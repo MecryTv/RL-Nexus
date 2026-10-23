@@ -1,0 +1,163 @@
+@use "mixins" as *;
+
+/* Ein Eintrag im Log. `--tone` kommt aus LogLine.tsx und färbt die Kategorie. */
+
+.list {
+    padding: var(--s-1) 0;
+    border: 1px solid var(--c-line);
+    background: var(--c-panel-solid);
+    font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+    font-size: 0.8125rem;
+    line-height: 1.55;
+}
+
+.row {
+    display: grid;
+    grid-template-columns: 6ch 8ch 14ch minmax(0, 1fr);
+    align-items: baseline;
+    column-gap: var(--s-3);
+    padding: 1px var(--s-3) 1px 0;
+    border-left: 3px solid transparent;
+    scroll-margin-block: 96px;
+
+    /* 400 Zeilen mit Stacktraces: Was nicht zu sehen ist, wird nicht gezeichnet. */
+    content-visibility: auto;
+    contain-intrinsic-size: auto 21px;
+
+    &:focus-visible {
+        @include focus-inset;
+    }
+
+    @include below(640px) {
+        grid-template-columns: auto auto minmax(0, 1fr);
+        padding: var(--s-1) var(--s-2) var(--s-1) var(--s-1);
+        border-bottom: 1px solid var(--c-line);
+    }
+}
+
+.error {
+    border-left-color: var(--c-loss);
+    background: color-mix(in srgb, var(--c-loss) 8%, transparent);
+}
+
+.warn {
+    border-left-color: var(--c-mod-engagement);
+    background: color-mix(in srgb, var(--c-mod-engagement) 7%, transparent);
+}
+
+.marked {
+    outline: 1px solid var(--c-blue);
+    outline-offset: -1px;
+    background: color-mix(in srgb, var(--c-blue) 14%, transparent);
+}
+
+.date {
+    grid-column: 1 / -1;
+    margin: var(--s-2) 0 var(--s-1) var(--s-3);
+    color: var(--c-text-dim);
+
+    @include label(0.72rem, 0.14em);
+}
+
+.number {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 2px;
+    color: var(--c-text-faint);
+    font-variant-numeric: tabular-nums;
+    user-select: none;
+
+    &:hover {
+        color: var(--c-blue);
+    }
+
+    &:focus-visible {
+        @include focus-ring;
+    }
+
+    @include below(640px) {
+        display: none;
+    }
+}
+
+/* In der Suche führt die Nummer in die Session: dort sichtbar, auch auf dem Handy. */
+.jump {
+    color: var(--c-blue);
+
+    &:hover {
+        color: var(--c-text);
+    }
+
+    @include below(640px) {
+        display: inline-flex;
+    }
+}
+
+.time {
+    color: var(--c-text-faint);
+    font-variant-numeric: tabular-nums;
+}
+
+.category {
+    overflow: hidden;
+    color: var(--tone);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.text {
+    min-width: 0;
+    color: var(--c-text);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+
+    @include below(640px) {
+        grid-column: 1 / -1;
+    }
+}
+
+.method {
+    color: var(--c-text-dim);
+}
+
+.status {
+    font-weight: 700;
+}
+
+.more,
+.fold {
+    grid-column: 4;
+    margin: 0;
+    color: var(--c-text-dim);
+
+    @include below(640px) {
+        grid-column: 1 / -1;
+    }
+}
+
+.more {
+    font: inherit;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.fold summary {
+    width: fit-content;
+    color: var(--c-blue);
+    cursor: pointer;
+
+    &:hover {
+        color: var(--c-text);
+    }
+
+    &:focus-visible {
+        @include focus-ring;
+    }
+}
+
+.row mark {
+    padding: 0 1px;
+    background: color-mix(in srgb, var(--c-mod-engagement) 35%, transparent);
+    color: var(--c-text);
+}

@@ -1,0 +1,143 @@
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@400;600;700&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  .rl { --base:#050608; --panel:#080d12; --solid:#0a0f15; --line:rgb(255 255 255 / 8%); --strong:rgb(255 255 255 / 14%);
+        --red:#ff1e2d; --win:#35e07f; --loss:#ff4d5e; --warn:#ffc53d; --blue:#00afff; --text:#f2f4f7; --dim:#a8b0bc; --faint:#8b95a3;
+        background:var(--base); color:var(--text); font-family:Oxanium,"Segoe UI",sans-serif; font-size:13px; line-height:1.45; padding:20px; border-radius:6px; width:100%; box-sizing:border-box; text-align:left; }
+  .rl h1 { font-size:22px; margin:0 0 2px; font-weight:700; }
+  .rl h4 { margin:0 0 8px; font-size:15px; }
+  .rl .sub { color:var(--dim); font-size:12.5px; margin:0 0 14px; }
+  .rl .lbl { font-family:Rajdhani,sans-serif; font-weight:700; letter-spacing:.14em; text-transform:uppercase; font-size:11px; color:var(--faint); }
+  .rl .panel { background:var(--panel); border:1px solid var(--line); padding:14px 16px; clip-path:polygon(0 0,calc(100% - 12px) 0,100% 12px,100% 100%,0 100%); }
+  .rl .row { display:flex; align-items:center; gap:10px; }
+  .rl .grow { flex:1; min-width:0; }
+  .rl .pill { font-family:Rajdhani,sans-serif; font-weight:700; letter-spacing:.12em; font-size:11px; padding:2px 8px; border:1px solid currentColor; text-transform:uppercase; white-space:nowrap; }
+  .rl .btn { font-family:Rajdhani,sans-serif; font-weight:700; letter-spacing:.12em; font-size:11.5px; padding:6px 12px; border:1px solid var(--strong); color:var(--text); text-transform:uppercase; white-space:nowrap; display:inline-block; }
+  .rl .btn.red { background:#d81424; border-color:#d81424; color:#fff; }
+  .rl .btn.ghost { border-color:transparent; color:var(--dim); }
+  .rl table { width:100%; border-collapse:collapse; font-size:12.5px; }
+  .rl td, .rl th { padding:7px 8px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; }
+  .rl th { font-family:Rajdhani,sans-serif; letter-spacing:.12em; text-transform:uppercase; color:var(--faint); font-size:11px; font-weight:700; white-space:nowrap; }
+  .rl tr.on td { background:rgb(255 30 45 / 7%); }
+  .rl .good { color:var(--win); } .rl .bad { color:var(--loss); } .rl .meh { color:var(--warn); } .rl .dim { color:var(--dim); } .rl .faint { color:var(--faint); }
+  .rl .side { background:var(--solid); border-left:1px solid var(--strong); padding:16px; }
+  .rl .entry { padding:10px 0; border-bottom:1px solid var(--line); }
+  .rl .entry:last-child { border-bottom:0; }
+  .rl .tag { font-family:Rajdhani,sans-serif; font-weight:700; font-size:10.5px; letter-spacing:.1em; padding:1px 6px; background:rgb(255 255 255 / 6%); color:var(--dim); text-transform:uppercase; }
+  .rl .tag.hand { background:rgb(0 175 255 / 14%); color:#7fd3ff; }
+  .rl .tag.safe { background:rgb(53 224 127 / 12%); color:var(--win); }
+  .rl .tabs { display:flex; gap:4px; border-bottom:1px solid var(--line); margin:10px 0 12px; }
+  .rl .tabs span { padding:7px 12px; color:var(--dim); font-weight:600; }
+  .rl .tabs span.on { color:var(--text); box-shadow:inset 0 -2px 0 var(--red); }
+  .rl .check { display:flex; gap:10px; align-items:flex-start; padding:8px 10px; border:1px solid var(--line); margin-bottom:6px; background:rgb(255 255 255 / 2%); }
+  .rl .check b { display:block; font-weight:600; }
+  .rl .box { width:16px; height:16px; border:1.5px solid var(--strong); flex:none; margin-top:2px; display:flex; align-items:center; justify-content:center; font-size:12px; }
+  .rl .box.on { background:#d81424; border-color:#d81424; color:#fff; }
+  .rl .warnbox { border:1px solid rgb(255 197 61 / 40%); background:rgb(255 197 61 / 8%); padding:10px 12px; color:#ffe2a0; font-size:12.5px; }
+  .rl .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .rl .kv { display:grid; grid-template-columns:max-content 1fr; gap:6px 16px; font-size:12.5px; }
+  .rl .kv span:nth-child(odd) { color:var(--dim); }
+  .rl .overlay { background:rgb(0 0 0 / 55%); padding:22px; border-radius:6px; }
+  .rl .dialog { max-width:620px; margin:0 auto; background:var(--solid); border:1px solid var(--strong); padding:20px; clip-path:polygon(0 0,calc(100% - 14px) 0,100% 14px,100% 100%,0 100%); }
+  .full { grid-template-columns:1fr !important; }
+  .full .card-image { aspect-ratio:auto; height:auto; min-height:0; padding:0; }
+  .note { font-size:13px; margin-top:6px; }
+</style>
+
+<h2>Datenbank-Backups: Entwurf</h2>
+<p class="subtitle">Jeder Server wird jede Nacht um 0:00 gesichert, mit allem: aktive Module, Einstellungen, eigene Nachrichten, Panels und die Daten der Mitglieder (Level, Tickets, Verwarnungen und so weiter). Admins und Developer können zusätzlich von Hand sichern, jedes Backup ansehen und auswählen, was zurückkommt. Oben zwei Möglichkeiten, wo das im Admin Dashboard wohnt; darunter das Ansehen und das Zurückladen, die bei beiden gleich sind. Werte sind Beispiele.</p>
+
+<div class="cards full">
+
+  <div class="card" data-choice="eigene-seite" onclick="toggleSelect(this)">
+    <div class="card-image"><div class="rl" style="padding:0">
+      <div style="display:grid;grid-template-columns:1.25fr 1fr">
+        <div style="padding:20px">
+          <div class="row"><div class="grow"><h1>Backups</h1><p class="sub">Jede Nacht um 0:00 für alle Server · letzte Runde heute 0:00, 27 von 27 gesichert</p></div><span class="btn">Alle jetzt sichern</span></div>
+          <div class="panel" style="padding:0 0 4px">
+            <table>
+              <tr><th>Server</th><th>Letztes Backup</th><th>Backups</th><th>Größe</th></tr>
+              <tr class="on"><td><b>RL Nexus</b><div class="faint">4.812 Mitglieder</div></td><td><span class="good">●</span> heute 0:00</td><td>14</td><td>8,4 MB</td></tr>
+              <tr><td><b>Lamina eSports</b><div class="faint">1.204 Mitglieder</div></td><td><span class="good">●</span> heute 0:00</td><td>14</td><td>2,1 MB</td></tr>
+              <tr><td><b>Rocket Liga Nord</b><div class="faint">388 Mitglieder</div></td><td><span class="meh">●</span> gestern 0:00 <div class="meh">heute fehlgeschlagen</div></td><td>13</td><td>0,9 MB</td></tr>
+              <tr><td><b>Dachrl Cup</b><div class="faint">96 Mitglieder</div></td><td><span class="good">●</span> heute 0:00</td><td>9</td><td>0,2 MB</td></tr>
+            </table>
+          </div>
+        </div>
+        <div class="side">
+          <div class="row"><b class="grow" style="font-size:16px">RL Nexus</b><span class="btn red">+ Jetzt sichern</span></div>
+          <p class="sub" style="margin:6px 0 10px">14 Backups · die nächtlichen bleiben 14 Tage, von Hand angelegte bis du sie löschst</p>
+          <div class="entry"><div class="row"><span class="tag hand">von Hand</span><b class="grow">Heute 13:42</b><span class="dim">8,4 MB</span></div><div class="faint">von Joe · „vor Umbau der Tickets“</div><div style="margin-top:6px"><span class="btn ghost">Ansehen</span> <span class="btn">Zurückladen</span></div></div>
+          <div class="entry"><div class="row"><span class="tag">0:00</span><b class="grow">Heute 0:00</b><span class="dim">8,3 MB</span></div><div style="margin-top:6px"><span class="btn ghost">Ansehen</span> <span class="btn">Zurückladen</span></div></div>
+          <div class="entry"><div class="row"><span class="tag safe">vor Zurückladen</span><b class="grow">Gestern 18:05</b><span class="dim">8,3 MB</span></div><div class="faint">automatisch, bevor Joe „16.10. 0:00“ zurückgeladen hat</div></div>
+          <div class="entry"><div class="row"><span class="tag">0:00</span><b class="grow">Gestern 0:00</b><span class="dim">8,2 MB</span></div></div>
+          <div class="faint" style="margin-top:6px">… 10 weitere</div>
+        </div>
+      </div>
+    </div></div>
+    <div class="card-body"><h3>A · Eigene Seite „Backups“ unter Bot</h3><p>Ein neuer Punkt im Menü. Die Tabelle zeigt alle Server mit dem Stand der letzten Sicherung, ein fehlgeschlagenes Backup fällt sofort auf. Klick auf einen Server öffnet rechts seine Backups. Oben „Alle jetzt sichern“.</p></div>
+  </div>
+
+  <div class="card" data-choice="im-server" onclick="toggleSelect(this)">
+    <div class="card-image"><div class="rl">
+      <div class="row"><div class="grow"><h1>Server</h1><p class="sub">Der Bot ist auf 27 Servern</p></div></div>
+      <div class="panel">
+        <div class="row"><b class="grow" style="font-size:15px">RL Nexus</b><span class="dim">4.812 Mitglieder · 9 Module</span><span class="lbl">▴</span></div>
+        <div class="tabs"><span>Übersicht</span><span class="on">Backups</span></div>
+        <div class="row" style="margin-bottom:8px"><span class="dim grow">Letztes Backup heute 0:00 · 14 gespeichert · 8,4 MB</span><span class="btn red">+ Jetzt sichern</span></div>
+        <table>
+          <tr><th>Wann</th><th>Art</th><th>Größe</th><th></th></tr>
+          <tr><td>Heute 13:42</td><td><span class="tag hand">von Hand</span> <span class="faint">„vor Umbau der Tickets“</span></td><td>8,4 MB</td><td style="text-align:right"><span class="btn ghost">Ansehen</span> <span class="btn">Zurückladen</span></td></tr>
+          <tr><td>Heute 0:00</td><td><span class="tag">0:00</span></td><td>8,3 MB</td><td style="text-align:right"><span class="btn ghost">Ansehen</span> <span class="btn">Zurückladen</span></td></tr>
+          <tr><td>Gestern 18:05</td><td><span class="tag safe">vor Zurückladen</span></td><td>8,3 MB</td><td style="text-align:right"><span class="btn ghost">Ansehen</span> <span class="btn">Zurückladen</span></td></tr>
+        </table>
+      </div>
+      <div class="panel" style="margin-top:8px"><div class="row"><b class="grow">Lamina eSports</b><span class="dim">1.204 Mitglieder · 6 Module</span><span class="lbl">▾</span></div></div>
+    </div></div>
+    <div class="card-body"><h3>B · Im Server-Eintrag</h3><p>Kein neuer Menüpunkt: Auf der Seite <i>Server</i> bekommt der aufgeklappte Server einen Reiter „Backups“. Alles zu einem Server an einer Stelle, dafür fehlt der Überblick, ob überall die Nacht-Sicherung geklappt hat.</p></div>
+  </div>
+</div>
+
+<div class="section" style="margin-top:26px">
+  <p class="label">Backup ansehen (bei A und B gleich)</p>
+  <div class="rl"><div class="panel">
+    <div class="row"><h4 class="grow" style="margin:0">RL Nexus · Backup von heute 0:00</h4><span class="dim">8,3 MB · 41.208 Einträge</span><span class="btn">Zurückladen …</span></div>
+    <div class="grid2" style="margin-top:12px">
+      <div><p class="lbl" style="margin:0 0 6px">Eingerichtet</p><div class="kv">
+        <span>Aktive Module</span><span>9 (Tickets, Level, Willkommen, Moderation, …)</span>
+        <span>Einstellungen der Module</span><span>9</span>
+        <span>Eigene Nachrichten</span><span>12</span>
+        <span>Rollen-Panels</span><span>3 mit 18 Rollen</span>
+        <span>Bewerbungsformulare</span><span>2</span>
+        <span>Auto-Antworten</span><span>7</span>
+        <span>Voice-Hubs und Vorlagen</span><span>2 · 4</span>
+        <span>Stream-Hinweise</span><span>5</span></div></div>
+      <div><p class="lbl" style="margin:0 0 6px">Daten der Mitglieder</p><div class="kv">
+        <span>Level und Aktivität</span><span>4.212 Mitglieder</span>
+        <span>Tickets und Transcripts</span><span>318 · 290</span>
+        <span>Verwarnungen und Fälle</span><span>146</span>
+        <span>Giveaways und Umfragen</span><span>21 · 9</span>
+        <span>Teams und Clubs</span><span>14 · 3</span>
+        <span>Clips</span><span>88</span>
+        <span>6-Mans</span><span>1.042 Spiele</span></div></div>
+    </div>
+  </div></div>
+</div>
+
+<div class="section" style="margin-top:26px">
+  <p class="label">Zurückladen mit Auswahl (bei A und B gleich)</p>
+  <div class="rl"><div class="overlay"><div class="dialog">
+    <h4 style="font-size:17px">Was soll zurückkommen?</h4>
+    <p class="sub">Aus dem Backup von <b style="color:var(--text)">heute 0:00</b> für <b style="color:var(--text)">RL Nexus</b>. Was du auswählst, wird durch den Stand von 0:00 ersetzt. Alles andere bleibt, wie es jetzt ist.</p>
+    <div class="row" style="margin-bottom:8px"><p class="lbl grow" style="margin:0">Eingerichtet</p><span class="faint">alle an · alle aus</span></div>
+    <div class="check"><span class="box on">✓</span><div><b>Aktive Module und ihre Einstellungen</b><span class="faint">9 Module</span></div></div>
+    <div class="check"><span class="box on">✓</span><div><b>Eigene Nachrichten, Rollen-Panels, Formulare, Auto-Antworten</b><span class="faint">Die Panels postet der Bot danach neu in ihre Kanäle</span></div></div>
+    <div class="check"><span class="box"></span><div><b>Voice-Hubs und Stream-Hinweise</b><span class="faint">2 Hubs, 5 Hinweise</span></div></div>
+    <div class="row" style="margin:12px 0 8px"><p class="lbl grow" style="margin:0">Daten der Mitglieder</p><span class="faint">alle an · alle aus</span></div>
+    <div class="check"><span class="box on">✓</span><div><b>Level und Aktivität</b><span class="meh">Fortschritt seit 0:00 geht verloren (13 Std.)</span></div></div>
+    <div class="check"><span class="box"></span><div><b>Tickets, Verwarnungen, Giveaways, Teams, Clips, 6-Mans</b><span class="faint">einzeln aufklappbar</span></div></div>
+    <div class="warnbox" style="margin-top:12px">Vorher legt der Bot automatisch ein Backup vom jetzigen Stand an. Damit lässt sich das Zurückladen rückgängig machen.</div>
+    <div class="row" style="margin-top:14px"><span class="grow faint">Zum Bestätigen den Servernamen eintippen: <span style="border-bottom:1px solid var(--strong);padding:0 40px">RL Nexus</span></span><span class="btn ghost">Abbrechen</span><span class="btn red">Zurückladen</span></div>
+  </div></div></div>
+  <p class="subtitle note">Das automatische Backup vor dem Zurückladen ist mein Vorschlag als Sicherheitsnetz. Das Eintippen des Namens verhindert, dass jemand aus Versehen den falschen Server zurücksetzt.</p>
+</div>

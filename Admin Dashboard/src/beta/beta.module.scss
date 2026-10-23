@@ -1,0 +1,118 @@
+@use "mixins" as *;
+
+/* Bot → Beta Access (Plan 22). Tabellen, Kästen und Sätze kommen aus shop.module.scss. */
+
+.status {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-3);
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--s-4);
+    padding: var(--s-3) var(--s-4);
+    color: var(--c-text-dim);
+    font-size: 0.875rem;
+    line-height: 1.5;
+
+    p {
+        flex: 1;
+        min-width: min(100%, 280px);
+        margin: 0;
+    }
+
+    b {
+        color: var(--c-text);
+    }
+}
+
+.on {
+    border-color: color-mix(in srgb, var(--c-purple) 40%, transparent);
+    background: color-mix(in srgb, var(--c-purple) 8%, transparent);
+}
+
+.statusLink {
+    color: var(--c-text);
+    font-size: 0.8125rem;
+    white-space: nowrap;
+}
+
+.grid {
+    display: grid;
+    gap: var(--s-4);
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    align-items: start;
+    margin-bottom: var(--s-5);
+
+    @include below(599px) {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+.form {
+    display: grid;
+    gap: var(--s-3);
+    justify-items: start;
+
+    > div {
+        width: 100%;
+    }
+}
+
+.fresh {
+    display: grid;
+    gap: var(--s-2);
+    padding-top: var(--s-3);
+    border-top: 1px solid var(--c-line);
+
+    ul {
+        display: grid;
+        gap: var(--s-1);
+        margin: 0;
+        padding: 0;
+        list-style: none;
+    }
+}
+
+.steps {
+    display: grid;
+    gap: var(--s-2);
+    margin: 0;
+    padding-left: 20px;
+    color: var(--c-text-dim);
+    font-size: 0.875rem;
+    line-height: 1.5;
+}
+
+.section {
+    margin-bottom: var(--s-5);
+}
+
+.heading {
+    margin: 0 0 var(--s-3);
+    color: var(--c-text-faint);
+
+    @include label(0.75rem, 0.16em);
+}
+
+.empty {
+    margin: 0;
+    color: var(--c-text-faint);
+    font-size: 0.875rem;
+}
+
+.table tbody tr {
+    cursor: default;
+}
+
+.note {
+    max-width: 260px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.action {
+    width: 1%;
+    text-align: right;
+    white-space: nowrap;
+}

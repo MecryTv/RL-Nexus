@@ -1,0 +1,43 @@
+@use "mixins" as *;
+
+.box {
+    display: flex;
+    flex: 1 1 300px;
+    align-items: center;
+    gap: 12px;
+    padding: 0 16px;
+    height: 48px;
+    border: 1px solid var(--c-line-strong);
+    transition: border-color var(--t-fast);
+    background: rgb(8 13 18 / 70%);
+    color: var(--c-text-faint);
+
+    @include bevel-diagonal(11px);
+
+    &:focus-within {
+        border-color: var(--c-red);
+        color: var(--c-red);
+    }
+}
+
+.input {
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    background: none;
+    color: var(--c-text);
+    font-size: 0.95rem;
+
+    &::placeholder {
+        color: var(--c-text-faint);
+    }
+
+    &:focus {
+        outline: none;
+    }
+
+    /* Das eigene Kreuz des Browsers passt nicht ins dunkle Feld. */
+    &::-webkit-search-cancel-button {
+        appearance: none;
+    }
+}

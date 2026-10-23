@@ -1,0 +1,398 @@
+@use "mixins" as *;
+
+/* Die Preisseite nach Entwurf A (brainstorm/preisseite.html). */
+
+.page {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-gap);
+}
+
+/* --- Anmeldung im Kopf ---------------------------------------------------- */
+.account {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 14px;
+    margin-top: 6px;
+}
+
+.who {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 10px 8px 12px;
+    background: rgb(88 101 242 / 10%);
+    box-shadow: inset 0 0 0 1px rgb(88 101 242 / 35%);
+    color: var(--c-text-dim);
+    font-size: 0.95rem;
+
+    b {
+        color: var(--c-text);
+    }
+
+    @include bevel-diagonal(10px);
+}
+
+.avatar {
+    display: inline-grid;
+    flex: none;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--c-purple), var(--c-blue));
+    color: var(--c-text);
+    font-family: var(--f-display);
+    font-weight: 700;
+    object-fit: cover;
+    place-items: center;
+}
+
+.closed {
+    padding: 7px 12px;
+    background: rgb(255 30 45 / 12%);
+    box-shadow: inset 0 0 0 1px rgb(255 30 45 / 40%);
+    color: var(--c-red-bright);
+
+    @include label(0.74rem, 0.14em);
+}
+
+/* --- Hinweise --------------------------------------------------------------- */
+.notice,
+.failure {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 14px 18px;
+    background: rgb(0 175 255 / 8%);
+    box-shadow: inset 0 0 0 1px rgb(0 175 255 / 35%);
+    color: var(--c-text);
+    line-height: 1.5;
+
+    @include bevel-diagonal(10px);
+}
+
+.failure {
+    max-width: 640px;
+    background: rgb(255 77 94 / 8%);
+    box-shadow: inset 0 0 0 1px rgb(255 77 94 / 40%);
+}
+
+.noticeClose {
+    min-width: 44px;
+    min-height: 44px;
+    border: 0;
+    background: transparent;
+    color: var(--c-text-dim);
+    cursor: pointer;
+    font-size: 1.4rem;
+
+    &:hover {
+        color: var(--c-text);
+    }
+
+    &:focus-visible {
+        @include focus-ring;
+    }
+}
+
+/* --- Tags ------------------------------------------------------------------- */
+.tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.tag {
+    display: inline-block;
+    padding: 3px 8px;
+
+    @include label(0.7rem, 0.14em);
+}
+
+/* Weiß auf dem hellen Rot hatte nur 3,8:1. Etwas dunkler sind es über 5:1. */
+.tagRed {
+    background: color-mix(in srgb, var(--c-red) 82%, #000);
+    color: #fff;
+}
+
+.tagBlue {
+    background: rgb(0 175 255 / 14%);
+    box-shadow: inset 0 0 0 1px rgb(0 175 255 / 40%);
+    color: var(--c-blue);
+}
+
+.tagGold {
+    background: rgb(255 197 61 / 12%);
+    box-shadow: inset 0 0 0 1px rgb(255 197 61 / 35%);
+    color: var(--c-mod-engagement);
+}
+
+.tagGreen {
+    background: rgb(53 224 127 / 12%);
+    box-shadow: inset 0 0 0 1px rgb(53 224 127 / 35%);
+    color: var(--c-win);
+}
+
+/* --- Testleiste ------------------------------------------------------------- */
+.trial {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 16px 18px;
+    padding: 16px 20px;
+    background: linear-gradient(90deg, rgb(53 224 127 / 12%), rgb(53 224 127 / 3%));
+    box-shadow: inset 0 0 0 1px rgb(53 224 127 / 30%);
+
+    @include bevel-diagonal(12px);
+}
+
+.trialUsed {
+    background: rgb(255 255 255 / 3%);
+    box-shadow: inset 0 0 0 1px var(--c-line-strong);
+
+    .tagGreen {
+        opacity: 0.6;
+    }
+}
+
+.trialText {
+    flex: 1 1 260px;
+
+    b {
+        font-size: 1.06rem;
+    }
+
+    p {
+        margin-top: 2px;
+        color: var(--c-text-dim);
+        font-size: 0.9rem;
+    }
+}
+
+.trialError {
+    color: var(--c-loss) !important;
+}
+
+.trialButton {
+    color: var(--c-win);
+}
+
+/* --- Karten ----------------------------------------------------------------- */
+.grid {
+    display: grid;
+    align-items: end;
+    gap: 18px;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+}
+
+.card {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 24px 22px;
+
+    @include panel(var(--c-line-strong), var(--c-panel-solid), 16px);
+}
+
+.highlighted {
+    padding-block: 32px;
+
+    @include panel(linear-gradient(160deg, var(--c-red), rgb(255 30 45 / 25%) 40%, rgb(0 175 255 / 40%)), var(--c-panel-solid), 16px);
+    @include glow(rgb(255 30 45 / 25%), 22px);
+}
+
+.cardTitle {
+    margin-top: 4px;
+    font-family: var(--f-display);
+    font-size: 1.3rem;
+    font-weight: 700;
+}
+
+.cardMeta {
+    color: var(--c-text-dim);
+    font-size: 0.88rem;
+
+    @include label(0.74rem, 0.12em);
+}
+
+.cardText {
+    color: var(--c-text-dim);
+    font-size: 0.92rem;
+    line-height: 1.5;
+}
+
+.price {
+    margin-top: 6px;
+    font-family: var(--f-accent);
+    font-size: 1.9rem;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+
+    small {
+        margin-left: 6px;
+        color: var(--c-text-dim);
+
+        @include label(0.8rem, 0.1em);
+    }
+}
+
+.features {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 8px;
+    padding: 0;
+    color: var(--c-text-dim);
+    font-size: 0.92rem;
+    line-height: 1.4;
+    list-style: none;
+
+    li {
+        display: flex;
+        align-items: flex-start;
+        gap: 9px;
+    }
+}
+
+.featureIcon {
+    flex: none;
+    margin-top: 1px;
+    color: var(--c-win);
+}
+
+.cardAction {
+    margin-top: auto;
+    padding-top: 14px;
+}
+
+.cardNote {
+    color: var(--c-text-dim);
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+
+.wide {
+    width: 100%;
+}
+
+.empty {
+    color: var(--c-text-dim);
+}
+
+.tax {
+    /* text-dim statt text-faint: Der Satz muss lesbar sein (mindestens 4,5:1). */
+    color: var(--c-text-dim);
+    font-size: 0.82rem;
+    text-align: center;
+}
+
+/* --- Dev-Leiste (nur mit --dev) ----------------------------------------------- */
+.dev {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 14px;
+    padding: 12px 16px;
+    margin-top: 10px;
+    background: rgb(10 15 21 / 96%);
+    outline: 1px dashed var(--c-mod-utility);
+    outline-offset: -1px;
+}
+
+.tagDev {
+    background: rgb(255 138 61 / 14%);
+    box-shadow: inset 0 0 0 1px rgb(255 138 61 / 45%);
+    color: var(--c-mod-utility);
+}
+
+.devText {
+    flex: 1 1 240px;
+    color: var(--c-text-dim);
+    font-size: 0.84rem;
+}
+
+.devActions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
+.devSelect select {
+    min-height: 44px;
+    padding: 0 10px;
+    border: 0;
+    background: var(--c-panel-solid);
+    box-shadow: inset 0 0 0 1px var(--c-line-strong);
+    color: var(--c-text);
+    font: inherit;
+
+    &:focus-visible {
+        @include focus-ring;
+    }
+}
+
+.devError {
+    width: 100%;
+    color: var(--c-loss);
+    font-size: 0.86rem;
+}
+
+/* --- Fragen ----------------------------------------------------------------- */
+.faq {
+    display: grid;
+    align-items: start;
+    gap: 10px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+
+    @include below(900px) {
+        grid-template-columns: 1fr;
+    }
+
+    details {
+        background: var(--c-panel-solid);
+        box-shadow: inset 0 0 0 1px var(--c-line);
+    }
+
+    summary {
+        display: flex;
+        min-height: 44px;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 12px 16px;
+        color: var(--c-text);
+        cursor: pointer;
+        font-size: 0.95rem;
+        list-style: none;
+
+        &::-webkit-details-marker {
+            display: none;
+        }
+
+        &::after {
+            color: var(--c-text-faint);
+            content: "+";
+            font-size: 1.2rem;
+        }
+
+        &:focus-visible {
+            @include focus-ring;
+        }
+    }
+
+    details[open] summary::after {
+        content: "–";
+    }
+
+    details p {
+        padding: 0 16px 14px;
+        color: var(--c-text-dim);
+        font-size: 0.92rem;
+        line-height: 1.6;
+    }
+}

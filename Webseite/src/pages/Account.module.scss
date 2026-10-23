@@ -1,0 +1,116 @@
+@use "mixins" as *;
+
+/* „Mein Zugang“ und „Kündigen“ nach Entwurf Teil 2 (brainstorm/zugang-kuendigen-mails.html). */
+
+.page {
+    max-width: 640px;
+}
+
+.card {
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+    padding: clamp(22px, 3.4vw, 32px);
+}
+
+.person {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 14px;
+
+    b {
+        display: block;
+        color: var(--c-text);
+        font-size: 1.1rem;
+    }
+
+    small {
+        color: var(--c-text-faint);
+        font-size: 0.85rem;
+    }
+}
+
+.status {
+    margin-left: auto;
+}
+
+/* Zeilen wie im Entwurf: links die Frage, rechts die Antwort. */
+.rows {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+
+    div {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        gap: 4px 16px;
+        padding: 11px 0;
+        border-bottom: 1px solid var(--c-line);
+    }
+
+    dt {
+        color: var(--c-text-dim);
+    }
+
+    dd {
+        margin: 0;
+        color: var(--c-text);
+        font-weight: 600;
+        text-align: right;
+    }
+}
+
+.text {
+    margin: 0;
+    color: var(--c-text-dim);
+    line-height: 1.6;
+
+    a {
+        color: var(--c-blue);
+        text-decoration: underline;
+        text-underline-offset: 3px;
+    }
+}
+
+.actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+}
+
+.note {
+    margin: 0;
+    color: var(--c-text-faint);
+    font-size: 0.85rem;
+    line-height: 1.5;
+}
+
+.problem {
+    margin: 0;
+    padding: 10px 14px;
+    border-left: 3px solid var(--c-loss);
+    background: rgb(255 77 94 / 10%);
+    color: var(--c-text);
+}
+
+/* Schritt 2: Die Überschrift bekommt den Fokus, ohne Rahmen sähe man es nicht. */
+.done h2 {
+    margin: 0;
+    color: var(--c-text);
+    font-size: 1.3rem;
+
+    &:focus-visible {
+        outline: 2px solid var(--c-blue);
+        outline-offset: 4px;
+    }
+}
+
+.step {
+    margin: 0;
+    color: var(--c-text-faint);
+
+    @include label(0.68rem, 0.14em);
+}

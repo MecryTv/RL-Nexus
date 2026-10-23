@@ -1,0 +1,57 @@
+.page {
+    display: grid;
+    min-height: 100dvh;
+    padding: var(--s-5) var(--s-4);
+    place-items: center;
+}
+
+.card {
+    display: grid;
+    width: min(100%, 440px);
+    padding: var(--s-6) var(--s-5);
+    gap: var(--s-4);
+    justify-items: center;
+    text-align: center;
+}
+
+.logo {
+    width: 72px;
+    height: 72px;
+}
+
+.title {
+    font-family: var(--f-accent);
+    font-size: 1.35rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+
+    span {
+        color: var(--c-red);
+    }
+}
+
+.lead {
+    color: var(--c-text-dim);
+    font-size: 0.9375rem;
+}
+
+.denied {
+    display: flex;
+    width: 100%;
+    padding: var(--s-3);
+    gap: var(--s-3);
+    border-left: 3px solid var(--c-loss);
+    background: color-mix(in srgb, var(--c-loss) 8%, transparent);
+    font-size: 0.9rem;
+    text-align: left;
+
+    > svg {
+        flex-shrink: 0;
+        margin-top: 2px;
+        color: var(--c-loss);
+    }
+}
+
+.deniedTitle {
+    font-weight: 700;
+}

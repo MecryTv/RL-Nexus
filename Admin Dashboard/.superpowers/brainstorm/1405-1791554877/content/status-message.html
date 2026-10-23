@@ -1,0 +1,140 @@
+<style>
+  .cards.dc { grid-template-columns: 1fr !important; max-width: 760px; }
+  .dc-chat { background:#313338; padding:16px 16px 18px; font-family: "gg sans", "Noto Sans", "Helvetica Neue", Arial, sans-serif; color:#dbdee1; font-size:15px; line-height:1.375; }
+  .dc-head { display:flex; align-items:center; gap:8px; margin-bottom:4px; }
+  .dc-av { width:40px; height:40px; border-radius:50%; background:#111; display:grid; place-items:center; color:#ff1e2d; font-weight:800; font-size:16px; flex-shrink:0; }
+  .dc-name { color:#fff; font-weight:600; }
+  .dc-app { background:#5865f2; color:#fff; font-size:10px; font-weight:700; padding:1px 4px; border-radius:3px; }
+  .dc-time { color:#949ba4; font-size:12px; }
+  .dc-msg { margin-left:48px; }
+  .box { background:#2b2d31; border:1px solid #3f4147; border-left:4px solid #23a55a; border-radius:8px; padding:12px 14px; max-width:560px; }
+  .box.warn { border-left-color:#f0b232; }
+  .img { width:100%; border-radius:6px; display:block; margin-bottom:10px; }
+  .h2 { font-size:20px; font-weight:700; color:#f2f3f5; margin:2px 0; }
+  .h3 { font-size:16px; font-weight:700; color:#f2f3f5; margin:0 0 2px; }
+  .sub { color:#949ba4; font-size:12.5px; }
+  .ts { background:#3f4147; border-radius:3px; padding:0 3px; }
+  .sep { height:1px; background:#3f4147; margin:10px 0; }
+  .sep.space { background:transparent; margin:6px 0; }
+  .row { display:flex; gap:12px; align-items:flex-start; }
+  .row .t { flex:1; min-width:0; }
+  .lbtn { display:inline-flex; align-items:center; gap:6px; padding:5px 12px; background:#4e5058; color:#fff; border-radius:4px; font-size:14px; font-weight:500; white-space:nowrap; }
+  .lbtn::after { content:"↗"; font-size:12px; opacity:.8; }
+  .btns { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
+  .pill { display:inline-block; margin-right:10px; white-space:nowrap; }
+  .code { font-family: Consolas, monospace; font-size:13px; background:#1e1f22; padding:1px 4px; border-radius:3px; }
+  .bar { font-family: Consolas, monospace; letter-spacing:1px; font-size:13px; }
+  .g { color:#23a55a; } .y { color:#f0b232; } .r { color:#f23f43; }
+  .thumb { width:48px; height:48px; border-radius:6px; background:#1e1f22; display:grid; place-items:center; font-size:22px; flex-shrink:0; }
+  .grid2 { display:grid; grid-template-columns: 1fr 1fr; gap:6px 14px; }
+</style>
+
+<h2>Wie soll die Statusmeldung in Discord aussehen?</h2>
+<p class="subtitle">Drei Entwürfe, so wie Discord sie mit Components V2 zeichnen kann: Container mit Farbrand, Banner, Text mit Überschriften und Kleingedrucktem, Trennlinien, Abschnitte mit Knopf rechts und Link-Knöpfe. Zahlen wie auf deinem Bild. Klick an, was dir gefällt.</p>
+
+<div class="cards dc">
+
+  <div class="card" data-choice="a-uebersicht" onclick="toggleSelect(this)">
+    <div class="dc-chat">
+      <div class="dc-head"><span class="dc-av">N</span><span class="dc-name">RL Nexus</span><span class="dc-app">APP</span><span class="dc-time">heute um 09:11</span></div>
+      <div class="dc-msg"><div class="box">
+        <img class="img" src="files/status-banner.webp" alt="">
+        <div class="h2">🟢 Alles läuft</div>
+        <div class="sub">Geprüft <span class="ts">vor 1 Minute</span> · alle 2 Minuten neu</div>
+        <div class="sep space"></div>
+        <div><span class="pill">🟢 Bot</span><span class="pill">🟢 Bot-Dashboard</span><span class="pill">🟢 Webseite</span><span class="pill">🟢 Datenbank</span></div>
+        <div class="sep"></div>
+
+        <div class="row"><div class="t">
+          <div class="h3">🤖 Bot</div>
+          Online seit <span class="ts">2 Stunden</span> · Ping <b>130 ms</b><br>
+          <b>2</b> Server · <b>13</b> Mitglieder · <b>159 MB</b> Speicher
+          <div class="sub">Version 1.0.0 · discord.js 14.27.0 · Node v24.15.0</div>
+        </div></div>
+        <div class="sep"></div>
+
+        <div class="row"><div class="t">
+          <div class="h3">🖥️ Bot-Dashboard</div>
+          Online · antwortet in <b>42 ms</b>
+          <div class="sub">Läuft im selben Prozess wie der Bot</div>
+        </div><span class="lbtn">Öffnen</span></div>
+        <div class="sep"></div>
+
+        <div class="row"><div class="t">
+          <div class="h3">🌐 Webseite</div>
+          Online · gebaut <span class="ts">heute 10:28</span><br>
+          Banner: aus
+        </div><span class="lbtn">Öffnen</span></div>
+        <div class="sep"></div>
+
+        <div class="h3">⚙️ Dahinter</div>
+        <div class="grid2">
+          <span>🗄️ MariaDB 11.4.13</span><span class="sub" style="font-size:14px">52 Tabellen · 2 MB</span>
+          <span>🛡️ Admin Dashboard</span><span class="sub" style="font-size:14px">seit 2 Min. · 94 MB</span>
+          <span>📬 Kontakt</span><span class="sub" style="font-size:14px">keine offenen Nachrichten</span>
+        </div>
+        <div class="btns"><span class="lbtn">Webseite</span><span class="lbtn">Bot-Dashboard</span><span class="lbtn">Admin Dashboard</span></div>
+      </div></div>
+    </div>
+    <div class="card-body"><h3>A · Aufgeräumt mit Schnellübersicht</h3><p>Oben in einer Zeile, wie es allen geht. Jeder Bereich hat zwei Zeilen statt fünf, mit „Öffnen“ rechts. Unten Knöpfe zu Webseite und Dashboards.</p></div>
+  </div>
+
+  <div class="card" data-choice="b-verlauf" onclick="toggleSelect(this)">
+    <div class="dc-chat">
+      <div class="dc-head"><span class="dc-av">N</span><span class="dc-name">RL Nexus</span><span class="dc-app">APP</span><span class="dc-time">heute um 09:11</span></div>
+      <div class="dc-msg"><div class="box">
+        <img class="img" src="files/status-banner.webp" alt="">
+        <div class="h2">🟢 Alles läuft</div>
+        <div class="sub">Geprüft <span class="ts">vor 1 Minute</span> · Verlauf der letzten 24 Stunden, ein Kästchen je 2 Stunden</div>
+        <div class="sep"></div>
+
+        <div class="row"><div class="t">
+          <div class="h3">🤖 Bot · <span class="g">99,8 %</span></div>
+          <span class="bar">🟩🟩🟩🟩🟩🟩🟩🟩🟨🟩🟩🟩</span><br>
+          Online seit <span class="ts">2 Stunden</span> · Ping <b>130 ms</b> · <b>2</b> Server · <b>13</b> Mitglieder
+          <div class="sub">Letzter Ausfall <span class="ts">heute 07:02</span>, 4 Minuten (Neustart)</div>
+        </div></div>
+        <div class="sep"></div>
+
+        <div class="row"><div class="t">
+          <div class="h3">🖥️ Bot-Dashboard · <span class="g">99,8 %</span></div>
+          <span class="bar">🟩🟩🟩🟩🟩🟩🟩🟩🟨🟩🟩🟩</span><br>
+          Online · antwortet in <b>42 ms</b>
+        </div><span class="lbtn">Öffnen</span></div>
+        <div class="sep"></div>
+
+        <div class="row"><div class="t">
+          <div class="h3">🌐 Webseite · <span class="g">100 %</span></div>
+          <span class="bar">🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩</span><br>
+          Online · gebaut <span class="ts">heute 10:28</span> · Banner aus
+        </div><span class="lbtn">Öffnen</span></div>
+        <div class="sep"></div>
+
+        <div class="h3">⚙️ Dahinter</div>
+        🗄️ MariaDB 11.4.13 · 52 Tabellen · 2 MB<br>
+        🛡️ Admin Dashboard seit <span class="ts">2 Min.</span> · 📬 keine offenen Nachrichten
+        <div class="btns"><span class="lbtn">Webseite</span><span class="lbtn">Bot-Dashboard</span><span class="lbtn">Admin Dashboard</span></div>
+      </div></div>
+    </div>
+    <div class="card-body"><h3>B · Wie A, dazu Verlauf der letzten 24 Stunden</h3><p>Je Bereich eine Leiste aus zwölf Kästchen (grün ok, gelb eingeschränkt, rot weg), die Verfügbarkeit in Prozent und der letzte Ausfall. Dafür merkt sich das Admin Dashboard jede Prüfung in der Datenbank.</p></div>
+  </div>
+
+  <div class="card" data-choice="c-kompakt" onclick="toggleSelect(this)">
+    <div class="dc-chat">
+      <div class="dc-head"><span class="dc-av">N</span><span class="dc-name">RL Nexus</span><span class="dc-app">APP</span><span class="dc-time">heute um 09:11</span></div>
+      <div class="dc-msg"><div class="box">
+        <img class="img" src="files/status-banner.webp" alt="">
+        <div class="h2">🟢 Alles läuft</div>
+        <div class="sub">Geprüft <span class="ts">vor 1 Minute</span></div>
+        <div class="sep"></div>
+        🟢 <b>Bot</b> · online seit <span class="ts">2 Stunden</span> · 130 ms<br>
+        🟢 <b>Bot-Dashboard</b> · online<br>
+        🟢 <b>Webseite</b> · online · Banner aus<br>
+        🟢 <b>Datenbank</b> · MariaDB 11.4.13<br>
+        📬 <b>Kontakt</b> · nichts offen
+        <div class="btns"><span class="lbtn">Webseite</span><span class="lbtn">Bot-Dashboard</span><span class="lbtn">Admin Dashboard</span></div>
+      </div></div>
+    </div>
+    <div class="card-body"><h3>C · Kompakt</h3><p>Eine Zeile je Bereich, nichts Technisches. Für Mitglieder gut lesbar, für dich als Developer zu wenig. Details stehen dann nur noch im Admin Dashboard.</p></div>
+  </div>
+</div>

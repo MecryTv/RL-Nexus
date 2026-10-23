@@ -1,0 +1,3 @@
+# Netlify: jede Adresse an die App, damit /module/rl-tracking auch beim direkten
+# Aufruf und beim Neuladen ankommt statt als 404 des Servers.
+/*  /index.html  200

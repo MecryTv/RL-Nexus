@@ -1,0 +1,38 @@
+.dialog {
+    width: min(460px, calc(100vw - 2 * var(--s-4)));
+    max-width: none;
+    /* Mittig. Der Reset `* { margin: 0 }` nimmt dem Browser sonst sein margin: auto für modale Dialoge. */
+    margin: auto;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--c-text);
+
+    &::backdrop {
+        background: rgb(0 0 0 / 65%);
+    }
+}
+
+.panel {
+    /* Deckend: Durch die Glas-Füllung schiene sonst die Seite darunter durch den Text. */
+    --c-panel-fill: var(--c-panel-solid);
+
+    display: grid;
+    padding: var(--s-5);
+    gap: var(--s-4);
+}
+
+.title {
+    font-size: 1.15rem;
+}
+
+.body {
+    color: var(--c-text-dim);
+}
+
+.actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: var(--s-2);
+}

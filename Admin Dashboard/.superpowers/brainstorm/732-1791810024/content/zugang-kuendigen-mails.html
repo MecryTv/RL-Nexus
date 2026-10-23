@@ -1,0 +1,182 @@
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800&family=Oxanium:wght@400;600;700&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  .pp {
+    --c-base:#050608; --c-line:rgb(255 255 255 / 8%); --c-line-strong:rgb(255 255 255 / 14%);
+    --c-red:#ff1e2d; --c-red-bright:#ff3344; --c-red-deep:#d81424; --c-blue:#00afff; --c-purple:#8a4dff; --c-win:#35e07f; --c-gold:#ffc53d;
+    --c-text:#f2f4f7; --c-dim:#a8b0bc; --c-faint:#7b8693; --c-discord:#5865f2;
+    --f-d:"Oxanium",system-ui,sans-serif; --f-l:"Rajdhani",system-ui,sans-serif; --f-a:"Orbitron","Oxanium",sans-serif;
+    font-family:var(--f-d); color:var(--c-text); font-size:14px;
+  }
+  .pp * { box-sizing:border-box; }
+  .pp .site { background: radial-gradient(900px 380px at 50% -120px, rgb(255 30 45 / 13%), transparent 60%), var(--c-base); border:1px solid #1a2028; overflow:hidden; position:relative; }
+  .pp .nav { display:flex; align-items:center; gap:18px; padding:12px 20px; border-bottom:1px solid var(--c-line); font-family:var(--f-l); font-weight:600; font-size:12.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--c-dim); }
+  .pp .nav img { height:24px; }
+  .pp .nav .sp { flex:1; }
+  .pp .lbl { font-family:var(--f-l); font-weight:600; font-size:11.5px; letter-spacing:.16em; text-transform:uppercase; color:var(--c-dim); }
+  .pp .bevel { clip-path: polygon(12px 0, calc(100% - 12px) 0, 100% 12px, 100% calc(100% - 12px), calc(100% - 12px) 100%, 12px 100%, 0 calc(100% - 12px), 0 12px); }
+  .pp .diag { clip-path: polygon(9px 0, 100% 0, 100% calc(100% - 9px), calc(100% - 9px) 100%, 0 100%, 0 9px); }
+  .pp .btn { display:inline-flex; align-items:center; justify-content:center; gap:8px; height:38px; padding:0 16px; font-family:var(--f-l); font-weight:700; font-size:12.5px; letter-spacing:.12em; text-transform:uppercase; border:0; color:#fff; }
+  .pp .btn.red { background: linear-gradient(135deg, var(--c-red-bright), var(--c-red) 55%, #d81424); }
+  .pp .btn.ghost { background:#0b1016; box-shadow: inset 0 0 0 1px var(--c-line-strong); color:var(--c-text); }
+  .pp .btn.discord { background: var(--c-discord); }
+  .pp .pnl { background: var(--c-line-strong); padding:1px; }
+  .pp .pnl > .in { background:#0a0f15; padding:16px 18px; }
+  .pp .avatar { width:34px; height:34px; border-radius:50%; background: linear-gradient(135deg,#8a4dff,#00afff); display:inline-block; flex:none; }
+  .pp .st { display:inline-flex; align-items:center; gap:6px; font-family:var(--f-l); font-weight:700; font-size:11px; letter-spacing:.12em; text-transform:uppercase; padding:2px 8px; color: var(--c-blue); background: rgb(0 175 255 / 10%); }
+  .pp .st i { width:6px; height:6px; border-radius:50%; background: currentColor; }
+  .pp .line { display:flex; justify-content:space-between; font-size:13px; color:var(--c-dim); padding:7px 0; border-bottom:1px solid var(--c-line); }
+  .pp .line b { color:var(--c-text); font-weight:600; }
+  .pp .inp { height:34px; background:#0b1016; box-shadow: inset 0 0 0 1px var(--c-line-strong); display:flex; align-items:center; padding:0 10px; font-size:13px; color:var(--c-dim); margin-top:4px; }
+  .pp .fl { font-size:12px; color:var(--c-dim); margin-top:10px; }
+  .pp .foot { padding:12px 20px; border-top:1px solid var(--c-line); font-size:12.5px; color:var(--c-faint); display:flex; gap:16px; }
+  .pp .foot b { color: var(--c-text); font-weight:600; }
+  .pp .hl { box-shadow: 0 0 0 2px var(--c-gold); padding:2px 6px; }
+  .pp .lockscr { display:flex; flex-direction:column; align-items:center; text-align:center; padding:46px 20px; }
+  .pp .lockic { width:46px; height:46px; position:relative; margin-bottom:14px; }
+  .pp .lockic .b { position:absolute; left:6px; right:6px; bottom:0; height:27px; background: var(--c-red); clip-path: polygon(5px 0, calc(100% - 5px) 0, 100% 5px, 100% 100%, 0 100%, 0 5px); }
+  .pp .lockic .s { position:absolute; left:13px; right:13px; top:2px; height:24px; border:4px solid var(--c-red); border-bottom:0; border-radius:12px 12px 0 0; }
+  .pp .bar { display:flex; align-items:center; gap:12px; padding:10px 20px; background: linear-gradient(90deg, rgb(255 197 61 / 14%), rgb(255 197 61 / 3%)); box-shadow: inset 0 -1px 0 rgb(255 197 61 / 30%); font-size:13px; }
+
+  .grid2 { display:grid; grid-template-columns: 1fr 1fr; gap:14px; }
+  @media (max-width: 1000px) { .grid2 { grid-template-columns: 1fr; } }
+  .opt2 .option { display:block; padding:12px; }
+  .opt2 .option h3 { margin:0 0 4px; font-size:16px; }
+  .opt2 .option p.d { margin:0 0 10px; font-size:13px; color: var(--text-secondary,#9aa0a6); line-height:1.45; }
+  .opt2 .letter { position:static; display:inline-flex; margin-right:8px; vertical-align:middle; }
+  .rec { display:inline-block; font-size:10.5px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:#050608; background:#35e07f; padding:2px 7px; border-radius:3px; margin-left:6px; vertical-align:middle; }
+  .cap { font-size:13px; color: var(--text-secondary,#9aa0a6); margin:6px 0 0; line-height:1.45; }
+
+  /* Mail */
+  .mailbox { background:#050608; border:1px solid #1d232b; max-width:600px; font-family: Arial, Helvetica, sans-serif; color:#d9dde3; }
+  .mailbox .mh { padding:20px 24px 16px; background:#0a0f15; background-image: radial-gradient(120% 140% at 0% 0%, rgba(255,30,45,.26), rgba(255,30,45,0) 55%); display:flex; align-items:center; gap:12px; }
+  .mailbox .mh img { height:38px; }
+  .mailbox .wm { font-family:Oxanium,Arial,sans-serif; font-weight:700; font-size:20px; letter-spacing:2px; color:#fff; line-height:1; }
+  .mailbox .wm span { color:#ff1e2d; }
+  .mailbox .sub { font-family:Rajdhani,Arial,sans-serif; font-weight:700; font-size:11px; letter-spacing:3px; color:#a8b0bc; text-transform:uppercase; margin-top:5px; }
+  .mailbox .stripe { height:3px; background: linear-gradient(90deg,#ff1e2d,#d81424 55%,rgba(255,30,45,0)); }
+  .mailbox .subj { padding:14px 24px 0; font-family:Rajdhani,Arial,sans-serif; font-size:11px; letter-spacing:3px; text-transform:uppercase; color:#7b8693; }
+  .mailbox .body { padding:10px 24px 8px; font-size:14.5px; line-height:1.6; }
+  .mailbox h2 { font-family:Oxanium,Arial,sans-serif; font-size:20px; color:#fff; margin:6px 0 12px; }
+  .mailbox table { width:100%; border-collapse:collapse; font-size:13.5px; margin:6px 0 14px; }
+  .mailbox td { padding:7px 0; border-bottom:1px solid #1d232b; } .mailbox td:last-child { text-align:right; color:#fff; }
+  .mailbox .mbtn { display:inline-block; padding:12px 22px; background:#d81424; color:#fff; font-family:Rajdhani,Arial,sans-serif; font-weight:700; font-size:13px; letter-spacing:2px; text-transform:uppercase; }
+  .mailbox .att { display:flex; gap:8px; flex-wrap:wrap; margin:12px 0 4px; }
+  .mailbox .att span { font-size:12px; padding:6px 10px; background:#0a0f15; border:1px solid #1d232b; color:#a8b0bc; }
+  .mailbox .mf { padding:14px 24px 16px; background:#0a0f15; border-top:1px solid #1d232b; font-size:12px; color:#8d97a3; line-height:1.6; }
+  .mailbox .mf a { color:#a8b0bc; }
+  .mails { list-style:none; padding:0; margin:0; font-size:14px; }
+  .mails li { padding:9px 12px; border:1px solid var(--border,#3d3d3f); background: var(--bg-secondary,#2d2d2f); margin-bottom:6px; border-radius:4px; line-height:1.45; }
+  .mails li b { display:block; }
+  .mails li span { font-size:13px; color: var(--text-secondary,#9aa0a6); }
+</style>
+
+<h2>Bot-Dashboard ohne Zugang, „Mein Zugang“, Kündigen und Mails</h2>
+<p class="subtitle">Oben eine Wahl. Darunter zwei Teile zum Ansehen: die Seite für den eigenen Zugang mit Kündigungsknopf und die Mails. Fällt dir etwas auf, schreib es im Chat.</p>
+
+<h3 style="margin:18px 0 8px">1 · Was passiert im Bot-Dashboard ohne Zugang?</h3>
+<div class="grid2 opt2 options">
+  <div class="option" data-choice="lock-a" onclick="toggleSelect(this)">
+    <h3><span class="letter">A</span>Gleich weiter zur Preisseite <span class="rec">Empfohlen</span></h3>
+    <p class="d">Nach dem Discord-Login prüft der Bot den Zugang. Fehlt er, geht es direkt auf nexus-emb.de/preise mit einer Leiste, die sagt, warum. Guardians sehen im Dashboard nur ihre Server mit Moderation. Wenig Änderung im Bot.</p>
+    <div class="pp"><div class="site">
+      <div class="nav"><img src="files/logo.webp" alt=""><span>Home</span><span>Module</span><span style="color:var(--c-text)">Preise</span><div class="sp"></div><span class="avatar" style="width:24px;height:24px"></span></div>
+      <div class="bar"><span style="color:var(--c-gold);font-family:var(--f-l);font-weight:700;letter-spacing:.12em;text-transform:uppercase;font-size:12px">Hinweis</span><span>Dein Test ist am 15.10. abgelaufen. Hol dir einen Zugang, um das Dashboard weiter zu nutzen.</span></div>
+      <div style="padding:22px 20px;opacity:.55"><div style="height:16px;width:50%;background:#1a2028;margin:0 auto 10px"></div><div style="height:30px;width:70%;background:#1a2028;margin:0 auto 20px"></div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px"><div style="height:120px;background:#0a0f15;box-shadow:inset 0 0 0 1px var(--c-line-strong)"></div><div style="height:120px;background:#0a0f15;box-shadow:inset 0 0 0 1px var(--c-red)"></div><div style="height:120px;background:#0a0f15;box-shadow:inset 0 0 0 1px var(--c-line-strong)"></div></div></div>
+    </div></div>
+  </div>
+  <div class="option" data-choice="lock-b" onclick="toggleSelect(this)">
+    <h3><span class="letter">B</span>Eigene Sperrseite im Dashboard</h3>
+    <p class="d">Man bleibt auf dashboard.nexus-emb.de und sieht eine Seite mit Schloss, Grund und Knopf zur Preisseite. Wirkt weicher, braucht aber eine neue Seite im Bot.</p>
+    <div class="pp"><div class="site">
+      <div class="nav" style="text-transform:none;letter-spacing:0;font-family:var(--f-d);font-size:13px"><img src="files/logo.webp" alt=""><span style="color:var(--c-text)">Dashboard</span><div class="sp"></div><span class="avatar" style="width:24px;height:24px"></span></div>
+      <div class="lockscr">
+        <div class="lockic"><div class="s"></div><div class="b"></div></div>
+        <div style="font-size:20px;font-weight:700">Kein Zugang zum Dashboard</div>
+        <div style="color:var(--c-dim);font-size:13.5px;margin-top:6px;max-width:340px;line-height:1.5">Dein Test ist am 15.10. abgelaufen. Mit einem Zugang geht es sofort weiter, deine Einstellungen bleiben erhalten.</div>
+        <div style="display:flex;gap:8px;margin-top:16px"><button class="btn red diag">Zugang holen</button><button class="btn ghost diag">Abmelden</button></div>
+      </div>
+    </div></div>
+  </div>
+</div>
+
+<h3 style="margin:28px 0 8px">2 · Zum Ansehen: „Mein Zugang“ und „Verträge hier kündigen“</h3>
+<div class="grid2">
+  <div>
+    <div class="pp"><div class="site">
+      <div class="nav"><img src="files/logo.webp" alt=""><span>Home</span><span>Preise</span><div class="sp"></div><span class="avatar" style="width:24px;height:24px"></span></div>
+      <div style="padding:22px 20px">
+        <div class="lbl" style="color:var(--c-red)">nexus-emb.de/zugang</div>
+        <div style="font-size:24px;font-weight:700;margin-top:6px">Mein Zugang</div>
+        <div class="pnl bevel" style="margin-top:14px"><div class="in bevel">
+          <div style="display:flex;align-items:center;gap:10px"><span class="avatar"></span><div style="flex:1"><b>mecry</b><div style="font-size:12px;color:var(--c-faint)">m***@gmail.com</div></div><span class="st"><i></i>Abo aktiv</span></div>
+          <div style="margin-top:10px">
+            <div class="line"><span>Produkt</span><b>Monat · 4,99 € / Monat</b></div>
+            <div class="line"><span>Nächste Zahlung</span><b>01.11.2026</b></div>
+            <div class="line"><span>Discord-Rolle</span><b>Nexus Plus</b></div>
+            <div class="line" style="border:0"><span>Kündbar</span><b>jederzeit zum 01.11.</b></div>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"><button class="btn ghost diag">Zahlungsart und Rechnungen</button><button class="btn ghost diag">Zum Dashboard</button></div>
+        </div></div>
+      </div>
+      <div class="foot"><span>Impressum</span><span>Datenschutz</span><span>AGB</span><span>Widerruf</span><b class="hl">Verträge hier kündigen</b></div>
+    </div></div>
+    <p class="cap">„Zahlungsart und Rechnungen“ öffnet das Kundenportal von Stripe. Der Link <b>Verträge hier kündigen</b> steht im Fuß jeder Seite, so verlangt es § 312k BGB.</p>
+  </div>
+  <div>
+    <div class="pp"><div class="site">
+      <div class="nav"><img src="files/logo.webp" alt=""><span>Home</span><span>Preise</span><div class="sp"></div></div>
+      <div style="padding:22px 20px">
+        <div class="lbl" style="color:var(--c-red)">nexus-emb.de/kuendigen · Schritt 1 von 2</div>
+        <div style="font-size:24px;font-weight:700;margin-top:6px">Vertrag kündigen</div>
+        <div style="font-size:13px;color:var(--c-dim);margin-top:6px;line-height:1.5">Geht ohne Anmeldung. Angemeldet ist alles schon ausgefüllt.</div>
+        <div class="fl">Art der Kündigung</div><div class="inp">Ordentlich, zum nächstmöglichen Zeitpunkt ▾</div>
+        <div class="fl">Dein Name</div><div class="inp">Connor Beispiel</div>
+        <div class="fl">Discord-Name oder Bestellnummer</div><div class="inp">mecry</div>
+        <div class="fl">E-Mail für die Bestätigung</div><div class="inp">m***@gmail.com</div>
+        <button class="btn red diag" style="margin-top:14px;width:100%">Jetzt kündigen</button>
+        <div style="font-size:12px;color:var(--c-faint);margin-top:8px;line-height:1.45">Danach Schritt 2: Bestätigung mit Datum und Uhrzeit der Kündigung und wann der Vertrag endet. Dieselbe Bestätigung kommt sofort per Mail.</div>
+      </div>
+    </div></div>
+    <p class="cap">Lässt sich der Vertrag nicht zuordnen, geht die Kündigung trotzdem ein und landet als Mail bei support@, damit ihr sie von Hand erledigt.</p>
+  </div>
+</div>
+
+<h3 style="margin:28px 0 8px">3 · Zum Ansehen: Mails von noreply@nexus-emb.de</h3>
+<div class="grid2">
+  <div>
+    <div class="mailbox">
+      <div class="mh"><img src="files/logo-n.webp" alt=""><div><div class="wm">RL <span>NEXUS</span></div><div class="sub">Bestellung</div></div></div>
+      <div class="stripe"></div>
+      <div class="subj">Deine Bestellung RLN-2026-0042</div>
+      <div class="body">
+        <h2>Danke, dein Zugang ist aktiv.</h2>
+        <p style="margin:0 0 12px">Hallo mecry, das ist die Bestätigung deines Vertrags. Bewahr die Mail am besten auf.</p>
+        <table>
+          <tr><td>Produkt</td><td>Jahr</td></tr>
+          <tr><td>Preis</td><td>44,99 € einmalig</td></tr>
+          <tr><td>Laufzeit</td><td>12.10.2026 bis 12.10.2027</td></tr>
+          <tr><td>Verlängerung</td><td>keine</td></tr>
+          <tr><td>Discord-Rolle</td><td>Nexus Plus</td></tr>
+          <tr><td>Bestellnummer</td><td>RLN-2026-0042</td></tr>
+        </table>
+        <p style="margin:0 0 12px;font-size:13px;color:#a8b0bc">Du hast verlangt, dass der Zugang sofort startet, und bestätigt, dass dein Widerrufsrecht damit vorzeitig erlischt. Gemäß § 19 UStG wird keine Umsatzsteuer berechnet.</p>
+        <span class="mbtn">Zum Dashboard</span>
+        <div class="att"><span>📄 Rechnung RLN-2026-0042.pdf</span><span>📄 AGB.pdf</span><span>📄 Widerrufsbelehrung.pdf</span></div>
+      </div>
+      <div class="mf">Connor Olischer · Königsberger Straße 8 · 25335 Elmshorn<br>Fragen: <a>support@nexus-emb.de</a> · <a>Mein Zugang</a> · <a>Verträge hier kündigen</a></div>
+    </div>
+  </div>
+  <div>
+    <ul class="mails">
+      <li><b>Test gestartet</b><span>Bis wann, welche Rolle, Link zum Dashboard.</span></li>
+      <li><b>Bestellung bestätigt</b> (links zu sehen)<span>Vertragsbestätigung mit Rechnung, AGB und Widerrufsbelehrung im Anhang.</span></li>
+      <li><b>Abo verlängert</b><span>Jeden Monat nach der Zahlung, mit Rechnung. Kurz.</span></li>
+      <li><b>Zahlung fehlgeschlagen</b><span>Stripe versucht es noch einige Tage. Link zum Kundenportal, um die Karte zu ändern.</span></li>
+      <li><b>Kündigung eingegangen</b><span>Datum und Uhrzeit der Kündigung, Vertragsende, Zugang bis dahin. Pflicht nach § 312k.</span></li>
+      <li><b>Zugang abgelaufen</b><span>Test oder Laufzeit vorbei, Rolle entfernt, Link zur Preisseite.</span></li>
+      <li><b>Zugang geschenkt</b><span>Wenn ein Admin per Hand freischaltet. Ohne Grund aus dem Panel.</span></li>
+    </ul>
+    <p class="cap">Gebaut mit der dunklen Vorlage, die das Admin Dashboard schon für Mails nutzt, ohne persönliche Signatur. Antworten gehen an support@. Beim Sperren geht keine Mail raus, außer der Zugang wird dabei beendet (dann „Zugang beendet“ mit Erstattungsbetrag).</p>
+  </div>
+</div>

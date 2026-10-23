@@ -1,0 +1,144 @@
+@use "mixins" as *;
+
+.button {
+    position: relative;
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    gap: 0.55em;
+    height: 40px;
+    padding: 0 1.15em;
+    transition:
+        background var(--t-fast),
+        color var(--t-fast),
+        filter var(--t-fast),
+        transform var(--t-fast);
+    white-space: nowrap;
+    user-select: none;
+
+    @include label(0.8rem, 0.12em);
+    @include bevel-diagonal(10px);
+    @include touch-target;
+
+    &:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    /* Der Fokusring wird vom clip-path abgeschnitten, darum liegt er innen. */
+    &:focus-visible {
+        @include focus-inset(var(--c-text));
+    }
+
+    @include motion {
+        &:active:not(:disabled) {
+            transform: translateY(1px);
+        }
+    }
+}
+
+.sm {
+    height: 32px;
+    padding: 0 0.9em;
+    font-size: 0.75rem;
+}
+
+/* Rot gefüllt wie auf der Webseite. Der Verlauf liegt so, dass hinter der
+   Schrift das dunkle Rot steht: Weiß darauf hat 5,2:1 statt 3,8:1. */
+.primary {
+    background: linear-gradient(135deg, var(--c-red) 0%, var(--c-red-deep) 50%, #c4111f 100%);
+    color: #fff;
+
+    &:hover:not(:disabled) {
+        filter: drop-shadow(0 4px 16px rgb(255 30 45 / 35%));
+    }
+}
+
+/* Umrandet: der Rand ist der Hintergrund, die Füllung liegt eingerückt
+   darüber. Ein echtes border schnitte der clip-path weg. */
+.outline {
+    background: var(--c-line-strong);
+    color: var(--c-text);
+
+    &::before {
+        position: absolute;
+        z-index: -1;
+        background: #0b1016;
+        content: "";
+        inset: 1px;
+
+        @include bevel-diagonal(9px);
+    }
+
+    &:hover:not(:disabled) {
+        background: var(--c-blue);
+        color: var(--c-blue);
+
+        &::before {
+            background: #071119;
+        }
+    }
+}
+
+.ghost {
+    padding-inline: 0.7em;
+    color: var(--c-text-dim);
+
+    &:hover:not(:disabled) {
+        background: var(--c-line);
+        color: var(--c-text);
+    }
+}
+
+.danger {
+    background: color-mix(in srgb, var(--c-loss) 55%, transparent);
+    color: var(--c-text);
+
+    &::before {
+        position: absolute;
+        z-index: -1;
+        background: #1a0a0d;
+        content: "";
+        inset: 1px;
+
+        @include bevel-diagonal(9px);
+    }
+
+    &:hover:not(:disabled) {
+        background: var(--c-loss);
+
+        &::before {
+            background: #24090d;
+        }
+    }
+}
+
+.label {
+    padding-top: 0.08em;
+    line-height: 1;
+
+    /* Ein Symbol hinter dem Text (Weiter →) bleibt in der Zeile. svg ist sonst Block (_base.scss). */
+    > svg {
+        display: inline-block;
+        vertical-align: -0.2em;
+    }
+}
+
+.spinner {
+    width: 14px;
+    height: 14px;
+    border: 2px solid currentcolor;
+    border-right-color: transparent;
+    border-radius: 50%;
+
+    @include motion {
+        animation: spin 0.8s linear infinite;
+    }
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}

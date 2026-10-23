@@ -1,0 +1,68 @@
+/**
+ * Farben, Schriften und Bewegung, 1:1 aus dem Admin Dashboard
+ * (`src/styles/_tokens.scss` dort), das sie wiederum von der Hauptseite hat.
+ * Wer dort eine Farbe dreht, dreht sie hier mit.
+ *
+ * Wie im Admin Dashboard bewusst anders als auf der Hauptseite, weil die
+ * Statusseite viel kleine Schrift hat:
+ * - `--c-text-faint` eine Stufe heller: 5,5:1 statt 4,4:1 auf dem Grund.
+ * - `--c-red-deep` als eigener Wert. Auf der Webseite steht er im Verlauf des
+ *   Primärknopfs, hier liegt er hinter der Schrift (Weiß darauf: 5,2:1).
+ * - Die Abstände eines Arbeitswerkzeugs statt die einer Werbeseite.
+ */
+
+:root {
+    /* --- Grundflächen ------------------------------------------------- */
+    --c-base: #050608;
+    --c-panel: #080d12;
+    --c-panel-solid: #0a0f15;
+    --c-panel-fill: rgb(6 9 13 / 78%);
+    --c-line: rgb(255 255 255 / 8%);
+    --c-line-strong: rgb(255 255 255 / 14%);
+
+    /* --- Akzente ------------------------------------------------------ */
+    --c-red: #ff1e2d;
+    --c-red-bright: #ff3344;
+    --c-red-deep: #d81424;
+    --c-blue: #00afff;
+    --c-rank-blue: #168cff;
+    --c-purple: #8a4dff;
+    --c-win: #35e07f;
+    --c-loss: #ff4d5e;
+
+    /* --- Text --------------------------------------------------------- */
+    --c-text: #f2f4f7;
+    --c-text-dim: #a8b0bc;
+    --c-text-faint: #7b8693;
+
+    /* --- Modulfarben -------------------------------------------------- */
+    --c-mod-community: #38c8ff;
+    --c-mod-competition: #ff4a3d;
+    --c-mod-moderation: #b06bff;
+    --c-mod-engagement: #ffc53d;
+    --c-mod-content: #35e07f;
+    --c-mod-utility: #ff8a3d;
+
+    /* --- Schrift ------------------------------------------------------ */
+    --f-display: "Oxanium", "Segoe UI", system-ui, sans-serif;
+    --f-label: "Rajdhani", "Segoe UI", system-ui, sans-serif;
+    --f-accent: "Orbitron", "Oxanium", system-ui, sans-serif;
+
+    /* --- Raster: dicht, von 4 bis 32 px ------------------------------- */
+    --s-1: 4px;
+    --s-2: 8px;
+    --s-3: 12px;
+    --s-4: 16px;
+    --s-5: 24px;
+    --s-6: 32px;
+    --s-cut: 14px;
+    --s-sidebar: 240px;
+    --s-rail: 68px;
+    --s-topbar: 60px;
+    --s-content: 1440px;
+
+    /* --- Bewegung ----------------------------------------------------- */
+    --t-fast: 140ms cubic-bezier(0.4, 0, 0.2, 1);
+    --t-base: 260ms cubic-bezier(0.4, 0, 0.2, 1);
+    --t-slow: 620ms cubic-bezier(0.16, 1, 0.3, 1);
+}

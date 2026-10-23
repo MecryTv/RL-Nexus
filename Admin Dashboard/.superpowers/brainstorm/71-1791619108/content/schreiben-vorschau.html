@@ -1,0 +1,127 @@
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@500;600;700&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  .cw { font-family: Oxanium, "Segoe UI", sans-serif; background: #050608; color: #f2f4f7; border: 1px solid rgb(255 255 255 / 14%); }
+  .cw-title { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-bottom: 1px solid rgb(255 255 255 / 8%); font-weight: 700; font-size: 15px; }
+  .cw-title span { color: #a8b0bc; font: 600 12px Rajdhani, sans-serif; letter-spacing: .1em; text-transform: uppercase; }
+  .cw-field { display: grid; grid-template-columns: 64px 1fr; align-items: center; border-bottom: 1px solid rgb(255 255 255 / 8%); font-size: 13px; }
+  .cw-field label { padding: 8px 12px; color: #7b8693; font: 600 12px Rajdhani, sans-serif; letter-spacing: .08em; text-transform: uppercase; }
+  .cw-field div { padding: 8px 12px 8px 0; color: #f2f4f7; }
+  .cw-tools { display: flex; gap: 4px; padding: 6px 10px; border-bottom: 1px solid rgb(255 255 255 / 8%); color: #a8b0bc; font-size: 12px; flex-wrap: wrap; }
+  .cw-tools b { display: inline-grid; place-items: center; min-width: 24px; height: 24px; border: 1px solid rgb(255 255 255 / 8%); font-weight: 600; }
+  .cw-edit { padding: 14px; font-family: Arial, sans-serif; font-size: 14px; line-height: 1.6; color: #d9dde3; min-height: 150px; }
+  .cw-edit .btn { display: inline-block; padding: 6px 14px; background: #d81424; color: #fff; font-weight: 700; font-size: 13px; }
+  .cw-caret { display: inline-block; width: 2px; height: 16px; background: #00afff; vertical-align: -3px; animation: blink 1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+  .cw-foot { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-top: 1px solid rgb(255 255 255 / 8%); font-size: 12px; color: #7b8693; }
+  .cw-send { margin-left: auto; padding: 8px 16px; background: linear-gradient(135deg, #ff1e2d, #d81424); color: #fff; font: 700 12px Rajdhani, sans-serif; letter-spacing: .14em; text-transform: uppercase; clip-path: polygon(0 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%); }
+  .cw-split { display: grid; grid-template-columns: 1fr 1fr; }
+  .cw-split > div + div { border-left: 1px solid rgb(255 255 255 / 8%); background: #020304; }
+  .cw-plabel { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; color: #7b8693; font: 600 11px Rajdhani, sans-serif; letter-spacing: .12em; text-transform: uppercase; border-bottom: 1px solid rgb(255 255 255 / 8%); }
+  .cw-seg { display: inline-flex; border: 1px solid rgb(255 255 255 / 14%); }
+  .cw-seg i { font-style: normal; padding: 3px 9px; }
+  .cw-seg i.on { background: rgb(0 175 255 / 16%); color: #f2f4f7; }
+  .cw-tabs { display: flex; gap: 0; border-bottom: 1px solid rgb(255 255 255 / 8%); }
+  .cw-tabs i { font-style: normal; padding: 9px 16px; font: 700 12px Rajdhani, sans-serif; letter-spacing: .12em; text-transform: uppercase; color: #7b8693; }
+  .cw-tabs i.on { color: #f2f4f7; box-shadow: inset 0 -2px 0 #ff1e2d; }
+
+  /* Die Vorlage, verkleinert wie in server/mail/compose.ts */
+  .tm { margin: 12px auto; max-width: 400px; border: 1px solid #1d232b; background: #050608; font-family: Arial, sans-serif; }
+  .tm-head { display: flex; align-items: center; gap: 10px; padding: 14px 16px 12px; background: #0a0f15 radial-gradient(120% 140% at 0% 0%, rgba(255,30,45,.26), rgba(255,30,45,0) 55%); }
+  .tm-head img { width: 32px; height: 32px; display: block; }
+  .tm-brand { font: 700 16px Oxanium, sans-serif; letter-spacing: 2px; line-height: 1; }
+  .tm-brand em { font-style: normal; color: #ff1e2d; }
+  .tm-label { margin-top: 4px; font: 700 9px Rajdhani, sans-serif; letter-spacing: 3px; color: #a8b0bc; text-transform: uppercase; }
+  .tm-line { height: 3px; background: linear-gradient(90deg, #ff1e2d, #d81424 55%, rgba(255,30,45,0)); }
+  .tm-subj { padding: 10px 16px 0; font: 600 9px Rajdhani, sans-serif; letter-spacing: 3px; text-transform: uppercase; color: #7b8693; }
+  .tm-body { padding: 6px 16px 6px; font-size: 12px; line-height: 1.6; color: #d9dde3; }
+  .tm-body p { margin: 0 0 8px; }
+  .tm-body .btn { display: inline-block; padding: 6px 14px; background: #d81424; color: #fff; font-weight: 700; font-size: 11px; }
+  .tm-sig { display: flex; align-items: center; gap: 10px; margin: 0 16px; padding: 10px 0 12px; border-top: 1px solid #1d232b; }
+  .tm-av { width: 30px; height: 30px; border-radius: 50%; border: 2px solid #b06bff; background: #1a212b; display: grid; place-items: center; font-size: 10px; font-weight: 700; color: #a8b0bc; flex-shrink: 0; }
+  .tm-name { font-size: 12px; font-weight: 700; color: #fff; }
+  .tm-rank { display: inline-block; margin-left: 4px; padding: 1px 5px; border: 1px solid #b06bff; color: #b06bff; font: 700 8px Rajdhani, sans-serif; letter-spacing: 2px; vertical-align: 1px; }
+  .tm-meta { font-size: 10px; color: #7b8693; margin-top: 2px; }
+  .tm-foot { padding: 10px 16px; background: #0a0f15; border-top: 1px solid #1d232b; font-size: 9px; color: #8d97a3; line-height: 1.6; }
+  .tm-foot b { color: #ff1e2d; }
+  .tm-fixed { position: relative; opacity: .72; }
+  .tm-fixed::after { content: "fest"; position: absolute; top: 6px; right: 8px; padding: 1px 6px; border: 1px solid rgb(255 255 255 / 20%); color: #a8b0bc; font: 700 8px Rajdhani, sans-serif; letter-spacing: .14em; text-transform: uppercase; }
+  .tm-editable { outline: 1px dashed rgb(0 175 255 / 55%); outline-offset: 2px; margin: 4px 12px; padding: 6px 4px; }
+
+  .cw-wrap { display: grid; gap: 22px; }
+  .cw-wrap .option { flex-direction: column; align-items: stretch; }
+  .cw-note { font-size: 13px; line-height: 1.5; margin-top: 10px; }
+</style>
+
+<h2>Frage 3: Wie willst du die Vorlage beim Schreiben sehen?</h2>
+<p class="subtitle">Die Vorschau zeigt die echte Vorlage mit Logo, deinem Namen, Rang und Avatar. Der Absender heißt künftig genau wie eingetragen, hier „Nexus EMB Support“.</p>
+
+<div class="options cw-wrap">
+  <!-- A -->
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="cw">
+      <div class="cw-title">Neue Mail <span>Großes Fenster über dem Postfach · Esc schließt</span></div>
+      <div class="cw-split">
+        <div>
+          <div class="cw-field"><label>Von</label><div>Nexus EMB Support · support@nexus-emb.de</div></div>
+          <div class="cw-field"><label>An</label><div>Vexa Esports &lt;orga@vexa.gg&gt;</div></div>
+          <div class="cw-field"><label>Betreff</label><div>Partnerschaft für Season 12</div></div>
+          <div class="cw-tools"><b>B</b><b><i>I</i></b><b><u>U</u></b><b><s>S</s></b><b>H</b><b>•</b><b>1.</b><b>❝</b><b>🔗</b><b>▭</b><b>—</b><b>📎</b></div>
+          <div class="cw-edit">Hallo Vexa-Team,<br><br>danke für eure Anfrage! Wir würden die Partnerschaft gern in einem kurzen Call besprechen.<br><br><span class="btn">Termin wählen</span><br><br>Bis bald<span class="cw-caret"></span></div>
+        </div>
+        <div>
+          <div class="cw-plabel">Vorschau · so kommt sie an <span class="cw-seg"><i class="on">Desktop</i><i>Handy</i></span></div>
+          <div class="tm">
+            <div class="tm-head"><img src="files/mail-logo.png" alt=""><div><div class="tm-brand">RL <em>NEXUS</em></div><div class="tm-label">Nexus EMB Support</div></div></div>
+            <div class="tm-line"></div>
+            <div class="tm-subj">Partnerschaft für Season 12</div>
+            <div class="tm-body"><p>Hallo Vexa-Team,</p><p>danke für eure Anfrage! Wir würden die Partnerschaft gern in einem kurzen Call besprechen.</p><p><span class="btn">Termin wählen</span></p><p>Bis bald</p></div>
+            <div class="tm-sig"><span class="tm-av">MT</span><div><span class="tm-name">MecryTv</span><span class="tm-rank">DEVELOPER</span><div class="tm-meta">Team RL Nexus · support@nexus-emb.de</div></div></div>
+            <div class="tm-foot"><b>›</b> Webseite &nbsp; <b>›</b> Discord &nbsp; <b>›</b> Impressum &nbsp; <b>›</b> Datenschutz<br>Diese Mail kommt vom Team von RL Nexus.</div>
+          </div>
+        </div>
+      </div>
+      <div class="cw-foot">☐ Vorlage weglassen<span class="cw-send">Senden</span></div>
+    </div>
+    <div class="content cw-note"><h3>Nebeneinander: links schreiben, rechts die echte Mail</h3><p>Die Vorschau baut der Server mit derselben Vorlage, die auch verschickt wird, und erneuert sie kurz nach dem Tippen. Was rechts steht, kommt genau so an. Umschalter für Handy-Breite. Unter 1100 px Breite wird daraus ein Umschalter „Schreiben | Vorschau“.</p></div>
+  </div>
+
+  <!-- B -->
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="cw" style="max-width:520px">
+      <div class="cw-title">Neue Mail <span>Im Lesebereich, wie heute</span></div>
+      <div class="cw-field"><label>An</label><div>Vexa Esports &lt;orga@vexa.gg&gt;</div></div>
+      <div class="cw-field"><label>Betreff</label><div>Partnerschaft für Season 12</div></div>
+      <div class="cw-tabs"><i>Schreiben</i><i class="on">Vorschau</i></div>
+      <div class="tm">
+        <div class="tm-head"><img src="files/mail-logo.png" alt=""><div><div class="tm-brand">RL <em>NEXUS</em></div><div class="tm-label">Nexus EMB Support</div></div></div>
+        <div class="tm-line"></div>
+        <div class="tm-subj">Partnerschaft für Season 12</div>
+        <div class="tm-body"><p>Hallo Vexa-Team,</p><p>danke für eure Anfrage! …</p><p><span class="btn">Termin wählen</span></p></div>
+        <div class="tm-sig"><span class="tm-av">MT</span><div><span class="tm-name">MecryTv</span><span class="tm-rank">DEVELOPER</span><div class="tm-meta">Team RL Nexus · support@nexus-emb.de</div></div></div>
+      </div>
+      <div class="cw-foot">☐ Vorlage weglassen<span class="cw-send">Senden</span></div>
+    </div>
+    <div class="content cw-note"><h3>Umschalter „Schreiben | Vorschau“</h3><p>Der Editor bleibt, wo er heute ist. Ein Klick auf „Vorschau“ zeigt die echte Mail, ein Klick zurück den Text. Einfach und auf jeder Breite gleich, aber du siehst nie beides zugleich.</p></div>
+  </div>
+
+  <!-- C -->
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="cw" style="max-width:520px">
+      <div class="cw-title">Neue Mail <span>Direkt in der Vorlage</span></div>
+      <div class="cw-field"><label>An</label><div>Vexa Esports &lt;orga@vexa.gg&gt;</div></div>
+      <div class="cw-field"><label>Betreff</label><div>Partnerschaft für Season 12</div></div>
+      <div class="cw-tools"><b>B</b><b><i>I</i></b><b><u>U</u></b><b>H</b><b>•</b><b>❝</b><b>🔗</b><b>▭</b><b>📎</b></div>
+      <div class="tm" style="max-width:none;margin:12px">
+        <div class="tm-fixed"><div class="tm-head"><img src="files/mail-logo.png" alt=""><div><div class="tm-brand">RL <em>NEXUS</em></div><div class="tm-label">Nexus EMB Support</div></div></div><div class="tm-line"></div><div class="tm-subj">Partnerschaft für Season 12</div></div>
+        <div class="tm-body tm-editable"><p>Hallo Vexa-Team,</p><p>danke für eure Anfrage! Wir würden die Partnerschaft gern in einem kurzen Call besprechen.</p><p><span class="btn">Termin wählen</span></p><p>Bis bald<span class="cw-caret"></span></p></div>
+        <div class="tm-fixed"><div class="tm-sig"><span class="tm-av">MT</span><div><span class="tm-name">MecryTv</span><span class="tm-rank">DEVELOPER</span><div class="tm-meta">Team RL Nexus · support@nexus-emb.de</div></div></div><div class="tm-foot"><b>›</b> Webseite &nbsp; <b>›</b> Discord &nbsp; <b>›</b> Impressum<br>Diese Mail kommt vom Team von RL Nexus.</div></div>
+      </div>
+      <div class="cw-foot">☐ Vorlage weglassen<span class="cw-send">Senden</span></div>
+    </div>
+    <div class="content cw-note"><h3>Schreiben direkt in der Mail</h3><p>Der Editor sitzt im dunklen Rahmen zwischen Logo-Kopf und Signatur. Kopf und Signatur sind fest, nur der Text in der Mitte ist bearbeitbar. Kein zweites Fenster. Nachteil: Das Dashboard zeichnet die Vorlage nach, Mailprogramme stellen sie leicht anders dar (etwa Schriften), es ist also eine Annäherung.</p></div>
+  </div>
+</div>

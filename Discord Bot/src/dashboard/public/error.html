@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>RL Nexus · __ERR_CODE__</title>
+<meta name="color-scheme" content="dark">
+<!-- Die Hauptseite. Wird beim Ausliefern eingesetzt. -->
+<meta name="rlnexus-site" content="__SITE__">
+<meta name="robots" content="noindex">
+<link rel="icon" type="image/png" href="__BASE__/assets/images/rl-nexus-n-48.png">
+<link rel="stylesheet" href="__BASE__/assets/style.css">
+</head>
+<!--
+  Die Fehlerseite. Absichtlich ohne app.js: Wenn der Bot stolpert, soll die
+  Seite trotzdem stehen, und jeder Knopf hier ist ein echter Link - „Neu laden"
+  ist ein leeres href, das genau auf diese Adresse zeigt.
+
+  Code, Überschrift und Text setzt der Bot beim Ausliefern ein
+  (src/utils/errorpage.ts).
+-->
+<body>
+
+<div class="ambient" aria-hidden="true"><i class="ambient__warm"></i><i class="ambient__cool"></i><i class="ambient__bands"></i><i class="ambient__grid"></i><i class="ambient__vignette"></i></div>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <symbol id="i-warn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 2 20h20z"/><path d="M12 10v4M12 17h.01"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13M13 6l6 6-6 6"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 4v5h-5"/></symbol>
+</svg>
+
+<main class="stage">
+  <div class="empty empty--error errpage">
+    <span class="empty__mark"><svg><use href="#i-warn"/></svg></span>
+    <span class="errcode">__ERR_CODE__</span>
+    <h2>__ERR_TITLE__</h2>
+    <p>__ERR_TEXT__</p>
+    <div class="erracts">
+      <a class="erract erract--go" href="__ERR_HREF__">__ERR_ACTION__<svg aria-hidden="true"><use href="#i-arrow"/></svg></a>
+      <a class="erract" href=""><svg aria-hidden="true"><use href="#i-refresh"/></svg>Neu laden</a>
+    </div>
+    <p class="errhint">__ERR_HINT__</p>
+    <p class="errhint">Bleibt der Fehler? Schreib an <a href="mailto:support@nexus-emb.de">support@nexus-emb.de</a> oder in unseren <a href="https://discord.gg/CjG2HFGw95" target="_blank" rel="noopener">Support-Discord</a>.</p>
+  </div>
+</main>
+
+</body>
+</html>

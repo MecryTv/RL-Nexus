@@ -1,0 +1,27 @@
+@use "mixins" as *;
+
+.main {
+    /* Der Fuß bleibt unten, auch wenn eine Seite kurz ist. */
+    min-height: calc(100dvh - var(--s-header) - 300px);
+}
+
+/* Erscheint nur, wenn er den Fokus hat - der erste Tabstopp der Seite. */
+.skip {
+    position: fixed;
+    z-index: 200;
+    top: 10px;
+    left: 10px;
+    padding: 12px 20px;
+    transform: translateY(-160%);
+    transition: transform var(--t-fast);
+    background: var(--c-red);
+    color: #fff;
+
+    @include label(0.76rem);
+    @include bevel-diagonal(8px);
+
+    &:focus-visible {
+        outline: none;
+        transform: translateY(0);
+    }
+}

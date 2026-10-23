@@ -1,0 +1,96 @@
+<link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@500;700&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+
+<style>
+  .wrap { display:grid; grid-template-columns: minmax(0, 1fr) 320px; gap:18px; max-width:1100px; align-items:start; }
+  .inbox { background:#1b1d21; padding:18px; border-radius:6px; }
+  .mailmeta { font-family: Arial, sans-serif; font-size:12px; color:#9aa0a6; margin-bottom:10px; }
+  .m { max-width: 560px; margin:0 auto; background:#050608; font-family: Arial, Helvetica, sans-serif; color:#d9dde3; border:1px solid #1d232b; }
+  .m.narrow { max-width: 300px; }
+  .head { position:relative; padding:22px 26px 18px; background:#0a0f15;
+          background-image: radial-gradient(120% 140% at 0% 0%, rgb(255 30 45/26%), transparent 55%), radial-gradient(80% 120% at 100% 0%, rgb(0 175 255/10%), transparent 60%); }
+  .brand { display:flex; align-items:center; gap:12px; }
+  .brand img { width:44px; height:44px; }
+  .word { font-family: Oxanium, Arial, sans-serif; font-weight:700; font-size:22px; letter-spacing:.08em; color:#fff; line-height:1; }
+  .word span { color:#ff1e2d; }
+  .sub { font-family: Rajdhani, Arial, sans-serif; font-weight:700; font-size:11px; letter-spacing:.24em; color:#a8b0bc; text-transform:uppercase; margin-top:5px; }
+  .rule { height:3px; background: linear-gradient(90deg, #ff1e2d, #d81424 55%, rgb(255 30 45/0)); }
+  .ref { font-family: Rajdhani, Arial, sans-serif; font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:#7b8693; padding:14px 26px 0; }
+  .content { padding:10px 26px 22px; font-size:15px; line-height:1.65; }
+  .content h3 { font-family: Oxanium, Arial, sans-serif; color:#fff; font-size:18px; margin:4px 0 10px; }
+  .content b { color:#fff; }
+  .content a { color:#33bfff; }
+  .content blockquote { margin:12px 0; padding:8px 14px; border-left:3px solid #2b333d; color:#a8b0bc; background:#0a0f15; }
+  .btn { display:inline-block; margin:8px 0 6px; padding:12px 22px; background:#d81424; color:#fff !important; font-family: Rajdhani, Arial, sans-serif; font-weight:700; font-size:13px; letter-spacing:.16em; text-transform:uppercase; text-decoration:none; }
+  .sig { margin:0 26px; padding:16px 0 20px; border-top:1px solid #1d232b; display:flex; gap:12px; align-items:center; }
+  .sig .av { width:46px; height:46px; border-radius:50%; background: linear-gradient(135deg,#2a3340,#151b23); display:grid; place-items:center; color:#a8b0bc; font-weight:700; border:2px solid #b06bff; flex-shrink:0; }
+  .sig .name { color:#fff; font-weight:700; font-size:15px; }
+  .rank { display:inline-block; margin-left:6px; padding:2px 7px; border:1px solid rgb(176 107 255/55%); color:#c79bff; font-family: Rajdhani, Arial, sans-serif; font-weight:700; font-size:11px; letter-spacing:.14em; text-transform:uppercase; vertical-align:2px; }
+  .sig small { display:block; color:#7b8693; font-size:12px; margin-top:3px; line-height:1.5; }
+  .sig small a { color:#a8b0bc; }
+  .foot { padding:16px 26px 18px; background:#0a0f15; border-top:1px solid #1d232b; font-size:12px; color:#8d97a3; line-height:1.6; }
+  .foot .links a { color:#a8b0bc; margin-right:12px; text-decoration:none; }
+  .foot .links a b { color:#ff1e2d; }
+  .note { font-family: Rajdhani, system-ui, sans-serif; color: var(--text-secondary, #a8b0bc); font-size:15px; line-height:1.5; }
+  .note h3 { margin: 0 0 6px; }
+  .note ul { padding-left:18px; margin:6px 0 14px; }
+  @media (max-width: 900px) { .wrap { grid-template-columns: 1fr; } }
+</style>
+
+<h2>Mailvorlage, zweiter Entwurf</h2>
+<p class="subtitle">Dunkel, mit dem N-Logo. Name, Rang und Avatar setzt das Dashboard selbst ein, je nachdem, wer gerade schreibt. Rechts dieselbe Mail auf dem Handy.</p>
+
+<div class="wrap">
+  <div class="inbox">
+    <div class="mailmeta">RL Nexus Support &lt;support@nexus-emb.de&gt; · an orga@vexa.gg · Re: Partnerschaft für Season 12</div>
+    <div class="m">
+      <div class="head">
+        <div class="brand"><img src="files/logo.webp" alt=""><div><div class="word">RL <span>NEXUS</span></div><div class="sub">Support</div></div></div>
+      </div>
+      <div class="rule"></div>
+      <div class="ref">Re: Partnerschaft für Season 12</div>
+      <div class="content">
+        <h3>Hallo Vexa-Team,</h3>
+        danke für eure Nachricht. Eine Partnerschaft für <b>Season 12</b> klingt gut. Bevor wir einen Termin machen, schaut euch bitte die <a href="#">Partner-Bedingungen</a> an:<br>
+        <a class="btn" href="#">Bedingungen ansehen</a>
+        <blockquote>„Wir würden RL Nexus gern auf unseren drei Servern einsetzen …“</blockquote>
+        <i>Wir melden uns bis Freitag mit einem Termin.</i>
+      </div>
+      <div class="sig">
+        <div class="av">MC</div>
+        <div>
+          <span class="name">mecry</span><span class="rank">Developer</span>
+          <small>Team RL Nexus · support@nexus-emb.de<br><a href="#">nexus-emb.de</a> · <a href="#">discord.gg/rlnexus</a></small>
+        </div>
+      </div>
+      <div class="foot">
+        <div class="links"><a href="#"><b>›</b> Webseite</a><a href="#"><b>›</b> Discord</a><a href="#"><b>›</b> Impressum</a><a href="#"><b>›</b> Datenschutz</a></div>
+        Du bekommst diese Mail, weil du RL Nexus geschrieben hast. Antworte einfach auf diese Mail.
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <div class="inbox">
+      <div class="m narrow">
+        <div class="head" style="padding:16px 18px 14px"><div class="brand"><img src="files/logo.webp" alt="" style="width:36px;height:36px"><div><div class="word" style="font-size:18px">RL <span>NEXUS</span></div><div class="sub">Support</div></div></div></div>
+        <div class="rule"></div>
+        <div class="content" style="padding:14px 18px 16px;font-size:14px">
+          <h3 style="font-size:16px">Hallo Vexa-Team,</h3>
+          danke für eure Nachricht. Eine Partnerschaft für <b>Season 12</b> klingt gut …<br>
+          <a class="btn" href="#" style="display:block;text-align:center">Bedingungen ansehen</a>
+        </div>
+        <div class="sig" style="margin:0 18px"><div class="av" style="width:38px;height:38px">MC</div><div><span class="name">mecry</span><span class="rank">Developer</span><small>Team RL Nexus</small></div></div>
+        <div class="foot" style="padding:12px 18px">Webseite · Discord · Impressum · Datenschutz</div>
+      </div>
+    </div>
+    <div class="note" style="margin-top:14px">
+      <h3>Was automatisch kommt</h3>
+      <ul>
+        <li><b>Name</b> und <b>Avatar</b> aus deinem Discord-Login</li>
+        <li><b>Rang</b>: steht die Person auf der Team-Seite, deren Rolle dort, sonst Administrator oder Developer, in der Farbe der Gruppe</li>
+        <li><b>Postfach</b> im Kopf („Support“, „Partner“) und unter der Signatur</li>
+        <li><b>Re:</b>-Zeile und zitierter Text beim Antworten</li>
+      </ul>
+    </div>
+  </div>
+</div>

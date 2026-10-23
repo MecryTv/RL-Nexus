@@ -1,0 +1,125 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          "src/components/Shell.module.scss"
+        ],
+        "createdAt": "2026-10-05T13:25:11.825Z",
+        "reason": "Claude-Entscheidung: Markierung der aktiven Seite in der Seitenleiste, kein Kartenrand; zweiter Hinweis neben der Farbe (Status nie nur ueber Farbe), wie die Auswahl-Pille in Discord"
+      },
+      {
+        "rule": "low-contrast",
+        "value": "*",
+        "files": [
+          "public/wartung.html"
+        ],
+        "createdAt": "2026-10-05T18:50:00.000Z",
+        "reason": "Claude-Entscheidung: Der Hook rechnet gegen #ffe4e6 (12 % Rot ueber Weiss), der echte Grund ist #050608 mit 12 % Rot darueber. Nachgerechnet: #ff1e2d 5,3:1, #a8b0bc 9,3:1, Weiss auf #d81424 5,2:1, Hover #b80f1d hoeher."
+      },
+      {
+        "rule": "low-contrast",
+        "value": "*",
+        "files": [
+          ".superpowers/brainstorm/732-1791810024/content/admin-produkte.html"
+        ],
+        "createdAt": "2026-10-12T13:10:57.954Z",
+        "reason": "Claude: verkleinerter Brainstorming-Entwurf, wird nicht ausgeliefert; die echte Seite nutzt die geprüften Admin-Tokens"
+      },
+      {
+        "rule": "tiny-text",
+        "value": "*",
+        "files": [
+          ".superpowers/brainstorm/732-1791810024/content/admin-produkte.html"
+        ],
+        "createdAt": "2026-10-12T13:10:58.248Z",
+        "reason": "Claude: verkleinerter Brainstorming-Entwurf, wird nicht ausgeliefert; die echte Seite nutzt die geprüften Admin-Tokens"
+      },
+      {
+        "rule": "undersized-ui-text",
+        "value": "*",
+        "files": [
+          ".superpowers/brainstorm/732-1791810024/content/admin-produkte.html"
+        ],
+        "createdAt": "2026-10-12T13:11:12.690Z",
+        "reason": "Claude: verkleinerter Brainstorming-Entwurf, wird nicht ausgeliefert; die echte Seite nutzt die geprüften Admin-Tokens"
+      },
+      {
+        "rule": "low-contrast",
+        "value": "*",
+        "files": [
+          ".superpowers/brainstorm/732-1791810024/content/admin-kunden.html"
+        ],
+        "createdAt": "2026-10-12T13:12:39.863Z",
+        "reason": "Claude: verkleinerter Brainstorming-Entwurf, wird nicht ausgeliefert; die echte Seite nutzt die geprüften Admin-Tokens"
+      },
+      {
+        "rule": "tiny-text",
+        "value": "*",
+        "files": [
+          ".superpowers/brainstorm/732-1791810024/content/admin-kunden.html"
+        ],
+        "createdAt": "2026-10-12T13:12:40.162Z",
+        "reason": "Claude: verkleinerter Brainstorming-Entwurf, wird nicht ausgeliefert; die echte Seite nutzt die geprüften Admin-Tokens"
+      },
+      {
+        "rule": "undersized-ui-text",
+        "value": "*",
+        "files": [
+          ".superpowers/brainstorm/732-1791810024/content/admin-kunden.html"
+        ],
+        "createdAt": "2026-10-12T13:12:40.465Z",
+        "reason": "Claude: verkleinerter Brainstorming-Entwurf, wird nicht ausgeliefert; die echte Seite nutzt die geprüften Admin-Tokens"
+      },
+      {
+        "rule": "cramped-padding",
+        "value": "*",
+        "files": [
+          ".superpowers/brainstorm/732-1791810024/content/admin-kunden.html"
+        ],
+        "createdAt": "2026-10-12T13:12:52.418Z",
+        "reason": "Claude: Brainstorming-Entwurf; die Liste in B hat bewusst Rand 0, die Zeilen bringen eigenen Abstand mit"
+      },
+      {
+        "rule": "low-contrast",
+        "value": "*",
+        "files": [
+          ".superpowers/brainstorm/732-1791810024/content/zugang-kuendigen-mails.html"
+        ],
+        "createdAt": "2026-10-12T13:14:33.055Z",
+        "reason": "Claude: verkleinerter Brainstorming-Entwurf mit abgedunkelten Platzhaltern, wird nicht ausgeliefert"
+      },
+      {
+        "rule": "tiny-text",
+        "value": "*",
+        "files": [
+          ".superpowers/brainstorm/732-1791810024/content/zugang-kuendigen-mails.html"
+        ],
+        "createdAt": "2026-10-12T13:14:33.374Z",
+        "reason": "Claude: verkleinerter Brainstorming-Entwurf mit abgedunkelten Platzhaltern, wird nicht ausgeliefert"
+      },
+      {
+        "rule": "undersized-ui-text",
+        "value": "*",
+        "files": [
+          ".superpowers/brainstorm/732-1791810024/content/zugang-kuendigen-mails.html"
+        ],
+        "createdAt": "2026-10-12T13:14:33.700Z",
+        "reason": "Claude: verkleinerter Brainstorming-Entwurf mit abgedunkelten Platzhaltern, wird nicht ausgeliefert"
+      },
+      {
+        "rule": "all-caps-body",
+        "value": "*",
+        "files": [
+          ".superpowers/brainstorm/732-1791810024/content/zugang-kuendigen-mails.html"
+        ],
+        "createdAt": "2026-10-12T13:14:52.609Z",
+        "reason": "Claude: Brainstorming-Entwurf; Großbuchstaben nur in kurzen Navigationspunkten wie auf der echten Webseite"
+      }
+    ]
+  }
+}

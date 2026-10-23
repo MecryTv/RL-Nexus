@@ -1,0 +1,44 @@
+@use "mixins" as *;
+
+.list {
+    display: flex;
+    flex-direction: column;
+}
+
+.item {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    padding: 14px 4px;
+    border-bottom: 1px solid var(--c-line);
+
+    &:first-child {
+        border-top: 1px solid var(--c-line);
+    }
+}
+
+.usage {
+    color: var(--c-text);
+    font-family: var(--f-label);
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    overflow-wrap: anywhere;
+}
+
+/* Der Schrägstrich in Rot: das Zeichen, mit dem in Discord alles anfängt. */
+.slash {
+    color: var(--c-red);
+}
+
+/* Die Angaben leiser als der Command selbst - den tippt man, die füllt man aus. */
+.args {
+    color: var(--c-text-dim);
+    font-weight: 600;
+}
+
+.text {
+    color: var(--c-text-dim);
+    font-size: 0.92rem;
+    line-height: 1.55;
+}

@@ -1,0 +1,110 @@
+<link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@500;700&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+
+<style>
+  .rl { --base:#050608; --panel:#0a0f15; --fill:rgb(6 9 13/78%); --line:rgb(255 255 255/8%); --strong:rgb(255 255 255/14%);
+        --text:#f2f4f7; --dim:#a8b0bc; --faint:#7b8693; --blue:#00afff; --win:#35e07f; --loss:#ff4d5e; --yellow:#ffc53d; --purple:#b06bff; --red:#ff1e2d;
+        font-family: "Rajdhani", system-ui, sans-serif; color: var(--text); }
+  .cards.rl { grid-template-columns: 1fr !important; max-width: 1100px; }
+  .screen { background: var(--base); border: 1px solid #222; height: 430px; display:grid; overflow:hidden; font-size:14px; }
+  .lbl { font-weight:700; font-size:11px; letter-spacing:.16em; text-transform:uppercase; color: var(--faint); }
+  .col { border-right:1px solid var(--line); overflow:hidden; min-width:0; }
+  .boxes { padding:12px 10px; background: var(--panel); }
+  .compose { display:block; text-align:center; padding:9px; margin-bottom:12px; background: linear-gradient(135deg,#ff1e2d,#d81424); color:#fff; font-weight:700; font-size:12px; letter-spacing:.14em; text-transform:uppercase;
+             clip-path: polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px); }
+  .box { margin-bottom:10px; }
+  .box .addr { display:flex; align-items:center; gap:6px; padding:4px 6px; color: var(--text); font-weight:600; }
+  .box .addr i { width:7px; height:7px; border-radius:50%; background: var(--c); }
+  .f { display:flex; justify-content:space-between; padding:5px 8px 5px 19px; color: var(--dim); }
+  .f.on { background: rgb(255 30 45/12%); color: var(--text); box-shadow: inset 2px 0 0 var(--red); }
+  .f b { color: var(--blue); font-weight:700; }
+  .list .head { display:flex; align-items:center; gap:8px; padding:10px 12px; border-bottom:1px solid var(--line); }
+  .list .search { flex:1; padding:6px 10px; border:1px solid var(--strong); color: var(--faint); background: var(--panel); }
+  .mail { padding:9px 12px; border-bottom:1px solid var(--line); position:relative; }
+  .mail.unread { box-shadow: inset 3px 0 0 var(--blue); }
+  .mail.sel { background: rgb(0 175 255/9%); }
+  .mail .r1 { display:flex; justify-content:space-between; gap:8px; }
+  .mail .from { font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .mail.read .from { font-weight:500; color: var(--dim); }
+  .mail time { color: var(--faint); font-size:12px; white-space:nowrap; }
+  .mail .subj { color: var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .mail .prev { color: var(--faint); font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .chip { display:inline-block; padding:1px 6px; font-size:11px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; border:1px solid color-mix(in srgb, var(--c) 50%, transparent); color: var(--c); margin-right:4px; }
+  .read-pane { padding:14px 18px; overflow:hidden; }
+  .read-pane h6 { font-family:Oxanium,sans-serif; font-size:19px; margin:0 0 8px; }
+  .hdr { display:flex; gap:10px; align-items:center; padding-bottom:10px; border-bottom:1px solid var(--line); }
+  .av { width:34px; height:34px; border-radius:50%; background: linear-gradient(135deg,#2a3340,#151b23); display:grid; place-items:center; font-weight:700; color: var(--dim); }
+  .hdr small { display:block; color: var(--faint); font-size:12px; }
+  .acts { display:flex; gap:6px; margin:10px 0; flex-wrap:wrap; }
+  .acts span { padding:5px 10px; border:1px solid var(--strong); color: var(--dim); font-size:12px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; }
+  .acts span.p { border-color: var(--red); color: var(--text); background: rgb(255 30 45/14%); }
+  .body { color: var(--dim); line-height:1.5; }
+  .att { display:inline-flex; gap:6px; align-items:center; margin-top:10px; padding:6px 10px; border:1px solid var(--line); color: var(--text); font-size:13px; }
+  .reply { margin-top:12px; border:1px solid var(--strong); background: var(--panel); }
+  .reply .from { display:flex; gap:8px; align-items:center; padding:7px 10px; border-bottom:1px solid var(--line); color: var(--dim); font-size:13px; }
+  .reply .sel { padding:3px 8px; border:1px solid var(--strong); color: var(--text); }
+  .reply .txt { padding:10px; color: var(--faint); height:46px; }
+
+  .three { grid-template-columns: 200px 320px 1fr; }
+  .two { grid-template-columns: 200px 1fr; }
+  .two .list { border-right:0; }
+  .wide .mail { display:grid; grid-template-columns: 180px 1fr 70px; gap:12px; align-items:center; }
+  .wide .mail .subj span { color: var(--faint); }
+</style>
+
+<h2>Wie soll der Mailbereich aufgebaut sein?</h2>
+<p class="subtitle">Links die Postfächer aus mailcow mit ihren Ordnern, darüber „Kontaktformular“ als eigener Eingang. „Neue Mail“ und „Antworten“ fragen, aus welchem Postfach geschrieben wird. Ungelesenes hat einen blauen Rand.</p>
+
+<div class="cards rl">
+  <div class="card" data-choice="a-drei-spalten" onclick="toggleSelect(this)">
+    <div class="screen three">
+      <div class="col boxes">
+        <span class="compose">+ Neue Mail</span>
+        <div class="box" style="--c:#ffc53d"><div class="addr"><i></i>Kontaktformular</div><div class="f">Neu <b>3</b></div><div class="f">Erledigt</div></div>
+        <div class="box" style="--c:#00afff"><div class="addr"><i></i>support@</div><div class="f on">Posteingang <b>5</b></div><div class="f">Gesendet</div><div class="f">Archiv</div><div class="f">Spam</div><div class="f">Papierkorb</div></div>
+        <div class="box" style="--c:#b06bff"><div class="addr"><i></i>partner@</div><div class="f">Posteingang <b>1</b></div></div>
+      </div>
+      <div class="col list">
+        <div class="head"><span class="search">In support@ suchen …</span></div>
+        <div class="mail unread sel"><div class="r1"><span class="from">Vexa Esports</span><time>09:41</time></div><div class="subj">Partnerschaft für Season 12</div><div class="prev">Hallo zusammen, wir würden gern …</div></div>
+        <div class="mail unread"><div class="r1"><span class="from">rocketbob</span><time>08:15</time></div><div class="subj"><span class="chip" style="--c:#ffc53d">Formular</span>Bot reagiert nicht auf /rank</div><div class="prev">Seit gestern Abend kommt …</div></div>
+        <div class="mail read"><div class="r1"><span class="from">Discord</span><time>gestern</time></div><div class="subj">Your app was verified</div><div class="prev">Congratulations …</div></div>
+        <div class="mail read"><div class="r1"><span class="from">kiwi</span><time>Mo</time></div><div class="subj">Re: Turnier-Bracket 📎</div><div class="prev">Anbei das Bracket als PDF …</div></div>
+      </div>
+      <div class="read-pane">
+        <h6>Partnerschaft für Season 12</h6>
+        <div class="hdr"><span class="av">VE</span><div>Vexa Esports &lt;orga@vexa.gg&gt;<small>an support@nexus-emb.de · heute 09:41</small></div></div>
+        <div class="acts"><span class="p">Antworten</span><span>Allen</span><span>Weiterleiten</span><span>Archiv</span><span>Löschen</span></div>
+        <div class="body">Hallo zusammen,<br>wir würden RL Nexus gern auf unseren drei Servern einsetzen und suchen eine Partnerschaft für die nächste Season …</div>
+        <span class="att">📎 Konzept.pdf · 240 KB</span>
+        <div class="reply"><div class="from">Von <span class="sel">support@nexus-emb.de ▾</span></div><div class="txt">Antwort schreiben …</div></div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A · Drei Spalten wie in einem Mailprogramm</h3>
+      <p>Postfächer, Liste, Lesebereich nebeneinander. Antworten passiert direkt unter der Mail, oben die Wahl des Postfachs. Unter 1100 px rutscht der Lesebereich über die Liste, auf dem Handy ist es ein Schritt nach dem anderen.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="b-zwei-spalten" onclick="toggleSelect(this)">
+    <div class="screen two">
+      <div class="col boxes">
+        <span class="compose">+ Neue Mail</span>
+        <div class="box" style="--c:#ffc53d"><div class="addr"><i></i>Kontaktformular</div><div class="f">Neu <b>3</b></div></div>
+        <div class="box" style="--c:#00afff"><div class="addr"><i></i>support@</div><div class="f on">Posteingang <b>5</b></div><div class="f">Gesendet</div><div class="f">Archiv</div></div>
+        <div class="box" style="--c:#b06bff"><div class="addr"><i></i>partner@</div><div class="f">Posteingang <b>1</b></div></div>
+      </div>
+      <div class="col list wide">
+        <div class="head"><span class="search">In support@ suchen …</span><span class="lbl">Alle · Ungelesen · Mit Anhang</span></div>
+        <div class="mail unread sel"><span class="from">Vexa Esports</span><span class="subj">Partnerschaft für Season 12 <span>– Hallo zusammen, wir würden gern …</span></span><time>09:41</time></div>
+        <div class="mail unread"><span class="from">rocketbob</span><span class="subj"><span class="chip" style="--c:#ffc53d">Formular</span>Bot reagiert nicht auf /rank <span>– Seit gestern Abend …</span></span><time>08:15</time></div>
+        <div class="mail read"><span class="from">Discord</span><span class="subj">Your app was verified <span>– Congratulations …</span></span><time>gestern</time></div>
+        <div class="mail read"><span class="from">kiwi</span><span class="subj">Re: Turnier-Bracket 📎 <span>– Anbei das Bracket …</span></span><time>Mo</time></div>
+        <div class="mail read"><span class="from">mecry</span><span class="subj">Wartung Samstag <span>– Kurz zur Info …</span></span><time>So</time></div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B · Liste über die ganze Breite, Mail öffnet sich als eigene Ansicht</h3>
+      <p>Wie Gmail: Die Liste hat Platz für Betreff und Vorschau, ein Klick öffnet die Mail ganzseitig mit Zurück. Ruhiger, aber zum Vergleichen zweier Mails muss man hin und her.</p>
+    </div>
+  </div>
+</div>

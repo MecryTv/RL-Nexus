@@ -1,0 +1,56 @@
+@use "mixins" as *;
+
+.loading {
+    display: flex;
+    align-items: center;
+    gap: var(--s-3);
+    min-height: 48px;
+    color: var(--c-text-dim);
+    font-size: 0.9375rem;
+}
+
+.spinner {
+    width: 18px;
+    height: 18px;
+    border: 2px solid var(--c-line-strong);
+    border-top-color: var(--c-red);
+    border-radius: 50%;
+
+    @include motion {
+        animation: spin 0.8s linear infinite;
+    }
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.failure {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s-3);
+    margin-bottom: var(--s-4);
+    padding: var(--s-3) var(--s-4);
+    border-left: 3px solid var(--c-loss);
+    background: color-mix(in srgb, var(--c-loss) 8%, transparent);
+    color: var(--c-text);
+
+    > svg {
+        flex-shrink: 0;
+        color: var(--c-loss);
+    }
+
+    > p {
+        flex: 1 1 240px;
+    }
+}
+
+.centered {
+    display: grid;
+    min-height: 100dvh;
+    padding: var(--s-5);
+    place-items: center;
+}

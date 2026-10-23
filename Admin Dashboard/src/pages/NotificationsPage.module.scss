@@ -1,0 +1,123 @@
+@use "mixins" as *;
+
+.layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(260px, 360px);
+    align-items: start;
+    gap: var(--s-5);
+
+    /* Wie bei den Gruppen: darunter würde das Formular schmaler als die Vorschau. */
+    @include below(1099px) {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+.formPanel {
+    padding: var(--s-4);
+}
+
+.form {
+    display: grid;
+    gap: var(--s-4);
+
+    > button {
+        justify-self: start;
+    }
+}
+
+.side {
+    display: grid;
+    gap: var(--s-3);
+
+    @include from(1099px) {
+        position: sticky;
+        top: calc(var(--s-topbar) + var(--s-4));
+    }
+}
+
+.heading {
+    color: var(--c-text-dim);
+
+    @include label(0.85rem, 0.16em);
+}
+
+.preview {
+    display: grid;
+    padding: var(--s-4);
+    gap: var(--s-2);
+    justify-items: start;
+}
+
+.previewTitle {
+    color: var(--c-text);
+    font-weight: 700;
+    overflow-wrap: anywhere;
+}
+
+.previewText {
+    color: var(--c-text-dim);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.previewLink {
+    color: var(--c-blue);
+    font-size: 0.875rem;
+    overflow-wrap: anywhere;
+}
+
+.placeholder {
+    color: var(--c-text-faint);
+    font-style: italic;
+}
+
+.recent {
+    display: grid;
+    margin-top: var(--s-6);
+    gap: var(--s-3);
+}
+
+.empty {
+    color: var(--c-text-dim);
+}
+
+.frame {
+    overflow-x: auto;
+    border: 1px solid var(--c-line);
+    background: var(--c-panel-fill);
+}
+
+.table {
+    width: 100%;
+    min-width: 640px;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+
+    th {
+        padding: var(--s-2) var(--s-3);
+        border-bottom: 1px solid var(--c-line-strong);
+        color: var(--c-text-faint);
+        text-align: left;
+        white-space: nowrap;
+
+        @include label(0.72rem, 0.14em);
+    }
+
+    td {
+        padding: var(--s-2) var(--s-3);
+        border-bottom: 1px solid var(--c-line);
+        color: var(--c-text-dim);
+    }
+
+    tbody tr:last-child td {
+        border-bottom: 0;
+    }
+}
+
+.when {
+    white-space: nowrap;
+}
+
+.count {
+    color: var(--c-text-faint);
+}

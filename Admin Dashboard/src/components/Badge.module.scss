@@ -1,0 +1,51 @@
+@use "mixins" as *;
+
+.badge {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 0.5em;
+    padding: 0.38em 0.7em 0.32em;
+    border: 1px solid currentcolor;
+    background: color-mix(in srgb, currentcolor 10%, transparent);
+    line-height: 1;
+
+    @include label(0.75rem, 0.12em);
+    @include bevel-diagonal(6px);
+}
+
+.dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentcolor;
+}
+
+.ok {
+    color: var(--c-win);
+
+    .dot {
+        box-shadow: 0 0 8px currentcolor;
+    }
+}
+
+.warn {
+    color: var(--c-mod-engagement);
+}
+
+.danger {
+    color: var(--c-loss);
+}
+
+.info {
+    color: var(--c-blue);
+}
+
+/* Das Lila der Marke ist als kleine Schrift zu dunkel (4,4:1), hier eine Stufe heller (6,5:1). */
+.pro {
+    color: #a578ff;
+}
+
+.neutral {
+    color: var(--c-text-dim);
+}

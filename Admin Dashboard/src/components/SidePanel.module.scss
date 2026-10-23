@@ -1,0 +1,85 @@
+@use "mixins" as *;
+
+.panel {
+    width: min(520px, 100vw);
+    max-width: none;
+    height: 100dvh;
+    max-height: none;
+    margin: 0 0 0 auto;
+    padding: 0;
+    border: 0;
+    border-left: 1px solid var(--c-line-strong);
+    background: var(--c-panel);
+    color: var(--c-text);
+
+    &[open] {
+        display: flex;
+        flex-direction: column;
+    }
+
+    &::backdrop {
+        background: rgb(0 0 0 / 55%);
+    }
+
+    @include motion {
+        &[open] {
+            animation: slide var(--t-base) both;
+        }
+    }
+}
+
+.head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-3);
+    padding: var(--s-3) var(--s-4);
+    border-bottom: 1px solid var(--c-line);
+}
+
+.title {
+    overflow: hidden;
+    font-size: 1.1rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.close {
+    display: grid;
+    width: 40px;
+    height: 40px;
+    flex-shrink: 0;
+    place-items: center;
+    color: var(--c-text-dim);
+
+    &:hover {
+        color: var(--c-text);
+    }
+
+    &:focus-visible {
+        @include focus-inset;
+    }
+}
+
+.body {
+    display: grid;
+    flex: 1;
+    align-content: start;
+    overflow-y: auto;
+    padding: var(--s-4);
+    gap: var(--s-4);
+}
+
+.foot {
+    display: flex;
+    justify-content: flex-end;
+    padding: var(--s-3) var(--s-4);
+    border-top: 1px solid var(--c-line);
+}
+
+@keyframes slide {
+    from {
+        transform: translateX(24px);
+        opacity: 0;
+    }
+}

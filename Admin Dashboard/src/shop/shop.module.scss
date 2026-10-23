@@ -1,0 +1,899 @@
+@use "mixins" as *;
+
+/* --- Raster der Karten -------------------------------------------------- */
+
+.grid {
+    display: grid;
+    gap: var(--s-4);
+    align-items: start;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+
+    @include below(599px) {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+.dragging {
+    opacity: 0.5;
+}
+
+.notice {
+    margin-bottom: var(--s-4);
+    padding: var(--s-3) var(--s-4);
+    color: var(--c-text-dim);
+}
+
+/* --- Karte -------------------------------------------------------------- */
+
+.card {
+    position: relative;
+    display: grid;
+    gap: var(--s-2);
+    padding: var(--s-4);
+}
+
+.hidden {
+    opacity: 0.6;
+}
+
+/* Die ganze Karte ist der Knopf, liegt aber unter Griff und Text: so bleibt der Griff greifbar. */
+.open {
+    position: absolute;
+    z-index: 0;
+    cursor: pointer;
+    inset: 0;
+
+    &:focus-visible {
+        @include focus-inset;
+    }
+}
+
+.cardTop {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
+}
+
+.grip {
+    display: grid;
+    width: 32px;
+    height: 32px;
+    place-items: center;
+    color: var(--c-text-faint);
+    cursor: grab;
+
+    &:focus-visible {
+        @include focus-inset;
+    }
+
+    @include touch-target;
+}
+
+.tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-1);
+}
+
+.tag {
+    padding: 2px 7px;
+
+    @include label(0.72rem, 0.12em);
+}
+
+.tagBadge {
+    background: var(--c-red-deep);
+    color: #fff;
+}
+
+.tagAbo {
+    background: rgb(0 175 255 / 14%);
+    color: var(--c-blue);
+}
+
+.tagOnce {
+    background: rgb(255 197 61 / 12%);
+    color: var(--c-mod-engagement);
+}
+
+.tagHidden {
+    background: rgb(255 255 255 / 6%);
+    color: var(--c-text-dim);
+}
+
+.cardTitle {
+    margin: var(--s-1) 0 0;
+    font-size: 1.15rem;
+}
+
+.cardMeta {
+    margin: 0;
+    color: var(--c-text-dim);
+    font-size: 0.875rem;
+}
+
+.price {
+    margin: var(--s-1) 0 0;
+    font-family: var(--f-accent);
+    font-size: 1.4rem;
+    font-weight: 800;
+
+    small {
+        margin-left: var(--s-1);
+        color: var(--c-text-dim);
+
+        @include label(0.75rem, 0.1em);
+    }
+}
+
+.bullets {
+    display: grid;
+    gap: var(--s-1);
+    margin: 0;
+    padding: 0;
+    color: var(--c-text-dim);
+    font-size: 0.875rem;
+    list-style: none;
+
+    li {
+        position: relative;
+        padding-left: 18px;
+    }
+
+    li::before {
+        position: absolute;
+        top: 6px;
+        left: 0;
+        width: 9px;
+        height: 9px;
+        background: var(--c-win);
+        clip-path: polygon(0 50%, 40% 100%, 100% 0, 40% 70%);
+        content: "";
+    }
+}
+
+.cardFoot {
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
+    margin-top: var(--s-2);
+    padding-top: var(--s-2);
+    border-top: 1px solid var(--c-line);
+    font-size: 0.8125rem;
+}
+
+.role {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--c-text);
+
+    &::before {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--role);
+        content: "";
+    }
+}
+
+.active {
+    margin-left: auto;
+    color: var(--c-text-dim);
+}
+
+.add {
+    display: flex;
+    min-height: 200px;
+    align-items: center;
+    justify-content: center;
+    gap: var(--s-2);
+    border: 1px dashed var(--c-line-strong);
+    color: var(--c-text-dim);
+
+    &:hover {
+        color: var(--c-text);
+    }
+
+    &:focus-visible {
+        @include focus-ring;
+    }
+}
+
+/* --- Formular im Seitenpanel ------------------------------------------- */
+
+.form {
+    display: grid;
+    gap: var(--s-4);
+}
+
+.row {
+    display: grid;
+    gap: var(--s-3);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: end;
+
+    @include below(599px) {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+.formError {
+    margin: 0;
+    padding: var(--s-2) var(--s-3);
+    border-left: 3px solid var(--c-loss);
+    background: color-mix(in srgb, var(--c-loss) 12%, var(--c-panel-solid));
+    color: var(--c-text);
+}
+
+.panelFoot {
+    display: flex;
+    width: 100%;
+    flex-wrap: wrap;
+    gap: var(--s-2);
+}
+
+.pushRight {
+    margin-left: auto;
+}
+
+/* --- Kunden ------------------------------------------------------------- */
+
+/* Zwei mal zwei, ab 1000 px vier nebeneinander. */
+.metrics {
+    display: grid;
+    gap: var(--s-3);
+    margin-bottom: var(--s-4);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+
+    @include from(1000px) {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+}
+
+.metricNote {
+    display: block;
+    margin-top: 2px;
+    color: var(--c-text-dim);
+    font-size: 0.8125rem;
+    font-weight: 400;
+}
+
+.toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    gap: var(--s-3);
+    margin-bottom: var(--s-3);
+}
+
+.chips {
+    display: flex;
+    flex: 1 1 420px;
+    flex-wrap: wrap;
+    gap: var(--s-2);
+}
+
+/* Ein Filter ist gewählt: roter Rahmen und helle Schrift, nicht nur die Farbe. */
+.chip {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-2);
+    min-height: 32px;
+    padding: 0 var(--s-3);
+    border: 1px solid var(--c-line-strong);
+    color: var(--c-text-dim);
+    font-size: 0.8125rem;
+    transition:
+        border-color var(--t-fast),
+        color var(--t-fast);
+
+    @include touch-target;
+
+    &:hover {
+        color: var(--c-text);
+    }
+
+    &:focus-visible {
+        @include focus-ring;
+    }
+
+    &[aria-pressed="true"] {
+        border-color: var(--c-red);
+        color: var(--c-text);
+        font-weight: 600;
+    }
+}
+
+.chipCount {
+    color: var(--c-text-faint);
+    font-variant-numeric: tabular-nums;
+}
+
+.search {
+    flex: 0 1 280px;
+    min-width: 200px;
+
+    @include below(599px) {
+        flex-basis: 100%;
+    }
+}
+
+.count {
+    margin-bottom: var(--s-2);
+    color: var(--c-text-faint);
+    font-size: 0.875rem;
+}
+
+.empty {
+    padding: var(--s-4) 0;
+    color: var(--c-text-dim);
+}
+
+.frame {
+    overflow-x: auto;
+    border: 1px solid var(--c-line);
+    background: var(--c-panel-fill);
+}
+
+.table {
+    width: 100%;
+    min-width: 560px;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+
+    th {
+        padding: var(--s-2) var(--s-3);
+        border-bottom: 1px solid var(--c-line-strong);
+        color: var(--c-text-faint);
+        text-align: left;
+        white-space: nowrap;
+
+        @include label(0.72rem, 0.14em);
+    }
+
+    td {
+        height: 48px;
+        padding: var(--s-1) var(--s-3);
+        border-bottom: 1px solid var(--c-line);
+        color: var(--c-text-dim);
+        vertical-align: middle;
+    }
+
+    tbody tr {
+        cursor: pointer;
+    }
+
+    tbody tr:hover td {
+        background: rgb(255 255 255 / 3%);
+    }
+
+    tbody tr.selected td {
+        background: rgb(255 30 45 / 7%);
+    }
+}
+
+.person {
+    display: flex;
+    align-items: center;
+    gap: var(--s-3);
+    min-width: 0;
+
+    small {
+        display: block;
+        color: var(--c-text-faint);
+        font-size: 0.75rem;
+        font-variant-numeric: tabular-nums;
+    }
+}
+
+.initial {
+    display: grid;
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    place-items: center;
+    background: var(--c-line-strong);
+    color: var(--c-text);
+    font-size: 0.8rem;
+    font-weight: 700;
+
+    @include bevel-diagonal(6px);
+}
+
+.personName {
+    padding: 0;
+    color: var(--c-text);
+    font-weight: 600;
+    text-align: left;
+
+    &:hover {
+        color: var(--c-blue);
+    }
+
+    &:focus-visible {
+        @include focus-ring;
+    }
+}
+
+.dim {
+    color: var(--c-text-faint);
+}
+
+/* --- Kunden: Panel ------------------------------------------------------ */
+
+.customer {
+    display: grid;
+    gap: var(--s-5);
+}
+
+/* Bleibt oben stehen, auch wenn unten im Panel geklickt wurde. */
+.feedback {
+    position: sticky;
+    z-index: 1;
+    top: 0;
+
+    // Leer bleibt es im Baum (sonst liest ein Vorleser den ersten Satz nicht vor), nur ohne den Abstand.
+    &:empty {
+        margin-bottom: calc(-1 * var(--s-5));
+    }
+}
+
+.feedbackOk {
+    margin: 0;
+    padding: var(--s-2) var(--s-3);
+    border-left: 3px solid var(--c-win);
+    background: color-mix(in srgb, var(--c-win) 12%, var(--c-panel-solid));
+    color: var(--c-text);
+}
+
+.facts {
+    display: grid;
+    margin: 0;
+    font-size: 0.875rem;
+
+    div {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--s-1) var(--s-3);
+        padding: var(--s-2) 0;
+        border-bottom: 1px solid var(--c-line);
+    }
+
+    dt {
+        color: var(--c-text-dim);
+    }
+
+    dd {
+        margin: 0;
+        color: var(--c-text);
+        overflow-wrap: anywhere;
+        text-align: right;
+    }
+
+    a {
+        color: var(--c-blue);
+    }
+}
+
+.roles {
+    display: inline-flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: var(--s-1) var(--s-3);
+}
+
+.section {
+    display: grid;
+    gap: var(--s-2);
+}
+
+.actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-2);
+}
+
+.inline {
+    display: flex;
+    align-items: end;
+    gap: var(--s-2);
+
+    > :first-child {
+        flex: 1;
+    }
+}
+
+.giftForm {
+    display: grid;
+    gap: var(--s-3);
+    padding: var(--s-3);
+    border: 1px solid var(--c-line-strong);
+}
+
+.sync {
+    padding: var(--s-2) var(--s-3);
+    border-left: 3px solid var(--c-blue);
+    background: rgb(0 175 255 / 8%);
+    color: var(--c-text);
+    font-size: 0.875rem;
+
+    p,
+    ul {
+        margin: 0;
+    }
+
+    ul {
+        margin-top: var(--s-1);
+        padding-left: var(--s-4);
+        color: var(--c-text-dim);
+    }
+}
+
+.grants {
+    display: grid;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+
+    li {
+        display: flex;
+        align-items: center;
+        gap: var(--s-3);
+        padding: var(--s-2) 0;
+        border-bottom: 1px solid var(--c-line);
+        font-size: 0.875rem;
+    }
+
+    li > div {
+        display: grid;
+        flex: 1;
+        min-width: 0;
+    }
+
+    b {
+        color: var(--c-text);
+        font-weight: 600;
+    }
+
+    span {
+        color: var(--c-text-dim);
+    }
+}
+
+.history {
+    display: grid;
+    gap: var(--s-1);
+    margin: 0;
+    padding: 0;
+    color: var(--c-text-dim);
+    font-size: 0.8125rem;
+    line-height: 1.45;
+    list-style: none;
+
+    li {
+        position: relative;
+        padding-left: 14px;
+    }
+
+    li::before {
+        position: absolute;
+        top: 7px;
+        left: 0;
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: var(--c-line-strong);
+        content: "";
+    }
+
+    b {
+        color: var(--c-text);
+        font-weight: 600;
+    }
+
+    time {
+        color: var(--c-text-faint);
+    }
+}
+
+/* --- Kunden: Rückfrage beim Beenden und Sperren -------------------------- */
+
+.confirm {
+    display: grid;
+    gap: var(--s-3);
+
+    p {
+        margin: 0;
+    }
+}
+
+.choices {
+    display: grid;
+    gap: var(--s-2);
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+.choice {
+    display: flex;
+    gap: var(--s-3);
+    padding: var(--s-3);
+    border: 1px solid var(--c-line);
+    color: var(--c-text-dim);
+    cursor: pointer;
+    font-size: 0.875rem;
+    line-height: 1.4;
+
+    &:has(input:checked) {
+        border-color: var(--c-red);
+    }
+
+    &:has(input:focus-visible) {
+        @include focus-ring;
+    }
+
+    input {
+        flex-shrink: 0;
+        margin-top: 3px;
+        accent-color: var(--c-red);
+    }
+
+    b {
+        display: block;
+        color: var(--c-text);
+    }
+}
+
+/* --- Zugang zum Bot: Free und Paid Access -------------------------------- */
+
+.freeNotice {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-3);
+    align-items: center;
+    margin-bottom: var(--s-4);
+    padding: var(--s-3) var(--s-4);
+    border: 1px solid color-mix(in srgb, var(--c-win) 30%, transparent);
+    background: color-mix(in srgb, var(--c-win) 7%, transparent);
+    color: color-mix(in srgb, var(--c-win) 25%, var(--c-text));
+    font-size: 0.875rem;
+    line-height: 1.5;
+
+    p {
+        flex: 1;
+        min-width: min(100%, 260px);
+        margin: 0;
+    }
+
+    b {
+        color: var(--c-text);
+    }
+}
+
+.freeWarn {
+    color: var(--c-mod-engagement);
+}
+
+.access {
+    display: grid;
+    gap: var(--s-3);
+    margin-bottom: var(--s-4);
+    padding: var(--s-4);
+}
+
+.accessTitle {
+    margin: 0 0 var(--s-1);
+    font-size: 1.0625rem;
+    font-weight: 700;
+}
+
+.modes {
+    display: grid;
+    gap: var(--s-3);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin: 0;
+    padding: 0;
+    border: 0;
+
+    @include below(899px) {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+.mode {
+    display: grid;
+    gap: var(--s-2);
+    align-content: start;
+    padding: var(--s-4);
+    border: 1px solid var(--c-line);
+    background: rgb(255 255 255 / 2%);
+    cursor: pointer;
+    transition: border-color var(--t-fast), background-color var(--t-fast);
+
+    &:hover {
+        border-color: var(--c-line-strong);
+    }
+
+    &:has(input:focus-visible) {
+        @include focus-ring;
+    }
+
+    b {
+        color: var(--c-text);
+    }
+
+    ul {
+        margin: 0;
+        padding-left: 18px;
+        color: var(--c-text-dim);
+        font-size: 0.8125rem;
+        line-height: 1.5;
+        list-style: disc;
+    }
+
+    li::marker {
+        color: var(--c-text-faint);
+    }
+}
+
+.modeTop {
+    display: flex;
+    gap: var(--s-2);
+    align-items: center;
+    justify-content: space-between;
+
+    input {
+        width: 18px;
+        height: 18px;
+        margin: 0;
+    }
+}
+
+.modeTag {
+    display: inline-flex;
+    padding: 2px 8px;
+    border: 1px solid currentcolor;
+
+    @include label(0.6875rem, 0.14em);
+}
+
+.modeFree {
+    .modeTag {
+        color: var(--c-win);
+    }
+
+    input {
+        accent-color: var(--c-win);
+    }
+
+    &:has(input:checked) {
+        border-color: color-mix(in srgb, var(--c-win) 55%, transparent);
+        background: linear-gradient(160deg, color-mix(in srgb, var(--c-win) 10%, transparent), transparent 60%);
+    }
+}
+
+.modePaid {
+    .modeTag {
+        color: var(--c-loss);
+    }
+
+    input {
+        accent-color: var(--c-red);
+    }
+
+    &:has(input:checked) {
+        border-color: color-mix(in srgb, var(--c-red) 60%, transparent);
+        background: linear-gradient(160deg, color-mix(in srgb, var(--c-red) 12%, transparent), transparent 60%);
+    }
+}
+
+.modeBeta {
+    .modeTag {
+        color: var(--c-purple);
+    }
+
+    input {
+        accent-color: var(--c-purple);
+    }
+
+    &:has(input:checked) {
+        border-color: color-mix(in srgb, var(--c-purple) 60%, transparent);
+        background: linear-gradient(160deg, color-mix(in srgb, var(--c-purple) 12%, transparent), transparent 60%);
+    }
+}
+
+/* Der Hinweis oben im Beta-Modus: lila statt grün, sonst wie bei Free Access. */
+.betaNotice {
+    border-color: color-mix(in srgb, var(--c-purple) 35%, transparent);
+    background: color-mix(in srgb, var(--c-purple) 8%, transparent);
+    color: color-mix(in srgb, var(--c-purple) 20%, var(--c-text));
+
+    a {
+        color: var(--c-text);
+    }
+}
+
+.accessFacts {
+    display: grid;
+    gap: var(--s-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+
+    li {
+        display: flex;
+        gap: var(--s-3);
+        align-items: baseline;
+        color: var(--c-text-dim);
+        font-size: 0.875rem;
+        line-height: 1.45;
+    }
+
+    b {
+        color: var(--c-text);
+        font-weight: 600;
+    }
+}
+
+.factCount {
+    flex: none;
+    min-width: 2.25rem;
+    color: var(--c-text);
+    font-size: 0.9375rem;
+    font-variant-numeric: tabular-nums;
+    font-weight: 800;
+    text-align: right;
+}
+
+/* Gilt erst wieder bei Paid Access, bleibt aber bedienbar. */
+.greyed {
+    opacity: 0.55;
+}
+
+.srOnly {
+    @include sr;
+}
+
+/* --- Einstellungen ------------------------------------------------------ */
+
+.settings {
+    display: grid;
+    gap: var(--s-4);
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    align-items: start;
+
+    @include below(599px) {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+.box {
+    display: grid;
+    gap: var(--s-3);
+    padding: var(--s-4);
+}
+
+.boxTitle {
+    margin: 0;
+    color: var(--c-text-faint);
+
+    @include label(0.75rem, 0.16em);
+}
+
+.fact {
+    margin: 0;
+    color: var(--c-text-dim);
+    font-size: 0.875rem;
+    line-height: 1.5;
+
+    b {
+        color: var(--c-text);
+        font-weight: 600;
+    }
+}

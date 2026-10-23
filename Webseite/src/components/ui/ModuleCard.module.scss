@@ -1,0 +1,146 @@
+@use "mixins" as *;
+
+.card {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 26px 24px 22px;
+    height: 100%;
+}
+
+.top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 2px;
+}
+
+/* Das Symbol in der Kategoriefarbe, auf einem Feld derselben Farbe mit sehr
+   wenig Deckkraft - so trägt die Farbe, ohne zu schreien. */
+.iconBox {
+    display: grid;
+    flex-shrink: 0;
+    width: 46px;
+    height: 46px;
+    transition:
+        background var(--t-base),
+        box-shadow var(--t-base);
+    background: color-mix(in srgb, var(--accent) 13%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 26%, transparent);
+    color: var(--accent);
+    place-items: center;
+
+    @include bevel-diagonal(10px);
+
+    .card:hover & {
+        background: color-mix(in srgb, var(--accent) 22%, transparent);
+        box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 50%, transparent);
+    }
+}
+
+.name {
+    font-size: 1.16rem;
+    font-weight: 700;
+    letter-spacing: -0.005em;
+}
+
+/* Der Link spannt sich über die ganze Kachel - anklickbar ist alles. */
+.link {
+    transition: color var(--t-fast);
+
+    &::after {
+        position: absolute;
+        content: "";
+        inset: 0;
+    }
+
+    &:hover {
+        color: var(--accent);
+    }
+
+    /* Der Fokusring gehört um die Kachel, nicht um die zwei Wörter. */
+    &:focus-visible {
+        outline: none;
+
+        &::after {
+            outline: 2px solid var(--c-text);
+            outline-offset: -4px;
+        }
+    }
+}
+
+.tagline {
+    color: var(--c-text-dim);
+    font-size: 0.92rem;
+    line-height: 1.62;
+}
+
+.highlights {
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+    margin-top: 4px;
+
+    li {
+        display: flex;
+        align-items: flex-start;
+        gap: 9px;
+        color: var(--c-text-dim);
+        font-size: 0.855rem;
+        line-height: 1.5;
+    }
+
+    svg {
+        flex-shrink: 0;
+        margin-top: 3px;
+        color: var(--accent);
+        stroke-width: 2.4;
+    }
+}
+
+.foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    /* Schiebt sich nach unten, damit alle Kacheln einer Reihe hier gleich
+       hoch abschließen - auch wenn die Texte verschieden lang sind. */
+    margin-top: auto;
+    padding-top: 16px;
+    border-top: 1px solid var(--c-line);
+}
+
+.category {
+    color: var(--c-text-faint);
+
+    @include label(0.64rem, 0.16em);
+}
+
+.arrow {
+    transition:
+        transform var(--t-base),
+        color var(--t-base);
+    color: var(--c-text-faint);
+
+    .card:hover & {
+        color: var(--accent);
+
+        @include motion {
+            transform: translateX(4px);
+        }
+    }
+}
+
+/* --- Große Fassung für die Startseite ----------------------------------- */
+.detailed {
+    padding: 30px 28px 24px;
+
+    .iconBox {
+        width: 54px;
+        height: 54px;
+    }
+
+    .name {
+        font-size: 1.3rem;
+    }
+}

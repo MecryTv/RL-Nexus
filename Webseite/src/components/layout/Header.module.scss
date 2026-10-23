@@ -1,0 +1,238 @@
+@use "mixins" as *;
+
+.header {
+    position: sticky;
+    z-index: 100;
+    top: 0;
+    transition:
+        background var(--t-base),
+        border-color var(--t-base),
+        backdrop-filter var(--t-base);
+    border-bottom: 1px solid transparent;
+}
+
+/* Ab dem ersten Scrollen bekommt die Kopfzeile einen eigenen Grund. */
+.solid,
+.open {
+    border-bottom-color: var(--c-line);
+    background: rgb(5 6 8 / 82%);
+    backdrop-filter: blur(14px) saturate(140%);
+}
+
+.inner {
+    display: flex;
+    align-items: center;
+    gap: 26px;
+    height: var(--s-header);
+}
+
+/* --- Marke -------------------------------------------------------------- */
+.brand {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 12px;
+    margin-right: auto;
+}
+
+.mark {
+    width: 40px;
+    height: 40px;
+    transition: filter var(--t-base);
+    filter: drop-shadow(0 0 10px rgb(255 30 45 / 35%));
+    object-fit: contain;
+
+    .brand:hover & {
+        filter: drop-shadow(0 0 16px rgb(255 30 45 / 70%));
+    }
+}
+
+.wordmark {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.name {
+    font-family: var(--f-accent);
+    font-size: 1.02rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    line-height: 1;
+
+    /* Das "Nexus" rot wie das X im Logo. */
+    em {
+        color: var(--c-red);
+        font-style: normal;
+    }
+}
+
+.claim {
+    color: var(--c-text-faint);
+
+    @include label(0.56rem, 0.2em);
+}
+
+/* --- Navigation --------------------------------------------------------- */
+.nav {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+
+    @include below(940px) {
+        display: none;
+    }
+}
+
+.link {
+    position: relative;
+    padding: 9px 14px;
+    transition: color var(--t-fast);
+    color: var(--c-text-dim);
+
+    @include label(0.78rem, 0.1em);
+
+    &:hover {
+        color: var(--c-text);
+    }
+
+    /* Der Strich unter dem aktiven Punkt - wächst aus der Mitte. */
+    &::after {
+        position: absolute;
+        bottom: 0;
+        left: 50%;
+        width: 0;
+        height: 2px;
+        transform: translateX(-50%);
+        transition:
+            width var(--t-base),
+            box-shadow var(--t-base);
+        background: var(--c-red);
+        content: "";
+    }
+}
+
+.active {
+    color: var(--c-text);
+
+    &::after {
+        width: 22px;
+        box-shadow: 0 0 10px var(--c-red);
+    }
+}
+
+/* --- Schaltflächen ------------------------------------------------------ */
+.actions {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 12px;
+
+    @include below(940px) {
+        display: none;
+    }
+}
+
+.iconLink {
+    display: grid;
+    width: 40px;
+    height: 40px;
+    transition:
+        color var(--t-fast),
+        background var(--t-fast);
+    color: var(--c-text-dim);
+    place-items: center;
+
+    @include bevel-diagonal(9px);
+
+    &:hover {
+        background: rgb(88 101 242 / 16%);
+        color: #7d8cff;
+    }
+}
+
+.toggle {
+    display: none;
+    width: 42px;
+    height: 42px;
+    color: var(--c-text);
+    place-items: center;
+
+    @include bevel-diagonal(9px);
+
+    &:hover {
+        background: var(--c-line);
+    }
+
+    @include below(940px) {
+        display: grid;
+    }
+}
+
+/* --- Mobiles Menü ------------------------------------------------------- */
+.drawer {
+    display: flex;
+    position: fixed;
+    z-index: 99;
+    top: var(--s-header);
+    right: 0;
+    left: 0;
+    flex-direction: column;
+    gap: 26px;
+    overflow-y: auto;
+    height: calc(100dvh - var(--s-header));
+    padding: 30px clamp(18px, 5vw, 40px) 40px;
+    border-top: 1px solid var(--c-line);
+    background: rgb(5 6 8 / 97%);
+    backdrop-filter: blur(20px);
+
+    @include from(940px) {
+        display: none;
+    }
+
+    @include motion {
+        animation: slide-in var(--t-base);
+    }
+}
+
+@keyframes slide-in {
+    from {
+        transform: translateY(-10px);
+        opacity: 0;
+    }
+}
+
+.drawerNav {
+    display: flex;
+    flex-direction: column;
+
+    .link {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 18px 4px;
+        border-bottom: 1px solid var(--c-line);
+        font-size: 1.05rem;
+        letter-spacing: 0.06em;
+
+        /* Der Unterstrich der Desktop-Navigation ergibt in einer Liste keinen
+           Sinn - hier trägt die Farbe allein. */
+        &::after {
+            content: none;
+        }
+    }
+
+    .active {
+        color: var(--c-red);
+    }
+}
+
+.drawerActions {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+
+    > * {
+        width: 100%;
+    }
+}

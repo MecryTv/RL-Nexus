@@ -1,0 +1,24 @@
+.restart {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--s-3);
+}
+
+.result {
+    color: var(--c-text-dim);
+    font-size: 0.875rem;
+
+    a {
+        color: var(--c-blue);
+    }
+}
+
+.ok {
+    color: var(--c-win);
+}
+
+.late {
+    color: var(--c-mod-engagement);
+}

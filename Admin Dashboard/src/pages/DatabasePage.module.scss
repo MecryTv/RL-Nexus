@@ -1,0 +1,210 @@
+@use "mixins" as *;
+
+.back {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-1);
+    margin-bottom: var(--s-3);
+    color: var(--c-blue);
+    font-size: 0.875rem;
+
+    @include touch-target;
+
+    &:hover {
+        color: var(--c-text);
+    }
+}
+
+.toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: var(--s-3);
+    margin-bottom: var(--s-4);
+}
+
+.searchForm {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: var(--s-2);
+
+    > div {
+        min-width: 220px;
+    }
+}
+
+.note {
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
+    margin-bottom: var(--s-3);
+    padding: var(--s-2) var(--s-3);
+    border: 1px solid var(--c-line);
+    background: var(--c-panel-fill);
+    color: var(--c-text-dim);
+    font-size: 0.85rem;
+
+    svg {
+        flex-shrink: 0;
+        color: var(--c-blue);
+    }
+}
+
+.empty {
+    color: var(--c-text-dim);
+}
+
+.frame {
+    overflow-x: auto;
+    border: 1px solid var(--c-line);
+    background: var(--c-panel-fill);
+}
+
+.table {
+    /*
+        Breiter als der Rahmen werden, statt die Spalten zu zerquetschen: Bei
+        zwölf Spalten bliebe sonst für jede ein Wort pro Zeile. Der Rahmen
+        scrollt dafür seitwärts, `min-width` hält schmale Tabellen trotzdem auf
+        voller Breite.
+    */
+    width: max-content;
+    min-width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+
+    th {
+        position: sticky;
+        top: 0;
+        padding: 0;
+        border-bottom: 1px solid var(--c-line-strong);
+        /* Deckend, sonst scheinen die Zeilen beim Scrollen durch. */
+        background: var(--c-panel);
+        text-align: left;
+    }
+
+    td {
+        /* Genug für ein Datum oder eine ID, höchstens ein lesbarer Absatz. */
+        min-width: 90px;
+        max-width: 380px;
+        padding: var(--s-2) var(--s-3);
+        border-bottom: 1px solid var(--c-line);
+        color: var(--c-text-dim);
+        vertical-align: top;
+        overflow-wrap: anywhere;
+        white-space: pre-wrap;
+    }
+
+    tbody tr:last-child td {
+        border-bottom: 0;
+    }
+
+    tbody tr:hover td {
+        background: color-mix(in srgb, var(--c-text) 3%, transparent);
+    }
+
+    code {
+        font-family: var(--f-mono, ui-monospace, monospace);
+    }
+}
+
+/* Die ganze Kopfzelle ist der Knopf: kleiner zu treffen wäre kein Gewinn. */
+.sort {
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
+    width: 100%;
+    padding: var(--s-2) var(--s-3);
+    color: var(--c-text-faint);
+    white-space: nowrap;
+
+    @include label(0.72rem, 0.14em);
+    @include touch-target;
+
+    &:hover {
+        color: var(--c-text);
+    }
+
+    &:focus-visible {
+        @include focus-inset;
+    }
+}
+
+.faint {
+    opacity: 0.4;
+}
+
+.right {
+    text-align: right;
+}
+
+.comment {
+    color: var(--c-text-faint);
+}
+
+.link {
+    color: var(--c-blue);
+
+    &:hover {
+        color: var(--c-text);
+    }
+}
+
+.null {
+    color: var(--c-text-faint);
+    font-size: 0.78rem;
+    font-style: italic;
+}
+
+/* Lange Werte stehen gekürzt da und öffnen sich unten ganz. */
+.more {
+    color: inherit;
+    text-align: left;
+    text-decoration: underline dotted;
+    text-underline-offset: 3px;
+    overflow-wrap: anywhere;
+
+    &:hover {
+        color: var(--c-text);
+    }
+
+    &:focus-visible {
+        @include focus-inset;
+    }
+}
+
+.full {
+    position: sticky;
+    bottom: 0;
+    margin-top: var(--s-4);
+    border: 1px solid var(--c-line-strong);
+    background: var(--c-panel);
+}
+
+.fullHead {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-3);
+    padding: var(--s-2) var(--s-3);
+    border-bottom: 1px solid var(--c-line);
+
+    h2 {
+        color: var(--c-text-dim);
+
+        @include label(0.78rem, 0.14em);
+    }
+}
+
+.fullText {
+    max-height: 40vh;
+    margin: 0;
+    overflow: auto;
+    padding: var(--s-3);
+    color: var(--c-text-dim);
+    font-size: 0.85rem;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}

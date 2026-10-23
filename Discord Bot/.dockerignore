@@ -1,0 +1,41 @@
+# Was nicht ins Abbild gehoert. Ohne diese Datei wandern node_modules vom
+# Entwicklungsrechner (mit Windows-Binaries) und die .env mit allen Tokens in
+# jede Schicht - beides nicht.
+
+.env
+.env.*
+!.env.example
+
+node_modules
+dist
+logs
+transcripts
+evidence
+clips
+
+.git
+.gitignore
+.claude
+.impeccable
+.superpowers
+.tmp-preview
+
+docs
+*.md
+!README.MD
+
+# Nur fuer die Entwicklung: MariaDB und phpMyAdmin auf dem eigenen Rechner.
+docker-compose.yml
+
+*.log
+*.stackdump
+*.bak
+card-check*.png
+prime-index.json
+
+# Galerie wie in der .gitignore: Vorlagen kommen mit, die Uploads eines Servers
+# nicht - die liegen im Volume und gehoeren nicht in ein Abbild.
+src/images/*
+!src/images/default
+!src/images/privacy
+

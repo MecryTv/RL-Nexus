@@ -1,0 +1,85 @@
+@use "mixins" as *;
+
+.panel {
+    --accent: var(--c-line-strong);
+    --cut: var(--s-cut);
+
+    position: relative;
+    isolation: isolate;
+    background: linear-gradient(155deg, var(--accent) 0%, rgb(255 255 255 / 9%) 45%, rgb(255 255 255 / 5%) 100%);
+    transition:
+        background var(--t-base),
+        transform var(--t-base),
+        filter var(--t-base);
+
+    clip-path: polygon(
+        var(--cut) 0,
+        calc(100% - var(--cut)) 0,
+        100% var(--cut),
+        100% calc(100% - var(--cut)),
+        calc(100% - var(--cut)) 100%,
+        var(--cut) 100%,
+        0 calc(100% - var(--cut)),
+        0 var(--cut)
+    );
+
+    /* Die Füllung. Liegt eingerückt darunter - der Streifen, der ringsum
+       stehen bleibt, ist der Rahmen. Ein echtes `border` würde vom
+       `clip-path` mit weggeschnitten. */
+    &::before {
+        position: absolute;
+        z-index: -1;
+        background:
+            linear-gradient(165deg, rgb(255 255 255 / 3.5%) 0%, rgb(255 255 255 / 0%) 38%),
+            var(--c-panel-fill);
+        content: "";
+        inset: 1px;
+
+        clip-path: polygon(
+            calc(var(--cut) - 1px) 0,
+            calc(100% - var(--cut) + 1px) 0,
+            100% calc(var(--cut) - 1px),
+            100% calc(100% - var(--cut) + 1px),
+            calc(100% - var(--cut) + 1px) 100%,
+            calc(var(--cut) - 1px) 100%,
+            0 calc(100% - var(--cut) + 1px),
+            0 calc(var(--cut) - 1px)
+        );
+    }
+}
+
+.sm {
+    --cut: 10px;
+}
+
+.md {
+    --cut: var(--s-cut);
+}
+
+.lg {
+    --cut: 26px;
+}
+
+.glow {
+    filter: drop-shadow(0 0 16px rgb(0 0 0 / 60%));
+}
+
+/**
+ * Anklickbare Felder.
+ *
+ * Beim Überfahren tritt die Akzentfarbe in den ganzen Rahmen und das Feld hebt
+ * sich einen Pixel - genug, um die Reaktion zu bemerken, zu wenig, um beim
+ * Überfliegen einer Liste zu stören. `transform` und `filter` laufen auf der
+ * Grafikkarte, das Raster darunter wird dabei nicht neu berechnet.
+ */
+.interactive {
+    &:hover,
+    &:focus-within {
+        background: var(--accent);
+        filter: drop-shadow(0 0 18px color-mix(in srgb, var(--accent) 42%, transparent));
+
+        @include motion {
+            transform: translateY(-2px);
+        }
+    }
+}

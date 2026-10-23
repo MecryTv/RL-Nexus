@@ -1,0 +1,221 @@
+<link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@500;700&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+
+<style>
+  .rl { --base:#050608; --panel:#0a0f15; --fill:rgb(6 9 13/78%); --line:rgb(255 255 255/8%); --strong:rgb(255 255 255/14%);
+        --text:#f2f4f7; --dim:#a8b0bc; --faint:#8d97a3; --blue:#00afff; --win:#35e07f; --loss:#ff4d5e; --yellow:#ffc53d; --red:#ff1e2d;
+        font-family: "Rajdhani", system-ui, sans-serif; color: var(--text); }
+  .page { max-width: 1100px; background: radial-gradient(60% 40% at 8% 0%, rgb(255 30 45/13%), transparent 60%), radial-gradient(40% 30% at 100% 10%, rgb(0 175 255/7%), transparent 60%), var(--base); padding: 22px 28px 26px; border:1px solid #222; font-size:15px; }
+  .lbl { font-weight:700; font-size:11px; letter-spacing:.16em; text-transform:uppercase; color: var(--faint); }
+  .top { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; }
+  .brand { display:flex; align-items:center; gap:10px; }
+  .brand img { width:36px; height:36px; }
+  .word { font-family:Oxanium,sans-serif; font-weight:700; font-size:19px; letter-spacing:.06em; }
+  .word span { color: var(--red); }
+  .word small { display:block; font-family:Rajdhani; font-size:11px; letter-spacing:.24em; color: var(--faint); }
+  .nav { display:flex; gap:8px; }
+  .ghost { padding:7px 12px; border:1px solid var(--strong); color: var(--dim); font-weight:700; font-size:12px; letter-spacing:.12em; text-transform:uppercase; }
+  .bevel { clip-path: polygon(14px 0,100% 0,100% calc(100% - 14px),calc(100% - 14px) 100%,0 100%,0 14px); }
+
+  .hero { display:grid; grid-template-columns: minmax(0,1.2fr) minmax(0,2fr); gap:14px; margin-bottom:16px; }
+  .state { display:flex; align-items:center; gap:14px; padding:18px; border:1px solid color-mix(in srgb, var(--yellow) 45%, transparent); background: color-mix(in srgb, var(--yellow) 9%, var(--panel)); }
+  .state .ring { width:18px; height:18px; border-radius:50%; background: var(--yellow); box-shadow: 0 0 0 6px rgb(255 197 61/16%); flex-shrink:0; }
+  .state h3 { font-family:Oxanium,sans-serif; font-size:23px; margin:0; }
+  .state p { margin:2px 0 0; color: var(--dim); font-size:14px; }
+  .kpis { display:grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap:10px; }
+  .kpi { border:1px solid var(--line); background: var(--fill); padding:10px 12px; }
+  .kpi .v { font-family:Oxanium,sans-serif; font-size:22px; margin-top:4px; }
+  .kpi .v.g { color: var(--win); }
+  .kpi small { color: var(--faint); font-size:12px; }
+
+  .notice { border:1px solid color-mix(in srgb, var(--yellow) 45%, transparent); background: color-mix(in srgb, var(--yellow) 7%, var(--panel)); padding:14px 16px; margin-bottom:12px; }
+  .notice .head { display:flex; justify-content:space-between; gap:10px; align-items:baseline; flex-wrap:wrap; }
+  .notice b.t { font-family:Oxanium,sans-serif; font-size:17px; }
+  .chip { padding:3px 8px; background: var(--yellow); color: var(--base); font-weight:700; font-size:11px; letter-spacing:.14em; text-transform:uppercase; }
+  .affects { color: var(--dim); font-size:13px; margin-top:4px; }
+  .tl { margin-top:10px; display:grid; gap:6px; }
+  .tl div { display:grid; grid-template-columns: 110px 1fr; gap:10px; color: var(--dim); font-size:14px; }
+  .tl b { color: var(--text); }
+  .maint { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; border:1px solid color-mix(in srgb, var(--blue) 40%, transparent); background: color-mix(in srgb, var(--blue) 7%, var(--panel)); padding:12px 16px; margin-bottom:18px; }
+  .maint b { font-family:Oxanium,sans-serif; font-size:16px; }
+  .maint .count { font-family:Oxanium,sans-serif; font-size:20px; color: var(--blue); }
+
+  .svc { border:1px solid var(--line); background: var(--fill); }
+  .s { display:grid; grid-template-columns: minmax(0, 1fr) 150px; gap:16px; padding:14px 16px; border-bottom:1px solid var(--line); }
+  .s:last-child { border-bottom:0; }
+  .s .r1 { display:flex; justify-content:space-between; align-items:baseline; gap:10px; }
+  .s .name { font-family:Oxanium,sans-serif; font-size:17px; display:flex; align-items:center; gap:8px; }
+  .s .name i { width:9px; height:9px; border-radius:50%; background: var(--c, var(--win)); }
+  .s .st { color: var(--c, var(--win)); font-weight:700; font-size:14px; }
+  .bars { display:flex; gap:2px; height:28px; margin:8px 0 4px; }
+  .bars span { flex:1; background: var(--win); opacity:.85; border-radius:1px; }
+  .bars span.w { background: var(--yellow); } .bars span.d { background: var(--loss); } .bars span.n { background:#2a313a; }
+  .bars span.hover { outline:2px solid #fff; }
+  .scale { display:flex; justify-content:space-between; color: var(--faint); font-size:12px; }
+  .facts { display:flex; gap:14px; flex-wrap:wrap; color: var(--dim); font-size:13px; margin-top:6px; }
+  .facts b { color: var(--text); }
+  .side { display:grid; align-content:start; gap:4px; border-left:1px solid var(--line); padding-left:14px; }
+  .side .big { font-family:Oxanium,sans-serif; font-size:20px; }
+  .side svg { width:100%; height:38px; }
+  .tip { position:relative; }
+  .bars .tipbox { flex:none; opacity:1; border-radius:0; height:auto; }
+  .tipbox { position:absolute; top:-34px; left:52%; background:#0f151c !important; border:1px solid var(--strong); padding:6px 10px; font-size:12px; color: var(--dim); white-space:nowrap; z-index:2; }
+  .tipbox b { color: var(--text); }
+
+  .lower { display:grid; grid-template-columns: minmax(0,1.5fr) minmax(0,1fr); gap:16px; margin-top:18px; }
+  .inc { border-left:2px solid var(--strong); padding:4px 0 4px 12px; margin:8px 0; color: var(--dim); font-size:14px; }
+  .inc b { color: var(--text); font-family:Oxanium,sans-serif; font-size:15px; }
+  .inc .d { color: var(--faint); font-size:12px; }
+  .about { border:1px dashed var(--strong); padding:12px 14px; color: var(--dim); font-size:14px; line-height:1.5; }
+  .foot { margin-top:18px; display:flex; justify-content:space-between; color: var(--faint); font-size:12px; }
+
+  /* Discord */
+  .dc-wrap { max-width: 640px; margin-top: 28px; }
+  .dc-chat { background:#313338; padding:16px 16px 18px; font-family: "gg sans", "Noto Sans", "Helvetica Neue", Arial, sans-serif; color:#dbdee1; font-size:15px; line-height:1.375; }
+  .dc-head { display:flex; align-items:center; gap:8px; margin-bottom:4px; }
+  .dc-av { width:40px; height:40px; border-radius:50%; background:#111; display:grid; place-items:center; color:#ff1e2d; font-weight:800; font-size:16px; flex-shrink:0; }
+  .dc-name { color:#fff; font-weight:600; }
+  .dc-app { background:#5865f2; color:#fff; font-size:10px; font-weight:700; padding:1px 4px; border-radius:3px; }
+  .dc-time { color:#949ba4; font-size:12px; }
+  .dc-msg { margin-left:48px; display:grid; gap:8px; max-width:540px; }
+  .box { background:#2b2d31; border:1px solid #3f4147; border-left:4px solid #23a55a; border-radius:8px; padding:12px 14px; }
+  .box.y { border-left-color:#f0b232; } .box.b { border-left-color:#5865f2; }
+  .img { width:100%; border-radius:6px; display:block; margin-bottom:10px; }
+  .h2d { font-size:20px; font-weight:700; color:#f2f3f5; margin:2px 0; }
+  .h3d { font-size:16px; font-weight:700; color:#f2f3f5; margin:0 0 2px; }
+  .subd { color:#949ba4; font-size:12.5px; }
+  .ts { background:#3f4147; border-radius:3px; padding:0 3px; }
+  .rowd { display:flex; gap:12px; align-items:flex-start; }
+  .rowd .t { flex:1; min-width:0; }
+  .lbtn { display:inline-flex; align-items:center; gap:6px; padding:5px 12px; background:#4e5058; color:#fff; border-radius:4px; font-size:14px; font-weight:500; white-space:nowrap; }
+  .lbtn::after { content:"↗"; font-size:12px; opacity:.8; }
+  .btns { display:flex; flex-wrap:wrap; gap:8px; }
+  .quote { border-left:4px solid #4e5058; padding-left:10px; margin:6px 0; }
+  .g { color:#23a55a; }
+  .dbgrid { display:grid; grid-template-columns: auto 1fr; gap:2px 12px; margin-top:4px; }
+  .dbgrid span:nth-child(odd) { color:#949ba4; }
+</style>
+
+<h2>Statusseite und Discord, zweiter Entwurf</h2>
+<p class="subtitle">Die Statusseite mischt beide Entwürfe: Kennzahlen aus B oben, die Dienste mit 90 Tagesbalken aus A, daneben je Dienst die Antwortzeit der letzten 24 Stunden. Darunter Discord mit einem Container je Bereich.</p>
+
+<div class="rl">
+  <div class="page">
+    <div class="top"><div class="brand"><img src="files/logo.webp" alt=""><div class="word">RL <span>NEXUS</span><small>STATUS</small></div></div><div class="nav"><span class="ghost">Discord</span><span class="ghost">Zur Webseite</span></div></div>
+
+    <div class="hero">
+      <div class="state bevel"><span class="ring"></span><div><h3>Eingeschränkt</h3><p>Ein Dienst hakt gerade. Geprüft vor 40 Sekunden, alle 2 Minuten neu.</p></div></div>
+      <div class="kpis">
+        <div class="kpi"><div class="lbl">Verfügbar</div><div class="v g">99,96 %</div><small>letzte 30 Tage</small></div>
+        <div class="kpi"><div class="lbl">Antwortzeit</div><div class="v">48 ms</div><small>Mittel aller Dienste</small></div>
+        <div class="kpi"><div class="lbl">Im Einsatz</div><div class="v">2</div><small>Server · 13 Mitglieder</small></div>
+        <div class="kpi"><div class="lbl">Ohne Störung</div><div class="v">3 Std.</div><small>seit heute 07:06</small></div>
+      </div>
+    </div>
+
+    <div class="notice bevel">
+      <div class="head"><b class="t">Login über Discord hakt bei manchen</b><span class="chip">Wird untersucht</span></div>
+      <div class="affects">Betrifft: Bot-Dashboard · seit 10:31 (13 Minuten)</div>
+      <div class="tl">
+        <div><b>10:42 Update</b><span>Discord antwortet langsam. Bot und Webseite laufen normal, nur die Anmeldung im Dashboard dauert länger.</span></div>
+        <div><b>10:31 Gemeldet</b><span>Wir schauen uns das an.</span></div>
+      </div>
+    </div>
+
+    <div class="maint bevel"><div><div class="lbl" style="color:#00afff">Geplante Wartung</div><b>Datenbank-Umzug</b> · Samstag, 11. Oktober, 20:00 bis etwa 20:30<div class="affects">Betrifft: Bot, Bot-Dashboard · Einstellungen bleiben erhalten</div></div><span class="count">2T 09:15:42</span></div>
+
+    <div class="lbl" style="margin-bottom:6px">Dienste</div>
+    <div class="svc">
+      <div class="s"><div>
+        <div class="r1"><span class="name"><i></i>Bot</span><span class="st">Läuft</span></div>
+        <div class="bars tip"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span class="w"></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span class="d hover"></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+          <span class="tipbox"><b>18. September</b> · 99,3 % · 1 Ausfall, 10 Min.</span></div>
+        <div class="scale"><span>vor 90 Tagen</span><span>99,94 % in 90 Tagen</span><span>heute</span></div>
+        <div class="facts"><span>läuft seit <b>2 Std.</b></span><span>Ping zu Discord <b>130 ms</b></span><span>letzter Ausfall <b>heute 07:02</b>, 4 Min.</span></div>
+      </div><div class="side"><div class="lbl">Ping 24 h</div><div class="big">130 ms</div><svg viewBox="0 0 150 38" preserveAspectRatio="none"><polyline fill="none" stroke="#35e07f" stroke-width="2" points="0,22 15,20 30,24 45,17 60,19 75,14 90,21 105,18 120,23 135,16 150,18"/></svg></div></div>
+
+      <div class="s" style="--c: var(--yellow)"><div>
+        <div class="r1"><span class="name"><i></i>Bot-Dashboard</span><span class="st">Eingeschränkt</span></div>
+        <div class="bars"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span class="w"></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span class="d"></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span class="w"></span></div>
+        <div class="scale"><span>vor 90 Tagen</span><span>99,91 % in 90 Tagen</span><span>heute</span></div>
+        <div class="facts"><span>Antwortzeit <b>420 ms</b></span><span>sonst <b>51 ms</b></span><span>siehe Meldung oben</span></div>
+      </div><div class="side"><div class="lbl">Antwortzeit 24 h</div><div class="big">420 ms</div><svg viewBox="0 0 150 38" preserveAspectRatio="none"><polyline fill="none" stroke="#ffc53d" stroke-width="2" points="0,30 15,31 30,30 45,29 60,31 75,30 90,30 105,29 120,12 135,6 150,8"/></svg></div></div>
+
+      <div class="s"><div>
+        <div class="r1"><span class="name"><i></i>Webseite</span><span class="st">Läuft</span></div>
+        <div class="bars"><span class="n"></span><span class="n"></span><span class="n"></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+        <div class="scale"><span>seit 87 Tagen gemessen</span><span>100 % verfügbar</span><span>heute</span></div>
+        <div class="facts"><span>Antwortzeit <b>18 ms</b></span><span>zuletzt aktualisiert <b>heute 10:28</b></span></div>
+      </div><div class="side"><div class="lbl">Antwortzeit 24 h</div><div class="big">18 ms</div><svg viewBox="0 0 150 38" preserveAspectRatio="none"><polyline fill="none" stroke="#35e07f" stroke-width="2" points="0,28 15,27 30,28 45,27 60,28 75,26 90,27 105,28 120,27 135,28 150,27"/></svg></div></div>
+
+      <div class="s"><div>
+        <div class="r1"><span class="name"><i></i>Datenbank</span><span class="st">Läuft</span></div>
+        <div class="bars"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span class="d"></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+        <div class="scale"><span>vor 90 Tagen</span><span>99,99 % in 90 Tagen</span><span>heute</span></div>
+        <div class="facts"><span>Antwortzeit <b>2 ms</b></span><span>speichert Einstellungen, Level, Tickets</span></div>
+      </div><div class="side"><div class="lbl">Antwortzeit 24 h</div><div class="big">2 ms</div><svg viewBox="0 0 150 38" preserveAspectRatio="none"><polyline fill="none" stroke="#35e07f" stroke-width="2" points="0,32 15,32 30,31 45,32 60,32 75,31 90,32 105,32 120,31 135,32 150,32"/></svg></div></div>
+    </div>
+
+    <div class="lower">
+      <div><div class="lbl">Störungen der letzten 14 Tage</div>
+        <div class="inc"><b>Bot kurz weg</b> · heute 07:02 bis 07:06, 4 Minuten<div class="d">Automatisch erkannt · Bot</div></div>
+        <div class="inc"><b>Dashboard langsam</b> · 3. Oktober, 21:10 bis 21:40, 30 Minuten<div class="d">Eigene Meldung · Bot-Dashboard · Discord-API antwortete verzögert</div></div>
+        <div class="inc"><b>Keine weiteren Störungen</b><div class="d">Vom 26. September bis 2. Oktober lief alles.</div></div>
+      </div>
+      <div class="about"><div class="lbl" style="margin-bottom:6px">So wird geprüft</div>Alle zwei Minuten fragt der Server Bot, Bot-Dashboard, Webseite und Datenbank ab und misst, wie schnell sie antworten. Ein Tagesbalken wird gelb, wenn etwas langsam oder eingeschränkt war, rot bei einem Ausfall. Zeiten stehen in deiner Zeitzone.</div>
+    </div>
+    <div class="foot"><span>Aktualisiert sich von selbst</span><span>RL Nexus · Impressum · Datenschutz</span></div>
+  </div>
+
+  <div class="dc-wrap">
+    <h3 style="font-family:system-ui">Discord: ein Container je Bereich</h3>
+    <p class="subtitle">Jeder Container hat die Farbe seines eigenen Zustands. Kontakt ist raus, die Datenbank hat jetzt Verlauf, Verfügbarkeit, Antwortzeit und was sie speichert. Knöpfe stehen unter den Containern.</p>
+    <div class="dc-chat">
+      <div class="dc-head"><span class="dc-av">N</span><span class="dc-name">RL Nexus</span><span class="dc-app">APP</span><span class="dc-time">heute um 10:44</span></div>
+      <div class="dc-msg">
+        <div class="box y">
+          <img class="img" src="files/status-banner.webp" alt="">
+          <div class="h2d">🟡 Eingeschränkt</div>
+          <div class="subd">Geprüft <span class="ts">vor 1 Minute</span> · 99,96 % verfügbar in 30 Tagen · Kästchen = 2 Stunden</div>
+        </div>
+        <div class="box y">
+          <div class="h3d">⚠️ Login über Discord hakt bei manchen</div>
+          <div class="quote">Discord antwortet langsam. Bot und Webseite laufen normal, nur die Anmeldung im Dashboard dauert länger.</div>
+          <div class="subd">Wird untersucht · betrifft Bot-Dashboard · seit <span class="ts">10:31</span> · Update <span class="ts">10:42</span></div>
+        </div>
+        <div class="box">
+          <div class="h3d">🤖 Bot · <span class="g">99,8 %</span> heute · 99,94 % in 30 Tagen</div>
+          🟩🟩🟩🟩🟩🟩🟩🟩🟨🟩🟩🟩<br>
+          Läuft seit <span class="ts">2 Stunden</span> · Ping <b>130 ms</b> · <b>2</b> Server · <b>13</b> Mitglieder
+          <div class="subd">Letzter Ausfall <span class="ts">heute 07:02</span>, 4 Minuten · Version 1.0.0</div>
+        </div>
+        <div class="box y"><div class="rowd"><div class="t">
+          <div class="h3d">🖥️ Bot-Dashboard · <span style="color:#f0b232">langsam</span> · 99,91 % in 30 Tagen</div>
+          🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟨<br>
+          Antwortet in <b>420 ms</b>, sonst <b>51 ms</b>
+        </div><span class="lbtn">Öffnen</span></div></div>
+        <div class="box"><div class="rowd"><div class="t">
+          <div class="h3d">🌐 Webseite · <span class="g">100 %</span> · 100 % in 30 Tagen</div>
+          🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩<br>
+          Antwortet in <b>18 ms</b> · aktualisiert <span class="ts">heute 10:28</span>
+          <div class="subd">Banner: Wartung „Datenbank-Umzug“</div>
+        </div><span class="lbtn">Öffnen</span></div></div>
+        <div class="box">
+          <div class="h3d">🗄️ Datenbank · <span class="g">100 %</span> heute · 99,99 % in 30 Tagen</div>
+          🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩<br>
+          <div class="dbgrid">
+            <span>Antwortzeit</span><span><b>2 ms</b> · Ø 24 h 3 ms · langsamste 11 ms</span>
+            <span>Server</span><span>MariaDB 11.4.13 · läuft seit <span class="ts">12 Tagen</span></span>
+            <span>Inhalt</span><span>52 Tabellen · 2 MB · 1.204 Einträge im Bot</span>
+          </div>
+          <div class="subd">Letzter Ausfall <span class="ts">18. September</span>, 10 Minuten</div>
+        </div>
+        <div class="box b">
+          <div class="h3d">🛠️ Geplante Wartung</div>
+          <b>Datenbank-Umzug</b> · <span class="ts">Samstag, 11. Oktober 20:00</span> (<span class="ts">in 2 Tagen</span>), etwa 30 Minuten
+          <div class="subd">Betrifft Bot und Bot-Dashboard · Einstellungen bleiben erhalten</div>
+        </div>
+        <div class="btns"><span class="lbtn">Statusseite</span><span class="lbtn">Webseite</span><span class="lbtn">Bot-Dashboard</span></div>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,219 @@
+# RL Nexus im Betrieb: Bot samt Dashboard, Admin Dashboard, Hauptseite,
+# Statusseite und MariaDB, jedes als eigener Container. Davor steht nginx auf
+# dem Host mit certbot und reicht jede Domain an ihren Container weiter (je
+# Domain eine Datei unter /etc/nginx/sites-available/, Vorlagen unter nginx/,
+# Anleitung in docs/Hosting.md).
+#
+#   docker compose -f docker-compose.prod.yml up -d --build              starten
+#   docker compose -f docker-compose.prod.yml logs -f bot                zusehen
+#   docker compose -f docker-compose.prod.yml down                       stoppen
+#   docker compose -f docker-compose.prod.yml --profile tools up -d      PHPMyAdmin Start
+#
+# Die Webseiten liegen auf dem Server unter /var/www und sind dort gebaut
+# (dist), die Container zeigen sie nur. Ohne Eintrag in der .env gelten diese
+# Ordner: ADMIN_DIR, WEBSITE_DIR und STATUS_DIR.
+
+# Fester Projektname: Die Volumes heißen damit immer rlnexus_mariadb-data und
+# rlnexus_images, egal aus welchem Ordner Compose läuft. Ohne diese Zeile sähe
+# die Datenbank nach einem Ordnerwechsel leer aus.
+name: rlnexus
+
+# Docker hebt die Ausgabe jedes Containers auf, ohne Grenze. So bleiben es
+# höchstens drei Dateien zu je 10 MB, die älteste wird überschrieben.
+x-logging: &logging
+    driver: json-file
+    options:
+        max-size: "10m"
+        max-file: "3"
+
+services:
+    admin:
+        build: ${ADMIN_DIR:-/var/www/admin.nexus-emb.de}
+        image: rlnexus-admin:latest
+        container_name: rlnexus-admin
+        restart: unless-stopped
+        logging: *logging
+        # Einzeln statt env_file: Das Admin Dashboard bekommt nur, was es braucht.
+        environment:
+            CLIENT_ID: ${CLIENT_ID:?CLIENT_ID fehlt in der .env}
+            CLIENT_SECRET: ${CLIENT_SECRET:?CLIENT_SECRET fehlt in der .env}
+            CLIENT_TOKEN: ${CLIENT_TOKEN:?CLIENT_TOKEN fehlt in der .env}
+            SERVER_JWT_SECRET: ${SERVER_JWT_SECRET:?SERVER_JWT_SECRET fehlt in der .env}
+            DATABASE_HOST: mariadb
+            DATABASE_PORT: "3306"
+            DATABASE_NAME: ${DATABASE_NAME:-rlnexus}
+            DATABASE_USER: ${DATABASE_USER:-rlnexus}
+            DATABASE_PASSWORD: ${DATABASE_PASSWORD:?DATABASE_PASSWORD fehlt in der .env}
+            DEV_USER_IDs: ${DEV_USER_IDs:-}
+            ADMIN_GUILD_ID: ${ADMIN_GUILD_ID:-1547258700480253982}
+            ADMIN_ROLE_ID: ${ADMIN_ROLE_ID:-1548701400031297619}
+            DEVELOPER_ROLE_ID: ${DEVELOPER_ROLE_ID:-1548701516418912370}
+            ADMIN_PUBLIC_URL: https://${ADMIN_DOMAIN:-admin.nexus-emb.de}
+            BOT_API_URL: http://bot:3000
+            # Ob die Webseite antwortet, prüft der Server wie ein Besucher, über
+            # nginx auf dem Host (extra_hosts unten). Ihren Standardinhalt liest er aus dem Build.
+            WEBSITE_URL: https://${SITE_DOMAIN:-nexus-emb.de}
+            WEBSITE_DIST: /website/dist
+            # Ersatz für das Kontaktformular, wenn es das Postfach von CONTACT_MAIL
+            # unter „Postfächer verwalten“ nicht gibt.
+            SMTP_HOST: ${SMTP_HOST:-}
+            SMTP_PORT: ${SMTP_PORT:-465}
+            SMTP_USER: ${SMTP_USER:-}
+            SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+            SMTP_FROM: ${SMTP_FROM:-}
+            # Der Shop (Stripe). Alle drei oder keiner, siehe README des Admin Dashboards.
+            STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+            STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY:-}
+            STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+            SHOP_MAIL_FROM: ${SHOP_MAIL_FROM:-noreply@nexus-emb.de}
+            # Wohin Kontaktformulare gehen, verschickt über das Postfach mit dieser Adresse.
+            CONTACT_MAIL: ${CONTACT_MAIL:-support@nexus-emb.de}
+            CONTACT_WEBHOOK_URL: ${CONTACT_WEBHOOK_URL:-}
+            # Das Postfach: Mailcow per IMAP und SMTP. Die Postfächer trägt man in der
+            # Oberfläche ein. MAIL_KEY verschlüsselt ihre Passwörter, leer: aus SERVER_JWT_SECRET abgeleitet.
+            MAIL_KEY: ${MAIL_KEY:-}
+            MAIL_IMAP_HOST: ${MAIL_IMAP_HOST:-${MAIL_DOMAIN:-mail.nexus-emb.de}}
+            MAIL_IMAP_PORT: ${MAIL_IMAP_PORT:-993}
+            MAIL_SMTP_HOST: ${MAIL_SMTP_HOST:-${MAIL_DOMAIN:-mail.nexus-emb.de}}
+            MAIL_SMTP_PORT: ${MAIL_SMTP_PORT:-465}
+            # Kanal für die Statusmeldung.
+            STATUS_CHANNEL_ID: ${STATUS_CHANNEL_ID:-}
+            # Für die Knöpfe in der Statusmeldung und die Links der Statusseite.
+            DASHBOARD_URL: https://${DASHBOARD_DOMAIN:-dashboard.nexus-emb.de}
+            STATUS_URL: https://${STATUS_DOMAIN:-status.nexus-emb.de}
+            WEBSITE_PUBLIC_URL: https://${SITE_DOMAIN:-nexus-emb.de}
+            DISCORD_INVITE_URL: ${DISCORD_INVITE_URL:-}
+            LOGS_DIR: /data/logs
+            SITE_DIR: /data/site
+            FLAGS_DIR: /data/flags
+            PORT: "3001"
+            TZ: Europe/Berlin
+        # nginx auf dem Host reicht admin.nexus-emb.de hierher, die Container von
+        # Hauptseite und Statusseite /api/contact und /public/status (über das
+        # Docker-Netz als admin:3001).
+        # Nur auf 127.0.0.1: von außen geht es nur über nginx.
+        ports:
+            - "127.0.0.1:3001:3001"
+        # Die Hauptseite geht über nginx auf dem Host, IMAP und SMTP zu Mailcow,
+        # beides auf diesem Server. So landen Prüfung und Postfach über den Host
+        # dort, auch wenn der Server seine eigene öffentliche Adresse von innen
+        # nicht erreicht.
+        extra_hosts:
+            - "${SITE_DOMAIN:-nexus-emb.de}:host-gateway"
+            - "${MAIL_DOMAIN:-mail.nexus-emb.de}:host-gateway"
+        volumes:
+            - ./data/logs:/data/logs:ro
+            # Beide gehören UID 1000, dem Nutzer node im Container. Der Container
+            # der Hauptseite liest data/content als /content/*, data/flags für die Wartung.
+            - ./data/content:/data/site
+            - ./data/flags:/data/flags
+            - ${WEBSITE_DIR:-/var/www/nexus-emb.de}:/website:ro
+            # Die Oberfläche, auf dem Server mit npm run build gebaut. Ein neuer
+            # Build ist sofort zu sehen, ohne Neustart.
+            - ${ADMIN_DIR:-/var/www/admin.nexus-emb.de}/dist:/app/dist:ro
+        depends_on:
+            mariadb:
+                condition: service_healthy
+
+    # Die Hauptseite: nginx im Container zeigt das dist aus WEBSITE_DIR, mit
+    # Wartung, Inhalten aus dem Admin Dashboard und Kontaktformular
+    # (nginx/container/website.conf). nginx auf dem Host reicht nexus-emb.de hierher.
+    website:
+        image: nginx:stable-alpine
+        container_name: rlnexus-website
+        restart: unless-stopped
+        logging: *logging
+        ports:
+            - "127.0.0.1:8090:80"
+        volumes:
+            - ./nginx/container/website.conf:/etc/nginx/conf.d/default.conf:ro
+            - ${WEBSITE_DIR:-/var/www/nexus-emb.de}:/srv/website:ro
+            - ./data/content:/srv/content:ro
+            - ./data/flags:/srv/flags:ro
+            # Die Wartungsseite liegt beim Admin Dashboard.
+            - ${ADMIN_DIR:-/var/www/admin.nexus-emb.de}/public:/srv/wartung:ro
+
+    # Die Statusseite, genauso (nginx/container/status.conf).
+    status:
+        image: nginx:stable-alpine
+        container_name: rlnexus-status
+        restart: unless-stopped
+        logging: *logging
+        ports:
+            - "127.0.0.1:8091:80"
+        volumes:
+            - ./nginx/container/status.conf:/etc/nginx/conf.d/default.conf:ro
+            - ${STATUS_DIR:-/var/www/status.nexus-emb.de}:/srv/status:ro
+
+    bot:
+        build: .
+        image: rlnexus:latest
+        container_name: rlnexus-bot
+        restart: unless-stopped
+        logging: *logging
+        env_file: .env
+        environment:
+            DATABASE_HOST: mariadb
+            DATABASE_PORT: "3306"
+            SERVER_PORT: "3000"
+            # Das Modul Backups reicht an das Admin Dashboard weiter, im Docker-Netz.
+            ADMIN_INTERNAL_URL: http://admin:3001
+            TZ: Europe/Berlin
+        # Nur auf 127.0.0.1: nginx auf dem Host reicht dashboard.nexus-emb.de
+        # hierher. Das Admin Dashboard erreicht den Bot im Docker-Netz unter bot:3000.
+        ports:
+            - "127.0.0.1:3000:3000"
+        volumes:
+            - images:/app/src/images
+            - ./data/transcripts:/app/transcripts
+            - ./data/evidence:/app/evidence
+            # Clips der Woche: alle Videos jeder Runde samt runde.json - der Bot liest sie selbst.
+            - ./data/clips:/app/clips
+            - ./data/logs:/app/logs
+        depends_on:
+            mariadb:
+                condition: service_healthy
+
+    mariadb:
+        image: mariadb:11.4
+        container_name: rlnexus-mariadb
+        restart: unless-stopped
+        logging: *logging
+        environment:
+            MARIADB_DATABASE: ${DATABASE_NAME:-rlnexus}
+            MARIADB_USER: ${DATABASE_USER:-rlnexus}
+            MARIADB_PASSWORD: ${DATABASE_PASSWORD:?DATABASE_PASSWORD fehlt in der .env}
+            MARIADB_ROOT_PASSWORD: ${DATABASE_ROOT_PASSWORD:?DATABASE_ROOT_PASSWORD fehlt in der .env}
+            TZ: Europe/Berlin
+        volumes:
+            - mariadb-data:/var/lib/mysql
+        healthcheck:
+            test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+            interval: 10s
+            timeout: 5s
+            retries: 12
+            start_period: 30s
+
+    # Nur bei Bedarf aktivierbar:
+    # docker compose -f docker-compose.prod.yml --profile tools up -d
+    phpmyadmin:
+        image: phpmyadmin:5
+        container_name: rlnexus-phpmyadmin
+        restart: unless-stopped
+        logging: *logging
+        profiles: ["tools"]
+        environment:
+            PMA_HOST: mariadb
+            PMA_PORT: 3306
+            UPLOAD_LIMIT: 64M
+        ports:
+            # Nur auf dem Server selbst, von außen über einen SSH-Tunnel
+            # (docs/Hosting.md, Schritt 5), wie Portainer.
+            - "127.0.0.1:8080:80"
+        depends_on:
+            mariadb:
+                condition: service_healthy
+
+volumes:
+    images:
+    mariadb-data:

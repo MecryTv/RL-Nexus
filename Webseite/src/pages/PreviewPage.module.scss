@@ -1,0 +1,10 @@
+.wait {
+    padding: 48px 16px;
+    color: var(--c-text-faint);
+    text-align: center;
+}
+
+.card {
+    width: min(380px, 100% - 32px);
+    margin: 32px auto;
+}

@@ -1,0 +1,30 @@
+@use "mixins" as *;
+
+/*
+ * Die Ebene unter Kasse und Freischalten. Der z-index bleibt bewusst klein:
+ * Stripe legt seine Abfragen (3-D Secure) mit dem höchsten Wert darüber.
+ */
+.backdrop {
+    position: fixed;
+    z-index: 100;
+    display: grid;
+    overflow-y: auto;
+    padding: 16px;
+    background: rgb(5 6 8 / 92%);
+    inset: 0;
+    overscroll-behavior: contain;
+    place-items: center;
+
+    @include below(640px) {
+        padding: 0;
+    }
+}
+
+.box {
+    width: 100%;
+    color: var(--c-text);
+
+    &:focus {
+        outline: none;
+    }
+}

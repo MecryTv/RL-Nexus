@@ -1,0 +1,692 @@
+@use "mixins" as *;
+
+/* Gelb wie bei den Modulen „Engagement“: so heißt „Achtung“ im ganzen Dashboard. */
+$warn: var(--c-mod-engagement);
+
+.grow {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.dim {
+    margin: 0;
+    color: var(--c-text-dim);
+}
+
+.faint {
+    margin: 0;
+    color: var(--c-text-faint);
+    font-size: 0.8125rem;
+}
+
+.meh {
+    color: $warn;
+}
+
+.label {
+    margin: 0;
+    color: var(--c-text-faint);
+
+    @include label(0.75rem, 0.16em);
+}
+
+.notice {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s-3);
+    margin-bottom: var(--s-4);
+    padding: var(--s-4);
+
+    > p {
+        flex: 1 1 260px;
+        margin: 0;
+    }
+}
+
+/* --- Lagebild ------------------------------------------------------------- */
+
+.hero {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s-4) var(--s-5);
+    padding: var(--s-5);
+
+    /* Der Text nimmt den Platz, der Knopf bleibt rechts, bis es zu eng wird. */
+    > .grow {
+        flex: 1 1 320px;
+    }
+}
+
+.sentence {
+    margin: 2px 0 var(--s-1);
+    font-size: 1.375rem;
+    font-weight: 800;
+    line-height: 1.25;
+}
+
+.ring {
+    flex: none;
+    width: 86px;
+    height: 86px;
+}
+
+.ringTrack,
+.ringFail,
+.ringFill {
+    fill: none;
+    stroke-width: 9;
+}
+
+.ringTrack {
+    stroke: rgb(255 255 255 / 8%);
+}
+
+.ringFail {
+    stroke: $warn;
+}
+
+.ringFill {
+    stroke: var(--c-win);
+    stroke-linecap: butt;
+}
+
+.ringValue,
+.ringLabel {
+    fill: var(--c-text);
+    text-anchor: middle;
+}
+
+.ringValue {
+    font-family: var(--f-display);
+    font-size: 17px;
+    font-weight: 800;
+}
+
+.ringLabel {
+    fill: var(--c-text-faint);
+    font-size: 9px;
+    font-weight: 600;
+}
+
+/* --- Kacheln -------------------------------------------------------------- */
+
+.listHead {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-2) var(--s-4);
+    margin: var(--s-6) 0 var(--s-3);
+}
+
+.legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-1) var(--s-4);
+    padding: 0;
+    margin: 0;
+    color: var(--c-text-dim);
+    font-size: 0.8125rem;
+    list-style: none;
+
+    li {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    i {
+        width: 10px;
+        height: 14px;
+    }
+}
+
+.tiles {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--s-3);
+    padding: 0;
+    margin: 0;
+    list-style: none;
+
+    @include below(1199px) {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    @include below(699px) {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+.tile {
+    display: grid;
+    gap: var(--s-3);
+    padding: var(--s-4);
+    align-content: start;
+}
+
+/* Bot nicht mehr da: Backups gibt es noch, gesichert wird nichts mehr. */
+.gone {
+    opacity: 0.62;
+}
+
+.tileHead,
+.tileFoot {
+    display: flex;
+    align-items: center;
+    gap: var(--s-3);
+}
+
+.tileFoot {
+    flex-wrap: wrap;
+    font-size: 0.8125rem;
+}
+
+.tileName {
+    margin: 0;
+    overflow: hidden;
+    font-size: 1rem;
+    font-weight: 700;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.avatar {
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border: 1px solid rgb(255 30 45 / 35%);
+    background: linear-gradient(135deg, #2a0b10, #120507);
+    color: #ff6b77;
+    font-size: 0.9375rem;
+    font-weight: 800;
+
+    @include bevel-diagonal(8px);
+}
+
+.open {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-1);
+    color: var(--c-blue);
+    font-weight: 600;
+    text-decoration: none;
+
+    @include touch-target;
+
+    &:hover,
+    &:focus-visible {
+        color: var(--c-text);
+    }
+}
+
+/* --- 14 Nächte ------------------------------------------------------------ */
+
+.nights {
+    display: grid;
+    grid-template-columns: repeat(14, minmax(0, 1fr));
+    gap: 3px;
+    max-width: 260px;
+    padding: 0;
+    margin: 0;
+    list-style: none;
+
+    li {
+        height: 18px;
+    }
+}
+
+.nights li,
+.legend i {
+    display: block;
+    background: #1b232d;
+
+    &.ok {
+        background: var(--c-win);
+    }
+
+    &.fail {
+        background: var(--c-loss);
+    }
+
+    /* Von Hand: blaue Raute, damit es nicht nur an der Farbe hängt. */
+    &.hand {
+        background: var(--c-blue);
+        clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+    }
+}
+
+/* --- Seite eines Servers -------------------------------------------------- */
+
+.back {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-1);
+    margin-bottom: var(--s-3);
+    color: var(--c-text-dim);
+    font-size: 0.875rem;
+    text-decoration: none;
+
+    @include touch-target;
+
+    &:hover,
+    &:focus-visible {
+        color: var(--c-text);
+    }
+}
+
+.head {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--s-4);
+
+    > header {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+}
+
+.big {
+    width: 52px;
+    height: 52px;
+    font-size: 1.125rem;
+}
+
+.actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: var(--s-2);
+}
+
+/* Was der Server im Bot-Dashboard für automatische Backups eingestellt hat. */
+.planLine {
+    margin: calc(var(--s-3) * -1) 0 var(--s-4);
+    color: var(--c-text-dim);
+    font-size: 0.875rem;
+}
+
+.handForm {
+    margin-bottom: var(--s-4);
+    padding: var(--s-4);
+
+    form {
+        display: grid;
+        gap: var(--s-3);
+    }
+}
+
+/* Zeitleiste: Linie in der Mitte, Nächte darauf, Fähnchen darüber, Daten darunter. */
+.timelinePanel {
+    display: grid;
+    gap: var(--s-2);
+    margin-bottom: var(--s-4);
+    padding: var(--s-4) var(--s-5);
+}
+
+.timeline {
+    position: relative;
+    height: 96px;
+}
+
+.axis {
+    position: absolute;
+    top: 52px;
+    right: 0;
+    left: 0;
+    height: 2px;
+    background: var(--c-line-strong);
+}
+
+.point {
+    position: absolute;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+    transform: translateX(-50%);
+
+    /* Der sichtbare Punkt ist kleiner als die Fläche zum Klicken. */
+    &::after {
+        position: absolute;
+        content: "";
+        inset: 5px;
+    }
+
+    &:focus-visible {
+        @include focus-ring;
+    }
+}
+
+.night {
+    top: 41px;
+
+    &::after {
+        border: 2px solid var(--c-panel-solid);
+        border-radius: 50%;
+        background: var(--c-win);
+        inset: 3px;
+    }
+}
+
+/* Vor dem Zurückladen: nur ein Ring, damit es nicht wie eine Nacht aussieht. */
+.night.before::after {
+    border: 3px solid var(--c-text-dim);
+    background: var(--c-panel-solid);
+}
+
+/* Von Hand: Raute auf einem Stiel bis zur Linie. */
+.flag {
+    top: 6px;
+
+    &::before {
+        position: absolute;
+        top: 20px;
+        left: 11px;
+        width: 2px;
+        height: 26px;
+        background: var(--c-blue);
+        content: "";
+    }
+
+    &::after {
+        background: var(--c-blue);
+        clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+        inset: 3px;
+    }
+}
+
+.on::after {
+    box-shadow: 0 0 0 3px var(--c-red);
+}
+
+/* Die Raute schneidet den Schatten ab: der Rahmen kommt stattdessen als Umriss. */
+.flag.on::after {
+    background: var(--c-text);
+}
+
+.day {
+    position: absolute;
+    top: 74px;
+    color: var(--c-text-faint);
+    font-size: 0.75rem;
+    white-space: nowrap;
+    transform: translateX(-50%);
+
+}
+
+/* Die Daten an den Enden stehen nach innen, sonst ragen sie aus dem Kasten. */
+.dayStart {
+    transform: translateX(-12px);
+}
+
+.dayEnd {
+    transform: translateX(calc(-100% + 12px));
+}
+
+.pointLegend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-1) var(--s-4);
+    padding: 0;
+    margin: 0;
+    color: var(--c-text-dim);
+    font-size: 0.8125rem;
+    list-style: none;
+
+    li {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    /* top: 0 hebt die Lage der Punkte auf der Zeitleiste auf. */
+    i {
+        position: relative;
+        top: 0;
+        display: block;
+        width: 14px;
+        height: 14px;
+
+        &::after {
+            position: absolute;
+            content: "";
+            inset: 0;
+        }
+    }
+
+    .night::after {
+        border-width: 0;
+        inset: 0;
+    }
+
+    .night.before::after {
+        border-width: 2px;
+    }
+
+    .flag::before {
+        display: none;
+    }
+}
+
+.chosen {
+    display: grid;
+    gap: var(--s-4);
+    padding: var(--s-5);
+}
+
+.chosenHead {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--s-3);
+}
+
+.chosenTitle {
+    margin: 2px 0 0;
+    font-size: 1.25rem;
+}
+
+.facts {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 6px var(--s-4);
+    margin: 0;
+    font-size: 0.875rem;
+
+    dt {
+        color: var(--c-text-faint);
+    }
+
+    dd {
+        margin: 0;
+        overflow-wrap: anywhere;
+    }
+}
+
+.groups {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--s-4) var(--s-5);
+
+    @include below(799px) {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+.areas {
+    display: grid;
+    padding: 0;
+    margin: var(--s-2) 0 0;
+    list-style: none;
+
+    li {
+        display: flex;
+        align-items: baseline;
+        gap: var(--s-3);
+        padding: 6px 0;
+        border-bottom: 1px solid var(--c-line);
+        font-size: 0.875rem;
+    }
+
+    strong {
+        font-variant-numeric: tabular-nums;
+    }
+
+    small {
+        display: block;
+        margin-top: 2px;
+        font-size: 0.75rem;
+    }
+}
+
+.factRow {
+    display: contents;
+}
+
+.small {
+    font-size: 0.8125rem;
+}
+
+/* --- Assistent zum Zurückladen -------------------------------------------- */
+
+.wizardTitle {
+    margin: 0 0 2px;
+    font-size: clamp(1.3rem, 2.2vw, 1.6rem);
+}
+
+.steps {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    padding: 0;
+    margin: 0 0 var(--s-4);
+    list-style: none;
+
+    @include below(599px) {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+.step {
+    padding: var(--s-3) var(--s-4);
+    border-bottom: 2px solid var(--c-line);
+    color: var(--c-text-faint);
+
+    b {
+        display: block;
+        overflow: hidden;
+        color: var(--c-text-dim);
+        font-size: 0.9375rem;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+}
+
+.done {
+    border-color: var(--c-win);
+
+    b {
+        color: var(--c-text);
+    }
+}
+
+.now {
+    border-color: var(--c-red);
+
+    b {
+        color: var(--c-text);
+    }
+}
+
+/* Zurück zu einem fertigen Schritt: die ganze Fläche ist der Knopf. */
+.stepButton {
+    display: block;
+    width: 100%;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+
+    &:hover b {
+        text-decoration: underline;
+    }
+
+    &:focus-visible {
+        @include focus-ring;
+    }
+}
+
+.pick {
+    display: grid;
+    gap: var(--s-1);
+    padding: 0;
+    margin: 0;
+    border: 0;
+
+    legend {
+        margin-bottom: var(--s-2);
+    }
+}
+
+.pickRow {
+    display: flex;
+    align-items: center;
+    gap: var(--s-3);
+    padding: var(--s-2) var(--s-3);
+    border: 1px solid var(--c-line);
+    cursor: pointer;
+
+    small {
+        display: block;
+    }
+
+    &:hover {
+        border-color: var(--c-line-strong);
+    }
+}
+
+.picked {
+    border-color: rgb(255 30 45 / 55%);
+    background: rgb(255 30 45 / 8%);
+}
+
+.cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: var(--s-2);
+    padding: 0;
+    margin: 0 0 var(--s-3);
+    list-style: none;
+}
+
+.card {
+    display: grid;
+    gap: var(--s-2);
+    padding: var(--s-3) var(--s-4);
+    align-content: start;
+}
+
+.cardOn::before {
+    background: linear-gradient(160deg, rgb(255 30 45 / 12%), var(--c-panel-fill) 60%);
+}
+
+.summary {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s-3);
+    padding: var(--s-3) var(--s-4);
+
+    p {
+        margin: 0;
+    }
+}

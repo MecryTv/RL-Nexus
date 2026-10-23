@@ -1,0 +1,53 @@
+# SDD ledger — plan: docs/superpowers/plans/2026-10-17-plan-14b-shop-recht-zugang.md
+
+Kein Git: keine Commits, Ledger von Hand. Spec: docs/superpowers/specs/2026-10-12-shop-design.md.
+Ruling: Ausführung inline (executing-plans), wie bei 12, 13 und 14a vom Nutzer gewählt — kostet, wenn falsch: kein Review je Aufgabe, nur der Abschluss-Review.
+Ruling: Rechtstexte kommen zur Laufzeit vom Admin-Server (Blöcke + PDF) statt als Kopie in der Webseite — eine Quelle für Seite und Mail-Anhang; ohne Admin-Server gibt es ohnehin keinen Kauf — kostet: /agb und /widerruf zeigen bei ausgefallenem Admin-Server nur den Hinweis mit der Support-Mail.
+Ruling: Zurückgestellte Kleinigkeiten aus Plan 12 (Mail-Fuß mit Anbieter, Rolle in der § 312f-Mail, Unterzeile „Bestellung“, Kündigungszeit aus canceled_at/cancel_at, keine Abgelaufen-Mail an Gesperrte) und Plan 13 (Kasse, Freischalten, Kontrast, cardAction) in Task 2, 4 und 7; Avatar-Größe, Kartenraster 2+1, Fehler beim Abmelden und ?produkt= bleiben zurückgestellt — kostet: kleine Schönheitsfehler auf der Preisseite.
+
+## Pre-flight
+| Erzeugt | Verbraucht | Befund |
+|---|---|---|
+| T1 LEGAL_DOCS/ILegalText, legal.ts (parseLegal, legalVersions, legalText, legalPdf, setLegalDir, PROVIDER_LINE) | T2, T5 | passt |
+| T2 GET /legal/:doc(.pdf), orderMail roleName/termsVersion, subline, Fuß | T5 | passt |
+| T3 IShopMe productTitle/roleName/hasBilling, ICancelInput/ICancelReceipt, /portal, /cancel, login ?ziel | T6 | passt |
+| T4 cleanup, Webhook-Nacharbeit | — | passt |
+Task 1: complete (tests: npm run check → RED „Cannot find module legal.ts“, dann „Shop: Rechtstexte“ 4× ok; pdfkit@0.20.2, @types/pdfkit@0.17.6; PDF angesehen: Umlaute, ß, §, Fuß mit Anbieter und Seitenzahl; typecheck 0, oxlint 0)
+Ruling: PDFs entstehen beim ersten Abruf und werden je Stand gemerkt, nicht beim Start — kostet: die erste Bestätigung nach einem Neustart wartet einen Moment länger
+Task 2: Ruling: orderMail ist jetzt async (die PDFs entstehen asynchron) — kostet: nichts, zwei Aufrufer
+Task 2: Ruling: Unterzeile unter dem Logo „Shop“ für alle Shop-Mails, „Bestellung“ nur bei der Bestätigung (Spec nennt nur „Bestellung“) — kostet: nichts
+Task 2: Ruling: GET /public/shop/legal ohne Datenbank nimmt den neuesten Stand aus shared/legal — die Seite zeigt dann trotzdem Text — kostet: nichts
+Task 2: complete (tests: npm run check → RED „Discord-Rolle:“, „Anbieter im Fuß“, Route 404 „Diese Adresse gibt es nicht.“; check:db → RED „AGB … des Stands der Bestellung“; dann alles ok, nur der alte Kontaktformular-FAIL; zwei Fehler im eigenen Test behoben (PUT settings antwortet 204; Event-ID evt_checkdb_w6 kollidierte mit „Teilerstattung“); IOrder.termsVersion ergänzt; typecheck 0, oxlint 0)
+Task 3: Ruling: ICancelCandidate trägt zusätzlich grantId, productId, endsAt, cancelAtPeriodEnd — die Route braucht sie für Stripe, Titel und „schon gekündigt“ — kostet: nichts
+Task 3: Ruling: Nimmt Stripe die Kündigung nicht an oder scheitert die Suche, gilt sie als nicht zugeordnet: Hinweis an support@ mit dem Grund, Eingangsbestätigung geht trotzdem raus (§ 312k: der Eingang zählt) — kostet: Handarbeit in dem Fall
+Task 3: Ruling: Außerordentlich und zugeordnet: zum Periodenende kündigen (das Mindeste) und zusätzlich an support@ zur Prüfung — kostet: nichts
+Task 3: Ruling: Fehler bei der Anmeldung führen weiter auf /preise?anmeldung=…, auch mit ?ziel= — kostet: nach einem Fehler landet man nicht auf /zugang
+Task 3: complete (tests: npm run check → RED „Cannot find module cancel.ts“, dann „Shop: Kündigen“ 2× ok; check:db „Shop: Kündigen und Mein Zugang“ 4× ok, nur der alte Kontaktformular-FAIL; typecheck 0, oxlint 0)
+Task 4: Ruling: Die Prüfung zur Kündigungsmail liegt in check:db (Abschnitt „Shop: Webhook“, bestehende Prüfung erweitert), nicht in shop.check — der Webhook braucht die Datenbank — kostet: nichts
+Task 4: Ruling: Sperren schließt offene Kassen nach setBanned; scheitert das Schließen (schon bezahlt/abgelaufen), bleibt die Bestellung, wie Stripe sie meldet — kostet: eine in derselben Sekunde bezahlte Kasse schaltet trotz Sperre frei
+Task 4: Beobachtung: „Jede Prüfung landet mit vier Zeilen …“ (Status) war in einem Lauf rot (8 statt 4 Zeilen): der Dev-Server des Nutzers auf 3001 schrieb in derselben Minute; nächster Lauf grün. Nicht vom Shop.
+Task 4: complete (tests: check:db → RED 4 neue/erweiterte Prüfungen (Mail-Datum aus cancel_at, Gesperrte ohne Abgelaufen-Mail, Aufräumen 90 Tage, Sperren schließt Kasse), dann alle ok, nur der alte Kontaktformular-FAIL; check 0, typecheck 0, oxlint 0)
+Deferred (minor): Bestellungen drei Jahre nach Vertragsende löschen — kommt, bevor die erste so alt ist (frühestens Oktober 2029); steht als ponytail-Kommentar in cleanup.ts
+Task 5: Ruling: Browser-Prüfung über die laufenden Dev-Server des Nutzers (Webseite 5173, Admin 3001 mit --watch), nur lesende Aufrufe — eigene Ports waren nicht nötig — kostet: nichts
+Task 5: Ruling: Blöcke je h2 in <section> wie im Impressum (dort hängen die Abstände dran), „Stand · Als PDF“ am Ende wie in der Datenschutzerklärung — kostet: nichts
+Task 5: Ruling: Datenschutz: Abschnitt „Zugang kaufen und testen“ (vor „Wohin Daten gehen“), Shop-Cookies rlnexus_shop und rlnexus_shop_state in der Cookie-Liste, Stripe bei den Empfängern, „Kurz gesagt“ angepasst, Stand 17. Oktober 2026. Impressum: „privat betrieben“ raus, Verweis auf Preise und AGB, Abschnitt Umsatzsteuer (§ 19 UStG); Streitbeilegung hatte schon keinen OS-Link — kostet: nichts
+Task 5: complete (tests: check-shop.mjs → RED (groupBlocks/legalDay fehlen), dann ok; Webseite check 0, lint 0, tsc 0, build 0; Browser: /agb und /widerruf mit Abschnitten, Stand, PDF-Link, Formular; Fuß mit AGB, Widerruf, Verträge hier kündigen; Fehlerfall mit Satz, Mail-Link, „Nochmal versuchen“ lädt danach; Impressum ohne „privat betrieben“, mit Umsatzsteuer; 375 px ohne seitliches Scrollen)
+Task 6: Ruling: accessRows bekommt die Produkte dazu (accessRows(me, products)), sonst fehlt der Preis in der Zeile „Produkt“; accessStatus für das Schild ergänzt — kostet: nichts
+Task 6: Ruling: Kündigungsformular nutzt die Feld-Styles des Kontaktformulars (ContactForm.module.scss) statt eigener Kopien; eigenes Field mit aria-describedby für Hinweis/Fehler — kostet: Änderungen dort wirken auch hier
+Task 6: Ruling: Abmelden-Knopf auf „Mein Zugang“ dazu (stand nicht im Plan) — sonst kommt man dort nicht raus — kostet: nichts
+Task 6: complete (tests: check-shop.mjs → RED (accessRows fehlt), dann 2 neue Prüfungen ok; Webseite tsc 0, lint 0, check 0, build 0; Browser mit nachgestelltem fetch (keine Anfrage an den Dev-Server des Nutzers): Mein Zugang Abo/Test/abgelaufen/abgemeldet, Kundenportal-Fehler als Satz; Kündigen angemeldet vorausgefüllt, Doppelklick → 1 POST, Fokus auf „Deine Kündigung ist eingegangen“, Vertragsende; abgemeldet: leere Felder → 3 Fehler an den Feldern, außerordentlich ohne Grund → Fehler, dann nicht zugeordnet mit Satz „von Hand“; 375 px ohne seitliches Scrollen; Optionstexte gekürzt, weil abgeschnitten)
+Task 7: Ruling: cardAction-Lücke über den Server gelöst: IShopMe.blocked (Produkt-ID → Satz aus purchaseProblem), die Karte zeigt diesen Satz zuerst — eine Regel an einer Stelle statt einer zweiten Kopie in der Seite — kostet: Vertrag in beiden Repos erweitert
+Task 7: Ruling: Satz zu § 19 UStG auf --c-text-dim, „Beliebt“ auf color-mix(Rot 82 %, Schwarz) ≈ 5,4:1 (von Hand gerechnet, das Prüfskript im Browser las das color()-Format falsch) — kostet: Rot minimal dunkler
+Task 7: Ruling: Ablehnungen der Bank aus confirm() bleiben Stripes Satz (für Kunden gedacht); nur loadActions-Fehler und Ausnahmen werden zu eigenen Sätzen — kostet: nichts
+Deferred (minor): loadStripe() erzeugt bei jedem neuen Versuch eine neue Stripe-Instanz (ein weiterer versteckter Controller-Frame); Instanz könnte gemerkt werden
+Deferred (minor): ?bestellung= nach Kartenzahlung ohne Weiterleitung nur am Code geprüft (braucht echte Stripe-Testschlüssel); dasselbe openUnlock nutzt der Dev-Kauf
+Task 7: complete (tests: check-shop.mjs → RED „Lehnt der Server ab, sagt die Karte seinen Satz“, dann ok; check:db „Mein Zugang …“ mit blocked ok; Webseite tsc/lint/check/build 0; Admin check 0, check:db nur der alte Kontaktformular-FAIL, oxlint 0; Browser mit nachgestelltem Shop und echtem Stripe.js: zwei Anläufe → je der deutsche Satz, nach Fehler kein Zahlungsfeld mehr im Dialog; Frage zum Test weg ohne Test)
+Task 8: complete (READMEs: Admin Routen /legal, /portal, /cancel, Rechtstexte, Kündigen, Mein Zugang, Aufräumen, „Vor dem Livegang“; Webseite Seitenliste und Abschnitt Shop. Admin check/typecheck/oxlint/build 0, check:db nur der alte Kontaktformular-FAIL; Webseite check/lint/build 0)
+Final: Review (frischer Reviewer, opus): 0 Critical, 3 Important, 4 Minor.
+Final: fix I1 Kündigen robust: alles nach parseCancelInput fällt bei Fehlern (Datenbank, Stripe) auf „nicht zugeordnet“, Support-Mail und Bestätigung gehen trotzdem raus; logEvent/findProduct nach der Kündigung nur noch „best effort“; customerOf mit catch; ICancelReceipt.mailed, die Seite sagt, wenn die Mail nicht rausging; CancelPage zeigt bei 5xx den Satz mit support@
+Final: fix I2 Mail-Schleuder: Bestätigungen höchstens 3 je Adresse am Tag, nicht zugeordnete zusätzlich 100 je Stunde; Support-Mails gleicher Angabe einmal am Tag, höchstens 30 je Stunde, darüber ins Log; Rate Limit von /cancel zählt IPv6 je /64 (rateKey) — ponytail: Grenzen im Speicher, ein Prozess
+Final: fix I3 § 312k Abs. 4: Bestätigung enthält Art, Name, Angabe, Grund (gekürzt, maskiert), „zum nächstmöglichen Zeitpunkt“, Eingang und (zugeordnet) das Vertragsende
+Final: fix M4 gescheitertes PDF wird nicht gemerkt; M5 Datenschutz: Kündigungsformular, Stripe-Kunde schon beim Öffnen der Kasse, gescheiterte Bestellungen 30 Tage (cleanup löscht jetzt open und failed), Verlauf 3 Jahre (cleanup löscht älteren), „im Shop“ statt „auf der Preisseite“; M6 Fokus aufs erste fehlerhafte Feld, nach „Nochmal versuchen“ auf den Text; M7 /legal ohne ?stand= no-cache, mit Stand einen Tag
+Final: tests: shop.check „Mails je Adresse begrenzt, IPv6 je /64“, „Kündigungsbestätigung enthält, was § 312k verlangt“ (RED: makeLimiter fehlte); check:db „Kündigen, wenn Stripe die Kündigung nicht annimmt …“ (RED über mailed); Browser: Fokus aufs Namensfeld, Hinweis bei mailed false
+Final: Admin check 0, check:db nur der alte Kontaktformular-FAIL, typecheck 0, oxlint 0, build 0; Webseite tsc 0, lint 0, check 0, build 0
+Deferred (minor): Kündigungen ohne Zuordnung stehen nur in der Mail an support@ (und bei Grenze im Log), nicht in einer Tabelle; „drei Jahre aufbewahren“ heißt dort: Postfach von Hand

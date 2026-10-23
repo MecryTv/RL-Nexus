@@ -1,0 +1,80 @@
+@use "mixins" as *;
+
+.section + .section {
+    margin-top: var(--s-6);
+}
+
+.section {
+    display: grid;
+    gap: var(--s-3);
+}
+
+.head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-3);
+}
+
+.heading {
+    color: var(--c-text-dim);
+
+    @include label(0.85rem, 0.16em);
+}
+
+.empty {
+    color: var(--c-text-faint);
+    font-size: 0.875rem;
+}
+
+.cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: var(--s-3);
+
+    @include below(479px) {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+.card {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    padding: var(--s-3) var(--s-4);
+    gap: var(--s-3);
+}
+
+.swatch {
+    width: 12px;
+    height: 40px;
+    flex-shrink: 0;
+}
+
+.identity {
+    flex: 1 1 140px;
+    min-width: 0;
+}
+
+.name {
+    overflow: hidden;
+    color: var(--c-text);
+    font-weight: 700;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.detail {
+    overflow: hidden;
+    color: var(--c-text-faint);
+    font-size: 0.8125rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.cardActions {
+    display: flex;
+    align-items: center;
+    gap: var(--s-1);
+}

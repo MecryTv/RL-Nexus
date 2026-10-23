@@ -1,0 +1,224 @@
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800&family=Oxanium:wght@400;600;700&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  .ad {
+    --c-base:#050608; --c-panel:#080d12; --c-solid:#0a0f15; --c-line:rgb(255 255 255 / 8%); --c-line-strong:rgb(255 255 255 / 14%);
+    --c-red:#ff1e2d; --c-red-bright:#ff3344; --c-red-deep:#d81424; --c-blue:#00afff; --c-purple:#8a4dff; --c-win:#35e07f; --c-gold:#ffc53d; --c-loss:#ff4d5e;
+    --c-text:#f2f4f7; --c-dim:#a8b0bc; --c-faint:#7b8693;
+    --f-d:"Oxanium",system-ui,sans-serif; --f-l:"Rajdhani",system-ui,sans-serif; --f-a:"Orbitron","Oxanium",sans-serif;
+    font-family:var(--f-d); color:var(--c-text); font-size:14px;
+  }
+  .ad * { box-sizing:border-box; }
+  .ad .app { display:grid; grid-template-columns: 180px 1fr; background:var(--c-base); border:1px solid #1a2028; min-height:560px; position:relative; overflow:hidden; }
+  .ad .side { background:var(--c-panel); border-right:1px solid var(--c-line); padding:14px 10px; }
+  .ad .brand { font-family:var(--f-a); font-weight:700; font-size:12px; letter-spacing:.05em; padding:2px 8px 12px; }
+  .ad .brand em { color:var(--c-red); font-style:normal; }
+  .ad .gl { font-family:var(--f-l); font-weight:600; font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:var(--c-faint); padding:10px 10px 4px; }
+  .ad .it { display:flex; align-items:center; gap:10px; height:32px; padding:0 10px; color:var(--c-dim); font-size:13.5px; }
+  .ad .it.on { color:var(--c-text); background: linear-gradient(90deg, rgb(255 30 45 / 16%), transparent); box-shadow: inset 2px 0 0 var(--c-red); }
+  .ad .ic { width:14px; height:14px; border:1.5px solid currentColor; border-radius:3px; opacity:.7; flex:none; }
+  .ad .main { padding:18px 20px; position:relative; }
+  .ad .ph { display:flex; align-items:flex-end; gap:14px; margin-bottom:14px; }
+  .ad .ph h1 { margin:0; font-size:22px; font-weight:700; }
+  .ad .ph p { margin:4px 0 0; color:var(--c-dim); font-size:13px; }
+  .ad .lbl { font-family:var(--f-l); font-weight:600; font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:var(--c-faint); }
+  .ad .bevel { clip-path: polygon(10px 0, calc(100% - 10px) 0, 100% 10px, 100% calc(100% - 10px), calc(100% - 10px) 100%, 10px 100%, 0 calc(100% - 10px), 0 10px); }
+  .ad .diag { clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px); }
+  .ad .pnl { background:var(--c-line-strong); padding:1px; }
+  .ad .pnl > .in { background:var(--c-solid); padding:12px 14px; height:100%; }
+  .ad .btn { display:inline-flex; align-items:center; justify-content:center; gap:7px; height:32px; padding:0 12px; font-family:var(--f-l); font-weight:700; font-size:11.5px; letter-spacing:.12em; text-transform:uppercase; border:0; color:#fff; }
+  .ad .btn.red { background: var(--c-red-deep); }
+  .ad .btn.ghost { background:#0b1016; box-shadow: inset 0 0 0 1px var(--c-line-strong); color:var(--c-text); }
+  .ad .btn.warn { background:#0b1016; box-shadow: inset 0 0 0 1px rgb(255 77 94 / 50%); color:#ff7c88; }
+  .ad .st { display:inline-flex; align-items:center; gap:6px; font-family:var(--f-l); font-weight:700; font-size:11px; letter-spacing:.12em; text-transform:uppercase; padding:2px 8px; }
+  .ad .st i { width:6px; height:6px; border-radius:50%; background: currentColor; }
+  .ad .st.test { color: var(--c-win); background: rgb(53 224 127 / 10%); }
+  .ad .st.abo { color: var(--c-blue); background: rgb(0 175 255 / 10%); }
+  .ad .st.einmal { color: var(--c-gold); background: rgb(255 197 61 / 10%); }
+  .ad .st.gift { color: #c79bff; background: rgb(138 77 255 / 14%); }
+  .ad .st.ab { color: var(--c-faint); background: rgb(255 255 255 / 5%); }
+  .ad .st.ban { color: #ff7c88; background: rgb(255 77 94 / 12%); }
+  .ad .av { width:24px; height:24px; border-radius:50%; flex:none; display:inline-block; vertical-align:middle; }
+  .ad .u { display:flex; align-items:center; gap:8px; }
+  .ad .u small { color:var(--c-faint); font-size:12px; }
+  .ad .kpis { display:grid; grid-template-columns: repeat(4,1fr); gap:10px; margin-bottom:12px; }
+  .ad .kpi b { display:block; font-family:var(--f-a); font-weight:800; font-size:20px; margin-top:4px; }
+  .ad .kpi span.s { font-size:12px; color:var(--c-dim); }
+  .ad .filters { display:flex; gap:6px; align-items:center; margin-bottom:10px; flex-wrap:wrap; }
+  .ad .chip { font-size:12.5px; padding:5px 10px; background:#0b1016; box-shadow: inset 0 0 0 1px var(--c-line-strong); color:var(--c-dim); }
+  .ad .chip.on { box-shadow: inset 0 0 0 1px var(--c-red); color:var(--c-text); }
+  .ad .search { margin-left:auto; width:220px; height:30px; background:#0b1016; box-shadow: inset 0 0 0 1px var(--c-line-strong); font-size:12.5px; color:var(--c-faint); display:flex; align-items:center; padding:0 10px; }
+  .ad table { width:100%; border-collapse:collapse; font-size:13px; }
+  .ad th { text-align:left; font-family:var(--f-l); font-weight:600; font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--c-faint); padding:7px 8px; border-bottom:1px solid var(--c-line-strong); }
+  .ad td { padding:8px; border-bottom:1px solid var(--c-line); }
+  .ad tr.sel td { background: rgb(255 30 45 / 7%); }
+  .ad .dim { color:var(--c-dim); }
+  .ad .sp { position:absolute; top:0; right:0; bottom:0; width:330px; background:#070b10; box-shadow: -1px 0 0 var(--c-line-strong), -20px 0 40px rgb(0 0 0 / 50%); padding:16px; overflow:hidden; }
+  .ad .sp .head { display:flex; gap:10px; align-items:center; }
+  .ad .sp .head .av { width:40px; height:40px; }
+  .ad .sp h3 { margin:0; font-size:17px; }
+  .ad .facts { margin-top:12px; font-size:12.5px; }
+  .ad .facts div { display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px solid var(--c-line); color:var(--c-dim); }
+  .ad .facts div b { color:var(--c-text); font-weight:600; }
+  .ad .sec { margin-top:14px; }
+  .ad .adj { display:flex; gap:6px; margin-top:6px; }
+  .ad .adj .btn { flex:1; padding:0 6px; }
+  .ad .hist { margin-top:6px; font-size:12px; color:var(--c-dim); }
+  .ad .hist div { padding:4px 0 4px 12px; position:relative; }
+  .ad .hist div::before { content:""; position:absolute; left:0; top:10px; width:5px; height:5px; border-radius:50%; background: var(--c-line-strong); }
+  .ad .hist b { color:var(--c-text); font-weight:600; }
+  .ad .modal-back { position:absolute; inset:0; background: rgb(5 6 8 / 75%); display:flex; align-items:center; justify-content:center; }
+  .ad .modal { width:420px; background: rgb(255 77 94 / 50%); padding:1px; }
+  .ad .modal > div { background:#070b10; padding:18px; }
+  .ad .radio { display:flex; gap:10px; padding:10px; background:#0b1016; box-shadow: inset 0 0 0 1px var(--c-line); margin-top:6px; font-size:12.5px; color:var(--c-dim); line-height:1.4; }
+  .ad .radio.on { box-shadow: inset 0 0 0 1px var(--c-red); }
+  .ad .radio i { width:14px; height:14px; border-radius:50%; flex:none; margin-top:2px; box-shadow: inset 0 0 0 2px var(--c-line-strong); }
+  .ad .radio.on i { box-shadow: inset 0 0 0 4px var(--c-red); }
+  .ad .radio b { color:var(--c-text); display:block; }
+  .ad .inp { height:32px; background:#0b1016; box-shadow: inset 0 0 0 1px var(--c-line-strong); display:flex; align-items:center; padding:0 10px; font-size:13px; color:var(--c-dim); }
+
+  .optwrap .option { display:block; }
+  .optwrap .head2 { display:flex; align-items:baseline; gap:12px; margin-bottom:10px; }
+  .optwrap .head2 h3 { margin:0; }
+  .optwrap .head2 p { margin:0; font-size:14px; color: var(--text-secondary,#9aa0a6); }
+  .optwrap .letter { position:static; }
+  .rec { display:inline-block; font-size:10.5px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:#050608; background:#35e07f; padding:2px 7px; border-radius:3px; margin-left:6px; vertical-align:middle; }
+
+  /* B */
+  .ad .two { display:grid; grid-template-columns: 300px 1fr; gap:14px; }
+  .ad .li { display:flex; align-items:center; gap:10px; padding:9px 10px; border-bottom:1px solid var(--c-line); }
+  .ad .li.on { background: rgb(255 30 45 / 8%); box-shadow: inset 2px 0 0 var(--c-red); }
+  .ad .li .t { flex:1; } .ad .li .t div { font-size:12px; color:var(--c-faint); }
+  /* C */
+  .ad .cols4 { display:grid; grid-template-columns: repeat(4,1fr); gap:10px; }
+  .ad .col h4 { margin:0 0 8px; font-size:13px; display:flex; justify-content:space-between; }
+  .ad .mini { display:flex; align-items:center; gap:8px; padding:8px; background:#0b1016; box-shadow: inset 0 0 0 1px var(--c-line); margin-bottom:6px; font-size:12.5px; }
+  .ad .mini small { margin-left:auto; color:var(--c-faint); font-size:11.5px; }
+</style>
+
+<h2>Admin Dashboard: Kunden</h2>
+<p class="subtitle">Jeder, der sich auf der Preisseite mit Discord angemeldet hat. Drei Arten, die Seite aufzubauen. Bei A siehst du auch das Fenster zum Sperren.</p>
+
+<div class="options optwrap">
+
+<!-- A -->
+<div class="option" data-choice="a" onclick="toggleSelect(this)">
+  <div class="content">
+    <div class="head2"><div class="letter">A</div><h3>Tabelle mit Seitenpanel <span class="rec">Empfohlen</span></h3><p>Passt zu den Produkten (B): oben Zahlen, Filter nach Status, Klick auf eine Zeile öffnet rechts alles zu der Person.</p></div>
+    <div class="ad"><div class="app">
+      <div class="side">
+        <div class="brand">RL <em>NEXUS</em> ADMIN</div>
+        <div class="gl">Shop</div><div class="it"><span class="ic"></span>Produkte</div><div class="it on"><span class="ic"></span>Kunden</div><div class="it"><span class="ic"></span>Einstellungen</div>
+      </div>
+      <div class="main" style="padding-right:350px">
+        <div class="ph"><div><h1>Kunden</h1><p>Wer kauft, testet oder gesperrt ist.</p></div></div>
+        <div class="kpis">
+          <div class="pnl bevel kpi"><div class="in bevel"><span class="lbl">Aktiv bezahlt</span><b>19</b><span class="s">12 Abo · 7 Einmal</span></div></div>
+          <div class="pnl bevel kpi"><div class="in bevel"><span class="lbl">Im Test</span><b>8</b><span class="s">3 enden in 2 Tagen</span></div></div>
+          <div class="pnl bevel kpi"><div class="in bevel"><span class="lbl">Umsatz Oktober</span><b>214 €</b><span class="s">laut Stripe</span></div></div>
+          <div class="pnl bevel kpi"><div class="in bevel"><span class="lbl">Gesperrt</span><b>2</b><span class="s">&nbsp;</span></div></div>
+        </div>
+        <div class="filters"><span class="chip on">Alle 41</span><span class="chip">Test 8</span><span class="chip">Abo 12</span><span class="chip">Einmal 7</span><span class="chip">Geschenkt 3</span><span class="chip">Abgelaufen 9</span><span class="chip">Gesperrt 2</span><span class="search">Name, ID oder Mail …</span></div>
+        <table>
+          <tr><th>Person</th><th>Status</th><th>Produkt</th><th>Bis</th></tr>
+          <tr class="sel"><td><div class="u"><span class="av" style="background:linear-gradient(135deg,#8a4dff,#00afff)"></span>mecry</div></td><td><span class="st test"><i></i>Test</span></td><td class="dim">–</td><td>15.10. <span class="dim">(3 Tage)</span></td></tr>
+          <tr><td><div class="u"><span class="av" style="background:linear-gradient(135deg,#ff3344,#ffc53d)"></span>blaze.rl</div></td><td><span class="st abo"><i></i>Abo</span></td><td>Monat</td><td>01.11. <span class="dim">verlängert</span></td></tr>
+          <tr><td><div class="u"><span class="av" style="background:linear-gradient(135deg,#35e07f,#00afff)"></span>kaiju</div></td><td><span class="st einmal"><i></i>Einmal</span></td><td>Lifetime</td><td>unbegrenzt</td></tr>
+          <tr><td><div class="u"><span class="av" style="background:linear-gradient(135deg,#c79bff,#8a4dff)"></span>nova_org</div></td><td><span class="st gift"><i></i>Geschenkt</span></td><td>Jahr</td><td>31.12.</td></tr>
+          <tr><td><div class="u"><span class="av" style="background:#3a4450"></span>trashtalk99</div></td><td><span class="st ban"><i></i>Gesperrt</span></td><td class="dim">–</td><td class="dim">–</td></tr>
+          <tr><td><div class="u"><span class="av" style="background:#2a333d"></span>sleepy</div></td><td><span class="st ab"><i></i>Abgelaufen</span></td><td class="dim">Test</td><td class="dim">02.10.</td></tr>
+        </table>
+      </div>
+      <div class="sp">
+        <div class="head"><span class="av" style="background:linear-gradient(135deg,#8a4dff,#00afff)"></span><div><h3>mecry</h3><div style="font-size:12px;color:var(--c-faint)">@mecry · 2849…7731</div></div></div>
+        <div class="facts">
+          <div><span>Status</span><span class="st test"><i></i>Test bis 15.10.</span></div>
+          <div><span>Mail (Discord)</span><b>m***@gmail.com</b></div>
+          <div><span>Auf dem Server</span><b>ja, Rolle Nexus Test</b></div>
+          <div><span>Stripe-Kunde</span><b style="color:#a5a0ff">öffnen ↗</b></div>
+        </div>
+        <div class="sec"><div class="lbl">Test anpassen</div>
+          <div class="adj"><button class="btn ghost diag">−1 Tag</button><button class="btn ghost diag">+1 Tag</button><button class="btn ghost diag">+7 Tage</button><button class="btn ghost diag">Datum</button></div>
+        </div>
+        <div class="sec"><div class="lbl">Zugang</div>
+          <div class="adj"><button class="btn ghost diag">Zugang schenken</button><button class="btn ghost diag">Rolle neu setzen</button></div>
+          <div class="adj"><button class="btn ghost diag">Test beenden</button><button class="btn warn diag">Sperren</button></div>
+        </div>
+        <div class="sec"><div class="lbl">Verlauf</div>
+          <div class="hist">
+            <div><b>Test verlängert</b> +3 Tage von MecryTv · heute 14:02</div>
+            <div><b>Test gestartet</b> 7 Tage · 05.10. 19:44</div>
+            <div><b>Server beigetreten</b>, Rolle Nexus Test · 05.10.</div>
+            <div><b>Erste Anmeldung</b> auf der Preisseite · 05.10.</div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-back" style="right:0; left:auto; width:100%; background: rgb(5 6 8 / 70%)">
+        <div class="modal bevel"><div class="bevel">
+          <div class="lbl" style="color:#ff7c88">Sperren</div>
+          <h3 style="margin:4px 0 8px;font-size:18px">blaze.rl sperren?</h3>
+          <div style="font-size:12.5px;color:var(--c-dim);line-height:1.45">Danach kein Test und kein Kauf mehr. Die Preisseite sagt der Person, dass sie sich an den Support wenden soll. Ein Abo läuft gerade (Monat, nächste Zahlung 01.11.).</div>
+          <div class="radio on"><i></i><div><b>Bis zum Ende laufen lassen</b>Abo wird zum 01.11. gekündigt, bis dahin bleibt der Zugang.</div></div>
+          <div class="radio"><i></i><div><b>Sofort beenden</b>Abo endet jetzt, Stripe erstattet anteilig 3,40 €. Rolle wird entfernt.</div></div>
+          <div style="margin-top:10px"><div style="font-size:12px;color:var(--c-dim);margin-bottom:4px">Grund (nur intern, steht im Protokoll)</div><div class="inp">Betrug mit Rückbuchung</div></div>
+          <div style="display:flex;gap:8px;margin-top:14px;justify-content:flex-end"><button class="btn ghost diag">Abbrechen</button><button class="btn red diag">Sperren</button></div>
+        </div></div>
+      </div>
+    </div></div>
+  </div>
+</div>
+
+<!-- B -->
+<div class="option" data-choice="b" onclick="toggleSelect(this)">
+  <div class="content">
+    <div class="head2"><div class="letter">B</div><h3>Liste links, Person rechts</h3><p>Wie das Postfach: schmale Liste, daneben die ganze Person mit Verlauf. Mehr Platz für den Verlauf, weniger Spalten.</p></div>
+    <div class="ad"><div class="app" style="min-height:400px">
+      <div class="side">
+        <div class="brand">RL <em>NEXUS</em> ADMIN</div>
+        <div class="gl">Shop</div><div class="it"><span class="ic"></span>Produkte</div><div class="it on"><span class="ic"></span>Kunden</div><div class="it"><span class="ic"></span>Einstellungen</div>
+      </div>
+      <div class="main">
+        <div class="ph"><div><h1>Kunden</h1></div></div>
+        <div class="two">
+          <div class="pnl bevel"><div class="in bevel" style="padding:0">
+            <div style="padding:8px"><span class="search" style="width:100%">Name, ID oder Mail …</span></div>
+            <div class="li on"><span class="av" style="background:linear-gradient(135deg,#8a4dff,#00afff)"></span><div class="t">mecry<div>Test bis 15.10.</div></div><span class="st test"><i></i></span></div>
+            <div class="li"><span class="av" style="background:linear-gradient(135deg,#ff3344,#ffc53d)"></span><div class="t">blaze.rl<div>Abo Monat</div></div><span class="st abo"><i></i></span></div>
+            <div class="li"><span class="av" style="background:linear-gradient(135deg,#35e07f,#00afff)"></span><div class="t">kaiju<div>Lifetime</div></div><span class="st einmal"><i></i></span></div>
+            <div class="li"><span class="av" style="background:#3a4450"></span><div class="t">trashtalk99<div>gesperrt</div></div><span class="st ban"><i></i></span></div>
+          </div></div>
+          <div class="pnl bevel"><div class="in bevel">
+            <div style="display:flex;gap:12px;align-items:center"><span class="av" style="width:48px;height:48px;background:linear-gradient(135deg,#8a4dff,#00afff)"></span><div><h3 style="margin:0">mecry</h3><span class="st test"><i></i>Test bis 15.10.</span></div><div style="margin-left:auto;display:flex;gap:6px"><button class="btn ghost diag">+7 Tage</button><button class="btn ghost diag">Schenken</button><button class="btn warn diag">Sperren</button></div></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:12px">
+              <div class="facts" style="margin:0"><div><span>Mail</span><b>m***@gmail.com</b></div><div><span>Server</span><b>ja</b></div><div><span>Rolle</span><b>Nexus Test</b></div></div>
+              <div class="hist" style="margin:0"><div><b>Test verlängert</b> +3 Tage · heute</div><div><b>Test gestartet</b> · 05.10.</div><div><b>Server beigetreten</b> · 05.10.</div></div>
+            </div>
+          </div></div>
+        </div>
+      </div>
+    </div></div>
+  </div>
+</div>
+
+<!-- C -->
+<div class="option" data-choice="c" onclick="toggleSelect(this)">
+  <div class="content">
+    <div class="head2"><div class="letter">C</div><h3>Spalten nach Status</h3><p>Wie die Gruppen-Seite: eine Spalte je Status. Gut zum Überblicken, bei vielen Kunden wird es lang.</p></div>
+    <div class="ad"><div class="app" style="min-height:300px">
+      <div class="side">
+        <div class="brand">RL <em>NEXUS</em> ADMIN</div>
+        <div class="gl">Shop</div><div class="it"><span class="ic"></span>Produkte</div><div class="it on"><span class="ic"></span>Kunden</div><div class="it"><span class="ic"></span>Einstellungen</div>
+      </div>
+      <div class="main">
+        <div class="ph"><div><h1>Kunden</h1></div></div>
+        <div class="cols4">
+          <div class="col"><h4><span class="st test"><i></i>Test</span><span class="dim">8</span></h4><div class="mini"><span class="av" style="background:linear-gradient(135deg,#8a4dff,#00afff)"></span>mecry<small>3 Tage</small></div><div class="mini"><span class="av" style="background:#556"></span>rotation<small>6 Tage</small></div></div>
+          <div class="col"><h4><span class="st abo"><i></i>Abo</span><span class="dim">12</span></h4><div class="mini"><span class="av" style="background:linear-gradient(135deg,#ff3344,#ffc53d)"></span>blaze.rl<small>01.11.</small></div></div>
+          <div class="col"><h4><span class="st einmal"><i></i>Einmal</span><span class="dim">7</span></h4><div class="mini"><span class="av" style="background:linear-gradient(135deg,#35e07f,#00afff)"></span>kaiju<small>∞</small></div></div>
+          <div class="col"><h4><span class="st ban"><i></i>Gesperrt</span><span class="dim">2</span></h4><div class="mini"><span class="av" style="background:#3a4450"></span>trashtalk99</div></div>
+        </div>
+      </div>
+    </div></div>
+  </div>
+</div>
+</div>

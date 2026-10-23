@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>RL Nexus · Kein Zugang</title>
+<meta name="color-scheme" content="dark">
+<!-- Die Hauptseite. Wird beim Ausliefern eingesetzt. -->
+<meta name="rlnexus-site" content="__SITE__">
+<meta name="robots" content="noindex">
+<link rel="icon" type="image/png" href="__BASE__/assets/images/rl-nexus-n-48.png">
+<link rel="stylesheet" href="__BASE__/assets/style.css">
+</head>
+<body>
+
+<div class="ambient" aria-hidden="true"><i class="ambient__warm"></i><i class="ambient__cool"></i><i class="ambient__bands"></i><i class="ambient__grid"></i><i class="ambient__vignette"></i></div>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <symbol id="i-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10.5" width="16" height="10.5" rx="2.5"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/><path d="M12 14.8v2.4"/></symbol>
+</svg>
+
+<!-- Die Bezahlschranke (Plan 15). Die Platzhalter setzt LockPlaceholders im DashboardService ein, der Grund schon maskiert.
+     Gesperrte bekommen statt „Zugang holen“ den Weg zum Support. -->
+<main class="stage">
+  <div class="empty empty--error">
+    <span class="empty__mark" aria-hidden="true"><svg><use href="#i-lock"/></svg></span>
+    <h2>Kein Zugang zum Dashboard</h2>
+    <p>__REASON__</p>
+
+    __HINT__
+
+    <div class="erracts">
+      <a class="__GO_CLASS__" href="__SITE____GO_PATH__">__GO_TEXT__<svg aria-hidden="true"><use href="#i-arrow"/></svg></a>
+      <a class="erract" href="__BASE__/logout">Abmelden</a>
+    </div>
+  </div>
+</main>
+
+</body>
+</html>

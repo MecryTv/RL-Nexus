@@ -1,0 +1,67 @@
+@use "mixins" as *;
+
+.header {
+    position: relative;
+    padding-block: clamp(46px, 6vw, 82px) clamp(30px, 4vw, 46px);
+
+    /* Ein rotes Licht hinter der Überschrift - der Seitenkopf soll denselben
+       warmen Grund haben wie der Hero, nur schwächer. */
+    &::before {
+        position: absolute;
+        z-index: -1;
+        top: -140px;
+        left: 12%;
+        width: min(760px, 88vw);
+        height: 460px;
+        background: radial-gradient(ellipse at center, rgb(255 30 45 / 10%), transparent 68%);
+        content: "";
+    }
+}
+
+/* Keine eigene Breite: `u-shell` zentriert, und eine schmalere Box rückte den
+   Kopf auf breiten Bildschirmen nach rechts, weg von der Kante des Inhalts
+   darunter. Wie breit die Überschrift wird, begrenzt `.title` selbst. */
+.inner {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 18px;
+}
+
+.eyebrow {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: var(--c-red);
+
+    @include label(0.72rem, 0.22em);
+}
+
+.rule {
+    width: 26px;
+    height: 2px;
+    background: currentcolor;
+    box-shadow: 0 0 10px currentcolor;
+}
+
+.title {
+    max-width: 55rem;
+    overflow-wrap: break-word;
+    font-size: clamp(2.1rem, 1.4rem + 3vw, 3.5rem);
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    line-height: 1.06;
+
+    em {
+        color: var(--c-red);
+        font-style: normal;
+        text-shadow: 0 0 30px rgb(255 30 45 / 40%);
+    }
+}
+
+.lead {
+    max-width: 62ch;
+    color: var(--c-text-dim);
+    font-size: clamp(1rem, 0.95rem + 0.3vw, 1.12rem);
+    line-height: 1.68;
+}

@@ -1,0 +1,48 @@
+@use "mixins" as *;
+
+.heading {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    max-width: 62ch;
+    color: var(--c-red);
+}
+
+.centered {
+    align-items: center;
+    margin-inline: auto;
+    text-align: center;
+
+    .eyebrow {
+        justify-content: center;
+    }
+}
+
+.eyebrow {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: inherit;
+
+    @include label(0.72rem, 0.22em);
+}
+
+/* Der kurze Strich vor der Zeile - dasselbe Zeichen wie die Neonlinien in den
+   Ecken der Rang-Karte, nur klein. */
+.rule {
+    width: 26px;
+    height: 2px;
+    background: currentcolor;
+    box-shadow: 0 0 10px currentcolor;
+}
+
+.title {
+    color: var(--c-text);
+    font-size: clamp(1.75rem, 1.15rem + 2.3vw, 2.9rem);
+    font-weight: 800;
+}
+
+.lead {
+    color: var(--c-text-dim);
+    font-size: clamp(1rem, 0.96rem + 0.2vw, 1.08rem);
+}

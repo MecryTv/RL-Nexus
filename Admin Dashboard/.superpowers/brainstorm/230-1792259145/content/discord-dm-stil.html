@@ -1,0 +1,92 @@
+<style>
+  .dc { background:#313338; border-radius:12px; padding:16px; font-family: "gg sans","Noto Sans",system-ui,sans-serif; font-size:15px; color:#dbdee1; line-height:1.4; }
+  .dc .row { display:flex; gap:14px; }
+  .dc .av { width:40px; height:40px; border-radius:50%; background:#0a0f15; flex:none; display:flex; align-items:center; justify-content:center; color:#ff1e2d; font-weight:700; }
+  .dc .name { color:#f2f3f5; font-weight:600; }
+  .dc .bot { background:#5865f2; color:#fff; font-size:10px; font-weight:600; padding:1px 4px; border-radius:3px; margin-left:4px; vertical-align:1px; }
+  .dc .time { color:#949ba4; font-size:12px; margin-left:6px; }
+  .dc .box { margin-top:6px; background:#2b2d31; border-radius:8px; border-left:4px solid #ff1e2d; padding:14px 16px; max-width:430px; }
+  .dc h4 { margin:0 0 4px; color:#f2f3f5; font-size:18px; font-weight:700; }
+  .dc .sub { color:#949ba4; font-size:12.5px; }
+  .dc .sep { height:1px; background:#3f4147; margin:12px 0; }
+  .dc .sec { display:flex; gap:12px; align-items:flex-start; }
+  .dc .sec .t { flex:1; min-width:0; }
+  .dc .thumb { width:72px; height:72px; border-radius:8px; background:#0a0f15; flex:none; display:flex; align-items:center; justify-content:center; color:#ff1e2d; font-weight:800; font-size:26px; border:1px solid #3f4147; }
+  .dc .kv { display:grid; grid-template-columns: max-content 1fr; gap:4px 14px; font-size:14px; }
+  .dc .kv b { color:#f2f3f5; font-weight:600; }
+  .dc .btns { display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; }
+  .dc .btn { background:#4e5058; color:#fff; padding:6px 14px; border-radius:6px; font-size:14px; font-weight:500; }
+
+  .dc .role { color:#f2f3f5; font-weight:600; }
+  .dc .banner { height:110px; border-radius:6px; margin:-2px 0 12px; background: linear-gradient(120deg,#0a0f15 0%, #0a0f15 45%, #3a0a10 100%); border:1px solid #3f4147; display:flex; align-items:center; padding:0 18px; color:#fff; font-weight:800; letter-spacing:.06em; font-size:22px; }
+  .dc .banner em { color:#ff1e2d; font-style:normal; margin-left:6px; }
+  .dc .chip { display:inline-block; font-size:12px; font-weight:600; letter-spacing:.04em; padding:2px 8px; border-radius:4px; background:rgba(53,224,127,.15); color:#35e07f; margin-bottom:8px; }
+</style>
+
+<h2>Discord-Nachricht nach einer Bestellung</h2>
+<p class="subtitle">Drei Richtungen, alle als Components V2 Container mit rotem Akzent. Inhalt ist überall derselbe: Abo „Monat“, Rolle, Bestellnummer, zwei Knöpfe. Werte sind Beispiele. Link-Knöpfe sind in Discord immer grau, die Farbe kommt nur über den Streifen links. Klick an, was dir am besten gefällt, und schreib im Chat, was du ändern würdest.</p>
+
+<div class="cards">
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="dc"><div class="row"><div class="av">N</div><div style="flex:1;min-width:0">
+        <div><span class="name">RL Nexus</span><span class="bot">BOT</span><span class="time">Heute um 14:30</span></div>
+        <div class="box">
+          <div class="sec"><div class="t">
+            <h4>Danke für deine Bestellung</h4>
+            <div>Dein Zugang zum Bot-Dashboard ist aktiv.</div>
+          </div><div class="thumb">N</div></div>
+          <div class="sep"></div>
+          <div class="kv">
+            <b>Produkt</b><span>Monat · 4,99 € / Monat</span>
+            <b>Nächste Zahlung</b><span>17.11.2026</span>
+            <b>Rolle</b><span><span class="role">Nexus Plus</span></span>
+            <b>Bestellnummer</b><span>RLN-2026-0042</span>
+          </div>
+          <div class="sep"></div>
+          <div class="sub">Bestätigung mit Rechnung, AGB und Widerruf kam per Mail. Kündigen jederzeit unter nexus-emb.de/kuendigen.</div>
+          <div class="btns"><span class="btn">Zum Dashboard ↗</span><span class="btn">Mein Zugang ↗</span></div>
+        </div>
+      </div></div></div>
+    </div>
+    <div class="card-body"><h3>A · Beleg</h3><p>Abschnitt mit Logo rechts, Trennlinien, Angaben als Liste. Wirkt wie eine kleine Quittung, alles auf einen Blick.</p></div>
+  </div>
+
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="dc"><div class="row"><div class="av">N</div><div style="flex:1;min-width:0">
+        <div><span class="name">RL Nexus</span><span class="bot">BOT</span><span class="time">Heute um 14:30</span></div>
+        <div class="box">
+          <div class="banner">RL<em>NEXUS</em></div>
+          <h4>Willkommen bei RL Nexus</h4>
+          <div>Dein Abo <b style="color:#f2f3f5">Monat</b> läuft, die Rolle <span class="role">Nexus Plus</span> hast du schon. Nächste Zahlung am 17.11.2026.</div>
+          <div class="sub" style="margin-top:8px">Bestellnummer RLN-2026-0042 · Rechnung kam per Mail</div>
+          <div class="btns"><span class="btn">Zum Dashboard ↗</span><span class="btn">Mein Zugang ↗</span></div>
+        </div>
+      </div></div></div>
+    </div>
+    <div class="card-body"><h3>B · Banner</h3><p>Großes Markenbild oben (Media Gallery), darunter zwei, drei Sätze. Fühlt sich mehr nach Begrüßung als nach Beleg an.</p></div>
+  </div>
+
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="dc"><div class="row"><div class="av">N</div><div style="flex:1;min-width:0">
+        <div><span class="name">RL Nexus</span><span class="bot">BOT</span><span class="time">Heute um 14:30</span></div>
+        <div class="box">
+          <span class="chip">ZUGANG AKTIV</span>
+          <div class="sec"><div class="t">
+            <h4 style="font-size:16px">Monat · 4,99 € / Monat</h4>
+            <div class="sub">Nächste Zahlung 17.11.2026 · <span class="role">Nexus Plus</span> · RLN-2026-0042</div>
+          </div><div class="thumb" style="width:56px;height:56px;font-size:20px">N</div></div>
+          <div class="btns"><span class="btn">Zum Dashboard ↗</span><span class="btn">Mein Zugang ↗</span></div>
+        </div>
+      </div></div></div>
+    </div>
+    <div class="card-body"><h3>C · Kompakt</h3><p>Ein Statusschild, eine Zeile mit allem Wichtigen, Knöpfe. Am kürzesten, gut wenn mehrere Nachrichten über die Zeit kommen.</p></div>
+  </div>
+</div>
+
+<div class="section" style="margin-top:24px">
+  <p class="label">So sähen die anderen drei Anlässe aus</p>
+  <p class="subtitle">Gleicher Aufbau wie der gewählte Stil, andere Farbe und Knöpfe: <b>Test gestartet</b> grün mit „Zum Dashboard“, <b>Zahlung fehlgeschlagen</b> gelb mit „Zahlungsart ändern“ (Kundenportal), <b>Zugang abgelaufen</b> grau mit „Zugang holen“ (Preisseite). Die zeige ich dir ausgeführt, sobald der Stil steht.</p>
+</div>

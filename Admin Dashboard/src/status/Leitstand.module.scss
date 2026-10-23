@@ -1,0 +1,197 @@
+@use "../styles/mixins" as *;
+
+.leitstand {
+    display: grid;
+    gap: var(--s-4);
+    margin-bottom: var(--s-6);
+}
+
+/* --- Kennzahlen ----------------------------------------------------------- */
+
+.metrics {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: var(--s-2);
+
+    @media (width < 1100px) {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    @media (width < 700px) {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+.sub {
+    display: block;
+    margin-top: 2px;
+    color: var(--c-text-dim);
+    font-size: 0.8125rem;
+    font-weight: 400;
+}
+
+.good {
+    color: var(--c-win);
+}
+
+.meh {
+    color: var(--c-mod-engagement);
+}
+
+.bad {
+    color: var(--c-loss);
+}
+
+.faint {
+    color: var(--c-text-faint);
+}
+
+/* --- Dienste -------------------------------------------------------------- */
+
+.services {
+    display: grid;
+    gap: var(--s-2);
+    padding: 0;
+    margin: 0;
+    list-style: none;
+}
+
+.service {
+    display: grid;
+    gap: var(--s-4);
+    padding: var(--s-3) var(--s-4);
+}
+
+.serviceHead {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-2) var(--s-3);
+    align-items: center;
+}
+
+.serviceName {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 700;
+}
+
+.facts {
+    flex: 1 1 320px;
+    min-width: 0;
+    margin: 0;
+    color: var(--c-text-dim);
+    font-size: 0.8125rem;
+}
+
+.uptime {
+    margin: 0;
+    font-size: 0.8125rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.uptimeLabel {
+    color: var(--c-text-faint);
+
+    @include label(0.7rem, 0.12em);
+}
+
+/* --- Drei Kästen ---------------------------------------------------------- */
+
+/* Ausfälle über die volle Breite (vier Spalten und der Knopf brauchen Platz), darunter Prüfungen und Technik nebeneinander. */
+.boxes {
+    display: grid;
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+    gap: var(--s-2);
+    align-items: start;
+
+    > :first-child {
+        grid-column: 1 / -1;
+    }
+
+    @media (width < 900px) {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+.box {
+    display: grid;
+    gap: var(--s-3);
+    min-width: 0;
+    padding: var(--s-4);
+    overflow-x: auto;
+    align-content: start;
+}
+
+.boxHead {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-2);
+    align-items: center;
+    justify-content: space-between;
+}
+
+.boxTitle {
+    margin: 0;
+    color: var(--c-text-dim);
+
+    @include label(0.75rem, 0.16em);
+}
+
+.empty {
+    margin: 0;
+    color: var(--c-text-faint);
+    font-size: 0.875rem;
+}
+
+.table {
+    width: 100%;
+    font-size: 0.8125rem;
+    font-variant-numeric: tabular-nums;
+    border-collapse: collapse;
+
+    th,
+    td {
+        padding: 5px 6px;
+        text-align: left;
+        vertical-align: top;
+        border-bottom: 1px solid var(--c-line);
+    }
+
+    th,
+    td:first-child {
+        white-space: nowrap;
+    }
+
+    th {
+        color: var(--c-text-faint);
+        font-weight: 700;
+
+        @include label(0.7rem, 0.12em);
+    }
+}
+
+.link {
+    color: var(--c-blue);
+    text-decoration: none;
+
+    &:hover,
+    &:focus-visible {
+        text-decoration: underline;
+    }
+}
+
+.tech {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 6px var(--s-3);
+    margin: 0;
+    font-size: 0.8125rem;
+
+    dt {
+        color: var(--c-text-dim);
+    }
+
+    dd {
+        margin: 0;
+    }
+}

@@ -1,0 +1,75 @@
+@use "mixins" as *;
+
+.grid {
+    display: grid;
+    gap: var(--s-gap);
+    margin-top: 44px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+
+    li {
+        display: flex;
+    }
+
+    @include below(940px) {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    @include below(620px) {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Die breite Kachel oben - das stärkste Argument bekommt den meisten Platz. */
+.wide {
+    grid-column: span 2;
+
+    .card {
+        justify-content: center;
+        padding: 34px 32px;
+    }
+
+    .title {
+        font-size: 1.45rem;
+    }
+
+    .text {
+        max-width: 52ch;
+        font-size: 0.98rem;
+    }
+
+    @include below(620px) {
+        grid-column: span 1;
+    }
+}
+
+.card {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 28px 26px;
+    width: 100%;
+}
+
+.icon {
+    display: grid;
+    width: 44px;
+    height: 44px;
+    margin-bottom: 4px;
+    background: rgb(255 30 45 / 11%);
+    box-shadow: inset 0 0 0 1px rgb(255 30 45 / 28%);
+    color: var(--c-red);
+    place-items: center;
+
+    @include bevel-diagonal(10px);
+}
+
+.title {
+    font-size: 1.14rem;
+    font-weight: 700;
+}
+
+.text {
+    color: var(--c-text-dim);
+    font-size: 0.9rem;
+    line-height: 1.65;
+}

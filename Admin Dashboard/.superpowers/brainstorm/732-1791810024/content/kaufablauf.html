@@ -1,0 +1,312 @@
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800&family=Oxanium:wght@400;600;700&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  .pp {
+    --c-base:#050608; --c-line:rgb(255 255 255 / 8%); --c-line-strong:rgb(255 255 255 / 14%);
+    --c-red:#ff1e2d; --c-red-bright:#ff3344; --c-blue:#00afff; --c-purple:#8a4dff; --c-win:#35e07f; --c-gold:#ffc53d;
+    --c-text:#f2f4f7; --c-dim:#a8b0bc; --c-faint:#6b7683; --c-discord:#5865f2;
+    --f-d:"Oxanium",system-ui,sans-serif; --f-l:"Rajdhani",system-ui,sans-serif; --f-a:"Orbitron","Oxanium",sans-serif;
+    font-family: var(--f-d); color: var(--c-text);
+  }
+  .pp * { box-sizing:border-box; }
+  .pp .site { position:relative; background: radial-gradient(900px 400px at 50% -100px, rgb(255 30 45 / 14%), transparent 60%), var(--c-base); border:1px solid #1a2028; overflow:hidden; }
+  .pp .lbl { font-family:var(--f-l); font-weight:600; font-size:11.5px; letter-spacing:.16em; text-transform:uppercase; color:var(--c-dim); }
+  .pp .bevel { clip-path: polygon(12px 0, calc(100% - 12px) 0, 100% 12px, 100% calc(100% - 12px), calc(100% - 12px) 100%, 12px 100%, 0 calc(100% - 12px), 0 12px); }
+  .pp .diag { clip-path: polygon(9px 0, 100% 0, 100% calc(100% - 9px), calc(100% - 9px) 100%, 0 100%, 0 9px); }
+  .pp .btn { display:inline-flex; align-items:center; justify-content:center; gap:8px; height:40px; padding:0 18px; font-family:var(--f-l); font-weight:700; font-size:12.5px; letter-spacing:.12em; text-transform:uppercase; border:0; color:#fff; cursor:pointer; }
+  .pp .btn.red { background: linear-gradient(135deg, var(--c-red-bright), var(--c-red) 55%, #d81424); }
+  .pp .btn.ghost { background:#0b1016; box-shadow: inset 0 0 0 1px var(--c-line-strong); color:var(--c-text); }
+  .pp .btn.wide { width:100%; }
+  .pp .tag { display:inline-block; font-family:var(--f-l); font-weight:700; font-size:10.5px; letter-spacing:.14em; text-transform:uppercase; padding:2px 7px; }
+  .pp .tag.red { background: var(--c-red); color:#fff; }
+  .pp .line { display:flex; justify-content:space-between; font-size:13px; color:var(--c-dim); padding:6px 0; border-bottom:1px solid var(--c-line); }
+  .pp .line.total { color:var(--c-text); font-weight:700; border:0; font-size:15px; }
+  .pp .check { display:flex; gap:8px; font-size:11.5px; color:var(--c-dim); margin-top:8px; line-height:1.4; }
+  .pp .check i { width:14px; height:14px; flex:none; margin-top:1px; background: var(--c-red); }
+  .pp .steps { display:flex; gap:6px; margin-bottom:14px; }
+  .pp .steps span { flex:1; font-family:var(--f-l); font-weight:700; font-size:11px; letter-spacing:.12em; text-transform:uppercase; padding:6px 0; text-align:center; color:var(--c-faint); box-shadow: inset 0 -2px 0 var(--c-line-strong); }
+  .pp .steps span.done { color: var(--c-win); box-shadow: inset 0 -2px 0 var(--c-win); }
+  .pp .steps span.on { color: var(--c-text); box-shadow: inset 0 -2px 0 var(--c-red); }
+  .pp .pe { background:#0b1016; box-shadow: inset 0 0 0 1px var(--c-line-strong); padding:12px; margin-top:12px; }
+  .pp .pe .tabs { display:flex; gap:6px; margin-bottom:10px; }
+  .pp .pe .tabs span { flex:1; font-size:12px; padding:8px 6px; background:#111820; box-shadow: inset 0 0 0 1px var(--c-line); color:var(--c-dim); text-align:center; }
+  .pp .pe .tabs span.on { box-shadow: inset 0 0 0 1px var(--c-red); color:var(--c-text); }
+  .pp .pe .f { height:34px; background:#111820; box-shadow: inset 0 0 0 1px var(--c-line); margin-top:6px; display:flex; align-items:center; padding:0 10px; font-size:12.5px; color:var(--c-faint); }
+  .pp .pe .row { display:flex; gap:6px; } .pp .pe .row .f { flex:1; }
+  .pp .who { display:flex; align-items:center; gap:9px; padding:8px 10px; background: rgb(88 101 242 / 10%); box-shadow: inset 0 0 0 1px rgb(88 101 242 / 35%); font-size:13px; }
+  .pp .avatar { width:26px; height:26px; border-radius:50%; background: linear-gradient(135deg,#8a4dff,#00afff); display:inline-block; flex:none; }
+  .pp .ghostcards { display:grid; grid-template-columns: repeat(3, 1fr); gap:12px; padding:30px 22px; opacity:.35; filter: blur(1px); }
+  .pp .ghostcards div { height:210px; background:#0a0f15; box-shadow: inset 0 0 0 1px var(--c-line-strong); }
+  .pp .ghostcards div.hl { box-shadow: inset 0 0 0 1px var(--c-red); }
+
+  /* drawer */
+  .pp .drawer { position:absolute; top:0; right:0; bottom:0; width:56%; background:#070b10; box-shadow: -1px 0 0 var(--c-line-strong), -30px 0 60px rgb(0 0 0 / 60%); padding:18px; }
+  /* full */
+  .pp .full { position:absolute; inset:0; background: rgb(5 6 8 / 92%); display:flex; align-items:center; justify-content:center; padding:16px; }
+  .pp .full .box { width:100%; max-width:560px; background: var(--c-line-strong); padding:1px; }
+  .pp .full .box > div { background:#070b10; padding:18px; display:grid; grid-template-columns:1fr 1.1fr; gap:16px; }
+  /* hosted */
+  .pp .hosted { display:grid; grid-template-columns: 1fr 1fr; min-height:330px; }
+  .pp .hosted .l { background:#0b0f14; padding:22px; }
+  .pp .hosted .r { background:#f6f8fa; padding:22px; color:#30313d; font-family: system-ui, sans-serif; }
+  .pp .hosted .r .f { height:34px; border:1px solid #d5dbe1; background:#fff; border-radius:6px; margin-top:8px; }
+  .pp .hosted .r .b { height:40px; border-radius:6px; background:#ff1e2d; color:#fff; font-weight:600; display:flex; align-items:center; justify-content:center; margin-top:14px; font-size:14px; }
+  .pp .mini { height:350px; }
+
+  .kasse { display:grid; grid-template-columns: repeat(3, 1fr); gap:14px; }
+  @media (max-width: 1100px) { .kasse { grid-template-columns: 1fr; } }
+  .kasse .option { display:block; padding:12px; }
+  .kasse .option h3 { margin:0 0 4px; font-size:16px; }
+  .kasse .option p.d { margin:0 0 10px; font-size:13px; color: var(--text-secondary,#9aa0a6); line-height:1.45; }
+  .kasse .option .letter { position:static; display:inline-flex; margin-right:8px; vertical-align:middle; }
+  .rec { display:inline-block; font-size:10.5px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:#050608; background:#35e07f; padding:2px 7px; border-radius:3px; margin-left:6px; vertical-align:middle; }
+
+  /* ============ Erfolg ============ */
+  .anis { display:grid; grid-template-columns: repeat(3, 1fr); gap:14px; }
+  @media (max-width: 1100px) { .anis { grid-template-columns: 1fr; } }
+  .anis .option { display:block; padding:12px; }
+  .anis .option h3 { margin:0 0 4px; font-size:16px; }
+  .anis .option p.d { margin:0 0 10px; font-size:13px; color: var(--text-secondary,#9aa0a6); line-height:1.45; }
+  .anis .option .letter { position:static; display:inline-flex; margin-right:8px; vertical-align:middle; }
+  .play { margin-top:10px; background:#1f2730; color:#f2f4f7; border:1px solid #3a4450; padding:8px 14px; font-size:13px; cursor:pointer; border-radius:3px; }
+  .play:hover { background:#2a3440; }
+  .stage { position:relative; height:390px; display:flex; align-items:center; justify-content:center; overflow:hidden; }
+
+  /* 1: Checkliste */
+  .s1 .lock { width:64px; height:64px; position:relative; margin:0 auto 16px; }
+  .s1 .lock .body { position:absolute; left:8px; right:8px; bottom:0; height:38px; background: linear-gradient(135deg, var(--c-red-bright), var(--c-red)); clip-path: polygon(6px 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 0 100%, 0 6px); }
+  .s1 .lock .sh { position:absolute; left:18px; right:18px; top:2px; height:34px; border:5px solid var(--c-red); border-bottom:0; border-radius:16px 16px 0 0; transform-origin: 85% 100%; }
+  .s1 .lock .glow { position:absolute; inset:-14px; border-radius:50%; background: radial-gradient(circle, rgb(53 224 127 / 45%), transparent 65%); opacity:0; }
+  .s1 ul { list-style:none; margin:0; padding:0; width:280px; }
+  .s1 li { display:flex; align-items:center; gap:10px; padding:8px 10px; font-size:14px; color:var(--c-dim); background: rgb(255 255 255 / 3%); margin-top:6px; opacity:0; transform: translateY(8px); }
+  .s1 li .ic { width:18px; height:18px; flex:none; position:relative; }
+  .s1 li .ic::before { content:""; position:absolute; inset:0; border-radius:50%; border:2px solid var(--c-line-strong); border-top-color: var(--c-blue); }
+  .s1 li .ic::after { content:""; position:absolute; inset:2px; background: var(--c-win); clip-path: polygon(10% 55%, 38% 82%, 92% 22%, 82% 12%, 38% 62%, 20% 44%); opacity:0; transform: scale(.4); }
+  .s1 .go { margin-top:16px; opacity:0; transform: translateY(10px); }
+  .s1 .title { font-family:var(--f-d); font-weight:700; font-size:20px; text-align:center; margin-bottom:12px; opacity:0; }
+  .s1.run .lock .sh { animation: shOpen .5s 3.3s cubic-bezier(.3,1.6,.5,1) forwards; }
+  .s1.run .lock .body { animation: bodyGreen .4s 3.3s forwards; }
+  .s1.run .lock .glow { animation: glow 1.2s 3.4s ease-out forwards; }
+  .s1.run li { animation: liIn .35s cubic-bezier(.16,1,.3,1) forwards; }
+  .s1.run li .ic::before { animation: spin .7s linear infinite, done0 .2s forwards; }
+  .s1.run li:nth-child(1) { animation-delay: .2s; } .s1.run li:nth-child(1) .ic::before { animation-delay: 0s, .9s; } .s1.run li:nth-child(1) .ic::after { animation: tick .3s .9s cubic-bezier(.3,1.6,.5,1) forwards; }
+  .s1.run li:nth-child(2) { animation-delay: .9s; } .s1.run li:nth-child(2) .ic::before { animation-delay: 0s, 1.6s; } .s1.run li:nth-child(2) .ic::after { animation: tick .3s 1.6s cubic-bezier(.3,1.6,.5,1) forwards; }
+  .s1.run li:nth-child(3) { animation-delay: 1.6s; } .s1.run li:nth-child(3) .ic::before { animation-delay: 0s, 2.3s; } .s1.run li:nth-child(3) .ic::after { animation: tick .3s 2.3s cubic-bezier(.3,1.6,.5,1) forwards; }
+  .s1.run li:nth-child(4) { animation-delay: 2.3s; } .s1.run li:nth-child(4) .ic::before { animation-delay: 0s, 3.0s; } .s1.run li:nth-child(4) .ic::after { animation: tick .3s 3.0s cubic-bezier(.3,1.6,.5,1) forwards; }
+  .s1.run .title { animation: fadeIn .4s 3.5s forwards; }
+  .s1.run .go { animation: liIn .4s 3.8s cubic-bezier(.16,1,.3,1) forwards; }
+  .s1 .wrapcol { display:flex; flex-direction:column; align-items:center; }
+  .s1 .titlewrap { order:-1; }
+
+  /* 2: Pass */
+  .s2 .card { width:280px; position:relative; padding:1px; background: linear-gradient(140deg, var(--c-red), rgb(138 77 255 / 60%) 45%, var(--c-blue)); opacity:0; transform: translateY(60px) rotateX(35deg) scale(.85); }
+  .s2 .card .in { background: radial-gradient(300px 160px at 90% 0%, rgb(0 175 255 / 18%), transparent 60%), radial-gradient(240px 180px at 0% 100%, rgb(255 30 45 / 18%), transparent 60%), #070b10; padding:20px; position:relative; overflow:hidden; }
+  .s2 .card .name { font-family:var(--f-a); font-weight:800; font-size:20px; letter-spacing:.06em; }
+  .s2 .card .stripe { height:5px; margin:12px 0; background: repeating-linear-gradient(115deg, var(--c-red) 0 12px, transparent 12px 19px); }
+  .s2 .card .sweep { position:absolute; top:-20%; bottom:-20%; width:40%; left:-60%; background: linear-gradient(100deg, transparent, rgb(255 255 255 / 22%), transparent); transform: skewX(-18deg); }
+  .s2 .card .stamp { position:absolute; right:14px; top:16px; font-family:var(--f-a); font-weight:800; font-size:14px; letter-spacing:.14em; color: var(--c-win); border:2px solid var(--c-win); padding:3px 8px; transform: rotate(-8deg) scale(2.4); opacity:0; }
+  .s2 .card .who { margin-top:12px; }
+  .s2 .role { display:inline-flex; align-items:center; gap:6px; margin-top:12px; font-size:13px; padding:4px 10px 4px 8px; border-radius:20px; background: rgb(255 51 68 / 14%); color:#ff6b78; opacity:0; transform: scale(.5); }
+  .s2 .role i { width:10px; height:10px; border-radius:50%; background:#ff3344; }
+  .s2 .p { position:absolute; left:50%; top:50%; width:8px; height:8px; opacity:0; }
+  .s2 .go { position:absolute; bottom:22px; left:50%; transform: translate(-50%, 10px); opacity:0; }
+  .s2.run .card { animation: cardIn .8s cubic-bezier(.16,1,.3,1) .1s forwards; }
+  .s2.run .card .sweep { animation: sweep 1s .9s ease-in-out forwards; }
+  .s2.run .card .stamp { animation: stamp .35s 1.5s cubic-bezier(.3,1.5,.5,1) forwards; }
+  .s2.run .role { animation: pop .35s 1.9s cubic-bezier(.3,1.6,.5,1) forwards; }
+  .s2.run .p { animation: burst 1.1s 1.5s cubic-bezier(.16,1,.3,1) forwards; }
+  .s2.run .go { animation: goIn .4s 2.3s cubic-bezier(.16,1,.3,1) forwards; }
+
+  /* 3: beides */
+  .s3 .phase1 { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; }
+  .s3 .phase2 { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; }
+  .s3.run .phase1 { animation: out .35s 3.6s forwards; }
+  .s3 .phase2 .card, .s3 .phase2 .role, .s3 .phase2 .p, .s3 .phase2 .go { animation-delay: 0s; }
+  .s3.run .phase2 .card { animation: cardIn .8s cubic-bezier(.16,1,.3,1) 3.8s forwards; }
+  .s3.run .phase2 .card .sweep { animation: sweep 1s 4.5s ease-in-out forwards; }
+  .s3.run .phase2 .card .stamp { animation: stamp .35s 5.0s cubic-bezier(.3,1.5,.5,1) forwards; }
+  .s3.run .phase2 .role { animation: pop .35s 5.3s cubic-bezier(.3,1.6,.5,1) forwards; }
+  .s3.run .phase2 .p { animation: burst 1.1s 5.0s cubic-bezier(.16,1,.3,1) forwards; }
+  .s3.run .phase2 .go { animation: goIn .4s 5.7s cubic-bezier(.16,1,.3,1) forwards; }
+  .s3 .s1mini li { opacity:0; transform: translateY(8px); }
+  .s3.run .s1mini li { animation: liIn .35s cubic-bezier(.16,1,.3,1) forwards; }
+  .s3.run .s1mini li .ic::before { animation: spin .7s linear infinite, done0 .2s forwards; }
+
+  @keyframes liIn { to { opacity:1; transform:none; } }
+  @keyframes fadeIn { to { opacity:1; } }
+  @keyframes out { to { opacity:0; transform: scale(.96); visibility:hidden; } }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes done0 { to { opacity:0; } }
+  @keyframes tick { to { opacity:1; transform: scale(1); } }
+  @keyframes shOpen { to { transform: translateY(-8px) rotate(28deg); border-color: var(--c-win); } }
+  @keyframes bodyGreen { to { background: linear-gradient(135deg, #4cf092, var(--c-win)); } }
+  @keyframes glow { 0% { opacity:0; transform: scale(.6); } 40% { opacity:1; } 100% { opacity:0; transform: scale(1.6); } }
+  @keyframes cardIn { to { opacity:1; transform:none; } }
+  @keyframes sweep { to { left: 130%; } }
+  @keyframes stamp { to { opacity:1; transform: rotate(-8deg) scale(1); } }
+  @keyframes pop { to { opacity:1; transform: scale(1); } }
+  @keyframes goIn { to { opacity:1; transform: translate(-50%, 0); } }
+  @keyframes burst { 0% { opacity:1; transform: translate(-50%,-50%) rotate(var(--r)) translateX(0) scale(1); } 100% { opacity:0; transform: translate(-50%,-50%) rotate(var(--r)) translateX(var(--d)) scale(.3); } }
+  @media (prefers-reduced-motion: reduce) { .stage * { animation-duration: .01s !important; animation-delay: 0s !important; } }
+</style>
+
+<h2>Kaufablauf und Animationen</h2>
+<p class="subtitle">Zwei Entscheidungen: wo die Kasse aufgeht (oben) und wie das Freischalten aussieht (unten). Unten auf „Abspielen“ klicken, die Animationen laufen wirklich.</p>
+
+<h3 style="margin:18px 0 8px">1 · Wo öffnet sich die Kasse?</h3>
+<p class="subtitle" style="margin-top:0">Ablauf immer: Produkt anklicken → mit Discord anmelden (falls noch nicht) → prüfen und Häkchen → zahlen → Freischalten.</p>
+<div class="kasse">
+  <div class="option" data-choice="kasse-a" onclick="toggleSelect(this)">
+    <h3><span class="letter">A</span>Seitenleiste von rechts <span class="rec">Empfohlen</span></h3>
+    <p class="d">Die Karten bleiben links sichtbar. Das Zahlungsfeld kommt von Stripe, sieht aber aus wie die Webseite. Der Knopf heißt so, wie das Gesetz es will.</p>
+    <div class="pp"><div class="site mini">
+      <div class="ghostcards"><div></div><div class="hl"></div><div></div></div>
+      <div class="drawer">
+        <div class="steps"><span class="done">Discord</span><span class="on">Prüfen</span><span>Zahlen</span></div>
+        <div class="who"><span class="avatar"></span><b style="flex:1">mecry</b><span style="font-size:11px;color:var(--c-dim)">m***@gmail.com</span></div>
+        <div style="margin-top:8px"><div class="line"><span>Jahr · 365 Tage</span><span>44,99 €</span></div><div class="line"><span>Verlängerung</span><span>keine</span></div><div class="line total"><span>Gesamt</span><span>44,99 €</span></div></div>
+        <div class="pe"><div class="tabs"><span class="on">Karte</span><span>PayPal</span><span>SEPA</span></div><div class="f">1234 1234 1234 1234</div><div class="row"><div class="f">MM / JJ</div><div class="f">CVC</div></div></div>
+        <div class="check"><i></i><span>AGB, sofortiger Start, Widerruf erlischt</span></div>
+        <button class="btn red wide diag" style="margin-top:10px">Zahlungspflichtig bestellen</button>
+      </div>
+    </div></div>
+  </div>
+  <div class="option" data-choice="kasse-b" onclick="toggleSelect(this)">
+    <h3><span class="letter">B</span>Kasse über der Seite</h3>
+    <p class="d">Die Seite wird abgedunkelt, mittig ein großes Fenster mit Bestellung links und Zahlung rechts. Mehr Platz, wirkt wie eine eigene Kasse.</p>
+    <div class="pp"><div class="site mini">
+      <div class="ghostcards"><div></div><div class="hl"></div><div></div></div>
+      <div class="full"><div class="box bevel"><div class="bevel">
+        <div>
+          <div class="lbl">Bestellung</div>
+          <div class="who" style="margin-top:8px"><span class="avatar"></span><b>mecry</b></div>
+          <div style="margin-top:6px"><div class="line"><span>Jahr</span><span>44,99 €</span></div><div class="line"><span>Laufzeit</span><span>365 Tage</span></div><div class="line total"><span>Gesamt</span><span>44,99 €</span></div></div>
+        </div>
+        <div>
+          <div class="lbl">Zahlung</div>
+          <div class="pe" style="margin-top:8px"><div class="tabs"><span class="on">Karte</span><span>PayPal</span></div><div class="f">1234 1234 …</div><div class="row"><div class="f">MM/JJ</div><div class="f">CVC</div></div></div>
+          <div class="check"><i></i><span>AGB, Widerruf erlischt</span></div>
+          <button class="btn red wide diag" style="margin-top:8px">Zahlungspflichtig bestellen</button>
+        </div>
+      </div></div></div>
+    </div></div>
+  </div>
+  <div class="option" data-choice="kasse-c" onclick="toggleSelect(this)">
+    <h3><span class="letter">C</span>Weiter zu Stripe</h3>
+    <p class="d">Klick auf das Produkt führt auf checkout.stripe.com (mit Logo und Rot). Am wenigsten Code, aber man verlässt die Seite. Die Animation läuft erst nach der Rückkehr.</p>
+    <div class="pp"><div class="site mini">
+      <div class="hosted">
+        <div class="l"><div class="lbl">RL Nexus</div><div style="font-size:13px;color:var(--c-dim);margin-top:16px">Jahr</div><div style="font-family:var(--f-a);font-weight:800;font-size:26px;margin-top:4px">44,99 €</div><div style="font-size:12px;color:var(--c-faint);margin-top:6px">365 Tage Zugang zum Bot-Dashboard</div></div>
+        <div class="r"><div style="font-weight:600;font-size:14px">Mit Karte zahlen</div><div class="f"></div><div class="f"></div><div style="display:flex;gap:8px"><div class="f" style="flex:1"></div><div class="f" style="flex:1"></div></div><div class="b">Bezahlen</div><div style="font-size:11px;color:#6b7280;margin-top:10px;text-align:center">Powered by stripe</div></div>
+      </div>
+    </div></div>
+  </div>
+</div>
+
+<h3 style="margin:26px 0 8px">2 · Wie sieht das Freischalten aus?</h3>
+<p class="subtitle" style="margin-top:0">Läuft nach der Zahlung, auch beim Teststart (dann grün statt rot). Die Schritte in A sind echt: Der Server meldet live, wann Beitritt und Rolle erledigt sind. Wer „Bewegung reduzieren“ eingestellt hat, sieht alles sofort ohne Animation.</p>
+<div class="anis">
+  <div class="option" data-choice="ani-a" onclick="toggleSelect(this)">
+    <h3><span class="letter">A</span>Freischalt-Liste</h3>
+    <p class="d">Jeder echte Schritt bekommt einen Haken, am Ende springt das Schloss auf.</p>
+    <div class="pp"><div class="site stage s1" id="s1">
+      <div class="wrapcol">
+        <div class="lock"><div class="glow"></div><div class="sh"></div><div class="body"></div></div>
+        <div class="title">Zugang freigeschaltet</div>
+        <ul>
+          <li><span class="ic"></span>Zahlung bestätigt</li>
+          <li><span class="ic"></span>Auf den RL-Nexus-Server geholt</li>
+          <li><span class="ic"></span>Rolle „Nexus Plus“ vergeben</li>
+          <li><span class="ic"></span>Bestätigung an m***@gmail.com</li>
+        </ul>
+        <button class="btn red diag go">Zum Dashboard</button>
+      </div>
+    </div></div>
+    <button class="play" onclick="event.stopPropagation(); replay('s1')">▶ Abspielen</button>
+  </div>
+  <div class="option" data-choice="ani-b" onclick="toggleSelect(this)">
+    <h3><span class="letter">B</span>Pass-Karte</h3>
+    <p class="d">Die Zugangskarte fliegt rein, ein Lichtstreifen läuft drüber, Stempel „Aktiv“, Funken in Rot und Blau, die Rolle springt auf.</p>
+    <div class="pp"><div class="site stage s2" id="s2">
+      <div class="card bevel"><div class="in bevel">
+        <div class="sweep"></div><div class="stamp">AKTIV</div>
+        <div class="lbl">RL Nexus</div><div class="name">NEXUS PASS</div>
+        <div class="stripe"></div>
+        <div style="font-size:13px;color:var(--c-dim)">Jahr · gültig bis 12.10.2027</div>
+        <div class="who"><span class="avatar"></span><b>mecry</b></div>
+        <div class="role"><i></i>Nexus Plus</div>
+      </div></div>
+      <div class="particles"></div>
+      <button class="btn red diag go">Zum Dashboard</button>
+    </div></div>
+    <button class="play" onclick="event.stopPropagation(); replay('s2')">▶ Abspielen</button>
+  </div>
+  <div class="option" data-choice="ani-c" onclick="toggleSelect(this)">
+    <h3><span class="letter">C</span>Beides nacheinander</h3>
+    <p class="d">Erst die Liste, während der Server arbeitet. Wenn alles fertig ist, wird daraus die Pass-Karte.</p>
+    <div class="pp"><div class="site stage s3" id="s3">
+      <div class="phase1 s1 s1mini" id="s3a">
+        <div class="wrapcol">
+          <div class="lbl" style="margin-bottom:10px">Wird freigeschaltet …</div>
+          <ul>
+            <li><span class="ic"></span>Zahlung bestätigt</li>
+            <li><span class="ic"></span>Auf den RL-Nexus-Server geholt</li>
+            <li><span class="ic"></span>Rolle „Nexus Plus“ vergeben</li>
+            <li><span class="ic"></span>Bestätigung gesendet</li>
+          </ul>
+        </div>
+      </div>
+      <div class="phase2 s2">
+        <div class="card bevel"><div class="in bevel">
+          <div class="sweep"></div><div class="stamp">AKTIV</div>
+          <div class="lbl">RL Nexus</div><div class="name">NEXUS PASS</div>
+          <div class="stripe"></div>
+          <div style="font-size:13px;color:var(--c-dim)">Jahr · gültig bis 12.10.2027</div>
+          <div class="who"><span class="avatar"></span><b>mecry</b></div>
+          <div class="role"><i></i>Nexus Plus</div>
+        </div></div>
+        <div class="particles"></div>
+        <button class="btn red diag go">Zum Dashboard</button>
+      </div>
+    </div></div>
+    <button class="play" onclick="event.stopPropagation(); replay('s3')">▶ Abspielen</button>
+  </div>
+</div>
+
+<script>
+  (function () {
+    var colors = ["#ff1e2d", "#ff3344", "#00afff", "#8a4dff", "#ffffff"];
+    document.querySelectorAll(".particles").forEach(function (host) {
+      for (var i = 0; i < 26; i++) {
+        var p = document.createElement("span");
+        p.className = "p";
+        p.style.setProperty("--r", (i * (360 / 26) + Math.random() * 10) + "deg");
+        p.style.setProperty("--d", (110 + Math.random() * 90) + "px");
+        p.style.background = colors[i % colors.length];
+        p.style.clipPath = i % 2 ? "polygon(50% 0,100% 50%,50% 100%,0 50%)" : "none";
+        p.style.borderRadius = i % 3 === 0 ? "50%" : "0";
+        host.appendChild(p);
+      }
+    });
+    // Stufen für die Liste in C: dieselben Zeiten wie in A.
+    var s3li = document.querySelectorAll("#s3a li");
+    s3li.forEach(function (li, i) {
+      li.style.animationDelay = (0.2 + i * 0.7) + "s";
+      var t = (0.9 + i * 0.7);
+      li.querySelector(".ic").setAttribute("data-t", t);
+    });
+    var css = "";
+    s3li.forEach(function (li, i) {
+      var t = (0.9 + i * 0.7).toFixed(1);
+      css += ".s3.run #s3a li:nth-child(" + (i + 1) + ") .ic::before{animation-delay:0s," + t + "s}" +
+             ".s3.run #s3a li:nth-child(" + (i + 1) + ") .ic::after{animation:tick .3s " + t + "s cubic-bezier(.3,1.6,.5,1) forwards}";
+    });
+    var st = document.createElement("style"); st.textContent = css; document.head.appendChild(st);
+
+    window.replay = function (id) {
+      var el = document.getElementById(id);
+      el.classList.remove("run"); void el.offsetWidth; el.classList.add("run");
+    };
+    setTimeout(function () { replay("s1"); replay("s2"); replay("s3"); }, 400);
+  })();
+</script>

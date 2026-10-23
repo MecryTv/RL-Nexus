@@ -1,0 +1,227 @@
+@use "mixins" as *;
+
+/* Ab hier steht das Inhaltsverzeichnis neben dem Text statt darüber. */
+$wide: 1080px;
+
+.page {
+    display: grid;
+    gap: 32px;
+    padding-bottom: clamp(60px, 8vw, 110px);
+}
+
+.withToc {
+    @include from($wide) {
+        grid-template-columns: 250px minmax(0, 1fr);
+        align-items: start;
+        gap: clamp(48px, 5vw, 80px);
+    }
+}
+
+/* --- Inhaltsverzeichnis ------------------------------------------------- */
+.toc {
+    padding: 20px 22px 22px;
+
+    @include panel(var(--c-line-strong), var(--c-panel-fill), 14px);
+
+    @include below(560px) {
+        padding-inline: 18px;
+    }
+
+    /* Mitlaufen nur, wenn es ganz in den Bildschirm passt. Auf einem flachen
+       Fenster klebte sonst sein unteres Ende unerreichbar unter dem Rand. */
+    @include from($wide) {
+        @media (height >= 640px) {
+            position: sticky;
+            top: calc(var(--s-header) + 24px);
+        }
+    }
+}
+
+.tocTitle {
+    margin-bottom: 10px;
+    color: var(--c-text-faint);
+
+    @include label;
+}
+
+.tocList {
+    display: grid;
+
+    /* Über dem Text wäre eine einzelne Spalte eine halbe Bildschirmhöhe lang.
+       134 px sind das längste Wort („Verantwortlicher“) samt Nummer, damit
+       auch ein 360 px breites Handy zwei Spalten bekommt. */
+    @include below($wide) {
+        grid-template-columns: repeat(auto-fill, minmax(134px, 1fr));
+        column-gap: 12px;
+    }
+
+    a {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 6px 0;
+        color: var(--c-text-dim);
+        font-size: 0.92rem;
+        line-height: 1.35;
+        transition: color var(--t-fast);
+
+        @include touch-target;
+
+        @include below(560px) {
+            gap: 8px;
+            font-size: 0.86rem;
+        }
+
+        &:hover {
+            color: var(--c-text);
+        }
+    }
+}
+
+/* Die Nummer vor jedem Abschnitt, im Verzeichnis und an der Überschrift. */
+.number {
+    flex-shrink: 0;
+    min-width: 2ch;
+    color: var(--c-red);
+    font-family: var(--f-accent);
+    font-size: 0.72rem;
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+}
+
+/* --- Fließtext ---------------------------------------------------------- */
+/* 64ch sind in Oxanium rund 72 Zeichen je Zeile: `ch` misst die Null, und
+   die ist breiter als ein durchschnittlicher Buchstabe. */
+.prose {
+    max-width: 64ch;
+    color: var(--c-text-dim);
+    font-size: 0.97rem;
+    line-height: 1.75;
+
+    section + section {
+        margin-top: 44px;
+    }
+
+    h2 {
+        display: flex;
+        align-items: baseline;
+        gap: 14px;
+        margin-bottom: 14px;
+        color: var(--c-text);
+        font-size: 1.24rem;
+        font-weight: 800;
+        line-height: 1.3;
+
+        .number {
+            font-size: 0.8rem;
+        }
+    }
+
+    h3 {
+        margin: 26px 0 10px;
+        color: var(--c-text);
+        font-size: 1.02rem;
+        font-weight: 700;
+    }
+
+    p + p,
+    p + address,
+    address + p {
+        margin-top: 14px;
+    }
+
+    address {
+        font-style: normal;
+    }
+
+    ul {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        margin-block: 16px;
+
+        li {
+            position: relative;
+            padding-left: 20px;
+
+            /* Der Punkt in Rot statt des Listenzeichens des Browsers. */
+            &::before {
+                position: absolute;
+                top: 0.72em;
+                left: 2px;
+                width: 5px;
+                height: 5px;
+                border-radius: 50%;
+                background: var(--c-red);
+                content: "";
+            }
+        }
+    }
+
+    strong {
+        color: var(--c-text);
+        font-weight: 700;
+    }
+
+    a {
+        color: var(--c-blue);
+        text-decoration: underline;
+        text-underline-offset: 3px;
+
+        &:hover {
+            color: var(--c-text);
+        }
+    }
+
+    code {
+        padding: 1px 6px;
+        background: rgb(255 255 255 / 6%);
+        color: var(--c-text);
+        font-family: var(--f-label);
+        font-size: 0.94em;
+        font-weight: 600;
+    }
+}
+
+/* Cookies, Speichereinträge, Berechtigungen. Keine Tabelle: drei Spalten
+   laufen auf dem Handy aus dem Bild, diese Zeilen stapeln sich einfach. */
+.facts {
+    margin-block: 16px 20px;
+    border-top: 1px solid var(--c-line);
+
+    > div {
+        display: grid;
+        gap: 4px 20px;
+        padding: 12px 0;
+        border-bottom: 1px solid var(--c-line);
+
+        @include from(560px) {
+            grid-template-columns: 12.5rem minmax(0, 1fr);
+        }
+    }
+}
+
+/* Wie lange ein Eintrag bleibt. */
+.keep {
+    display: block;
+    margin-top: 4px;
+    color: var(--c-text-faint);
+
+    @include label(0.7rem, 0.12em);
+}
+
+/* Rechtstext nicht geladen: Satz und Knopf mit Luft dazwischen. */
+.retry {
+    display: grid;
+    justify-items: start;
+    gap: 16px;
+}
+
+.updated {
+    margin-top: 52px;
+    padding-top: 18px;
+    border-top: 1px solid var(--c-line);
+    color: var(--c-text-faint);
+    font-size: 0.88rem;
+}

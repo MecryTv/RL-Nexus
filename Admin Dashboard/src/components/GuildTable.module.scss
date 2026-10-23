@@ -1,0 +1,128 @@
+@use "mixins" as *;
+
+.frame {
+    overflow-x: auto;
+    border: 1px solid var(--c-line);
+    background: var(--c-panel-fill);
+}
+
+.table {
+    width: 100%;
+    min-width: 560px;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+
+    th {
+        padding: var(--s-2) var(--s-3);
+        border-bottom: 1px solid var(--c-line-strong);
+        color: var(--c-text-faint);
+        text-align: left;
+        white-space: nowrap;
+
+        @include label(0.72rem, 0.14em);
+    }
+
+    td {
+        height: 40px;
+        padding: var(--s-1) var(--s-3);
+        border-bottom: 1px solid var(--c-line);
+        color: var(--c-text-dim);
+        vertical-align: middle;
+
+        @media (pointer: coarse) {
+            height: 44px;
+        }
+    }
+
+    tbody tr:not(.detail):hover td {
+        background: rgb(255 255 255 / 3%);
+    }
+
+    .num {
+        font-variant-numeric: tabular-nums;
+        text-align: right;
+    }
+}
+
+.name {
+    display: flex;
+    align-items: center;
+    gap: var(--s-3);
+    min-width: 0;
+    color: var(--c-text);
+    font-weight: 500;
+}
+
+.icon {
+    display: grid;
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    place-items: center;
+    background: var(--c-line-strong);
+    color: var(--c-text);
+    font-size: 0.8rem;
+    font-weight: 700;
+
+    @include bevel-diagonal(6px);
+}
+
+.toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-2);
+    min-height: 32px;
+    font-weight: 500;
+    text-align: left;
+
+    &:hover {
+        color: var(--c-blue);
+    }
+}
+
+.chevron {
+    color: var(--c-text-faint);
+    transition: transform var(--t-fast);
+}
+
+.openRow .chevron {
+    transform: rotate(180deg);
+}
+
+.detail td {
+    height: auto;
+    padding: var(--s-3) var(--s-4) var(--s-4);
+    background: rgb(255 255 255 / 2%);
+}
+
+.facts {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--s-3) var(--s-5);
+
+    dt {
+        color: var(--c-text-faint);
+
+        @include label(0.72rem, 0.14em);
+    }
+
+    dd {
+        margin-top: var(--s-1);
+        color: var(--c-text);
+    }
+}
+
+.wide {
+    grid-column: 1 / -1;
+}
+
+.modules {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-2);
+}
+
+.empty {
+    padding: var(--s-4) 0;
+    color: var(--c-text-dim);
+}

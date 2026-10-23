@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="de">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <meta name="theme-color" content="#050608" />
+        <meta name="robots" content="noindex, nofollow" />
+        <title>RL Nexus Admin</title>
+        <link rel="icon" type="image/png" href="/favicon.png" />
+
+        <!--
+            Der Ladeschirm. Steht hier und nicht im Stylesheet, weil er zu sehen
+            sein muss, bevor irgendetwas geladen ist. Die Farben sind die aus
+            _tokens.scss, die Schrift nimmt, was da ist: Die eigenen Schnitte
+            kommen erst mit dem Stylesheet, und darauf zu warten hieße, einen
+            leeren Bildschirm zu zeigen.
+        -->
+        <style>
+            body {
+                margin: 0;
+                background: #050608;
+            }
+
+            #start {
+                position: fixed;
+                z-index: 1000;
+                inset: 0;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                gap: 22px;
+                background: radial-gradient(circle at 50% 42%, rgb(255 30 45 / 10%), transparent 46%), #050608;
+                transition: opacity 0.25s ease-out;
+            }
+
+            /* Beim Entfernen: erst ausblenden, dann aus dem Baum nehmen. */
+            #start.gone {
+                opacity: 0;
+                pointer-events: none;
+            }
+
+            #start img {
+                width: 72px;
+                height: 72px;
+            }
+
+            #start p {
+                margin: 0;
+                color: #7b8693;
+                font-family: ui-sans-serif, system-ui, sans-serif;
+                font-size: 0.78rem;
+                letter-spacing: 0.18em;
+                text-transform: uppercase;
+            }
+
+            #start div {
+                width: 168px;
+                height: 2px;
+                overflow: hidden;
+                background: rgb(255 30 45 / 20%);
+            }
+
+            #start div::after {
+                display: block;
+                width: 40%;
+                height: 100%;
+                background: linear-gradient(90deg, transparent, #ff1e2d, transparent);
+                content: "";
+                animation: start-bar 1.1s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+            }
+
+            @keyframes start-bar {
+                from {
+                    transform: translateX(-100%);
+                }
+
+                to {
+                    transform: translateX(350%);
+                }
+            }
+
+            /* Wer Bewegung abbestellt hat, bekommt einen ruhigen Balken. */
+            @media (prefers-reduced-motion: reduce) {
+                #start div::after {
+                    width: 100%;
+                    animation: none;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <!--
+            role="status" statt alert: Das Laden ist eine Information, keine
+            Warnung. Die Schriftmarke ist dekorativ, der Text sagt dasselbe.
+        -->
+        <div id="start" role="status">
+            <img src="/favicon.png" alt="" width="72" height="72" />
+            <div></div>
+            <p>RL Nexus Admin wird geladen</p>
+        </div>
+
+        <div id="root"></div>
+        <script type="module" src="/src/main.tsx"></script>
+    </body>
+</html>

@@ -1,0 +1,88 @@
+/**
+ * Die Bausteine, aus denen die Oberfläche besteht. Die meisten 1:1 von der
+ * Webseite; dazu `focus-inset`, `sr` und `between`.
+ */
+
+/// Abgeschrägte Ecken, wie `bevelPath()` im Karten-Renderer des Bots.
+@mixin bevel($cut: 18px) {
+    clip-path: polygon(
+        #{$cut} 0,
+        calc(100% - #{$cut}) 0,
+        100% #{$cut},
+        100% calc(100% - #{$cut}),
+        calc(100% - #{$cut}) 100%,
+        #{$cut} 100%,
+        0 calc(100% - #{$cut}),
+        0 #{$cut}
+    );
+}
+
+/// Nur oben links und unten rechts abgeschrägt, ruhiger, für kleine Flächen.
+@mixin bevel-diagonal($cut: 12px) {
+    clip-path: polygon(#{$cut} 0, 100% 0, 100% calc(100% - #{$cut}), calc(100% - #{$cut}) 100%, 0 100%, 0 #{$cut});
+}
+
+/// Großbuchstaben mit Sperrung, die HUD-Labels der Rang-Karte.
+@mixin label($size: 0.72rem, $spacing: 0.16em) {
+    font-family: var(--f-label);
+    font-size: $size;
+    font-weight: 600;
+    letter-spacing: $spacing;
+    text-transform: uppercase;
+}
+
+/// Der Fokusring für alles ohne clip-path.
+@mixin focus-ring($color: var(--c-blue)) {
+    outline: 2px solid $color;
+    outline-offset: 3px;
+}
+
+/// Der Fokusring für Flächen mit clip-path: ein äußerer Ring würde abgeschnitten.
+@mixin focus-inset($color: var(--c-blue)) {
+    outline: none;
+    box-shadow: inset 0 0 0 2px $color;
+}
+
+/// Für Bildschirmleser lesbar, sonst unsichtbar.
+@mixin sr {
+    position: absolute;
+    overflow: hidden;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    border: 0;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
+/// Mindestens 44 Pixel hoch, wo getippt statt geklickt wird.
+@mixin touch-target {
+    @media (pointer: coarse) {
+        min-height: 44px;
+    }
+}
+
+@mixin below($width) {
+    @media (width <= $width) {
+        @content;
+    }
+}
+
+@mixin between($min, $max) {
+    @media (#{$min} <= width <= #{$max}) {
+        @content;
+    }
+}
+
+@mixin from($width) {
+    @media (width > $width) {
+        @content;
+    }
+}
+
+/// Für alles, was sich bewegt: wer das abbestellt hat, bekommt es nicht.
+@mixin motion {
+    @media (prefers-reduced-motion: no-preference) {
+        @content;
+    }
+}

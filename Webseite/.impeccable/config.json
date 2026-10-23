@@ -1,0 +1,38 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "dark-glow",
+        "value": "*",
+        "files": [
+          "index.html"
+        ],
+        "createdAt": "2026-09-30T15:45:03.246Z",
+        "reason": "Claude: Intro-Ladebalken uebernimmt den bestehenden Seiten-Ladebalken (src/components/ui/PageLoader.module.scss, box-shadow 0 0 12px var(--c-red)); Leuchten ist Teil der Rang-Karten-Optik der Seite (glow-Mixin in _mixins.scss)"
+      },
+      {
+        "rule": "marquee",
+        "value": "*",
+        "files": [
+          "index.html"
+        ],
+        "createdAt": "2026-09-30T15:53:57.598Z",
+        "reason": "Claude: kein Laufband mit Inhalt, sondern die unbestimmte Fortschrittsanzeige des Intros (intro-sweep auf einem leeren 2px-Balken), dieselbe Bewegung wie der bestehende Seiten-Ladebalken in src/components/ui/PageLoader.module.scss; laeuft nur waehrend des Ladens und ruht bei prefers-reduced-motion"
+      },
+      {
+        "rule": "bounce-easing",
+        "value": "cubic-bezier(0.3, 1.6, 0.5, 1)",
+        "createdAt": "2026-10-23T03:54:48.258Z",
+        "reason": "Claude triage: intentional short overshoot for the check and role pop in the purchase-unlock celebration (src/shop/Unlock.module.scss), 0.3-0.35s, inside the motion-allowed block"
+      },
+      {
+        "rule": "bounce-easing",
+        "value": "cubic-bezier(0.3, 1.5, 0.5, 1)",
+        "createdAt": "2026-10-23T03:54:48.609Z",
+        "reason": "Claude triage: intentional short overshoot for the stamp landing in the purchase-unlock celebration (src/shop/Unlock.module.scss), 0.35s, inside the motion-allowed block"
+      }
+    ]
+  }
+}

@@ -1,0 +1,223 @@
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800&family=Oxanium:wght@400;600;700&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  .pp {
+    --c-base:#050608; --c-panel:#080d12; --c-fill:rgb(6 9 13 / 78%); --c-line:rgb(255 255 255 / 8%); --c-line-strong:rgb(255 255 255 / 14%);
+    --c-red:#ff1e2d; --c-red-bright:#ff3344; --c-blue:#00afff; --c-purple:#8a4dff; --c-win:#35e07f; --c-gold:#ffc53d;
+    --c-text:#f2f4f7; --c-dim:#a8b0bc; --c-faint:#6b7683; --c-discord:#5865f2;
+    --f-d:"Oxanium",system-ui,sans-serif; --f-l:"Rajdhani",system-ui,sans-serif; --f-a:"Orbitron","Oxanium",sans-serif;
+    font-family: var(--f-d); color: var(--c-text);
+  }
+  .pp * { box-sizing: border-box; }
+  .pp .site { background: radial-gradient(1200px 500px at 50% -120px, rgb(255 30 45 / 16%), transparent 60%), radial-gradient(800px 400px at 100% 30%, rgb(0 175 255 / 9%), transparent 60%), var(--c-base); border:1px solid #1a2028; overflow:hidden; }
+  .pp .nav { display:flex; align-items:center; gap:22px; padding:14px 26px; border-bottom:1px solid var(--c-line); background: rgb(5 6 8 / 70%); }
+  .pp .nav img { height:28px; }
+  .pp .nav .links { display:flex; gap:18px; font-family:var(--f-l); font-weight:600; font-size:13px; letter-spacing:.14em; text-transform:uppercase; color:var(--c-dim); }
+  .pp .nav .links .on { color:var(--c-text); box-shadow: inset 0 -2px 0 var(--c-red); padding-bottom:4px; }
+  .pp .nav .sp { flex:1; }
+  .pp .lbl { font-family:var(--f-l); font-weight:600; font-size:12px; letter-spacing:.16em; text-transform:uppercase; color:var(--c-dim); }
+  .pp .bevel { clip-path: polygon(14px 0, calc(100% - 14px) 0, 100% 14px, 100% calc(100% - 14px), calc(100% - 14px) 100%, 14px 100%, 0 calc(100% - 14px), 0 14px); }
+  .pp .diag { clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px); }
+  .pp .btn { display:inline-flex; align-items:center; justify-content:center; gap:8px; height:42px; padding:0 20px; font-family:var(--f-l); font-weight:700; font-size:13px; letter-spacing:.12em; text-transform:uppercase; border:0; color:#fff; cursor:pointer; }
+  .pp .btn.red { background: linear-gradient(135deg, var(--c-red-bright), var(--c-red) 55%, #d81424); filter: drop-shadow(0 4px 18px rgb(255 30 45 / 30%)); }
+  .pp .btn.ghost { background: #0b1016; box-shadow: inset 0 0 0 1px var(--c-line-strong); color: var(--c-text); }
+  .pp .btn.discord { background: var(--c-discord); }
+  .pp .btn.sm { height:34px; padding:0 14px; font-size:12px; }
+  .pp .btn.wide { width:100%; }
+  .pp .panel { position:relative; background: var(--c-line-strong); padding:1px; }
+  .pp .panel > .in { background: #0a0f15; height:100%; }
+  .pp .panel.hl { background: linear-gradient(160deg, var(--c-red), rgb(255 30 45 / 25%) 40%, rgb(0 175 255 / 40%)); filter: drop-shadow(0 0 22px rgb(255 30 45 / 25%)); }
+  .pp h1 { font-family:var(--f-d); font-weight:700; font-size:40px; line-height:1.05; margin:0; letter-spacing:-.01em; }
+  .pp h1 em { font-style:normal; color: var(--c-red); }
+  .pp .lead { color:var(--c-dim); font-size:16px; line-height:1.55; margin:12px 0 0; max-width:560px; }
+  .pp .price { font-family:var(--f-a); font-weight:800; font-size:30px; letter-spacing:.02em; }
+  .pp .price small { font-family:var(--f-l); font-size:13px; font-weight:600; letter-spacing:.1em; color:var(--c-dim); text-transform:uppercase; margin-left:4px; }
+  .pp .tag { display:inline-block; font-family:var(--f-l); font-weight:700; font-size:11px; letter-spacing:.14em; text-transform:uppercase; padding:3px 8px; }
+  .pp .tag.red { background: var(--c-red); color:#fff; }
+  .pp .tag.blue { background: rgb(0 175 255 / 14%); color: var(--c-blue); box-shadow: inset 0 0 0 1px rgb(0 175 255 / 40%); }
+  .pp .tag.green { background: rgb(53 224 127 / 12%); color: var(--c-win); box-shadow: inset 0 0 0 1px rgb(53 224 127 / 35%); }
+  .pp .tag.gold { background: rgb(255 197 61 / 12%); color: var(--c-gold); box-shadow: inset 0 0 0 1px rgb(255 197 61 / 35%); }
+  .pp ul.feat { list-style:none; padding:0; margin:14px 0 0; font-size:14px; color:var(--c-dim); line-height:1.4; }
+  .pp ul.feat li { padding:5px 0 5px 22px; position:relative; }
+  .pp ul.feat li::before { content:""; position:absolute; left:2px; top:10px; width:9px; height:9px; background:var(--c-win); clip-path: polygon(0 50%, 40% 100%, 100% 0, 40% 70%); }
+  .pp .tax { font-size:12px; color:var(--c-faint); margin-top:10px; }
+  .pp .avatar { width:30px; height:30px; border-radius:50%; background: linear-gradient(135deg,#8a4dff,#00afff); display:inline-block; vertical-align:middle; }
+
+  /* A */
+  .pp .a-hero { text-align:center; padding:44px 30px 10px; }
+  .pp .a-hero .lead { margin-left:auto; margin-right:auto; }
+  .pp .trial-strip { margin:26px auto 0; max-width:900px; display:flex; align-items:center; gap:18px; padding:14px 20px; background: linear-gradient(90deg, rgb(53 224 127 / 12%), rgb(53 224 127 / 3%)); box-shadow: inset 0 0 0 1px rgb(53 224 127 / 30%); text-align:left; }
+  .pp .trial-strip b { font-size:17px; }
+  .pp .trial-strip p { margin:2px 0 0; color:var(--c-dim); font-size:13px; }
+  .pp .a-grid { display:grid; grid-template-columns: repeat(3, 1fr); gap:18px; max-width:900px; margin:26px auto 0; padding: 0 0 8px; align-items:end; }
+  .pp .a-card .in { padding:22px; }
+  .pp .a-card.hl .in { padding-top:30px; padding-bottom:30px; }
+  .pp .a-card h3 { font-family:var(--f-d); font-size:20px; margin:8px 0 6px; }
+  .pp .a-card .meta { font-size:13px; color:var(--c-dim); margin-bottom:14px; }
+  .pp .faq { max-width:900px; margin:26px auto 36px; display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .pp .faq div { padding:12px 16px; background:#0a0f15; box-shadow: inset 0 0 0 1px var(--c-line); font-size:14px; display:flex; justify-content:space-between; color:var(--c-dim); }
+
+  /* B */
+  .pp .b-wrap { display:grid; grid-template-columns: 1.35fr 1fr; gap:22px; padding:34px 30px 36px; }
+  .pp .b-row { display:flex; align-items:center; gap:16px; padding:16px 18px; background:#0a0f15; box-shadow: inset 0 0 0 1px var(--c-line); margin-top:10px; }
+  .pp .b-row.sel { box-shadow: inset 0 0 0 1px var(--c-red), 0 0 24px rgb(255 30 45 / 18%); background: linear-gradient(90deg, rgb(255 30 45 / 10%), #0a0f15 55%); }
+  .pp .radio { width:18px; height:18px; border-radius:50%; box-shadow: inset 0 0 0 2px var(--c-line-strong); flex:none; }
+  .pp .b-row.sel .radio { box-shadow: inset 0 0 0 5px var(--c-red); }
+  .pp .b-row .t { flex:1; }
+  .pp .b-row .t b { font-size:17px; }
+  .pp .b-row .t p { margin:2px 0 0; font-size:13px; color:var(--c-dim); }
+  .pp .b-row .price { font-size:22px; }
+  .pp .sum .in { padding:22px; }
+  .pp .who { display:flex; align-items:center; gap:10px; padding:10px 12px; background: rgb(88 101 242 / 10%); box-shadow: inset 0 0 0 1px rgb(88 101 242 / 35%); font-size:14px; }
+  .pp .line { display:flex; justify-content:space-between; font-size:14px; color:var(--c-dim); padding:7px 0; border-bottom:1px solid var(--c-line); }
+  .pp .line.total { color:var(--c-text); font-weight:700; border:0; font-size:16px; }
+  .pp .check { display:flex; gap:9px; font-size:12.5px; color:var(--c-dim); margin-top:10px; line-height:1.4; }
+  .pp .check i { width:15px; height:15px; flex:none; margin-top:1px; box-shadow: inset 0 0 0 1px var(--c-line-strong); background:#0b1016; }
+  .pp .check i.on { background: var(--c-red); box-shadow:none; }
+
+  /* C */
+  .pp .c-wrap { display:grid; grid-template-columns: 1fr 1fr; gap:34px; padding:44px 34px 40px; align-items:center; }
+  .pp .c-cta { display:flex; gap:12px; margin-top:22px; flex-wrap:wrap; }
+  .pp .c-note { font-size:13px; color:var(--c-faint); margin-top:10px; }
+  .pp .seg { display:flex; background:#0b1016; box-shadow: inset 0 0 0 1px var(--c-line-strong); padding:4px; gap:4px; margin-bottom:14px; }
+  .pp .seg span { flex:1; text-align:center; padding:8px 0; font-family:var(--f-l); font-weight:700; font-size:13px; letter-spacing:.12em; text-transform:uppercase; color:var(--c-dim); }
+  .pp .seg span.on { background: var(--c-red); color:#fff; }
+  .pp .pass { position:relative; padding:1px; background: linear-gradient(140deg, var(--c-red), rgb(138 77 255 / 60%) 45%, var(--c-blue)); filter: drop-shadow(0 0 30px rgb(255 30 45 / 22%)); }
+  .pp .pass .in { background: radial-gradient(400px 200px at 90% 0%, rgb(0 175 255 / 16%), transparent 60%), radial-gradient(300px 220px at 0% 100%, rgb(255 30 45 / 16%), transparent 60%), #070b10; padding:24px 24px 22px; }
+  .pp .pass .top { display:flex; justify-content:space-between; align-items:flex-start; }
+  .pp .pass .name { font-family:var(--f-a); font-weight:800; font-size:24px; letter-spacing:.06em; }
+  .pp .pass .stripe { height:6px; margin:16px 0; background: repeating-linear-gradient(115deg, var(--c-red) 0 14px, transparent 14px 22px); opacity:.8; }
+  .pp .pass .grid2 { display:grid; grid-template-columns: 1fr 1fr; gap:10px; }
+  .pp .pass .stat { background: rgb(255 255 255 / 4%); padding:10px 12px; }
+  .pp .pass .stat b { display:block; font-size:16px; margin-top:3px; }
+  .pp .mods { display:flex; flex-wrap:wrap; gap:6px; margin-top:24px; }
+  .pp .mods span { font-family:var(--f-l); font-weight:600; font-size:12px; letter-spacing:.08em; text-transform:uppercase; padding:4px 9px; background:#0b1016; box-shadow: inset 0 0 0 1px var(--c-line-strong); color:var(--c-dim); }
+
+  .optwrap .option { display:block; }
+  .optwrap .option .content { width:100%; }
+  .optwrap .head { display:flex; align-items:baseline; gap:12px; margin-bottom:10px; }
+  .optwrap .head h3 { margin:0; }
+  .optwrap .head p { margin:0; font-size:14px; color: var(--text-secondary, #9aa0a6); }
+  @media (max-width: 900px) { .pp .a-grid, .pp .b-wrap, .pp .c-wrap, .pp .faq { grid-template-columns: 1fr; } }
+</style>
+
+<h2>Preisseite: nexus-emb.de/preise</h2>
+<p class="subtitle">Drei Entwürfe mit Beispielpreisen (die stellst du später im Admin Dashboard ein). Klick den an, der dir am besten gefällt. Mischen geht auch, sag dann im Chat, was von wo.</p>
+
+<div class="options optwrap">
+
+<!-- ================= A ================= -->
+<div class="option" data-choice="a" onclick="toggleSelect(this)">
+  <div class="content">
+    <div class="head"><div class="letter" style="position:static">A</div><h3>Drei Karten</h3><p>Klassisch: Test als grüne Leiste oben, darunter die Produkte nebeneinander, Fragen unten.</p></div>
+    <div class="pp"><div class="site">
+      <div class="nav"><img src="files/logo.webp" alt=""><div class="links"><span>Home</span><span>Module</span><span>Commands</span><span class="on">Preise</span><span>Team</span><span>Kontakt</span></div><div class="sp"></div><button class="btn discord sm diag">Mit Discord anmelden</button></div>
+      <div class="a-hero">
+        <div class="lbl" style="color:var(--c-red)">Bot-Dashboard freischalten</div>
+        <h1 style="margin-top:10px">Ein Zugang. <em>Alle Module.</em></h1>
+        <p class="lead">Richte RL Nexus auf allen deinen Servern im Dashboard ein: Teams, Rang-Rollen, Tickets, 6 Mans und der Rest. Jeder Plan schaltet dasselbe frei.</p>
+        <div class="trial-strip diag">
+          <span class="tag green">Test</span>
+          <div style="flex:1"><b>7 Tage kostenlos testen</b><p>Ohne Karte. Einmal pro Discord-Konto. Danach entscheidest du.</p></div>
+          <button class="btn ghost sm diag" style="box-shadow: inset 0 0 0 1px rgb(53 224 127 / 50%); color: var(--c-win)">Test starten</button>
+        </div>
+      </div>
+      <div class="a-grid">
+        <div class="panel bevel a-card"><div class="in bevel">
+          <span class="tag blue">Abo</span><h3>Monat</h3><div class="meta">Verlängert sich monatlich, jederzeit zum Monatsende kündbar</div>
+          <div class="price">4,99 €<small>/ Monat</small></div>
+          <ul class="feat"><li>Alle Module im Dashboard</li><li>Alle deine Server</li><li>Rolle „Nexus Plus“</li></ul>
+          <button class="btn ghost wide diag" style="margin-top:16px">Auswählen</button>
+        </div></div>
+        <div class="panel hl bevel a-card hl"><div class="in bevel">
+          <span class="tag red">Beliebt</span> <span class="tag gold">Einmalig</span><h3>Jahr</h3><div class="meta">365 Tage, verlängert sich nicht</div>
+          <div class="price">44,99 €<small>einmalig</small></div>
+          <ul class="feat"><li>Alle Module im Dashboard</li><li>Alle deine Server</li><li>Rolle „Nexus Plus“</li><li>Rund 25 % günstiger als 12 Monate</li></ul>
+          <button class="btn red wide diag" style="margin-top:16px">Auswählen</button>
+        </div></div>
+        <div class="panel bevel a-card"><div class="in bevel">
+          <span class="tag gold">Einmalig</span><h3>Lifetime</h3><div class="meta">Unbegrenzt, keine Verlängerung</div>
+          <div class="price">99,00 €<small>einmalig</small></div>
+          <ul class="feat"><li>Alle Module im Dashboard</li><li>Alle deine Server</li><li>Rolle „Nexus Legend“</li></ul>
+          <button class="btn ghost wide diag" style="margin-top:16px">Auswählen</button>
+        </div></div>
+      </div>
+      <p class="tax" style="text-align:center">Endpreise. Gemäß § 19 UStG wird keine Umsatzsteuer berechnet.</p>
+      <div class="faq"><div>Was passiert nach dem Test? <span>+</span></div><div>Wie kündige ich? <span>+</span></div><div>Warum Discord-Anmeldung? <span>+</span></div><div>Welche Zahlungsarten? <span>+</span></div></div>
+    </div></div>
+  </div>
+</div>
+
+<!-- ================= B ================= -->
+<div class="option" data-choice="b" onclick="toggleSelect(this)">
+  <div class="content">
+    <div class="head"><div class="letter" style="position:static">B</div><h3>Auswahl mit Zusammenfassung</h3><p>Wie eine Kasse: links Produkt wählen, rechts steht schon alles, was das Gesetz vor dem Knopf verlangt.</p></div>
+    <div class="pp"><div class="site">
+      <div class="nav"><img src="files/logo.webp" alt=""><div class="links"><span>Home</span><span>Module</span><span>Commands</span><span class="on">Preise</span><span>Team</span><span>Kontakt</span></div><div class="sp"></div><span class="avatar"></span><span style="font-size:14px">mecry</span></div>
+      <div class="b-wrap">
+        <div>
+          <div class="lbl" style="color:var(--c-red)">Bot-Dashboard freischalten</div>
+          <h1 style="margin-top:10px;font-size:34px">Wähle deinen Zugang</h1>
+          <p class="lead" style="font-size:15px">Jeder Plan schaltet dasselbe frei: alle Module, alle deine Server.</p>
+          <div class="b-row" style="margin-top:20px; background: linear-gradient(90deg, rgb(53 224 127 / 10%), #0a0f15 60%); box-shadow: inset 0 0 0 1px rgb(53 224 127 / 30%)"><div class="radio"></div><div class="t"><b>7 Tage testen</b> <span class="tag green">Kostenlos</span><p>Ohne Karte, einmal pro Konto</p></div><div class="price" style="color:var(--c-win)">0 €</div></div>
+          <div class="b-row"><div class="radio"></div><div class="t"><b>Monat</b> <span class="tag blue">Abo</span><p>Monatlich kündbar</p></div><div class="price">4,99 €</div></div>
+          <div class="b-row sel"><div class="radio"></div><div class="t"><b>Jahr</b> <span class="tag red">Beliebt</span><p>365 Tage einmalig, verlängert sich nicht</p></div><div class="price">44,99 €</div></div>
+          <div class="b-row"><div class="radio"></div><div class="t"><b>Lifetime</b><p>Unbegrenzt</p></div><div class="price">99,00 €</div></div>
+        </div>
+        <div class="panel bevel sum"><div class="in bevel">
+          <div class="lbl">Deine Bestellung</div>
+          <div class="who" style="margin-top:12px"><span class="avatar"></span><div style="flex:1"><b>mecry</b><div style="font-size:12px;color:var(--c-dim)">Bestätigung an m***@gmail.com</div></div><span style="font-size:12px;color:var(--c-dim)">Wechseln</span></div>
+          <div style="margin-top:14px">
+            <div class="line"><span>Jahr, 365 Tage</span><span>44,99 €</span></div>
+            <div class="line"><span>Beginn</span><span>sofort</span></div>
+            <div class="line"><span>Verlängerung</span><span>keine</span></div>
+            <div class="line"><span>Discord-Rolle</span><span>Nexus Plus</span></div>
+            <div class="line total"><span>Gesamt</span><span>44,99 €</span></div>
+          </div>
+          <div class="check"><i class="on"></i><span>Ich stimme den AGB zu und will, dass der Zugang sofort startet. Mir ist klar, dass mein Widerrufsrecht damit vorzeitig erlischt.</span></div>
+          <div class="check"><i></i><span>Ich bin volljährig oder meine Eltern sind einverstanden.</span></div>
+          <button class="btn red wide diag" style="margin-top:16px; height:48px">Zahlungspflichtig bestellen</button>
+          <p class="tax">Gemäß § 19 UStG wird keine Umsatzsteuer berechnet.</p>
+        </div></div>
+      </div>
+    </div></div>
+  </div>
+</div>
+
+<!-- ================= C ================= -->
+<div class="option" data-choice="c" onclick="toggleSelect(this)">
+  <div class="content">
+    <div class="head"><div class="letter" style="position:static">C</div><h3>Nexus Pass</h3><p>Test steht vorne. Rechts eine Zugangskarte im Stil der Rang-Karte, die sich mit dem Umschalter ändert.</p></div>
+    <div class="pp"><div class="site">
+      <div class="nav"><img src="files/logo.webp" alt=""><div class="links"><span>Home</span><span>Module</span><span>Commands</span><span class="on">Preise</span><span>Team</span><span>Kontakt</span></div><div class="sp"></div><button class="btn discord sm diag">Mit Discord anmelden</button></div>
+      <div class="c-wrap">
+        <div>
+          <div class="lbl" style="color:var(--c-red)">Bot-Dashboard freischalten</div>
+          <h1 style="margin-top:10px;font-size:44px">Dein Server.<br><em>Voll ausgestattet.</em></h1>
+          <p class="lead">Teste das Dashboard 7 Tage mit allen Modulen. Ohne Karte, ohne Abo. Gefällt es dir, holst du dir danach einen Pass.</p>
+          <div class="c-cta"><button class="btn red diag" style="height:50px;padding:0 26px">7 Tage kostenlos testen</button><button class="btn ghost diag" style="height:50px">Gleich kaufen</button></div>
+          <p class="c-note">Einmal pro Discord-Konto. Du wirst dabei auf den RL-Nexus-Server geholt.</p>
+          <div class="mods"><span>Teams</span><span>Rank Roles</span><span>Tickets</span><span>6 Mans</span><span>Matchups</span><span>Level</span><span>Welcome</span><span>+16</span></div>
+        </div>
+        <div>
+          <div class="seg diag"><span>Monat</span><span class="on">Jahr</span><span>Lifetime</span></div>
+          <div class="pass bevel"><div class="in bevel">
+            <div class="top"><div><div class="lbl">RL Nexus</div><div class="name">NEXUS PASS</div></div><span class="tag red">Beliebt</span></div>
+            <div class="stripe"></div>
+            <div class="price" style="font-size:38px">44,99 €<small>einmalig</small></div>
+            <div class="grid2" style="margin-top:14px">
+              <div class="stat"><span class="lbl">Laufzeit</span><b>365 Tage</b></div>
+              <div class="stat"><span class="lbl">Verlängerung</span><b>Keine</b></div>
+              <div class="stat"><span class="lbl">Server</span><b>Alle deine</b></div>
+              <div class="stat"><span class="lbl">Discord-Rolle</span><b style="color:var(--c-red-bright)">Nexus Plus</b></div>
+            </div>
+            <button class="btn red wide diag" style="margin-top:18px;height:48px">Pass holen</button>
+            <p class="tax">Endpreis. Gemäß § 19 UStG wird keine Umsatzsteuer berechnet.</p>
+          </div></div>
+        </div>
+      </div>
+    </div></div>
+  </div>
+</div>
+
+</div>

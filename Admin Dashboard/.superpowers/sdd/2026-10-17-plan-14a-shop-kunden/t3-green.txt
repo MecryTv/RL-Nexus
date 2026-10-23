@@ -1,0 +1,147 @@
+
+> rl-nexus-admin@1.0.0 check:db
+> node --env-file=.env server/check-db.ts
+
+<claude-code-hint v="1" type="plugin" value="stripe@claude-plugins-official" />
+🗄️  Datenbank verbunden
+
+  Gruppen
+  ok    Vergeben, ändern und entziehen
+  ok    Jede Änderung steht im Protokoll
+  ok    Die Übersicht zeigt die letzten Aktionen, neueste zuerst, ohne Details
+
+  Meldungen
+  ok    An eine leere Gruppe geht nichts
+  ok    An eine Gruppe: jedes Mitglied bekommt die Meldung
+  ok    An IDs: doppelte zählen einmal, der Link bleibt, wie er ist
+  ok    Zuletzt verschickt nennt Titel, Empfänger, Art und Anzahl
+
+  Postfach
+📬 IMAP-Anmeldung für check-db-support@example.test gescheitert: Invalid credentials
+  ok    Postfach anlegen: falsches Passwort fällt auf, das richtige wird verschlüsselt gespeichert
+  ok    Die Übersicht zeigt das Postfach mit Ordnern, nie das Passwort
+  ok    Alle Posteingänge liefert die Mails mit ihrem Postfach
+  ok    Vorschau aus einem Postfach: Name im Kopf, Logo eingebettet, Skripte raus
+  ok    Senden über ein Postfach: verschickt, bereinigt, in „Gesendet“ abgelegt
+  ok    Weiterleiten nimmt gewählte Anhänge mit, das Zitat steht in der Mail
+  ok    Weiterleiten einer Mail, die es nicht mehr gibt: klarer Satz, nichts geht raus
+  ok    Ein riesiges Zitat wird gekürzt statt die Mail abzulehnen
+  FAIL  Das Kontaktformular geht über das Postfach von CONTACT_MAIL raus, ohne SMTP_*
+        nichts in Gesendet
+
+1 !== 0
+
+  ok    Umbenennen und Entfernen, beides im Protokoll
+
+  Aufräumen
+🧹 Aufgeräumt: 1 Kontaktnachricht(en), 0 Protokolleintrag/-einträge
+  ok    Kontaktnachrichten verschwinden 90 Tage nach dem Eingang, egal welcher Stand
+🧹 Aufgeräumt: 0 Kontaktnachricht(en), 1 Protokolleintrag/-einträge
+  ok    Protokolleinträge verschwinden nach 365 Tagen
+  ok    Statusprüfungen verschwinden nach 90 Tagen
+
+  Status: Verlauf und Meldungen
+  ok    Jede Prüfung landet mit vier Zeilen in der Datenbank und kommt im Verlauf an
+  ok    Meldung anlegen, ergänzen, lösen, löschen, alles im Protokoll
+  ok    Eine geplante Wartung steht auf der Statusseite und färbt nichts, solange sie nicht läuft
+
+  Protokoll und Technik
+  ok    Das Protokoll filtert nach Aktion und Person und blättert in Seiten zu 50
+  ok    Die Technik-Ansicht kennt Version, Migrationen und Tabellen der Datenbank
+
+  Datenbank ansehen
+  ok    Tabellen und Spalten kommen aus information_schema
+  ok    Nur Admins draußen, Tabelle muss es geben, Seite muss eine Zahl sein
+  ok    Suchen, sortieren und blättern über echte Zeilen
+  ok    Zeitstempel und Zahlen kommen als Text, der Download als CSV
+  ok    Spalten, die nach einem Geheimnis aussehen, liefern keinen Inhalt
+
+  Statusmeldung in Discord
+📊 Statusmeldung in Kanal 900000000000000009 geschrieben
+  ok    Erst schreiben, dann dieselbe Nachricht ändern, beides mit dem Banner
+📊 Statusmeldung in Kanal 900000000000000009 geschrieben
+  ok    Ist die Nachricht gelöscht, wird eine neue geschrieben
+📊 Statusmeldung in Kanal 900000000000000009 geschrieben
+  ok    Gehört die Nachricht einer anderen Application, wird eine eigene geschrieben
+📊 Statusmeldung in Kanal 900000000000000009 fehlgeschlagen: Discord antwortet mit 403 beim Ändern: {"message":"Missing Permissions","code":50013}
+  ok    Jeder andere Fehler fällt auf, statt den Kanal mit neuen Nachrichten zu füllen
+📊 Statusmeldung in Kanal 900000000000000009 fehlgeschlagen: Discord hat die Nachricht unvollständig angelegt (flags 0, Banner fehlt). Wieder gelöscht.
+📊 Statusmeldung in Kanal 900000000000000009 fehlgeschlagen: Discord hat die Nachricht unvollständig angelegt (flags 32768, Banner fehlt). Wieder gelöscht.
+  ok    Kommt die Nachricht unvollständig an, wird sie gelöscht und nichts gemerkt
+📊 Statuskanal 900000000000000009 aufgeräumt: 3 Nachricht(en) gelöscht
+  ok    Im Kanal bleibt nur die Statusmeldung: neuere gesammelt gelöscht, ältere als 14 Tage einzeln
+📊 Statuskanal 900000000000000009 aufgeräumt: 1 Nachricht(en) gelöscht
+  ok    Eine einzelne fremde Nachricht wird einzeln gelöscht, steht nur die Meldung drin, passiert nichts
+📊 Statusmeldung in Kanal 900000000000000009 geschrieben
+📊 Statuskanal 900000000000000009 aufgeräumt: 1 Nachricht(en) gelöscht
+  ok    Eine frisch geschriebene Meldung bleibt beim Aufräumen stehen
+  ok    Ohne Kanal passiert nichts
+📊 Statusmeldung in Kanal 900000000000000010 geschrieben
+📊 Aufräumen in Kanal 900000000000000010 fehlgeschlagen: Discord antwortet mit 404 beim Lesen des Kanals: {}
+📊 Statusmeldung in Kanal 900000000000000011 geschrieben
+📊 Aufräumen in Kanal 900000000000000011 fehlgeschlagen: Discord antwortet mit 404 beim Lesen des Kanals: {}
+  ok    Mehrere Kanäle: jeder bekommt seine eigene Nachricht und merkt sich deren ID
+  ok    Eine gemerkte ID von früher (ohne Kanal) wird weiter geändert statt neu geschrieben
+  ok    Die echte Nachrichten-ID steht hinterher wieder da
+
+  Shop
+  ok    Einstellungen lassen sich lesen und speichern
+  ok    Ein Produkt anlegen, ändern, sortieren
+  ok    Die Bezahlschranke sperrt niemanden aus
+  ok    Produkte ohne Bestellungen lassen sich löschen
+
+  Shop: Datensätze
+  ok    Kunde, Tokens und Beitritt
+  ok    Der Test lässt sich nur einmal anlegen
+  ok    Bestellung: Nummer, bezahlt nur einmal, Schritte
+  ok    Zugänge: beenden, fällig, verarbeitet, neues Ende, Abo finden
+  ok    Webhooks: einmal verarbeitet, Zeitpunkt neu bei jedem
+
+  Shop: Anmeldung und Test
+  ok    Anmeldung über Discord legt den Kunden an und setzt das Shop-Cookie
+  ok    Ohne bestätigte Discord-Mail kein Konto im Shop
+  ok    Der Stand zeigt die Person mit gekürzter Mail und ob sie testen darf
+  ok    Test starten: Zugang, Server, Test-Rolle, Mail, und nur einmal
+
+  Shop: Kauf
+  ok    Checkout legt Bestellung, Stripe-Kunde und Session an
+  ok    Fremde Bestellungen sieht man nicht
+  ok    Abgebrochene oder gescheiterte Zahlung: Der Fortschritt meldet sie gelb, statt ewig zu warten
+  ok    Erfüllen: bezahlt, Abo-Zugang, Test endet, Rolle getauscht, Mail mit Rechnung, nur einmal
+
+  Shop: Webhook
+  ok    Gleiches Ereignis zweimal: einmal verarbeitet
+  ok    Periodenwechsel vor der Zahlung: Der Ablauf-Job lässt das Abo in Ruhe, subscription.updated zieht das Ende nach
+  ok    Verlängerung erst nach dem Ablauf-Job: Die Rolle kommt zurück
+  ok    Kündigung über das Kundenportal: Mail mit Datum und Ende
+  ok    Fehlgeschlagene Zahlung: Mail, Zugang bleibt
+  ok    Abo gelöscht: Zugang endet, Rolle weg
+  ok    Unbekannte Ereignisse werden angenommen und ignoriert
+  ok    Bezahlt vermerkt, aber kein Zugang (Abbruch dazwischen): Der nächste Webhook holt Zugang und Mail nach, nichts doppelt
+  ok    Gutschein über den ganzen Betrag: no_payment_required schaltet frei, der bezahlte Betrag steht in der Bestellung
+  ok    Lastschrift unterwegs: Die Bestellung wartet, ein zweiter Kauf geht nicht, async_payment_succeeded schaltet frei
+  ok    Teilerstattung: Die Bestellung bleibt bezahlt, nur der erstattete Betrag wird vermerkt
+
+  Shop: Ablauf
+  ok    Abgelaufener Einmalkauf: Rolle weg, eine Mail, danach nichts mehr fällig
+🛒 Abgleich für 99999999999999999911: Discord antwortet nicht: Discord ist nicht erreichbar: fetch failed
+  ok    Discord gerade weg: nicht als erledigt markiert, nächstes Mal wieder
+  ok    Aufräumen: offene Bestellungen nach 30 Tagen, alte Tokens weg
+  ok    Die Tokens erscheinen im Datenbank-Browser maskiert
+
+  Shop: Nachholen
+🛒 Abgleich für 99999999999999999912: Kein gültiges Discord-Token mehr. Die Person muss sich auf der Preisseite neu anmelden, dann holt der Shop sie auf den Server.
+  ok    Beendeter Zugang, Person nicht auf dem Server und Beitritt unmöglich: gilt trotzdem als erledigt
+  ok    Anmeldung mit laufendem Zugang gleicht gleich ab, und die Sitzung hält so lange wie die Discord-Tokens
+  ok    Gescheiterte Rolle beim Kauf: Der Ablauf-Job holt sie später nach
+
+  Shop: Dev-Knöpfe
+  ok    Mit --dev: zurücksetzen, simulierter Kauf, kündigen, ablaufen
+
+  Shop: Kunden
+  ok    Kunden: Liste mit Zahlen, Status und gekürzter Mail
+  ok    Kunden: eine Person mit voller Mail, bezahltem Betrag, Vorschlag und Verlauf
+  ok    Kunden: unbekannt 404, ohne Sitzung 401
+
+  1 Prüfung(en) fehlgeschlagen.
+

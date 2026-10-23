@@ -1,0 +1,34 @@
+@use "mixins" as *;
+
+.wrap {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-1);
+}
+
+.code {
+    color: var(--c-text-dim);
+    font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+    font-size: 0.85rem;
+}
+
+.button {
+    display: grid;
+    width: 32px;
+    height: 32px;
+    place-items: center;
+    color: var(--c-text-faint);
+
+    &:hover {
+        color: var(--c-text);
+    }
+
+    &:focus-visible {
+        @include focus-inset;
+    }
+
+    @media (pointer: coarse) {
+        width: 44px;
+        height: 44px;
+    }
+}

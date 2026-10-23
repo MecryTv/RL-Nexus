@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="de">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <meta name="theme-color" content="#050608" />
+
+        <title>RL Nexus · Discord-Bot für Rocket-League-Organisationen</title>
+        <meta
+            name="description"
+            content="RL Nexus ist der Discord-Bot für deine Rocket-League-Organisation: Ränge, Teams, Bewerbungen, Tickets, Logging und mehr, modular zuschaltbar über ein Web-Dashboard."
+        />
+
+        <link rel="icon" type="image/png" href="/favicon.png" />
+        <link rel="apple-touch-icon" href="/favicon.png" />
+
+        <!-- Die Vorschau, wenn jemand den Link in Discord teilt. -->
+        <meta property="og:type" content="website" />
+        <meta property="og:site_name" content="RL Nexus" />
+        <meta property="og:title" content="RL Nexus · Esports Management Bot" />
+        <meta
+            property="og:description"
+            content="Ränge, Teams, Bewerbungen, Tickets, Logging und Stream-Meldungen in einem Discord-Bot für deine Rocket-League-Organisation."
+        />
+        <meta property="og:image" content="https://nexus-emb.de/og-banner.png" />
+        <meta name="twitter:card" content="summary_large_image" />
+
+        <!-- Das Intro beim ersten Besuch des Tages. Hier und nicht im Stylesheet,
+             weil es zu sehen sein muss, bevor irgendetwas anderes geladen ist.
+             Die Farben sind die aus _tokens.scss. -->
+        <style>
+            .intro {
+                display: none;
+            }
+
+            .intro-on:not(.intro-out) {
+                overflow: hidden;
+            }
+
+            .intro-on .intro {
+                position: fixed;
+                z-index: 1000;
+                inset: 0;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                gap: 26px;
+                background:
+                    radial-gradient(circle at 50% 44%, rgb(255 30 45 / 14%), transparent 46%),
+                    #050608;
+                transition: opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+            }
+
+            /* Die Seite baut sich darunter schon auf, bleibt aber unsichtbar
+               und unerreichbar, bis das Intro geht. */
+            .intro-on:not(.intro-out) #root {
+                visibility: hidden;
+            }
+
+            .intro-out .intro {
+                opacity: 0;
+                pointer-events: none;
+            }
+
+            .intro-mark {
+                position: relative;
+                width: 208px;
+                height: 208px;
+                transition: scale 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+                animation: intro-in 0.9s cubic-bezier(0.16, 1, 0.3, 1) both;
+            }
+
+            .intro-out .intro-mark {
+                scale: 1.08;
+            }
+
+            .intro-mark img {
+                display: block;
+                width: 100%;
+                height: 100%;
+                border-radius: 50%;
+            }
+
+            /* Ein Lichtbogen, der um das Logo läuft: dieselbe rote Kante wie im
+               Logo selbst, als Zeichen, dass noch etwas lädt. */
+            .intro-mark::after {
+                position: absolute;
+                inset: -9px;
+                border-radius: 50%;
+                background: conic-gradient(transparent 60%, #ff1e2d 92%, transparent);
+                -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2px));
+                mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2px));
+                animation: intro-spin 1.2s linear infinite;
+                content: "";
+            }
+
+            .intro-text {
+                margin: 0;
+                color: #a8b0bc;
+                font:
+                    600 0.8rem/1 Rajdhani,
+                    "Segoe UI",
+                    system-ui,
+                    sans-serif;
+                letter-spacing: 0.3em;
+                text-transform: uppercase;
+                animation: intro-up 0.6s 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+            }
+
+            .intro-bar {
+                position: relative;
+                overflow: hidden;
+                width: 140px;
+                height: 2px;
+                background: rgb(255 255 255 / 8%);
+                animation: intro-up 0.6s 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+            }
+
+            .intro-bar::after {
+                position: absolute;
+                inset: 0;
+                width: 40%;
+                background: #ff1e2d;
+                box-shadow: 0 0 10px #ff1e2d;
+                animation: intro-sweep 1.1s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+                content: "";
+            }
+
+            @keyframes intro-in {
+                from {
+                    opacity: 0;
+                    transform: scale(0.88);
+                    filter: blur(8px);
+                }
+            }
+
+            @keyframes intro-up {
+                from {
+                    opacity: 0;
+                    transform: translateY(8px);
+                }
+            }
+
+            @keyframes intro-spin {
+                to {
+                    transform: rotate(1turn);
+                }
+            }
+
+            @keyframes intro-sweep {
+                from {
+                    transform: translateX(-100%);
+                }
+
+                to {
+                    transform: translateX(260%);
+                }
+            }
+
+            /* Wer weniger Bewegung eingestellt hat, bekommt ein ruhiges Bild:
+               Logo, Gruß, Balken, dann eine kurze Blende. */
+            @media (prefers-reduced-motion: reduce) {
+                .intro-mark,
+                .intro-mark::after,
+                .intro-text,
+                .intro-bar,
+                .intro-bar::after {
+                    animation: none;
+                }
+
+                .intro-out .intro-mark {
+                    scale: 1;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <div class="intro" id="intro" role="status" aria-label="RL Nexus wird geladen">
+            <div class="intro-mark">
+                <img src="/src/assets/brand/logo.webp" alt="" width="208" height="208" />
+            </div>
+            <p class="intro-text" id="intro-text" aria-hidden="true"></p>
+            <span class="intro-bar" aria-hidden="true"></span>
+        </div>
+        <script>
+            /* Einmal am Tag das Intro, bis die Seite fertig geladen ist.
+               Direkt nach dem Intro und vor allem anderen, damit nie ein Bild
+               ohne diese Entscheidung auf dem Schirm steht. */
+            (function () {
+                var html = document.documentElement;
+                var intro = document.getElementById("intro");
+                var today = new Date().toDateString();
+
+                // Suchmaschinen und Messwerkzeuge sollen die Seite sehen, nicht das Intro.
+                var robot = /bot|crawl|spider|lighthouse|headless/i.test(navigator.userAgent);
+                var show = false;
+
+                try {
+                    show = !robot && localStorage.getItem("rlnexus.intro") !== today;
+                    if (show) localStorage.setItem("rlnexus.intro", today);
+                } catch (error) {
+                    // Ohne Speicher käme das Intro bei jedem Aufruf. Dann lieber nie.
+                    show = false;
+                }
+
+                if (!show) {
+                    intro.remove();
+                    return;
+                }
+
+                var hour = new Date().getHours();
+                document.getElementById("intro-text").textContent =
+                    hour < 5 ? "Schön, dass du da bist" : hour < 11 ? "Guten Morgen" : hour < 18 ? "Guten Tag" : "Guten Abend";
+
+                var calm = matchMedia("(prefers-reduced-motion: reduce)").matches;
+                var started = Date.now();
+                var done = false;
+
+                html.classList.add("intro-on");
+
+                // Die Anwendung ruft das, sobald Seite, Schriften und Bilder stehen
+                // (src/services/Intro.ts). Das Intro bleibt trotzdem so lange, bis
+                // seine eigene Bewegung einmal durch ist.
+                window.nexusIntroDone = function () {
+                    if (done) return;
+                    done = true;
+
+                    setTimeout(
+                        function () {
+                            html.classList.add("intro-out");
+                            setTimeout(
+                                function () {
+                                    html.classList.remove("intro-on", "intro-out");
+                                    intro.remove();
+                                },
+                                calm ? 200 : 600
+                            );
+                        },
+                        Math.max(0, (calm ? 500 : 1800) - (Date.now() - started))
+                    );
+                };
+
+                // Hängt etwas, geht das Intro trotzdem. Niemand soll davor warten.
+                setTimeout(window.nexusIntroDone, 8000);
+            })();
+        </script>
+        <div id="root"></div>
+        <script type="module" src="/src/main.tsx"></script>
+        <noscript>
+            RL Nexus braucht JavaScript. Ohne JavaScript bleibt der Support-Server der schnellste Weg:
+            <a href="https://discord.gg/CjG2HFGw95">discord.gg/CjG2HFGw95</a>
+        </noscript>
+    </body>
+</html>

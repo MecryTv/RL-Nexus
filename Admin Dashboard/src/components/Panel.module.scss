@@ -1,0 +1,54 @@
+.panel {
+    --accent: var(--c-line-strong);
+    --cut: var(--s-cut);
+
+    position: relative;
+    isolation: isolate;
+    background: linear-gradient(155deg, var(--accent) 0%, rgb(255 255 255 / 9%) 45%, rgb(255 255 255 / 5%) 100%);
+
+    clip-path: polygon(
+        var(--cut) 0,
+        calc(100% - var(--cut)) 0,
+        100% var(--cut),
+        100% calc(100% - var(--cut)),
+        calc(100% - var(--cut)) 100%,
+        var(--cut) 100%,
+        0 calc(100% - var(--cut)),
+        0 var(--cut)
+    );
+
+    /* Die Füllung liegt eingerückt darunter. Der Streifen, der ringsum stehen
+       bleibt, ist der Rahmen: ein echtes border schnitte der clip-path weg. */
+    &::before {
+        position: absolute;
+        z-index: -1;
+        background:
+            linear-gradient(165deg, rgb(255 255 255 / 3.5%) 0%, rgb(255 255 255 / 0%) 38%),
+            var(--c-panel-fill);
+        content: "";
+        inset: 1px;
+
+        clip-path: polygon(
+            calc(var(--cut) - 1px) 0,
+            calc(100% - var(--cut) + 1px) 0,
+            100% calc(var(--cut) - 1px),
+            100% calc(100% - var(--cut) + 1px),
+            calc(100% - var(--cut) + 1px) 100%,
+            calc(var(--cut) - 1px) 100%,
+            0 calc(100% - var(--cut) + 1px),
+            0 calc(var(--cut) - 1px)
+        );
+    }
+}
+
+.sm {
+    --cut: 10px;
+}
+
+.md {
+    --cut: var(--s-cut);
+}
+
+.lg {
+    --cut: 22px;
+}

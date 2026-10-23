@@ -1,0 +1,101 @@
+/**
+ * Die Bausteine, aus denen die Seite besteht.
+ *
+ * Der wichtigste ist `bevel` - die abgeschrägte Ecke. Auf der Rang-Karte hat
+ * sie jedes Panel, und sie ist das eine Merkmal, an dem man beide Oberflächen
+ * als dasselbe Produkt erkennt.
+ */
+
+/// Abgeschrägte Ecken, wie `bevelPath()` im Karten-Renderer.
+@mixin bevel($cut: 18px) {
+    clip-path: polygon(
+        #{$cut} 0,
+        calc(100% - #{$cut}) 0,
+        100% #{$cut},
+        100% calc(100% - #{$cut}),
+        calc(100% - #{$cut}) 100%,
+        #{$cut} 100%,
+        0 calc(100% - #{$cut}),
+        0 #{$cut}
+    );
+}
+
+/// Nur oben links und unten rechts abgeschrägt - ruhiger, für kleine Flächen.
+@mixin bevel-diagonal($cut: 12px) {
+    clip-path: polygon(#{$cut} 0, 100% 0, 100% calc(100% - #{$cut}), calc(100% - #{$cut}) 100%, 0 100%, 0 #{$cut});
+}
+
+/**
+ * Ein dunkles Panel mit leuchtender Kante.
+ *
+ * `clip-path` schneidet auch den Rahmen weg, ein `border` bliebe also unsichtbar.
+ * Deshalb liegt die Randfarbe als Hintergrund auf dem Element selbst und die
+ * Füllung auf einem eingerückten `::before` - der sichtbare Streifen dazwischen
+ * ist der Rahmen. Das Leuchten macht `drop-shadow`, weil `box-shadow` an der
+ * ungeschnittenen Box hinge und die Ecken verraten würde.
+ */
+@mixin panel($border: var(--c-line-strong), $fill: var(--c-panel-fill), $cut: 18px, $width: 1px) {
+    position: relative;
+    isolation: isolate;
+    background: $border;
+
+    @include bevel($cut);
+
+    &::before {
+        position: absolute;
+        z-index: -1;
+        background: $fill;
+        content: "";
+        inset: $width;
+
+        @include bevel($cut - $width);
+    }
+}
+
+/// Leuchten um eine geschnittene Form. Nur dort einsetzen, wo es etwas trägt.
+/// `$color` muss die Deckkraft schon mitbringen - `drop-shadow` kennt keine.
+@mixin glow($color, $blur: 14px) {
+    filter: drop-shadow(0 0 $blur $color);
+}
+
+/// Großbuchstaben mit Sperrung - die HUD-Labels der Karte.
+@mixin label($size: 0.72rem, $spacing: 0.16em) {
+    font-family: var(--f-label);
+    font-size: $size;
+    font-weight: 600;
+    letter-spacing: $spacing;
+    text-transform: uppercase;
+}
+
+/// Der Fokusring. Einmal definiert, damit er überall gleich aussieht.
+@mixin focus-ring($color: var(--c-blue)) {
+    outline: 2px solid $color;
+    outline-offset: 3px;
+}
+
+/// Mindestens 44 Pixel hoch, wo getippt statt geklickt wird. Mit der Maus
+/// bleibt alles, wie es ist - dort trifft man auch kleinere Flächen.
+@mixin touch-target {
+    @media (pointer: coarse) {
+        min-height: 44px;
+    }
+}
+
+@mixin below($width) {
+    @media (width <= $width) {
+        @content;
+    }
+}
+
+@mixin from($width) {
+    @media (width > $width) {
+        @content;
+    }
+}
+
+/// Für alles, was sich bewegt: wer das abbestellt hat, bekommt es nicht.
+@mixin motion {
+    @media (prefers-reduced-motion: no-preference) {
+        @content;
+    }
+}

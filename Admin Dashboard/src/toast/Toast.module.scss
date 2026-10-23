@@ -1,0 +1,68 @@
+@use "mixins" as *;
+
+.stack {
+    position: fixed;
+    z-index: 90;
+    right: var(--s-4);
+    bottom: var(--s-4);
+    display: grid;
+    width: min(380px, calc(100vw - 2 * var(--s-4)));
+    gap: var(--s-2);
+    pointer-events: none;
+}
+
+.toast {
+    display: flex;
+    align-items: center;
+    padding: var(--s-2) var(--s-2) var(--s-2) var(--s-4);
+    gap: var(--s-3);
+    border: 1px solid var(--c-line-strong);
+    background: var(--c-panel-solid);
+    box-shadow: 0 12px 32px rgb(0 0 0 / 55%);
+    pointer-events: auto;
+
+    @include motion {
+        animation: rise var(--t-base) both;
+    }
+
+    > svg {
+        flex-shrink: 0;
+    }
+
+    > p {
+        flex: 1;
+        font-size: 0.9375rem;
+    }
+}
+
+.ok > svg {
+    color: var(--c-win);
+}
+
+.danger > svg {
+    color: var(--c-loss);
+}
+
+.close {
+    display: grid;
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    place-items: center;
+    color: var(--c-text-faint);
+
+    &:hover {
+        color: var(--c-text);
+    }
+
+    &:focus-visible {
+        @include focus-inset;
+    }
+}
+
+@keyframes rise {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+}

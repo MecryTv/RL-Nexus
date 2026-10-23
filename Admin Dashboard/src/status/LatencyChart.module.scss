@@ -1,0 +1,169 @@
+@use "../styles/mixins" as *;
+
+/* Breite der Spalte mit den Achsenwerten links. Die Zeitachse unten rückt um dasselbe ein. */
+$gutter: 56px;
+
+.chart {
+    display: grid;
+    gap: var(--s-2);
+}
+
+.head {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-3);
+    align-items: flex-end;
+    justify-content: space-between;
+}
+
+.title {
+    color: var(--c-text-dim);
+
+    @include label;
+}
+
+.frame {
+    display: grid;
+    grid-template-columns: $gutter minmax(0, 1fr);
+}
+
+.scale {
+    position: relative;
+
+    span {
+        position: absolute;
+        right: var(--s-2);
+        font-size: 0.75rem;
+        font-variant-numeric: tabular-nums;
+        color: var(--c-text-faint);
+        white-space: nowrap;
+        transform: translateY(-50%);
+    }
+}
+
+.plot {
+    position: relative;
+    min-width: 0;
+}
+
+.svg {
+    display: block;
+    width: 100%;
+    height: auto;
+}
+
+.grid {
+    stroke: rgb(255 255 255 / 7%);
+}
+
+/* Nicht gemessen: eine helle Fläche mit feiner Schraffur. Sichtbar, aber leiser als die Messung selbst. */
+.gap rect:first-child {
+    fill: rgb(255 255 255 / 3%);
+}
+
+.hatch {
+    fill: rgb(255 255 255 / 14%);
+}
+
+.down rect {
+    fill: rgb(255 77 94 / 30%);
+}
+
+.bridge {
+    fill: none;
+    stroke: var(--c-text-faint);
+    stroke-width: 1.5;
+    stroke-dasharray: 5 4;
+    vector-effect: non-scaling-stroke;
+}
+
+.line {
+    fill: none;
+    stroke: var(--c-win);
+    stroke-width: 1.6;
+    vector-effect: non-scaling-stroke;
+}
+
+.slow {
+    fill: var(--c-mod-engagement);
+}
+
+.labels {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+
+    span {
+        position: absolute;
+        top: 6px;
+        overflow: hidden;
+        padding: 0 6px;
+        font-family: var(--f-label);
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+}
+
+.gapLabel {
+    color: var(--c-text-dim);
+}
+
+.downLabel {
+    color: var(--c-loss);
+}
+
+.tip {
+    position: absolute;
+    top: 0;
+    padding: 4px 8px;
+    font-size: 0.75rem;
+    white-space: nowrap;
+    pointer-events: none;
+    background: var(--c-panel-solid);
+    border: 1px solid var(--c-line-strong);
+    transform: translate(-50%, -110%);
+}
+
+.axis {
+    display: flex;
+    justify-content: space-between;
+    margin-left: $gutter;
+    font-size: 0.75rem;
+    color: var(--c-text-faint);
+}
+
+.legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-2) var(--s-4);
+    padding: 0;
+    margin: 0 0 0 $gutter;
+    font-size: 0.75rem;
+    color: var(--c-text-dim);
+    list-style: none;
+
+    i {
+        display: inline-block;
+        width: 14px;
+        height: 8px;
+        margin-right: 6px;
+    }
+}
+
+.keyLine {
+    background: var(--c-win);
+}
+
+.keySlow {
+    background: var(--c-mod-engagement);
+}
+
+.keyDown {
+    background: rgb(255 77 94 / 45%);
+}
+
+.keyGap {
+    background: repeating-linear-gradient(45deg, rgb(255 255 255 / 22%) 0 1.5px, rgb(255 255 255 / 4%) 1.5px 5px);
+}

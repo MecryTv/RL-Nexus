@@ -1,0 +1,10 @@
+/**
+ * Der Einstieg ins Stylesheet.
+ *
+ * Nur Tokens und Grundlagen - alles Bauteilbezogene liegt als `*.module.scss`
+ * neben seiner Komponente, damit nichts versehentlich in etwas hineinwirkt, das
+ * es nicht kennt. Die Schriften werden in `main.tsx` geladen: `@use` erwartet
+ * hier Sass-Dateien, und die Pakete liefern fertiges CSS.
+ */
+@use "tokens";
+@use "base";

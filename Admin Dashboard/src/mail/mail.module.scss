@@ -1,0 +1,1251 @@
+@use "mixins" as *;
+
+/* Das Postfach nach Entwurf A: Postfächer, Liste, Lesebereich.
+   Ab 1100 px nebeneinander, jede Spalte scrollt für sich. Darunter liegt der
+   Lesebereich über der Liste, unter 768 px kommt eins nach dem anderen. */
+$wide: 1100px;
+$narrow: 1099px;
+$phone: 767px;
+
+.mail {
+    display: grid;
+    grid-template-columns: 236px minmax(300px, 380px) minmax(0, 1fr);
+    height: max(560px, calc(100dvh - var(--s-topbar) - 150px));
+    border: 1px solid var(--c-line);
+    background: var(--c-panel-fill);
+
+    @include below($narrow) {
+        grid-template-columns: 220px minmax(0, 1fr);
+    }
+
+    @include below($phone) {
+        display: block;
+        height: auto;
+        border: 0;
+        background: none;
+    }
+}
+
+.column {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    border-right: 1px solid var(--c-line);
+
+    &:last-child {
+        border-right: 0;
+    }
+
+    @include below($phone) {
+        border: 1px solid var(--c-line);
+        background: var(--c-panel-fill);
+    }
+}
+
+.scroll {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+
+    @include below($phone) {
+        overflow: visible;
+    }
+}
+
+/* Unter 1100 px: Lesebereich statt Liste, sobald etwas offen ist. */
+@include below($narrow) {
+    .mail[data-view="read"] .listPane,
+    .mail:not([data-view="read"]) .readPane {
+        display: none;
+    }
+}
+
+/* Unter 768 px: nur die Spalte, um die es gerade geht. */
+@include below($phone) {
+    .mail[data-view="nav"] .listPane,
+    .mail[data-view="nav"] .readPane,
+    .mail:not([data-view="nav"]) .boxes {
+        display: none;
+    }
+}
+
+.back {
+    display: none;
+    align-items: center;
+    gap: var(--s-1);
+    padding: var(--s-2) var(--s-3);
+    border-bottom: 1px solid var(--c-line);
+    color: var(--c-blue);
+    font-size: 0.875rem;
+    font-weight: 600;
+    text-align: left;
+
+    @include touch-target;
+
+    &:focus-visible {
+        @include focus-inset;
+    }
+}
+
+.backTablet {
+    @include below($narrow) {
+        display: flex;
+    }
+}
+
+.backPhone {
+    @include below($phone) {
+        display: flex;
+    }
+}
+
+/* --- Postfächer ---------------------------------------------------------- */
+.boxes {
+    background: var(--c-panel-solid);
+
+    @include below($phone) {
+        background: var(--c-panel-fill);
+    }
+}
+
+.boxesInner {
+    display: grid;
+    align-content: start;
+    gap: var(--s-4);
+    padding: var(--s-3) var(--s-2);
+}
+
+.compose {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--s-2);
+    width: 100%;
+    min-height: 44px;
+    background: linear-gradient(135deg, var(--c-red), var(--c-red-deep));
+    color: #fff;
+    transition: filter var(--t-fast);
+
+    @include label(0.78rem, 0.14em);
+    @include bevel-diagonal(8px);
+
+    &:hover:not(:disabled) {
+        filter: brightness(1.12);
+    }
+
+    &:focus-visible {
+        @include focus-inset(#fff);
+    }
+
+    &:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+    }
+}
+
+.box {
+    display: grid;
+    gap: 2px;
+}
+
+.boxToggle {
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
+    width: 100%;
+    min-width: 0;
+    min-height: 36px;
+    padding: 0 var(--s-2);
+    background: none;
+    color: var(--c-text);
+    font: inherit;
+    font-weight: 700;
+    text-align: left;
+    transition: background var(--t-fast);
+
+    &:hover {
+        background: rgb(255 255 255 / 4%);
+    }
+
+    &:focus-visible {
+        @include focus-inset;
+    }
+
+    svg {
+        flex-shrink: 0;
+        color: var(--c-text-faint);
+    }
+}
+
+.boxName {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.boxFolders {
+    display: grid;
+    gap: 2px;
+
+    &[hidden] {
+        display: none;
+    }
+}
+
+.allInboxes {
+    padding-left: var(--s-2);
+    color: var(--c-text);
+    font-weight: 600;
+}
+
+.boxDot {
+    width: 8px;
+    height: 8px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background: var(--dot, var(--c-blue));
+}
+
+.folder {
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
+    min-height: 36px;
+    padding: 0 var(--s-2) 0 var(--s-5);
+    color: var(--c-text-dim);
+    font-size: 0.9375rem;
+    transition:
+        background var(--t-fast),
+        color var(--t-fast);
+
+    &:hover {
+        background: rgb(255 255 255 / 4%);
+        color: var(--c-text);
+    }
+
+    &:focus-visible {
+        @include focus-inset;
+    }
+
+    svg {
+        flex-shrink: 0;
+        opacity: 0.8;
+    }
+}
+
+.folderName {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.folderOn {
+    background: rgb(255 30 45 / 12%);
+    box-shadow: inset 2px 0 0 var(--c-red);
+    color: var(--c-text);
+}
+
+.count {
+    color: var(--c-blue);
+    font-size: 0.8125rem;
+    font-weight: 700;
+}
+
+.boxError {
+    padding: var(--s-1) var(--s-2) var(--s-1) var(--s-5);
+    color: var(--c-loss);
+    font-size: 0.8125rem;
+    line-height: 1.4;
+}
+
+.boxesNote {
+    display: grid;
+    justify-items: start;
+    gap: var(--s-2);
+    padding: var(--s-2);
+    color: var(--c-text-faint);
+    font-size: 0.875rem;
+    line-height: 1.5;
+}
+
+.manage {
+    margin-top: auto;
+    padding: var(--s-2);
+    border-top: 1px solid var(--c-line);
+}
+
+/* --- Liste --------------------------------------------------------------- */
+.listHead {
+    display: grid;
+    gap: var(--s-2);
+    padding: var(--s-3);
+    border-bottom: 1px solid var(--c-line);
+}
+
+.listTitle {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--s-2);
+    min-width: 0;
+
+    h2 {
+        overflow: hidden;
+        font-size: 1.05rem;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    span {
+        flex-shrink: 0;
+        color: var(--c-text-faint);
+        font-size: 0.8125rem;
+    }
+}
+
+.search {
+    position: relative;
+
+    svg {
+        position: absolute;
+        top: 50%;
+        left: var(--s-3);
+        color: var(--c-text-faint);
+        transform: translateY(-50%);
+        pointer-events: none;
+    }
+
+    input {
+        width: 100%;
+        min-height: 40px;
+        padding: 0 var(--s-3) 0 calc(var(--s-3) + 24px);
+        border: 1px solid var(--c-line-strong);
+        background: var(--c-base);
+        color: var(--c-text);
+        font: inherit;
+
+        &::placeholder {
+            color: var(--c-text-faint);
+        }
+
+        &:focus-visible {
+            border-color: var(--c-blue);
+
+            @include focus-inset;
+        }
+    }
+}
+
+.filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-1);
+}
+
+.filter {
+    min-height: 32px;
+    padding: 0 var(--s-3);
+    border: 1px solid var(--c-line-strong);
+    color: var(--c-text-dim);
+    transition:
+        border-color var(--t-fast),
+        color var(--t-fast);
+
+    @include label(0.7rem, 0.12em);
+
+    &:hover {
+        color: var(--c-text);
+    }
+
+    &:focus-visible {
+        @include focus-inset;
+    }
+
+    &[aria-pressed="true"] {
+        border-color: var(--c-red);
+        background: rgb(255 30 45 / 14%);
+        color: var(--c-text);
+    }
+}
+
+.rows {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.row {
+    display: grid;
+    gap: 2px;
+    padding: var(--s-2) var(--s-3) var(--s-2) calc(var(--s-3) + 3px);
+    border-bottom: 1px solid var(--c-line);
+    transition: background var(--t-fast);
+
+    &:hover {
+        background: rgb(255 255 255 / 3%);
+    }
+
+    &:focus-visible {
+        @include focus-inset;
+    }
+}
+
+.rowUnread {
+    box-shadow: inset 3px 0 0 var(--c-blue);
+}
+
+.rowOn {
+    background: rgb(0 175 255 / 9%);
+
+    &:hover {
+        background: rgb(0 175 255 / 12%);
+    }
+}
+
+.rowTop {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--s-2);
+    min-width: 0;
+}
+
+.rowFrom {
+    overflow: hidden;
+    color: var(--c-text-dim);
+    font-weight: 500;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+
+    .rowUnread & {
+        color: var(--c-text);
+        font-weight: 700;
+    }
+}
+
+.rowTime {
+    flex-shrink: 0;
+    color: var(--c-text-faint);
+    font-size: 0.8125rem;
+}
+
+.rowSubject {
+    display: flex;
+    align-items: center;
+    gap: var(--s-1);
+    min-width: 0;
+    color: var(--c-text);
+
+    span {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    svg {
+        flex-shrink: 0;
+        color: var(--c-text-faint);
+    }
+}
+
+.rowPreview {
+    overflow: hidden;
+    color: var(--c-text-faint);
+    font-size: 0.875rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.rowDot {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    margin-right: 6px;
+    border-radius: 50%;
+    vertical-align: 1px;
+}
+
+.rowBox {
+    color: var(--c-text-dim);
+}
+
+.listNotice {
+    margin: var(--s-2) var(--s-3) 0;
+    padding: var(--s-2) var(--s-3);
+    border-left: 3px solid var(--c-loss);
+    background: rgb(255 77 94 / 8%);
+    color: var(--c-text-dim);
+    font-size: 0.8125rem;
+    line-height: 1.45;
+}
+
+.listNote {
+    padding: var(--s-5) var(--s-4);
+    color: var(--c-text-dim);
+    line-height: 1.5;
+    text-align: center;
+}
+
+.pager {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-2);
+    padding: var(--s-2) var(--s-3);
+    border-top: 1px solid var(--c-line);
+    color: var(--c-text-faint);
+    font-size: 0.8125rem;
+}
+
+/* --- Lesebereich ---------------------------------------------------------- */
+.reader {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-3);
+    min-height: 100%;
+    padding: var(--s-4) var(--s-5) var(--s-5);
+
+    @include below($phone) {
+        padding: var(--s-3);
+    }
+}
+
+.subject {
+    font-size: 1.3rem;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
+}
+
+.sender {
+    display: flex;
+    align-items: center;
+    gap: var(--s-3);
+    padding-bottom: var(--s-3);
+    border-bottom: 1px solid var(--c-line);
+    min-width: 0;
+}
+
+.avatar {
+    display: grid;
+    width: 40px;
+    height: 40px;
+    flex-shrink: 0;
+    place-items: center;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #2a3340, #151b23);
+    color: var(--c-text-dim);
+    font-weight: 700;
+}
+
+.senderText {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+
+    strong {
+        overflow-wrap: anywhere;
+    }
+
+    span {
+        color: var(--c-text-faint);
+        font-size: 0.8125rem;
+        overflow-wrap: anywhere;
+    }
+}
+
+.actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-2);
+}
+
+.notice {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-2);
+    padding: var(--s-2) var(--s-3);
+    border: 1px solid color-mix(in srgb, var(--c-blue) 35%, transparent);
+    background: rgb(0 175 255 / 7%);
+    color: var(--c-text-dim);
+    font-size: 0.875rem;
+}
+
+.frame {
+    flex: 1;
+    width: 100%;
+    min-height: 420px;
+    border: 1px solid var(--c-line);
+    background: #fff;
+
+    @include below($phone) {
+        min-height: 70vh;
+    }
+}
+
+.attachments {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.attachment {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-2);
+    min-height: 40px;
+    padding: 0 var(--s-3);
+    border: 1px solid var(--c-line-strong);
+    color: var(--c-text);
+    font-size: 0.875rem;
+    transition: border-color var(--t-fast);
+
+    &:hover {
+        border-color: var(--c-blue);
+    }
+
+    &:focus-visible {
+        @include focus-inset;
+    }
+
+    small {
+        color: var(--c-text-faint);
+    }
+}
+
+.pick {
+    display: grid;
+    flex: 1;
+    place-content: center;
+    gap: var(--s-2);
+    padding: var(--s-6);
+    color: var(--c-text-faint);
+    text-align: center;
+    justify-items: center;
+}
+
+/* --- Kontaktformular im Lesebereich ------------------------------------- */
+.facts {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: var(--s-3) var(--s-5);
+
+    dt {
+        color: var(--c-text-faint);
+
+        @include label(0.72rem, 0.14em);
+    }
+
+    dd {
+        min-width: 0;
+        margin: var(--s-1) 0 0;
+    }
+}
+
+.block {
+    display: grid;
+    gap: var(--s-2);
+}
+
+.blockTitle {
+    color: var(--c-text-dim);
+
+    @include label(0.78rem, 0.14em);
+}
+
+.text {
+    padding: var(--s-3) var(--s-4);
+    border: 1px solid var(--c-line);
+    background: var(--c-base);
+    line-height: 1.6;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.replies {
+    display: grid;
+    gap: var(--s-3);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.reply {
+    display: grid;
+    gap: var(--s-2);
+    padding-left: var(--s-3);
+    border-left: 2px solid color-mix(in srgb, var(--c-blue) 45%, transparent);
+}
+
+.replyHead {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s-2);
+    color: var(--c-text-faint);
+    font-size: 0.8125rem;
+}
+
+/* --- Schreiben ----------------------------------------------------------- */
+.fields {
+    display: grid;
+    gap: var(--s-2);
+}
+
+.fieldRow {
+    display: grid;
+    grid-template-columns: 64px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--s-2);
+
+    label {
+        color: var(--c-text-faint);
+
+        @include label(0.7rem, 0.12em);
+    }
+
+    input,
+    select {
+        width: 100%;
+        min-height: 40px;
+        padding: 0 var(--s-3);
+        border: 1px solid var(--c-line-strong);
+        background: var(--c-base);
+        color: var(--c-text);
+        font: inherit;
+
+        &:focus-visible {
+            border-color: var(--c-blue);
+
+            @include focus-inset;
+        }
+    }
+
+    @include below($phone) {
+        grid-template-columns: minmax(0, 1fr) auto;
+
+        label {
+            grid-column: 1 / -1;
+        }
+    }
+}
+
+.toggleLinks {
+    display: flex;
+    gap: var(--s-2);
+
+    button {
+        color: var(--c-blue);
+        font-size: 0.8125rem;
+        font-weight: 600;
+
+        &:focus-visible {
+            @include focus-ring;
+        }
+    }
+}
+
+.toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px;
+    padding: var(--s-1);
+    border: 1px solid var(--c-line-strong);
+    border-bottom: 0;
+    background: var(--c-base);
+}
+
+.tool {
+    display: inline-grid;
+    min-width: 34px;
+    height: 34px;
+    place-items: center;
+    padding: 0 var(--s-1);
+    color: var(--c-text-dim);
+    font-weight: 700;
+    transition:
+        background var(--t-fast),
+        color var(--t-fast);
+
+    &:hover:not(:disabled) {
+        background: rgb(255 255 255 / 7%);
+        color: var(--c-text);
+    }
+
+    &:focus-visible {
+        @include focus-inset;
+    }
+
+    &[aria-pressed="true"] {
+        background: rgb(255 30 45 / 16%);
+        color: var(--c-text);
+    }
+
+    &:disabled {
+        opacity: 0.35;
+    }
+}
+
+.toolSep {
+    width: 1px;
+    margin: var(--s-1) 2px;
+    background: var(--c-line-strong);
+}
+
+.linkBar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-2);
+    padding: var(--s-2);
+    border: 1px solid var(--c-line-strong);
+    border-bottom: 0;
+    background: var(--c-panel-fill);
+
+    input {
+        flex: 1 1 220px;
+        min-height: 36px;
+        padding: 0 var(--s-3);
+        border: 1px solid var(--c-line-strong);
+        background: var(--c-base);
+        color: var(--c-text);
+        font: inherit;
+
+        &:focus-visible {
+            border-color: var(--c-blue);
+
+            @include focus-inset;
+        }
+    }
+}
+
+/* Der Text im Editor, so ähnlich wie später in der Vorlage. */
+.editor {
+    min-height: 220px;
+    max-height: 60vh;
+    padding: var(--s-3) var(--s-4);
+    overflow-y: auto;
+    border: 1px solid var(--c-line-strong);
+    background: var(--c-base);
+    color: #d9dde3;
+    line-height: 1.65;
+    cursor: text;
+
+    &:focus-within {
+        border-color: var(--c-blue);
+    }
+
+    :global(.ProseMirror) {
+        min-height: 190px;
+        outline: none;
+
+        > * + * {
+            margin-top: 0.7em;
+        }
+
+        h2,
+        h3 {
+            color: #fff;
+            font-family: var(--f-display);
+        }
+
+        h2 {
+            font-size: 1.25rem;
+        }
+
+        h3 {
+            font-size: 1.08rem;
+        }
+
+        strong {
+            color: #fff;
+        }
+
+        a {
+            color: #33bfff;
+            text-decoration: underline;
+        }
+
+        a[data-button] {
+            display: inline-block;
+            padding: 8px 16px;
+            background: #d81424;
+            color: #fff;
+            text-decoration: none;
+
+            @include label(0.75rem, 0.14em);
+        }
+
+        ul,
+        ol {
+            padding-left: 1.4em;
+        }
+
+        blockquote {
+            padding: 6px 12px;
+            border-left: 3px solid #2b333d;
+            background: var(--c-panel-solid);
+            color: #a8b0bc;
+        }
+
+        hr {
+            border: 0;
+            border-top: 1px solid var(--c-line-strong);
+        }
+
+        p.is-editor-empty:first-child::before {
+            content: attr(data-placeholder);
+            float: left;
+            height: 0;
+            color: var(--c-text-faint);
+            pointer-events: none;
+        }
+    }
+}
+
+.files {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.file {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-2);
+    min-height: 36px;
+    padding: 0 0 0 var(--s-3);
+    border: 1px solid var(--c-line-strong);
+    font-size: 0.875rem;
+
+    small {
+        color: var(--c-text-faint);
+    }
+
+    button {
+        display: inline-grid;
+        width: 36px;
+        height: 34px;
+        place-items: center;
+        color: var(--c-text-faint);
+
+        &:hover {
+            color: var(--c-loss);
+        }
+
+        &:focus-visible {
+            @include focus-inset;
+        }
+    }
+}
+
+.check {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-2);
+    color: var(--c-text-dim);
+    font-size: 0.875rem;
+    cursor: pointer;
+
+    input {
+        width: 18px;
+        height: 18px;
+        accent-color: var(--c-red);
+    }
+}
+
+.hint {
+    color: var(--c-text-faint);
+    font-size: 0.8125rem;
+    line-height: 1.5;
+}
+
+.error {
+    color: var(--c-loss);
+    font-size: 0.875rem;
+}
+
+/* --- Schreibfenster: Editor links, Vorschau rechts ------------------------ */
+.window {
+    width: min(1400px, calc(100vw - 32px));
+    max-width: none;
+    height: calc(100dvh - 32px);
+    max-height: none;
+    margin: auto;
+    padding: 0;
+    border: 1px solid var(--c-line-strong);
+    background: var(--c-panel-solid);
+    color: var(--c-text);
+
+    &::backdrop {
+        background: rgb(0 0 0 / 65%);
+    }
+
+    @include below($phone) {
+        width: 100vw;
+        height: 100dvh;
+        border: 0;
+    }
+}
+
+.windowForm {
+    display: grid;
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
+    height: 100%;
+}
+
+.windowHead,
+.windowFoot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s-3);
+    padding: var(--s-3) var(--s-4);
+}
+
+.windowHead {
+    border-bottom: 1px solid var(--c-line);
+
+    legend {
+        @include sr;
+    }
+}
+
+.windowTitle {
+    @include label(0.85rem, 0.14em);
+}
+
+.windowClose {
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    margin-left: auto;
+    background: none;
+    color: var(--c-text-dim);
+
+    &:hover {
+        color: var(--c-text);
+    }
+
+    &:focus-visible {
+        @include focus-ring;
+    }
+}
+
+.windowFoot {
+    grid-row: 4;
+    border-top: 1px solid var(--c-line);
+
+    .hint {
+        flex: 1;
+        min-width: 200px;
+    }
+}
+
+.windowPanes {
+    display: none;
+    padding: var(--s-2) var(--s-4) 0;
+
+    legend {
+        @include sr;
+    }
+
+    @include below($narrow) {
+        display: block;
+    }
+}
+
+.windowBody {
+    display: grid;
+    // Feste Zeile: Die Zeile mit dem Umschalter ist auf breiten Bildschirmen ausgeblendet und zählt dann nicht mit.
+    grid-row: 3;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    min-height: 0;
+
+    @include below($narrow) {
+        grid-template-columns: minmax(0, 1fr);
+
+        &[data-pane="schreiben"] .preview,
+        &[data-pane="vorschau"] .windowWrite {
+            display: none;
+        }
+    }
+}
+
+.windowWrite {
+    display: grid;
+    align-content: start;
+    gap: var(--s-3);
+    min-height: 0;
+    padding: var(--s-4);
+    overflow-y: auto;
+
+    .editor {
+        min-height: 260px;
+        max-height: none;
+    }
+}
+
+.preview {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    border-left: 1px solid var(--c-line);
+    background: #020304;
+
+    @include below($narrow) {
+        border-left: 0;
+    }
+}
+
+.previewHead {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-2);
+    padding: var(--s-2) var(--s-4);
+    border-bottom: 1px solid var(--c-line);
+    color: var(--c-text-faint);
+
+    @include label(0.75rem, 0.12em);
+
+    legend {
+        @include sr;
+    }
+}
+
+.previewFrame {
+    flex: 1;
+    width: 100%;
+    max-width: 660px;
+    margin: 0 auto;
+    border: 0;
+    background: #050608;
+
+    &[data-device="handy"] {
+        max-width: 390px;
+        border-right: 1px solid var(--c-line);
+        border-left: 1px solid var(--c-line);
+    }
+}
+
+.original {
+    border: 1px solid var(--c-line);
+    background: var(--c-base);
+
+    summary {
+        padding: var(--s-2) var(--s-3);
+        color: var(--c-text-dim);
+        cursor: pointer;
+
+        &:focus-visible {
+            @include focus-ring;
+        }
+    }
+}
+
+.originalText {
+    max-height: 240px;
+    padding: 0 var(--s-3) var(--s-3);
+    overflow-y: auto;
+    color: var(--c-text-dim);
+    font-size: 0.875rem;
+    line-height: 1.55;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.forwardFiles {
+    display: grid;
+    gap: var(--s-2);
+    margin: 0;
+    padding: var(--s-2) var(--s-3) var(--s-3);
+    border: 1px solid var(--c-line);
+
+    legend {
+        padding: 0 var(--s-1);
+        color: var(--c-text-faint);
+
+        @include label(0.72rem, 0.12em);
+    }
+
+    small {
+        color: var(--c-text-faint);
+    }
+}
+
+/* --- Postfächer verwalten ------------------------------------------------ */
+.accounts {
+    display: grid;
+    gap: var(--s-3);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.account {
+    display: grid;
+    gap: var(--s-2);
+    padding: var(--s-3);
+    border: 1px solid var(--c-line);
+    background: var(--c-panel-fill);
+}
+
+.accountHead {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-2);
+    min-width: 0;
+
+    strong {
+        overflow-wrap: anywhere;
+    }
+}
+
+.accountTools {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-1);
+}
+
+.form {
+    display: grid;
+    gap: var(--s-3);
+}
+
+.servers {
+    display: grid;
+    gap: var(--s-3);
+    color: var(--c-text-dim);
+    font-size: 0.875rem;
+
+    summary {
+        overflow-wrap: anywhere;
+        cursor: pointer;
+
+        &:focus-visible {
+            @include focus-ring;
+        }
+    }
+}
+
+.serverRow {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 6.5rem;
+    gap: var(--s-2);
+}

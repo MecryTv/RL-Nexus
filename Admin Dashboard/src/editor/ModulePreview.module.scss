@@ -1,0 +1,59 @@
+@use "mixins" as *;
+
+.preview {
+    position: sticky;
+    top: calc(var(--s-topbar) + var(--s-3));
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    border: 1px solid var(--c-line);
+    background: #020304;
+
+    @include below(1099px) {
+        position: static;
+    }
+}
+
+.head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-2);
+    padding: var(--s-2) var(--s-3);
+    border-bottom: 1px solid var(--c-line);
+    color: var(--c-text-faint);
+
+    @include label(0.75rem, 0.12em);
+
+    legend {
+        @include sr;
+    }
+}
+
+.note {
+    padding: var(--s-2) var(--s-3);
+    color: var(--c-text-dim);
+    font-size: 0.8125rem;
+    line-height: 1.5;
+}
+
+.stage {
+    display: flex;
+    justify-content: center;
+    background: var(--c-base);
+}
+
+.frame {
+    width: 100%;
+    height: min(78vh, 900px);
+    border: 0;
+    background: var(--c-base);
+
+    &[data-device="handy"] {
+        width: 390px;
+        max-width: 100%;
+        border-right: 1px solid var(--c-line);
+        border-left: 1px solid var(--c-line);
+    }
+}

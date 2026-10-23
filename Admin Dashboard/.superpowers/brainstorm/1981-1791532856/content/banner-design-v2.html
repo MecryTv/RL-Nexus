@@ -1,0 +1,133 @@
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@500;700&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+
+<style>
+  .rl { --base:#050608; --panel:#0a0f15; --line:rgb(255 255 255/8%); --text:#f2f4f7; --dim:#a8b0bc; --faint:#7b8693;
+        --blue:#00afff; --win:#35e07f; --loss:#ff4d5e; --yellow:#ffc53d; --purple:#b06bff; --red:#ff1e2d;
+        font-family: "Rajdhani", system-ui, sans-serif; color: var(--text); }
+  .cards.rl { grid-template-columns: 1fr !important; max-width: 900px; }
+  .stage { position: relative; height: 300px; overflow: hidden; background:
+      radial-gradient(60% 80% at 20% 10%, rgb(255 30 45/14%), transparent 60%),
+      radial-gradient(50% 60% at 90% 90%, rgb(0 175 255/10%), transparent 60%), var(--base); border:1px solid #222; }
+  .stage .hero { padding: 40px 36px; }
+  .stage .hero h1 { font-family: Oxanium, sans-serif; font-size: 34px; margin: 0 0 8px; letter-spacing: .02em; }
+  .stage .hero h1 span { color: var(--red); }
+  .stage .hero p { color: var(--dim); max-width: 380px; margin: 0; font-size: 16px; }
+  .lbl { font-weight: 700; font-size: 12px; letter-spacing: .16em; text-transform: uppercase; }
+  .x { position:absolute; top:10px; right:10px; width:28px; height:28px; display:grid; place-items:center; color:var(--faint); font-size:18px; }
+  .btn { display:inline-flex; align-items:center; gap:6px; margin-top:12px; padding:7px 14px; font-weight:700; font-size:12px; letter-spacing:.14em; text-transform:uppercase;
+         color: var(--base); background: var(--accent); clip-path: polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px); }
+  .count { font-family: Oxanium, sans-serif; font-variant-numeric: tabular-nums; font-size: 22px; letter-spacing: .04em; }
+
+  /* A: HUD-Karte */
+  .a { position:absolute; right:18px; bottom:18px; width: 330px; --accent: var(--yellow);
+       background: color-mix(in srgb, var(--accent) 7%, var(--panel)); border:1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+       clip-path: polygon(14px 0,100% 0,100% calc(100% - 14px),calc(100% - 14px) 100%,0 100%,0 14px); padding: 14px 16px 16px 20px; }
+  .a::before { content:""; position:absolute; left:0; top:14px; bottom:0; width:3px; background: var(--accent); box-shadow: 0 0 14px var(--accent); }
+  .a .top { display:flex; align-items:center; gap:8px; color: var(--accent); }
+  .a .top .dot { width:7px; height:7px; border-radius:50%; background: var(--accent); box-shadow:0 0 8px var(--accent); }
+  .a h4 { font-family:Oxanium,sans-serif; font-size:18px; margin:8px 0 4px; }
+  .a p { margin:0; color: var(--dim); font-size:15px; line-height:1.4; }
+  .a .when { display:flex; align-items:baseline; gap:8px; margin-top:10px; padding-top:10px; border-top:1px solid var(--line); color: var(--faint); }
+  .a .when .count { color: var(--text); }
+
+  /* B: Kompakt mit Fortschritt */
+  .b { position:absolute; right:18px; bottom:18px; width: 360px; --accent: var(--blue); display:grid; grid-template-columns: 56px 1fr; background: var(--panel);
+       border:1px solid var(--line); box-shadow: 0 18px 40px rgb(0 0 0/55%); }
+  .b .tile { display:grid; place-items:center; background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); font-size:24px; border-right:1px solid color-mix(in srgb, var(--accent) 35%, transparent); }
+  .b .body { padding: 12px 40px 14px 14px; }
+  .b .lbl { color: var(--accent); }
+  .b h4 { font-family:Oxanium,sans-serif; font-size:16px; margin:4px 0 2px; }
+  .b p { margin:0; color: var(--dim); font-size:14px; line-height:1.35; }
+  .b .link { display:inline-block; margin-top:8px; color: var(--accent); font-weight:700; font-size:13px; text-decoration: underline; text-underline-offset:3px; }
+  .b .bar { grid-column: 1 / -1; height:3px; background: var(--line); }
+  .b .bar i { display:block; width: 62%; height:100%; background: var(--accent); }
+
+  /* C: Leiste unten mittig */
+  .c { position:absolute; left:50%; bottom:18px; transform:translateX(-50%); width: 560px; --accent: var(--purple);
+       display:flex; align-items:center; gap:14px; padding: 10px 44px 10px 12px; background: color-mix(in srgb, var(--accent) 10%, var(--panel));
+       border:1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+       clip-path: polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px); }
+  .c .chip { padding:5px 10px; background: var(--accent); color: var(--base); }
+  .c .t { flex:1; min-width:0; }
+  .c .t strong { font-family:Oxanium,sans-serif; font-size:15px; }
+  .c .t span { color: var(--dim); font-size:14px; }
+  .c .count { font-size:18px; color: var(--accent); white-space:nowrap; }
+  .c .x { top:50%; transform: translateY(-50%); }
+
+  .kinds { display:flex; flex-wrap:wrap; gap:10px; margin: 6px 0 18px; }
+  .kind { display:flex; align-items:center; gap:8px; padding:6px 12px; border:1px solid color-mix(in srgb, var(--k) 45%, transparent);
+          background: color-mix(in srgb, var(--k) 10%, #0a0f15); color: var(--k); }
+  .kind i { width:8px; height:8px; border-radius:50%; background: var(--k); }
+  .kind small { color:#a8b0bc; font-size:13px; letter-spacing:0; text-transform:none; font-weight:500; margin-left:4px; }
+</style>
+
+<h2>Welcher Banner passt zur Webseite?</h2>
+<p class="subtitle">Alle drei schweben über der Seite statt oben als Streifen. Hintergrund ist ein Ausschnitt im Stil der Startseite. Klick an, was dir am besten gefällt, gern auch mehrere.</p>
+
+<div class="section rl">
+  <div class="label" style="margin-bottom:6px">Die Arten, jede mit eigener Farbe und eigenem Symbol</div>
+  <div class="kinds">
+    <span class="kind lbl" style="--k:#00afff"><i></i>Info <small>allgemeiner Hinweis</small></span>
+    <span class="kind lbl" style="--k:#35e07f"><i></i>Update <small>neue Funktionen</small></span>
+    <span class="kind lbl" style="--k:#b06bff"><i></i>Event <small>Turnier, Aktion</small></span>
+    <span class="kind lbl" style="--k:#ffc53d"><i></i>Wartung <small>geplant, mit Countdown</small></span>
+    <span class="kind lbl" style="--k:#ff4d5e"><i></i>Störung <small>gerade kaputt</small></span>
+  </div>
+</div>
+
+<div class="cards rl">
+  <div class="card" data-choice="a-hud" onclick="toggleSelect(this)">
+    <div class="stage">
+      <div class="hero"><h1>RL <span>NEXUS</span></h1><p>Der Discord-Bot für Rocket-League-Communities.</p></div>
+      <div class="a">
+        <div class="top lbl"><span class="dot"></span>Wartung · geplant</div>
+        <span class="x">×</span>
+        <h4>Datenbank-Umzug am Samstag</h4>
+        <p>Bot und Dashboard sind etwa 30 Minuten nicht erreichbar. Einstellungen bleiben erhalten.</p>
+        <div class="when"><span class="lbl">Beginnt in</span><span class="count">02:14:33</span></div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A · HUD-Karte unten rechts</h3>
+      <p>Abgeschrägte Ecken und leuchtende Akzentkante wie die Karten der Seite. Label mit Art, Titel, Text, darunter der Countdown. Auf dem Handy wird sie zur Leiste am unteren Rand.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="b-kompakt" onclick="toggleSelect(this)">
+    <div class="stage">
+      <div class="hero"><h1>RL <span>NEXUS</span></h1><p>Der Discord-Bot für Rocket-League-Communities.</p></div>
+      <div class="b">
+        <div class="tile">ⓘ</div>
+        <div class="body">
+          <div class="lbl">Update · seit heute</div>
+          <h4>Clips sind jetzt live</h4>
+          <p>Teilt eure besten Tore direkt im Server.</p>
+          <span class="link">Zum Modul →</span>
+        </div>
+        <span class="x">×</span>
+        <div class="bar"><i></i></div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B · Kompakt mit Symbolfeld</h3>
+      <p>Ruhiger, eckig, mit Schatten. Symbol links in der Farbe der Art. Die Linie unten zeigt, wie viel der Laufzeit schon vorbei ist.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="c-leiste" onclick="toggleSelect(this)">
+    <div class="stage">
+      <div class="hero"><h1>RL <span>NEXUS</span></h1><p>Der Discord-Bot für Rocket-League-Communities.</p></div>
+      <div class="c">
+        <span class="chip lbl">Event</span>
+        <div class="t"><strong>Nexus Cup 2v2</strong> <span>· Anmeldung offen bis Freitag</span></div>
+        <span class="count">3T 04:12</span>
+        <span class="x">×</span>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C · Schwebende Leiste unten mittig</h3>
+      <p>Eine Zeile, deckt am wenigsten zu. Art als farbiges Schild, Countdown rechts. Für längere Texte zu knapp.</p>
+    </div>
+  </div>
+</div>

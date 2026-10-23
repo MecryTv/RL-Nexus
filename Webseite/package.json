@@ -1,0 +1,35 @@
+{
+  "name": "rl-nexus-website",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "export": "node scripts/export-content.mjs",
+    "predev": "npm run export",
+    "dev": "vite",
+    "prebuild": "npm run export",
+    "build": "tsc -b && vite build",
+    "lint": "oxlint",
+    "check": "npm run export && node scripts/check-content.mjs && node scripts/check-shop.mjs",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@fontsource/orbitron": "^5.3.0",
+    "@fontsource/oxanium": "^5.3.0",
+    "@fontsource/rajdhani": "^5.3.0",
+    "@stripe/stripe-js": "^10.1.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "react-router-dom": "^7.18.3"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "@vitejs/plugin-react": "^6.1.0",
+    "oxlint": "^1.79.0",
+    "sass-embedded": "^1.104.0",
+    "typescript": "~6.0.2",
+    "vite": "^8.2.2"
+  }
+}

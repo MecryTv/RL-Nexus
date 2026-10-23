@@ -1,0 +1,88 @@
+<style>
+  .plan { max-width: 980px; }
+  .phase { border:1px solid var(--border, #3d3d3f); border-left:4px solid var(--c); background: var(--bg-secondary, #2d2d2f); padding:14px 18px; margin-bottom:14px; border-radius:4px; }
+  .phase h3 { margin:0 0 4px; display:flex; gap:10px; align-items:baseline; }
+  .phase h3 .n { color: var(--c); font-size:14px; font-weight:700; }
+  .phase .where { font-size:13px; color: var(--text-secondary, #9aa0a6); margin-bottom:8px; }
+  .phase ul { margin:0; padding-left:18px; line-height:1.55; }
+  .phase li { margin-bottom:4px; }
+  .phase code { font-size:13px; }
+  .skip { margin-top:18px; padding:12px 16px; border:1px dashed var(--border, #3d3d3f); border-radius:4px; }
+  .skip h3 { margin:0 0 6px; }
+</style>
+
+<h2>Der Plan im Ganzen</h2>
+<p class="subtitle">Fünf Teile, in dieser Reihenfolge gebaut. Jeder ist für sich fertig und geprüft, bevor der nächste anfängt. Sag im Chat, ob das so passt.</p>
+
+<div class="plan">
+  <div class="phase" style="--c:#ffc53d">
+    <h3><span class="n">1</span> Banner auf der Webseite</h3>
+    <div class="where">Webseite, Admin Dashboard</div>
+    <ul>
+      <li>Schwebende Leiste unten mittig (Entwurf C), auf dem Handy über die ganze Breite.</li>
+      <li>Fünf Arten mit Farbe und Symbol: Info, Update, Event, Wartung, Störung. Dazu Titel, Text, Link.</li>
+      <li>Zeitsteuerung: sichtbar ab, sichtbar bis, Countdown auf ein Datum (etwa Beginn der Wartung).</li>
+      <li>Der bisherige Banner wird beim ersten Laden übernommen: „Info“ bleibt Info, „Warnung“ wird Störung.</li>
+      <li>Die Statusmeldung in Discord zeigt Art und Titel mit.</li>
+    </ul>
+  </div>
+
+  <div class="phase" style="--c:#ff3344">
+    <h3><span class="n">2</span> Gruppenübersicht</h3>
+    <div class="where">Admin Dashboard, Bot (eine Zeile: DEV_USER_IDs in der Übersicht)</div>
+    <ul>
+      <li>Karten je Gruppe (Entwurf A): Administrator, Developer, Partner, Premium, mit Anzahl, Mitgliedern, was die Gruppe freischaltet.</li>
+      <li>Developer kommen vom Bot und sind nur zum Ansehen. Guardian und Testphase stehen als Erklärung da.</li>
+      <li>Suche nach Name, ID, Notiz. Filter nach Gruppe. Ab fünf Personen klappt eine Karte zu.</li>
+      <li>Verlauf darunter aus dem Protokoll: wer wem wann was gegeben oder entzogen hat.</li>
+    </ul>
+  </div>
+
+  <div class="phase" style="--c:#35e07f">
+    <h3><span class="n">3</span> Commands vom Bot</h3>
+    <div class="where">Bot (RLOrgs), Admin Dashboard, Webseite</div>
+    <ul>
+      <li>Jeder Command bekommt im Bot sein Modul, etwa <code>module: "clips"</code>. Dev-Commands bleiben ohne.</li>
+      <li>Neue Route im Bot: <code>/dcapi/admin/commands</code> mit Name, Beschreibung und allen Unterbefehlen.</li>
+      <li>Das Admin Dashboard holt die Liste alle 5 Minuten und schreibt sie als <code>commands.json</code> neben die anderen Inhalte. Getrennt von <code>modules.json</code>, damit niemandem beim Bearbeiten der Stand wegrutscht.</li>
+      <li>Die Webseite zeigt die Commands jetzt mit Beschreibung. Ist der Bot aus, bleibt der letzte Stand.</li>
+      <li>Ein Check im Bot meldet Commands ohne Modul.</li>
+    </ul>
+  </div>
+
+  <div class="phase" style="--c:#00afff">
+    <h3><span class="n">4</span> Module: Kategorien und Live-Vorschau</h3>
+    <div class="where">Admin Dashboard, Webseite, Caddy</div>
+    <ul>
+      <li>Kategorien als eigene Inhaltsdatei <code>categories.json</code>: Name, Farbe (Palette oder Hex), Reihenfolge per Ziehen. Die heutigen sechs sind der Startstand.</li>
+      <li>Löschen nur, wenn kein Modul mehr drin steckt. Die ID entsteht aus dem Namen und bleibt fest.</li>
+      <li>Live-Vorschau: Die Webseite bekommt eine Vorschau-Seite, die den Entwurf vom Admin Dashboard annimmt. Nur von dessen Adresse, sonst ignoriert sie alles. Umschalter Desktop und Handy, für Kachel und Detailseite.</li>
+      <li>Caddy erlaubt der Webseite dafür, im Admin Dashboard eingebettet zu werden.</li>
+    </ul>
+  </div>
+
+  <div class="phase" style="--c:#b06bff">
+    <h3><span class="n">5</span> Mailclient</h3>
+    <div class="where">Admin Dashboard (neuer Bereich „Postfach“ statt „Kontakt“), mailcow</div>
+    <ul>
+      <li>Drei Spalten (Entwurf A): Postfächer mit Ordnern, Liste, Lesebereich. Kontaktformular als eigener Eingang ganz oben.</li>
+      <li>Direkt über IMAP und SMTP (Weg A), live über IMAP IDLE. Keine Mails in der Datenbank.</li>
+      <li>Postfächer: Developer tragen Adresse, Anzeigename und App-Passwort ein. Das Dashboard prüft die Verbindung vor dem Speichern. Das Passwort liegt mit <code>MAIL_KEY</code> verschlüsselt in der Datenbank und geht nie zurück an den Browser.</li>
+      <li>Lesen, antworten, allen antworten, weiterleiten, neue Mail, Anhänge rein und raus, gelesen und ungelesen, archivieren, Spam, löschen, Suche im Ordner.</li>
+      <li>Editor (TipTap): fett, kursiv, unterstrichen, durchgestrichen, Überschriften, Listen, Zitat, Link, Knopf, Linie, rückgängig.</li>
+      <li>Vorlage dunkel mit N-Logo (zweiter Entwurf). Name, Avatar und Rang setzt das Dashboard selbst ein. Haken für eine schlichte Mail ohne Vorlage.</li>
+      <li>Antworten auf das Kontaktformular gehen über das gewählte Postfach und landen dort unter „Gesendet“. Der Status wechselt wie heute auf „Beantwortet“.</li>
+      <li>HTML-Mails werden bereinigt und abgeschottet gezeigt. Externe Bilder erst nach Klick.</li>
+      <li>Alle Admins lesen und schreiben, Senden und Löschen stehen im Protokoll.</li>
+    </ul>
+  </div>
+
+  <div class="skip">
+    <h3>Bewusst weggelassen, kommt bei Bedarf</h3>
+    <ul>
+      <li>Textbausteine im Editor</li>
+      <li>Unterhaltungen als Verlauf (jede Mail steht einzeln, Antworten zitieren die vorige)</li>
+      <li>Rechte pro Postfach</li>
+    </ul>
+  </div>
+</div>

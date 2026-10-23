@@ -1,0 +1,22 @@
+@use "mixins" as *;
+
+.metric {
+    display: grid;
+    min-height: 84px;
+    padding: var(--s-3) var(--s-4);
+    align-content: center;
+    gap: var(--s-1);
+}
+
+.label {
+    color: var(--c-text-faint);
+
+    @include label(0.75rem, 0.14em);
+}
+
+.value {
+    font-size: 1.4rem;
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    line-height: 1.2;
+}

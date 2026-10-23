@@ -1,0 +1,107 @@
+<link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@500;700&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+
+<style>
+  .cards.rl { grid-template-columns: 1fr 1fr !important; max-width: 1100px; }
+  .rl { font-family: "Rajdhani", system-ui, sans-serif; }
+  .inbox { background:#e9ebee; padding:18px; height: 560px; overflow:hidden; }
+  .inbox.darkc { background:#1b1d21; }
+  .mailmeta { font-family: Arial, sans-serif; font-size:12px; color:#5f6368; margin-bottom:10px; }
+  .darkc .mailmeta { color:#9aa0a6; }
+  /* Dunkel */
+  .d { max-width: 460px; margin:0 auto; background:#050608; color:#f2f4f7; font-family: Arial, sans-serif; border:1px solid #1d232b; }
+  .d .top { padding:18px 22px; background: linear-gradient(135deg, rgb(255 30 45/22%), transparent 60%), #0a0f15; border-bottom:2px solid #ff1e2d; }
+  .d .logo { font-family: Oxanium, Arial, sans-serif; font-weight:700; font-size:20px; letter-spacing:.06em; }
+  .d .logo span { color:#ff1e2d; }
+  .d .tag { font-size:10px; letter-spacing:.2em; color:#a8b0bc; text-transform:uppercase; margin-top:2px; }
+  .d .content { padding:20px 22px; font-size:14px; line-height:1.6; color:#d9dde3; }
+  .d .content b { color:#fff; }
+  .d .content a { color:#00afff; }
+  .d .btn { display:inline-block; margin:6px 0 4px; padding:10px 18px; background:#ff1e2d; color:#fff; font-weight:700; font-size:12px; letter-spacing:.14em; text-transform:uppercase; text-decoration:none; }
+  .d .sig { padding:14px 22px; border-top:1px solid #1d232b; font-size:13px; color:#a8b0bc; }
+  .d .sig strong { color:#f2f4f7; }
+  .d .foot { padding:12px 22px; background:#0a0f15; font-size:11px; color:#7b8693; line-height:1.5; }
+  .d .foot a { color:#a8b0bc; }
+  /* Hell */
+  .l { max-width: 460px; margin:0 auto; background:#ffffff; color:#1d232b; font-family: Arial, sans-serif; border:1px solid #d7dbe0; }
+  .l .top { padding:16px 22px; background:#050608; border-bottom:3px solid #ff1e2d; color:#fff; }
+  .l .logo { font-family: Oxanium, Arial, sans-serif; font-weight:700; font-size:20px; letter-spacing:.06em; }
+  .l .logo span { color:#ff1e2d; }
+  .l .tag { font-size:10px; letter-spacing:.2em; color:#a8b0bc; text-transform:uppercase; margin-top:2px; }
+  .l .content { padding:20px 22px; font-size:14px; line-height:1.6; color:#2b323b; }
+  .l .content a { color:#0077cc; }
+  .l .btn { display:inline-block; margin:6px 0 4px; padding:10px 18px; background:#d81424; color:#fff; font-weight:700; font-size:12px; letter-spacing:.14em; text-transform:uppercase; text-decoration:none; }
+  .l .sig { padding:14px 22px; border-top:1px solid #e3e6ea; font-size:13px; color:#5b6470; }
+  .l .sig strong { color:#1d232b; }
+  .l .foot { padding:12px 22px; background:#f3f4f6; font-size:11px; color:#6b7380; line-height:1.5; }
+  .l .foot a { color:#5b6470; }
+
+  .editor { margin-top: 18px; grid-column: 1 / -1; background:#050608; border:1px solid #222; padding:14px; color:#f2f4f7; }
+  .tb { display:flex; flex-wrap:wrap; gap:4px; padding:6px; border:1px solid rgb(255 255 255/14%); border-bottom:0; background:#0a0f15; }
+  .tb span { min-width:30px; height:30px; display:grid; place-items:center; padding:0 6px; border:1px solid transparent; color:#a8b0bc; font-family: Arial, sans-serif; font-size:13px; }
+  .tb span.on { border-color: rgb(255 255 255/14%); color:#fff; background: rgb(255 255 255/6%); }
+  .tb .sep { width:1px; min-width:1px; padding:0; background: rgb(255 255 255/14%); margin: 4px 2px; }
+  .area { border:1px solid rgb(255 255 255/14%); background:#0a0f15; padding:12px; font-family: Arial, sans-serif; font-size:14px; line-height:1.6; color:#d9dde3; min-height:90px; }
+  .area a { color:#00afff; }
+  .row { display:flex; gap:10px; align-items:center; margin-bottom:8px; font-size:14px; color:#a8b0bc; }
+  .row .sel { padding:5px 10px; border:1px solid rgb(255 255 255/14%); color:#f2f4f7; background:#0a0f15; }
+  .row label { display:flex; align-items:center; gap:6px; }
+</style>
+
+<h2>Wie sollen deine Mails beim Empfänger aussehen?</h2>
+<p class="subtitle">Jede Mail aus dem Admin Dashboard kommt in diese Vorlage: Kopf mit Logo, dein Text, Signatur des Postfachs, Fuß mit Impressum. Gezeigt in einem Posteingang, wie ihn der Empfänger sieht. Unten die Werkzeugleiste zum Schreiben.</p>
+
+<div class="cards rl">
+  <div class="card" data-choice="a-dunkel" onclick="toggleSelect(this)">
+    <div class="inbox darkc">
+      <div class="mailmeta">RL Nexus Support &lt;support@nexus-emb.de&gt; · an orga@vexa.gg</div>
+      <div class="d">
+        <div class="top"><div class="logo">RL <span>NEXUS</span></div><div class="tag">Support</div></div>
+        <div class="content">
+          Hallo Vexa-Team,<br><br>
+          danke für eure Nachricht. Eine Partnerschaft für <b>Season 12</b> klingt gut. Schaut euch vorab die <a href="#">Partner-Bedingungen</a> an:<br>
+          <span class="btn">Bedingungen ansehen</span><br>
+          <i>Wir melden uns bis Freitag mit einem Termin.</i>
+        </div>
+        <div class="sig"><strong>mecry</strong> · Team RL Nexus<br>Discord: discord.gg/rlnexus</div>
+        <div class="foot">RL Nexus · nexus-emb.de · <a href="#">Impressum</a> · <a href="#">Datenschutz</a><br>Du bekommst diese Mail, weil du uns geschrieben hast.</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A · Dunkel wie die Webseite</h3>
+      <p>Sieht aus wie RL Nexus. Manche Mailprogramme (Outlook, Gmail im Hellmodus) drehen dunkle Mails aber teils um oder hellen sie auf, dann wirkt es fleckig.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="b-hell" onclick="toggleSelect(this)">
+    <div class="inbox">
+      <div class="mailmeta">RL Nexus Support &lt;support@nexus-emb.de&gt; · an orga@vexa.gg</div>
+      <div class="l">
+        <div class="top"><div class="logo">RL <span>NEXUS</span></div><div class="tag">Support</div></div>
+        <div class="content">
+          Hallo Vexa-Team,<br><br>
+          danke für eure Nachricht. Eine Partnerschaft für <b>Season 12</b> klingt gut. Schaut euch vorab die <a href="#">Partner-Bedingungen</a> an:<br>
+          <span class="btn">Bedingungen ansehen</span><br>
+          <i>Wir melden uns bis Freitag mit einem Termin.</i>
+        </div>
+        <div class="sig"><strong>mecry</strong> · Team RL Nexus<br>Discord: discord.gg/rlnexus</div>
+        <div class="foot">RL Nexus · nexus-emb.de · <a href="#">Impressum</a> · <a href="#">Datenschutz</a><br>Du bekommst diese Mail, weil du uns geschrieben hast.</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B · Heller Text, dunkler Kopf</h3>
+      <p>Kopf schwarz mit roter Linie wie die Seite, Text auf Weiß. Liest sich in jedem Mailprogramm gleich, auch ausgedruckt.</p>
+    </div>
+  </div>
+
+  <div class="editor">
+    <div class="row">Von <span class="sel">support@nexus-emb.de ▾</span> An <span class="sel">orga@vexa.gg</span> <label>☐ Vorlage weglassen (schlichte Mail)</label></div>
+    <div class="tb">
+      <span class="on"><b>F</b></span><span><i>K</i></span><span><u>U</u></span><span><s>S</s></span><span class="sep"></span>
+      <span>H2</span><span>H3</span><span class="sep"></span>
+      <span>• Liste</span><span>1. Liste</span><span>❝ Zitat</span><span class="sep"></span>
+      <span>🔗 Link</span><span>▭ Knopf</span><span>— Linie</span><span class="sep"></span>
+      <span>⎌</span><span>⎌̸</span><span class="sep"></span><span>📎 Anhang</span><span>Textbausteine ▾</span>
+    </div>
+    <div class="area">Hallo Vexa-Team,<br><br>danke für eure Nachricht. Eine Partnerschaft für <b>Season 12</b> klingt gut …</div>
+  </div>
+</div>

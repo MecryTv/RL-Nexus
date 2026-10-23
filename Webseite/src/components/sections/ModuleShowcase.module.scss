@@ -1,0 +1,77 @@
+@use "mixins" as *;
+
+.head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 32px;
+    margin-bottom: 44px;
+}
+
+.headAction {
+    flex-shrink: 0;
+    margin-bottom: 6px;
+
+    @include below(760px) {
+        display: none;
+    }
+}
+
+.grid {
+    display: grid;
+    gap: var(--s-gap);
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 310px), 1fr));
+}
+
+/* --- Kategorienzeile ---------------------------------------------------- */
+.categories {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 34px;
+}
+
+.category {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    padding: 9px 15px 8px;
+    border: 1px solid var(--c-line);
+    transition:
+        border-color var(--t-fast),
+        background var(--t-fast),
+        color var(--t-fast);
+    color: var(--c-text-dim);
+
+    @include label(0.68rem, 0.12em);
+    @include bevel-diagonal(8px);
+    @include touch-target;
+
+    svg {
+        opacity: 0;
+        transition: opacity var(--t-fast);
+    }
+
+    &:hover {
+        border-color: color-mix(in srgb, var(--accent) 50%, transparent);
+        background: color-mix(in srgb, var(--accent) 10%, transparent);
+        color: var(--c-text);
+
+        svg {
+            opacity: 1;
+        }
+    }
+}
+
+.categoryDot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 9px var(--accent);
+}
+
+.count {
+    color: var(--c-text-faint);
+    font-variant-numeric: tabular-nums;
+}

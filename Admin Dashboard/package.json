@@ -1,0 +1,56 @@
+{
+    "name": "rl-nexus-admin",
+    "private": true,
+    "version": "1.0.0",
+    "description": "Admin Dashboard für den RL Nexus Bot, sein Dashboard und die Hauptseite",
+    "type": "module",
+    "engines": {
+        "node": ">=24"
+    },
+    "scripts": {
+        "dev": "vite",
+        "dev:server": "node --watch --env-file=.env server/index.ts --dev",
+        "dev:server:live": "node --watch --env-file=.env server/index.ts",
+        "start": "node server/index.ts",
+        "build": "tsc -b && vite build",
+        "check": "node server/check.ts",
+        "check:db": "node --env-file=.env server/check-db.ts",
+        "lint": "oxlint",
+        "typecheck": "tsc -b"
+    },
+    "dependencies": {
+        "@fastify/rate-limit": "^11.2.0",
+        "@fastify/static": "^10.1.5",
+        "fastify": "^5.12.5",
+        "imapflow": "^2.3.0",
+        "mailparser": "^3.9.37",
+        "mariadb": "^3.5.4",
+        "nodemailer": "^10.0.15",
+        "pdfkit": "^0.20.2",
+        "sanitize-html": "^2.18.0",
+        "stripe": "^23.0.0"
+    },
+    "devDependencies": {
+        "@fontsource/orbitron": "^5.3.0",
+        "@fontsource/oxanium": "^5.3.0",
+        "@fontsource/rajdhani": "^5.3.0",
+        "@tiptap/pm": "^3.31.4",
+        "@tiptap/react": "^3.31.4",
+        "@tiptap/starter-kit": "^3.31.4",
+        "@types/mailparser": "^3.9.0",
+        "@types/node": "^26.6.4",
+        "@types/nodemailer": "^8.0.2",
+        "@types/pdfkit": "^0.17.6",
+        "@types/react": "^19.3.0",
+        "@types/react-dom": "^19.3.0",
+        "@types/sanitize-html": "^2.16.2",
+        "@vitejs/plugin-react": "^6.1.1",
+        "oxlint": "^1.86.0",
+        "react": "^19.3.0",
+        "react-dom": "^19.3.0",
+        "react-router-dom": "^7.18.4",
+        "sass-embedded": "^1.105.1",
+        "typescript": "~6.0.3",
+        "vite": "^8.3.2"
+    }
+}

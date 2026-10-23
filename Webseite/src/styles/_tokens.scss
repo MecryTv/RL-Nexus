@@ -1,0 +1,61 @@
+/**
+ * Die Farben, Maße und Schriften der Seite.
+ *
+ * Alles hier stammt aus `src/constants/RankCard.ts` des Bots: die Webseite und
+ * die Rang-Karte, die der Bot in Discord postet, sollen erkennbar dasselbe
+ * Produkt sein. Wer dort eine Farbe dreht, dreht sie auch hier.
+ */
+
+:root {
+    /* --- Grundflächen ------------------------------------------------- */
+    --c-base: #050608;
+    --c-panel: #080d12;
+    --c-panel-solid: #0a0f15;
+    --c-panel-fill: rgb(6 9 13 / 78%);
+    --c-line: rgb(255 255 255 / 8%);
+    --c-line-strong: rgb(255 255 255 / 14%);
+
+    /* --- Akzente ------------------------------------------------------ */
+    --c-red: #ff1e2d;
+    --c-red-bright: #ff3344;
+    --c-blue: #00afff;
+    --c-rank-blue: #168cff;
+    --c-purple: #8a4dff;
+    --c-win: #35e07f;
+    --c-loss: #ff4d5e;
+
+    /* --- Text --------------------------------------------------------- */
+    --c-text: #f2f4f7;
+    --c-text-dim: #a8b0bc;
+    --c-text-faint: #6b7683;
+
+    /* --- Modulfarben --------------------------------------------------
+       Dieselbe Staffelung wie die Karriere-Werte auf der Karte. Sechs Formen
+       in einer Reihe verschwimmen zu einem Band, wenn sie alle weiß sind -
+       eine Farbe je Kategorie macht auf einen Blick sichtbar, wo man hinsieht.
+    */
+    --c-mod-community: #38c8ff;
+    --c-mod-competition: #ff4a3d;
+    --c-mod-moderation: #b06bff;
+    --c-mod-engagement: #ffc53d;
+    --c-mod-content: #35e07f;
+    --c-mod-utility: #ff8a3d;
+
+    /* --- Schrift ------------------------------------------------------ */
+    --f-display: "Oxanium", "Segoe UI", system-ui, sans-serif;
+    --f-label: "Rajdhani", "Segoe UI", system-ui, sans-serif;
+    --f-accent: "Orbitron", "Oxanium", system-ui, sans-serif;
+
+    /* --- Raster -------------------------------------------------------
+       PAD und GAP der Karte, auf Bildschirmmaße übersetzt. */
+    --s-pad: 34px;
+    --s-gap: 22px;
+    --s-cut: 18px;
+    --s-shell: 1240px;
+    --s-header: 76px;
+
+    /* --- Bewegung ----------------------------------------------------- */
+    --t-fast: 140ms cubic-bezier(0.4, 0, 0.2, 1);
+    --t-base: 260ms cubic-bezier(0.4, 0, 0.2, 1);
+    --t-slow: 620ms cubic-bezier(0.16, 1, 0.3, 1);
+}

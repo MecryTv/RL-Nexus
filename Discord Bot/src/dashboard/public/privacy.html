@@ -1,0 +1,390 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>RL Nexus · Datenschutz</title>
+<meta name="color-scheme" content="dark">
+<!-- Die Hauptseite. Wird beim Ausliefern eingesetzt. -->
+<meta name="rlnexus-site" content="__SITE__">
+<meta name="description" content="Was RL Nexus speichert, warum, wie lange, und wie du es wieder loswirst.">
+<link rel="icon" type="image/png" href="__BASE__/assets/images/rl-nexus-n-48.png">
+<link rel="stylesheet" href="__BASE__/assets/style.css">
+</head>
+<body data-page="static">
+<!--
+  Derselbe Text wie auf der Website (RL Nexus Website, src/pages/LegalPage.tsx).
+  Ändert sich, was ein Modul speichert, gehören beide Stellen nachgezogen.
+-->
+
+<div class="ambient" aria-hidden="true"><i class="ambient__warm"></i><i class="ambient__cool"></i><i class="ambient__bands"></i><i class="ambient__grid"></i><i class="ambient__vignette"></i></div>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <symbol id="i-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13M13 6l6 6-6 6"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></symbol>
+</svg>
+
+<header class="topbar">
+  <div class="shell topbar__inner">
+    <a class="brand" href="__BASE__/" aria-label="RL Nexus Startseite">
+      <span class="brand__mark"><img src="__BASE__/assets/images/rl-nexus-n-96.png" alt="" width="38" height="38" decoding="async"></span>
+      <span>
+        <span class="brand__name">RL <em>Nexus</em></span>
+        <span class="brand__sub">Esports Management Bot</span>
+      </span>
+    </a>
+  </div>
+</header>
+
+<main class="shell docpage">
+  <div class="setpage">
+    <div class="docside">
+      <div class="docside__inner">
+        <a class="backlink" href="__BASE__/"><svg><use href="#i-arrow"/></svg>Zurück zum Dashboard</a>
+
+        <nav class="setnav setnav--legal" id="docNav" aria-label="Inhalt">
+          <a href="#verantwortlicher"><span class="legal__num">01</span>Verantwortlicher</a>
+          <a href="#kurz-gesagt"><span class="legal__num">02</span>Kurz gesagt</a>
+          <a href="#hosting"><span class="legal__num">03</span>Hosting</a>
+          <a href="#logs"><span class="legal__num">04</span>Server-Logs</a>
+          <a href="#cookies"><span class="legal__num">05</span>Cookies und Speicher</a>
+          <a href="#kontakt"><span class="legal__num">06</span>Kontakt und Fehlermeldungen</a>
+          <a href="#bot"><span class="legal__num">07</span>Der Discord-Bot</a>
+          <a href="#dashboard"><span class="legal__num">08</span>Das Dashboard</a>
+          <a href="#empfaenger"><span class="legal__num">09</span>Wohin Daten gehen</a>
+          <a href="#rechte"><span class="legal__num">10</span>Deine Rechte</a>
+          <a href="#aenderungen"><span class="legal__num">11</span>Änderungen</a>
+        </nav>
+      </div>
+    </div>
+
+    <div class="doc legal">
+  <h1>Datenschutzerklärung</h1>
+  <p class="doc__lead">Was RL Nexus speichert, warum, wie lange, und wie du es wieder loswirst.</p>
+
+  <h2 id="verantwortlicher"><span class="legal__num">01</span>Verantwortlicher</h2>
+  <p>Verantwortlich für die Website, die Statusseite, dieses Dashboard und den Discord-Bot RL Nexus ist:</p>
+  <address class="legal__address">
+    Connor Olischer<br>
+    Königsberger Straße 8<br>
+    25335 Elmshorn<br>
+    Deutschland
+  </address>
+  <p>E-Mail: <a href="mailto:support@nexus-emb.de">support@nexus-emb.de</a></p>
+
+  <h2 id="kurz-gesagt"><span class="legal__num">02</span>Kurz gesagt</h2>
+  <ul class="doc__bullets">
+    <li>Die Website setzt keine Cookies, das Dashboard nur die für die Anmeldung. Keine der Seiten misst Besuche. Schriften und Bilder liefern sie selbst aus, nur Profilbilder, Server-Icons und Emojis im Dashboard kommen direkt von Discord.</li>
+    <li>Der Bot speichert nur, was die Module brauchen, die das Team eines Servers eingeschaltet hat.</li>
+    <li>Wir verkaufen keine Daten und geben sie nicht für Werbung weiter.</li>
+    <li>Website, Dashboard und Bot laufen auf einem gemieteten Server in einem Rechenzentrum in der EU.</li>
+  </ul>
+  <p>Du musst uns keine Daten geben. Ohne Discord-Konto lassen sich Bot und Dashboard aber nicht nutzen.</p>
+
+  <h2 id="hosting"><span class="legal__num">03</span>Hosting</h2>
+  <p>
+    Website, Dashboard, Bot, Datenbank und Mailserver laufen auf einem virtuellen Server der Contabo GmbH,
+    Aschauer Straße 32a, 81549 München, in einem Rechenzentrum in der EU. Was wir speichern, liegt dort.
+  </p>
+  <p>
+    Rechtsgrundlage ist Art. 6 Abs. 1 lit. f DSGVO. Unser berechtigtes Interesse ist, Website, Dashboard und
+    Bot zuverlässig zu betreiben.
+  </p>
+
+  <h2 id="logs"><span class="legal__num">04</span>Server-Logs</h2>
+  <p>
+    Vor Website, Dashboard und Statusseite läuft der Webserver nginx. Bei jedem Aufruf schreibt er einen Eintrag
+    in sein Protokoll: die gekürzte IP-Adresse (bei IPv4 ohne den letzten Block, bei IPv6 nur die ersten drei
+    Blöcke), Datum und Uhrzeit, die aufgerufene Adresse, den Statuscode, die übertragene Datenmenge, die Seite,
+    von der du kamst, und die Kennung deines Browsers. Cookies und Anmeldedaten stehen nicht darin.
+  </p>
+  <p>
+    Kann der Server eine Anfrage nicht bearbeiten, schreibt nginx das mit der vollständigen IP-Adresse in sein
+    Fehlerprotokoll. Damit finden wir Fehler und erkennen Angriffe. Beide Protokolle bleiben auf unserem Server
+    und werden nach 14 Tagen automatisch gelöscht.
+  </p>
+  <p>
+    Der Bot führt ein eigenes Betriebsprotokoll mit Fehlern und Ereignissen, zum Beispiel wann jemand ein
+    Spielerkonto verknüpft oder getrennt hat. Darin können Discord-IDs, Server-IDs und Namen stehen. Jede
+    Protokolldatei wird 30 Tage nach ihrem letzten Eintrag gelöscht.
+  </p>
+  <p>
+    Rechtsgrundlage ist in beiden Fällen Art. 6 Abs. 1 lit. f DSGVO. Unser berechtigtes Interesse ist ein
+    sicherer Betrieb ohne Fehler.
+  </p>
+
+  <h2 id="cookies"><span class="legal__num">05</span>Cookies und Speicher im Browser</h2>
+  <h3>Im Dashboard</h3>
+  <p>
+    Das Dashboard setzt nur Cookies, ohne die die Anmeldung nicht funktioniert. Skripte können sie nicht
+    auslesen, und sie gehen nur verschlüsselt über HTTPS.
+  </p>
+  <table class="doc__table">
+    <thead><tr><th>Name</th><th>Wofür</th><th>Wie lange</th></tr></thead>
+    <tbody>
+      <tr><td><code>rlnexus_session</code></td><td>Hält dich angemeldet. Enthält ein signiertes Token mit deiner Discord-ID.</td><td>7 Tage</td></tr>
+      <tr><td><code>rlnexus_oauth_state</code></td><td>Schützt die Anmeldung mit Discord gegen untergeschobene Anfragen.</td><td>10 Minuten</td></tr>
+    </tbody>
+  </table>
+  <p>Dazu kommen ein paar Einträge im lokalen Speicher deines Browsers (localStorage). Sie verlassen deinen Rechner nicht:</p>
+  <table class="doc__table">
+    <thead><tr><th>Name</th><th>Wofür</th><th>Wie lange</th></tr></thead>
+    <tbody>
+      <tr><td><code>rlnexus.prefs</code></td><td>Deine Einstellungen für Töne, Lautstärke, reduzierte Bewegung und Hinweise.</td><td>Bis du sie löschst</td></tr>
+      <tr><td><code>rlnexus.cookies</code></td><td>Merkt sich, dass du den Hinweis auf die Cookies gesehen hast.</td><td>Bis du ihn löschst</td></tr>
+      <tr><td><code>rlnexus.nav.folded</code></td><td>Welche Gruppen der Seitenleiste du auf einer Serverseite zugeklappt hast.</td><td>Bis du ihn löschst</td></tr>
+      <tr><td><code>rlnexus.live.sound</code></td><td>Ob Live Tickets bei einer neuen Nachricht einen Ton spielen.</td><td>Bis du ihn löschst</td></tr>
+    </tbody>
+  </table>
+  <h3>Auf der Website</h3>
+  <p>
+    Die Website setzt keine Cookies. Im Speicher deines Browsers legt sie höchstens zwei Einträge ab. Beide
+    bleiben in deinem Browser, wir bekommen sie nie zu sehen:
+  </p>
+  <table class="doc__table">
+    <thead><tr><th>Name</th><th>Wofür</th><th>Wie lange</th></tr></thead>
+    <tbody>
+      <tr><td><code>rlnexus.intro</code></td><td>Das Datum, an dem die Startanimation zuletzt lief. Damit läuft sie nur beim ersten Besuch am Tag. Liegt im localStorage.</td><td>Bis du ihn löschst</td></tr>
+      <tr><td><code>rlnexus.banner</code></td><td>Nur wenn du den Hinweis oben auf der Seite wegklickst: welchen Stand des Hinweises du weggeklickt hast. Damit bleibt er weg, bis sich sein Text ändert. Liegt im sessionStorage dieses Tabs.</td><td>Bis du den Tab schließt</td></tr>
+    </tbody>
+  </table>
+  <p>
+    Rechtsgrundlage für das Speichern auf deinem Gerät ist § 25 Abs. 2 Nr. 2 TDDDG, für die Anmeldung selbst
+    Art. 6 Abs. 1 lit. b DSGVO. Tracking, Werbung und Reichweitenmessung gibt es weder hier noch auf der
+    Website. Deshalb fragt dich auch kein Banner nach einer Einwilligung. Einträge im localStorage löschst du
+    in den Einstellungen deines Browsers bei den gespeicherten Website-Daten.
+  </p>
+
+  <h2 id="kontakt"><span class="legal__num">06</span>Kontakt und Fehlermeldungen</h2>
+  <p>
+    Schreibst du an <a href="mailto:support@nexus-emb.de">support@nexus-emb.de</a>, speichern wir deine
+    Adresse und deine Nachricht, um dir antworten zu können. Die E-Mails liegen auf unserem eigenen
+    Mailserver, der auf demselben Server läuft wie Website und Bot. Wir löschen sie, sobald deine Anfrage
+    erledigt ist.
+  </p>
+  <p>
+    Meldest du einen Fehler über das Pop-up im Dashboard oder mit <code>/fehler</code> in Discord, schickt der
+    Bot deine Meldung als E-Mail an dieselbe Adresse. Darin stehen dein Text, die Kontaktangabe, die du
+    einträgst, und, falls du angemeldet bist oder den Befehl benutzt, deine Discord-ID, dein Name, der Server
+    und die Seite, auf der du warst. Für diese Meldungen gilt dieselbe Frist.
+  </p>
+  <p>
+    Schickst du das Formular auf der <a href="__SITE__/kontakt">Kontaktseite der Website</a> ab, geht es als
+    E-Mail an <a href="mailto:support@nexus-emb.de">support@nexus-emb.de</a> auf unserem eigenen Mailserver:
+    Thema, Name, E-Mail-Adresse oder Discord-Name, Betreff, Nachricht und, falls ausgefüllt, die Angaben zur
+    Lage. Damit wir es schnell sehen, geht derselbe Inhalt zusätzlich als Hinweis in einen internen
+    Discord-Kanal unseres Teams (siehe <a href="#empfaenger">Wohin Daten gehen</a>). In unserer Datenbank
+    landet das Formular nicht. E-Mail und Hinweis löschen wir, sobald deine Anfrage erledigt ist. Nachrichten
+    aus der Zeit, als das Formular sie noch in unserer Datenbank ablegte, löschen wir spätestens 90 Tage nach
+    dem Eingang.
+  </p>
+  <p>
+    Deine IP-Adresse speichern wir dabei nicht. Damit niemand das Formular mit Nachrichten flutet, zählt der
+    Server im Arbeitsspeicher mit, wie viele Nachrichten von deiner Adresse kommen, und vergisst das nach
+    spätestens zehn Minuten.
+  </p>
+  <p>
+    Meldest du dich im <a href="https://discord.gg/CjG2HFGw95" target="_blank" rel="noopener noreferrer">Support-Server</a>
+    auf Discord, verarbeitet Discord deine Nachrichten nach seinen eigenen Regeln (siehe
+    <a href="#empfaenger">Wohin Daten gehen</a>).
+  </p>
+  <p>
+    Rechtsgrundlage ist Art. 6 Abs. 1 lit. f DSGVO: Wir haben ein berechtigtes Interesse daran, deine Anfrage
+    zu beantworten. Geht es um die Nutzung von Bot oder Dashboard, gilt Art. 6 Abs. 1 lit. b DSGVO.
+  </p>
+
+  <h2 id="bot"><span class="legal__num">07</span>Der Discord-Bot</h2>
+  <p>
+    Den Bot lädt das Team eines Discord-Servers ein. Welche Module dort laufen und wie sie eingestellt sind,
+    entscheidet dieses Team im Dashboard. Ein abgeschaltetes Modul verarbeitet nichts.
+  </p>
+  <p>
+    Auf einem Server sieht der Bot, was Discord jedem Bot dort zeigt: IDs, Namen, Profilbilder und Rollen der
+    Mitglieder und die Nachrichten in den Kanälen, die er lesen darf. Gespeichert wird davon nur, was hier steht:
+  </p>
+  <ul class="doc__bullets">
+    <li>
+      <b>Auf jedem Server:</b> die Server-ID, die IDs der eingestellten Kanäle und Rollen und die
+      Einstellungen der Module, solange der Bot auf dem Server ist. Dazu Zahlen zur Aktivität: je Server und
+      Kanal Nachrichten, Minuten im Sprachkanal, Beitritte und Abgänge ohne Discord-IDs, gelöscht nach 90 Tagen.
+      Je Mitglied und Tag die Zahl der Nachrichten und Minuten im Sprachkanal für die Liste der aktivsten
+      Mitglieder, gelöscht nach 14 Tagen. Was in einer Nachricht stand, wird dafür nicht gespeichert.
+    </li>
+    <li>
+      <b><code>/rank</code> und Rank Roles:</b> nur wenn du dein Epic-Konto selbst mit <code>/rank link</code>
+      und deinem Epic-Namen verknüpfst. Dann speichern wir Konto-ID, Anzeigenamen und Zeitpunkt der
+      Verknüpfung, dazu Ränge, MMR, Spiele, Karriere-Werte, die Season-Reward-Stufe und deinen Ingame-Club.
+      Diese Werte sind in Rocket League öffentlich. Der Bot holt sie höchstens alle zehn Minuten neu und
+      überschreibt die alten. Die Verknüpfung trennst du mit <code>/rank unlink</code>, sobald die Sperre nach
+      dem letzten Wechsel abgelaufen ist. Die gespeicherten Werte löschen wir auf Anfrage.
+    </li>
+    <li>
+      <b>RL Team-Übersicht, Matchups und 2, 4 &amp; 6 Mans:</b> Kader mit Discord-ID, Name, Epic-Name, Rolle
+      und dem zuletzt geholten Rang. Partien mit Gegner, Liga, Termin und Ergebnis. Bei den Mans die Wertung je
+      Spieler und Server und jede Runde mit Teilnehmern, Lobbyname und Passwort.
+    </li>
+    <li>
+      <b>Clips der Woche:</b> jeder hochgeladene Clip als Kopie im Ordner des Bots, je Runde mit einer Liste: wer welchen Clip eingereicht hat (Discord-ID und Anzeigename), wie viele Stimmen er bekam und welchen Platz. Abgestimmt wird per Reaktion; der Bot merkt sich je Person, unter welchem Clip sie zuletzt reagiert hat. Gesperrte Mitglieder stehen mit Grund in einer Liste. Ob jemand nach Strafen ausgeschlossen ist, rechnet der Bot aus den Fällen der Moderation und speichert dafür nichts zusätzlich. Die öffentliche Clip-Seite eines Servers zeigt Clips, Namen und Gewinner aller Runden auch ohne Anmeldung. Die Kopien bleiben, bis das Team die Runde im Archiv löscht.
+    </li>
+    <li>
+      <b>Moderation:</b> jede Aktion als Fall mit dem betroffenen Mitglied (ID und Name), dem Moderator, Grund
+      und Dauer sowie den Notizen und Beweisen, die das Team anhängt. Im Support-Warteraum merkt sich der Bot,
+      wer seit wann wartet und wer übernommen hat, bis die Person den Warteraum verlässt.
+    </li>
+    <li>
+      <b>Auto Mod:</b> prüft neue Nachrichten gegen die Filter, die das Team eingeschaltet hat. Je nach
+      Einstellung löscht der Bot die Nachricht, verwarnt, schaltet stumm, kickt oder bannt. Geprüft wird im
+      Arbeitsspeicher; für Spam und Wiederholungen merkt sich der Bot die letzten Nachrichten eines Mitglieds
+      höchstens eine Minute lang. Jeder Eingriff erscheint mit dem entfernten Text als Meldung in einem Kanal,
+      den das Team wählt, und jede Strafe wird ein Fall wie bei der Moderation. Verwarnungen, Timeouts und
+      Banns kann das Team zurücknehmen.
+    </li>
+    <li>
+      <b>Logging System:</b> meldet die Ereignisse, die das Team auswählt, in einen Kanal auf dem Server, etwa
+      gelöschte oder bearbeitete Nachrichten mit ihrem Inhalt, Beitritte oder geänderte Rollen. Diese
+      Meldungen stehen nur in Discord, nicht in unserer Datenbank.
+    </li>
+    <li>
+      <b>Ticket System:</b> Nummer, Thema, Ersteller, Bearbeiter, Status, Notizen des Teams und wer das Ticket
+      warum geschlossen hat, dazu eine feste Kurzkennung je Mitglied (etwa U-7K3F) und für Tickets gesperrte
+      Mitglieder mit Grund. Hat der Server Transcripts eingeschaltet, legt der Bot beim Schließen den ganzen
+      Verlauf ab: Nachrichten, Anhänge als Kopie und die Namen der Beteiligten. Ein Transcript sehen nach der
+      Anmeldung nur das Team und die Beteiligten. Es bleibt, bis das Team es löscht.
+    </li>
+    <li>
+      <b>Apply System und Looking for:</b> deine Antworten mit Discord-ID und Namen, bei Bewerbungen dazu die
+      Entscheidung und wer sie getroffen hat.
+    </li>
+    <li>
+      <b>Level System:</b> je Server deine Discord-ID, deine Punkte und wann du zuletzt Punkte bekommen hast.
+      Keine Nachrichteninhalte. Schaltet ein Server seine Rangliste öffentlich, zeigt das Dashboard Platz,
+      Anzeigename, Profilbild, Level und Punkte der ersten 100 auch ohne Anmeldung.
+    </li>
+    <li>
+      <b>Giveaways und Umfragen:</b> wer teilnimmt oder abstimmt, mit Discord-ID und Auswahl. Bei Giveaways
+      dazu Lose, Gewinner und ob sie den Gewinn angenommen haben. Bei anonymen Umfragen sieht das Team nicht,
+      wer was gewählt hat.
+    </li>
+    <li>
+      <b>Temp Voice:</b> wem ein eigener Sprachkanal gehört, solange es ihn gibt, und die Vorlagen, die du dir
+      speicherst: Name, Größe, Zutritt und wem du vertraust oder wen du blockierst.
+    </li>
+    <li>
+      <b>Twitch und YouTube Notifier:</b> Name, ID und Profilbild der Kanäle, die ein Server verfolgt.
+    </li>
+    <li>
+      <b>Welcome System, Self Roles, Gallery System und Custom Message:</b> nur Einstellungen und die Bilder,
+      die das Team hochlädt. Die Willkommenskarte zeichnet der Bot mit Namen und Profilbild des neuen
+      Mitglieds. Gespeichert wird sie nicht.
+    </li>
+  </ul>
+  <p>
+    Was oben ohne Frist steht, bleibt gespeichert, bis das Team des Servers es löscht oder du uns um Löschung
+    bittest. Entfernt ein Team den Bot von seinem Server, löschen wir die Daten dieses Servers auf Anfrage
+    vollständig. Was der Bot in die Kanäle eines Servers schreibt, liegt danach bei Discord und wird vom Team
+    dieses Servers verwaltet.
+  </p>
+  <p>
+    Rechtsgrundlage ist Art. 6 Abs. 1 lit. f DSGVO: Wir und das Team des Servers haben ein berechtigtes
+    Interesse daran, die eingeschalteten Funktionen bereitzustellen. Verknüpfst du selbst ein Konto oder
+    schickst du eine Bewerbung ab, gilt Art. 6 Abs. 1 lit. b DSGVO.
+  </p>
+
+  <h2 id="dashboard"><span class="legal__num">08</span>Das Dashboard</h2>
+  <p>Im Dashboard meldest du dich mit deinem Discord-Konto an. Dabei fragt es diese Berechtigungen an:</p>
+  <table class="doc__table">
+    <thead><tr><th>Berechtigung</th><th>Wofür</th></tr></thead>
+    <tbody>
+      <tr><td><code>identify</code></td><td>Discord-ID, Name und Profilbild. Damit weiß das Dashboard, wer du bist.</td></tr>
+      <tr><td><code>guilds</code></td><td>Deine Serverliste. Daraus entsteht die Auswahl der Server.</td></tr>
+      <tr><td><code>guilds.members.read</code></td><td>Nickname, Beitrittsdatum und Rollen auf einem Server, dessen Seite du öffnest.</td></tr>
+      <tr><td><code>email</code></td><td>Deine E-Mail-Adresse. Sie steht nur in deinen Einstellungen unter „Profil“ und wird nirgends verschickt.</td></tr>
+      <tr><td><code>connections</code></td><td>Deine Verknüpfungen zu anderen Diensten. Behalten werden nur bestätigte Twitch- und YouTube-Kanäle, damit der Notifier deinen Kanal deinem Discord-Konto zuordnen kann. Alles andere wird verworfen.</td></tr>
+    </tbody>
+  </table>
+  <p>
+    Name, Profilbild, E-Mail-Adresse und Serverliste liegen nur in deiner Sitzung und sind mit dem Abmelden
+    weg. In die Datenbank schreibt die Anmeldung nur deine bestätigten Twitch- und YouTube-Kanäle. Sie werden
+    bei jeder Anmeldung abgeglichen: Entfernst du eine Verknüpfung bei Discord, verschwindet sie damit auch
+    hier. Deine Discord-ID steht außerdem in der Datenbank, wenn du eine Gruppe im Dashboard hast, eine
+    Benachrichtigung bekommst oder ein Modul sie braucht (siehe <a href="#bot">Der Discord-Bot</a>).
+  </p>
+  <p>
+    Rechtsgrundlage ist Art. 6 Abs. 1 lit. b DSGVO: Ohne diese Angaben kann dir das Dashboard nicht zeigen,
+    welche Server du verwalten darfst.
+  </p>
+
+  <h2 id="empfaenger"><span class="legal__num">09</span>Wohin Daten gehen</h2>
+  <p>
+    Wir verkaufen keine Daten und geben sie nicht für Werbung weiter. Beim Betrieb entstehen aber Verbindungen
+    zu diesen Diensten:
+  </p>
+  <ul class="doc__bullets">
+    <li>
+      <b>Discord:</b> die Anmeldung im Dashboard, alles, was der Bot auf einem Server tut, und der Hinweis
+      auf eine Nachricht über das Kontaktformular. Profilbilder, Server-Icons und Emojis lädt dein Browser im Dashboard direkt von Discords Servern; dabei sieht Discord deine IP-Adresse.
+      <a href="https://discord.com/privacy" target="_blank" rel="noopener noreferrer">Datenschutzerklärung von Discord</a>
+    </li>
+    <li>
+      <b>Rocket League API:</b> Ränge, Karriere-Werte und Club zu einem Epic-Konto. Dafür geht der Name oder
+      die Kennung des Kontos dorthin, auch bei einer Suche mit <code>/rank search</code>.
+    </li>
+    <li>
+      <b>Twitch:</b> ob ein Kanal, den ein Server verfolgt, gerade live ist.
+      <a href="https://www.twitch.tv/p/legal/privacy-notice/" target="_blank" rel="noopener noreferrer">Datenschutzerklärung von Twitch</a>
+    </li>
+    <li>
+      <b>YouTube:</b> neue Videos der Kanäle, die ein Server verfolgt.
+      <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Datenschutzerklärung von Google</a>
+    </li>
+    <li><b>Contabo:</b> der Hoster, siehe <a href="#hosting">Hosting</a>.</li>
+    <li>
+      <b>Cloudflare:</b> Aufrufe von Website, Dashboard und Statusseite laufen über das Netz der Cloudflare, Inc.
+      Cloudflare sieht dabei deine IP-Adresse und die aufgerufene Adresse, hält Überlastungen und Angriffe ab und
+      hält Dateien zwischengespeichert.
+      <a href="https://www.cloudflare.com/privacypolicy/" target="_blank" rel="noopener noreferrer">Datenschutzerklärung von Cloudflare</a>
+    </li>
+  </ul>
+  <p>
+    Discord, Twitch, Google und Cloudflare verarbeiten Daten auch in den USA. Welche Garantien sie dafür nutzen, etwa das
+    EU-US Data Privacy Framework oder Standardvertragsklauseln der EU-Kommission, steht in ihren
+    Datenschutzerklärungen.
+  </p>
+
+  <h2 id="rechte"><span class="legal__num">10</span>Deine Rechte</h2>
+  <p>
+    Du hast das Recht auf Auskunft über deine Daten (Art. 15 DSGVO), auf Berichtigung (Art. 16), Löschung
+    (Art. 17), Einschränkung der Verarbeitung (Art. 18) und Datenübertragbarkeit (Art. 20).
+  </p>
+  <p>
+    <b>Widerspruch:</b> Stützt sich eine Verarbeitung auf Art. 6 Abs. 1 lit. f DSGVO, kannst du ihr aus Gründen
+    widersprechen, die sich aus deiner besonderen Situation ergeben (Art. 21 DSGVO). Wir verarbeiten die Daten
+    dann nicht weiter, es sei denn, es gibt zwingende schutzwürdige Gründe, die deine Interessen überwiegen,
+    oder wir brauchen sie, um Rechtsansprüche geltend zu machen, auszuüben oder zu verteidigen.
+  </p>
+  <p>
+    Schreib dafür an <a href="mailto:support@nexus-emb.de">support@nexus-emb.de</a> oder melde dich im
+    <a href="https://discord.gg/CjG2HFGw95" target="_blank" rel="noopener noreferrer">Support-Server</a>. Nenn uns
+    dabei deine Discord-ID, damit wir die richtigen Daten finden.
+  </p>
+  <p>
+    Außerdem kannst du dich bei einer Datenschutz-Aufsichtsbehörde beschweren (Art. 77 DSGVO). Für uns
+    zuständig ist das Unabhängige Landeszentrum für Datenschutz Schleswig-Holstein, Holstenstraße 98, 24103 Kiel.
+  </p>
+
+  <h2 id="aenderungen"><span class="legal__num">11</span>Änderungen</h2>
+  <p>
+    Kommt ein Modul hinzu oder ändert sich, was der Bot speichert, passen wir diese Erklärung an. Es gilt die
+    Fassung, die hier steht.
+  </p>
+
+  <p class="legal__updated">Stand: 11. Oktober 2026</p>
+    </div>
+  </div>
+</main>
+
+<div class="toasts" id="toasts"></div>
+
+<script type="module" src="__BASE__/assets/app.js"></script>
+</body>
+</html>

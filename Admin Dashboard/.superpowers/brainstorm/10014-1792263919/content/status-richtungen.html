@@ -1,0 +1,212 @@
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@400;600;700&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  .rl { --base:#050608; --panel:#080d12; --solid:#0a0f15; --line:rgb(255 255 255 / 8%); --strong:rgb(255 255 255 / 14%);
+        --red:#ff1e2d; --win:#35e07f; --loss:#ff4d5e; --warn:#ffc53d; --blue:#00afff; --text:#f2f4f7; --dim:#a8b0bc; --faint:#7b8693; --gap:#8b95a3;
+        background:var(--base); color:var(--text); font-family:Oxanium,"Segoe UI",sans-serif; font-size:13px; line-height:1.45; padding:22px; border-radius:6px; }
+  .rl h1 { font-size:24px; margin:0 0 2px; font-weight:700; }
+  .rl .sub { color:var(--dim); font-size:12.5px; margin:0 0 16px; }
+  .rl .lbl { font-family:Rajdhani,sans-serif; font-weight:700; letter-spacing:.16em; text-transform:uppercase; font-size:11px; color:var(--dim); }
+  .rl .panel { background:var(--panel); border:1px solid var(--line); padding:12px 14px; clip-path:polygon(0 0,calc(100% - 12px) 0,100% 12px,100% 100%,0 100%); }
+  .rl .grid { display:grid; gap:10px; }
+  .rl .kpi b { display:block; font-size:20px; font-weight:700; margin-top:2px; }
+  .rl .kpi span { color:var(--dim); font-size:12px; }
+  .rl .good { color:var(--win); } .rl .bad { color:var(--loss); } .rl .meh { color:var(--warn); }
+  .rl .pill { font-family:Rajdhani,sans-serif; font-weight:700; letter-spacing:.14em; font-size:11px; padding:2px 8px; border:1px solid currentColor; text-transform:uppercase; white-space:nowrap; }
+  .rl .row { display:flex; align-items:center; gap:10px; }
+  .rl .grow { flex:1; min-width:0; }
+  .rl table { width:100%; border-collapse:collapse; font-size:12px; }
+  .rl td, .rl th { padding:4px 6px; border-bottom:1px solid var(--line); text-align:left; white-space:nowrap; }
+  .rl th { font-family:Rajdhani,sans-serif; letter-spacing:.12em; text-transform:uppercase; color:var(--faint); font-size:11px; font-weight:700; }
+  .rl .seg { display:inline-flex; border:1px solid var(--strong); }
+  .rl .seg span { padding:3px 10px; font-family:Rajdhani,sans-serif; font-weight:700; font-size:11px; letter-spacing:.1em; color:var(--dim); }
+  .rl .seg span.on { background:var(--red); color:#fff; }
+  .rl .tabs { display:flex; gap:6px; margin-bottom:10px; }
+  .rl .tab { padding:8px 14px; border:1px solid var(--line); background:var(--panel); font-weight:600; }
+  .rl .tab.on { border-color:var(--red); box-shadow:inset 0 -2px 0 var(--red); }
+  .rl .tab small { display:block; color:var(--dim); font-weight:400; font-size:11.5px; }
+  .rl .legend { display:flex; gap:14px; flex-wrap:wrap; font-size:11.5px; color:var(--dim); margin-top:6px; }
+  .rl .legend i { display:inline-block; width:14px; height:8px; margin-right:5px; vertical-align:0; }
+  .rl .feed div { padding:5px 0; border-bottom:1px solid var(--line); font-size:12px; }
+  .rl .feed time { color:var(--faint); margin-right:8px; font-variant-numeric:tabular-nums; }
+  .rl svg { display:block; width:100%; }
+  .full { grid-template-columns:1fr !important; }
+  .note { font-size:13px; margin-top:6px; }
+</style>
+
+<h2>Admin → Status: drei Richtungen</h2>
+<p class="subtitle">Alles in den Entwürfen gibt es heute schon in den Daten: Prüfung alle zwei Minuten mit Zustand und Antwortzeit (90 Tage), Ausfälle, Meldungen, Bot- und Datenbank-Werte. Neu ist nur, dass Lücken erkannt werden. Die Werte hier sind Beispiele. Klick an, was dir am nächsten kommt, und schreib im Chat, was du übernehmen oder streichen würdest.</p>
+
+<div class="section">
+  <p class="label">Der Graph ohne Lücken, in allen drei Richtungen gleich</p>
+  <div class="rl"><div class="panel">
+    <div class="row"><span class="lbl grow">Bot · Antwortzeit 24 Std. · alle 2 Minuten</span><span class="seg"><span class="on">24 Std.</span><span>7 Tage</span><span>30 Tage</span></span></div>
+    <svg id="g-demo" viewBox="0 0 900 170" style="margin-top:8px"></svg>
+    <div class="legend"><span><i style="background:var(--win)"></i>gemessen</span><span><i style="background:var(--warn)"></i>langsam</span><span><i style="background:rgb(255 77 94 / 45%)"></i>keine Antwort (Ausfall)</span><span><i style="background:repeating-linear-gradient(45deg,#5b6470 0 3px,transparent 3px 6px)"></i>nicht gemessen</span></div>
+  </div></div>
+  <p class="subtitle note">Heute reißt die Linie ab, wenn eine Stunde ohne Wert ist. Neu läuft sie durch: Wo nicht gemessen wurde, liegt ein graues, schraffiertes Feld mit gestrichelter Verbindung, ein Ausfall ist ein rotes Feld. Fährt man mit der Maus drüber, steht dort z. B. „03:12–05:40 nicht gemessen“. Dasselbe kommt auf status.nexus-emb.de.</p>
+</div>
+
+<div class="cards full" style="margin-top:22px">
+
+  <div class="card" data-choice="leitstand" onclick="toggleSelect(this)">
+    <div class="card-image"><div class="rl">
+      <div class="row"><div class="grow"><h1>Status</h1><p class="sub">Geprüft vor 38 Sek., nächste Prüfung in 1:22 · 2.871 Prüfungen in 24 Std.</p></div><span class="pill" style="color:var(--dim)">→ Statusseite</span><span class="pill" style="color:#fff;background:var(--red);border-color:var(--red)">+ Neue Meldung</span></div>
+      <div class="grid" style="grid-template-columns:repeat(6,1fr)">
+        <div class="panel kpi"><span class="lbl">Verfügbar 24 Std.</span><b class="good">99,31 %</b><span>7 T. 98,9 · 30 T. 94,8</span></div>
+        <div class="panel kpi"><span class="lbl">Ausfälle 30 T.</span><b>4</b><span>zusammen 3 Std. 12 Min.</span></div>
+        <div class="panel kpi"><span class="lbl">Nicht gemessen</span><b class="meh">2 Std. 28</b><span>in 24 Std.</span></div>
+        <div class="panel kpi"><span class="lbl">Ø Antwortzeit</span><b>41 ms</b><span>alle Dienste, 24 Std.</span></div>
+        <div class="panel kpi"><span class="lbl">Offene Meldungen</span><b>0</b><span>letzte vor 6 Tagen</span></div>
+        <div class="panel kpi"><span class="lbl">Discord-Meldung</span><b class="good" style="font-size:16px">aktuell</b><span>aktualisiert 20:36</span></div>
+      </div>
+      <div class="grid" style="margin-top:10px">
+        <div class="panel">
+          <div class="row"><span class="pill good">Läuft</span><b style="font-size:16px">Bot</b><span class="grow" style="color:var(--dim)">jetzt 113 ms · Median 108 · 95 % unter 160 · Spitze 412</span><span class="lbl">24 Std. · 7 T. · 30 T. · 90 T.:&nbsp;</span><span>99,3 · 98,9 · 93,1 · 89,8 %</span></div>
+          <svg class="g-big" data-base="110" data-spread="40" viewBox="0 0 900 120" style="margin-top:8px"></svg>
+        </div>
+        <div class="panel"><div class="row"><span class="pill good">Läuft</span><b style="font-size:16px">Bot-Dashboard</b><span class="grow" style="color:var(--dim)">jetzt 9 ms · Median 11 · 95 % unter 22 · Spitze 140</span><span>99,3 · 98,9 · 93,1 · 89,8 %</span><span class="lbl">▾ Graph</span></div></div>
+        <div class="panel"><div class="row"><span class="pill good">Läuft</span><b style="font-size:16px">Webseite</b><span class="grow" style="color:var(--dim)">jetzt 20 ms · Median 19 · 95 % unter 31 · gebaut 16.10. 20:36 · Banner aus</span><span>100 · 100 · 99,8 · 99,7 %</span><span class="lbl">▾ Graph</span></div></div>
+        <div class="panel"><div class="row"><span class="pill good">Läuft</span><b style="font-size:16px">Datenbank</b><span class="grow" style="color:var(--dim)">jetzt 6 ms · Median 7 · MariaDB 11.4 · 38 Tabellen · 41 MB</span><span>100 · 100 · 100 · 100 %</span><span class="lbl">▾ Graph</span></div></div>
+      </div>
+      <div class="grid" style="grid-template-columns:1.1fr 1fr 1fr;margin-top:10px">
+        <div class="panel"><p class="lbl" style="margin:0 0 6px">Ausfälle</p><table><tr><th>Beginn</th><th>Dienst</th><th>Dauer</th><th></th></tr>
+          <tr><td>11.10. 14:02</td><td>Bot, Dashboard</td><td>18 Min.</td><td class="bad">Meldung #12</td></tr>
+          <tr><td>09.10. 03:40</td><td>Webseite</td><td>4 Min.</td><td style="color:var(--faint)">ohne Meldung</td></tr>
+          <tr><td>02.10. 22:10</td><td>Bot</td><td>2 Std. 46</td><td class="bad">Meldung #11</td></tr></table></div>
+        <div class="panel"><p class="lbl" style="margin:0 0 6px">Letzte Prüfungen</p><table><tr><th>Zeit</th><th>Bot</th><th>Dash.</th><th>Web</th><th>DB</th></tr>
+          <tr><td>20:38</td><td>113</td><td>9</td><td>20</td><td>6</td></tr><tr><td>20:36</td><td>109</td><td>12</td><td>22</td><td>7</td></tr>
+          <tr><td>20:34</td><td class="meh">1.640</td><td>10</td><td>19</td><td>6</td></tr><tr><td>20:32</td><td class="bad">—</td><td class="bad">—</td><td>21</td><td>6</td></tr></table></div>
+        <div class="panel"><p class="lbl" style="margin:0 0 6px">Technik</p><table>
+          <tr><td style="color:var(--dim)">Bot läuft seit</td><td>3 Tg. 4 Std.</td></tr><tr><td style="color:var(--dim)">Speicher</td><td>212 MB (Heap 96)</td></tr>
+          <tr><td style="color:var(--dim)">Server · Mitglieder</td><td>27 · 4.812</td></tr><tr><td style="color:var(--dim)">Versionen</td><td>Node 24.15 · d.js 14.22</td></tr>
+          <tr><td style="color:var(--dim)">MariaDB läuft seit</td><td>12 Tagen</td></tr></table></div>
+      </div>
+    </div></div>
+    <div class="card-body"><h3>A · Leitstand</h3><p>Alles auf einer Seite: Kennzahlen oben, jeder Dienst eine Zeile mit Median, 95-%-Wert und Verfügbarkeit über vier Zeiträume, ein Graph aufklappbar. Darunter Ausfälle, das Messprotokoll und die Technik-Werte. Die Meldungen (Offen, Vergangen) kommen wie heute ans Ende.</p></div>
+  </div>
+
+  <div class="card" data-choice="fokus" onclick="toggleSelect(this)">
+    <div class="card-image"><div class="rl">
+      <div class="row"><div class="grow"><h1>Status</h1><p class="sub">Geprüft vor 38 Sek. · nächste in 1:22</p></div><span class="pill" style="color:#fff;background:var(--red);border-color:var(--red)">+ Neue Meldung</span></div>
+      <div class="tabs"><div class="tab on"><span class="good">●</span> Bot<small>113 ms · 93,1 %</small></div><div class="tab"><span class="good">●</span> Bot-Dashboard<small>9 ms · 93,1 %</small></div><div class="tab"><span class="good">●</span> Webseite<small>20 ms · 99,8 %</small></div><div class="tab"><span class="good">●</span> Datenbank<small>6 ms · 100 %</small></div></div>
+      <div class="grid" style="grid-template-columns:3fr 1fr">
+        <div class="panel"><div class="row"><span class="lbl grow">Antwortzeit</span><span class="seg"><span>24 Std.</span><span class="on">7 Tage</span><span>30 Tage</span></span></div>
+          <svg class="g-big" data-base="110" data-spread="45" data-seed="3" viewBox="0 0 900 150" style="margin-top:8px"></svg></div>
+        <div class="panel"><p class="lbl" style="margin:0 0 6px">7 Tage</p><table>
+          <tr><td style="color:var(--dim)">Verfügbar</td><td class="good">98,9 %</td></tr><tr><td style="color:var(--dim)">Median</td><td>108 ms</td></tr>
+          <tr><td style="color:var(--dim)">95 % unter</td><td>160 ms</td></tr><tr><td style="color:var(--dim)">Spitze</td><td>1.640 ms</td></tr>
+          <tr><td style="color:var(--dim)">Langsam</td><td class="meh">14 Prüfungen</td></tr><tr><td style="color:var(--dim)">Ausfälle</td><td class="bad">1 · 18 Min.</td></tr>
+          <tr><td style="color:var(--dim)">Nicht gemessen</td><td style="color:var(--gap)">5 Std. 10</td></tr></table></div>
+      </div>
+      <div class="panel" style="margin-top:10px"><div class="row"><span class="lbl grow">90 Tage × 24 Stunden</span><span style="color:var(--faint);font-size:11.5px">jede Zelle eine Stunde · grau: nicht gemessen</span></div>
+        <svg id="heat" viewBox="0 0 900 120" style="margin-top:8px"></svg></div>
+      <div class="grid" style="grid-template-columns:1fr 1fr;margin-top:10px">
+        <div class="panel"><p class="lbl" style="margin:0 0 6px">Ausfälle des Bots</p><table><tr><th>Beginn</th><th>Ende</th><th>Dauer</th><th>Meldung</th></tr>
+          <tr><td>11.10. 14:02</td><td>14:20</td><td>18 Min.</td><td class="bad">#12</td></tr><tr><td>02.10. 22:10</td><td>03.10. 00:56</td><td>2 Std. 46</td><td class="bad">#11</td></tr></table></div>
+        <div class="panel"><p class="lbl" style="margin:0 0 6px">Bot gerade</p><table><tr><td style="color:var(--dim)">Läuft seit</td><td>3 Tg. 4 Std.</td></tr><tr><td style="color:var(--dim)">Speicher</td><td>212 MB</td></tr><tr><td style="color:var(--dim)">Server</td><td>27</td></tr><tr><td style="color:var(--dim)">Versionen</td><td>App 2.4.1 · Node 24.15</td></tr></table></div>
+      </div>
+    </div></div>
+    <div class="card-body"><h3>B · Ein Dienst im Fokus</h3><p>Oben vier Reiter mit dem Wichtigsten je Dienst, darunter nur der gewählte, dafür tief: großer Graph mit Zeitraum, Zahlen daneben, eine Wärmekarte über 90 Tage mal 24 Stunden (zeigt sofort, ob Ausfälle immer nachts kommen) und die Ausfälle dieses Dienstes.</p></div>
+  </div>
+
+  <div class="card" data-choice="zeitstrahl" onclick="toggleSelect(this)">
+    <div class="card-image"><div class="rl">
+      <div class="row"><div class="grow"><h1>Status</h1><p class="sub">Was wann passiert ist · geprüft vor 38 Sek.</p></div><span class="seg"><span class="on">24 Std.</span><span>7 Tage</span><span>30 Tage</span></span></div>
+      <div class="panel"><svg id="lanes" viewBox="0 0 900 150" style=""></svg>
+        <div class="legend"><span><i style="background:var(--win)"></i>läuft</span><span><i style="background:var(--warn)"></i>langsam</span><span><i style="background:var(--loss)"></i>Ausfall</span><span><i style="background:repeating-linear-gradient(45deg,#5b6470 0 3px,transparent 3px 6px)"></i>nicht gemessen</span></div></div>
+      <div class="grid" style="grid-template-columns:2fr 1fr;margin-top:10px">
+        <div class="panel"><div class="row"><span class="lbl grow">Antwortzeit aller Dienste</span><span style="font-size:11.5px"><span class="good">━ Bot</span> &nbsp;<span style="color:var(--blue)">━ Dashboard</span> &nbsp;<span style="color:#b06bff">┅ Webseite</span> &nbsp;<span style="color:var(--warn)">┉ Datenbank</span></span></div>
+          <svg id="multi" viewBox="0 0 900 130" style="margin-top:8px"></svg></div>
+        <div class="panel feed"><p class="lbl" style="margin:0 0 4px">Ereignisse</p>
+          <div><time>20:34</time><span class="meh">Bot langsam</span> · 1.640 ms</div>
+          <div><time>20:32</time><span class="bad">Bot, Dashboard antworten nicht</span> · 4 Min.</div>
+          <div><time>14:10</time>Meldung #12 gelöst · Joe</div>
+          <div><time>05:40</time><span style="color:var(--gap)">Messung läuft wieder</span> · 2 Std. 28 Lücke</div>
+          <div><time>03:12</time><span style="color:var(--gap)">Keine Messung mehr</span></div>
+          <div><time>gestern</time>Webseite neu gebaut</div></div>
+      </div>
+      <div class="grid" style="grid-template-columns:repeat(4,1fr);margin-top:10px">
+        <div class="panel kpi"><span class="lbl">Bot</span><b>113 ms</b><span>99,3 % · Median 108</span></div>
+        <div class="panel kpi"><span class="lbl">Bot-Dashboard</span><b>9 ms</b><span>99,3 % · Median 11</span></div>
+        <div class="panel kpi"><span class="lbl">Webseite</span><b>20 ms</b><span>100 % · Median 19</span></div>
+        <div class="panel kpi"><span class="lbl">Datenbank</span><b>6 ms</b><span>100 % · Median 7</span></div>
+      </div>
+    </div></div>
+    <div class="card-body"><h3>C · Zeitstrahl</h3><p>Alle vier Dienste als Bahnen untereinander auf derselben Zeitachse: Man sieht sofort, ob Bot und Dashboard gleichzeitig weg waren. Daneben ein Ereignis-Verlauf in Worten (Ausfall, langsam, Messlücke, Meldungen, Neubau der Webseite). Die Zahlen je Dienst stehen kleiner darunter.</p></div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const NS = "http://www.w3.org/2000/svg";
+  const el = (svg, tag, attrs) => { const n = document.createElementNS(NS, tag); for (const k in attrs) n.setAttribute(k, attrs[k]); svg.appendChild(n); return n; };
+  const rand = (seed) => () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
+  const W = 900, N = 720;
+  // Ein Tag in 2-Minuten-Schritten: Lücke 03:12–05:40, Ausfall 14:02–14:20, langsam um 20:34.
+  const gap = [96, 170], down = [421, 430];
+  function hatch(svg, id) {
+    const defs = el(svg, "defs", {}); const p = el(defs, "pattern", { id, width: 6, height: 6, patternUnits: "userSpaceOnUse", patternTransform: "rotate(45)" });
+    el(p, "rect", { width: 3, height: 6, fill: "#5b6470" });
+  }
+  function series(base, spread, seed) {
+    const r = rand(seed); return Array.from({ length: N }, (_, i) => {
+      if (i >= gap[0] && i < gap[1]) return { v: null, s: "gap" };
+      if (i >= down[0] && i < down[1]) return { v: null, s: "down" };
+      if (i === 617 || i === 618) return { v: base * 9, s: "warn" };
+      return { v: base + (r() - .5) * spread + Math.sin(i / 60) * spread * .3, s: "ok" };
+    });
+  }
+  function chart(svg, base, spread, seed) {
+    const H = +svg.viewBox.baseVal.height, id = "h" + Math.random().toString(36).slice(2);
+    hatch(svg, id);
+    const data = series(base, spread, seed), max = base * 3, x = (i) => i / (N - 1) * W, y = (v) => H - 8 - Math.min(v, max) / max * (H - 18);
+    for (let t = 0; t <= 4; t++) el(svg, "line", { x1: 0, x2: W, y1: 6 + t * (H - 14) / 4, y2: 6 + t * (H - 14) / 4, stroke: "rgb(255 255 255 / 6%)" });
+    el(svg, "rect", { x: x(gap[0]), y: 0, width: x(gap[1]) - x(gap[0]), height: H, fill: `url(#${id})`, opacity: .45 });
+    el(svg, "rect", { x: x(down[0]), y: 0, width: Math.max(4, x(down[1]) - x(down[0])), height: H, fill: "rgb(255 77 94 / 35%)" });
+    let d = "", last = null;
+    data.forEach((p, i) => { if (p.v === null) return; d += (d ? "L" : "M") + x(i).toFixed(1) + " " + y(p.v).toFixed(1); });
+    // Durchgehende Linie über die Lücke: gestrichelt grau, über den Ausfall: rot am Boden.
+    const pre = data[gap[0] - 1].v, post = data[gap[1]].v;
+    el(svg, "path", { d: `M${x(gap[0] - 1)} ${y(pre)} L${x(gap[1])} ${y(post)}`, stroke: "#8b95a3", "stroke-width": 1.5, "stroke-dasharray": "5 4", fill: "none" });
+    let path = ""; data.forEach((p, i) => { if (p.v === null) { last = null; return; } path += (last === null ? "M" : "L") + x(i).toFixed(1) + " " + y(p.v).toFixed(1); last = i; });
+    el(svg, "path", { d: path, stroke: "#35e07f", "stroke-width": 1.6, fill: "none", "vector-effect": "non-scaling-stroke" });
+    el(svg, "path", { d: `M${x(down[0] - 1)} ${y(data[down[0] - 1].v)} L${x(down[0])} ${H - 3} L${x(down[1])} ${H - 3} L${x(down[1])} ${y(data[down[1]].v)}`, stroke: "#ff4d5e", "stroke-width": 2, fill: "none" });
+    el(svg, "circle", { cx: x(617), cy: y(base * 9), r: 3.5, fill: "#ffc53d" });
+    const label = (xx, text, color) => { const t = el(svg, "text", { x: xx, y: 14, fill: color, "font-size": 11, "font-family": "Rajdhani", "font-weight": 700 }); t.textContent = text; };
+    label(x(gap[0]) + 6, "03:12–05:40 nicht gemessen", "#a8b0bc"); label(x(down[1]) + 6, "14:02 Ausfall 18 Min.", "#ff4d5e");
+    ["00:00", "06:00", "12:00", "18:00", "jetzt"].forEach((t, k) => { const n = el(svg, "text", { x: k * W / 4 + (k === 4 ? -26 : 2), y: H - 0.5, fill: "#7b8693", "font-size": 11, "font-family": "Oxanium" }); n.textContent = t; });
+  }
+  chart(document.getElementById("g-demo"), 110, 40, 7);
+  document.querySelectorAll(".g-big").forEach((svg) => chart(svg, +svg.dataset.base, +svg.dataset.spread, +(svg.dataset.seed || 5)));
+
+  // Wärmekarte: 90 Spalten (Tage) × 24 Zeilen (Stunden).
+  const heat = document.getElementById("heat"), r = rand(11), cw = W / 90, ch = 120 / 24;
+  for (let d = 0; d < 90; d++) for (let h = 0; h < 24; h++) {
+    let c = "#1d6b43"; const v = r();
+    if (d < 82) c = "#20262e"; else if (v > .97) c = "#ff4d5e"; else if (v > .93) c = "#ffc53d"; else if (v > .5) c = "#35e07f";
+    if (d === 88 && h >= 3 && h <= 5) c = "#3a414b";
+    el(heat, "rect", { x: d * cw + .5, y: h * ch + .5, width: cw - 1, height: ch - 1, fill: c });
+  }
+
+  // Bahnen: je Dienst ein Streifen mit Zuständen.
+  const lanes = document.getElementById("lanes"); hatch(lanes, "hl");
+  ["Bot", "Bot-Dashboard", "Webseite", "Datenbank"].forEach((name, k) => {
+    const y0 = 8 + k * 35; const t = el(lanes, "text", { x: 0, y: y0 + 17, fill: "#a8b0bc", "font-size": 11, "font-family": "Rajdhani", "font-weight": 700 }); t.textContent = name.toUpperCase();
+    const x0 = 120, w = W - x0, seg = (a, b, fill) => el(lanes, "rect", { x: x0 + a / N * w, y: y0, width: Math.max(2, (b - a) / N * w), height: 24, fill });
+    seg(0, N, "#1f8a50"); seg(gap[0], gap[1], "url(#hl)");
+    if (k < 2) { seg(down[0], down[1], "#ff4d5e"); seg(611, 613, "#ff4d5e"); }
+    if (k === 0) seg(617, 619, "#ffc53d");
+    if (k === 2) seg(300, 302, "#ff4d5e");
+  });
+
+  // Alle Antwortzeiten in einem Graph, logarithmisch, damit 6 ms und 110 ms nebeneinander lesbar bleiben.
+  const multi = document.getElementById("multi"); hatch(multi, "hm");
+  const H = 130, xs = (i) => i / (N - 1) * W, ys = (v) => H - 6 - Math.log10(Math.max(v, 1)) / Math.log10(2000) * (H - 12);
+  el(multi, "rect", { x: xs(gap[0]), y: 0, width: xs(gap[1]) - xs(gap[0]), height: H, fill: "url(#hm)", opacity: .4 });
+  [[110, 40, "#35e07f", ""], [10, 5, "#00afff", ""], [20, 6, "#b06bff", "6 3"], [6, 2, "#ffc53d", "2 3"]].forEach(([b, s, color, dash], k) => {
+    let p = "", last = null; series(b, s, 20 + k).forEach((pt, i) => { if (pt.v === null) { last = null; return; } p += (last === null ? "M" : "L") + xs(i).toFixed(1) + " " + ys(pt.v).toFixed(1); last = i; });
+    el(multi, "path", { d: p, stroke: color, "stroke-width": 1.4, fill: "none", "stroke-dasharray": dash });
+  });
+})();
+</script>

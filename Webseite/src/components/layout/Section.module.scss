@@ -1,0 +1,25 @@
+@use "mixins" as *;
+
+.section {
+    padding-block: clamp(56px, 7vw, 100px);
+
+    /* Der Zielzustand steht hier, das Umschalten macht der Beobachter über
+       `data-revealed`. Wer Bewegung abbestellt hat, bekommt das Attribut
+       sofort gesetzt - deshalb genügt hier eine Bedingung. */
+    @include motion {
+        transform: translateY(18px);
+        transition:
+            opacity var(--t-slow),
+            transform var(--t-slow);
+        opacity: 0;
+
+        &[data-revealed="true"] {
+            transform: none;
+            opacity: 1;
+        }
+    }
+}
+
+.flush {
+    padding-top: 0;
+}

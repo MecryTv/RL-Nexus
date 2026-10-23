@@ -1,0 +1,143 @@
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@500;600;700&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  .cw { font-family: Oxanium, "Segoe UI", sans-serif; background: #050608; color: #f2f4f7; border: 1px solid rgb(255 255 255 / 14%); }
+  .cw-title { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-bottom: 1px solid rgb(255 255 255 / 8%); font-weight: 700; font-size: 15px; }
+  .cw-title .x { margin-left: auto; color: #7b8693; font-size: 16px; }
+  .cw-seg { display: inline-flex; border: 1px solid rgb(255 255 255 / 14%); font: 700 11px Rajdhani, sans-serif; letter-spacing: .1em; text-transform: uppercase; }
+  .cw-seg i { font-style: normal; padding: 5px 10px; color: #a8b0bc; }
+  .cw-seg i.on { background: rgb(255 30 45 / 16%); color: #f2f4f7; box-shadow: inset 0 -2px 0 #ff1e2d; }
+  .cw-field { display: grid; grid-template-columns: 64px 1fr; align-items: center; border-bottom: 1px solid rgb(255 255 255 / 8%); font-size: 13px; }
+  .cw-field label { padding: 8px 12px; color: #7b8693; font: 600 12px Rajdhani, sans-serif; letter-spacing: .08em; text-transform: uppercase; }
+  .cw-field div { padding: 8px 12px 8px 0; }
+  .cw-tools { display: flex; gap: 4px; padding: 6px 10px; border-bottom: 1px solid rgb(255 255 255 / 8%); color: #a8b0bc; font-size: 12px; flex-wrap: wrap; }
+  .cw-tools b { display: inline-grid; place-items: center; min-width: 24px; height: 24px; border: 1px solid rgb(255 255 255 / 8%); font-weight: 600; }
+  .cw-edit { padding: 14px; font-family: Arial, sans-serif; font-size: 14px; line-height: 1.6; color: #d9dde3; }
+  .cw-caret { display: inline-block; width: 2px; height: 16px; background: #00afff; vertical-align: -3px; animation: blink 1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+  .cw-quote { display: flex; align-items: center; gap: 10px; margin: 0 14px 14px; padding: 8px 10px; border: 1px solid rgb(255 255 255 / 10%); background: #0a0f15; color: #a8b0bc; font-size: 12px; }
+  .cw-quote b { display: inline-grid; place-items: center; min-width: 30px; height: 18px; border: 1px solid rgb(255 255 255 / 14%); color: #f2f4f7; letter-spacing: 1px; }
+  .cw-files { display: flex; gap: 8px; flex-wrap: wrap; padding: 0 14px 12px; }
+  .cw-file { display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px; border: 1px solid rgb(255 255 255 / 14%); font-size: 12px; color: #d9dde3; }
+  .cw-file .box { width: 14px; height: 14px; border: 1px solid #00afff; background: #00afff; display: grid; place-items: center; color: #050608; font-size: 10px; font-weight: 700; }
+  .cw-file small { color: #7b8693; }
+  .cw-foot { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-top: 1px solid rgb(255 255 255 / 8%); font-size: 12px; color: #7b8693; }
+  .cw-send { margin-left: auto; padding: 8px 16px; background: linear-gradient(135deg, #ff1e2d, #d81424); color: #fff; font: 700 12px Rajdhani, sans-serif; letter-spacing: .14em; text-transform: uppercase; clip-path: polygon(0 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%); }
+  .cw-ghost { padding: 7px 12px; border: 1px solid rgb(255 255 255 / 14%); color: #d9dde3; font: 700 11px Rajdhani, sans-serif; letter-spacing: .12em; text-transform: uppercase; }
+  .cw-split { display: grid; grid-template-columns: 1fr 1fr; }
+  .cw-split > div + div { border-left: 1px solid rgb(255 255 255 / 8%); background: #020304; }
+  .cw-plabel { padding: 8px 12px; color: #7b8693; font: 600 11px Rajdhani, sans-serif; letter-spacing: .12em; text-transform: uppercase; border-bottom: 1px solid rgb(255 255 255 / 8%); }
+
+  .tm { margin: 12px auto; max-width: 380px; border: 1px solid #1d232b; background: #050608; font-family: Arial, sans-serif; }
+  .tm-head { display: flex; align-items: center; gap: 10px; padding: 12px 14px 10px; background: #0a0f15 radial-gradient(120% 140% at 0% 0%, rgba(255,30,45,.26), rgba(255,30,45,0) 55%); }
+  .tm-head img { width: 28px; height: 28px; display: block; }
+  .tm-brand { font: 700 14px Oxanium, sans-serif; letter-spacing: 2px; line-height: 1; }
+  .tm-brand em { font-style: normal; color: #ff1e2d; }
+  .tm-label { margin-top: 3px; font: 700 8px Rajdhani, sans-serif; letter-spacing: 3px; color: #a8b0bc; text-transform: uppercase; }
+  .tm-line { height: 3px; background: linear-gradient(90deg, #ff1e2d, #d81424 55%, rgba(255,30,45,0)); }
+  .tm-body { padding: 10px 14px 4px; font-size: 11px; line-height: 1.6; color: #d9dde3; }
+  .tm-body p { margin: 0 0 6px; }
+  .tm-q { margin: 6px 0 8px; padding: 6px 10px; border-left: 3px solid #2b333d; background: #0a0f15; color: #a8b0bc; font-size: 10px; }
+  .tm-sig { display: flex; align-items: center; gap: 8px; margin: 0 14px; padding: 8px 0 10px; border-top: 1px solid #1d232b; font-size: 10px; color: #7b8693; }
+  .tm-av { width: 24px; height: 24px; border-radius: 50%; border: 2px solid #b06bff; background: #1a212b; display: grid; place-items: center; font-size: 8px; font-weight: 700; color: #a8b0bc; }
+  .tm-sig strong { color: #fff; font-size: 11px; }
+
+  .rd { font-family: Oxanium, "Segoe UI", sans-serif; background: #050608; color: #f2f4f7; border: 1px solid rgb(255 255 255 / 14%); padding: 14px; }
+  .rd h4 { margin: 0 0 8px; font-size: 16px; }
+  .rd-from { display: flex; gap: 10px; align-items: center; font-size: 12px; color: #a8b0bc; margin-bottom: 10px; }
+  .rd-av { width: 30px; height: 30px; border-radius: 50%; background: #1a212b; display: grid; place-items: center; font-weight: 700; color: #f2f4f7; font-size: 11px; }
+  .rd-mail { background: #fff; color: #1d232b; font-family: Arial, sans-serif; font-size: 12px; line-height: 1.5; padding: 12px; margin-bottom: 12px; }
+  .rd-quick { border: 1px solid rgb(255 255 255 / 14%); background: #0a0f15; }
+  .rd-quick .t { padding: 10px 12px; font-family: Arial, sans-serif; font-size: 13px; color: #d9dde3; min-height: 60px; }
+  .rd-quick .f { display: flex; gap: 8px; align-items: center; padding: 8px 10px; border-top: 1px solid rgb(255 255 255 / 8%); font-size: 11px; color: #7b8693; }
+
+  .wrap { display: grid; gap: 22px; }
+  .wrap .option { flex-direction: column; align-items: stretch; }
+  .note { font-size: 13px; line-height: 1.5; margin-top: 10px; }
+  .always { margin-top: 26px; }
+  .always ul { margin: 8px 0 0 18px; line-height: 1.7; font-size: 14px; }
+</style>
+
+<h2>Frage 4: Wie soll Antworten und Weiterleiten aussehen?</h2>
+<p class="subtitle">Beispiel: Antwort auf die Mail von Vexa Esports mit einem PDF im Anhang. Die Vorschau rechts ist die aus Frage 3.</p>
+
+<div class="options wrap">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="cw">
+      <div class="cw-title">Antworten <span class="cw-seg"><i class="on">Antworten</i><i>Allen antworten</i><i>Weiterleiten</i></span><span class="x">✕</span></div>
+      <div class="cw-split">
+        <div>
+          <div class="cw-field"><label>Von</label><div>Nexus EMB Support · support@nexus-emb.de</div></div>
+          <div class="cw-field"><label>An</label><div>Vexa Esports &lt;orga@vexa.gg&gt;</div></div>
+          <div class="cw-field"><label>Betreff</label><div>Re: Partnerschaft für Season 12</div></div>
+          <div class="cw-tools"><b>B</b><b><i>I</i></b><b><u>U</u></b><b>H</b><b>•</b><b>❝</b><b>🔗</b><b>▭</b><b>📎</b></div>
+          <div class="cw-edit">Hallo Vexa-Team,<br><br>klingt gut! Passt euch Donnerstag um 19 Uhr?<span class="cw-caret"></span></div>
+          <div class="cw-quote"><b>···</b>Ursprüngliche Mail von Vexa Esports, 9. Okt., 14:02, wird unten angehängt</div>
+        </div>
+        <div>
+          <div class="cw-plabel">Vorschau · so kommt sie an</div>
+          <div class="tm">
+            <div class="tm-head"><img src="files/mail-logo.png" alt=""><div><div class="tm-brand">RL <em>NEXUS</em></div><div class="tm-label">Nexus EMB Support</div></div></div>
+            <div class="tm-line"></div>
+            <div class="tm-body"><p>Hallo Vexa-Team,</p><p>klingt gut! Passt euch Donnerstag um 19 Uhr?</p></div>
+            <div class="tm-sig"><span class="tm-av">MT</span><div><strong>MecryTv</strong> · Developer<br>Team RL Nexus</div></div>
+            <div class="tm-body"><div class="tm-q">Am 9. Okt. um 14:02 schrieb Vexa Esports:<br>Hallo zusammen, wir würden RL Nexus gern auf unseren drei Servern einsetzen …</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="cw-foot">☐ Vorlage weglassen<span class="cw-send">Senden</span></div>
+    </div>
+    <div class="cw" style="margin-top:10px">
+      <div class="cw-title">Weiterleiten <span class="cw-seg"><i>Antworten</i><i>Allen antworten</i><i class="on">Weiterleiten</i></span><span class="x">✕</span></div>
+      <div class="cw-field"><label>An</label><div style="color:#7b8693">An wen?</div></div>
+      <div class="cw-edit" style="padding-bottom:8px">Schau mal, die Anfrage von Vexa. Kannst du das übernehmen?</div>
+      <div class="cw-files"><span class="cw-file"><span class="box">✓</span>Konzept Partnerschaft.pdf <small>245 KB</small></span><span class="cw-file"><span class="box">✓</span>logo-vexa.png <small>38 KB</small></span></div>
+    </div>
+    <div class="content note"><h3>Dasselbe große Fenster wie „Neue Mail“</h3><p>Antworten öffnet das Fenster aus Frage 3, mit Empfänger und Betreff schon ausgefüllt. Oben wechselst du zwischen Antworten, Allen antworten und Weiterleiten, ohne dass dein Text verloren geht. Die ursprüngliche Mail steht eingeklappt unter dem Text und wird unten angehängt, so wie Gmail es macht. Beim Weiterleiten gehen die Anhänge mit, abwählbar.</p></div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="rd" style="max-width:560px">
+      <h4>Partnerschaft für Season 12</h4>
+      <div class="rd-from"><span class="rd-av">VE</span><span><strong style="color:#f2f4f7">Vexa Esports</strong> &lt;orga@vexa.gg&gt; · 9. Okt., 14:02</span></div>
+      <div class="rd-mail">Hallo zusammen,<br>wir würden RL Nexus gern auf unseren drei Servern einsetzen und suchen eine Partnerschaft …</div>
+      <div class="rd-quick">
+        <div class="t">klingt gut! Passt euch Donnerstag um 19 Uhr?<span class="cw-caret"></span></div>
+        <div class="f">An Vexa Esports<span class="cw-ghost" style="margin-left:auto">⤢ Großes Fenster</span><span class="cw-send" style="margin-left:0">Senden</span></div>
+      </div>
+    </div>
+    <div class="content note"><h3>Schnellantwort unter der Mail, großes Fenster bei Bedarf</h3><p>Unter jeder Mail steht ein Antwortfeld. Für kurze Antworten tippst du einfach los, mit Vorlage, aber ohne Vorschau und Werkzeugleiste. „Großes Fenster“ nimmt den Text mit ins Fenster aus Frage 3. Weiterleiten öffnet immer das große Fenster.</p></div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="cw">
+      <div class="cw-title">Antworten <span class="cw-seg"><i class="on">Antworten</i><i>Allen</i><i>Weiterleiten</i></span><span class="x">✕</span></div>
+      <div class="cw-split">
+        <div style="padding:12px">
+          <div class="cw-plabel" style="padding:0 0 8px;border:0">Ursprüngliche Mail</div>
+          <div class="rd-mail" style="margin:0">Hallo zusammen,<br>wir würden RL Nexus gern auf unseren drei Servern einsetzen und suchen eine Partnerschaft für die nächste Season.<br><br>Viele Grüße<br>Vexa</div>
+        </div>
+        <div style="background:#050608">
+          <div class="cw-field"><label>An</label><div>Vexa Esports &lt;orga@vexa.gg&gt;</div></div>
+          <div class="cw-tools"><b>B</b><b><i>I</i></b><b>•</b><b>🔗</b><b>▭</b><span style="margin-left:auto" class="cw-seg"><i class="on">Schreiben</i><i>Vorschau</i></span></div>
+          <div class="cw-edit">Hallo Vexa-Team,<br><br>klingt gut! Passt euch Donnerstag um 19 Uhr?<span class="cw-caret"></span></div>
+        </div>
+      </div>
+      <div class="cw-foot"><span class="cw-send">Senden</span></div>
+    </div>
+    <div class="content note"><h3>Ursprüngliche Mail links, Antwort rechts</h3><p>Beim Schreiben siehst du immer, worauf du antwortest. Die Vorschau aus Frage 3 rückt dafür hinter einen Umschalter, weil kein Platz für drei Spalten ist.</p></div>
+  </div>
+</div>
+
+<div class="always">
+  <p class="label">Kommt in jedem Fall dazu</p>
+  <ul>
+    <li>Weiterleiten nimmt die Anhänge der ursprünglichen Mail mit, einzeln abwählbar.</li>
+    <li>Das Zitat behält Absätze, Links und Fettschrift statt nur Text.</li>
+    <li>„Allen antworten“ lässt die eigene Adresse weg und zeigt Cc gleich an.</li>
+    <li>Der Absender ist automatisch das Postfach, an das die Mail ging.</li>
+  </ul>
+</div>

@@ -1,0 +1,185 @@
+@use "mixins" as *;
+
+/* --- Speicherleiste ------------------------------------------------------ */
+
+.bar {
+    position: sticky;
+    z-index: 20;
+    bottom: 0;
+    display: grid;
+    margin-top: var(--s-6);
+    padding: var(--s-3) 0;
+    border-top: 1px solid var(--c-line-strong);
+    background: var(--c-base);
+
+    > div[role="alert"] {
+        margin-bottom: var(--s-3);
+    }
+}
+
+.barInner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-3);
+}
+
+.state {
+    color: var(--c-text-dim);
+    font-size: 0.875rem;
+
+    strong {
+        color: var(--c-mod-engagement);
+        font-weight: 700;
+    }
+}
+
+.barActions {
+    display: flex;
+    gap: var(--s-2);
+}
+
+/* --- Listen --------------------------------------------------------------- */
+
+.group {
+    display: grid;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    gap: var(--s-2);
+    border: 0;
+
+    > button {
+        justify-self: start;
+    }
+}
+
+/* float holt die legend aus ihrer Sonderrolle im fieldset. */
+.legend {
+    float: left;
+    width: 100%;
+    padding: 0;
+    color: var(--c-text-dim);
+
+    @include label(0.75rem, 0.14em);
+}
+
+.hint {
+    clear: both;
+    color: var(--c-text-faint);
+    font-size: 0.8125rem;
+}
+
+.items {
+    display: grid;
+    clear: both;
+    gap: var(--s-2);
+}
+
+.item {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--s-2);
+
+    > input,
+    > textarea {
+        flex: 1;
+        min-width: 0;
+    }
+}
+
+.controls {
+    display: flex;
+    flex-shrink: 0;
+    gap: 2px;
+}
+
+.control {
+    display: grid;
+    width: 32px;
+    height: 40px;
+    place-items: center;
+    border: 1px solid var(--c-line);
+    color: var(--c-text-dim);
+
+    @include touch-target;
+
+    &:hover:not(:disabled) {
+        border-color: var(--c-line-strong);
+        color: var(--c-text);
+    }
+
+    &:disabled {
+        opacity: 0.35;
+        cursor: not-allowed;
+    }
+
+    &:focus-visible {
+        @include focus-ring;
+    }
+}
+
+.remove:hover:not(:disabled) {
+    color: var(--c-loss);
+}
+
+.entry {
+    display: grid;
+    padding: var(--s-3);
+    gap: var(--s-3);
+    border: 1px solid var(--c-line);
+    background: var(--c-panel-fill);
+}
+
+.entryHead {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-2);
+}
+
+.entryLabel {
+    overflow: hidden;
+    color: var(--c-text-dim);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+
+    @include label(0.75rem, 0.12em);
+}
+
+.entryBody {
+    display: grid;
+    gap: var(--s-3);
+}
+
+/* --- Auswahl mit Vorschau ----------------------------------------------- */
+
+.picker {
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
+
+    > select {
+        flex: 1;
+        min-width: 0;
+    }
+}
+
+.swatch {
+    display: grid;
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    place-items: center;
+    border: 1px solid var(--c-line-strong);
+    background: var(--c-panel-solid);
+
+    @include touch-target;
+}
+
+.color {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+}

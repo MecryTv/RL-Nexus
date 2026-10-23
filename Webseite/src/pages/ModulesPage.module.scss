@@ -1,0 +1,208 @@
+@use "mixins" as *;
+
+/* --- Suche und Schalter ------------------------------------------------- */
+.controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px 20px;
+    align-items: center;
+    margin-bottom: 18px;
+}
+
+/* --- Schalter "Nur verfügbare" ------------------------------------------ */
+.toggle {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 10px;
+    color: var(--c-text-dim);
+    cursor: pointer;
+    user-select: none;
+
+    @include label(0.7rem, 0.12em);
+
+    input {
+        position: absolute;
+        opacity: 0;
+        pointer-events: none;
+    }
+
+    input:focus-visible + .switch {
+        @include focus-ring;
+    }
+
+    &:hover {
+        color: var(--c-text);
+    }
+
+    @include touch-target;
+}
+
+.switch {
+    position: relative;
+    width: 38px;
+    height: 21px;
+    border: 1px solid var(--c-line-strong);
+    border-radius: 99px;
+    transition:
+        background var(--t-fast),
+        border-color var(--t-fast);
+    background: rgb(255 255 255 / 4%);
+
+    &::after {
+        position: absolute;
+        top: 3px;
+        left: 3px;
+        width: 13px;
+        height: 13px;
+        border-radius: 50%;
+        transition: transform var(--t-fast);
+        background: var(--c-text-faint);
+        content: "";
+    }
+
+    input:checked + & {
+        border-color: var(--c-win);
+        background: rgb(53 224 127 / 18%);
+
+        &::after {
+            transform: translateX(17px);
+            background: var(--c-win);
+            box-shadow: 0 0 8px var(--c-win);
+        }
+    }
+}
+
+/* --- Kategorie-Filter --------------------------------------------------- */
+.filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 9px;
+    margin-bottom: 16px;
+}
+
+.filter {
+    --accent: var(--c-red);
+
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    padding: 9px 15px 8px;
+    border: 1px solid var(--c-line);
+    transition:
+        border-color var(--t-fast),
+        background var(--t-fast),
+        color var(--t-fast);
+    color: var(--c-text-dim);
+
+    @include label(0.68rem, 0.12em);
+    @include bevel-diagonal(8px);
+    @include touch-target;
+
+    &:hover {
+        border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+        color: var(--c-text);
+    }
+}
+
+.activeFilter {
+    border-color: color-mix(in srgb, var(--accent) 62%, transparent);
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
+    color: var(--c-text);
+}
+
+.dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 9px var(--accent);
+}
+
+.count {
+    color: var(--c-text-faint);
+    font-variant-numeric: tabular-nums;
+}
+
+.resultLine {
+    margin-bottom: 34px;
+    color: var(--c-text-faint);
+
+    @include label(0.66rem, 0.16em);
+}
+
+/* --- Gruppen ------------------------------------------------------------ */
+.body {
+    display: flex;
+    flex-direction: column;
+    gap: 60px;
+}
+
+.group {
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+}
+
+.groupHead {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding-left: 16px;
+    border-left: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
+}
+
+.groupTitle {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    color: var(--c-text);
+    font-size: 1.32rem;
+    font-weight: 800;
+}
+
+.groupText {
+    color: var(--c-text-dim);
+    font-size: 0.92rem;
+}
+
+.grid {
+    display: grid;
+    gap: var(--s-gap);
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
+}
+
+/* --- Nichts gefunden ---------------------------------------------------- */
+.empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    padding: 80px 24px;
+    border: 1px dashed var(--c-line-strong);
+    color: var(--c-text-dim);
+    text-align: center;
+
+    svg {
+        color: var(--c-text-faint);
+    }
+
+    h2 {
+        color: var(--c-text);
+        font-size: 1.3rem;
+    }
+
+    p {
+        max-width: 44ch;
+        font-size: 0.94rem;
+    }
+
+    > :last-child {
+        margin-top: 8px;
+    }
+}
+
+.resetRow {
+    display: flex;
+    justify-content: center;
+}

@@ -1,0 +1,207 @@
+<link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@500;700&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+
+<style>
+  .rl { --base:#050608; --panel:#0a0f15; --fill:rgb(6 9 13/78%); --line:rgb(255 255 255/8%); --strong:rgb(255 255 255/14%);
+        --text:#f2f4f7; --dim:#a8b0bc; --faint:#8d97a3; --blue:#00afff; --win:#35e07f; --loss:#ff4d5e; --yellow:#ffc53d; --red:#ff1e2d;
+        font-family: "Rajdhani", system-ui, sans-serif; color: var(--text); }
+  .cards.rl { grid-template-columns: 1fr !important; max-width: 1100px; }
+  .page { background: radial-gradient(70% 50% at 10% 0%, rgb(255 30 45/12%), transparent 60%), var(--base); padding: 22px 26px 26px; border:1px solid #222; font-size:15px; }
+  .lbl { font-weight:700; font-size:11px; letter-spacing:.16em; text-transform:uppercase; color: var(--faint); }
+  .top { display:flex; justify-content:space-between; align-items:center; margin-bottom:18px; }
+  .brand { display:flex; align-items:center; gap:10px; }
+  .brand img { width:34px; height:34px; }
+  .word { font-family:Oxanium,sans-serif; font-weight:700; font-size:18px; letter-spacing:.06em; }
+  .word span { color: var(--red); }
+  .word small { display:block; font-family:Rajdhani; font-size:11px; letter-spacing:.2em; color: var(--faint); }
+  .ghost { padding:6px 12px; border:1px solid var(--strong); color: var(--dim); font-weight:700; font-size:12px; letter-spacing:.12em; text-transform:uppercase; }
+  .hero { display:flex; align-items:center; gap:14px; padding:16px 18px; border:1px solid color-mix(in srgb, var(--win) 40%, transparent); background: color-mix(in srgb, var(--win) 9%, var(--panel));
+          clip-path: polygon(14px 0,100% 0,100% calc(100% - 14px),calc(100% - 14px) 100%,0 100%,0 14px); margin-bottom:16px; }
+  .hero .big { width:16px; height:16px; border-radius:50%; background: var(--win); box-shadow: 0 0 0 5px rgb(53 224 127/18%); }
+  .hero h3 { font-family:Oxanium,sans-serif; font-size:22px; margin:0; }
+  .hero p { margin:2px 0 0; color: var(--dim); }
+  .notice { border:1px solid color-mix(in srgb, var(--yellow) 45%, transparent); background: color-mix(in srgb, var(--yellow) 8%, var(--panel)); padding:12px 16px; margin-bottom:16px; }
+  .notice .head { display:flex; justify-content:space-between; gap:10px; }
+  .notice b { font-family:Oxanium,sans-serif; font-size:16px; }
+  .notice .tag { color: var(--yellow); }
+  .upd { margin-top:8px; padding-left:12px; border-left:2px solid var(--strong); color: var(--dim); font-size:14px; }
+  .upd b { color: var(--text); font-family: Rajdhani; font-size:14px; }
+  .comp { border:1px solid var(--line); background: var(--fill); }
+  .c { padding:12px 16px; border-bottom:1px solid var(--line); }
+  .c:last-child { border-bottom:0; }
+  .c .r1 { display:flex; justify-content:space-between; align-items:baseline; gap:10px; }
+  .c .name { font-family:Oxanium,sans-serif; font-size:16px; display:flex; align-items:center; gap:8px; }
+  .c .name i { width:9px; height:9px; border-radius:50%; background: var(--win); }
+  .c .state { color: var(--win); font-weight:700; font-size:14px; }
+  .bars { display:flex; gap:2px; height:26px; margin:8px 0 4px; }
+  .bars span { flex:1; background: var(--win); opacity:.85; border-radius:1px; }
+  .bars span.w { background: var(--yellow); }
+  .bars span.d { background: var(--loss); }
+  .bars span.n { background: #2a313a; }
+  .scale { display:flex; justify-content:space-between; color: var(--faint); font-size:12px; }
+  .facts { display:flex; gap:16px; flex-wrap:wrap; color: var(--dim); font-size:13px; margin-top:4px; }
+  .facts b { color: var(--text); }
+  .sec { margin-top:18px; }
+  .inc { border-left:2px solid var(--strong); padding:4px 0 4px 12px; margin:8px 0; color: var(--dim); font-size:14px; }
+  .inc b { color: var(--text); font-family:Oxanium,sans-serif; font-size:15px; }
+  .inc .d { color: var(--faint); font-size:12px; }
+  .foot { margin-top:18px; display:flex; justify-content:space-between; color: var(--faint); font-size:12px; }
+
+  /* B */
+  .tiles { display:grid; grid-template-columns: repeat(4, 1fr); gap:10px; margin-bottom:16px; }
+  .tile { border:1px solid var(--line); background: var(--fill); padding:10px 12px; }
+  .tile .v { font-family:Oxanium,sans-serif; font-size:24px; margin-top:4px; }
+  .tile .v.g { color: var(--win); }
+  .grid2 { display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
+  .card2 { border:1px solid var(--line); border-top:2px solid var(--win); background: var(--fill); padding:12px 14px; }
+  .spark { height:34px; margin:6px 0; }
+  .two { display:grid; grid-template-columns: minmax(0,1.6fr) minmax(0,1fr); gap:14px; }
+</style>
+
+<h2>Wie soll status.nexus-emb.de aussehen?</h2>
+<p class="subtitle">Beide im Stil der Webseite, beide öffentlich ohne Login. Gezeigt mit einer laufenden eigenen Meldung, damit du siehst, wo sie steht. Klick an, was dir gefällt.</p>
+
+<div class="cards rl">
+  <div class="card" data-choice="a-klassisch" onclick="toggleSelect(this)">
+    <div class="page">
+      <div class="top"><div class="brand"><img src="files/logo.webp" alt=""><div class="word">RL <span>NEXUS</span><small>STATUS</small></div></div><span class="ghost">Zur Webseite</span></div>
+
+      <div class="hero"><span class="big"></span><div><h3>Alle Systeme laufen</h3><p>Geprüft vor 40 Sekunden · alle 2 Minuten neu</p></div></div>
+
+      <div class="notice">
+        <div class="head"><b>Login über Discord hakt bei manchen</b><span class="lbl tag">Wird untersucht</span></div>
+        <div class="upd"><b>10:42 · Update</b> · Discord antwortet langsam. Bot und Webseite laufen normal, nur die Anmeldung im Dashboard dauert länger.</div>
+        <div class="upd"><b>10:31 · Gemeldet</b> · Wir schauen uns das an.</div>
+      </div>
+
+      <div class="lbl" style="margin-bottom:6px">Dienste · letzte 90 Tage</div>
+      <div class="comp">
+        <div class="c"><div class="r1"><span class="name"><i></i>Bot</span><span class="state">Läuft</span></div>
+          <div class="bars"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span class="w"></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span class="d"></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+          <div class="scale"><span>vor 90 Tagen</span><span>99,94 % verfügbar</span><span>heute</span></div>
+          <div class="facts"><span>Ping <b>130 ms</b></span><span>auf <b>2</b> Servern</span><span>läuft seit <b>2 Std.</b></span><span>letzter Ausfall <b>heute 07:02</b>, 4 Min.</span></div></div>
+        <div class="c"><div class="r1"><span class="name"><i></i>Bot-Dashboard</span><span class="state">Läuft</span></div>
+          <div class="bars"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span class="w"></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span class="d"></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+          <div class="scale"><span>vor 90 Tagen</span><span>99,91 % verfügbar</span><span>heute</span></div>
+          <div class="facts"><span>Antwortzeit <b>42 ms</b></span><span>Ø 30 Tage <b>51 ms</b></span></div></div>
+        <div class="c"><div class="r1"><span class="name"><i></i>Webseite</span><span class="state">Läuft</span></div>
+          <div class="bars"><span class="n"></span><span class="n"></span><span class="n"></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+          <div class="scale"><span>vor 90 Tagen</span><span>100 % verfügbar</span><span>heute</span></div>
+          <div class="facts"><span>Antwortzeit <b>18 ms</b></span><span>zuletzt aktualisiert <b>heute 10:28</b></span></div></div>
+        <div class="c"><div class="r1"><span class="name"><i></i>Datenbank</span><span class="state">Läuft</span></div>
+          <div class="facts"><span>Antwortzeit <b>2 ms</b></span><span>99,99 % in 90 Tagen</span></div></div>
+      </div>
+
+      <div class="sec"><div class="lbl">Geplante Wartung</div>
+        <div class="inc"><b>Datenbank-Umzug</b> · Samstag, 11. Oktober, 20:00 bis etwa 20:30<div class="d">Bot und Dashboard sind kurz nicht erreichbar. Einstellungen bleiben erhalten.</div></div></div>
+
+      <div class="sec"><div class="lbl">Vergangene Störungen</div>
+        <div class="inc"><b>Bot kurz weg</b> · heute 07:02 bis 07:06, 4 Minuten<div class="d">Automatisch erkannt · Neustart nach Update</div></div>
+        <div class="inc"><b>Dashboard langsam</b> · 3. Oktober, 21:10 bis 21:40<div class="d">Eigene Meldung · Discord-API antwortete verzögert</div></div>
+      </div>
+      <div class="foot"><span>Alle Zeiten in deiner Zeitzone</span><span>RL Nexus · Impressum · Datenschutz</span></div>
+    </div>
+    <div class="card-body"><h3>A · Klassisch untereinander</h3><p>Wie bei großen Diensten: oben der Gesamtzustand, darunter laufende Meldungen, dann jeder Dienst mit 90 Balken (ein Tag je Balken, Maus drüber zeigt den Tag), danach geplante Wartung und vergangene Störungen. Liest sich auch auf dem Handy gut.</p></div>
+  </div>
+
+  <div class="card" data-choice="b-hud" onclick="toggleSelect(this)">
+    <div class="page">
+      <div class="top"><div class="brand"><img src="files/logo.webp" alt=""><div class="word">RL <span>NEXUS</span><small>STATUS</small></div></div><span class="ghost">Zur Webseite</span></div>
+      <div class="hero"><span class="big"></span><div><h3>Alle Systeme laufen</h3><p>Geprüft vor 40 Sekunden</p></div></div>
+      <div class="tiles">
+        <div class="tile"><div class="lbl">Verfügbar 30 Tage</div><div class="v g">99,96 %</div></div>
+        <div class="tile"><div class="lbl">Ø Antwortzeit</div><div class="v">48 ms</div></div>
+        <div class="tile"><div class="lbl">Server mit RL Nexus</div><div class="v">2</div></div>
+        <div class="tile"><div class="lbl">Letzte Störung</div><div class="v" style="font-size:18px;padding-top:4px">heute, 4 Min.</div></div>
+      </div>
+      <div class="two">
+        <div class="grid2">
+          <div class="card2"><div class="name" style="font-family:Oxanium;font-size:16px">Bot</div><svg class="spark" viewBox="0 0 200 34" preserveAspectRatio="none"><polyline fill="none" stroke="#35e07f" stroke-width="2" points="0,20 20,18 40,22 60,15 80,17 100,12 120,19 140,16 160,21 180,14 200,16"/></svg><div class="facts"><span>Ping <b>130 ms</b></span><span><b>99,94 %</b></span></div></div>
+          <div class="card2"><div class="name" style="font-family:Oxanium;font-size:16px">Bot-Dashboard</div><svg class="spark" viewBox="0 0 200 34" preserveAspectRatio="none"><polyline fill="none" stroke="#35e07f" stroke-width="2" points="0,22 20,20 40,21 60,24 80,18 100,20 120,6 140,19 160,20 180,22 200,21"/></svg><div class="facts"><span><b>42 ms</b></span><span><b>99,91 %</b></span></div></div>
+          <div class="card2"><div class="name" style="font-family:Oxanium;font-size:16px">Webseite</div><svg class="spark" viewBox="0 0 200 34" preserveAspectRatio="none"><polyline fill="none" stroke="#35e07f" stroke-width="2" points="0,26 20,25 40,26 60,25 80,26 100,24 120,25 140,26 160,25 180,26 200,25"/></svg><div class="facts"><span><b>18 ms</b></span><span><b>100 %</b></span></div></div>
+          <div class="card2"><div class="name" style="font-family:Oxanium;font-size:16px">Datenbank</div><svg class="spark" viewBox="0 0 200 34" preserveAspectRatio="none"><polyline fill="none" stroke="#35e07f" stroke-width="2" points="0,28 20,28 40,27 60,28 80,28 100,27 120,28 140,28 160,27 180,28 200,28"/></svg><div class="facts"><span><b>2 ms</b></span><span><b>99,99 %</b></span></div></div>
+        </div>
+        <div>
+          <div class="notice" style="margin-bottom:10px"><div class="head"><b>Login über Discord hakt</b><span class="lbl tag">Untersucht</span></div><div class="upd"><b>10:42</b> · Discord antwortet langsam, nur die Anmeldung dauert länger.</div></div>
+          <div class="lbl">Verlauf</div>
+          <div class="inc"><b>Geplant: Datenbank-Umzug</b><div class="d">Sa 11.10., 20:00 bis etwa 20:30</div></div>
+          <div class="inc"><b>Bot kurz weg</b><div class="d">heute 07:02, 4 Minuten</div></div>
+          <div class="inc"><b>Dashboard langsam</b><div class="d">3. Okt., 30 Minuten</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body"><h3>B · HUD-Übersicht mit Kennzahlen</h3><p>Oben vier Kennzahlen, darunter Karten je Dienst mit Verlauf der Antwortzeit, rechts Meldungen und Störungen. Wirkt mehr nach Dashboard, auf dem Handy wird es eine lange Spalte.</p></div>
+  </div>
+</div>
+
+<style>
+  .dc-wrap { max-width: 760px; margin-top: 28px; }
+  .dc-chat { background:#313338; padding:16px 16px 18px; font-family: "gg sans", "Noto Sans", "Helvetica Neue", Arial, sans-serif; color:#dbdee1; font-size:15px; line-height:1.375; }
+  .dc-head { display:flex; align-items:center; gap:8px; margin-bottom:4px; }
+  .dc-av { width:40px; height:40px; border-radius:50%; background:#111; display:grid; place-items:center; color:#ff1e2d; font-weight:800; font-size:16px; flex-shrink:0; }
+  .dc-name { color:#fff; font-weight:600; }
+  .dc-app { background:#5865f2; color:#fff; font-size:10px; font-weight:700; padding:1px 4px; border-radius:3px; }
+  .dc-time { color:#949ba4; font-size:12px; }
+  .dc-msg { margin-left:48px; }
+  .box { background:#2b2d31; border:1px solid #3f4147; border-left:4px solid #f0b232; border-radius:8px; padding:12px 14px; max-width:560px; }
+  .img { width:100%; border-radius:6px; display:block; margin-bottom:10px; }
+  .h2d { font-size:20px; font-weight:700; color:#f2f3f5; margin:2px 0; }
+  .h3d { font-size:16px; font-weight:700; color:#f2f3f5; margin:0 0 2px; }
+  .subd { color:#949ba4; font-size:12.5px; }
+  .ts { background:#3f4147; border-radius:3px; padding:0 3px; }
+  .sepd { height:1px; background:#3f4147; margin:10px 0; }
+  .rowd { display:flex; gap:12px; align-items:flex-start; }
+  .rowd .t { flex:1; min-width:0; }
+  .lbtn { display:inline-flex; align-items:center; gap:6px; padding:5px 12px; background:#4e5058; color:#fff; border-radius:4px; font-size:14px; font-weight:500; white-space:nowrap; }
+  .lbtn::after { content:"↗"; font-size:12px; opacity:.8; }
+  .btns { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
+  .quote { border-left:4px solid #4e5058; padding-left:10px; margin:6px 0; }
+  .g { color:#23a55a; }
+</style>
+
+<div class="dc-wrap">
+  <h3>Dazu die Discord-Meldung (Variante B, erweitert)</h3>
+  <p class="subtitle">Ohne offene Kontaktnachrichten. Neu: eigene Meldung oben, Verfügbarkeit 24 Stunden und 30 Tage, Antwortzeiten, geplante Wartung, Knopf zur Statusseite. Die Randfarbe ist gelb, weil eine Meldung läuft.</p>
+  <div class="dc-chat">
+    <div class="dc-head"><span class="dc-av">N</span><span class="dc-name">RL Nexus</span><span class="dc-app">APP</span><span class="dc-time">heute um 10:44</span></div>
+    <div class="dc-msg"><div class="box">
+      <img class="img" src="files/status-banner.webp" alt="">
+      <div class="h2d">🟡 Eingeschränkt</div>
+      <div class="subd">Geprüft <span class="ts">vor 1 Minute</span> · Verlauf der letzten 24 Stunden, ein Kästchen je 2 Stunden</div>
+      <div class="sepd"></div>
+      <div class="h3d">⚠️ Login über Discord hakt bei manchen</div>
+      <div class="quote">Discord antwortet langsam. Bot und Webseite laufen normal, nur die Anmeldung im Dashboard dauert länger.</div>
+      <div class="subd">Wird untersucht · gemeldet <span class="ts">10:31</span> · Update <span class="ts">10:42</span></div>
+      <div class="sepd"></div>
+
+      <div class="h3d">🤖 Bot · <span class="g">99,8 %</span> in 24 h · 99,94 % in 30 Tagen</div>
+      🟩🟩🟩🟩🟩🟩🟩🟩🟨🟩🟩🟩<br>
+      Online seit <span class="ts">2 Stunden</span> · Ping <b>130 ms</b> · auf <b>2</b> Servern mit <b>13</b> Mitgliedern
+      <div class="subd">Letzter Ausfall <span class="ts">heute 07:02</span>, 4 Minuten · Version 1.0.0</div>
+      <div class="sepd"></div>
+
+      <div class="rowd"><div class="t">
+        <div class="h3d">🖥️ Bot-Dashboard · <span class="g">99,8 %</span> · 99,91 % in 30 Tagen</div>
+        🟩🟩🟩🟩🟩🟩🟩🟩🟨🟩🟩🟩<br>
+        Antwortet in <b>42 ms</b> · Ø 30 Tage 51 ms
+      </div><span class="lbtn">Öffnen</span></div>
+      <div class="sepd"></div>
+
+      <div class="rowd"><div class="t">
+        <div class="h3d">🌐 Webseite · <span class="g">100 %</span> · 100 % in 30 Tagen</div>
+        🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩<br>
+        Antwortet in <b>18 ms</b> · aktualisiert <span class="ts">heute 10:28</span> · Banner: Wartung „Datenbank-Umzug“
+      </div><span class="lbtn">Öffnen</span></div>
+      <div class="sepd"></div>
+
+      <div class="h3d">🗄️ Datenbank · <span class="g">100 %</span></div>
+      Antwortet in <b>2 ms</b>
+      <div class="sepd"></div>
+
+      <div class="h3d">🛠️ Geplante Wartung</div>
+      <b>Datenbank-Umzug</b> · <span class="ts">Samstag, 11. Oktober 20:00</span> (<span class="ts">in 2 Tagen</span>), etwa 30 Minuten
+      <div class="subd">Bot und Dashboard sind kurz nicht erreichbar.</div>
+
+      <div class="btns"><span class="lbtn">Statusseite</span><span class="lbtn">Webseite</span><span class="lbtn">Bot-Dashboard</span></div>
+    </div></div>
+  </div>
+</div>

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" version="1.2" baseProfile="tiny-ps" viewBox="0 0 512 512">
+  <title>RL Nexus</title>
+  <defs>
+    <linearGradient id="silber" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.5" stop-color="#cdd2d8"/>
+      <stop offset="1" stop-color="#8d949e"/>
+    </linearGradient>
+    <linearGradient id="rot" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ff3b47"/>
+      <stop offset="0.55" stop-color="#e0101f"/>
+      <stop offset="1" stop-color="#8a0912"/>
+    </linearGradient>
+    <linearGradient id="schatten" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#d81424"/>
+      <stop offset="1" stop-color="#5a050b"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="#0a0f15"/>
+  <g transform="translate(71.3 68.8) scale(0.72)">
+    <polygon fill="url(#rot)" points="60,32 455,368 455,448 60,110"/>
+    <polygon fill="url(#schatten)" points="368,102 405,75 405,317 368,286"/>
+    <polygon fill="url(#silber)" points="405,75 455,38 455,358 405,317"/>
+    <polygon fill="url(#silber)" points="60,126 352,376 352,486 112,281 112,446 60,474"/>
+    <polygon fill="url(#schatten)" points="112,281 148,312 148,416 112,444"/>
+  </g>
+</svg>

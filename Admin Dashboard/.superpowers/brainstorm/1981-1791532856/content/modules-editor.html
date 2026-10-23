@@ -1,0 +1,117 @@
+<link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@500;700&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+
+<style>
+  .rl { --base:#050608; --panel:#0a0f15; --fill:rgb(6 9 13/78%); --line:rgb(255 255 255/8%); --strong:rgb(255 255 255/14%);
+        --text:#f2f4f7; --dim:#a8b0bc; --faint:#8d97a3; --blue:#00afff; --red:#ff1e2d;
+        font-family: "Rajdhani", system-ui, sans-serif; color: var(--text); }
+  .cards.rl { grid-template-columns: 1fr !important; max-width: 1100px; }
+  .screen { background: var(--base); border:1px solid #222; padding:18px; font-size:14px; }
+  .lbl { font-weight:700; font-size:11px; letter-spacing:.16em; text-transform:uppercase; color: var(--faint); }
+  h5 { font-family:Oxanium,sans-serif; font-size:20px; margin:0 0 4px; }
+  .meta { color: var(--dim); margin-bottom:12px; }
+  .btn { display:inline-block; padding:8px 14px; background: linear-gradient(135deg,#ff1e2d,#d81424); color:#fff; font-weight:700; font-size:12px; letter-spacing:.14em; text-transform:uppercase;
+         clip-path: polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px); }
+  .ghost { display:inline-block; padding:7px 12px; border:1px solid var(--strong); color: var(--dim); font-weight:700; font-size:12px; letter-spacing:.12em; text-transform:uppercase; }
+
+  /* Kategorien */
+  .cats { border:1px solid var(--line); background: var(--fill); }
+  .cat { display:grid; grid-template-columns: 22px 14px 1fr 150px 90px 120px; gap:12px; align-items:center; padding:9px 12px; border-bottom:1px solid var(--line); }
+  .cat:last-child { border-bottom:0; }
+  .grip { color: var(--faint); letter-spacing:-2px; }
+  .sw { width:14px; height:14px; background: var(--c); }
+  .cat .name { font-weight:700; font-size:15px; }
+  .cat .name small { display:block; color: var(--faint); font-weight:500; font-size:12px; }
+  .pal { display:flex; gap:4px; }
+  .pal i { width:16px; height:16px; background: var(--p); outline-offset:2px; }
+  .pal i.on { outline:2px solid #fff; }
+  .cat .count { color: var(--dim); }
+  .cat .act { color: var(--faint); font-size:13px; text-align:right; }
+  .cat .act b { color: var(--dim); font-weight:600; }
+  .cat .act .off { opacity:.5; }
+  .newcat { display:flex; gap:10px; align-items:center; padding:10px 12px; border-top:1px dashed var(--strong); }
+  .input { padding:7px 10px; border:1px solid var(--strong); background: var(--panel); color: var(--faint); min-width:200px; }
+
+  /* Editor mit Vorschau */
+  .ed { display:grid; grid-template-columns: 1fr 1fr; gap:14px; }
+  .tabs { display:flex; gap:16px; border-bottom:1px solid var(--line); margin-bottom:12px; }
+  .tabs span { padding:8px 0; color: var(--faint); }
+  .tabs span.on { color: var(--text); box-shadow: inset 0 -2px 0 var(--red); }
+  .fld { margin-bottom:10px; }
+  .fld .box { margin-top:4px; padding:8px 10px; border:1px solid var(--strong); background: var(--panel); color: var(--dim); }
+  .fld .box.tall { height:62px; }
+  .cmds { margin-top:4px; border:1px solid var(--line); }
+  .cmds div { display:flex; justify-content:space-between; padding:6px 10px; border-bottom:1px solid var(--line); color: var(--dim); font-size:13px; }
+  .cmds div:last-child { border-bottom:0; }
+  .cmds code { color: var(--text); font-family: ui-monospace, Consolas, monospace; }
+  .botnote { margin-top:4px; color: var(--faint); font-size:12px; }
+  .pv { border:1px solid var(--strong); background: var(--panel); }
+  .pvbar { display:flex; justify-content:space-between; align-items:center; padding:7px 10px; border-bottom:1px solid var(--line); }
+  .seg span { padding:3px 8px; border:1px solid var(--strong); color: var(--faint); font-size:12px; margin-left:4px; }
+  .seg span.on { border-color: var(--red); color: var(--text); background: rgb(255 30 45/14%); }
+  .site { padding:16px; background: radial-gradient(70% 60% at 0% 0%, rgb(255 30 45/12%), transparent 60%), #050608; height:300px; overflow:hidden; }
+  .site .crumb { color: var(--faint); font-size:12px; }
+  .site h6 { font-family:Oxanium,sans-serif; font-size:24px; margin:6px 0 2px; }
+  .site .tagl { color: var(--dim); margin-bottom:10px; }
+  .pill { display:inline-block; padding:2px 8px; border:1px solid color-mix(in srgb, var(--c) 50%, transparent); color: var(--c); font-size:11px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; margin-right:6px; }
+  .site p { color: var(--dim); line-height:1.5; margin:10px 0; }
+  .site .blk { border:1px solid var(--line); padding:10px; margin-top:8px; }
+  .site .blk b { font-family:Oxanium,sans-serif; }
+  .site .cmd { display:inline-block; margin:6px 6px 0 0; padding:3px 8px; background: rgb(255 255 255/6%); font-family: ui-monospace, Consolas, monospace; font-size:12px; }
+</style>
+
+<h2>Module: Kategorien und Vorschau</h2>
+<p class="subtitle">Oben die neue Verwaltung der Kategorien auf der Modulseite, unten der Modul-Editor mit Live-Vorschau. Die Vorschau ist die echte Webseite in einem Rahmen, sie bekommt deinen Entwurf, bevor du speicherst.</p>
+
+<div class="cards rl">
+  <div class="card" data-choice="kategorien" onclick="toggleSelect(this)">
+    <div class="screen">
+      <h5>Kategorien</h5>
+      <div class="meta">In dieser Reihenfolge stehen die Filter auf der Webseite. Ziehen zum Sortieren.</div>
+      <div class="cats">
+        <div class="cat"><span class="grip">⋮⋮</span><span class="sw" style="--c:#38c8ff"></span><span class="name">Community<small>community</small></span>
+          <span class="pal"><i style="--p:#38c8ff" class="on"></i><i style="--p:#ff4a3d"></i><i style="--p:#b06bff"></i><i style="--p:#ffc53d"></i><i style="--p:#35e07f"></i><i style="--p:#ff8a3d"></i><i style="--p:#00afff"></i></span>
+          <span class="count">6 Module</span><span class="act"><b>Umbenennen</b> · <span class="off">Löschen</span></span></div>
+        <div class="cat"><span class="grip">⋮⋮</span><span class="sw" style="--c:#ff4a3d"></span><span class="name">Wettbewerb<small>competition</small></span>
+          <span class="pal"><i style="--p:#38c8ff"></i><i style="--p:#ff4a3d" class="on"></i><i style="--p:#b06bff"></i><i style="--p:#ffc53d"></i><i style="--p:#35e07f"></i><i style="--p:#ff8a3d"></i><i style="--p:#00afff"></i></span>
+          <span class="count">5 Module</span><span class="act"><b>Umbenennen</b> · <span class="off">Löschen</span></span></div>
+        <div class="cat"><span class="grip">⋮⋮</span><span class="sw" style="--c:#b06bff"></span><span class="name">Moderation<small>moderation</small></span>
+          <span class="pal"><i style="--p:#38c8ff"></i><i style="--p:#ff4a3d"></i><i style="--p:#b06bff" class="on"></i><i style="--p:#ffc53d"></i><i style="--p:#35e07f"></i><i style="--p:#ff8a3d"></i><i style="--p:#00afff"></i></span>
+          <span class="count">3 Module</span><span class="act"><b>Umbenennen</b> · <span class="off">Löschen</span></span></div>
+        <div class="cat"><span class="grip">⋮⋮</span><span class="sw" style="--c:#00afff"></span><span class="name">Turniere<small>turniere · neu</small></span>
+          <span class="pal"><i style="--p:#38c8ff"></i><i style="--p:#ff4a3d"></i><i style="--p:#b06bff"></i><i style="--p:#ffc53d"></i><i style="--p:#35e07f"></i><i style="--p:#ff8a3d"></i><i style="--p:#00afff" class="on"></i></span>
+          <span class="count">0 Module</span><span class="act"><b>Umbenennen</b> · <b>Löschen</b></span></div>
+        <div class="newcat"><span class="input">Name der neuen Kategorie</span><span class="btn">+ Anlegen</span></div>
+      </div>
+      <p style="color:#8d97a3;font-size:13px;margin:8px 0 0">Löschen geht erst, wenn kein Modul mehr in der Kategorie steckt. Die Farben kommen aus der Palette der Webseite.</p>
+    </div>
+    <div class="card-body"><h3>Kategorien verwalten</h3><p>Name, Farbe aus der Palette, Reihenfolge per Ziehen. Die ID entsteht aus dem Namen und bleibt danach fest, weil die Module darauf zeigen.</p></div>
+  </div>
+
+  <div class="card" data-choice="vorschau" onclick="toggleSelect(this)">
+    <div class="screen">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h5>Clips</h5><span><span class="ghost">Verwerfen</span> <span class="btn">Speichern</span></span></div>
+      <div class="ed">
+        <div>
+          <div class="tabs"><span>Kachel</span><span class="on">Detailseite</span></div>
+          <div class="fld"><span class="lbl">Einleitung, Absatz 1</span><div class="box tall">Clips sammelt die besten Momente eures Servers an einem Ort. Mitglieder laden Tore hoch …</div></div>
+          <div class="fld"><span class="lbl">Commands</span>
+            <div class="cmds"><div><code>/clip hochladen</code><span>Lädt einen Clip hoch</span></div><div><code>/clip top</code><span>Die besten Clips der Woche</span></div></div>
+            <div class="botnote">Kommt vom Bot, Stand vor 2 Minuten. Ändern im Code des Commands (module: "clips").</div>
+          </div>
+        </div>
+        <div class="pv">
+          <div class="pvbar"><span class="lbl">Live-Vorschau · nicht gespeichert</span><span class="seg"><span class="on">Desktop</span><span>Handy</span></span></div>
+          <div class="site">
+            <div class="crumb">Module › Clips</div>
+            <h6>Clips</h6>
+            <div class="tagl">Die besten Tore eurer Community.</div>
+            <span class="pill" style="--c:#35e07f">Inhalte</span><span class="pill" style="--c:#ffc53d">Beta</span>
+            <p>Clips sammelt die besten Momente eures Servers an einem Ort. Mitglieder laden Tore hoch …</p>
+            <div class="blk"><b>Commands</b><br><span class="cmd">/clip hochladen</span><span class="cmd">/clip top</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body"><h3>Editor mit Live-Vorschau</h3><p>Links schreiben, rechts sofort sehen, wie es auf der Webseite aussieht, umschaltbar zwischen Desktop und Handy. Die Commands füllt der Bot, im Editor stehen sie nur zum Ansehen.</p></div>
+  </div>
+</div>

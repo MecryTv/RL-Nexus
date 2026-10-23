@@ -1,0 +1,164 @@
+@use "mixins" as *;
+
+.back {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-1);
+    min-height: 34px;
+    color: var(--c-blue);
+    font-size: 0.875rem;
+
+    &:hover {
+        color: var(--c-text);
+    }
+
+    @include touch-target;
+}
+
+.missing {
+    color: var(--c-text-dim);
+
+    a {
+        color: var(--c-blue);
+    }
+}
+
+/* --- Reiter --------------------------------------------------------------- */
+
+.tabs {
+    display: flex;
+    gap: var(--s-1);
+    margin-bottom: var(--s-4);
+    border-bottom: 1px solid var(--c-line-strong);
+}
+
+.tab {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-2);
+    min-height: 42px;
+    margin-bottom: -1px;
+    padding: 0 var(--s-4);
+    border-bottom: 2px solid transparent;
+    color: var(--c-text-dim);
+
+    @include label(0.8rem, 0.14em);
+    @include touch-target;
+
+    &:hover:not(:disabled) {
+        color: var(--c-text);
+    }
+
+    &[aria-selected="true"] {
+        border-bottom-color: var(--c-red);
+        color: var(--c-text);
+    }
+
+    &:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+    }
+
+    &:focus-visible {
+        @include focus-inset;
+    }
+}
+
+/* Ungespeichert: ein Punkt in der Warnfarbe, das Wort dazu für Bildschirmleser. */
+.changed {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--c-mod-engagement);
+}
+
+.panel {
+    min-width: 0;
+}
+
+/* --- Formulare ------------------------------------------------------------ */
+
+.form {
+    display: grid;
+    max-width: 880px;
+    gap: var(--s-5);
+}
+
+.row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: var(--s-3);
+
+    @include below(639px) {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+.fixed {
+    color: var(--c-text-dim);
+    font-size: 0.875rem;
+
+    code {
+        color: var(--c-text);
+        font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+    }
+}
+
+.switches {
+    display: grid;
+    gap: var(--s-1);
+}
+
+.switch {
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
+    min-height: 36px;
+    color: var(--c-text);
+    cursor: pointer;
+
+    input {
+        width: 18px;
+        height: 18px;
+        accent-color: var(--c-red);
+    }
+
+    @include touch-target;
+}
+
+.block {
+    display: grid;
+    padding: var(--s-4);
+    gap: var(--s-3);
+}
+
+.blockTitle {
+    color: var(--c-text);
+    font-size: 1rem;
+}
+
+.blockHint {
+    color: var(--c-text-faint);
+    font-size: 0.8125rem;
+}
+
+.empty {
+    display: grid;
+    max-width: 640px;
+    gap: var(--s-3);
+    justify-items: start;
+    color: var(--c-text-dim);
+}
+
+/* Editor links, Vorschau der Webseite rechts. Unter 1100 px darunter. */
+.workspace {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: var(--s-4);
+    align-items: start;
+
+    @include below(1099px) {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}

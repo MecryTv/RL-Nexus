@@ -1,0 +1,147 @@
+<link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@500;700&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+
+<style>
+  .rl { --base:#050608; --panel:#0a0f15; --fill:rgb(6 9 13/78%); --line:rgb(255 255 255/8%); --strong:rgb(255 255 255/14%);
+        --text:#f2f4f7; --dim:#a8b0bc; --faint:#7b8693; --blue:#00afff; --win:#35e07f; --loss:#ff4d5e; --yellow:#ffc53d; --purple:#b06bff; --red:#ff1e2d;
+        font-family: "Rajdhani", system-ui, sans-serif; color: var(--text); }
+  .cards.rl { grid-template-columns: 1fr !important; max-width: 1000px; }
+  .screen { background: var(--base); padding: 22px; border: 1px solid #222; }
+  .lbl { font-weight:700; font-size:11px; letter-spacing:.16em; text-transform:uppercase; }
+  h5 { font-family:Oxanium,sans-serif; font-size:22px; margin:0 0 4px; }
+  .meta { color: var(--dim); font-size:14px; margin-bottom:14px; }
+  .bar { display:flex; gap:10px; margin-bottom:16px; flex-wrap:wrap; }
+  .input { flex:1; min-width:200px; padding:9px 12px; border:1px solid var(--strong); background:var(--panel); color:var(--faint); font-size:14px; }
+  .seg { display:flex; gap:4px; }
+  .seg span { padding:8px 12px; border:1px solid var(--strong); color:var(--dim); font-size:14px; }
+  .seg span.on { border-color: var(--red); background: rgb(255 30 45/14%); color: var(--text); }
+  .btn { padding:9px 14px; background: linear-gradient(135deg,#ff1e2d,#d81424); color:#fff; font-weight:700; font-size:12px; letter-spacing:.14em; text-transform:uppercase;
+         clip-path: polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px); }
+  .av { width:28px; height:28px; border-radius:50%; background: linear-gradient(135deg,#2a3340,#151b23); display:grid; place-items:center; font-size:12px; font-weight:700; color:var(--dim); flex-shrink:0; }
+  .grp { --g: var(--blue); }
+  .tag { display:inline-flex; align-items:center; gap:6px; color: var(--g); }
+  .tag i { width:7px; height:7px; border-radius:50%; background: var(--g); }
+  .ro { color: var(--faint); font-size:12px; border:1px solid var(--strong); padding:2px 6px; }
+
+  /* A: Karten */
+  .grid { display:grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap:14px; }
+  .gcard { border:1px solid var(--line); background: var(--fill); border-top: 2px solid var(--g); }
+  .ghead { display:flex; align-items:center; justify-content:space-between; padding:12px 14px 4px; }
+  .gname { font-family:Oxanium,sans-serif; font-size:18px; display:flex; align-items:center; gap:8px; }
+  .gcount { font-family:Oxanium,sans-serif; color: var(--g); font-size:20px; }
+  .grant { padding: 0 14px 10px; color: var(--dim); font-size:13px; line-height:1.35; border-bottom:1px solid var(--line); }
+  .m { display:flex; align-items:center; gap:10px; padding:8px 14px; border-bottom:1px solid var(--line); font-size:14px; }
+  .m:last-child { border-bottom:0; }
+  .m .who { flex:1; min-width:0; }
+  .m .who small { display:block; color: var(--faint); font-size:12px; }
+  .m .act { color: var(--faint); font-size:12px; }
+  .add { padding:8px 14px; color: var(--blue); font-size:13px; font-weight:600; }
+  .derived { margin-top:14px; display:grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap:14px; }
+  .derived div { border:1px dashed var(--strong); padding:10px 14px; color: var(--dim); font-size:13px; }
+  .derived strong { color: var(--text); font-family:Oxanium,sans-serif; display:block; margin-bottom:2px; }
+  .hist { margin-top:16px; border:1px solid var(--line); background:var(--fill); }
+  .hist .row { display:flex; gap:10px; align-items:center; padding:7px 14px; border-bottom:1px solid var(--line); font-size:13px; color: var(--dim); }
+  .hist .row b { color: var(--text); font-weight:600; }
+  .hist .row time { color: var(--faint); width: 92px; flex-shrink:0; }
+
+  /* B: Liste links, Details rechts */
+  .split2 { display:grid; grid-template-columns: 250px 1fr; gap:14px; }
+  .nav a { display:block; padding:10px 12px; border:1px solid var(--line); border-left:3px solid var(--g); margin-bottom:6px; background: var(--fill); }
+  .nav a.on { background: color-mix(in srgb, var(--g) 12%, var(--panel)); border-color: color-mix(in srgb, var(--g) 50%, transparent); border-left-color: var(--g); }
+  .nav a .row1 { display:flex; justify-content:space-between; font-family:Oxanium,sans-serif; font-size:16px; }
+  .nav a .row1 span:last-child { color: var(--g); }
+  .nav a small { color: var(--faint); font-size:12px; line-height:1.3; display:block; margin-top:2px; }
+  .detail { border:1px solid var(--line); background: var(--fill); }
+  .detail .dh { padding:12px 14px; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; align-items:center; }
+  .tabs { display:flex; gap:16px; padding:0 14px; border-bottom:1px solid var(--line); }
+  .tabs span { padding:9px 0; color: var(--faint); font-size:14px; }
+  .tabs span.on { color: var(--text); box-shadow: inset 0 -2px 0 var(--red); }
+  table { width:100%; border-collapse:collapse; font-size:14px; }
+  th { text-align:left; color: var(--faint); padding:8px 14px; border-bottom:1px solid var(--strong); }
+  td { padding:8px 14px; border-bottom:1px solid var(--line); color: var(--dim); }
+  td .p { display:flex; align-items:center; gap:8px; color: var(--text); }
+</style>
+
+<h2>Wie soll die Gruppenübersicht aussehen?</h2>
+<p class="subtitle">Reihenfolge überall: Administrator, Developer, Partner, Premium. Developer kommen aus DEV_USER_IDs des Bots und lassen sich hier nur ansehen. Guardian und Testphase ergeben sich von selbst und stehen nur als Erklärung da.</p>
+
+<div class="cards rl">
+  <div class="card" data-choice="a-karten" onclick="toggleSelect(this)">
+    <div class="screen">
+      <h5>Gruppen</h5>
+      <div class="meta">14 Personen mit Gruppe. Gilt im Bot-Dashboard.</div>
+      <div class="bar"><span class="input">Name, ID oder Notiz suchen …</span>
+        <span class="seg"><span class="on">Alle</span><span>Administrator</span><span>Developer</span><span>Partner</span><span>Premium</span></span>
+        <span class="btn">+ Gruppe vergeben</span></div>
+      <div class="grid">
+        <div class="gcard grp" style="--g:#ff3344">
+          <div class="ghead"><span class="gname"><span class="tag"><i></i></span>Administrator</span><span class="gcount">2</span></div>
+          <div class="grant">Sieht jeden Server, auf dem RL Nexus läuft.</div>
+          <div class="m"><span class="av">MC</span><span class="who">mecry <small>seit 5. Okt. 2026 · von nutzer2</small></span><span class="act">Ändern · Entziehen</span></div>
+          <div class="m"><span class="av">LX</span><span class="who">lexa <small>seit 6. Okt. 2026 · von mecry · „Orga-Leitung“</small></span><span class="act">Ändern · Entziehen</span></div>
+        </div>
+        <div class="gcard grp" style="--g:#b06bff">
+          <div class="ghead"><span class="gname">Developer <span class="ro">aus dem Bot</span></span><span class="gcount">3</span></div>
+          <div class="grant">Sieht jeden Server und darf Entwickler-Befehle ausführen.</div>
+          <div class="m"><span class="av">MC</span><span class="who">mecry <small>DEV_USER_IDs</small></span></div>
+          <div class="m"><span class="av">TK</span><span class="who">tekk <small>DEV_USER_IDs</small></span></div>
+          <div class="m"><span class="av">JN</span><span class="who">jonas <small>DEV_USER_IDs</small></span></div>
+        </div>
+        <div class="gcard grp" style="--g:#00afff">
+          <div class="ghead"><span class="gname">Partner</span><span class="gcount">4</span></div>
+          <div class="grant">Kennzeichnung für Partner-Organisationen.</div>
+          <div class="m"><span class="av">VE</span><span class="who">Vexa Esports <small>seit 2. Okt. 2026 · von lexa</small></span><span class="act">Ändern · Entziehen</span></div>
+          <div class="add">+ 3 weitere zeigen</div>
+        </div>
+        <div class="gcard grp" style="--g:#ffc53d">
+          <div class="ghead"><span class="gname">Premium</span><span class="gcount">5</span></div>
+          <div class="grant">Kennzeichnung für Premium-Zugang. Freigeschaltet ist daran heute noch nichts.</div>
+          <div class="m"><span class="av">RB</span><span class="who">rocketbob <small>seit 1. Okt. 2026 · von mecry · „Gewinner Cup 3“</small></span><span class="act">Ändern · Entziehen</span></div>
+          <div class="add">+ 4 weitere zeigen</div>
+        </div>
+      </div>
+      <div class="derived">
+        <div><strong>Guardian</strong>Wer keine Gruppe hat, aber irgendwo Moderator ist. Ergibt sich von selbst.</div>
+        <div><strong>Testphase</strong>Alle anderen. Sehen nur Server, auf denen sie Owner oder Admin sind.</div>
+      </div>
+      <div class="hist">
+        <div class="row"><span class="lbl" style="color:#a8b0bc">Verlauf</span></div>
+        <div class="row"><time>heute 09:12</time><span><b>mecry</b> hat <b>rocketbob</b> Premium gegeben</span></div>
+        <div class="row"><time>gestern 18:40</time><span><b>lexa</b> hat <b>kiwi</b> Partner entzogen</span></div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A · Karten je Gruppe auf einer Seite</h3>
+      <p>Alle Gruppen auf einen Blick, je Karte die Mitglieder und was die Gruppe freischaltet. Lange Gruppen klappen nach fünf Personen zu. Der Verlauf steht darunter.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="b-liste" onclick="toggleSelect(this)">
+    <div class="screen">
+      <h5>Gruppen</h5>
+      <div class="meta">14 Personen mit Gruppe. Gilt im Bot-Dashboard.</div>
+      <div class="bar"><span class="input">Name, ID oder Notiz suchen …</span><span class="btn">+ Gruppe vergeben</span></div>
+      <div class="split2">
+        <div class="nav">
+          <a class="grp on" style="--g:#ff3344"><div class="row1"><span>Administrator</span><span>2</span></div><small>Sieht jeden Server.</small></a>
+          <a class="grp" style="--g:#b06bff"><div class="row1"><span>Developer</span><span>3</span></div><small>Aus dem Bot, nur ansehen.</small></a>
+          <a class="grp" style="--g:#00afff"><div class="row1"><span>Partner</span><span>4</span></div><small>Partner-Organisationen.</small></a>
+          <a class="grp" style="--g:#ffc53d"><div class="row1"><span>Premium</span><span>5</span></div><small>Noch ohne Freischaltung.</small></a>
+          <a class="grp" style="--g:#7b8693"><div class="row1"><span>Guardian · Testphase</span><span></span></div><small>Ergeben sich von selbst.</small></a>
+        </div>
+        <div class="detail">
+          <div class="dh"><span class="gname" style="font-family:Oxanium;font-size:18px">Administrator</span><span style="color:#a8b0bc;font-size:13px">Sieht jeden Server, auf dem RL Nexus läuft.</span></div>
+          <div class="tabs"><span class="on">Mitglieder (2)</span><span>Verlauf</span></div>
+          <table>
+            <tr><th>Person</th><th>Seit</th><th>Vergeben von</th><th>Notiz</th></tr>
+            <tr><td><span class="p"><span class="av">MC</span>mecry</span></td><td>5. Okt. 2026</td><td>nutzer2</td><td>–</td></tr>
+            <tr><td><span class="p"><span class="av">LX</span>lexa</span></td><td>6. Okt. 2026</td><td>mecry</td><td>Orga-Leitung</td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B · Gruppen links, Mitglieder rechts</h3>
+      <p>Links die Gruppen mit Anzahl, rechts die gewählte als Tabelle mit Tab für den Verlauf. Übersichtlicher bei vielen Premium-Leuten, dafür sieht man immer nur eine Gruppe.</p>
+    </div>
+  </div>
+</div>

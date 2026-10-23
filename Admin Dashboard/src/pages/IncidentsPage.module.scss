@@ -1,0 +1,191 @@
+@use "mixins" as *;
+
+.heading {
+    color: var(--c-text-dim);
+
+    @include label(0.85rem, 0.16em);
+}
+
+.empty {
+    color: var(--c-text-faint);
+    font-size: 0.875rem;
+}
+
+.meta {
+    color: var(--c-text-faint);
+    font-size: 0.8125rem;
+}
+
+.actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-2);
+}
+
+/* --- Gerade --------------------------------------------------------------- */
+
+/* --- Neue Meldung --------------------------------------------------------- */
+
+.formPanel {
+    display: grid;
+    gap: var(--s-3);
+    max-width: 760px;
+    margin-bottom: var(--s-5);
+    padding: var(--s-4);
+}
+
+.form {
+    display: grid;
+    gap: var(--s-4);
+}
+
+.services {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-2) var(--s-4);
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+.legend {
+    float: left;
+    width: 100%;
+    margin-bottom: var(--s-1);
+    padding: 0;
+    color: var(--c-text-dim);
+
+    @include label(0.75rem, 0.14em);
+}
+
+.check {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-2);
+    min-height: 36px;
+    color: var(--c-text);
+    cursor: pointer;
+
+    input {
+        width: 18px;
+        height: 18px;
+        accent-color: var(--c-red);
+    }
+
+    @include touch-target;
+}
+
+.row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--s-3);
+
+    @include below(599px) {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+/* --- Offene Meldungen ----------------------------------------------------- */
+
+.section {
+    display: grid;
+    gap: var(--s-3);
+    margin-bottom: var(--s-6);
+}
+
+.cards {
+    display: grid;
+    gap: var(--s-4);
+}
+
+.card {
+    display: grid;
+    gap: var(--s-3);
+    padding: var(--s-4);
+    border: 1px solid color-mix(in srgb, var(--c-mod-engagement) 40%, transparent);
+    border-left: 3px solid var(--c-mod-engagement);
+    background: color-mix(in srgb, var(--c-mod-engagement) 5%, var(--c-panel-fill));
+}
+
+.planned {
+    border-color: color-mix(in srgb, var(--c-blue) 40%, transparent);
+    border-left-color: var(--c-blue);
+    background: color-mix(in srgb, var(--c-blue) 5%, var(--c-panel-fill));
+}
+
+.cardHead {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--s-2) var(--s-4);
+}
+
+.kind {
+    color: var(--c-text-faint);
+
+    @include label(0.72rem, 0.16em);
+}
+
+.title {
+    color: var(--c-text);
+    font-family: var(--f-display);
+    font-size: 1.15rem;
+}
+
+.timeline {
+    display: grid;
+    gap: var(--s-2);
+
+    li {
+        padding-left: var(--s-3);
+        border-left: 2px solid var(--c-line-strong);
+    }
+
+    p {
+        color: var(--c-text);
+        font-size: 0.9375rem;
+        line-height: 1.5;
+        overflow-wrap: anywhere;
+    }
+}
+
+.when {
+    color: var(--c-text-faint);
+    font-size: 0.8125rem;
+}
+
+.update {
+    display: grid;
+    gap: var(--s-3);
+    padding-top: var(--s-3);
+    border-top: 1px solid var(--c-line);
+}
+
+/* --- Vergangene ----------------------------------------------------------- */
+
+.past {
+    border: 1px solid var(--c-line);
+    background: var(--c-panel-fill);
+
+    li {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: var(--s-1) var(--s-4);
+        padding: var(--s-2) var(--s-4);
+        border-bottom: 1px solid var(--c-line);
+
+        &:last-child {
+            border-bottom: 0;
+        }
+    }
+}
+
+.pastTitle {
+    flex: 1 1 260px;
+    min-width: 0;
+    color: var(--c-text);
+    overflow-wrap: anywhere;
+}

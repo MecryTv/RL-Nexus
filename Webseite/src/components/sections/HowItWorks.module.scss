@@ -1,0 +1,98 @@
+@use "mixins" as *;
+
+.section {
+    position: relative;
+
+    /* Ein schwaches blaues Licht hinter dem Abschnitt - dasselbe Mittel wie auf
+       der Karte, damit die Seite beim Scrollen nicht gleichförmig bleibt. */
+    &::before {
+        position: absolute;
+        z-index: -1;
+        left: 50%;
+        width: min(1100px, 90vw);
+        height: 520px;
+        translate: -50% 0;
+        background: radial-gradient(ellipse at center, rgb(0 175 255 / 8%), transparent 70%);
+        content: "";
+        inset-block: 0 auto;
+    }
+}
+
+.steps {
+    display: grid;
+    gap: var(--s-gap);
+    margin-top: 52px;
+    counter-reset: step;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+}
+
+.item {
+    display: flex;
+}
+
+.step {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 30px 26px 28px;
+    width: 100%;
+}
+
+/* Die Nummer, groß und blass in der Ecke - sie ordnet, ohne zu drängen. */
+.number {
+    position: absolute;
+    top: 14px;
+    right: 20px;
+    color: color-mix(in srgb, var(--accent) 16%, transparent);
+    font-family: var(--f-accent);
+    font-size: 3.1rem;
+    font-weight: 700;
+    line-height: 1;
+    pointer-events: none;
+}
+
+.icon {
+    display: grid;
+    width: 50px;
+    height: 50px;
+    margin-bottom: 4px;
+    background: color-mix(in srgb, var(--accent) 13%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent);
+    color: var(--accent);
+    place-items: center;
+
+    @include bevel-diagonal(11px);
+}
+
+.title {
+    font-size: 1.2rem;
+    font-weight: 700;
+}
+
+.text {
+    color: var(--c-text-dim);
+    font-size: 0.92rem;
+    line-height: 1.65;
+}
+
+/* --- Abschluss ---------------------------------------------------------- */
+.action {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    margin-top: 44px;
+    text-align: center;
+}
+
+.note {
+    color: var(--c-text-faint);
+    font-size: 0.82rem;
+
+    code {
+        color: var(--c-text-dim);
+        font-family: var(--f-label);
+        font-size: 0.88rem;
+        font-weight: 600;
+    }
+}

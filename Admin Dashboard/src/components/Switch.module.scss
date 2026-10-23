@@ -1,0 +1,32 @@
+@use "mixins" as *;
+
+.wrap {
+    display: grid;
+    gap: var(--s-1);
+}
+
+.switch {
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
+    min-height: 40px;
+    color: var(--c-text);
+    cursor: pointer;
+
+    /* flex: none: Bei langem Text bricht der Text um, das Kästchen bleibt gleich groß. */
+    input {
+        flex: none;
+        width: 18px;
+        height: 18px;
+        accent-color: var(--c-red);
+    }
+
+    @include touch-target;
+}
+
+.hint {
+    margin: 0 0 0 26px;
+    color: var(--c-text-faint);
+    font-size: 0.8125rem;
+    line-height: 1.45;
+}

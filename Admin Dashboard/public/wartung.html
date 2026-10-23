@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="de">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="robots" content="noindex" />
+        <meta name="theme-color" content="#050608" />
+        <title>Wartung · RL Nexus</title>
+        <!--
+            Die Wartungsseite für Webseite und Bot-Dashboard. nginx zeigt sie mit
+            Status 503, solange in data/flags die passende Datei liegt (Schalter
+            unter /dev/wartung im Admin Dashboard). Alles steht in dieser einen
+            Datei, ohne Schriften, Bilder oder Skripte von außen: Sie muss auch
+            stehen, wenn sonst nichts läuft. Farben aus _tokens.scss der Webseite.
+        -->
+        <style>
+            :root {
+                color-scheme: dark;
+            }
+
+            * {
+                box-sizing: border-box;
+            }
+
+            body {
+                display: grid;
+                min-height: 100vh;
+                min-height: 100dvh;
+                margin: 0;
+                padding: 24px 16px;
+                place-items: center;
+                background:
+                    radial-gradient(circle at 50% 38%, rgb(255 30 45 / 12%), transparent 52%),
+                    #050608;
+                color: #f2f4f7;
+                font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+                line-height: 1.6;
+            }
+
+            main {
+                width: 100%;
+                max-width: 520px;
+                text-align: center;
+            }
+
+            .wordmark {
+                margin: 0 0 32px;
+                font-size: 1.05rem;
+                font-weight: 800;
+                letter-spacing: 0.08em;
+            }
+
+            .wordmark span {
+                color: #ff1e2d;
+            }
+
+            .label {
+                margin: 0 0 10px;
+                color: #ff1e2d;
+                font-size: 0.75rem;
+                font-weight: 700;
+                letter-spacing: 0.22em;
+                text-transform: uppercase;
+            }
+
+            h1 {
+                margin: 0 0 14px;
+                font-size: clamp(1.9rem, 6vw, 2.6rem);
+                line-height: 1.1;
+                letter-spacing: -0.015em;
+            }
+
+            p {
+                margin: 0 0 28px;
+                color: #a8b0bc;
+            }
+
+            a {
+                display: inline-block;
+                padding: 12px 22px;
+                background: #d81424;
+                color: #fff;
+                font-weight: 700;
+                letter-spacing: 0.06em;
+                text-decoration: none;
+                text-transform: uppercase;
+                clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+            }
+
+            /* Dunkler statt heller: Weiß auf #ff1e2d hätte nur 3,8:1. */
+            a:hover {
+                background: #b80f1d;
+            }
+
+            a:focus-visible {
+                outline: 2px solid #00afff;
+                outline-offset: 3px;
+            }
+
+            /* Die Mailadresse als Text mit Link, nicht als zweiter Knopf. */
+            .mail {
+                margin: 24px 0 0;
+                font-size: 0.9rem;
+            }
+
+            .mail a {
+                display: inline;
+                padding: 0;
+                background: none;
+                color: #f2f4f7;
+                font-weight: 600;
+                letter-spacing: 0;
+                text-decoration: underline;
+                text-transform: none;
+                clip-path: none;
+            }
+
+            .mail a:hover {
+                background: none;
+                color: #00afff;
+            }
+        </style>
+    </head>
+    <body>
+        <main>
+            <p class="wordmark">RL <span>NEXUS</span></p>
+            <p class="label">Wartung</p>
+            <h1>Gleich wieder da.</h1>
+            <p>Gerade wird etwas umgebaut. In ein paar Minuten läuft alles wieder. Was los ist, steht im Support-Server.</p>
+            <a href="https://discord.gg/CjG2HFGw95">Zum Support-Server</a>
+            <p class="mail">Oder per Mail an <a href="mailto:support@nexus-emb.de">support@nexus-emb.de</a></p>
+        </main>
+    </body>
+</html>

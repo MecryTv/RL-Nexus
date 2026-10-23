@@ -1,0 +1,36 @@
+@use "mixins" as *;
+
+.field {
+    display: grid;
+    min-width: 0;
+    gap: var(--s-1);
+}
+
+.head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--s-2);
+}
+
+.label {
+    color: var(--c-text-dim);
+
+    @include label(0.75rem, 0.14em);
+}
+
+.counter {
+    color: var(--c-text-faint);
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.hint {
+    color: var(--c-text-faint);
+    font-size: 0.8125rem;
+}
+
+.error {
+    color: var(--c-loss);
+    font-size: 0.8125rem;
+}

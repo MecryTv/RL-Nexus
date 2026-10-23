@@ -1,0 +1,327 @@
+@use "mixins" as *;
+
+.heading {
+    color: var(--c-text-dim);
+
+    @include label(0.85rem, 0.16em);
+}
+
+.none {
+    color: var(--c-text-faint);
+    font-size: 0.875rem;
+}
+
+.note {
+    color: var(--c-text-dim);
+}
+
+.link {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-1);
+    color: var(--c-blue);
+    font-size: 0.875rem;
+
+    &:hover {
+        color: var(--c-text);
+    }
+
+    &:focus-visible {
+        @include focus-ring;
+    }
+}
+
+/* --- Formular ------------------------------------------------------------- */
+
+.formPanel {
+    display: grid;
+    gap: var(--s-3);
+    max-width: 760px;
+    margin-bottom: var(--s-5);
+    padding: var(--s-4);
+}
+
+.form {
+    display: grid;
+    gap: var(--s-4);
+}
+
+.idBlock {
+    display: grid;
+}
+
+.preview {
+    display: grid;
+    gap: var(--s-2);
+
+    &:not(:empty) {
+        margin-top: var(--s-3);
+    }
+}
+
+.searching {
+    color: var(--c-text-faint);
+    font-size: 0.875rem;
+}
+
+.unknown {
+    color: var(--c-loss);
+    font-size: 0.875rem;
+}
+
+.current {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s-2);
+    color: var(--c-text-dim);
+    font-size: 0.875rem;
+}
+
+.formRow {
+    display: grid;
+    grid-template-columns: minmax(180px, 240px) minmax(0, 1fr);
+    gap: var(--s-3);
+
+    @include below(599px) {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+.grantHint {
+    padding-left: var(--s-3);
+    border-left: 2px solid var(--c-line-strong);
+    color: var(--c-text-dim);
+    font-size: 0.875rem;
+}
+
+.formActions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-2);
+}
+
+/* --- Suche und Filter ----------------------------------------------------- */
+
+.toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: var(--s-3) var(--s-5);
+    margin-bottom: var(--s-4);
+}
+
+.search {
+    flex: 1 1 240px;
+    max-width: 380px;
+}
+
+/* --- Karten --------------------------------------------------------------- */
+
+.grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+    gap: var(--s-4);
+
+    @include below(899px) {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+/* `--group` setzt GroupsPage.tsx: die Farbe der Gruppe als Linie oben und Punkt. */
+.card {
+    min-width: 0;
+    border: 1px solid var(--c-line);
+    border-top: 2px solid var(--group);
+    background: var(--c-panel-fill);
+}
+
+.cardHead {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--s-3);
+    padding: var(--s-3) var(--s-4) var(--s-1);
+}
+
+.cardTitle {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s-2);
+    color: var(--c-text);
+    font-family: var(--f-display);
+    font-size: 1.15rem;
+}
+
+.dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--group);
+}
+
+.source {
+    padding: 1px 6px;
+    border: 1px solid var(--c-line-strong);
+    color: var(--c-text-faint);
+    font-family: var(--f-label);
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+}
+
+.count {
+    color: var(--group);
+    font-family: var(--f-display);
+    font-size: 1.35rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.grants {
+    padding: 0 var(--s-4) var(--s-3);
+    border-bottom: 1px solid var(--c-line);
+    color: var(--c-text-dim);
+    font-size: 0.875rem;
+    line-height: 1.45;
+}
+
+.card > .none {
+    padding: var(--s-3) var(--s-4);
+}
+
+.members {
+    display: grid;
+}
+
+.member {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-2) var(--s-3);
+    padding: var(--s-2) var(--s-4);
+    border-bottom: 1px solid var(--c-line);
+
+    &:last-child {
+        border-bottom: 0;
+    }
+}
+
+.who {
+    display: grid;
+    flex: 1 1 200px;
+    gap: 2px;
+    min-width: 0;
+}
+
+.meta {
+    padding-left: 28px;
+    color: var(--c-text-faint);
+    font-size: 0.8125rem;
+    overflow-wrap: anywhere;
+}
+
+.wins {
+    padding-left: 28px;
+    color: var(--c-mod-engagement);
+    font-size: 0.8125rem;
+}
+
+.actions {
+    display: flex;
+    gap: var(--s-1);
+}
+
+.more {
+    display: flex;
+    align-items: center;
+    gap: var(--s-1);
+    width: 100%;
+    padding: var(--s-2) var(--s-4);
+    border-top: 1px solid var(--c-line);
+    color: var(--c-blue);
+    font-size: 0.875rem;
+    text-align: left;
+
+    @include touch-target;
+
+    &:hover {
+        color: var(--c-text);
+    }
+
+    &:focus-visible {
+        @include focus-inset;
+    }
+}
+
+/* Guardian und Testphase: keine Mitglieder, nur die Erklärung. */
+.derived {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--s-4);
+    margin-top: var(--s-4);
+
+    p {
+        padding: var(--s-3) var(--s-4);
+        border: 1px dashed var(--c-line-strong);
+        color: var(--c-text-dim);
+        font-size: 0.875rem;
+        line-height: 1.45;
+    }
+
+    strong {
+        display: block;
+        margin-bottom: 2px;
+        color: var(--c-text);
+        font-family: var(--f-display);
+        font-size: 1rem;
+    }
+
+    @include below(899px) {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+/* --- Verlauf -------------------------------------------------------------- */
+
+.history {
+    display: grid;
+    gap: var(--s-2);
+    margin-top: var(--s-6);
+}
+
+.historyHead {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--s-2);
+}
+
+.events {
+    border: 1px solid var(--c-line);
+    background: var(--c-panel-fill);
+
+    li {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--s-1) var(--s-4);
+        padding: var(--s-2) var(--s-4);
+        border-bottom: 1px solid var(--c-line);
+        color: var(--c-text);
+        font-size: 0.875rem;
+
+        &:last-child {
+            border-bottom: 0;
+        }
+    }
+
+    time {
+        flex-shrink: 0;
+        min-width: 150px;
+        color: var(--c-text-faint);
+        font-variant-numeric: tabular-nums;
+    }
+}

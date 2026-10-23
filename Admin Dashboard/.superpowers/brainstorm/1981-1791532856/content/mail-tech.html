@@ -1,0 +1,77 @@
+<style>
+  .flow { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:10px 0 14px; font-size:14px; }
+  .node { padding:8px 12px; border:1px solid var(--border, #3d3d3f); background: var(--bg-tertiary, #2d2d2f); border-radius:4px; }
+  .node.hl { border-color:#ff1e2d; }
+  .arrow { color: var(--text-secondary, #9aa0a6); }
+  .card-body ul { margin:6px 0 0; padding-left:18px; line-height:1.55; }
+  .card-body li { margin-bottom:3px; }
+  .plus { color:#35e07f; font-weight:700; }
+  .minus { color:#ff4d5e; font-weight:700; }
+  .rec { display:inline-block; margin-left:8px; padding:2px 8px; font-size:12px; font-weight:700; color:#35e07f; border:1px solid #35e07f; border-radius:3px; vertical-align:2px; }
+  .deps { margin-top:20px; }
+  .deps table { border-collapse:collapse; width:100%; max-width:900px; font-size:14px; }
+  .deps th, .deps td { text-align:left; padding:7px 10px; border-bottom:1px solid var(--border, #3d3d3f); }
+  .deps th { color: var(--text-secondary, #9aa0a6); font-weight:600; }
+  .deps code { font-size:13px; }
+</style>
+
+<h2>Wie kommt der Mailclient an die Mails?</h2>
+<p class="subtitle">Zwei Wege. Klick den an, den du willst. Unten steht, was dafür neu dazukommt.</p>
+
+<div class="options">
+  <div class="option" data-choice="a-imap-direkt" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Direkt über IMAP, ohne Kopie <span class="rec">Empfehlung</span></h3>
+      <div class="flow">
+        <span class="node">Admin Dashboard</span><span class="arrow">⇄</span>
+        <span class="node hl">Admin-Server</span><span class="arrow">⇄ IMAP / SMTP ⇄</span>
+        <span class="node">mailcow</span><span class="arrow">⇄</span>
+        <span class="node">SnappyMail, Handy</span>
+      </div>
+      <div class="card-body">
+        <ul>
+          <li><span class="plus">+</span> Gelesen, archiviert, gelöscht wird direkt in mailcow. SnappyMail und Handy sehen genau dasselbe.</li>
+          <li><span class="plus">+</span> Neue Mails meldet mailcow sofort (IMAP IDLE). Sie erscheinen live, ohne Neuladen.</li>
+          <li><span class="plus">+</span> Gespeichert wird nur die Liste der Postfächer mit verschlüsseltem App-Passwort und Signatur. Keine Mails in der Datenbank.</li>
+          <li><span class="plus">+</span> Gesendetes landet automatisch im Ordner „Gesendet“ des Postfachs.</li>
+          <li><span class="minus">−</span> Wie schnell Liste und Suche sind, hängt an mailcow. Dessen Volltextsuche ist aber gut.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b-kopie-db" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Alle Mails in die Datenbank kopieren</h3>
+      <div class="flow">
+        <span class="node">Admin Dashboard</span><span class="arrow">⇄</span>
+        <span class="node hl">Admin-Server</span><span class="arrow">⇄</span>
+        <span class="node">MariaDB (Kopie aller Mails)</span><span class="arrow">⇄ Abgleich ⇄</span>
+        <span class="node">mailcow</span>
+      </div>
+      <div class="card-body">
+        <ul>
+          <li><span class="plus">+</span> Liste und Suche sind schneller.</li>
+          <li><span class="minus">−</span> Der Server muss ständig abgleichen, was gelöscht, verschoben oder gelesen wurde. Das ist eine eigene Fehlerquelle.</li>
+          <li><span class="minus">−</span> Jede Mail liegt doppelt vor, auch in jedem Datenbank-Backup. Für den Datenschutz schlechter.</li>
+          <li><span class="minus">−</span> Deutlich mehr Code, länger bis es fertig ist.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="deps">
+  <h3>Was für A neu dazukommt</h3>
+  <table>
+    <tr><th>Was</th><th>Wofür</th></tr>
+    <tr><td><code>imapflow</code></td><td>Verbindung zu mailcow: Ordner, Liste, Mails, live bei neuen Mails</td></tr>
+    <tr><td><code>mailparser</code></td><td>Mails zerlegen: Absender, Text, HTML, Anhänge</td></tr>
+    <tr><td><code>sanitize-html</code></td><td>HTML-Mails entschärfen. Externe Bilder bleiben gesperrt, bis du sie per Klick erlaubst (Tracking-Pixel)</td></tr>
+    <tr><td>TipTap</td><td>Der Editor mit fett, kursiv, Listen, Links, Knopf</td></tr>
+    <tr><td><code>nodemailer</code></td><td>Senden über SMTP, ist schon installiert</td></tr>
+    <tr><td><code>MAIL_KEY</code> in der .env</td><td>Schlüssel für die App-Passwörter. Getrennt vom Sitzungsschlüssel, damit ein neuer Sitzungsschlüssel keine Postfächer aussperrt</td></tr>
+  </table>
+</div>

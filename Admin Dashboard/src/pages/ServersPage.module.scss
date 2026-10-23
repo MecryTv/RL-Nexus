@@ -1,0 +1,18 @@
+@use "mixins" as *;
+
+.toolbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(160px, 220px);
+    gap: var(--s-3);
+    margin-bottom: var(--s-4);
+
+    @include below(559px) {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+.count {
+    margin-bottom: var(--s-2);
+    color: var(--c-text-faint);
+    font-size: 0.875rem;
+}

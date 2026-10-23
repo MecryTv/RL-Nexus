@@ -1,0 +1,179 @@
+@use "mixins" as *;
+
+/* Die Kasse nach Entwurf B (brainstorm/kaufablauf.html, „Kasse über der Seite“). */
+
+.dialog {
+    max-width: 880px;
+
+    @include below(640px) {
+        min-height: 100dvh;
+    }
+}
+
+.box {
+    position: relative;
+    display: grid;
+    gap: 26px;
+    padding: 28px;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+
+    @include panel(var(--c-line-strong), #070b10, 18px);
+
+    @include below(640px) {
+        min-height: 100%;
+        padding: 56px 18px 28px;
+        grid-template-columns: 1fr;
+        clip-path: none;
+
+        &::before {
+            clip-path: none;
+        }
+    }
+}
+
+.close {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    display: grid;
+    width: 44px;
+    height: 44px;
+    border: 0;
+    background: transparent;
+    color: var(--c-text-dim);
+    cursor: pointer;
+    place-items: center;
+
+    &:hover {
+        color: var(--c-text);
+    }
+
+    &:focus-visible {
+        @include focus-ring;
+    }
+}
+
+.label {
+    color: var(--c-text-dim);
+
+    @include label(0.74rem, 0.16em);
+}
+
+.order,
+.payment {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.who {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    background: rgb(88 101 242 / 10%);
+    box-shadow: inset 0 0 0 1px rgb(88 101 242 / 35%);
+
+    span {
+        display: flex;
+        min-width: 0;
+        flex-direction: column;
+    }
+
+    small {
+        overflow: hidden;
+        color: var(--c-text-dim);
+        font-size: 0.82rem;
+        text-overflow: ellipsis;
+    }
+}
+
+.lines {
+    display: flex;
+    flex-direction: column;
+
+    div {
+        display: flex;
+        justify-content: space-between;
+        gap: 14px;
+        padding: 8px 0;
+        border-bottom: 1px solid var(--c-line);
+        color: var(--c-text-dim);
+        font-size: 0.92rem;
+    }
+
+    dd {
+        color: var(--c-text);
+        text-align: right;
+    }
+}
+
+.total {
+    border-bottom: 0 !important;
+    color: var(--c-text) !important;
+    font-size: 1.05rem !important;
+    font-weight: 700;
+}
+
+.tax {
+    color: var(--c-text-faint);
+    font-size: 0.8rem;
+}
+
+.check {
+    display: flex;
+    min-height: 44px;
+    align-items: flex-start;
+    gap: 10px;
+    color: var(--c-text-dim);
+    cursor: pointer;
+    font-size: 0.86rem;
+    line-height: 1.45;
+
+    input {
+        flex: none;
+        width: 18px;
+        height: 18px;
+        margin-top: 1px;
+        accent-color: var(--c-red);
+        cursor: pointer;
+
+        &:focus-visible {
+            @include focus-ring;
+        }
+
+        &:disabled {
+            cursor: default;
+        }
+    }
+
+    a {
+        color: var(--c-text);
+        text-decoration: underline;
+        text-underline-offset: 2px;
+    }
+}
+
+.stripe {
+    min-width: 0;
+}
+
+.summary {
+    color: var(--c-text);
+    font-size: 0.88rem;
+    line-height: 1.5;
+}
+
+.error {
+    padding: 10px 12px;
+    background: rgb(255 77 94 / 10%);
+    box-shadow: inset 0 0 0 1px rgb(255 77 94 / 40%);
+    color: var(--c-text);
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+
+.wide {
+    width: 100%;
+}

@@ -1,0 +1,620 @@
+@use "mixins" as *;
+
+.frame {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    /* Leicht gekippt, wie eine hingelegte Karte. Nicht mehr - eine schräge
+       Fläche voller Zahlen wird sonst mühsam zu lesen. */
+    transform: perspective(1800px) rotateY(-6deg) rotateX(1.5deg);
+    transform-style: preserve-3d;
+
+    /* Sobald die Karte unter dem Text steht statt daneben, hat die Neigung
+       keinen Bezug mehr - sie wirkt dann nur noch schief. */
+    @include below(1080px) {
+        transform: none;
+    }
+}
+
+/**
+ * Ein Panel innerhalb der Karte.
+ *
+ * Auf der echten Karte hat jeder Block eine leuchtende rote Kante. Umgesetzt
+ * über `box-shadow: inset` statt über einen zweiten Pseudo-Element-Rahmen: bei
+ * dieser Größe ist der Unterschied nicht zu sehen, und es spart je Block ein
+ * Element.
+ */
+@mixin card-panel($cut: 12px) {
+    background: rgb(255 255 255 / 2.4%);
+    box-shadow: inset 0 0 0 1.4px rgb(255 30 45 / 46%);
+
+    @include bevel($cut);
+}
+
+/**
+ * Die Karte selbst.
+ *
+ * Der Grund folgt `drawBackground()` im Bot: Verlauf, zwei weiche Lichter,
+ * Raster, Vignette. Die roten Kanten der Panels darin sind das, woran man die
+ * Karte auf einen Blick erkennt.
+ */
+.card {
+    /*
+     * Die Karte richtet sich nach ihrer eigenen Breite, nicht nach der des
+     * Fensters: sie steht im Hero neben dem Text, auf der Modulseite allein
+     * und auf dem Handy über die volle Breite. Ein Umbruchpunkt am Viewport
+     * träfe in zwei dieser drei Fälle daneben.
+     */
+    container: rankcard / inline-size;
+
+    /* Die Karte richtet ihren Text selbst aus. Ohne das erbt sie die
+       Zentrierung des Abschnitts, in dem sie gerade steht - und dann sitzt
+       "1v1" mittig über einem Panel, in dem alles andere links steht. */
+    text-align: left;
+
+    position: relative;
+    display: flex;
+    isolation: isolate;
+    flex-direction: column;
+    gap: 14px;
+    padding: 16px;
+    background: linear-gradient(155deg, rgb(255 30 45 / 60%), rgb(255 255 255 / 9%) 45%, rgb(0 175 255 / 26%));
+    filter: drop-shadow(0 30px 60px rgb(0 0 0 / 62%));
+
+    @include bevel(18px);
+
+    &::before {
+        position: absolute;
+        z-index: -1;
+        background:
+            radial-gradient(ellipse 70% 90% at 88% 82%, rgb(255 30 45 / 18%), transparent 62%),
+            radial-gradient(ellipse 60% 80% at 8% 0%, rgb(0 130 200 / 14%), transparent 60%),
+            linear-gradient(155deg, #0a0e14, #050608 55%, #07090d);
+        content: "";
+        inset: 1.5px;
+
+        @include bevel(17px);
+    }
+
+    /* Das Raster der Karte - über der Füllung, unter dem Inhalt. */
+    &::after {
+        position: absolute;
+        z-index: -1;
+        background:
+            linear-gradient(rgb(255 255 255 / 2.2%) 1px, transparent 1px) 0 0 / 100% 30px,
+            linear-gradient(90deg, rgb(255 255 255 / 2.2%) 1px, transparent 1px) 0 0 / 30px 100%;
+        content: "";
+        inset: 1.5px;
+
+        @include bevel(17px);
+    }
+}
+
+/* --- Kopf --------------------------------------------------------------- */
+.head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 14px 16px;
+
+    @include card-panel(14px);
+}
+
+.identity {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    min-width: 0;
+}
+
+/* Rund und mit rotem Ring - wie der Avatar auf der echten Karte. */
+.avatar {
+    display: grid;
+    flex-shrink: 0;
+    overflow: hidden;
+    width: 54px;
+    height: 54px;
+    border-radius: 50%;
+    background: #0b0f15;
+    box-shadow:
+        inset 0 0 0 2px var(--c-red),
+        0 0 14px rgb(255 30 45 / 45%);
+    place-items: center;
+
+    img {
+        width: 40px;
+        height: 40px;
+        object-fit: contain;
+    }
+}
+
+.who {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.tag {
+    color: var(--c-red);
+    line-height: 1.1;
+
+    @include label(0.62rem, 0.1em);
+}
+
+.player {
+    overflow: hidden;
+    color: var(--c-text);
+    font-size: 1.5rem;
+    font-weight: 800;
+    letter-spacing: -0.015em;
+    line-height: 1.1;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.handle {
+    color: var(--c-text-faint);
+    font-size: 0.76rem;
+    line-height: 1.4;
+}
+
+/* --- Season Reward ------------------------------------------------------ */
+.reward {
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    gap: 5px;
+    padding: 10px 14px;
+    min-width: 208px;
+
+    @include card-panel(10px);
+}
+
+.rewardLabel {
+    color: var(--c-text);
+
+    @include label(0.56rem, 0.14em);
+}
+
+.rewardRow {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+}
+
+.rewardBadge {
+    display: block;
+    flex-shrink: 0;
+    width: 34px;
+    height: 34px;
+    /* Die Abzeichen bringen ihre Farbe selbst mit. Das Leuchten kommt dazu,
+       damit sie auf dem dunklen Grund nicht flach wirken. */
+    filter: drop-shadow(0 0 8px color-mix(in srgb, var(--tier) 55%, transparent));
+    object-fit: contain;
+}
+
+.rewardName {
+    color: var(--tier);
+    font-size: 1.1rem;
+    font-weight: 800;
+    letter-spacing: 0.01em;
+    text-shadow: 0 0 14px color-mix(in srgb, var(--tier) 55%, transparent);
+    text-transform: uppercase;
+}
+
+.rewardBar {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+}
+
+.bar {
+    display: block;
+    overflow: hidden;
+    flex: 1;
+    height: 8px;
+    border-radius: 99px;
+    background: rgb(255 255 255 / 9%);
+}
+
+.fill {
+    display: block;
+    height: 100%;
+    border-radius: 99px;
+    background: linear-gradient(90deg, var(--tier), color-mix(in srgb, var(--tier) 50%, #fff));
+    box-shadow: 0 0 10px color-mix(in srgb, var(--tier) 70%, transparent);
+}
+
+.percent {
+    flex-shrink: 0;
+    color: var(--c-text);
+    font-size: 0.8rem;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+}
+
+/* --- Abschnittsüberschrift ---------------------------------------------- */
+.sectionHead {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 2px 4px;
+
+    > svg {
+        flex-shrink: 0;
+        color: var(--c-text);
+    }
+}
+
+.sectionText {
+    display: flex;
+    flex-direction: column;
+}
+
+.sectionTitle {
+    color: var(--c-text);
+    font-size: 1.35rem;
+    font-weight: 800;
+    letter-spacing: 0.01em;
+    line-height: 1;
+    text-transform: uppercase;
+}
+
+.sectionSub {
+    color: var(--c-text-faint);
+
+    @include label(0.54rem, 0.24em);
+}
+
+/* Der Strich, der den Titel nach rechts verlängert. */
+.sectionRule {
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, rgb(255 30 45 / 55%), rgb(255 30 45 / 0%));
+}
+
+/* --- Playlists ---------------------------------------------------------- */
+.playlists {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.playlist {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 14px;
+
+    @include card-panel(12px);
+}
+
+.playlistHead {
+    display: flex;
+    flex-direction: column;
+}
+
+.playlistName {
+    color: var(--c-text);
+    font-family: var(--f-accent);
+    font-size: 1.14rem;
+    font-weight: 700;
+    line-height: 1.1;
+}
+
+.playlistSub {
+    color: var(--c-text-faint);
+
+    @include label(0.52rem, 0.2em);
+}
+
+/* Der Kasten mit Abzeichen und Rang - innen dunkler als das Panel. */
+.rankBox {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    padding: 9px 11px;
+    background: rgb(255 255 255 / 3%);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tier) 34%, transparent);
+
+    @include bevel-diagonal(9px);
+}
+
+/* In der Platzierung ist alles grau - genau wie im Spiel. */
+.placementBox {
+    box-shadow: inset 0 0 0 1px rgb(255 255 255 / 9%);
+}
+
+.rankBadge {
+    display: block;
+    flex-shrink: 0;
+    width: 38px;
+    height: 38px;
+    filter: drop-shadow(0 0 7px color-mix(in srgb, var(--tier) 45%, transparent));
+    object-fit: contain;
+}
+
+/* Ohne Rang gibt es nichts hervorzuheben. */
+.placementBox .rankBadge {
+    filter: none;
+    opacity: 0.55;
+}
+
+.rankText {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.rankName {
+    color: var(--tier);
+    font-size: 0.86rem;
+    font-weight: 800;
+    line-height: 1.15;
+    /* Ein Rangname darf umbrechen. Abgeschnitten wäre er falsch - aus
+       "Platzierung 2/10" würde "Platzieru…", und das heißt nichts mehr. */
+    overflow-wrap: anywhere;
+    text-shadow: 0 0 12px color-mix(in srgb, var(--tier) 45%, transparent);
+    text-transform: uppercase;
+}
+
+.rankDivision {
+    color: var(--c-text-faint);
+
+    @include label(0.52rem, 0.1em);
+}
+
+/* --- MMR und Zähler ----------------------------------------------------- */
+.stats {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.mmr {
+    display: flex;
+    flex-direction: column;
+}
+
+.mmrLabel {
+    color: var(--c-text-faint);
+
+    @include label(0.5rem, 0.18em);
+}
+
+.mmrValue {
+    color: var(--c-text);
+    font-size: 1.42rem;
+    font-weight: 800;
+    letter-spacing: -0.025em;
+    line-height: 1;
+}
+
+.counters {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.counter {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+}
+
+.counterIcon {
+    display: grid;
+    flex-shrink: 0;
+    width: 17px;
+    color: var(--c-text-faint);
+    place-items: center;
+}
+
+/* Die Serie ist der einzige grüne Wert auf der Karte - das macht sie lesbar,
+   ohne dass eine zusätzliche Beschriftung nötig wäre. */
+.streakIcon {
+    color: var(--c-win);
+}
+
+.counterText {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.15;
+}
+
+.counterLabel {
+    color: var(--c-text-faint);
+
+    @include label(0.46rem, 0.1em);
+}
+
+.counterValue {
+    color: var(--c-text);
+    font-size: 0.78rem;
+    font-weight: 800;
+
+    .streakIcon + .counterText & {
+        color: var(--c-win);
+    }
+}
+
+/* --- Karriere ----------------------------------------------------------- */
+.career {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 14px 16px;
+
+    @include card-panel(12px);
+}
+
+.careerTitle {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    color: var(--c-text);
+    font-size: 0.94rem;
+    font-weight: 800;
+    text-transform: uppercase;
+
+    svg {
+        color: var(--c-red);
+    }
+}
+
+.careerGrid {
+    display: grid;
+    gap: 10px;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    text-align: center;
+}
+
+/**
+ * Das Symbol eines Karriere-Werts.
+ *
+ * Die Dateien sind schwarze Striche auf durchsichtigem Grund. Als Maske über
+ * einer farbigen Fläche nehmen sie die Farbe des Werts an, statt schwarz auf
+ * schwarzem Grund zu verschwinden. Denselben Weg geht der Bot beim Zeichnen.
+ */
+.statIcon {
+    display: block;
+    width: 19px;
+    height: 19px;
+    background: var(--stat);
+    filter: drop-shadow(0 0 7px color-mix(in srgb, var(--stat) 55%, transparent));
+    mask: var(--icon) center / contain no-repeat;
+}
+
+.statLabel {
+    color: var(--c-text-faint);
+
+    @include label(0.46rem, 0.12em);
+}
+
+.statValue {
+    color: var(--c-text);
+    font-size: 1.02rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+}
+
+/* --- Fußzeile der Karte ------------------------------------------------- */
+.freshness {
+    padding-left: 4px;
+    color: var(--c-text-faint);
+    font-size: 0.66rem;
+}
+
+/* --- Bildunterschrift --------------------------------------------------- */
+.caption {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    color: var(--c-text-faint);
+    font-size: 0.78rem;
+
+    code {
+        padding: 1px 6px;
+        background: rgb(255 255 255 / 6%);
+        color: var(--c-text-dim);
+        font-family: var(--f-label);
+        font-size: 0.82rem;
+        font-weight: 600;
+    }
+}
+
+/* ------------------------------------------------------------------------
+   Enge Karte.
+   Unterhalb von rund 640 px reicht die Spaltenbreite nicht mehr für Abzeichen
+   und Rangnamen nebeneinander. Statt zu schrumpfen, bis nichts mehr lesbar
+   ist, stellt sich der Kasten dann um.
+   ------------------------------------------------------------------------ */
+@container rankcard (width < 640px) {
+    .rankBox {
+        flex-direction: column;
+        gap: 6px;
+        padding: 10px 8px;
+        text-align: center;
+    }
+
+    .rankBadge {
+        width: 30px;
+    }
+
+    .rankText {
+        align-items: center;
+    }
+
+    .rankName {
+        font-size: 0.76rem;
+    }
+
+    .stats {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+    }
+
+    .counters {
+        flex-direction: row;
+        gap: 12px;
+    }
+
+    .mmrValue {
+        font-size: 1.28rem;
+    }
+
+    .careerGrid {
+        gap: 8px;
+    }
+
+    .statValue {
+        font-size: 0.92rem;
+    }
+}
+
+/* Noch enger: die Playlists untereinander statt nebeneinander. */
+@container rankcard (width < 430px) {
+    .playlists {
+        grid-template-columns: 1fr;
+    }
+
+    .rankBox {
+        flex-direction: row;
+        text-align: left;
+    }
+
+    .rankText {
+        align-items: flex-start;
+    }
+
+    .stats {
+        flex-direction: row;
+        align-items: flex-end;
+    }
+
+    .counters {
+        flex-direction: column;
+        gap: 5px;
+    }
+
+    .head {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .careerGrid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}

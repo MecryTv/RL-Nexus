@@ -1,0 +1,193 @@
+@use "mixins" as *;
+
+.headerActions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 6px;
+}
+
+/* --- Die Personen ------------------------------------------------------- */
+.members {
+    display: grid;
+    gap: var(--s-gap);
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 330px), 1fr));
+
+    li {
+        display: flex;
+    }
+}
+
+.member {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    padding: 28px 26px 24px;
+    width: 100%;
+}
+
+.memberHead {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.avatar {
+    display: grid;
+    flex-shrink: 0;
+    overflow: hidden;
+    width: 52px;
+    height: 52px;
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+    box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--accent) 40%, transparent);
+    place-items: center;
+
+    @include bevel-diagonal(11px);
+
+    img {
+        width: 44px;
+        height: 44px;
+        object-fit: contain;
+    }
+}
+
+.avatarEmpty {
+    color: var(--accent);
+}
+
+.identity {
+    min-width: 0;
+    margin-right: auto;
+}
+
+.name {
+    font-size: 1.24rem;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+}
+
+.handle {
+    color: var(--c-text-faint);
+    font-size: 0.86rem;
+}
+
+.role {
+    flex-shrink: 0;
+    padding: 5px 10px 4px;
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 34%, transparent);
+    color: var(--accent);
+    text-align: right;
+
+    @include label(0.6rem, 0.12em);
+    @include bevel-diagonal(6px);
+
+    @include below(420px) {
+        display: none;
+    }
+}
+
+.memberText {
+    color: var(--c-text-dim);
+    font-size: 0.93rem;
+    line-height: 1.68;
+}
+
+/* Die Bereiche als kleine Marken - kompakter als eine Aufzählung. */
+.focus {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+
+    li {
+        padding: 5px 10px 4px;
+        border: 1px solid var(--c-line);
+        color: var(--c-text-dim);
+
+        @include label(0.6rem, 0.1em);
+        @include bevel-diagonal(5px);
+    }
+}
+
+.memberLinks {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    margin-top: auto;
+    padding-top: 16px;
+    border-top: 1px solid var(--c-line);
+}
+
+.memberLink {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: color var(--t-fast);
+    color: var(--c-text-dim);
+    font-size: 0.86rem;
+    font-weight: 600;
+
+    &:hover {
+        color: var(--accent);
+    }
+}
+
+/* Die offene Karte ist blasser als die besetzten - sie soll einladen, nicht
+   um Aufmerksamkeit kämpfen. */
+.open {
+    .memberText {
+        color: var(--c-text-faint);
+    }
+}
+
+.openAction {
+    margin-top: auto;
+    align-self: flex-start;
+}
+
+/* --- Gesuchte Bereiche und Grundsätze ----------------------------------- */
+.roles,
+.principles {
+    display: grid;
+    gap: var(--s-gap);
+    margin-top: 44px;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+
+    li {
+        display: flex;
+    }
+}
+
+.roleCard,
+.principle {
+    display: flex;
+    flex-direction: column;
+    gap: 11px;
+    padding: 26px 24px;
+    width: 100%;
+
+    h3 {
+        font-size: 1.06rem;
+        font-weight: 700;
+    }
+
+    p {
+        color: var(--c-text-dim);
+        font-size: 0.89rem;
+        line-height: 1.62;
+    }
+}
+
+.roleIcon,
+.principleIcon {
+    display: grid;
+    width: 42px;
+    height: 42px;
+    margin-bottom: 3px;
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 28%, transparent);
+    color: var(--accent);
+    place-items: center;
+
+    @include bevel-diagonal(9px);
+}

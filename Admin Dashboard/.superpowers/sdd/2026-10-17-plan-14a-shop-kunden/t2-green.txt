@@ -1,0 +1,271 @@
+
+> rl-nexus-admin@1.0.0 check
+> node server/check.ts
+
+<claude-code-hint v="1" type="plugin" value="stripe@claude-plugins-official" />
+
+  Konfiguration
+  ok    Fehlende Pflichtvariable nennt ihren Namen
+  ok    Zu kurzes Secret wird abgelehnt
+  ok    Rollen-IDs müssen Discord-IDs sein
+  ok    Ohne Datenbank-Angaben läuft der Server ohne Datenbank
+  ok    Secure-Cookies nur bei https, Adressen ohne Schrägstrich am Ende
+  ok    DEV_USER_IDs nimmt nur echte IDs
+  ok    Mit --dev zählt die Dev-Application, sonst die produktive
+  ok    Statuskanäle: im Dev-Modus #moderator-only auf dem Dev Server, sonst STATUS_CHANNEL_ID
+  ok    Vorschau der Webseite: sonst WEBSITE_PUBLIC_URL, im Dev-Modus die lokale Webseite
+  ok    Kontakt-Webhook: im Dev-Modus nur DEV_CONTACT_WEBHOOK_URL, nie der echte Kanal
+  ok    Ohne Dev-Werte nennt --dev genau die fehlende Variable
+
+  Sitzungs-Cookie
+  ok    Sitzung lässt sich ver- und entschlüsseln
+  ok    Ein verändertes Byte macht das Cookie wertlos
+  ok    Falsches Secret, leerer Wert und Unsinn öffnen nichts
+  ok    Cookies von Admin Dashboard und Bot sind nicht austauschbar
+  ok    Cookies tragen HttpOnly und SameSite=Lax, Secure nur bei https
+  ok    Cookies werden aus dem Header gelesen
+
+  Rollen und Zugang
+  ok    Developer-Rolle gewinnt gegen Admin-Rolle
+  ok    Rückweg nur als eigener Pfad
+  ok    Der Link zu Discord fragt nur identify und nicht doppelt
+  ok    Mitglied mit Rolle wird erkannt, Fremder auch
+  ok    Kennt Discord den Server nicht, ist das ein Ausfall und kein fehlendes Mitglied
+🔐 Rollenprüfung für 200000000000000009 gescheitert: Discord kennt den Server nicht (Code 10004). Ist der Bot noch drauf?
+🔐 Rollenprüfung für 200000000000000009 gescheitert: Discord kennt den Server 1162553851187040326 nicht (Code 10004). Der Dev-Bot muss auf dem Dev Server sein, sonst kann er die Rollen nicht lesen. Server-ID steht in DEV_ADMIN_GUILD_ID.
+  ok    Scheitert die Rollenprüfung, nennt der Dev-Modus den Grund statt „Discord antwortet nicht“
+  ok    Innerhalb einer Minute fragt die Prüfung Discord nicht erneut
+  ok    Fällt Discord aus, gilt der letzte Stand höchstens fünf Minuten
+
+  Anmeldung
+  ok    Ohne Sitzung ist /api/me 401
+  ok    Der Healthcheck antwortet ohne Sitzung
+  ok    Login legt einen versiegelten Zustand ab und geht zu Discord
+  ok    Ein falscher state gibt keine Sitzung
+  ok    Ohne Zustand-Cookie gibt es keine Sitzung
+  ok    Abbruch bei Discord
+  ok    Ohne Zwei-Faktor kein Zugang, auch wenn das Feld fehlt
+  ok    Wer nicht auf dem Server ist, kommt nicht herein
+  ok    Ohne Admin- oder Developer-Rolle kein Zugang
+🔒 Anmeldung gescheitert: Discord kennt den Server nicht (Code 10004). Ist der Bot noch drauf?
+  ok    Fällt Discord beim Login aus, heißt das fehler
+  ok    Mit Admin-Rolle: Sitzung, Rückweg und /api/me
+  ok    Mit beiden Rollen ist man Developer
+  ok    Ein fremder Rückweg landet auf der Übersicht
+  ok    Ein verändertes Cookie gilt nicht
+  ok    Wer die Rolle verliert, ist bei der nächsten Prüfung draußen
+  ok    X-Forwarded-For zählt nur vom eigenen Proxy, sonst ließe sich das Rate Limit umgehen
+  ok    Fehler kommen als deutscher Satz, auch vom Rate Limit
+  ok    Abmelden nur von der eigenen Seite und ohne fremden Inhaltstyp
+
+  Bot-Daten
+  ok    Das Token besteht die Prüfung des Bots
+  ok    Fremdes Secret und abgelaufene Tokens fallen durch
+  ok    Die Übersicht fasst den Bot zusammen und nennt die fünf größten Server
+  ok    Die Übersicht verrät nichts aus der Umgebung des Bots
+  ok    Die Serverliste kommt vollständig
+  ok    Ohne Sitzung gibt es keine Bot-Daten
+  ok    Fünf Sekunden lang fragt der Server den Bot nicht erneut
+  ok    Antwortet der Bot nicht, steht offline da statt eines Fehlers
+
+  Formatierung der Oberfläche
+  ok    Laufzeiten stehen in der größten sinnvollen Einheit
+  ok    Zahlen mit Tausenderpunkt, fehlendes Datum als „unbekannt“
+  ok    Dateigrößen mit einer Nachkommastelle in der passenden Einheit
+  ok    Verfügbarkeit mit höchstens zwei Nachkommastellen
+  ok    Die Kurve läuft als eine Linie über Stunden ohne Messung hinweg, statt abzureißen oder auf null zu fallen
+
+  Eingaben und Fehler
+  ok    Texte werden getrimmt und an ihren Grenzen gemessen
+  ok    Discord-IDs, feste Werte und Nachrichten-IDs
+  ok    Links nur als https-Adresse oder eigener Pfad, nie javascript:
+  ok    Das Kontaktformular gilt mit denselben Regeln wie auf der Webseite
+  ok    Die Falle erkennt ausgefüllte unsichtbare Felder
+  ok    Jeder Fehler wird zu Status und deutschem Satz, Internes nur ins Log
+
+  Kontaktformular
+  ok    Formular geht als Mail an support@, Antworten geht an die Person
+  ok    Nur Discord-Name: kein Reply-To, Hinweis über der Nachricht
+📮 Kontaktformular nicht verschickt: 550 abgelehnt
+  ok    Scheitert der Versand, bekommt die Person einen Satz statt Erfolg
+📮 Kontaktformular nicht verschickt: Weder ein Postfach support@nexus-emb.de noch SMTP_* in der .env.
+  ok    Ohne Postfach und ohne SMTP_* sagt das Formular, dass es gerade nicht geht
+  ok    CONTACT_MAIL leer: es geht an support@nexus-emb.de
+  ok    Die Falle verschickt nichts und meldet trotzdem Erfolg
+  ok    Mehr als fünf Nachrichten in zehn Minuten bremst das Formular
+  ok    Die Mail maskiert jeden Wert
+  ok    Der Discord-Hinweis geht raus, zeigt aufs Postfach und hält das Formular nicht auf
+
+  Verwaltung ohne Datenbank
+  ok    Discord-Nutzer lassen sich nachschlagen
+  ok    Ohne Sitzung gibt es keine Verwaltung
+  ok    Schreiben ohne eigenes Origin wird abgelehnt
+  ok    Falsche Gruppen-Eingaben werden vor der Datenbank abgefangen
+  ok    Ohne Datenbank sagen die Gruppen, dass sie fehlt
+  ok    Meldungen mit javascript:-Link, ohne Titel oder an zu viele IDs werden abgelehnt
+📮 Kontaktformular nicht verschickt: Weder ein Postfach support@nexus-emb.de noch SMTP_* in der .env.
+  ok    Das Kontaktformular nimmt nur JSON und sagt ohne Mailversand Bescheid
+  ok    Die Falle meldet Erfolg, auch ohne Datenbank
+  ok    Die Kontakt-Verwaltung gibt es nicht mehr
+  ok    Der Ereignisstrom braucht eine Sitzung und meldet, was sich ändert
+
+  Inhalte der Webseite
+  ok    Alle heutigen Inhalte gehen durch und bleiben, wie sie sind (23 Detailtexte)
+  ok    Kategorien: der Startstand geht durch, Grenzen, Farben und IDs werden geprüft
+  ok    Kategorie mit Modulen lässt sich nicht löschen, Umbenennen geht, Module prüfen gegen die Kategorien
+  ok    Die Oberfläche erfährt, wo die Vorschau der Webseite liegt
+  ok    Kategorien speichern über die Route, danach prüfen Module dagegen
+  ok    Fremde Symbole, Farben, Kategorien und IDs fallen durch
+  ok    Links nur als https-Adresse oder eigener Pfad
+  ok    Banner: alte Form wird übernommen, Zeitfenster und Arten werden geprüft
+  ok    Banner: sichtbar, geplant, abgelaufen
+  ok    Speichern zählt die Revision hoch, ein veralteter Stand gibt 409
+  ok    Zurücksetzen löscht die Datei, danach gilt wieder der Stand der Webseite
+  ok    Detailtexte: ein neues Modul fängt leer an, die ID ist geprüft
+  ok    Mit WEBSITE_DIST kommt der Standard von der Platte, auch wenn die Webseite gerade nicht antwortet
+  ok    Ohne Webseite wird nichts gespeichert, und die Übersicht sagt es
+
+  Commands vom Bot
+  ok    Nach Modul geordnet, Commands ohne Modul fallen weg
+  ok    Erster Abgleich schreibt commands.json, gleicher Stand keine neue Revision
+  ok    Antwortet der Bot nicht, bleibt commands.json, wie sie ist
+  ok    Routen: lesen mit Sitzung, abholen holt neu, ohne Bot ein Satz
+
+  Logs zerlegen
+  ok    Der Kopf wird zu Titel und Feldern, Zierzeichen fallen weg
+  ok    Jede Zeile mit Zeitstempel wird ein Eintrag mit Zeit, Kategorie und Text
+  ok    HTTP wird zerlegt, ein 5xx zählt als Fehler, ein 4xx nicht
+  ok    Folgezeilen hängen am Eintrag davor, Rahmen und Leerzeilen nicht
+  ok    Das Ende kommt aus dem Endrahmen, die Zähler stimmen
+  ok    Ohne Endrahmen läuft die Session noch, eine leere Datei hat nichts
+
+  Status: Verlauf auswerten
+  ok    Aufeinanderfolgende Ausfälle sind einer, eine Lücke über 5 Minuten trennt
+  ok    Ein Ausfall, der gerade läuft, hat noch kein Ende
+  ok    90 Tage, 12 Kästchen, Verfügbarkeit und Kurve aus den Stunden
+  ok    Ohne Messung ist nichts bekannt, nicht 100 Prozent
+
+  Status: Meldungen, Statusseite, Discord
+  ok    Vor der ersten Prüfung sagt die Statusseite, dass sie gleich kommt
+  ok    Nach einer Prüfung: vier Dienste, nichts Internes, ohne Anmeldung
+  ok    Meldungen: Art, Titel, Dienste und Zeitraum werden geprüft
+  ok    Ohne Datenbank keine Meldungen, aber ein klarer Satz
+  ok    Discord: ein Container je Bereich, Knöpfe darunter, kein Kontakt, Grenzen eingehalten
+
+  Developer-Funktionen
+  ok    Admins bekommen auf jeder Developer-Route 403
+  ok    Die Sessions kommen neueste zuerst, mit Zählern, laufender und gelöschten Teilen
+  ok    Die Liste filtert nach Fehlern, Abstürzen und laufender Session
+  ok    Seiten zählen Einträge, keiner fehlt oder kommt doppelt, Umlaute bleiben heil
+  ok    Die Ansicht kennt Kopf, Kategorien und Stufen und filtert danach
+  ok    Mit ?zeile springt die Ansicht auf die Seite der Zeile
+  ok    Die Suche über alle Sessions gruppiert nach Session und nennt Teil und Zeile
+  ok    Mitlesen: neue Einträge kommen nach, ein wachsender Eintrag kommt noch einmal
+  ok    Gelöschte Teile, fremde Pfade und Download
+  ok    Wartung: Schalter legen Dateien an und löschen sie, die Übersicht zeigt es
+  ok    Neustart: der Bot nimmt an, ohne Bot gibt es 503
+  ok    Die Technik-Ansicht sammelt Bot, Admin-Server und Webseite, ohne Datenbank als offline
+
+  Postfach
+  ok    Einstellungen: Standard-Ports, ohne MAIL_* geht es trotzdem, zu kurzer Schlüssel bricht ab
+  ok    App-Passwörter: verschlüsselt, mit falschem Schlüssel nicht lesbar
+  ok    Eingaben beim Anlegen werden geprüft, Server kommen sonst aus dem Vorschlag
+  ok    Alle Posteingänge: nach Datum gemischt, Seiten über alle, kaputtes Postfach in errors
+  ok    Empfänger: mit und ohne Namen, getrennt durch Komma, Semikolon, Zeile
+  ok    HTML-Mails: Skripte, Ereignisse, javascript: und Formulare fliegen raus
+  ok    Text-Mails und Vorschau: Links erkannt, HTML maskiert, Zitate raus
+  ok    Editor-HTML: nur erlaubte Tags, der Knopf bleibt
+  ok    Rang in der Signatur: von der Team-Seite, sonst die Gruppe
+  ok    Vorlage: Logo per cid, Knopf, Signatur, Fuß, Text-Version, Anhang
+  ok    Absender heißt genau wie das Postfach
+  ok    Zitat: unter der Signatur, ohne Vorlage abgesetzt, im Text mit >
+  ok    Vorschau: dieselbe Vorlage, Logo als data:, Avatar von Discord, kein cid:
+  ok    Vorschau zum Live-Tippen: Stellen für Text und Betreff, Styles wie in der echten Mail
+  ok    Ohne Vorlage: kein Kopf, kein Logo, keine Signatur
+  ok    Ordner: Posteingang zuerst, deutsche Namen, Zahlen
+  ok    Liste: neueste zuerst, Vorschau, ungelesen, Büroklammer, Filter
+  ok    Öffnen: bereinigt, externe Bilder blockiert, Anhang gelistet, danach gelesen
+  ok    Eingebettete Bilder (cid:) erscheinen im Text und nicht als Anhang
+  ok    Archivieren legt den Ordner an, Löschen geht erst in den Papierkorb
+  ok    Senden: über SMTP mit Bcc im Umschlag, dieselbe Mail in „Gesendet“ als gelesen
+📬 IMAP-Anmeldung für support@nexus-emb.de gescheitert: Invalid credentials
+  ok    Anmeldung prüfen: falsches Passwort sagt, dass es an IMAP liegt
+  ok    Rechte und Schutz: Admin liest, nur Developer verwalten, Upload nur an /api/mail/send
+
+  Shop: Regeln
+  ok    Preise werden gelesen, wie Menschen sie tippen
+  ok    Preise und Laufzeiten stehen auf Deutsch da
+  ok    Ein Produkt wird geprüft und aufgeräumt
+  ok    Shop-Einstellungen werden geprüft
+  ok    Die Bezahlschranke sperrt niemanden aus
+
+  Shop: Zugänge
+  ok    Welcher Zugang gerade gilt
+  ok    Ein Abo gilt einen Tag über das Periodenende hinaus, gekündigt nicht
+  ok    Der Test geht einmal pro Konto und nur ohne Zugang
+  ok    Kaufregeln: Abo, Einmalkauf, unbegrenzt, Sperre
+  ok    Ein Einmalkauf beginnt jetzt oder am Ende des laufenden
+  ok    Rollen: was dazu kommt, was weg muss
+  ok    Bestellnummer und Mail für die Anzeige
+
+  Shop: Kunden
+  ok    Status einer Person
+  ok    Filter und Suche
+  ok    Erstattungsvorschlag nach Resttagen
+  ok    Neues Testende
+  ok    Verlauf in Worten
+  ok    Monatsanfang in Berlin
+
+  Shop: Discord
+  ok    Die Anmeldung fragt Mail, Server und Beitritt ab und kommt auf die Webseite zurück
+  ok    Tokens kommen mit Refresh, und Refresh liefert neue
+  ok    Beitreten und Rollen setzen, Fehler als Satz
+  ok    Ein Shop-Cookie öffnet im Admin Dashboard nichts
+
+  Shop: Abgleich
+  ok    Neu im Shop: beitreten, Rolle bekommen, Tokens weg
+  ok    Schon Mitglied: nur die Rollen, Test-Rolle geht beim Kauf
+  ok    Ohne Zugang wird niemand auf den Server geholt
+  ok    Wenn Discord nicht mitspielt: gelb mit Grund, Zugang bleibt
+  ok    Eine Rolle mit Administrator-Recht vergibt der Shop nie
+  ok    Abgelaufenes Token wird erneuert, bevor es benutzt wird
+
+  Shop: Mails
+  ok    Die Bestellbestätigung enthält, was § 312f verlangt
+📮 Shop-Mail „Dein Test läuft“ an k***@example.test nicht verschickt: SMTP weg
+  ok    Shop-Mails gehen von noreply@ mit Antwort an support@ und ohne Signatur
+  ok    Mail „Zugang geschenkt“: Produkt und bis wann
+  ok    Mail „Zugang beendet“: mit und ohne Erstattung
+
+  Shop: Stripe
+⚠️  Stripe bleibt aus: STRIPE_SECRET_KEY, STRIPE_PUBLISHABLE_KEY, STRIPE_WEBHOOK_SECRET gehören zusammen. Trag alle drei ein oder keinen.
+⚠️  Stripe bleibt aus: STRIPE_PUBLISHABLE_KEY passt nicht zum Modus von STRIPE_SECRET_KEY (test).
+  ok    Stripe-Schlüssel: alle drei oder keiner, Live nie mit --dev
+  ok    Neues Produkt: Produkt und Preis bei Stripe
+  ok    Nur der Text geändert: kein neuer Preis
+  ok    Preis oder Art geändert: neuer Preis, der alte wird erst nach dem Speichern archiviert
+
+  Shop: Formular
+  ok    Aus dem Formular wird ein Produkt und zurück
+  ok    Das Formular sagt, was nicht passt, bevor der Server gefragt wird
+  ok    Die Einstellungen übernehmen einen neuen Stand nur, wenn hier nichts geändert wurde
+
+  Shop: Verwaltung ohne Datenbank
+  ok    Ohne Sitzung gibt es den Shop nicht zu verwalten
+  ok    Falsche Eingaben scheitern vor Datenbank und Stripe
+  ok    Ohne Datenbank entsteht auch bei Stripe nichts
+  ok    Rollen mit Rechten im Admin Dashboard lassen sich nicht verkaufen
+  ok    Die Rollenauswahl zeigt nur Rollen, die man verkaufen kann
+  ok    Schreibende Shop-Anfragen nur von der Webseite
+  ok    Ohne Anmeldung gibt es keinen Test
+  ok    Die Anmeldung merkt sich Zustand und Produkt und schickt zu Discord
+  ok    Rücksprung mit falschem Zustand oder Abbruch: zurück auf die Preisseite mit Grund
+  ok    Abmelden löscht das Shop-Cookie
+  ok    Checkout: nur von der Webseite, ohne alle drei Häkchen geht nichts, auch nicht zu Stripe
+🛒 Webhook abgelehnt: No signatures found matching the expected signature for payload.
+🛒 Webhook abgelehnt: No signatures found matching the expected signature for payload.
+  ok    Webhook: falsche Signatur 400, ohne Stripe 503
+  ok    Dev-Knöpfe gibt es ohne --dev nicht
+
+  Alles in Ordnung.
+

@@ -1,0 +1,110 @@
+@use "mixins" as *;
+
+.hero {
+    position: relative;
+    padding-block: clamp(56px, 7vw, 104px) clamp(60px, 8vw, 116px);
+}
+
+.inner {
+    display: grid;
+    gap: clamp(44px, 6vw, 76px);
+    align-items: center;
+    grid-template-columns: minmax(0, 1.02fr) minmax(0, 1fr);
+
+    @include below(1080px) {
+        grid-template-columns: 1fr;
+    }
+}
+
+.copy {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 26px;
+    max-width: 40rem;
+}
+
+.eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    padding: 7px 14px 6px;
+    border: 1px solid rgb(255 30 45 / 32%);
+    background: rgb(255 30 45 / 9%);
+    color: var(--c-red-bright);
+
+    @include label(0.66rem, 0.15em);
+    @include bevel-diagonal(7px);
+}
+
+.title {
+    font-size: clamp(2.5rem, 1.4rem + 4.6vw, 4.4rem);
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    line-height: 1.02;
+
+    /* Das eine hervorgehobene Wort in Rot - dasselbe Rot wie das X im Logo. */
+    em {
+        position: relative;
+        color: var(--c-red);
+        font-style: normal;
+        text-shadow: 0 0 34px rgb(255 30 45 / 45%);
+    }
+}
+
+.lead {
+    color: var(--c-text-dim);
+    font-size: clamp(1.02rem, 0.96rem + 0.34vw, 1.18rem);
+    line-height: 1.68;
+    text-wrap: pretty;
+}
+
+.actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    margin-top: 2px;
+}
+
+/* --- Zahlen ------------------------------------------------------------- */
+.stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px 40px;
+    margin-top: 12px;
+    padding-top: 28px;
+    width: 100%;
+    border-top: 1px solid var(--c-line);
+}
+
+.stat {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.statValue {
+    color: var(--c-text);
+    font-family: var(--f-accent);
+    font-size: 1.72rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1;
+}
+
+.statLabel {
+    margin: 0;
+    color: var(--c-text-faint);
+
+    @include label(0.62rem, 0.16em);
+}
+
+/* --- Karte -------------------------------------------------------------- */
+.visual {
+    min-width: 0;
+
+    @include below(1080px) {
+        max-width: 620px;
+        width: 100%;
+    }
+}

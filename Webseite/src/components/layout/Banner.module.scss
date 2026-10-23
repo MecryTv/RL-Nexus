@@ -1,0 +1,153 @@
+@use "mixins" as *;
+
+/*
+ * Schwebt unten mittig über dem Inhalt. Unter dem Menü des Handys (z-index 99),
+ * über allem anderen. `--accent` setzt Banner.tsx je nach Art.
+ */
+.banner {
+    position: fixed;
+    z-index: 90;
+    bottom: calc(16px + env(safe-area-inset-bottom));
+    left: 50%;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas: "kind text count";
+    align-items: center;
+    gap: 12px;
+    width: min(720px, calc(100% - 32px));
+    padding: 10px 50px 10px 12px;
+    border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+    background: color-mix(in srgb, var(--accent) 10%, var(--c-panel-solid));
+    transform: translateX(-50%);
+
+    @include bevel-diagonal(12px);
+
+    @include motion {
+        animation: rise var(--t-base) both;
+    }
+
+    /* Zwei Zeilen: oben Art und Countdown, darunter Titel und Text. */
+    @include below(639px) {
+        right: 8px;
+        bottom: calc(8px + env(safe-area-inset-bottom));
+        left: 8px;
+        grid-template-columns: auto minmax(0, 1fr);
+        grid-template-areas:
+            "kind count"
+            "text text";
+        gap: 8px;
+        width: auto;
+        transform: none;
+
+        @include motion {
+            animation-name: rise-phone;
+        }
+    }
+}
+
+@keyframes rise {
+    from {
+        opacity: 0;
+        transform: translate(-50%, 12px);
+    }
+}
+
+@keyframes rise-phone {
+    from {
+        opacity: 0;
+        transform: translateY(12px);
+    }
+}
+
+.kind {
+    display: inline-flex;
+    grid-area: kind;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 10px 4px;
+    background: var(--accent);
+    color: var(--c-base);
+    white-space: nowrap;
+
+    @include label(0.72rem, 0.14em);
+
+    svg {
+        display: inline-block;
+    }
+}
+
+.text {
+    grid-area: text;
+    min-width: 0;
+    color: var(--c-text-dim);
+    font-size: 0.92rem;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+}
+
+.title {
+    color: var(--c-text);
+    font-weight: 700;
+}
+
+.link {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: 8px;
+    color: var(--accent);
+    font-weight: 700;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    white-space: nowrap;
+
+    &:hover {
+        color: var(--c-text);
+    }
+
+    &:focus-visible {
+        @include focus-ring;
+    }
+
+    svg {
+        display: inline-block;
+    }
+}
+
+.count {
+    grid-area: count;
+    justify-self: end;
+    color: var(--accent);
+    font-size: 1.05rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.close {
+    position: absolute;
+    top: 50%;
+    right: 8px;
+    display: grid;
+    width: 36px;
+    height: 36px;
+    place-items: center;
+    color: var(--c-text-dim);
+    transform: translateY(-50%);
+    transition: color var(--t-fast);
+
+    @include touch-target;
+
+    &:hover {
+        color: var(--c-text);
+    }
+
+    &:focus-visible {
+        @include focus-ring;
+    }
+
+    @include below(639px) {
+        top: 4px;
+        transform: none;
+    }
+}

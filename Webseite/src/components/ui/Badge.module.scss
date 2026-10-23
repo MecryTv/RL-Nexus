@@ -1,0 +1,40 @@
+@use "mixins" as *;
+
+.badge {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 0.5em;
+    padding: 0.36em 0.75em 0.3em;
+    border: 1px solid currentcolor;
+    background: color-mix(in srgb, currentcolor 10%, transparent);
+    color: var(--c-text-dim);
+    line-height: 1;
+
+    @include label(0.66rem, 0.13em);
+    @include bevel-diagonal(6px);
+}
+
+.dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentcolor;
+}
+
+.live {
+    color: var(--c-win);
+
+    /* Nur das Fertige leuchtet - sonst hebt sich am Ende nichts mehr ab. */
+    .dot {
+        box-shadow: 0 0 8px currentcolor;
+    }
+}
+
+.beta {
+    color: var(--c-mod-engagement);
+}
+
+.planned {
+    color: var(--c-text-faint);
+}

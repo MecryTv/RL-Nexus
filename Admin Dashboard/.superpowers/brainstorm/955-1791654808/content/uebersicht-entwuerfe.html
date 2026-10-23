@@ -1,0 +1,260 @@
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@500;600;700&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  .ov { --base:#050608; --panel:#080d12; --solid:#0a0f15; --line:rgb(255 255 255 / 8%); --strong:rgb(255 255 255 / 14%); --red:#ff1e2d; --blue:#00afff; --win:#35e07f; --warn:#ffc53d; --loss:#ff4d5e; --text:#f2f4f7; --dim:#a8b0bc; --faint:#7b8693;
+        font-family: Oxanium, "Segoe UI", sans-serif; background: var(--base); color: var(--text); padding: 18px; font-size: 13px; line-height: 1.45; }
+  .ov * { box-sizing: border-box; }
+  .ov h4 { margin: 0; font: 700 12px Rajdhani, sans-serif; letter-spacing: .12em; text-transform: uppercase; color: var(--dim); }
+  .ov .title { display: flex; align-items: baseline; gap: 12px; margin-bottom: 14px; }
+  .ov .title b { font-size: 22px; }
+  .ov .title span { color: var(--faint); font-size: 12px; }
+  .ov .p { background: var(--panel); border: 1px solid var(--line); padding: 12px 14px; clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%); }
+  .ov .head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .ov .more { color: var(--blue); font-size: 12px; }
+  .ov .grid { display: grid; gap: 12px; }
+  .ov .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--win); flex: none; }
+  .ov .dot.warn { background: var(--warn); }
+  .ov .dot.down { background: var(--loss); }
+  .ov .badge { display: inline-block; padding: 1px 8px; font: 700 11px Rajdhani, sans-serif; letter-spacing: .08em; text-transform: uppercase; border: 1px solid; }
+  .ov .ok { color: var(--win); border-color: rgb(53 224 127 / 40%); background: rgb(53 224 127 / 8%); }
+  .ov .wn { color: var(--warn); border-color: rgb(255 197 61 / 40%); background: rgb(255 197 61 / 8%); }
+  .ov .bd { color: var(--loss); border-color: rgb(255 77 94 / 40%); background: rgb(255 77 94 / 8%); }
+  .ov .inf { color: var(--blue); border-color: rgb(0 175 255 / 40%); background: rgb(0 175 255 / 8%); }
+  .ov .muted { color: var(--faint); }
+  .ov .num { font-variant-numeric: tabular-nums; }
+  .ov .boxes { display: inline-flex; gap: 2px; }
+  .ov .boxes i { width: 9px; height: 14px; background: var(--win); opacity: .85; }
+  .ov .boxes i.w { background: var(--warn); } .ov .boxes i.d { background: var(--loss); }
+  .ov table { width: 100%; border-collapse: collapse; color: inherit; font: inherit; }
+  .ov td, .ov th { padding: 7px 6px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; }
+  .ov th { font: 700 11px Rajdhani, sans-serif; letter-spacing: .1em; text-transform: uppercase; color: var(--faint); }
+  .ov .kv { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); }
+  .ov .kv div { background: var(--solid); padding: 9px 10px; }
+  .ov .kv small { display: block; font: 700 10px Rajdhani, sans-serif; letter-spacing: .12em; text-transform: uppercase; color: var(--faint); }
+  .ov .kv b { font-size: 15px; }
+  .ov .kv em { font-style: normal; color: var(--faint); font-size: 11px; display: block; }
+  .ov .list { list-style: none; margin: 0; padding: 0; }
+  .ov .list li { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--line); }
+  .ov .list li:last-child { border-bottom: 0; }
+  .ov .list .grow { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ov .count { min-width: 26px; text-align: center; padding: 1px 6px; background: #d81424; color: #fff; font-weight: 700; font-size: 12px; }
+  .ov .count.zero { background: transparent; color: var(--faint); border: 1px solid var(--line); }
+  .ov .av { width: 24px; height: 24px; display: grid; place-items: center; background: #1a2230; color: var(--dim); font-size: 10px; font-weight: 700; flex: none; }
+  .ov .strip { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .ov .strip .big { font-size: 16px; font-weight: 700; }
+  .ov .tile b.state { font-size: 18px; }
+  .ov .bignum { font-size: 26px; font-weight: 700; }
+  .ov svg.spark { width: 100%; height: 34px; display: block; margin-top: 6px; }
+  .ov .feed li { align-items: flex-start; }
+  .ov .feed .when { width: 54px; color: var(--faint); font-size: 12px; flex: none; padding-top: 2px; }
+  .ov .feed .icon { width: 22px; height: 22px; display: grid; place-items: center; border: 1px solid var(--strong); font-size: 11px; flex: none; }
+  .ov .pill { display: inline-flex; align-items: center; gap: 7px; padding: 5px 10px; border: 1px solid var(--line); background: var(--solid); }
+  .ov .note { margin-top: 8px; color: var(--faint); font-size: 11px; }
+  .lbl { margin: 26px 0 8px; }
+</style>
+
+<h2>Übersicht: drei Aufbauten</h2>
+<p class="subtitle">Alle drei zeigen dasselbe: Dienste mit Verfügbarkeit, jedes Postfach, die letzten Aktionen und den Bot im Detail. Unterschiedlich ist, was zuerst ins Auge fällt. Zahlen sind Beispiele.</p>
+
+<!-- ================= A ================= -->
+<h3 class="lbl">A · Leitstand: Dienste links, Postfach und Aktionen in einer Spalte rechts</h3>
+<div class="mockup"><div class="mockup-body" style="padding:0">
+<div class="ov">
+  <div class="title"><b>Übersicht</b><span>Stand 14:32, aktualisiert sich alle 15 Sekunden</span></div>
+
+  <div class="p strip" style="margin-bottom:12px">
+    <span class="dot"></span><span class="big">Alles läuft</span>
+    <span class="muted">99,96 % in 30 Tagen · letzter Ausfall vor 6 Tagen (4 Min.) · geprüft vor 40 s</span>
+    <span style="margin-left:auto" class="badge inf">Wartung geplant · Sa 02:00</span>
+  </div>
+
+  <div class="grid" style="grid-template-columns: 1.7fr 1fr">
+    <div class="grid">
+      <div class="p">
+        <div class="head"><h4>Dienste</h4><span class="more">Meldungen →</span></div>
+        <table>
+          <tr><th></th><th>Dienst</th><th>Letzte 24 h</th><th>24 h</th><th>30 Tage</th><th>Antwort</th></tr>
+          <tr><td><span class="dot"></span></td><td>Bot</td><td><span class="boxes"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span></td><td class="num">100 %</td><td class="num">99,98 %</td><td class="num">42 ms <span class="muted">Ø 51</span></td></tr>
+          <tr><td><span class="dot"></span></td><td>Bot-Dashboard</td><td><span class="boxes"><i></i><i></i><i></i><i></i><i class="w"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span></td><td class="num">99,7 %</td><td class="num">99,95 %</td><td class="num">180 ms <span class="muted">Ø 210</span></td></tr>
+          <tr><td><span class="dot"></span></td><td>Webseite</td><td><span class="boxes"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span></td><td class="num">100 %</td><td class="num">100 %</td><td class="num">95 ms <span class="muted">Ø 88</span></td></tr>
+          <tr><td><span class="dot warn"></span></td><td>Datenbank</td><td><span class="boxes"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i class="w"></i></span></td><td class="num">100 %</td><td class="num">99,99 %</td><td class="num">610 ms <span class="muted">Ø 12</span></td></tr>
+        </table>
+      </div>
+
+      <div class="p">
+        <div class="head"><h4>Bot im Detail</h4><span class="more">Neu starten</span></div>
+        <div class="kv">
+          <div><small>Status</small><b><span class="badge ok">Online</span></b></div>
+          <div><small>Ping</small><b>42 ms</b></div>
+          <div><small>Läuft seit</small><b>3 T 4 Std</b><em>Mo, 10:12</em></div>
+          <div><small>Speicher</small><b>182 MB</b><em>Heap 96 MB</em></div>
+          <div><small>Server</small><b>18</b></div>
+          <div><small>Mitglieder</small><b>4.812</b></div>
+          <div><small>Commands</small><b>64</b><em>in 21 Modulen</em></div>
+          <div><small>Version</small><b>2.4.1</b><em>discord.js 14.16 · Node 24.1</em></div>
+        </div>
+        <p class="note">Statusmeldung zuletzt geändert vor 1 Min. in 1 Kanal · Webseite gebaut gestern 21:04 · Banner: sichtbar</p>
+      </div>
+    </div>
+
+    <div class="grid" style="align-content:start">
+      <div class="p">
+        <div class="head"><h4>Postfächer</h4><span class="more">Alle Posteingänge →</span></div>
+        <ul class="list">
+          <li><span class="dot" style="background:#ff1e2d;box-shadow:none"></span><span class="grow">Support<br><span class="muted">support@nexus-emb.de</span></span><span class="count">3</span></li>
+          <li><span class="dot" style="background:#00afff;box-shadow:none"></span><span class="grow">Bewerbungen<br><span class="muted">team@nexus-emb.de</span></span><span class="count zero">0</span></li>
+          <li><span class="dot" style="background:#8a4dff;box-shadow:none"></span><span class="grow">Partner<br><span class="muted" style="color:var(--loss)">Anmeldung fehlgeschlagen</span></span><span class="badge bd">Fehler</span></li>
+        </ul>
+      </div>
+      <div class="p">
+        <div class="head"><h4>Letzte Aktionen</h4><span class="more">Protokoll →</span></div>
+        <ul class="list">
+          <li><span class="av">CO</span><span class="grow">Connor hat das Banner geändert</span><span class="muted">vor 5 Min.</span></li>
+          <li><span class="av">MK</span><span class="grow">Max hat eine Mail an jonas@… geschickt</span><span class="muted">vor 22 Min.</span></li>
+          <li><span class="av">CO</span><span class="grow">Connor hat Modul „Ticket System“ gespeichert</span><span class="muted">vor 1 Std.</span></li>
+          <li><span class="av">LS</span><span class="grow">Lea hat eine Störung gemeldet</span><span class="muted">gestern</span></li>
+          <li><span class="av">CO</span><span class="grow">Connor hat den Bot neu gestartet</span><span class="muted">gestern</span></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <p class="note">Darunter wie bisher: Größte Server.</p>
+</div>
+</div></div>
+
+<!-- ================= B ================= -->
+<h3 class="lbl">B · Kacheln: vier Dienste oben mit Antwortzeit-Kurve, darunter Bot, Postfach, Aktionen</h3>
+<div class="mockup"><div class="mockup-body" style="padding:0">
+<div class="ov">
+  <div class="title"><b>Übersicht</b><span>Stand 14:32 · 99,96 % in 30 Tagen</span></div>
+
+  <div class="grid" style="grid-template-columns: repeat(4, 1fr); margin-bottom:12px">
+    <div class="p tile"><div class="head"><h4>Bot</h4><span class="dot"></span></div><b class="state">Online</b><div class="muted num">99,98 % · 30 Tage</div>
+      <svg class="spark" viewBox="0 0 100 30" preserveAspectRatio="none"><polyline fill="none" stroke="#35e07f" stroke-width="1.5" points="0,20 8,18 16,21 24,17 32,19 40,16 48,18 56,15 64,19 72,17 80,18 88,16 100,17"/></svg><div class="muted num">jetzt 42 ms · Ø 51</div></div>
+    <div class="p tile"><div class="head"><h4>Bot-Dashboard</h4><span class="dot"></span></div><b class="state">Erreichbar</b><div class="muted num">99,95 % · 30 Tage</div>
+      <svg class="spark" viewBox="0 0 100 30" preserveAspectRatio="none"><polyline fill="none" stroke="#35e07f" stroke-width="1.5" points="0,16 8,15 16,18 24,6 32,14 40,15 48,16 56,14 64,15 72,13 80,15 88,14 100,15"/></svg><div class="muted num">jetzt 180 ms · Ø 210</div></div>
+    <div class="p tile"><div class="head"><h4>Webseite</h4><span class="dot"></span></div><b class="state">Erreichbar</b><div class="muted num">100 % · 30 Tage</div>
+      <svg class="spark" viewBox="0 0 100 30" preserveAspectRatio="none"><polyline fill="none" stroke="#35e07f" stroke-width="1.5" points="0,22 8,21 16,22 24,20 32,21 40,22 48,21 56,20 64,21 72,22 80,21 88,20 100,21"/></svg><div class="muted num">jetzt 95 ms · gebaut gestern</div></div>
+    <div class="p tile"><div class="head"><h4>Datenbank</h4><span class="dot warn"></span></div><b class="state" style="color:var(--warn)">Langsam</b><div class="muted num">99,99 % · 30 Tage</div>
+      <svg class="spark" viewBox="0 0 100 30" preserveAspectRatio="none"><polyline fill="none" stroke="#ffc53d" stroke-width="1.5" points="0,26 8,26 16,25 24,26 32,26 40,25 48,26 56,26 64,25 72,26 80,24 88,20 100,4"/></svg><div class="muted num">jetzt 610 ms · Ø 12</div></div>
+  </div>
+
+  <div class="grid" style="grid-template-columns: 2fr 1fr; margin-bottom:12px">
+    <div class="p">
+      <div class="head"><h4>Bot im Detail</h4><span class="more">Neu starten</span></div>
+      <div class="kv">
+        <div><small>Ping</small><b>42 ms</b></div>
+        <div><small>Läuft seit</small><b>3 T 4 Std</b></div>
+        <div><small>Server</small><b>18</b></div>
+        <div><small>Mitglieder</small><b>4.812</b></div>
+        <div><small>Speicher</small><b>182 MB</b><em>Heap 96 MB</em></div>
+        <div><small>Commands</small><b>64</b><em>21 Module</em></div>
+        <div><small>Version</small><b>2.4.1</b><em>discord.js 14.16</em></div>
+        <div><small>Statusmeldung</small><b>vor 1 Min.</b><em>1 Kanal</em></div>
+      </div>
+    </div>
+    <div class="p">
+      <div class="head"><h4>Postfächer</h4><span class="more">→</span></div>
+      <div class="grid" style="grid-template-columns: 1fr 1fr 1fr; text-align:center">
+        <div><div class="bignum" style="color:var(--red)">3</div><div class="muted">Support</div></div>
+        <div><div class="bignum muted">0</div><div class="muted">Bewerbungen</div></div>
+        <div><div class="bignum" style="color:var(--loss)">!</div><div class="muted">Partner</div></div>
+      </div>
+      <p class="note">ungelesen · Partner: Anmeldung fehlgeschlagen</p>
+    </div>
+  </div>
+
+  <div class="grid" style="grid-template-columns: 1fr 1fr">
+    <div class="p">
+      <div class="head"><h4>Letzte Aktionen</h4><span class="more">Protokoll →</span></div>
+      <ul class="list">
+        <li><span class="av">CO</span><span class="grow">Banner geändert</span><span class="muted">vor 5 Min.</span></li>
+        <li><span class="av">MK</span><span class="grow">Mail an jonas@… geschickt</span><span class="muted">vor 22 Min.</span></li>
+        <li><span class="av">CO</span><span class="grow">Modul „Ticket System“ gespeichert</span><span class="muted">vor 1 Std.</span></li>
+      </ul>
+    </div>
+    <div class="p">
+      <div class="head"><h4>Neueste Mails</h4><span class="more">Zum Postfach →</span></div>
+      <ul class="list">
+        <li><span class="grow"><b>Jonas Weber</b> · Frage zu Rank Roles</span><span class="muted">14:02</span></li>
+        <li><span class="grow"><b>Team Nova</b> · Partnerschaft</span><span class="muted">11:47</span></li>
+        <li><span class="grow"><b>Discord</b> · Kontakt: Bot reagiert nicht</span><span class="muted">gestern</span></li>
+      </ul>
+    </div>
+  </div>
+  <p class="note">Darunter wie bisher: Größte Server.</p>
+</div>
+</div></div>
+
+<!-- ================= C ================= -->
+<h3 class="lbl">C · Lagebericht: ein Satz und vier Punkte oben, darunter ein Verlauf „Was los war“</h3>
+<div class="mockup"><div class="mockup-body" style="padding:0">
+<div class="ov">
+  <div class="title"><b>Übersicht</b><span>Stand 14:32</span></div>
+
+  <div class="p" style="margin-bottom:12px">
+    <div class="strip">
+      <span class="big">Alles läuft, die Datenbank antwortet gerade langsam.</span>
+      <span class="muted">Seit 6 Tagen kein Ausfall · 99,96 % in 30 Tagen</span>
+    </div>
+    <div class="strip" style="margin-top:10px; gap:8px">
+      <span class="pill"><span class="dot"></span>Bot <span class="muted num">99,98 % · 42 ms</span></span>
+      <span class="pill"><span class="dot"></span>Bot-Dashboard <span class="muted num">99,95 % · 180 ms</span></span>
+      <span class="pill"><span class="dot"></span>Webseite <span class="muted num">100 % · 95 ms</span></span>
+      <span class="pill"><span class="dot warn"></span>Datenbank <span class="muted num">99,99 % · 610 ms</span></span>
+    </div>
+  </div>
+
+  <div class="grid" style="grid-template-columns: 1.4fr 1fr">
+    <div class="p">
+      <div class="head"><h4>Was los war</h4><span class="muted">Mails, Aktionen, Meldungen, Bot</span></div>
+      <ul class="list feed">
+        <li><span class="when">14:29</span><span class="icon" style="color:var(--warn)">!</span><span class="grow">Datenbank langsam: 610 ms statt Ø 12 ms</span></li>
+        <li><span class="when">14:27</span><span class="icon">✎</span><span class="grow">Connor hat das Banner geändert</span></li>
+        <li><span class="when">14:02</span><span class="icon" style="color:var(--red)">@</span><span class="grow"><b>Jonas Weber</b> an Support: Frage zu Rank Roles</span></li>
+        <li><span class="when">14:10</span><span class="icon">↗</span><span class="grow">Max hat eine Mail an jonas@… geschickt</span></li>
+        <li><span class="when">13:31</span><span class="icon">✎</span><span class="grow">Connor hat Modul „Ticket System“ gespeichert</span></li>
+        <li><span class="when">11:47</span><span class="icon" style="color:var(--red)">@</span><span class="grow"><b>Team Nova</b> an Partner: Partnerschaft</span></li>
+        <li><span class="when">gestern</span><span class="icon">⟳</span><span class="grow">Bot neu gestartet von Connor, nach 41 s wieder online</span></li>
+      </ul>
+    </div>
+
+    <div class="grid" style="align-content:start">
+      <div class="p">
+        <div class="head"><h4>Bot</h4><span class="badge ok">Online</span></div>
+        <table>
+          <tr><td class="muted">Läuft seit</td><td>3 T 4 Std (Mo, 10:12)</td></tr>
+          <tr><td class="muted">Server · Mitglieder</td><td>18 · 4.812</td></tr>
+          <tr><td class="muted">Speicher</td><td>182 MB, Heap 96 MB</td></tr>
+          <tr><td class="muted">Commands</td><td>64 in 21 Modulen</td></tr>
+          <tr><td class="muted">Version</td><td>2.4.1 · discord.js 14.16 · Node 24.1</td></tr>
+          <tr><td class="muted">Statusmeldung</td><td>geändert vor 1 Min.</td></tr>
+        </table>
+      </div>
+      <div class="p">
+        <div class="head"><h4>Postfächer</h4><span class="more">→</span></div>
+        <ul class="list">
+          <li><span class="grow">Support</span><span class="count">3</span></li>
+          <li><span class="grow">Bewerbungen</span><span class="count zero">0</span></li>
+          <li><span class="grow">Partner <span style="color:var(--loss)">· Anmeldung fehlgeschlagen</span></span><span class="badge bd">Fehler</span></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <p class="note">Darunter wie bisher: Größte Server.</p>
+</div>
+</div></div>
+
+<h3 class="lbl">Welcher Aufbau?</h3>
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)"><div class="letter">A</div><div class="content"><h3>Leitstand</h3><p>Dienste als Tabelle mit 12 Kästchen, Bot als Kennzahlen, rechts Postfächer und Aktionen. Am meisten auf einen Blick.</p></div></div>
+  <div class="option" data-choice="b" onclick="toggleSelect(this)"><div class="letter">B</div><div class="content"><h3>Kacheln</h3><p>Jeder Dienst eine Kachel mit Kurve der letzten 24 Stunden. Fällt ein Dienst ab, sieht man es sofort an der Farbe.</p></div></div>
+  <div class="option" data-choice="c" onclick="toggleSelect(this)"><div class="letter">C</div><div class="content"><h3>Lagebericht</h3><p>Ein Satz sagt, wie es steht. Der Verlauf mischt Mails, Aktionen, Meldungen und Neustarts nach Zeit.</p></div></div>
+</div>
+
+<h3 class="lbl">„Letzte Aktionen“ für Admins?</h3>
+<p class="subtitle">Das Protokoll sehen bisher nur Developer. Auf der Übersicht würde es auch Admins zeigen, wer was geändert hat.</p>
+<div class="options">
+  <div class="option" data-choice="aktionen-alle" onclick="toggleSelect(this)"><div class="letter">1</div><div class="content"><h3>Alle sehen die letzten fünf</h3><p>Nur Wer, Was, Wann. Details und Filter bleiben im Protokoll für Developer.</p></div></div>
+  <div class="option" data-choice="aktionen-dev" onclick="toggleSelect(this)"><div class="letter">2</div><div class="content"><h3>Nur Developer</h3><p>Admins sehen den Bereich nicht, wie beim Protokoll.</p></div></div>
+</div>

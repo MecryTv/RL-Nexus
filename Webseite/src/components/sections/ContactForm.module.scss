@@ -1,0 +1,279 @@
+@use "mixins" as *;
+
+.form {
+    padding: clamp(24px, 3.4vw, 36px);
+
+    form {
+        display: flex;
+        flex-direction: column;
+        gap: 26px;
+    }
+}
+
+/* --- Themenauswahl ------------------------------------------------------ */
+.topics {
+    padding: 0;
+    border: 0;
+}
+
+.legend {
+    padding: 0;
+    margin-bottom: 14px;
+    color: var(--c-text);
+
+    @include label(0.72rem, 0.18em);
+}
+
+.topicGrid {
+    display: grid;
+    gap: 10px;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr));
+}
+
+.topic {
+    position: relative;
+    display: grid;
+    gap: 2px 11px;
+    align-items: center;
+    padding: 13px 15px 12px;
+    border: 1px solid var(--c-line);
+    transition:
+        border-color var(--t-fast),
+        background var(--t-fast);
+    cursor: pointer;
+    grid-template-columns: auto minmax(0, 1fr);
+
+    @include bevel-diagonal(9px);
+
+    input {
+        position: absolute;
+        opacity: 0;
+        pointer-events: none;
+    }
+
+    svg {
+        grid-row: span 2;
+        color: var(--c-text-faint);
+        transition: color var(--t-fast);
+    }
+
+    &:hover {
+        border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+    }
+
+    /* Der Fokusring gehört sichtbar an die Kachel - das Eingabefeld darin
+       sieht ja niemand. */
+    &:focus-within {
+        @include focus-ring;
+    }
+}
+
+.topicActive {
+    border-color: color-mix(in srgb, var(--accent) 62%, transparent);
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+
+    svg {
+        color: var(--accent);
+    }
+
+    .topicLabel {
+        color: var(--c-text);
+    }
+}
+
+.topicLabel {
+    color: var(--c-text-dim);
+
+    @include label(0.72rem, 0.1em);
+}
+
+.topicHint {
+    color: var(--c-text-faint);
+    font-size: 0.76rem;
+    line-height: 1.4;
+}
+
+/* --- Felder ------------------------------------------------------------- */
+.row {
+    display: grid;
+    gap: 18px;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+}
+
+.field {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    min-width: 0;
+}
+
+.label {
+    color: var(--c-text);
+
+    @include label(0.66rem, 0.14em);
+}
+
+.input {
+    padding: 12px 14px;
+    width: 100%;
+    border: 1px solid var(--c-line-strong);
+    background: rgb(4 6 9 / 70%);
+    color: var(--c-text);
+    font-family: var(--f-display);
+    font-size: 0.95rem;
+    transition:
+        border-color var(--t-fast),
+        background var(--t-fast);
+
+    @include bevel-diagonal(9px);
+
+    &::placeholder {
+        color: var(--c-text-faint);
+    }
+
+    &:hover {
+        border-color: rgb(255 255 255 / 22%);
+    }
+
+    &:focus {
+        border-color: var(--accent);
+        background: rgb(4 6 9 / 90%);
+        outline: none;
+    }
+}
+
+.area {
+    /* Nur senkrecht - waagerecht ziehen bricht das Raster daneben. */
+    resize: vertical;
+    min-height: 150px;
+    line-height: 1.6;
+}
+
+.areaSmall {
+    min-height: 84px;
+}
+
+.hint,
+.error {
+    font-size: 0.79rem;
+    line-height: 1.5;
+}
+
+.hint {
+    color: var(--c-text-faint);
+}
+
+.error {
+    color: var(--c-loss);
+}
+
+.invalid .input {
+    border-color: var(--c-loss);
+}
+
+/* --- Die Falle ----------------------------------------------------------
+   Nicht `display: none`: manche Skripte überspringen ausgeblendete Felder.
+   Aus dem Blickfeld geschoben wird es dagegen mitgefüllt. */
+.trap {
+    position: absolute;
+    left: -9999px;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+}
+
+/* --- Absenden ----------------------------------------------------------- */
+.footer {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px 22px;
+    align-items: center;
+    padding-top: 6px;
+}
+
+.note {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    color: var(--c-text-faint);
+    font-size: 0.81rem;
+
+    /* Auf Höhe der ersten Zeile, auch wenn der Satz auf dem Handy umbricht. */
+    svg {
+        flex-shrink: 0;
+        margin-top: 4px;
+    }
+
+    /* Wie die Links im Fließtext der Rechtsseiten. */
+    a {
+        color: var(--c-blue);
+        text-decoration: underline;
+        text-underline-offset: 3px;
+
+        &:hover {
+            color: var(--c-text);
+        }
+    }
+}
+
+.failure {
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+    padding: 13px 15px;
+    border: 1px solid rgb(255 77 94 / 40%);
+    background: rgb(255 77 94 / 9%);
+    color: var(--c-loss);
+    font-size: 0.87rem;
+    line-height: 1.55;
+
+    @include bevel-diagonal(8px);
+
+    svg {
+        flex-shrink: 0;
+        margin-top: 2px;
+    }
+}
+
+/* --- Nach dem Absenden -------------------------------------------------- */
+.done {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    padding: clamp(40px, 6vw, 70px) 30px;
+    text-align: center;
+
+    h2 {
+        font-size: 1.55rem;
+        font-weight: 800;
+    }
+
+    p {
+        max-width: 52ch;
+        color: var(--c-text-dim);
+        font-size: 0.96rem;
+        line-height: 1.68;
+    }
+}
+
+.doneIcon {
+    display: grid;
+    width: 62px;
+    height: 62px;
+    margin-bottom: 6px;
+    background: rgb(53 224 127 / 12%);
+    box-shadow: inset 0 0 0 1.5px rgb(53 224 127 / 40%);
+    color: var(--c-win);
+    place-items: center;
+
+    @include bevel-diagonal(14px);
+}
+
+.doneActions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    justify-content: center;
+    margin-top: 10px;
+}

@@ -1,0 +1,87 @@
+{
+    "version": "0.0.1",
+    "configurations": [
+        {
+            "name": "admin-vite",
+            "runtimeExecutable": "npm",
+            "runtimeArgs": [
+                "run",
+                "dev"
+            ],
+            "port": 5174
+        },
+        {
+            "name": "website-vite",
+            "runtimeExecutable": "node",
+            "runtimeArgs": [
+                "../RL Nexus Website/node_modules/vite/bin/vite.js",
+                "../RL Nexus Website",
+                "--port",
+                "5173",
+                "--strictPort"
+            ],
+            "port": 5173
+        },
+        {
+            "name": "website-preview",
+            "runtimeExecutable": "node",
+            "runtimeArgs": [
+                "../RL Nexus Website/node_modules/vite/bin/vite.js",
+                "preview",
+                "../RL Nexus Website",
+                "--port",
+                "5175",
+                "--strictPort"
+            ],
+            "port": 5175
+        },
+        {
+            "name": "admin-server",
+            "runtimeExecutable": "npm",
+            "runtimeArgs": [
+                "run",
+                "dev:server"
+            ],
+            "port": 3001
+        },
+        {
+            "name": "admin-server-live",
+            "runtimeExecutable": "npm",
+            "runtimeArgs": [
+                "run",
+                "dev:server:live"
+            ],
+            "port": 3001
+        },
+        {
+            "name": "admin-server-test",
+            "runtimeExecutable": "node",
+            "runtimeArgs": [
+                "server/index.ts"
+            ],
+            "port": 3001,
+            "env": {
+                "CLIENT_ID": "111111111111111111",
+                "CLIENT_SECRET": "nur-zum-ansehen",
+                "CLIENT_TOKEN": "nur-zum-ansehen",
+                "SERVER_JWT_SECRET": "ssssssssssssssssssssssssssssssssssssssss",
+                "ADMIN_GUILD_ID": "1547258700480253982",
+                "ADMIN_ROLE_ID": "1548701400031297619",
+                "DEVELOPER_ROLE_ID": "1548701516418912370",
+                "ADMIN_PUBLIC_URL": "http://localhost:5174"
+            }
+        },
+        {
+            "name": "status-vite",
+            "runtimeExecutable": "node",
+            "runtimeArgs": [
+                "../RL Nexus Status Website/node_modules/vite/bin/vite.js",
+                "../RL Nexus Status Website",
+                "--port",
+                "5176",
+                "--strictPort"
+            ],
+            "port": 5176
+        }
+    ]
+}

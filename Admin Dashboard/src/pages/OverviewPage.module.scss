@@ -1,0 +1,327 @@
+@use "mixins" as *;
+
+/* Gleich hoch, ob rechts ein Link steht oder nicht. Sonst springen Überschriften nebeneinander. */
+.head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 44px;
+    margin-bottom: var(--s-2);
+    gap: var(--s-3);
+}
+
+.heading {
+    color: var(--c-text-dim);
+
+    @include label(0.85rem, 0.16em);
+}
+
+/* Zwischen den Blöcken der Seite. Die Kacheln oben brauchen keinen Abstand nach oben. */
+.split,
+.pair,
+.spaced {
+    margin-top: var(--s-6);
+}
+
+/* --- Dienste ------------------------------------------------------------ */
+
+.tiles {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--s-3);
+
+    @include below(1099px) {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    @include below(519px) {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+.tile {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-1);
+    padding: var(--s-4);
+}
+
+.tileHead {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-2);
+    margin-bottom: var(--s-1);
+}
+
+.tileName {
+    color: var(--c-text);
+    font-size: 1rem;
+    font-weight: 700;
+}
+
+.uptime {
+    color: var(--c-text-dim);
+    font-size: 0.875rem;
+    font-variant-numeric: tabular-nums;
+
+    strong {
+        color: var(--c-text);
+        font-size: 1.25rem;
+    }
+}
+
+.spark {
+    display: block;
+    width: 100%;
+    height: 34px;
+    margin: var(--s-1) 0;
+
+    polyline {
+        fill: none;
+        stroke: var(--c-win);
+        stroke-width: 1.5;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        vector-effect: non-scaling-stroke;
+    }
+
+    &[data-state="warn"] polyline {
+        stroke: var(--c-mod-engagement);
+    }
+
+    &[data-state="down"] polyline {
+        stroke: var(--c-loss);
+    }
+}
+
+.small {
+    color: var(--c-text-faint);
+    font-size: 0.8125rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.extra {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s-2);
+    margin-top: var(--s-1);
+}
+
+.inline {
+    display: inline-flex;
+
+    &:hover {
+        filter: brightness(1.2);
+    }
+
+    &:focus-visible {
+        @include focus-ring;
+    }
+}
+
+/* --- Bot und Postfächer -------------------------------------------------- */
+
+.split {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+    gap: var(--s-5);
+
+    @include below(1099px) {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+.facts {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 1px;
+    border: 1px solid var(--c-line);
+    background: var(--c-line);
+
+    @include below(699px) {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+.fact {
+    padding: var(--s-3);
+    background: var(--c-panel-solid);
+
+    dt {
+        color: var(--c-text-faint);
+
+        @include label(0.72rem, 0.14em);
+    }
+
+    dd {
+        color: var(--c-text);
+        font-size: 1.125rem;
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+        overflow-wrap: anywhere;
+    }
+
+    small {
+        display: block;
+        color: var(--c-text-faint);
+        font-size: 0.75rem;
+        font-weight: 500;
+    }
+}
+
+.card {
+    padding: var(--s-4);
+}
+
+.boxes {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+    gap: var(--s-2);
+    margin-bottom: var(--s-3);
+}
+
+.box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: var(--s-2);
+    gap: var(--s-1);
+    border: 1px solid var(--c-line);
+    text-align: center;
+
+    @include touch-target;
+
+    &:hover {
+        border-color: var(--c-line-strong);
+        background: rgb(255 255 255 / 3%);
+    }
+
+    &:focus-visible {
+        @include focus-inset;
+    }
+}
+
+.boxCount {
+    color: var(--c-text-faint);
+    font-family: var(--f-display);
+    font-size: 1.75rem;
+    font-weight: 700;
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+}
+
+.boxLabel {
+    max-width: 100%;
+    overflow: hidden;
+    color: var(--c-text-dim);
+    font-size: 0.8125rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.error {
+    color: var(--c-loss);
+}
+
+/* --- Aktionen und Mails -------------------------------------------------- */
+
+.pair {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--s-5);
+
+    @include below(899px) {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+.rows {
+    display: grid;
+    /* Sonst wird ein Eintrag so breit wie sein Text ohne Umbruch. */
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    padding: var(--s-2) 0;
+    gap: var(--s-1) var(--s-3);
+    border-bottom: 1px solid var(--c-line);
+}
+
+a.row {
+    @include touch-target;
+
+    &:hover {
+        background: rgb(255 255 255 / 3%);
+    }
+
+    &:focus-visible {
+        @include focus-inset;
+    }
+}
+
+.rows li:last-child .row,
+.rows li.row:last-child {
+    border-bottom: 0;
+}
+
+/* Eine Zeile je Eintrag wie im Postfach. Der volle Text steht im title. */
+.text {
+    flex: 1 1 200px;
+    min-width: 0;
+    overflow: hidden;
+    color: var(--c-text);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.target {
+    color: var(--c-text-dim);
+}
+
+.when {
+    color: var(--c-text-faint);
+    font-size: 0.8125rem;
+    white-space: nowrap;
+}
+
+/* --- Hinweise ------------------------------------------------------------ */
+
+.notice {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s-3);
+    padding: var(--s-4);
+}
+
+.alert {
+    margin-bottom: var(--s-5);
+
+    > p {
+        flex: 1 1 260px;
+    }
+}
+
+.more {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-1);
+    color: var(--c-blue);
+    font-size: 0.875rem;
+
+    @include touch-target;
+
+    &:hover {
+        color: var(--c-text);
+    }
+}
+
+.note {
+    color: var(--c-text-dim);
+}

@@ -1,0 +1,26 @@
+<h2>Frage 1: Was passiert mit dem Kontaktformular?</h2>
+<p class="subtitle">Der Bereich „Kontaktformular“ fliegt aus dem Postfach. Jede Nachricht kommt ja schon als Mail in support@ an, mit der Adresse der Person als Antwortadresse. Offen ist, was im Hintergrund bleibt.</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Nur noch Mail (empfohlen)</h3>
+      <p>Das Formular speichert nichts mehr in der Datenbank. Es schickt die Mail an support@ und, falls eingerichtet, den Hinweis nach Discord. Klappt die Mail nicht, bekommt die Person eine Fehlermeldung und kann es nochmal versuchen, statt dass die Nachricht still verloren geht.</p>
+      <p><strong>Folgen:</strong> Die Kontakt-Liste und die Verwaltung im Dashboard fallen weg. Die Übersichtsseite zeigt stattdessen die neuesten ungelesenen Mails aus den Posteingängen. Der Discord-Link führt zum Posteingang. Der Datenschutztext der Webseite wird kürzer, weil nichts mehr gespeichert wird. Die vorhandenen Einträge in der Tabelle bleiben liegen, bis du sagst, dass sie weg dürfen.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Weiter speichern, nur nicht mehr anzeigen</h3>
+      <p>Alles läuft wie bisher, nur der Bereich im Postfach ist weg. Die Datenbank hebt die Nachrichten als Sicherheitsnetz auf, falls eine Mail nicht ankommt.</p>
+      <p><strong>Haken:</strong> Dann liegen persönliche Daten in der Datenbank, die niemand mehr ansieht. Das ist datenschutzrechtlich schwer zu begründen, und der Datenschutztext muss es trotzdem erwähnen.</p>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top:24px">
+  <p class="label">Kommt in beiden Fällen dazu</p>
+  <p>Die Mail, die das Formular an support@ schickt, wird aufgeräumt: Thema, Name, Discord und Nachricht sauber gegliedert statt als Textblock, damit sie im Postfach gut lesbar ist. Auf „Antworten“ geht die Antwort direkt an die Person.</p>
+</div>

@@ -1,0 +1,467 @@
+@use "mixins" as *;
+
+.page {
+    position: relative;
+}
+
+.top {
+    position: relative;
+    padding-block: 34px 0;
+
+    /* Das Licht hinter dem Kopf trägt hier die Modulfarbe statt Rot - man soll
+       auf den ersten Blick sehen, in welchem Bereich man gelandet ist. */
+    &::before {
+        position: absolute;
+        z-index: -1;
+        top: -120px;
+        left: 8%;
+        width: min(720px, 88vw);
+        height: 440px;
+        background: radial-gradient(ellipse at center, color-mix(in srgb, var(--accent) 12%, transparent), transparent 68%);
+        content: "";
+    }
+}
+
+/* --- Brotkrumen --------------------------------------------------------- */
+.crumbs {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 30px;
+    color: var(--c-text-faint);
+
+    @include label(0.66rem, 0.14em);
+
+    a {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        transition: color var(--t-fast);
+        color: var(--c-text-dim);
+
+        &:hover {
+            color: var(--accent);
+        }
+    }
+}
+
+.back {
+    transform: rotate(180deg);
+}
+
+/* --- Kopf --------------------------------------------------------------- */
+.head {
+    display: flex;
+    align-items: flex-start;
+    gap: 22px;
+    margin-bottom: 46px;
+
+    @include below(560px) {
+        flex-direction: column;
+        gap: 18px;
+    }
+}
+
+.icon {
+    display: grid;
+    flex-shrink: 0;
+    width: 76px;
+    height: 76px;
+    background: color-mix(in srgb, var(--accent) 13%, transparent);
+    box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--accent) 34%, transparent);
+    color: var(--accent);
+    place-items: center;
+
+    @include bevel-diagonal(16px);
+    @include glow(rgb(0 0 0 / 50%), 20px);
+}
+
+.headText {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 0;
+}
+
+.badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.title {
+    font-size: clamp(2rem, 1.4rem + 2.6vw, 3.1rem);
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    line-height: 1.05;
+}
+
+.tagline {
+    max-width: 58ch;
+    color: var(--c-text-dim);
+    font-size: clamp(1rem, 0.95rem + 0.3vw, 1.14rem);
+}
+
+/* --- Rumpf -------------------------------------------------------------- */
+.body {
+    display: grid;
+    gap: 44px;
+    align-items: start;
+    grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+
+    @include below(880px) {
+        gap: 34px;
+        grid-template-columns: 1fr;
+    }
+}
+
+.main {
+    display: flex;
+    flex-direction: column;
+    gap: 40px;
+}
+
+.description {
+    max-width: 66ch;
+    color: var(--c-text);
+    font-size: 1.06rem;
+    line-height: 1.72;
+}
+
+.block {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.blockTitle {
+    color: var(--c-text);
+
+    @include label(0.74rem, 0.18em);
+}
+
+/* Überschrift und das Schild, wer die Commands benutzen darf. */
+.blockHead {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 14px;
+}
+
+.more {
+    display: inline-flex;
+    align-self: flex-start;
+    align-items: center;
+    gap: 8px;
+    transition: color var(--t-fast);
+    color: var(--c-text-dim);
+
+    @include label(0.68rem, 0.14em);
+    @include touch-target;
+
+    &:hover {
+        color: var(--accent);
+    }
+}
+
+.highlights {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+
+    li {
+        display: flex;
+        align-items: flex-start;
+        gap: 13px;
+        padding: 13px 4px;
+        border-bottom: 1px solid var(--c-line);
+        color: var(--c-text-dim);
+        font-size: 0.97rem;
+        line-height: 1.55;
+    }
+
+    svg {
+        flex-shrink: 0;
+        margin-top: 3px;
+        color: var(--accent);
+        stroke-width: 2.4;
+    }
+}
+
+/* --- Seitenspalte ------------------------------------------------------- */
+.side {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-gap);
+
+    /* Bleibt beim Scrollen stehen - die lange Liste links liest man, und die
+       Schaltfläche soll dabei nicht davonlaufen. */
+    @include from(880px) {
+        position: sticky;
+        top: calc(var(--s-header) + 24px);
+    }
+}
+
+.card {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 24px 22px;
+}
+
+.cardTitle {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    color: var(--c-text);
+
+    @include label(0.7rem, 0.16em);
+
+    svg {
+        color: var(--accent);
+    }
+}
+
+.cardText {
+    color: var(--c-text-dim);
+    font-size: 0.89rem;
+    line-height: 1.62;
+}
+
+.cardAction {
+    margin-top: 4px;
+    width: 100%;
+}
+
+/* Die Teile eines Moduls: Name oben, ein Satz darunter, der Strich links in
+   der Modulfarbe hält die Einträge auseinander. */
+.parts {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+
+    li {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        padding-left: 12px;
+        border-left: 2px solid color-mix(in srgb, var(--accent) 45%, transparent);
+        color: var(--c-text-dim);
+        font-size: 0.86rem;
+        line-height: 1.55;
+    }
+
+    strong {
+        color: var(--c-text);
+        font-size: 0.92rem;
+        font-weight: 700;
+    }
+}
+
+/* --- Verwandte Module --------------------------------------------------- */
+.related {
+    padding-top: 44px;
+    border-top: 1px solid var(--c-line);
+}
+
+.relatedTitle {
+    margin-bottom: 24px;
+    color: var(--c-text);
+
+    @include label(0.74rem, 0.18em);
+}
+
+.relatedGrid {
+    display: grid;
+    gap: var(--s-gap);
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 290px), 1fr));
+}
+
+/* ------------------------------------------------------------------------
+   Der ausführliche Teil - Beispiel, Begriffe, Automatiken, Schritte, Fragen.
+   Dieselben Muster wie auf der Team-Seite, damit man beim Wechsel zwischen
+   zwei Modulen nicht jedes Mal neu suchen muss, wo was steht.
+   ------------------------------------------------------------------------ */
+
+.paragraph {
+    max-width: 68ch;
+    color: var(--c-text);
+    font-size: 1.04rem;
+    line-height: 1.75;
+
+    & + & {
+        margin-top: 16px;
+    }
+}
+
+/* --- Beispiel ----------------------------------------------------------- */
+.showcase {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+}
+
+.showcaseBody {
+    margin-top: 44px;
+    max-width: 760px;
+    width: 100%;
+}
+
+.teams {
+    display: grid;
+    gap: var(--s-gap);
+    margin-top: 44px;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+
+    li {
+        display: flex;
+    }
+}
+
+.disclaimer {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    margin-top: 20px;
+    color: var(--c-text-faint);
+    font-size: 0.82rem;
+}
+
+/* --- Begriffe ----------------------------------------------------------- */
+.concepts {
+    display: flex;
+    flex-direction: column;
+    margin-top: 40px;
+}
+
+.concept {
+    display: grid;
+    gap: 6px 18px;
+    align-items: baseline;
+    padding: 20px 4px;
+    border-bottom: 1px solid var(--c-line);
+    grid-template-columns: 14px 150px minmax(0, 1fr);
+
+    &:first-child {
+        border-top: 1px solid var(--c-line);
+    }
+
+    @include below(680px) {
+        gap: 8px 12px;
+        grid-template-columns: 14px minmax(0, 1fr);
+    }
+}
+
+.conceptDot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--dot);
+    box-shadow: 0 0 10px var(--dot);
+    translate: 0 -2px;
+}
+
+.conceptLabel {
+    color: var(--dot);
+
+    @include label(0.74rem, 0.14em);
+}
+
+.conceptText {
+    color: var(--c-text-dim);
+    font-size: 0.95rem;
+    line-height: 1.62;
+
+    @include below(680px) {
+        grid-column: 2;
+    }
+}
+
+/* --- Automatiken -------------------------------------------------------- */
+.automations {
+    display: grid;
+    gap: var(--s-gap);
+    margin-top: 44px;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+
+    li {
+        display: flex;
+    }
+}
+
+.automation {
+    display: flex;
+    flex-direction: column;
+    gap: 11px;
+    padding: 26px 24px;
+    width: 100%;
+
+    h3 {
+        font-size: 1.06rem;
+        font-weight: 700;
+    }
+
+    p {
+        color: var(--c-text-dim);
+        font-size: 0.89rem;
+        line-height: 1.62;
+    }
+}
+
+.automationIcon {
+    display: grid;
+    width: 42px;
+    height: 42px;
+    margin-bottom: 3px;
+    background: rgb(255 30 45 / 11%);
+    box-shadow: inset 0 0 0 1px rgb(255 30 45 / 28%);
+    color: var(--c-red);
+    place-items: center;
+
+    @include bevel-diagonal(9px);
+}
+
+/* --- Einrichtung -------------------------------------------------------- */
+.steps {
+    display: grid;
+    gap: var(--s-gap);
+    margin-top: 44px;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+
+    li {
+        display: flex;
+    }
+}
+
+.step {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 28px 24px 26px;
+    width: 100%;
+
+    h3 {
+        font-size: 1.08rem;
+        font-weight: 700;
+    }
+
+    p {
+        color: var(--c-text-dim);
+        font-size: 0.89rem;
+        line-height: 1.62;
+    }
+}
+
+/* Die Nummer groß und blass in der Ecke - sie ordnet, ohne zu drängen. */
+.number {
+    position: absolute;
+    top: 12px;
+    right: 18px;
+    color: color-mix(in srgb, var(--accent) 16%, transparent);
+    font-family: var(--f-accent);
+    font-size: 2.9rem;
+    font-weight: 700;
+    line-height: 1;
+    pointer-events: none;
+}

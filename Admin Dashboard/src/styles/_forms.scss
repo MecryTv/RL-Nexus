@@ -1,0 +1,64 @@
+@use "mixins" as *;
+
+/**
+ * Eingabefelder. Global, weil fast jede Seite welche hat und alle gleich
+ * aussehen sollen. Die Ecken bleiben gerade: ein clip-path würde den
+ * Fokusring abschneiden, und an Feldern ist der wichtiger als die Form.
+ */
+
+input:where([type="text"], [type="search"], [type="url"], [type="email"], [type="number"], [type="datetime-local"], [type="date"], [type="password"]),
+select,
+textarea {
+    width: 100%;
+    min-height: 40px;
+    padding: 0 var(--s-3);
+    border: 1px solid var(--c-line-strong);
+    border-radius: 0;
+    background: var(--c-panel-solid);
+    color: var(--c-text);
+    font-size: 0.9375rem;
+    transition:
+        border-color var(--t-fast),
+        box-shadow var(--t-fast);
+
+    @include touch-target;
+
+    &::placeholder {
+        color: var(--c-text-faint);
+    }
+
+    &:hover {
+        border-color: rgb(255 255 255 / 24%);
+    }
+
+    &:focus-visible {
+        outline: none;
+        border-color: var(--c-blue);
+        box-shadow: 0 0 0 1px var(--c-blue);
+    }
+
+    &[aria-invalid="true"] {
+        border-color: var(--c-loss);
+    }
+
+    &:disabled {
+        opacity: 0.55;
+        cursor: not-allowed;
+    }
+}
+
+textarea {
+    min-height: 120px;
+    padding-block: var(--s-2);
+    resize: vertical;
+    line-height: 1.5;
+}
+
+select {
+    appearance: none;
+    padding-right: var(--s-6);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23a8b0bc' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9.5 6 6 6-6'/%3E%3C/svg%3E");
+    background-position: right var(--s-3) center;
+    background-repeat: no-repeat;
+    background-size: 16px;
+}

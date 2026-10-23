@@ -1,0 +1,113 @@
+<style>
+  .wrap { max-width: 1040px; }
+  .cols { display:grid; grid-template-columns: 1fr 1fr; gap:16px; margin-bottom:22px; }
+  @media (max-width: 820px) { .cols { grid-template-columns: 1fr; } }
+  .box { border:1px solid var(--border, #3d3d3f); background: var(--bg-secondary, #2d2d2f); padding:14px 18px; border-radius:4px; }
+  .box h3 { margin:0 0 8px; font-size:15px; }
+  .box ul { margin:0; padding-left:18px; line-height:1.55; font-size:14px; }
+  .box li { margin-bottom:4px; }
+  .said { border-left:4px solid #35e07f; }
+  .assume { border-left:4px solid #ffc53d; }
+  .law { border-left:4px solid #00afff; margin-bottom:22px; }
+  .law ul { columns: 2; column-gap: 28px; }
+  @media (max-width: 820px) { .law ul { columns: 1; } }
+  .flow { display:flex; flex-wrap:wrap; gap:6px; align-items:center; font-size:13px; margin:8px 0 2px; }
+  .flow span { background: rgba(255,255,255,.06); border:1px solid var(--border, #3d3d3f); padding:3px 8px; border-radius:3px; }
+  .flow b { color:#6b7683; font-weight:400; }
+  .rec { display:inline-block; font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:#050608; background:#35e07f; padding:2px 7px; border-radius:3px; margin-left:8px; vertical-align:middle; }
+  .option .content p { font-size:14px; line-height:1.5; }
+  .option .content ul { margin:6px 0 0; padding-left:18px; font-size:13px; line-height:1.5; }
+  code { font-size:12.5px; }
+</style>
+
+<div class="wrap">
+<h2>Kaufsystem für das Bot-Dashboard: So habe ich es verstanden</h2>
+<p class="subtitle">Links deine Antworten, rechts was ich daraus gefolgert habe. Stimmt rechts etwas nicht, sag es im Chat. Unten wählst du, wo die Technik hinkommt.</p>
+
+<div class="cols">
+  <div class="box said">
+    <h3>Was du gesagt hast</h3>
+    <ul>
+      <li>Gesperrt wird das <b>Bot-Dashboard</b> (dashboard.nexus-emb.de). Ein Kauf gilt <b>pro Discord-Nutzer</b>.</li>
+      <li>Kaufseite auf der <b>Webseite</b> (nexus-emb.de).</li>
+      <li>Mehrere Produkte, die sich nur in <b>Preis und Laufzeit</b> unterscheiden. Je Produkt: <b>Abo</b> oder <b>Einmalkauf</b>, Einmalkauf mit Laufzeit in Tagen oder unbegrenzt. Eigene Discord-Rolle je Produkt.</li>
+      <li><b>Ein globaler Testzeitraum</b>, ohne Karte, einmal pro Konto, mit eigener Test-Rolle.</li>
+      <li>Admins und Developer können je Nutzer den Test verlängern oder kürzen, Zugang per Hand geben und Nutzer vom Kauf ausschließen.</li>
+      <li>Kauf nur mit Discord-Anmeldung (Mail, Server, Profil). Wer nicht auf dem RL-Nexus-Server ist, wird hinzugefügt und bekommt die Rolle.</li>
+      <li>Endet der Zugang: Rolle weg, Nutzer bleibt auf dem Server, Dashboard leitet zur Preisseite.</li>
+      <li>Ab Livegang sind <b>alle</b> hinter der Bezahlschranke. Ohne Kauf rein kommen nur <b>Administrator, Developer</b> und <b>Guardians</b> (Moderatoren auf einem Server, dessen Owner bezahlt hat).</li>
+      <li>Stripe, <b>Kleinunternehmer</b> nach § 19 UStG. Bestätigung geht von <code>noreply@nexus-emb.de</code> an die Discord-Mail.</li>
+      <li>Im Dev-Modus: Stripe-Testmodus, Dev-Leiste mit Simulations-Knöpfen, Dev-Bot und Dev Server.</li>
+    </ul>
+  </div>
+  <div class="box assume">
+    <h3>Meine Annahmen (bitte prüfen)</h3>
+    <ul>
+      <li><b>Partner</b> und die alte Gruppe <b>Premium</b> geben keinen Zugang mehr. Zugang per Hand gibt es in einer neuen Kundenverwaltung („Zugang schenken“, bis Datum oder unbegrenzt). Die Gruppe Premium zeigt danach einfach „hat gekauft“.</li>
+      <li>Der Test startet auf der Preisseite mit Knopf, nicht automatisch beim ersten Login im Dashboard.</li>
+      <li>Wer schon einen Test hatte und kauft, bekommt sofort die Produkt-Rolle, die Test-Rolle geht weg.</li>
+      <li>Kauft jemand vor Ablauf nochmal (Einmalkauf), wird die Laufzeit verlängert. Abo und Einmalkauf gleichzeitig geht nicht.</li>
+      <li><b>Abos nur monatlich.</b> Ein Jahr gibt es als Einmalkauf mit 365 Tagen. Grund: Ein Jahresabo, das sich still um ein Jahr verlängert, ist bei Verbrauchern seit 2022 nicht mehr erlaubt (§ 309 Nr. 9 BGB).</li>
+      <li><b>Sperren</b> verhindert Test und neue Käufe. Läuft gerade ein bezahlter Zugang, wählt der Admin: bis zum Ende laufen lassen oder sofort beenden mit anteiliger Erstattung.</li>
+      <li>Verwalten (Karte ändern, Rechnungen, kündigen) auf der Webseite unter <b>„Mein Zugang“</b>, Karte und Rechnungen über das Kundenportal von Stripe.</li>
+      <li>Zahlungsarten schaltest du im Stripe-Dashboard frei (Karte, PayPal, SEPA, Apple/Google Pay), der Code nimmt, was dort an ist.</li>
+    </ul>
+  </div>
+</div>
+
+<div class="box law">
+  <h3>Deutsches Recht: Was dafür eingebaut wird</h3>
+  <ul>
+    <li>Knopf „Zahlungspflichtig bestellen“, direkt darüber Preis, Laufzeit, Verlängerung und Kündigung (§ 312j BGB).</li>
+    <li>AGB, Widerrufsbelehrung und Muster-Widerrufsformular als neue Seiten auf der Webseite.</li>
+    <li>Häkchen vor dem Kauf: sofort starten, Hinweis auf das vorzeitige Erlöschen bzw. Wertersatz beim Widerruf (§ 356, § 357a BGB).</li>
+    <li>Vertragsbestätigung per Mail mit AGB und Widerrufsbelehrung als Anhang (§ 312f BGB).</li>
+    <li>Kündigungsbutton „Verträge hier kündigen“ in zwei Schritten, mit Bestätigung per Mail (§ 312k BGB).</li>
+    <li>Endpreise mit „Gemäß § 19 UStG wird keine Umsatzsteuer berechnet“, auch auf den Rechnungen von Stripe.</li>
+    <li>Häkchen „Ich bin volljährig oder meine Eltern sind einverstanden“ (Discord erlaubt ab 13).</li>
+    <li>Impressum (nicht mehr „privat“) und Datenschutzerklärung mit Stripe und dem neuen Discord-Login.</li>
+  </ul>
+  <p style="font-size:13px; color:#a8b0bc; margin:10px 0 0;">Die Texte (AGB, Widerruf) schreibe ich als Entwurf. Rechtsberatung ist das nicht, vor dem Livegang sollte sie jemand mit Rechtskenntnis oder ein Generator wie IT-Recht Kanzlei oder Händlerbund prüfen.</p>
+</div>
+
+<h3 style="margin-bottom:6px">Wo läuft die Technik?</h3>
+<p class="subtitle" style="margin-top:0">Klick auf einen Weg. Ich empfehle A.</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Admin-Server macht den Shop <span class="rec">Empfohlen</span></h3>
+      <div class="flow"><span>nexus-emb.de/preise</span><b>→</b><span>/api/shop/* (nginx)</span><b>→</b><span>Admin-Server</span><b>→</b><span>Stripe · Discord · MariaDB</span><b>←</b><span>Bot liest Zugang</span></div>
+      <p>Genau wie heute das Kontaktformular: Die Webseite zeigt die Seite, nginx reicht <code>/api/shop/*</code> an den Admin-Server. Dort laufen Discord-Login, Stripe, Webhook, Rollen und Mails. Produkte und Kunden verwaltest du im selben Server. Der Bot fragt beim Dashboard-Login nur die Tabelle ab.</p>
+      <ul>
+        <li>Mail-Vorlage, Postfächer, Protokoll, Dev-Modus, Discord-Token: alles schon im Admin-Server.</li>
+        <li>Im Bot-Repo ändern sich nur wenige Dateien (Sperre und Guardian-Prüfung).</li>
+        <li>Ein Bot-Neustart unterbricht keine Zahlungen.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Bot macht den Shop</h3>
+      <p>Stripe, Webhook und Login kommen in den Fastify-Server des Bots. Das Admin Dashboard ändert Produkte über <code>/dcapi/admin/*</code>.</p>
+      <ul>
+        <li>Viele neue Dateien im Bot-Repo, das gerade viele offene Änderungen hat.</li>
+        <li>Startet der Bot neu oder hängt, gehen Webhooks von Stripe verzögert durch.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Eigener Shop-Dienst</h3>
+      <p>Ein neuer Container nur für Bezahlen, mit eigenem nginx-Eintrag.</p>
+      <ul>
+        <li>Sauber getrennt, aber Login, Mail, Protokoll und Dev-Modus müssten nochmal gebaut werden.</li>
+        <li>Ein Dienst mehr auf dem VPS, den man überwachen muss.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+</div>

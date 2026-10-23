@@ -1,0 +1,245 @@
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800&family=Oxanium:wght@400;600;700&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  .ad {
+    --c-base:#050608; --c-panel:#080d12; --c-solid:#0a0f15; --c-fill:rgb(6 9 13 / 78%); --c-line:rgb(255 255 255 / 8%); --c-line-strong:rgb(255 255 255 / 14%);
+    --c-red:#ff1e2d; --c-red-bright:#ff3344; --c-red-deep:#d81424; --c-blue:#00afff; --c-purple:#8a4dff; --c-win:#35e07f; --c-gold:#ffc53d; --c-loss:#ff4d5e;
+    --c-text:#f2f4f7; --c-dim:#a8b0bc; --c-faint:#7b8693;
+    --f-d:"Oxanium",system-ui,sans-serif; --f-l:"Rajdhani",system-ui,sans-serif; --f-a:"Orbitron","Oxanium",sans-serif;
+    font-family:var(--f-d); color:var(--c-text); font-size:14px;
+  }
+  .ad * { box-sizing:border-box; }
+  .ad .app { display:grid; grid-template-columns: 190px 1fr; background:var(--c-base); border:1px solid #1a2028; min-height:520px; position:relative; overflow:hidden; }
+  .ad .side { background:var(--c-panel); border-right:1px solid var(--c-line); padding:14px 10px; }
+  .ad .brand { font-family:var(--f-a); font-weight:700; font-size:12px; letter-spacing:.05em; padding:2px 8px 12px; }
+  .ad .brand em { color:var(--c-red); font-style:normal; }
+  .ad .gl { font-family:var(--f-l); font-weight:600; font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:var(--c-faint); padding:10px 10px 4px; }
+  .ad .it { display:flex; align-items:center; gap:10px; height:32px; padding:0 10px; color:var(--c-dim); font-size:13.5px; }
+  .ad .it.on { color:var(--c-text); background: linear-gradient(90deg, rgb(255 30 45 / 16%), transparent); box-shadow: inset 2px 0 0 var(--c-red); }
+  .ad .it.new::after { content:"neu"; margin-left:auto; font-family:var(--f-l); font-weight:700; font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--c-win); }
+  .ad .ic { width:14px; height:14px; border:1.5px solid currentColor; border-radius:3px; opacity:.7; flex:none; }
+  .ad .main { padding:18px 22px; position:relative; }
+  .ad .ph { display:flex; align-items:flex-end; gap:14px; margin-bottom:16px; }
+  .ad .ph h1 { margin:0; font-size:22px; font-weight:700; }
+  .ad .ph p { margin:4px 0 0; color:var(--c-dim); font-size:13px; }
+  .ad .ph .sp { flex:1; }
+  .ad .lbl { font-family:var(--f-l); font-weight:600; font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:var(--c-faint); }
+  .ad .bevel { clip-path: polygon(10px 0, calc(100% - 10px) 0, 100% 10px, 100% calc(100% - 10px), calc(100% - 10px) 100%, 10px 100%, 0 calc(100% - 10px), 0 10px); }
+  .ad .diag { clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px); }
+  .ad .pnl { background:var(--c-line-strong); padding:1px; }
+  .ad .pnl > .in { background:var(--c-solid); padding:14px; height:100%; }
+  .ad .btn { display:inline-flex; align-items:center; gap:7px; height:34px; padding:0 14px; font-family:var(--f-l); font-weight:700; font-size:12px; letter-spacing:.12em; text-transform:uppercase; border:0; color:#fff; }
+  .ad .btn.red { background: var(--c-red-deep); }
+  .ad .btn.ghost { background:#0b1016; box-shadow: inset 0 0 0 1px var(--c-line-strong); color:var(--c-text); }
+  .ad .tag { display:inline-block; font-family:var(--f-l); font-weight:700; font-size:10.5px; letter-spacing:.12em; text-transform:uppercase; padding:2px 7px; }
+  .ad .tag.blue { background: rgb(0 175 255 / 14%); color: var(--c-blue); }
+  .ad .tag.gold { background: rgb(255 197 61 / 12%); color: var(--c-gold); }
+  .ad .tag.red { background: var(--c-red); color:#fff; }
+  .ad .tag.green { background: rgb(53 224 127 / 12%); color: var(--c-win); }
+  .ad .tag.grey { background: rgb(255 255 255 / 6%); color: var(--c-faint); }
+  .ad .role { display:inline-flex; align-items:center; gap:6px; font-size:12.5px; padding:2px 9px 2px 7px; border-radius:20px; background: rgb(255 51 68 / 12%); color:#ff6b78; }
+  .ad .role i { width:8px; height:8px; border-radius:50%; background:#ff3344; }
+  .ad .role.gold { background: rgb(255 197 61 / 12%); color: var(--c-gold); } .ad .role.gold i { background: var(--c-gold); }
+  .ad .role.green { background: rgb(53 224 127 / 12%); color: var(--c-win); } .ad .role.green i { background: var(--c-win); }
+  .ad .price { font-family:var(--f-a); font-weight:800; font-size:20px; }
+  .ad .price small { font-family:var(--f-l); font-weight:600; font-size:11px; letter-spacing:.1em; color:var(--c-dim); text-transform:uppercase; margin-left:3px; }
+  .ad .fld { margin-top:10px; }
+  .ad .fld label { display:block; font-size:12px; color:var(--c-dim); margin-bottom:4px; }
+  .ad .inp { height:32px; background:#0b1016; box-shadow: inset 0 0 0 1px var(--c-line-strong); display:flex; align-items:center; padding:0 10px; font-size:13px; }
+  .ad .inp.ta { height:56px; align-items:flex-start; padding-top:8px; color:var(--c-dim); line-height:1.4; }
+  .ad .row2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .ad .segm { display:flex; background:#0b1016; box-shadow: inset 0 0 0 1px var(--c-line-strong); padding:3px; gap:3px; }
+  .ad .segm span { flex:1; text-align:center; padding:5px 0; font-family:var(--f-l); font-weight:700; font-size:11.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--c-dim); }
+  .ad .segm span.on { background: var(--c-red-deep); color:#fff; }
+  .ad .toggle { display:inline-block; width:30px; height:16px; border-radius:10px; background: var(--c-win); position:relative; vertical-align:middle; }
+  .ad .toggle::after { content:""; position:absolute; right:2px; top:2px; width:12px; height:12px; border-radius:50%; background:#fff; }
+  .ad .toggle.off { background: #2a333d; } .ad .toggle.off::after { right:auto; left:2px; }
+  .ad .hint { font-size:11.5px; color:var(--c-faint); margin-top:4px; line-height:1.4; }
+  .ad .stripe { display:flex; align-items:center; gap:8px; font-size:12px; color:var(--c-dim); padding:8px 10px; background: rgb(99 91 255 / 8%); box-shadow: inset 0 0 0 1px rgb(99 91 255 / 30%); margin-top:12px; }
+  .ad .stripe b { color:#a5a0ff; }
+  .ad .drag { color:var(--c-faint); letter-spacing:-2px; font-size:12px; }
+
+  /* Option A: Liste + Editor + Vorschau */
+  .ad .a3 { display:grid; grid-template-columns: 180px 1fr 210px; gap:12px; }
+  .ad .plist .p { padding:10px; background:#0b1016; box-shadow: inset 0 0 0 1px var(--c-line); margin-bottom:6px; }
+  .ad .plist .p.on { box-shadow: inset 0 0 0 1px var(--c-red); background: linear-gradient(90deg, rgb(255 30 45 / 10%), #0b1016); }
+  .ad .plist .p b { display:block; font-size:13.5px; }
+  .ad .plist .p span { font-size:12px; color:var(--c-dim); }
+  .ad .prev { background: radial-gradient(300px 200px at 50% 0, rgb(255 30 45 / 14%), transparent 70%), #050608; padding:14px; box-shadow: inset 0 0 0 1px var(--c-line); }
+  .ad .wcard { padding:1px; background: linear-gradient(160deg, var(--c-red), rgb(255 30 45 / 25%) 40%, rgb(0 175 255 / 40%)); }
+  .ad .wcard .in { background:#0a0f15; padding:14px; }
+  .ad .wcard h4 { margin:6px 0 2px; font-size:16px; }
+  .ad .wcard ul { list-style:none; padding:0; margin:8px 0 0; font-size:12px; color:var(--c-dim); }
+  .ad .wcard li { padding:3px 0 3px 14px; position:relative; }
+  .ad .wcard li::before { content:""; position:absolute; left:0; top:7px; width:7px; height:7px; background:var(--c-win); clip-path: polygon(0 50%, 40% 100%, 100% 0, 40% 70%); }
+
+  /* Option B: Karten + Seitenpanel */
+  .ad .b-grid { display:grid; grid-template-columns: repeat(3, 1fr); gap:12px; padding-right: 300px; }
+  .ad .pc .in { padding:14px; }
+  .ad .pc.hl { background: linear-gradient(160deg, var(--c-red), rgb(255 30 45 / 25%) 40%, rgb(0 175 255 / 40%)); }
+  .ad .pc h4 { margin:8px 0 2px; font-size:16px; }
+  .ad .pc .meta { font-size:12px; color:var(--c-dim); }
+  .ad .pc .foot { display:flex; align-items:center; gap:8px; margin-top:10px; padding-top:10px; border-top:1px solid var(--c-line); font-size:12px; color:var(--c-dim); }
+  .ad .pc.add { background: transparent; box-shadow: inset 0 0 0 1px dashed; display:flex; align-items:center; justify-content:center; color:var(--c-faint); border:1px dashed var(--c-line-strong); min-height:180px; }
+  .ad .pc.off { opacity:.55; }
+  .ad .sp { position:absolute; top:0; right:0; bottom:0; width:300px; background:#070b10; box-shadow: -1px 0 0 var(--c-line-strong), -20px 0 40px rgb(0 0 0 / 50%); padding:16px; overflow:hidden; }
+  .ad .sp h3 { margin:0 0 2px; font-size:16px; }
+
+  /* Option C: Tabelle */
+  .ad table { width:100%; border-collapse:collapse; font-size:13px; }
+  .ad th { text-align:left; font-family:var(--f-l); font-weight:600; font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--c-faint); padding:8px 10px; border-bottom:1px solid var(--c-line-strong); }
+  .ad td { padding:10px; border-bottom:1px solid var(--c-line); vertical-align:middle; }
+  .ad tr.edit td { background: rgb(255 30 45 / 6%); }
+  .ad td .inp { height:28px; }
+
+  .optwrap .option { display:block; }
+  .optwrap .head { display:flex; align-items:baseline; gap:12px; margin-bottom:10px; }
+  .optwrap .head h3 { margin:0; }
+  .optwrap .head p { margin:0; font-size:14px; color: var(--text-secondary,#9aa0a6); }
+  .optwrap .letter { position:static; }
+  .rec { display:inline-block; font-size:10.5px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:#050608; background:#35e07f; padding:2px 7px; border-radius:3px; margin-left:6px; vertical-align:middle; }
+</style>
+
+<h2>Admin Dashboard: Produkte</h2>
+<p class="subtitle">In der Seitenleiste kommt ein neuer Bereich <b>Shop</b> dazu: Produkte, Kunden, Einstellungen. Hier geht es um die Seite <b>Produkte</b>. Drei Arten, sie aufzubauen. Darunter die Seite <b>Einstellungen</b> zum Ansehen, dort gibt es nichts zu wählen.</p>
+
+<div class="options optwrap">
+
+<!-- A -->
+<div class="option" data-choice="a" onclick="toggleSelect(this)">
+  <div class="content">
+    <div class="head"><div class="letter">A</div><h3>Liste, Formular, Vorschau</h3><p>Wie der Modul-Editor: links die Produkte, Mitte das Formular, rechts die Karte, wie sie auf der Webseite aussieht.</p></div>
+    <div class="ad"><div class="app">
+      <div class="side">
+        <div class="brand">RL <em>NEXUS</em> ADMIN</div>
+        <div class="it"><span class="ic"></span>Übersicht</div><div class="it"><span class="ic"></span>Postfach</div>
+        <div class="gl">Bot</div><div class="it"><span class="ic"></span>Server</div><div class="it"><span class="ic"></span>Gruppen</div>
+        <div class="gl">Shop</div><div class="it on new"><span class="ic"></span>Produkte</div><div class="it new"><span class="ic"></span>Kunden</div><div class="it new"><span class="ic"></span>Einstellungen</div>
+        <div class="gl">Webseite</div><div class="it"><span class="ic"></span>Banner</div>
+      </div>
+      <div class="main">
+        <div class="ph"><div><h1>Produkte</h1><p>Was auf nexus-emb.de/preise steht.</p></div><div class="sp"></div><button class="btn ghost diag">Neues Produkt</button><button class="btn red diag">Speichern</button></div>
+        <div class="a3">
+          <div class="plist">
+            <div class="p"><span class="drag">⋮⋮</span> <b style="display:inline">Monat</b><br><span>4,99 € · Abo</span></div>
+            <div class="p on"><span class="drag">⋮⋮</span> <b style="display:inline">Jahr</b><br><span>44,99 € · 365 Tage</span></div>
+            <div class="p"><span class="drag">⋮⋮</span> <b style="display:inline">Lifetime</b><br><span>99,00 € · unbegrenzt</span></div>
+          </div>
+          <div class="pnl bevel"><div class="in bevel">
+            <div class="row2"><div class="fld" style="margin:0"><label>Titel</label><div class="inp">Jahr</div></div><div class="fld" style="margin:0"><label>Hervorhebung</label><div class="inp">Beliebt</div></div></div>
+            <div class="fld"><label>Beschreibung</label><div class="inp ta">365 Tage, verlängert sich nicht</div></div>
+            <div class="row2"><div class="fld"><label>Art</label><div class="segm"><span>Abo</span><span class="on">Einmalig</span></div></div><div class="fld"><label>Laufzeit</label><div class="inp">365 Tage</div></div></div>
+            <div class="row2"><div class="fld"><label>Preis</label><div class="inp">44,99 €</div></div><div class="fld"><label>Discord-Rolle</label><div class="inp"><span class="role"><i></i>Nexus Plus</span></div></div></div>
+            <div class="stripe"><b>Stripe</b> abgeglichen · price_1Q…a8 <span style="margin-left:auto">vor 2 Min.</span></div>
+          </div></div>
+          <div>
+            <div class="lbl" style="margin-bottom:6px">So auf der Webseite</div>
+            <div class="prev"><div class="wcard bevel"><div class="in bevel"><span class="tag red">Beliebt</span> <span class="tag gold">Einmalig</span><h4>Jahr</h4><div style="font-size:11.5px;color:var(--c-dim)">365 Tage, verlängert sich nicht</div><div class="price" style="margin-top:8px">44,99 €<small>einmalig</small></div><ul><li>Alle Module im Dashboard</li><li>Alle deine Server</li><li>Rolle „Nexus Plus“</li></ul></div></div></div>
+          </div>
+        </div>
+      </div>
+    </div></div>
+  </div>
+</div>
+
+<!-- B -->
+<div class="option" data-choice="b" onclick="toggleSelect(this)">
+  <div class="content">
+    <div class="head"><div class="letter">B</div><h3>Karten mit Seitenpanel <span class="rec">Empfohlen</span></h3><p>Die Karten sehen aus wie auf der Webseite und sind damit selbst die Vorschau. Klick öffnet rechts das Formular, die Karte ändert sich beim Tippen mit. Ziehen sortiert.</p></div>
+    <div class="ad"><div class="app">
+      <div class="side">
+        <div class="brand">RL <em>NEXUS</em> ADMIN</div>
+        <div class="it"><span class="ic"></span>Übersicht</div><div class="it"><span class="ic"></span>Postfach</div>
+        <div class="gl">Bot</div><div class="it"><span class="ic"></span>Server</div><div class="it"><span class="ic"></span>Gruppen</div>
+        <div class="gl">Shop</div><div class="it on new"><span class="ic"></span>Produkte</div><div class="it new"><span class="ic"></span>Kunden</div><div class="it new"><span class="ic"></span>Einstellungen</div>
+        <div class="gl">Webseite</div><div class="it"><span class="ic"></span>Banner</div>
+      </div>
+      <div class="main">
+        <div class="ph" style="padding-right:300px"><div><h1>Produkte</h1><p>3 sichtbar, 1 ausgeblendet. Reihenfolge wie auf der Webseite.</p></div></div>
+        <div class="b-grid">
+          <div class="pnl bevel pc"><div class="in bevel"><span class="drag">⋮⋮</span> <span class="tag blue">Abo</span><h4>Monat</h4><div class="meta">monatlich kündbar</div><div class="price" style="margin-top:8px">4,99 €<small>/ Monat</small></div><div class="foot"><span class="role"><i></i>Nexus Plus</span><span style="margin-left:auto">12 aktiv</span></div></div></div>
+          <div class="pnl bevel pc hl"><div class="in bevel"><span class="drag">⋮⋮</span> <span class="tag red">Beliebt</span> <span class="tag gold">Einmalig</span><h4>Jahr</h4><div class="meta">365 Tage</div><div class="price" style="margin-top:8px">44,99 €<small>einmalig</small></div><div class="foot"><span class="role"><i></i>Nexus Plus</span><span style="margin-left:auto">5 aktiv</span></div></div></div>
+          <div class="pnl bevel pc"><div class="in bevel"><span class="drag">⋮⋮</span> <span class="tag gold">Einmalig</span><h4>Lifetime</h4><div class="meta">unbegrenzt</div><div class="price" style="margin-top:8px">99,00 €<small>einmalig</small></div><div class="foot"><span class="role gold"><i></i>Nexus Legend</span><span style="margin-left:auto">2 aktiv</span></div></div></div>
+          <div class="pnl bevel pc off"><div class="in bevel"><span class="tag grey">Ausgeblendet</span><h4>Halbjahr</h4><div class="meta">180 Tage</div><div class="price" style="margin-top:8px">24,99 €<small>einmalig</small></div><div class="foot"><span class="role"><i></i>Nexus Plus</span><span style="margin-left:auto">1 aktiv</span></div></div></div>
+          <div class="pc add">+ Neues Produkt</div>
+        </div>
+        <div class="sp">
+          <div class="lbl">Produkt bearbeiten</div><h3>Jahr</h3>
+          <div class="fld"><label>Titel</label><div class="inp">Jahr</div></div>
+          <div class="fld"><label>Beschreibung</label><div class="inp ta">365 Tage, verlängert sich nicht</div></div>
+          <div class="fld"><label>Stichpunkte (je Zeile einer)</label><div class="inp ta">Alle Module im Dashboard<br>Alle deine Server</div></div>
+          <div class="row2"><div class="fld"><label>Art</label><div class="segm"><span>Abo</span><span class="on">Einmalig</span></div></div><div class="fld"><label>Laufzeit</label><div class="inp">365 Tage</div></div></div>
+          <div class="row2"><div class="fld"><label>Preis</label><div class="inp">44,99 €</div></div><div class="fld"><label>Hervorhebung</label><div class="inp">Beliebt</div></div></div>
+          <div class="fld"><label>Discord-Rolle</label><div class="inp"><span class="role"><i></i>Nexus Plus</span><span style="margin-left:auto;color:var(--c-faint)">▾</span></div></div>
+          <div class="fld" style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:12.5px">Auf der Webseite sichtbar</span><span class="toggle"></span></div>
+          <div class="stripe"><b>Stripe</b> abgeglichen · vor 2 Min.</div>
+          <div style="display:flex;gap:8px;margin-top:12px"><button class="btn red diag">Speichern</button><button class="btn ghost diag">Abbrechen</button></div>
+        </div>
+      </div>
+    </div></div>
+  </div>
+</div>
+
+<!-- C -->
+<div class="option" data-choice="c" onclick="toggleSelect(this)">
+  <div class="content">
+    <div class="head"><div class="letter">C</div><h3>Tabelle</h3><p>Kompakt, alles in einer Zeile, Bearbeiten direkt in der Zeile. Keine Vorschau.</p></div>
+    <div class="ad"><div class="app" style="min-height:300px">
+      <div class="side">
+        <div class="brand">RL <em>NEXUS</em> ADMIN</div>
+        <div class="gl">Shop</div><div class="it on new"><span class="ic"></span>Produkte</div><div class="it new"><span class="ic"></span>Kunden</div><div class="it new"><span class="ic"></span>Einstellungen</div>
+      </div>
+      <div class="main">
+        <div class="ph"><div><h1>Produkte</h1></div><div class="sp"></div><button class="btn ghost diag">Neues Produkt</button></div>
+        <table>
+          <tr><th></th><th>Titel</th><th>Art</th><th>Laufzeit</th><th>Preis</th><th>Rolle</th><th>Sichtbar</th><th>Aktiv</th></tr>
+          <tr><td class="drag">⋮⋮</td><td>Monat</td><td><span class="tag blue">Abo</span></td><td>monatlich</td><td>4,99 €</td><td><span class="role"><i></i>Nexus Plus</span></td><td><span class="toggle"></span></td><td>12</td></tr>
+          <tr class="edit"><td class="drag">⋮⋮</td><td><div class="inp">Jahr</div></td><td><span class="tag gold">Einmalig</span></td><td><div class="inp">365 Tage</div></td><td><div class="inp">44,99 €</div></td><td><span class="role"><i></i>Nexus Plus</span></td><td><span class="toggle"></span></td><td>5</td></tr>
+          <tr><td class="drag">⋮⋮</td><td>Lifetime</td><td><span class="tag gold">Einmalig</span></td><td>unbegrenzt</td><td>99,00 €</td><td><span class="role gold"><i></i>Nexus Legend</span></td><td><span class="toggle"></span></td><td>2</td></tr>
+          <tr style="opacity:.55"><td class="drag">⋮⋮</td><td>Halbjahr</td><td><span class="tag gold">Einmalig</span></td><td>180 Tage</td><td>24,99 €</td><td><span class="role"><i></i>Nexus Plus</span></td><td><span class="toggle off"></span></td><td>1</td></tr>
+        </table>
+      </div>
+    </div></div>
+  </div>
+</div>
+</div>
+
+<h3 style="margin:28px 0 6px">Zum Ansehen: Shop → Einstellungen</h3>
+<p class="subtitle" style="margin-top:0">Alles, was nicht zu einem Produkt gehört. Fehlt dir hier etwas, sag es im Chat.</p>
+<div class="ad"><div class="app" style="grid-template-columns:190px 1fr">
+  <div class="side">
+    <div class="brand">RL <em>NEXUS</em> ADMIN</div>
+    <div class="gl">Shop</div><div class="it new"><span class="ic"></span>Produkte</div><div class="it new"><span class="ic"></span>Kunden</div><div class="it on new"><span class="ic"></span>Einstellungen</div>
+  </div>
+  <div class="main">
+    <div class="ph"><div><h1>Shop-Einstellungen</h1><p>Gilt für alle Produkte.</p></div><div class="sp"></div><button class="btn red diag">Speichern</button></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="pnl bevel"><div class="in bevel">
+        <div class="lbl">Verkauf</div>
+        <div class="fld" style="display:flex;justify-content:space-between;align-items:center"><span>Shop geöffnet</span><span class="toggle"></span></div>
+        <div class="hint">Aus: Die Preisseite zeigt „Gerade kein Verkauf“, bestehende Zugänge laufen weiter.</div>
+        <div class="fld" style="display:flex;justify-content:space-between;align-items:center"><span>Bezahlschranke im Bot-Dashboard</span><span class="toggle"></span></div>
+        <div class="hint">Der Schalter für den Livegang. Aus: Das Dashboard ist für alle offen wie heute.</div>
+        <div class="fld"><label>Discord-Server</label><div class="inp">RL Nexus · 1547258700480253982</div><div class="hint">Fest. Mit --dev: Dev Server 1162553851187040326.</div></div>
+      </div></div>
+      <div class="pnl bevel"><div class="in bevel">
+        <div class="lbl">Testzeitraum</div>
+        <div class="fld" style="display:flex;justify-content:space-between;align-items:center"><span>Test anbieten</span><span class="toggle"></span></div>
+        <div class="row2"><div class="fld"><label>Dauer</label><div class="inp">7 Tage</div></div><div class="fld"><label>Test-Rolle</label><div class="inp"><span class="role green"><i></i>Nexus Test</span></div></div></div>
+        <div class="hint">Gilt für neue Tests. Laufende Tests ändert man je Person unter Kunden.</div>
+      </div></div>
+      <div class="pnl bevel"><div class="in bevel">
+        <div class="lbl">Stripe</div>
+        <div class="fld" style="display:flex;gap:8px;align-items:center"><span class="tag green">Verbunden</span><span class="tag gold">Testmodus</span><span style="font-size:12px;color:var(--c-dim)">wegen --dev</span></div>
+        <div class="hint" style="font-size:12.5px;color:var(--c-dim)">Letzter Webhook: vor 4 Min. (checkout.session.completed)<br>Schlüssel stehen in der .env, nicht hier.</div>
+        <div class="fld" style="display:flex;justify-content:space-between;align-items:center"><span>Rabattcodes im Checkout erlauben</span><span class="toggle off"></span></div>
+        <div class="hint">Die Codes selbst legst du im Stripe-Dashboard an.</div>
+      </div></div>
+      <div class="pnl bevel"><div class="in bevel">
+        <div class="lbl">Mails und Rechtliches</div>
+        <div class="fld"><label>Absender</label><div class="inp">RL Nexus &lt;noreply@nexus-emb.de&gt;</div><div class="hint">Antworten gehen an support@nexus-emb.de. Das Postfach noreply@ muss unter Postfach → Verwalten eingetragen sein.</div></div>
+        <div class="fld"><label>Stand AGB und Widerruf</label><div class="inp">12.10.2026</div><div class="hint">Wird bei jedem Kauf mitgespeichert, damit klar ist, welcher Text galt.</div></div>
+      </div></div>
+    </div>
+  </div>
+</div></div>

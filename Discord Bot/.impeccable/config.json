@@ -1,0 +1,62 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "flat-type-hierarchy",
+        "value": "*",
+        "files": [
+          "src/dashboard/public/index.html"
+        ],
+        "createdAt": "2026-09-11T15:09:56.865Z",
+        "reason": "Claude-Triage: Fehlalarm, Detektor kann __BASE__/assets/style.css nicht aufloesen und rechnet alle Rollen mit 16px; real ist h1 clamp(38px,6.2vw,60px) bei 15px Fliesstext"
+      },
+      {
+        "rule": "flat-type-hierarchy",
+        "value": "*",
+        "files": [
+          "src/dashboard/public/docu.html"
+        ],
+        "createdAt": "2026-09-11T15:09:56.935Z",
+        "reason": "Claude-Triage: Fehlalarm, Detektor kann __BASE__/assets/style.css nicht aufloesen und rechnet alle Rollen mit 16px; real ist h1 clamp(28px,4vw,38px), h2 20px, Text 14.5px"
+      },
+      {
+        "rule": "layout-transition",
+        "value": "*",
+        "files": [
+          "src/dashboard/public/assets/style.css"
+        ],
+        "createdAt": "2026-09-11T18:24:58.736Z",
+        "reason": "Claude-Triage: absichtlich und vor dieser Session vorhanden - .tabs__glide (L531) passt beim Gleiten die Breite an den aktiven Reiter an, .reward__bar i (L1562) ist die Fortschrittsanzeige des Season-Rewards; beides einzelne Elemente ohne Reflow der Nachbarn, scaleX wuerde 1px-Rahmen, Abschraegung und Pill-Enden verzerren"
+      },
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          "src/dashboard/public/assets/style.css"
+        ],
+        "createdAt": "2026-09-18T12:54:20.129Z",
+        "reason": "Claude: .tkprev border-left shows the message accent color (IMessageDoc.accent, set by the color picker) exactly as Discord renders a Components-V2 container accent bar - data in the preview, not decoration"
+      },
+      {
+        "rule": "flat-type-hierarchy",
+        "value": "*",
+        "files": [
+          "src/dashboard/public/privacy.html"
+        ],
+        "createdAt": "2026-10-01T18:49:03.395Z",
+        "reason": "Claude, static false positive: the stylesheet link __BASE__/assets/style.css is only resolved by the server, so the static scan reads every role as 16px. Live scan of the served page (computed h1 28px, h2 20px, body 14.5px) shows no flat hierarchy, checked 2026-10-01."
+      },
+      {
+        "rule": "flat-type-hierarchy",
+        "value": "*",
+        "files": [
+          "src/dashboard/public/impressum.html"
+        ],
+        "createdAt": "2026-10-01T18:49:03.740Z",
+        "reason": "Claude, static false positive: the stylesheet link __BASE__/assets/style.css is only resolved by the server, so the static scan reads every role as 16px. Live scan of the served page (computed h1 28px, h2 20px, body 14.5px) shows no flat hierarchy, checked 2026-10-01."
+      }
+    ]
+  }
+}

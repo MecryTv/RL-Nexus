@@ -1,0 +1,135 @@
+@use "mixins" as *;
+
+.footer {
+    margin-top: 120px;
+    border-top: 1px solid var(--c-line);
+    background: linear-gradient(180deg, rgb(8 13 18 / 0%), rgb(8 13 18 / 80%));
+}
+
+.inner {
+    display: grid;
+    gap: 56px;
+    padding-block: 64px 48px;
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1.6fr);
+
+    @include below(860px) {
+        gap: 44px;
+        grid-template-columns: 1fr;
+    }
+}
+
+/* --- Marke -------------------------------------------------------------- */
+.brand {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    max-width: 42ch;
+}
+
+/* Rund zugeschnitten: das Logo ist ein Kreis auf schwarzem Quadrat. Ohne den
+   Zuschnitt stünden die Ecken da, und der Schein folgte dem Quadrat. */
+.logo {
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    filter: drop-shadow(0 0 18px rgb(255 30 45 / 30%));
+    object-fit: contain;
+}
+
+.description {
+    color: var(--c-text-dim);
+    font-size: 0.94rem;
+    line-height: 1.7;
+}
+
+.socials {
+    display: flex;
+    gap: 10px;
+}
+
+.social {
+    display: grid;
+    width: 42px;
+    height: 42px;
+    border: 1px solid var(--c-line);
+    transition:
+        color var(--t-fast),
+        border-color var(--t-fast),
+        background var(--t-fast);
+    color: var(--c-text-dim);
+    place-items: center;
+
+    @include bevel-diagonal(9px);
+
+    &:hover {
+        border-color: var(--c-red);
+        background: rgb(255 30 45 / 10%);
+        color: var(--c-red);
+    }
+}
+
+/* --- Spalten ------------------------------------------------------------ */
+.columns {
+    display: grid;
+    gap: 32px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+
+    @include below(560px) {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+.column ul {
+    display: flex;
+    flex-direction: column;
+    gap: 11px;
+}
+
+.columnTitle {
+    margin-bottom: 18px;
+    color: var(--c-text);
+
+    @include label(0.68rem, 0.18em);
+}
+
+.link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: color var(--t-fast);
+    color: var(--c-text-dim);
+    font-size: 0.9rem;
+
+    &:hover {
+        color: var(--c-red);
+    }
+}
+
+.more {
+    color: var(--c-text);
+    font-weight: 700;
+}
+
+/* --- Unterste Zeile ----------------------------------------------------- */
+.bottom {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 24px;
+    justify-content: space-between;
+    padding-block: 22px 28px;
+    border-top: 1px solid var(--c-line);
+    color: var(--c-text-faint);
+    font-size: 0.8rem;
+}
+
+.build a,
+.build :global(a) {
+    color: var(--c-text-dim);
+    text-decoration: underline;
+    text-decoration-color: var(--c-line-strong);
+    text-underline-offset: 3px;
+
+    &:hover {
+        color: var(--c-red);
+    }
+}

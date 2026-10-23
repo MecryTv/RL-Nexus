@@ -1,0 +1,209 @@
+<style>
+  .rl { --bg:#050608; --panel:#080d12; --raise:#0f151d; --line:rgb(255 255 255 / 8%); --strong:rgb(255 255 255 / 14%);
+        --brand:#ff1e2d; --deep:#d81424; --live:#35e07f; --warn:#ffc53d; --blue:#00afff; --text:#f2f4f7; --t2:#a8b0bc; --t3:#7b8693;
+        background:radial-gradient(1100px 380px at 8% -10%, rgb(255 30 45 / 9%), transparent 60%), var(--bg);
+        color:var(--text); font-family:Oxanium,"Segoe UI",sans-serif; font-size:13.5px; line-height:1.5; padding:22px; border-radius:6px; text-align:left; }
+  .rl * { box-sizing:border-box; }
+  .rl .cut { clip-path:polygon(14px 0,100% 0,100% calc(100% - 14px),calc(100% - 14px) 100%,0 100%,0 14px); }
+  .rl .lbl { font-family:Rajdhani,"Segoe UI",sans-serif; font-weight:700; letter-spacing:.16em; text-transform:uppercase; font-size:11px; color:var(--t3); margin:0 0 8px; }
+  .rl h4 { margin:0 0 2px; font-size:16px; }
+  .rl p { margin:0; }
+  .rl .dim { color:var(--t2); } .rl .faint { color:var(--t3); font-size:12.5px; }
+  .rl .grid { display:grid; grid-template-columns:minmax(0,1.15fr) minmax(0,1fr); gap:14px; }
+  .rl .box { background:var(--panel); border:1px solid var(--line); padding:16px 18px; display:grid; gap:14px; align-content:start; }
+  .rl .seg { display:flex; flex-wrap:wrap; gap:6px; }
+  .rl .seg button { font:700 12px Rajdhani,"Segoe UI",sans-serif; letter-spacing:.1em; text-transform:uppercase; color:var(--t2); background:rgb(255 255 255 / 3%);
+        border:1px solid var(--strong); padding:7px 11px; cursor:pointer; }
+  .rl .seg button.on { color:#fff; border-color:var(--brand); background:rgb(255 30 45 / 14%); }
+  .rl .dir { display:flex; gap:6px; align-items:center; }
+  .rl .chips { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+  .rl .chip { display:inline-flex; align-items:center; gap:7px; padding:5px 9px; border:1px solid rgb(255 197 61 / 45%); background:rgb(255 197 61 / 8%); font-weight:700; font-size:12.5px; }
+  .rl .chip .grip, .rl .row .grip { color:var(--t3); letter-spacing:-2px; cursor:grab; }
+  .rl .chip .x { color:var(--t3); cursor:pointer; }
+  .rl .add { border:1px dashed var(--strong); padding:5px 9px; color:var(--t2); font-size:12.5px; background:none; }
+  .rl .rows { display:grid; gap:4px; }
+  .rl .row { display:flex; gap:10px; align-items:center; padding:7px 10px; border:1px solid var(--line); background:var(--raise); font-size:13px; }
+  .rl .row b { flex:1; }
+  .rl .row .mmr { color:var(--t2); font-variant-numeric:tabular-nums; }
+  .rl .pin { color:var(--warn); }
+  .rl .discord { background:#2b2d31; border-radius:6px; padding:12px 14px; font-family:"gg sans","Segoe UI",sans-serif; color:#dbdee1; font-size:13.5px; display:grid; gap:2px; }
+  .rl .discord h5 { margin:8px 0 2px; font-size:15px; color:#f2f3f5; }
+  .rl .discord .t { display:flex; gap:6px; align-items:baseline; }
+  .rl .discord .tag { background:#1e1f22; padding:0 4px; border-radius:3px; font-size:12px; }
+  .rl .discord .m { color:#b5bac1; font-size:12.5px; }
+  .rl .hide { display:none !important; }
+
+  .rl table { width:100%; border-collapse:collapse; font-size:13px; }
+  .rl th, .rl td { text-align:left; padding:8px 10px; border-bottom:1px solid var(--line); vertical-align:top; }
+  .rl th { font:700 11px Rajdhani,sans-serif; letter-spacing:.14em; text-transform:uppercase; color:var(--t3); }
+  .rl .yes { color:var(--live); } .rl .no { color:#ff6b77; }
+  @media (max-width:900px){ .rl .grid { grid-template-columns:1fr; } }
+</style>
+
+<h2>Reihenfolge der Teams</h2>
+<p class="subtitle">Entwurf, die Teams sind ausgedacht. Oben die neue Einstellung im Teams-Modul mit Live-Vorschau, unten die Rechte für die Team-Kanäle. Die Knöpfe im Entwurf funktionieren, probier sie aus.</p>
+
+<div class="section">
+  <p class="label">1 · Bot-Dashboard → Teams → Übersicht, neue Karte „Reihenfolge“</p>
+  <div class="rl">
+    <div class="grid">
+      <div class="box cut">
+        <div>
+          <h4>Reihenfolge</h4>
+          <p class="dim">Gilt für die ganze Übersicht: für Karten, Menü und Liste. Bei Gruppen sortiert jede Gruppe für sich.</p>
+        </div>
+
+        <div>
+          <p class="lbl">Immer oben</p>
+          <div class="chips">
+            <span class="chip"><span class="grip">⋮⋮</span>📌 Nexus Main<span class="x">✕</span></span>
+            <span class="chip"><span class="grip">⋮⋮</span>📌 Nexus Ladies<span class="x">✕</span></span>
+            <button class="add" type="button">+ Team anheften</button>
+          </div>
+          <p class="faint" style="margin-top:6px">Angeheftete Teams stehen in dieser Reihenfolge über allen anderen, egal wie sortiert wird. Ziehen ändert die Reihenfolge.</p>
+        </div>
+
+        <div>
+          <p class="lbl">Danach sortiert nach</p>
+          <div class="seg" id="sort">
+            <button type="button" data-k="mmr" class="on">Team-MMR</button>
+            <button type="button" data-k="abc">Alphabetisch</button>
+            <button type="button" data-k="new">Neueste zuerst</button>
+            <button type="button" data-k="size">Anzahl Spieler</button>
+            <button type="button" data-k="league">Liga</button>
+            <button type="button" data-k="own">Eigene Reihenfolge</button>
+          </div>
+        </div>
+
+        <div id="dirbox">
+          <p class="lbl">Richtung</p>
+          <div class="seg" id="dir">
+            <button type="button" data-d="down" class="on" id="d1">Höchste zuerst</button>
+            <button type="button" data-d="up" id="d2">Niedrigste zuerst</button>
+          </div>
+        </div>
+
+        <div id="ownbox" class="hide">
+          <p class="lbl">Eigene Reihenfolge</p>
+          <div class="rows" id="ownrows"></div>
+          <p class="faint" style="margin-top:6px">Am Griff ziehen. Neue Teams kommen ans Ende.</p>
+        </div>
+      </div>
+
+      <div class="box cut">
+        <div>
+          <p class="lbl">So steht es in Discord</p>
+          <p class="faint">Vorschau der Liste, aktualisiert sich beim Ändern links.</p>
+        </div>
+        <div class="discord" id="preview"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <p class="label">2 · Team-Kanäle anlegen: wer was darf</p>
+  <div class="rl">
+    <div class="box cut">
+      <table>
+        <thead><tr><th>Kanal</th><th>Sehen</th><th>Joinen / Schreiben</th></tr></thead>
+        <tbody>
+          <tr><td>📁 Kategorie „Nexus Main“</td><td><span class="yes">alle</span></td><td class="dim">–</td></tr>
+          <tr><td>#nexus-main</td><td><span class="no">nur Team</span> und Admins</td><td><span class="no">nur Team</span> und Admins</td></tr>
+          <tr><td>🔊 Nexus Main</td><td><span class="yes">alle</span></td><td><span class="no">nur Team</span> und Admins</td></tr>
+        </tbody>
+      </table>
+      <p class="faint">„Admins“ heißt: wer auf dem Server die Berechtigung Administrator hat. Discord lässt sie ohnehin überall rein. Der Bot selbst darf immer, sonst könnte er die Kanäle nicht pflegen.</p>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <p class="label">3 · Was wird aus dem Schalter „Nur das Team sieht die Kanäle“?</p>
+  <div class="options">
+    <div class="option" data-choice="ersetzen" onclick="toggleSelect(this)">
+      <div class="letter">A</div>
+      <div class="content">
+        <h3>Ersetzen</h3>
+        <p>Es gibt nur noch die Regel aus 2. Wer einen offenen Kanal will, macht ihn in Discord selbst auf.</p>
+      </div>
+    </div>
+    <div class="option" data-choice="drei" onclick="toggleSelect(this)">
+      <div class="letter">B</div>
+      <div class="content">
+        <h3>Drei Stufen zur Wahl</h3>
+        <p>Offen (alle sehen und nutzen alles), <b>Team-Kanäle</b> wie in 2 (ab Werk) und Ganz privat (wie heute: alles nur fürs Team).</p>
+      </div>
+    </div>
+    <div class="option" data-choice="zwei" onclick="toggleSelect(this)">
+      <div class="letter">C</div>
+      <div class="content">
+        <h3>Zwei Stufen</h3>
+        <p>Der Schalter bleibt, macht aber an genau das aus 2. Aus heißt: alles offen.</p>
+      </div>
+    </div>
+  </div>
+  <p class="subtitle" style="margin-top:10px">Meine Annahmen, sag Bescheid, wenn eine nicht stimmt: Angeheftete Teams bleiben in ihrer Gruppe und stehen dort oben. Bei Teams, die schon Kanäle haben, gibt es einen Knopf „Rechte angleichen“, der sie auf die neue Regel bringt. Ohne Klick ändert sich an bestehenden Kanälen nichts.</p>
+</div>
+
+<script>
+(() => {
+  const teams = [
+    { name: "Nexus Main", tag: "NXM", mmr: 1612, size: 5, made: 1, league: "RLCS", group: "Main", pin: 1 },
+    { name: "Nexus Ladies", tag: "NXL", mmr: 1388, size: 4, made: 5, league: "Ladies Cup", group: "Main", pin: 2 },
+    { name: "Nexus Rising", tag: "NXR", mmr: 1497, size: 6, made: 3, league: "ESL", group: "Main" },
+    { name: "Atlas", tag: "ATL", mmr: 1544, size: 4, made: 6, league: "RLCS", group: "Main" },
+    { name: "Nexus Academy", tag: "NXA", mmr: 1203, size: 5, made: 2, league: "Uniliga", group: "Academy" },
+    { name: "Comet", tag: "CMT", mmr: 1276, size: 3, made: 7, league: "ESL", group: "Academy" },
+    { name: "Blitz", tag: "BLZ", mmr: 1129, size: 4, made: 4, league: "Uniliga", group: "Academy" },
+  ];
+  let key = "mmr", dir = "down";
+  let own = teams.filter(t => !t.pin).map(t => t.name);
+  const labels = { mmr: ["Höchste zuerst", "Niedrigste zuerst"], abc: ["A bis Z", "Z bis A"], new: ["Neueste zuerst", "Älteste zuerst"], size: ["Meiste zuerst", "Wenigste zuerst"], league: ["A bis Z", "Z bis A"] };
+  const by = {
+    mmr: (a, b) => b.mmr - a.mmr,
+    abc: (a, b) => b.name.localeCompare(a.name, "de"),
+    new: (a, b) => a.made - b.made,
+    size: (a, b) => b.size - a.size,
+    league: (a, b) => b.league.localeCompare(a.league, "de") || b.mmr - a.mmr,
+  };
+  const ordered = (list) => {
+    const pinned = list.filter(t => t.pin).sort((a, b) => a.pin - b.pin);
+    let rest = list.filter(t => !t.pin);
+    if (key === "own") rest.sort((a, b) => own.indexOf(a.name) - own.indexOf(b.name));
+    else { rest.sort(by[key]); if (key === "abc" || key === "league") rest.reverse(); if (dir === "up") rest.reverse(); }
+    return [...pinned, ...rest];
+  };
+  const preview = document.getElementById("preview");
+  const draw = () => {
+    preview.innerHTML = "";
+    for (const group of ["Main", "Academy"]) {
+      const h = document.createElement("h5"); h.textContent = group; preview.append(h);
+      for (const t of ordered(teams.filter(x => x.group === group))) {
+        const line = document.createElement("div"); line.className = "t";
+        line.innerHTML = `${t.pin ? "📌 " : ""}<b>${t.name}</b> <span class="tag">${t.tag}</span> <span class="m">· ${t.mmr} MMR · ${t.size} Spieler · ${t.league}</span>`;
+        preview.append(line);
+      }
+    }
+    document.getElementById("dirbox").classList.toggle("hide", key === "own");
+    document.getElementById("ownbox").classList.toggle("hide", key !== "own");
+    if (labels[key]) { document.getElementById("d1").textContent = labels[key][0]; document.getElementById("d2").textContent = labels[key][1]; }
+    const rows = document.getElementById("ownrows"); rows.innerHTML = "";
+    own.forEach((name, i) => {
+      const t = teams.find(x => x.name === name);
+      const r = document.createElement("div"); r.className = "row";
+      r.innerHTML = `<span class="grip">⋮⋮</span><b>${name}</b><span class="mmr">${t.mmr} MMR</span>`;
+      const up = document.createElement("button"); up.textContent = "↑"; up.className = "add"; up.type = "button";
+      up.onclick = () => { if (i > 0) { [own[i - 1], own[i]] = [own[i], own[i - 1]]; draw(); } };
+      r.append(up); rows.append(r);
+    });
+  };
+  document.querySelectorAll("#sort button").forEach(b => b.onclick = () => {
+    document.querySelectorAll("#sort button").forEach(x => x.classList.toggle("on", x === b)); key = b.dataset.k; draw();
+  });
+  document.querySelectorAll("#dir button").forEach(b => b.onclick = () => {
+    document.querySelectorAll("#dir button").forEach(x => x.classList.toggle("on", x === b)); dir = b.dataset.d; draw();
+  });
+  draw();
+})();
+</script>

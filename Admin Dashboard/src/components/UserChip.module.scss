@@ -1,0 +1,54 @@
+.chip {
+    display: inline-flex;
+    align-items: center;
+    min-width: 0;
+    gap: var(--s-2);
+}
+
+.avatar {
+    display: grid;
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    place-items: center;
+    background: var(--c-line-strong);
+    color: var(--c-text);
+    font-size: 0.8rem;
+    font-weight: 700;
+}
+
+.text {
+    display: grid;
+    min-width: 0;
+    line-height: 1.25;
+}
+
+.name {
+    overflow: hidden;
+    color: var(--c-text);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.detail {
+    color: var(--c-text-faint);
+    font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+    font-size: 0.75rem;
+}
+
+/* Ohne ID: kleiner und in einer Zeile, damit die Person neben einem Datum steht. */
+.plain {
+    gap: var(--s-1);
+
+    .avatar {
+        width: 20px;
+        height: 20px;
+        font-size: 0.68rem;
+    }
+
+    .name {
+        font-size: 0.875rem;
+        font-weight: 600;
+    }
+}

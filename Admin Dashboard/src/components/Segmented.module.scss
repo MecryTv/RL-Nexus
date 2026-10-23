@@ -1,0 +1,67 @@
+@use "mixins" as *;
+
+.group {
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+/* float holt die legend aus ihrer Sonderrolle im fieldset, dann nimmt sie Abstände wie ein normaler Block. */
+.legend {
+    float: left;
+    width: 100%;
+    margin-bottom: var(--s-1);
+    padding: 0;
+    color: var(--c-text-dim);
+
+    @include label(0.75rem, 0.14em);
+}
+
+.options {
+    display: flex;
+    clear: both;
+    flex-wrap: wrap;
+    gap: var(--s-1);
+}
+
+.option {
+    position: relative;
+
+    input {
+        position: absolute;
+        opacity: 0;
+        pointer-events: none;
+    }
+
+    span {
+        display: inline-flex;
+        align-items: center;
+        min-height: 36px;
+        padding: 0 var(--s-3);
+        border: 1px solid var(--c-line-strong);
+        color: var(--c-text-dim);
+        cursor: pointer;
+        font-size: 0.875rem;
+        transition:
+            background var(--t-fast),
+            color var(--t-fast),
+            border-color var(--t-fast);
+
+        @include touch-target;
+    }
+
+    &:hover span {
+        color: var(--c-text);
+    }
+
+    input:checked + span {
+        border-color: var(--c-red);
+        background: rgb(255 30 45 / 14%);
+        color: var(--c-text);
+    }
+
+    input:focus-visible + span {
+        @include focus-ring;
+    }
+}

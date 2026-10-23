@@ -1,0 +1,157 @@
+<style>
+  .rl { --base:#050608; --panel:#0a0f15; --raise:#0f151d; --line:rgb(255 255 255 / 8%); --strong:rgb(255 255 255 / 16%);
+        --red:#ff1e2d; --deep:#d81424; --win:#35e07f; --warn:#ffc53d; --blue:#00afff; --text:#f2f4f7; --dim:#a8b0bc; --faint:#8b95a3;
+        background:radial-gradient(1200px 400px at 10% -10%, rgb(255 30 45 / 9%), transparent 60%), var(--base);
+        color:var(--text); font-family:Oxanium,"Segoe UI",sans-serif; font-size:13.5px; line-height:1.5; padding:22px; border-radius:6px; text-align:left; }
+  .rl * { box-sizing:border-box; }
+  .rl .lbl { font-family:Rajdhani,"Segoe UI",sans-serif; font-weight:700; letter-spacing:.16em; text-transform:uppercase; font-size:11px; color:var(--faint); margin:0 0 6px; }
+  .rl h4 { margin:0 0 4px; font-size:17px; }
+  .rl p { margin:0; }
+  .rl .dim { color:var(--dim); } .rl .faint { color:var(--faint); font-size:12.5px; }
+  .rl .cut { clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px); }
+  .rl .box { background:var(--panel); border:1px solid var(--line); padding:16px 18px; }
+  .rl .btn { display:inline-flex; align-items:center; gap:6px; padding:8px 14px; border:1px solid var(--strong); background:rgb(255 255 255 / 3%); font:700 12px Rajdhani,"Segoe UI",sans-serif; letter-spacing:.12em; text-transform:uppercase; color:var(--text); }
+  .rl .btn.red { background:var(--deep); border-color:var(--deep); color:#fff; }
+  .rl .row { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+  .rl .grow { flex:1; min-width:0; }
+
+  /* Zwei Zustände als große Karten */
+  .rl .modes { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:12px; }
+  .rl .mode { padding:16px; border:1px solid var(--line); background:var(--raise); display:grid; gap:8px; align-content:start; }
+  .rl .mode.on { border-color:rgb(255 30 45 / 60%); background:linear-gradient(160deg, rgb(255 30 45 / 12%), var(--raise) 60%); }
+  .rl .mode.on.free { border-color:rgb(53 224 127 / 55%); background:linear-gradient(160deg, rgb(53 224 127 / 10%), var(--raise) 60%); }
+  .rl .mode .top { display:flex; justify-content:space-between; align-items:center; }
+  .rl .radio { width:18px; height:18px; border-radius:50%; border:2px solid var(--strong); }
+  .rl .mode.on .radio { border-color:var(--red); box-shadow:inset 0 0 0 3px var(--panel); background:var(--red); }
+  .rl .mode.on.free .radio { border-color:var(--win); background:var(--win); }
+  .rl .mode ul { margin:0; padding-left:18px; color:var(--dim); font-size:12.5px; }
+  .rl .tag { display:inline-flex; align-items:center; gap:6px; padding:2px 8px; border:1px solid var(--strong); font:700 10.5px Rajdhani,sans-serif; letter-spacing:.14em; text-transform:uppercase; }
+  .rl .tag.paid { color:#ff6b77; border-color:rgb(255 30 45 / 45%); }
+  .rl .tag.free { color:var(--win); border-color:rgb(53 224 127 / 45%); }
+
+  /* Rückfrage */
+  .rl .dialog { max-width:560px; margin:0 auto; background:var(--panel); border:1px solid var(--strong); padding:20px 22px; box-shadow:0 20px 60px rgb(0 0 0 / 60%); }
+  .rl .facts { display:grid; gap:8px; margin:14px 0; padding:0; list-style:none; }
+  .rl .facts li { display:flex; gap:10px; align-items:flex-start; }
+  .rl .facts b { color:var(--text); }
+  .rl .num { min-width:34px; text-align:right; font-weight:800; font-size:15px; }
+  .rl .notice { display:flex; gap:10px; align-items:center; padding:12px 14px; border:1px solid rgb(53 224 127 / 30%); background:rgb(53 224 127 / 7%); color:#c9f7dc; }
+  .rl .greyed { opacity:.45; }
+
+  /* Webseite */
+  .rl .site { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .rl .nav { display:flex; gap:14px; align-items:center; padding:10px 12px; background:#06080b; border:1px solid var(--line); font:700 11px Rajdhani,sans-serif; letter-spacing:.14em; text-transform:uppercase; color:var(--dim); flex-wrap:wrap; }
+  .rl .nav .logo { color:var(--text); font-family:Oxanium,sans-serif; letter-spacing:0; text-transform:none; font-size:13px; margin-right:auto; }
+  .rl .nav .gone { text-decoration:line-through; color:#ff6b77; opacity:.7; }
+  .rl .nav .cta { background:var(--deep); color:#fff; padding:5px 10px; }
+  .rl .side { margin-top:8px; padding:12px; border:1px solid var(--line); background:var(--panel); display:grid; gap:6px; }
+  .rl .foot { margin-top:8px; font-size:11.5px; color:var(--faint); display:flex; gap:10px; flex-wrap:wrap; }
+  .rl .foot .keep { color:var(--dim); }
+
+  /* Bot-Dashboard */
+  .rl .profile { display:flex; gap:10px; align-items:center; padding:8px 12px; border:1px solid var(--line); background:var(--panel); width:max-content; }
+  .rl .avatar { width:32px; height:32px; border-radius:50%; background:linear-gradient(135deg,#00afff,#35e07f); }
+  .rl .chip { display:inline-flex; gap:5px; align-items:center; font-size:11.5px; font-weight:700; }
+  .rl .groups { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; margin-top:10px; }
+  .rl .group { padding:10px; border:1px solid var(--line); background:var(--raise); font-size:12px; color:var(--dim); }
+  .rl .group b { display:block; color:var(--text); margin-bottom:2px; }
+  .rl .group.new { border-color:rgb(53 224 127 / 50%); }
+  @media (max-width:900px){ .rl .modes, .rl .site { grid-template-columns:1fr; } .rl .groups { grid-template-columns:1fr 1fr; } }
+</style>
+
+<h2>Free Access und Paid Access</h2>
+<p class="subtitle">Entwurf, nichts davon ist echt. Ein Schalter im Admin Dashboard entscheidet, ob man für den Bot zahlen muss. Unten: was beim Umschalten passiert, wie die Webseite in beiden Zuständen aussieht und die neue Gruppe „Free“ im Bot-Dashboard.</p>
+
+<div class="section">
+  <p class="label">1 · Admin Dashboard → Shop → Einstellungen (heute Paid Access)</p>
+  <div class="rl">
+    <div class="box cut">
+      <p class="lbl">Zugang zum Bot</p>
+      <h4>Muss man für RL Nexus zahlen?</h4>
+      <p class="dim">Gilt sofort für den ganzen Bot: Bot-Dashboard, Webseite und Shop. Ersetzt die Schalter „Shop geöffnet“ und „Bezahlschranke“.</p>
+      <div class="modes">
+        <div class="mode cut">
+          <div class="top"><span class="tag free">Free Access</span><span class="radio"></span></div>
+          <b>Kostenlos für alle</b>
+          <ul>
+            <li>Jeder kommt ins Bot-Dashboard und kann alles nutzen</li>
+            <li>Keine Preise und keine Kaufen-Knöpfe auf der Webseite</li>
+            <li>Laufende Abos werden bei Stripe pausiert, Tage und Tests angehalten</li>
+          </ul>
+        </div>
+        <div class="mode cut on">
+          <div class="top"><span class="tag paid">Paid Access</span><span class="radio"></span></div>
+          <b>Nur mit Kauf oder Testzeitraum</b>
+          <ul>
+            <li>Ins Bot-Dashboard kommt, wer einen Zugang hat</li>
+            <li>Preise-Seite, Test und Rabattcodes sind aktiv</li>
+            <li>Pausierte Abos laufen weiter, angehaltene Tage zählen weiter</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <p class="label">2 · Klick auf „Free Access“: die Rückfrage</p>
+  <div class="rl">
+    <div class="dialog cut">
+      <h4>Auf Free Access umstellen?</h4>
+      <p class="dim">RL Nexus ist danach für alle kostenlos. Das passiert sofort:</p>
+      <ul class="facts">
+        <li><span class="num">12</span><span><b>Abos werden bei Stripe pausiert.</b> Es wird nichts mehr abgebucht, bis du wieder auf Paid Access stellst.</span></li>
+        <li><span class="num">5</span><span><b>Zugänge nach Tagen und 3 Tests werden angehalten.</b> Ihre Resttage bleiben stehen.</span></li>
+        <li><span class="num">20</span><span><b>Kunden bekommen eine kurze Mail</b>, dass ihr Zugang pausiert ist und warum.</span></li>
+        <li><span class="num">·</span><span><b>Die Webseite zeigt keine Preise mehr.</b> AGB, Widerruf, „Verträge hier kündigen“ und „Mein Zugang“ bleiben unten in der Fußzeile erreichbar.</span></li>
+      </ul>
+      <div class="row" style="justify-content:flex-end"><span class="btn">Abbrechen</span><span class="btn red">Auf Free Access umstellen</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <p class="label">3 · Admin Dashboard, solange Free Access gilt</p>
+  <div class="rl">
+    <div class="notice cut"><b>Free Access seit 23. Okt., 14:10.</b><span class="grow">12 Abos pausiert, 8 Zugänge angehalten. Zurück auf Paid Access laufen sie weiter.</span><span class="btn">Auf Paid Access</span></div>
+    <div class="box cut greyed" style="margin-top:10px">
+      <p class="lbl">Test · Rabattcodes · Produkte</p>
+      <p class="dim">Gelten erst wieder bei Paid Access. Ändern geht trotzdem, etwa um den Wechsel vorzubereiten.</p>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <p class="label">4 · Webseite: Paid Access links, Free Access rechts</p>
+  <div class="rl">
+    <div class="site">
+      <div>
+        <div class="nav"><span class="logo">RL Nexus</span><span>Home</span><span>Module</span><span>Preise</span><span>Team</span><span>Kontakt</span><span class="cta">Dashboard</span></div>
+        <div class="side cut"><p class="lbl">Modulseite, rechts</p><b>Mit Zugang nutzbar</b><span class="faint">Test starten oder Preise ansehen.</span><span class="btn red" style="width:max-content">Preise ansehen</span></div>
+        <div class="foot"><span>Impressum</span><span>Datenschutz</span><span>AGB</span><span>Widerruf</span><span>Verträge hier kündigen</span></div>
+      </div>
+      <div>
+        <div class="nav"><span class="logo">RL Nexus</span><span>Home</span><span>Module</span><span class="gone">Preise</span><span>Team</span><span>Kontakt</span><span class="cta">Dashboard</span></div>
+        <div class="side cut"><p class="lbl">Modulseite, rechts</p><b>Im Dashboard einschalten</b><span class="faint">Einloggen, Server wählen, loslegen.</span><span class="btn red" style="width:max-content">Zum Dashboard</span></div>
+        <div class="foot"><span>Impressum</span><span>Datenschutz</span><span class="keep">AGB</span><span class="keep">Widerruf</span><span class="keep">Verträge hier kündigen</span></div>
+        <p class="faint" style="margin-top:6px">/preise leitet auf die Startseite. Preise-Hinweise in Texten verschwinden.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <p class="label">5 · Bot-Dashboard: die neue Gruppe „Free“</p>
+  <div class="rl">
+    <div class="row">
+      <div class="profile"><span class="avatar"></span><span><b>kioskmann</b><br><span class="chip" style="color:#35e07f">● Free</span></span></div>
+      <p class="dim grow">Bei Free Access bekommt jeder ohne eigene Gruppe „Free“ statt „Testphase“ oder der Sperrseite.</p>
+    </div>
+    <div class="groups">
+      <div class="group new"><b>Free</b>RL Nexus ist gerade kostenlos. Du siehst die Server, auf denen du Owner oder Admin bist, und kannst alles nutzen.</div>
+      <div class="group"><b>Zugang</b>Paid Access: dein Zugang aus dem Shop läuft (Abo, Einmalkauf, Geschenk).</div>
+      <div class="group"><b>Testphase</b>Paid Access: dein Testzeitraum läuft.</div>
+      <div class="group"><b>Guardian</b>Paid Access: moderiert einen Server ohne eigenes Abo.</div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,511 @@
+/**
+ * Abschnitt: Level System.
+ *
+ * Oben die Zahlen, darunter drei Karten: Punkte (Chat, Voice, Kurve, Bonus,
+ * Ausnahmen), Aufsteigen (Nachricht im Editor, Belohnungsrollen) und die
+ * Rangliste samt Punkte-Verwaltung.
+ */
+
+import { BASE } from "../core/Base.js";
+import { icon, need } from "../core/Dom.js";
+import { toast } from "../core/Toast.js";
+import { api, button, card, el, IRole, loading, row, select, stat, toggle } from "../core/Ui.js";
+import { LEVEL_IMAGES, LEVEL_PLACEHOLDERS } from "../constants/Placeholders.js";
+import { IServerEmoji } from "../layout/EmojiPicker.js";
+import { IEditorContext, IMessageDoc, renderEditor, renderPreview } from "../layout/MessageEditor.js";
+import { templateBar } from "../layout/Templates.js";
+
+interface IBonus {
+    id: string;
+    factor: number;
+}
+
+interface IReward {
+    level: number;
+    roleId: string;
+}
+
+interface ISettings {
+    chat: { on: boolean; min: number; max: number; cooldown: number };
+    voice: { on: boolean; xp: number; alone: boolean; muted: boolean };
+    base: number;
+    roleBonus: IBonus[];
+    channelBonus: IBonus[];
+    noChannels: string[];
+    noRoles: string[];
+    announce: "current" | "channel" | "dm" | "off";
+    announceChannelId: string | null;
+    message: IMessageDoc | null;
+    rewards: IReward[];
+    stack: boolean;
+    public: boolean;
+}
+
+interface IRank {
+    id: string;
+    name: string;
+    avatar: string | null;
+    gone: boolean;
+    rank: number;
+    level: number;
+    xp: number;
+    into: number;
+    need: number;
+    messages: number;
+    voiceMinutes: number;
+}
+
+interface IPayload {
+    settings: ISettings;
+    defaultMessage: IMessageDoc;
+    limits: { rewards: number; bonus: number; excluded: number };
+    page: number;
+    total: number;
+    top: IRank[];
+    guild: { name: string; roles: IRole[]; channels: { id: string; name: string }[]; categories: { id: string; name: string }[]; emojis: IServerEmoji[] };
+}
+
+export function renderLevels(guildId: string): void {
+    const host = need<HTMLElement>("#levelBody");
+    const note = need<HTMLElement>("#levelNote");
+    const call = api(`${BASE}/api/guild/${encodeURIComponent(guildId)}/levels`, note);
+
+    let data: IPayload | null = null;
+    let draft: ISettings | null = null;
+    let dirty = false;
+
+    const save = el("button", "btn btn--primary") as HTMLButtonElement;
+
+    function touch(): void {
+        dirty = true;
+        save.disabled = false;
+    }
+
+    /* ------------------------------------------------------------
+       Kopf
+       ------------------------------------------------------------ */
+    function head(): HTMLElement {
+        const best = data!.top[0];
+        // Kurz halten: die Kachel ist schmal, die Einzelheiten stehen in der Karte darunter.
+        const chat = draft!.chat.on ? `${draft!.chat.min}–${draft!.chat.max}` : "aus";
+        const voice = draft!.voice.on ? `${draft!.voice.xp}/min` : "aus";
+
+        return el(
+            "div",
+            "tkhead snhead",
+            stat("#i-chart-up", "Mit Punkten", String(data!.total)),
+            stat("#i-crown", "Spitze", best ? `${best.name} · Level ${best.level}` : "noch niemand"),
+            // Chat und Voice in einer Kachel - fünf nebeneinander brechen unschön um.
+            stat("#i-message", "Punkte", `Chat ${chat} · Voice ${voice}`, draft!.chat.on || draft!.voice.on ? "is-ok" : ""),
+            stat("#i-badge", "Belohnungsrollen", String(draft!.rewards.length))
+        );
+    }
+
+    /* ------------------------------------------------------------
+       Punkte
+       ------------------------------------------------------------ */
+    function points(): HTMLElement {
+        const settings = draft!;
+        const num = (value: number, min: number, max: number, onChange: (value: number) => void, label: string): HTMLInputElement => {
+            const input = el("input", "text gwnum");
+
+            input.type = "number";
+            input.min = String(min);
+            input.max = String(max);
+            input.value = String(value);
+            input.setAttribute("aria-label", label);
+            input.addEventListener("input", () => {
+                onChange(Math.max(min, Math.min(max, Number(input.value) || 0)));
+                touch();
+            });
+
+            return input;
+        };
+
+        const chatRange = el(
+            "div",
+            "lvrange",
+            num(settings.chat.min, 0, 500, (value) => (settings.chat.min = value), "Punkte mindestens"),
+            el("span", "lvrange__to", "bis"),
+            num(settings.chat.max, 0, 500, (value) => (settings.chat.max = value), "Punkte höchstens")
+        );
+
+        return card(
+            "Punkte",
+            "Wie schnell es vorangeht. Die Punkte je Nachricht sind zufällig zwischen den beiden Werten – das macht Spam weniger berechenbar.",
+            row(
+                "Punkte für Nachrichten",
+                "Nur alle paar Sekunden, sonst zählt jedes „k“",
+                el("label", "snitem__switch", toggle(settings.chat.on, "Chat-Punkte", (on) => {
+                    settings.chat.on = on;
+                    touch();
+                }), el("span", "", "an"))
+            ),
+            row("Punkte je Nachricht", "Zufällig zwischen beiden Werten", chatRange),
+            row("Sperre", "So viele Sekunden zwischen zwei Nachrichten mit Punkten", num(settings.chat.cooldown, 0, 3600, (value) => (settings.chat.cooldown = value), "Sperre in Sekunden")),
+            row(
+                "Punkte für Voice",
+                "Je angefangener Minute im Sprachkanal",
+                el("label", "snitem__switch", toggle(settings.voice.on, "Voice-Punkte", (on) => {
+                    settings.voice.on = on;
+                    touch();
+                }), el("span", "", "an"))
+            ),
+            row("Punkte je Minute", "0 schaltet sie faktisch ab", num(settings.voice.xp, 0, 500, (value) => (settings.voice.xp = value), "Punkte je Minute")),
+            row(
+                "Auch allein",
+                "Sonst gibt es Punkte nur, wenn jemand anderes dabei ist",
+                el("label", "snitem__switch", toggle(settings.voice.alone, "Auch allein", (on) => {
+                    settings.voice.alone = on;
+                    touch();
+                }), el("span", "", "erlauben"))
+            ),
+            row(
+                "Auch stumm",
+                "Sonst zählt nicht, wer sich selbst stumm geschaltet hat",
+                el("label", "snitem__switch", toggle(settings.voice.muted, "Auch stumm", (on) => {
+                    settings.voice.muted = on;
+                    touch();
+                }), el("span", "", "erlauben"))
+            ),
+            row(
+                "Kurve",
+                `Level 1 braucht ${settings.base} Punkte, Level 10 insgesamt ${(settings.base * 10 * 11) / 2}`,
+                num(settings.base, 10, 1000, (value) => {
+                    settings.base = value;
+                    paint();
+                }, "Punkte je Stufe")
+            ),
+            bonusBox("Rollen mit Bonus", "Der höchste Faktor einer Rolle zählt", settings.roleBonus, data!.guild.roles.map((role) => [role.id, `@${role.name}`])),
+            bonusBox("Kanäle mit Bonus", "Etwa doppelte Punkte im Vorstellungs-Kanal", settings.channelBonus, data!.guild.channels.map((channel) => [channel.id, `# ${channel.name}`])),
+            listBox("Ohne Punkte: Kanäle", settings.noChannels, [
+                ...data!.guild.channels.map((channel): [string, string] => [channel.id, `# ${channel.name}`]),
+                ...data!.guild.categories.map((category): [string, string] => [category.id, `📁 ${category.name}`]),
+            ]),
+            listBox("Ohne Punkte: Rollen", settings.noRoles, data!.guild.roles.map((role) => [role.id, `@${role.name}`]))
+        );
+    }
+
+    /** Eine Liste „Eintrag + Faktor" mit Hinzufügen und Entfernen. */
+    function bonusBox(label: string, hint: string, list: IBonus[], options: [string, string][]): HTMLElement {
+        const box = el("div", "lvbonus");
+        const draw = (): void => {
+            box.replaceChildren();
+
+            for (const entry of list) {
+                const name = options.find(([id]) => id === entry.id)?.[1] ?? entry.id;
+                const factor = el("input", "text lvfactor");
+                const remove = button("btn btn--quiet btn--icon", icon("#i-x"));
+
+                factor.type = "number";
+                factor.min = "0.1";
+                factor.max = "5";
+                factor.step = "0.1";
+                factor.value = String(entry.factor);
+                factor.setAttribute("aria-label", `Faktor für ${name}`);
+                factor.addEventListener("input", () => {
+                    entry.factor = Math.max(0.1, Math.min(5, Number(factor.value) || 1));
+                    touch();
+                });
+
+                remove.title = "Entfernen";
+                remove.addEventListener("click", () => {
+                    list.splice(list.indexOf(entry), 1);
+                    touch();
+                    draw();
+                });
+
+                box.append(el("div", "lvbonus__row", el("span", "lvbonus__name", name), el("span", "lvbonus__x", "×"), factor, remove));
+            }
+
+            const pick = select(
+                [["", "— hinzufügen —"], ...options.filter(([id]) => !list.some((entry) => entry.id === id))],
+                "",
+                (value) => {
+                    if (!value) return;
+
+                    list.push({ id: value, factor: 2 });
+                    touch();
+                    draw();
+                },
+                `${label} hinzufügen`
+            );
+
+            pick.disabled = list.length >= data!.limits.bonus;
+            box.append(pick);
+        };
+
+        draw();
+
+        return row(label, hint, box);
+    }
+
+    /** Eine reine Auswahl-Liste (Kanäle oder Rollen ohne Punkte). */
+    function listBox(label: string, list: string[], options: [string, string][]): HTMLElement {
+        const box = el("div", "lvbonus");
+        const draw = (): void => {
+            box.replaceChildren();
+
+            for (const id of list) {
+                const chip = button("phchip", el("span", "", options.find(([entry]) => entry === id)?.[1] ?? id), icon("#i-x"));
+
+                chip.title = "Entfernen";
+                chip.addEventListener("click", () => {
+                    list.splice(list.indexOf(id), 1);
+                    touch();
+                    draw();
+                });
+                box.append(chip);
+            }
+
+            const pick = select(
+                [["", "— hinzufügen —"], ...options.filter(([id]) => !list.includes(id))],
+                "",
+                (value) => {
+                    if (!value) return;
+
+                    list.push(value);
+                    touch();
+                    draw();
+                },
+                `${label} hinzufügen`
+            );
+
+            pick.disabled = list.length >= data!.limits.excluded;
+            box.append(pick);
+        };
+
+        draw();
+
+        return row(label, "Hier sammelt niemand Punkte", box);
+    }
+
+    /* ------------------------------------------------------------
+       Aufsteigen
+       ------------------------------------------------------------ */
+    function levelUp(): HTMLElement {
+        const settings = draft!;
+        const editorHost = el("div", "");
+        const preview = el("div", "tkprev");
+        const doc = (): IMessageDoc => {
+            settings.message ??= structuredClone(data!.defaultMessage);
+
+            return settings.message;
+        };
+        const values: Record<string, string> = Object.fromEntries(LEVEL_PLACEHOLDERS.map((entry) => [entry.key, entry.sample]));
+        const context = (): IEditorContext => ({
+            guildId,
+            values,
+            roles: new Map(data!.guild.roles.map((role) => [role.id, role.name])),
+            channels: new Map(data!.guild.channels.map((channel) => [channel.id, channel.name])),
+            emojis: data!.guild.emojis,
+            placeholders: LEVEL_PLACEHOLDERS,
+            imagePlaceholders: LEVEL_IMAGES,
+            onChange: () => {
+                touch();
+                paintPreview();
+            },
+        });
+        const paintPreview = (): void => renderPreview(preview, doc(), context());
+
+        renderEditor(editorHost, doc(), context());
+        paintPreview();
+
+        // Fertige Nachrichten statt eines einzelnen "Zuruecksetzen" - dieselbe
+        // Leiste wie im Inhalts-Editor der anderen Module.
+        const bar = templateBar<IMessageDoc>("levelUp", {
+            take: () => structuredClone(doc()),
+            put: (state) => {
+                settings.message = structuredClone(state);
+                touch();
+                renderEditor(editorHost, doc(), context());
+                paintPreview();
+            },
+            apply: (template) => {
+                if (!template.body.doc) return;
+
+                settings.message = structuredClone(template.body.doc);
+                touch();
+                renderEditor(editorHost, doc(), context());
+                paintPreview();
+            },
+        });
+
+        const where = select(
+            [
+                ["current", "Im Kanal, in dem es passiert"],
+                ["channel", "In einem festen Kanal"],
+                ["dm", "Als Direktnachricht"],
+                ["off", "Gar nicht"],
+            ],
+            settings.announce,
+            (value) => {
+                settings.announce = value as ISettings["announce"];
+                touch();
+                paint();
+            },
+            "Wohin die Aufstiegs-Nachricht geht"
+        );
+
+        const target = select(
+            [["", "— Kanal wählen —"], ...data!.guild.channels.map((channel): [string, string] => [channel.id, `# ${channel.name}`])],
+            settings.announceChannelId ?? "",
+            (value) => {
+                settings.announceChannelId = value || null;
+                touch();
+            },
+            "Kanal für die Aufstiegs-Nachricht"
+        );
+
+        target.disabled = settings.announce !== "channel";
+
+        return card(
+            "Aufsteigen",
+            "Was passiert, wenn jemand ein Level schafft.",
+            row("Nachricht", "Im Kanal, an einer festen Stelle oder per DM", where),
+            row("Fester Kanal", "Nur nötig für „In einem festen Kanal“", target),
+            ...(settings.announce === "off"
+                ? []
+                : [
+                      el("div", "sneditor", el("div", "sneditor__main", el("div", "sneditor__bar", el("h4", "sneditor__title", "Die Nachricht")), bar, placeholderHint(), editorHost), el("aside", "sneditor__side", el("div", "tkside__head", el("span", "tkside__live", "Live-Vorschau")), preview)),
+                  ]),
+            rewardBox()
+        );
+    }
+
+    function placeholderHint(): HTMLElement {
+        const chips = el("div", "phhint__list");
+
+        for (const entry of LEVEL_PLACEHOLDERS) {
+            const chip = el("span", "phchip", el("code", "", `{${entry.key}}`), el("span", "phchip__label", entry.label));
+
+            chip.title = `Beispiel: ${entry.sample}`;
+            chips.append(chip);
+        }
+
+        return el("div", "phhint", el("p", "hintline phhint__lead", "Diese Platzhalter setzt der Bot beim Senden ein:"), chips);
+    }
+
+    /** Rollen ab Level X. */
+    function rewardBox(): HTMLElement {
+        const settings = draft!;
+        const box = el("div", "lvrewards");
+        const draw = (): void => {
+            box.replaceChildren();
+
+            for (const reward of settings.rewards) {
+                const role = data!.guild.roles.find((entry) => entry.id === reward.roleId);
+                const level = el("input", "text gwnum");
+                const remove = button("btn btn--quiet btn--icon", icon("#i-x"));
+
+                level.type = "number";
+                level.min = "1";
+                level.max = "999";
+                level.value = String(reward.level);
+                level.setAttribute("aria-label", `Ab welchem Level für ${role?.name ?? reward.roleId}`);
+                level.addEventListener("input", () => {
+                    reward.level = Math.max(1, Math.min(999, Number(level.value) || 1));
+                    touch();
+                });
+
+                remove.title = "Entfernen";
+                remove.addEventListener("click", () => {
+                    settings.rewards.splice(settings.rewards.indexOf(reward), 1);
+                    touch();
+                    draw();
+                });
+
+                box.append(el("div", "lvreward", el("span", "lvreward__lead", "ab Level"), level, el("span", "lvreward__role", `@${role?.name ?? "gelöschte Rolle"}`), remove));
+            }
+
+            const pick = select(
+                [["", "— Rolle hinzufügen —"], ...data!.guild.roles.filter((role) => !settings.rewards.some((reward) => reward.roleId === role.id)).map((role): [string, string] => [role.id, `@${role.name}`])],
+                "",
+                (value) => {
+                    if (!value) return;
+
+                    settings.rewards.push({ level: (settings.rewards.at(-1)?.level ?? 0) + 5, roleId: value });
+                    touch();
+                    draw();
+                },
+                "Belohnungsrolle hinzufügen"
+            );
+
+            pick.disabled = settings.rewards.length >= data!.limits.rewards;
+            box.append(pick);
+        };
+
+        draw();
+
+        const sync = button("btn btn--quiet", icon("#i-refresh"), "Rollen nachtragen");
+
+        sync.title = "Vergibt fehlende Belohnungsrollen an alle, die das Level schon haben";
+        sync.addEventListener("click", async () => {
+            sync.disabled = true;
+
+            const answer = await call<{ touched: number }>("", { action: "sync" });
+
+            sync.disabled = false;
+
+            if (answer) toast("info", "Nachgetragen", `${answer.touched} Mitglied(er) geprüft.`);
+        });
+
+        return el(
+            "div",
+            "lvrewardbox",
+            row("Belohnungsrollen", `Bis ${data!.limits.rewards} Stück – die Rolle muss unter der höchsten Rolle des Bots stehen`, box),
+            row(
+                "Alte behalten",
+                "Aus heißt: die neue Rolle ersetzt die vorherige",
+                el("label", "snitem__switch", toggle(settings.stack, "Alte behalten", (on) => {
+                    settings.stack = on;
+                    touch();
+                }), el("span", "", "sammeln"))
+            ),
+            el("div", "mcsave", sync)
+        );
+    }
+
+    /* ------------------------------------------------------------
+       Zeichnen und Laden
+       ------------------------------------------------------------ */
+    function paint(): void {
+        if (!data || !draft) return;
+
+        save.replaceChildren(icon("#i-check"), document.createTextNode("Speichern"));
+        save.disabled = !dirty;
+
+        host.replaceChildren(head(), points(), levelUp(), el("div", "mcsave lvsave", save));
+    }
+
+    save.addEventListener("click", async () => {
+        save.disabled = true;
+
+        const answer = await call<{ settings: ISettings }>("", { action: "save", settings: draft });
+
+        if (!answer) {
+            save.disabled = false;
+
+            return;
+        }
+
+        data!.settings = answer.settings;
+        draft = structuredClone(answer.settings);
+        dirty = false;
+        toast("info", "Gespeichert", "Gilt ab der nächsten Nachricht.");
+        paint();
+    });
+
+    function load(): void {
+        void call<IPayload>("").then((answer) => {
+            if (!answer) return;
+
+            data = answer;
+            draft ??= structuredClone(answer.settings);
+            paint();
+        });
+    }
+
+    loading(host, 4);
+    load();
+}

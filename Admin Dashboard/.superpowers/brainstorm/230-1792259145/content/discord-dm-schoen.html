@@ -1,0 +1,112 @@
+<style>
+  .dc { background:#313338; border-radius:12px; padding:16px 16px 18px; font-family: "gg sans","Noto Sans",system-ui,sans-serif; font-size:15px; color:#dbdee1; line-height:1.375; }
+  .dc .row { display:flex; gap:14px; }
+  .dc .av { width:40px; height:40px; border-radius:50%; background:#0a0f15 url(/files/n-logo.png) center/70% no-repeat; flex:none; }
+  .dc .name { color:#f2f3f5; font-weight:600; }
+  .dc .bot { background:#5865f2; color:#fff; font-size:10px; font-weight:600; padding:1px 4px; border-radius:3px; margin-left:4px; vertical-align:1px; }
+  .dc .time { color:#949ba4; font-size:12px; margin-left:6px; }
+  .dc .box { margin-top:6px; background:#2b2d31; border-radius:8px; border-left:4px solid #ff1e2d; padding:16px; max-width:520px; }
+  .dc .gallery { display:block; width:100%; border-radius:8px; margin-bottom:14px; }
+  .dc h2 { margin:0 0 6px; color:#f2f3f5; font-size:20px; font-weight:700; line-height:1.25; }
+  .dc h3 { margin:0 0 6px; color:#f2f3f5; font-size:16px; font-weight:700; }
+  .dc b { color:#f2f3f5; font-weight:600; }
+  .dc p { margin:0 0 4px; }
+  .dc .subtext { color:#949ba4; font-size:12.5px; margin:2px 0; }
+  .dc .sep { height:1px; background:#3f4147; margin:14px 0; }
+  .dc .sec { display:flex; gap:14px; align-items:center; }
+  .dc .sec .t { flex:1; min-width:0; }
+  .dc .thumb { width:76px; height:76px; border-radius:8px; background:#0a0f15 url(/files/n-logo.png) center/72% no-repeat; flex:none; }
+  .dc blockquote { margin:0 0 4px; padding:0 0 0 12px; border-left:4px solid #4e5058; border-radius:4px; }
+  .dc blockquote p { margin:2px 0; }
+  .dc code { background:#1e1f22; border:1px solid #3f4147; border-radius:4px; padding:0 4px; font-family: Consolas,"Courier New",monospace; font-size:13px; }
+  .dc .ts { background:rgba(255,255,255,.07); border-radius:3px; padding:0 2px; }
+  .dc a { color:#00a8fc; text-decoration:none; }
+  .dc .btns { display:flex; gap:8px; flex-wrap:wrap; margin-top:14px; }
+  .dc .btn { background:#4e5058; color:#fff; padding:6px 14px; border-radius:8px; font-size:14px; font-weight:500; white-space:nowrap; }
+  .dc .btn.green { background:#248046; }
+  .dc .btn.red { background:#da373c; }
+  .small-dc .box { max-width:420px; }
+  .hint { font-size:13px; margin-top:10px; }
+</style>
+
+<h2>Bestellung: Nachricht im Discord-Stil</h2>
+<p class="subtitle">Variante A2 mit deinem Banner oben. Alles im Container nutzt echte Discord-Formatierung: Überschrift, Zitatblöcke, Zeitstempel (Discord zeigt Datum und „in einem Monat“ in der Sprache der Person), Code für die Bestellnummer, Subtext und blaue Links unten.</p>
+
+<div class="dc"><div class="row"><div class="av"></div><div style="flex:1;min-width:0">
+  <div><span class="name">RL Nexus</span><span class="bot">BOT</span><span class="time">Heute um 14:30</span></div>
+  <div class="box">
+    <img class="gallery" src="/files/bestaetigt.png" alt="Banner: Bestellung bestätigt">
+    <h2>Danke, Connor! 🎉</h2>
+    <p>Dein Zugang zum <b>RL Nexus Bot-Dashboard</b> ist freigeschaltet. Du kannst sofort loslegen.</p>
+    <div class="sep"></div>
+    <div class="sec"><div class="t">
+      <h3>📦 Monat</h3>
+      <p><b>4,99 €</b> pro Monat · Abo</p>
+      <p class="subtext">Verlängert sich jeden Monat, bis du kündigst.</p>
+    </div><div class="thumb" role="img" aria-label="RL Nexus Logo"></div></div>
+    <div class="sep"></div>
+    <h3>🗓️ Laufzeit</h3>
+    <blockquote>
+      <p><b>Bestellt:</b> <span class="ts">17. Oktober 2026 14:30</span></p>
+      <p><b>Nächste Zahlung:</b> <span class="ts">17. November 2026</span> · <span class="ts">in einem Monat</span></p>
+      <p><b>Kündigen:</b> jederzeit zum Ende des bezahlten Monats</p>
+    </blockquote>
+    <h3 style="margin-top:12px">🎮 Auf Discord</h3>
+    <blockquote>
+      <p><b>Rolle:</b> Nexus Plus auf <b>RL Nexus</b></p>
+      <p><b>Bestellnummer:</b> <code>RLN-2026-0042</code></p>
+    </blockquote>
+    <div class="sep"></div>
+    <p class="subtext">⚖️ Du wolltest, dass der Zugang sofort startet. Damit erlischt dein Widerrufsrecht vorzeitig, bei einem Widerruf schuldest du Wertersatz bis dahin. Gemäß § 19 UStG wird keine Umsatzsteuer berechnet.</p>
+    <p class="subtext">📧 Rechnung, AGB und Widerrufsbelehrung (Stand 12.10.2026) kommen per Mail.</p>
+    <p class="subtext"><a>AGB</a> · <a>Widerrufsbelehrung</a> · <a>Kündigen</a> · <a>Datenschutz</a></p>
+    <div class="btns"><span class="btn">🚀 Zum Dashboard ↗</span><span class="btn green">📋 Zugang anzeigen</span><span class="btn red">Kündigen</span></div>
+  </div>
+</div></div></div>
+
+<div class="section" style="margin-top:32px">
+  <p class="label">Die anderen drei Anlässe im selben Aufbau (Vorschau)</p>
+  <div class="cards">
+    <div class="card"><div class="card-image"><div class="dc small-dc"><div class="row"><div class="av"></div><div style="flex:1;min-width:0">
+      <div><span class="name">RL Nexus</span><span class="bot">BOT</span><span class="time">Heute um 14:30</span></div>
+      <div class="box">
+        <img class="gallery" src="/files/test.png" alt="Banner: Test">
+        <h2>Dein Test läuft, Connor! 🧪</h2>
+        <p>Probier das Bot-Dashboard <b>7 Tage</b> lang kostenlos aus.</p>
+        <div class="sep"></div>
+        <h3>⏳ Test</h3>
+        <blockquote>
+          <p><b>Endet:</b> <span class="ts">24. Oktober 2026 14:30</span> · <span class="ts">in 7 Tagen</span></p>
+          <p><b>Kosten:</b> keine, der Test endet von selbst</p>
+        </blockquote>
+        <div class="btns"><span class="btn">🚀 Zum Dashboard ↗</span><span class="btn green">📋 Zugang anzeigen</span><span class="btn">🛒 Preise ↗</span></div>
+      </div>
+    </div></div></div></div><div class="card-body"><h3>Test gestartet</h3><p>Banner „Test Kauf“. Kein Kündigen-Knopf, weil nichts abgebucht wird.</p></div></div>
+
+    <div class="card"><div class="card-image"><div class="dc small-dc"><div class="row"><div class="av"></div><div style="flex:1;min-width:0">
+      <div><span class="name">RL Nexus</span><span class="bot">BOT</span><span class="time">Heute um 14:30</span></div>
+      <div class="box">
+        <img class="gallery" src="/files/fehlgeschlagen.png" alt="Banner: Bestellung fehlgeschlagen">
+        <h2>Zahlung hat nicht geklappt</h2>
+        <p>Stripe konnte <b>4,99 €</b> für <b>Monat</b> gerade nicht einziehen und versucht es in den nächsten Tagen noch ein paar Mal.</p>
+        <div class="sep"></div>
+        <blockquote>
+          <p><b>Dein Zugang läuft weiter bis:</b> <span class="ts">17. November 2026</span></p>
+        </blockquote>
+        <p class="subtext">Ändere die Zahlungsart unter Mein Zugang, dann klappt der nächste Versuch.</p>
+        <div class="btns"><span class="btn">💳 Zahlungsart ändern ↗</span><span class="btn green">📋 Zugang anzeigen</span></div>
+      </div>
+    </div></div></div></div><div class="card-body"><h3>Zahlung fehlgeschlagen</h3><p>Banner „Bestellung fehlgeschlagen“. Der Knopf führt zu Mein Zugang, dort geht es ins Stripe-Kundenportal.</p></div></div>
+
+    <div class="card"><div class="card-image"><div class="dc small-dc"><div class="row"><div class="av"></div><div style="flex:1;min-width:0">
+      <div><span class="name">RL Nexus</span><span class="bot">BOT</span><span class="time">Heute um 14:30</span></div>
+      <div class="box">
+        <img class="gallery" src="/files/banner.png" alt="Banner: RL Nexus">
+        <h2>Dein Zugang ist abgelaufen</h2>
+        <p><b>Monat</b> lief bis <span class="ts">17. November 2026</span>. Die Rolle <b>Nexus Plus</b> ist weg, du bleibst aber auf dem Server. Deine Einstellungen bleiben gespeichert.</p>
+        <div class="btns"><span class="btn">🛒 Wieder freischalten ↗</span><span class="btn">👤 Mein Zugang ↗</span></div>
+      </div>
+    </div></div></div></div><div class="card-body"><h3>Zugang abgelaufen</h3><p>Für diesen Anlass gibt es noch kein eigenes Banner, deshalb steht hier dein allgemeines RL-Nexus-Banner.</p></div></div>
+  </div>
+  <p class="subtitle hint">Banner und Logo kommen als Bilder mit, die Texte stehen in echten Textfeldern. Discord kann den Text also vorlesen, und Links bleiben klickbar.</p>
+</div>

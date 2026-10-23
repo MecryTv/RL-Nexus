@@ -1,0 +1,1266 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>RL Nexus · Dokumentation</title>
+<meta name="color-scheme" content="dark">
+<!-- Die Hauptseite. Wird beim Ausliefern eingesetzt. -->
+<meta name="rlnexus-site" content="__SITE__">
+<meta name="description" content="Wie RL Nexus arbeitet: jedes Modul mit Einrichtung, Einstellungen und Befehlen, dazu Anmeldung, Rechte und Datenschutz.">
+<link rel="icon" type="image/png" href="__BASE__/assets/images/rl-nexus-n-48.png">
+<link rel="stylesheet" href="__BASE__/assets/style.css">
+</head>
+<body data-page="static">
+
+<div class="ambient" aria-hidden="true"><i class="ambient__warm"></i><i class="ambient__cool"></i><i class="ambient__bands"></i><i class="ambient__grid"></i><i class="ambient__vignette"></i></div>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <symbol id="i-grid" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7.5" height="7.5" rx="2"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="2"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="2"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="2"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></symbol>
+  <symbol id="i-settings" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v2.6M12 18.9v2.6M4.9 4.9l1.9 1.9M17.2 17.2l1.9 1.9M2.5 12h2.6M18.9 12h2.6M4.9 19.1l1.9-1.9M17.2 6.8l1.9-1.9"/></symbol>
+  <symbol id="i-gamepad" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 7.5h11a4.5 4.5 0 0 1 4.4 3.6l.8 4.3A2.8 2.8 0 0 1 20 18.8a2.8 2.8 0 0 1-2.3-1.2L16.4 15.8H7.6L6.3 17.6A2.8 2.8 0 0 1 4 18.8a2.8 2.8 0 0 1-2.7-3.4l.8-4.3A4.5 4.5 0 0 1 6.5 7.5z"/><path d="M7 10.5v3M5.5 12h3M15.5 11h.01M17.5 13h.01"/></symbol>
+  <symbol id="i-user-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="7.5" r="3.5"/><path d="M3.5 20a6.5 6.5 0 0 1 8.8-6.1"/><circle cx="16.5" cy="16.5" r="3.5"/><path d="m19.2 19.2 2.3 2.3"/></symbol>
+  <symbol id="i-shield-users" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.5 4.5 5.4V11c0 4.9 3.2 8.9 7.5 10.5 4.3-1.6 7.5-5.6 7.5-10.5V5.4z"/><circle cx="12" cy="10" r="2"/><path d="M8.5 16.5a3.7 3.7 0 0 1 7 0"/></symbol>
+  <symbol id="i-shield-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.5 4.5 5.4V11c0 4.9 3.2 8.9 7.5 10.5 4.3-1.6 7.5-5.6 7.5-10.5V5.4z"/><path d="m8.8 11.8 2.3 2.3 4.1-4.4"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.8 19 12 7 19.2z"/></symbol>
+  <symbol id="i-swords" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 17.5 3 6V3h3l11.5 11.5M13 19l6-6M16 16l4 4M19 21l2-2"/><path d="M14.5 6.5 18 3h3v3l-3.5 3.5M5 14l4 4M7 17l-3 3M3 19l2 2"/></symbol>
+  <symbol id="i-wave" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><path d="m10 17 5-5-5-5M15 12H3"/></symbol>
+  <symbol id="i-clipboard" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6v3H9z"/><path d="M15 4.5h3A1.5 1.5 0 0 1 19.5 6v13.5A1.5 1.5 0 0 1 18 21H6a1.5 1.5 0 0 1-1.5-1.5V6A1.5 1.5 0 0 1 6 4.5h3"/><path d="m8.5 12.5 2 2 4-4"/></symbol>
+  <symbol id="i-sparkle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 2.3 6.7L21 12l-6.7 2.3L12 21l-2.3-6.7L3 12l6.7-2.3z"/><path d="M18.5 3.5v3M20 5h-3"/></symbol>
+  <symbol id="i-chart-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 20.5h17"/><path d="m6 15.5 4-4.5 3.5 2.8L20 6"/><path d="M15.5 6H20v4.5"/></symbol>
+  <symbol id="i-gift" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 11h15v8.5a1 1 0 0 1-1 1h-13a1 1 0 0 1-1-1z"/><rect x="3" y="7" width="18" height="4" rx="1"/><path d="M12 7v13.5"/><path d="M12 7s-2.6.3-3.7-.8a1.9 1.9 0 0 1 2.7-2.7C12 4.7 12 7 12 7zm0 0s2.6.3 3.7-.8a1.9 1.9 0 0 0-2.7-2.7C12 4.7 12 7 12 7z"/></symbol>
+  <symbol id="i-list-checks" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 7 2 2 4-4M3 17l2 2 4-4M13 6h8M13 12h8M13 18h8"/></symbol>
+  <symbol id="i-mic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M19 11a7 7 0 0 1-14 0"/><path d="M12 18v4M8.5 22h7"/></symbol>
+  <symbol id="i-ticket" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 8.5A1.5 1.5 0 0 1 5 7h14a1.5 1.5 0 0 1 1.5 1.5v1.8a2 2 0 0 0 0 3.4v1.8A1.5 1.5 0 0 1 19 17H5a1.5 1.5 0 0 1-1.5-1.5v-1.8a2 2 0 0 0 0-3.4z"/><path d="M14 7v10" stroke-dasharray="1.6 2.8"/></symbol>
+  <symbol id="i-gavel" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m14.5 12.5-8 8a2.12 2.12 0 1 1-3-3l8-8M16 16l6-6M8 8l6-6M9 7l8 8M21 11l-8-8"/></symbol>
+  <symbol id="i-scroll" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 4A1.5 1.5 0 0 1 7 2.5h7.5L19.5 7.5V20A1.5 1.5 0 0 1 18 21.5H7A1.5 1.5 0 0 1 5.5 20z"/><path d="M14 2.5v5h5M9 12.5h6M9 16h4"/></symbol>
+  <symbol id="i-twitch" viewBox="0 0 24 24" fill="currentColor"><path d="M4.3 2 2 6.5V20h5v3h3l3-3h4l5-5V2zm15.4 11.3-3 3h-4l-3 3v-3H6.4V3.7h13.3z M15.5 7v5h1.8V7zm-4.8 0v5h1.8V7z"/></symbol>
+  <symbol id="i-layout" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 3.5h7v7h-7zM13.5 3.5h7v4.5h-7zM13.5 11h7v9.5h-7zM3.5 13h7v7.5h-7z"/></symbol>
+  <symbol id="i-image" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4" width="17" height="16" rx="2"/><circle cx="9" cy="9.5" r="1.6"/><path d="m4 16.5 4.5-4.2 3.5 3.2 3-2.8 5 4.3"/></symbol>
+  <symbol id="i-code" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 17-5-5 5-5M16 7l5 5-5 5M13.5 3.5l-3 17"/></symbol>
+  <symbol id="i-warn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 2 20h20z"/><path d="M12 10v4M12 17h.01"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13M13 6l6 6-6 6"/></symbol>
+  <symbol id="i-gem" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12l4 6-10 13L2 9z"/><path d="M11 3 8 9l4 13 4-13-3-6"/><path d="M2 9h20"/></symbol>
+  <symbol id="i-star" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.6l2.9 5.9 6.5.95-4.7 4.6 1.1 6.45L12 17.45 6.2 20.5l1.1-6.45-4.7-4.6 6.5-.95z"/></symbol>
+  <symbol id="i-flask" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 2.5h5M10 3v6.2L4.9 18a2 2 0 0 0 1.7 3h10.8a2 2 0 0 0 1.7-3L14 9.2V3"/><path d="M7.4 15.5h9.2"/></symbol>
+  <symbol id="i-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></symbol>
+</svg>
+
+<header class="topbar">
+  <div class="shell topbar__inner">
+    <a class="brand" href="__BASE__/" aria-label="RL Nexus Startseite">
+      <span class="brand__mark"><img src="__BASE__/assets/images/rl-nexus-n-96.png" alt="" width="38" height="38" decoding="async"></span>
+      <span>
+        <span class="brand__name">RL <em>Nexus</em></span>
+        <span class="brand__sub">Esports Management Bot</span>
+      </span>
+    </a>
+  </div>
+</header>
+
+<main class="shell docpage">
+  <div class="setpage">
+    <!-- Die ganze linke Spalte steht mit: die Seite ist lang, und wer unten in
+         einem Kapitel steht, soll weder nach oben scrollen muessen, um
+         woandershin zu springen, noch um aus der Doku herauszukommen. -->
+    <div class="docside">
+      <div class="docside__inner">
+        <a class="backlink" href="__BASE__/"><svg><use href="#i-arrow"/></svg>Zurück zum Dashboard</a>
+
+        <label class="docsearch">
+          <svg aria-hidden="true"><use href="#i-search"/></svg>
+          <input type="search" id="docSearch" placeholder="Modul oder Thema" aria-label="Dokumentation durchsuchen" autocomplete="off">
+        </label>
+
+        <nav class="setnav docnav" id="docNav" aria-label="Inhalt">
+          <div class="docgroup">
+            <button class="docgroup__head" type="button" aria-expanded="false" aria-controls="docg-grundlagen">
+              <svg class="docgroup__chev" aria-hidden="true"><use href="#i-chevron"/></svg>
+              <span class="docgroup__name">Grundlagen</span>
+              <span class="docgroup__count">7</span>
+            </button>
+            <div class="docgroup__list" id="docg-grundlagen" hidden>
+              <a href="#ueberblick">Überblick</a>
+              <a href="#anmeldung">Anmeldung</a>
+              <a href="#gruppen">Gruppen und Rechte</a>
+              <a href="#einstellungen">Einstellungen</a>
+              <a href="#befehle">Befehle</a>
+              <a href="#fehler">Fehler melden</a>
+              <a href="#datenschutz">Daten und Sicherheit</a>
+            </div>
+          </div>
+          <div class="docgroup">
+            <button class="docgroup__head" type="button" aria-expanded="false" aria-controls="docg-rocket-league">
+              <svg class="docgroup__chev" aria-hidden="true"><use href="#i-chevron"/></svg>
+              <span class="docgroup__name">Rocket League</span>
+              <span class="docgroup__count">7</span>
+            </button>
+            <div class="docgroup__list" id="docg-rocket-league" hidden>
+              <a href="#rl-6mans">2, 4 &amp; 6 Mans</a>
+              <a href="#lft">Looking for</a>
+              <a href="#teams">RL Team-Übersicht</a>
+              <a href="#wtsi">WTSI</a>
+              <a href="#rank-roles">Rank Roles</a>
+              <a href="#clips">Clips der Woche</a>
+              <a href="#matchups">Matchups</a>
+            </div>
+          </div>
+          <div class="docgroup">
+            <button class="docgroup__head" type="button" aria-expanded="false" aria-controls="docg-community">
+              <svg class="docgroup__chev" aria-hidden="true"><use href="#i-chevron"/></svg>
+              <span class="docgroup__name">Community</span>
+              <span class="docgroup__count">7</span>
+            </button>
+            <div class="docgroup__list" id="docg-community" hidden>
+              <a href="#welcome">Welcome System</a>
+              <a href="#apply">Apply System</a>
+              <a href="#reaction-roles">Self Roles</a>
+              <a href="#levels">Level System</a>
+              <a href="#giveaways">Giveaways</a>
+              <a href="#polls">Umfragen</a>
+              <a href="#voice-hub">Temp Voice</a>
+            </div>
+          </div>
+          <div class="docgroup">
+            <button class="docgroup__head" type="button" aria-expanded="false" aria-controls="docg-support">
+              <svg class="docgroup__chev" aria-hidden="true"><use href="#i-chevron"/></svg>
+              <span class="docgroup__name">Support</span>
+              <span class="docgroup__count">1</span>
+            </button>
+            <div class="docgroup__list" id="docg-support" hidden>
+              <a href="#tickets">Ticket System</a>
+            </div>
+          </div>
+          <div class="docgroup">
+            <button class="docgroup__head" type="button" aria-expanded="false" aria-controls="docg-moderation">
+              <svg class="docgroup__chev" aria-hidden="true"><use href="#i-chevron"/></svg>
+              <span class="docgroup__name">Moderation</span>
+              <span class="docgroup__count">4</span>
+            </button>
+            <div class="docgroup__list" id="docg-moderation" hidden>
+              <a href="#moderation">Moderation</a>
+              <a href="#support-warteraum">Support-Warteraum</a>
+              <a href="#automod">Auto Mod</a>
+              <a href="#logging">Logging System</a>
+            </div>
+          </div>
+          <div class="docgroup">
+            <button class="docgroup__head" type="button" aria-expanded="false" aria-controls="docg-inhalte-und-meldungen">
+              <svg class="docgroup__chev" aria-hidden="true"><use href="#i-chevron"/></svg>
+              <span class="docgroup__name">Inhalte &amp; Meldungen</span>
+              <span class="docgroup__count">3</span>
+            </button>
+            <div class="docgroup__list" id="docg-inhalte-und-meldungen" hidden>
+              <a href="#notifier">Twitch &amp; YouTube</a>
+              <a href="#custom-message">Custom Message</a>
+              <a href="#gallery">Gallery System</a>
+              <a href="#backups">Backups</a>
+            </div>
+          </div>
+        </nav>
+        <p class="docnav__empty" id="docEmpty" hidden>Nichts gefunden.</p>
+      </div>
+    </div>
+
+    <div class="doc">
+  <h1>Dokumentation</h1>
+  <p class="doc__lead">
+    Was RL Nexus kann, wie du jedes Modul einrichtest und was deine Mitglieder davon sehen. Die Seite steht
+    ohne Anmeldung offen, du kannst einzelne Abschnitte also einfach verlinken.
+  </p>
+
+  <h2 id="ueberblick">Überblick</h2>
+  <p>
+    RL Nexus ist ein Discord-Bot mit Dashboard für Rocket-League-Organisationen. Alles ist in Module
+    aufgeteilt: du schaltest nur ein, was dein Server braucht, und jedes Modul hat im Dashboard eine eigene
+    Seite. Ein Modul, das aus ist, tut nichts und speichert nichts.
+  </p>
+
+  <h3>Ein Modul einschalten</h3>
+  <ol class="doc__bullets doc__steps">
+    <li>Melde dich im Dashboard an und wähle deinen Server.</li>
+    <li>Unter <b>Module</b> legst du den Schalter des Moduls um. Danach steht es links in der Leiste, unter seiner Gruppe.</li>
+    <li>Auf der Seite des Moduls stellst du alles ein und speicherst.</li>
+  </ol>
+  <p>
+    In Discord geht dasselbe mit <code>/module an</code>, <code>/module aus</code> und <code>/module liste</code>.
+    Gallery System und Backups gehören fest dazu und lassen sich nicht abschalten.
+  </p>
+  <p>
+    Neu laden musst du das Dashboard nicht. Legst du in Discord einen Kanal, eine Rolle oder ein Emoji an, benennst
+    etwas um oder löschst es, stehen die Auswahlfelder gleich richtig da, auch während du etwas einträgst. Was du
+    noch nicht gespeichert hast, bleibt dabei stehen.
+  </p>
+
+  <h3>Wer was darf</h3>
+  <table class="doc__table">
+    <thead><tr><th>Wer</th><th>Was im Dashboard offensteht</th></tr></thead>
+    <tbody>
+      <tr><td>Owner und alle mit „Server verwalten“</td><td>Alles: Module, Einstellungen, Nachrichten senden, Moderatoren eintragen.</td></tr>
+      <tr><td>Moderatoren</td><td>Live Tickets, Transcriptions und die Moderation, ohne Einstellungen. Eingetragen werden sie unter <b>Moderatoren</b>, als Rollen oder einzelne Mitglieder.</td></tr>
+      <tr><td>Support-Rollen der Tickets</td><td>Live Tickets und Transcriptions, aber nur für die Themen ihrer Rolle.</td></tr>
+      <tr><td>Prüfer im Apply System</td><td>Nur der Punkt <b>Bewerbungen</b>: lesen und entscheiden.</td></tr>
+    </tbody>
+  </table>
+  <p class="hintline">Was Mitglieder in Discord tun dürfen, also Befehle und Knöpfe, steht beim jeweiligen Modul.</p>
+
+  <h2 id="anmeldung">Anmeldung</h2>
+  <p>
+    Angemeldet wird nur mit Discord. Eine Registrierung gibt es nicht: dein Konto entsteht beim ersten Anmelden,
+    und RL Nexus speichert kein Passwort, weil es keins gibt.
+  </p>
+
+  <h3>Zwei-Faktor ist Pflicht</h3>
+  <p>
+    <b>Ohne eingeschaltete Zwei-Faktor-Anmeldung bei Discord kommt niemand herein.</b> Das Dashboard hängt
+    vollständig an deinem Discord-Konto, also ist es genau so gut geschützt wie dieses Konto. Fehlt der Schutz,
+    zeigt RL Nexus statt der Serverauswahl eine kurze Anleitung: in Discord unten links auf das Zahnrad,
+    <b>Mein Konto</b>, dort <b>Zwei-Faktor-Authentifizierung</b> aktivieren. Eine Authenticator-App reicht.
+  </p>
+  <p class="hintline">
+    Wer den Schutz später abschaltet, bleibt bis zum Ende seiner Sitzung angemeldet, höchstens sieben Tage.
+    Bei der nächsten Anmeldung greift die Regel wieder.
+  </p>
+
+  <h3>Was RL Nexus von Discord bekommt</h3>
+  <table class="doc__table">
+    <thead><tr><th>Freigabe</th><th>Wofür</th></tr></thead>
+    <tbody>
+      <tr><td><code>identify</code></td><td>Name und Bild in der Kopfzeile.</td></tr>
+      <tr><td><code>guilds</code></td><td>Die Serverauswahl.</td></tr>
+      <tr><td><code>guilds.members.read</code></td><td>Deine Rollen und dein Beitrittsdatum auf der Serverseite.</td></tr>
+      <tr><td><code>email</code></td><td>Die Adresse in deinem Profil. Sie wird nirgends verschickt.</td></tr>
+      <tr><td><code>connections</code></td><td>Bestätigte Twitch- und YouTube-Kanäle, damit der Notifier deinen Kanal deinem Discord-Konto zuordnen kann. Alles andere wird verworfen.</td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="gruppen">Gruppen und Rechte</h2>
+  <p>
+    Jedes Konto hat eine Gruppe. Sie steht oben rechts neben deinem Namen und in deinem Profil. Welche Server du
+    im Dashboard siehst, hängt aber vor allem an Discord: dort, wo du Owner bist oder „Server verwalten“ hast,
+    kannst du einstellen.
+  </p>
+
+  <div class="glist">
+    <div class="grow" style="--group:var(--brand)">
+      <span class="grow__mark"><svg><use href="#i-shield"/></svg></span>
+      <div class="grow__text"><b>Administrator</b><span>Sieht jeden Server, auf dem RL Nexus läuft.</span></div>
+    </div>
+    <div class="grow" style="--group:#9b8bff">
+      <span class="grow__mark"><svg><use href="#i-code"/></svg></span>
+      <div class="grow__text"><b>Developer</b><span>Wie Administrator, dazu die Entwickler-Befehle des Bots.</span></div>
+    </div>
+    <div class="grow" style="--group:var(--blue)">
+      <span class="grow__mark"><svg><use href="#i-gem"/></svg></span>
+      <div class="grow__text"><b>Partner</b><span>Kennzeichnung für Partner-Organisationen.</span></div>
+    </div>
+    <div class="grow" style="--group:#ffd166">
+      <span class="grow__mark"><svg><use href="#i-star"/></svg></span>
+      <div class="grow__text"><b>Premium</b><span>Kennzeichnung für Premium-Zugang. Freigeschaltet ist daran heute noch nichts.</span></div>
+    </div>
+    <div class="grow" style="--group:var(--live)">
+      <span class="grow__mark"><svg><use href="#i-shield-check"/></svg></span>
+      <div class="grow__text"><b>Guardian</b><span>Für alle ohne eigene Gruppe, die auf mindestens einem Server Moderator sind. Dort stehen Live Tickets, Transcriptions und Moderation offen.</span></div>
+    </div>
+    <div class="grow" style="--group:var(--text-2)">
+      <span class="grow__mark"><svg><use href="#i-flask"/></svg></span>
+      <div class="grow__text"><b>Testphase</b><span>Der Standard, solange RL Nexus in der Testphase läuft. Du siehst die Server, auf denen du Owner oder Admin bist.</span></div>
+    </div>
+  </div>
+
+  <p>
+    Gruppen vergibt das RL Nexus Team. Wer als Organisation Partner werden möchte, meldet sich im
+    <a href="https://discord.gg/CjG2HFGw95" target="_blank" rel="noopener">Support-Server</a>. Bekommst du eine
+    neue Gruppe, steht die Meldung in deinem Postfach.
+  </p>
+
+  <h2 id="einstellungen">Einstellungen und Postfach</h2>
+  <p>
+    Die Einstellungen öffnest du über das Menü oben rechts. Unter <b>Profil</b> stehen Name, Bild, E-Mail und
+    Discord-ID. Sie kommen von Discord und lassen sich nur dort ändern. Unter <b>Töne &amp; Oberfläche</b>
+    schaltest du Klänge, Lautstärke, reduzierte Bewegung und die Hinweise unten rechts. Diese Schalter gelten nur
+    in dem Browser, in dem du sie setzt.
+  </p>
+  <p>
+    Das Postfach (die Glocke im Menü) liegt dagegen beim Bot: Meldungen über eine neue Gruppe stehen auf jedem
+    Gerät gleich da und bleiben, bis du sie löschst.
+  </p>
+
+  <h2 id="befehle">Befehle</h2>
+  <p>Alle Befehle des Bots auf einen Blick. Was sie im Einzelnen tun, steht beim jeweiligen Modul.</p>
+  <table class="doc__table">
+    <thead><tr><th>Befehl</th><th>Wofür</th><th>Wer</th></tr></thead>
+    <tbody>
+      <tr><td><code>/module an · aus · liste</code></td><td>Module schalten</td><td>Server verwalten</td></tr>
+      <tr><td><code>/ticket setup · panel · entsperren</code></td><td>Ticket System einrichten, Panel senden, Sperre aufheben</td><td>Server verwalten</td></tr>
+      <tr><td><code>/gallery</code></td><td>Bilder des Servers ansehen und verwalten</td><td>Administratoren</td></tr>
+      <tr><td><code>/giveaway start · beenden · neu · abbrechen</code></td><td>Giveaways</td><td>Server verwalten</td></tr>
+      <tr><td><code>/umfrage erstellen · beenden</code></td><td>Umfragen</td><td>Server verwalten</td></tr>
+      <tr><td><code>/warn</code> <code>/unwarn</code> <code>/timeout</code> <code>/untimeout</code> <code>/kick</code> <code>/ban</code> <code>/unban</code> <code>/purge</code></td><td>Moderation</td><td>Moderatoren oder das passende Discord-Recht</td></tr>
+      <tr><td><code>/fall zeigen · notiz · beweis</code> <code>/verlauf</code></td><td>Fälle nachlesen und ergänzen</td><td>Moderatoren</td></tr>
+      <tr><td><code>/level rang · rangliste</code></td><td>Eigener Stand im Level System und die Besten</td><td>alle</td></tr>
+      <tr><td><code>/lookingfor spieler · team · beenden</code></td><td>Ein Team oder Spieler suchen</td><td>alle</td></tr>
+      <tr><td><code>/rank me · search · link · unlink</code></td><td>Rocket-League-Ränge als Karte, Epic-Konto verbinden</td><td>alle</td></tr>
+      <tr><td><code>/rangrollen holen · ablegen</code></td><td>Die Rolle zum eigenen Rang</td><td>alle</td></tr>
+      <tr><td><code>/fehler</code></td><td>Einen Fehler an das RL Nexus Team melden</td><td>alle</td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="fehler">Fehler melden</h2>
+  <p>Etwas funktioniert nicht oder sieht falsch aus? Es gibt drei Wege zu uns:</p>
+  <ul class="doc__bullets">
+    <li>
+      <b>Im Dashboard:</b> unten auf jeder Seite steht <button class="doclink" type="button" data-report>Fehler melden</button>.
+      Ein Fenster fragt nach einem Betreff, was passiert ist und wo. Die Meldung geht direkt an
+      <a href="mailto:support@nexus-emb.de">support@nexus-emb.de</a>. Bist du angemeldet, steht deine Discord-ID
+      dabei, sonst brauchen wir eine Mail-Adresse oder deinen Discord-Namen für die Antwort.
+    </li>
+    <li><b>In Discord:</b> <code>/fehler</code> auf jedem Server mit RL Nexus oder in der DM an den Bot. Es öffnet sich dasselbe Formular.</li>
+    <li><b>Direkt:</b> im <a href="https://discord.gg/CjG2HFGw95" target="_blank" rel="noopener">Support-Server</a> oder per Mail.</li>
+  </ul>
+  <p class="hintline">
+    Je genauer du schreibst, was du getan hast und was stattdessen passiert ist, desto schneller finden wir es.
+    Modul, Server und ungefähre Uhrzeit helfen am meisten.
+  </p>
+
+  <h2 id="datenschutz">Daten und Sicherheit</h2>
+  <p>
+    Nach der Anmeldung liegt im Browser genau eine Sache: die Sitzung, verschlüsselt in einem
+    <code>HttpOnly</code>-Cookie. Kein Skript kommt daran, keine fremde Seite schickt es mit, und nach sieben Tagen
+    verfällt sie. Abmelden beendet die Sitzung in dem Browser, in dem du es tust.
+  </p>
+  <p>
+    Cookies setzt RL Nexus nur für die Anmeldung: kein Tracking, keine Werbung, keine Weitergabe. Was die Module
+    speichern und wie lange, steht in der <a href="__BASE__/privacy">Datenschutzerklärung</a>. Wer hinter
+    RL Nexus steht, steht im <a href="__BASE__/impressum">Impressum</a>.
+  </p>
+
+  <!-- ============================ Rocket League ============================ -->
+
+  <h2 id="rl-6mans">2, 4 &amp; 6 Mans</h2>
+  <p class="doc__kicker">Rocket League · Modul <code>rl-6mans</code></p>
+  <p>
+    Warteschlangen für 1v1, 2v2 und 3v3. Sobald genug Leute drin sind, teilt der Bot zwei möglichst gleich
+    starke Teams ein, nach einer eigenen MMR dieses Servers. Mit den Rängen im Spiel hat sie nichts zu tun.
+  </p>
+
+  <h3>So läuft eine Runde</h3>
+  <ol class="doc__bullets doc__steps">
+    <li>Im Kanal steht ein Panel mit einem Knopf je Modus und einem zum Verlassen aller Warteschlangen.</li>
+    <li>Ist eine Warteschlange voll (2, 4 oder 6 Spieler), rechnet der Bot die fairste Aufteilung aus. Auf Wunsch legt er zwei Sprachkanäle an (Blau und Orange), zieht alle hinüber, die schon im Voice sitzen, und schickt jedem eine DM.</li>
+    <li>Die Karte der Runde nennt beide Teams, einen Lobby-Namen und ein Passwort. Eine Person macht die private Lobby im Spiel auf, der Rest tritt bei. Rocket League lässt Lobbys nicht von außen anlegen, deshalb geht es nur so.</li>
+    <li>Nach dem Spiel melden die Spieler das Ergebnis per Knopf. Die MMR passt sich an, die Rangliste ebenso.</li>
+  </ol>
+
+  <h3>Einstellungen</h3>
+  <table class="doc__table">
+    <thead><tr><th>Einstellung</th><th>Was sie bewirkt</th></tr></thead>
+    <tbody>
+      <tr><td>Modi</td><td>Jeder einzeln an oder aus. Ein abgeschalteter Modus fehlt im Panel.</td></tr>
+      <tr><td>Start-MMR</td><td>Ab Werk 600, je Modus getrennt. Wer in 6 Mans oben steht, fängt in 2 Mans trotzdem bei 600 an.</td></tr>
+      <tr><td>Höchster Ausschlag</td><td>Wie viel eine Runde höchstens bewegt. Ab Werk 25, bei gleich starken Teams sind das etwa ±13. Wer den Favoriten schlägt, bekommt mehr.</td></tr>
+      <tr><td>Ergebnis bestätigen lassen</td><td>An: das andere Team muss dasselbe melden. Melden beide Verschiedenes, entscheidet, wer den Server verwaltet. Aus: der erste Klick zählt.</td></tr>
+      <tr><td>Aus der Warteschlange nach</td><td>Minuten, nach denen jemand ohne Runde wieder herausfällt. <code>0</code> heißt nie.</td></tr>
+      <tr><td>Sprachkanäle, DM an alle</td><td>Jeweils an oder aus.</td></tr>
+      <tr><td>Stufen</td><td>Eigene Namen für MMR-Bereiche, bis zu zwölf, je mit Zeichen und Farbe. Ab Werk acht Stufen von „Bodenhaftung“ bis „Umlaufbahn“.</td></tr>
+      <tr><td>Öffentliche Rangliste</td><td>Ein Link ohne Anmeldung (<code>/mans/&lt;server&gt;</code>) mit Platz, Name, Stufe, MMR und Bilanz. Ab Werk aus.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Gut zu wissen</h3>
+  <ul class="doc__bullets">
+    <li>Die Warteschlangen leben nur im Bot. Nach einem Neustart sind sie leer, Runden und Wertung bleiben.</li>
+    <li>Wer in einer laufenden Runde steckt, kommt erst wieder in eine Warteschlange, wenn das Ergebnis gemeldet ist.</li>
+    <li>Lobby-Namen und Passwörter kommen ohne <code>i</code>, <code>l</code>, <code>o</code>, <code>0</code> und <code>1</code> aus. Auf dem Controller vertippt man sich sonst.</li>
+    <li>Panel, Runde, DM und Ergebnis sind frei gestaltbar, als Karte, Embed oder Text, mit Platzhaltern wie <code>{blau}</code>, <code>{orange}</code>, <code>{lobby}</code> und <code>{passwort}</code>.</li>
+    <li>Im Dashboard stehen drei Punkte: die Einstellungen, <b>Live</b> mit Warteschlangen, laufenden Runden und Verlauf, und <b>Rangliste</b> mit der Wertung je Modus und dem öffentlichen Link.</li>
+  </ul>
+
+  <h2 id="lft">Looking for</h2>
+  <p class="doc__kicker">Rocket League · Modul <code>lft</code></p>
+  <p>
+    Spieler suchen ein Team, Teams suchen Spieler. Der Bot fragt per DM, eine Frage nach der anderen, und legt
+    aus den Antworten einen Beitrag im Forum an.
+  </p>
+
+  <h3>Für Mitglieder</h3>
+  <ul class="doc__bullets">
+    <li><code>/lookingfor spieler</code>: du suchst ein Team. <code>/lookingfor team</code>: ihr sucht Spieler. Danach geht es in der DM weiter.</li>
+    <li>Eine Antwort ist eine Nachricht. Bei einer Auswahl-Frage erscheint ein Menü. <code>-</code> überspringt eine freiwillige Frage, <code>abbrechen</code> beendet alles, ohne etwas zu speichern.</li>
+    <li>Am Ende steht eine Vorschau mit <b>Abschicken</b> und <b>Abbrechen</b>. Erst danach entsteht der Beitrag.</li>
+    <li><code>/lookingfor beenden</code> oder der Knopf am Beitrag schließt die Suche. Je Seite ist eine Suche gleichzeitig offen.</li>
+  </ul>
+  <p class="hintline">Dafür müssen Direktnachrichten vom Server erlaubt sein. Ist das nicht so, sagt der Bot, wo man es einschaltet.</p>
+
+  <h3>Einrichten</h3>
+  <table class="doc__table">
+    <thead><tr><th>Einstellung</th><th>Was sie bewirkt</th></tr></thead>
+    <tbody>
+      <tr><td>Forum</td><td>Je Seite eines, oder beide im selben. Der Bot legt die Tags „🔎 Sucht Team“, „📣 Sucht Spieler“ und „🔒 Beendet“ selbst an. Dafür braucht er im Forum „Kanäle verwalten“.</td></tr>
+      <tr><td>Fragen</td><td>Je Seite eigene Fragen: Text oder Auswahl, Pflicht oder freiwillig, mit einem Hinweis darunter.</td></tr>
+      <tr><td>Beitrag</td><td>Titel als Vorlage (etwa <code>🔎 {user.name} sucht ein Team</code>) und der Beitrag selbst als Karte, Embed oder Text, mit <code>{antworten}</code> oder einzeln <code>{frage1}</code> und <code>{antwort1}</code>.</td></tr>
+      <tr><td>Meldung ans Team</td><td>Ein Kanal und bis zu fünf Rollen, die bei jedem neuen Beitrag gepingt werden, mit den Knöpfen „Suche beenden“ und „Beitrag löschen“.</td></tr>
+      <tr><td>Läuft ab nach</td><td>Tage, nach denen der Bot eine Suche selbst beendet. Ab Werk 30, <code>0</code> heißt nie.</td></tr>
+    </tbody>
+  </table>
+  <p class="hintline">
+    Nach zehn Minuten ohne Antwort endet das Gespräch, die Vorschau wartet fünfzehn Minuten. Gespeichert wird erst
+    beim Abschicken, es geht also nichts halb verloren.
+  </p>
+
+  <h2 id="teams">RL Team-Übersicht</h2>
+  <p class="doc__kicker">Rocket League · Modul <code>teams</code></p>
+  <p>
+    Die Kader deines Servers in einem Kanal: Teams mit Aufgaben, Links zu ihren Ligen und einer Team-MMR, die der
+    Bot selbst ausrechnet. Ändert sich etwas an einem Team, zieht er die Karte im Kanal nach.
+  </p>
+
+  <h3>Ein Team</h3>
+  <table class="doc__table">
+    <thead><tr><th>Feld</th><th></th></tr></thead>
+    <tbody>
+      <tr><td>Name, Kürzel, Beschreibung</td><td>Stehen auf der Karte, das Kürzel etwa als <code>VYX</code>.</td></tr>
+      <tr><td>Gruppe</td><td>Main, Academy, Div 2 … oder gar keine. Gruppen legst du oben auf der Seite an.</td></tr>
+      <tr><td>Farbe und Logo</td><td>Der Rand der Karte und ein Bild aus der Galerie oder als Link.</td></tr>
+      <tr><td>Rolle</td><td>Bekommt jeder im Kader, und in der Karte steht sie als <code>{team.role}</code>. Der Bot kann sie auch selbst anlegen.</td></tr>
+      <tr><td>Kanäle</td><td>Eine ganze Kategorie oder einzeln ausgesuchte Text- und Sprachkanäle.</td></tr>
+      <tr><td>Ligen</td><td>Bis zu fünf Links auf Ligen oder Turniere, je mit Namen. Nur <code>https://</code>. In der Karte stehen sie mit <code>{team.leagues}</code>.</td></tr>
+    </tbody>
+  </table>
+  <p class="hintline">Bis zu 40 Teams, 12 Gruppen und 12 Personen je Kader.</p>
+
+  <h3>Der Kader</h3>
+  <p>
+    Je Person wählst du das Mitglied, die Aufgabe, auf Wunsch einen Anzeigenamen und den Epic-Namen. Hat jemand
+    sein Epic-Konto mit <code>/rank link</code> verbunden, trägt der Bot den Namen selbst ein.
+  </p>
+  <table class="doc__table">
+    <thead><tr><th>Aufgabe</th><th>Steht in der Aufstellung</th><th>Zählt in die Team-MMR</th></tr></thead>
+    <tbody>
+      <tr><td>Captain, Co-Captain</td><td>ja</td><td>ja</td></tr>
+      <tr><td>Stamm, Ersatz</td><td>ja</td><td>ja</td></tr>
+      <tr><td>Trial</td><td>ja</td><td>nein, der Platz ist noch nicht fest</td></tr>
+      <tr><td>Coach, Manager</td><td>nein, sie stehen unter Staff</td><td>nein</td></tr>
+    </tbody>
+  </table>
+  <p>
+    Von Hand kommt nur der <b>Peak</b>, also die höchste MMR, die jemand schon erreicht hat. Aktuelle MMR und Rang
+    holt der Bot über den Epic-Namen und frischt sie alle 30 Minuten auf. Bleibt der Peak leer, gilt der aktuelle
+    Wert. Mit <b>Prime jetzt abfragen</b> unter <i>Anzeige</i> holt er alles sofort neu. Prime ist der Dienst, über den RL Nexus die Ränge aus Rocket League liest.
+  </p>
+
+  <h3>Rollen und Kanäle</h3>
+  <p>
+    Wer mit Discord-Konto im Kader steht, bekommt die Rolle seines Teams und, wenn du eine eingestellt hast, die
+    Rolle seiner Aufgabe. Die Rollen je Aufgabe stellst du unter <b>Rollen im Kader</b> ein, sie gelten in allen
+    Teams: Wer irgendwo Captain ist, bekommt die Captain-Rolle. Geht jemand aus dem Kader oder wird das Team
+    gelöscht, nimmt der Bot die Rollen wieder. Eine Rolle, die jemand von Hand bekommen hat, bleibt.
+  </p>
+  <p>
+    Unter <b>In Discord anlegen</b> legt der Bot an, was einem Team noch fehlt: Rolle, Kategorie, Textkanal und
+    Sprachkanal. Gibt es schon etwas mit dem Namen des Teams, nimmt er das, statt ein zweites anzulegen. Ab Werk
+    sieht nur das Team die neuen Kanäle.
+  </p>
+  <p>
+    Beim Löschen eines Teams fragt das Dashboard, ob Rolle und Kanäle mitgehen sollen, die der Bot dafür angelegt
+    hat. Was vorher schon da war, rührt er nicht an, und eine Kategorie löscht er nur, wenn danach nichts mehr darin
+    steht.
+  </p>
+  <p class="hintline">
+    <b>Jetzt abgleichen</b> geht alle Kader durch: Wem eine Rolle fehlt, der bekommt sie, und wer eine dieser Rollen
+    ohne Platz im Kader hat, verliert sie, auch wenn er sie von Hand bekam. Der Bot braucht dafür „Rollen
+    verwalten“, und seine eigene Rolle muss über den Team-Rollen stehen. Für Kanäle braucht er „Kanäle verwalten“.
+  </p>
+
+  <h3>Die Team-MMR</h3>
+  <p>
+    Die Team-MMR ist der Durchschnitt aus Captain, Co-Captain, Stamm und Ersatz. Wer keine verwertbaren Zahlen
+    hat, zählt nicht mit, sonst zöge er den Schnitt nach unten, obwohl über ihn nichts bekannt ist. Wie aus einem
+    Spieler eine Zahl wird, wählst du für alle Teams: <a href="#wtsi">WTSI</a> (empfohlen) oder eine eigene
+    Rechnung.
+  </p>
+  <p>
+    Eine eigene Rechnung ist eine Formel, die je Spieler ausgewertet wird, zum Beispiel
+    <code>{peak3s} * 0.7 + {current3s} * 0.3</code>. Erlaubt sind <code>{current1s}</code> bis
+    <code>{current3s}</code>, <code>{peak1s}</code> bis <code>{peak3s}</code>, <code>{tier}</code>, die
+    Rechenzeichen <code>+ - * / ^</code>, Klammern und <code>sqrt</code>, <code>min</code>, <code>max</code>,
+    <code>abs</code>, <code>round</code>, <code>floor</code>, <code>ceil</code>. Eine Formel, die nicht aufgeht,
+    lässt sich gar nicht erst speichern. Fertige Rechnungen gibt es zum Anklicken.
+  </p>
+
+  <h3>Die Anzeige im Kanal</h3>
+  <p>
+    <b>Anzeige</b> hat drei Reiter. Unter <b>Kanal &amp; Darstellung</b> wählst du den Kanal und die Darstellung: je
+    Team eine eigene Nachricht, eine Nachricht mit Auswahlmenü (wer ein Team wählt, bekommt dessen Karte, die nur er
+    sieht) oder alles in einer. Unter <b>Nachrichten</b> baust du beide Nachrichten im Editor, als Karte, Embed oder
+    Text, mit Vorlagen zum Anklicken. Unter <b>Teams-Liste</b> legst du fest, wie <code>{teams}</code> jedes Team
+    aufschreibt. <b>Einsammeln</b> löscht die Nachrichten wieder, die Teams bleiben.
+  </p>
+  <table class="doc__table">
+    <thead><tr><th>Platzhalter</th><th></th></tr></thead>
+    <tbody>
+      <tr><td><code>{team.lineup}</code></td><td>Die Aufstellung: je Zeile Aufgabe, Spieler, Wert, Rang und ein Tracker-Link.</td></tr>
+      <tr><td><code>{team.staff}</code></td><td>Coach und Manager.</td></tr>
+      <tr><td><code>{team.roster}</code></td><td>Der ganze Kader, nach Aufgaben gruppiert.</td></tr>
+      <tr><td><code>{team.leagues}</code></td><td>Die Liga-Links hintereinander, etwa „RLCS Quali · Nexus Liga“. Ohne Links bleibt der Baustein weg.</td></tr>
+      <tr><td><code>{team.mmr}</code> <code>{team.players}</code></td><td>Team-MMR und wie viele mitspielen.</td></tr>
+      <tr><td><code>{team.rank}</code> <code>{team.rank.short}</code> <code>{team.rank.icon}</code></td><td>Der Rang zur Team-MMR: ausgeschrieben, als Icon oder beides, je nach „Ränge zeigen als“. <code>.icon</code> ist immer das Icon.</td></tr>
+      <tr><td><code>{team.captain}</code> <code>{team.cocaptain}</code> <code>{team.player}</code> <code>{team.sub}</code> <code>{team.trial}</code> <code>{team.coach}</code> <code>{team.manager}</code></td><td>Einzeln, als Erwähnung. <code>{team.player}</code> ist der Stamm, <code>{team.sub}</code> der Ersatz. Dahinter geht <code>.icon</code> (das Abzeichen der Aufgabe), <code>.rank</code>, <code>.rank.short</code>, <code>.rank.icon</code>, <code>.mmr</code>, <code>.current</code>, <code>.peak</code> und <code>.tracker</code>, etwa <code>{team.captain.rank}</code>. Stehen mehrere Spieler in einer Aufgabe, stehen ihre Werte hintereinander. Im Editor der Team-Karte findest du sie im Menü <b>Aufgaben-Platzhalter</b>.</td></tr>
+      <tr><td><code>{team.name}</code> <code>{team.tag}</code> <code>{team.group}</code> <code>{team.description}</code> <code>{team.logo}</code></td><td>Die Eckdaten.</td></tr>
+      <tr><td><code>{teams}</code> <code>{teams.short}</code> <code>{teams.count}</code></td><td>Nur in der Übersicht: alle Teams so, wie die Teams-Liste sie aufschreibt, oder nur die Kopfzeile je Team.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Die Teams-Liste</h3>
+  <p>
+    Der Reiter <b>Teams-Liste</b> hat ein Menü mit drei Ebenen, die aufeinander aufbauen. Unter <b>Team</b> steht
+    die Zeile je Team in <code>{teams}</code>, etwa <code>**{team.name}** · {team.rank} · MMR {team.mmr}</code> und
+    darunter <code>{team.members}</code>. Unter <b>Spieler</b> legst du fest, wie jeder Spieler dasteht – gern über
+    mehrere Zeilen, etwa <code>{spieler.role.icon} {spieler}</code> und darunter klein Rang und Tracker – und welche
+    Aufgaben mitkommen. Unter <b>Staff</b> stehen Coach und Manager, die meist keinen Rang und keinen Tracker haben.
+    Jeder steht in eigener Zeile; was in der Zeile je Team davor steht, etwa <code>-#</code>, steht vor jeder seiner
+    Zeilen. Über jedem Feld helfen der Emoji-Knopf (mit den Rang-Icons und Abzeichen des Bots) und die Knöpfe für
+    Fett, Code und kleine Schrift; die Platzhalter sind im Feld farbig hinterlegt. Die Vorschau daneben zeigt deine
+    echten Teams, auch bevor du speicherst.
+  </p>
+  <p>
+    Ab Werk bekommt jeder Spieler eine eigene Zeile mit Abzeichen, Rang-Icon, Erwähnung, MMR und Tracker-Link. Oben
+    im Reiter stehen dazu <b>Vorlagen</b>: <b>Spieler untereinander</b> (ab Werk), <b>Zweizeilig</b> und
+    <b>Kompakt</b>, bei der jeder Spieler klein unter dem Team steht. Ein Klick füllt alle Ebenen, <b>Zurück</b> holt
+    den Stand davor. Gespeichert wird erst mit Speichern.
+  </p>
+  <p class="hintline">
+    Zeilen, deren Platzhalter alle leer sind, fallen weg, etwa „Staff:“ bei einem Team ohne Staff. Die Liste gilt bei
+    einer Nachricht für alle Teams ohne Auswahlmenü; mit Auswahlmenü steht nur die Kopfzeile je Team da.
+  </p>
+
+  <h3>Platzhalter je Spieler</h3>
+  <p>
+    Jeder Spieler mit Epic-Namen hat eigene Platzhalter, in der Übersicht und in jeder Karte. Sie heißen wie
+    sein Epic-Name, klein und ohne Sonderzeichen: aus <code>Nico_RL</code> wird <code>{nicorl}</code>. Groß
+    und klein ist egal. Im Editor stehen sie im Menü <b>Spieler-Platzhalter</b>: erst das Team wählen, dann den
+    Platzhalter. Über „‹ Anderes Team“ geht es zurück. Das Menü gibt es nur bei „Eine Nachricht für alle Teams“
+    ohne Auswahlmenü, denn nur dort kommt jeder Spieler genau einmal vor. Für die Team-Karte, die für jedes Team
+    gilt, nimmst du die Platzhalter je Aufgabe wie <code>{team.captain.rank}</code>.
+  </p>
+  <table class="doc__table">
+    <thead><tr><th>Platzhalter</th><th></th></tr></thead>
+    <tbody>
+      <tr><td><code>{nicorl}</code></td><td>Der Spieler, als Erwähnung.</td></tr>
+      <tr><td><code>{nicorl.rank}</code> <code>{nicorl.rank.short}</code> <code>{nicorl.rank.icon}</code></td><td>Der Rang zu seinem Wert, ausgeschrieben („Grand Champion I Div II“), kurz („GC1 D2“) oder immer als Icon.</td></tr>
+      <tr><td><code>{nicorl.mmr}</code></td><td>Sein Wert nach derselben Rechnung wie die Team-MMR.</td></tr>
+      <tr><td><code>{nicorl.current}</code> <code>{nicorl.peak}</code></td><td>Aktuelle MMR und Peak, im Schnitt der Playlists, mit denen die Rechnung arbeitet.</td></tr>
+      <tr><td><code>{nicorl.tracker}</code></td><td>Der Link auf sein Profil im RL Tracker.</td></tr>
+    </tbody>
+  </table>
+  <p class="hintline">
+    Der Rang zum Wert ist errechnet: der Bot ordnet den Wert nach der MMR-Tabelle von 3v3 ein. Der echte Rang aus
+    dem Spiel kann davon um eine Division abweichen; er steht in der Aufstellung.
+  </p>
+  <p>
+    Unter <b>Anzeige</b> legst du mit <b>Ränge zeigen als</b> fest, wie ein Rang dasteht: ausgeschrieben, als
+    Rang-Icon oder beides. Das gilt für die Aufstellung, den Kader und <code>{nicorl.rank}</code>. Die Icons bringt
+    der Bot selbst mit; auf deinem Server belegen sie keine Emoji-Plätze.
+  </p>
+  <p>
+    Genauso hat jede Aufgabe ein Abzeichen: eine Krone für den Captain, ein Schild für den Co-Captain, ein Gamepad
+    für den Stamm, Pfeile für den Ersatz, ein Laborkolben für Trial, ein Klemmbrett für den Coach und eine Aktentasche für
+    den Manager. Du findest sie in der Galerie unter <b>Vorlagen › rocketleague › teamicons</b>; aus diesen Bildern
+    macht der Bot die Emojis in den Nachrichten. Unter <b>Abzeichen</b> (gleich unter „Aufgaben zeigen als“) kannst du
+    jedes ersetzen: ein Klick auf die Aufgabe, dann ein Emoji, ein <b>Bild aus der Galerie</b> oder wieder
+    <b>Standard</b>. Aus einem Bild macht der Bot beim Speichern ein eigenes Emoji. <b>Aufgaben zeigen als</b> legt
+    fest, ob in der Aufstellung, im Kader, beim Staff und in <code>{spieler.role}</code> der Name, das Abzeichen
+    oder beides steht. <code>{spieler.role.icon}</code> und <code>{team.captain.icon}</code> zeigen immer das
+    Abzeichen.
+  </p>
+
+  <h3 id="wtsi">WTSI: der Weighted True Skill Index</h3>
+  <p>
+    Die Zahl, mit der die Team-Übersicht ab Werk rechnet. Sie beantwortet eine Frage, die eine einzelne MMR nicht
+    beantworten kann: <em>wie stark ist dieser Spieler eigentlich?</em>
+  </p>
+  <p>
+    Ein Spieler hat drei Ränge, und sie sagen nicht dasselbe. Wer 2v2 fast nie spielt, hat dort eine niedrige Zahl,
+    ohne schwächer zu sein. Wer gerade eine Pechsträhne hat, steht unter seinem Niveau. WTSI nimmt deshalb
+    <b>2v2 und 3v3</b>, die beiden Modi, in denen Organisationen spielen, und gewichtet sie danach, wo der Spieler
+    zu Hause ist. 1v1 bleibt außen vor.
+  </p>
+  <pre class="doc__code"><code>Rel_2s = Peak_2s / (Peak_2s + Peak_3s)     Gewicht des Modus
+K_2s   = √(Current_2s / Peak_2s)           gedämpfte Konsistenz
+TS_2s  = Peak_2s × K_2s                    Stärke in diesem Modus
+
+WTSI   = TS_2s × Rel_2s + TS_3s × Rel_3s</code></pre>
+  <dl class="doc__list">
+    <dt>Der Peak ist die Aussage, nicht der Tagesstand.</dt>
+    <dd>Die höchste erreichte MMR verschwindet nicht, wenn ein Abend schiefgeht.</dd>
+    <dt>Die Wurzel dämpft Pech.</dt>
+    <dd>Wer auf 80&nbsp;% seines Peaks steht, verliert nicht 20&nbsp;%, sondern 10,6&nbsp;%. Wer dauerhaft darunter bleibt, rutscht trotzdem.</dd>
+    <dt>Die Gewichtung kommt vom Spieler selbst.</dt>
+    <dd>Wer den höheren Peak in 3v3 hat, wird stärker über 3v3 bewertet.</dd>
+  </dl>
+  <table class="doc__table">
+    <thead><tr><th>Modus</th><th>Aktuell</th><th>Peak</th><th>Gewicht</th><th>Beitrag</th></tr></thead>
+    <tbody>
+      <tr><td>2v2</td><td>1.350</td><td>1.400</td><td>52 %</td><td>1.375 × 0,52 = 715</td></tr>
+      <tr><td>3v3</td><td>1.180</td><td>1.300</td><td>48 %</td><td>1.239 × 0,48 = 595</td></tr>
+      <tr><th colspan="4">WTSI</th><th>1.310</th></tr>
+    </tbody>
+  </table>
+  <p class="hintline">
+    Fehlt eine Playlist ganz, trägt die andere allein. Liegt die aktuelle MMR über dem Peak, zählt sie als Peak.
+    Ist kein Peak eingetragen, rechnet die Formel mit „aktuell gleich Peak“, der Schutz gegen eine Pechsträhne
+    fällt dann weg.
+  </p>
+
+  <h2 id="rank-roles">Rank Roles</h2>
+  <p class="doc__kicker">Rocket League · Modul <code>rank-roles</code></p>
+  <p>Rollen nach Rocket-League-Rang, je Playlist eine eigene. Mitglieder holen sie sich selbst.</p>
+
+  <h3>Für Mitglieder</h3>
+  <ol class="doc__bullets doc__steps">
+    <li>Einmal das Epic-Konto verbinden: <code>/rank link epicname:DeinName</code>. Wechseln oder trennen geht danach erst nach drei Tagen, damit niemand mit fremden Konten Rollen sammelt.</li>
+    <li><code>/rangrollen holen</code> setzt die Rollen zum aktuellen Rang. <code>/rangrollen ablegen</code> nimmt alle wieder ab.</li>
+  </ol>
+  <p>
+    Der Bot fragt nicht von selbst nach: wer aufsteigt, gibt den Befehl noch einmal ein. <code>/rank me</code>
+    zeigt die eigenen Ränge als Karte, <code>/rank search</code> die eines anderen Epic-Namens.
+  </p>
+
+  <h3>Einstellungen</h3>
+  <table class="doc__table">
+    <thead><tr><th>Einstellung</th><th>Was sie bewirkt</th></tr></thead>
+    <tbody>
+      <tr><td>Je Playlist</td><td>1v1, 2v2 und 3v3 einzeln an oder aus, je mit einer Rolle für jeden der 22 Ränge von Bronze I bis Supersonic Legend. Wer grob unterteilen will, legt dieselbe Rolle auf mehrere Ränge.</td></tr>
+      <tr><td>Alte Rolle abnehmen</td><td>Beim Aufstieg geht die vorige Rolle derselben Playlist weg.</td></tr>
+      <tr><td>Platzierungsspiele</td><td>Wer noch platziert wird, bleibt ohne Rolle, im Spiel steht dort auch kein Rang.</td></tr>
+      <tr><td>Nur in diesem Kanal</td><td>Hält den Befehl aus dem restlichen Server heraus.</td></tr>
+    </tbody>
+  </table>
+  <p class="hintline">Unranked bekommt nie eine Rolle. Der Bot braucht „Rollen verwalten“ und muss über allen Rang-Rollen stehen. Fehlt etwas davon, sagt die Antwort woran es liegt.</p>
+
+  <h2 id="clips">Clips der Woche</h2>
+  <p class="doc__kicker">Rocket League · Modul <code>clips</code></p>
+  <p>
+    Die besten Szenen deines Servers: Mitglieder laden ihre Clips als Video in einen Kanal, danach wird per
+    Reaktion abgestimmt, und am Ende verkündet der Bot die Gewinner. Die Termine legst du mit Datum fest,
+    einmalig, jede Woche oder jeden Monat.
+  </p>
+
+  <h3>So läuft eine Runde</h3>
+  <ol class="doc__bullets doc__steps">
+    <li><b>Öffnen.</b> Der Kanal geht auf, zum geplanten Termin oder mit <b>Jetzt öffnen</b> im Dashboard. Im Ankündigungskanal erscheint die Ansage mit Limit, Fristen und Preisen.</li>
+    <li><b>Hochladen.</b> Es zählt nur ein Video als Datei: MP4, WebM oder MOV bis 100 MB, eins pro Nachricht. Jeder Clip bekommt ein ✅. Alles andere löscht der Bot und sagt kurz, warum – Text, Bilder, Links und alles über dem Limit.</li>
+    <li><b>Abstimmen.</b> Der Kanal schließt fürs Schreiben, und der Bot setzt sein Emoji (ab Werk 🔥) unter jeden Clip. Wer damit reagiert, stimmt ab. Jede Person hat eine Stimme: Reagiert sie unter einem anderen Clip, nimmt der Bot die alte Reaktion weg. Für den eigenen Clip zählt es nicht.</li>
+    <li><b>Küren.</b> Am Ende zählt der Bot die Reaktionen, verkündet drei Plätze samt Preisen, sichert alle Clips und leert den Kanal für die nächste Runde.</li>
+  </ol>
+
+  <h3>Einstellungen</h3>
+  <table class="doc__table">
+    <thead><tr><th>Einstellung</th><th>Was sie bewirkt</th></tr></thead>
+    <tbody>
+      <tr><td>Clip-Kanal</td><td>Nur hier wird hochgeladen und abgestimmt. Der Bot öffnet, schließt und leert ihn selbst.</td></tr>
+      <tr><td>Ansagen in</td><td>Ein eigener Kanal für die Ansagen. Ohne Angabe landen sie im Clip-Kanal und verschwinden beim Leeren mit.</td></tr>
+      <tr><td>Emoji</td><td>Die Reaktion zum Abstimmen, gern auch ein Emoji von deinem Server.</td></tr>
+      <tr><td>Clips je Person</td><td>1 bis 10 je Runde.</td></tr>
+      <tr><td>Termine</td><td>Datum und Uhrzeit für Öffnen, Schließen und das Ende der Abstimmung.</td></tr>
+      <tr><td>Wiederholen</td><td>Einmalig, jede Woche oder jeden Monat. Nach jeder Runde rücken die drei Termine um diesen Abstand weiter, die Uhrzeit bleibt.</td></tr>
+      <tr><td>Automatisch</td><td>An: der Bot folgt den Terminen. Aus: eine Runde startet nur über <b>Jetzt öffnen</b>.</td></tr>
+      <tr><td>Preise</td><td>Je Platz ein Text, etwa „Discord Nitro“. Leer heißt kein Preis für diesen Platz.</td></tr>
+      <tr><td>Öffentliche Seite</td><td>Ein Link ohne Anmeldung: die laufende Runde und alle fertigen Runden mit Clips, Plätzen und Gewinnern.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Ansagen</h3>
+  <p>
+    Die drei Nachrichten gestaltest du unter <b>Clips der Woche → Ansagen</b> selbst: wenn der Kanal aufgeht,
+    wenn die Abstimmung startet und wenn die Gewinner feststehen. Jede als Karte, Embed oder normale Nachricht,
+    mit Bildern, Thumbnail und Platzhaltern wie <code>{schluss}</code>, <code>{preise}</code> oder
+    <code>{gewinner}</code>. Jede lässt sich einzeln abschalten. Gepingt werden nur die Gewinner.
+  </p>
+
+  <h3>Sperrliste und Strafen</h3>
+  <p>
+    Unter <b>Sperrliste</b> schließt du Mitglieder aus. Wer dort steht, kann weder hochladen noch abstimmen.
+    Die Seite hat drei Reiter: <b>Gesperrt</b> zeigt, wer gerade ausgeschlossen ist, unter <b>Neue Sperre</b>
+    sperrst du von Hand, unter <b>Einstellungen</b> legst du die Strafen fest.
+    Von Hand gesperrt bleibt gesperrt, bis du die Sperre aufhebst, auf Wunsch mit Grund. Dazu kommt der
+    Ausschluss nach Strafen aus der Moderation: etwa ab drei Verwarnungen oder schon nach einem Kick. Er gilt,
+    solange die Strafen zählen, und hebt sich danach von selbst auf. Verwarnungen zählen so lange wie in der
+    Moderation eingestellt, Timeouts, Kicks und Banns so viele Tage, wie du festlegst.
+  </p>
+
+  <h3>Archiv</h3>
+  <p>
+    Jede fertige Runde steht unter <b>Archiv</b> mit allen Clips, ihren Stimmen und ihrem Platz. Die Videos
+    liegen im Ordner des Bots, je Runde ein Ordner mit Datum. Darin liegt auch eine Liste
+    <code>runde.json</code>: wer welchen Clip eingereicht hat und wie viele Stimmen er bekam. Eine Runde lässt
+    sich im Archiv samt Videos löschen.
+  </p>
+
+  <h3>Gut zu wissen</h3>
+  <ul class="doc__bullets">
+    <li>Es gewinnen die meisten Stimmen. Bei Gleichstand gewinnt, wer früher hochgeladen hat. Ein Clip ohne Stimme bekommt keinen Platz, und niemand gewinnt zweimal.</li>
+    <li>Wer seinen Clip löscht, solange die Runde läuft, zieht ihn samt Stimmen zurück. Im Dashboard kannst du einzelne Clips entfernen.</li>
+    <li>Im Clip-Kanal löscht der Bot alles, was kein Video ist, auch vom Team. Regeln schickst du am besten mit Custom Message in den Kanal und pinnst sie an: Nachrichten von Bots bleiben stehen, angepinnte auch beim Leeren.</li>
+    <li>Der Bot braucht im Clip-Kanal „Nachrichten verwalten“, „Reaktionen hinzufügen“, „Nachrichtenverlauf lesen“ und „Berechtigungen verwalten“. Fehlt etwas, sagt es das Dashboard.</li>
+    <li>Im Dashboard schaltest du eine Runde auch von Hand weiter: <b>Einreichen jetzt beenden</b> und <b>Abstimmung jetzt beenden</b>.</li>
+  </ul>
+
+  <h2 id="matchups">Matchups</h2>
+  <p class="doc__kicker">Rocket League · Modul <code>matchups</code></p>
+  <p>
+    Anstehende Partien deiner Teams. Captains tragen sie selbst über einen Link ein, der Bot kündigt sie an,
+    erinnert kurz vor dem Anpfiff und hält das Ergebnis fest.
+  </p>
+
+  <h3>Wer eintragen darf</h3>
+  <p>
+    Grundlage ist die <a href="#teams">RL Team-Übersicht</a>: wer dort im Kader als Captain, Co-Captain, Manager
+    oder Coach steht, darf für genau dieses Team eintragen. Wer den Server verwaltet, darf für jedes Team.
+  </p>
+
+  <h3>Der Link</h3>
+  <p>
+    Unter <code>/matchups/&lt;server&gt;</code> kann jeder lesen, was ansteht. Eintragen, ändern, absagen und das
+    Ergebnis melden geht nach der Anmeldung. Mit dem Schalter <i>Link offen</i> machst du die Seite zu, ohne das
+    Modul abzuschalten.
+  </p>
+  <table class="doc__table">
+    <thead><tr><th>Feld</th><th></th></tr></thead>
+    <tbody>
+      <tr><td>Gegner</td><td>Pflicht.</td></tr>
+      <tr><td>Liga oder Turnier</td><td>Leer heißt Freundschaftsspiel. Vorschläge stellst du im Dashboard ein.</td></tr>
+      <tr><td>Anpfiff</td><td>In der Zeitzone dessen, der einträgt. Nicht in der Vergangenheit.</td></tr>
+      <tr><td>Modus und Best-of</td><td>1v1 bis 4v4, Bo1 bis Bo9 oder offen.</td></tr>
+      <tr><td>Stream-Link und Notiz</td><td>Freiwillig. Der Stream steht als „Live“ in der Nachricht.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Was der Bot meldet</h3>
+  <ul class="doc__bullets">
+    <li><b>Beim Eintragen</b> die Ankündigung im Kanal, auf Wunsch mit Ping.</li>
+    <li><b>Kurz vorher</b> eine Erinnerung, ab Werk 30 Minuten vor dem Anpfiff.</li>
+    <li><b>Nach dem Spiel</b> das Ergebnis, sobald es jemand einträgt.</li>
+  </ul>
+  <p class="hintline">
+    Wird eine Partie geändert, zieht der Bot die Ankündigung nach, ohne noch einmal zu pingen. Eine Absage bekommt
+    ein „❌ Abgesagt“ und bleibt stehen, damit niemand vergeblich wartet. Alle drei Nachrichten sind frei gestaltbar.
+  </p>
+
+  <!-- ============================== Community ============================== -->
+
+  <h2 id="welcome">Welcome System</h2>
+  <p class="doc__kicker">Community · Modul <code>welcome</code></p>
+  <p>
+    Begrüßt neue Mitglieder und verabschiedet, wer geht. Wahlweise als gezeichnete Welcome Card, als Karte im
+    Components-V2-Stil, als Embed oder als normale Nachricht. Dazu Rollen, die jeder Neue automatisch bekommt.
+  </p>
+
+  <h3>Die Welcome Card</h3>
+  <p>Ein Bild, das der Bot für jedes neue Mitglied zeichnet, in einem von vier Layouts:</p>
+  <table class="doc__table">
+    <thead><tr><th>Layout</th><th></th></tr></thead>
+    <tbody>
+      <tr><td>Klassisch</td><td>Avatar links, Text rechts, ein Streifen in der Akzentfarbe am linken Rand.</td></tr>
+      <tr><td>Mittig</td><td>Avatar oben, Text mittig darunter. Gut für breite Banner.</td></tr>
+      <tr><td>Panel</td><td>Der Text steht auf einer dunklen Fläche links, rechts bleibt dein Hintergrundbild frei.</td></tr>
+      <tr><td>HUD</td><td>Abgeschrägter Rahmen mit Eckwinkeln, die kleine Zeile als Marke, im Stil der Rang-Karte.</td></tr>
+    </tbody>
+  </table>
+  <table class="doc__table">
+    <thead><tr><th>Einstellung</th><th>Was sie bewirkt</th></tr></thead>
+    <tbody>
+      <tr><td>Hintergrund</td><td>Ein Bild aus der Galerie oder frisch hochgeladen. Am besten ein Querformat um <b>1920 × 653 px</b> (etwa 3&nbsp;:&nbsp;1), höchstens <b>8 MB</b>. Andere Formate schneidet der Bot mittig zu. Ist ein Bild kleiner als die Karte (1000 × 340 px), sagt das Dashboard es gleich: es wirkt dann unscharf. Ohne Bild zeichnet der Bot einen dunklen Grund mit einem Schein in der Akzentfarbe.</td></tr>
+      <tr><td>Abdunkeln</td><td>0 bis 90 %. Hält den Text auf hellen Bildern lesbar.</td></tr>
+      <tr><td>Akzentfarbe</td><td>Streifen, Rahmen, Ring und die kleine Zeile. Lässt sich ganz abschalten, dann bleibt die Karte neutral.</td></tr>
+      <tr><td>Texte</td><td>Überschrift, Unterzeile und kleine Zeile, jede mit eigener Farbe und mit Platzhaltern. Die kleine Zeile folgt ohne eigene Farbe dem Akzent.</td></tr>
+      <tr><td>Schrift</td><td>Für die Überschrift: Oxanium, Orbitron oder Rajdhani, 28 bis 72 Pixel. Lange Namen werden von selbst kleiner, bevor sie abgeschnitten werden.</td></tr>
+      <tr><td>Avatar</td><td>An oder aus, 96 bis 200 px groß, Ring 0 bis 12 px stark, rund oder abgeschrägt.</td></tr>
+      <tr><td>Server-Icon, Beitrittsdatum</td><td>Das Icon oben rechts, das Datum hinten an der kleinen Zeile.</td></tr>
+    </tbody>
+  </table>
+  <p class="hintline">
+    Über der Karte kann eine Textzeile stehen. Setz dort <code>{user}</code> hinein, dann bekommt das neue Mitglied
+    eine Benachrichtigung. Auf dem Bild selbst kann Discord niemanden erwähnen.
+  </p>
+
+  <h3>Karte, Embed oder Text</h3>
+  <p>
+    Statt des Bildes geht auch eine Karte im Components-V2-Stil (die Farbe am Rand schaltest du dort mit
+    <b>Custom Color</b> an oder aus), ein klassisches Embed oder normaler Text. Über dem Editor stehen fertige Vorlagen, die
+    Vorschau rechts zeigt jede Art so, wie sie in Discord aussieht. <b>Test senden</b> schickt, was gespeichert ist,
+    mit deinen eigenen Daten.
+  </p>
+  <p>
+    Platzhalter: <code>{user}</code> (Erwähnung), <code>{user.name}</code>, <code>{user.tag}</code>,
+    <code>{user.id}</code>, <code>{user.avatar}</code>, <code>{guild}</code>, <code>{guild.icon}</code>,
+    <code>{guild.members}</code>, <code>{member.number}</code> (das wievielte Mitglied), <code>{joined}</code> und
+    <code>{created}</code> (Konto erstellt).
+  </p>
+
+  <h3>Auto-Rollen und Abschied</h3>
+  <ul class="doc__bullets">
+    <li><b>Für Mitglieder</b> und <b>für Bots</b> je bis zu zehn Rollen, die jeder Neue bekommt. Bots werden nicht begrüßt.</li>
+    <li>Die Rollen müssen unter der höchsten Rolle des Bots stehen, und er braucht „Rollen verwalten“. Sonst sagt das Dashboard beim Speichern, woran es liegt.</li>
+    <li>Der <b>Abschied</b> kennt dieselben Arten, mit eigenem Kanal und eigenem Text. Er ist ab Werk aus. Wer gebannt wird, zählt dabei mit.</li>
+  </ul>
+
+  <h2 id="apply">Apply System</h2>
+  <p class="doc__kicker">Community · Modul <code>apply</code></p>
+  <p>
+    Bewerbungen über einen öffentlichen Link: eigene Formulare, eine Karte für das Team und Zu- oder Absage per DM.
+  </p>
+
+  <h3>Formulare</h3>
+  <p>
+    Bis zu 15 Formulare, etwa „Spieler 3v3“, „Moderator“ oder „Cutter“, je mit Name, Beschreibung, Emoji und bis
+    zu 20 Fragen: kurze Antwort (bis 200 Zeichen), langer Text (bis 1024) oder Auswahl (bis 10 Punkte). Je Formular
+    stellst du außerdem ein:
+  </p>
+  <table class="doc__table">
+    <thead><tr><th>Einstellung</th><th>Was sie bewirkt</th></tr></thead>
+    <tbody>
+      <tr><td>Kanal</td><td>Wohin die Karten gehen. Leer: der Standard-Kanal aus den Einstellungen.</td></tr>
+      <tr><td>Rolle bei Annahme</td><td>Bekommt der Bewerber, sobald ihr zusagt.</td></tr>
+      <tr><td>Erwähnen</td><td>Bis zu fünf Rollen, die bei einer neuen Bewerbung gepingt werden.</td></tr>
+      <tr><td>Nachricht an den Bewerber</td><td>Zu- und Absage als DM, mit eurer Notiz.</td></tr>
+      <tr><td>Pause nach Absage</td><td>So viele Tage nimmt das Formular von derselben Person nichts an.</td></tr>
+      <tr><td>Kontoalter, Voraussetzung</td><td>Mindestalter des Discord-Kontos und eine Rolle, ohne die man sich nicht bewerben kann.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Der Link und die Entscheidung</h3>
+  <p>
+    Unter <code>/bewerben/&lt;server&gt;</code> kann jeder lesen. Abschicken kann, wer mit Discord angemeldet und
+    Mitglied des Servers ist. Den Link findest du unter <i>Einstellungen</i> zum Kopieren.
+  </p>
+  <p>
+    Jede Bewerbung kommt als Karte mit <b>Annehmen</b> und <b>Ablehnen</b> in den Team-Kanal. Im Dashboard unter
+    <b>Bewerbungen</b> steht dasselbe, dazu eine Notiz, die in der DM an den Bewerber mitgeht. Entschieden wird
+    genau einmal. Wer prüfen darf, legst du unter <i>Einstellungen</i> fest: Rollen und einzelne Mitglieder, je bis
+    zu 15. Prüfer sehen nur die Bewerbungen, nicht die Formulare.
+  </p>
+
+  <h2 id="reaction-roles">Self Roles</h2>
+  <p class="doc__kicker">Community · Modul <code>reaction-roles</code></p>
+  <p>Panels, aus denen sich Mitglieder ihre Rollen selbst holen, per Knopf oder Auswahlmenü.</p>
+
+  <h3>Ein Panel</h3>
+  <p>
+    Kanal, Art (bis zu 25 Knöpfe mit Emoji und Farbe, oder ein Auswahlmenü mit bis zu 25 Einträgen), ein Kopf als
+    Karte, Embed oder Text, und die Rollen. Bis zu 25 Panels je Server. <b>Senden</b> schickt das Panel, danach zieht
+    jede Änderung die Nachricht in Discord nach. <b>Einsammeln</b> löscht die Nachricht, das Panel bleibt.
+  </p>
+  <table class="doc__table">
+    <thead><tr><th>Regel</th><th>Wirkung</th></tr></thead>
+    <tbody>
+      <tr><td>Mehrere möglich</td><td>Der Standard: jede Rolle lässt sich einzeln an- und abwählen.</td></tr>
+      <tr><td>Genau eine</td><td>Die neue Rolle ersetzt die vorige aus diesem Panel. Gut für Farben, Regionen oder Plattformen.</td></tr>
+      <tr><td>Höchstzahl</td><td>Zum Beispiel drei. Wer mehr will, bekommt einen Hinweis.</td></tr>
+      <tr><td>Voraussetzung</td><td>Ohne diese Rolle tut das Panel nichts und sagt, welche fehlt.</td></tr>
+      <tr><td>Nur dazu</td><td>Eine Rolle, die dazukommt und sich nicht wieder abwählen lässt.</td></tr>
+    </tbody>
+  </table>
+  <p class="hintline">Jede Antwort sieht nur, wer geklickt hat. Der Bot braucht „Rollen verwalten“ und muss über allen Rollen des Panels stehen.</p>
+
+  <h2 id="levels">Level System</h2>
+  <p class="doc__kicker">Community · Modul <code>levels</code></p>
+  <p>Punkte fürs Schreiben und für die Zeit im Sprachkanal, Rollen ab einem bestimmten Level und eine Rangliste.</p>
+
+  <h3>Punkte</h3>
+  <table class="doc__table">
+    <thead><tr><th></th><th>Ab Werk</th></tr></thead>
+    <tbody>
+      <tr><td>Chat</td><td>15 bis 25 Punkte je Nachricht, aber höchstens alle 60 Sekunden.</td></tr>
+      <tr><td>Voice</td><td>5 Punkte je Minute im Sprachkanal. Nur, wenn noch jemand dabei ist und man sich nicht selbst stumm geschaltet hat. Der AFK-Kanal zählt nie.</td></tr>
+      <tr><td>Bonus</td><td>Ein Faktor von 0,1 bis 5 je Rolle und je Kanal.</td></tr>
+      <tr><td>Ohne Punkte</td><td>Kanäle, ganze Kategorien und Rollen, die leer ausgehen.</td></tr>
+      <tr><td>Kurve</td><td>Von Level <i>n</i> auf <i>n</i>+1 braucht es Basis × (<i>n</i>+1) Punkte. Mit der Basis 100 sind das 1.500 Punkte bis Level 5 und 5.500 bis Level 10.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Aufsteigen</h3>
+  <ul class="doc__bullets">
+    <li><b>Belohnungsrollen:</b> bis zu 25, je eine ab einem Level. Entweder bleiben alle erreichten Rollen, oder nur die höchste. <b>Rollen nachtragen</b> vergibt fehlende Rollen an alle, die das Level schon haben.</li>
+    <li><b>Die Nachricht:</b> im Kanal, in dem es passiert, in einem festen Kanal, per DM oder gar nicht. Platzhalter: <code>{user}</code>, <code>{level}</code>, <code>{level.old}</code>, <code>{xp}</code>, <code>{xp.next}</code>, <code>{rank}</code>, <code>{channel}</code>.</li>
+  </ul>
+
+  <h3>Rangliste</h3>
+  <p>
+    <code>/level rang</code> zeigt den eigenen Stand als Karte, <code>/level rangliste</code> die Besten. Im
+    Dashboard unter <b>Rangliste</b> stehen alle mit Level, Punkten, Nachrichten und Voice-Minuten. Dort setzt oder
+    verteilst du auch Punkte von Hand. Auf Wunsch ist die Rangliste öffentlich unter
+    <code>/rangliste/&lt;server&gt;</code>, mit den ersten 100 Plätzen. Das ist ab Werk aus, weil damit Namen und
+    Bilder deiner aktivsten Mitglieder öffentlich werden.
+  </p>
+
+  <h2 id="giveaways">Giveaways</h2>
+  <p class="doc__kicker">Community · Modul <code>giveaways</code></p>
+  <p>Verlosungen mit Bedingungen, Bonus-Losen und Gewinnern, die sich melden müssen.</p>
+
+  <h3>Anlegen</h3>
+  <p>
+    Im Dashboard unter <b>Neues Giveaway</b>: Preis, Beschreibung, Bild, Zahl der Gewinner (bis 50), Kanal, Ping,
+    Laufzeit (eine Minute bis 60 Tage) und Start, sofort oder geplant bis 90 Tage voraus. In Discord geht der
+    schnelle Weg mit <code>/giveaway start</code>. <code>/giveaway beenden</code> lost sofort aus,
+    <code>/giveaway neu</code> lost neu, <code>/giveaway abbrechen</code> bricht ab.
+  </p>
+
+  <h3>Bedingungen und Bonus-Lose</h3>
+  <table class="doc__table">
+    <thead><tr><th>Bedingung</th><th></th></tr></thead>
+    <tbody>
+      <tr><td>Rollen</td><td>Eine dieser Rollen, oder auf Wunsch alle.</td></tr>
+      <tr><td>Verboten</td><td>Mit einer dieser Rollen geht es nicht, etwa für das Team.</td></tr>
+      <tr><td>Booster</td><td>Nur Server-Booster, oder gerade keine.</td></tr>
+      <tr><td>Dabei seit, Konto-Alter</td><td>Mindestens so viele Tage auf dem Server und so alt das Discord-Konto.</td></tr>
+      <tr><td>Nachrichten</td><td>Mindestens so viele Nachrichten in den letzten 14 Tagen.</td></tr>
+      <tr><td>Epic-Konto</td><td>Ein mit <code>/rank link</code> verbundenes Rocket-League-Konto.</td></tr>
+    </tbody>
+  </table>
+  <p>
+    Wer nicht passt, sieht beim Klick auf <b>Mitmachen</b> genau, was ihm fehlt. Geprüft wird beim Mitmachen und noch
+    einmal beim Auslosen. Bonus-Lose gibt es je Rolle, bis zu zehn extra, Booster zählen als eigene Rolle.
+  </p>
+
+  <h3>Gewinnen</h3>
+  <p>
+    Die Gewinner bekommen eine DM. Ist eine Frist gesetzt (6 Stunden bis 7 Tage), steht darin der Knopf
+    <b>Gewinn annehmen</b>. Wer die Frist verpasst, wird automatisch ersetzt. Neu auslosen geht auch von Hand: für
+    alle, die noch nicht angenommen haben, nur für verpasste Fristen oder für einen einzelnen Gewinner.
+  </p>
+
+  <h2 id="polls">Umfragen</h2>
+  <p class="doc__kicker">Community · Modul <code>polls</code></p>
+  <p>Abstimmungen im Kanal: eigene mit Knöpfen oder Discords eingebaute Umfrage.</p>
+  <table class="doc__table">
+    <thead><tr><th></th><th>Eigene (Knöpfe)</th><th>Discord-Umfrage</th></tr></thead>
+    <tbody>
+      <tr><td>Laufzeit</td><td>eine Minute bis ein Jahr, oder ohne Ende</td><td>eine Stunde bis 32 Tage</td></tr>
+      <tr><td>Mehrfachwahl</td><td>ja, auf Wunsch mit Höchstzahl</td><td>ja</td></tr>
+      <tr><td>Anonym</td><td>ja, auch im Dashboard sieht niemand, wer was gewählt hat</td><td>nein</td></tr>
+      <tr><td>Ergebnis erst später zeigen</td><td>ja: immer, nach der eigenen Stimme oder erst am Ende</td><td>nein</td></tr>
+      <tr><td>Nur bestimmte Rollen</td><td>ja</td><td>nein</td></tr>
+    </tbody>
+  </table>
+  <p>
+    Starten geht im Dashboard unter <b>Neue Umfrage</b> oder mit <code>/umfrage erstellen</code>, die Antworten mit
+    <code>|</code> getrennt (<code>Ja | Nein | Vielleicht</code>). Ein Klick zählt, ein zweiter auf dieselbe Antwort
+    zieht die Stimme zurück. Am Ende stehen die Balken für alle da, <code>/umfrage beenden</code> beendet früher.
+  </p>
+
+  <h2 id="voice-hub">Temp Voice</h2>
+  <p class="doc__kicker">Community · Modul <code>voice-hub</code></p>
+  <p>
+    Ein eigener Sprachkanal auf Zuruf: wer den Hub betritt, bekommt seinen Kanal und wird hineingezogen. Ist der
+    letzte draußen, verschwindet der Kanal wieder.
+  </p>
+
+  <h3>Hubs</h3>
+  <p>
+    Ein Hub ist ein normaler Sprachkanal, etwa „➕ Kanal erstellen“. Bis zu zehn je Server, jeder mit eigenen
+    Vorgaben: Namensvorlage mit <code>{user}</code>, <code>{nummer}</code> und <code>{spiel}</code>, Kategorie,
+    Plätze, Zutritt (offen oder privat), Region, unsichtbar, ob Presets erlaubt sind und welche Optionen im Panel
+    stehen.
+  </p>
+
+  <h3>Das Panel</h3>
+  <p>
+    Ein Auswahlmenü im Chat des eigenen Kanals oder einmal fest in einem Kanal für alle. Darin: Name, Plätze,
+    offen/privat, unsichtbar, Vertrauen geben und nehmen, Einladen per DM, Rauswerfen, Region, Blockieren und
+    Entblocken, Besitz übergeben und Löschen. Bedienen darf nur, wem der Kanal gehört. Geht der Besitzer und jemand
+    bleibt, übernimmt der Nächste.
+  </p>
+  <p>
+    Mit <b>Presets</b> speichert sich jeder bis zu fünf Einstellungen. Das Standard-Preset gilt beim nächsten
+    eigenen Kanal von selbst, auf jedem Server mit RL Nexus.
+  </p>
+
+  <h3>Support-Hub</h3>
+  <p>
+    Ein Hub lässt sich auf <b>Support</b> stellen. Seine Kanäle bekommen dann kein Panel und keinen Besitzerwechsel:
+    sie sind Gesprächsräume des Teams. Zusammen mit dem <a href="#support-warteraum">Support-Warteraum</a> der
+    Moderation holt „Übernehmen“ den Wartenden genau dorthin. Wer den Hub betreten darf, regelst du in Discord über
+    die Rechte des Kanals.
+  </p>
+  <p class="hintline">Der Bot braucht „Kanäle verwalten“ und „Mitglieder verschieben“.</p>
+
+  <!-- =============================== Support =============================== -->
+
+  <h2 id="tickets">Ticket System</h2>
+  <p class="doc__kicker">Support · Modul <code>tickets</code></p>
+  <p>
+    Support-Anfragen als eigener Kanal, als Beitrag in einem Forum oder ganz per DM (ModMail). Beim Schließen
+    entsteht ein Transcript, und im Dashboard liest und schreibt das Team live mit.
+  </p>
+
+  <h3>Zwei Schalter statt drei Modi</h3>
+  <table class="doc__table">
+    <thead><tr><th></th><th>Kanal (je Ticket ein Textkanal)</th><th>Forum-Beitrag</th></tr></thead>
+    <tbody>
+      <tr><td><b>Klassisch</b>: das Mitglied sitzt im Ticket</td><td>Kanal nur für Ersteller und Team</td><td>Beitrag im Forum, Thema und Priorität als Tags. Wer das Forum sieht, sieht alle Tickets.</td></tr>
+      <tr><td><b>ModMail</b>: das Mitglied schreibt dem Bot per DM</td><td>Kanal nur fürs Team, der Bot leitet hin und her</td><td>Beitrag in einem Team-Forum</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Einrichten</h3>
+  <p>
+    Im Dashboard unter <b>Ticket System</b>, mit den Reitern Einrichtung, Themen, Aktionen, Nachrichten, Panel und
+    Sperrliste und einer Live-Vorschau daneben. In Discord führt <code>/ticket setup</code> durch dieselben Schritte.
+    Es gibt ein Panel je Server: <code>/ticket panel</code> oder <b>Panel senden</b> legt nie ein zweites daneben,
+    sondern aktualisiert oder zieht um.
+  </p>
+  <table class="doc__table">
+    <thead><tr><th>Einstellung</th><th>Was sie bewirkt</th></tr></thead>
+    <tbody>
+      <tr><td>Themen</td><td>Je Thema ein Knopf oder Menüeintrag: Name, Emoji, kurze Beschreibung, Kategorie oder Forum-Tag, eine eigene Support-Rolle und auf Wunsch eine eigene Eröffnungs-Nachricht.</td></tr>
+      <tr><td>Kürzel</td><td>Daraus entstehen die Ticket-IDs: <code>SUP</code> ergibt SUP-1, SUP-2 … Leer nimmt der Bot die ersten drei Buchstaben des Themas.</td></tr>
+      <tr><td>Grenze je Mitglied</td><td>Wie viele offene Tickets jemand gleichzeitig haben darf. Bei ModMail ist es immer eines.</td></tr>
+      <tr><td>Kanal löschen</td><td>Nach dem Schließen nie, sofort oder nach einer Stunde bis sieben Tagen.</td></tr>
+      <tr><td>Sperrliste</td><td>Wer hier steht, kann keine Tickets öffnen. <code>/ticket entsperren</code> hebt das auf.</td></tr>
+    </tbody>
+  </table>
+  <p class="hintline">Jedes Mitglied bekommt beim ersten Ticket eine feste Kurz-ID wie <code>U-7K3F</code>. Sie steht in jedem seiner Tickets, und die Suche in den Transcripts findet damit alles von ihm.</p>
+
+  <h3>Die Aktionen im Ticket</h3>
+  <p>
+    Unter der Eröffnung steht ein Menü mit allen Aktionen, die du einschaltest. Fest dabei sind Schließen,
+    Übernehmen und Zurückgeben sowie Mitglieder hinzufügen und entfernen. Dazu kommen nach Wahl: Verschieben in ein
+    anderes Thema, Priorität, anonymer Modus (das Team schreibt unter einem gemeinsamen Namen), Medien-Tresor (alle
+    Bilder und Dateien des Tickets), Slowmode, Zusammenfassung, interne Notiz, Einfrieren, Sperren und ein Termin
+    mit Erinnerung. Schließen darf bei Klassisch auch der Ersteller, alles andere nur das Team.
+  </p>
+
+  <h3>Nachrichten</h3>
+  <p>
+    Sieben Nachrichten baust du selbst: das Panel, das Panel für ModMail, die Eröffnung im Ticket, die Bestätigung
+    per DM, die Meldung beim Schließen, beim Einfrieren und bei einer Sperre. Jede besteht aus Bausteinen (Text,
+    Bilder, Trenner, Abschnitt mit Bild), mit Platzhaltern wie <code>{user}</code>, <code>{ticket.id}</code>,
+    <code>{ticket.option}</code>, <code>{ticket.claimer}</code>, <code>{support.role}</code>, <code>{closer}</code>
+    und <code>{reason}</code>.
+  </p>
+
+  <h3>Transcripts und Live Tickets</h3>
+  <ul class="doc__bullets">
+    <li><b>Transcripts</b> entstehen beim Schließen: der ganze Verlauf mit Bildern, Embeds und Karten, wie in Discord. Sie stehen im Dashboard unter <b>Transcriptions</b>, auf Wunsch als Karte mit Datei in einem Log-Kanal und bei Klassisch als Kopie für den Ersteller. Öffnen darf das Team des Tickets und, bei Klassisch, wer im Ticket war.</li>
+    <li><b>Live Tickets</b> zeigt alle offenen Tickets mit ihrem Verlauf in Echtzeit. Das Team schreibt von dort aus mit (im Ticket steht dann „via Dashboard“), hängt Dateien an und nutzt dieselben Aktionen wie in Discord.</li>
+  </ul>
+
+  <!-- ============================== Moderation ============================= -->
+
+  <h2 id="moderation">Moderation</h2>
+  <p class="doc__kicker">Moderation · Modul <code>moderation</code></p>
+  <p>
+    Verwarnen, stummschalten, kicken, bannen und aufräumen, per Befehl oder im Dashboard. Jede Aktion wird ein Fall
+    mit fortlaufender Nummer, Grund, Dauer und Verlauf.
+  </p>
+
+  <h3>Die Aktionen</h3>
+  <table class="doc__table">
+    <thead><tr><th>Befehl</th><th>Was passiert</th></tr></thead>
+    <tbody>
+      <tr><td><code>/warn</code></td><td>Eine Verwarnung mit Grund. Erreicht jemand eine Stufe, folgt die Strafe von selbst.</td></tr>
+      <tr><td><code>/unwarn</code></td><td>Nimmt eine Verwarnung zurück.</td></tr>
+      <tr><td><code>/timeout</code> <code>/untimeout</code></td><td>Discord-Timeout von 60 Sekunden bis 28 Tagen, und wieder aufheben.</td></tr>
+      <tr><td><code>/kick</code></td><td>Wirft vom Server. Mit einer Einladung kann die Person zurück.</td></tr>
+      <tr><td><code>/ban</code> <code>/unban</code></td><td>Dauerhaft oder befristet, auch gegen Leute, die nicht mehr auf dem Server sind. Auf Wunsch mit den Nachrichten der letzten Stunde bis sieben Tage.</td></tr>
+      <tr><td><code>/purge</code></td><td>Löscht 1 bis 100 Nachrichten im Kanal, auf Wunsch nur die einer Person.</td></tr>
+      <tr><td><code>/fall</code> <code>/verlauf</code></td><td>Einen Fall ansehen, eine Notiz oder einen Beweis anhängen, alle Fälle einer Person.</td></tr>
+    </tbody>
+  </table>
+  <p class="hintline">
+    Dauer-Angaben versteht der Bot als <code>10m</code>, <code>2h</code>, <code>1h30m</code>, <code>3 Tage</code>
+    oder <code>1w</code>. Was er nicht versteht, lehnt er ab, damit ein Tippfehler keinen Bann dauerhaft macht.
+  </p>
+
+  <h3>Wer darf</h3>
+  <p>
+    Unter <b>Moderatoren</b> trägst du Rollen und einzelne Mitglieder ein, je bis zu 25. Diese Liste gilt für die
+    Moderation und für die Tickets. Moderatoren dürfen alle Aktionen und sehen im Dashboard Verlauf und Fälle, aber
+    keine Einstellungen. Wer nur ein Discord-Recht wie „Mitglieder bannen“ hat, kann den passenden Befehl nutzen.
+  </p>
+
+  <h3>Stufen, Fälle und Log</h3>
+  <ul class="doc__bullets">
+    <li><b>Stufen:</b> etwa „ab 3 Verwarnungen eine Stunde Timeout, ab 5 ein Kick“. Bis zu zehn Stufen. Gezählt werden die aktiven Verwarnungen, auf Wunsch nur die der letzten 30 bis 365 Tage.</li>
+    <li><b>Ein Fall</b> trägt Notizen fürs Team (bis 50) und Beweise: Bilder bis 8 MB und Links, bis 20 je Fall.</li>
+    <li><b>Log-Kanal:</b> jeder Fall als Karte, die sich nachzieht, wenn sich etwas ändert. Ein Textkanal oder ein Beitrag in einem Forum.</li>
+    <li><b>DM an die betroffene Person</b> mit Aktion, Grund und Dauer, ohne den Namen des Moderators. Ab Werk an.</li>
+  </ul>
+
+  <h3 id="support-warteraum">Support-Warteraum</h3>
+  <p>
+    Ein fester Sprachkanal, in dem Mitglieder auf das Team warten. Du stellst ihn unter
+    <i>Moderation › Einstellungen › Support-Warteraum</i> ein:
+  </p>
+  <table class="doc__table">
+    <thead><tr><th>Einstellung</th><th>Was sie bewirkt</th></tr></thead>
+    <tbody>
+      <tr><td>Warteraum</td><td>Ein gewöhnlicher Sprachkanal. Ein Temp-Voice-Hub geht nicht, der zöge jeden sofort in einen eigenen Kanal.</td></tr>
+      <tr><td>Meldung in</td><td>Der Textkanal, in dem das Team erfährt, dass jemand wartet. Ohne ihn lässt sich kein Warteraum speichern.</td></tr>
+      <tr><td>Wer wird gepingt</td><td>Bis zu fünf Rollen. Ohne Rolle kommt die Meldung ohne Ping.</td></tr>
+      <tr><td>Erinnern nach</td><td>Minuten, bis der Bot einmal nachfasst, falls sich niemand meldet. <code>0</code> heißt nie.</td></tr>
+    </tbody>
+  </table>
+  <ol class="doc__bullets doc__steps">
+    <li>Jemand betritt den Warteraum. Im Meldekanal steht eine Karte: wer, wo, seit wann, mit dem Knopf <b>Übernehmen</b>.</li>
+    <li>Ein Teamler betritt einen <a href="#voice-hub">Temp-Voice-Hub mit Support-Schalter</a> und bekommt einen eigenen Talk ohne Panel.</li>
+    <li>Er klickt <b>Übernehmen</b>, und der Bot zieht den Wartenden in seinen Talk. Sitzt der Teamler noch in keinem Sprachkanal, ist der Fall erst einmal nur übernommen, und auf der Karte steht <b>Zu mir holen</b>.</li>
+    <li>Sobald der Wartende den Warteraum verlässt, zeigt die Karte, wo es weitergeht, oder dass er gegangen ist.</li>
+  </ol>
+  <p class="hintline">
+    Teamler im Warteraum lösen keine Meldung aus. Zum Team zählt, wer den Server verwaltet, auf der
+    Moderatoren-Liste steht oder eine der Ping-Rollen hat. Der Bot braucht „Mitglieder verschieben“.
+  </p>
+
+  <h2 id="automod">Auto Mod</h2>
+  <p class="doc__kicker">Moderation · Modul <code>automod</code></p>
+  <p>
+    Nimmt aus dem Chat, was niemand sehen soll, bevor ein Moderator online ist. Ab Werk ist jeder Filter aus, du
+    schaltest sie einzeln an.
+  </p>
+  <table class="doc__table">
+    <thead><tr><th>Filter</th><th>Was er erkennt</th></tr></thead>
+    <tbody>
+      <tr><td>Wortliste</td><td>Wörter von deiner Liste, auch verschleiert: <code>1d10t</code> fällt genauso auf wie <code>i.d.i.o.t</code>. Auf Wunsch nur ganze Wörter.</td></tr>
+      <tr><td>Einladungen</td><td>Discord-Einladungen, auf Wunsch außer der eigenen.</td></tr>
+      <tr><td>Links</td><td>Alle Links außer denen auf deiner Erlaubnisliste.</td></tr>
+      <tr><td>Spam</td><td>Zu viele Nachrichten in kurzer Zeit.</td></tr>
+      <tr><td>Wiederholung</td><td>Dieselbe Nachricht mehrfach am Stück.</td></tr>
+      <tr><td>Erwähnungen</td><td>Zu viele <code>@</code> in einer Nachricht.</td></tr>
+      <tr><td>GROSSBUCHSTABEN</td><td>Geschrei ab einem Anteil, den du einstellst.</td></tr>
+      <tr><td>Emojis</td><td>Zu viele Emojis in einer Nachricht.</td></tr>
+    </tbody>
+  </table>
+  <ul class="doc__bullets">
+    <li><b>Folgen</b> je Filter: nur löschen, verwarnen, Timeout, Kick oder Bann. Ab „verwarnen“ wird daraus ein Fall in der Moderation, dafür muss das Modul Moderation an sein.</li>
+    <li><b>Ansage:</b> auf Wunsch eine kurze Nachricht im Kanal, die nach acht Sekunden verschwindet.</li>
+    <li><b>Ausnahmen:</b> Kanäle und ganze Kategorien, Rollen, und alle mit „Nachrichten verwalten“ (ab Werk an). Bots sind immer außen vor.</li>
+    <li><b>Probe</b> im Dashboard: Text eingeben und sehen, welcher Filter greifen würde, ohne dass etwas passiert.</li>
+    <li>Auch bearbeitete Nachrichten werden geprüft. Jeder Eingriff landet auf Wunsch mit dem entfernten Text in einem Meldekanal.</li>
+  </ul>
+
+  <h2 id="logging">Logging System</h2>
+  <p class="doc__kicker">Moderation · Modul <code>logging</code></p>
+  <p>
+    Was auf dem Server passiert, landet in den Kanälen deiner Wahl: 38 Ereignisse in fünf Gruppen, jedes einzeln an
+    und aus. Ohne Kanal bleibt ein Ereignis still, ein Kanal je Gruppe genügt also zum Anfangen.
+  </p>
+  <table class="doc__table">
+    <thead><tr><th>Gruppe</th><th>Zum Beispiel</th></tr></thead>
+    <tbody>
+      <tr><td>Nachrichten</td><td>Gelöscht (mit Text und wer gelöscht hat), bearbeitet (vorher und nachher), angeheftet, Reaktionen.</td></tr>
+      <tr><td>Mitglieder</td><td>Beitritt mit Kontoalter, Austritt, Nickname, Rollen, Profil, Boosts.</td></tr>
+      <tr><td>Server</td><td>Kanäle, Rechte, Rollen, Emojis, Einladungen, Threads, Server-Einstellungen, Webhooks, Integrationen, Events.</td></tr>
+      <tr><td>Sprache</td><td>Beitreten, verlassen, wechseln, stumm geschaltet, aus dem Kanal geholt.</td></tr>
+      <tr><td>Moderation</td><td>Bann, Entbannung, Kick, Timeout und Discords eigener AutoMod, auch wenn es nicht über den Bot lief.</td></tr>
+    </tbody>
+  </table>
+  <ul class="doc__bullets">
+    <li>Jede Gruppe hat einen Kanal, ein einzelnes Ereignis darf einen eigenen bekommen. Ein Textkanal oder ein Beitrag in einem Forum.</li>
+    <li>Die Farbe der Karte sagt, was passiert ist: grün dazugekommen, rot weg, blau geändert.</li>
+    <li>Wer etwas getan hat, steht im Audit-Log. Dafür braucht der Bot „Audit-Log ansehen“.</li>
+    <li>Übergehen lassen sich Kanäle und Kategorien, Rollen und, ab Werk, Bots.</li>
+    <li>Gelöschte Nachrichten kann der Bot nur zeigen, wenn er sie noch kennt. Meistens ist das der Fall, weil gleich nach dem Schreiben gelöscht wird.</li>
+  </ul>
+
+  <!-- ========================= Inhalte & Meldungen ========================= -->
+
+  <h2 id="notifier">Twitch und YouTube Notifier</h2>
+  <p class="doc__kicker">Inhalte &amp; Meldungen · Module <code>twitch-notifier</code> und <code>youtube-notifier</code></p>
+  <p>Sagt Bescheid, wenn eure Streamer live gehen oder ein neues Video erscheint.</p>
+  <ul class="doc__bullets">
+    <li><b>Eintragen:</b> Twitch über den Namen oder den Link zum Kanal, YouTube über Kanal-ID, <code>@handle</code> oder den Link. Bis zu 25 je Server und Plattform.</li>
+    <li><b>Was gemeldet wird:</b> bei Twitch der Start eines Streams, bei YouTube neue Videos, Shorts und Livestreams, jede Art mit eigener Nachricht.</li>
+    <li><b>Wohin:</b> ein Textkanal oder ein Beitrag in einem Forum, je Streamer mit eigenem Ping (<code>@everyone</code>, <code>@here</code> oder eine Rolle). <b>Test senden</b> zeigt die Meldung sofort.</li>
+    <li><b>Während des Streams</b> zieht der Bot Titel, Spiel und Zuschauer in der Karte nach. Danach wird sie zur Zusammenfassung, verschwindet oder bleibt stehen, je nach Einstellung.</li>
+    <li><b>Live-Rolle:</b> eine Rolle für alle, die gerade live sind. Bei Twitch über den Streaming-Status in Discord oder über die Liste, bei YouTube nur über die Liste.</li>
+  </ul>
+  <p>
+    Platzhalter für Twitch: <code>{streamer}</code>, <code>{streamer.mention}</code>, <code>{stream.title}</code>,
+    <code>{stream.game}</code>, <code>{stream.url}</code>, <code>{stream.viewers}</code>, <code>{stream.preview}</code>.
+    Für YouTube: <code>{channel}</code>, <code>{channel.mention}</code>, <code>{video.title}</code>,
+    <code>{video.url}</code>, <code>{video.thumbnail}</code>, <code>{video.kind}</code>.
+  </p>
+  <p class="hintline">
+    Wer sich im Dashboard anmeldet und seinen Twitch- oder YouTube-Kanal bei Discord verknüpft hat, wird dem
+    passenden Eintrag automatisch zugeordnet. Sonst wählst du das Mitglied am Eintrag selbst aus.
+  </p>
+
+  <h2 id="custom-message">Custom Message</h2>
+  <p class="doc__kicker">Inhalte &amp; Meldungen · Modul <code>custom-message</code></p>
+  <p>Eigene Nachrichten im Namen des Bots, mit Knöpfen und Terminen, dazu Stichwörter, auf die er von selbst antwortet.</p>
+
+  <h3>Nachrichten</h3>
+  <p>
+    Jede Nachricht hat einen Namen, den nur das Team sieht, eine Art (Karte, Embed oder normaler Text), einen Kanal
+    und auf Wunsch Knöpfe und einen Termin. <b>Senden</b> schickt sie, danach ändert <b>Speichern</b> die Nachricht
+    in Discord gleich mit. Bis zu 50 Nachrichten je Server.
+  </p>
+  <table class="doc__table">
+    <thead><tr><th>Knopf</th><th>Was passiert</th></tr></thead>
+    <tbody>
+      <tr><td>Rolle geben/nehmen</td><td>An und aus, nur geben oder nur nehmen.</td></tr>
+      <tr><td>Link öffnen</td><td>Ein normaler Link-Knopf.</td></tr>
+      <tr><td>Text nur für den Klickenden</td><td>Eine versteckte Antwort, mehrzeilig, gut für Anleitungen oder Spoiler.</td></tr>
+    </tbody>
+  </table>
+  <p>
+    Termine: von Hand, einmal zu einem Zeitpunkt, täglich oder wöchentlich. Bei wiederkehrenden Nachrichten löscht
+    <b>Alte löschen</b> die vorige, bevor die neue kommt.
+  </p>
+
+  <h3>Stichwörter</h3>
+  <p>
+    Der Bot liest mit und antwortet, wenn etwas passt: enthält, ist genau, beginnt mit oder als Regex. Die Antwort
+    kommt als Antwort auf die Nachricht oder als eigene, auf Wunsch leise und mit gelöschtem Auslöser. Dazu eine
+    Sperre in Sekunden und Filter nach Kanälen und Rollen. Bis zu 50 Stichwörter.
+  </p>
+  <p class="hintline">
+    Im Editor stehen Vorlagen, Platzhalter und die Emojis des Servers bereit. Bilder kommen aus der Galerie. Die
+    Farbe am Rand einer Karte schaltest du mit <b>Custom Color</b> an oder aus.
+  </p>
+
+  <h2 id="gallery">Gallery System</h2>
+  <p class="doc__kicker">Inhalte &amp; Meldungen · Modul <code>gallery</code>, immer an</p>
+  <p>
+    Die Bilder deines Servers an einem Ort: Logos, Grafiken und Hintergründe, sortiert in Alben. Alle Module, die
+    Bilder brauchen, greifen darauf zu, von der Welcome Card bis zu den Team-Logos.
+  </p>
+  <ul class="doc__bullets">
+    <li>Hochladen geht im Dashboard und überall, wo ein Bild gewählt wird. Erlaubt sind PNG, JPG, GIF und WebP bis 8 MB. Der Bot verkleinert auf höchstens 1920 Pixel und speichert als WebP.</li>
+    <li>Alben und Unteralben legst du selbst an, Bilder lassen sich verschieben und löschen.</li>
+    <li>Mitgeliefert werden Vorlagen wie die Rang-Abzeichen und Plattform-Logos.</li>
+    <li>In Discord öffnet <code>/gallery</code> dieselbe Verwaltung.</li>
+  </ul>
+
+  <h2 id="backups">Backups</h2>
+  <p class="doc__kicker">Immer dabei · Modul <code>backups</code>, immer an</p>
+  <p>
+    Der Stand deines Servers zum Zurückholen: Module und Einstellungen, Nachrichten und Panels und die Daten der
+    Mitglieder wie Level, Tickets oder Verwarnungen.
+  </p>
+  <ul class="doc__bullets">
+    <li>Von Hand sicherst du unter <b>Backups</b>, auf Wunsch mit Notiz. Bis zu zehn Backups von Hand bleiben, bis du sie löschst.</li>
+    <li>Automatisch sichert der Bot jeden Tag, alle drei Tage, jede Woche oder jeden Monat zu einer vollen Stunde. Wie viele bleiben (1 bis 14), stellst du ein, ältere löscht er selbst.</li>
+    <li>Unter <b>Meine Backups</b> siehst du, was in einem Backup steckt, und holst einzelne Bereiche zurück. Bestätigt wird mit dem Namen des Servers.</li>
+    <li>Vor jedem Zurückladen sichert der Bot den jetzigen Stand. 72 Stunden lang lässt es sich so rückgängig machen. Fehlende Panels postet er danach neu.</li>
+    <li>Zusätzlich sichert RL Nexus jede Nacht alle Server für den Notfall. Diese Backups siehst du nicht, brauchst du eins, hilft dir der Support.</li>
+  </ul>
+
+  <p class="hintline doc__end">
+    Etwas fehlt hier oder stimmt nicht mehr? <button class="doclink" type="button" data-report>Sag uns Bescheid</button>.
+  </p>
+
+    </div>
+  </div>
+</main>
+
+<div class="toasts" id="toasts"></div>
+
+<script type="module" src="__BASE__/assets/app.js"></script>
+</body>
+</html>
