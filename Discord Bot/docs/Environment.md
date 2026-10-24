@@ -35,6 +35,7 @@ Die Datei liegt im **Projekt-Root**, nicht in `src`. Der Pfad wird beim Start au
 | `DEV_CLIENT_SECRET` | nein | `""` | OAuth2-Secret im `--dev` Modus |
 | `DEV_GUILD_ID` | ja | — | Server, auf dem Commands im `--dev` Modus sofort registriert werden — global dauert das bis zu eine Stunde. Im Betrieb ungenutzt: dort steht **jeder** Befehl global, auch die mit `developerOnly` |
 | `DEV_USER_IDs` | nein | `""` | **Kommagetrennt.** Wer `developerOnly`-Commands ausführen darf, im Dashboard die Gruppe Developer trägt **und jeden Bot-Fehler als DM bekommt** (siehe unten) |
+| `ERROR_REPORTS_BROWSER` | nein | `false` | Meldet das Bot-Dashboard Fehler aus dem Browser von selbst an die Devs ([DevLogs.md](DevLogs.md#guardian-fehlerberichte-für-die-devs))? Erst `true`, wenn der Absatz in der Datenschutzerklärung geprüft ist. „Fehler melden“, `/fehler` und Fehler im Bot laufen immer |
 | `GUILD_MEMBER_INTENT` | nein | `false` | Privilegiertes Members-Intent. Nur `true`, wenn es im Developer Portal ebenfalls an ist — sonst weist Discord den Login rundweg ab. Das [Welcome System](Welcome.md) braucht es: ohne sieht der Bot niemanden kommen |
 | `GUILD_PRESENCE_INTENT` | nein | `false` | Ebenfalls privilegiert. Nur für die **Live-Rolle** des Twitch Notifiers ([Notifiers.md](Notifiers.md#live-rolle)); aus = der Rest des Notifiers läuft trotzdem |
 | `PRIME_API_TOKEN` | nein | `""` | Ränge über prime.rocketplanet.gg für `/rank`, die RL Team-Übersicht und Rank Roles. Leer = keine Ränge, siehe [Prime.md](Prime.md) |
@@ -151,9 +152,9 @@ Leerzeichen um die Kommas sind in Ordnung, leere Einträge fallen weg.
 
 ### Fehler landen bei den Entwicklern
 
-Jeder Fehler, den der Bot auffängt, geht als DM an alle IDs in `DEV_USER_IDs`: Fehler-ID, Art, Meldung, Datei und Zeile, Zeitpunkt, dazu Server, Kanal, Nutzer und der Befehl beziehungsweise die Custom-ID, wenn der Fehler an einer Interaktion hing — und der gekürzte Stack.
+Jeder Fehler, den der Bot auffängt, geht als DM an alle IDs in `DEV_USER_IDs`: Fehler-ID (`NEXUS-…`), was passiert ist, Datei und Zeile in `src/` mit drei Zeilen Ausschnitt, Zeitpunkt, dazu Nutzer, Server, Kanal und Befehl oder Knopf, wenn der Fehler an einer Interaktion hing. Darunter „In DevLogs öffnen“ und „Erledigt“. Dazu kommen Fehler aus dem Bot-Dashboard und Meldungen über „Fehler melden“ und `/fehler`.
 
-Derselbe Fehler kommt höchstens **alle zehn Minuten**; was dazwischen auftritt, wird gezählt und steht in der nächsten Nachricht. Wer dem Bot keine Direktnachrichten erlaubt, bekommt keine — das steht dann im Log. Gebaut ist das in `src/Guardian.ts`.
+Derselbe Fehler kommt höchstens **alle zehn Minuten**; was dazwischen auftritt, wird gezählt und steht in der nächsten Nachricht. Wer dem Bot keine Direktnachrichten erlaubt, bekommt keine — das steht dann im Log. Alles Weitere steht in [DevLogs.md](DevLogs.md#guardian-fehlerberichte-für-die-devs).
 
 **IDs sind Text, keine Zahlen.** In der `.env` ist ohnehin alles Text — anders als früher in der `config.json`, wo eine Snowflake als JSON-Zahl still gerundet wurde.
 

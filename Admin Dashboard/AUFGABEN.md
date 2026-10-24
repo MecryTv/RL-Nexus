@@ -121,6 +121,7 @@ Reihenfolge: P1 vor P2 vor P3 vor P4. Bei gleicher Priorität gilt die Reihenfol
 - **Migrationen:** Das Admin Dashboard bringt `010_access_mode`, `011_beta` und `012_beta_fixes` mit. Sie laufen beim Start von selbst.
 - **Stripe-Testlauf mit Test Clock:** Abo auf Free bzw. Beta stellen, Zeit über das Periodenende vorspulen, zurück auf Paid. Dazu dasselbe mit einem gekündigten Abo. Prüfen, dass nichts abgebucht wird und `trial_end` angenommen wird.
 - **Rechtstexte:** AGB, Widerruf, Impressum und Datenschutz von jemandem mit Rechtskenntnis prüfen lassen. Der Bot wird verkauft und speichert Nutzerdaten.
+- **Fehlerberichte (Plan 24):** Den Absatz „Fehlerberichte im Bot-Dashboard“ aus der Spec (`docs/superpowers/specs/2026-10-24-fehlerberichte-design.md`, Anhang) prüfen lassen und in die Datenschutzerklärung von Bot-Dashboard (`privacy.html`) und Webseite übernehmen. Erst danach `ERROR_REPORTS_BROWSER=true` in die `.env` und den Bot neu starten. Bis dahin meldet das Dashboard nichts von selbst; „Fehler melden“, `/fehler` und Fehler im Bot laufen schon. Beim Update: Migration 035 läuft von selbst, der Bot startet mit Source Maps (`Dockerfile`).
 
 ---
 

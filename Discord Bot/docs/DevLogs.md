@@ -139,3 +139,27 @@ Die Log-Inhalte laufen durch `Fence()`: ein ` ``` ` in einer Log-Zeile würde so
 - **`Colorize()` färbt nach Textinhalt.** Eine Zeile mit dem Wort `ERROR` im Nutzertext wird rot, auch wenn sie eine INFO-Zeile ist. Für ein Log-Fenster ist das die richtige Näherung.
 - **Der Statistik-Cache hängt an der Größe.** Wächst die aktuelle Session, wird neu gescannt. Ändert sich eine Datei ohne Größenänderung, sieht der Cache das nicht — bei Logs passiert das nicht.
 - **Kein Rechte-Check im Handler.** Bewusst: die Panel-Nachricht ist ephemeral, es gibt keinen zweiten Nutzer, der klicken könnte.
+
+## Guardian: Fehlerberichte für die Devs
+
+Gebaut in Plan 24 (Spec und Plan im Admin Dashboard unter `docs/superpowers/`). Alle drei Arten kommen als DM an `DEV_USER_IDs`, als Components V2:
+
+| Art | Woher | In der DM |
+|---|---|---|
+| 🛠️ Fehler im Bot | `Guardian.ReportError`, `HandleServer`, globale Handler | Was, Typ, Wo (`src/…ts:118 in Rename`), Wann, Nutzer, Server, Kanal, Befehl oder Knopf, Ausschnitt, „Stack: n Zeilen · Version · Sitzung #n“ |
+| 🌐 Fehler im Dashboard | `POST /dashboard/api/report/error` (`routes/DashboardApiClientError.ts`) | Was, Wo, Seite, Nutzer, Server (falls bekannt), Browser und Bildschirm, Ausschnitt, „Letzte Schritte“ |
+| 📮 Meldung | „Fehler melden“ und `/fehler` (`services/ReportService.ts`) | Betreff als Titel, Text, Wo und wie, Von, Kontakt, Woher, Browser, „Fehler davor“; ob die Mail an support@ rausging |
+
+- **Fehler-ID:** `NEXUS-<Unix-Sekunden>-<6 Zeichen>` (`NewErrorId`), ohne I und O. Sie steht im Log, in der DM, in der Antwort des Servers (`errorId` bei 500), auf der Fehlerseite und im Dashboard („Fehler-ID … [Kopieren] · Das Team weiß schon Bescheid.“).
+- **Wo im Code:** Der Bot läuft mit `--enable-source-maps` (`npm start`, `Dockerfile`), `tsc` schreibt Karten mit eingebetteten Quellen. `WhereOf` nimmt den ersten Rahmen im eigenen Code, `Excerpt` holt drei Zeilen aus der Karte unter `dist/` (im Image liegt `src/` nicht) oder lokal aus der Datei.
+- **Browser:** `BuildDashboard.ts` schreibt die Karten nach `src/dashboard/maps/`, nie unter `public/`, nicht in git, im Image dabei. `Translate` übersetzt den Stack damit zurück; fehlt die Karte (alter Tab nach einem Deploy), steht „Karte zu diesem Build fehlt“.
+- **Zusammenfassen:** Signatur = Art, Stelle, Meldung ohne Zahlen (`ErrorSignature`). Dieselbe Signatur in zehn Minuten: keine neue DM, die nächste sagt, wie oft er dazwischen kam. Meldungen werden nie zusammengefasst. Jedes Auftreten hat trotzdem eine Zeile in `error_reports`.
+- **Erledigt** (`guardian:done:<ID>`, nur `DEV_USER_IDs`): ändert die DM bei allen Devs zu „✅ Erledigt · …“ ohne Knöpfe. Kommt dieselbe Signatur wieder, kommt sofort eine neue DM mit „Kam wieder, nachdem … als erledigt markiert hat.“
+- **In DevLogs öffnen** (`guardian:logs:<ID>`): öffnet das Panel bei der Sitzung des Fehlers mit der Suche nach der ID, nur für den, der klickt. Ist die Sitzung weg, sagt das Panel es.
+- **Ohne Datenbank:** DMs kommen trotzdem, nur ohne Knöpfe.
+- **Speicher:** Tabelle `error_reports` (Migration 035): ID, Art, Signatur, Sitzung, DMs je Dev, erledigt von und wann. `ErrorReportsPrune` löscht täglich um 04:40 Berichte älter als 90 Tage **und ihre DMs**.
+- **Datenschutz:** Fehlerzeilen im Log nennen keine Discord-IDs; wer betroffen war, steht nur in der DM. Die letzten Schritte im Dashboard (`core/Trail.ts`) sind Pfade ohne Abfrage, Beschriftungen von Knöpfen und Antworten des Bots, nie Eingaben.
+- **Grenzen der Route:** nur mit Sitzung, nur `Sec-Fetch-Site: same-origin`, höchstens 16 KB, zehn je Minute und Person, derselbe Fehler einmal je Minute und Person (dann dieselbe ID).
+- **Schalter:** Das Dashboard meldet Fehler aus dem Browser erst, wenn `ERROR_REPORTS_BROWSER=true` in der `.env` steht. Vorher antwortet die Route mit 404, und `/api/me` sagt `errorReports: false`.
+- **Prüfen:** `npm run check:guardian` (mit und ohne `DATABASE_*`), dazu `check:dashboard` für Route, Fehlerseite, Karten und Spur.
+

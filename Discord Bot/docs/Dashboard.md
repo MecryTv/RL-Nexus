@@ -401,6 +401,17 @@ Schaltet das Admin Dashboard die Wartung des Bot-Dashboards an (Tabelle `site_ma
 
 „Läuft“ heißt: an, und nicht mit Haken über die Endzeit hinaus. Der Bot fragt höchstens alle 5 Sekunden. Fehlt die Tabelle (älteres Admin Dashboard) oder ist keine Datenbank eingerichtet, gibt es keine Wartung. Antwortet die Datenbank nicht, gilt der zuletzt gelesene Stand.
 
+### Fehlerberichte
+
+Fehler im Dashboard sieht der Nutzer mit einer ID, die er dem Support nennen kann (Plan 24, Einzelheiten in [DevLogs.md](DevLogs.md#guardian-fehlerberichte-für-die-devs)):
+
+- **Server antwortet 500:** Die Antwort trägt `errorId`, die Fehlerseite (`error.html`, Platzhalter `__ERR_ID__`) zeigt sie. Der Guardian hat den Fehler schon gemeldet, das Dashboard meldet ihn nicht noch einmal.
+- **Bereich lädt nicht** (`whenShown` in `Guild.ts`): Ein echter Fehler wird gemeldet, unter dem Hinweis steht „Fehler-ID … [Kopieren] · Das Team weiß schon Bescheid.“ Ein fehlendes Code-Stück nach einem Deploy wird nicht gemeldet, dort steht weiter „Neu laden“.
+- **Nicht abgefangene Fehler und abgelehnte Promises** meldet `core/ErrorReport.ts` von selbst, ohne Anzeige. Nicht gemeldet: Abbrüche, Offline, fehlende Code-Stücke, „Script error.“ und die ResizeObserver-Warnung.
+- **Letzte Schritte** sammelt `core/Trail.ts` ab dem Start: Seiten, Klicks auf Knöpfe und Links, Antworten des Bots (über ein einmal umhülltes `fetch`). Höchstens zehn, nie Eingaben.
+- **„Fehler melden“** schickt Seite, Browser und die letzten drei Fehler-IDs mit, das Formular sagt das.
+- **Schalter:** Ohne `ERROR_REPORTS_BROWSER=true` meldet das Dashboard nichts von selbst (`errorReports` in `/api/me`).
+
 ### Knöpfe in der Shop-DM
 
 Bei Bestellung, Test, fehlgeschlagener Zahlung und Ablauf schickt der **Admin-Server** eine DM im Namen des Bots (`server/shop/dm.ts` im Admin Dashboard). Zwei Knöpfe darin beantwortet der Bot, weil Discord Klicks an die Gateway-Sitzung schickt: `src/events/shop/ShopButtons.ts`.
