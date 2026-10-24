@@ -48,7 +48,7 @@
         "dev:dashboard": "tsx src/scripts/BuildDashboard.ts --watch",
         "icons:ranks": "tsx src/scripts/MakeRankIcons.ts",
         "measure:dashboard": "tsx src/scripts/MeasureDashboard.ts",
-        "start": "node .",
+        "start": "node --enable-source-maps .",
         "token": "tsx src/scripts/GenerateToken.ts",
         "typecheck": "tsc --noEmit"
     },

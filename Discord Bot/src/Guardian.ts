@@ -1,5 +1,6 @@
 import path from "path";
 import { randomInt } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { ChatInputCommandInteraction, Interaction } from "discord.js";
 import BotClient from "./client/BotClient";
 import IGuardian from "./interfaces/services/guardian/IGuardian";
@@ -38,6 +39,80 @@ export function ErrorSignature(kind: ErrorKind, message: string, where: string):
     const text = message.replace(/\d+/g, "#").replace(/\s+/g, " ").trim();
 
     return `${kind}|${where}|${text}`.slice(0, 255);
+}
+
+/** Eine Stelle im eigenen Code: Datei ab `src/`, Zeile, Funktion. */
+export interface IWhere {
+    file: string;
+    line: number;
+    fn: string | null;
+}
+
+/**
+ * Wo es passiert ist: der erste Rahmen im eigenen Code, nicht in
+ * `node_modules`, nicht in Node selbst und nicht im Guardian. Der Bot läuft
+ * mit Source Maps (`--enable-source-maps`), die Pfade zeigen also auf `src/`.
+ */
+export function WhereOf(stack: string): IWhere | null {
+    for (const raw of stack.split("\n").slice(1)) {
+        const frame = raw.trim().match(/^at (?:async )?(?:(.+?) \()?(?:file:\/\/)?(.+?):(\d+):\d+\)?$/);
+
+        if (!frame) continue;
+
+        const [, name, file] = frame;
+
+        if (file.includes("node_modules") || file.startsWith("node:") || /[\\/]Guardian\.[jt]s$/.test(file)) continue;
+
+        const own = file.replace(/\\/g, "/");
+        const at = own.lastIndexOf("/src/");
+        const fn = name ? (name.replace(/^new /, "").split(".").pop() ?? null) : null;
+
+        return { file: at === -1 ? own : own.slice(at + 1), line: Number(frame[3]), fn: fn === "<anonymous>" ? null : fn };
+    }
+
+    return null;
+}
+
+/** Drei Zeilen um die Stelle, die Fehlerzeile mit ›. */
+function Lines(source: string, line: number): string | null {
+    const all = source.split(/\r?\n/);
+
+    if (line < 1 || line > all.length) return null;
+
+    const width = String(Math.min(line + 1, all.length)).length;
+
+    return all
+        .slice(Math.max(line - 2, 0), Math.min(line + 1, all.length))
+        .map((text, index) => {
+            const number = Math.max(line - 1, 1) + index;
+
+            return `${String(number).padStart(width)} ${number === line ? "›" : " "} ${text.trimEnd().slice(0, 120)}`;
+        })
+        .join("\n");
+}
+
+/**
+ * Der Ausschnitt aus der Quelle. Im Image liegt `src/` nicht: Dann kommen die
+ * Zeilen aus den eingebetteten Quellen der Karte unter `dist/` (tsc mit
+ * `inlineSources`). Lokal mit tsx steht die Datei selbst da.
+ */
+export function Excerpt(file: string, line: number, root = process.cwd()): string | null {
+    if (file.startsWith("src/")) {
+        try {
+            const map = JSON.parse(readFileSync(path.join(root, "dist", `${file.slice(4).replace(/\.ts$/, "")}.js.map`), "utf8")) as { sourcesContent?: (string | null)[] };
+            const source = map.sourcesContent?.[0];
+
+            if (source) return Lines(source, line);
+        } catch {
+            // Keine Karte: dann die Datei selbst.
+        }
+    }
+
+    try {
+        return Lines(readFileSync(path.join(root, file), "utf8"), line);
+    } catch {
+        return null;
+    }
 }
 
 export default class Guardian implements IGuardian {

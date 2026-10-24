@@ -51,4 +51,5 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
 
 # Kein --dev: der Betrieb nimmt CLIENT_TOKEN, das Dashboard liegt an der Wurzel
 # von SERVER_PUBLIC_URL, und Galerie-Bilder gehen als URL an Discord.
-CMD ["node", "."]
+# Mit Source Maps: Fehler zeigen auf src/…ts und die Zeile dort (Plan 24).
+CMD ["node", "--enable-source-maps", "."]

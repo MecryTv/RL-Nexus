@@ -8,3 +8,4 @@ Pre-flight: Task 3 nutzt Task 1 (ErrorReports, Signatur) und Task 2 (WhereOf, Ex
 - Task 1: Ruling: Signatur ist `art|wo|meldung ohne Zahlen`, gekürzt auf 255 — die Stelle vor der Meldung, damit lange Meldungen sie nicht abschneiden — kostet bei Irrtum: nichts.
 - Task 1: Ruling: lokale Testdatenbank `rlnexus_bot_check` (Nutzer check) für check:guardian — kostet bei Irrtum: nichts, nur lokal.
 - Task 1: complete (tests: check:guardian 13/13 RED (NewErrorId fehlt) → GREEN, mit Datenbank; tsc --noEmit 0)
+- Task 2: complete (tests: check:guardian „Wo im Code“ 6/6 RED (WhereOf fehlt) → GREEN; npm run build schreibt dist/*.js.map mit sourcesContent; echter Fehler aus dist mit --enable-source-maps → src/runnables/ErrorReportsPrune.ts:21 in Execute samt Ausschnitt; tsc 0)

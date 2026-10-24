@@ -7,7 +7,10 @@
  * legt der Bot seine Tabellen selbst an.
  */
 import BotClient from "../client/BotClient";
-import { ErrorSignature, NewErrorId } from "../Guardian";
+import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { ErrorSignature, Excerpt, NewErrorId, WhereOf } from "../Guardian";
 
 let failures = 0;
 
@@ -41,6 +44,50 @@ function checkIds(): void {
     check("Signatur: andere Stelle, anderer Fehler", one !== ErrorSignature("bot", "Unknown Channel 1", "src/events/voice/VoicePanelHandler.ts:120"));
     check("Signatur: andere Art, anderer Fehler", one !== ErrorSignature("dashboard", "Unknown Channel 1", "src/events/voice/VoicePanelHandler.ts:118"));
     check("Signatur passt in die Spalte (255 Zeichen)", ErrorSignature("bot", "x".repeat(2000), "y".repeat(500)).length <= 255);
+}
+
+/* ----------------------------------------------------------
+   Wo im Code
+   ---------------------------------------------------------- */
+async function checkWhere(): Promise<void> {
+    console.log("\n  — Wo im Code —");
+
+    const stack = [
+        "Error: Unknown Channel",
+        "    at RequestManager.handle (/app/node_modules/@discordjs/rest/dist/index.js:1:2)",
+        "    at node:internal/process/task_queues:95:5",
+        "    at Guardian.ReportError (/app/src/Guardian.ts:150:10)",
+        "    at async VoicePanelHandler.Rename (/app/src/events/voice/VoicePanelHandler.ts:118:9)",
+        "    at async VoicePanelHandler.Execute (/app/src/events/voice/VoicePanelHandler.ts:40:5)",
+    ].join("\n");
+    const where = WhereOf(stack);
+
+    check("Wo: erster eigener Rahmen, Pfad ab src/, Funktion ohne Klasse", JSON.stringify(where) === JSON.stringify({ file: "src/events/voice/VoicePanelHandler.ts", line: 118, fn: "Rename" }), JSON.stringify(where));
+    check("Wo: auch ohne Funktionsnamen", JSON.stringify(WhereOf("Error: x\n    at /app/src/Server.ts:12:3")) === JSON.stringify({ file: "src/Server.ts", line: 12, fn: null }));
+    check("Wo: ohne eigenen Rahmen nichts", WhereOf("Error: x\n    at node:internal/timers:1:1") === null);
+
+    // Ausschnitt aus einer echten Datei unter src/ (so läuft es mit tsx).
+    const own = Excerpt("src/Guardian.ts", 2);
+
+    check("Ausschnitt: drei Zeilen, die Fehlerzeile in der Mitte markiert", own !== null && own.split("\n").length === 3 && own.split("\n")[1].startsWith("2 ›"), own ?? "null");
+
+    // Im Image liegt src/ nicht: dann aus den Quellen in der Karte unter dist/.
+    const root = await mkdtemp(path.join(tmpdir(), "guardian-"));
+
+    try {
+        await mkdir(path.join(root, "dist", "events"), { recursive: true });
+        await writeFile(
+            path.join(root, "dist", "events", "Voice.js.map"),
+            JSON.stringify({ version: 3, sources: ["../../src/events/Voice.ts"], sourcesContent: ["eins\nzwei\ndrei\nvier"], mappings: "", names: [] })
+        );
+
+        const mapped = Excerpt("src/events/Voice.ts", 3, root);
+
+        check("Ausschnitt: aus der Karte, wenn src/ fehlt", mapped === "2   zwei\n3 › drei\n4   vier", JSON.stringify(mapped));
+        check("Ausschnitt: ohne Datei und Karte nichts", Excerpt("src/events/Gibtsnicht.ts", 3, root) === null);
+    } finally {
+        await rm(root, { recursive: true, force: true });
+    }
 }
 
 /* ----------------------------------------------------------
@@ -85,6 +132,7 @@ async function main(): Promise<void> {
     const client = new BotClient();
 
     checkIds();
+    await checkWhere();
 
     if (await client.databaseService.Connect()) {
         try {
