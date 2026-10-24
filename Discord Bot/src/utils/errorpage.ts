@@ -114,13 +114,13 @@ export function WantsPage(request: FastifyRequest): boolean {
 }
 
 /** Schickt die Fehlerseite - oder JSON, wenn kein Browser fragt. */
-export async function SendError(client: BotClient, request: FastifyRequest, reply: FastifyReply, code: number, error?: Error): Promise<unknown> {
+export async function SendError(client: BotClient, request: FastifyRequest, reply: FastifyReply, code: number, error?: Error, errorId: string | null = null): Promise<unknown> {
     const info = ErrorInfo(code);
 
     reply.code(info.code);
 
     if (!WantsPage(request)) {
-        return reply.send({ error: info.title, hint: info.text, statusCode: info.code, ...(error && client.developerMode ? { detail: error.message } : {}) });
+        return reply.send({ error: info.title, hint: info.text, statusCode: info.code, ...(errorId ? { errorId } : {}), ...(error && client.developerMode ? { detail: error.message } : {}) });
     }
 
     const page = await SendPage(client, reply, "error.html", {
@@ -130,6 +130,8 @@ export async function SendError(client: BotClient, request: FastifyRequest, repl
         ERR_HINT: info.hint,
         ERR_ACTION: info.action.label,
         ERR_HREF: info.action.href,
+        // Nur Buchstaben, Ziffern und Bindestriche (NewErrorId), muss also nicht maskiert werden.
+        ERR_ID: errorId && /^[A-Z0-9-]+$/.test(errorId) ? `<p class="errid">Fehler-ID <code>${errorId}</code> · Das Team weiß schon Bescheid.</p>` : "",
     });
 
     return page;

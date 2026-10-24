@@ -1092,6 +1092,51 @@ async function checkMaintenance(client: BotClient): Promise<void> {
     }
 }
 
+/** Serverfehler tragen die Fehler-ID des Guardian (Plan 24). */
+async function checkErrorIds(client: BotClient): Promise<void> {
+    console.log("\n  — Fehler-ID bei Serverfehlern —");
+
+    const service = client.dashboardService;
+    const saved = { payload: service.Payload.bind(service), maintenanceFor: service.MaintenanceFor.bind(service) };
+    const session = service.Sign({ id: "fehler-id", userId: "1059621019947634751", username: "Check", avatar: null, accessToken: "egal", mfa: true, expiresAt: Date.now() + 60_000 });
+    const cookie = { Cookie: `${SESSION_COOKIE}=${encodeURIComponent(session)}` };
+    const ID = /^NEXUS-\d{10}-[A-HJ-NP-Z2-9]{6}$/;
+
+    service.Payload = async () => {
+        throw new Error("check:dashboard Probe");
+    };
+
+    try {
+        const api = await fetch(`${BASE}${P}/api/me`, { ...MANUAL, headers: { Accept: "application/json", ...cookie } });
+        const body = (await api.json()) as { error?: string; errorId?: string };
+
+        check("Eine Route wirft: 500 mit Fehler-ID", api.status === 500 && ID.test(body.errorId ?? ""), `${api.status} ${JSON.stringify(body)}`);
+    } finally {
+        service.Payload = saved.payload;
+    }
+
+    // Ein Fehler vor der Route (hier im Haken der Wartung) landet auf der Fehlerseite.
+    service.MaintenanceFor = async () => {
+        throw new Error("check:dashboard Probe im Haken");
+    };
+
+    try {
+        const page = await fetch(`${BASE}${P}/`, { ...MANUAL, headers: { Accept: "text/html" } });
+        const html = await page.text();
+        const json = await fetch(`${BASE}${P}/api/me`, { ...MANUAL, headers: { Accept: "application/json" } });
+        const body = (await json.json()) as { errorId?: string };
+
+        check("Fehlerseite: zeigt die Fehler-ID und dass das Team Bescheid weiß", page.status === 500 && /Fehler-ID <code>NEXUS-\d{10}-[A-HJ-NP-Z2-9]{6}<\/code>/.test(html) && html.includes("Das Team weiß schon Bescheid."), `${page.status}`);
+        check("Auch als JSON mit Fehler-ID", json.status === 500 && ID.test(body.errorId ?? ""), JSON.stringify(body));
+    } finally {
+        service.MaintenanceFor = saved.maintenanceFor;
+    }
+
+    const missing = await fetch(`${BASE}${P}/gibt-es-nicht`, { ...MANUAL, headers: { Accept: "text/html" } });
+
+    check("Ein 404 hat keine Fehler-ID", missing.status === 404 && !(await missing.text()).includes("Fehler-ID"));
+}
+
 async function main(): Promise<void> {
     const client = new BotClient();
 
@@ -1108,6 +1153,7 @@ async function main(): Promise<void> {
     await checkPaywall(client);
     await checkBeta(client);
     await checkMaintenance(client);
+    await checkErrorIds(client);
     checkShopStatus();
     checkSessions(client);
 

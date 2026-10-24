@@ -17,5 +17,6 @@ export default interface IGuardian {
     HandleGeneric(errorMSG: string, type?: string, stackTrace?: string | null): Promise<void>;
     HandleRLAPI(errorMSG: string, context: { endpoint?: string }): Promise<void>;
     HandleRunnable(errorMSG: string, context: { taskName?: string; stack?: string }): Promise<void>;
-    HandleServer(errorMSG: string, context: { route?: string; stack?: string }): Promise<void>;
+    /** Gibt die Fehler-ID sofort zurück, die DMs laufen im Hintergrund. */
+    HandleServer(errorMSG: string, context: { route?: string; stack?: string }): Promise<string | null>;
 }

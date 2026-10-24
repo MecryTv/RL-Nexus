@@ -528,10 +528,12 @@ export default class Guardian implements IGuardian {
         await this.ReportError(error, null, type);
     }
 
-    async HandleServer(errorMSG: string, context: { route?: string; stack?: string }): Promise<void> {
+    /** Ein Fehler im Server: die ID sofort, damit die Antwort sie tragen kann. Die DMs laufen im Hintergrund. */
+    async HandleServer(errorMSG: string, context: { route?: string; stack?: string }): Promise<string | null> {
         const error = new Error(errorMSG);
         if (context?.stack) error.stack = context.stack;
         const type = context?.route ? `Server Error: ${context.route}` : "Server Error";
-        await this.ReportError(error, null, type);
+
+        return this._fromError(error, null, type)?.id ?? null;
     }
 }

@@ -140,11 +140,10 @@ export default class RouteManager implements IRouteManager {
             logger.http(request.method, request.url, 500);
             logger.error(`[RouteManager] ${route.Key} ist fehlgeschlagen: ${normalized.message}`);
 
-            this.client.guardian
-                ?.HandleServer(normalized.message, { route: route.Key, stack: normalized.stack })
-                .catch(() => {});
+            // Die ID geht mit: Das Dashboard zeigt sie und meldet den Fehler nicht noch einmal.
+            const errorId = (await this.client.guardian?.HandleServer(normalized.message, { route: route.Key, stack: normalized.stack }).catch(() => null)) ?? null;
 
-            return reply.code(500).send({ error: "Internal Server Error" });
+            return reply.code(500).send({ error: "Internal Server Error", ...(errorId ? { errorId } : {}) });
         }
     }
 }

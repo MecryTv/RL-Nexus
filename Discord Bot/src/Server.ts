@@ -166,7 +166,11 @@ export default class Server implements IServer {
 
             LogError(request, error, code);
 
-            return SendError(this.client, request, reply, code, error);
+            // Ein Fehler im Code geht an den Guardian; seine ID steht in der Antwort und auf der Fehlerseite.
+            const route = request.routeOptions?.url ?? "unbekannt";
+            const errorId = code >= 500 ? await this.client.guardian.HandleServer(error.message, { route: `${request.method} ${route}`, stack: error.stack }).catch(() => null) : null;
+
+            return SendError(this.client, request, reply, code, error, errorId);
         });
 
         await instance.listen({ port: this.port, host: this.host });

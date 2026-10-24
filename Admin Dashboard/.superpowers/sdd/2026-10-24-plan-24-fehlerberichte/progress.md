@@ -16,3 +16,6 @@ Pre-flight: Task 3 nutzt Task 1 (ErrorReports, Signatur) und Task 2 (WhereOf, Ex
 - Task 3: „In DevLogs öffnen“-Test nach dem Code geschrieben (sofort grün), deckt den Fall „Sitzung weg“ ab.
 - Task 3: complete (tests: check:guardian 34/34 mit DB und ohne DB grün; RED: ErrorCard fehlt → GREEN; check:dashboard (ohne DB, wie immer) 0 FAIL, check:teams, check:admin, check:voice 0 FAIL, tsc 0, build 0)
 - Hinweis für spätere Läufe: check:dashboard erwartet „ohne Datenbank“ (mit DATABASE_* scheitern 11 Prüfungen, die nichts mit Plan 24 zu tun haben); check:guardian mit und ohne DB laufen lassen.
+- Task 4: Ruling: Der Guardian bekommt beim Fehler-Haken als „Route“ das Muster (`request.routeOptions.url`), nicht die echte Adresse — so stehen keine Server-IDs in Typ und Signatur, und gleiche Fehler auf verschiedenen Servern fassen sich zusammen — kostet bei Irrtum: im DM steht nicht, welcher Server.
+- Task 4: Ruling: Auf der Fehlerseite des Servers kein Knopf „Kopieren“ (die Seite lädt kein Skript), die ID ist mit user-select:all in einem Klick markiert — kostet bei Irrtum: ein Knopf mehr nachrüsten.
+- Task 4: complete (tests: check:dashboard „— Fehler-ID bei Serverfehlern —“ 4 Prüfungen, 3 RED (keine errorId) → GREEN, 404 ohne ID; check:dashboard 0 FAIL, check:guardian (mit DB) 0 FAIL, check:teams/admin/voice 0 FAIL, tsc 0, build 0)
