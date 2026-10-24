@@ -1,0 +1,515 @@
+<title>Seitenleiste der Server-Ansicht</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oxanium:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: Kopf mit Umschalter, darunter vier Leisten nebeneinander (heute + drei Vorschläge), darunter die Abwägung.
+   Bewusst nur dunkel: Das Bot-Dashboard hat kein helles Thema, die Entwürfe sollen aussehen wie dort. */
+:root{
+  color-scheme:dark;
+  --bg:#050608;
+  --panel:#080d12;
+  --line:rgba(255,255,255,.08);
+  --line-strong:rgba(255,255,255,.14);
+  --glass:rgba(255,255,255,.035);
+  --glass-2:rgba(255,255,255,.06);
+  --text:#f2f4f7;
+  --text-2:#a8b0bc;
+  --text-3:#6b7683;
+  --brand:#ff1e2d;
+  --brand-soft:rgba(255,30,45,.10);
+  --ok:#3ddc97;
+  --font-ui:"Oxanium",ui-sans-serif,system-ui,sans-serif;
+  --font-body:ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.55 var(--font-body)}
+.wrap{max-width:1240px;margin:0 auto;padding-block:32px 56px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:28px}
+h1,h2,h3{font-family:var(--font-ui);text-wrap:balance;margin:0}
+h1{font-size:28px;font-weight:700;letter-spacing:.01em}
+h2{font-size:19px;font-weight:600}
+h3{font-size:15px;font-weight:600}
+p{margin:0;max-width:68ch;color:var(--text-2)}
+.eyebrow{font:600 11px/1 var(--font-ui);letter-spacing:.14em;text-transform:uppercase;color:var(--text-3)}
+.head{display:grid;gap:10px}
+.toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:12px}
+.seg{display:inline-flex;border:1px solid var(--line-strong);border-radius:10px;padding:3px;background:var(--glass)}
+.seg button{font:500 13px var(--font-ui);color:var(--text-2);background:none;border:0;border-radius:7px;padding:7px 12px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--glass-2);color:var(--text);box-shadow:inset 0 0 0 1px var(--line-strong)}
+.seg button:focus-visible,.nav button:focus-visible,.nav a:focus-visible,.search input:focus-visible,.rail button:focus-visible,.launch button:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+.hint{font-size:13px;color:var(--text-3)}
+
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(262px,1fr));gap:18px;align-items:start}
+.option{display:grid;gap:10px;min-width:0}
+.option__top{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.tag{font:600 11px var(--font-ui);letter-spacing:.06em;text-transform:uppercase;padding:3px 8px;border-radius:999px;border:1px solid var(--line-strong);color:var(--text-2);white-space:nowrap}
+.tag--pick{border-color:color-mix(in srgb,var(--brand) 60%,transparent);color:var(--brand);background:var(--brand-soft)}
+.count{font:600 12px var(--font-ui);color:var(--text-3);font-variant-numeric:tabular-nums}
+.count b{color:var(--text)}
+.frame{position:relative;height:540px;border:1px solid var(--line);border-radius:14px;background:linear-gradient(160deg,#0a0e14 0%,var(--bg) 60%);overflow:hidden}
+.option p{font-size:13.5px}
+
+/* Die Leiste selbst, nah am echten .setnav */
+.nav{height:100%;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--line-strong) transparent;padding:12px 8px;display:grid;align-content:start;gap:2px;font-family:var(--font-ui)}
+.nav a,.nav .row{display:flex;align-items:center;gap:10px;padding:7px 12px;border-radius:8px;color:var(--text-2);text-decoration:none;font-size:14px;font-weight:500;min-width:0}
+.nav a span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+.nav a:hover{color:var(--text);background:var(--glass)}
+.nav a[aria-current="page"]{color:var(--text);background:var(--brand-soft);box-shadow:inset 2px 0 0 var(--brand)}
+.nav a[aria-current="page"] svg{color:var(--brand)}
+.nav svg{width:15px;height:15px;flex:none;color:currentColor}
+.nav a.sub{padding-left:34px;font-size:13.5px;position:relative}
+.nav a.sub::before{content:"";position:absolute;left:21px;top:0;bottom:0;width:1px;background:var(--line)}
+.cap{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;margin-top:10px;padding:6px 12px 4px;background:none;border:0;color:var(--text-3);font:600 11px var(--font-ui);letter-spacing:.12em;text-transform:uppercase;cursor:pointer;text-align:left}
+.cap:hover{color:var(--text-2)}
+.cap .chev{transition:transform .15s}
+.cap[aria-expanded="false"] .chev{transform:rotate(-90deg)}
+.cap .num{margin-left:auto;margin-right:6px;font-size:11px;letter-spacing:0;color:var(--text-3);background:var(--glass-2);border-radius:999px;padding:1px 7px}
+.label{margin:12px 12px 2px;font:600 11px var(--font-ui);letter-spacing:.12em;text-transform:uppercase;color:var(--text-3)}
+.more{font-size:11px;color:var(--text-3);font-variant-numeric:tabular-nums}
+.pin{margin-left:auto;background:none;border:0;padding:2px;color:var(--text-3);cursor:pointer;opacity:0;border-radius:4px}
+.nav a:hover .pin,.nav a:focus-within .pin,.pin:focus-visible,.pin[aria-pressed="true"]{opacity:1}
+.pin[aria-pressed="true"]{color:var(--brand)}
+.search{position:relative;margin:2px 4px 6px}
+.search input{width:100%;font:500 13.5px var(--font-ui);color:var(--text);background:var(--glass);border:1px solid var(--line-strong);border-radius:9px;padding:8px 34px 8px 32px}
+.search input::placeholder{color:var(--text-3)}
+.search svg{position:absolute;left:10px;top:50%;translate:0 -50%;width:14px;height:14px;color:var(--text-3)}
+.kbd{position:absolute;right:8px;top:50%;translate:0 -50%;font:600 11px var(--font-ui);color:var(--text-3);border:1px solid var(--line-strong);border-radius:5px;padding:0 5px}
+.where{font-size:11px;color:var(--text-3);white-space:nowrap}
+.empty{padding:10px 12px;font:500 13px var(--font-ui);color:var(--text-3);line-height:1.45}
+.fixed{padding-bottom:8px;margin-bottom:4px;border-bottom:1px solid var(--line);display:grid;gap:2px}
+
+/* B: Symbolleiste mit Klappmenü */
+.railwrap{display:grid;grid-template-columns:56px 1fr;height:100%}
+.rail{display:grid;align-content:start;gap:4px;padding:12px 8px;border-right:1px solid var(--line);background:rgba(255,255,255,.015)}
+.rail button{display:grid;place-items:center;height:40px;border-radius:10px;border:0;background:none;color:var(--text-3);cursor:pointer;position:relative}
+.rail button:hover{color:var(--text);background:var(--glass)}
+.rail button[aria-pressed="true"]{color:var(--brand);background:var(--brand-soft)}
+.rail button svg{width:18px;height:18px}
+.rail hr{border:0;border-top:1px solid var(--line);margin:6px 4px}
+.rail .dot{position:absolute;top:7px;right:9px;width:6px;height:6px;border-radius:50%;background:var(--brand)}
+.fly{min-width:0}
+
+/* C: Modul-Starter */
+.launchbtn{display:flex;align-items:center;gap:10px;margin:10px 4px 0;padding:9px 12px;border-radius:9px;border:1px dashed var(--line-strong);background:none;color:var(--text-2);font:500 14px var(--font-ui);cursor:pointer;width:calc(100% - 8px)}
+.launchbtn:hover{color:var(--text);border-color:var(--text-3)}
+.launchbtn .kbd{position:static;translate:none;margin-left:auto}
+.launch{position:absolute;inset:0;background:rgba(5,6,8,.94);backdrop-filter:blur(6px);display:grid;grid-template-rows:auto auto 1fr;gap:10px;padding:14px;font-family:var(--font-ui)}
+.launch__top{display:flex;align-items:center;justify-content:space-between}
+.launch__top button{background:none;border:1px solid var(--line-strong);color:var(--text-2);border-radius:7px;font:500 12px var(--font-ui);padding:4px 8px;cursor:pointer}
+.launch__list{overflow-y:auto;display:grid;gap:12px;align-content:start;scrollbar-width:thin}
+.launch__cat{display:grid;gap:6px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chips button{font:500 12.5px var(--font-ui);color:var(--text-2);background:var(--glass);border:1px solid var(--line);border-radius:8px;padding:6px 9px;cursor:pointer}
+.chips button:hover{color:var(--text);border-color:var(--line-strong)}
+.chips button[aria-current="page"]{color:var(--text);border-color:color-mix(in srgb,var(--brand) 60%,transparent);background:var(--brand-soft)}
+
+.compare{overflow-x:auto;border:1px solid var(--line);border-radius:14px}
+table{border-collapse:collapse;width:100%;min-width:720px;font-size:14px}
+th,td{padding:12px 14px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line)}
+th{font:600 12px var(--font-ui);letter-spacing:.08em;text-transform:uppercase;color:var(--text-3);background:var(--panel)}
+td{color:var(--text-2)}
+td:first-child{color:var(--text);font-family:var(--font-ui);font-weight:600;white-space:nowrap}
+tr:last-child td{border-bottom:0}
+.pick{display:grid;gap:10px;padding:18px 20px;border:1px solid color-mix(in srgb,var(--brand) 40%,transparent);border-radius:14px;background:linear-gradient(160deg,rgba(255,30,45,.07),transparent 60%)}
+.pick ul{margin:0;padding-left:18px;color:var(--text-2);display:grid;gap:6px;max-width:72ch}
+@media (prefers-reduced-motion:reduce){.cap .chev{transition:none}}
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-grid" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></g></symbol>
+  <symbol id="i-puzzle" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" d="M9 4h4v2a2 2 0 1 0 4 0V4h3v5h-2a2 2 0 1 0 0 4h2v7h-6v-2a2 2 0 1 0-4 0v2H4v-6h2a2 2 0 1 0 0-4H4V4z"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" d="M12 3l8 3v6c0 4.5-3.4 8-8 9-4.6-1-8-4.5-8-9V6z"/></symbol>
+  <symbol id="i-dot" viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="4" fill="none" stroke="currentColor" stroke-width="2"/></symbol>
+  <symbol id="i-sub" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M6 8h12M6 12h12M6 16h8"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></g></symbol>
+  <symbol id="i-pin" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" d="M9 3h6l-1 5 4 4H6l4-4zM12 12v9"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" d="M6 9l6 6 6-6"/></symbol>
+  <symbol id="i-always" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2" stroke-linecap="round"/></g></symbol>
+  <symbol id="i-rl" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><path d="M4.5 9.5h15M4.5 14.5h15M12 4c2.5 2.5 2.5 13.5 0 16"/></g></symbol>
+  <symbol id="i-people" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="9" cy="9" r="3.2"/><path d="M3.5 19c.8-3 3-4.5 5.5-4.5s4.7 1.5 5.5 4.5"/><circle cx="17" cy="8" r="2.6"/><path d="M16 13.6c2.4 0 4 1.4 4.6 4"/></g></symbol>
+  <symbol id="i-help" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M6.3 6.3l3.6 3.6M14.1 14.1l3.6 3.6M17.7 6.3l-3.6 3.6M9.9 14.1l-3.6 3.6"/></g></symbol>
+  <symbol id="i-hammer" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M14 4l6 6-3 3-6-6zM11 7l-7 7 3 3 7-7"/></symbol>
+  <symbol id="i-feed" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 5a14 14 0 0 1 14 14M5 11a8 8 0 0 1 8 8"/><circle cx="6" cy="18" r="1.4" fill="currentColor"/></g></symbol>
+</svg>
+
+<main class="wrap">
+  <header class="head">
+    <span class="eyebrow">Bot-Dashboard · Server-Ansicht · Entwurf</span>
+    <h1>Seitenleiste mit vielen Modulen</h1>
+    <p>Links siehst du die Leiste, wie sie heute ist, daneben drei Ideen, alle zum Anklicken. Mit dem Umschalter siehst du, wie jede Idee mit deinen Modulen aussieht und wie mit allen 22 Modulen. Oben rechts an jeder Leiste steht, wie viele Zeilen man sieht, ohne zu scrollen oder etwas aufzuklappen.</p>
+    <div class="toolbar">
+      <div class="seg" role="group" aria-label="Welche Module an sind">
+        <button type="button" id="set-mine" aria-pressed="true">Wie auf deinem Bild · 11 Module</button>
+        <button type="button" id="set-all" aria-pressed="false">Alle an · 22 Module</button>
+      </div>
+      <span class="hint">Geöffnet ist gerade „Level System“.</span>
+    </div>
+  </header>
+
+  <section class="grid" aria-label="Entwürfe">
+    <article class="option">
+      <div class="option__top"><h2>Heute</h2><span class="count" id="count-now"></span></div>
+      <div class="frame"><nav class="nav" id="nav-now" aria-label="Heute"></nav></div>
+      <p>Jede Gruppe offen, jeder Unterpunkt immer da. Wer zum ersten Mal kommt, sieht alles auf einmal.</p>
+    </article>
+
+    <article class="option">
+      <div class="option__top"><h2>A · Fokus-Leiste</h2><span class="tag tag--pick">Mein Vorschlag</span></div>
+      <div class="frame"><nav class="nav" id="nav-a" aria-label="Vorschlag A"></nav></div>
+      <div class="option__top"><span class="count" id="count-a"></span></div>
+      <p>Oben eine Suche, die beim Tippen filtert (Taste <b>/</b>). Darunter deine angehefteten Module. Offen ist nur die Gruppe, in der du gerade bist, die anderen zeigen, wie viele Module drin sind. Unterpunkte erscheinen nur beim geöffneten Modul. Probier die Nadel an einem Modul und die Suche aus.</p>
+    </article>
+
+    <article class="option">
+      <div class="option__top"><h2>B · Symbolleiste</h2><span class="tag">Kompakt</span></div>
+      <div class="frame" id="frame-b"></div>
+      <div class="option__top"><span class="count" id="count-b"></span></div>
+      <p>Eine schmale Leiste mit einem Symbol je Gruppe, daneben die Module der gewählten Gruppe. Sehr ruhig und platzsparend, aber man muss die Symbole kennen.</p>
+    </article>
+
+    <article class="option">
+      <div class="option__top"><h2>C · Modul-Starter</h2><span class="tag">Am ruhigsten</span></div>
+      <div class="frame" id="frame-c"></div>
+      <div class="option__top"><span class="count" id="count-c"></span></div>
+      <p>Die Leiste zeigt nur Angeheftetes und zuletzt Geöffnetes. Alles andere liegt hinter „Alle Module“ (auch mit Strg K), einer Übersicht mit Suche.</p>
+    </article>
+  </section>
+
+  <section class="compare" aria-label="Vergleich">
+    <table>
+      <thead><tr><th>Idee</th><th>Schnell finden</th><th>Meine Module</th><th>Neu zu lernen</th><th>Handy</th><th>Aufwand</th></tr></thead>
+      <tbody>
+        <tr><td>A · Fokus-Leiste</td><td>Suche beim Tippen, Gruppen mit Zahl</td><td>Anheften, Gruppe des offenen Moduls ist auf</td><td>Kaum: sieht aus wie heute, nur aufgeräumt</td><td>Gut: dieselbe Liste, Suche oben</td><td>Mittel, nur <code>Guild.ts</code>, <code>guild.html</code>, <code>style.css</code></td></tr>
+        <tr><td>B · Symbolleiste</td><td>Zwei Klicks: Gruppe, dann Modul</td><td>Nur über die Gruppe</td><td>Ja: sechs Symbole merken</td><td>Schwierig: Klappmenü auf kleinem Bildschirm</td><td>Mittel bis groß, neues Layout der Seite</td></tr>
+        <tr><td>C · Modul-Starter</td><td>Sehr gut über die Übersicht mit Suche</td><td>Sehr gut: Angeheftet und Zuletzt</td><td>Ja: Nicht-Angeheftetes liegt einen Klick tiefer</td><td>Gut: Übersicht füllt den Bildschirm</td><td>Groß, neue Übersicht über der Seite</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="pick" aria-label="Empfehlung">
+    <h2>Warum ich A empfehle</h2>
+    <ul>
+      <li>Mit allen 22 Modulen sind es statt 47 Zeilen rund 20, und das Wichtigste steht oben: Suche, Angeheftetes, die Gruppe, in der du gerade bist.</li>
+      <li>Es bleibt die Leiste, die alle kennen. Niemand muss Symbole lernen oder ein neues Fenster verstehen.</li>
+      <li>Was du anheftest und welche Gruppe offen ist, merkt sich der Browser. Auf deinem anderen Gerät beginnt die Leiste neu.</li>
+      <li>Die Idee aus C lässt sich später dazunehmen: Strg K öffnet dann einfach die Suche.</li>
+    </ul>
+  </section>
+</main>
+
+<script>
+(function () {
+  "use strict";
+
+  // Die echten Gruppen und Module aus src/dashboard/client/constants/Modules.ts.
+  const GROUPS = [
+    { id: "always", name: "Immer dabei", icon: "i-always" },
+    { id: "rocket-league", name: "Rocket League", icon: "i-rl" },
+    { id: "community", name: "Community", icon: "i-people" },
+    { id: "support", name: "Support", icon: "i-help" },
+    { id: "moderation", name: "Moderation", icon: "i-hammer" },
+    { id: "content", name: "Inhalte & Meldungen", icon: "i-feed" },
+  ];
+  const MODULES = [
+    { id: "gallery", name: "Gallery System", group: "always" },
+    { id: "backups", name: "Backups", group: "always", parts: ["Meine Backups"] },
+    { id: "rl-6mans", name: "2, 4 & 6 Mans", group: "rocket-league", parts: ["Live", "Rangliste"] },
+    { id: "lft", name: "Looking for", group: "rocket-league", parts: ["Spieler-Suche", "Team-Suche", "Anfragen"] },
+    { id: "teams", name: "RL Team-Übersicht", group: "rocket-league", parts: ["Anzeige"] },
+    { id: "rank-roles", name: "Rank Roles", group: "rocket-league" },
+    { id: "clips", name: "Clips der Woche", group: "rocket-league", parts: ["Ansagen", "Sperrliste", "Archiv"] },
+    { id: "matchups", name: "Matchups", group: "rocket-league", parts: ["Eintragen", "Alle Partien"] },
+    { id: "welcome", name: "Welcome System", group: "community" },
+    { id: "apply", name: "Apply System", group: "community", parts: ["Bewerbungen"] },
+    { id: "reaction-roles", name: "Self Roles", group: "community" },
+    { id: "levels", name: "Level System", group: "community", parts: ["Rangliste"] },
+    { id: "giveaways", name: "Giveaways", group: "community" },
+    { id: "polls", name: "Umfragen", group: "community" },
+    { id: "voice-hub", name: "Temp Voice", group: "community" },
+    { id: "tickets", name: "Ticket System", group: "support", parts: ["Live Tickets", "Transcriptions"] },
+    { id: "moderation", name: "Moderation", group: "moderation" },
+    { id: "automod", name: "Auto Mod", group: "moderation" },
+    { id: "logging", name: "Logging System", group: "moderation" },
+    { id: "twitch-notifier", name: "Twitch Notifier", group: "content" },
+    { id: "youtube-notifier", name: "YouTube Notifier", group: "content" },
+    { id: "custom-message", name: "Custom Message", group: "content" },
+  ];
+  // Wie auf dem Bild vom 24.10.
+  const MINE = ["gallery", "backups", "teams", "rank-roles", "welcome", "reaction-roles", "levels", "voice-hub", "tickets", "moderation", "twitch-notifier"];
+
+  const state = { set: "mine", current: "levels", pinned: new Set(["teams", "tickets"]), recent: ["levels", "welcome", "backups"], openA: "community", query: "", groupB: "community", launch: false };
+
+  const active = () => MODULES.filter((m) => state.set === "all" || MINE.includes(m.id));
+  const groupOf = (id) => MODULES.find((m) => m.id === id).group;
+  const svg = (id) => `<svg aria-hidden="true"><use href="#${id}"/></svg>`;
+  const esc = (text) => text.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+  const fixed = () =>
+    `<div class="fixed"><a href="#" data-go="uebersicht">${svg("i-grid")}<span>Übersicht</span></a><a href="#" data-go="module">${svg("i-puzzle")}<span>Module</span></a><a href="#" data-go="team">${svg("i-shield")}<span>Moderatoren</span></a></div>`;
+  const link = (m, extra = "") => `<a href="#" data-go="${m.id}"${m.id === state.current ? ' aria-current="page"' : ""}>${svg("i-dot")}<span>${esc(m.name)}</span>${extra}</a>`;
+  const subs = (m) => (m.parts || []).map((part) => `<a href="#" class="sub" data-go="${m.id}">${svg("i-sub")}<span>${esc(part)}</span></a>`).join("");
+
+  /** Zeilen, die man ohne Scrollen sieht: alles Sichtbare, das oben in den Rahmen passt. */
+  function visibleRows(root) {
+    const frame = root.closest(".frame").getBoundingClientRect();
+    const rows = root.querySelectorAll("a, .cap, .label, .search, .rail button, .launchbtn");
+    let all = 0, seen = 0;
+
+    for (const row of rows) {
+      const box = row.getBoundingClientRect();
+
+      if (box.height === 0) continue;
+
+      all++;
+      if (box.bottom <= frame.bottom + 1) seen++;
+    }
+
+    return { all, seen };
+  }
+
+  function counted(id, root) {
+    const { all, seen } = visibleRows(root);
+
+    document.getElementById(id).innerHTML = all > seen ? `<b>${all}</b> Zeilen, ${all - seen} erst nach Scrollen` : `<b>${all}</b> Zeilen, alles sichtbar`;
+  }
+
+  /* ---------- Heute ---------- */
+  function renderNow() {
+    const nav = document.getElementById("nav-now");
+    let html = fixed();
+
+    for (const group of GROUPS) {
+      const members = active().filter((m) => m.group === group.id);
+
+      if (!members.length) continue;
+
+      html += `<button type="button" class="cap" aria-expanded="true"><span>${group.name}</span>${svg("i-chev").replace("<svg", '<svg class="chev"')}</button>`;
+      html += members.map((m) => link(m) + subs(m)).join("");
+    }
+
+    nav.innerHTML = html;
+    counted("count-now", nav);
+  }
+
+  /* ---------- A: Fokus-Leiste ---------- */
+  function renderA() {
+    const nav = document.getElementById("nav-a");
+    const hadFocus = document.activeElement && document.activeElement.id === "a-search";
+    const pinButton = (m) => `<button type="button" class="pin" data-pin="${m.id}" aria-pressed="${state.pinned.has(m.id)}" aria-label="${esc(m.name)} ${state.pinned.has(m.id) ? "lösen" : "anheften"}">${svg("i-pin")}</button>`;
+    let html = fixed();
+
+    html += `<div class="search">${svg("i-search")}<input id="a-search" type="search" placeholder="Modul suchen" autocomplete="off" value="${esc(state.query)}" aria-label="Modul suchen"><span class="kbd">/</span></div>`;
+
+    const query = state.query.trim().toLowerCase();
+
+    if (query) {
+      const hits = [];
+
+      for (const m of active()) {
+        const group = GROUPS.find((g) => g.id === m.group).name;
+
+        if (m.name.toLowerCase().includes(query)) hits.push(`<a href="#" data-go="${m.id}">${svg("i-dot")}<span>${esc(m.name)}</span><span class="where">${group}</span></a>`);
+
+        for (const part of m.parts || []) {
+          if (part.toLowerCase().includes(query)) hits.push(`<a href="#" data-go="${m.id}">${svg("i-sub")}<span>${esc(part)}</span><span class="where">${esc(m.name)}</span></a>`);
+        }
+      }
+
+      html += hits.length ? hits.join("") : `<p class="empty">Nichts gefunden. Ist das Modul aus? Unter „Module“ schaltest du es ein.</p>`;
+      nav.innerHTML = html;
+    } else {
+      const pinned = active().filter((m) => state.pinned.has(m.id));
+
+      html += `<div class="label">Angeheftet</div>`;
+      html += pinned.length ? pinned.map((m) => link(m, pinButton(m))).join("") : `<p class="empty">Fahr über ein Modul und heft es mit der Nadel an. Dann steht es hier oben.</p>`;
+
+      for (const group of GROUPS) {
+        const members = active().filter((m) => m.group === group.id);
+
+        if (!members.length) continue;
+
+        const open = state.openA === group.id;
+
+        html += `<button type="button" class="cap" data-open="${group.id}" aria-expanded="${open}"><span>${group.name}</span><span class="num">${members.length}</span>${svg("i-chev").replace("<svg", '<svg class="chev"')}</button>`;
+
+        if (!open) continue;
+
+        for (const m of members) {
+          const extra = m.id !== state.current && m.parts ? `<span class="more" title="${m.parts.length} Unterseiten">+${m.parts.length}</span>` : "";
+
+          html += link(m, extra + pinButton(m));
+          if (m.id === state.current) html += subs(m);
+        }
+      }
+
+      nav.innerHTML = html;
+    }
+
+    if (hadFocus) {
+      const input = document.getElementById("a-search");
+
+      input.focus();
+      input.setSelectionRange(input.value.length, input.value.length);
+    }
+
+    counted("count-a", nav);
+  }
+
+  /* ---------- B: Symbolleiste ---------- */
+  function renderB() {
+    const frame = document.getElementById("frame-b");
+    const groups = GROUPS.filter((g) => active().some((m) => m.group === g.id));
+
+    if (!groups.some((g) => g.id === state.groupB)) state.groupB = groups[0].id;
+
+    const rail = [
+      `<button type="button" title="Übersicht" aria-label="Übersicht">${svg("i-grid")}</button>`,
+      `<button type="button" title="Module" aria-label="Module">${svg("i-puzzle")}</button>`,
+      `<button type="button" title="Moderatoren" aria-label="Moderatoren">${svg("i-shield")}</button>`,
+      "<hr>",
+      ...groups.map((g) => `<button type="button" data-group="${g.id}" title="${g.name}" aria-label="${g.name}" aria-pressed="${state.groupB === g.id}">${svg(g.icon)}${groupOf(state.current) === g.id ? '<i class="dot" aria-hidden="true"></i>' : ""}</button>`),
+    ].join("");
+    const group = GROUPS.find((g) => g.id === state.groupB);
+    const list = active().filter((m) => m.group === group.id).map((m) => link(m) + subs(m)).join("");
+
+    frame.innerHTML = `<div class="railwrap"><div class="rail" aria-label="Gruppen">${rail}</div><nav class="nav fly" aria-label="${group.name}"><div class="label" style="margin-top:2px">${group.name}</div>${list}</nav></div>`;
+    counted("count-b", frame.querySelector(".nav"));
+    const railRows = frame.querySelectorAll(".rail button").length;
+    const flyRows = frame.querySelectorAll(".fly a").length + 1;
+
+    document.getElementById("count-b").innerHTML = `<b>${railRows}</b> Symbole, daneben <b>${flyRows}</b> Zeilen`;
+  }
+
+  /* ---------- C: Modul-Starter ---------- */
+  function renderC() {
+    const frame = document.getElementById("frame-c");
+    const pinned = active().filter((m) => state.pinned.has(m.id));
+    const recent = state.recent.map((id) => active().find((m) => m.id === id)).filter((m) => m && !state.pinned.has(m.id));
+    let html = fixed();
+
+    html += `<div class="label">Angeheftet</div>${pinned.map((m) => link(m)).join("") || '<p class="empty">Noch nichts angeheftet.</p>'}`;
+    html += `<div class="label">Zuletzt geöffnet</div>${recent.map((m) => link(m) + (m.id === state.current ? subs(m) : "")).join("")}`;
+    html += `<button type="button" class="launchbtn" data-launch>${svg("i-grid")}<span>Alle Module</span><span class="kbd">Strg K</span></button>`;
+
+    let overlay = "";
+
+    if (state.launch) {
+      const cats = GROUPS.map((g) => {
+        const members = active().filter((m) => m.group === g.id);
+
+        if (!members.length) return "";
+
+        return `<div class="launch__cat"><span class="eyebrow">${g.name}</span><div class="chips">${members.map((m) => `<button type="button" data-go="${m.id}"${m.id === state.current ? ' aria-current="page"' : ""}>${esc(m.name)}</button>`).join("")}</div></div>`;
+      }).join("");
+
+      overlay = `<div class="launch" role="dialog" aria-label="Alle Module"><div class="launch__top"><h3>Alle Module</h3><button type="button" data-close>Schließen · Esc</button></div><div class="search" style="margin:0">${svg("i-search")}<input type="search" placeholder="Modul suchen" aria-label="Modul suchen"></div><div class="launch__list">${cats}</div></div>`;
+    }
+
+    frame.innerHTML = `<nav class="nav" aria-label="Vorschlag C">${html}</nav>${overlay}`;
+    counted("count-c", frame.querySelector(".nav"));
+  }
+
+  function renderAll() {
+    renderNow();
+    renderA();
+    renderB();
+    renderC();
+  }
+
+  function go(id) {
+    if (!MODULES.some((m) => m.id === id)) return;
+
+    state.current = id;
+    state.openA = groupOf(id);
+    state.groupB = groupOf(id);
+    state.recent = [id, ...state.recent.filter((entry) => entry !== id)].slice(0, 3);
+    state.launch = false;
+    state.query = "";
+    renderAll();
+  }
+
+  document.addEventListener("click", (event) => {
+    const target = event.target.closest("button, a");
+
+    if (!target) return;
+
+    if (target.id === "set-mine" || target.id === "set-all") {
+      state.set = target.id === "set-all" ? "all" : "mine";
+      document.getElementById("set-mine").setAttribute("aria-pressed", String(state.set === "mine"));
+      document.getElementById("set-all").setAttribute("aria-pressed", String(state.set === "all"));
+      renderAll();
+      return;
+    }
+
+    if (target.dataset.pin) {
+      event.preventDefault();
+      event.stopPropagation();
+      state.pinned.has(target.dataset.pin) ? state.pinned.delete(target.dataset.pin) : state.pinned.add(target.dataset.pin);
+      renderA();
+      renderC();
+      return;
+    }
+
+    if (target.dataset.open) {
+      state.openA = state.openA === target.dataset.open ? null : target.dataset.open;
+      renderA();
+      return;
+    }
+
+    if (target.dataset.group) {
+      state.groupB = target.dataset.group;
+      renderB();
+      return;
+    }
+
+    if (target.hasAttribute("data-launch")) {
+      state.launch = true;
+      renderC();
+      document.querySelector(".launch input")?.focus();
+      return;
+    }
+
+    if (target.hasAttribute("data-close")) {
+      state.launch = false;
+      renderC();
+      return;
+    }
+
+    if (target.dataset.go) {
+      event.preventDefault();
+      go(target.dataset.go);
+    }
+  });
+
+  document.addEventListener("input", (event) => {
+    if (event.target.id === "a-search") {
+      state.query = event.target.value;
+      renderA();
+    }
+  });
+
+  document.addEventListener("keydown", (event) => {
+    const typing = event.target.matches("input, textarea");
+
+    if (event.key === "/" && !typing) {
+      event.preventDefault();
+      document.getElementById("a-search").focus();
+    } else if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+      event.preventDefault();
+      state.launch = true;
+      renderC();
+      document.querySelector(".launch input")?.focus();
+    } else if (event.key === "Escape" && state.launch) {
+      state.launch = false;
+      renderC();
+    } else if (event.key === "Enter" && event.target.id === "a-search") {
+      const first = document.querySelector("#nav-a a[data-go]:not(.fixed a)");
+
+      if (first) go(first.dataset.go);
+    }
+  });
+
+  renderAll();
+  window.addEventListener("resize", renderAll);
+})();
+</script>

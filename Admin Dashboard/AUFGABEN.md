@@ -208,7 +208,7 @@ Reihenfolge: P1 vor P2 vor P3 vor P4. Bei gleicher Priorität gilt die Reihenfol
 - **Hinweise:** Discord erlaubt 4096 Zeichen in der Beschreibung eines Embeds und 6000 Zeichen über alle Embeds einer Nachricht, bis zu 10 Embeds. Jede Erwähnung (`<@…>`) kostet rund 21 Zeichen, auch wenn sie kurz aussieht. Ideen für den Brainstorm: ein Embed je Team oder je Gruppe von Teams, mehrere Nachrichten, wenn es nicht in eine passt, oder Components V2. Dazu kürzere Zeilen (Tracker-Link nicht ausgeschrieben).
 
 ### [P1, neu 24.10.] Server-Übersicht: Seitenleiste wird bei vielen Modulen unübersichtlich
-- **Stand (24.10.): Brainstorm läuft.** Du hast mir die Lösung überlassen, ich zeige einen Vorschlag mit Entwürfen.
+- **Stand (24.10.): Brainstorm, Entwürfe liegen bei dir.** Drei Ideen neben dem heutigen Stand, klickbar: https://claude.ai/artifact/RN3yhtnhzDALKvG5aDPyso (Datei `.superpowers/brainstorm/cloud-2026-10-24/content/seitenleiste-entwuerfe.html`). A Fokus-Leiste (Suche, Angeheftet, nur die aktuelle Gruppe offen, Unterpunkte nur beim offenen Modul; mein Vorschlag), B Symbolleiste mit Klappmenü, C Modul-Starter (Angeheftet, Zuletzt, „Alle Module“ mit Strg K). Mit allen 22 Modulen heute 47 Zeilen, bei A 21. **Weiter:** deine Wahl abwarten, dann kurze Spec, Plan, bauen. Betroffen wären `Guild.ts`, `guild.html`, `style.css` im Bot (Freigabe noch offen).
 - **Reihenfolge:** nach der RL Team-Übersicht.
 - **Projekt:** Bot (Bot-Dashboard, Seitenleiste der Server-Ansicht)
 - **Was passiert:** Mit vielen aktiven Modulen wird die Seitenleiste lang und schwer zu überblicken: viele Gruppen, Unterpunkte, man muss scrollen (Bild 2 vom 24.10.).
