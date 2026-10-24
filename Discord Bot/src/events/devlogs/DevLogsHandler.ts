@@ -15,6 +15,8 @@ import BotClient from "../../client/BotClient";
 import Event from "../../structures/Event";
 import ComponentV2Builder from "../../builder/ComponentV2Builder";
 import { PANEL_PREFIX, PanelStates, RenderPanel } from "../../builder/DevLogsPanel";
+import { GUARDIAN_PREFIX } from "../../Guardian";
+import logger from "../../utils/logger";
 import { IDevLogsState } from "../../interfaces/services/devlogs/IDevLogsPanel";
 import { ILogFile } from "../../interfaces/services/devlogs/IDevLogsService";
 import { MAX_SEARCH_TERM, MAX_UPLOAD_BYTES, PagesFor } from "../../constants/DevLogs";
@@ -33,6 +35,14 @@ export default class DevLogsHandler extends Event {
     async Execute(interaction: Interaction): Promise<void> {
         const isComponent = interaction.isMessageComponent();
         if (!isComponent && !interaction.isModalSubmit()) return;
+
+        // Die Knöpfe unter den Fehler-DMs (Plan 24): Erledigt und In DevLogs öffnen.
+        if (interaction.isButton() && interaction.customId.startsWith(`${GUARDIAN_PREFIX}:`)) {
+            await this.client.guardian.HandleButton(interaction).catch((error: unknown) => logger.guardian("warn", `Knopf unter einer Fehler-DM ging nicht: ${String(error)}`));
+
+            return;
+        }
+
         if (!interaction.customId.startsWith(PANEL_PREFIX)) return;
 
         try {

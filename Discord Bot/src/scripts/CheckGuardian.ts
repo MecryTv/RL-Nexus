@@ -10,7 +10,7 @@ import BotClient from "../client/BotClient";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { ErrorSignature, Excerpt, NewErrorId, WhereOf } from "../Guardian";
+import { DoneJson, ErrorCard, ErrorSignature, Excerpt, IErrorInfo, NewErrorId, WhereOf } from "../Guardian";
 
 let failures = 0;
 
@@ -91,6 +91,147 @@ async function checkWhere(): Promise<void> {
 }
 
 /* ----------------------------------------------------------
+   Die DMs
+   ---------------------------------------------------------- */
+const BOT: IErrorInfo = {
+    id: "NEXUS-1792841102-M2XD7K",
+    kind: "bot",
+    title: "🛠️ Fehler im Bot",
+    message: "Unknown Channel",
+    where: "src/events/voice/VoicePanelHandler.ts:118 in Rename",
+    fields: [
+        ["Was", "DiscordAPIError[10003]: Unknown Channel"],
+        ["Wo", "`src/events/voice/VoicePanelHandler.ts:118 in Rename`"],
+    ],
+    excerpt: "117   const channel = await this.Fetch(id);\n118 › await channel.setName(name);\n119   return true;",
+    footer: "Stack: 6 Zeilen · Version 40e3226 · Sitzung #67",
+};
+
+/** Aller Text und alle Custom-IDs einer Karte, wie Discord sie bekommt. */
+function JsonOf(message: { components?: { toJSON(): unknown }[] }): string {
+    return JSON.stringify((message.components ?? []).map((entry) => entry.toJSON()));
+}
+
+function checkCards(): void {
+    console.log("\n  — Die DMs —");
+
+    const bot = JsonOf(ErrorCard(BOT, { buttons: true, repeats: 0, reopened: null, production: true }));
+
+    check("Fehler im Bot: Titel, ID, Was, Wo, Ausschnitt, Stand", ["🛠️ Fehler im Bot", "NEXUS-1792841102-M2XD7K", "**Wo** `src/events/voice/VoicePanelHandler.ts:118 in Rename`", "118 › await channel.setName(name);", "Stack: 6 Zeilen · Version 40e3226 · Sitzung #67", "Produktion"].every((part) => bot.includes(part)), bot.slice(0, 300));
+    check("Knöpfe „In DevLogs öffnen“ und „Erledigt“", bot.includes("guardian:logs:NEXUS-1792841102-M2XD7K") && bot.includes("guardian:done:NEXUS-1792841102-M2XD7K") && bot.includes("In DevLogs öffnen") && bot.includes("Erledigt"));
+    check("Ohne Datenbank keine Knöpfe", !JsonOf(ErrorCard(BOT, { buttons: false, repeats: 0, reopened: null, production: true })).includes("guardian:"));
+    check("Zusammengefasst: wie oft er dazwischen kam", JsonOf(ErrorCard(BOT, { buttons: true, repeats: 3, reopened: null, production: true })).includes("Derselbe Fehler kam in den letzten 10 Minuten noch 3-mal."));
+    check(
+        "Kam wieder nach Erledigt",
+        JsonOf(ErrorCard(BOT, { buttons: true, repeats: 0, reopened: { by: "Mecry", at: new Date("2026-10-24T10:00:00Z") }, production: true })).includes("Kam wieder, nachdem Mecry ihn am 24.10.2026 als erledigt markiert hat.")
+    );
+
+    const dashboard = JsonOf(
+        ErrorCard({ ...BOT, kind: "dashboard", title: "🌐 Fehler im Dashboard", steps: ["14:02:10 Seite /guild/1/levels", "14:02:15 Klick „Speichern“", "14:02:16 PUT /api/guild/1/levels → 500 · 120 ms"] }, { buttons: true, repeats: 0, reopened: null, production: true })
+    );
+
+    check("Fehler im Dashboard: mit den letzten Schritten", dashboard.includes("🌐 Fehler im Dashboard") && dashboard.includes("Letzte Schritte") && dashboard.includes("PUT /api/guild/1/levels → 500 · 120 ms"));
+
+    const report = JsonOf(ErrorCard({ ...BOT, kind: "report", title: "📮 Speichern geht nicht", excerpt: null, footer: undefined, note: "Auch per Mail an support@nexus-emb.de" }, { buttons: true, repeats: 0, reopened: null, production: true }));
+
+    check("Meldung: Betreff als Titel, Hinweis auf die Mail", report.includes("📮 Speichern geht nicht") && report.includes("Auch per Mail an support@nexus-emb.de"));
+
+    const done = JSON.stringify(DoneJson(ErrorCard(BOT, { buttons: true, repeats: 0, reopened: null, production: true }).components[0].toJSON(), "Mecry", new Date("2026-10-24T14:05:00Z")));
+
+    check(
+        "Erledigt: Titel mit ✅, wer und wann, ohne Knöpfe, Inhalt bleibt",
+        done.includes("✅ Erledigt · Fehler im Bot") && done.includes("Erledigt von Mecry um 16:05 Uhr. Kommt der Fehler wieder, gibt es eine neue DM.") && !done.includes("guardian:") && done.includes("118 › await channel.setName(name);"),
+        done.slice(0, 300)
+    );
+}
+
+/** Der Guardian mit nachgestellten Devs: wer welche DM bekam, was bearbeitet wurde. */
+async function checkDelivery(client: BotClient, database: boolean): Promise<void> {
+    console.log(`\n  — Zustellen${database ? " (mit Datenbank)" : " (ohne Datenbank)"} —`);
+
+    const sent: { to: string; json: string }[] = [];
+    const edited: string[] = [];
+    const users = client.users as unknown as { fetch: unknown };
+    const channels = client.channels as unknown as { fetch: unknown };
+    const original = { users: users.fetch, channels: channels.fetch, ready: client.isReady, devs: client.config.DEV_USER_IDs };
+    let next = 1000;
+
+    users.fetch = async (id: string) => ({
+        id,
+        tag: `dev-${id}`,
+        send: async (message: { components?: { toJSON(): unknown }[] }) => {
+            sent.push({ to: id, json: JsonOf(message) });
+
+            return { id: String(next++), channelId: `dm-${id}` };
+        },
+    });
+    channels.fetch = async (id: string) => ({ isTextBased: () => true, messages: { edit: async (messageId: string) => void edited.push(`${id}/${messageId}`) } });
+    client.isReady = (() => true) as typeof client.isReady;
+    (client.config as { DEV_USER_IDs: string[] }).DEV_USER_IDs = ["111", "222"];
+
+    const guardian = client.guardian;
+    const message = `check:guardian Zustellen ${Date.now()}`;
+    const info = (): IErrorInfo => ({ ...BOT, id: NewErrorId(), message });
+
+    try {
+        const first = guardian.Report(info());
+
+        await first.sent;
+
+        for (let index = 0; index < 99; index++) await guardian.Report(info()).sent;
+
+        check("100 gleiche Fehler: eine DM je Dev", sent.length === 2, `${sent.length} DMs`);
+        check(database ? "Mit Datenbank: Knöpfe in der DM" : "Ohne Datenbank: keine Knöpfe", sent.every((entry) => entry.json.includes("guardian:done:") === database));
+
+        if (!database) return;
+
+        check("Jedes Auftreten hat eine Zeile", (await client.databaseService.Query<{ id: string }>("SELECT id FROM error_reports WHERE signature = ?", [ErrorSignature("bot", message, BOT.where)])).length === 100);
+
+        const press = (userId: string, action: string) => {
+            const answers: string[] = [];
+
+            return {
+                answers,
+                interaction: {
+                    customId: `guardian:${action}:${first.id}`,
+                    user: { id: userId, username: userId === "111" ? "Mecry" : "Fremd" },
+                    message: { id: "1000", components: [{ toJSON: () => JSON.parse(sent[0].json)[0] }] },
+                    isButton: () => true,
+                    reply: async (payload: unknown) => void answers.push(`reply ${JSON.stringify(payload)}`),
+                    update: async (payload: unknown) => void answers.push(`update ${JSON.stringify(payload)}`),
+                },
+            };
+        };
+
+        const stranger = press("999", "done");
+
+        await guardian.HandleButton(stranger.interaction as never);
+        check("Erledigt von jemandem ohne Dev-Rechte ändert nichts", (await client.errorReports.LastDone(ErrorSignature("bot", message, BOT.where))) === null && stranger.answers.join().includes("Nur die Devs"), stranger.answers.join());
+
+        const dev = press("111", "done");
+
+        await guardian.HandleButton(dev.interaction as never);
+        check("Erledigt: gespeichert, die eigene DM aktualisiert, die des anderen Devs bearbeitet", (await client.errorReports.LastDone(ErrorSignature("bot", message, BOT.where)))?.by === "Mecry" && dev.answers.join().includes("✅ Erledigt") && edited.includes("dm-222/1001"), `${dev.answers.join()} | ${edited}`);
+
+        const lost = press("111", "logs");
+
+        lost.interaction.customId = "guardian:logs:NEXUS-1-AAAAAA";
+        await guardian.HandleButton(lost.interaction as never);
+        check("In DevLogs öffnen: Ist die Sitzung weg, sagt das Panel es", lost.answers.join().includes("Diese Sitzung gibt es nicht mehr"), lost.answers.join().slice(0, 200));
+
+        sent.length = 0;
+        await guardian.Report(info()).sent;
+        check("Kommt er danach wieder: sofort eine neue DM mit „Kam wieder“", sent.length === 2 && sent[0].json.includes("Kam wieder, nachdem Mecry ihn am"), sent.map((entry) => entry.json.slice(0, 80)).join(" | "));
+    } finally {
+        users.fetch = original.users;
+        channels.fetch = original.channels;
+        client.isReady = original.ready;
+        (client.config as { DEV_USER_IDs: string[] }).DEV_USER_IDs = original.devs;
+        await client.databaseService.Write("DELETE FROM error_reports WHERE signature LIKE ?", ["%check:guardian Zustellen%"]).catch(() => undefined);
+    }
+}
+
+/* ----------------------------------------------------------
    Speicher
    ---------------------------------------------------------- */
 async function checkStore(client: BotClient): Promise<void> {
@@ -133,15 +274,18 @@ async function main(): Promise<void> {
 
     checkIds();
     await checkWhere();
+    checkCards();
 
     if (await client.databaseService.Connect()) {
         try {
             await checkStore(client);
+            await checkDelivery(client, true);
         } finally {
             await client.databaseService.Close();
         }
     } else {
         console.log("\n  — Speicher —\n  übersprungen: keine Verbindung (siehe Meldung oben)");
+        await checkDelivery(client, false);
     }
 
     console.log(failures === 0 ? "\n✅ Alle Prüfungen bestanden.\n" : `\n❌ ${failures} Prüfung(en) fehlgeschlagen.\n`);

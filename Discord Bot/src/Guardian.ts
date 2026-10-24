@@ -1,10 +1,12 @@
 import path from "path";
 import { randomInt } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { ChatInputCommandInteraction, Interaction } from "discord.js";
+import { ButtonInteraction, ChatInputCommandInteraction, ComponentType, Interaction, MessageFlags } from "discord.js";
 import BotClient from "./client/BotClient";
 import IGuardian from "./interfaces/services/guardian/IGuardian";
 import ComponentV2Builder from "./builder/ComponentV2Builder";
+import { NewPanelState, PanelStates, RenderPanel } from "./builder/DevLogsPanel";
+import { IErrorDm, ParseDms } from "./models/ErrorReports";
 import logger from "./utils/logger";
 
 /**
@@ -115,6 +117,87 @@ export function Excerpt(file: string, line: number, root = process.cwd()): strin
     }
 }
 
+/** Was eine DM an die Devs trägt. Die drei Arten unterscheiden sich nur in Titel und Feldern. */
+export interface IErrorInfo {
+    id: string;
+    kind: ErrorKind;
+    /** „🛠️ Fehler im Bot“, „🌐 Fehler im Dashboard“ oder bei Meldungen „📮 <Betreff>“. */
+    title: string;
+    /** Für die Signatur: die Meldung, ohne Nutzer und Zeit. */
+    message: string;
+    /** „src/…ts:118 in Rename“, für die Signatur und „Wo“. */
+    where: string;
+    /** Je Zeile „**Label** Wert“. */
+    fields: [string, string][];
+    excerpt: string | null;
+    /** Die letzten Schritte im Dashboard, schon als Text. */
+    steps?: string[];
+    /** Klein unter dem Ausschnitt, etwa „Stack: 6 Zeilen · Version … · Sitzung #67“. */
+    footer?: string;
+    /** Ganz unten klein, etwa „Auch per Mail an support@nexus-emb.de“. */
+    note?: string;
+}
+
+export interface ICardOptions {
+    /** Erledigt und DevLogs gehen nur mit Datenbank. */
+    buttons: boolean;
+    /** Wie oft derselbe Fehler seit der letzten DM kam. */
+    repeats: number;
+    reopened: { by: string; at: Date } | null;
+    production: boolean;
+}
+
+/** Anfang der Custom-IDs: guardian:done:<ID> und guardian:logs:<ID>. */
+export const GUARDIAN_PREFIX = "guardian";
+
+const DAY = new Intl.DateTimeFormat("de-DE", { timeZone: "Europe/Berlin", day: "2-digit", month: "2-digit", year: "numeric" });
+const CLOCK = new Intl.DateTimeFormat("de-DE", { timeZone: "Europe/Berlin", hour: "2-digit", minute: "2-digit" });
+
+/** Die DM an die Devs, nach dem Entwurf vom 24.10. */
+export function ErrorCard(info: IErrorInfo, options: ICardOptions) {
+    const card = new ComponentV2Builder({ accentColor: info.kind === "report" ? "#00afff" : "#ff1e2d" }).title(info.title, `ID \`${info.id}\` · ${options.production ? "Produktion" : "Entwicklung"}`);
+
+    if (options.reopened) card.subtext(`Kam wieder, nachdem ${options.reopened.by} ihn am ${DAY.format(options.reopened.at)} als erledigt markiert hat.`);
+
+    card.separator().text(info.fields.map(([label, value]) => `**${label}** ${value}`).join("\n"));
+
+    if (info.excerpt) card.text(`\`\`\`ts\n${info.excerpt}\n\`\`\``);
+    if (info.steps?.length) card.separator().text(`**Letzte Schritte**\n${info.steps.map((step) => `-# ${step}`).join("\n")}`);
+    if (info.footer) card.subtext(info.footer);
+    if (options.repeats > 0) card.subtext(`Derselbe Fehler kam in den letzten ${Math.round(REPEAT_WINDOW / 60_000)} Minuten noch ${options.repeats}-mal.`);
+    if (info.note) card.subtext(info.note);
+
+    if (options.buttons) {
+        card.buttons(
+            { customId: `${GUARDIAN_PREFIX}:logs:${info.id}`, label: "In DevLogs öffnen", tone: "secondary" },
+            { customId: `${GUARDIAN_PREFIX}:done:${info.id}`, label: "Erledigt", tone: "success" }
+        );
+    }
+
+    return card.toMessage();
+}
+
+/**
+ * Eine DM als erledigt: ✅ im Titel, wer und wann darunter, keine Knöpfe mehr.
+ * Arbeitet auf dem JSON der Nachricht, damit der Inhalt bleibt, wie er kam.
+ */
+export function DoneJson(container: unknown, by: string, at: Date): Record<string, unknown> {
+    const copy = structuredClone(container) as Record<string, unknown> & { components?: Record<string, unknown>[] };
+    const parts = (copy.components ?? []).filter((part) => part.type !== ComponentType.ActionRow);
+    const head = parts.find((part) => part.type === ComponentType.TextDisplay);
+
+    if (head && typeof head.content === "string") head.content = head.content.replace(/^# (?:[^\p{L}\p{N}\s]\S* )?(.*)$/mu, "# ✅ Erledigt · $1");
+
+    parts.push({ type: ComponentType.TextDisplay, content: `-# Erledigt von ${by} um ${CLOCK.format(at)} Uhr. Kommt der Fehler wieder, gibt es eine neue DM.` });
+
+    return { ...copy, accent_color: 0x3ddc97, components: parts };
+}
+
+/** Eine kurze Antwort nur für den, der geklickt hat. */
+function Notice(title: string, text: string) {
+    return new ComponentV2Builder({ accentColor: "Red" }).title(title).separator().text(text).toMessage({ ephemeral: true });
+}
+
 export default class Guardian implements IGuardian {
     client: BotClient;
 
@@ -175,67 +258,193 @@ export default class Guardian implements IGuardian {
         }
     }
 
-    private _parseStackForLocation(error: Error) {
-        if (!error.stack) return null;
-
-        const stackLines = error.stack.split("\n").slice(1);
-        const relevantLine = stackLines.find((line) => !line.includes("Guardian."));
-
-        if (!relevantLine) return null;
-
-        const locationMatch = relevantLine.match(/\((.*?)\)/);
-
-        if (!locationMatch || !locationMatch[1]) return null;
-
-        const fullPath = locationMatch[1];
-        const parts = fullPath.split(":");
-        const line = parts[parts.length - 2] || "N/A";
-        const filePath = parts.slice(0, parts.length - 2).join(":") || "N/A";
-        const fileName = path.basename(filePath) || "N/A";
-
-        return { fileName, filePath, line };
-    }
-
     GenErrorID(): string {
         return NewErrorId();
     }
 
-    async ReportError(error: Error, interaction: Interaction | null, type = "Unknown Error"): Promise<void> {
+    /** Ein Fehler im Bot: loggen, an die Devs, und wer ihn ausgelöst hat, bekommt die ID. Wartet auf die DMs. */
+    async ReportError(error: Error, interaction: Interaction | null, type = "Unknown Error"): Promise<string | null> {
+        const report = this._fromError(error, interaction, type);
+
+        if (!report) return null;
+
+        await report.sent;
+
+        if (interaction) await this._sendUserReply(interaction, report.id);
+
+        return report.id;
+    }
+
+    /** Baut den Bericht und stellt ihn zu. null: kein Fehler im Code (abgelaufene Interaktion). */
+    private _fromError(error: Error, interaction: Interaction | null, type: string): { id: string; sent: Promise<void> } | null {
         const errorCode = (error as Error & { code?: number | string }).code;
         const normalizedCode = typeof errorCode === "string" ? Number(errorCode) : errorCode;
 
         if (typeof normalizedCode === "number" && [10062, 10008, 40060].includes(normalizedCode)) {
-            return logger.guardian(
+            logger.guardian(
                 "warn",
                 `Ignored expired/already-acknowledged interaction [${errorCode}] in ${type} (Nutzer war vermutlich zu langsam oder hat doppelt geklickt).`
             );
+
+            return null;
         }
 
-        const errorId = this.GenErrorID();
+        const errorId = NewErrorId();
+        const stack = error.stack ?? "";
+        const where = WhereOf(stack);
+        const whereText = where ? `${where.file}:${where.line}${where.fn ? ` in ${where.fn}` : ""}` : "unbekannt";
 
         logger.guardian("error", `Fehler gefunden [ID: ${errorId}] | Type: ${type}:`, error);
 
-        const location = this._parseStackForLocation(error);
-        if (location) {
-            logger.guardian(
-                "error",
-                `📍 Error location: ${location.fileName} (line: ${location.line}) | Path: ${location.filePath}`
-            );
-        }
+        if (where) logger.guardian("error", `📍 Fehlerstelle: ${whereText}`);
 
-        // Konsole und Logdatei haben ihn schon; die Entwickler bekommen ihn
-        // zusaetzlich als DM. Faellt das aus, darf es den Fehlerbericht nicht
-        // mitreissen - sonst verschwindet der eigentliche Fehler.
-        await this._dmDevelopers(error, interaction, type, errorId, location).catch((problem) =>
-            logger.guardian("warn", `Fehlerbericht ging nicht an die Entwickler: ${String(problem)}`)
-        );
-
-        if (interaction) await this._sendUserReply(interaction, errorId);
+        return this.Report({
+            id: errorId,
+            kind: "bot",
+            title: "🛠️ Fehler im Bot",
+            message: `${type}: ${error.message}`,
+            where: whereText,
+            fields: [
+                ["Was", this._clamp(`${error.name}: ${error.message}`, 400)],
+                ["Typ", this._clamp(type, 120)],
+                ["Wo", `\`${whereText}\``],
+                ["Wann", `<t:${Math.floor(Date.now() / 1000)}:f>`],
+                ...this._context(interaction),
+            ],
+            excerpt: where ? Excerpt(where.file, where.line) : null,
+            footer: `Stack: ${Math.max(stack.split("\n").length - 1, 0)} Zeilen · Version ${logger.getGitCommit() ?? "unbekannt"} · Sitzung #${logger.getCurrentSessionNumber()}`,
+        });
     }
 
     /* ------------------------------------------------------------------
        Der Weg zu den Entwicklern
        ------------------------------------------------------------------ */
+    /**
+     * Speichert den Bericht und schickt die DM. Die ID steht sofort fest, die
+     * DMs laufen im Hintergrund (`sent`). Fällt dabei etwas aus, darf es den
+     * eigentlichen Fehler nicht mitreißen.
+     */
+    Report(info: IErrorInfo): { id: string; sent: Promise<void> } {
+        const signature = ErrorSignature(info.kind, info.message, info.where);
+        const stored = this._store(info, signature);
+        const sent = this._deliver(info, signature, stored).catch((problem: unknown) => logger.guardian("warn", `Fehlerbericht ging nicht an die Entwickler: ${String(problem)}`));
+
+        return { id: info.id, sent };
+    }
+
+    /** Je Auftreten eine Zeile. false: ohne Datenbank, dann gibt es auch keine Knöpfe. */
+    private async _store(info: IErrorInfo, signature: string): Promise<boolean> {
+        if (!this.client.databaseService.Ready) return false;
+
+        try {
+            await this.client.errorReports.Add({ id: info.id, kind: info.kind, signature, session: logger.getCurrentSessionNumber() || null });
+
+            return true;
+        } catch (problem) {
+            logger.guardian("warn", `Fehlerbericht ${info.id} nicht gespeichert: ${String(problem)}`);
+
+            return false;
+        }
+    }
+
+    private async _deliver(info: IErrorInfo, signature: string, stored: Promise<boolean>): Promise<void> {
+        const ids = this.client.config.DEV_USER_IDs;
+        const saved = await stored;
+
+        if (!ids.length || !this.client.isReady()) return;
+
+        // Meldungen von Nutzern werden nie zusammengefasst.
+        const repeats = info.kind === "report" ? 0 : this._repeats(signature);
+
+        // null heisst: derselbe Fehler kam eben erst raus.
+        if (repeats === null) return;
+
+        const reopened = saved ? await this.client.errorReports.LastDone(signature).catch(() => null) : null;
+        const message = ErrorCard(info, { buttons: saved, repeats, reopened, production: !this.client.developerMode });
+        const dms: IErrorDm[] = [];
+
+        for (const id of ids) {
+            const user = await this.client.users.fetch(id).catch(() => null);
+
+            if (!user) {
+                logger.guardian("warn", "Ein Entwickler aus DEV_USER_IDs wurde nicht gefunden - keine DM.");
+
+                continue;
+            }
+
+            const sent = await user.send(message).catch(() => null);
+
+            if (sent) dms.push({ userId: id, channelId: sent.channelId, messageId: sent.id });
+            else logger.guardian("warn", "Eine DM an einen Entwickler ging nicht raus - Direktnachrichten zu?");
+        }
+
+        if (saved && dms.length) await this.client.errorReports.SetDms(info.id, dms).catch(() => undefined);
+    }
+
+    /** Die Knöpfe unter einer DM: Erledigt und In DevLogs öffnen. Nur für die Devs. */
+    async HandleButton(interaction: ButtonInteraction): Promise<void> {
+        const [, action, id] = interaction.customId.split(":");
+
+        if (!this.client.config.DEV_USER_IDs.includes(interaction.user.id)) {
+            await interaction.reply(Notice("Nur die Devs", "Diesen Knopf dürfen nur die Devs drücken."));
+
+            return;
+        }
+
+        if (action === "done") await this._done(interaction, id);
+        else if (action === "logs") await this._logs(interaction, id);
+    }
+
+    private async _done(interaction: ButtonInteraction, id: string): Promise<void> {
+        const by = interaction.user.username;
+        const row = await this.client.errorReports.MarkDone(id, by).catch(() => null);
+
+        if (!row) {
+            await interaction.reply(Notice("Schon erledigt", "Den Fehler hat schon jemand als erledigt markiert."));
+
+            return;
+        }
+
+        // Alle Devs haben dieselbe Karte bekommen: einmal umbauen, überall einsetzen.
+        const done = DoneJson(interaction.message.components[0].toJSON(), by, new Date());
+
+        await interaction.update({ components: [done], flags: MessageFlags.IsComponentsV2 } as never);
+
+        // Kommt er wieder, soll das sofort auffallen und nicht im Zehn-Minuten-Fenster verschwinden.
+        this.seen.delete(row.signature);
+
+        for (const dm of ParseDms(row.dms)) {
+            if (dm.messageId === interaction.message.id) continue;
+
+            const channel = await this.client.channels.fetch(dm.channelId).catch(() => null);
+
+            if (channel?.isTextBased()) await channel.messages.edit(dm.messageId, { components: [done], flags: MessageFlags.IsComponentsV2 } as never).catch(() => undefined);
+        }
+    }
+
+    /** Öffnet DevLogs bei der Sitzung des Fehlers und sucht nach seiner ID. */
+    private async _logs(interaction: ButtonInteraction, id: string): Promise<void> {
+        const row = await this.client.errorReports.Find(id).catch(() => null);
+        const service = this.client.devLogsService;
+        const state = NewPanelState();
+        const session = row?.session ?? null;
+
+        if (session !== null && service.Sessions().some((entry) => entry.sessionNumber === session)) {
+            state.session = session;
+            state.listPage = service.ListPageOf(session);
+            state.view = "search";
+            state.term = id;
+        } else {
+            state.notice = "⚠️ Diese Sitzung gibt es nicht mehr.";
+        }
+
+        const view = await RenderPanel(this.client, state);
+        const response = await interaction.reply({ ...view, flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral, withResponse: true } as never);
+        const messageId = (response as { resource?: { message?: { id: string } } } | undefined)?.resource?.message?.id;
+
+        if (messageId) PanelStates.set(messageId, state);
+    }
+
     /**
      * Wie oft dieser Fehler gerade auftritt. Beim ersten Mal 0, danach zaehlt
      * er hoch und die DM bleibt aus, bis das Fenster um ist - dann steht in der
@@ -264,80 +473,27 @@ export default class Guardian implements IGuardian {
     }
 
     /** Woher der Fehler kam - so viel, wie ohne Raten zu holen ist. */
-    private _context(interaction: Interaction | null): string[] {
+    private _context(interaction: Interaction | null): [string, string][] {
         if (!interaction) return [];
 
-        const lines: string[] = [];
+        const lines: [string, string][] = [];
         const guild = interaction.guild;
 
-        lines.push(`**Nutzer** ${interaction.user.tag} \`${interaction.user.id}\``);
+        lines.push(["Nutzer", `${interaction.user.tag} \`${interaction.user.id}\``]);
 
-        if (guild) lines.push(`**Server** ${guild.name} \`${guild.id}\``);
-        if (interaction.channelId) lines.push(`**Kanal** <#${interaction.channelId}>`);
+        if (guild) lines.push(["Server", `${guild.name} \`${guild.id}\``]);
+        if (interaction.channelId) lines.push(["Kanal", `<#${interaction.channelId}>`]);
 
         if (interaction.isChatInputCommand()) {
             const command = interaction as ChatInputCommandInteraction;
             const sub = command.options.getSubcommand(false);
 
-            lines.push(`**Befehl** \`/${command.commandName}${sub ? ` ${sub}` : ""}\``);
+            lines.push(["Befehl", `\`/${command.commandName}${sub ? ` ${sub}` : ""}\``]);
         } else if ("customId" in interaction && typeof interaction.customId === "string") {
-            lines.push(`**Custom-ID** \`${interaction.customId}\``);
+            lines.push(["Knopf", `\`${interaction.customId}\``]);
         }
 
         return lines;
-    }
-
-    private async _dmDevelopers(
-        error: Error,
-        interaction: Interaction | null,
-        type: string,
-        errorId: string,
-        location: { fileName: string; line: string; filePath: string } | null
-    ): Promise<void> {
-        const ids = this.client.config.DEV_USER_IDs;
-
-        if (!ids.length || !this.client.isReady()) return;
-
-        const where = location ? `${location.fileName}:${location.line}` : "unbekannt";
-        const missed = this._repeats(`${type}|${error.message}|${where}`);
-
-        // null heisst: derselbe Fehler kam eben erst raus.
-        if (missed === null) return;
-
-        const stack = this._clamp(error.stack ?? error.message, STACK_LIMIT);
-        const card = new ComponentV2Builder({ accentColor: "#ff1e2d" })
-            .title("🛠️ Fehler im Bot", `ID \`${errorId}\` · ${this.client.developerMode ? "Entwicklung" : "Produktion"}`)
-            .separator()
-            .text(
-                [
-                    `**Was** ${this._clamp(`${error.name}: ${error.message}`, 400)}`,
-                    `**Typ** ${this._clamp(type, 120)}`,
-                    `**Wo** \`${where}\``,
-                    `**Wann** <t:${Math.floor(Date.now() / 1000)}:f>`,
-                    ...this._context(interaction),
-                ].join("\n")
-            )
-            .separator()
-            .text(`\`\`\`js\n${stack}\n\`\`\``);
-
-        if (missed > 0) card.subtext(`Derselbe Fehler kam in den letzten ${Math.round(REPEAT_WINDOW / 60_000)} Minuten noch ${missed}-mal.`);
-
-        // toMessage() setzt die V2-Flagge schon - mehr braucht eine DM nicht.
-        const message = card.toMessage();
-
-        for (const id of ids) {
-            const user = await this.client.users.fetch(id).catch(() => null);
-
-            if (!user) {
-                logger.guardian("warn", `Entwickler ${id} nicht gefunden - keine DM.`);
-
-                continue;
-            }
-
-            await user
-                .send(message)
-                .catch(() => logger.guardian("warn", `DM an ${user.tag} ging nicht raus - Direktnachrichten zu?`));
-        }
     }
 
     async HandleCommand(
