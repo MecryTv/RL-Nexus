@@ -6,6 +6,7 @@ Reihenfolge: P1 vor P2 vor P3 vor P4. Bei gleicher Priorität gilt die Reihenfol
 
 | Prio | Bedeutung |
 |---|---|
+| P0 | **Oberste Priorität** (vom Betreiber gesetzt, 24.10.): vor allem anderen fertig machen |
 | P1 | Kritisch: kaputt oder blockiert, sofort |
 | P2 | Hoch: wichtig und bald |
 | P3 | Mittel: normale Arbeit |
@@ -27,6 +28,35 @@ Reihenfolge: P1 vor P2 vor P3 vor P4. Bei gleicher Priorität gilt die Reihenfol
   - Bot: `npm run check:dashboard`, `check:teams`, `check:admin`, `check:voice`, `npx tsc --noEmit`, `npm run build`.
   - Webseite: `npm run check`, `lint`, `build`.
   - Bekannte Ausreißer: Im Admin `check:db` scheitert „Kontaktformular“. Im Bot `check:db` scheitern zwei Gruppen-Tests wegen lokaler Daten.
+
+## Oberste Priorität (P0, gesetzt am 24.10.)
+
+### [P0] Wartungsmodus: fertig, nur noch ausrollen
+- **Stand: 100 % gebaut und geprüft** (Plan 23, Review mit allen Nacharbeiten, Restpunkte erledigt). Pushes bis `9689570`.
+- **Was er kann:** Schalter in der Datenbank (`site_maintenance`), Seite „Wartung“ im Admin Dashboard mit Grund, Schnellwahl, Endzeit (höchstens 30 Tage) und „automatisch beenden“. Webseite zeigt die Wartung selbst (auch beim Klicken innerhalb der Seite), Rechtstexte bleiben offen. Bot-Dashboard zeigt eine Wartungsseite mit 503, Admin und Developer kommen durch und sehen einen Streifen. Statusseite und Discord-Statusmeldung zeigen Grund und Ende mit Tag. Kontaktformular und Shop sind während der Wartung zu, der Stripe-Webhook nicht.
+- **Was noch fehlt (nur Betrieb, kein Code):** ausrollen nach `Discord Bot/docs/Hosting.md`, Abschnitt Wartungsmodus. Erst Admin Dashboard, dann Bot und Webseite; dabei den alten Wartungsblock aus der nginx-Konfiguration des Bot-Dashboards auf dem Host entfernen und den Container der Webseite neu erstellen. Danach einmal auf dem Server an- und ausschalten.
+- **Später (P4):** Aufräum-Update (alte Dateien, Vorlagen-Regel, `data/flags`-Mounts, `public/wartung.html`).
+
+### [P0] Fehler melden an die Devs: gebaut, vier Punkte offen
+- **Stand: rund 85 %.** Alle acht Schritte von Plan 24 gebaut, getestet und gepusht (bis `933a1db`), frischer Review gelaufen, die zwei Punkte behoben, die sofort live wirken.
+- **Läuft ab dem nächsten Update:** Fehler im Bot als DM mit Datei und Zeile in `src/`, Ausschnitt, „In DevLogs öffnen“ und „Erledigt“ (mit „Kam wieder“). Fehler-IDs `NEXUS-…` in Serverantworten, auf der Fehlerseite und im Dashboard mit „Kopieren“. „Fehler melden“ und `/fehler` zusätzlich als DM (ohne Anmeldung höchstens 20 DMs je Stunde). Löschen nach 90 Tagen, auch der DMs. Keine Discord-IDs in Fehlerzeilen des Logs.
+- **Gebaut, aber per Schalter aus:** Fehler aus dem Browser mit den letzten Schritten (`ERROR_REPORTS_BROWSER`).
+- **Offen, in dieser Reihenfolge:**
+  1. `Translate` (`src/Guardian.ts`) erkennt `app.js?v=…` nicht: `?v=` erlauben und mit `Version("app.js")` vergleichen, sonst Karte als fehlend behandeln.
+  2. Firefox- und Safari-Stacks haben keine Kopfzeile: Zeile 0 nicht überspringen.
+  3. Den übersetzten Browser-Stack ohne IDs loggen und gekürzt in die DM, wenn „Wo“ unbekannt ist.
+  4. „In DevLogs öffnen“ sucht nur im letzten Log-Teil: Teil-Nummer in `error_reports` speichern oder alle Teile durchsuchen; IDs der 📮-Meldungen ins Log schreiben.
+  5. Danach: Datenschutzabsatz (Spec, Anhang) prüfen lassen, in `privacy.html` und die Datenschutzerklärung der Webseite übernehmen, dann `ERROR_REPORTS_BROWSER=true` setzen.
+  6. Kleinigkeiten aus dem Review (Ledger `.superpowers/sdd/2026-10-24-plan-24-fehlerberichte/progress.md`, „Final: minor (deferred)“).
+- **Weitermachen:** Ledger lesen, dann Punkt 1. Prüfen mit `npm run check:guardian` (einmal mit `DATABASE_*` auf eine Testdatenbank, einmal ohne) und `npm run check:dashboard` ohne `DATABASE_*`.
+
+## Erledigt am 24.10. (Cloud, zweiter Teil)
+
+- **Wartung (Plan 23):** Review-Nacharbeiten und alle Restpunkte, siehe oben.
+- **[P1] RL Team-Übersicht, Zeichenlimit:** Passt die Liste nicht in eine Nachricht, schreibt der Bot sie in weiteren Nachrichten darunter fort, getrennt nur zwischen Teams. Dazu nach dem Senden ein Tipp im Dashboard, dass Karten oder das Auswahlmenü bei vielen Teams aufgeräumter wirken. Mit Tests, gepusht.
+- **[P1] Server-Übersicht (Seitenleiste):** drei Entwürfe gezeigt (https://claude.ai/artifact/RN3yhtnhzDALKvG5aDPyso). Du hast „Mischung aus A und B“ gewählt. Noch nicht gebaut.
+- **Fehler melden (Plan 24):** gebaut, siehe oben.
+- **Neu eingetragen:** Level System und Welcome System (P2), Team-Rollen auf dem Support-Discord (P2), Zustimmung des Owners, wenn Staff einen fremden Server bearbeitet (bei P3 „fremde Server bearbeiten“).
 
 ## Gerade in Arbeit
 
