@@ -251,6 +251,27 @@ Reihenfolge: P1 vor P2 vor P3 vor P4. Bei gleicher Priorität gilt die Reihenfol
 ### [P1, neu 24.10.] Server-Übersicht: Seitenleiste wird bei vielen Modulen unübersichtlich
 - **Entschieden (24.10.): eine Mischung aus A und B.** Reihenfolge laut dir: erst Wartung und Fehler melden fertig machen, dann das hier. Vor dem Bauen: Entwurf der Mischung zeigen.
 - **Stand (24.10.): Brainstorm, Entwürfe liegen bei dir.** Drei Ideen neben dem heutigen Stand, klickbar: https://claude.ai/artifact/RN3yhtnhzDALKvG5aDPyso (Datei `.superpowers/brainstorm/cloud-2026-10-24/content/seitenleiste-entwuerfe.html`). A Fokus-Leiste (Suche, Angeheftet, nur die aktuelle Gruppe offen, Unterpunkte nur beim offenen Modul; mein Vorschlag), B Symbolleiste mit Klappmenü, C Modul-Starter (Angeheftet, Zuletzt, „Alle Module“ mit Strg K). Mit allen 22 Modulen heute 47 Zeilen, bei A 21. **Weiter:** deine Wahl abwarten, dann kurze Spec, Plan, bauen. Betroffen wären `Guild.ts`, `guild.html`, `style.css` im Bot (Freigabe noch offen).
+- **Übergabe für die nächste Sitzung (24.10.):**
+  - **Die Entwürfe:** https://claude.ai/artifact/RN3yhtnhzDALKvG5aDPyso, Datei `Admin Dashboard/.superpowers/brainstorm/cloud-2026-10-24/content/seitenleiste-entwuerfe.html`. Klickbar, mit Umschalter „wie auf deinem Bild (11 Module)“ und „alle an (22 Module)“. Echte Modulnamen und Farben des Dashboards.
+  - **Die drei Ideen:**
+    - **A, Fokus-Leiste:** Suche oben (Taste `/`, filtert beim Tippen auch Unterpunkte), darunter „Angeheftet“ (Nadel am Modul), dann die Gruppen. Offen ist nur die Gruppe des aktuellen Moduls, die anderen zeigen eine Zahl. Unterpunkte nur beim offenen Modul, sonst ein kleines „+2“.
+    - **B, Symbolleiste:** schmale Leiste (56 px) mit einem Symbol je Gruppe und einem roten Punkt bei der Gruppe des offenen Moduls, daneben die Module der gewählten Gruppe samt Unterpunkten.
+    - C, Modul-Starter (nicht gewählt): nur Angeheftet und Zuletzt, alles andere hinter „Alle Module“ (Strg K).
+  - **Gemessen in den Entwürfen:** heute 25 Zeilen bei deinen Modulen und 47 Zeilen, wenn alle 22 Module an sind; A hat 18 bzw. 21; B hat 9 Symbole und daneben 6 bzw. 10 Zeilen.
+  - **Entschieden:** eine Mischung aus A und B. Wie genau, ist noch offen.
+  - **Vorschlag für die Mischung, noch zu bestätigen:** links die Symbolleiste aus B mit den Gruppen, oben darin „Übersicht“, „Module“, „Moderatoren“ und eine Lupe. Daneben das Panel aus A: Suche, „Angeheftet“, dann die Module der gewählten Gruppe; Unterpunkte nur beim offenen Modul. Ein Klick auf eine Gruppe wechselt nur das Panel, nicht die Seite. Am Handy wird die Symbolleiste zu einer waagrechten Leiste oben, das Panel klappt darunter auf. Was angeheftet und welche Gruppe gewählt ist, merkt sich der Browser (`localStorage`), so wie heute die zugeklappten Gruppen.
+  - **Fragen für den Brainstorm:**
+    - Soll die Symbolleiste auf großen Bildschirmen immer offen sein, oder klappt das Panel weg, wenn man im Inhalt arbeitet?
+    - Sollen „Angeheftet“ und die Suche über alle Gruppen gehen?
+    - Bleibt „Module“ (an und aus schalten) oben fest, oder wandert es ins Panel?
+  - **So ist es heute gebaut:** `src/dashboard/client/pages/Guild.ts`, Funktion `bindModules` (ab etwa Zeile 465). Sie baut aus `CATEGORIES` und `MODULES` (`src/dashboard/client/constants/Modules.ts`, 6 Gruppen, 22 Module, 16 Unterpunkte) Überschriften-Knöpfe (`.setnav__cap`) mit `.setnav__group`. Zugeklappte Gruppen stehen in `localStorage` unter `rlnexus.nav.folded` (`FOLD_KEY`, `foldedGroups`, `foldGroup`). `paint()` blendet aus, was nicht an ist, und klappt die Gruppe des offenen Abschnitts auf. `reveal()` scrollt den markierten Eintrag in Sicht. Das HTML ist `#setNav` in `src/dashboard/public/guild.html` mit den festen Links Übersicht, Module und Moderatoren. Die Stile sind `.setnav` und `.setnav--modules` in `src/dashboard/public/assets/style.css` (ab etwa Zeile 1462).
+  - **Gestaltung:** Farben und Schrift wie im Dashboard: Hintergrund `#050608`, Rot `#ff1e2d`, Text `#f2f4f7`, `#a8b0bc`, `#6b7683`, Linien `rgba(255,255,255,.08)`, Schrift Oxanium. UI UX Pro Max rät zu einer Suche mit Vorschlägen beim Tippen, voller Bedienung per Tastatur und wenig Bewegung.
+  - **Freigaben, vor dem Bauen erfragen:** `pages/Guild.ts`, `public/guild.html` und `public/assets/style.css` im Bot, eventuell `constants/Modules.ts`, falls Symbole je Gruppe dazukommen. Neue Dateien nur nach Rückfrage.
+  - **Nächste Schritte:**
+    1. Entwurf der Mischung als Artifact zeigen, in derselben Datei oder einer neuen daneben.
+    2. Deine Antworten auf die Fragen oben einholen.
+    3. Kurze Spec unter `Admin Dashboard/docs/superpowers/specs/`.
+    4. Plan, dann bauen mit Tests (Quelltext-Prüfungen in `check:dashboard` wie bei `showMaintenance`) und einer Sichtprüfung mit Playwright bei 1440 und 390 px.
 - **Reihenfolge:** nach der RL Team-Übersicht.
 - **Projekt:** Bot (Bot-Dashboard, Seitenleiste der Server-Ansicht)
 - **Was passiert:** Mit vielen aktiven Modulen wird die Seitenleiste lang und schwer zu überblicken: viele Gruppen, Unterpunkte, man muss scrollen (Bild 2 vom 24.10.).
