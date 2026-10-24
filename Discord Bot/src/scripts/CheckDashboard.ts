@@ -957,6 +957,11 @@ async function checkMaintenance(client: BotClient): Promise<void> {
         overnight.TIMELINE
     );
 
+    // SendPage setzt die Platzhalter mit replaceAll ein: Ein „$&“ im Grund würde dort sonst zum Platzhalter selbst.
+    const dollar = MaintenancePlaceholders(MaintenanceOf({ ...row, reason: "Rabatt $& weg, $1 auch" }, now)!, now);
+
+    check("Wartungsseite: Ein $ im Grund bleibt ein $", !dollar.REASON.includes("$") && dollar.REASON.includes("&#36;&amp;"), dollar.REASON);
+
     const noEnd = MaintenancePlaceholders(MaintenanceOf({ ...row, reason: null, ends_at: null, auto_end: 0 }, now)!, now);
 
     check("Wartungsseite ohne Endzeit und Grund: fester Satz, keine Zeitleiste", noEnd.REASON === "Wir arbeiten gerade am System." && noEnd.TIMELINE === "" && noEnd.ETA.includes("Wie lange es dauert, steht noch nicht fest."), JSON.stringify(noEnd));

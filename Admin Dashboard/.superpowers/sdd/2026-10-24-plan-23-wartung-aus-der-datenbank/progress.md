@@ -61,3 +61,12 @@ Ausführung: Native (Betreiber, 24.10.). Ein frischer Reviewer am Ende.
 - Final: minor (deferred): Der Hinweisstreifen erscheint für Admin/Dev auch auf öffentlichen Seiten des Dashboards.
 - Final: minor (deferred): `stopMaintenance` wird exportiert, aber nirgends aufgerufen.
 - Plan 23: abgeschlossen (24.10.)
+- Nachtrag (24.10., „Wartung zu Ende machen“): die Restpunkte erledigt, je mit Test RED→GREEN:
+  - fixed Discord-Statusmeldung ohne Tag — status.check „Wartung auf Statusseite und Discord …“ (<t:…:f> an einem anderen Tag)
+  - fixed keine Obergrenze für die Endzeit — maintenance-db „Ablehnungen mit Satz“: höchstens 30 Tage („Stimmt das Datum?“)
+  - fixed Shop-Anmeldung zeigt JSON — GET login/callback leiten während der Wartung zur Webseite (302)
+  - fixed Übersicht kippt, wenn die Wartung nicht lesbar ist — maintenance-db „Übersicht: Lässt sich die Wartung nicht lesen …“
+  - fixed `$&` im Grund — check:dashboard „Wartungsseite: Ein $ im Grund bleibt ein $“
+  - removed `stopMaintenance` (nirgends benutzt)
+  - Ruling: Der Hinweisstreifen bleibt auch auf öffentlichen Seiten des Dashboards — Staff soll überall sehen, dass Wartung läuft — kostet bei Irrtum: ein Streifen auf Impressum und Doku.
+  - Suite: Admin check, check:db (nur die bekannten 5 Ausreißer), typecheck, oxlint, build; Bot check:dashboard/teams/admin/voice, tsc, build — alles grün.

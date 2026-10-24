@@ -32,7 +32,7 @@ Reihenfolge: P1 vor P2 vor P3 vor P4. Bei gleicher Priorität gilt die Reihenfol
 
 - **[P1, fertig 24.10.] Wartungsmodus als Umbau: Plan 23 ist gebaut, geprüft und nachgebessert.** Alle Prüfungen grün bis auf die bekannten Ausreißer, die es schon vor dem Umbau gab.
   - **Nachgebessert nach dem Review:** Der Hinweisstreifen für Admin und Dev nennt das Ende mit Tag. Wer im Admin Dashboard bei einer Wartung ohne Endzeit ein Datum einträgt, bekommt „automatisch beenden“ dazu. Import alter Dateien schaltet eine abgelaufene Wartung nicht wieder ein. Alte Dateien werden nur noch gelöscht, nie neu angelegt, die alte nginx-Regel der Webseite ist weg. Die Webseite sperrt auch beim Klicken innerhalb der Seite. Beginn und Ende mit Tag („gestern 18:05“, „morgen 9:00“) auf Webseite, Statusseite und der Wartungsseite des Bots. Die Webseite wartet beim Nachfragen so lange wie beim ersten Laden und lädt neu, wenn das automatische Ende vorbei ist, auch wenn das Admin Dashboard nicht antwortet. Der Bot fragt bei Datenbankfehlern höchstens alle 5 Sekunden. Die Wartungsseite des Bots hat einen Link zur Anmeldung fürs Team.
-  - **Bewusst später (klein):** Die Discord-Statusmeldung nennt das Ende ohne Tag. Keine Obergrenze für die Endzeit. Die Shop-Anmeldung zeigt während der Wartung JSON statt einer Seite. Der Hinweisstreifen erscheint auch auf öffentlichen Seiten des Dashboards. Die vollständige Liste steht im Ledger.
+  - **Restpunkte erledigt (24.10.):** Die Discord-Statusmeldung nennt das Ende mit Tag, wenn es nicht heute ist. Die Endzeit darf höchstens 30 Tage in der Zukunft liegen. Die Shop-Anmeldung führt während der Wartung zur Webseite statt JSON zu zeigen. Die Übersicht im Admin Dashboard lädt auch, wenn die Wartung kurz nicht lesbar ist. Ein `$` im Grund bleibt ein `$`. Bewusst so gelassen: Der Hinweisstreifen für Staff erscheint auch auf öffentlichen Seiten des Dashboards. **Die Wartung ist damit fertig.**
   - **Als Nächstes:** [P1] Server-Übersicht (Seitenleiste), siehe „Offen“. Die RL Team-Übersicht ist erledigt.
   - **Gebaut (24.10.), alle acht Aufgaben mit Tests:**
     - **Admin Dashboard:** Tabelle `site_maintenance` (Migration 013), Seite „Wartung“ mit Grund, Schnellwahl, Endzeit und „automatisch beenden“, Sperre von Kontaktformular und Shop (Stripe-Webhook offen), Statusseite und Discord-Meldung mit Grund und Endzeit.
@@ -55,7 +55,9 @@ Reihenfolge: P1 vor P2 vor P3 vor P4. Bei gleicher Priorität gilt die Reihenfol
   - **Entwürfe:** https://claude.ai/artifact/5s6bsQjLumT6hut3jwyQsE (privat)
   - **Offene Fragen** (stehen auch unten auf der Entwurfsseite): Bildschirm A oder B, Hinweis-Streifen für Admin und Dev, Schnellwahl-Zeiten, Haken „automatisch beenden“ standardmäßig an, Grund und Endzeit auch auf Statusseite und in der Discord-Meldung.
   - **Prüfung der Spec (24.10.):** Zwei Punkte habe ich selbst entschieden und in der Spec markiert. Die Flag-Dateien werden bis zum Aufräum-Update weiter gespiegelt, damit eine laufende Wartung das Ausrollen übersteht. `/vorschau/wartung` bekommt die Werte per postMessage und ist von der Wartung ausgenommen. Offen für dich: Rechtstexte der Webseite während der Wartung, Freigabe der Bot-Dateien.
-- **[P1] Fehler melden: Spec geschrieben und gegengelesen. Zwei Fragen an dich sind offen** (Spec, Abschnitt „Ergebnis der Prüfung“):
+- **[P1] Fehler melden: Spec fertig, deine Antworten vom 24.10. sind drin. Als Nächstes: Plan und Bau (nach den Restpunkten der Wartung).**
+  - **Entschieden (24.10.):** alle Freigaben (dazu `RouteManager.ts`, `Server.ts`, `BotClient.ts`, neues Runnable zum Löschen nach 90 Tagen), `fetch` zentral in `core/Trail.ts`. „90 Tage“ wird wahr: keine Discord-IDs mehr in Fehlerzeilen der Logs, Fehler-DMs löscht der Bot nach 90 Tagen. Das automatische Melden aus dem Browser bleibt per Schalter aus, bis der Datenschutztext geprüft ist.
+  - **Frühere offene Fragen** (Spec, Abschnitt „Ergebnis der Prüfung“), jetzt beantwortet:
   - **Freigaben:** die Liste plus `RouteManager.ts`, `Server.ts`, `BotClient.ts` und ein Runnable zum Löschen. Bei `fetch` schlage ich vor, es einmal zentral zu umhüllen.
   - **„90 Tage“ im Datenschutz-Absatz:** Dieselben Angaben stehen auch in den Logs und in den DMs. Soll beides gelöscht werden, oder soll der Text das ehrlich sagen? Und soll das automatische Melden erst nach der Prüfung des Textes live gehen?
   - **Entschieden (24.10.):** Weg A, alles im Bot (Guardian erweitern, kein Sammelpostfach). Der Datenschutz-Absatz ist mit entworfen und steht im Anhang der Spec. **Bitte von jemandem mit Rechtskenntnis prüfen lassen**, wie die übrigen Rechtstexte.
@@ -208,12 +210,23 @@ Reihenfolge: P1 vor P2 vor P3 vor P4. Bei gleicher Priorität gilt die Reihenfol
 - **Hinweise:** Discord erlaubt 4096 Zeichen in der Beschreibung eines Embeds und 6000 Zeichen über alle Embeds einer Nachricht, bis zu 10 Embeds. Jede Erwähnung (`<@…>`) kostet rund 21 Zeichen, auch wenn sie kurz aussieht. Ideen für den Brainstorm: ein Embed je Team oder je Gruppe von Teams, mehrere Nachrichten, wenn es nicht in eine passt, oder Components V2. Dazu kürzere Zeilen (Tracker-Link nicht ausgeschrieben).
 
 ### [P1, neu 24.10.] Server-Übersicht: Seitenleiste wird bei vielen Modulen unübersichtlich
+- **Entschieden (24.10.): eine Mischung aus A und B.** Reihenfolge laut dir: erst Wartung und Fehler melden fertig machen, dann das hier. Vor dem Bauen: Entwurf der Mischung zeigen.
 - **Stand (24.10.): Brainstorm, Entwürfe liegen bei dir.** Drei Ideen neben dem heutigen Stand, klickbar: https://claude.ai/artifact/RN3yhtnhzDALKvG5aDPyso (Datei `.superpowers/brainstorm/cloud-2026-10-24/content/seitenleiste-entwuerfe.html`). A Fokus-Leiste (Suche, Angeheftet, nur die aktuelle Gruppe offen, Unterpunkte nur beim offenen Modul; mein Vorschlag), B Symbolleiste mit Klappmenü, C Modul-Starter (Angeheftet, Zuletzt, „Alle Module“ mit Strg K). Mit allen 22 Modulen heute 47 Zeilen, bei A 21. **Weiter:** deine Wahl abwarten, dann kurze Spec, Plan, bauen. Betroffen wären `Guild.ts`, `guild.html`, `style.css` im Bot (Freigabe noch offen).
 - **Reihenfolge:** nach der RL Team-Übersicht.
 - **Projekt:** Bot (Bot-Dashboard, Seitenleiste der Server-Ansicht)
 - **Was passiert:** Mit vielen aktiven Modulen wird die Seitenleiste lang und schwer zu überblicken: viele Gruppen, Unterpunkte, man muss scrollen (Bild 2 vom 24.10.).
 - **Was gewünscht ist:** Übersichtlicher machen, gern auch etwas ganz Neues.
 - **Hinweise:** Brainstorm mit Entwürfen im Browser. Ideen: Suche oder Schnellwahl, eingeklappte Gruppen mit Merken, angeheftete Module, Unterpunkte erst beim aktiven Modul, Symbolleiste mit Flyout.
+
+### [P2, neu 24.10.] Team-Rollen auf dem Support-Discord und Gruppen im Dashboard abgleichen
+- **Projekt:** Bot (Bot-Dashboard, Support-Discord `1547258700480253982`)
+- **Was gewünscht ist:**
+  - Wer auf dem Support-Discord die Admin-Rolle `1548701400031297619` und die Rolle `1551013214630711306` bekommt, ist auch im Dashboard „und überall“ Administrator.
+  - Wer neu als Developer in der `.env` steht (`DEV_USER_IDs`), bekommt auf dem Support-Discord automatisch die Developer-Rolle `1548701516418912370` und die Rolle `1551013214630711306`, dazu im Dashboard die Gruppe Developer.
+- **Heute:** Die Gruppe steht in der Datenbank (gesetzt im Admin Dashboard), Developer kommen zusätzlich aus `DEV_USER_IDs` (`DashboardService.GroupOf`).
+- **Entschieden (24.10.):** Administrator wird nur, wer **beide** Rollen hat (`1548701400031297619` und `1551013214630711306`). Die zweite vergibst du selbst. Fehlt eine, ist Administrator weg.
+- **Noch zu klären:** ob „überall“ auch das Admin Dashboard meint.
+- **Priorität:** vorläufig P2, nach Wartung und Fehler melden. Sag Bescheid, wenn es früher dran sein soll.
 
 ### [P2] Apply System: Webseite oder Discord
 - **Projekt:** Bot (Modul Bewerbungen), Webseite

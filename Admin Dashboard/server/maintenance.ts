@@ -57,6 +57,9 @@ function stateOf(row: IRow | undefined, now: Date): IMaintenanceState | null {
 
 const NONE: IMaintenance = { website: null, dashboard: null };
 
+/** So weit darf die Endzeit höchstens in der Zukunft liegen. */
+const MAX_DAYS = 30;
+
 /** Was gerade läuft. Abgelaufene Wartungen mit Haken sind schon aus, auch wenn noch niemand aufgeräumt hat. Ohne Datenbank: nichts. */
 export async function readMaintenance(_config: IConfig, now = new Date()): Promise<IMaintenance> {
     if (!databaseReady()) return NONE;
@@ -183,6 +186,8 @@ export function parseMaintenanceInput(raw: unknown, now: Date): { area: Maintena
 
         if (Number.isNaN(at)) throw new InvalidInput("Die Endzeit ist kein gültiger Zeitpunkt.");
         if (input.on && at <= now.getTime()) throw new InvalidInput("Die Endzeit liegt in der Vergangenheit.");
+        // Ein Tippfehler im Jahr hielte die Seite sonst jahrelang zu.
+        if (input.on && at > now.getTime() + MAX_DAYS * 86_400_000) throw new InvalidInput(`Die Endzeit liegt mehr als ${MAX_DAYS} Tage in der Zukunft. Stimmt das Datum?`);
 
         endsAt = new Date(at).toISOString();
     }
@@ -258,10 +263,4 @@ export function scheduleMaintenance(config: IConfig): void {
 
     timer = setInterval(() => void tick(config), EVERY);
     timer.unref();
-}
-
-/** Für die Checks. */
-export function stopMaintenance(): void {
-    if (timer !== null) clearInterval(timer);
-    timer = null;
 }

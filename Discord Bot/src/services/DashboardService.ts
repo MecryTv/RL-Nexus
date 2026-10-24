@@ -348,7 +348,8 @@ export function MaintenanceDayClock(iso: string, now: Date): string {
 
 /** Die Platzhalter der Wartungsseite (wartung.html), schon maskiert. Mit Endzeit eine Zeitleiste, ohne den festen Satz. */
 export function MaintenancePlaceholders(note: IMaintenanceNote, now: Date): Record<"REASON" | "ETA" | "TIMELINE", string> {
-    const reason = EscapeHtml(note.reason ?? "Wir arbeiten gerade am System.");
+    // $ als Entität: SendPage setzt mit replaceAll ein, dort wäre „$&“ sonst der Platzhalter selbst.
+    const reason = EscapeHtml(note.reason ?? "Wir arbeiten gerade am System.").replaceAll("$", "&#36;");
 
     if (note.endsAt === null) {
         return { REASON: reason, ETA: '<p class="wt-eta">Wie lange es dauert, steht noch nicht fest.</p>', TIMELINE: "" };

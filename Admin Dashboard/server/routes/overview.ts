@@ -97,7 +97,8 @@ export async function overviewRoutes(app: FastifyInstance, { config }: { config:
         const [bot, website, maintenance, commands, recent] = await Promise.all([
             botOverview(config, accessOf(request).id),
             websiteSummary(config),
-            readMaintenance(config),
+            // Hängt die Datenbank kurz, fehlt nur die Wartung, nicht die ganze Übersicht.
+            readMaintenance(config).catch((): IOverview["maintenance"] => ({ website: null, dashboard: null })),
             commandCount(config),
             recentActions(),
         ]);

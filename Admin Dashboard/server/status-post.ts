@@ -1,4 +1,4 @@
-import type { IMaintenanceState } from "../shared/maintenance.ts";
+import { berlinDay, type IMaintenanceState } from "../shared/maintenance.ts";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { BANNER_KIND_LABELS, bannerState, type IBanner } from "../shared/content.ts";
@@ -110,11 +110,14 @@ async function remembered(name: string): Promise<string | null> {
 
 /**
  * Die Zeile eines Dienstes in der Wartung: seit wann, bis wann, warum (Plan 23).
- * Discord zeigt die Uhrzeit in der Zeitzone dessen, der liest. Der Name dessen,
- * der sie eingeschaltet hat, steht hier nicht.
+ * Discord zeigt die Uhrzeit in der Zeitzone dessen, der liest. Endet sie nicht
+ * heute (Berliner Zeit), steht der Tag dabei. Der Name dessen, der sie
+ * eingeschaltet hat, steht hier nicht.
  */
-export function pausedLine(state: IMaintenanceState): string {
-    return [`In Wartung seit ${at(state.startedAt, "R")}`, ...(state.endsAt ? [`zurück gegen ${at(state.endsAt, "t")}`] : []), ...(state.reason ? [`„${state.reason}“`] : [])].join(" · ");
+export function pausedLine(state: IMaintenanceState, now = new Date()): string {
+    const until = state.endsAt ? at(state.endsAt, berlinDay(new Date(state.endsAt)) === berlinDay(now) ? "t" : "f") : null;
+
+    return [`In Wartung seit ${at(state.startedAt, "R")}`, ...(until ? [`zurück gegen ${until}`] : []), ...(state.reason ? [`„${state.reason}“`] : [])].join(" · ");
 }
 
 /**

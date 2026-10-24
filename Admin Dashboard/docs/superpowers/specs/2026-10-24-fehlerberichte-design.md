@@ -104,6 +104,12 @@ Ein frischer Prüfer hat die Spec gegen den Code gelesen. Drei Punkte sind entsc
 1. **Freigaben:** Die Liste unten reicht nicht ganz. Dazu kommen `src/handler/RouteManager.ts` und `src/Server.ts` (ID im 500er), `src/client/BotClient.ts` (das neue Model eintragen) und ein Runnable für das Löschen nach 90 Tagen. Für die letzten Schritte müssten rund 20 Client-Dateien, die selbst `fetch` rufen, angefasst werden, oder `fetch` wird einmal zentral umhüllt (Vorschlag: zentral, dann nur `core/Trail.ts`).
 2. **„90 Tage“ im Datenschutz-Absatz:** Dieselben Angaben stehen auch in den Sitzungs-Logs (der Bot löscht sie heute nie) und in den DMs (bleiben in Discord). Entweder die Logs bekommen keine Discord-IDs und die DMs werden nach 90 Tagen gelöscht, oder der Text sagt ehrlich, dass Logs und Nachrichten länger bleiben. Dazu: Soll das automatische Melden erst live gehen, wenn der Text geprüft ist (Schalter bis dahin aus)?
 
+**Antworten des Betreibers (24.10.2026):**
+
+1. **Freigaben:** alle, dazu `src/handler/RouteManager.ts`, `src/Server.ts`, `src/client/BotClient.ts` und ein neues Runnable für das Löschen nach 90 Tagen. `fetch` wird einmal zentral umhüllt, in `core/Trail.ts`.
+2. **„90 Tage“ wird wahr:** Fehlerzeilen in den Sitzungs-Logs tragen keine Discord-IDs mehr, und der Bot löscht seine Fehler-DMs nach 90 Tagen (die Nachrichten-IDs stehen dafür mit in der Datenbank).
+3. **Schalter:** Das automatische Melden aus dem Browser ist gebaut, bleibt aber aus, bis der Datenschutztext geprüft ist und der Betreiber es einschaltet. Der Knopf „Fehler melden“ und Fehler im Bot laufen sofort.
+
 ## Betroffene Dateien (Bot, Freigabe nötig)
 
 - `src/Guardian.ts`, `src/interfaces/services/guardian/IGuardian.ts` (ID, Source Maps, Ausschnitt, DM-Arten, Erledigt)

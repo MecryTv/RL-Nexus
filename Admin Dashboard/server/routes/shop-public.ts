@@ -150,6 +150,9 @@ export async function publicShopRoutes(app: FastifyInstance, { config }: { confi
         // Während der Wartung der Webseite: keine Anmeldung, keine Kasse, nichts Schreibendes.
         // Lesen bleibt, und der Webhook von Stripe läuft immer, sonst gingen Zahlungen verloren.
         if (path !== "/public/shop/stripe" && (request.method === "POST" || path === "/public/shop/login" || path === "/public/shop/callback") && (await websiteClosed(config))) {
+            // Anmeldung und Rückkehr von Discord sind Seitenaufrufe im Browser: zur Webseite, die zeigt die Wartung.
+            if (request.method === "GET") return reply.redirect(`${config.websitePublicUrl.replace(/\/+$/, "")}/`, 302);
+
             return reply.code(503).send({ error: MAINTENANCE_CLOSED });
         }
 

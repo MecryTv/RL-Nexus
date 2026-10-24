@@ -136,6 +136,8 @@ export async function checkMaintenanceDb(databaseEnv: Readonly<Record<string, st
                 await reject({ area: "website", on: true, reason: "x".repeat(201) }, "Der Grund darf höchstens 200 Zeichen haben.");
                 await reject({ area: "website", on: true, endsAt: "bald" }, "Die Endzeit ist kein gültiger Zeitpunkt.");
                 await reject({ area: "website", on: true, endsAt: new Date(Date.now() - 60_000).toISOString() }, "Die Endzeit liegt in der Vergangenheit.");
+                // Ein Tippfehler im Jahr (2062 statt 2026) hielte die Seite sonst jahrelang zu.
+                await reject({ area: "website", on: true, endsAt: new Date(Date.now() + 31 * 86_400_000).toISOString() }, "Die Endzeit liegt mehr als 30 Tage in der Zukunft. Stimmt das Datum?");
             });
 
             await check("Wartung der Webseite: öffentlich mit Grund und Endzeit, ohne Namen", async () => {
@@ -165,9 +167,23 @@ export async function checkMaintenanceDb(databaseEnv: Readonly<Record<string, st
 
                 assert.deepEqual([contact.statusCode, contact.json()], [503, closed]);
                 assert.deepEqual([checkout.statusCode, checkout.json()], [503, closed]);
-                assert.deepEqual([login.statusCode, login.json()], [503, closed]);
+                // Die Anmeldung ist ein Seitenaufruf im Browser: Sie führt zur Webseite, und die zeigt die Wartung.
+                assert.deepEqual([login.statusCode, login.headers.location], [302, `${config.websitePublicUrl.replace(/\/+$/, "")}/`]);
                 assert.notDeepEqual(stripe.statusCode === 503 ? stripe.json() : null, closed);
                 assert.equal(state.statusCode, 200);
+            });
+
+            await check("Übersicht: Lässt sich die Wartung nicht lesen, lädt der Rest trotzdem", async () => {
+                await query("RENAME TABLE site_maintenance TO site_maintenance_weg");
+
+                try {
+                    const overview = await app.inject({ method: "GET", url: "/api/overview", headers: { cookie } });
+
+                    assert.equal(overview.statusCode, 200, overview.body);
+                    assert.deepEqual(overview.json().maintenance, { website: null, dashboard: null });
+                } finally {
+                    await query("RENAME TABLE site_maintenance_weg TO site_maintenance");
+                }
             });
 
             await check("Wartung nur im Bot-Dashboard: die Webseite bleibt offen", async () => {

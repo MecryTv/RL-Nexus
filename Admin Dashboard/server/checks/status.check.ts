@@ -282,8 +282,12 @@ export async function checkStatusRoutes(): Promise<void> {
             const state = { reason: "Wir spielen ein Update ein.", startedAt: started, startedBy: "nutzer1", endsAt: "2026-10-24T16:00:00.000Z", autoEnd: true };
             const seconds = Date.parse(started) / 1000;
 
-            assert.equal(pausedLine(state), `In Wartung seit <t:${seconds}:R> · zurück gegen <t:${Date.parse(state.endsAt) / 1000}:t> · „Wir spielen ein Update ein.“`);
-            assert.equal(pausedLine({ ...state, reason: null, endsAt: null }), `In Wartung seit <t:${seconds}:R>`);
+            const now = new Date("2026-10-24T15:00:00.000Z");
+
+            assert.equal(pausedLine(state, now), `In Wartung seit <t:${seconds}:R> · zurück gegen <t:${Date.parse(state.endsAt) / 1000}:t> · „Wir spielen ein Update ein.“`);
+            assert.equal(pausedLine({ ...state, reason: null, endsAt: null }, now), `In Wartung seit <t:${seconds}:R>`);
+            // Endet sie erst morgen, steht der Tag dabei: <t:…:f> statt nur der Uhrzeit.
+            assert.equal(pausedLine({ ...state, reason: null, endsAt: "2026-10-25T08:00:00.000Z" }, now), `In Wartung seit <t:${seconds}:R> · zurück gegen <t:${Date.parse("2026-10-25T08:00:00.000Z") / 1000}:f>`);
 
             const snapshot = await refreshStatus(config);
             const paused = { ...snapshot, measured: { ...snapshot.measured, maintenance: { website: state, dashboard: null } } };

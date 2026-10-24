@@ -38,7 +38,7 @@ const CLOCK = new Intl.DateTimeFormat("de-DE", { timeZone: ZONE, hour: "numeric"
 const DATE = new Intl.DateTimeFormat("de-DE", { timeZone: ZONE, weekday: "long", day: "numeric", month: "long" });
 
 /** Kalendertag in Berlin als Tageszahl, damit sich „morgen“ auch über die Zeitumstellung zählen lässt. */
-function berlinDay(at: Date): number {
+export function berlinDay(at: Date): number {
     const [year, month, day] = CALENDAR.format(at).split("-").map(Number);
 
     return Date.UTC(year, month - 1, day) / 86_400_000;
