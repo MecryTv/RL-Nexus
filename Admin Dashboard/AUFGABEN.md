@@ -50,6 +50,55 @@ Reihenfolge: P1 vor P2 vor P3 vor P4. Bei gleicher Priorität gilt die Reihenfol
   6. Kleinigkeiten aus dem Review (Ledger `.superpowers/sdd/2026-10-24-plan-24-fehlerberichte/progress.md`, „Final: minor (deferred)“).
 - **Weitermachen:** Ledger lesen, dann Punkt 1. Prüfen mit `npm run check:guardian` (einmal mit `DATABASE_*` auf eine Testdatenbank, einmal ohne) und `npm run check:dashboard` ohne `DATABASE_*`.
 
+## Offene Fragen an dich (Stand 24.10.)
+
+Gesammelt aus allen Aufgaben. Die Antworten gehören zur jeweiligen Aufgabe, bevor dort gebaut wird.
+
+### Zu den obersten Punkten (P0)
+- **Wartung:** keine Fragen mehr. Offen ist nur das Ausrollen auf dem Server (siehe oben).
+- **Fehler melden:**
+  1. Wer prüft den Datenschutzabsatz (Spec, Anhang), und wann darf `ERROR_REPORTS_BROWSER=true` gesetzt werden? Bis dahin bleibt das automatische Melden aus dem Browser aus.
+  2. Sollen die sieben Kleinigkeiten aus dem Review gleich mit erledigt werden, oder erst nach den vier Pflichtpunkten?
+
+### [P1] Server-Übersicht (Seitenleiste, Mischung aus A und B)
+1. Passt der Vorschlag: links die Symbolleiste mit den Gruppen, daneben das Panel mit Suche, Angeheftet und den Modulen der gewählten Gruppe?
+2. Soll das Panel auf großen Bildschirmen immer offen sein, oder klappt es weg, wenn man im Inhalt arbeitet?
+3. Sollen „Angeheftet“ und die Suche über alle Gruppen gehen?
+4. Bleibt „Module“ (an und aus schalten) oben fest, oder wandert es ins Panel?
+5. Wie soll es am Handy aussehen? Der Vorschlag ist eine waagrechte Leiste oben mit einem Panel, das darunter aufklappt.
+
+### [P2] Team-Rollen auf dem Support-Discord
+1. Meint „auf dem Dashboard und überall“ auch das Admin Dashboard (admin.nexus-emb.de), oder nur das Bot-Dashboard?
+2. Wird ein Developer aus der `.env` entfernt: Soll der Bot ihm die Developer-Rolle und `1551013214630711306` wieder wegnehmen?
+3. Soll die Gruppe Administrator auch in der Datenbank stehen (sichtbar im Admin Dashboard), oder nur aus den Rollen gerechnet werden?
+- Schon entschieden: Administrator wird nur, wer beide Rollen hat (`1548701400031297619` und `1551013214630711306`). Fehlt eine, ist Administrator weg.
+
+### [P2] Level System
+1. Woher kommen die Voice-Daten für den Nachtrag: aus der Statistik der Voice-Zeit, aus TempVoice oder aus beidem?
+2. Wie weit zurück soll der Nachtrag gehen? Alles, was da ist, oder nur ab einem Datum?
+3. Wie wird ein doppelter Nachtrag verhindert? Vorschlag: einmal je Person und Zeitraum vermerken.
+4. „Custom Image für Chat und Voice“: Ist ein eigenes Bild für die Rang-Karte gemeint, oder ein Bild in der Level-up-Nachricht? Sollen die Bilder über die Galerie hochgeladen werden?
+5. Was gehört in den neuen Unterpunkt „Nachrichten bearbeiten“: nur die Level-up-Nachricht, oder auch die Antwort auf `/level rang`?
+
+### [P2] Welcome System
+1. Was soll sich pixelgenau verschieben lassen: Texte, Avatar, Logo, eigene Bilder?
+2. Reicht ein Editor mit Ziehen und Zahlenfeldern (x, y, Größe), mit Einrasten an einem Raster?
+3. Sollen Schriftart, Farbe und Schatten je Text einstellbar sein?
+
+### [P3] Fremde Server bearbeiten, mit Zustimmung des Owners
+1. Wie lange gilt eine Freigabe des Owners: einmal, für einen Tag, bis er sie zurückzieht?
+2. Kann der Owner die Freigabe jederzeit zurückziehen?
+3. Bekommt der Owner zusätzlich eine DM, oder nur die Anfrage im Dashboard?
+4. Was sieht Staff, bis der Owner zustimmt: nur lesen, oder gar nichts?
+5. Sollen Änderungen durch Staff dem Owner angezeigt oder protokolliert werden?
+6. Was gehört zu „Owner und alles“ oben auf der Seite: Name und Bild, Mitglieder, seit wann der Bot drauf ist, aktive Module, Beta oder Shop?
+
+### Aus älteren Aufgaben (stehen dort schon)
+- **[P2] Apply System:** Wie werden Bewerbungen per DM und Mod Mail auseinandergehalten?
+- **[P2] Matchups:** Wer darf Ergebnisse eintragen, wie wird ein öffentlicher Link abgesichert, was passiert mit den Ergebnissen?
+- **Vor dem Livegang:** Rechtstexte prüfen lassen, Testlauf in Stripe mit Test Clock.
+- **Humanity-Skill:** Du wolltest ihn hinzufügen. Wenn er da ist, nutze ich ihn für die Texte.
+
 ## Erledigt am 24.10. (Cloud, zweiter Teil)
 
 - **Wartung (Plan 23):** Review-Nacharbeiten und alle Restpunkte, siehe oben.
