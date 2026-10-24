@@ -27,6 +27,10 @@ export interface IPayload {
     user: IUser;
     guilds: IGuild[];
     inviteURL: string;
-    /** Nur für Administrator und Developer, und nur, solange die Wartung läuft. Fehlt bei einem älteren Bot. */
-    maintenance?: IMaintenanceNote | null;
+    /**
+     * Nur für Administrator und Developer, und nur, solange die Wartung läuft.
+     * `until`: das Ende als „18:00“ oder „morgen 9:00“, vom Server gerechnet,
+     * null ohne Endzeit. Fehlt bei einem älteren Bot.
+     */
+    maintenance?: (IMaintenanceNote & { until: string | null }) | null;
 }

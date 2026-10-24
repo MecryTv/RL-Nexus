@@ -18,7 +18,8 @@ Reihenfolge: P1 vor P2 vor P3 vor P4. Bei gleicher Priorität gilt die Reihenfol
   - Gestaltet wird mit UI UX Pro Max, geschrieben im Menschlichkeit-Stil.
   - Reine Fehler: Ursache suchen und direkt beheben, mit Test.
   - Größere Sachen bekommen Spec, Plan und am Ende einen frischen Reviewer.
-- **Git:** Nichts committen, nichts stagen, kein git. Das machst du von Hand.
+- **Git:** Commits nur als MecryTv, ohne Hinweis auf Claude, auf `claude/relaxed-cannon-5ntusn`. Zwischenstände werden gesichert, bevor die Sitzung endet.
+- **Cloud-Guthaben (höchste Priorität):** Reicht die Sitzung nicht mehr, um eine Sache fertig zu bauen, kommt der aktuelle Stand in diese Datei, damit es später weitergehen kann. Unter 10 $ sehr vorsichtig arbeiten, unter 5 $ sofort sichern. Claude sieht das Guthaben nicht selbst: Sag Bescheid, wenn es knapp wird. Bis dahin wird nach jedem fertigen Schritt gesichert.
 - **Bot-Repo:** Nur Dateien ändern, die du freigegeben hast. Neue Dateien vorher erfragen. `src/dashboard/client/pages/Settings.ts` ist **nicht** freigegeben. Nie die `.env` lesen.
 - **Dev-Server:** Keine POSTs und keine Mails über deine laufenden Dev-Server (3001, 5173, 5174). Für Sichtprüfungen gibt es eigene Vorschau-Ports.
 - **Prüfen:**
@@ -29,21 +30,17 @@ Reihenfolge: P1 vor P2 vor P3 vor P4. Bei gleicher Priorität gilt die Reihenfol
 
 ## Gerade in Arbeit
 
-- **[P1] Wartungsmodus als Umbau: Plan 23 ist gebaut und geprüft, die Nacharbeiten aus dem Review laufen (Zwischenstand, 24.10. nachts).**
-  - **Hier geht es weiter:**
-    1. Bot-Client: `until` in `src/dashboard/client/interfaces/IUser.ts` (`IPayload.maintenance`) ergänzen und in `layout/Topbar.ts` statt `CLOCK.format(...)` nutzen („bis voraussichtlich morgen 9:00 Uhr“). Server, Typ und Test (`/api/me: Ende für den Hinweisstreifen mit Tag`) sind schon fertig.
-    2. MaintenancePage (Admin): Wer bei einer laufenden Wartung ohne Endzeit ein Datum einträgt, bekommt den Haken „automatisch beenden“ gesetzt. Erst Test, dann Fix.
-    3. Kommentare aufräumen: alter Kommentar über `IMaintenance` in `shared/api.ts`, der Kommentar von `at()` über `pausedLine` in `server/status-post.ts`.
-    4. Doku: `Hosting.md` und der Ausroll-Text unten: keine Spiegelung mehr, alte Dateien werden nur noch gelöscht. Den nginx-Block des Bot-Dashboards auf dem Host in Schritt 2 entfernen (wenn der neue Bot live geht).
-    5. Alle Prüfungen in allen vier Projekten, Ledger mit „Final:“-Zeilen, dann Commit und Push.
-  - **Schon erledigt aus dem Review:** Import alter Dateien schaltet eine abgelaufene Wartung nicht wieder ein. Alte Dateien werden nur noch gelöscht, nie neu angelegt, die alte nginx-Regel der Webseite ist weg. Die Webseite sperrt auch beim Klicken innerhalb der Seite. Beginn und Ende mit Tag („gestern 18:05“, „morgen 9:00“) auf Webseite, Statusseite und der Wartungsseite des Bots. Die Webseite wartet beim Nachfragen so lange wie beim ersten Laden und lädt neu, wenn das automatische Ende vorbei ist, auch wenn das Admin Dashboard nicht antwortet. Der Bot fragt bei Datenbankfehlern höchstens alle 5 Sekunden. Die Wartungsseite des Bots hat einen Link zur Anmeldung fürs Team.
+- **[P1, fertig 24.10.] Wartungsmodus als Umbau: Plan 23 ist gebaut, geprüft und nachgebessert.** Alle Prüfungen grün bis auf die bekannten Ausreißer, die es schon vor dem Umbau gab.
+  - **Nachgebessert nach dem Review:** Der Hinweisstreifen für Admin und Dev nennt das Ende mit Tag. Wer im Admin Dashboard bei einer Wartung ohne Endzeit ein Datum einträgt, bekommt „automatisch beenden“ dazu. Import alter Dateien schaltet eine abgelaufene Wartung nicht wieder ein. Alte Dateien werden nur noch gelöscht, nie neu angelegt, die alte nginx-Regel der Webseite ist weg. Die Webseite sperrt auch beim Klicken innerhalb der Seite. Beginn und Ende mit Tag („gestern 18:05“, „morgen 9:00“) auf Webseite, Statusseite und der Wartungsseite des Bots. Die Webseite wartet beim Nachfragen so lange wie beim ersten Laden und lädt neu, wenn das automatische Ende vorbei ist, auch wenn das Admin Dashboard nicht antwortet. Der Bot fragt bei Datenbankfehlern höchstens alle 5 Sekunden. Die Wartungsseite des Bots hat einen Link zur Anmeldung fürs Team.
+  - **Bewusst später (klein):** Die Discord-Statusmeldung nennt das Ende ohne Tag. Keine Obergrenze für die Endzeit. Die Shop-Anmeldung zeigt während der Wartung JSON statt einer Seite. Der Hinweisstreifen erscheint auch auf öffentlichen Seiten des Dashboards. Die vollständige Liste steht im Ledger.
+  - **Als Nächstes:** [P1] RL Team-Übersicht, danach [P1] Server-Übersicht (siehe „Offen“).
   - **Gebaut (24.10.), alle acht Aufgaben mit Tests:**
     - **Admin Dashboard:** Tabelle `site_maintenance` (Migration 013), Seite „Wartung“ mit Grund, Schnellwahl, Endzeit und „automatisch beenden“, Sperre von Kontaktformular und Shop (Stripe-Webhook offen), Statusseite und Discord-Meldung mit Grund und Endzeit.
     - **Webseite:** zeigt Variante B selbst, Rechtstexte bleiben offen.
     - **Bot:** eigene Wartungsseite mit 503, Durchlass und gelber Streifen für Administrator und Developer.
     - **Doku:** `Hosting.md`, `Dashboard.md`.
-  - **Ausrollen:** erst das Admin Dashboard (Migration, Schnittstelle, Spiegelung der alten Dateien), dann Bot und Webseite. Den Container der Webseite danach neu starten (`docker compose -f docker-compose.prod.yml restart website`), weil `website.conf` den neuen Eintrag `/api/wartung` hat.
-  - **Neue Aufgabe für später (P4):** Aufräum-Update. Spiegelung, alte nginx-Regeln, `data/flags`-Mounts und `public/wartung.html` entfernen.
+  - **Ausrollen:** erst das Admin Dashboard (Migration, Schnittstelle; eine alte Wartungsdatei wird einmal übernommen und gelöscht, sobald die Wartung endet, neue Dateien entstehen nicht mehr). Dann Bot und Webseite: Dabei auf dem Host den Wartungsblock aus der nginx-Konfiguration des Bot-Dashboards entfernen und den Container der Webseite neu erstellen (`docker compose -f docker-compose.prod.yml up -d --force-recreate website`), weil `website.conf` den neuen Eintrag `/api/wartung` hat. Genaue Schritte in `Discord Bot/docs/Hosting.md`, Abschnitt Wartungsmodus.
+  - **Neue Aufgabe für später (P4):** Aufräum-Update. Import der alten Dateien, die alte Regel in der Vorlage `nginx/dashboard.nexus-emb.de.conf`, `data/flags`-Mounts und `public/wartung.html` entfernen.
   - **Ledger:** `.superpowers/sdd/2026-10-24-plan-23-wartung-aus-der-datenbank/progress.md`
   - **Plan 23:** `docs/superpowers/plans/2026-10-24-plan-23-wartung-aus-der-datenbank.md`, acht Aufgaben (Admin: Tabelle, Schnittstellen, Status, Seite; Webseite; Bot: Sperre, Hinweisstreifen; Doku).
   - **Freigaben (24.10.):** alle Bot-Dateien aus der Spec, samt neuer `wartung.html`. Rechtstexte der Webseite bleiben während der Wartung erreichbar.
@@ -197,6 +194,20 @@ Reihenfolge: P1 vor P2 vor P3 vor P4. Bei gleicher Priorität gilt die Reihenfol
 - **Entscheiden:** offen lassen wie jetzt, oder im Zweifel sperren (dann sieht bei einem Datenbank-Aussetzer jeder die Sperrseite).
 - **Entschieden (24.10.):** im Zweifel sperren, auch wenn der Stand unbekannt ist. **Erledigt 24.10.**, siehe oben.
 
+### [P1, neu 24.10.] RL Team-Übersicht: Zeichenlimit bei vielen Teams
+- **Reihenfolge:** direkt nach Plan 23 (Wartung), vor der Server-Übersicht.
+- **Projekt:** Bot (Modul RL Team-Übersicht, Discord-Nachricht „Unsere Teams“)
+- **Was passiert:** Bei vielen Teams stößt die Nachricht an das Zeichenlimit von Discord. Die Liste bricht mitten in einer Zeile ab (`<@1…`), darunter steht nur noch „…“ (Bild 3 vom 24.10.).
+- **Was gewünscht ist:** Eine richtig gute Lösung, damit alle Teams vollständig dastehen, egal wie viele es sind.
+- **Hinweise:** Discord erlaubt 4096 Zeichen in der Beschreibung eines Embeds und 6000 Zeichen über alle Embeds einer Nachricht, bis zu 10 Embeds. Jede Erwähnung (`<@…>`) kostet rund 21 Zeichen, auch wenn sie kurz aussieht. Ideen für den Brainstorm: ein Embed je Team oder je Gruppe von Teams, mehrere Nachrichten, wenn es nicht in eine passt, oder Components V2. Dazu kürzere Zeilen (Tracker-Link nicht ausgeschrieben).
+
+### [P1, neu 24.10.] Server-Übersicht: Seitenleiste wird bei vielen Modulen unübersichtlich
+- **Reihenfolge:** nach der RL Team-Übersicht.
+- **Projekt:** Bot (Bot-Dashboard, Seitenleiste der Server-Ansicht)
+- **Was passiert:** Mit vielen aktiven Modulen wird die Seitenleiste lang und schwer zu überblicken: viele Gruppen, Unterpunkte, man muss scrollen (Bild 2 vom 24.10.).
+- **Was gewünscht ist:** Übersichtlicher machen, gern auch etwas ganz Neues.
+- **Hinweise:** Brainstorm mit Entwürfen im Browser. Ideen: Suche oder Schnellwahl, eingeklappte Gruppen mit Merken, angeheftete Module, Unterpunkte erst beim aktiven Modul, Symbolleiste mit Flyout.
+
 ### [P2] Apply System: Webseite oder Discord
 - **Projekt:** Bot (Modul Bewerbungen), Webseite
 - **Was gewünscht ist:**
@@ -209,6 +220,22 @@ Reihenfolge: P1 vor P2 vor P3 vor P4. Bei gleicher Priorität gilt die Reihenfol
 - **Projekt:** Bot (Modul Matchups)
 - **Was gewünscht ist:** Ergebnisse eintragen können, über einen öffentlichen Link oder über Discord, und das Modul generell besser machen.
 - **Hinweise:** Doku `docs/Matchups.md`. Im Brainstorm klären, wer eintragen darf (Captains, Staff?), wie ein Link abgesichert ist und was mit den Ergebnissen passiert (Tabelle, Verlauf?).
+
+### [P2, neu 24.10.] Level System: Voice immer zählen, Nachtrag, eigene Bilder
+- **Projekt:** Bot (Modul Level System), Bot-Dashboard
+- **Was passiert:** `/level rang` zeigt „0 Nachrichten · 0 Min. im Voice“ und Level 0, obwohl Leute im Voice waren (Bild 1 vom 24.10.).
+- **Was gewünscht ist:**
+  - Voice wird immer gezählt, das Modul ist dauerhaft aktiv.
+  - Nachtrag: Die vorhandenen Voice-Daten auswerten und die XP gutschreiben, die jemand hätte bekommen müssen. Das passiert von selbst, sobald der Bot läuft und Daten da sind, die noch nicht gutgeschrieben wurden.
+  - Die Rangliste aktualisieren.
+  - Eigene Bilder für Chat und Voice.
+  - Neuer Unterpunkt im Level System zum Bearbeiten der Nachrichten.
+- **Hinweise:** Im Brainstorm klären, woher die Voice-Daten kommen (TempVoice, Statistik?), wie ein doppelter Nachtrag verhindert wird und wie die Bilder hochgeladen werden.
+
+### [P2, neu 24.10.] Welcome System: Texte und Logos pixelgenau platzieren
+- **Projekt:** Bot (Modul Welcome System), Bot-Dashboard
+- **Was gewünscht ist:** Texte und Logos auf dem Willkommensbild pixelgenau so anordnen können, wie man es möchte.
+- **Hinweise:** Brainstorm mit Entwürfen: ein Editor mit Ziehen und Zahlenfeldern (x, y, Größe), Vorschau in Echtzeit, Raster zum Einrasten.
 
 ### [P3] Rangrollen nach `/rank me`
 - **Projekt:** Bot

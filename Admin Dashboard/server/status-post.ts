@@ -109,13 +109,6 @@ async function remembered(name: string): Promise<string | null> {
 }
 
 /**
- * Ein Zeitpunkt, den Discord selbst in Worte fasst.
- *
- * `<t:…:R>` wird im Client zu „vor 3 Stunden“ und zählt dort weiter. Das ist
- * einem festen Text überlegen: Zwischen zwei Durchläufen liegen zwei Minuten,
- * in denen eine ausgeschriebene Dauer schon wieder falsch wäre.
- */
-/**
  * Die Zeile eines Dienstes in der Wartung: seit wann, bis wann, warum (Plan 23).
  * Discord zeigt die Uhrzeit in der Zeitzone dessen, der liest. Der Name dessen,
  * der sie eingeschaltet hat, steht hier nicht.
@@ -124,6 +117,13 @@ export function pausedLine(state: IMaintenanceState): string {
     return [`In Wartung seit ${at(state.startedAt, "R")}`, ...(state.endsAt ? [`zurück gegen ${at(state.endsAt, "t")}`] : []), ...(state.reason ? [`„${state.reason}“`] : [])].join(" · ");
 }
 
+/**
+ * Ein Zeitpunkt, den Discord selbst in Worte fasst.
+ *
+ * `<t:…:R>` wird im Client zu „vor 3 Stunden“ und zählt dort weiter. Das ist
+ * einem festen Text überlegen: Zwischen zwei Durchläufen liegen zwei Minuten,
+ * in denen eine ausgeschriebene Dauer schon wieder falsch wäre.
+ */
 function at(iso: string | null, style: "R" | "f" | "F" | "t"): string {
     if (iso === null) return "–";
 

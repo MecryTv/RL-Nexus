@@ -32,3 +32,12 @@ export function rowLine(state: IMaintenanceState, now: Date): string {
 export function quickEnd(minutes: number, now: Date): string {
     return new Date(Math.ceil((now.getTime() + minutes * 60_000) / 60_000) * 60_000).toISOString();
 }
+
+/**
+ * Neue Endzeit im Dialog. Kommt sie neu dazu, ist „automatisch beenden“ an:
+ * Bei einer laufenden Wartung ohne Endzeit ist der Haken aus, und ein Datum
+ * allein beendete sie sonst nie. Danach entscheidet der Haken.
+ */
+export function withEnd<T extends { readonly endsAt: string | undefined; readonly autoEnd: boolean }>(draft: T, endsAt: string | undefined): T {
+    return { ...draft, endsAt, autoEnd: draft.endsAt === undefined && endsAt !== undefined ? true : draft.autoEnd };
+}

@@ -4,7 +4,7 @@
  */
 
 import { icon, maybe } from "../core/Dom.js";
-import { DashboardGroup, IMaintenanceNote } from "../interfaces/IUser.js";
+import { DashboardGroup, IPayload } from "../interfaces/IUser.js";
 
 export function watchScroll(): void {
     // Ueber die Klasse, nicht die id: Doku und Datenschutz tragen ihre Kopfzeile
@@ -31,14 +31,12 @@ export function watchScroll(): void {
     update();
 }
 
-const CLOCK = new Intl.DateTimeFormat("de-DE", { timeZone: "Europe/Berlin", hour: "numeric", minute: "2-digit" });
-
 /**
  * Wartung des Bot-Dashboards (Plan 23): Administrator und Developer kommen
  * herein, alle anderen sehen die Wartungsseite. Damit das niemand vergisst,
  * hängt unter der Kopfzeile ein Streifen, der beim Scrollen mitkommt.
  */
-export function showMaintenance(note: IMaintenanceNote | null | undefined, group: DashboardGroup): void {
+export function showMaintenance(note: IPayload["maintenance"], group: DashboardGroup): void {
     const topbar = maybe<HTMLElement>(".topbar");
 
     if (!note || !topbar) return;
@@ -54,7 +52,7 @@ export function showMaintenance(note: IMaintenanceNote | null | undefined, group
     lead.textContent = "Wartung läuft";
     text.append(
         lead,
-        `${note.endsAt ? ` bis voraussichtlich ${CLOCK.format(new Date(note.endsAt))} Uhr.` : ", ohne Endzeit."} ` +
+        `${note.until ? ` bis voraussichtlich ${note.until} Uhr.` : ", ohne Endzeit."} ` +
             `Du siehst das Dashboard, weil du ${group === "administrator" ? "Administrator" : "Developer"} bist. Alle anderen sehen die Wartungsseite. ` +
             "Schalter im Admin Dashboard unter Developer → Wartung."
     );

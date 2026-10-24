@@ -120,7 +120,6 @@ export interface IOverview {
     readonly recent: readonly IRecentAction[];
 }
 
-/** Ein eingeschalteter Wartungsmodus. Beides null, wenn die Datei da, aber unlesbar ist: an ist er trotzdem. */
 /** null heißt: läuft nicht (aus, oder mit Haken über die Endzeit hinaus). Regel und Felder in shared/maintenance.ts. */
 export interface IMaintenance {
     readonly website: IMaintenanceState | null;

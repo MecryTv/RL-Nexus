@@ -1028,6 +1028,10 @@ async function checkMaintenance(client: BotClient): Promise<void> {
         const app = await readFile(path.join(process.cwd(), "src", "dashboard", "client", "app.ts"), "utf8");
 
         check("Dashboard: jede Seite zeigt Admin und Dev den Hinweisstreifen (showMaintenance in app.ts)", /showMaintenance\(data\.maintenance/.test(app));
+
+        const topbar = await readFile(path.join(process.cwd(), "src", "dashboard", "client", "layout", "Topbar.ts"), "utf8");
+
+        check("Hinweisstreifen: Ende mit Tag aus /api/me (note.until), nicht nur die Uhrzeit", /note\.until/.test(topbar) && !/CLOCK\.format/.test(topbar));
     } finally {
         service.Maintenance = savedMaintenance;
         service.GroupOf = savedGroupOf;

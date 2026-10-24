@@ -11,7 +11,7 @@ import { PageHeader } from "../components/PageHeader";
 import { Panel } from "../components/Panel";
 import { Failure, Loading } from "../components/Status";
 import { formatDateTime, fromLocalInput, toLocalInput } from "../format";
-import { quickEnd, rowLine } from "../maintenance/format";
+import { quickEnd, rowLine, withEnd } from "../maintenance/format";
 import { useToast } from "../toast/context";
 import { useTitle } from "../useTitle";
 import styles from "./dev.module.scss";
@@ -258,7 +258,7 @@ export function MaintenancePage(): JSX.Element {
                                 type="datetime-local"
                                 value={toLocalInput(draft.endsAt)}
                                 aria-describedby={problem?.field === "end" ? "wartung-ende-error" : "wartung-ende-hint"}
-                                onChange={(event) => setDraft({ ...draft, endsAt: fromLocalInput(event.target.value) })}
+                                onChange={(event) => setDraft(withEnd(draft, fromLocalInput(event.target.value)))}
                             />
                         </Field>
                         <label className={styles.maintenanceCheck}>

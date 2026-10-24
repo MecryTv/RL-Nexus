@@ -69,7 +69,7 @@ Gewählt hat der Betreiber C („Die Webseite selbst hat so was drin, sodass sie
 
 - Liegt beim Start des Admin Dashboards noch eine alte Datei in `FLAGS_DIR` (`wartung-webseite`, `wartung-dashboard`), übernimmt es den Stand (seit wann, von wem) in die Tabelle.
 - **Die Dateien bleiben bis zum Aufräum-Update gespiegelt:** Das Admin Dashboard schreibt und löscht sie weiter nach dem Stand der Tabelle (beim Schalten und im Takt, also auch beim automatischen Ende). So bleibt eine Wartung, die genau für dieses Update eingeschaltet wurde, während des Ausrollens bestehen: die alten nginx-Regeln greifen weiter, bis Bot und Webseite die Wartung selbst zeigen. (Ergebnis der Prüfung, Entscheidung Claude. Kostet bei Irrtum: eine Funktion, die im Aufräum-Update wieder wegfällt.)
-- Reihenfolge beim Ausrollen: zuerst das Admin Dashboard (Migration, Schnittstelle, Spiegelung), dann Bot und Webseite. In einem späteren Update fallen Spiegelung, nginx-Regeln, Mounts und `public/wartung.html` weg. Jede Zwischenstufe ist sicher: Ohne Antwort der Schnittstelle ist die Webseite offen, ohne Tabelle ist die Wartung im Bot aus.
+- Reihenfolge beim Ausrollen: zuerst das Admin Dashboard (Migration, Schnittstelle, einmaliger Import alter Dateien), dann Bot und Webseite; dabei fällt der Wartungsblock im Host-nginx des Bot-Dashboards weg. Nach dem finalen Review (24.10.) legt das Admin Dashboard keine Dateien mehr an, es löscht alte nur noch, und die alte Regel in `website.conf` ist schon entfernt. In einem späteren Update fallen Import, Vorlagen-Regel, Mounts und `public/wartung.html` weg. Jede Zwischenstufe ist sicher: Ohne Antwort der Schnittstelle ist die Webseite offen, ohne Tabelle ist die Wartung im Bot aus.
 
 ### Admin Dashboard
 
@@ -110,7 +110,7 @@ Gewählt hat der Betreiber C („Die Webseite selbst hat so was drin, sodass sie
 ### Aufräumen
 
 - In diesem Umbau: `nginx/container/website.conf` bekommt `location = /api/wartung` an `admin:3001/public/maintenance` (wie `/api/contact`). Die alte Regel `if (-f /srv/flags/…)` bleibt für den Übergang.
-- Im späteren Aufräum-Update: Regel und `@rlnexus_wartung` in `website.conf`, der Wartungsblock in `nginx/dashboard.nexus-emb.de.conf`, die Mounts `data/flags` und `FLAGS_DIR` in `docker-compose.prod.yml`, die Spiegelung im Admin Dashboard und `public/wartung.html`.
+- Im späteren Aufräum-Update: der Wartungsblock in `nginx/dashboard.nexus-emb.de.conf`, die Mounts `data/flags` und `FLAGS_DIR` in `docker-compose.prod.yml`, Import und Löschen der alten Dateien im Admin Dashboard und `public/wartung.html`. (Regel und `@rlnexus_wartung` in `website.conf` sind seit dem finalen Review schon weg.)
 - `docs/Hosting.md` und die Kopfzeile der Wartungsseite im Admin Dashboard beschreiben den neuen Weg.
 
 ## Betroffene Dateien

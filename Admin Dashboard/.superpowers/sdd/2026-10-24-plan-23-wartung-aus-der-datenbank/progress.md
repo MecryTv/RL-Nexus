@@ -48,4 +48,16 @@ Ausführung: Native (Betreiber, 24.10.). Ein frischer Reviewer am Ende.
 - Final: Test „abgelaufene Sitzung oder nicht prüfbare Gruppe zählt wie ein Nutzer“ war sofort grün: sichert vorhandenes Verhalten ab, kein Fehler gefunden.
 - Final: Ruling: Den Text für den Hinweisstreifen („morgen 9:00“) rechnet der Server und schickt ihn als `until` in /api/me mit — im Bot dürfen keine neuen Dateien entstehen, und der Client kann den Server-Code nicht importieren; so gibt es eine Umsetzung mit Test — kostet bei Irrtum: bleibt ein Tab über Mitternacht offen, steht im Streifen noch „morgen“.
 - Final: Ruling: watchMaintenance bekommt den gezeigten Stand statt eines Booleans, `stateChanged(shown, after, now)` mit `after === undefined` für „keine Antwort“ — kostet bei Irrtum: nichts.
-- ZWISCHENSTAND (24.10. nachts): weiter bei AUFGABEN.md „Hier geht es weiter“ (Client until, MaintenancePage autoEnd, Kommentare, Doku, alle Prüfungen, Final-minors ins Ledger, Commit).
+- Final: fixed Hinweisstreifen zeigt nur die Uhrzeit — check:dashboard „/api/me: Ende für den Hinweisstreifen mit Tag“ und „Hinweisstreifen: Ende mit Tag aus /api/me (note.until)“ RED→GREEN
+- Final: fixed Datum bei laufender Wartung ohne Endzeit beendet nie — format.check „Wer eine Endzeit neu einträgt, bekommt „automatisch beenden“ dazu“ RED→GREEN (withEnd)
+- Final: fixed doppelte Kommentare in shared/api.ts und server/status-post.ts; Doku (Hosting.md, Spec, AUFGABEN.md) auf „nur noch löschen“ und Host-nginx in Schritt 2
+- Final: Suite — Admin: check 258 ok, 2 FAIL (Webseiten-Ordner fehlt, bekannt); check:db 165 ok, 3 FAIL (Kontaktformular, Backup-Datenbank wieder da, Interne Schnittstelle) — dieselben 3 auch auf 29b6be5 vor Plan 23; typecheck, oxlint, build 0. Webseite: check 40/40, lint, build 0. Statusseite: lint, build 0. Bot: check:dashboard, check:teams, check:admin, check:voice 0 FAIL; tsc --noEmit, build 0.
+- Final: Ruling: Der Ledger-Ordner bleibt liegen statt gelöscht zu werden — AUFGABEN.md verweist darauf und die Rulings sind so ohne git log lesbar — kostet bei Irrtum: ein Ordner mehr im Repo.
+- Final: minor (deferred): Discord-Statusmeldung nennt das Ende als <t:…:t>, also ohne Tag, wenn es erst morgen ist.
+- Final: minor (deferred): Übersicht im Admin Dashboard ohne eigenes .catch, wenn die Datenbank beim Lesen der Wartung kurz hängt.
+- Final: minor (deferred): Keine Obergrenze für die Endzeit (eine Wartung bis 2099 wird angenommen).
+- Final: minor (deferred): Shop-Anmeldung während der Wartung liefert im Browser JSON statt einer Seite.
+- Final: minor (deferred): replaceAll mit Platzhaltern wertet `$`-Muster im Grund aus (Grund ist maskiert, betrifft nur `$&` u. ä. im Text).
+- Final: minor (deferred): Der Hinweisstreifen erscheint für Admin/Dev auch auf öffentlichen Seiten des Dashboards.
+- Final: minor (deferred): `stopMaintenance` wird exportiert, aber nirgends aufgerufen.
+- Plan 23: abgeschlossen (24.10.)

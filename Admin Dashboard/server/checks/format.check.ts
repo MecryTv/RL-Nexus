@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { formatBytes, formatDuration, formatMonth, formatNumber, formatPercent } from "../../src/format.ts";
 import { sparkline } from "../../src/sparkline.ts";
 import { clockText, isRunning, whenText } from "../../shared/maintenance.ts";
-import { quickEnd, rowLine } from "../../src/maintenance/format.ts";
+import { quickEnd, rowLine, withEnd } from "../../src/maintenance/format.ts";
 import { check, section } from "./harness.ts";
 
 /** src/format.ts hat keine DOM-Abhängigkeit, deshalb läuft ihr Check hier mit. */
@@ -53,6 +53,15 @@ export async function checkFormat(): Promise<void> {
     await check("Wartung: Schnellwahl rundet auf die nächste volle Minute", () => {
         assert.equal(quickEnd(30, new Date("2026-10-24T14:30:20Z")), "2026-10-24T15:01:00.000Z");
         assert.equal(quickEnd(60, new Date("2026-10-24T14:30:00Z")), "2026-10-24T15:30:00.000Z");
+    });
+
+    await check("Wartung: Wer eine Endzeit neu einträgt, bekommt „automatisch beenden“ dazu", () => {
+        // Eine laufende Wartung ohne Endzeit hat den Haken aus. Ein Datum allein beendete sie sonst nie.
+        const end = "2026-10-24T18:00:00.000Z";
+
+        assert.deepEqual(withEnd({ endsAt: undefined, autoEnd: false }, end), { endsAt: end, autoEnd: true });
+        assert.deepEqual(withEnd({ endsAt: "2026-10-24T17:00:00.000Z", autoEnd: false }, end), { endsAt: end, autoEnd: false });
+        assert.deepEqual(withEnd({ endsAt: end, autoEnd: true }, undefined), { endsAt: undefined, autoEnd: true });
     });
 
     await check("Zahlen mit Tausenderpunkt, fehlendes Datum als „unbekannt“", () => {
