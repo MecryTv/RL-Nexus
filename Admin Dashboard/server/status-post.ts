@@ -1,3 +1,4 @@
+import type { IMaintenanceState } from "../shared/maintenance.ts";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { BANNER_KIND_LABELS, bannerState, type IBanner } from "../shared/content.ts";
@@ -114,6 +115,15 @@ async function remembered(name: string): Promise<string | null> {
  * einem festen Text überlegen: Zwischen zwei Durchläufen liegen zwei Minuten,
  * in denen eine ausgeschriebene Dauer schon wieder falsch wäre.
  */
+/**
+ * Die Zeile eines Dienstes in der Wartung: seit wann, bis wann, warum (Plan 23).
+ * Discord zeigt die Uhrzeit in der Zeitzone dessen, der liest. Der Name dessen,
+ * der sie eingeschaltet hat, steht hier nicht.
+ */
+export function pausedLine(state: IMaintenanceState): string {
+    return [`In Wartung seit ${at(state.startedAt, "R")}`, ...(state.endsAt ? [`zurück gegen ${at(state.endsAt, "t")}`] : []), ...(state.reason ? [`„${state.reason}“`] : [])].join(" · ");
+}
+
 function at(iso: string | null, style: "R" | "f" | "F" | "t"): string {
     if (iso === null) return "–";
 
@@ -272,7 +282,7 @@ export function payload(snapshot: IStatusSnapshot, config: IConfig): Record<stri
     /* --- Bot-Dashboard -------------------------------------------------- */
     const dashboardLine =
         paused.dashboard !== null
-            ? `In Wartung seit ${at(paused.dashboard.since, "R")}`
+            ? pausedLine(paused.dashboard)
             : dashboard.state === "down"
               ? "Antwortet nicht"
               : `Antwortet in **${ms(dashboard.latencyNow)}** · Ø 24 h ${ms(dashboard.latency.avg)}`;
@@ -282,7 +292,7 @@ export function payload(snapshot: IStatusSnapshot, config: IConfig): Record<stri
     /* --- Webseite ------------------------------------------------------- */
     const siteLine =
         paused.website !== null
-            ? `In Wartung seit ${at(paused.website.since, "R")}`
+            ? pausedLine(paused.website)
             : site.state === "down"
               ? "Antwortet nicht"
               : `Antwortet in **${ms(site.latencyNow)}** · aktualisiert ${at(website.builtAt, "f")}`;

@@ -1,9 +1,11 @@
+import type { IMaintenanceState } from "../../shared/maintenance.ts";
 import {
     STATUS_SERVICE_LABELS,
     STATUS_SERVICES,
     type CheckState,
     type IIncident,
     type IPastIssue,
+    type IPublicService,
     type IPublicStatus,
     type StatusService,
 } from "../../shared/status.ts";
@@ -198,6 +200,11 @@ function anonymous(incident: IIncident): IIncident {
     return { ...incident, updates: incident.updates.map((update) => ({ ...update, by: null })) };
 }
 
+/** Die Wartung eines Dienstes für die Statusseite: Grund und Endzeit, kein Name. */
+function pausedOf(state: IMaintenanceState | null): IPublicService["paused"] {
+    return state ? { reason: state.reason, endsAt: state.endsAt } : null;
+}
+
 /** Was status.nexus-emb.de bekommt: nur, was öffentlich sein darf. Kein Speicher, keine Größen, keine Kontakte. */
 export function toPublic(snapshot: IStatusSnapshot, config: IConfig): IPublicStatus {
     const bot = snapshot.measured.bot;
@@ -218,6 +225,7 @@ export function toPublic(snapshot: IStatusSnapshot, config: IConfig): IPublicSta
             latency: { now: service.latencyNow, ...service.latency },
             lastOutage: service.lastOutage,
             since: service.id === "bot" ? (bot?.startedAt ?? null) : service.id === "website" ? snapshot.measured.website.builtAt : null,
+            paused: pausedOf(service.id === "website" ? snapshot.measured.maintenance.website : service.id === "dashboard" ? snapshot.measured.maintenance.dashboard : null),
         })),
         incidents: snapshot.incidents.map(anonymous),
         maintenance: snapshot.maintenance.map(anonymous),

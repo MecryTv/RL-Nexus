@@ -463,6 +463,83 @@ a.careful {
     font-size: 0.875rem;
 }
 
+/* Wartung (Plan 23): die Zeile zum Ende, der Grund, die Knöpfe und der Dialog. */
+.maintenanceLine {
+    color: var(--c-mod-engagement);
+    font-size: 0.875rem;
+}
+
+.maintenanceReason {
+    margin: 0;
+    padding: var(--s-2) var(--s-3);
+    border: 1px solid var(--c-line);
+    background: var(--c-panel-solid);
+    color: var(--c-text);
+    font-size: 0.9rem;
+}
+
+.maintenanceActions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-2);
+}
+
+.maintenanceForm {
+    display: grid;
+    gap: var(--s-4);
+}
+
+.maintenanceQuick {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-2);
+    margin-bottom: var(--s-2);
+}
+
+.maintenanceCheck {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: var(--s-2);
+    align-items: start;
+    color: var(--c-text);
+    cursor: pointer;
+
+    input {
+        width: 20px;
+        height: 20px;
+        margin: 2px 0 0;
+        accent-color: var(--c-red);
+    }
+
+    small {
+        display: block;
+        margin-top: 2px;
+        color: var(--c-text-faint);
+        font-size: 0.8125rem;
+    }
+}
+
+.maintenanceSays {
+    display: grid;
+    gap: 2px;
+    padding: var(--s-3);
+    border-left: 3px solid var(--c-mod-engagement);
+    background: var(--c-panel-solid);
+    color: var(--c-text-dim);
+    font-size: 0.875rem;
+
+    small {
+        color: var(--c-text-faint);
+
+        @include label(0.7rem, 0.14em);
+    }
+
+    b {
+        color: var(--c-text);
+        font-weight: 600;
+    }
+}
+
 .preview {
     width: 100%;
     height: 420px;

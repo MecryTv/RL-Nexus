@@ -1,3 +1,4 @@
+import type { IMaintenanceNote } from "../../../services/DashboardService";
 import BotClient from "../../../client/BotClient";
 import { ModuleId } from "../../../constants/Modules";
 import IDashboardActivity from "./IDashboardActivity";
@@ -10,6 +11,12 @@ export interface IDashboardPayload {
     user: IDashboardUser;
     guilds: IDashboardGuild[];
     inviteURL: string;
+    /**
+     * Laufende Wartung des Bot-Dashboards, nur für Administrator und Developer
+     * (Hinweisstreifen). Sonst null. `until`: das Ende als „18:00“ oder
+     * „morgen 9:00“, null ohne Endzeit.
+     */
+    maintenance: (IMaintenanceNote & { readonly until: string | null }) | null;
 }
 
 export default interface IDashboardService {

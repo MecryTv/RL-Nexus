@@ -14,8 +14,19 @@ export interface IUser {
     group: DashboardGroup;
 }
 
+/** Laufende Wartung des Bot-Dashboards. Spiegelt IMaintenanceNote aus dem Backend. */
+export interface IMaintenanceNote {
+    reason: string | null;
+    startedAt: string;
+    /** null: ohne Endzeit. */
+    endsAt: string | null;
+    autoEnd: boolean;
+}
+
 export interface IPayload {
     user: IUser;
     guilds: IGuild[];
     inviteURL: string;
+    /** Nur für Administrator und Developer, und nur, solange die Wartung läuft. Fehlt bei einem älteren Bot. */
+    maintenance?: IMaintenanceNote | null;
 }

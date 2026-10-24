@@ -8,6 +8,7 @@
 
 import type { BannerState } from "./content.ts";
 import type { Group, LogLevelFilter, MailFolderRole, NotificationKind } from "./limits.ts";
+import type { IMaintenanceState } from "./maintenance.ts";
 import type { CheckState, ILatency, IncidentKind, StatusService } from "./status.ts";
 
 /** Die Rolle im Admin Dashboard. Kommt bei jeder Anfrage frisch aus Discord. */
@@ -120,15 +121,10 @@ export interface IOverview {
 }
 
 /** Ein eingeschalteter Wartungsmodus. Beides null, wenn die Datei da, aber unlesbar ist: an ist er trotzdem. */
-export interface IMaintenanceFlag {
-    readonly since: string | null;
-    readonly by: string | null;
-}
-
-/** null heißt: aus. */
+/** null heißt: läuft nicht (aus, oder mit Haken über die Endzeit hinaus). Regel und Felder in shared/maintenance.ts. */
 export interface IMaintenance {
-    readonly website: IMaintenanceFlag | null;
-    readonly dashboard: IMaintenanceFlag | null;
+    readonly website: IMaintenanceState | null;
+    readonly dashboard: IMaintenanceState | null;
 }
 
 /** GET /api/bot/status: ohne Zwischenspeicher, für die Rückmeldung nach dem Neustart. */

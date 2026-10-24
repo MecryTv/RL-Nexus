@@ -237,6 +237,8 @@ export interface IPublicService {
     readonly lastOutage: IOutage | null;
     /** Seit wann der Bot läuft, wann die Webseite gebaut wurde. Nur, was öffentlich sein darf. */
     readonly since: string | null;
+    /** Webseite und Bot-Dashboard in der Wartung (Plan 23): Grund und Endzeit, nie der Name. null: keine. */
+    readonly paused: { readonly reason: string | null; readonly endsAt: string | null } | null;
 }
 
 /** Ein Eintrag unter „Störungen der letzten 14 Tage“. */

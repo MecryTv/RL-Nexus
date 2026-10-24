@@ -29,6 +29,10 @@ import DashboardService, {
     DisplayGroup,
     EscapeHtml,
     LockPlaceholders,
+    MaintenanceOf,
+    MaintenanceOpenPath,
+    MaintenanceDayClock,
+    MaintenancePlaceholders,
     MfaRequired,
     SchemaMissing,
     ShopDecision,
@@ -905,6 +909,180 @@ async function checkBeta(client: BotClient): Promise<void> {
     check("Einlösen ohne Sitzung: zur Anmeldung", anonymous.status === 302 && String(anonymous.headers.get("location")).endsWith("/login"), `${anonymous.status} ${anonymous.headers.get("location")}`);
 }
 
+/**
+ * Wartung des Bot-Dashboards (Plan 23): Der Bot liest site_maintenance und
+ * stellt sich vor jede Anfrage. Administrator und Developer kommen durch.
+ */
+async function checkMaintenance(client: BotClient): Promise<void> {
+    console.log("\n  — Wartung —");
+
+    const now = new Date("2026-10-24T15:00:00Z");
+    const row = { active: 1, reason: "Wir spielen ein Update ein.", started_at: new Date("2026-10-24T14:00:00Z"), ends_at: new Date("2026-10-24T16:00:00Z"), auto_end: 1 };
+
+    check(
+        "Wartung läuft: an, und nicht mit Haken über die Endzeit hinaus",
+        MaintenanceOf(row, now)?.endsAt === "2026-10-24T16:00:00.000Z" &&
+            MaintenanceOf({ ...row, active: 0 }, now) === null &&
+            MaintenanceOf(row, new Date("2026-10-24T16:00:00Z")) === null &&
+            MaintenanceOf({ ...row, auto_end: 0 }, new Date("2026-10-24T17:00:00Z")) !== null &&
+            MaintenanceOf(null, now) === null
+    );
+
+    const open = [`${P}/assets/style.css`, "/images/gallery/1.webp", "/dcapi/health", `${P}/login`, `${P}/callback`, `${P}/logout`, `${P}/impressum`, `${P}/privacy`];
+    const closed = [`${P}/`, `${P}/guild/1059621019947634739/backups`, `${P}/api/me`, `${P}/settings`];
+
+    check(
+        "Wartung: Assets, Bilder, /dcapi, Anmeldung und Rechtstexte bleiben offen",
+        open.every(MaintenanceOpenPath) && !closed.some(MaintenanceOpenPath),
+        [...open.filter((path) => !MaintenanceOpenPath(path)), ...closed.filter(MaintenanceOpenPath)].join(", ")
+    );
+
+    const placeholders = MaintenancePlaceholders(MaintenanceOf({ ...row, reason: "<b>Update</b>" }, now)!, now);
+
+    check(
+        "Wartungsseite: Grund maskiert, Zeitleiste mit Berliner Zeit",
+        placeholders.REASON === "&lt;b&gt;Update&lt;/b&gt;" && placeholders.TIMELINE.includes("16:00") && placeholders.TIMELINE.includes("18:00") && placeholders.ETA === "",
+        JSON.stringify(placeholders)
+    );
+
+    // Über Nacht: „Seit 18:05“ allein hieße heute 18:05.
+    const overnight = MaintenancePlaceholders(MaintenanceOf({ ...row, started_at: new Date("2026-10-23T16:05:00Z"), ends_at: new Date("2026-10-25T08:00:00Z") }, now)!, now);
+
+    check(
+        "Wartungsseite: an einem anderen Tag mit Tag vor der Uhrzeit",
+        overnight.TIMELINE.includes("Seit <b>gestern 18:05</b>") &&
+            overnight.TIMELINE.includes("Zurück gegen <b>morgen 9:00</b>") &&
+            MaintenanceDayClock("2026-10-31T08:00:00Z", now) === "31.10. 9:00" &&
+            MaintenanceDayClock("2026-10-24T16:00:00Z", now) === "18:00",
+        overnight.TIMELINE
+    );
+
+    const noEnd = MaintenancePlaceholders(MaintenanceOf({ ...row, reason: null, ends_at: null, auto_end: 0 }, now)!, now);
+
+    check("Wartungsseite ohne Endzeit und Grund: fester Satz, keine Zeitleiste", noEnd.REASON === "Wir arbeiten gerade am System." && noEnd.TIMELINE === "" && noEnd.ETA.includes("Wie lange es dauert, steht noch nicht fest."), JSON.stringify(noEnd));
+
+    // Über den laufenden Server, mit nachgestellter Wartung und Gruppe.
+    const service = client.dashboardService;
+    const savedMaintenance = service.Maintenance.bind(service);
+    const savedGroupOf = service.GroupOf.bind(service);
+    const developer = service.Sign({ id: "wartung-dev", userId: "1059621019947634750", username: "Dev", avatar: null, accessToken: "egal", mfa: true, expiresAt: Date.now() + 60_000 });
+    const devCookie = { Cookie: `${SESSION_COOKIE}=${encodeURIComponent(developer)}` };
+
+    service.Maintenance = async () => MaintenanceOf(row, now);
+    service.GroupOf = async (userId: string) => (userId === "1059621019947634750" ? "developer" : "testphase");
+
+    try {
+        const page = await fetch(`${BASE}${P}/`, { ...MANUAL, headers: { Accept: "text/html" } });
+        const pageText = await page.text();
+        const api = await fetch(`${BASE}${P}/api/me`, { ...MANUAL, headers: { Accept: "application/json" } });
+        const asset = await fetch(`${BASE}${P}/assets/style.css`, MANUAL);
+        const login = await fetch(`${BASE}${P}/login`, MANUAL);
+        const staff = await fetch(`${BASE}${P}/api/me`, { ...MANUAL, headers: { Accept: "application/json", ...devCookie } });
+
+        check("Wartung: Seiten zeigen die Wartungsseite mit 503", page.status === 503 && page.headers.get("retry-after") === "300" && pageText.includes("Wir sind gleich wieder da"), `${page.status}`);
+        check("Wartung: API antwortet 503 mit Satz", api.status === 503 && (await api.json()).error === "Gerade ist Wartung. Versuch es in ein paar Minuten noch einmal.", `${api.status}`);
+        check("Wartung: Assets und Anmeldung bleiben erreichbar", asset.status === 200 && login.status !== 503, `${asset.status} ${login.status}`);
+        check("Wartung: Developer kommen durch", staff.status !== 503, `${staff.status}`);
+        check("Wartungsseite: Link zur Anmeldung fürs Team", pageText.includes(`href="${P}/login"`));
+
+        const expired = service.Sign({ id: "wartung-alt", userId: "1059621019947634750", username: "Dev", avatar: null, accessToken: "egal", mfa: true, expiresAt: Date.now() - 1_000 });
+        const late = await fetch(`${BASE}${P}/api/me`, { ...MANUAL, headers: { Accept: "application/json", Cookie: `${SESSION_COOKIE}=${encodeURIComponent(expired)}` } });
+
+        service.GroupOf = async () => {
+            throw new Error("Discord antwortet nicht");
+        };
+
+        const unknown = await fetch(`${BASE}${P}/api/me`, { ...MANUAL, headers: { Accept: "application/json", ...devCookie } });
+
+        service.GroupOf = async (userId: string) => (userId === "1059621019947634750" ? "developer" : "testphase");
+        check("Wartung: abgelaufene Sitzung oder nicht prüfbare Gruppe zählt wie ein Nutzer", late.status === 503 && unknown.status === 503, `${late.status} ${unknown.status}`);
+
+        // /api/me trägt die Wartung nur für Administrator und Developer: Für sie zeigt jede Seite den Hinweisstreifen.
+        const originalFetch = globalThis.fetch;
+
+        globalThis.fetch = (async (input: RequestInfo | URL) =>
+            String(input).includes("/users/@me/guilds") ? new Response("[]", { headers: { "Content-Type": "application/json" } }) : new Response("{}", { status: 404 })) as typeof fetch;
+
+        try {
+            const session = (userId: string): IDashboardSession => ({ id: `wartung-${userId}`, userId, username: "Check", avatar: null, accessToken: "egal", mfa: true, expiresAt: Date.now() + 60_000 });
+            const forDeveloper = await service.Payload(session("1059621019947634750"));
+            const forUser = await service.Payload(session("1059621019947634751"));
+
+            check(
+                "/api/me: Wartung nur für Administrator und Developer",
+                forDeveloper.maintenance?.reason === "Wir spielen ein Update ein." && forUser.maintenance === null,
+                JSON.stringify([forDeveloper.maintenance, forUser.maintenance])
+            );
+
+            // Den Text für den Hinweisstreifen rechnet der Server: endet die Wartung morgen, steht das da.
+            service.Maintenance = async () => MaintenanceOf({ ...row, started_at: new Date(), ends_at: new Date(Date.now() + 86_400_000) }, new Date());
+
+            const tomorrow = (await service.Payload(session("1059621019947634750"))).maintenance;
+
+            service.Maintenance = async () => MaintenanceOf(row, now);
+            check("/api/me: Ende für den Hinweisstreifen mit Tag", tomorrow?.until?.startsWith("morgen ") === true, JSON.stringify(tomorrow));
+        } finally {
+            globalThis.fetch = originalFetch;
+        }
+
+        const app = await readFile(path.join(process.cwd(), "src", "dashboard", "client", "app.ts"), "utf8");
+
+        check("Dashboard: jede Seite zeigt Admin und Dev den Hinweisstreifen (showMaintenance in app.ts)", /showMaintenance\(data\.maintenance/.test(app));
+    } finally {
+        service.Maintenance = savedMaintenance;
+        service.GroupOf = savedGroupOf;
+    }
+
+    // Die Hauptseite zeigt die Wartung selbst. Bliebe die alte Datei-Regel im
+    // Container, sperrte sie bei jeder Wartung auch Rechtstexte und Vorschau.
+    const websiteConf = await readFile(path.join(process.cwd(), "nginx", "container", "website.conf"), "utf8");
+
+    check(
+        "nginx der Hauptseite: /api/wartung geht ans Admin Dashboard, keine alte Datei-Regel mehr",
+        /location = \/api\/wartung \{[^}]*proxy_pass \$rlnexus_admin\/public\/maintenance;/.test(websiteConf) && !websiteConf.includes("/srv/flags/wartung-webseite") && !websiteConf.includes("@rlnexus_wartung")
+    );
+
+    // Fehlt die Tabelle (Bot neuer als das Admin Dashboard), ist keine Wartung.
+    const db = client.databaseService as unknown as { One: (sql: string) => Promise<unknown> };
+    const savedOne = db.One;
+    const readyOf = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(client.databaseService), "Ready");
+    const configuredOf = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(client.databaseService), "IsConfigured");
+
+    Object.defineProperty(client.databaseService, "Ready", { configurable: true, get: () => true });
+    Object.defineProperty(client.databaseService, "IsConfigured", { configurable: true, get: () => true });
+    db.One = async () => {
+        throw Object.assign(new Error("Table 'site_maintenance' doesn't exist"), { errno: 1146 });
+    };
+
+    const cache = service as unknown as { maintenanceRow: { at: number; row: unknown } | null };
+
+    try {
+        cache.maintenanceRow = null;
+        check("Wartung: ohne Tabelle keine Wartung", (await service.Maintenance()) === null);
+
+        // Antwortet die Datenbank nicht, fragt nicht jede Anfrage von vorn: Jede wartete sonst auf ihr Zeitlimit.
+        let queries = 0;
+
+        db.One = async () => {
+            queries++;
+            throw Object.assign(new Error("Lost connection to server during query"), { errno: 2013 });
+        };
+        cache.maintenanceRow = { at: 0, row };
+
+        const first = await service.Maintenance(now);
+        const second = await service.Maintenance(now);
+
+        check("Wartung: Datenbank weg, letzter Stand gilt und höchstens eine Abfrage alle 5 Sekunden", first !== null && second !== null && queries === 1, `${queries} Abfragen`);
+    } finally {
+        cache.maintenanceRow = null;
+        db.One = savedOne;
+        delete (client.databaseService as unknown as Record<string, unknown>).Ready;
+        delete (client.databaseService as unknown as Record<string, unknown>).IsConfigured;
+        if (readyOf) Object.defineProperty(Object.getPrototypeOf(client.databaseService), "Ready", readyOf);
+        if (configuredOf) Object.defineProperty(Object.getPrototypeOf(client.databaseService), "IsConfigured", configuredOf);
+    }
+}
+
 async function main(): Promise<void> {
     const client = new BotClient();
 
@@ -920,6 +1098,7 @@ async function main(): Promise<void> {
     await checkGroups(client);
     await checkPaywall(client);
     await checkBeta(client);
+    await checkMaintenance(client);
     checkShopStatus();
     checkSessions(client);
 

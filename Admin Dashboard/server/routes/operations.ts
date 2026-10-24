@@ -6,11 +6,11 @@ import { botOverview, botStatus, restartBot } from "../bot.ts";
 import type { IConfig } from "../config.ts";
 import { websiteStatus } from "../content.ts";
 import { databaseReady, query } from "../db.ts";
-import { InvalidInput, PublicError } from "../errors.ts";
+import { PublicError } from "../errors.ts";
 import { publish } from "../events.ts";
 import { notifyStatus } from "../notify.ts";
-import { MAINTENANCE_FILES, readMaintenance, setMaintenance, type MaintenanceArea } from "../maintenance.ts";
-import { body } from "../validate.ts";
+import type { MaintenanceArea } from "../../shared/maintenance.ts";
+import { afterChange, parseMaintenanceInput, readMaintenance, setMaintenance } from "../maintenance.ts";
 
 /** Wartung, Neustart und Technik-Ansicht. Nur für Developer. */
 
@@ -77,24 +77,17 @@ export async function operationRoutes(app: FastifyInstance, { config }: { config
 
     app.put("/api/maintenance", async (request) => {
         const actor = accessOf(request);
-        const input = body(request.body);
-        const changes = (Object.keys(MAINTENANCE_FILES) as MaintenanceArea[]).filter((area) => input[area] !== undefined);
+        const now = new Date();
+        const { area, input } = parseMaintenanceInput(request.body, now);
 
-        if (changes.length === 0) throw new InvalidInput("Sag, welcher Bereich in die Wartung soll: website oder dashboard.");
+        if (!databaseReady()) throw new PublicError(503, "Ohne Datenbank lässt sich die Wartung nicht schalten.");
 
-        for (const area of changes) {
-            if (typeof input[area] !== "boolean") throw new InvalidInput(`${AREA_LABELS[area]}: an oder aus, als true oder false.`);
-        }
+        const running = (await readMaintenance(config, now))[area] !== null;
 
-        for (const area of changes) {
-            const on = input[area] === true;
+        await setMaintenance(config, area, input, actor.name, now);
+        await audit(actor, "maintenance.set", AREA_LABELS[area], !input.on ? "aus" : running ? "geändert" : "an");
 
-            await setMaintenance(config, area, on, actor.name);
-            await audit(actor, "maintenance.set", AREA_LABELS[area], on ? "an" : "aus");
-            publish("maintenance");
-        }
-
-        return readMaintenance(config);
+        return afterChange(config);
     });
 
     app.post("/api/bot/restart", async (request, reply) => {

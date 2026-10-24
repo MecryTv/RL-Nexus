@@ -29,7 +29,24 @@ Reihenfolge: P1 vor P2 vor P3 vor P4. Bei gleicher Priorität gilt die Reihenfol
 
 ## Gerade in Arbeit
 
-- **[P1] Wartungsmodus als Umbau: Die Spec ist geschrieben, ein frischer Prüfer liest sie gerade gegen.**
+- **[P1] Wartungsmodus als Umbau: Plan 23 ist gebaut und geprüft, die Nacharbeiten aus dem Review laufen (Zwischenstand, 24.10. nachts).**
+  - **Hier geht es weiter:**
+    1. Bot-Client: `until` in `src/dashboard/client/interfaces/IUser.ts` (`IPayload.maintenance`) ergänzen und in `layout/Topbar.ts` statt `CLOCK.format(...)` nutzen („bis voraussichtlich morgen 9:00 Uhr“). Server, Typ und Test (`/api/me: Ende für den Hinweisstreifen mit Tag`) sind schon fertig.
+    2. MaintenancePage (Admin): Wer bei einer laufenden Wartung ohne Endzeit ein Datum einträgt, bekommt den Haken „automatisch beenden“ gesetzt. Erst Test, dann Fix.
+    3. Kommentare aufräumen: alter Kommentar über `IMaintenance` in `shared/api.ts`, der Kommentar von `at()` über `pausedLine` in `server/status-post.ts`.
+    4. Doku: `Hosting.md` und der Ausroll-Text unten: keine Spiegelung mehr, alte Dateien werden nur noch gelöscht. Den nginx-Block des Bot-Dashboards auf dem Host in Schritt 2 entfernen (wenn der neue Bot live geht).
+    5. Alle Prüfungen in allen vier Projekten, Ledger mit „Final:“-Zeilen, dann Commit und Push.
+  - **Schon erledigt aus dem Review:** Import alter Dateien schaltet eine abgelaufene Wartung nicht wieder ein. Alte Dateien werden nur noch gelöscht, nie neu angelegt, die alte nginx-Regel der Webseite ist weg. Die Webseite sperrt auch beim Klicken innerhalb der Seite. Beginn und Ende mit Tag („gestern 18:05“, „morgen 9:00“) auf Webseite, Statusseite und der Wartungsseite des Bots. Die Webseite wartet beim Nachfragen so lange wie beim ersten Laden und lädt neu, wenn das automatische Ende vorbei ist, auch wenn das Admin Dashboard nicht antwortet. Der Bot fragt bei Datenbankfehlern höchstens alle 5 Sekunden. Die Wartungsseite des Bots hat einen Link zur Anmeldung fürs Team.
+  - **Gebaut (24.10.), alle acht Aufgaben mit Tests:**
+    - **Admin Dashboard:** Tabelle `site_maintenance` (Migration 013), Seite „Wartung“ mit Grund, Schnellwahl, Endzeit und „automatisch beenden“, Sperre von Kontaktformular und Shop (Stripe-Webhook offen), Statusseite und Discord-Meldung mit Grund und Endzeit.
+    - **Webseite:** zeigt Variante B selbst, Rechtstexte bleiben offen.
+    - **Bot:** eigene Wartungsseite mit 503, Durchlass und gelber Streifen für Administrator und Developer.
+    - **Doku:** `Hosting.md`, `Dashboard.md`.
+  - **Ausrollen:** erst das Admin Dashboard (Migration, Schnittstelle, Spiegelung der alten Dateien), dann Bot und Webseite. Den Container der Webseite danach neu starten (`docker compose -f docker-compose.prod.yml restart website`), weil `website.conf` den neuen Eintrag `/api/wartung` hat.
+  - **Neue Aufgabe für später (P4):** Aufräum-Update. Spiegelung, alte nginx-Regeln, `data/flags`-Mounts und `public/wartung.html` entfernen.
+  - **Ledger:** `.superpowers/sdd/2026-10-24-plan-23-wartung-aus-der-datenbank/progress.md`
+  - **Plan 23:** `docs/superpowers/plans/2026-10-24-plan-23-wartung-aus-der-datenbank.md`, acht Aufgaben (Admin: Tabelle, Schnittstellen, Status, Seite; Webseite; Bot: Sperre, Hinweisstreifen; Doku).
+  - **Freigaben (24.10.):** alle Bot-Dateien aus der Spec, samt neuer `wartung.html`. Rechtstexte der Webseite bleiben während der Wartung erreichbar.
   - **Entwurf abgenommen (24.10.):** Variante B mit Zeitleiste, „der Rest passt so“.
   - **Spec:** `docs/superpowers/specs/2026-10-24-wartung-aus-der-datenbank-design.md`. Der Entwurf liegt unter `.superpowers/brainstorm/cloud-2026-10-24/content/wartung-entwuerfe.html`.
   - **Danach:** Fragen aus der Prüfung klären, dann dein OK zur Spec, dann der Plan. Fürs Bauen brauche ich Freigaben im Bot-Repo, die Liste steht in der Spec unter „Betroffene Dateien“.
@@ -40,7 +57,16 @@ Reihenfolge: P1 vor P2 vor P3 vor P4. Bei gleicher Priorität gilt die Reihenfol
     - Beim Einschalten lassen sich Grund und voraussichtliches Ende angeben, auf Wunsch schaltet sich die Wartung zur Endzeit selbst ab.
   - **Entwürfe:** https://claude.ai/artifact/5s6bsQjLumT6hut3jwyQsE (privat)
   - **Offene Fragen** (stehen auch unten auf der Entwurfsseite): Bildschirm A oder B, Hinweis-Streifen für Admin und Dev, Schnellwahl-Zeiten, Haken „automatisch beenden“ standardmäßig an, Grund und Endzeit auch auf Statusseite und in der Discord-Meldung.
-- **Danach:** Brainstorm „Fehler melden“. Entschieden sind: alle drei Arten (Knopf „Fehler melden“, Fehlerseiten im Dashboard, Fehler im Bot auf Discord), mit Code-Zeile und allem Nötigen, Versand per DM an die Dev-User.
+  - **Prüfung der Spec (24.10.):** Zwei Punkte habe ich selbst entschieden und in der Spec markiert. Die Flag-Dateien werden bis zum Aufräum-Update weiter gespiegelt, damit eine laufende Wartung das Ausrollen übersteht. `/vorschau/wartung` bekommt die Werte per postMessage und ist von der Wartung ausgenommen. Offen für dich: Rechtstexte der Webseite während der Wartung, Freigabe der Bot-Dateien.
+- **[P1] Fehler melden: Spec geschrieben und gegengelesen. Zwei Fragen an dich sind offen** (Spec, Abschnitt „Ergebnis der Prüfung“):
+  - **Freigaben:** die Liste plus `RouteManager.ts`, `Server.ts`, `BotClient.ts` und ein Runnable zum Löschen. Bei `fetch` schlage ich vor, es einmal zentral zu umhüllen.
+  - **„90 Tage“ im Datenschutz-Absatz:** Dieselben Angaben stehen auch in den Logs und in den DMs. Soll beides gelöscht werden, oder soll der Text das ehrlich sagen? Und soll das automatische Melden erst nach der Prüfung des Textes live gehen?
+  - **Entschieden (24.10.):** Weg A, alles im Bot (Guardian erweitern, kein Sammelpostfach). Der Datenschutz-Absatz ist mit entworfen und steht im Anhang der Spec. **Bitte von jemandem mit Rechtskenntnis prüfen lassen**, wie die übrigen Rechtstexte.
+  - **Spec:** `docs/superpowers/specs/2026-10-24-fehlerberichte-design.md`. Bauen braucht viele Freigaben im Bot-Repo, die Liste steht in der Spec unter „Betroffene Dateien“.
+- **Brainstorm-Stand Fehler melden:**
+  - **Entschieden (24.10.):** alle drei Arten per DM an die Devs (`DEV_USER_IDs`). Browser-Fehler gehen automatisch, der Nutzer sieht die Fehler-ID. Meldungen kommen per DM und zusätzlich wie bisher per Mail an support@. In der DM stehen ein Code-Ausschnitt, die letzten Schritte und die Knöpfe „In DevLogs öffnen“ und „Erledigt“. Die IDs heißen `NEXUS-…` statt `EarthCraft-…`.
+  - **Funde:** Bot-Fehler kommen schon per DM (Guardian), aber im Betrieb ohne Source Maps. „Wo“ zeigt deshalb auf `dist/*.js`. Browser-Fehler kommen bisher gar nicht an.
+  - **Entwürfe:** https://claude.ai/artifact/2adKrAFiVbPL61JiHe4Pbc (privat). Kopie unter `.superpowers/brainstorm/cloud-2026-10-24/content/fehlerberichte-entwuerfe.html`.
 
 ## Erledigt in dieser Sitzung (Cloud, 23. und 24.10.)
 

@@ -3,6 +3,8 @@ import { createRoot } from "react-dom/client";
 import { ModuleStatus } from "./domain/enums/ModuleCategory";
 import { type IModulesContent, type IModuleValues, isBanner, isCategories, isCommandsContent, isModuleList, loadContent, toBanner } from "./services/Content";
 import { setCategories } from "./services/categories";
+import { isExempt, isRunning } from "./maintenance/logic";
+import { fetchMaintenance, watchMaintenance } from "./maintenance/watch";
 import { setCommands, setModules } from "./services/registry";
 
 /* Selbst gehostet, keine Anfrage an Google - und nur die Schnitte, die
@@ -36,12 +38,31 @@ const isModules = (data: unknown): data is IModulesContent => isModuleList(data,
  * eingebauten Daten.
  */
 async function start(container: HTMLElement): Promise<void> {
-    const [modules, stored, commands, categories] = await Promise.all([
+    const [modules, stored, commands, categories, maintenance] = await Promise.all([
         loadContent("modules.json", isModules),
         loadContent("banner.json", isBanner),
         loadContent("commands.json", isCommandsContent),
         loadContent("categories.json", isCategories),
+        // Wartung aus dem Admin Dashboard (Plan 23). Ohne Antwort in zwei Sekunden: offen.
+        fetchMaintenance(),
     ]);
+
+    const paused = maintenance !== undefined && maintenance !== null && isRunning(maintenance, new Date()) ? maintenance : null;
+
+    // Jede Seite fragt weiter nach, auch die Rechtstexte: Endet oder beginnt die Wartung, lädt sie neu.
+    watchMaintenance(paused);
+
+    if (paused !== null && !isExempt(window.location.pathname)) {
+        const { MaintenanceScreen } = await import("./maintenance/MaintenanceScreen");
+
+        createRoot(container).render(
+            <StrictMode>
+                <MaintenanceScreen state={paused} />
+            </StrictMode>
+        );
+
+        return;
+    }
 
     if (categories !== null) setCategories(categories.data.categories);
     if (modules !== null) setModules(modules.data.modules);
@@ -51,7 +72,7 @@ async function start(container: HTMLElement): Promise<void> {
 
     createRoot(container).render(
         <StrictMode>
-            <App banner={stored === null ? null : { revision: stored.revision, data: toBanner(stored.data) }} />
+            <App banner={stored === null ? null : { revision: stored.revision, data: toBanner(stored.data) }} paused={paused} />
         </StrictMode>
     );
 }

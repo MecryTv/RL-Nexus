@@ -276,19 +276,16 @@ export async function checkDev(): Promise<void> {
             assert.match(download.body, /Etwas ging schief/);
         });
 
-        await check("Wartung: Schalter legen Dateien an und löschen sie, die Übersicht zeigt es", async () => {
-            const on = await send("PUT", "/api/maintenance", { website: true });
-            assert.equal(on.statusCode, 200);
-            assert.equal(on.json().website.by, "nutzer2");
-            assert.ok(existsSync(path.join(flagsDir, "wartung-webseite")));
-
-            const overview = (await get("/api/overview", admin)).json();
-            assert.deepEqual([overview.maintenance.website?.by, overview.maintenance.dashboard], ["nutzer2", null]);
-
-            assert.equal((await send("PUT", "/api/maintenance", { website: false })).statusCode, 200);
+        await check("Wartung ohne Datenbank: Schalten geht nicht, die Übersicht zeigt keine", async () => {
+            // Plan 23: Der Schalter liegt in der Datenbank. Mit Datenbank prüft es checks/maintenance-db.check.ts.
+            const on = await send("PUT", "/api/maintenance", { area: "website", on: true });
+            assert.deepEqual([on.statusCode, on.json().error], [503, "Ohne Datenbank lässt sich die Wartung nicht schalten."]);
             assert.ok(!existsSync(path.join(flagsDir, "wartung-webseite")));
 
-            assert.equal((await send("PUT", "/api/maintenance", { website: "ja" })).statusCode, 400);
+            const overview = (await get("/api/overview", admin)).json();
+            assert.deepEqual(overview.maintenance, { website: null, dashboard: null });
+
+            assert.equal((await send("PUT", "/api/maintenance", { website: true })).statusCode, 400);
             assert.equal((await send("PUT", "/api/maintenance", {})).statusCode, 400);
         });
 

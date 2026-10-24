@@ -1,6 +1,7 @@
 import type { JSX, ReactNode } from "react";
 import { Link } from "react-router-dom";
-import type { IMailAllPage, IMaintenance, IMaintenanceFlag, IOverview, IOverviewService } from "../../shared/api";
+import type { IMailAllPage, IMaintenance, IOverview, IOverviewService } from "../../shared/api";
+import type { IMaintenanceState } from "../../shared/maintenance";
 import type { IBackupsOverview } from "../../shared/backups";
 import { roundSentence } from "../backups/format";
 import { BANNER_STATE_LABELS, type BannerState } from "../../shared/content";
@@ -33,8 +34,8 @@ const STATE_TONES: Readonly<Record<CheckState, BadgeTone>> = { ok: "ok", warn: "
 /** Gelb heißt bei der Prüfung: langsam, in Wartung oder der Bot ist noch nicht bereit. */
 const STATE_WORDS: Readonly<Record<CheckState, string>> = { ok: "Erreichbar", warn: "Eingeschränkt", down: "Ausfall" };
 
-function sinceText(flag: IMaintenanceFlag): string {
-    const parts = [flag.since ? `seit ${formatDateTime(flag.since)}` : null, flag.by ? `von ${flag.by}` : null].filter(Boolean);
+function sinceText(state: IMaintenanceState): string {
+    const parts = [`seit ${formatDateTime(state.startedAt)}`, state.startedBy ? `von ${state.startedBy}` : null].filter(Boolean);
 
     return parts.length > 0 ? ` (${parts.join(", ")})` : "";
 }

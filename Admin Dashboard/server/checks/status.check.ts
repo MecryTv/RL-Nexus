@@ -2,9 +2,9 @@ import assert from "node:assert/strict";
 import type { IChartPoint, IIncident, IPublicStatus, ISpan, IStatusDetail, StatusService } from "../../shared/status.ts";
 import { buildApp } from "../app.ts";
 import { SESSION_COOKIE, seal } from "../session.ts";
-import { payload } from "../status-post.ts";
+import { pausedLine, payload } from "../status-post.ts";
 import { parseIncident, parseUpdate } from "../status/incidents.ts";
-import { historyData, refreshStatus, setHistoryLoader } from "../status/snapshot.ts";
+import { historyData, refreshStatus, setHistoryLoader, toPublic } from "../status/snapshot.ts";
 import { USERS } from "./fakes.ts";
 import { chartGeometry } from "../../src/status/chart.ts";
 import { ago, canReport, countdown, uptimeRow } from "../../src/status/format.ts";
@@ -275,6 +275,27 @@ export async function checkStatusRoutes(): Promise<void> {
         await check("Ohne Datenbank keine Meldungen, aber ein klarer Satz", async () => {
             const response = await post("/api/status/incidents", { kind: "stoerung", title: "Login hakt", services: ["dashboard"], body: "Wir schauen uns das an." });
             assert.deepEqual([response.statusCode, response.json()], [503, { error: "Ohne Datenbank lassen sich keine Meldungen anlegen." }]);
+        });
+
+        await check("Wartung auf Statusseite und Discord: seit wann, bis wann, Grund, nie der Name", async () => {
+            const started = "2026-10-24T14:30:00.000Z";
+            const state = { reason: "Wir spielen ein Update ein.", startedAt: started, startedBy: "nutzer1", endsAt: "2026-10-24T16:00:00.000Z", autoEnd: true };
+            const seconds = Date.parse(started) / 1000;
+
+            assert.equal(pausedLine(state), `In Wartung seit <t:${seconds}:R> · zurück gegen <t:${Date.parse(state.endsAt) / 1000}:t> · „Wir spielen ein Update ein.“`);
+            assert.equal(pausedLine({ ...state, reason: null, endsAt: null }), `In Wartung seit <t:${seconds}:R>`);
+
+            const snapshot = await refreshStatus(config);
+            const paused = { ...snapshot, measured: { ...snapshot.measured, maintenance: { website: state, dashboard: null } } };
+            const open = toPublic(paused, config);
+
+            assert.deepEqual(open.services.find((service) => service.id === "website")?.paused, { reason: state.reason, endsAt: state.endsAt });
+            assert.equal(open.services.find((service) => service.id === "dashboard")?.paused, null);
+            assert.ok(!JSON.stringify(open).includes("nutzer1"));
+
+            const texts = textsOf((payload(paused, config) as { components: IComponent[] }).components).join("\n");
+            assert.match(texts, /zurück gegen <t:\d+:t> · „Wir spielen ein Update ein.“/);
+            assert.ok(!texts.includes("nutzer1"));
         });
 
         await check("Discord: ein Container je Bereich, Knöpfe darunter, kein Kontakt, Grenzen eingehalten", async () => {

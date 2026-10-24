@@ -5,6 +5,7 @@ import type { IConfig } from "../config.ts";
 import { query } from "../db.ts";
 import { DiscordUnavailable, avatarUrl, displayName, exchangeShopCode, fetchMe, fetchRoles, shopAuthorizeUrl, userGuildIds } from "../discord.ts";
 import { InvalidInput, PublicError } from "../errors.ts";
+import { MAINTENANCE_CLOSED, websiteClosed } from "../maintenance.ts";
 import { makeLimiter, matchCancellation, parseCancelInput, rateKey, type ICancelCandidate } from "../shop/cancel.ts";
 import { publish } from "../events.ts";
 import { seal } from "../session.ts";
@@ -144,9 +145,17 @@ function publicProduct(product: { readonly id: number; readonly title: string; r
 
 export async function publicShopRoutes(app: FastifyInstance, { config }: { config: IConfig }): Promise<void> {
     app.addHook("onRequest", async (request: FastifyRequest, reply: FastifyReply) => {
+        const path = request.url.split("?")[0];
+
+        // Während der Wartung der Webseite: keine Anmeldung, keine Kasse, nichts Schreibendes.
+        // Lesen bleibt, und der Webhook von Stripe läuft immer, sonst gingen Zahlungen verloren.
+        if (path !== "/public/shop/stripe" && (request.method === "POST" || path === "/public/shop/login" || path === "/public/shop/callback") && (await websiteClosed(config))) {
+            return reply.code(503).send({ error: MAINTENANCE_CLOSED });
+        }
+
         if (request.method !== "POST" || !request.url.startsWith("/public/shop/")) return;
         // Der Webhook kommt von Stripe und trägt dessen Signatur, nicht unser Origin.
-        if (request.url.split("?")[0] === "/public/shop/stripe") return;
+        if (path === "/public/shop/stripe") return;
 
         if (!fromWebsite(request, config)) return reply.code(403).send({ error: "Diese Anfrage kam nicht von der Webseite." });
     });

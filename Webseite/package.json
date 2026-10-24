@@ -10,7 +10,7 @@
     "prebuild": "npm run export",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "check": "npm run export && node scripts/check-content.mjs && node scripts/check-shop.mjs",
+    "check": "npm run export && node scripts/check-content.mjs && node scripts/check-shop.mjs && node scripts/check-maintenance.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

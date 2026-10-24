@@ -1,0 +1,350 @@
+<title>Fehlerberichte · Entwürfe</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oxanium:wght@500;600;700;800&family=Rajdhani:wght@500;600;700&display=swap">
+<style>
+/* Layout: drei DMs nebeneinander in einer Discord-Ansicht, darunter was Nutzer sehen, unten die Fragen.
+   Bewusst nur dunkel: RL Nexus und Discord sind beide dunkel, die Entwürfe sollen aussehen wie dort. */
+:root {
+  color-scheme: dark;
+  --base: #050608;
+  --panel: #0a0f15;
+  --line: rgb(255 255 255 / 8%);
+  --line-strong: rgb(255 255 255 / 14%);
+  --text: #f2f4f7;
+  --dim: #a8b0bc;
+  --faint: #7b8693;
+  --red: #ff1e2d;
+  --red-deep: #d81424;
+  --warn: #ffc53d;
+  --ok: #35e07f;
+  --blue: #00afff;
+  /* Discord */
+  --dc-bg: #313338;
+  --dc-card: #2b2d31;
+  --dc-text: #dbdee1;
+  --dc-muted: #949ba4;
+  --dc-code: #1e1f22;
+  --dc-btn: #4e5058;
+  --dc-green: #248046;
+  --dc-blurple: #5865f2;
+  --f-display: "Oxanium", "Segoe UI", system-ui, sans-serif;
+  --f-label: "Rajdhani", "Segoe UI", system-ui, sans-serif;
+  --f-body: "Segoe UI", system-ui, -apple-system, sans-serif;
+  --f-mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  --cut: 10px;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--base); color: var(--text); font-family: var(--f-body); font-size: 15px; line-height: 1.6; }
+.wrap {
+  max-width: 1240px; margin: 0 auto; padding-block: 40px 72px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; gap: 56px;
+}
+h1, h2, h3 { font-family: var(--f-display); margin: 0; text-wrap: balance; line-height: 1.15; }
+p { margin: 0; }
+.eyebrow { font-family: var(--f-label); font-weight: 700; font-size: 13px; letter-spacing: .2em; text-transform: uppercase; color: var(--red); }
+.intro { display: grid; gap: 14px; max-width: 72ch; }
+.intro h1 { font-size: clamp(28px, 4.5vw, 40px); font-weight: 700; }
+.intro p { color: var(--dim); }
+.decided { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.decided span { font-family: var(--f-label); font-weight: 600; font-size: 14px; letter-spacing: .04em; padding: 4px 12px; border: 1px solid var(--line-strong); background: var(--panel); }
+.place { display: grid; gap: 20px; }
+.place__head { display: grid; gap: 6px; max-width: 78ch; }
+.place__head h2 { font-size: 24px; font-weight: 600; }
+.place__head p { color: var(--dim); }
+.help { color: var(--faint); font-size: 13.5px; }
+
+/* Discord-Ansicht */
+.dms { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; align-items: start; }
+@media (max-width: 1080px) { .dms { grid-template-columns: minmax(0, 1fr); max-width: 640px; } }
+.kind { display: grid; gap: 8px; min-width: 0; }
+.kind__tag { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.kind__tag b { font-family: var(--f-display); font-size: 17px; }
+.kind__tag small { color: var(--faint); font-size: 13.5px; }
+.dc { background: var(--dc-bg); color: var(--dc-text); padding: 16px 14px 18px; font-family: "gg sans", "Segoe UI", system-ui, sans-serif; font-size: 14.5px; line-height: 1.45; border: 1px solid #1e1f22; min-width: 0; }
+.dc__msg { display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 12px; }
+.dc__ava { width: 40px; height: 40px; border-radius: 50%; background: #0a0f15; display: grid; place-items: center; font-family: var(--f-display); font-weight: 800; font-size: 15px; color: var(--red); border: 1px solid #3f4147; }
+.dc__head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; margin-bottom: 6px; }
+.dc__name { font-weight: 600; color: #f2f3f5; }
+.dc__app { background: var(--dc-blurple); color: #fff; font-size: 10.5px; font-weight: 700; padding: 1px 5px; border-radius: 3px; letter-spacing: .02em; }
+.dc__time { color: var(--dc-muted); font-size: 12px; }
+.v2 { background: var(--dc-card); border-left: 4px solid var(--red); border-radius: 6px; padding: 12px 14px; display: grid; gap: 10px; min-width: 0; }
+.v2--ok { border-left-color: var(--dc-green); }
+.v2--report { border-left-color: var(--blue); }
+.v2 h4 { margin: 0; font-size: 16px; color: #f2f3f5; font-weight: 700; }
+.v2 .sub { color: var(--dc-muted); font-size: 13px; margin-top: -6px; }
+.v2 .sep { height: 1px; background: #3f4147; }
+.v2 .lines { display: grid; gap: 2px; min-width: 0; }
+.v2 .lines, .v2 > p, .v2 h4, .errid { overflow-wrap: anywhere; }
+.v2 .lines code, .v2 .mono, .errid code { word-break: break-all; }
+.v2 .lines b { color: #f2f3f5; font-weight: 600; }
+.v2 code, .v2 .mono { font-family: var(--f-mono); font-size: 12.5px; background: var(--dc-code); padding: 1px 4px; border-radius: 3px; }
+.v2 pre {
+  margin: 0; background: var(--dc-code); border: 1px solid #232428; border-radius: 4px; padding: 8px 10px;
+  font-family: var(--f-mono); font-size: 12px; line-height: 1.55; overflow-x: auto; color: #c9d1d9; white-space: pre;
+}
+.v2 pre .hit { color: #ffb4b9; background: rgb(255 30 45 / 14%); display: inline-block; min-width: 100%; }
+.v2 pre .no { color: #6e7681; }
+.v2 .small { color: var(--dc-muted); font-size: 12.5px; }
+.v2 ol { margin: 0; padding-left: 20px; display: grid; gap: 1px; }
+.dc__btns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 2px; }
+.dc__btn { border: 0; border-radius: 4px; padding: 0 14px; min-height: 32px; font: inherit; font-size: 14px; font-weight: 500; color: #fff; background: var(--dc-btn); cursor: pointer; }
+.dc__btn--ok { background: var(--dc-green); }
+.dc__btn:disabled { opacity: .55; cursor: not-allowed; }
+.dc__btn:focus-visible, .copy:focus-visible, .btn:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+
+/* Nutzer-Seite */
+.pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+@media (max-width: 860px) { .pair { grid-template-columns: minmax(0, 1fr); } }
+.option { display: grid; gap: 10px; align-content: start; min-width: 0; }
+.option__tag b { font-family: var(--f-display); font-size: 18px; }
+.option__tag small { color: var(--faint); font-size: 13.5px; margin-left: 8px; }
+.frame { border: 1px solid var(--line-strong); background: var(--base); overflow: hidden; }
+.frame__bar { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: var(--panel); border-bottom: 1px solid var(--line); font-size: 12.5px; color: var(--faint); font-family: var(--f-mono); }
+.frame__bar i { width: 9px; height: 9px; border-radius: 50%; background: var(--line-strong); }
+.frame__bar span { margin-left: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.card { padding: 20px; display: grid; gap: 14px; }
+.card h3 { font-size: 20px; }
+.card .lead { color: var(--dim); font-size: 14px; }
+.notice { display: flex; flex-wrap: wrap; gap: 11px; align-items: center; padding: 14px 16px; font-size: 14px; border: 1px solid rgb(255 197 61 / 34%); background: rgb(255 197 61 / 8%); color: #ffe7b0; }
+.notice > span { flex: 1 1 200px; min-width: 0; }
+.notice svg { width: 16px; height: 16px; flex: none; }
+.errid { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13.5px; color: var(--dim); }
+.errid code { font-family: var(--f-mono); font-size: 13px; color: var(--text); background: var(--panel); border: 1px solid var(--line-strong); padding: 3px 8px; }
+.copy { min-height: 32px; padding: 0 12px; border: 1px solid var(--line-strong); background: transparent; color: var(--text); font-family: var(--f-label); font-weight: 700; font-size: 13px; letter-spacing: .1em; text-transform: uppercase; cursor: pointer; }
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 20px; border: 0; cursor: pointer;
+  font-family: var(--f-label); font-weight: 700; font-size: 14px; letter-spacing: .12em; text-transform: uppercase; color: var(--text); background: rgb(255 255 255 / 14%);
+  clip-path: polygon(var(--cut) 0, 100% 0, 100% calc(100% - var(--cut)), calc(100% - var(--cut)) 100%, 0 100%, 0 var(--cut));
+}
+.btn--red { background: var(--red-deep); color: #fff; }
+.errpage { display: grid; justify-items: center; text-align: center; gap: 12px; padding: 40px 20px 36px; background: radial-gradient(circle at 50% 30%, rgb(255 30 45 / 12%), transparent 58%), var(--base); }
+.errcode { font-family: var(--f-display); font-weight: 800; font-size: 44px; color: var(--red); line-height: 1; }
+.errpage h3 { font-size: 24px; }
+.errpage p { color: var(--dim); max-width: 44ch; }
+.erracts { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 4px; }
+
+.questions { background: var(--panel); border: 1px solid var(--line-strong); padding: 24px; display: grid; gap: 14px; max-width: 82ch; }
+.questions h2 { font-size: 22px; }
+.questions ol { margin: 0; padding-left: 22px; display: grid; gap: 10px; color: var(--dim); }
+.questions li b { color: var(--text); font-weight: 600; }
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-warn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.6-6.4L21 8"/><path d="M21 3v5h-5"/></symbol>
+</svg>
+
+<main class="wrap">
+  <header class="intro">
+    <p class="eyebrow">Brainstorm · Fehler melden</p>
+    <h1>Fehlerberichte für die Devs</h1>
+    <p>Entwürfe zum Abstimmen, gebaut wird noch nichts. Inhalte sind Beispiele, die Fehler stammen aber aus dem echten Code. Die Knöpfe in den DMs lassen sich anklicken. Unten stehen die Fragen.</p>
+    <div class="decided" aria-label="Schon entschieden">
+      <span>Alle drei Arten per DM</span>
+      <span>Browser-Fehler automatisch</span>
+      <span>Meldungen auch per Mail</span>
+      <span>Zeile, Ausschnitt, DevLogs, Erledigt, letzte Schritte</span>
+      <span>IDs: NEXUS-…</span>
+    </div>
+  </header>
+
+  <section class="place" aria-labelledby="dms">
+    <div class="place__head">
+      <p class="eyebrow">Discord · DM an jeden Dev</p>
+      <h2 id="dms">Drei Arten, eine Form</h2>
+      <p>Oben steht, was passiert ist, darunter wo im Code, mit drei Zeilen Ausschnitt aus der echten Quelle. Kommt derselbe Fehler in 10 Minuten öfter, gibt es keine neue DM, sondern einen Zähler. „Erledigt“ ändert die DM bei allen Devs. Kommt der Fehler danach wieder, gibt es eine neue DM mit dem Hinweis darauf.</p>
+    </div>
+    <div class="dms">
+      <div class="kind">
+        <div class="kind__tag"><b>Fehler im Bot</b><small>Befehl, Knopf, Modul, Route</small></div>
+        <div class="dc">
+          <div class="dc__msg">
+            <div class="dc__ava" aria-hidden="true">N</div>
+            <div style="min-width:0">
+              <div class="dc__head"><span class="dc__name">RL Nexus</span><span class="dc__app">APP</span><span class="dc__time">Heute um 14:02</span></div>
+              <div class="v2" data-card="bot">
+                <h4>🛠️ Fehler im Bot</h4>
+                <p class="sub">ID <span class="mono">NEXUS-1792840938-QJT8ZE</span> · Produktion</p>
+                <div class="sep"></div>
+                <div class="lines">
+                  <span><b>Was</b> TypeError: Cannot read properties of null (reading 'channels')</span>
+                  <span><b>Wo</b> <code>src/events/voice/VoicePanelHandler.ts:118</code> in <code>Rename</code></span>
+                  <span><b>Wann</b> 24. Oktober 2026 14:02</span>
+                  <span><b>Nutzer</b> mecry <code>1059621019947634739</code></span>
+                  <span><b>Server</b> RL Nexus Esports <code>1547258700480253982</code></span>
+                  <span><b>Knopf</b> <code>voice:panel:rename</code></span>
+                </div>
+<pre><span class="no">116 </span>    const room = this.rooms.get(interaction.channelId);
+<span class="no">117 </span>    const name = interaction.fields.getTextInputValue("name");
+<span class="hit"><span class="no">118 </span>    await room.channels.edit({ name });</span>
+<span class="no">119 </span>    await interaction.reply(ROOM_RENAMED);</pre>
+                <p class="small">Stack: 6 Zeilen · Version 1.0.0 · Sitzung #212</p>
+                <div class="dc__btns">
+                  <button type="button" class="dc__btn" data-devlogs>In DevLogs öffnen</button>
+                  <button type="button" class="dc__btn dc__btn--ok" data-done="bot">Erledigt</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="kind">
+        <div class="kind__tag"><b>Fehler im Browser</b><small>Bot-Dashboard, automatisch</small></div>
+        <div class="dc">
+          <div class="dc__msg">
+            <div class="dc__ava" aria-hidden="true">N</div>
+            <div style="min-width:0">
+              <div class="dc__head"><span class="dc__name">RL Nexus</span><span class="dc__app">APP</span><span class="dc__time">Heute um 14:05</span></div>
+              <div class="v2" data-card="web">
+                <h4>🌐 Fehler im Dashboard</h4>
+                <p class="sub">ID <span class="mono">NEXUS-1792841102-M2XD7K</span> · Produktion</p>
+                <div class="sep"></div>
+                <div class="lines">
+                  <span><b>Was</b> TypeError: Cannot read properties of undefined (reading 'enabled')</span>
+                  <span><b>Wo</b> <code>dashboard/client/pages/GuildBackups.ts:179</code> in <code>stats</code></span>
+                  <span><b>Seite</b> <code>/guild/1547258700480253982/backups</code></span>
+                  <span><b>Nutzer</b> mecry <code>1059621019947634739</code> · Owner</span>
+                  <span><b>Browser</b> Chrome 141 · Windows · 1920 × 1080</span>
+                  <span><b>Version</b> Build <code>T4OJGOVS</code> vom 24.10. 00:12</span>
+                </div>
+<pre><span class="no">178 </span>    return el("div", "tkhead",
+<span class="hit"><span class="no">179 </span>        stat("#i-clock", "Nächstes", data!.plan.next ? …</span>
+<span class="no">180 </span>    );</pre>
+                <div class="lines">
+                  <b>Letzte Schritte</b>
+                  <ol>
+                    <li>Öffnet <code>/uebersicht</code></li>
+                    <li>Klickt in der Leiste „Backups“</li>
+                    <li>Antwort <code>GET …/backups</code> 200 in 340 ms</li>
+                  </ol>
+                </div>
+                <div class="dc__btns">
+                  <button type="button" class="dc__btn" data-devlogs>In DevLogs öffnen</button>
+                  <button type="button" class="dc__btn dc__btn--ok" data-done="web">Erledigt</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="kind">
+        <div class="kind__tag"><b>Meldung eines Nutzers</b><small>„Fehler melden“ oder /fehler</small></div>
+        <div class="dc">
+          <div class="dc__msg">
+            <div class="dc__ava" aria-hidden="true">N</div>
+            <div style="min-width:0">
+              <div class="dc__head"><span class="dc__name">RL Nexus</span><span class="dc__app">APP</span><span class="dc__time">Heute um 14:09</span></div>
+              <div class="v2 v2--report" data-card="report">
+                <h4>📮 Meldung: Ticket-Panel lässt sich nicht senden</h4>
+                <p class="sub">ID <span class="mono">NEXUS-1792841340-H7Q2LP</span> · über das Dashboard · auch per Mail an support@</p>
+                <div class="sep"></div>
+                <p>„Ich klicke auf Senden, der Knopf dreht sich kurz und dann passiert nichts. Kanal ist #support.“</p>
+                <div class="lines">
+                  <span><b>Wo und wie</b> Tickets, nach dem Ändern der Farbe</span>
+                  <span><b>Kontakt</b> lena.k (Discord) · <code>984511203348791306</code></span>
+                  <span><b>Seite</b> <code>/guild/1547258700480253982/tickets</code></span>
+                  <span><b>Browser</b> Firefox 133 · macOS</span>
+                  <span><b>Fehler davor</b> <span class="mono">NEXUS-1792841301-ZP3E9W</span> vor 39 Sekunden: 403 auf <code>POST …/tickets/panel</code></span>
+                </div>
+                <div class="dc__btns">
+                  <button type="button" class="dc__btn" data-devlogs>In DevLogs öffnen</button>
+                  <button type="button" class="dc__btn dc__btn--ok" data-done="report">Erledigt</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="help">„Erledigt“ ändert die DM bei allen Devs zu „✅ Erledigt von mecry um 14:20“. „In DevLogs öffnen“ öffnet /devlogs bei der Sitzung und sucht nach der ID. Das Panel sieht nur, wer es geöffnet hat.</p>
+  </section>
+
+  <section class="place" aria-labelledby="users">
+    <div class="place__head">
+      <p class="eyebrow">Bot-Dashboard · was Nutzer sehen</p>
+      <h2 id="users">Die ID zum Weitergeben</h2>
+      <p>Gemeldet wird automatisch. Der Nutzer erfährt das in einem Satz und bekommt die ID, falls er beim Support nachfragt. Über „Fehler melden“ geht sie gleich mit.</p>
+    </div>
+    <div class="pair">
+      <div class="option">
+        <div class="option__tag"><b>Bereich lädt nicht</b><small>in der Karte</small></div>
+        <div class="frame">
+          <div class="frame__bar"><i></i><i></i><i></i><span>dashboard.nexus-emb.de/guild/…/backups</span></div>
+          <div class="card">
+            <h3>Backups</h3>
+            <p class="lead">Sichert eure Module, Einstellungen, Nachrichten und die Daten eurer Mitglieder.</p>
+            <div class="notice" role="alert">
+              <svg aria-hidden="true"><use href="#i-warn"/></svg>
+              <span>Dieser Bereich lässt sich nicht laden. Das Team weiß schon Bescheid.</span>
+              <button type="button" class="btn"><svg aria-hidden="true" style="width:16px;height:16px"><use href="#i-refresh"/></svg>Neu laden</button>
+            </div>
+            <p class="errid">Fehler-ID <code id="id-a">NEXUS-1792841102-M2XD7K</code> <button type="button" class="copy" data-copy="id-a">Kopieren</button></p>
+          </div>
+        </div>
+      </div>
+      <div class="option">
+        <div class="option__tag"><b>Fehlerseite</b><small>500 und Co.</small></div>
+        <div class="frame">
+          <div class="frame__bar"><i></i><i></i><i></i><span>dashboard.nexus-emb.de/guild/…</span></div>
+          <div class="errpage">
+            <span class="errcode">500</span>
+            <h3>Da ist etwas schiefgelaufen</h3>
+            <p>Das Team hat den Fehler schon bekommen. Lade die Seite in einem Moment neu. Hilft das nicht, nenn dem Support diese ID.</p>
+            <p class="errid">Fehler-ID <code id="id-b">NEXUS-1792841455-W4VB8N</code> <button type="button" class="copy" data-copy="id-b">Kopieren</button></p>
+            <div class="erracts">
+              <button type="button" class="btn btn--red">Zur Übersicht</button>
+              <button type="button" class="btn">Fehler melden</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="help">Bei Fehlern im Bot auf Discord bleibt die Antwort wie heute: „Ein unerwarteter Fehler ist aufgetreten.“ mit der Fehler-ID, nur eben mit NEXUS-…</p>
+  </section>
+
+  <section class="questions" aria-labelledby="fragen">
+    <h2 id="fragen">Fragen an dich</h2>
+    <ol>
+      <li><b>Passt die Form der DMs?</b> Reihenfolge der Zeilen, die Symbole 🛠️ 🌐 📮, der Ausschnitt mit drei Zeilen.</li>
+      <li><b>Letzte Schritte:</b> Seitenwechsel, Klicks auf Knöpfe und die letzten Antworten des Bots, nie Eingaben. Passt das so?</li>
+      <li><b>Wer bekommt die DMs?</b> Alle aus <code>DEV_USER_IDs</code> wie heute, oder auch Administratoren?</li>
+      <li><b>Datenschutz:</b> Automatische Berichte enthalten Nutzer-ID, Seite und Browser. Das gehört in die Datenschutzerklärung. Soll ich den Absatz mit entwerfen? Prüfen lassen müsstest du ihn trotzdem.</li>
+    </ol>
+  </section>
+</main>
+
+<script>
+(() => {
+  for (const button of document.querySelectorAll("[data-done]")) {
+    button.addEventListener("click", () => {
+      const card = document.querySelector(`[data-card="${button.dataset.done}"]`);
+      const title = card.querySelector("h4");
+      card.classList.add("v2--ok");
+      title.textContent = `✅ Erledigt · ${title.textContent.replace(/^\S+\s/, "")}`;
+      const note = document.createElement("p");
+      note.className = "small";
+      note.textContent = "Erledigt von mecry um 14:20. Kommt der Fehler wieder, gibt es eine neue DM.";
+      card.insertBefore(note, card.querySelector(".dc__btns"));
+      button.disabled = true;
+      button.textContent = "Erledigt";
+    }, { once: true });
+  }
+  for (const button of document.querySelectorAll("[data-devlogs]")) {
+    button.addEventListener("click", () => { button.textContent = "Öffnet /devlogs …"; setTimeout(() => (button.textContent = "In DevLogs öffnen"), 1400); });
+  }
+  for (const button of document.querySelectorAll("[data-copy]")) {
+    button.addEventListener("click", async () => {
+      const code = document.getElementById(button.dataset.copy);
+      try { await navigator.clipboard.writeText(code.textContent); button.textContent = "Kopiert"; }
+      catch { const range = document.createRange(); range.selectNodeContents(code); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(range); button.textContent = "Markiert"; }
+      setTimeout(() => (button.textContent = "Kopieren"), 1600);
+    });
+  }
+})();
+</script>

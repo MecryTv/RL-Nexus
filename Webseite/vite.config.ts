@@ -118,6 +118,8 @@ export default defineConfig(({ command, mode }) => {
             // Greift nur mit VITE_CONTACT_ENDPOINT=/api/contact in der .env.
             proxy: {
                 "/api/contact": { target: "http://localhost:3001", rewrite: () => "/public/contact" },
+                // Ist die Webseite in der Wartung? (Plan 23) Ohne laufendes Admin Dashboard: keine Wartung.
+                "/api/wartung": { target: "http://localhost:3001", rewrite: () => "/public/maintenance" },
                 // Der Shop (Plan 12) wie im Betrieb. Ohne changeOrigin: Der Admin-Server prüft den Origin der Webseite.
                 "/api/shop": { target: "http://localhost:3001", rewrite: (path) => path.replace(/^\/api\/shop/, "/public/shop") },
             },

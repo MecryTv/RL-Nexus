@@ -2,12 +2,16 @@ import type { FastifyInstance } from "fastify";
 import type { IConfig } from "../config.ts";
 import { isTrap, parseContact } from "../contact.ts";
 import { PublicError } from "../errors.ts";
+import { MAINTENANCE_CLOSED, websiteClosed } from "../maintenance.ts";
 import { ContactMailUnavailable, notifyContact, sendContactMail } from "../notify.ts";
 import { body } from "../validate.ts";
 
 /** Was die Webseite schickt. nginx reicht nexus-emb.de/api/contact hierher, ohne Sitzung. */
 export async function publicContactRoutes(app: FastifyInstance, { config }: { config: IConfig }): Promise<void> {
     app.post("/public/contact", { bodyLimit: 32 * 1024, config: { rateLimit: { max: 5, timeWindow: "10 minutes" } } }, async (request, reply) => {
+        // Während der Wartung der Webseite nimmt das Formular nichts an, auch nicht aus einem offenen Tab.
+        if (await websiteClosed(config)) throw new PublicError(503, MAINTENANCE_CLOSED);
+
         const input = body(request.body);
 
         // Die Falle: ausgefüllt heißt, es war kein Mensch. Erfolg melden und

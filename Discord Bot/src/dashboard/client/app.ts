@@ -27,7 +27,7 @@ import { bindFooter } from "./layout/Footer.js";
 import { renderProfile } from "./layout/Profile.js";
 import { buildUserUI } from "./layout/UserMenu.js";
 import { showFailure } from "./layout/Failure.js";
-import { watchScroll } from "./layout/Topbar.js";
+import { showMaintenance, watchScroll } from "./layout/Topbar.js";
 
 /**
  * Die Daten kamen nicht. Der Grund steht in der Konsole, hier steht, was der
@@ -154,6 +154,7 @@ async function boot(): Promise<void> {
 
     renderProfile(data.user);
     buildUserUI(data.user);
+    showMaintenance(data.maintenance, data.user.group);
 
     // Das Postfach liegt beim Bot: einmal holen und danach im Hintergrund
     // nachsehen, damit man neue Meldungen auch ohne Neuladen mitbekommt.

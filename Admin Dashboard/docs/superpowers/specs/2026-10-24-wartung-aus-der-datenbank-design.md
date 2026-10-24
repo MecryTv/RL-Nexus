@@ -11,7 +11,7 @@ Der Betreiber will deshalb: Der Schalter steht in der Datenbank, und Webseite un
 ## Was der Betreiber entschieden hat
 
 - **Quelle:** Der Schalter liegt in der Datenbank. Webseite und Bot-Dashboard zeigen die Wartung selbst.
-- **Webseite:** Sie hat die Wartung selbst eingebaut und kann sie jederzeit anzeigen. Sie ist während der Wartung komplett zu: jede Adresse zeigt die Wartung, Kontaktformular und Shop nehmen nichts an.
+- **Webseite:** Sie hat die Wartung selbst eingebaut und kann sie jederzeit anzeigen. Sie ist während der Wartung komplett zu: jede Adresse zeigt die Wartung, Kontaktformular und Shop nehmen nichts an. Ausgenommen bleiben die Rechtstexte (Impressum, Datenschutz, AGB, Widerruf), der Bildschirm verlinkt sie.
 - **Wer trotzdem herein kommt:** Im Bot-Dashboard Administrator und Developer. Die Webseite ist für alle zu, dort gibt es keine Anmeldung.
 - **Beim Einschalten:** Grund (freiwillig), voraussichtliches Ende (freiwillig) und „Zur Endzeit automatisch beenden“.
 - **Abgenommen ist der Entwurf** `.superpowers/brainstorm/cloud-2026-10-24/content/wartung-entwuerfe.html` (auch unter https://claude.ai/artifact/5s6bsQjLumT6hut3jwyQsE). Antwort des Betreibers: „B und der Rest passt so.“ Damit gilt:
@@ -40,7 +40,7 @@ Der Betreiber will deshalb: Der Schalter steht in der Datenbank, und Webseite un
 - Die Webseite bleibt in der Wartung hängen, obwohl sie aus ist (etwa weil das Admin Dashboard nicht antwortet). Im Zweifel ist die Webseite **offen**.
 - Stripe-Zahlungen gehen während der Wartung verloren. Der Webhook `/public/shop/stripe` läuft immer weiter.
 - Administrator oder Developer sperren sich selbst aus dem Bot-Dashboard aus. Anmeldung und Abmeldung bleiben offen.
-- Impressum und Datenschutz des Bot-Dashboards sind nicht erreichbar (Pflichtangaben).
+- Impressum und Datenschutz (Bot-Dashboard) bzw. Impressum, Datenschutz, AGB und Widerruf (Webseite) sind nicht erreichbar (Pflichtangaben).
 - Der Name dessen, der die Wartung eingeschaltet hat, erscheint öffentlich (Statusseite, Webseite, Discord).
 
 ## Ansätze
@@ -67,8 +67,9 @@ Gewählt hat der Betreiber C („Die Webseite selbst hat so was drin, sodass sie
 
 ### Übergang beim Update
 
-- Liegt beim Start des Admin Dashboards noch eine alte Datei in `FLAGS_DIR` (`wartung-webseite`, `wartung-dashboard`), übernimmt es den Stand (seit wann, von wem) in die Tabelle und löscht die Datei. Danach liest niemand mehr Dateien.
-- Reihenfolge beim Ausrollen: zuerst das Admin Dashboard (Migration, Schnittstelle), dann Bot und Webseite, zuletzt die alten nginx-Regeln und Mounts entfernen. Jede Zwischenstufe ist sicher: Ohne Antwort der Schnittstelle ist die Webseite offen, ohne Tabelle ist die Wartung im Bot aus.
+- Liegt beim Start des Admin Dashboards noch eine alte Datei in `FLAGS_DIR` (`wartung-webseite`, `wartung-dashboard`), übernimmt es den Stand (seit wann, von wem) in die Tabelle.
+- **Die Dateien bleiben bis zum Aufräum-Update gespiegelt:** Das Admin Dashboard schreibt und löscht sie weiter nach dem Stand der Tabelle (beim Schalten und im Takt, also auch beim automatischen Ende). So bleibt eine Wartung, die genau für dieses Update eingeschaltet wurde, während des Ausrollens bestehen: die alten nginx-Regeln greifen weiter, bis Bot und Webseite die Wartung selbst zeigen. (Ergebnis der Prüfung, Entscheidung Claude. Kostet bei Irrtum: eine Funktion, die im Aufräum-Update wieder wegfällt.)
+- Reihenfolge beim Ausrollen: zuerst das Admin Dashboard (Migration, Schnittstelle, Spiegelung), dann Bot und Webseite. In einem späteren Update fallen Spiegelung, nginx-Regeln, Mounts und `public/wartung.html` weg. Jede Zwischenstufe ist sicher: Ohne Antwort der Schnittstelle ist die Webseite offen, ohne Tabelle ist die Wartung im Bot aus.
 
 ### Admin Dashboard
 
@@ -92,7 +93,9 @@ Gewählt hat der Betreiber C („Die Webseite selbst hat so was drin, sodass sie
   - Endzeit vorbei, Wartung läuft noch: Zeitleiste voll, „Es dauert etwas länger als geplant.“
   - Zeiten in Europe/Berlin: „heute um 18:00 Uhr“, „morgen um 9:00 Uhr“, sonst „am Samstag, 25. Oktober, um 9:00 Uhr“.
   - Im Kopf `noindex` und der Titel „Wartung · RL Nexus“.
-- **`/vorschau/wartung`** zeigt denselben Bildschirm mit Werten aus der Adresse (`grund`, `seit`, `bis`, `auto`), ohne Kopf und Fuß, für die Vorschau im Admin Dashboard.
+- **`/vorschau/wartung`** zeigt denselben Bildschirm ohne Kopf und Fuß, für die Vorschau im Admin Dashboard. Die Werte kommen wie bei der bestehenden `/vorschau` per `postMessage` vom Admin Dashboard, mit Prüfung des Absenders. Aus der Adresse liest die Seite nichts, sonst ließe sich ein Link mit fremdem Text als offizielle Wartungsmeldung bauen. (Ergebnis der Prüfung, Entscheidung Claude.)
+- **Ausgenommen von der Wartung** sind die Rechtstexte `/impressum`, `/datenschutz`, `/agb` und `/widerruf` (Entscheidung des Betreibers vom 24.10.). Sie öffnen ganz normal, und der Wartungsbildschirm verlinkt sie unten in einer kleinen Zeile.
+- **Ebenfalls ausgenommen** sind die Vorschau-Adressen `/vorschau*`. Sonst zeigte die Vorschau im Dialog „Ändern“ den gespeicherten statt des gerade bearbeiteten Stands, und der Modul-Editor hätte keine Vorschau. (Ergebnis der Prüfung, Entscheidung Claude.)
 
 ### Bot-Dashboard
 
@@ -106,9 +109,8 @@ Gewählt hat der Betreiber C („Die Webseite selbst hat so was drin, sodass sie
 
 ### Aufräumen
 
-- `nginx/container/website.conf`: die Regel `if (-f /srv/flags/…)` und `@rlnexus_wartung` fallen weg, dazu kommt `location = /api/wartung` an `admin:3001/public/maintenance` (wie `/api/contact`).
-- `nginx/dashboard.nexus-emb.de.conf`: der Wartungsblock fällt weg.
-- `docker-compose.prod.yml`: die Mounts `data/flags` bei `admin` und `website` und `FLAGS_DIR` können nach dem Übergang weg. In diesem Umbau bleiben sie (für den Übergang), entfernt wird in einem späteren Update.
+- In diesem Umbau: `nginx/container/website.conf` bekommt `location = /api/wartung` an `admin:3001/public/maintenance` (wie `/api/contact`). Die alte Regel `if (-f /srv/flags/…)` bleibt für den Übergang.
+- Im späteren Aufräum-Update: Regel und `@rlnexus_wartung` in `website.conf`, der Wartungsblock in `nginx/dashboard.nexus-emb.de.conf`, die Mounts `data/flags` und `FLAGS_DIR` in `docker-compose.prod.yml`, die Spiegelung im Admin Dashboard und `public/wartung.html`.
 - `docs/Hosting.md` und die Kopfzeile der Wartungsseite im Admin Dashboard beschreiben den neuen Weg.
 
 ## Betroffene Dateien
@@ -116,7 +118,16 @@ Gewählt hat der Betreiber C („Die Webseite selbst hat so was drin, sodass sie
 - **Admin Dashboard:** `server/migrations/013_maintenance.sql` (neu), `server/maintenance.ts`, `server/routes/operations.ts`, neue öffentliche Route (in `contact.ts` oder eigene Datei), `server/routes/contact.ts`, `server/routes/shop-public.ts`, `server/status/measure.ts`, `server/status-post.ts`, `shared/api.ts`, `src/pages/MaintenancePage.tsx` und Stile, Checks.
 - **Webseite:** `src/main.tsx`, neuer Wartungsbildschirm und Dienst, `src/App.tsx` (Vorschau), `vite.config.ts` (Proxy), Checks.
 - **Statusseite:** `src/status.ts`, `src/StatusApp.tsx` (Zeile beim Dienst).
-- **Bot (Freigabe nötig):** `src/Server.ts` (Haken), `src/services/DashboardService.ts` (Lesen, `/api/me`), die Route für `/api/me`, `src/interfaces/services/dashboard/IDashboardUser.ts` bzw. Payload, `src/dashboard/client` (Streifen im Layout, `IUser`), `src/dashboard/public/wartung.html` (neu), `src/scripts/CheckDashboard.ts`, `nginx/container/website.conf`, `nginx/dashboard.nexus-emb.de.conf`, `docs/Hosting.md`, `docs/Dashboard.md`.
+- **Bot (vom Betreiber am 24.10. freigegeben, samt neuer `wartung.html`):**
+  - `src/Server.ts` (Haken am Anfang jeder Anfrage)
+  - `src/services/DashboardService.ts` (Wartung lesen, Angaben für `/api/me`)
+  - `src/interfaces/services/dashboard/IDashboardUser.ts` bzw. die Payload-Schnittstelle daneben
+  - `src/dashboard/client/interfaces/IUser.ts`, `src/dashboard/client/app.ts`, `src/dashboard/client/layout/Topbar.ts` (Streifen)
+  - `src/dashboard/public/assets/style.css` (Streifen, Wartungsseite)
+  - `src/dashboard/public/wartung.html` (**neu**)
+  - `src/scripts/CheckDashboard.ts`
+  - `nginx/container/website.conf`
+  - `docs/Hosting.md`, `docs/Dashboard.md`
 
 ## Was dem Entwickler bleibt
 

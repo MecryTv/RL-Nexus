@@ -81,6 +81,13 @@ function relative(iso: string, now: number): string {
 }
 
 /** „2T 09:15:42“ bis zu einem Zeitpunkt. */
+/** „18:00 Uhr“ am selben Tag, sonst mit Tag: „25. Oktober um 09:00 Uhr“. */
+function clockOrDate(iso: string, now: number): string {
+    const at = new Date(iso);
+
+    return `${(at.toDateString() === new Date(now).toDateString() ? TIME : DATE_TIME).format(at)} Uhr`;
+}
+
 function countdown(target: number, now: number): string {
     const total = Math.max(0, Math.floor((target - now) / 1000));
     const days = Math.floor(total / 86_400);
@@ -392,6 +399,12 @@ function Service({ service, now }: { readonly service: IPublicService; readonly 
                     <span>{percent(service.uptime.quarter)} verfügbar</span>
                     <span>heute</span>
                 </p>
+                {service.paused && (
+                    <p className={styles.paused}>
+                        <b>In Wartung{service.paused.endsAt ? ` · zurück gegen ${clockOrDate(service.paused.endsAt, now)}` : ""}</b>
+                        {service.paused.reason && <span>{service.paused.reason}</span>}
+                    </p>
+                )}
                 <p className={styles.facts}>{facts.join(" · ")}</p>
                 <p className="u-sr">
                     {STATUS_SERVICE_LABELS[service.id]}: {SERVICE_STATE[service.state]}. {percent(service.uptime.quarter)} verfügbar in 90 Tagen, {percent(service.uptime.month)} in 30

@@ -21,6 +21,7 @@ import type { IIncidentList, IPublicStatus, IStatusDetail } from "../shared/stat
 import { buildApp } from "./app.ts";
 import { checkBackupsDb } from "./checks/backups-db.check.ts";
 import { checkBetaDb } from "./checks/beta-db.check.ts";
+import { checkMaintenanceDb } from "./checks/maintenance-db.check.ts";
 import { cleanup } from "./cleanup.ts";
 import { FakeMailStore, fakeImapFactory } from "./checks/fake-imap.ts";
 import { FakeStripe } from "./checks/fake-stripe.ts";
@@ -2619,6 +2620,7 @@ try {
 
     await checkBackupsDb(config, { get, write, raw });
     await checkBetaDb(config, { get, write, raw });
+    await checkMaintenanceDb(DATABASE_ENV);
 } finally {
     stopStatusPost();
     setShopMailer(null);

@@ -4368,3 +4368,28 @@ body.no-motion .hero__field .run{display:none}
 .bk-sum .btn{flex:none}
 .bk-info{display:flex;gap:8px;align-items:flex-start;margin-top:12px;font-size:12.5px;color:var(--text-3)}
 .bk-info svg{width:14px;height:14px;flex:none;margin-top:2px}
+
+/* Wartung (Plan 23, wartung.html): mittig wie die Fehlerseite, mit Zeitleiste
+   bis zur Endzeit. Dieselbe Seite wie die Wartung der Webseite, im Stil des Dashboards. */
+.wt{display:grid;place-items:center;min-height:100vh;min-height:100dvh;text-align:center}
+.wt__inner{display:grid;gap:14px;justify-items:center;width:100%;max-width:480px;padding:32px 0}
+.wt__mark{margin-bottom:18px;font-family:var(--f-display);font-size:1.05rem;font-weight:800;letter-spacing:.08em}
+.wt__mark span{color:var(--brand)}
+.wt__label{color:var(--brand);font-family:var(--f-label);font-size:.78rem;font-weight:700;letter-spacing:.22em;text-transform:uppercase}
+.wt__title{font-family:var(--f-display);font-size:clamp(1.9rem,1.4rem + 2.4vw,2.6rem);font-weight:800;line-height:1.1;text-wrap:balance}
+.wt__reason{color:var(--text)}
+.wt__note{color:var(--text-2);font-size:.9rem}
+.wt-eta{padding:7px 14px;border:1px solid color-mix(in srgb,var(--warn) 35%,transparent);background:color-mix(in srgb,var(--warn) 8%,transparent);color:color-mix(in srgb,var(--warn) 30%,#fff);font-family:var(--f-label);font-weight:600}
+.wt-timeline{display:grid;gap:8px;width:100%;margin-top:4px}
+.wt-track{position:relative;height:6px;overflow:hidden;background:var(--line-strong)}
+.wt-track span{position:absolute;inset:0;background:linear-gradient(90deg,var(--brand-deep),var(--brand));transform:scaleX(var(--share));transform-origin:left}
+.wt-ends{display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 12px;color:var(--text-2);font-family:var(--f-label);font-size:.95rem;font-weight:600}
+.wt-ends b{color:var(--text)}
+.wt__legal{display:flex;flex-wrap:wrap;justify-content:center;gap:6px 16px;margin-top:10px;font-size:.8125rem}
+.wt__legal a{color:var(--text-3)}
+.wt__legal a:hover{color:var(--text-2)}
+/* Wartung läuft, für Administrator und Developer (Topbar.ts, showMaintenance): unter der Kopfzeile, gelb wie jeder Hinweis. */
+.staffbar{border-top:1px solid color-mix(in srgb,var(--warn) 30%,transparent);border-bottom:1px solid color-mix(in srgb,var(--warn) 30%,transparent);background:color-mix(in srgb,var(--warn) 10%,#0b1016);color:color-mix(in srgb,var(--warn) 30%,#fff);font-size:13.5px}
+.staffbar__inner{display:flex;gap:10px;align-items:flex-start;padding-top:9px;padding-bottom:9px}
+.staffbar__inner svg{width:16px;height:16px;flex:none;margin-top:3px}
+.staffbar__inner p{margin:0;min-width:0}

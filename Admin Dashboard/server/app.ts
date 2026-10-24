@@ -11,6 +11,7 @@ import { databaseRoutes } from "./routes/database.ts";
 import { subscribe } from "./events.ts";
 import { authRoutes } from "./routes/auth.ts";
 import { publicContactRoutes } from "./routes/contact.ts";
+import { publicMaintenanceRoutes } from "./routes/maintenance-public.ts";
 import { contentRoutes } from "./routes/content.ts";
 import { groupRoutes } from "./routes/groups.ts";
 import { logRoutes } from "./routes/logs.ts";
@@ -56,6 +57,7 @@ export async function buildApp(config: IConfig): Promise<FastifyInstance> {
 
     await app.register(authRoutes, { config });
     await app.register(publicContactRoutes, { config });
+    await app.register(publicMaintenanceRoutes, { config });
     await app.register(publicStatusRoutes);
     await app.register(publicShopRoutes, { config });
     await app.register(internalBackupRoutes, { config });

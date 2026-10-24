@@ -1,0 +1,156 @@
+@use "mixins" as *;
+
+/* Der Wartungsbildschirm: mittig, ein roter Schein dahinter wie auf der alten
+   Wartungsseite, die Zeitleiste als einziges bewegtes Element. */
+.page {
+    display: grid;
+    min-height: 100vh;
+    min-height: 100dvh;
+    padding: 32px max(16px, env(safe-area-inset-right, 0px)) 32px max(16px, env(safe-area-inset-left, 0px));
+    place-items: center;
+    background:
+        radial-gradient(circle at 50% 34%, rgb(255 30 45 / 12%), transparent 56%),
+        var(--c-base);
+    text-align: center;
+}
+
+.inner {
+    display: grid;
+    width: 100%;
+    max-width: 480px;
+    gap: 14px;
+    justify-items: center;
+}
+
+.wordmark {
+    margin-bottom: 18px;
+    font-family: var(--f-display);
+    font-size: 1.05rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+
+    span {
+        color: var(--c-red);
+    }
+}
+
+.label {
+    color: var(--c-red);
+
+    @include label(0.78rem, 0.22em);
+}
+
+.title {
+    font-size: clamp(1.9rem, 1.4rem + 2.4vw, 2.6rem);
+    font-weight: 800;
+    letter-spacing: -0.015em;
+    line-height: 1.1;
+    text-wrap: balance;
+}
+
+.reason {
+    color: var(--c-text);
+    line-height: 1.6;
+}
+
+.eta {
+    padding: 7px 14px;
+    border: 1px solid rgb(255 197 61 / 35%);
+    background: rgb(255 197 61 / 8%);
+    color: #ffe3a3;
+    font-family: var(--f-label);
+    font-weight: 600;
+}
+
+.timeline {
+    display: grid;
+    width: 100%;
+    gap: 8px;
+    margin-top: 4px;
+}
+
+.track {
+    position: relative;
+    height: 6px;
+    overflow: hidden;
+    background: var(--c-line-strong);
+}
+
+.fill {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, #d81424, var(--c-red));
+    transform: scaleX(var(--share));
+    transform-origin: left;
+
+    @include motion {
+        transition: transform var(--t-slow);
+    }
+}
+
+.ends {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 4px 12px;
+    color: var(--c-text-dim);
+    font-family: var(--f-label);
+    font-size: 0.95rem;
+    font-weight: 600;
+
+    b {
+        color: var(--c-text);
+    }
+}
+
+.note {
+    color: var(--c-text-dim);
+    font-size: 0.9rem;
+    line-height: 1.6;
+}
+
+.status {
+    display: inline-flex;
+    align-items: center;
+    padding: 0 20px;
+    background: rgb(255 255 255 / 14%);
+    color: var(--c-text);
+    font-family: var(--f-label);
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-decoration: none;
+    text-transform: uppercase;
+
+    min-height: 44px;
+
+    @include bevel-diagonal(10px);
+
+    &:hover {
+        background: rgb(255 255 255 / 20%);
+    }
+
+    &:focus-visible {
+        @include focus-ring;
+    }
+}
+
+.legal {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px 16px;
+    margin-top: 10px;
+    font-size: 0.8125rem;
+
+    a {
+        color: var(--c-text-faint);
+
+        &:hover {
+            color: var(--c-text-dim);
+        }
+
+        &:focus-visible {
+            @include focus-ring;
+        }
+    }
+}

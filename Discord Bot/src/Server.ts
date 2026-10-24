@@ -1,6 +1,8 @@
 import fastify, { FastifyInstance } from "fastify";
 import rateLimit from "@fastify/rate-limit";
 import { LogError, SendError } from "./utils/errorpage";
+import { SendPage } from "./utils/dashboard";
+import { MAINTENANCE_CLOSED, MaintenancePlaceholders } from "./services/DashboardService";
 import BotClient from "./client/BotClient";
 import RouteManager from "./handler/RouteManager";
 import IServer from "./interfaces/services/server/IServer";
@@ -123,6 +125,24 @@ export default class Server implements IServer {
             reply.header("Content-Encoding", encoding).header("Vary", "Accept-Encoding").removeHeader("content-length");
 
             return Pack(payload, encoding);
+        });
+
+        // Wartung des Bot-Dashboards (Plan 23), vor allem anderen: Der Bot liest
+        // den Schalter selbst aus der Datenbank. Seiten bekommen die
+        // Wartungsseite, alles andere einen Satz. Administrator und Developer
+        // kommen durch, offen bleiben Anmeldung, Rechtstexte, Stil und Bilder.
+        instance.addHook("onRequest", async (request, reply) => {
+            const note = await this.client.dashboardService.MaintenanceFor(request);
+
+            if (!note) return;
+
+            reply.code(503).header("Retry-After", "300").header("Cache-Control", "no-store");
+
+            if (request.method === "GET" && String(request.headers.accept ?? "").includes("text/html")) {
+                return SendPage(this.client, reply, "wartung.html", MaintenancePlaceholders(note, new Date()));
+            }
+
+            return reply.send({ error: MAINTENANCE_CLOSED });
         });
 
         await instance.register(rateLimit, {

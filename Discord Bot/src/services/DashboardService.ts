@@ -1,4 +1,5 @@
 import { randomBytes } from "node:crypto";
+import { FastifyRequest } from "fastify";
 import { escapeMarkdown } from "discord.js";
 import { LRUCache } from "lru-cache";
 import BotClient from "../client/BotClient";
@@ -24,6 +25,8 @@ import {
     MANAGE_GUILD,
     MAX_SESSIONS,
     OAUTH_SCOPES,
+    ParseCookies,
+    SESSION_COOKIE,
 } from "../constants/Dashboard";
 import { Open, Seal } from "../utils/seal";
 import logger from "../utils/logger";
@@ -268,6 +271,106 @@ export function LockPlaceholders(access: IShopAccess, betaError: string | null =
     };
 }
 
+/* ------------------------------------------------------------------
+   Wartung (Plan 23)
+
+   Das Admin Dashboard schreibt den Schalter in site_maintenance, je Bereich
+   eine Zeile. Der Bot liest die Zeile „dashboard“ und stellt sich vor jede
+   Anfrage (Server.ts). Die Regel „läuft“ ist dieselbe wie im Admin Dashboard
+   und auf der Webseite: an, und nicht mit Haken über die Endzeit hinaus.
+   ------------------------------------------------------------------ */
+
+/** Was jede gesperrte Anfrage außer einer Seite bekommt. */
+export const MAINTENANCE_CLOSED = "Gerade ist Wartung. Versuch es in ein paar Minuten noch einmal.";
+
+/** Eine laufende Wartung des Bot-Dashboards. Zeiten als ISO-Text. Wer sie eingeschaltet hat, liest der Bot gar nicht erst. */
+export interface IMaintenanceNote {
+    readonly reason: string | null;
+    readonly startedAt: string;
+    /** null: ohne Endzeit. */
+    readonly endsAt: string | null;
+    readonly autoEnd: boolean;
+}
+
+export interface IMaintenanceRow {
+    readonly active: number;
+    readonly reason: string | null;
+    readonly started_at: Date | null;
+    readonly ends_at: Date | null;
+    readonly auto_end: number;
+}
+
+/** Die Zeile als laufende Wartung, oder null. */
+export function MaintenanceOf(row: IMaintenanceRow | null, now: Date): IMaintenanceNote | null {
+    if (!row || row.active !== 1) return null;
+
+    const autoEnd = row.auto_end === 1;
+
+    if (autoEnd && row.ends_at !== null && row.ends_at.getTime() <= now.getTime()) return null;
+
+    return { reason: row.reason, startedAt: (row.started_at ?? now).toISOString(), endsAt: row.ends_at?.toISOString() ?? null, autoEnd };
+}
+
+/** Diese Adressen bleiben während der Wartung offen: Stil und Bilder, Anmeldung, Rechtstexte und was Bot und Admin Dashboard untereinander brauchen. */
+export function MaintenanceOpenPath(path: string): boolean {
+    if (path.startsWith("/images/") || path.startsWith("/dcapi/")) return true;
+    // Im Entwicklungsmodus hängt das Dashboard unter /dashboard: Alles daneben ist nicht das Dashboard.
+    if (DASHBOARD_PATH !== "" && path !== DASHBOARD_PATH && !path.startsWith(`${DASHBOARD_PATH}/`)) return true;
+
+    const inner = path.slice(DASHBOARD_PATH.length).replace(/\/+$/, "");
+
+    return inner.startsWith("/assets/") || ["/login", "/callback", "/logout", "/impressum", "/privacy"].includes(inner);
+}
+
+const MAINTENANCE_CLOCK = new Intl.DateTimeFormat("de-DE", { timeZone: "Europe/Berlin", hour: "numeric", minute: "2-digit" });
+const MAINTENANCE_DATE = new Intl.DateTimeFormat("de-DE", { timeZone: "Europe/Berlin", day: "2-digit", month: "2-digit" });
+const MAINTENANCE_DAY = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Berlin", year: "numeric", month: "2-digit", day: "2-digit" });
+
+/** Kalendertag in Berlin als Tageszahl, damit „morgen“ auch über die Zeitumstellung stimmt. */
+function BerlinDay(at: Date): number {
+    const [year, month, day] = MAINTENANCE_DAY.format(at).split("-").map(Number);
+
+    return Date.UTC(year, month - 1, day) / 86_400_000;
+}
+
+/** „18:05“ am selben Tag, sonst „gestern 18:05“, „morgen 9:00“ oder „31.10. 9:00“. Wie auf der Webseite. */
+export function MaintenanceDayClock(iso: string, now: Date): string {
+    const at = new Date(iso);
+    const days = BerlinDay(at) - BerlinDay(now);
+    const clock = MAINTENANCE_CLOCK.format(at);
+
+    if (days === 0) return clock;
+    if (days === -1) return `gestern ${clock}`;
+    if (days === 1) return `morgen ${clock}`;
+
+    return `${MAINTENANCE_DATE.format(at)} ${clock}`;
+}
+
+/** Die Platzhalter der Wartungsseite (wartung.html), schon maskiert. Mit Endzeit eine Zeitleiste, ohne den festen Satz. */
+export function MaintenancePlaceholders(note: IMaintenanceNote, now: Date): Record<"REASON" | "ETA" | "TIMELINE", string> {
+    const reason = EscapeHtml(note.reason ?? "Wir arbeiten gerade am System.");
+
+    if (note.endsAt === null) {
+        return { REASON: reason, ETA: '<p class="wt-eta">Wie lange es dauert, steht noch nicht fest.</p>', TIMELINE: "" };
+    }
+
+    const start = Date.parse(note.startedAt);
+    const end = Date.parse(note.endsAt);
+    const share = end > start ? Math.min(1, Math.max(0, (now.getTime() - start) / (end - start))) : 1;
+    const late = end <= now.getTime();
+    const clock = (iso: string): string => MaintenanceDayClock(iso, now);
+    const right = late ? "Es dauert etwas länger als geplant." : `Zurück gegen <b>${clock(note.endsAt)}</b>`;
+
+    return {
+        REASON: reason,
+        ETA: "",
+        TIMELINE:
+            `<div class="wt-timeline"><div class="wt-track" role="progressbar" aria-label="Fortschritt der Wartung" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(share * 100)}">` +
+            `<span style="--share:${share.toFixed(2)}"></span></div>` +
+            `<p class="wt-ends"><span>Seit <b>${clock(note.startedAt)}</b></span><span>${right}</span></p></div>`,
+    };
+}
+
 /**
  * Welche Gruppe das Dashboard anzeigt. Die freien Gruppen bleiben. Bei Free
  * Access (Schranke aus) ist jeder andere „Free“. Bei Paid Access ist, wer über
@@ -347,6 +450,8 @@ export default class DashboardService implements IDashboardService {
     private betaMode: { readonly at: number; readonly on: boolean } | null = null;
     /** Der zuletzt gelesene Beta-Modus, ohne Ablauf. null: noch nie gelesen. Gilt, wenn die Datenbank nicht antwortet. */
     private lastBeta: boolean | null = null;
+    /** Die Zeile „dashboard“ aus site_maintenance, höchstens 5 Sekunden alt. Antwortet die Datenbank nicht, gilt der letzte Stand. */
+    private maintenanceRow: { readonly at: number; readonly row: IMaintenanceRow | null } | null = null;
     private shopWarnedAt = 0;
 
     constructor(client: BotClient) {
@@ -565,11 +670,14 @@ export default class DashboardService implements IDashboardService {
     async Payload(session: IDashboardSession): Promise<IDashboardPayload> {
         const guilds = await this.GuildsOf(session);
         const user = await this.User(session);
+        // Vor DisplayGroup: Nur Administrator und Developer sehen die Wartung als Hinweisstreifen.
+        const note = BETA_FREE.includes(user.group) ? await this.Maintenance() : null;
+        const maintenance = note && { ...note, until: note.endsAt && MaintenanceDayClock(note.endsAt, new Date()) };
 
         // Free, Zugang aus dem Shop, Guardian oder Testphase (siehe DisplayGroup).
         user.group = DisplayGroup(user.group, await this.ShopAccess(session.userId), guilds, await this.Paywall());
 
-        return { user, guilds, inviteURL: this.InviteURL() };
+        return { user, guilds, inviteURL: this.InviteURL(), maintenance };
     }
 
     /** Zugang laut Shop, mit Cache. Wirft nie: Kann der Bot die Tabellen nicht lesen, bleibt die Schranke offen. */
@@ -669,6 +777,55 @@ export default class DashboardService implements IDashboardService {
      */
     private async BetaMember(userId: string): Promise<boolean> {
         return (await this.client.databaseService.One<{ user_id: string }>("SELECT user_id FROM beta_members WHERE user_id = ?", [userId])) != null;
+    }
+
+    /**
+     * Die laufende Wartung des Bot-Dashboards, oder null. Ohne eingerichtete
+     * Datenbank oder ohne Tabelle (älteres Admin Dashboard): keine. Antwortet
+     * die Datenbank nicht, gilt der zuletzt gelesene Stand, ohne einen keiner.
+     * Anders als die Beta ist die Wartung keine Schranke.
+     */
+    async Maintenance(now = new Date()): Promise<IMaintenanceNote | null> {
+        const db = this.client.databaseService;
+
+        if (!db.IsConfigured) return null;
+
+        if (!this.maintenanceRow || Date.now() - this.maintenanceRow.at >= 5_000) {
+            try {
+                if (!db.Ready) throw new Error("Datenbank nicht verbunden");
+
+                const row = await db.One<IMaintenanceRow>("SELECT active, reason, started_at, ends_at, auto_end FROM site_maintenance WHERE area = 'dashboard'");
+
+                this.maintenanceRow = { at: Date.now(), row: row ?? null };
+            } catch (error) {
+                // Auch ohne Antwort neu gestempelt: Sonst wartete jede Anfrage auf das Zeitlimit der Datenbank.
+                this.maintenanceRow = { at: Date.now(), row: SchemaMissing(error) ? null : (this.maintenanceRow?.row ?? null) };
+            }
+        }
+
+        return MaintenanceOf(this.maintenanceRow?.row ?? null, now);
+    }
+
+    /**
+     * Muss diese Anfrage die Wartung sehen? Dann die Wartung, sonst null.
+     * Administrator und Developer kommen durch. Lässt sich das nicht prüfen
+     * (abgelaufene Sitzung, Discord weg), gilt die Person als Nutzer.
+     */
+    async MaintenanceFor(request: FastifyRequest): Promise<IMaintenanceNote | null> {
+        if (MaintenanceOpenPath(request.url.split("?")[0])) return null;
+
+        const note = await this.Maintenance();
+        if (!note) return null;
+
+        try {
+            const session = this.Session(ParseCookies(request.headers.cookie)[SESSION_COOKIE]);
+
+            if (session && BETA_FREE.includes(await this.GroupOf(session.userId))) return null;
+        } catch {
+            // Wie ein Nutzer: Die Anmeldung bleibt offen, danach geht es weiter.
+        }
+
+        return note;
     }
 
     /** shop_settings.paywall, eine Minute gemerkt. Ohne Datenbank oder Tabelle: aus. */

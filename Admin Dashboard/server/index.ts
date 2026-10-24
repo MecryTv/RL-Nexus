@@ -7,6 +7,7 @@ import { loadConfig, type IConfig } from "./config.ts";
 import { closeDatabase, connectDatabase } from "./db.ts";
 import { closeEvents } from "./events.ts";
 import { closeAllMail } from "./mail/pool.ts";
+import { scheduleMaintenance } from "./maintenance.ts";
 import { scheduleShopExpiry } from "./shop/expiry.ts";
 import { scheduleStatusPost } from "./status-post.ts";
 
@@ -34,6 +35,7 @@ scheduleCleanup();
 scheduleStatusPost(config);
 scheduleCommandSync(config);
 scheduleShopExpiry(config);
+scheduleMaintenance(config);
 
 const app = await buildApp(config);
 await app.listen({ port: config.port, host: "0.0.0.0" });

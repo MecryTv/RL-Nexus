@@ -388,6 +388,19 @@ Im Code: `BetaGate` (die Regel, ohne Datenbank), `BetaMode`, `BetaMember`, `Forg
 
 Im Code: `ShopDecision` (die Regel, ohne Datenbank), `DisplayGroup`, `ShopAccess`, `Paywalled`, `GuildAllowed`, `Locked` und `LockPlaceholders` in `DashboardService.ts`. `npm run check:dashboard` prüft die Regel, den Filter und die Sperrseite, alles ohne Datenbank.
 
+### Wartung
+
+Schaltet das Admin Dashboard die Wartung des Bot-Dashboards an (Tabelle `site_maintenance`, Zeile `dashboard`), stellt sich der Bot mit einem `onRequest`-Haken vor jede Anfrage (`Server.ts`, `DashboardService.MaintenanceFor`):
+
+| Wer oder was | Bekommt |
+|---|---|
+| Seiten (GET mit `Accept: text/html`) | `wartung.html` mit 503 und `Retry-After: 300`, Grund und Zeitleiste vom Server eingesetzt, lädt sich jede Minute neu |
+| Alles andere | 503 mit `{ "error": "Gerade ist Wartung. Versuch es in ein paar Minuten noch einmal." }` |
+| Administrator und Developer | normal, dazu ein Streifen unter der Kopfzeile (`/api/me` trägt `maintenance`) |
+| `/assets/*`, `/images/*`, `/dcapi/*`, Anmeldung, Abmeldung, Impressum, Datenschutz | immer normal |
+
+„Läuft“ heißt: an, und nicht mit Haken über die Endzeit hinaus. Der Bot fragt höchstens alle 5 Sekunden. Fehlt die Tabelle (älteres Admin Dashboard) oder ist keine Datenbank eingerichtet, gibt es keine Wartung. Antwortet die Datenbank nicht, gilt der zuletzt gelesene Stand.
+
 ### Knöpfe in der Shop-DM
 
 Bei Bestellung, Test, fehlgeschlagener Zahlung und Ablauf schickt der **Admin-Server** eine DM im Namen des Bots (`server/shop/dm.ts` im Admin Dashboard). Zwei Knöpfe darin beantwortet der Bot, weil Discord Klicks an die Gateway-Sitzung schickt: `src/events/shop/ShopButtons.ts`.

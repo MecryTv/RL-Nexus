@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Wartung · RL Nexus</title>
+<meta name="color-scheme" content="dark">
+<meta name="rlnexus-site" content="__SITE__">
+<meta name="robots" content="noindex">
+<!-- Jede Minute neu: Ist die Wartung vorbei, steht danach wieder das Dashboard da. -->
+<meta http-equiv="refresh" content="60">
+<link rel="icon" type="image/png" href="__BASE__/assets/images/rl-nexus-n-48.png">
+<link rel="stylesheet" href="__BASE__/assets/style.css">
+</head>
+<body>
+
+<div class="ambient" aria-hidden="true"><i class="ambient__warm"></i><i class="ambient__cool"></i><i class="ambient__bands"></i><i class="ambient__grid"></i><i class="ambient__vignette"></i></div>
+
+<!-- Die Wartung des Bot-Dashboards (Plan 23). Der Bot zeigt sie mit 503, solange
+     sie im Admin Dashboard an ist. Die Platzhalter setzt MaintenancePlaceholders
+     im DashboardService ein, schon maskiert. Ohne Skript: Die Seite lädt sich
+     über das refresh oben selbst neu. -->
+<main class="stage wt">
+  <div class="wt__inner">
+    <p class="wt__mark">RL <span>NEXUS</span></p>
+    <p class="wt__label">Wartung</p>
+    <h1 class="wt__title">Wir sind gleich wieder da</h1>
+    <p class="wt__reason">__REASON__</p>
+    __ETA__
+    __TIMELINE__
+    <p class="wt__note">Deine Einstellungen bleiben, wie sie sind. Der Bot auf Discord läuft normal weiter.</p>
+    <nav class="wt__legal" aria-label="Rechtliches">
+      <a href="__BASE__/impressum">Impressum</a>
+      <a href="__BASE__/privacy">Datenschutz</a>
+      <a href="__BASE__/login">Anmelden fürs Team</a>
+    </nav>
+  </div>
+</main>
+
+</body>
+</html>
