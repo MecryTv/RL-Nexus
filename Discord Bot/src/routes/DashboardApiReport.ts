@@ -4,7 +4,7 @@ import Route from "../structures/Route";
 import { DASHBOARD_PATH } from "../constants/Dashboard";
 import { WantsJSON } from "../utils/admin";
 import { SessionOf } from "../utils/dashboard";
-import { ReportError } from "../services/ReportService";
+import { ReportError, ReportExtras } from "../services/ReportService";
 
 /**
  * Fehler melden aus dem Pop-up. Steht auch ohne Anmeldung offen - die Doku und
@@ -50,6 +50,7 @@ export default class DashboardApiReport extends Route {
                     user: session ? { id: session.userId, name: session.handle ? `@${session.handle}` : session.username } : null,
                     guild: guild ? { id: guild.id, name: guild.name } : null,
                     page,
+                    ...ReportExtras(body),
                 },
                 session?.userId ?? request.ip
             );

@@ -8,7 +8,8 @@ export default interface IGuardian {
     /** Gibt die Fehler-ID zurück, null bei abgelaufenen Interaktionen. Wartet auf die DMs. */
     ReportError(error: Error, interaction: Interaction | null, type?: string): Promise<string | null>;
     /** Speichert und stellt zu: die ID sofort, die DMs im Hintergrund. */
-    Report(info: IErrorInfo): { id: string; sent: Promise<void> };
+    /** sent: wie viele DMs rausgingen. */
+    Report(info: IErrorInfo): { id: string; sent: Promise<number> };
     /** Erledigt und In DevLogs öffnen unter einer DM. */
     HandleButton(interaction: ButtonInteraction): Promise<void>;
 

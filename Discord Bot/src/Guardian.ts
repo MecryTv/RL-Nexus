@@ -376,7 +376,7 @@ export default class Guardian implements IGuardian {
     }
 
     /** Baut den Bericht und stellt ihn zu. null: kein Fehler im Code (abgelaufene Interaktion). */
-    private _fromError(error: Error, interaction: Interaction | null, type: string): { id: string; sent: Promise<void> } | null {
+    private _fromError(error: Error, interaction: Interaction | null, type: string): { id: string; sent: Promise<number> } | null {
         const errorCode = (error as Error & { code?: number | string }).code;
         const normalizedCode = typeof errorCode === "string" ? Number(errorCode) : errorCode;
 
@@ -424,10 +424,14 @@ export default class Guardian implements IGuardian {
      * DMs laufen im Hintergrund (`sent`). Fällt dabei etwas aus, darf es den
      * eigentlichen Fehler nicht mitreißen.
      */
-    Report(info: IErrorInfo): { id: string; sent: Promise<void> } {
+    Report(info: IErrorInfo): { id: string; sent: Promise<number> } {
         const signature = ErrorSignature(info.kind, info.message, info.where);
         const stored = this._store(info, signature);
-        const sent = this._deliver(info, signature, stored).catch((problem: unknown) => logger.guardian("warn", `Fehlerbericht ging nicht an die Entwickler: ${String(problem)}`));
+        const sent = this._deliver(info, signature, stored).catch((problem: unknown) => {
+            logger.guardian("warn", `Fehlerbericht ging nicht an die Entwickler: ${String(problem)}`);
+
+            return 0;
+        });
 
         return { id: info.id, sent };
     }
@@ -447,17 +451,18 @@ export default class Guardian implements IGuardian {
         }
     }
 
-    private async _deliver(info: IErrorInfo, signature: string, stored: Promise<boolean>): Promise<void> {
+    /** Wie viele DMs rausgingen. 0 auch, wenn der Fehler gerade zusammengefasst wird. */
+    private async _deliver(info: IErrorInfo, signature: string, stored: Promise<boolean>): Promise<number> {
         const ids = this.client.config.DEV_USER_IDs;
         const saved = await stored;
 
-        if (!ids.length || !this.client.isReady()) return;
+        if (!ids.length || !this.client.isReady()) return 0;
 
         // Meldungen von Nutzern werden nie zusammengefasst.
         const repeats = info.kind === "report" ? 0 : this._repeats(signature);
 
         // null heisst: derselbe Fehler kam eben erst raus.
-        if (repeats === null) return;
+        if (repeats === null) return 0;
 
         const reopened = saved ? await this.client.errorReports.LastDone(signature).catch(() => null) : null;
         const message = ErrorCard(info, { buttons: saved, repeats, reopened, production: !this.client.developerMode });
@@ -479,6 +484,8 @@ export default class Guardian implements IGuardian {
         }
 
         if (saved && dms.length) await this.client.errorReports.SetDms(info.id, dms).catch(() => undefined);
+
+        return dms.length;
     }
 
     /** Die Knöpfe unter einer DM: Erledigt und In DevLogs öffnen. Nur für die Devs. */

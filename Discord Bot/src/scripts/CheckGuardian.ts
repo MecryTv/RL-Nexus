@@ -7,6 +7,8 @@
  * legt der Bot seine Tabellen selbst an.
  */
 import BotClient from "../client/BotClient";
+import { readFile } from "node:fs/promises";
+import { ReportError, ReportExtras } from "../services/ReportService";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -314,6 +316,62 @@ async function checkStore(client: BotClient): Promise<void> {
     check("Entfernen löscht die Zeilen", (await store.Find(fresh)) === null && (await store.Find(old)) === null);
 }
 
+/* ----------------------------------------------------------
+   Meldungen über „Fehler melden“ und /fehler
+   ---------------------------------------------------------- */
+async function checkReports(client: BotClient): Promise<void> {
+    console.log("\n  — Meldungen als DM —");
+
+    const extras = ReportExtras({ browser: "Firefox 140 · Windows", errorIds: ["NEXUS-1792841102-M2XD7K", "fremd", "NEXUS-1-ABC", "<script>", "NEXUS-1792841103-QQQQQQ"] });
+
+    check("Fehler davor: nur IDs im echten Format, höchstens drei", JSON.stringify(extras.errorIds) === JSON.stringify(["NEXUS-1792841102-M2XD7K", "NEXUS-1792841103-QQQQQQ"]) && extras.browser === "Firefox 140 · Windows", JSON.stringify(extras));
+
+    const service = client.reportService as unknown as { transport: unknown; Send: typeof client.reportService.Send };
+    const sent: string[] = [];
+    const users = client.users as unknown as { fetch: unknown };
+    const original = { transport: service.transport, users: users.fetch, ready: client.isReady, devs: client.config.DEV_USER_IDs, mail: Object.getOwnPropertyDescriptor(Object.getPrototypeOf(client.reportService), "Ready") };
+    let mailWorks = true;
+    let next = 5000;
+
+    Object.defineProperty(client.reportService, "Ready", { configurable: true, get: () => true });
+    service.transport = { sendMail: async () => {
+        if (!mailWorks) throw new Error("SMTP weg");
+    } };
+    users.fetch = async (id: string) => ({ id, send: async (message: { components?: { toJSON(): unknown }[] }) => (sent.push(JsonOf(message)), { id: String(next++), channelId: `dm-${id}` }) });
+    client.isReady = (() => true) as typeof client.isReady;
+    (client.config as { DEV_USER_IDs: string[] }).DEV_USER_IDs = ["111"];
+
+    const report = { subject: "Speichern geht nicht", message: "Beim Level System passiert nichts, wenn ich auf Speichern klicke.", context: "Level System, Speichern", contact: "mecry@example.com", source: "dashboard" as const, user: { id: "1059621019947634751", name: "@mecry" }, guild: null, page: "/guild/1/levels", browser: "Firefox 140 · Windows", errorIds: ["NEXUS-1792841102-M2XD7K"] };
+
+    try {
+        await service.Send(report, `check-${Date.now()}-a`);
+        check("Meldung: Mail und DM, mit Betreff, Fehler davor und Hinweis auf die Mail", sent.length === 1 && sent[0].includes("📮 Speichern geht nicht") && sent[0].includes("NEXUS-1792841102-M2XD7K") && sent[0].includes("Auch per Mail an support@nexus-emb.de"), sent[0]?.slice(0, 200));
+
+        mailWorks = false;
+        sent.length = 0;
+
+        let failed: unknown = null;
+
+        await service.Send(report, `check-${Date.now()}-b`).catch((error: unknown) => (failed = error));
+        check("Mail scheitert, DM klappt: die Meldung gilt als angekommen", failed === null && sent.length === 1 && sent[0].includes("Die Mail an support@nexus-emb.de ging nicht raus"), String(failed));
+
+        (client.config as { DEV_USER_IDs: string[] }).DEV_USER_IDs = [];
+        failed = null;
+        await service.Send(report, `check-${Date.now()}-c`).catch((error: unknown) => (failed = error));
+        check("Mail und DM scheitern: Fehler wie bisher", failed instanceof ReportError && failed.status === 502, String(failed));
+    } finally {
+        service.transport = original.transport;
+        users.fetch = original.users;
+        client.isReady = original.ready;
+        (client.config as { DEV_USER_IDs: string[] }).DEV_USER_IDs = original.devs;
+        delete (client.reportService as unknown as Record<string, unknown>).Ready;
+    }
+
+    const form = await readFile(path.join(process.cwd(), "src", "dashboard", "client", "layout", "Report.ts"), "utf8");
+
+    check("Formular: sagt, was automatisch mitgeht, und schickt es mit", form.includes("Seite, Browser und die letzten Fehler-IDs gehen automatisch mit.") && form.includes("recentErrorIds()") && form.includes("browserOf("));
+}
+
 async function main(): Promise<void> {
     console.log("\n🛠️  Guardian und Fehlerberichte\n");
 
@@ -323,6 +381,7 @@ async function main(): Promise<void> {
     await checkWhere();
     await checkTranslate();
     checkCards();
+    await checkReports(client);
 
     if (await client.databaseService.Connect()) {
         try {

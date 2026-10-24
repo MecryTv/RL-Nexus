@@ -8,6 +8,8 @@
  * Support-Server und /fehler.
  */
 
+import { recentErrorIds } from "../core/ErrorReport.js";
+import { browserOf } from "../core/Trail.js";
 import { maybe } from "../core/Dom.js";
 import { url } from "../core/Base.js";
 import { toast } from "../core/Toast.js";
@@ -52,6 +54,7 @@ export const REPORT_HTML = `
       <a class="btn btn--quiet" href="${SUPPORT_DISCORD}" target="_blank" rel="noopener">Lieber im Discord</a>
       <button class="btn btn--primary" type="submit" id="reportSend">Meldung senden</button>
     </div>
+    <p class="hintline">Seite, Browser und die letzten Fehler-IDs gehen automatisch mit.</p>
     <p class="hintline">In Discord geht es auch mit <code>/fehler</code>, auf jedem Server mit RL Nexus.</p>
   </form>
 </dialog>`;
@@ -149,7 +152,8 @@ export function bindReport(): void {
             response = await fetch(url("/api/report"), {
                 method: "POST",
                 headers: { "Content-Type": "application/json", Accept: "application/json" },
-                body: JSON.stringify({ ...fields, guildId, page: location.pathname }),
+                // Automatisch dabei, wie im Formular gesagt: Browser und die letzten Fehler-IDs (Plan 24).
+                body: JSON.stringify({ ...fields, guildId, page: location.pathname, browser: browserOf(navigator.userAgent), errorIds: recentErrorIds() }),
             });
         } catch {
             response = null;

@@ -2,6 +2,7 @@ import { createTransport, Transporter } from "nodemailer";
 import BotClient from "../client/BotClient";
 import { REPORT_LIMITS, REPORT_MAIL, REPORT_MAX, REPORT_WINDOW } from "../constants/Report";
 import logger from "../utils/logger";
+import { NewErrorId } from "../Guardian";
 
 /** Ein Fehler mit einem Satz für die Oberfläche und dem passenden Statuscode. */
 export class ReportError extends Error {
@@ -29,6 +30,19 @@ export interface IReport extends IReportInput {
     guild: { id: string; name: string } | null;
     /** Die Seite im Dashboard, auf der das Pop-up aufging. */
     page: string | null;
+    /** „Firefox 140 · Windows“, nur aus dem Dashboard. */
+    browser: string | null;
+    /** Die letzten Fehler-IDs dieses Tabs, höchstens drei (Plan 24). */
+    errorIds: string[];
+}
+
+const ERROR_ID = /^NEXUS-\d{10}-[A-HJ-NP-Z2-9]{6}$/;
+
+/** Was das Dashboard automatisch mitschickt, geprüft: Browser und die letzten Fehler-IDs. */
+export function ReportExtras(body: Record<string, unknown>): Pick<IReport, "browser" | "errorIds"> {
+    const ids = Array.isArray(body.errorIds) ? body.errorIds.filter((id): id is string => typeof id === "string" && ERROR_ID.test(id)) : [];
+
+    return { browser: typeof body.browser === "string" && body.browser.trim() ? body.browser.trim().slice(0, 120) : null, errorIds: ids.slice(-3) };
 }
 
 const MAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
@@ -118,11 +132,26 @@ export default class ReportService {
         return lines.join("\n");
     }
 
-    /** Verschickt die Meldung. key: Discord-ID oder IP - darauf zählt die Grenze. */
+    /**
+     * Verschickt die Meldung: als Mail an support@ und als DM an die Devs
+     * (Plan 24). Klappt eins von beiden, ist sie angekommen. key: Discord-ID
+     * oder IP - darauf zählt die Grenze.
+     */
     async Send(report: IReport, key: string): Promise<void> {
-        if (!this.Ready) throw new ReportError("Der Mailversand ist noch nicht eingerichtet.", 503);
         if (!this.Allow(key)) throw new ReportError("Du hast gerade schon mehrere Meldungen geschickt. Versuch es in ein paar Minuten noch einmal.", 429);
 
+        const mailed = this.Ready ? await this.Mail(report) : false;
+        const direct = await this.client.guardian.Report(this.Info(report, mailed)).sent;
+
+        if (!mailed && direct === 0) {
+            throw this.Ready ? new ReportError("Die Meldung ließ sich gerade nicht verschicken.", 502) : new ReportError("Der Mailversand ist noch nicht eingerichtet.", 503);
+        }
+
+        logger.user(`📮 Fehlermeldung über ${report.source}: ${mailed ? "Mail" : "keine Mail"}, ${direct} DM(s)`);
+    }
+
+    /** Die Mail an support@. false: ging nicht raus. */
+    private async Mail(report: IReport): Promise<boolean> {
         const config = this.client.config;
 
         this.transport ??= createTransport({
@@ -144,12 +173,40 @@ export default class ReportService {
                 subject: `[RL Nexus · Fehler] ${report.subject}`,
                 text: this.Body(report),
             });
+
+            return true;
         } catch (error) {
-            logger.error("📮 Fehlermeldung ließ sich nicht verschicken", error);
+            logger.error("📮 Fehlermeldung ließ sich nicht als Mail verschicken", error);
 
-            throw new ReportError("Die Meldung ließ sich gerade nicht verschicken.", 502);
+            return false;
         }
+    }
 
-        logger.user(`📮 Fehlermeldung von ${report.user?.id ?? "Gast"} über ${report.source}`);
+    /** Die DM 📮 an die Devs: Betreff als Titel, nie zusammengefasst. */
+    private Info(report: IReport, mailed: boolean) {
+        const fields: [string, string][] = [["Text", report.message.slice(0, 1500)]];
+
+        if (report.context) fields.push(["Wo und wie", report.context.slice(0, 600)]);
+
+        fields.push(["Von", report.user ? `${report.user.name} \`${report.user.id}\`` : "nicht angemeldet"]);
+
+        if (report.contact) fields.push(["Kontakt", report.contact]);
+        if (report.guild) fields.push(["Server", `${report.guild.name} \`${report.guild.id}\``]);
+
+        fields.push(["Woher", report.source === "discord" ? "Discord (/fehler)" : `Dashboard${report.page ? ` · \`${report.page}\`` : ""}`]);
+
+        if (report.browser) fields.push(["Browser", report.browser]);
+        if (report.errorIds.length) fields.push(["Fehler davor", report.errorIds.map((id) => `\`${id}\``).join(", ")]);
+
+        return {
+            id: NewErrorId(),
+            kind: "report" as const,
+            title: `📮 ${report.subject}`,
+            message: report.subject,
+            where: report.page ?? report.source,
+            fields,
+            excerpt: null,
+            note: mailed ? `Auch per Mail an ${REPORT_MAIL}.` : `Die Mail an ${REPORT_MAIL} ging nicht raus. Antworte über Discord.`,
+        };
     }
 }

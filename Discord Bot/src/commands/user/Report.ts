@@ -91,6 +91,8 @@ export default class Report extends Command {
                     user: { id: interaction.user.id, name: `@${interaction.user.username}` },
                     guild: interaction.guild ? { id: interaction.guild.id, name: interaction.guild.name } : null,
                     page: null,
+                    browser: null,
+                    errorIds: [],
                 },
                 interaction.user.id
             );
