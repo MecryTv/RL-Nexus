@@ -1,4 +1,5 @@
 import path from "path";
+import { randomInt } from "node:crypto";
 import { ChatInputCommandInteraction, Interaction } from "discord.js";
 import BotClient from "./client/BotClient";
 import IGuardian from "./interfaces/services/guardian/IGuardian";
@@ -14,6 +15,30 @@ const REPEAT_WINDOW = 10 * 60 * 1000;
 
 /** So viel vom Stack passt in eine Nachricht, ohne sie zu sprengen. */
 const STACK_LIMIT = 1200;
+
+/** Woher ein Bericht kommt: Bot, Bot-Dashboard im Browser oder eine Meldung über „Fehler melden“. */
+export type ErrorKind = "bot" | "dashboard" | "report";
+
+/** A–Z und 2–9 ohne I und O: nichts, was man beim Abtippen mit 1 oder 0 verwechselt. */
+const ID_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
+/** Die Fehler-ID: `NEXUS-<Unix-Sekunden>-<6 Zeichen>`, etwa NEXUS-1792841102-M2XD7K. */
+export function NewErrorId(now = new Date()): string {
+    const random = Array.from({ length: 6 }, () => ID_ALPHABET[randomInt(ID_ALPHABET.length)]).join("");
+
+    return `NEXUS-${Math.floor(now.getTime() / 1000)}-${random}`;
+}
+
+/**
+ * Woran derselbe Fehler zu erkennen ist: Art, Stelle und Meldung ohne Zahlen,
+ * damit „Unknown Channel 1059…39“ und „… 1059…40“ einer sind. Die Stelle steht
+ * vor der Meldung, damit eine lange Meldung sie beim Kürzen nicht verdrängt.
+ */
+export function ErrorSignature(kind: ErrorKind, message: string, where: string): string {
+    const text = message.replace(/\d+/g, "#").replace(/\s+/g, " ").trim();
+
+    return `${kind}|${where}|${text}`.slice(0, 255);
+}
 
 export default class Guardian implements IGuardian {
     client: BotClient;
@@ -97,9 +122,7 @@ export default class Guardian implements IGuardian {
     }
 
     GenErrorID(): string {
-        const timestamp = Math.floor(Date.now() / 1000);
-        const randomPart = Math.random().toString(36).substring(2, 8).toUpperCase();
-        return `EarthCraft-${timestamp}-${randomPart}`;
+        return NewErrorId();
     }
 
     async ReportError(error: Error, interaction: Interaction | null, type = "Unknown Error"): Promise<void> {

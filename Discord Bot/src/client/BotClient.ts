@@ -55,6 +55,7 @@ import Tickets from "../models/Tickets";
 import TicketBlacklist from "../models/TicketBlacklist";
 import TicketTranscripts from "../models/TicketTranscripts";
 import UserCodes from "../models/UserCodes";
+import ErrorReports from "../models/ErrorReports";
 import ModSettings from "../models/ModSettings";
 import ModCases from "../models/ModCases";
 import ModuleSettings from "../models/ModuleSettings";
@@ -138,6 +139,8 @@ export default class BotClient extends Client implements IBotClient {
     ticketBlacklist: TicketBlacklist;
     ticketTranscripts: TicketTranscripts;
     userCodes: UserCodes;
+    /** Fehlerberichte für die Devs (Plan 24). */
+    errorReports: ErrorReports;
     modSettings: ModSettings;
     modCases: ModCases;
     moduleSettings: ModuleSettings;
@@ -263,6 +266,7 @@ export default class BotClient extends Client implements IBotClient {
         this.ticketBlacklist = new TicketBlacklist(this);
         this.ticketTranscripts = new TicketTranscripts(this);
         this.userCodes = new UserCodes(this);
+        this.errorReports = new ErrorReports(this);
         this.modSettings = new ModSettings(this);
         this.modCases = new ModCases(this);
         this.moduleSettings = new ModuleSettings(this);

@@ -53,6 +53,7 @@ export const TABLES = {
     clipRounds: "clip_rounds",
     clipEntries: "clip_entries",
     clipVotes: "clip_votes",
+    errorReports: "error_reports",
 } as const;
 
 export type TableName = (typeof TABLES)[keyof typeof TABLES];

@@ -26,6 +26,7 @@
         "check:dashboard": "tsx src/scripts/CheckDashboard.ts",
         "check:db": "tsx src/scripts/CheckDatabase.ts",
         "check:gallery": "tsx src/scripts/CheckGallery.ts",
+        "check:guardian": "tsx src/scripts/CheckGuardian.ts",
         "check:image": "tsx src/scripts/CheckImage.ts",
         "check:levels": "tsx src/scripts/CheckLevels.ts",
         "check:lft": "tsx src/scripts/CheckLft.ts",
