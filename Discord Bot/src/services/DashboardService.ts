@@ -120,6 +120,8 @@ export interface IShopAccess {
     readonly beta?: boolean;
     /** Beta-Modus mit eingelöstem Code. Für die Anzeige „Beta“. */
     readonly betaMember?: boolean;
+    /** Datenbankfehler, und Beta könnte laufen: im Zweifel zu. Die Sperrseite bittet ums Neuladen statt um einen Code. */
+    readonly unsure?: boolean;
 }
 
 /** Im Beta-Modus ohne Code herein (Plan 22). Partner braucht einen Code. */
@@ -130,6 +132,8 @@ export const BETA_ERRORS = {
     falsch: "Diesen Code gibt es nicht, oder er ist schon aufgebraucht.",
     weg: "Das Einlösen klappt gerade nicht. Versuch es gleich noch einmal.",
     leer: "Tipp zuerst deinen Beta-Code ein.",
+    // Das Rate-Limit der Route (Server.ts leitet bei 429 hierher um).
+    zuviel: "Zu viele Versuche. Warte ein paar Minuten, dann geht es wieder.",
 } as const;
 
 export type BetaError = keyof typeof BETA_ERRORS;
@@ -150,6 +154,16 @@ export function BetaGate(input: { readonly betaMode: boolean; readonly group: Da
     if (!input.betaMode || BETA_FREE.includes(input.group)) return null;
 
     return input.member ? { allowed: true, reason: "", betaMember: true } : { allowed: false, reason: "RL Nexus ist gerade in der geschlossenen Beta.", beta: true };
+}
+
+/** beta: true, damit niemand über einen zahlenden Owner als Guardian hereinkommt (Paywalled, GuildAllowed). */
+const BETA_UNSURE: IShopAccess = { allowed: false, reason: "Dein Zugang lässt sich gerade nicht prüfen.", beta: true, unsure: true };
+
+/** Tabelle oder Spalte fehlt (MariaDB 1146, 1054): ein älteres Admin Dashboard ohne Beta, kein Ausfall. */
+function MissingSchema(error: unknown): boolean {
+    const errno = (error as { errno?: unknown } | null)?.errno;
+
+    return errno === 1054 || errno === 1146;
 }
 
 /** Ohne Kauf frei (Partner seit der Entscheidung vom 17.10.2026, Premium nicht). */
@@ -209,6 +223,9 @@ export function EscapeHtml(text: string): string {
  */
 export function LockPlaceholders(access: IShopAccess, betaError: string | null = null): Record<"REASON" | "HINT" | "GO_PATH" | "GO_TEXT" | "GO_CLASS", string> {
     const reason = EscapeHtml(access.reason);
+
+    // Ohne Datenbank ließe sich auch kein Code einlösen.
+    if (access.unsure) return { REASON: reason, HINT: '<p class="hintline">Lad die Seite in einer Minute neu.</p>', GO_PATH: "/kontakt", GO_TEXT: "Support kontaktieren", GO_CLASS: "erract" };
 
     // Beta: ein Feld für den Code statt „Zugang holen“. text/plain, weil der Server sonst nur JSON liest - und die Seite kommt ohne Skript aus.
     if (access.beta) {
@@ -421,6 +438,25 @@ export default class DashboardService implements IDashboardService {
         }
     }
 
+    /**
+     * Beim Abmelden: Discord vergisst den Token. Die Sitzung lebt im Cookie und
+     * ließe sich sonst kopiert bis zu ihrem Ablauf weiter nutzen. Mit
+     * widerrufenem Token antwortet Discord 401, und jede Prüfung über GuildsOf
+     * endet in SessionExpired. Klappt es nicht, läuft der Token von selbst ab.
+     */
+    async Revoke(session: IDashboardSession): Promise<void> {
+        try {
+            await fetch(`${DISCORD_API}/oauth2/token/revoke`, {
+                method: "POST",
+                headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                body: new URLSearchParams({ client_id: this.ClientId, client_secret: this.ClientSecret, token: session.accessToken, token_type_hint: "access_token" }),
+                signal: AbortSignal.timeout(5_000),
+            });
+        } catch (error) {
+            logger.warn(`Discord-Token beim Abmelden nicht widerrufen: ${String(error)}`);
+        }
+    }
+
     async Exchange(code: string): Promise<IDashboardSession> {
         const response = await fetch(`${DISCORD_API}/oauth2/token`, {
             method: "POST",
@@ -541,7 +577,7 @@ export default class DashboardService implements IDashboardService {
         return { user, guilds, inviteURL: this.InviteURL() };
     }
 
-    /** Zugang laut Shop, mit Cache. Wirft nie: Kann der Bot die Tabellen nicht lesen, bleibt die Schranke offen. */
+    /** Zugang laut Shop, mit Cache. Wirft nie: Kann der Bot die Tabellen nicht lesen, bleibt die Schranke offen, außer Beta könnte laufen. */
     async ShopAccess(userId: string): Promise<IShopAccess> {
         const cached = this.shopAccess.get(userId);
         if (cached) return cached;
@@ -578,13 +614,16 @@ export default class DashboardService implements IDashboardService {
                 access = ShopDecision({ paywall, group, banned: customer?.banned_at != null, grants, now: new Date() });
             }
         } catch (error) {
-            // Lieber offen als alle ausgesperrt. Nicht merken: Der nächste Aufruf versucht es wieder.
+            // Bei Free und Paid lieber offen als alle ausgesperrt. Bei Beta im Zweifel zu, auch wenn der
+            // Modus noch nie gelesen wurde. Nicht merken: Der nächste Aufruf versucht es wieder.
+            const open = this.betaMode?.on === false;
+
             if (Date.now() - this.shopWarnedAt > 60_000) {
                 this.shopWarnedAt = Date.now();
-                logger.warn(`Zugang aus dem Shop nicht lesbar, die Bezahlschranke bleibt offen: ${String(error)}`);
+                logger.warn(`Zugang aus dem Shop nicht lesbar, ${open ? "die Bezahlschranke bleibt offen" : "Beta könnte laufen, alle sehen die Sperrseite"}: ${String(error)}`);
             }
 
-            return ALLOWED;
+            return open ? ALLOWED : BETA_UNSURE;
         }
 
         this.shopAccess.set(userId, access, { ttl: access.allowed ? 60_000 : 10_000 });
@@ -597,7 +636,10 @@ export default class DashboardService implements IDashboardService {
         this.shopAccess.delete(userId);
     }
 
-    /** Beta-Modus (shop_settings.access_mode = 'beta'), eine Minute gemerkt. Ohne Datenbank, Tabelle oder Spalte: aus. */
+    /**
+     * Beta-Modus (shop_settings.access_mode = 'beta'), eine Minute gemerkt. Ohne Datenbank, Tabelle oder
+     * Spalte: aus. Jeder andere Fehler geht nach oben, der alte Stand bleibt stehen (LoadShopAccess).
+     */
     private async BetaMode(): Promise<boolean> {
         if (this.betaMode && Date.now() - this.betaMode.at < 60_000) return this.betaMode.on;
 
@@ -607,9 +649,9 @@ export default class DashboardService implements IDashboardService {
             try {
                 const row = await this.client.databaseService.One<{ access_mode: string }>("SELECT access_mode FROM shop_settings WHERE id = 1");
                 on = row?.access_mode === "beta";
-            } catch {
+            } catch (error) {
                 // Älterer Stand des Admin Dashboards ohne access_mode: kein Beta.
-                on = false;
+                if (!MissingSchema(error)) throw error;
             }
         }
 
@@ -620,8 +662,7 @@ export default class DashboardService implements IDashboardService {
 
     /**
      * Hat die Person einen Beta-Code eingelöst? Ein Datenbankfehler geht nach
-     * oben: LoadShopAccess lässt dann herein, ohne es zu merken - wie bei der
-     * Bezahlschranke lieber offen als einen Tester wegen eines Aussetzers aussperren.
+     * oben: LoadShopAccess sperrt dann, ohne es zu merken - im Zweifel zu.
      */
     private async BetaMember(userId: string): Promise<boolean> {
         return (await this.client.databaseService.One<{ user_id: string }>("SELECT user_id FROM beta_members WHERE user_id = ?", [userId])) != null;

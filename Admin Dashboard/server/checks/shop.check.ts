@@ -572,6 +572,19 @@ section("Shop: Kündigen");
         assert.match(mail.html, /Jahr/);
         assert.match(mail.html, /31\.01\.2027/);
         assert.match(giftMail(config, { ...input, until: null }).html, /unbegrenzt/);
+
+        // Bei Free und Beta ruht der Zugang (catchUpFree): Tage statt Datum.
+        const now = new Date("2026-10-24T10:00:00.000Z");
+        const until = new Date("2026-11-23T10:00:00.000Z");
+        const free = giftMail(config, { ...input, until, mode: "free", now }).html;
+        const beta = giftMail(config, { ...input, until, mode: "beta", now }).html;
+
+        assert.match(free, /30 Tage/);
+        assert.match(free, /kostenlos/);
+        assert.doesNotMatch(free, /23\.11\.2026/, "kein Datum, das wegen der Pause nicht stimmt");
+        assert.match(beta, /Beta-Code/);
+        assert.doesNotMatch(beta, /Zugang zum Bot-Dashboard/, "verspricht nicht, was nur mit Code geht");
+        assert.match(giftMail(config, { ...input, until: null, mode: "beta", now }).html, /Beta-Code/);
     });
 
     await check("Mail „Zugang beendet“: mit und ohne Erstattung", () => {

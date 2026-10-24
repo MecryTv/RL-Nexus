@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { appendFile, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import type { ILogFeed, ILogSearch, ILogSessionPage, ILogView } from "../../shared/api.ts";
+import type { ILogFeed, ILogSearch, ILogSessionPage, ILogView, IMaintenancePlan, IMaintenanceState } from "../../shared/api.ts";
 import { LOG_PAGE_ENTRIES, LOG_SEARCH } from "../../shared/limits.ts";
 import { buildApp } from "../app.ts";
 import { loadConfig } from "../config.ts";
@@ -107,7 +107,10 @@ export async function checkDev(): Promise<void> {
                 assert.deepEqual([response.statusCode, response.json()], [403, { error: "Das dürfen nur Developer." }], url);
             }
 
-            assert.equal((await send("PUT", "/api/maintenance", { website: true }, admin)).statusCode, 403);
+            assert.equal((await send("PUT", "/api/maintenance", { website: false }, admin)).statusCode, 403);
+            for (const url of ["/api/maintenance/start", "/api/maintenance/step", "/api/maintenance/until"]) {
+                assert.equal((await send("POST", url, {}, admin)).statusCode, 403, url);
+            }
             assert.equal((await send("POST", "/api/bot/restart", undefined, admin)).statusCode, 403);
             assert.ok(!existsSync(path.join(flagsDir, "wartung-webseite")));
         });
@@ -276,20 +279,106 @@ export async function checkDev(): Promise<void> {
             assert.match(download.body, /Etwas ging schief/);
         });
 
-        await check("Wartung: Schalter legen Dateien an und löschen sie, die Übersicht zeigt es", async () => {
-            const on = await send("PUT", "/api/maintenance", { website: true });
-            assert.equal(on.statusCode, 200);
-            assert.equal(on.json().website.by, "nutzer2");
-            assert.ok(existsSync(path.join(flagsDir, "wartung-webseite")));
+        // Plan 23: Wartung mit Zeitstrahl. wartung.json ist öffentlich, die Schalter bleiben, wie sie sind.
+        const planFile = path.join(flagsDir, "wartung.json");
+        const inMinutes = (minutes: number): string => new Date(Date.now() + minutes * 60_000).toISOString();
+        const start = (overrides: Record<string, unknown> = {}) =>
+            send("POST", "/api/maintenance/start", {
+                areas: ["website", "dashboard"],
+                title: "Wir bauen um, gleich geht es weiter.",
+                text: "",
+                until: inMinutes(60),
+                steps: ["Backup", "Update", "Test", "Wieder online"],
+                ...overrides,
+            });
+        const plan = async (): Promise<IMaintenanceState["plan"]> => ((await get("/api/maintenance")).json() as IMaintenanceState).plan;
+
+        await check("Wartung: Einschalten schreibt erst den Plan, dann die Schalter, ohne Namen", async () => {
+            const on = await start();
+            assert.equal(on.statusCode, 200, on.body);
+
+            const raw = readFileSync(planFile, "utf8");
+            const file = JSON.parse(raw) as IMaintenancePlan;
+            assert.deepEqual(file.areas, ["website", "dashboard"]);
+            assert.equal(file.current, 0);
+            assert.ok(file.steps[0].startedAt !== null);
+            assert.equal(file.steps[1].startedAt, null);
+            assert.doesNotMatch(raw, /"by"|nutzer2/);
+            assert.ok(existsSync(path.join(flagsDir, "wartung-webseite")) && existsSync(path.join(flagsDir, "wartung-dashboard")));
+
+            const state = (await get("/api/maintenance")).json() as IMaintenanceState;
+            assert.equal(state.plan?.title, "Wir bauen um, gleich geht es weiter.");
+            assert.equal(state.website?.by, "nutzer2");
 
             const overview = (await get("/api/overview", admin)).json();
-            assert.deepEqual([overview.maintenance.website?.by, overview.maintenance.dashboard], ["nutzer2", null]);
+            assert.deepEqual([overview.maintenance.website?.by, overview.maintenance.dashboard?.by], ["nutzer2", "nutzer2"]);
+        });
 
+        await check("Wartung: zweites Einschalten wird abgelehnt", async () => {
+            assert.equal((await start()).statusCode, 409);
+        });
+
+        await check("Wartung: Weiter und Zurück", async () => {
+            const next = (await send("POST", "/api/maintenance/step", { direction: "next" })).json() as IMaintenanceState;
+            assert.equal(next.plan?.current, 1);
+            assert.ok(next.plan?.steps[1].startedAt !== null);
+
+            const back = (await send("POST", "/api/maintenance/step", { direction: "back" })).json() as IMaintenanceState;
+            assert.equal(back.plan?.current, 0);
+            assert.equal(back.plan?.steps[1].startedAt, null);
+
+            assert.equal((await send("POST", "/api/maintenance/step", { direction: "back" })).statusCode, 409);
+            for (let index = 0; index < 3; index++) assert.equal((await send("POST", "/api/maintenance/step", { direction: "next" })).statusCode, 200);
+            assert.equal((await plan())?.current, 3);
+            assert.equal((await send("POST", "/api/maintenance/step", { direction: "next" })).statusCode, 409);
+            assert.equal((await send("POST", "/api/maintenance/step", { direction: "seitwärts" })).statusCode, 400);
+        });
+
+        await check("Wartung: Ende ändern", async () => {
+            assert.equal(((await send("POST", "/api/maintenance/until", { until: null })).json() as IMaintenanceState).plan?.until, null);
+            assert.equal((await send("POST", "/api/maintenance/until", { until: inMinutes(30) })).statusCode, 200);
+            assert.equal((await send("POST", "/api/maintenance/until", { until: inMinutes(-5) })).statusCode, 400);
+            assert.equal((await send("POST", "/api/maintenance/until", { until: inMinutes(8 * 24 * 60) })).statusCode, 400);
+            assert.equal((await send("POST", "/api/maintenance/until", { until: "morgen" })).statusCode, 400);
+        });
+
+        await check("Wartung: Beenden je Bereich kürzt den Plan, ganz beendet löscht ihn", async () => {
             assert.equal((await send("PUT", "/api/maintenance", { website: false })).statusCode, 200);
             assert.ok(!existsSync(path.join(flagsDir, "wartung-webseite")));
+            assert.deepEqual((await plan())?.areas, ["dashboard"]);
 
+            assert.equal((await send("PUT", "/api/maintenance", { dashboard: false })).statusCode, 200);
+            assert.ok(!existsSync(planFile));
+            assert.equal(await plan(), null);
+
+            assert.equal((await send("PUT", "/api/maintenance", { website: true })).statusCode, 400);
             assert.equal((await send("PUT", "/api/maintenance", { website: "ja" })).statusCode, 400);
             assert.equal((await send("PUT", "/api/maintenance", {})).statusCode, 400);
+            assert.equal((await send("POST", "/api/maintenance/step", { direction: "next" })).statusCode, 409);
+        });
+
+        await check("Wartung: Grenzen beim Einschalten", async () => {
+            const bad: Record<string, unknown>[] = [
+                { title: "" },
+                { title: "x".repeat(81) },
+                { text: "x".repeat(201) },
+                { steps: Array.from({ length: 9 }, (_, index) => `Schritt ${index + 1}`) },
+                { steps: ["x".repeat(41)] },
+                { steps: [""] },
+                { areas: [] },
+                { areas: ["irgendwo"] },
+                { until: inMinutes(-1) },
+                { until: inMinutes(8 * 24 * 60) },
+            ];
+
+            for (const overrides of bad) assert.equal((await start(overrides)).statusCode, 400, JSON.stringify(overrides));
+            assert.ok(!existsSync(planFile) && !existsSync(path.join(flagsDir, "wartung-webseite")));
+
+            const bare = await start({ steps: [], until: null, areas: ["website"] });
+            assert.equal(bare.statusCode, 200, bare.body);
+            assert.deepEqual([(await plan())?.current, (await plan())?.steps], [null, []]);
+            assert.equal((await send("PUT", "/api/maintenance", { website: false })).statusCode, 200);
+            assert.ok(!existsSync(planFile));
         });
 
         await check("Neustart: der Bot nimmt an, ohne Bot gibt es 503", async () => {

@@ -1,0 +1,187 @@
+<style>
+  .wm { --bg:#050608; --panel:rgba(12,14,18,.82); --line:rgba(255,255,255,.08); --text:#f2f4f7; --muted:#a8b0bc; --dim:#6b7380; --red:#ff1e2d; --redd:#d81424; --ok:#35e07f;
+        background:var(--bg); color:var(--text); font-family:"Segoe UI",system-ui,sans-serif; line-height:1.55; overflow:hidden; position:relative; }
+  .wm .caps { font-size:11px; font-weight:700; letter-spacing:.22em; text-transform:uppercase; }
+  .wm .btn { display:inline-block; padding:11px 20px; background:var(--redd); color:#fff; font-weight:700; font-size:12.5px; letter-spacing:.08em; text-transform:uppercase; text-decoration:none;
+             clip-path:polygon(9px 0,100% 0,100% calc(100% - 9px),calc(100% - 9px) 100%,0 100%,0 9px); }
+  .wm .ghost { display:inline-block; padding:10px 18px; border:1px solid rgba(255,255,255,.18); font-size:12.5px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; text-decoration:none; color:var(--text); background:rgba(5,6,8,.5); }
+  .wm .legal { display:flex; flex-wrap:wrap; justify-content:center; gap:6px 18px; font-size:12px; color:var(--dim); }
+  .wm .legal a { color:var(--muted); text-decoration:none; border-bottom:1px solid rgba(255,255,255,.15); }
+  .wm .ring { position:relative; }
+  .wm .ring svg { position:absolute; inset:0; transform:rotate(-90deg); width:100%; height:100%; }
+  .wm .ring img { position:absolute; border-radius:50%; }
+  .wm .big { font-weight:800; line-height:1; font-variant-numeric:tabular-nums; }
+  .wm .big small { font-weight:600; color:var(--muted); margin-left:6px; }
+  .wm .note { display:inline-flex; gap:8px; align-items:center; font-size:12px; color:var(--dim); }
+  .wm .note i { width:7px; height:7px; border-radius:50%; background:var(--ok); box-shadow:0 0 8px var(--ok); }
+
+  /* D: Arena */
+  /* Das Banner nur als unscharfe Textur: sonst stünde sein großes N hinter dem Logo im Ring. */
+  .wm.wd { padding:40px 28px 24px; text-align:center; isolation:isolate; }
+  .wm.wd::before { content:""; position:absolute; inset:-30px; z-index:-2; background:url(/files/banner.webp) center 30%/cover; filter:blur(14px) saturate(1.2); opacity:.55; }
+  .wm.wd::after { content:""; position:absolute; inset:0; z-index:-1; background:linear-gradient(180deg, rgba(5,6,8,.35), rgba(5,6,8,.9) 60%, var(--bg)); }
+  .wm.wd .ring { width:190px; height:190px; margin:0 auto; }
+  .wm.wd .ring img { inset:34px; width:122px; height:122px; }
+  .wm.wd h1 { margin:14px 0 2px; font-size:30px; line-height:1.15; }
+  .wm.wd .big { margin:12px 0 2px; font-size:46px; } .wd .big small { font-size:17px; }
+  .wm.wd .sub { margin:0 0 22px; color:var(--muted); font-size:14px; }
+  .wm.wd .line { position:relative; display:grid; grid-template-columns:repeat(4,1fr); max-width:600px; margin:0 auto 24px; }
+  .wm.wd .line::before { content:""; position:absolute; left:12.5%; right:12.5%; top:6px; height:2px; background:rgba(255,255,255,.1); }
+  .wm.wd .line::after { content:""; position:absolute; left:12.5%; width:30%; top:6px; height:2px; background:linear-gradient(90deg,var(--ok),var(--red)); }
+  .wm.wd .st { position:relative; z-index:1; display:flex; flex-direction:column; align-items:center; gap:5px; font-size:12px; color:var(--dim); }
+  .wm.wd .st i { width:14px; height:14px; border-radius:50%; background:var(--bg); border:2px solid rgba(255,255,255,.22); }
+  .wm.wd .st time { font-size:11.5px; font-variant-numeric:tabular-nums; }
+  .wm.wd .st.done { color:var(--muted); } .wd .st.done i { background:var(--ok); border-color:var(--ok); }
+  .wm.wd .st.now { color:#fff; font-weight:600; } .wd .st.now i { border-color:var(--red); box-shadow:0 0 0 5px rgba(255,30,45,.22); }
+  .wm.wd .actions { display:flex; gap:10px; justify-content:center; margin-bottom:22px; }
+
+  /* E: Leitstand */
+  .wm.we .strip { height:96px; background:url(/files/banner.webp) center 38%/cover; position:relative; }
+  .wm.we .strip::after { content:""; position:absolute; inset:0; background:linear-gradient(180deg,rgba(5,6,8,.1),var(--bg)); }
+  .wm.we .grid { display:grid; grid-template-columns:auto 1fr; gap:30px; align-items:center; padding:4px 32px 22px; }
+  .wm.we .ring { width:210px; height:210px; }
+  .wm.we .ring img { inset:36px; width:138px; height:138px; }
+  .wm.we .label { color:var(--red); }
+  .wm.we h1 { margin:6px 0 6px; font-size:28px; line-height:1.15; }
+  .wm.we .lead { margin:0 0 14px; color:var(--muted); font-size:14px; }
+  .wm.we .eta { display:flex; align-items:baseline; gap:14px; margin-bottom:12px; }
+  .wm.we .big { font-size:40px; } .we .big small { font-size:15px; }
+  .wm.we .eta .until { color:var(--muted); font-size:13px; }
+  .wm.we ol { list-style:none; margin:0 0 16px; padding:12px 14px; position:relative; border:1px solid var(--line); background:var(--panel); display:grid; grid-template-columns:repeat(2,1fr); gap:4px 18px; }
+  .wm.we li { position:relative; display:flex; justify-content:space-between; gap:10px; padding:3px 0 3px 22px; font-size:13px; color:var(--dim); }
+  .wm.we li::before { content:""; position:absolute; left:0; top:7px; width:12px; height:12px; border-radius:50%; border:2px solid rgba(255,255,255,.2); }
+  .wm.we li.done { color:var(--muted); } .we li.done::before { background:var(--ok); border-color:var(--ok); }
+  .wm.we li.now { color:#fff; font-weight:600; } .we li.now::before { border-color:var(--red); box-shadow:0 0 0 4px rgba(255,30,45,.2); }
+  .wm.we li time { font-variant-numeric:tabular-nums; }
+  .wm.we .actions { display:flex; gap:10px; flex-wrap:wrap; }
+  .wm.we .foot { padding:12px 32px 18px; border-top:1px solid var(--line); display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; }
+
+  /* F: Ladebalken im Banner */
+  .wm.wf .hero { position:relative; height:200px; background:url(/files/banner.webp) center 40%/cover; }
+  .wm.wf .hero::after { content:""; position:absolute; inset:0; background:linear-gradient(180deg,transparent 55%,rgba(5,6,8,.85)); }
+  .wm.wf .progress { position:absolute; left:0; right:0; bottom:0; height:4px; background:rgba(255,255,255,.08); z-index:2; }
+  .wm.wf .progress b { position:absolute; left:0; top:0; bottom:0; width:58%; background:linear-gradient(90deg,var(--redd),var(--red)); box-shadow:0 0 16px rgba(255,30,45,.8); }
+  .wm.wf .progress em { position:absolute; left:58%; bottom:10px; transform:translateX(-50%); font-style:normal; font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:#fff; background:var(--redd); padding:2px 7px; }
+  .wm.wf .body { display:grid; grid-template-columns:1fr 1fr; gap:28px; padding:22px 30px 20px; }
+  .wm.wf .label { color:var(--red); }
+  .wm.wf h1 { margin:6px 0 8px; font-size:28px; line-height:1.15; }
+  .wm.wf .lead { margin:0 0 16px; color:var(--muted); font-size:14px; }
+  .wm.wf .count { display:flex; align-items:center; gap:16px; margin-bottom:16px; }
+  .wm.wf .count .ring { width:84px; height:84px; flex:none; }
+  .wm.wf .count .ring img { inset:14px; width:56px; height:56px; }
+  .wm.wf .big { font-size:38px; } .wf .big small { font-size:14px; }
+  .wm.wf .count p { margin:4px 0 0; font-size:12.5px; color:var(--muted); }
+  .wm.wf ol { list-style:none; margin:0; padding:0; position:relative; }
+  .wm.wf ol::before { content:""; position:absolute; left:6px; top:8px; bottom:8px; width:2px; background:rgba(255,255,255,.08); }
+  .wm.wf li { position:relative; display:flex; justify-content:space-between; gap:10px; padding:6px 0 6px 24px; font-size:13.5px; color:var(--dim); }
+  .wm.wf li::before { content:""; position:absolute; left:0; top:11px; width:14px; height:14px; border-radius:50%; background:var(--bg); border:2px solid rgba(255,255,255,.2); }
+  .wm.wf li.done { color:var(--muted); } .wf li.done::before { border-color:var(--ok); background:var(--ok); }
+  .wm.wf li.now { color:#fff; font-weight:600; } .wf li.now::before { border-color:var(--red); box-shadow:0 0 0 4px rgba(255,30,45,.2); }
+  .wm.wf li time { font-variant-numeric:tabular-nums; }
+  .wm.wf .actions { display:flex; gap:10px; flex-wrap:wrap; }
+  .wm.wf .foot { padding:12px 30px 18px; border-top:1px solid var(--line); }
+</style>
+
+<h2>Neue Entwürfe: Banner und Fahrplan aus B, Countdown und Ring aus C</h2>
+<p class="subtitle">Gleiches Beispiel: Wartung seit 14:00, geplant bis 15:00, jetzt 14:35. Der Ring und der Balken füllen sich live bis zum geplanten Ende, die Seite lädt sich von selbst neu, sobald alles wieder läuft.</p>
+
+<div class="options">
+  <div class="option" data-choice="d" onclick="toggleSelect(this)">
+    <div class="letter">D</div>
+    <div class="content">
+      <h3>Arena: Banner als Hintergrund, Ring in der Mitte</h3>
+      <p>Das Markenbild liegt abgedunkelt hinter allem. Darauf Ring mit Logo, die Restzeit groß und der Fahrplan als waagrechte Linie mit Uhrzeiten.</p>
+      <div class="mockup"><div class="mockup-body" style="padding:0">
+        <div class="wm wd">
+          <div class="ring">
+            <svg viewBox="0 0 200 200"><circle cx="100" cy="100" r="92" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="6"/><circle cx="100" cy="100" r="92" fill="none" stroke="#ff1e2d" stroke-width="6" stroke-linecap="round" stroke-dasharray="578" stroke-dashoffset="243" style="filter:drop-shadow(0 0 7px rgba(255,30,45,.7))"/></svg>
+            <img src="/files/logo-n.webp" alt="RL Nexus">
+          </div>
+          <p class="caps" style="color:var(--red);margin:16px 0 0">Wartung</p>
+          <h1>Wir bauen um, gleich geht es weiter.</h1>
+          <p class="big">~25<small>Min.</small></p>
+          <p class="sub">voraussichtlich bis 15:00 Uhr · der Bot in Discord läuft weiter</p>
+          <div class="line">
+            <div class="st done"><i></i>Backup<time>14:00</time></div>
+            <div class="st now"><i></i>Update läuft<time>14:10</time></div>
+            <div class="st"><i></i>Test<time>14:45</time></div>
+            <div class="st"><i></i>Wieder online<time>15:00</time></div>
+          </div>
+          <div class="actions"><a class="btn" href="#">Zum Support-Discord</a><a class="ghost" href="#">Statusseite</a></div>
+          <p class="note" style="margin:0 0 16px"><i></i>Diese Seite lädt sich von selbst neu, sobald alles wieder läuft.</p>
+          <nav class="legal"><a href="#">Impressum</a><a href="#">Datenschutz</a><a href="#">AGB</a><a href="#">Widerruf</a><span>support@nexus-emb.de</span></nav>
+        </div>
+      </div></div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="e" onclick="toggleSelect(this)">
+    <div class="letter">E</div>
+    <div class="content">
+      <h3>Leitstand: Banner-Streifen, links der Ring, rechts alle Angaben</h3>
+      <p>Am meisten Information auf einen Blick, wie eine Anzeigetafel. Gut auf breiten Bildschirmen, auf dem Handy rutscht der Ring über den Text.</p>
+      <div class="mockup"><div class="mockup-body" style="padding:0">
+        <div class="wm we">
+          <div class="strip"></div>
+          <div class="grid">
+            <div class="ring">
+              <svg viewBox="0 0 200 200"><circle cx="100" cy="100" r="92" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="6"/><circle cx="100" cy="100" r="92" fill="none" stroke="#ff1e2d" stroke-width="6" stroke-linecap="round" stroke-dasharray="578" stroke-dashoffset="243" style="filter:drop-shadow(0 0 7px rgba(255,30,45,.7))"/></svg>
+              <img src="/files/logo-n.webp" alt="RL Nexus">
+            </div>
+            <div>
+              <p class="caps label">Wartung · Bot-Dashboard</p>
+              <h1>Wir bauen um, gleich geht es weiter.</h1>
+              <p class="lead">Neue Funktionen fürs Bot-Dashboard. Der Bot in Discord läuft die ganze Zeit weiter.</p>
+              <div class="eta"><span class="big">~25<small>Min.</small></span><span class="until">bis ca. 15:00 Uhr</span></div>
+              <ol>
+                <li class="done"><span>Backup</span><time>14:00</time></li>
+                <li class="now"><span>Update läuft</span><time>14:10</time></li>
+                <li><span>Test</span><time>14:45</time></li>
+                <li><span>Wieder online</span><time>15:00</time></li>
+              </ol>
+              <div class="actions"><a class="btn" href="#">Zum Support-Discord</a><a class="ghost" href="#">Statusseite</a></div>
+            </div>
+          </div>
+          <div class="foot"><p class="note" style="margin:0"><i></i>Lädt sich von selbst neu, sobald alles wieder läuft.</p><nav class="legal"><a href="#">Impressum</a><a href="#">Datenschutz</a><a href="#">AGB</a><a href="#">Widerruf</a></nav></div>
+        </div>
+      </div></div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="f" onclick="toggleSelect(this)">
+    <div class="letter">F</div>
+    <div class="content">
+      <h3>Ladebalken: das Banner selbst zeigt den Fortschritt</h3>
+      <p>Unten am Banner läuft eine rote Linie von Start bis Ende, mit „jetzt“ als Marke. Darunter die Restzeit mit kleinem Ring und der Fahrplan wie in B.</p>
+      <div class="mockup"><div class="mockup-body" style="padding:0">
+        <div class="wm wf">
+          <div class="hero"><div class="progress"><b></b><em>jetzt</em></div></div>
+          <div class="body">
+            <div>
+              <p class="caps label">Wartung</p>
+              <h1>Wir bauen um, gleich geht es weiter.</h1>
+              <p class="lead">Neue Funktionen fürs Bot-Dashboard. Der Bot in Discord läuft die ganze Zeit weiter, nur das Dashboard ist kurz zu.</p>
+              <div class="actions"><a class="btn" href="#">Zum Support-Discord</a><a class="ghost" href="#">Statusseite</a></div>
+            </div>
+            <div>
+              <div class="count">
+                <div class="ring">
+                  <svg viewBox="0 0 200 200"><circle cx="100" cy="100" r="88" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="12"/><circle cx="100" cy="100" r="88" fill="none" stroke="#ff1e2d" stroke-width="12" stroke-linecap="round" stroke-dasharray="553" stroke-dashoffset="232"/></svg>
+                  <img src="/files/logo-n.webp" alt="">
+                </div>
+                <div><span class="big">~25<small>Min.</small></span><p>voraussichtlich bis 15:00 Uhr</p></div>
+              </div>
+              <ol>
+                <li class="done"><span>Backup</span><time>14:00</time></li>
+                <li class="now"><span>Update läuft</span><time>14:10</time></li>
+                <li><span>Test</span><time>14:45</time></li>
+                <li><span>Wieder online</span><time>15:00</time></li>
+              </ol>
+            </div>
+          </div>
+          <div class="foot"><nav class="legal"><a href="#">Impressum</a><a href="#">Datenschutz</a><a href="#">AGB</a><a href="#">Widerruf</a><span>support@nexus-emb.de</span></nav></div>
+        </div>
+      </div></div>
+    </div>
+  </div>
+</div>

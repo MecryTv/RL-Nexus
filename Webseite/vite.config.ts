@@ -75,7 +75,7 @@ function precompress(): Plugin {
  * ansehen, ohne Docker.
  */
 function localContent(): Plugin {
-    const live = process.env.CONTENT_DIR ?? fileURLToPath(new URL("../RL Nexus Admin Dashboard/data/site", import.meta.url));
+    const live = process.env.CONTENT_DIR ?? fileURLToPath(new URL("../Admin Dashboard/data/site", import.meta.url));
     const defaults = fileURLToPath(new URL("./public/content-default", import.meta.url));
 
     return {

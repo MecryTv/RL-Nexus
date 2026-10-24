@@ -10,6 +10,9 @@ export const SNOWFLAKE = /^\d{17,20}$/;
 /** Locker wie im ContactService der Webseite: sieht es wie eine Adresse aus? */
 export const MAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
+/** Wartung mit Zeitstrahl (Plan 23): Überschrift, Zusatz, Schritte, wie weit das Ende voraus liegen darf. */
+export const MAINTENANCE_LIMITS = { title: 80, text: 200, steps: 8, step: 40, aheadDays: 7 } as const;
+
 /** Listen kommen in Seiten zu so vielen Einträgen. */
 export const PAGE_SIZE = 50;
 

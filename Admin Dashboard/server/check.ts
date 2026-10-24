@@ -18,6 +18,7 @@ import { checkCommands } from "./checks/commands.check.ts";
 import { checkContent } from "./checks/content.check.ts";
 import { checkDev } from "./checks/dev.check.ts";
 import { checkFormat } from "./checks/format.check.ts";
+import { checkWartungPage } from "./checks/wartung-page.check.ts";
 import { finish } from "./checks/harness.ts";
 import { checkInput } from "./checks/input.check.ts";
 import { checkLogParse } from "./checks/logparse.check.ts";
@@ -47,5 +48,6 @@ await checkMail();
 await checkShop();
 await checkBackups();
 await checkBeta();
+await checkWartungPage();
 
 finish();

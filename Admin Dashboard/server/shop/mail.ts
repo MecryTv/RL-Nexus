@@ -1,6 +1,6 @@
 import { createTransport } from "nodemailer";
 import type { Options } from "nodemailer/lib/mailer/index.js";
-import { TAX_NOTE, durationLabel, formatPrice, maskEmail, priceSuffix, type ProductKind } from "../../shared/shop.ts";
+import { TAX_NOTE, durationLabel, formatPrice, maskEmail, priceSuffix, type AccessMode, type ProductKind } from "../../shared/shop.ts";
 import type { IConfig } from "../config.ts";
 import { databaseReady } from "../db.ts";
 import { accountByAddress } from "../mail/accounts.ts";
@@ -253,14 +253,28 @@ export function resumedMail(config: IConfig, input: { readonly to: string; reado
     };
 }
 
-/** Ein Admin hat Zugang geschenkt (Shop → Kunden). */
-export function giftMail(config: IConfig, input: { readonly to: string; readonly name: string; readonly title: string; readonly until: Date | null }): IShopMail {
+/**
+ * Ein Admin hat Zugang geschenkt (Shop → Kunden). Bei Free und Beta friert
+ * catchUpFree das Geschenk ein: dann Tage statt eines Datums, das sich noch
+ * verschiebt. Bei Beta kommt man nur mit Code ins Bot-Dashboard.
+ */
+export function giftMail(
+    config: IConfig,
+    input: { readonly to: string; readonly name: string; readonly title: string; readonly until: Date | null; readonly mode?: AccessMode; readonly now?: Date }
+): IShopMail {
+    const paused = input.mode === "free" || input.mode === "beta";
+    const days = input.until === null ? 0 : Math.max(1, Math.ceil((input.until.getTime() - (input.now ?? new Date()).getTime()) / 86_400_000));
+    const span = input.until === null ? "unbegrenzt" : paused ? `${days} ${days === 1 ? "Tag" : "Tage"}` : `bis ${esc(formatDay(input.until))}`;
+    const why = input.mode === "beta" ? "Gerade läuft die geschlossene Beta" : "Gerade ist RL Nexus kostenlos";
+
     return {
         to: input.to,
         subject: "Du hast einen Zugang geschenkt bekommen",
         html:
             `<h2>Dein Zugang ist da.</h2>` +
-            `<p>Hallo ${esc(input.name)}, du hast Zugang zum Bot-Dashboard bekommen: ${esc(input.title)}, ${input.until === null ? "unbegrenzt" : `bis ${esc(formatDay(input.until))}`}. Es wird nichts abgebucht.</p>` +
+            `<p>Hallo ${esc(input.name)}, du hast ${paused ? "einen Zugang geschenkt" : "Zugang zum Bot-Dashboard"} bekommen: ${esc(input.title)}, ${span}. Es wird nichts abgebucht.</p>` +
+            (paused && input.until !== null ? `<p>${why}, deshalb ruht er: Die Tage zählen erst, wenn es wieder Preise gibt.</p>` : "") +
+            (input.mode === "beta" ? `<p>In der Beta kommst du nur mit einem Beta-Code ins Bot-Dashboard. Hast du noch keinen, frag beim Support nach.</p>` : "") +
             button(dashboardUrl(config), "Zum Dashboard"),
     };
 }

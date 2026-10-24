@@ -1253,6 +1253,24 @@ body:has(dialog[open]){overflow:hidden}
 .report__actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:10px}
 .report__actions .btn{min-height:44px}
 .report .hintline{margin-top:0}
+/* Was automatisch mitgeht: zu, bis jemand nachsehen will. */
+.report__tech{border:1px solid var(--line);background:var(--glass)}
+.report__tech summary{
+  display:flex;align-items:center;gap:10px;min-height:44px;padding:0 12px;cursor:pointer;list-style:none;
+  font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--text-3);
+}
+.report__tech summary::-webkit-details-marker{display:none}
+.report__tech summary::before{content:"";width:6px;height:6px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(-45deg);transition:transform .15s}
+.report__tech[open] summary::before{transform:rotate(45deg)}
+.report__tech summary:hover{color:var(--text-2)}
+.report__tech summary:focus-visible{outline:2px solid var(--blue);outline-offset:-2px}
+.report__techlist{display:grid;grid-template-columns:auto minmax(0,1fr);gap:6px 14px;margin:0;padding:2px 12px 12px;font-size:12px;line-height:1.5}
+.report__techlist dt{color:var(--text-3)}
+.report__techlist dd{margin:0;color:var(--text-2);font-family:var(--f-mono);overflow-wrap:anywhere}
+.report__techlist ul{margin:0;padding-left:16px}
+@media (prefers-reduced-motion:reduce){.report__tech summary::before{transition:none}}
+/* Fehlerseite: die Fehler-ID zum Abschreiben. */
+.errref code{font-family:var(--f-mono);color:var(--text-2);user-select:all}
 .set{padding:18px 0;border-bottom:1px solid var(--line)}
 .set:last-child{border-bottom:0;padding-bottom:4px}
 .set > h3{
@@ -1629,8 +1647,10 @@ body[data-page="guild"]{--shell:1440px}
 .col{display:flex;align-items:flex-end;justify-content:center;height:100%}
 .col i{display:block;width:min(24px,72%);background:var(--bar);border-radius:4px 4px 0 0}
 .col:hover i{filter:brightness(1.25)}
-/* Aufgeteilt: Beitritte nach oben, Abgaenge nach unten, die Null in der Mitte. */
-.col--split{display:grid;grid-template-rows:1fr 1fr;align-items:stretch}
+/* Aufgeteilt: Beitritte nach oben, Abgaenge nach unten, die Null in der Mitte.
+   stretch statt des center von .col: sonst schrumpft die Spalte im Grid auf
+   0 px, und die Balken sind unsichtbar, obwohl ihre Hoehe stimmt. */
+.col--split{display:grid;grid-template-rows:1fr 1fr;align-items:stretch;justify-content:stretch}
 .col--split > span{display:flex;justify-content:center}
 .col--split > span:first-child{align-items:flex-end}
 .col--split > span:last-child{align-items:flex-start}

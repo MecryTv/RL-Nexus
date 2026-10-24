@@ -184,7 +184,8 @@ function parse(html: string): DocumentFragment {
         for (const attribute of [...node.attributes]) {
             const name = attribute.name.toLowerCase();
             const value = attribute.value.trim().toLowerCase();
-            const foreign = (name === "href" || name === "src") && !/^(https?:|#|\/(?!\/))/.test(value);
+            // Alles, was eine Adresse trägt, auch xlink:href in SVG und action an Formularknöpfen.
+            const foreign = ["href", "src", "xlink:href", "action", "formaction"].includes(name) && !/^(https?:|#|\/(?!\/))/.test(value);
 
             if (name.startsWith("on") || name === "srcdoc" || foreign) node.removeAttribute(attribute.name);
         }

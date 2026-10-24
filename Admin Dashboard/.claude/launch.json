@@ -14,8 +14,8 @@
             "name": "website-vite",
             "runtimeExecutable": "node",
             "runtimeArgs": [
-                "../RL Nexus Website/node_modules/vite/bin/vite.js",
-                "../RL Nexus Website",
+                "../Webseite/node_modules/vite/bin/vite.js",
+                "../Webseite",
                 "--port",
                 "5173",
                 "--strictPort"
@@ -26,9 +26,9 @@
             "name": "website-preview",
             "runtimeExecutable": "node",
             "runtimeArgs": [
-                "../RL Nexus Website/node_modules/vite/bin/vite.js",
+                "../Webseite/node_modules/vite/bin/vite.js",
                 "preview",
-                "../RL Nexus Website",
+                "../Webseite",
                 "--port",
                 "5175",
                 "--strictPort"

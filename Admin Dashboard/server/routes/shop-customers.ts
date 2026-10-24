@@ -414,7 +414,8 @@ export async function shopCustomerRoutes(app: FastifyInstance, { config }: { con
             await syncMember(config, userId);
 
             if (customer.email) {
-                const sent = await sendShopMail(config, giftMail(config, { to: customer.email, name: customer.name ?? "du", title: product.title, until: endsAt }));
+                const { mode } = await readSettings();
+                const sent = await sendShopMail(config, giftMail(config, { to: customer.email, name: customer.name ?? "du", title: product.title, until: endsAt, mode, now }));
                 await logEvent(userId, sent ? "mail.gift" : "mail.failed", product.title);
             }
 

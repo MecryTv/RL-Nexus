@@ -164,7 +164,8 @@ export function ClearCookie(name: string, secure: boolean): string {
 // "https://fremd.de" fällt genauso durch wie vorher.
 export function SafeReturnPath(value: string | undefined): string {
     if (!value || !value.startsWith(`${DASHBOARD_PATH}/`)) return DASHBOARD_HOME;
-    if (value.startsWith("//") || value.includes("\\")) return DASHBOARD_HOME;
+    // Steuerzeichen streicht der Browser aus der Adresse: Aus "/\t/evil" würde "//evil".
+    if (value.startsWith("//") || value.includes("\\") || /[\u0000-\u001f\u007f]/.test(value)) return DASHBOARD_HOME;
 
     return value;
 }

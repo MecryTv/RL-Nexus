@@ -6,6 +6,10 @@
  * antwortet er mit 503 - dann bietet das Pop-up dieselbe Mail im eigenen
  * Mailprogramm an. Wer lieber in Discord schreibt, findet daneben den
  * Support-Server und /fehler.
+ *
+ * Mit jeder Meldung geht ein Technik-Block mit: Browser, Fenster, Stand des
+ * Dashboards und was in dieser Sitzung schiefging (API-Aufrufe, Skriptfehler,
+ * mit Fehler-ID bei Serverfehlern). Was genau, steht aufklappbar im Pop-up.
  */
 
 import { maybe } from "../core/Dom.js";
@@ -46,6 +50,10 @@ export const REPORT_HTML = `
       <input class="text" name="contact" maxlength="120" autocomplete="email" placeholder="E-Mail oder Discord-Name">
       <span class="mcfield__hint">Wenn du angemeldet bist, reicht deine Discord-ID. Sonst brauchen wir das für die Antwort.</span>
     </label>
+    <details class="report__tech">
+      <summary>Das geht automatisch mit</summary>
+      <dl class="report__techlist" id="reportTech"></dl>
+    </details>
     <input class="report__trap" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
     <p class="report__state" id="reportState" role="status" aria-live="polite"></p>
     <div class="report__actions">
@@ -56,13 +64,128 @@ export const REPORT_HTML = `
   </form>
 </dialog>`;
 
+/* ----------------------------------------------------------
+   Was in dieser Sitzung schiefging
+   ---------------------------------------------------------- */
+interface IProblem {
+    at: string;
+    what: string;
+}
+
+/** Höchstens acht, die neuesten zuletzt - so viele nimmt auch der Bot an (ReportService.Tech). */
+const PROBLEMS_MAX = 8;
+const problems: IProblem[] = [];
+
+function note(what: string): void {
+    problems.push({ at: new Date().toISOString(), what: what.slice(0, 300) });
+
+    if (problems.length > PROBLEMS_MAX) problems.shift();
+}
+
+/** Nur der Dateiname: Der Pfad davor sagt nichts, der Name der Datei sagt, welcher Stand lief. */
+function fileOf(source: string): string {
+    return source.split("?")[0].split("/").pop() || "?";
+}
+
+/**
+ * Merkt sich ab dem Start der Seite fehlgeschlagene API-Aufrufe und
+ * Skriptfehler. fetch einmal zu umhüllen ist die eine Stelle, durch die jeder
+ * Aufruf geht - sonst müsste jede Seite selbst mitschreiben. Abfrage-Parameter
+ * bleiben weg, darin stehen etwa Suchtexte.
+ */
+function watchProblems(): void {
+    const original = window.fetch.bind(window);
+
+    window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+        const target = new URL(input instanceof Request ? input.url : String(input), location.href);
+        const method = (init?.method ?? (input instanceof Request ? input.method : "GET")).toUpperCase();
+        const watched = target.origin === location.origin && target.pathname.includes("/api/") && !target.pathname.endsWith("/api/report");
+        const where = `${method} ${target.pathname}`;
+
+        try {
+            const response = await original(input, init);
+
+            if (watched && !response.ok) {
+                const ref = response.headers.get("x-error-id");
+
+                void response
+                    .clone()
+                    .json()
+                    .catch(() => ({}))
+                    .then((body: { error?: unknown }) =>
+                        note([`${where} → ${response.status}`, typeof body.error === "string" ? body.error : "", ref ? `Fehler-ID ${ref}` : ""].filter(Boolean).join(" · "))
+                    );
+            }
+
+            return response;
+        } catch (error) {
+            // Abgebrochen hat die Seite selbst, das ist kein Fehler.
+            if (watched && !(error instanceof DOMException && error.name === "AbortError")) note(`${where} → keine Antwort`);
+
+            throw error;
+        }
+    };
+
+    window.addEventListener("error", (event) => note(`Skript: ${event.message}${event.filename ? ` (${fileOf(event.filename)}:${event.lineno})` : ""}`));
+    window.addEventListener("unhandledrejection", (event) => note(`Skript: ${event.reason instanceof Error ? event.reason.message : String(event.reason)}`));
+}
+
+/** Der Technik-Block für die Meldung. Die Version ist die Prüfsumme von app.js (?v=). */
+function tech(): { browser: string; screen: string; version: string; problems: IProblem[] } {
+    const script = document.querySelector<HTMLScriptElement>('script[src*="/assets/app.js"]');
+    const version = script ? new URL(script.src).searchParams.get("v") : null;
+
+    return { browser: navigator.userAgent, screen: `${window.innerWidth} × ${window.innerHeight}`, version: version ?? "unbekannt", problems: [...problems] };
+}
+
+/** Zeigt im Pop-up, was mitgeht. Nur textContent: Fehlersätze kommen vom Server. */
+function paintTech(host: HTMLElement): void {
+    const block = tech();
+    const rows: [string, string | HTMLElement][] = [
+        ["Seite", location.pathname],
+        ["Browser", block.browser],
+        ["Fenster", block.screen],
+        ["Version", block.version],
+    ];
+
+    if (block.problems.length === 0) {
+        rows.push(["Probleme", "keine bemerkt"]);
+    } else {
+        const list = document.createElement("ul");
+
+        for (const problem of block.problems) {
+            const item = document.createElement("li");
+
+            item.textContent = `${new Date(problem.at).toLocaleTimeString("de-DE")} ${problem.what}`;
+            list.append(item);
+        }
+
+        rows.push(["Probleme", list]);
+    }
+
+    host.replaceChildren(
+        ...rows.flatMap(([label, value]) => {
+            const term = document.createElement("dt");
+            const detail = document.createElement("dd");
+
+            term.textContent = label;
+            detail.append(value);
+
+            return [term, detail];
+        })
+    );
+}
+
 /** Dieselbe Mail fürs eigene Mailprogramm. mailto hat eine Längengrenze, deshalb gekürzt. */
 function mailto(fields: Record<string, string>): string {
+    const block = tech();
     const body = [
         fields.message,
         fields.context ? `\nWo und wie:\n${fields.context}` : "",
         fields.contact ? `\nKontakt: ${fields.contact}` : "",
         `\nSeite: ${location.pathname}`,
+        `Version: ${block.version}`,
+        ...block.problems.map((problem) => `- ${problem.what}`),
     ].join("\n");
     const short = body.length > 1400 ? `${body.slice(0, 1400)}\n\n[gekürzt]` : body;
 
@@ -70,14 +193,16 @@ function mailto(fields: Record<string, string>): string {
 }
 
 export function bindReport(): void {
+    watchProblems();
     document.body.insertAdjacentHTML("beforeend", REPORT_HTML);
 
     const dialog = maybe<HTMLDialogElement>("#reportModal");
     const form = maybe<HTMLFormElement>("#reportForm");
     const state = maybe<HTMLElement>("#reportState");
     const send = maybe<HTMLButtonElement>("#reportSend");
+    const techList = maybe<HTMLElement>("#reportTech");
 
-    if (!dialog || !form || !state || !send) return;
+    if (!dialog || !form || !state || !send || !techList) return;
 
     const field = (name: string) => form.elements.namedItem(name) as HTMLInputElement | HTMLTextAreaElement;
 
@@ -99,6 +224,7 @@ export function bindReport(): void {
 
         for (const name of ["subject", "message"]) field(name).removeAttribute("aria-invalid");
 
+        paintTech(techList);
         dialog.showModal();
         field("subject").focus();
     };
@@ -149,7 +275,7 @@ export function bindReport(): void {
             response = await fetch(url("/api/report"), {
                 method: "POST",
                 headers: { "Content-Type": "application/json", Accept: "application/json" },
-                body: JSON.stringify({ ...fields, guildId, page: location.pathname }),
+                body: JSON.stringify({ ...fields, guildId, page: location.pathname, tech: tech() }),
             });
         } catch {
             response = null;

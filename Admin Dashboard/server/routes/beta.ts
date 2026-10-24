@@ -116,7 +116,16 @@ export async function betaRoutes(app: FastifyInstance, { config }: { config: ICo
 
 /** Für den Bot: einen Code einlösen. 200 { ok, already? }, 400 mit Satz, 401 ohne Token. */
 export async function internalBetaRoutes(app: FastifyInstance, { config }: { config: IConfig }): Promise<void> {
-    app.post("/internal/beta/redeem", { config: { rateLimit: { max: 60, timeWindow: "1 minute" } } }, async (request): Promise<{ ok: true; already?: true }> => {
+    // Je Person statt je Absender: Alle Anfragen kommen vom Bot. Ohne gültiges Token zählt die Adresse.
+    const perPerson = (request: FastifyRequest): string => {
+        try {
+            return `beta:${botActor(config, request).id}`;
+        } catch {
+            return request.ip;
+        }
+    };
+
+    app.post("/internal/beta/redeem", { config: { rateLimit: { max: 10, timeWindow: "1 minute", keyGenerator: perPerson } } }, async (request): Promise<{ ok: true; already?: true }> => {
         const actor = botActor(config, request);
         const code = normalizeCode(body(request.body).code);
 

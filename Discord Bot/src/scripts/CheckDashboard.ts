@@ -17,12 +17,12 @@ import BotClient from "../client/BotClient";
 import { SNOWFLAKE } from "../constants/Discord";
 import { MAX_IMAGE_BYTES } from "../constants/Gallery";
 import { PLACEHOLDER_KEYS } from "../constants/Placeholders";
-import { ErrorInfo, WantsPage } from "../utils/errorpage";
+import { ErrorInfo, SendError, WantsPage } from "../utils/errorpage";
 import { MODULE_IDS, PERMANENT_MODULES } from "../constants/Modules";
 import { AdminStatus, AskAdmin, BackupCall } from "../routes/DashboardApiBackups";
 import { DASHBOARD_HOME, DASHBOARD_PATH, DISCORD_EPOCH, OAUTH_SCOPES, SESSION_COOKIE } from "../constants/Dashboard";
 import IDashboardSession from "../interfaces/services/dashboard/IDashboardSession";
-import DashboardService, { BETA_ERRORS, BetaGate, DisplayGroup, LockPlaceholders, MfaRequired, ShopDecision, ShopStatusLines, type IShopGrantRow, type IShopStatusRow } from "../services/DashboardService";
+import DashboardService, { BETA_ERRORS, BetaErrorText, BetaGate, DisplayGroup, LockPlaceholders, MfaRequired, ShopDecision, ShopStatusLines, type IShopGrantRow, type IShopStatusRow } from "../services/DashboardService";
 import { CodeFromForm, RedeemAtAdmin } from "../routes/DashboardBeta";
 import IDashboardGuild, { DashboardRole } from "../interfaces/services/dashboard/IDashboardGuild";
 import { DashboardGroup } from "../interfaces/services/dashboard/IDashboardUser";
@@ -730,6 +730,10 @@ async function checkBeta(client: BotClient): Promise<void> {
     check("Sperrseite im Beta-Modus: der Fehler steht über dem Feld", LockPlaceholders({ allowed: false, reason: "x", beta: true }, BETA_ERRORS.falsch).HINT.includes(`role="alert">${BETA_ERRORS.falsch}`));
     check("Sperrseite im Beta-Modus: der Fehler wird maskiert", LockPlaceholders({ allowed: false, reason: "x", beta: true }, "<b>").HINT.includes("&lt;b&gt;"));
 
+    const doubt = LockPlaceholders({ allowed: false, reason: "x", beta: true, unsure: true });
+
+    check("Sperrseite im Zweifel: kein Code-Feld, nur Neuladen und Support", !doubt.HINT.includes('name="code"') && doubt.GO_PATH === "/kontakt" && doubt.REASON === "x", JSON.stringify(doubt));
+
     check(
         "Code aus dem Formular (text/plain)",
         CodeFromForm("code=NXB-7KQ4-M2XD\r\n") === "NXB-7KQ4-M2XD" && CodeFromForm("code= nxb 7kq4 \r\n") === "nxb 7kq4" && CodeFromForm({ code: "x" }) === "" && CodeFromForm("") === ""
@@ -786,17 +790,24 @@ async function checkBeta(client: BotClient): Promise<void> {
     }
 
     // Zusammen mit der Datenbank (nachgestellt): Modus aus shop_settings, Tester aus beta_members.
-    const db = client.databaseService as unknown as { One: (sql: string, values?: unknown[]) => Promise<unknown> };
+    const db = client.databaseService as unknown as { One: (sql: string, values?: unknown[]) => Promise<unknown>; Query: (sql: string, values?: unknown[]) => Promise<unknown[]> };
     const savedOne = db.One;
+    const savedQuery = db.Query;
     const savedGroupOf = service.GroupOf.bind(service);
     const readyOf = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(client.databaseService), "Ready");
     const internals = service as unknown as { betaMode: unknown; paywall: unknown };
+    const users = ["1059621019947634741", "1059621019947634742", "1059621019947634743", "1059621019947634744", "1059621019947634745", "1059621019947634746", "1059621019947634747"];
     let membersDown = false;
+    let modeFails: Error | null = null;
 
     Object.defineProperty(client.databaseService, "Ready", { configurable: true, get: () => true });
     service.GroupOf = async () => "testphase";
+    db.Query = async () => [];
     db.One = async (sql: string, values: unknown[] = []) => {
-        if (sql.includes("access_mode")) return { access_mode: "beta" };
+        if (sql.includes("access_mode")) {
+            if (modeFails) throw modeFails;
+            return { access_mode: "beta" };
+        }
         if (sql.includes("paywall")) return { paywall: 0 };
         if (sql.includes("beta_members")) {
             if (membersDown) throw new Error("Datenbank weg");
@@ -812,19 +823,39 @@ async function checkBeta(client: BotClient): Promise<void> {
         const stranger = await service.ShopAccess("1059621019947634742");
 
         membersDown = true;
-        const blip = await service.ShopAccess("1059621019947634743");
+        const blip = await service.ShopAccess(users[2]);
+        membersDown = false;
+
+        // Der Modus selbst ist nicht lesbar: offen nur, wenn feststeht, dass Beta aus ist.
+        modeFails = new Error("connect ETIMEDOUT");
+        internals.betaMode = null;
+        const unknown = await service.ShopAccess(users[3]);
+        internals.betaMode = { at: 0, on: true };
+        const wasBeta = await service.ShopAccess(users[4]);
+        internals.betaMode = { at: 0, on: false };
+        const wasOpen = await service.ShopAccess(users[5]);
+
+        // Älteres Admin Dashboard ohne die Spalte access_mode: kein Beta, kein Zweifel.
+        modeFails = Object.assign(new Error("Unknown column 'access_mode' in 'field list'"), { errno: 1054 });
+        internals.betaMode = null;
+        const oldAdmin = await service.ShopAccess(users[6]);
 
         check("Beta mit Datenbank: Tester herein und als Beta erkennbar", member.allowed && member.betaMember === true, JSON.stringify(member));
         check("Beta mit Datenbank: ohne Code gesperrt", !stranger.allowed && stranger.beta === true, JSON.stringify(stranger));
-        check("Beta mit Datenbank: Aussetzer beim Nachschlagen sperrt niemanden aus", blip.allowed === true && blip.beta !== true, JSON.stringify(blip));
+        check("Beta mit Datenbank: Aussetzer beim Nachschlagen sperrt, im Zweifel zu", !blip.allowed && blip.unsure === true, JSON.stringify(blip));
+        check("Beta-Modus nicht lesbar und nie gelesen: gesperrt", !unknown.allowed && unknown.unsure === true, JSON.stringify(unknown));
+        check("Beta-Modus nicht lesbar, zuletzt Beta: gesperrt", !wasBeta.allowed && wasBeta.unsure === true, JSON.stringify(wasBeta));
+        check("Beta-Modus nicht lesbar, zuletzt aus: offen wie bisher", wasOpen.allowed && wasOpen.unsure !== true, JSON.stringify(wasOpen));
+        check("Spalte access_mode fehlt: Beta aus", oldAdmin.allowed && oldAdmin.beta !== true, JSON.stringify(oldAdmin));
     } finally {
         db.One = savedOne;
+        db.Query = savedQuery;
         service.GroupOf = savedGroupOf;
         delete (client.databaseService as unknown as Record<string, unknown>).Ready;
         if (readyOf) Object.defineProperty(Object.getPrototypeOf(client.databaseService), "Ready", readyOf);
         internals.betaMode = null;
         internals.paywall = null;
-        for (const id of ["1059621019947634741", "1059621019947634742", "1059621019947634743"]) service.ForgetAccess(id);
+        for (const id of users) service.ForgetAccess(id);
     }
 
     const foreign = await fetch(`${BASE}${P}/beta`, { method: "POST", headers: { "Content-Type": "text/plain", "Sec-Fetch-Site": "cross-site" }, body: "code=NXB-2222-2222", ...MANUAL });
@@ -832,6 +863,131 @@ async function checkBeta(client: BotClient): Promise<void> {
 
     const anonymous = await fetch(`${BASE}${P}/beta`, { method: "POST", headers: { "Content-Type": "text/plain" }, body: "code=NXB-2222-2222", ...MANUAL });
     check("Einlösen ohne Sitzung: zur Anmeldung", anonymous.status === 302 && String(anonymous.headers.get("location")).endsWith("/login"), `${anonymous.status} ${anonymous.headers.get("location")}`);
+
+    // Zehn Versuche je zehn Minuten, zwei sind oben schon verbraucht.
+    let flood: Response = anonymous;
+
+    for (let attempt = 0; attempt < 12 && flood.status !== 429 && flood.status !== 303; attempt++) {
+        flood = await fetch(`${BASE}${P}/beta`, { method: "POST", headers: { "Content-Type": "text/plain" }, body: "code=NXB-2222-2222", ...MANUAL });
+    }
+
+    check(
+        "Zu viele Versuche: zurück zur Sperrseite, der Satz steht über dem Feld",
+        flood.status === 303 && String(flood.headers.get("location")).endsWith("?beta=zuviel") && BetaErrorText({ beta: "zuviel" }) === BETA_ERRORS.zuviel,
+        `${flood.status} ${flood.headers.get("location")}`
+    );
+
+    // Hinter nginx zählt die Adresse, die nginx anhängt (die letzte fremde), nicht der Anfang, den der Aufrufer selbst schreibt.
+    const via = (chain: string) => fetch(`${BASE}${P}/beta`, { method: "POST", headers: { "Content-Type": "text/plain", "X-Forwarded-For": chain }, body: "code=NXB-2222-2222", ...MANUAL });
+    const fresh = await via("203.0.113.7");
+    let spoofed: Response = fresh;
+
+    for (let attempt = 0; attempt < 12 && spoofed.status !== 303; attempt++) spoofed = await via(`198.51.100.${attempt}, 203.0.113.7`);
+
+    check("Hinter dem Proxy: eigene Adresse, gefälschter Anfang hilft nicht", fresh.status === 302 && spoofed.status === 303, `${fresh.status} ${spoofed.status}`);
+}
+
+/** Abmelden widerruft den Discord-Token: Ein kopiertes Cookie öffnet danach nichts mehr. */
+async function checkLogout(client: BotClient): Promise<void> {
+    console.log("\n  — Abmelden —");
+
+    const service = client.dashboardService;
+    const session: IDashboardSession = { id: "sitzung-abmelden", userId: "1059621019947634739", username: "Check", avatar: null, accessToken: "token-zum-widerrufen", mfa: true, expiresAt: Date.now() + 60_000 };
+
+    // Was an Discord ginge, landet hier statt bei Discord.
+    const realFetch = globalThis.fetch;
+    const calls: { url: string; body: string }[] = [];
+
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = input instanceof Request ? input.url : String(input);
+
+        if (!url.startsWith("https://discord.com/")) return realFetch(input, init);
+
+        calls.push({ url, body: String(init?.body ?? "") });
+
+        return new Response(null, { status: 200 });
+    }) as typeof fetch;
+
+    try {
+        const response = await realFetch(`${BASE}${P}/logout`, { headers: { cookie: `${SESSION_COOKIE}=${service.Sign(session)}` }, ...MANUAL });
+        const revoke = calls.find((call) => call.url.endsWith("/oauth2/token/revoke"));
+
+        check("Abmelden: zurück zum Login, Cookie gelöscht", response.status === 302 && String(response.headers.get("set-cookie")).includes("Max-Age=0"), `${response.status}`);
+        check("Abmelden: der Discord-Token wird widerrufen", revoke !== undefined && revoke.body.includes("token=token-zum-widerrufen") && revoke.body.includes("token_type_hint=access_token"), JSON.stringify(calls));
+    } finally {
+        globalThis.fetch = realFetch;
+    }
+}
+
+/**
+ * Fehler melden: Der Browser schickt einen Technik-Block mit (Report.ts), der
+ * Bot prüft ihn und schreibt ihn in die Mail. Serverfehler bekommen eine
+ * Fehler-ID, die im Log, auf der Seite und in der Meldung steht.
+ */
+async function checkReports(client: BotClient): Promise<void> {
+    console.log("\n  — Fehler melden —");
+
+    const service = client.reportService;
+    const tech = service.Tech({
+        browser: "Mozilla/5.0 Chrome/130",
+        screen: "1440 × 900",
+        version: "a1b2c3d4e5",
+        problems: [
+            ...Array.from({ length: 9 }, (_, index) => ({ at: "2026-10-24T09:00:00.000Z", what: `GET /api/guild/1/x → 500 · Nummer ${index}` })),
+            { at: "2026-10-24T09:01:00.000Z", what: "Skript: kaputt\nVon: gefälscht" },
+            { at: 5, what: 7 },
+        ],
+    });
+
+    check("Technik-Block: ohne Objekt keiner", service.Tech("x") === null && service.Tech(null) === null);
+    check(
+        "Technik-Block: höchstens acht Probleme, die neuesten, ohne Zeilenumbrüche",
+        tech?.problems.length === 8 && tech.problems[0].what.endsWith("Nummer 2") && tech.problems[7].what === "Skript: kaputt Von: gefälscht",
+        JSON.stringify(tech?.problems)
+    );
+
+    const mail = service.Body({ subject: "Test", message: "y".repeat(20), context: "", contact: "", source: "dashboard", user: null, guild: null, page: "/guild/1/backups", tech });
+
+    check(
+        "Mail: Browser, Fenster, Version und Probleme stehen drin",
+        mail.includes("Browser: Mozilla/5.0 Chrome/130") && mail.includes("Fenster: 1440 × 900") && mail.includes("Version: a1b2c3d4e5") && mail.includes("Nummer 8") && !mail.includes("\nVon: gefälscht"),
+        mail
+    );
+
+    // Eine nachgestellte Antwort, wie Fastify sie hat: Status, Header, Inhalt.
+    const answer = (request: { method: string; url: string; headers: Record<string, string> }) => {
+        const sent: { status: number; headers: Record<string, string>; body: unknown } = { status: 0, headers: {}, body: null };
+        const reply = {
+            request,
+            code(status: number) {
+                sent.status = status;
+                return reply;
+            },
+            header(name: string, value: string) {
+                sent.headers[name.toLowerCase()] = value;
+                return reply;
+            },
+            send(body: unknown) {
+                sent.body = body;
+                return reply;
+            },
+        };
+
+        return { sent, request: request as never, reply: reply as never };
+    };
+
+    const api = answer({ method: "GET", url: "/api/guild/1/backups", headers: { accept: "application/json" } });
+    await SendError(client, api.request, api.reply, 500, new Error("kaputt"), "abcd1234");
+    check("Serverfehler: Fehler-ID im Header und im JSON", api.sent.headers["x-error-id"] === "abcd1234" && (api.sent.body as { ref?: string }).ref === "abcd1234", JSON.stringify(api.sent));
+
+    const page = answer({ method: "GET", url: `${P}/guild/1`, headers: { accept: "text/html" } });
+    await SendError(client, page.request, page.reply, 500, new Error("kaputt"), "abcd1234");
+    const html = String(page.sent.body);
+    check("Serverfehler: Fehler-ID auf der Seite und im Betreff der Mail", html.includes("<code>abcd1234</code>") && html.includes("ID%20abcd1234"), html.slice(0, 200));
+
+    const missing = answer({ method: "GET", url: `${P}/gibtsnicht`, headers: { accept: "text/html" } });
+    await SendError(client, missing.request, missing.reply, 404);
+    check("404: keine Fehler-ID", missing.sent.headers["x-error-id"] === undefined && !String(missing.sent.body).includes("Fehler-ID"));
 }
 
 async function main(): Promise<void> {
@@ -849,8 +1005,10 @@ async function main(): Promise<void> {
     await checkGroups(client);
     await checkPaywall(client);
     await checkBeta(client);
+    await checkReports(client);
     checkShopStatus();
     checkSessions(client);
+    await checkLogout(client);
 
     // RL Tracker, Administration und die Epic-Verknuepfung gibt es nicht mehr.
     for (const gone of ["/admins", "/api/admin", "/user/1059621019947634739/tracking", "/api/tracking/1059621019947634739", "/link/epic"]) {
@@ -902,6 +1060,14 @@ async function main(): Promise<void> {
     const evil = await fetch(`${BASE}${P}/login?return=//evil.example`, MANUAL);
     const evilCookie = evil.headers.get("set-cookie") ?? "";
     check("Fremder return-Pfad wird verworfen", !evilCookie.includes("evil"), evilCookie);
+
+    // Browser streichen Tab und Zeilenumbruch aus Adressen: Aus "/\t/evil" würde "//evil", ein fremder Host.
+    for (const sneaky of ["%09", "%0A", "%0D"]) {
+        const response = await fetch(`${BASE}${P}/login?return=${P}/${sneaky}/evil.example`, MANUAL);
+        const sneakyCookie = response.headers.get("set-cookie") ?? "";
+
+        check(`return-Pfad mit ${sneaky} wird verworfen`, !sneakyCookie.includes("evil"), sneakyCookie);
+    }
 
     const me = await fetch(`${BASE}${P}/api/me`);
     check(`${P}/api/me ohne Sitzung ist 401`, me.status === 401, `${me.status}`);

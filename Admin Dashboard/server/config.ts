@@ -240,7 +240,7 @@ export function loadConfig(env: Env = process.env, argv: readonly string[] = pro
         botApiUrl: address("BOT_API_URL", "http://localhost:3000"),
         websiteUrl: address("WEBSITE_URL", "http://localhost:5173"),
         websiteDist: raw("WEBSITE_DIST") || null,
-        logsDir: raw("LOGS_DIR") || "../RL Nexus Bot/logs",
+        logsDir: raw("LOGS_DIR") || "../Discord Bot/logs",
         siteDir: raw("SITE_DIR") || "./data/site",
         flagsDir: raw("FLAGS_DIR") || "./data/flags",
         port,

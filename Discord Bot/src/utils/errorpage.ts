@@ -113,15 +113,24 @@ export function WantsPage(request: FastifyRequest): boolean {
     return !/\/(api|assets|images|dcapi)(\/|$)/.test(path);
 }
 
-/** Schickt die Fehlerseite - oder JSON, wenn kein Browser fragt. */
-export async function SendError(client: BotClient, request: FastifyRequest, reply: FastifyReply, code: number, error?: Error): Promise<unknown> {
+/**
+ * Schickt die Fehlerseite - oder JSON, wenn kein Browser fragt. ref ist die
+ * Fehler-ID eines Serverfehlers (Server.ts): Sie steht auch im Log, so findet
+ * das Team zu einer Meldung die passende Zeile.
+ */
+export async function SendError(client: BotClient, request: FastifyRequest, reply: FastifyReply, code: number, error?: Error, ref: string | null = null): Promise<unknown> {
     const info = ErrorInfo(code);
 
     reply.code(info.code);
 
+    // Auch für Skripte: Das Pop-up „Fehler melden“ liest die ID aus dem Header.
+    if (ref) reply.header("X-Error-Id", ref);
+
     if (!WantsPage(request)) {
-        return reply.send({ error: info.title, hint: info.text, statusCode: info.code, ...(error && client.developerMode ? { detail: error.message } : {}) });
+        return reply.send({ error: info.title, hint: info.text, statusCode: info.code, ...(ref ? { ref } : {}), ...(error && client.developerMode ? { detail: error.message } : {}) });
     }
+
+    const subject = `Fehler ${info.code}${ref ? ` · ID ${ref}` : ""}`;
 
     const page = await SendPage(client, reply, "error.html", {
         ERR_CODE: String(info.code),
@@ -130,15 +139,18 @@ export async function SendError(client: BotClient, request: FastifyRequest, repl
         ERR_HINT: info.hint,
         ERR_ACTION: info.action.label,
         ERR_HREF: info.action.href,
+        // ref ist nur Hex (Server.ts), darf also ungeprüft ins HTML.
+        ERR_REF: ref ? `Fehler-ID: <code>${ref}</code>. Nenn sie, wenn du dich meldest.` : "",
+        ERR_MAILTO: `mailto:support@nexus-emb.de?subject=${encodeURIComponent(subject)}`,
     });
 
     return page;
 }
 
-/** Schreibt einen Fehler ins Log - einmal pro Aufruf, mit Adresse. */
-export function LogError(request: FastifyRequest, error: Error, code: number): void {
+/** Schreibt einen Fehler ins Log - einmal pro Aufruf, mit Adresse. Serverfehler mit Fehler-ID und Stacktrace. */
+export function LogError(request: FastifyRequest, error: Error, code: number, ref: string | null = null): void {
     const where = `${request.method} ${request.url.split("?")[0]}`;
 
-    if (code >= 500) logger.error(`🌐 ${where}: ${error.message}`);
+    if (code >= 500) logger.error(`🌐 ${where}${ref ? ` [Fehler-ID ${ref}]` : ""}: ${error.message}`, error);
     else logger.warn(`🌐 ${where} → ${code}: ${error.message}`);
 }

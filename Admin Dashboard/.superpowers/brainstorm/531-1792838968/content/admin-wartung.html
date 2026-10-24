@@ -1,0 +1,144 @@
+<style>
+  .ad { --base:#050608; --panel:#080d12; --solid:#0a0f15; --line:rgba(255,255,255,.08); --text:#f2f4f7; --dim:#a8b0bc; --faint:#8b93a0; --red:#ff1e2d; --redd:#d81424; --blue:#00afff; --win:#35e07f; --warn:#ffb020;
+        background:var(--base); color:var(--text); font-family:"Segoe UI",system-ui,sans-serif; line-height:1.5; padding:22px 24px 26px; text-align:left; }
+  .ad.ad h2 { margin:0 0 2px; font-size:22px; }
+  .ad.ad .meta { margin:0 0 18px; color:var(--faint); font-size:13px; }
+  .ad .cols { display:grid; grid-template-columns:1.15fr .85fr; gap:18px; align-items:start; }
+  .ad .panel { background:var(--panel); border:1px solid var(--line); padding:18px; }
+  .ad .panel + .panel { margin-top:14px; }
+  .ad.ad h3 { margin:0 0 12px; font-size:14px; letter-spacing:.04em; }
+  .ad .lab { display:block; margin:0 0 6px; font-size:11.5px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:var(--faint); }
+  .ad .field { margin-bottom:14px; }
+  .ad .in { width:100%; box-sizing:border-box; min-height:40px; padding:9px 12px; background:var(--solid); border:1px solid rgba(255,255,255,.14); color:var(--text); font:inherit; font-size:14px; }
+  .ad .chips { display:flex; flex-wrap:wrap; gap:8px; }
+  .ad .chip { min-height:36px; padding:7px 13px; border:1px solid rgba(255,255,255,.16); font-size:13px; color:var(--dim); background:transparent; display:inline-flex; align-items:center; gap:6px; }
+  .ad .chip.on { color:#fff; border-color:var(--red); background:rgba(255,30,45,.12); }
+  .ad .chip input { width:84px; min-height:24px; padding:2px 6px; background:var(--solid); border:1px solid rgba(255,255,255,.14); color:var(--text); font:inherit; font-size:13px; }
+  .ad .steps { list-style:none; margin:0; padding:0; display:grid; gap:8px; }
+  .ad .steps li { display:grid; grid-template-columns:22px 1fr 36px; gap:8px; align-items:center; }
+  .ad .steps .n { color:var(--faint); font-size:12px; text-align:right; font-variant-numeric:tabular-nums; }
+  .ad .x { min-height:36px; border:1px solid var(--line); background:transparent; color:var(--faint); font-size:16px; }
+  .ad .add { margin-top:8px; min-height:36px; padding:7px 13px; border:1px dashed rgba(255,255,255,.2); background:transparent; color:var(--dim); font-size:13px; }
+  .ad .hint { margin:6px 0 0; font-size:12.5px; color:var(--faint); }
+  .ad .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+  .ad .btn { min-height:42px; padding:10px 18px; border:0; background:var(--redd); color:#fff; font-weight:700; font-size:13px; letter-spacing:.06em; text-transform:uppercase; }
+  .ad .btn.quiet { background:transparent; border:1px solid rgba(255,255,255,.18); color:var(--text); }
+  .ad .btn.ok { background:transparent; border:1px solid rgba(53,224,127,.5); color:var(--win); }
+  .ad .area { display:flex; justify-content:space-between; align-items:center; gap:12px; padding:12px 0; border-top:1px solid var(--line); font-size:14px; }
+  .ad .area:first-of-type { border-top:0; padding-top:0; }
+  .ad .badge { display:inline-block; padding:3px 9px; font-size:12px; font-weight:600; }
+  .ad .badge.warn { color:var(--warn); border:1px solid rgba(255,176,32,.4); }
+  .ad .badge.ok { color:var(--win); border:1px solid rgba(53,224,127,.4); }
+  .ad .live { display:flex; gap:16px; align-items:center; margin-bottom:14px; }
+  .ad .mini { position:relative; width:74px; height:74px; flex:none; }
+  .ad .mini svg { position:absolute; inset:0; transform:rotate(-90deg); }
+  .ad .mini img { position:absolute; inset:13px; width:48px; height:48px; border-radius:50%; }
+  .ad .live .big { font-size:30px; font-weight:800; line-height:1; font-variant-numeric:tabular-nums; }
+  .ad .live p { margin:4px 0 0; font-size:13px; color:var(--dim); }
+  .ad .plan { list-style:none; margin:0 0 12px; padding:0; }
+  .ad .plan li { display:flex; justify-content:space-between; gap:10px; padding:8px 10px; font-size:13.5px; color:var(--faint); border-left:2px solid transparent; }
+  .ad .plan li.done { color:var(--dim); } .ad .plan li.done span::before { content:"✓ "; color:var(--win); }
+  .ad .plan li.now { color:#fff; font-weight:600; border-left-color:var(--red); background:rgba(255,30,45,.08); }
+  .ad .plan time { font-variant-numeric:tabular-nums; }
+  .ad .preview { border:1px solid var(--line); background:#000; height:330px; overflow:hidden; position:relative; }
+  .ad .preview .scale { transform:scale(.62); transform-origin:top left; width:161%; }
+  /* Die Arena-Seite in klein */
+  .ar { position:relative; isolation:isolate; overflow:hidden; text-align:center; padding:30px 20px 22px; background:#050608; }
+  .ar::before { content:""; position:absolute; inset:-30px; z-index:-2; background:url(/files/banner.webp) center 30%/cover; filter:blur(14px); opacity:.55; }
+  .ar::after { content:""; position:absolute; inset:0; z-index:-1; background:linear-gradient(180deg, rgba(5,6,8,.35), rgba(5,6,8,.9) 60%, #050608); }
+  .ar .ring { position:relative; width:140px; height:140px; margin:0 auto; }
+  .ar .ring svg { position:absolute; inset:0; transform:rotate(-90deg); }
+  .ar .ring img { position:absolute; inset:25px; width:90px; height:90px; border-radius:50%; }
+  .ar .c { margin:12px 0 0; font-size:11px; font-weight:700; letter-spacing:.22em; color:#ff1e2d; }
+  .ar.ar .h { margin:6px 0 0; font-size:24px; font-weight:700; }
+  .ar.ar .b { margin:8px 0 0; font-size:38px; font-weight:800; }
+  .ar.ar .s { margin:2px 0 0; font-size:13px; color:#a8b0bc; }
+  .cap { margin:0 0 8px; font-size:13px; color:#9aa3ad; }
+</style>
+
+<h2>Admin Dashboard → Developer → Wartung</h2>
+<p class="subtitle">Zwei Zustände derselben Seite. Oben: Wartung planen und einschalten. Unten: Wartung läuft, du schaltest Schritte weiter oder verschiebst das Ende. Die Vorschau rechts ist die echte Arena-Seite mit deinen Angaben.</p>
+
+<div class="section">
+  <p class="cap">Zustand 1 · Wartung ist aus</p>
+  <div class="mockup"><div class="mockup-body" style="padding:0">
+    <div class="ad">
+      <h2>Wartung</h2>
+      <p class="meta">Webseite: normal · Bot-Dashboard: normal</p>
+      <div class="cols">
+        <div>
+          <div class="panel">
+            <h3>Wartung planen</h3>
+            <div class="field"><span class="lab">Wo</span>
+              <div class="chips"><span class="chip on">✓ Webseite</span><span class="chip on">✓ Bot-Dashboard</span></div></div>
+            <div class="field"><span class="lab">Überschrift</span><input class="in" value="Wir bauen um, gleich geht es weiter."></div>
+            <div class="field"><span class="lab">Zusatz, freiwillig</span><input class="in" value="Neue Funktionen fürs Bot-Dashboard. Der Bot in Discord läuft weiter."></div>
+            <div class="field"><span class="lab">Voraussichtlich fertig</span>
+              <div class="chips"><span class="chip">in 15 Min.</span><span class="chip">in 30 Min.</span><span class="chip on">in 1 Std.</span><span class="chip">in 2 Std.</span><span class="chip">um <input value="15:00"></span><span class="chip">offen</span></div>
+              <p class="hint">„offen“ zeigt keine Restzeit, nur seit wann die Wartung läuft.</p></div>
+            <div class="field"><span class="lab">Fahrplan, freiwillig</span>
+              <ul class="steps">
+                <li><span class="n">1</span><input class="in" value="Backup"><button class="x">×</button></li>
+                <li><span class="n">2</span><input class="in" value="Update"><button class="x">×</button></li>
+                <li><span class="n">3</span><input class="in" value="Test"><button class="x">×</button></li>
+                <li><span class="n">4</span><input class="in" value="Wieder online"><button class="x">×</button></li>
+              </ul>
+              <button class="add">+ Schritt</button>
+              <p class="hint">Der erste Schritt startet beim Einschalten. Die Uhrzeit eines Schritts steht auf der Seite, sobald er beginnt.</p></div>
+            <div class="row"><button class="btn">Wartung einschalten</button><span class="hint" style="margin:0">Wirkt sofort, ohne Neustart.</span></div>
+          </div>
+        </div>
+        <div>
+          <span class="lab">Vorschau</span>
+          <div class="preview"><div class="scale"><div class="ar">
+            <div class="ring"><svg viewBox="0 0 200 200"><circle cx="100" cy="100" r="92" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="6"/><circle cx="100" cy="100" r="92" fill="none" stroke="#ff1e2d" stroke-width="6" stroke-linecap="round" stroke-dasharray="578" stroke-dashoffset="578"/></svg><img src="/files/logo-n.webp" alt=""></div>
+            <p class="c">WARTUNG · WEBSEITE</p><p class="h">Wir bauen um, gleich geht es weiter.</p><p class="b">~60 Min.</p><p class="s">voraussichtlich bis 15:00 Uhr</p>
+          </div></div></div>
+        </div>
+      </div>
+    </div>
+  </div></div>
+</div>
+
+<div class="section">
+  <p class="cap">Zustand 2 · Wartung läuft (seit 14:00, jetzt 14:35)</p>
+  <div class="mockup"><div class="mockup-body" style="padding:0">
+    <div class="ad">
+      <h2>Wartung</h2>
+      <p class="meta">Läuft seit 14:00, eingeschaltet von MecryTv</p>
+      <div class="cols">
+        <div>
+          <div class="panel">
+            <div class="live">
+              <div class="mini"><svg viewBox="0 0 200 200"><circle cx="100" cy="100" r="88" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="12"/><circle cx="100" cy="100" r="88" fill="none" stroke="#ff1e2d" stroke-width="12" stroke-linecap="round" stroke-dasharray="553" stroke-dashoffset="232"/></svg><img src="/files/logo-n.webp" alt=""></div>
+              <div><div class="big">~25 Min.</div><p>voraussichtlich bis 15:00 Uhr</p></div>
+            </div>
+            <span class="lab">Fahrplan</span>
+            <ul class="plan">
+              <li class="done"><span>Backup</span><time>14:00</time></li>
+              <li class="now"><span>Update</span><time>seit 14:10</time></li>
+              <li><span>Test</span><time></time></li>
+              <li><span>Wieder online</span><time>15:00 geplant</time></li>
+            </ul>
+            <div class="row" style="margin-bottom:16px"><button class="btn">Weiter zu „Test“</button><button class="btn quiet">Schritt zurück</button></div>
+            <span class="lab">Ende</span>
+            <div class="chips" style="margin-bottom:6px"><span class="chip">+15 Min.</span><span class="chip">+30 Min.</span><span class="chip">um <input value="15:00"></span><span class="chip">offen</span></div>
+            <p class="hint">Die Seite rückt innerhalb von 30 Sekunden nach.</p>
+          </div>
+          <div class="panel">
+            <div class="area"><span>Webseite <span class="badge warn">Wartung</span></span><button class="btn quiet">Beenden</button></div>
+            <div class="area"><span>Bot-Dashboard <span class="badge warn">Wartung</span></span><button class="btn quiet">Beenden</button></div>
+            <div class="row" style="margin-top:12px"><button class="btn ok">Alles beenden, wieder online</button></div>
+          </div>
+        </div>
+        <div>
+          <span class="lab">So sieht es gerade aus</span>
+          <div class="preview"><div class="scale"><div class="ar">
+            <div class="ring"><svg viewBox="0 0 200 200"><circle cx="100" cy="100" r="92" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="6"/><circle cx="100" cy="100" r="92" fill="none" stroke="#ff1e2d" stroke-width="6" stroke-linecap="round" stroke-dasharray="578" stroke-dashoffset="243"/></svg><img src="/files/logo-n.webp" alt=""></div>
+            <p class="c">WARTUNG · WEBSEITE</p><p class="h">Wir bauen um, gleich geht es weiter.</p><p class="b">~25 Min.</p><p class="s">voraussichtlich bis 15:00 Uhr</p>
+          </div></div></div>
+        </div>
+      </div>
+    </div>
+  </div></div>
+</div>

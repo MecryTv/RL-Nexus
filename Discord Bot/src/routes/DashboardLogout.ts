@@ -21,7 +21,10 @@ export default class DashboardLogout extends Route {
 
         // Serverseitig zuerst: ein gelöschtes Cookie allein würde die Sitzung
         // im Speicher weiterleben lassen.
-        if (session) service.Destroy(session);
+        if (session) {
+            service.Destroy(session);
+            await service.Revoke(session);
+        }
 
         return reply
             .header("Set-Cookie", ClearCookie(SESSION_COOKIE, service.Secure))

@@ -131,6 +131,41 @@ export interface IMaintenance {
     readonly dashboard: IMaintenanceFlag | null;
 }
 
+export type MaintenanceArea = keyof IMaintenance;
+
+/** Ein Schritt im Fahrplan. startedAt: erst gesetzt, wenn der Schritt beginnt. */
+export interface IMaintenanceStep {
+    readonly name: string;
+    readonly startedAt: string | null;
+}
+
+/** data/flags/wartung.json: was die Wartungsseite zeigt. Öffentlich, deshalb ohne Namen. */
+export interface IMaintenancePlan {
+    readonly areas: readonly MaintenanceArea[];
+    readonly title: string;
+    readonly text: string;
+    readonly since: string;
+    /** null: offen, ohne geplantes Ende. */
+    readonly until: string | null;
+    readonly steps: readonly IMaintenanceStep[];
+    /** Index des laufenden Schritts, null ohne Fahrplan. */
+    readonly current: number | null;
+}
+
+/** GET /api/maintenance: die Schalter und der Plan. */
+export interface IMaintenanceState extends IMaintenance {
+    readonly plan: IMaintenancePlan | null;
+}
+
+/** POST /api/maintenance/start */
+export interface IMaintenanceStart {
+    readonly areas: readonly MaintenanceArea[];
+    readonly title: string;
+    readonly text: string;
+    readonly until: string | null;
+    readonly steps: readonly string[];
+}
+
 /** GET /api/bot/status: ohne Zwischenspeicher, für die Rückmeldung nach dem Neustart. */
 export interface IBotStatus {
     readonly online: boolean;

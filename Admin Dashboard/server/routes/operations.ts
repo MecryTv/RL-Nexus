@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import type { ITech } from "../../shared/api.ts";
+import type { IMaintenanceState, ITech } from "../../shared/api.ts";
 import { accessOf } from "../access.ts";
 import { audit } from "../audit.ts";
 import { botOverview, botStatus, restartBot } from "../bot.ts";
@@ -9,8 +9,8 @@ import { databaseReady, query } from "../db.ts";
 import { InvalidInput, PublicError } from "../errors.ts";
 import { publish } from "../events.ts";
 import { notifyStatus } from "../notify.ts";
-import { MAINTENANCE_FILES, readMaintenance, setMaintenance, type MaintenanceArea } from "../maintenance.ts";
-import { body } from "../validate.ts";
+import { MAINTENANCE_FILES, endMaintenance, parseStart, readMaintenanceState, setMaintenanceUntil, startMaintenance, stepMaintenance, type MaintenanceArea } from "../maintenance.ts";
+import { body, oneOf } from "../validate.ts";
 
 /** Wartung, Neustart und Technik-Ansicht. Nur für Developer. */
 
@@ -73,28 +73,60 @@ export async function operationRoutes(app: FastifyInstance, { config }: { config
         };
     });
 
-    app.get("/api/maintenance", async () => readMaintenance(config));
+    app.get("/api/maintenance", async (): Promise<IMaintenanceState> => readMaintenanceState(config));
 
-    app.put("/api/maintenance", async (request) => {
+    // Eingeschaltet wird nur noch mit Plan (POST /start), hier wird nur beendet.
+    app.put("/api/maintenance", async (request): Promise<IMaintenanceState> => {
         const actor = accessOf(request);
         const input = body(request.body);
         const changes = (Object.keys(MAINTENANCE_FILES) as MaintenanceArea[]).filter((area) => input[area] !== undefined);
 
-        if (changes.length === 0) throw new InvalidInput("Sag, welcher Bereich in die Wartung soll: website oder dashboard.");
+        if (changes.length === 0) throw new InvalidInput("Sag, welcher Bereich aus der Wartung soll: website oder dashboard.");
 
         for (const area of changes) {
-            if (typeof input[area] !== "boolean") throw new InvalidInput(`${AREA_LABELS[area]}: an oder aus, als true oder false.`);
+            if (input[area] !== false) throw new InvalidInput(`${AREA_LABELS[area]}: Hier geht nur Beenden (false). Eingeschaltet wird mit Plan.`);
         }
 
         for (const area of changes) {
-            const on = input[area] === true;
-
-            await setMaintenance(config, area, on, actor.name);
-            await audit(actor, "maintenance.set", AREA_LABELS[area], on ? "an" : "aus");
+            await endMaintenance(config, area);
+            await audit(actor, "maintenance.set", AREA_LABELS[area], "aus");
             publish("maintenance");
         }
 
-        return readMaintenance(config);
+        return readMaintenanceState(config);
+    });
+
+    app.post("/api/maintenance/start", async (request): Promise<IMaintenanceState> => {
+        const actor = accessOf(request);
+        const now = new Date();
+        const start = parseStart(request.body, now);
+
+        await startMaintenance(config, start, actor.name, now);
+        await audit(actor, "maintenance.start", start.areas.map((area) => AREA_LABELS[area]).join(", "), start.until ?? "offen");
+        publish("maintenance");
+
+        return readMaintenanceState(config);
+    });
+
+    app.post("/api/maintenance/step", async (request): Promise<IMaintenanceState> => {
+        const actor = accessOf(request);
+        const direction = oneOf(body(request.body).direction, ["next", "back"] as const, "Die Richtung");
+        const plan = await stepMaintenance(config, direction, new Date());
+
+        await audit(actor, "maintenance.step", plan.current === null ? null : (plan.steps[plan.current]?.name ?? null));
+        publish("maintenance");
+
+        return readMaintenanceState(config);
+    });
+
+    app.post("/api/maintenance/until", async (request): Promise<IMaintenanceState> => {
+        const actor = accessOf(request);
+        const plan = await setMaintenanceUntil(config, body(request.body).until ?? null, new Date());
+
+        await audit(actor, "maintenance.until", plan.until ?? "offen");
+        publish("maintenance");
+
+        return readMaintenanceState(config);
     });
 
     app.post("/api/bot/restart", async (request, reply) => {

@@ -23,18 +23,38 @@ export interface IReportInput {
     contact: string;
 }
 
+/** Was der Browser von selbst mitschickt (layout/Report.ts im Dashboard). Nur Technik, nichts Getipptes. */
+export interface IReportTech {
+    browser: string;
+    screen: string;
+    /** Prüfsumme von app.js: welcher Stand des Dashboards lief. */
+    version: string;
+    /** Fehlgeschlagene API-Aufrufe und Skriptfehler dieser Sitzung, die neuesten zuletzt. */
+    problems: { at: string; what: string }[];
+}
+
 export interface IReport extends IReportInput {
     source: "dashboard" | "discord";
     user: { id: string; name: string } | null;
     guild: { id: string; name: string } | null;
     /** Die Seite im Dashboard, auf der das Pop-up aufging. */
     page: string | null;
+    tech?: IReportTech | null;
 }
 
 const MAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+/** So viele Probleme gehen höchstens mit, so lang darf jedes sein. */
+const PROBLEMS_MAX = 8;
+const PROBLEM_LENGTH = 300;
+const BERLIN_TIME = new Intl.DateTimeFormat("de-DE", { hour: "2-digit", minute: "2-digit", second: "2-digit", timeZone: "Europe/Berlin" });
 
 function Text(value: unknown, max: number): string {
     return typeof value === "string" ? value.trim().slice(0, max) : "";
+}
+
+/** Eine Zeile ohne Umbrüche: Was der Browser schickt, soll in der Mail keine eigene Kopfzeile vortäuschen. */
+function Line(value: unknown, max: number): string {
+    return Text(value, max).replace(/[\u0000-\u001f\u007f]+/g, " ");
 }
 
 /**
@@ -79,6 +99,20 @@ export default class ReportService {
         return report;
     }
 
+    /** Prüft den Technik-Block aus dem Browser. Kein Objekt: keiner. */
+    Tech(input: unknown): IReportTech | null {
+        if (typeof input !== "object" || input === null) return null;
+
+        const raw = input as Record<string, unknown>;
+        const problems = (Array.isArray(raw.problems) ? raw.problems : [])
+            .map((entry) => (typeof entry === "object" && entry !== null ? (entry as Record<string, unknown>) : {}))
+            .map((entry) => ({ at: Line(entry.at, 40), what: Line(entry.what, PROBLEM_LENGTH) }))
+            .filter((entry) => entry.what !== "")
+            .slice(-PROBLEMS_MAX);
+
+        return { browser: Line(raw.browser, 300), screen: Line(raw.screen, 30), version: Line(raw.version, 40), problems };
+    }
+
     /** Höchstens REPORT_MAX Meldungen je Person (oder Adresse) in zehn Minuten. */
     private Allow(key: string): boolean {
         const now = Date.now();
@@ -114,6 +148,19 @@ export default class ReportService {
         lines.push(`Zeit: ${new Date().toISOString()}`, "", "Was ist passiert?", report.message);
 
         if (report.context) lines.push("", "Wo und wie:", report.context);
+
+        const tech = report.tech;
+
+        if (tech) {
+            lines.push("", "Technik (vom Browser mitgeschickt):", `Browser: ${tech.browser || "?"}`, `Fenster: ${tech.screen || "?"}`, `Version: ${tech.version || "?"}`);
+            lines.push(tech.problems.length === 0 ? "Probleme in dieser Sitzung: keine bemerkt" : "Probleme in dieser Sitzung:");
+
+            for (const problem of tech.problems) {
+                const at = new Date(problem.at);
+
+                lines.push(`- ${Number.isNaN(at.getTime()) ? "?" : BERLIN_TIME.format(at)} ${problem.what}`);
+            }
+        }
 
         return lines.join("\n");
     }

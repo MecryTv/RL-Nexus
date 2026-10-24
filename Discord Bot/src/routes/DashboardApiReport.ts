@@ -50,6 +50,7 @@ export default class DashboardApiReport extends Route {
                     user: session ? { id: session.userId, name: session.handle ? `@${session.handle}` : session.username } : null,
                     guild: guild ? { id: guild.id, name: guild.name } : null,
                     page,
+                    tech: service.Tech(body.tech),
                 },
                 session?.userId ?? request.ip
             );

@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import fastify, { FastifyInstance } from "fastify";
 import rateLimit from "@fastify/rate-limit";
 import { LogError, SendError } from "./utils/errorpage";
@@ -7,6 +8,7 @@ import IServer from "./interfaces/services/server/IServer";
 import { AssertSecret } from "./utils/jwt";
 import logger from "./utils/logger";
 import { UPLOAD_TYPES } from "./constants/Gallery";
+import { DASHBOARD_HOME, DASHBOARD_PATH } from "./constants/Dashboard";
 
 import { EncodingOf, MIN_COMPRESS, Pack } from "./utils/compress";
 const DEFAULT_HOST = "0.0.0.0";
@@ -79,13 +81,16 @@ export default class Server implements IServer {
         // das Dashboard "/", im Entwicklungsmodus "/dashboard" - und ein Link auf
         // "/dashboard/" soll nicht ins Leere laufen.
         //
-        // trustProxy: 1 heißt "genau ein Proxy davor" - im Betrieb nginx, siehe
-        // docs/Hosting.md. Ohne das ist request.ip immer der Proxy, und das
-        // Rate Limit zaehlt die ganze Welt in einen Topf. Gezaehlt wird der
-        // letzte Eintrag aus X-Forwarded-For, nicht der erste: den ersten
-        // schreibt der Aufrufer selbst, und der darf sich nicht aussuchen, als
-        // wer er gezaehlt wird. Ohne Proxy (--dev) aendert die Option nichts.
-        const instance = fastify({ logger: false, routerOptions: { ignoreTrailingSlash: true }, trustProxy: 1 });
+        // trustProxy: Vertraut wird nur einem Gegenüber aus dem eigenen Netz -
+        // im Betrieb nginx auf dem Host, dessen Anfragen über Dockers
+        // Portweiterleitung aus dem Docker-Netz kommen (docs/Hosting.md), dazu
+        // das Admin Dashboard im selben Netz. Ohne das ist request.ip immer der
+        // Proxy, und das Rate Limit zaehlt die ganze Welt in einen Topf. Den
+        // Anfang von X-Forwarded-For schreibt der Aufrufer selbst: gezaehlt wird
+        // die letzte Adresse, die nicht aus diesen Netzen stammt. Eine Zahl
+        // (Anzahl der Proxys) nimmt Fastify seit 5.12.5 nicht mehr, sie prueft
+        // nicht, wer wirklich davorsitzt. Wie im Admin Dashboard (server/app.ts).
+        const instance = fastify({ logger: false, routerOptions: { ignoreTrailingSlash: true }, trustProxy: ["loopback", "uniquelocal"] });
 
         // Bilder kommen roh: der Browser schickt die Datei als Body, Ziel und
         // Name stehen in der Adresse. Ein Multipart-Paket waere eine Dependency
@@ -144,9 +149,15 @@ export default class Server implements IServer {
             const error = thrown instanceof Error ? thrown : new Error(String(thrown));
             const code = Number((thrown as { statusCode?: number }).statusCode ?? 500);
 
-            LogError(request, error, code);
+            // Zu viele Beta-Codes probiert: zurück auf die Sperrseite, der Satz steht dort über dem Feld.
+            if (code === 429 && request.method === "POST" && request.routeOptions.url === `${DASHBOARD_PATH}/beta`) return reply.redirect(`${DASHBOARD_HOME}?beta=zuviel`, 303);
 
-            return SendError(this.client, request, reply, code, error);
+            // Serverfehler bekommen eine kurze ID: Sie steht im Log, auf der Seite und in der Meldung.
+            const ref = code >= 500 ? randomBytes(4).toString("hex") : null;
+
+            LogError(request, error, code, ref);
+
+            return SendError(this.client, request, reply, code, error, ref);
         });
 
         await instance.listen({ port: this.port, host: this.host });

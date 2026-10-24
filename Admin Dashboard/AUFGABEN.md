@@ -44,6 +44,27 @@ Reihenfolge: P1 vor P2 vor P3 vor P4. Bei gleicher Priorität gilt die Reihenfol
   - Eingelöst wird auf der Sperrseite. Die Gruppe heißt „Beta“.
   - Die Webseite zeigt im Beta-Modus (wie bei Free) keinen Tab „Preise“, auch nicht kurz beim Laden.
 
+## Erledigt (24.10., zweite Runde)
+
+- **Graph Beitritte/Abgänge:** In `style.css` hatte `.col--split` das `justify-content:center` von `.col` geerbt. Die Spalte schrumpfte dadurch auf 0 px. Jetzt `stretch`, im Browser nachgemessen.
+- **Beta im Zweifel zu:** Bei einem Datenbankfehler öffnet der Bot nur noch, wenn sicher feststeht, dass Beta aus ist. Sonst kommt eine Sperrseite „Zugang lässt sich gerade nicht prüfen“ ohne Code-Feld. Fehlt die Spalte `access_mode` (älteres Admin Dashboard), bleibt Beta aus. Tests in `CheckDashboard.ts`.
+- **Beta-Feinschliff:**
+  - Zu viele Einlöse-Versuche: zurück zur Sperrseite mit dem Satz über dem Feld (`?beta=zuviel`, `Server.ts`).
+  - Das interne Limit im Admin zählt pro Person (10 je Minute) statt für alle zusammen.
+  - Die Geschenk-Mail nennt bei Free und Beta Tage statt Datum (das Geschenk ruht) und im Beta-Modus den Beta-Code.
+  - Doku-Seite: Free, Paid, Beta erklärt, Gruppenliste wie im Dashboard.
+- **Fehlermeldungen an die Devs:**
+  - Jede Meldung aus dem Bot-Dashboard bringt einen Technik-Block mit: Seite, Browser, Fenster, Dashboard-Version und die letzten bis zu 8 Probleme der Sitzung (fehlgeschlagene API-Aufrufe mit Status und Satz, Skriptfehler mit Datei und Zeile). Im Pop-up steht aufklappbar „Das geht automatisch mit“.
+  - Serverfehler (5xx) bekommen eine Fehler-ID. Sie steht im Log mit Stacktrace, im Header `X-Error-Id`, im JSON, auf der Fehlerseite und im Betreff der Mail dort.
+  - Ziel bleibt `support@nexus-emb.de` (Postfach im Admin Dashboard). Ein eigener Discord-Kanal für die Devs wäre ein kleiner Zusatz.
+- **Sicherheitsprüfung (P2):** Statisch nach OWASP API Top 10, alle drei Projekte. Solide waren: Rechte zentral (`GuildsOf` mit Bezahlschranke und Beta, im Admin Rolle je Anfrage), CSRF (Origin, JSON, SameSite), JWT, Dateipfade, Uploads, SSRF, Postfach (sanitize-html und Sandbox), Stripe-Webhook, keine Geheimnisse im Repo. Behoben:
+  - Offener Redirect nach dem Login im Bot-Dashboard und im Admin (`/login?return=/%09/evil.com`), mit Tests.
+  - Abhängigkeiten: Bot 0 Lücken (u. a. Fastify, axios, undici, nodemailer). Fastify ab 5.12.5 nimmt `trustProxy: 1` nicht mehr, der Bot vertraut jetzt wie das Admin Dashboard `loopback` und `uniquelocal`, mit Test gegen gefälschte X-Forwarded-For.
+  - Abmelden im Bot-Dashboard widerruft den Discord-Token, ein kopiertes Cookie ist danach wertlos.
+  - CSP `script-src 'self'` fürs Bot-Dashboard (nginx-Vorlage), lokal ohne Verstöße geprüft. Die Wartungsseiten haben jetzt dieselben Sicherheits-Header.
+  - Live-Ticket-Filter entfernt auch `xlink:href`, `action` und `formaction` mit fremden Zielen.
+- **Alte Ordnernamen nach der Umbenennung:** `Webseite/vite.config.ts` (lokale Inhalte aus dem Admin), `Admin Dashboard/server/config.ts` (Logs), `server/checks/fakes.ts` und `.claude/launch.json` zeigen jetzt auf `Webseite`, `Discord Bot` und `Admin Dashboard`. Damit laufen auch zwei Admin-Checks wieder.
+
 ## Vor dem Livegang
 
 - **Reihenfolge beim Ausrollen:** erst Bot und Webseite, dann das Admin Dashboard, erst danach auf Beta Access stellen.
@@ -66,42 +87,22 @@ Reihenfolge: P1 vor P2 vor P3 vor P4. Bei gleicher Priorität gilt die Reihenfol
   - Die Daten kommen über `src/routes/DashboardApiBackups.ts` vom Admin Dashboard (`ADMIN_INTERNAL_URL`).
   - Weil gar nichts kommt, nicht einmal ein Fehler, liegt die Ursache eher im Client: Die Funktion zum Zeichnen läuft nicht, oder ein JavaScript-Fehler bricht ab. Zuerst die Browser-Konsole und den Netzwerk-Tab prüfen.
   - Danach prüfen, ob `ADMIN_INTERNAL_URL` gesetzt ist.
+- **Stand 24.10.:** Lokal getestet. Mit dem aktuellen Bau laden beide Seiten (direkt, über die Leiste, unter `/dashboard`), Fehler der API werden angezeigt. Vermutung: Am 23.10. lief ein veralteter Client-Bau, denn `npm run dev` baut den Client nur beim Start. **Nachtest:** `npm run dev` neu starten und noch einmal öffnen. Bleibt es leer, Browser-Konsole und Netzwerk-Tab ansehen.
 - **Freigaben:** Die Plan-19-Dateien sind freigegeben.
 
-### [P1] Übersicht: Beitritte und Abgänge fehlen im Graphen
-- **Projekt:** Bot (Bot-Dashboard, Server-Übersicht)
-- **Was passiert:** Die Kacheln zeigen „10 Beitritte · 7 Tage, 2 Abgänge“, der Graph „Beitritte und Abgänge pro Tag“ bleibt aber leer (Bild 3).
-- **Hinweise:**
-  - Der Graph steht in `src/dashboard/client/pages/GuildOverview.ts`. Die Zahlen für die Kacheln kommen offenbar an, die Tageswerte für den Graphen nicht.
-  - Verdacht: Die Tage werden anders geschlüsselt (Zeitzone oder Datumsformat), oder das Feld für die Tageswerte heißt anders als erwartet.
-  - Die Daten-Route und `ActivityService` gehören dazu.
-- **Freigaben:** `GuildOverview.ts` und die Activity-Dateien sind noch nicht freigegeben. Erfragen, sobald klar ist, welche es braucht.
-
-### [P1] Wartungsmodus im Admin Dashboard bewirkt nichts
+### [P1] Wartungsmodus: auf dem Server prüfen
 - **Projekt:** Admin Dashboard, nginx im Bot-Repo, Server
-- **Was passiert:** Schaltest du im Admin Dashboard die Wartung an, passiert nichts.
-- **Hinweise:**
-  - Das Admin Dashboard schreibt nur Dateien (`server/maintenance.ts`: `wartung-webseite`, `wartung-dashboard` im Ordner `flagsDir`).
-  - Wirken tut das erst über nginx: `nginx/container/website.conf` prüft `/srv/flags/wartung-webseite`, `nginx/dashboard.nexus-emb.de.conf` die Dashboard-Datei.
-  - Lokal ohne nginx passiert deshalb nie etwas.
-  - Auf dem Server prüfen:
-    - Zeigen `FLAGS_DIR` des Admin-Containers und der Mount `/srv/flags` bei nginx auf denselben Ordner?
-    - Ist die nginx-Konfiguration mit den Wartungsregeln wirklich aktiv?
-  - Danach festlegen, ob der Bot selbst (Bot-Dashboard) die Wartung auch ohne nginx zeigen soll.
-- **Offene Frage:** Wo hast du es getestet, lokal oder auf dem Server?
+- **Stand 24.10.:** Lokal getestet, dort wirkt der Schalter nie, weil nginx fehlt. Beide nginx-Konfigurationen sind in Docker geprüft: Schalter an ergibt 503 mit Wartungsseite und `Retry-After`, POST bekommt einen JSON-Satz, `/images/` und `/dcapi/` laufen weiter, Schalter aus wirkt sofort.
+- **Auf dem Server prüfen:**
+  - Liegt die aktuelle Vorlage aktiv in nginx? `sudo grep -c wartung-dashboard /etc/nginx/sites-enabled/dashboard.nexus-emb.de`
+  - Entsteht die Datei beim Umschalten? `ls -la /home/rlnexus/data/flags`
+  - Darf das Admin Dashboard dort schreiben? Sonst `sudo chown -R 1000:1000 /home/rlnexus/data/flags`
+- **Offen:** Soll der Bot die Wartung auch selbst zeigen, ohne nginx (dann auch lokal sichtbar)?
 
-### [P1] Fehler genauer beschreiben und an die Devs schicken
-- **Projekt:** noch offen (Bot-Dashboard hat „Fehler melden“ in der Fußzeile: `src/dashboard/client/layout/Report.ts`, `POST /api/report`)
-- **Was gewünscht ist:** Fehler genauer beschreiben und an die Devs schicken.
-- **Offene Fragen, vor dem Bauen klären:**
-  - Welche Fehler sind gemeint? Die Fehlerseiten des Bot-Dashboards, Fehler im Bot auf Discord oder Meldungen von Nutzern über „Fehler melden“?
-  - Wohin sollen sie gehen? Postfach im Admin Dashboard, ein Discord-Kanal oder Mail?
-  - Was soll automatisch mitgehen? Seite, Server, Uhrzeit, Fehlercode, Browser?
-
-### [P1, Entscheidung nötig] Beta Access: bei Datenbankfehler offen oder zu?
-- **Projekt:** Bot
-- **Stand:** Antwortet die Datenbank nicht, gilt Beta im Bot als aus, bis zu einer Minute lang. Dann käme jeder ins Bot-Dashboard. So war es geplant („lieber offen als alle ausgesperrt“), passt aber schlecht zu „Sicherheitsschranke“.
-- **Entscheiden:** offen lassen wie jetzt, oder im Zweifel sperren (dann sieht bei einem Datenbank-Aussetzer jeder die Sperrseite).
+### [P2] Rest aus der Sicherheitsprüfung
+- **Admin Dashboard: Pakete einspielen.** Das Lockfile ist schon aktualisiert (0 Lücken), `node_modules` noch nicht: Dein laufender Vite-Server hielt `sass-embedded` gesperrt. Admin-Vite kurz stoppen, dann `npm install` im Ordner `Admin Dashboard`.
+- **Bot: nginx-Vorlage auf den Server.** Die neue CSP und die Header der Wartungsseite wirken erst, wenn `nginx/dashboard.nexus-emb.de.conf` nach `/etc/nginx/sites-available/` kopiert und nginx neu geladen ist. Danach einmal durchs Dashboard klicken und in der Konsole nach „Content Security Policy“ suchen.
+- **Webseite: noch keine Skript-Sperre per CSP.** Das Intro-Skript steht inline in `index.html`, `script-src 'self'` würde es blockieren. Zwei Wege: Skript als eigene Datei auslagern (ein Request mehr vor dem ersten Bild), oder seinen Hash in die CSP schreiben und im Webseiten-Check prüfen, dass er passt.
 
 ### [P2] Apply System: Webseite oder Discord
 - **Projekt:** Bot (Modul Bewerbungen), Webseite
@@ -156,13 +157,9 @@ Reihenfolge: P1 vor P2 vor P3 vor P4. Bei gleicher Priorität gilt die Reihenfol
 - **Was gewünscht ist:** Schutz gegen Spam, gehackte Accounts und Ähnliches, modern umgesetzt.
 
 ### [P4] Kleinkram
-- **Bot-Doku-Seite** `src/dashboard/public/docu.html`: Der Satz zu „Testphase“ ist veraltet, „Free“ und „Beta“ fehlen. Die Datei ist freigegeben.
 - **Ende des Zugangs im Bot-Dashboard** (`Settings.ts`): braucht eine Freigabe.
-- **Beta Access:**
-  - Beim Rate-Limit (10 Versuche je 10 Minuten) kommt die allgemeine Fehlerseite statt eines Satzes über dem Feld. Das braucht eine Änderung in `src/Server.ts` und damit eine Freigabe.
-  - Das interne Limit im Admin (60 je Minute) teilen sich alle Nutzer.
-  - Die Geschenk-Mail verspricht im Beta-Modus „Zugang zum Bot-Dashboard“, ins Bot-Dashboard kommt man dann aber nur mit Beta-Code.
-  - Test fehlt: „Beta aus, wenn die Spalte fehlt“.
+- **Admin-Check „Status“ wackelt, solange deine Dev-Server laufen:** Er misst die Webseite unter `localhost:5173` (Standard von `WEBSITE_URL`) und erwartet höchstens 1,5 Sekunden. Der Vite-Dev-Server ist manchmal langsamer. Die Prüfung sollte eine eigene Adresse bekommen statt des echten Ports.
+- **Wartung im offenen Tab:** Ruft das Bot-Dashboard während der Wartung eine API ab, kommt die Wartungsseite als HTML. Die Seite zeigt dann „Datenbank nicht erreichbar“ statt „Wartung“. Lösung in nginx: bei `Accept: application/json` auch für GET den JSON-Satz.
 - **Aus Plan 19 (Backup-Modul):**
   - Die Plan-Einstellungen zeigen kurz nicht gespeicherte Werte.
   - „Nächstes“ mischt Browser-Zeitzone und Berliner Stunde.

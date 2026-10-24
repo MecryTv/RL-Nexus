@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import { BETA_CODE_ALPHABET, newCode, normalizeCode } from "../../shared/beta.ts";
+import { buildApp } from "../app.ts";
 import { parseCodesInput } from "../beta/store.ts";
-import { check, section } from "./harness.ts";
+import { signToken } from "../bot.ts";
+import { check, config, section } from "./harness.ts";
 
 /** Beta Access ohne Datenbank: Codes lesen, erzeugen, Eingaben prüfen (Plan 22). */
 export async function checkBeta(): Promise<void> {
@@ -35,5 +37,28 @@ export async function checkBeta(): Promise<void> {
         assert.throws(() => parseCodesInput({ count: 1, maxUses: 0 }), /Nutzungen/);
         assert.throws(() => parseCodesInput({ count: 1, maxUses: 1.5 }), /Nutzungen/);
         assert.throws(() => parseCodesInput({ count: 1, maxUses: 1, note: "x".repeat(191) }), /Notiz/);
+    });
+
+    // Alle Anfragen kommen vom Bot, also von einer Adresse: Ein Topf hieße, einer braucht das Limit für alle auf.
+    await check("Einlösen: Das Limit zählt je Person, nicht für alle zusammen", async () => {
+        const app = await buildApp(config);
+        const redeem = (userId: string) =>
+            app.inject({
+                method: "POST",
+                url: "/internal/beta/redeem",
+                headers: { authorization: `Bearer ${signToken(config.jwtSecret, `dashboard:${userId}`, ["beta"])}`, "content-type": "application/json" },
+                payload: { code: "NXB-2222-2222" },
+            });
+
+        try {
+            let last = 0;
+
+            for (let attempt = 0; attempt < 11; attempt++) last = (await redeem("99999999999999999981")).statusCode;
+
+            assert.equal(last, 429, "die elfte Anfrage derselben Person");
+            assert.notEqual((await redeem("99999999999999999982")).statusCode, 429, "eine andere Person kommt durch");
+        } finally {
+            await app.close();
+        }
     });
 }

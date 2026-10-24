@@ -9,7 +9,7 @@ import { config } from "./harness.ts";
  * version.json ab. Die nachgestellte Webseite liefert genau diese Dateien,
  * damit die Checks gegen die echten heutigen Inhalte laufen.
  */
-export const WEBSITE_PUBLIC = process.env.WEBSITE_PUBLIC_DIR ?? path.join(import.meta.dirname, "..", "..", "..", "RL Nexus Website", "public");
+export const WEBSITE_PUBLIC = process.env.WEBSITE_PUBLIC_DIR ?? path.join(import.meta.dirname, "..", "..", "..", "Webseite", "public");
 
 /**
  * Discord, nachgestellt. Jeder Nutzer steht für einen Fall: beim Login wandert

@@ -20,7 +20,8 @@ export async function checkAccess(): Promise<void> {
     await check("Rückweg nur als eigener Pfad", () => {
         assert.equal(safeReturn("/server?sort=name"), "/server?sort=name");
 
-        for (const bad of ["//evil.example", "https://evil.example", "/\\evil.example", "server", "", undefined, 42]) {
+        // Browser streichen Tab und Zeilenumbruch: Aus "/\t/evil" würde "//evil", ein fremder Host.
+        for (const bad of ["//evil.example", "https://evil.example", "/\\evil.example", "/\t/evil.example", "/\n/evil.example", "/\r/evil.example", "server", "", undefined, 42]) {
             assert.equal(safeReturn(bad), "/", String(bad));
         }
     });
