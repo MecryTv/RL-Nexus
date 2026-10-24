@@ -12,6 +12,7 @@
 import { BASE } from "../core/Base.js";
 import { icon } from "../core/Dom.js";
 import { el } from "../core/Ui.js";
+import { errorNote } from "../core/ErrorReport.js";
 
 export interface IFailure {
     /** Was oben in der Marke steht - "503", "Offline", "Fehler". */
@@ -22,6 +23,8 @@ export interface IFailure {
     hint?: string;
     /** Der erste Knopf. Ohne Angabe führt er zur Übersicht. */
     action?: { label: string; href: string };
+    /** Die Fehler-ID, wenn der Bot den Fehler schon gemeldet hat (Plan 24). */
+    errorId?: string | null;
 }
 
 /**
@@ -56,7 +59,8 @@ export function showFailure(failure: IFailure): void {
                 el("h2", "", failure.title),
                 el("p", "", failure.text),
                 el("div", "erracts", go, again),
-                ...(failure.hint ? [el("p", "errhint", failure.hint)] : [])
+                ...(failure.hint ? [el("p", "errhint", failure.hint)] : []),
+                ...[errorNote(failure.errorId ?? null)].filter((note): note is HTMLElement => note !== null)
             )
         )
     );

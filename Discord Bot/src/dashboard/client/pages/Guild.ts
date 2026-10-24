@@ -9,6 +9,8 @@ import { ROLE_ICONS, ROLE_LABELS } from "../constants/Groups.js";
 import { CATEGORIES, IModulePart, MODULES } from "../constants/Modules.js";
 import { clickSound } from "../core/Sound.js";
 import { BASE } from "../core/Base.js";
+import { errorNote, reportClientError } from "../core/ErrorReport.js";
+import { shouldReport } from "../core/Trail.js";
 import { debounce, onPulse } from "../core/Pulse.js";
 import { ActivityResult, fetchActivity, renderOverview } from "./GuildOverview.js";
 
@@ -329,10 +331,17 @@ function whenShown(ids: string[], start: () => Promise<unknown>): void {
         if (started || sections.every((section) => section.hidden)) return;
 
         started = true;
-        start().catch((error: unknown) => {
+        start().catch(async (error: unknown) => {
             console.error(`Abschnitt ${ids.join(", ")} lädt nicht:`, error);
 
-            for (const section of sections) notLoaded(section);
+            // Ein fehlendes Code-Stück nach einem Deploy ist kein Fehler im Code: dafür gibt es „Neu laden“.
+            const broken = shouldReport(error);
+
+            for (const section of sections) notLoaded(section, broken);
+
+            const note = errorNote(broken ? await reportClientError({ kind: "section", error, section: ids.join(", ") }) : null);
+
+            if (note) sections[0]?.querySelector(".notice--reload")?.append(note);
         });
     };
 
@@ -342,7 +351,7 @@ function whenShown(ids: string[], start: () => Promise<unknown>): void {
 }
 
 /** Die Zeile in einer Karte, deren Code nicht kam. Der leere Link lädt genau diese Adresse neu. */
-function notLoaded(section: HTMLElement): void {
+function notLoaded(section: HTMLElement, broken = false): void {
     // Transcriptions startet zwei Abschnitte: eine Zeile reicht.
     if (section.querySelector(".notice--reload")) return;
 
@@ -352,7 +361,9 @@ function notLoaded(section: HTMLElement): void {
 
     box.className = "notice modnote notice--reload";
     box.setAttribute("role", "alert");
-    text.textContent = "Dieser Bereich lässt sich nicht laden, vermutlich weil das Dashboard inzwischen aktualisiert wurde. Lade die Seite neu.";
+    text.textContent = broken
+        ? "Dieser Bereich lässt sich gerade nicht laden. Lade die Seite neu, und wenn es dabei bleibt, melde dich beim Support."
+        : "Dieser Bereich lässt sich nicht laden, vermutlich weil das Dashboard inzwischen aktualisiert wurde. Lade die Seite neu.";
     again.className = "btn btn--quiet";
     again.href = "";
     again.append(icon("#i-refresh"), "Neu laden");

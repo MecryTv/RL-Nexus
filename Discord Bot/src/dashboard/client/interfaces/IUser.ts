@@ -33,4 +33,6 @@ export interface IPayload {
      * null ohne Endzeit. Fehlt bei einem älteren Bot.
      */
     maintenance?: (IMaintenanceNote & { until: string | null }) | null;
+    /** Meldet das Dashboard Fehler von selbst an die Devs? Fehlt bei einem älteren Bot (Plan 24). */
+    errorReports?: boolean;
 }

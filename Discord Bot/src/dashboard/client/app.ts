@@ -27,6 +27,8 @@ import { bindFooter } from "./layout/Footer.js";
 import { renderProfile } from "./layout/Profile.js";
 import { buildUserUI } from "./layout/UserMenu.js";
 import { showFailure } from "./layout/Failure.js";
+import { installTrail, lastServerErrorId } from "./core/Trail.js";
+import { installErrorReports } from "./core/ErrorReport.js";
 import { showMaintenance, watchScroll } from "./layout/Topbar.js";
 
 /**
@@ -53,6 +55,8 @@ function failed(page: string): void {
             title: "Der Inhalt lässt sich gerade nicht laden",
             text: "Der Bot antwortet nicht oder Discord hat die Anfrage gebremst. Deine Einstellungen sind davon nicht betroffen.",
             hint: "Lade die Seite in einem Moment neu – bleibt es dabei, läuft der Bot vermutlich nicht.",
+            // Kam eine 500 mit Fehler-ID, hat der Bot den Fehler schon gemeldet: dann steht sie hier.
+            errorId: lastServerErrorId(),
         });
 
         return;
@@ -91,6 +95,9 @@ async function boot(): Promise<void> {
         (await import("./pages/Docu.js")).bindDocNav();
         return;
     }
+
+    // Die letzten Schritte für Fehlerberichte (Plan 24): ab hier, nie Eingaben.
+    installTrail();
 
     // Die öffentliche Rangliste steht ohne Anmeldung offen - sie fragt /api/me
     // gar nicht erst, sondern holt nur ihre eine Liste.
@@ -155,6 +162,7 @@ async function boot(): Promise<void> {
     renderProfile(data.user);
     buildUserUI(data.user);
     showMaintenance(data.maintenance, data.user.group);
+    installErrorReports(data.errorReports === true);
 
     // Das Postfach liegt beim Bot: einmal holen und danach im Hintergrund
     // nachsehen, damit man neue Meldungen auch ohne Neuladen mitbekommt.

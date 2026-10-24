@@ -1192,6 +1192,54 @@ async function checkMaps(): Promise<void> {
     check("Die Karten stehen nicht in git", (await readFile(path.join(process.cwd(), ".gitignore"), "utf8")).split(/\r?\n/).includes("src/dashboard/maps/"));
 }
 
+/** Die letzten Schritte und was gemeldet wird, ohne DOM (Plan 24, core/Trail.ts). */
+async function checkTrail(): Promise<void> {
+    console.log("\n  — Letzte Schritte im Dashboard —");
+
+    const trail = await import("../dashboard/client/core/Trail.js");
+
+    check("Pfad ohne Abfrage und Anker", trail.pathOnly("https://dashboard.nexus-emb.de/guild/1/levels?tab=2&code=geheim#oben") === "/guild/1/levels" && trail.pathOnly("/api/guild/1?x=1") === "/api/guild/1");
+    check("Beschriftung: eine Zeile, höchstens 40 Zeichen", trail.labelOf("  Speichern\n  ") === "Speichern" && trail.labelOf("x".repeat(60)).length === 40 && trail.labelOf("x".repeat(60)).endsWith("…"));
+
+    for (let index = 0; index < 14; index++) trail.remember(`Schritt ${index}`, new Date("2026-10-24T12:02:10Z"));
+
+    const steps = trail.steps();
+
+    check("Höchstens die letzten 10 Schritte, mit Uhrzeit", steps.length === 10 && steps[0].endsWith("Schritt 4") && steps[9].endsWith("Schritt 13") && /^\d{2}:\d{2}:\d{2} /.test(steps[0]), steps.join(" | "));
+
+    const named = (name: string, message: string) => Object.assign(new Error(message), { name });
+
+    check(
+        "Nicht gemeldet: Abbruch, Offline, fehlendes Code-Stück nach einem Deploy",
+        !trail.shouldReport(named("AbortError", "The operation was aborted.")) &&
+            !trail.shouldReport(new TypeError("Failed to fetch")) &&
+            !trail.shouldReport(new TypeError("NetworkError when attempting to fetch resource.")) &&
+            !trail.shouldReport(new TypeError("Failed to fetch dynamically imported module: https://x/assets/chunks/Guild-OLD.js")) &&
+            !trail.shouldReport(new TypeError("Importing a module script failed."))
+    );
+    check("Nicht gemeldet: Rauschen des Browsers (fremde Skripte, ResizeObserver)", !trail.shouldReport("Script error.") && !trail.shouldReport(new Error("ResizeObserver loop completed with undelivered notifications.")));
+    check("Gemeldet: ein echter Fehler im Code", trail.shouldReport(new TypeError("Cannot read properties of undefined (reading 'id')")) && trail.shouldReport("String statt Error"));
+    check("Schon gemeldet (500 mit Fehler-ID): nicht noch einmal", !trail.shouldReport(Object.assign(new Error("Internal Server Error"), { errorId: "NEXUS-1792841102-M2XD7K" })));
+    check(
+        "Browser kurz benannt",
+        trail.browserOf("Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:140.0) Gecko/20100101 Firefox/140.0") === "Firefox 140 · Windows" &&
+            trail.browserOf("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36") === "Chrome 141 · macOS" &&
+            trail.browserOf("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36 Edg/141.0.0.0") === "Edge 141 · Windows"
+    );
+
+    const source = await readFile(path.join(process.cwd(), "src", "dashboard", "client", "core", "Trail.ts"), "utf8");
+
+    check("Nie Eingaben: die Spur liest keine Werte aus Feldern", !/\.value\b/.test(source));
+
+    // Verdrahtet: Spur ab dem Start, Melden nach /api/me, Bereiche und Fehlerseite zeigen die ID.
+    const client = (file: string) => readFile(path.join(process.cwd(), "src", "dashboard", "client", file), "utf8");
+    const [app, guild, failure] = await Promise.all([client("app.ts"), client("pages/Guild.ts"), client("layout/Failure.ts")]);
+
+    check("app.ts: Spur beim Start, Melden mit dem Schalter aus /api/me", app.includes("installTrail()") && /installErrorReports\(data\.errorReports === true\)/.test(app) && /errorId: lastServerErrorId\(\)/.test(app));
+    check("Guild.ts: ein Bereich, der nicht lädt, meldet sich und zeigt die ID", /reportClientError\(\{ kind: "section"/.test(guild) && guild.includes("errorNote("));
+    check("Failure.ts: die Fehlerseite zeigt eine Fehler-ID, wenn es eine gibt", failure.includes("errorNote(failure.errorId"));
+}
+
 async function main(): Promise<void> {
     const client = new BotClient();
 
@@ -1211,6 +1259,7 @@ async function main(): Promise<void> {
     await checkErrorIds(client);
     await checkClientErrors(client);
     await checkMaps();
+    await checkTrail();
     checkShopStatus();
     checkSessions(client);
 
