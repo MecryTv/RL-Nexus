@@ -34,3 +34,16 @@ Pre-flight: Task 3 nutzt Task 1 (ErrorReports, Signatur) und Task 2 (WhereOf, Ex
 - Task 7: Ruling: Die Grenze (3 je 10 Minuten) wird jetzt vor dem Mailversand geprüft, auch wenn kein SMTP eingerichtet ist; ohne SMTP geht die Meldung allein als DM durch — kostet bei Irrtum: nichts.
 - Task 7: Ruling: Die DM sagt, ob die Mail rausging („Auch per Mail an …“ oder „Die Mail … ging nicht raus. Antworte über Discord.“) — so wissen die Devs, wo geantwortet werden muss — kostet bei Irrtum: nichts.
 - Task 7: complete (tests: check:guardian „Meldungen als DM“ 5 Prüfungen, RED (ReportExtras fehlt) → GREEN, mit und ohne DB; check:dashboard 0 FAIL, teams/admin/voice 0 FAIL, tsc 0, build 0)
+- Task 8: complete (Doku: docs/DevLogs.md Kapitel „Guardian“, docs/Dashboard.md „Fehlerberichte“, docs/Environment.md Guardian-Abschnitt und ERROR_REPORTS_BROWSER; AUFGABEN.md „Vor dem Livegang“)
+- Final review: frischer Reviewer (opus), 6 Important, 7 Minor. Fix-Runde wegen Budget (14 $) auf das beschränkt, was ab dem nächsten Update live wirkt.
+- Final: fixed #4 Meldungen ohne Anmeldung ohne DM-Grenze — check:guardian „Ohne Anmeldung: höchstens 20 DMs je Stunde …“ RED (21 DMs) → GREEN, „Die nächste DM sagt, wie viele nur per Mail kamen“ → GREEN
+- Final: fixed #5 Discord-IDs in Fehlerzeilen des Logs (Fehlerobjekt mit URL, Typ mit IDs) — check:guardian „Log: keine Discord-IDs in Fehlerzeilen“ RED auf dem alten Guardian → GREEN; Suite: guardian(db) 47/47, check:dashboard, check:teams 0 FAIL, tsc 0, build 0
+- Final: Ruling: #1 Translate erkennt app.js?v=… nicht (und braucht dann einen Versionsabgleich), #2 Firefox/Safari-Stacks ohne Kopfzeile verlieren den ersten Rahmen, #3 der Browser-Stack landet nirgends — NICHT behoben: wirkt erst mit ERROR_REPORTS_BROWSER=true, der Schalter ist aus; in AUFGABEN.md als Pflicht vor dem Einschalten — kostet bei Irrtum: wer den Schalter früher setzt, bekommt Browser-DMs mit „Wo: unbekannt“ oder falscher Zeile.
+- Final: Ruling: #6 „In DevLogs öffnen“ sucht nur im letzten Teil der Sitzung, 📮-IDs stehen nicht im Log — NICHT behoben (Budget), in AUFGABEN.md — kostet bei Irrtum: der Knopf findet ältere Fehler nicht, der Fehler steht trotzdem in der DM.
+- Final: minor (deferred): #7 Aufräumen löscht die Zeile auch, wenn das Löschen der DM scheiterte.
+- Final: minor (deferred): #8 Markdown aus Nutzereingaben (Meldung, Seite, Schritte) unmaskiert in den DMs an die Devs.
+- Final: minor (deferred): #9 Erledigt vor SetDms aktualisiert die DMs der anderen nicht; ein Datenbankfehler heißt „Schon erledigt“.
+- Final: minor (deferred): #10 „Kam wieder“ kann bei 📮-Meldungen mit gleichem Betreff erscheinen.
+- Final: minor (deferred): #11 „Version unbekannt“ im Image (kein git), getGitCommit und Excerpt laufen je Fehler vor dem Zusammenfassen.
+- Final: minor (deferred): #12 shouldReport-errorId greift nie; recentErrorIds ohne lastServerErrorId.
+- Final: minor (deferred): #13 Browser-„Wo“ nennt den Namen an der Spalte, nicht die umgebende Funktion.

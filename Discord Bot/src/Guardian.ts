@@ -119,6 +119,16 @@ export function Translate(stack: string, dir = DASHBOARD_MAPS): ITranslated {
     return { stack: lines.join("\n"), where, excerpt, missing };
 }
 
+/** Discord-IDs raus aus Logzeilen: Wer betroffen war, steht nur in der DM (Datenschutz, Plan 24). */
+export function Scrub(text: string): string {
+    return text.replace(/\d{17,20}/g, "<id>");
+}
+
+/** Ein Fehler als Text fürs Log: Stack statt Objekt, damit keine URL und kein Request-Inhalt mitkommt. */
+function LogText(value: unknown): string {
+    return Scrub(value instanceof Error ? (value.stack ?? `${value.name}: ${value.message}`) : String(value ?? "unbekannt"));
+}
+
 /** Woher ein Bericht kommt: Bot, Bot-Dashboard im Browser oder eine Meldung über „Fehler melden“. */
 export type ErrorKind = "bot" | "dashboard" | "report";
 
@@ -315,7 +325,7 @@ export default class Guardian implements IGuardian {
 
     private _initializeGlobalHandlers(): void {
         process.on("unhandledRejection", (reason) => {
-            logger.guardian("error", "Unhandled Rejection erfasst:", reason);
+            logger.guardian("error", "Unhandled Rejection erfasst:", LogText(reason));
 
             const error =
                 reason instanceof Error
@@ -326,7 +336,7 @@ export default class Guardian implements IGuardian {
         });
 
         process.on("uncaughtException", (err, origin) => {
-            logger.guardian("error", `Uncaught Exception erfasst: ${err}`, `Origin: ${origin}`);
+            logger.guardian("error", `Uncaught Exception erfasst: ${LogText(err)}`, `Origin: ${origin}`);
 
             this.ReportError(err, null, "Uncaught Exception")
                 .catch(() => {})
@@ -394,7 +404,7 @@ export default class Guardian implements IGuardian {
         const where = WhereOf(stack);
         const whereText = where ? `${where.file}:${where.line}${where.fn ? ` in ${where.fn}` : ""}` : "unbekannt";
 
-        logger.guardian("error", `Fehler gefunden [ID: ${errorId}] | Type: ${type}:`, error);
+        logger.guardian("error", `Fehler gefunden [ID: ${errorId}] | Type: ${Scrub(type)}:`, LogText(error));
 
         if (where) logger.guardian("error", `📍 Fehlerstelle: ${whereText}`);
 

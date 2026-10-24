@@ -38,6 +38,10 @@ export interface IReport extends IReportInput {
 
 const ERROR_ID = /^NEXUS-\d{10}-[A-HJ-NP-Z2-9]{6}$/;
 
+/** Meldungen ohne Anmeldung: so viele DMs je Stunde für alle zusammen, danach nur per Mail (Spec, „Entschieden“). */
+const ANON_DM_MAX = 20;
+const ANON_DM_WINDOW = 60 * 60 * 1000;
+
 /** Was das Dashboard automatisch mitschickt, geprüft: Browser und die letzten Fehler-IDs. */
 export function ReportExtras(body: Record<string, unknown>): Pick<IReport, "browser" | "errorIds"> {
     const ids = Array.isArray(body.errorIds) ? body.errorIds.filter((id): id is string => typeof id === "string" && ERROR_ID.test(id)) : [];
@@ -141,7 +145,11 @@ export default class ReportService {
         if (!this.Allow(key)) throw new ReportError("Du hast gerade schon mehrere Meldungen geschickt. Versuch es in ein paar Minuten noch einmal.", 429);
 
         const mailed = this.Ready ? await this.Mail(report) : false;
-        const direct = await this.client.guardian.Report(this.Info(report, mailed)).sent;
+        // Ohne Anmeldung zählt nur die IP: Wer Adressen wechselt, soll die DMs der Devs nicht fluten können.
+        const capped = report.user === null && !this.AnonymousSlot();
+        const direct = capped ? 0 : await this.client.guardian.Report(this.Info(report, mailed, report.user === null ? this.TakeMailOnly() : 0)).sent;
+
+        if (capped && mailed) this.mailOnly++;
 
         if (!mailed && direct === 0) {
             throw this.Ready ? new ReportError("Die Meldung ließ sich gerade nicht verschicken.", 502) : new ReportError("Der Mailversand ist noch nicht eingerichtet.", 503);
@@ -182,8 +190,32 @@ export default class ReportService {
         }
     }
 
-    /** Die DM 📮 an die Devs: Betreff als Titel, nie zusammengefasst. */
-    private Info(report: IReport, mailed: boolean) {
+    /** Zeitpunkte der DMs zu Meldungen ohne Anmeldung, und wie viele seitdem nur per Mail kamen. */
+    private anonymous: number[] = [];
+    private mailOnly = 0;
+
+    private AnonymousSlot(): boolean {
+        const now = Date.now();
+
+        this.anonymous = this.anonymous.filter((at) => now - at < ANON_DM_WINDOW);
+
+        if (this.anonymous.length >= ANON_DM_MAX) return false;
+
+        this.anonymous.push(now);
+
+        return true;
+    }
+
+    private TakeMailOnly(): number {
+        const count = this.mailOnly;
+
+        this.mailOnly = 0;
+
+        return count;
+    }
+
+    /** Die DM 📮 an die Devs: Betreff als Titel, nie zusammengefasst. skipped: Meldungen ohne Anmeldung, die nur per Mail kamen. */
+    private Info(report: IReport, mailed: boolean, skipped = 0) {
         const fields: [string, string][] = [["Text", report.message.slice(0, 1500)]];
 
         if (report.context) fields.push(["Wo und wie", report.context.slice(0, 600)]);
@@ -206,7 +238,12 @@ export default class ReportService {
             where: report.page ?? report.source,
             fields,
             excerpt: null,
-            note: mailed ? `Auch per Mail an ${REPORT_MAIL}.` : `Die Mail an ${REPORT_MAIL} ging nicht raus. Antworte über Discord.`,
+            note: [
+                mailed ? `Auch per Mail an ${REPORT_MAIL}.` : `Die Mail an ${REPORT_MAIL} ging nicht raus. Antworte über Discord.`,
+                skipped > 0 ? `${skipped} weitere ${skipped === 1 ? "Meldung" : "Meldungen"} ohne Anmeldung ${skipped === 1 ? "kam" : "kamen"} nur per Mail.` : "",
+            ]
+                .filter(Boolean)
+                .join(" "),
         };
     }
 }

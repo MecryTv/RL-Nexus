@@ -7,6 +7,7 @@
  * legt der Bot seine Tabellen selbst an.
  */
 import BotClient from "../client/BotClient";
+import logger from "../utils/logger";
 import { readFile } from "node:fs/promises";
 import { ReportError, ReportExtras } from "../services/ReportService";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
@@ -366,6 +367,48 @@ async function checkReports(client: BotClient): Promise<void> {
         (client.config as { DEV_USER_IDs: string[] }).DEV_USER_IDs = original.devs;
         delete (client.reportService as unknown as Record<string, unknown>).Ready;
     }
+
+    // Ohne Anmeldung höchstens 20 DMs je Stunde für alle zusammen, danach nur per Mail (Spec, „Entschieden“).
+    const anon = { ...report, user: null, errorIds: [] };
+    const queue = client.reportService as unknown as { anonymous: number[]; mailOnly: number };
+
+    (client.config as { DEV_USER_IDs: string[] }).DEV_USER_IDs = ["111"];
+    Object.defineProperty(client.reportService, "Ready", { configurable: true, get: () => true });
+    service.transport = { sendMail: async () => undefined };
+    mailWorks = true;
+    sent.length = 0;
+    users.fetch = async (id: string) => ({ id, send: async (message: { components?: { toJSON(): unknown }[] }) => (sent.push(JsonOf(message)), { id: String(next++), channelId: `dm-${id}` }) });
+    client.isReady = (() => true) as typeof client.isReady;
+
+    try {
+        for (let index = 0; index < 21; index++) await service.Send(anon, `check-anon-${Date.now()}-${index}`);
+        check("Ohne Anmeldung: höchstens 20 DMs je Stunde, danach nur per Mail", sent.length === 20, `${sent.length} DMs`);
+
+        queue.anonymous = queue.anonymous.map(() => Date.now() - 2 * 3_600_000);
+        sent.length = 0;
+        await service.Send(anon, `check-anon-${Date.now()}-x`);
+        check("Die nächste DM sagt, wie viele nur per Mail kamen", sent.length === 1 && sent[0].includes("1 weitere Meldung ohne Anmeldung kam nur per Mail."), sent[0]?.slice(-300));
+    } finally {
+        service.transport = original.transport;
+        users.fetch = original.users;
+        client.isReady = original.ready;
+        (client.config as { DEV_USER_IDs: string[] }).DEV_USER_IDs = original.devs;
+        delete (client.reportService as unknown as Record<string, unknown>).Ready;
+    }
+
+    // Keine Discord-IDs in Fehlerzeilen des Logs (Antwort des Betreibers Nr. 2): weder aus Meldung, Typ noch Stack.
+    const logged: string[] = [];
+    const guardianLog = logger.guardian.bind(logger);
+
+    (logger as unknown as { guardian: (...args: unknown[]) => void }).guardian = (...args: unknown[]) => void logged.push(args.map((arg) => (arg instanceof Error ? `${arg.stack}` : String(arg))).join(" "));
+
+    try {
+        await client.guardian.ReportError(Object.assign(new Error("Unknown Member 1059621019947634739"), { url: "/guilds/1059621019947634741/members/1059621019947634742" }), null, "Gespräch mit 1059621019947634740");
+    } finally {
+        (logger as unknown as { guardian: typeof guardianLog }).guardian = guardianLog;
+    }
+
+    check("Log: keine Discord-IDs in Fehlerzeilen", logged.length > 0 && logged.every((line) => !/\d{17,20}/.test(line)), logged.join(" | ").slice(0, 300));
 
     const form = await readFile(path.join(process.cwd(), "src", "dashboard", "client", "layout", "Report.ts"), "utf8");
 
