@@ -120,6 +120,8 @@ export interface IShopAccess {
     readonly beta?: boolean;
     /** Beta-Modus mit eingelöstem Code. Für die Anzeige „Beta“. */
     readonly betaMember?: boolean;
+    /** Die Datenbank antwortet nicht, und im Zweifel bleibt das Dashboard zu (AccessWithoutDatabase). */
+    readonly unchecked?: boolean;
 }
 
 /** Im Beta-Modus ohne Code herein (Plan 22). Partner braucht einen Code. */
@@ -158,6 +160,28 @@ const DAY_MS = 86_400_000;
 const BERLIN_DAY = new Intl.DateTimeFormat("de-DE", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "Europe/Berlin" });
 const ALLOWED: IShopAccess = { allowed: true, reason: "" };
 const VIA_SHOP: IShopAccess = { allowed: true, reason: "", viaShop: true };
+const UNCHECKED: IShopAccess = { allowed: false, reason: "Gerade lässt sich nicht prüfen, ob du Zugang hast. Versuch es in einer Minute noch einmal.", unchecked: true };
+
+/** Fehlt nur Spalte oder Tabelle (älteres Admin Dashboard ohne access_mode), gibt es kein Beta. Alles andere ist ein Aussetzer der Datenbank. */
+export function SchemaMissing(error: unknown): boolean {
+    const errno = (error as { errno?: unknown } | null)?.errno;
+
+    // ER_BAD_FIELD_ERROR und ER_NO_SUCH_TABLE.
+    return errno === 1054 || errno === 1146;
+}
+
+/**
+ * Zugang, wenn die Datenbank nicht antwortet (Entscheidung vom 24.10.2026). Bei
+ * Free und Paid wie bisher lieber offen als alle ausgesperrt. Die Beta aber ist
+ * eine Schranke: War sie zuletzt an, oder hat der Bot den Modus noch nie lesen
+ * können, bleibt das Dashboard im Zweifel zu. Administrator und Developer kommen
+ * immer herein.
+ */
+export function AccessWithoutDatabase(lastBeta: boolean | null, group: DashboardGroup | null): IShopAccess {
+    if (lastBeta === false || (group !== null && BETA_FREE.includes(group))) return ALLOWED;
+
+    return UNCHECKED;
+}
 
 /**
  * Läuft ein Zugang? Dieselbe Regel wie activeGrant im Admin-Server: Ein nicht
@@ -209,6 +233,11 @@ export function EscapeHtml(text: string): string {
  */
 export function LockPlaceholders(access: IShopAccess, betaError: string | null = null): Record<"REASON" | "HINT" | "GO_PATH" | "GO_TEXT" | "GO_CLASS", string> {
     const reason = EscapeHtml(access.reason);
+
+    // Die Datenbank antwortet nicht: weder Code-Feld noch Kauf, beides ginge gerade nicht.
+    if (access.unchecked) {
+        return { REASON: reason, HINT: '<p class="hintline">Deine Einstellungen sind davon nicht betroffen.</p>', GO_PATH: "/kontakt", GO_TEXT: "Support kontaktieren", GO_CLASS: "erract erract--go" };
+    }
 
     // Beta: ein Feld für den Code statt „Zugang holen“. text/plain, weil der Server sonst nur JSON liest - und die Seite kommt ohne Skript aus.
     if (access.beta) {
@@ -316,6 +345,8 @@ export default class DashboardService implements IDashboardService {
     private shopLoading = new Map<string, Promise<IShopAccess>>();
     private paywall: { readonly at: number; readonly on: boolean } | null = null;
     private betaMode: { readonly at: number; readonly on: boolean } | null = null;
+    /** Der zuletzt gelesene Beta-Modus, ohne Ablauf. null: noch nie gelesen. Gilt, wenn die Datenbank nicht antwortet. */
+    private lastBeta: boolean | null = null;
     private shopWarnedAt = 0;
 
     constructor(client: BotClient) {
@@ -578,13 +609,17 @@ export default class DashboardService implements IDashboardService {
                 access = ShopDecision({ paywall, group, banned: customer?.banned_at != null, grants, now: new Date() });
             }
         } catch (error) {
-            // Lieber offen als alle ausgesperrt. Nicht merken: Der nächste Aufruf versucht es wieder.
+            // Bei Free und Paid offen, in der Beta im Zweifel zu (AccessWithoutDatabase). Nicht
+            // merken: Der nächste Aufruf versucht es wieder. Developer stehen in der .env, nicht in der Datenbank.
+            const group = await this.GroupOf(userId).catch((): DashboardGroup | null => (this.client.config.DEV_USER_IDs.includes(userId) ? "developer" : null));
+            const fallback = AccessWithoutDatabase(this.lastBeta, group);
+
             if (Date.now() - this.shopWarnedAt > 60_000) {
                 this.shopWarnedAt = Date.now();
-                logger.warn(`Zugang aus dem Shop nicht lesbar, die Bezahlschranke bleibt offen: ${String(error)}`);
+                logger.warn(`Zugang aus dem Shop nicht lesbar, das Dashboard bleibt ${fallback.allowed ? "offen" : "im Zweifel zu (Beta)"}: ${String(error)}`);
             }
 
-            return ALLOWED;
+            return fallback;
         }
 
         this.shopAccess.set(userId, access, { ttl: access.allowed ? 60_000 : 10_000 });
@@ -597,31 +632,40 @@ export default class DashboardService implements IDashboardService {
         this.shopAccess.delete(userId);
     }
 
-    /** Beta-Modus (shop_settings.access_mode = 'beta'), eine Minute gemerkt. Ohne Datenbank, Tabelle oder Spalte: aus. */
+    /**
+     * Beta-Modus (shop_settings.access_mode = 'beta'), eine Minute gemerkt. Ohne
+     * eingerichtete Datenbank, Tabelle oder Spalte: aus. Ist die Datenbank
+     * eingerichtet, antwortet aber nicht, wirft es: LoadShopAccess entscheidet
+     * dann mit dem zuletzt gelesenen Stand.
+     */
     private async BetaMode(): Promise<boolean> {
         if (this.betaMode && Date.now() - this.betaMode.at < 60_000) return this.betaMode.on;
 
+        const db = this.client.databaseService;
         let on = false;
 
-        if (this.client.databaseService.Ready) {
+        if (db.IsConfigured) {
+            if (!db.Ready) throw new Error("Datenbank nicht verbunden");
+
             try {
-                const row = await this.client.databaseService.One<{ access_mode: string }>("SELECT access_mode FROM shop_settings WHERE id = 1");
+                const row = await db.One<{ access_mode: string }>("SELECT access_mode FROM shop_settings WHERE id = 1");
                 on = row?.access_mode === "beta";
-            } catch {
+            } catch (error) {
                 // Älterer Stand des Admin Dashboards ohne access_mode: kein Beta.
-                on = false;
+                if (!SchemaMissing(error)) throw error;
             }
         }
 
         this.betaMode = { at: Date.now(), on };
+        this.lastBeta = on;
 
         return on;
     }
 
     /**
      * Hat die Person einen Beta-Code eingelöst? Ein Datenbankfehler geht nach
-     * oben: LoadShopAccess lässt dann herein, ohne es zu merken - wie bei der
-     * Bezahlschranke lieber offen als einen Tester wegen eines Aussetzers aussperren.
+     * oben: LoadShopAccess sperrt dann im Zweifel, ohne es zu merken - der
+     * nächste Aufruf fragt wieder (Entscheidung vom 24.10.2026).
      */
     private async BetaMember(userId: string): Promise<boolean> {
         return (await this.client.databaseService.One<{ user_id: string }>("SELECT user_id FROM beta_members WHERE user_id = ?", [userId])) != null;
@@ -663,7 +707,8 @@ export default class DashboardService implements IDashboardService {
 
         if (access.allowed) return list;
         // Beta-Modus ohne Code: auch kein Guardian. Herein kommt nur, wer einen Code hat.
-        if (access.beta) return [];
+        // Dasselbe, wenn sich das gerade nicht prüfen lässt.
+        if (access.beta || access.unchecked) return [];
 
         const kept: IDashboardGuild[] = [];
 
@@ -699,7 +744,7 @@ export default class DashboardService implements IDashboardService {
         const access = await this.ShopAccess(userId);
 
         if (access.allowed) return true;
-        if (access.beta) return false;
+        if (access.beta || access.unchecked) return false;
 
         const owner = this.OwnerOf(guildId);
 

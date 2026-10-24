@@ -1544,6 +1544,12 @@ body[data-page="guild"]{--shell:1440px}
    ist, wie dort. */
 .modlead{margin:-4px 0 18px;max-width:72ch;font-size:13.5px;color:var(--text-2)}
 .modnote{margin-bottom:16px}
+/* Ein Abschnitt, dessen Code nicht kam (Guild.ts, notLoaded): Satz links,
+   Neu laden rechts, auf dem Handy darunter. */
+.notice--reload{align-items:center;flex-wrap:wrap}
+.notice--reload > span{flex:1 1 180px}
+.notice--reload svg{margin-top:0}
+.notice--reload .btn{flex:none}
 .modlist{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:8px}
 .modlist .acct{margin-top:0;align-items:flex-start}
 .modlist .acct__mark{margin-top:2px}
@@ -1629,8 +1635,10 @@ body[data-page="guild"]{--shell:1440px}
 .col{display:flex;align-items:flex-end;justify-content:center;height:100%}
 .col i{display:block;width:min(24px,72%);background:var(--bar);border-radius:4px 4px 0 0}
 .col:hover i{filter:brightness(1.25)}
-/* Aufgeteilt: Beitritte nach oben, Abgaenge nach unten, die Null in der Mitte. */
-.col--split{display:grid;grid-template-rows:1fr 1fr;align-items:stretch}
+/* Aufgeteilt: Beitritte nach oben, Abgaenge nach unten, die Null in der Mitte.
+   Die Spalte braucht ihre Breite selbst: sonst richtet sie sich nach den
+   Balken, die Balken nach ihr, und beide werden 0. */
+.col--split{display:grid;grid-template-rows:1fr 1fr;grid-template-columns:minmax(0,1fr);align-items:stretch}
 .col--split > span{display:flex;justify-content:center}
 .col--split > span:first-child{align-items:flex-end}
 .col--split > span:last-child{align-items:flex-start}

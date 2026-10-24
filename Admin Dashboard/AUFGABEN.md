@@ -27,6 +27,47 @@ Reihenfolge: P1 vor P2 vor P3 vor P4. Bei gleicher Priorität gilt die Reihenfol
   - Webseite: `npm run check`, `lint`, `build`.
   - Bekannte Ausreißer: Im Admin `check:db` scheitert „Kontaktformular“. Im Bot `check:db` scheitern zwei Gruppen-Tests wegen lokaler Daten.
 
+## Gerade in Arbeit
+
+- **[P1] Wartungsmodus als Umbau, Brainstorm läuft, ich warte auf deine Antworten.**
+  - **Entschieden (24.10.):**
+    - Der Schalter liegt in der Datenbank.
+    - Die Webseite zeigt die Wartung selbst, als eigene Ansicht in der App. Sie fragt beim Laden und jede Minute nach, wie heute bei „Preise“. Kontaktformular und Shop sperrt das Admin Dashboard.
+    - Das Bot-Dashboard liest selbst aus der Datenbank. Administrator und Developer kommen trotzdem herein.
+    - Beim Einschalten lassen sich Grund und voraussichtliches Ende angeben, auf Wunsch schaltet sich die Wartung zur Endzeit selbst ab.
+  - **Entwürfe:** https://claude.ai/artifact/5s6bsQjLumT6hut3jwyQsE (privat)
+  - **Offene Fragen** (stehen auch unten auf der Entwurfsseite): Bildschirm A oder B, Hinweis-Streifen für Admin und Dev, Schnellwahl-Zeiten, Haken „automatisch beenden“ standardmäßig an, Grund und Endzeit auch auf Statusseite und in der Discord-Meldung.
+- **Danach:** Brainstorm „Fehler melden“. Entschieden sind: alle drei Arten (Knopf „Fehler melden“, Fehlerseiten im Dashboard, Fehler im Bot auf Discord), mit Code-Zeile und allem Nötigen, Versand per DM an die Dev-User.
+
+## Erledigt in dieser Sitzung (Cloud, 23. und 24.10.)
+
+- **[P1] Beta Access bei Datenbankfehler: im Zweifel sperren** (Entscheidung und Freigabe von `DashboardService.ts` am 24.10.):
+  - **Neues Verhalten:**
+    - Antwortet die eingerichtete Datenbank nicht und war Beta zuletzt an, sehen alle die Sperrseite: „Gerade lässt sich nicht prüfen, ob du Zugang hast. Versuch es in einer Minute noch einmal.“ Darunter steht „Deine Einstellungen sind davon nicht betroffen.“ und der Weg zum Support. Ein Code-Feld gibt es nicht, weil Einlösen ohne Datenbank auch scheitert.
+    - Dasselbe gilt, wenn der Bot während eines Ausfalls startet und den Modus noch nie lesen konnte.
+    - Der Guardian-Weg über einen Owner mit Zugang bleibt in diesem Fall ebenfalls zu.
+  - **Wer trotzdem reinkommt:** Developer (aus der `.env`) immer. Administratoren, solange ihre Gruppe noch im Cache liegt.
+  - **Was gleich bleibt:**
+    - Free und Paid lassen bei einem Aussetzer weiterhin alle herein.
+    - Ist gar keine Datenbank eingerichtet (lokal), bleibt alles offen.
+    - Fehlen nur Spalte oder Tabelle (älteres Admin Dashboard), ist Beta aus.
+  - **Tests:** sieben neue Prüfungen in `check:dashboard`. Dazu kommt der Test „Beta aus, wenn die Spalte fehlt“ aus dem Kleinkram. Der alte Test „Aussetzer sperrt niemanden aus“ prüft jetzt das neue Verhalten.
+  - **Geprüft:** `check:dashboard`, `check:teams`, `check:admin`, `check:voice`, `tsc --noEmit` und `build` sind grün.
+
+- **[P1] Übersicht: Beitritte und Abgänge fehlen im Graphen:**
+  - **Ursache:** Die Daten waren immer da, das Problem lag im CSS. Die geteilten Säulen (Beitritte nach oben, Abgänge nach unten) sind ein Grid ohne eigene Spaltenbreite. Die Spalte richtete sich nach dem Balken, der Balken (`width: min(24px, 72%)`) nach der Spalte, und beide wurden 0 Pixel breit. Chat und Voice nutzen keine geteilten Säulen, deshalb lief es dort.
+  - **Behebung:** eine Zeile in `style.css` (`.col--split` bekommt `grid-template-columns: minmax(0,1fr)`), von dir freigegeben. `GuildOverview.ts` und die Activity-Dateien sind unverändert.
+  - **Test:** neue Prüfung in `check:dashboard` („Geteilte Saeulen … haben eine Spaltenbreite“): erst rot, jetzt grün. Im Browser nachgemessen: Balken vorher 0 px breit, jetzt 23 px.
+  - **Geprüft:** `check:dashboard`, `check:teams`, `check:admin`, `check:voice`, `tsc --noEmit` und `build` sind grün.
+
+- **[P1] Backups im Bot-Dashboard laden nicht:**
+  - **Ursache:** Das Dashboard lädt den Code eines Abschnitts erst beim ersten Öffnen nach. Jeder `npm run build` und jeder Deploy löscht die alten Code-Stücke unter `assets/chunks`. Wer die Seite vorher offen hatte, bekommt beim ersten Klick auf „Backups“ einen Ladefehler. `Guild.ts` hat diesen Fehler verschluckt (`void import(...)`). Deshalb gab es weder eine Ladeanzeige noch eine Meldung. Nachgestellt in Chromium, das Bild war dasselbe wie auf deinen Screenshots. In der Konsole stand: „Failed to fetch dynamically imported module“.
+  - **Betroffen** waren alle 39 Abschnitte, die so nachladen, nicht nur die Backups.
+  - **Behebung:** `whenShown` in `Guild.ts` fängt den Fehler ab. In der Karte steht dann „Dieser Bereich lässt sich nicht laden, vermutlich weil das Dashboard inzwischen aktualisiert wurde. Lade die Seite neu.“ und daneben der Knopf „Neu laden“. Der Knopf führt zurück auf denselben Abschnitt. Dazu kommen drei Zeilen in `style.css`, die die Meldung auch am Handy ordentlich umbrechen.
+  - **Test:** neue Prüfung in `check:dashboard` („Abschnitte melden, wenn ihr Code nicht laedt“): erst rot (39 Abschnitte), jetzt grün.
+  - **Geprüft:** `check:dashboard`, `check:teams`, `check:admin`, `check:voice`, `tsc --noEmit` und `build` sind grün. Sichtprüfung bei 1400 und 390 px Breite.
+  - **Für dich:** Wenn bei dir „Backups“ noch leer bleibt, lade die Seite einmal neu. Bleibt sie danach leer oder kommt eine Meldung, schick mir bitte die Browser-Konsole.
+
 ## Erledigt (23. und 24.10.)
 
 - **Plan 20, Free und Paid Access:**
@@ -57,7 +98,8 @@ Reihenfolge: P1 vor P2 vor P3 vor P4. Bei gleicher Priorität gilt die Reihenfol
 
 ## Offen
 
-### [P1] Backups im Bot-Dashboard laden nicht
+### [P1, erledigt 23.10. abends] Backups im Bot-Dashboard laden nicht
+- **Stand:** behoben, siehe „Erledigt in dieser Sitzung“ oben.
 - **Projekt:** Bot (Bot-Dashboard), eventuell Admin Dashboard
 - **Was passiert:** Unter „Backups“ und „Meine Backups“ steht nur der Text der Karte, kein Inhalt. Es gibt keine Fehlermeldung und keine Ladeanzeige (Bilder 1 und 2 vom 23.10.).
 - **Hinweise:**
@@ -68,7 +110,8 @@ Reihenfolge: P1 vor P2 vor P3 vor P4. Bei gleicher Priorität gilt die Reihenfol
   - Danach prüfen, ob `ADMIN_INTERNAL_URL` gesetzt ist.
 - **Freigaben:** Die Plan-19-Dateien sind freigegeben.
 
-### [P1] Übersicht: Beitritte und Abgänge fehlen im Graphen
+### [P1, erledigt 24.10.] Übersicht: Beitritte und Abgänge fehlen im Graphen
+- **Stand:** behoben, siehe „Erledigt in dieser Sitzung“ oben.
 - **Projekt:** Bot (Bot-Dashboard, Server-Übersicht)
 - **Was passiert:** Die Kacheln zeigen „10 Beitritte · 7 Tage, 2 Abgänge“, der Graph „Beitritte und Abgänge pro Tag“ bleibt aber leer (Bild 3).
 - **Hinweise:**
@@ -89,10 +132,31 @@ Reihenfolge: P1 vor P2 vor P3 vor P4. Bei gleicher Priorität gilt die Reihenfol
     - Ist die nginx-Konfiguration mit den Wartungsregeln wirklich aktiv?
   - Danach festlegen, ob der Bot selbst (Bot-Dashboard) die Wartung auch ohne nginx zeigen soll.
 - **Offene Frage:** Wo hast du es getestet, lokal oder auf dem Server?
+- **Antwort (24.10.):** auf dem Server.
+- **Befund im Repo (24.10.):** Im Code passt die Kette zusammen. Das Admin Dashboard schreibt nach `/data/flags`, das ist auf dem Host `/home/rlnexus/data/flags`. Der Container der Webseite liest denselben Ordner als `/srv/flags`, und nginx auf dem Host schaut fürs Bot-Dashboard in `/home/rlnexus/data/flags`. Wahrscheinlich läuft auf dem Server eine ältere nginx-Konfiguration:
+  - **Webseite:** `website.conf` ist als einzelne Datei in den Container eingehängt. `unzip -o` legt die Datei neu an, und nginx liest seine Konfiguration nur beim Start. Das Update laut `docs/Hosting.md` startet nur den Bot neu (`up -d --build bot`), der Container `rlnexus-website` läuft also mit dem alten Stand weiter.
+  - **Bot-Dashboard:** Die Vorlage unter `nginx/` wird laut `docs/Hosting.md` einmal nach `/etc/nginx/sites-available/` kopiert. Kam die Wartungsregel später dazu, fehlt sie dort.
+- **Bitte auf dem Server ausführen**, nachdem du die Wartung im Admin Dashboard angeschaltet hast (das Ergebnis kannst du mir einfach schicken):
+  ```bash
+  ls -la /home/rlnexus/data/flags/                                          # Liegen wartung-webseite / wartung-dashboard da?
+  docker exec rlnexus-website ls -la /srv/flags                               # Sieht der Container der Webseite die Datei?
+  docker exec rlnexus-website grep -c wartung /etc/nginx/conf.d/default.conf  # 0 = alte Konfiguration im Container
+  sudo nginx -T 2>/dev/null | grep -c "wartung-dashboard"                     # 0 = Host-nginx ohne Wartungsregel
+  sudo -u www-data test -f /home/rlnexus/data/flags/wartung-dashboard && echo sichtbar || echo unsichtbar
+  curl -sI https://nexus-emb.de | head -1; curl -sI https://dashboard.nexus-emb.de | head -1   # erwartet: 503
+  ```
+- **Behebung je nach Ergebnis:**
+  - Webseite mit alter Konfiguration: `cd /home/rlnexus && docker compose -f docker-compose.prod.yml up -d --force-recreate website`
+  - Host-nginx ohne Regel: `sudo cp /home/rlnexus/nginx/dashboard.nexus-emb.de.conf /etc/nginx/sites-available/dashboard.nexus-emb.de`. Danach die Zeilen, die certbot ergänzt hat (Port 443, Zertifikat), wieder eintragen, sonst `sudo certbot --nginx -d dashboard.nexus-emb.de` erneut ausführen. Zum Schluss `sudo nginx -t && sudo systemctl reload nginx`.
+  - `unsichtbar` bei www-data: `sudo chmod o+x /home/rlnexus /home/rlnexus/data` und `sudo chmod o+rx /home/rlnexus/data/flags`.
+- **Vorschlag fürs Repo:** In `docs/Hosting.md` beim Update ergänzen, dass nach einer Änderung unter `nginx/` der Container der Webseite neu erstellt und die Host-Vorlage neu kopiert wird. Die Datei ist nicht freigegeben, deshalb habe ich nichts geändert.
+- **Noch zu entscheiden:** Soll das Bot-Dashboard die Wartung auch selbst zeigen, ohne nginx? Dann würde es auch lokal wirken und hinge nicht an der Host-Konfiguration.
+- **Entschieden (24.10.):** Der Schalter soll in die Datenbank, und Webseite und Bot-Dashboard lesen ihn dort und zeigen die Wartung direkt. Das wird ein Umbau mit Brainstorm, Spec und Plan.
 
 ### [P1] Fehler genauer beschreiben und an die Devs schicken
 - **Projekt:** noch offen (Bot-Dashboard hat „Fehler melden“ in der Fußzeile: `src/dashboard/client/layout/Report.ts`, `POST /api/report`)
 - **Was gewünscht ist:** Fehler genauer beschreiben und an die Devs schicken.
+- **Geklärt (24.10.):** alle drei Arten, also der Knopf „Fehler melden“, die Fehlerseiten im Bot-Dashboard und Fehler im Bot auf Discord. Mitgehen sollen die Code-Zeile und alles, was hilft. Versand per DM an die Dev-User.
 - **Offene Fragen, vor dem Bauen klären:**
   - Welche Fehler sind gemeint? Die Fehlerseiten des Bot-Dashboards, Fehler im Bot auf Discord oder Meldungen von Nutzern über „Fehler melden“?
   - Wohin sollen sie gehen? Postfach im Admin Dashboard, ein Discord-Kanal oder Mail?
@@ -102,6 +166,7 @@ Reihenfolge: P1 vor P2 vor P3 vor P4. Bei gleicher Priorität gilt die Reihenfol
 - **Projekt:** Bot
 - **Stand:** Antwortet die Datenbank nicht, gilt Beta im Bot als aus, bis zu einer Minute lang. Dann käme jeder ins Bot-Dashboard. So war es geplant („lieber offen als alle ausgesperrt“), passt aber schlecht zu „Sicherheitsschranke“.
 - **Entscheiden:** offen lassen wie jetzt, oder im Zweifel sperren (dann sieht bei einem Datenbank-Aussetzer jeder die Sperrseite).
+- **Entschieden (24.10.):** im Zweifel sperren, auch wenn der Stand unbekannt ist. **Erledigt 24.10.**, siehe oben.
 
 ### [P2] Apply System: Webseite oder Discord
 - **Projekt:** Bot (Modul Bewerbungen), Webseite
@@ -162,7 +227,7 @@ Reihenfolge: P1 vor P2 vor P3 vor P4. Bei gleicher Priorität gilt die Reihenfol
   - Beim Rate-Limit (10 Versuche je 10 Minuten) kommt die allgemeine Fehlerseite statt eines Satzes über dem Feld. Das braucht eine Änderung in `src/Server.ts` und damit eine Freigabe.
   - Das interne Limit im Admin (60 je Minute) teilen sich alle Nutzer.
   - Die Geschenk-Mail verspricht im Beta-Modus „Zugang zum Bot-Dashboard“, ins Bot-Dashboard kommt man dann aber nur mit Beta-Code.
-  - Test fehlt: „Beta aus, wenn die Spalte fehlt“.
+  - ~~Test fehlt: „Beta aus, wenn die Spalte fehlt“.~~ Erledigt am 24.10. (`SchemaMissing` in `check:dashboard`).
 - **Aus Plan 19 (Backup-Modul):**
   - Die Plan-Einstellungen zeigen kurz nicht gespeicherte Werte.
   - „Nächstes“ mischt Browser-Zeitzone und Berliner Stunde.

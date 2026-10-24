@@ -233,61 +233,61 @@ export function renderGuild(data: IPayload): void {
     // erst, wenn sein Abschnitt das erste Mal offen ist - Code und Abfragen.
     if (!supportOnly) {
         void renderOverview(guild, data.user.id, waiting.activity);
-        whenShown(["gallery"], () => void import("./GuildGallery.js").then((module) => module.renderGallery(guild.id, guild.canManage)));
-        whenShown(["backups"], () => void import("./GuildBackups.js").then((module) => module.renderBackups(guild.id)));
-        whenShown(["meine-backups"], () => void import("./GuildBackups.js").then((module) => module.renderBackupList(guild.id)));
-        whenShown(["tickets"], () => void import("./GuildTickets.js").then((module) => module.renderTickets(guild.id, guild.canManage, user)));
+        whenShown(["gallery"], () => import("./GuildGallery.js").then((module) => module.renderGallery(guild.id, guild.canManage)));
+        whenShown(["backups"], () => import("./GuildBackups.js").then((module) => module.renderBackups(guild.id)));
+        whenShown(["meine-backups"], () => import("./GuildBackups.js").then((module) => module.renderBackupList(guild.id)));
+        whenShown(["tickets"], () => import("./GuildTickets.js").then((module) => module.renderTickets(guild.id, guild.canManage, user)));
 
-        if (guild.canManage) whenShown(["team"], () => void import("./GuildTeam.js").then((module) => module.renderTeam(guild.id)));
+        if (guild.canManage) whenShown(["team"], () => import("./GuildTeam.js").then((module) => module.renderTeam(guild.id)));
 
         // RL 6Mans: Einstellungen und die Live-Ansicht.
-        whenShown(["rl-6mans"], () => void import("./GuildSixMans.js").then((module) => module.renderSixMans(guild.id)));
-        whenShown(["sixmans-live"], () => void import("./GuildSixMans.js").then((module) => module.renderSixMansLive(guild.id)));
-        whenShown(["sixmans-board"], () => void import("./GuildSixMans.js").then((module) => module.renderSixMansBoard(guild.id)));
+        whenShown(["rl-6mans"], () => import("./GuildSixMans.js").then((module) => module.renderSixMans(guild.id)));
+        whenShown(["sixmans-live"], () => import("./GuildSixMans.js").then((module) => module.renderSixMansLive(guild.id)));
+        whenShown(["sixmans-board"], () => import("./GuildSixMans.js").then((module) => module.renderSixMansBoard(guild.id)));
 
         // Matchups: die Grundlagen und die Partien selbst.
-        whenShown(["matchups"], () => void import("./GuildMatchups.js").then((module) => module.renderMatchups(guild.id)));
-        whenShown(["matchup-list"], () => void import("./GuildMatchups.js").then((module) => module.renderMatchupList(guild.id)));
-        whenShown(["matchup-all"], () => void import("./GuildMatchups.js").then((module) => module.renderMatchupAll(guild.id)));
+        whenShown(["matchups"], () => import("./GuildMatchups.js").then((module) => module.renderMatchups(guild.id)));
+        whenShown(["matchup-list"], () => import("./GuildMatchups.js").then((module) => module.renderMatchupList(guild.id)));
+        whenShown(["matchup-all"], () => import("./GuildMatchups.js").then((module) => module.renderMatchupAll(guild.id)));
 
         // Looking for: die Grundlagen, dazu je Seite Fragen, Beitrag und Anfragen.
-        whenShown(["lft"], () => void import("./GuildLft.js").then((module) => module.renderLft(guild.id)));
-        whenShown(["lft-player"], () => void import("./GuildLft.js").then((module) => module.renderLftPlayer(guild.id)));
-        whenShown(["lft-team"], () => void import("./GuildLft.js").then((module) => module.renderLftTeam(guild.id)));
-        whenShown(["lft-requests"], () => void import("./GuildLft.js").then((module) => module.renderLftRequests(guild.id)));
+        whenShown(["lft"], () => import("./GuildLft.js").then((module) => module.renderLft(guild.id)));
+        whenShown(["lft-player"], () => import("./GuildLft.js").then((module) => module.renderLftPlayer(guild.id)));
+        whenShown(["lft-team"], () => import("./GuildLft.js").then((module) => module.renderLftTeam(guild.id)));
+        whenShown(["lft-requests"], () => import("./GuildLft.js").then((module) => module.renderLftRequests(guild.id)));
 
         // RL Team-Uebersicht: die Teams selbst und ihre Anzeige im Kanal.
-        whenShown(["teams"], () => void import("./GuildTeams.js").then((module) => module.renderTeams(guild.id)));
-        whenShown(["team-board"], () => void import("./GuildTeams.js").then((module) => module.renderTeamBoard(guild.id)));
-        whenShown(["rank-roles"], () => void import("./GuildRankRoles.js").then((module) => module.renderRankRoles(guild.id)));
-        whenShown(["clips"], () => void import("./GuildClips.js").then((module) => module.renderClips(guild.id)));
-        whenShown(["clip-messages"], () => void import("./GuildClips.js").then((module) => module.renderClipMessages(guild.id)));
-        whenShown(["clip-blocked"], () => void import("./GuildClips.js").then((module) => module.renderClipBlocked(guild.id)));
-        whenShown(["clip-archive"], () => void import("./GuildClips.js").then((module) => module.renderClipArchive(guild.id)));
+        whenShown(["teams"], () => import("./GuildTeams.js").then((module) => module.renderTeams(guild.id)));
+        whenShown(["team-board"], () => import("./GuildTeams.js").then((module) => module.renderTeamBoard(guild.id)));
+        whenShown(["rank-roles"], () => import("./GuildRankRoles.js").then((module) => module.renderRankRoles(guild.id)));
+        whenShown(["clips"], () => import("./GuildClips.js").then((module) => module.renderClips(guild.id)));
+        whenShown(["clip-messages"], () => import("./GuildClips.js").then((module) => module.renderClipMessages(guild.id)));
+        whenShown(["clip-blocked"], () => import("./GuildClips.js").then((module) => module.renderClipBlocked(guild.id)));
+        whenShown(["clip-archive"], () => import("./GuildClips.js").then((module) => module.renderClipArchive(guild.id)));
 
         // Community-Module: Code und Abfragen kommen erst, wenn der Abschnitt aufgeht.
-        whenShown(["welcome"], () => void import("./GuildWelcome.js").then((module) => module.renderWelcome(guild.id)));
-        whenShown(["custom-message"], () => void import("./GuildMessages.js").then((module) => module.renderMessages(guild.id)));
-        whenShown(["levels"], () => void import("./GuildLevels.js").then((module) => module.renderLevels(guild.id)));
-        whenShown(["leaderboard"], () => void import("./GuildLeaderboard.js").then((module) => module.renderLeaderboard(guild.id)));
-        whenShown(["voice-hub"], () => void import("./GuildVoice.js").then((module) => module.renderVoice(guild.id)));
-        whenShown(["twitch-notifier"], () => void import("./GuildStreams.js").then((module) => module.renderStreams(guild.id, "twitch")));
-        whenShown(["youtube-notifier"], () => void import("./GuildStreams.js").then((module) => module.renderStreams(guild.id, "youtube")));
-        whenShown(["polls"], () => void import("./GuildPolls.js").then((module) => module.renderPolls(guild.id)));
-        whenShown(["giveaways"], () => void import("./GuildGiveaways.js").then((module) => module.renderGiveaways(guild.id)));
-        whenShown(["logging"], () => void import("./GuildLogging.js").then((module) => module.renderLogging(guild.id)));
-        whenShown(["automod"], () => void import("./GuildAutoMod.js").then((module) => module.renderAutoMod(guild.id)));
-        whenShown(["reaction-roles"], () => void import("./GuildSelfRoles.js").then((module) => module.renderSelfRoles(guild.id)));
+        whenShown(["welcome"], () => import("./GuildWelcome.js").then((module) => module.renderWelcome(guild.id)));
+        whenShown(["custom-message"], () => import("./GuildMessages.js").then((module) => module.renderMessages(guild.id)));
+        whenShown(["levels"], () => import("./GuildLevels.js").then((module) => module.renderLevels(guild.id)));
+        whenShown(["leaderboard"], () => import("./GuildLeaderboard.js").then((module) => module.renderLeaderboard(guild.id)));
+        whenShown(["voice-hub"], () => import("./GuildVoice.js").then((module) => module.renderVoice(guild.id)));
+        whenShown(["twitch-notifier"], () => import("./GuildStreams.js").then((module) => module.renderStreams(guild.id, "twitch")));
+        whenShown(["youtube-notifier"], () => import("./GuildStreams.js").then((module) => module.renderStreams(guild.id, "youtube")));
+        whenShown(["polls"], () => import("./GuildPolls.js").then((module) => module.renderPolls(guild.id)));
+        whenShown(["giveaways"], () => import("./GuildGiveaways.js").then((module) => module.renderGiveaways(guild.id)));
+        whenShown(["logging"], () => import("./GuildLogging.js").then((module) => module.renderLogging(guild.id)));
+        whenShown(["automod"], () => import("./GuildAutoMod.js").then((module) => module.renderAutoMod(guild.id)));
+        whenShown(["reaction-roles"], () => import("./GuildSelfRoles.js").then((module) => module.renderSelfRoles(guild.id)));
     }
 
-    whenShown(["transcriptions"], () => void import("./GuildTranscripts.js").then((module) => module.renderTranscripts(guild.id)));
+    whenShown(["transcriptions"], () => import("./GuildTranscripts.js").then((module) => module.renderTranscripts(guild.id)));
 
-    if (guild.canManage) whenShown(["apply"], () => void import("./GuildApply.js").then((module) => module.renderApply(guild.id)));
-    if (guild.canManage || guild.canReview) whenShown(["applications"], () => void import("./GuildApply.js").then((module) => module.renderApplications(guild.id)));
-    if (guild.canModerate) whenShown(["moderation"], () => void import("./GuildModeration.js").then((module) => module.renderModeration(guild.id)));
+    if (guild.canManage) whenShown(["apply"], () => import("./GuildApply.js").then((module) => module.renderApply(guild.id)));
+    if (guild.canManage || guild.canReview) whenShown(["applications"], () => import("./GuildApply.js").then((module) => module.renderApplications(guild.id)));
+    if (guild.canModerate) whenShown(["moderation"], () => import("./GuildModeration.js").then((module) => module.renderModeration(guild.id)));
     else maybe<HTMLElement>("#modNote")?.removeAttribute("hidden");
     // Live Tickets meldet fertige Transcripts - der Stream läuft auch, wenn nur Transcriptions offen ist.
-    whenShown(["live-tickets", "transcriptions"], () => void import("./GuildLive.js").then((module) => module.renderLive(guild.id, user)));
+    whenShown(["live-tickets", "transcriptions"], () => import("./GuildLive.js").then((module) => module.renderLive(guild.id, user)));
 
     void waiting.detail.then((detail) => {
         paintDetails(detail);
@@ -316,8 +316,12 @@ export function renderGuild(data: IPayload): void {
  * Startet einen Abschnitt, sobald eine seiner Karten zum ersten Mal sichtbar
  * ist. Bis dahin lädt weder sein Code noch fragt er beim Bot nach - wer nur die
  * Übersicht ansieht, lädt keinen Ticket-Editor.
+ *
+ * Kommt der Code nicht an, steht das in der Karte. Meist war es ein neuer Bau:
+ * Der löscht die alten Stücke, die eine länger offene Seite noch nachladen
+ * will. Ohne die Zeile bliebe die Karte leer, ohne Ladeanzeige und ohne Fehler.
  */
-function whenShown(ids: string[], start: () => void): void {
+function whenShown(ids: string[], start: () => Promise<unknown>): void {
     const sections = ids.map((id) => maybe<HTMLElement>(`#${id}`)).filter((section): section is HTMLElement => section !== null);
     let started = false;
 
@@ -325,12 +329,35 @@ function whenShown(ids: string[], start: () => void): void {
         if (started || sections.every((section) => section.hidden)) return;
 
         started = true;
-        start();
+        start().catch((error: unknown) => {
+            console.error(`Abschnitt ${ids.join(", ")} lädt nicht:`, error);
+
+            for (const section of sections) notLoaded(section);
+        });
     };
 
     for (const section of sections) new MutationObserver(check).observe(section, { attributes: true, attributeFilter: ["hidden"] });
 
     check();
+}
+
+/** Die Zeile in einer Karte, deren Code nicht kam. Der leere Link lädt genau diese Adresse neu. */
+function notLoaded(section: HTMLElement): void {
+    // Transcriptions startet zwei Abschnitte: eine Zeile reicht.
+    if (section.querySelector(".notice--reload")) return;
+
+    const box = document.createElement("div");
+    const text = document.createElement("span");
+    const again = document.createElement("a");
+
+    box.className = "notice modnote notice--reload";
+    box.setAttribute("role", "alert");
+    text.textContent = "Dieser Bereich lässt sich nicht laden, vermutlich weil das Dashboard inzwischen aktualisiert wurde. Lade die Seite neu.";
+    again.className = "btn btn--quiet";
+    again.href = "";
+    again.append(icon("#i-refresh"), "Neu laden");
+    box.append(icon("#i-warn"), text, again);
+    section.append(box);
 }
 
 // Den markierten Eintrag in den sichtbaren Teil der Leiste holen: bei einem Link

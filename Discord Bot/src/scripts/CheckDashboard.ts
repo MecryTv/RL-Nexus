@@ -22,7 +22,20 @@ import { MODULE_IDS, PERMANENT_MODULES } from "../constants/Modules";
 import { AdminStatus, AskAdmin, BackupCall } from "../routes/DashboardApiBackups";
 import { DASHBOARD_HOME, DASHBOARD_PATH, DISCORD_EPOCH, OAUTH_SCOPES, SESSION_COOKIE } from "../constants/Dashboard";
 import IDashboardSession from "../interfaces/services/dashboard/IDashboardSession";
-import DashboardService, { BETA_ERRORS, BetaGate, DisplayGroup, LockPlaceholders, MfaRequired, ShopDecision, ShopStatusLines, type IShopGrantRow, type IShopStatusRow } from "../services/DashboardService";
+import DashboardService, {
+    AccessWithoutDatabase,
+    BETA_ERRORS,
+    BetaGate,
+    DisplayGroup,
+    EscapeHtml,
+    LockPlaceholders,
+    MfaRequired,
+    SchemaMissing,
+    ShopDecision,
+    ShopStatusLines,
+    type IShopGrantRow,
+    type IShopStatusRow,
+} from "../services/DashboardService";
 import { CodeFromForm, RedeemAtAdmin } from "../routes/DashboardBeta";
 import IDashboardGuild, { DashboardRole } from "../interfaces/services/dashboard/IDashboardGuild";
 import { DashboardGroup } from "../interfaces/services/dashboard/IDashboardUser";
@@ -730,6 +743,31 @@ async function checkBeta(client: BotClient): Promise<void> {
     check("Sperrseite im Beta-Modus: der Fehler steht über dem Feld", LockPlaceholders({ allowed: false, reason: "x", beta: true }, BETA_ERRORS.falsch).HINT.includes(`role="alert">${BETA_ERRORS.falsch}`));
     check("Sperrseite im Beta-Modus: der Fehler wird maskiert", LockPlaceholders({ allowed: false, reason: "x", beta: true }, "<b>").HINT.includes("&lt;b&gt;"));
 
+    // Antwortet die Datenbank nicht, bleibt die Beta im Zweifel zu (Entscheidung vom 24.10.2026).
+    // Free und Paid bleiben offen wie bisher, Administrator und Developer kommen immer herein.
+    const betaWasOn = AccessWithoutDatabase(true, "testphase");
+    const unknown = AccessWithoutDatabase(null, null);
+
+    check("Datenbank weg, Beta war an: gesperrt, ohne Code-Feld", betaWasOn.allowed === false && betaWasOn.unchecked === true && betaWasOn.beta !== true, JSON.stringify(betaWasOn));
+    check("Datenbank weg, Modus noch nie gelesen: gesperrt", unknown.allowed === false && unknown.unchecked === true, JSON.stringify(unknown));
+    check("Datenbank weg bei Free oder Paid: offen wie bisher", AccessWithoutDatabase(false, "testphase").allowed && AccessWithoutDatabase(false, null).allowed);
+    check(
+        "Datenbank weg: Administrator und Developer kommen herein",
+        AccessWithoutDatabase(true, "administrator").allowed && AccessWithoutDatabase(null, "developer").allowed && !AccessWithoutDatabase(true, "partner").allowed
+    );
+
+    const unchecked = LockPlaceholders(betaWasOn);
+
+    check(
+        "Sperrseite ohne Datenbank: kein Code-Feld, kein Kauf",
+        !unchecked.HINT.includes("<form") && unchecked.GO_PATH === "/kontakt" && unchecked.REASON === EscapeHtml(betaWasOn.reason),
+        JSON.stringify(unchecked)
+    );
+    check(
+        "Beta aus, wenn Spalte oder Tabelle fehlt (älteres Admin Dashboard), sonst ist es ein Aussetzer",
+        SchemaMissing({ errno: 1054 }) && SchemaMissing({ errno: 1146 }) && !SchemaMissing({ errno: 45028 }) && !SchemaMissing(new Error("ECONNREFUSED")) && !SchemaMissing(null)
+    );
+
     check(
         "Code aus dem Formular (text/plain)",
         CodeFromForm("code=NXB-7KQ4-M2XD\r\n") === "NXB-7KQ4-M2XD" && CodeFromForm("code= nxb 7kq4 \r\n") === "nxb 7kq4" && CodeFromForm({ code: "x" }) === "" && CodeFromForm("") === ""
@@ -780,6 +818,13 @@ async function checkBeta(client: BotClient): Promise<void> {
     try {
         check("Beta gesperrt: keine Server, auch nicht als Guardian", (await service.Paywalled("person", [card("B", "Moderator")])).length === 0);
         check("Beta gesperrt: auch Bewerbungen und Transcripts nicht", !(await service.GuildAllowed("person", "B")));
+
+        // Ohne Datenbank im Zweifel zu: auch dann kein Guardian, sonst käme man über den Owner herein.
+        service.ShopAccess = async (userId: string) => (userId === "tester" ? { allowed: true, reason: "", betaMember: true } : { allowed: false, reason: "x", unchecked: true });
+        check(
+            "Datenbank weg in der Beta: auch kein Guardian über einen Owner mit Zugang",
+            (await service.Paywalled("person", [card("B", "Moderator"), card("C", "Admin")])).length === 0 && !(await service.GuildAllowed("person", "B"))
+        );
     } finally {
         service.ShopAccess = savedAccess;
         service.OwnerOf = savedOwner;
@@ -790,11 +835,13 @@ async function checkBeta(client: BotClient): Promise<void> {
     const savedOne = db.One;
     const savedGroupOf = service.GroupOf.bind(service);
     const readyOf = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(client.databaseService), "Ready");
-    const internals = service as unknown as { betaMode: unknown; paywall: unknown };
+    const configuredOf = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(client.databaseService), "IsConfigured");
+    const internals = service as unknown as { betaMode: unknown; paywall: unknown; lastBeta: unknown };
     let membersDown = false;
 
     Object.defineProperty(client.databaseService, "Ready", { configurable: true, get: () => true });
-    service.GroupOf = async () => "testphase";
+    Object.defineProperty(client.databaseService, "IsConfigured", { configurable: true, get: () => true });
+    service.GroupOf = async (userId: string) => (userId === "1059621019947634744" ? "developer" : "testphase");
     db.One = async (sql: string, values: unknown[] = []) => {
         if (sql.includes("access_mode")) return { access_mode: "beta" };
         if (sql.includes("paywall")) return { paywall: 0 };
@@ -813,18 +860,42 @@ async function checkBeta(client: BotClient): Promise<void> {
 
         membersDown = true;
         const blip = await service.ShopAccess("1059621019947634743");
+        const developer = await service.ShopAccess("1059621019947634744");
 
         check("Beta mit Datenbank: Tester herein und als Beta erkennbar", member.allowed && member.betaMember === true, JSON.stringify(member));
         check("Beta mit Datenbank: ohne Code gesperrt", !stranger.allowed && stranger.beta === true, JSON.stringify(stranger));
-        check("Beta mit Datenbank: Aussetzer beim Nachschlagen sperrt niemanden aus", blip.allowed === true && blip.beta !== true, JSON.stringify(blip));
+        // Bis zum 24.10. ließ ein Aussetzer jeden herein. Jetzt bleibt die Beta im Zweifel zu.
+        check("Beta mit Datenbank: Aussetzer beim Nachschlagen sperrt im Zweifel", blip.allowed === false && blip.unchecked === true, JSON.stringify(blip));
+        check("Beta mit Datenbank: beim Aussetzer kommen Developer trotzdem herein", developer.allowed === true, JSON.stringify(developer));
+
+        // Paid gelesen, danach fällt die Datenbank ganz aus: offen wie bisher.
+        db.One = async (sql: string) => {
+            if (sql.includes("access_mode")) return { access_mode: "paid" };
+            if (sql.includes("paywall")) return { paywall: 1 };
+            throw new Error("Datenbank weg");
+        };
+        internals.betaMode = null;
+        internals.paywall = null;
+        await service.ShopAccess("1059621019947634745");
+        db.One = async () => {
+            throw new Error("Datenbank weg");
+        };
+        internals.betaMode = null;
+        internals.paywall = null;
+        const paidDown = await service.ShopAccess("1059621019947634746");
+
+        check("Paid gelesen, dann Datenbank weg: offen wie bisher", paidDown.allowed === true, JSON.stringify(paidDown));
     } finally {
         db.One = savedOne;
         service.GroupOf = savedGroupOf;
         delete (client.databaseService as unknown as Record<string, unknown>).Ready;
+        delete (client.databaseService as unknown as Record<string, unknown>).IsConfigured;
         if (readyOf) Object.defineProperty(Object.getPrototypeOf(client.databaseService), "Ready", readyOf);
+        if (configuredOf) Object.defineProperty(Object.getPrototypeOf(client.databaseService), "IsConfigured", configuredOf);
         internals.betaMode = null;
         internals.paywall = null;
-        for (const id of ["1059621019947634741", "1059621019947634742", "1059621019947634743"]) service.ForgetAccess(id);
+        internals.lastBeta = null;
+        for (const id of ["1059621019947634741", "1059621019947634742", "1059621019947634743", "1059621019947634744", "1059621019947634745", "1059621019947634746"]) service.ForgetAccess(id);
     }
 
     const foreign = await fetch(`${BASE}${P}/beta`, { method: "POST", headers: { "Content-Type": "text/plain", "Sec-Fetch-Site": "cross-site" }, body: "code=NXB-2222-2222", ...MANUAL });
@@ -1104,6 +1175,28 @@ async function main(): Promise<void> {
         clientLimit === MAX_IMAGE_BYTES,
         `Dashboard: ${clientLimit} | Bot: ${MAX_IMAGE_BYTES}`
     );
+
+    // Ein Abschnitt laedt seinen Code erst beim ersten Oeffnen. Nach einem neuen
+    // Bau sind die alten Stuecke weg: Wer die Seite offen hatte, sah nur die
+    // leere Karte, ohne Ladeanzeige und ohne Fehler (Backups, 23.10.). whenShown
+    // meldet das nur, wenn jeder Start sein import() zurueckgibt.
+    const guildCode = await readFile(path.join(CLIENT, "pages", "Guild.ts"), "utf8");
+    const swallowed = [...guildCode.matchAll(/whenShown\(\[([^\]]*)\], \(\) => void /g)].map((match) => match[1]);
+
+    check(
+        "Abschnitte melden, wenn ihr Code nicht laedt (kein void import in whenShown)",
+        swallowed.length === 0 && /\.catch\(/.test(/function whenShown[\s\S]*?\n}\n/.exec(guildCode)?.[0] ?? ""),
+        swallowed.join(" | ")
+    );
+
+    // Beitritte nach oben, Abgaenge nach unten: die Saeule ist ein Grid. Ohne
+    // eigene Spaltenbreite schrumpft die Spalte auf die Breite der Balken, und
+    // die haengt wieder an der Spalte - beides wird 0, der Graph bleibt leer,
+    // waehrend die Kacheln die Zahlen zeigen (Uebersicht, 23.10.).
+    const styles = await readFile(path.join(process.cwd(), "src", "dashboard", "public", "assets", "style.css"), "utf8");
+    const splitRule = /\.col--split\{([^}]*)\}/.exec(styles)?.[1] ?? "";
+
+    check("Geteilte Saeulen (Beitritte und Abgaenge) haben eine Spaltenbreite", /grid-template-columns:\s*minmax\(0,\s*1fr\)/.test(splitRule), splitRule);
 
     // Die Platzhalter der Ticket-Nachrichten kennt der Bot; das Dashboard fuehrt
     // dieselbe Liste mit Beschriftung und Beispiel. Fehlt dort einer, bietet der
