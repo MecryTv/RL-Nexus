@@ -200,6 +200,7 @@ Reihenfolge: P1 vor P2 vor P3 vor P4. Bei gleicher Priorität gilt die Reihenfol
 - **Lösung:** Passt die Liste nicht, schreibt der Bot darunter weitere Nachrichten im selben Stil. Getrennt wird nur zwischen Teams. Kopf in der ersten, alles nach `{teams}` in der letzten Nachricht. Wird die Liste kürzer, löscht er überzählige. Die IDs stehen in den Modul-Einstellungen, ohne Datenbank-Änderung.
 - **Gebaut:** `TeamListParts` (Liste je Team), `PackParts` und `BoardViews` (Verteilung und Nachrichten), `Publish` und `Withdraw` mit mehreren Nachrichten (`messageId` + `moreIds`). Gilt für Components V2, Embed und reinen Text. 17 neue Prüfungen in `check:teams` (Verteilung, 16 Teams mit je vier Spielern, Embed, Bearbeiten/Löschen/Neusenden im Kanal, Einsammeln). Alle Bot-Prüfungen, `tsc` und Build grün. Doku: `docs/Teams.md`.
 - **Auf dem Server prüfen:** Übersicht einmal neu senden. Bei vielen Teams stehen dann mehrere Nachrichten untereinander.
+- **Nachtrag (24.10.), erledigt:** Braucht die Übersicht mehrere Nachrichten, sagt das Dashboard nach dem Senden, dass „Je Team eine eigene Nachricht“ oder das Auswahlmenü bei so vielen Teams aufgeräumter wirkt (`PublishText` in `constants/TeamList.ts`, angezeigt in `GuildTeams.ts`, freigegeben 24.10.). Mit Test in `check:teams`.
 - **Reihenfolge:** direkt nach Plan 23 (Wartung), vor der Server-Übersicht.
 - **Projekt:** Bot (Modul RL Team-Übersicht, Discord-Nachricht „Unsere Teams“)
 - **Was passiert:** Bei vielen Teams stößt die Nachricht an das Zeichenlimit von Discord. Die Liste bricht mitten in einer Zeile ab (`<@1…`), darunter steht nur noch „…“ (Bild 3 vom 24.10.).
@@ -207,6 +208,7 @@ Reihenfolge: P1 vor P2 vor P3 vor P4. Bei gleicher Priorität gilt die Reihenfol
 - **Hinweise:** Discord erlaubt 4096 Zeichen in der Beschreibung eines Embeds und 6000 Zeichen über alle Embeds einer Nachricht, bis zu 10 Embeds. Jede Erwähnung (`<@…>`) kostet rund 21 Zeichen, auch wenn sie kurz aussieht. Ideen für den Brainstorm: ein Embed je Team oder je Gruppe von Teams, mehrere Nachrichten, wenn es nicht in eine passt, oder Components V2. Dazu kürzere Zeilen (Tracker-Link nicht ausgeschrieben).
 
 ### [P1, neu 24.10.] Server-Übersicht: Seitenleiste wird bei vielen Modulen unübersichtlich
+- **Stand (24.10.): Brainstorm läuft.** Du hast mir die Lösung überlassen, ich zeige einen Vorschlag mit Entwürfen.
 - **Reihenfolge:** nach der RL Team-Übersicht.
 - **Projekt:** Bot (Bot-Dashboard, Seitenleiste der Server-Ansicht)
 - **Was passiert:** Mit vielen aktiven Modulen wird die Seitenleiste lang und schwer zu überblicken: viele Gruppen, Unterpunkte, man muss scrollen (Bild 2 vom 24.10.).
@@ -253,6 +255,7 @@ Reihenfolge: P1 vor P2 vor P3 vor P4. Bei gleicher Priorität gilt die Reihenfol
   - Nachdem man den Bot eingeladen hat, aktualisiert sich das Dashboard von selbst, und man kommt direkt ins Server-Dashboard.
   - Staff (Administrator und Developer) kann fremde Server voll bearbeiten, also Module an- und ausschalten und alles einstellen.
   - **Neu (24.10.):** Öffnet Administrator oder Developer einen fremden Server, auf dem sie selbst nicht sind, sehen sie oben, wem der Server gehört: Owner mit Name und Bild, dazu was zum Server gehört (Mitglieder, seit wann der Bot drauf ist, aktive Module). So ist klar, wessen Server man gerade bearbeitet.
+  - **Neu (24.10.), Zustimmung des Owners:** Will Administrator oder Developer einen fremden Server bearbeiten, bekommt der Owner im Dashboard eine Anfrage. Erst wenn er sie annimmt, geht das Bearbeiten. Im Brainstorm klären: wie lange die Freigabe gilt, ob der Owner sie zurückziehen kann, ob er zusätzlich eine DM bekommt und was Staff bis dahin sieht (nur lesen?).
 - **Hinweise:** Heute sehen Administrator und Developer fremde Server nur (`DashboardService.IsStaff`). Im Brainstorm klären, was genau „und alles“ umfasst und ob Änderungen durch Staff dem Owner angezeigt oder protokolliert werden.
 
 ### [P3] Neues Modul „Rollen-Übersicht“

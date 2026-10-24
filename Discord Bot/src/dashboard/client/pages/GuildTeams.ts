@@ -28,7 +28,7 @@ import {
     TEAM_MEMBER_PLACEHOLDERS,
     TEAM_PLAYER_FIELDS,
 } from "../constants/Placeholders.js";
-import { IListTeam, ITeamListPreset, ITeamListSettings, TEAM_LIST_PRESETS, TeamListText } from "../../../constants/TeamList.js";
+import { IListTeam, ITeamListPreset, ITeamListSettings, PublishText, TEAM_LIST_PRESETS, TeamListText } from "../../../constants/TeamList.js";
 import { DefaultTeamOrder, IOrderFacts, ITeamOrder, OrderTeams, TEAM_ORDER_BY, TEAM_ORDER_DIRECTIONS, TEAM_ORDER_LABELS } from "../../../constants/TeamOrder.js";
 import { presetBar } from "../layout/Templates.js";
 import { clickSound } from "../core/Sound.js";
@@ -1615,13 +1615,13 @@ function mount(guildId: string, view: "teams" | "board"): void {
         publish.addEventListener("click", async () => {
             publish.disabled = true;
 
-            const answer = await call<{ sent: number }>("", { action: "publish" });
+            const answer = await call<{ sent: number; layout: string }>("", { action: "publish" });
 
             publish.disabled = false;
 
             if (!answer) return;
 
-            toast("info", "Steht im Kanal", `${answer.sent} Nachricht${answer.sent === 1 ? "" : "en"} geschrieben.`);
+            toast("info", "Steht im Kanal", PublishText(answer.layout, answer.sent));
             void reload();
         });
 

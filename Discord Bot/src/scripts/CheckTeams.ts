@@ -18,7 +18,7 @@ import { ChannelType, ComponentType, Guild, GuildBasedChannel, PermissionFlagsBi
 import { ICustomView } from "../builder/CustomView";
 import BotClient from "../client/BotClient";
 import { BoardText, BoardView, BoardViews, ChannelsText, PackParts, LeaguesText, LineupText, PLAYER_FIELDS, PlayerKey, PlayerList, PlayerValues, RoleValues, RosterText, StaffText, TeamMenuRow, TeamValues, ListTeams, Formats } from "../builder/TeamView";
-import { DefaultTeamList, MEMBER_FIELDS, TEAM_LIST_PRESETS, TeamListText } from "../constants/TeamList";
+import { DefaultTeamList, MEMBER_FIELDS, PublishText, TEAM_LIST_PRESETS, TeamListText } from "../constants/TeamList";
 import { CardsInOrder, DefaultTeamOrder, ITeamOrder, OrderTeams } from "../constants/TeamOrder";
 import { Fill } from "../constants/Placeholders";
 import { DIVISIONS, RankFromMMR, RankShort, RankText, TIERS } from "../constants/Prime";
@@ -1468,6 +1468,14 @@ async function checkLongBoard(client: BotClient): Promise<void> {
         embeds.length > 1 && embeds.every((text) => text.length <= 4000) && mentions.every((mention) => embeds.join("\n").includes(mention)),
         embeds.map((text) => text.length).join(", ")
     );
+
+    // Nach dem Senden sagt das Dashboard, wenn die Liste mehrere Nachrichten braucht, und was aufgeräumter wirkt.
+    check(
+        "Nach dem Senden: bei mehreren Nachrichten ein Tipp zu Karten oder Auswahlmenü",
+        PublishText("single", 3).includes("3 Nachrichten") && PublishText("single", 3).includes("„Je Team eine eigene Nachricht“") && PublishText("single", 3).includes("Auswahlmenü"),
+        PublishText("single", 3)
+    );
+    check("Nach dem Senden: eine Nachricht oder Karten ohne Tipp", PublishText("single", 1) === "1 Nachricht geschrieben." && PublishText("cards", 5) === "5 Nachrichten geschrieben.", `${PublishText("single", 1)} | ${PublishText("cards", 5)}`);
 
     // Im Kanal: aus einer Nachricht werden mehrere, dann gleich viele, dann weniger.
     const stored: ITeamSettings = { ...settings, channelId: TEXT, messageId: "100" };

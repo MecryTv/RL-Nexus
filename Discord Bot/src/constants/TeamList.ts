@@ -206,3 +206,16 @@ export function TeamListParts(teams: IListTeam[], groups: { id: number; name: st
 export function TeamListText(teams: IListTeam[], groups: { id: number; name: string }[], list: ITeamListSettings): string {
     return TeamListParts(teams, groups, list).join("\n") || "Noch keine Teams.";
 }
+
+/**
+ * Was das Dashboard nach „Übersicht senden“ sagt. Braucht {teams} mehrere
+ * Nachrichten (BoardViews), kommt ein Tipp dazu: Bei so vielen Teams wirken
+ * Karten oder das Auswahlmenü aufgeräumter als eine lange Liste.
+ */
+export function PublishText(layout: string, sent: number): string {
+    const written = `${sent} Nachricht${sent === 1 ? "" : "en"} geschrieben.`;
+
+    if (layout !== "single" || sent < 2) return written;
+
+    return `Die Liste war zu lang für eine Nachricht und steht jetzt in ${sent} Nachrichten untereinander. Bei so vielen Teams wirkt „Je Team eine eigene Nachricht“ oder das Auswahlmenü aufgeräumter. Umstellen kannst du das unter Kanal & Darstellung.`;
+}
