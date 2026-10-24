@@ -1,4 +1,5 @@
 import { randomBytes } from "node:crypto";
+import { BrowserReportsOn } from "../constants/Report";
 import { FastifyRequest } from "fastify";
 import { escapeMarkdown } from "discord.js";
 import { LRUCache } from "lru-cache";
@@ -678,7 +679,8 @@ export default class DashboardService implements IDashboardService {
         // Free, Zugang aus dem Shop, Guardian oder Testphase (siehe DisplayGroup).
         user.group = DisplayGroup(user.group, await this.ShopAccess(session.userId), guilds, await this.Paywall());
 
-        return { user, guilds, inviteURL: this.InviteURL(), maintenance };
+        // errorReports: Meldet das Dashboard Fehler von selbst? (Plan 24, Schalter in constants/Report.ts)
+        return { user, guilds, inviteURL: this.InviteURL(), maintenance, errorReports: BrowserReportsOn() };
     }
 
     /** Zugang laut Shop, mit Cache. Wirft nie: Kann der Bot die Tabellen nicht lesen, bleibt die Schranke offen. */

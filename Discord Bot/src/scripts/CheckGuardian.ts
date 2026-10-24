@@ -10,7 +10,8 @@ import BotClient from "../client/BotClient";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { DoneJson, ErrorCard, ErrorSignature, Excerpt, IErrorInfo, NewErrorId, WhereOf } from "../Guardian";
+import { build } from "esbuild";
+import { DoneJson, ErrorCard, ErrorSignature, Excerpt, IErrorInfo, NewErrorId, Translate, WhereOf } from "../Guardian";
 
 let failures = 0;
 
@@ -85,6 +86,52 @@ async function checkWhere(): Promise<void> {
 
         check("Ausschnitt: aus der Karte, wenn src/ fehlt", mapped === "2   zwei\n3 › drei\n4   vier", JSON.stringify(mapped));
         check("Ausschnitt: ohne Datei und Karte nichts", Excerpt("src/events/Gibtsnicht.ts", 3, root) === null);
+    } finally {
+        await rm(root, { recursive: true, force: true });
+    }
+}
+
+/* ----------------------------------------------------------
+   Browser-Stacks zurückübersetzen
+   ---------------------------------------------------------- */
+async function checkTranslate(): Promise<void> {
+    console.log("\n  — Browser-Stacks zurückübersetzen —");
+
+    // Wie im echten Build: Quellen unter client/, Ausgabe unter public/assets, Karten danach in maps/.
+    const root = await mkdtemp(path.join(tmpdir(), "karten-"));
+
+    try {
+        await mkdir(path.join(root, "client", "pages"), { recursive: true });
+        await writeFile(path.join(root, "client", "pages", "Boom.ts"), "export function boom(value: number): number {\n    const doubled = value * 2;\n    if (doubled > 10) throw new Error(\"zu groß\");\n    return doubled;\n}\n");
+
+        const result = await build({
+            entryPoints: [path.join(root, "client", "pages", "Boom.ts")],
+            bundle: true,
+            minify: true,
+            format: "esm",
+            sourcemap: "external",
+            sourcesContent: true,
+            outdir: path.join(root, "public", "assets", "chunks"),
+            write: false,
+        });
+        const js = result.outputFiles.find((file) => file.path.endsWith(".js"))!.text;
+        const map = result.outputFiles.find((file) => file.path.endsWith(".map"))!.text;
+        const column = js.indexOf("throw") + 1;
+
+        await mkdir(path.join(root, "maps", "chunks"), { recursive: true });
+        await writeFile(path.join(root, "maps", "chunks", "Boom-ABC123.js.map"), map);
+
+        const stack = `Error: zu groß\n    at a (https://dashboard.nexus-emb.de/assets/chunks/Boom-ABC123.js:1:${column})\n    at https://dashboard.nexus-emb.de/assets/app.js:1:10`;
+        const translated = Translate(stack, path.join(root, "maps"));
+
+        check("Browser-Stack: Zeile in der .ts statt im verkleinerten Bündel", translated.where?.file === "src/dashboard/client/pages/Boom.ts" && translated.where.line === 3 && !translated.missing, JSON.stringify(translated.where));
+        check("Browser-Stack: Ausschnitt aus der Karte", translated.excerpt?.includes("3 › ") === true && translated.excerpt.includes("throw new Error"), translated.excerpt ?? "null");
+        check("Browser-Stack: der übersetzte Stack nennt die Quelle", translated.stack.includes("src/dashboard/client/pages/Boom.ts:3"), translated.stack);
+
+        const old = Translate(stack.replace("Boom-ABC123", "Boom-ALT999"), path.join(root, "maps"));
+
+        check("Alter Tab nach einem Deploy: Karte fehlt, der Stack bleibt, wie er kam", old.missing && old.where === null && old.stack.includes("Boom-ALT999.js:1:"), JSON.stringify(old).slice(0, 200));
+        check("Kaputte Eingabe wirft nicht", Translate("Unsinn ohne Rahmen", path.join(root, "maps")).where === null);
     } finally {
         await rm(root, { recursive: true, force: true });
     }
@@ -274,6 +321,7 @@ async function main(): Promise<void> {
 
     checkIds();
     await checkWhere();
+    await checkTranslate();
     checkCards();
 
     if (await client.databaseService.Connect()) {

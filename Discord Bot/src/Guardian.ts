@@ -1,6 +1,7 @@
 import path from "path";
 import { randomInt } from "node:crypto";
 import { readFileSync } from "node:fs";
+import { SourceMap } from "node:module";
 import { ButtonInteraction, ChatInputCommandInteraction, ComponentType, Interaction, MessageFlags } from "discord.js";
 import BotClient from "./client/BotClient";
 import IGuardian from "./interfaces/services/guardian/IGuardian";
@@ -18,6 +19,105 @@ const REPEAT_WINDOW = 10 * 60 * 1000;
 
 /** So viel vom Stack passt in eine Nachricht, ohne sie zu sprengen. */
 const STACK_LIMIT = 1200;
+
+/** Die Karten des Dashboards: außerhalb von public/, damit niemand die Quellen abrufen kann (BuildDashboard.ts). */
+const DASHBOARD_MAPS = path.join(process.cwd(), "src", "dashboard", "maps");
+
+/** Geladene Karten je Datei, null: gibt es nicht. Klein gehalten, nach einem Deploy kommen neue Namen. */
+const MAPS = new Map<string, { map: SourceMap; contents: Map<string, string> } | null>();
+
+/** „../../client/pages/Guild.ts“ aus der Karte wird „src/dashboard/client/pages/Guild.ts“. */
+function DashboardSource(source: string): string {
+    const clean = source.replace(/^file:\/\//, "").replace(/\\/g, "/");
+    const at = clean.lastIndexOf("client/");
+
+    return at === -1 ? clean.replace(/^(\.\.\/)+/, "") : `src/dashboard/${clean.slice(at)}`;
+}
+
+function LoadMap(file: string, dir: string): { map: SourceMap; contents: Map<string, string> } | null {
+    const key = `${dir}|${file}`;
+
+    if (MAPS.has(key)) return MAPS.get(key) ?? null;
+    if (MAPS.size > 100) MAPS.clear();
+
+    let loaded: { map: SourceMap; contents: Map<string, string> } | null = null;
+
+    // Nur Namen aus dem Build: Buchstaben, Ziffern, Punkt, Bindestrich und ein Unterordner.
+    if (/^[\w-]+(?:\/[\w.-]+)?\.js$/.test(file)) {
+        try {
+            const payload = JSON.parse(readFileSync(path.join(dir, `${file}.map`), "utf8")) as { sources: string[]; sourcesContent?: (string | null)[] };
+            const contents = new Map(payload.sources.map((source, index) => [DashboardSource(source), payload.sourcesContent?.[index] ?? ""] as const));
+
+            loaded = { map: new SourceMap(payload as never), contents };
+        } catch {
+            loaded = null;
+        }
+    }
+
+    MAPS.set(key, loaded);
+
+    return loaded;
+}
+
+export interface ITranslated {
+    /** Der Stack mit Quelle und Zeile, wo eine Karte half, sonst wie er kam. */
+    stack: string;
+    where: IWhere | null;
+    excerpt: string | null;
+    /** Zum ersten Rahmen fehlt die Karte: ein alter Tab nach einem Deploy. */
+    missing: boolean;
+}
+
+/**
+ * Übersetzt einen Stack aus dem Browser mit den Karten des Builds zurück auf
+ * die Dateien unter `src/dashboard/client`. Fehlt eine Karte, bleibt der
+ * Rahmen, wie er kam. Wirft nie.
+ */
+export function Translate(stack: string, dir = DASHBOARD_MAPS): ITranslated {
+    let where: IWhere | null = null;
+    let excerpt: string | null = null;
+    let missing = false;
+    let first = true;
+
+    const lines = stack.split("\n").map((line, index) => {
+        const frame = index === 0 ? null : line.match(/^(.*?)(?:https?:\/\/[^\s)]*?)?\/assets\/([\w./-]+?\.js):(\d+):(\d+)(\)?)\s*$/);
+
+        if (!frame) return line;
+
+        const [, before, file, row, column, close] = frame;
+        const loaded = LoadMap(file, dir);
+
+        if (first) {
+            first = false;
+            missing = loaded === null;
+        }
+
+        if (!loaded) return line;
+
+        try {
+            const entry = loaded.map.findEntry(Number(row) - 1, Number(column) - 1) as { originalSource?: string; originalLine?: number; originalColumn?: number; name?: string };
+
+            if (entry.originalSource === undefined || entry.originalLine === undefined) return line;
+
+            const source = DashboardSource(entry.originalSource);
+            const original = entry.originalLine + 1;
+
+            if (!where) {
+                where = { file: source, line: original, fn: entry.name ?? null };
+
+                const content = loaded.contents.get(source);
+
+                excerpt = content ? Lines(content, original) : null;
+            }
+
+            return `${before}${source}:${original}:${(entry.originalColumn ?? 0) + 1}${close}`;
+        } catch {
+            return line;
+        }
+    });
+
+    return { stack: lines.join("\n"), where, excerpt, missing };
+}
 
 /** Woher ein Bericht kommt: Bot, Bot-Dashboard im Browser oder eine Meldung über „Fehler melden“. */
 export type ErrorKind = "bot" | "dashboard" | "report";

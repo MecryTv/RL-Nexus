@@ -29,3 +29,6 @@ card-check-stale.png
 
 # Clips der Woche: gesicherte Videos je Runde samt runde.json
 /clips
+
+# Source Maps des Dashboards: nur beim Bot, nie öffentlich (Plan 24)
+src/dashboard/maps/

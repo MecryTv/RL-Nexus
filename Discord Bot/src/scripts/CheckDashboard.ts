@@ -1137,6 +1137,61 @@ async function checkErrorIds(client: BotClient): Promise<void> {
     check("Ein 404 hat keine Fehler-ID", missing.status === 404 && !(await missing.text()).includes("Fehler-ID"));
 }
 
+/** Fehler aus dem Browser: Route mit Schalter und Grenzen (Plan 24). */
+async function checkClientErrors(client: BotClient): Promise<void> {
+    console.log("\n  — Fehler aus dem Browser —");
+
+    const service = client.dashboardService;
+    const session = service.Sign({ id: "browser-fehler", userId: "1059621019947634752", username: "Check", avatar: null, accessToken: "egal", mfa: true, expiresAt: Date.now() + 60_000 });
+    const headers = { "Content-Type": "application/json", "Sec-Fetch-Site": "same-origin", Cookie: `${SESSION_COOKIE}=${encodeURIComponent(session)}` };
+    const report = (body: Record<string, unknown>, extra: Record<string, string> = {}) =>
+        fetch(`${BASE}${P}/api/report/error`, { ...MANUAL, method: "POST", headers: { ...headers, ...extra }, body: JSON.stringify(body) });
+    const sample = (message: string) => ({ kind: "error", message, stack: `Error: ${message}\n    at a (https://x/assets/app.js:1:10)`, page: "/guild/1/levels", steps: ["14:02:10 Seite /guild/1/levels"], browser: "Firefox 140", screen: "1920×1080" });
+    const before = process.env.ERROR_REPORTS_BROWSER;
+
+    delete process.env.ERROR_REPORTS_BROWSER;
+
+    try {
+        check("Schalter aus: die Route gibt es nicht", (await report(sample("aus"))).status === 404);
+
+        process.env.ERROR_REPORTS_BROWSER = "true";
+
+        const first = await report(sample("check:dashboard Browser"));
+        const id = ((await first.json()) as { errorId?: string }).errorId;
+        const again = (await (await report(sample("check:dashboard Browser"))).json()) as { errorId?: string };
+
+        check("Ein Bericht bekommt eine Fehler-ID", first.status === 200 && /^NEXUS-\d{10}-[A-HJ-NP-Z2-9]{6}$/.test(id ?? ""), `${first.status} ${id}`);
+        check("Derselbe Fehler in derselben Minute: dieselbe ID, kein zweiter Bericht", id !== undefined && again.errorId === id, JSON.stringify(again));
+        check("Ohne Sitzung: 401", (await report(sample("ohne"), { Cookie: "" })).status === 401);
+        check("Von einer fremden Seite: 403", (await report(sample("fremd"), { "Sec-Fetch-Site": "cross-site" })).status === 403);
+        check("Über 16 KB: 413", (await report({ ...sample("groß"), stack: "x".repeat(20_000) })).status === 413);
+        check("Kaputte Eingabe: 400", (await report({ kind: "unsinn" })).status === 400);
+
+        const statuses: number[] = [];
+
+        for (let index = 0; index < 10; index++) statuses.push((await report(sample(`check:dashboard viele ${"abcdefghij"[index]}`))).status);
+
+        check("Mehr als 10 in einer Minute: 429", statuses.includes(429) && statuses.filter((status) => status === 200).length <= 9, statuses.join(","));
+    } finally {
+        if (before === undefined) delete process.env.ERROR_REPORTS_BROWSER;
+        else process.env.ERROR_REPORTS_BROWSER = before;
+    }
+}
+
+/** Die Karten des Dashboards liegen beim Bot, nie unter public/ (Plan 24). Setzt `npm run build:dashboard` voraus. */
+async function checkMaps(): Promise<void> {
+    console.log("\n  — Karten des Dashboards —");
+
+    const assets = path.join(process.cwd(), "src", "dashboard", "public", "assets");
+    const maps = path.join(process.cwd(), "src", "dashboard", "maps");
+    const exposed = (await readdir(assets, { recursive: true })).filter((file) => String(file).endsWith(".map"));
+    const app = existsSync(path.join(maps, "app.js.map")) ? (JSON.parse(await readFile(path.join(maps, "app.js.map"), "utf8")) as { sourcesContent?: unknown[] }) : null;
+
+    check("Keine Karte unter public/", exposed.length === 0, exposed.join(", "));
+    check("Die Karte zu app.js liegt beim Bot, mit Quellen", (app?.sourcesContent?.length ?? 0) > 0);
+    check("Die Karten stehen nicht in git", (await readFile(path.join(process.cwd(), ".gitignore"), "utf8")).split(/\r?\n/).includes("src/dashboard/maps/"));
+}
+
 async function main(): Promise<void> {
     const client = new BotClient();
 
@@ -1154,6 +1209,8 @@ async function main(): Promise<void> {
     await checkBeta(client);
     await checkMaintenance(client);
     await checkErrorIds(client);
+    await checkClientErrors(client);
+    await checkMaps();
     checkShopStatus();
     checkSessions(client);
 

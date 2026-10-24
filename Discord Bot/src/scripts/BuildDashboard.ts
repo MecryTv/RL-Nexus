@@ -11,8 +11,8 @@
  * Jahr behalten (DashboardAssets). Vorher waren es rund 40 Module, die jede
  * Seite einzeln und alle nachgeladen hat.
  */
-import { build, BuildOptions, context } from "esbuild";
-import { rm } from "node:fs/promises";
+import { build, BuildOptions, context, Plugin } from "esbuild";
+import { mkdir, readdir, rename, rm } from "node:fs/promises";
 import path from "node:path";
 
 const ROOT = path.join(process.cwd(), "src", "dashboard");
@@ -20,6 +20,28 @@ const OUT = path.join(ROOT, "public", "assets");
 
 // Die Ordner, in die tsc früher jedes Modul einzeln geschrieben hat.
 const LEGACY = ["core", "pages", "layout", "constants", "interfaces", "services"];
+
+/**
+ * Die Karten (Source Maps) mit den Quellen: außerhalb von public/, damit
+ * niemand die Quellen abrufen kann. Der Bot übersetzt damit Fehler aus dem
+ * Browser zurück (Guardian.Translate). Nicht in git, im Image dabei.
+ */
+const MAPS = path.join(ROOT, "maps");
+
+/** Schiebt die Karten nach jedem Bau aus public/assets nach maps/, in dieselben Unterordner. */
+const moveMaps: Plugin = {
+    name: "rl-nexus:maps",
+    setup(builder) {
+        builder.onEnd(async () => {
+            await rm(MAPS, { recursive: true, force: true });
+
+            for (const file of (await readdir(OUT, { recursive: true })).map(String).filter((name) => name.endsWith(".map"))) {
+                await mkdir(path.dirname(path.join(MAPS, file)), { recursive: true });
+                await rename(path.join(OUT, file), path.join(MAPS, file));
+            }
+        });
+    },
+};
 
 const options: BuildOptions = {
     entryPoints: [path.join(ROOT, "client", "app.ts")],
@@ -33,6 +55,10 @@ const options: BuildOptions = {
     chunkNames: "chunks/[name]-[hash]",
     legalComments: "none",
     logLevel: "info",
+    // Extern und ohne Verweis in den Dateien: Der Browser sucht die Karten gar nicht erst.
+    sourcemap: "external",
+    sourcesContent: true,
+    plugins: [moveMaps],
 };
 
 async function main(): Promise<void> {

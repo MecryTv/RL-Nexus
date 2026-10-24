@@ -17,6 +17,8 @@ export interface IDashboardPayload {
      * „morgen 9:00“, null ohne Endzeit.
      */
     maintenance: (IMaintenanceNote & { readonly until: string | null }) | null;
+    /** Meldet das Dashboard Fehler von selbst an die Devs? Aus, bis der Datenschutztext geprüft ist (Plan 24). */
+    errorReports: boolean;
 }
 
 export default interface IDashboardService {

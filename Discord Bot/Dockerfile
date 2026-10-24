@@ -31,6 +31,8 @@ RUN npm ci --omit=dev && npm cache clean --force
 
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/src/dashboard/public ./src/dashboard/public
+# Die Karten des Dashboards, damit der Bot Fehler aus dem Browser zurückübersetzen kann (Plan 24).
+COPY --from=build /app/src/dashboard/maps ./src/dashboard/maps
 COPY --from=build /app/src/database/migrations ./src/database/migrations
 COPY --from=build /app/src/assets/fonts ./src/assets/fonts
 COPY --from=build /app/src/config ./src/config
