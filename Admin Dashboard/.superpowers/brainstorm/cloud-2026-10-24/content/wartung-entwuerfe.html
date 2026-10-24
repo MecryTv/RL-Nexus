@@ -1,0 +1,460 @@
+<title>Wartung · Entwürfe</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oxanium:wght@500;600;700;800&family=Rajdhani:wght@500;600;700&display=swap">
+<style>
+/* Layout: eine Spalte mit drei Orten (Webseite, Bot-Dashboard, Admin Dashboard), je Ort Entwürfe in Geräte-Rahmen nebeneinander.
+   Bewusst nur dunkel: Das ist der Look von RL Nexus, die Entwürfe sollen aussehen wie die echten Seiten. */
+:root {
+  color-scheme: dark;
+  --base: #050608;
+  --panel: #0a0f15;
+  --panel-2: #0d141c;
+  --line: rgb(255 255 255 / 8%);
+  --line-strong: rgb(255 255 255 / 14%);
+  --text: #f2f4f7;
+  --dim: #a8b0bc;
+  --faint: #7b8693;
+  --red: #ff1e2d;
+  --red-deep: #d81424;
+  --warn: #ffc53d;
+  --ok: #35e07f;
+  --blue: #00afff;
+  --f-display: "Oxanium", "Segoe UI", system-ui, sans-serif;
+  --f-label: "Rajdhani", "Segoe UI", system-ui, sans-serif;
+  --f-body: "Segoe UI", system-ui, -apple-system, sans-serif;
+  --cut: 10px;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--base);
+  color: var(--text);
+  font-family: var(--f-body);
+  font-size: 15px;
+  line-height: 1.6;
+}
+.wrap {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding-block: 40px 72px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid;
+  gap: 56px;
+}
+h1, h2, h3 { font-family: var(--f-display); margin: 0; text-wrap: balance; line-height: 1.15; }
+p { margin: 0; }
+.eyebrow {
+  font-family: var(--f-label); font-weight: 700; font-size: 13px;
+  letter-spacing: .2em; text-transform: uppercase; color: var(--red);
+}
+
+/* Kopf */
+.intro { display: grid; gap: 14px; max-width: 70ch; }
+.intro h1 { font-size: clamp(28px, 4.5vw, 40px); font-weight: 700; }
+.intro p { color: var(--dim); }
+.decided { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.decided span {
+  font-family: var(--f-label); font-weight: 600; font-size: 14px; letter-spacing: .04em;
+  padding: 4px 12px; border: 1px solid var(--line-strong); color: var(--text); background: var(--panel);
+}
+
+/* Abschnitte */
+.place { display: grid; gap: 20px; }
+.place__head { display: grid; gap: 6px; max-width: 75ch; }
+.place__head h2 { font-size: 24px; font-weight: 600; }
+.place__head p { color: var(--dim); }
+.pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+@media (max-width: 860px) { .pair { grid-template-columns: minmax(0, 1fr); } }
+.option { display: grid; gap: 10px; align-content: start; min-width: 0; }
+.option__tag { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.option__tag b { font-family: var(--f-display); font-size: 18px; }
+.option__tag small { color: var(--faint); font-size: 13.5px; }
+
+/* Geräte-Rahmen */
+.frame { border: 1px solid var(--line-strong); background: var(--base); overflow: hidden; min-width: 0; }
+.frame__bar {
+  display: flex; align-items: center; gap: 8px; padding: 8px 12px;
+  background: var(--panel); border-bottom: 1px solid var(--line);
+  font-size: 12.5px; color: var(--faint); font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+.frame__bar i { width: 9px; height: 9px; border-radius: 50%; background: var(--line-strong); }
+.frame__bar span { margin-left: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Wartungsbildschirm */
+.maint {
+  display: grid; place-items: center; text-align: center;
+  padding: 44px 22px 40px; min-height: 360px;
+  background: radial-gradient(circle at 50% 30%, rgb(255 30 45 / 12%), transparent 58%), var(--base);
+}
+.maint__inner { display: grid; gap: 14px; justify-items: center; max-width: 440px; }
+.wordmark { font-family: var(--f-display); font-weight: 800; letter-spacing: .08em; font-size: 15px; margin-bottom: 10px; }
+.wordmark span { color: var(--red); }
+.maint h3 { font-size: clamp(24px, 3.2vw, 30px); font-weight: 700; }
+.maint__reason { color: var(--text); }
+.maint__note { color: var(--dim); font-size: 14px; }
+.eta {
+  display: inline-flex; align-items: center; gap: 8px; padding: 7px 14px;
+  border: 1px solid rgb(255 197 61 / 35%); background: rgb(255 197 61 / 8%); color: #ffe3a3;
+  font-family: var(--f-label); font-weight: 600; font-size: 15px; letter-spacing: .03em;
+}
+.eta svg, .btn svg, .badge svg, .staffbar svg { width: 16px; height: 16px; flex: none; }
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 44px; padding: 0 20px; border: 0; cursor: pointer;
+  font-family: var(--f-label); font-weight: 700; font-size: 14px; letter-spacing: .12em; text-transform: uppercase;
+  text-decoration: none; color: var(--text); background: var(--line-strong);
+  clip-path: polygon(var(--cut) 0, 100% 0, 100% calc(100% - var(--cut)), calc(100% - var(--cut)) 100%, 0 100%, 0 var(--cut));
+}
+.btn--red { background: var(--red-deep); color: #fff; }
+.btn--red:hover { background: #b80f1d; }
+.btn--quiet:hover { background: rgb(255 255 255 / 20%); }
+.btn:focus-visible, .chip:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+
+/* Variante B: Zeitleiste */
+.timeline { width: 100%; display: grid; gap: 8px; margin-top: 4px; }
+.timeline__track { height: 6px; background: var(--line-strong); position: relative; overflow: hidden; }
+.timeline__fill { position: absolute; inset: 0 auto 0 0; width: 42%; background: linear-gradient(90deg, var(--red-deep), var(--red)); }
+.timeline__ends { display: flex; justify-content: space-between; gap: 12px; font-family: var(--f-label); font-weight: 600; font-size: 14px; color: var(--dim); }
+.timeline__ends b { color: var(--text); font-weight: 700; }
+
+/* Bot-Dashboard: Hinweis für Admin und Dev */
+.dash { background: var(--base); }
+.staffbar {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 12px 16px; border-bottom: 1px solid rgb(255 197 61 / 35%); background: rgb(255 197 61 / 9%); color: #ffe3a3; font-size: 14px;
+}
+.staffbar p { flex: 1 1 240px; min-width: 0; }
+.staffbar a { color: var(--text); font-family: var(--f-label); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; font-size: 13px; }
+.dash__body { padding: 20px 18px 26px; display: grid; gap: 14px; }
+.dash__title { font-family: var(--f-display); font-size: 20px; font-weight: 700; }
+.skel { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.skel i { height: 64px; border: 1px solid var(--line); background: var(--panel); }
+.skel i:nth-child(4) { grid-column: 1 / -1; height: 110px; }
+
+/* Admin Dashboard */
+.admin { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+@media (max-width: 860px) { .admin { grid-template-columns: minmax(0, 1fr); } }
+.dialog { background: var(--panel); border: 1px solid var(--line-strong); padding: 22px; display: grid; gap: 18px; }
+.dialog h3 { font-size: 20px; font-weight: 700; }
+.dialog__lead { color: var(--dim); font-size: 14px; margin-top: -8px; }
+.field { display: grid; gap: 7px; }
+.field label, .field .label { font-family: var(--f-label); font-weight: 700; font-size: 14px; letter-spacing: .08em; text-transform: uppercase; color: var(--text); }
+.field label small, .field .label small { color: var(--faint); font-weight: 600; letter-spacing: .04em; text-transform: none; font-size: 13.5px; margin-left: 6px; }
+.help { color: var(--faint); font-size: 13.5px; }
+textarea, input[type="datetime-local"] {
+  width: 100%; background: var(--base); color: var(--text); border: 1px solid var(--line-strong);
+  font: inherit; font-size: 15px; padding: 10px 12px; border-radius: 0;
+}
+textarea { min-height: 76px; resize: vertical; }
+.count { justify-self: end; color: var(--faint); font-size: 12.5px; font-variant-numeric: tabular-nums; margin-top: -4px; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip {
+  min-height: 36px; padding: 0 14px; border: 1px solid var(--line-strong); background: var(--base); color: var(--text);
+  font-family: var(--f-label); font-weight: 600; font-size: 14.5px; cursor: pointer;
+}
+.chip[aria-pressed="true"] { border-color: var(--red); background: rgb(255 30 45 / 12%); }
+.check { display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; align-items: start; }
+.check input { width: 20px; height: 20px; margin: 2px 0 0; accent-color: var(--red); }
+.check label { font-weight: 600; }
+.check .help { grid-column: 2; }
+.preview {
+  border-left: 3px solid var(--warn); background: var(--base); padding: 12px 14px; display: grid; gap: 4px;
+}
+.preview small { font-family: var(--f-label); font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--faint); font-size: 12.5px; }
+.preview p { color: var(--dim); font-size: 14px; }
+.preview p b { color: var(--text); font-weight: 600; }
+.actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end; }
+
+.row { background: var(--panel); border: 1px solid var(--line-strong); padding: 20px; display: grid; gap: 12px; }
+.row h3 { font-size: 18px; font-weight: 600; }
+.row__state { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; color: var(--dim); font-size: 14px; }
+.badge {
+  display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px;
+  font-family: var(--f-label); font-weight: 700; font-size: 13px; letter-spacing: .1em; text-transform: uppercase;
+  color: #ffe3a3; background: rgb(255 197 61 / 12%); border: 1px solid rgb(255 197 61 / 35%);
+}
+.badge--ok { color: #b9f5d2; background: rgb(53 224 127 / 10%); border-color: rgb(53 224 127 / 35%); }
+.row blockquote { margin: 0; padding: 10px 14px; background: var(--base); border: 1px solid var(--line); color: var(--text); font-size: 14.5px; }
+.row__auto { color: #ffe3a3; font-size: 14px; }
+.row--off .row__state { color: var(--faint); }
+
+/* Fragen */
+.questions { background: var(--panel); border: 1px solid var(--line-strong); padding: 24px; display: grid; gap: 14px; max-width: 80ch; }
+.questions h2 { font-size: 22px; }
+.questions ol { margin: 0; padding-left: 22px; display: grid; gap: 10px; color: var(--dim); }
+.questions li b { color: var(--text); font-weight: 600; }
+@media (prefers-reduced-motion: no-preference) {
+  .timeline__fill { transition: width .6s cubic-bezier(.16, 1, .3, 1); }
+}
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+  <symbol id="i-wrench" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.2L3.6 17.2a1.8 1.8 0 0 0 2.6 2.6l5.7-5.7a4 4 0 0 0 5.2-5.4l-2.5 2.5-2.4-.4-.4-2.4z"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+  <symbol id="i-power" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v8"/><path d="M6.4 7.4a8 8 0 1 0 11.2 0"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+</svg>
+
+<main class="wrap">
+  <header class="intro">
+    <p class="eyebrow">Brainstorm · Wartungsmodus</p>
+    <h1>Wartung aus der Datenbank</h1>
+    <p>Entwürfe zum Abstimmen, gebaut wird noch nichts. Texte und Zeiten sind Beispiele. Unten stehen die Fragen. Antworte einfach im Chat, zum Beispiel „A, Hinweis passt, Schnellwahl ohne 22 Uhr“.</p>
+    <div class="decided" aria-label="Schon entschieden">
+      <span>Schalter in der Datenbank</span>
+      <span>Webseite zeigt die Wartung selbst</span>
+      <span>Admin und Dev kommen ins Dashboard</span>
+      <span>Grund, Endzeit, automatisch aus</span>
+    </div>
+  </header>
+
+  <section class="place" aria-labelledby="web">
+    <div class="place__head">
+      <p class="eyebrow">Webseite · nexus-emb.de</p>
+      <h2 id="web">Was Besucher sehen</h2>
+      <p>Die Webseite fragt beim Laden und danach jede Minute, ob Wartung ist. Wenn ja, zeigt sie auf jeder Adresse diesen Bildschirm, und Kontaktformular und Shop nehmen nichts an. Ist die Wartung vorbei, lädt die Seite von selbst neu.</p>
+    </div>
+    <div class="pair">
+      <div class="option">
+        <div class="option__tag"><b>A · Ruhig</b><small>nah an der heutigen Wartungsseite</small></div>
+        <div class="frame">
+          <div class="frame__bar"><i></i><i></i><i></i><span>nexus-emb.de/preise</span></div>
+          <div class="maint">
+            <div class="maint__inner">
+              <p class="wordmark">RL <span>NEXUS</span></p>
+              <p class="eyebrow">Wartung</p>
+              <h3>Wir sind gleich wieder da</h3>
+              <p class="maint__reason" data-reason>Wir spielen ein Update für das Bot-Dashboard ein.</p>
+              <p class="eta"><svg aria-hidden="true"><use href="#i-clock"/></svg><span data-eta>Voraussichtlich zurück heute um 18:00 Uhr</span></p>
+              <p class="maint__note">Diese Seite lädt von selbst neu, sobald wir fertig sind. Der Bot auf Discord läuft normal weiter.</p>
+              <a class="btn btn--quiet" href="#web">Aktuellen Stand ansehen<svg aria-hidden="true"><use href="#i-arrow"/></svg></a>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="option">
+        <div class="option__tag"><b>B · Mit Zeitleiste</b><small>zeigt, wie weit die Wartung ist</small></div>
+        <div class="frame">
+          <div class="frame__bar"><i></i><i></i><i></i><span>nexus-emb.de/preise</span></div>
+          <div class="maint">
+            <div class="maint__inner">
+              <p class="wordmark">RL <span>NEXUS</span></p>
+              <p class="eyebrow">Wartung</p>
+              <h3>Wir sind gleich wieder da</h3>
+              <p class="maint__reason" data-reason>Wir spielen ein Update für das Bot-Dashboard ein.</p>
+              <div class="timeline" aria-label="Fortschritt der Wartung">
+                <div class="timeline__track"><span class="timeline__fill" data-fill></span></div>
+                <div class="timeline__ends"><span>Seit <b>16:30</b></span><span>Zurück gegen <b data-eta-short>18:00</b></span></div>
+              </div>
+              <p class="maint__note">Diese Seite lädt von selbst neu, sobald wir fertig sind. Der Bot auf Discord läuft normal weiter.</p>
+              <a class="btn btn--quiet" href="#web">Aktuellen Stand ansehen<svg aria-hidden="true"><use href="#i-arrow"/></svg></a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="help">Ohne Endzeit steht dort „Wie lange es dauert, steht noch nicht fest.“ Ist die Endzeit vorbei und die Wartung läuft noch, steht dort „Es dauert etwas länger als geplant.“</p>
+  </section>
+
+  <section class="place" aria-labelledby="dash">
+    <div class="place__head">
+      <p class="eyebrow">Bot-Dashboard · dashboard.nexus-emb.de</p>
+      <h2 id="dash">Nutzer sehen die Wartung, ihr arbeitet weiter</h2>
+      <p>Der Bot liest den Schalter alle paar Sekunden aus der Datenbank. Nutzer bekommen denselben Bildschirm wie auf der Webseite. Administrator und Developer kommen herein und sehen oben einen Hinweis, damit niemand vergisst, dass die Wartung noch läuft.</p>
+    </div>
+    <div class="pair">
+      <div class="option">
+        <div class="option__tag"><b>Nutzer</b><small>derselbe Bildschirm wie gewählt (A oder B)</small></div>
+        <div class="frame">
+          <div class="frame__bar"><i></i><i></i><i></i><span>dashboard.nexus-emb.de/guild/…/backups</span></div>
+          <div class="maint">
+            <div class="maint__inner">
+              <p class="wordmark">RL <span>NEXUS</span></p>
+              <p class="eyebrow">Wartung</p>
+              <h3>Wir sind gleich wieder da</h3>
+              <p class="maint__reason" data-reason>Wir spielen ein Update für das Bot-Dashboard ein.</p>
+              <p class="eta"><svg aria-hidden="true"><use href="#i-clock"/></svg><span data-eta>Voraussichtlich zurück heute um 18:00 Uhr</span></p>
+              <p class="maint__note">Deine Einstellungen bleiben, wie sie sind. Der Bot auf Discord läuft normal weiter.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="option">
+        <div class="option__tag"><b>Administrator und Developer</b><small>Hinweis über jeder Seite</small></div>
+        <div class="frame dash">
+          <div class="frame__bar"><i></i><i></i><i></i><span>dashboard.nexus-emb.de/guild/…/backups</span></div>
+          <div class="staffbar" role="status">
+            <svg aria-hidden="true"><use href="#i-wrench"/></svg>
+            <p><b>Wartung läuft</b> bis voraussichtlich 18:00 Uhr. Du siehst das Dashboard, weil du Developer bist. Alle anderen sehen die Wartungsseite.</p>
+            <a href="#admin">Im Admin Dashboard ändern</a>
+          </div>
+          <div class="dash__body">
+            <p class="dash__title">Backups</p>
+            <div class="skel" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="place" aria-labelledby="admin">
+    <div class="place__head">
+      <p class="eyebrow">Admin Dashboard · Developer → Wartung</p>
+      <h2 id="admin">Einschalten mit Grund und Endzeit</h2>
+      <p>Der Dialog links ist zum Ausprobieren: Schnellwahl, Uhrzeit und Haken ändern die Vorschau und die Zeile rechts. Gespeichert wird nichts.</p>
+    </div>
+    <div class="admin">
+      <form class="dialog" id="dialog" aria-labelledby="dialog-title">
+        <h3 id="dialog-title">Webseite: Wartung einschalten?</h3>
+        <p class="dialog__lead">Wer nexus-emb.de öffnet, sieht nur noch die Wartungsseite. Kontaktformular und Shop nehmen nichts an.</p>
+
+        <div class="field">
+          <label for="reason">Grund <small>freiwillig</small></label>
+          <textarea id="reason" maxlength="200" aria-describedby="reason-help">Wir spielen ein Update für das Bot-Dashboard ein.</textarea>
+          <span class="count" id="reason-count">49 / 200</span>
+          <span class="help" id="reason-help">Steht so auf der Wartungsseite. Ein Satz reicht.</span>
+        </div>
+
+        <div class="field">
+          <span class="label" id="end-label">Voraussichtlich zurück <small>freiwillig</small></span>
+          <div class="chips" role="group" aria-labelledby="end-label">
+            <button type="button" class="chip" data-add="30">in 30 Min.</button>
+            <button type="button" class="chip" data-add="60">in 1 Std.</button>
+            <button type="button" class="chip" data-add="120">in 2 Std.</button>
+            <button type="button" class="chip" data-add="0">ohne Endzeit</button>
+          </div>
+          <input type="datetime-local" id="end" aria-labelledby="end-label" aria-describedby="end-help">
+          <span class="help" id="end-help">Zeit in Berlin. Auf der Seite steht nur die Uhrzeit, bei einem anderen Tag auch das Datum.</span>
+        </div>
+
+        <div class="check">
+          <input type="checkbox" id="auto" checked aria-describedby="auto-help">
+          <label for="auto">Zur Endzeit automatisch beenden</label>
+          <span class="help" id="auto-help">Ohne Haken bleibt die Wartung an, bis du sie selbst beendest. Nach der Endzeit steht dann „Es dauert etwas länger als geplant.“</span>
+        </div>
+
+        <div class="preview" aria-live="polite">
+          <small>So steht es auf der Seite</small>
+          <p id="preview"></p>
+        </div>
+
+        <div class="actions">
+          <button type="button" class="btn btn--quiet">Abbrechen</button>
+          <button type="submit" class="btn btn--red"><svg aria-hidden="true"><use href="#i-wrench"/></svg>Wartung einschalten</button>
+        </div>
+      </form>
+
+      <div style="display:grid;gap:14px;min-width:0">
+        <div class="row" id="row-web">
+          <h3>Webseite</h3>
+          <p class="row__state"><span class="badge"><svg aria-hidden="true"><use href="#i-wrench"/></svg>Wartung</span><span>An seit 16:30, von Mecry</span></p>
+          <p class="row__auto" id="row-auto">Endet automatisch heute um 18:00 Uhr, in 1 Std. 30 Min.</p>
+          <blockquote id="row-reason">„Wir spielen ein Update für das Bot-Dashboard ein.“</blockquote>
+          <div class="actions" style="justify-content:flex-start">
+            <button type="button" class="btn btn--quiet">Ändern</button>
+            <button type="button" class="btn btn--quiet"><svg aria-hidden="true"><use href="#i-power"/></svg>Wartung beenden</button>
+          </div>
+        </div>
+        <div class="row row--off">
+          <h3>Bot-Dashboard</h3>
+          <p class="row__state"><span class="badge badge--ok">Normal</span><span>Admin und Dev kommen bei Wartung trotzdem herein.</span></p>
+          <div class="actions" style="justify-content:flex-start">
+            <button type="button" class="btn btn--red"><svg aria-hidden="true"><use href="#i-wrench"/></svg>Wartung einschalten</button>
+          </div>
+        </div>
+        <p class="help">Die Vorschau der Wartungsseite darunter zeigt dann den echten Grund und die echte Endzeit statt eines festen Textes.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="questions" aria-labelledby="fragen">
+    <h2 id="fragen">Fragen an dich</h2>
+    <ol>
+      <li><b>Bildschirm A oder B?</b> A ist ruhig wie heute, B zeigt mit der Zeitleiste, wie weit die Wartung ist.</li>
+      <li><b>Hinweis für Admin und Dev im Dashboard:</b> passt der Streifen oben so, oder lieber nur ein kleines Abzeichen?</li>
+      <li><b>Schnellwahl:</b> passen 30 Min., 1 Std. und 2 Std., oder brauchst du andere Zeiten?</li>
+      <li><b>Haken „automatisch beenden“:</b> soll er beim Setzen einer Endzeit von selbst an sein, so wie hier?</li>
+      <li><b>Statusseite und Discord-Meldung:</b> sollen Grund und Endzeit dort auch erscheinen? Die Statusseite zeigt Wartungen heute schon an.</li>
+    </ol>
+  </section>
+</main>
+
+<script>
+(() => {
+  const reason = document.getElementById("reason");
+  const count = document.getElementById("reason-count");
+  const end = document.getElementById("end");
+  const auto = document.getElementById("auto");
+  const preview = document.getElementById("preview");
+  const rowAuto = document.getElementById("row-auto");
+  const rowReason = document.getElementById("row-reason");
+  const chips = [...document.querySelectorAll(".chip")];
+  const pad = (n) => String(n).padStart(2, "0");
+  const local = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  const clock = (d) => `${d.getHours()}:${pad(d.getMinutes())}`;
+  const sameDay = (a, b) => a.toDateString() === b.toDateString();
+  const dateText = (d) => d.toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long" });
+
+  function inText(ms) {
+    const m = Math.max(0, Math.round(ms / 60000));
+    const h = Math.floor(m / 60);
+    if (h === 0) return `${m} Min.`;
+    return m % 60 ? `${h} Std. ${m % 60} Min.` : `${h} Std.`;
+  }
+
+  function when(d) {
+    return sameDay(d, new Date()) ? `heute um ${clock(d)} Uhr` : `am ${dateText(d)} um ${clock(d)} Uhr`;
+  }
+
+  function render() {
+    const text = reason.value.trim();
+    const at = end.value ? new Date(end.value) : null;
+    count.textContent = `${reason.value.length} / 200`;
+    auto.disabled = !at;
+
+    const eta = at ? `Voraussichtlich zurück ${when(at)}` : "Wie lange es dauert, steht noch nicht fest.";
+    preview.innerHTML = "";
+    const b = document.createElement("b");
+    b.textContent = text || "Wir sind gleich wieder da.";
+    preview.append(b, document.createElement("br"), eta);
+
+    rowReason.hidden = !text;
+    rowReason.textContent = `„${text}“`;
+    rowAuto.textContent = !at
+      ? "Ohne Endzeit: läuft, bis du sie beendest."
+      : auto.checked
+        ? `Endet automatisch ${when(at)}, in ${inText(at - Date.now())}`
+        : `Endzeit ${when(at)}, beendet sich aber nicht selbst.`;
+
+    for (const el of document.querySelectorAll("[data-reason]")) el.textContent = text || "Wir arbeiten gerade am System.";
+    for (const el of document.querySelectorAll("[data-eta]")) el.textContent = eta;
+    for (const el of document.querySelectorAll("[data-eta-short]")) el.textContent = at ? clock(at) : "offen";
+    const fill = document.querySelector("[data-fill]");
+    if (fill) fill.style.width = at ? "42%" : "0%";
+  }
+
+  chips.forEach((chip) => chip.addEventListener("click", () => {
+    const add = Number(chip.dataset.add);
+    chips.forEach((c) => c.setAttribute("aria-pressed", String(c === chip)));
+    end.value = add ? local(new Date(Date.now() + add * 60000)) : "";
+    if (add) auto.checked = true;
+    render();
+  }));
+  chips.forEach((c) => c.setAttribute("aria-pressed", "false"));
+
+  const start = new Date();
+  start.setHours(18, 0, 0, 0);
+  if (start < new Date()) start.setTime(Date.now() + 90 * 60000);
+  end.value = local(start);
+
+  reason.addEventListener("input", render);
+  end.addEventListener("input", () => { chips.forEach((c) => c.setAttribute("aria-pressed", "false")); render(); });
+  auto.addEventListener("change", render);
+  document.getElementById("dialog").addEventListener("submit", (event) => event.preventDefault());
+  render();
+})();
+</script>

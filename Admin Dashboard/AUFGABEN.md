@@ -29,7 +29,10 @@ Reihenfolge: P1 vor P2 vor P3 vor P4. Bei gleicher Priorität gilt die Reihenfol
 
 ## Gerade in Arbeit
 
-- **[P1] Wartungsmodus als Umbau, Brainstorm läuft, ich warte auf deine Antworten.**
+- **[P1] Wartungsmodus als Umbau: Die Spec ist geschrieben, ein frischer Prüfer liest sie gerade gegen.**
+  - **Entwurf abgenommen (24.10.):** Variante B mit Zeitleiste, „der Rest passt so“.
+  - **Spec:** `docs/superpowers/specs/2026-10-24-wartung-aus-der-datenbank-design.md`. Der Entwurf liegt unter `.superpowers/brainstorm/cloud-2026-10-24/content/wartung-entwuerfe.html`.
+  - **Danach:** Fragen aus der Prüfung klären, dann dein OK zur Spec, dann der Plan. Fürs Bauen brauche ich Freigaben im Bot-Repo, die Liste steht in der Spec unter „Betroffene Dateien“.
   - **Entschieden (24.10.):**
     - Der Schalter liegt in der Datenbank.
     - Die Webseite zeigt die Wartung selbst, als eigene Ansicht in der App. Sie fragt beim Laden und jede Minute nach, wie heute bei „Preise“. Kontaktformular und Shop sperrt das Admin Dashboard.
