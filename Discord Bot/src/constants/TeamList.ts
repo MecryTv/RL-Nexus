@@ -177,27 +177,32 @@ export function TeamListLines(team: IListTeam, list: ITeamListSettings): string[
     return lines;
 }
 
+/**
+ * {teams} in Stücken, je Team eins: seine Zeilen, beim ersten Team einer Gruppe
+ * mit deren Überschrift davor. Zwischen den Stücken darf die Liste auf die
+ * nächste Nachricht umbrechen (TeamView.BoardViews), nie mitten im Kader.
+ */
+export function TeamListParts(teams: IListTeam[], groups: { id: number; name: string }[], list: ITeamListSettings): string[] {
+    const parts: string[] = [];
+    const add = (members: IListTeam[], header: string | null): void => {
+        members.forEach((team, index) => {
+            const lines = [...(index === 0 && header ? [header] : []), ...TeamListLines(team, list)];
+
+            if (lines.length) parts.push(lines.join("\n"));
+        });
+    };
+
+    for (const group of groups) add(teams.filter((team) => team.group === group.id), `### ${group.name}`);
+
+    add(
+        teams.filter((team) => !groups.some((group) => group.id === team.group)),
+        parts.length ? "### Ohne Gruppe" : null
+    );
+
+    return parts;
+}
+
 /** {teams}: je Gruppe eine Überschrift, darunter ihre Teams; Teams ohne Gruppe stehen am Ende. */
 export function TeamListText(teams: IListTeam[], groups: { id: number; name: string }[], list: ITeamListSettings): string {
-    const lines: string[] = [];
-
-    for (const group of groups) {
-        const members = teams.filter((team) => team.group === group.id);
-
-        if (!members.length) continue;
-
-        lines.push(`### ${group.name}`);
-
-        for (const team of members) lines.push(...TeamListLines(team, list));
-    }
-
-    const loose = teams.filter((team) => !groups.some((group) => group.id === team.group));
-
-    if (loose.length) {
-        if (lines.length) lines.push("### Ohne Gruppe");
-
-        for (const team of loose) lines.push(...TeamListLines(team, list));
-    }
-
-    return lines.join("\n") || "Noch keine Teams.";
+    return TeamListParts(teams, groups, list).join("\n") || "Noch keine Teams.";
 }

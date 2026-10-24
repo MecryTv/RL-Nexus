@@ -143,6 +143,12 @@ Zwei Entscheidungen, unabhängig voneinander:
 | **Eine Nachricht für alle Teams** | Eine Nachricht im Kanal. `{teams}` setzt darin alle Kader ein |
 | **Je Team eine eigene Nachricht** | Eine Karte je Team. Gut zum Verlinken, zieht sich einzeln nach |
 
+**Viele Teams:** Discord nimmt in einer Nachricht höchstens 4000 Zeichen Text (Components V2 zählt alles zusammen, beim Embed die Beschreibung, reiner Text 2000). Jede Spielerzeile kostet mit Emojis, Erwähnung und Tracker-Link schnell 170 Zeichen. Passt `{teams}` nicht hinein, geht die Liste in weiteren Nachrichten direkt darunter weiter, im selben Stil und in derselben Farbe (`BoardViews` in `builder/TeamView.ts`):
+- Getrennt wird nur zwischen Teams, nie mitten im Kader (`TeamListParts` in `constants/TeamList.ts`, verteilt von `PackParts`). Ein Team, das allein nicht passt, teilt sich an Zeilen.
+- Der Kopf steht in der ersten Nachricht. Was in der Vorlage nach `{teams}` kommt, steht in der letzten: bei Components V2 die Bausteine darunter, beim Embed Fußzeile, Felder und Bild.
+- Beim Aktualisieren werden die Nachrichten bearbeitet. Wird die Liste kürzer, löscht der Bot die überzähligen. Braucht sie mehr, oder fehlt eine, gehen alle neu raus, damit die Folge im Kanal stimmt. Einsammeln nimmt alle mit. Die IDs stehen als `messageId` und `moreIds` in den Einstellungen des Moduls.
+- Mit Auswahlmenü bleibt es eine Nachricht, dort steht nur die Kopfzeile je Team.
+
 ### Reihenfolge
 
 Unter *Kanal & Darstellung* legt die Karte **Reihenfolge** fest, in welcher Folge die Teams stehen – für Karten, Menü und `{teams}`. Bot und Dashboard ordnen mit derselben Funktion (`OrderTeams` in `constants/TeamOrder.ts`), die Vorschau rechts zeigt also genau, was in Discord steht.

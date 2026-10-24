@@ -33,7 +33,7 @@ Reihenfolge: P1 vor P2 vor P3 vor P4. Bei gleicher Priorität gilt die Reihenfol
 - **[P1, fertig 24.10.] Wartungsmodus als Umbau: Plan 23 ist gebaut, geprüft und nachgebessert.** Alle Prüfungen grün bis auf die bekannten Ausreißer, die es schon vor dem Umbau gab.
   - **Nachgebessert nach dem Review:** Der Hinweisstreifen für Admin und Dev nennt das Ende mit Tag. Wer im Admin Dashboard bei einer Wartung ohne Endzeit ein Datum einträgt, bekommt „automatisch beenden“ dazu. Import alter Dateien schaltet eine abgelaufene Wartung nicht wieder ein. Alte Dateien werden nur noch gelöscht, nie neu angelegt, die alte nginx-Regel der Webseite ist weg. Die Webseite sperrt auch beim Klicken innerhalb der Seite. Beginn und Ende mit Tag („gestern 18:05“, „morgen 9:00“) auf Webseite, Statusseite und der Wartungsseite des Bots. Die Webseite wartet beim Nachfragen so lange wie beim ersten Laden und lädt neu, wenn das automatische Ende vorbei ist, auch wenn das Admin Dashboard nicht antwortet. Der Bot fragt bei Datenbankfehlern höchstens alle 5 Sekunden. Die Wartungsseite des Bots hat einen Link zur Anmeldung fürs Team.
   - **Bewusst später (klein):** Die Discord-Statusmeldung nennt das Ende ohne Tag. Keine Obergrenze für die Endzeit. Die Shop-Anmeldung zeigt während der Wartung JSON statt einer Seite. Der Hinweisstreifen erscheint auch auf öffentlichen Seiten des Dashboards. Die vollständige Liste steht im Ledger.
-  - **Als Nächstes:** [P1] RL Team-Übersicht, danach [P1] Server-Übersicht (siehe „Offen“).
+  - **Als Nächstes:** [P1] Server-Übersicht (Seitenleiste), siehe „Offen“. Die RL Team-Übersicht ist erledigt.
   - **Gebaut (24.10.), alle acht Aufgaben mit Tests:**
     - **Admin Dashboard:** Tabelle `site_maintenance` (Migration 013), Seite „Wartung“ mit Grund, Schnellwahl, Endzeit und „automatisch beenden“, Sperre von Kontaktformular und Shop (Stripe-Webhook offen), Statusseite und Discord-Meldung mit Grund und Endzeit.
     - **Webseite:** zeigt Variante B selbst, Rechtstexte bleiben offen.
@@ -195,6 +195,11 @@ Reihenfolge: P1 vor P2 vor P3 vor P4. Bei gleicher Priorität gilt die Reihenfol
 - **Entschieden (24.10.):** im Zweifel sperren, auch wenn der Stand unbekannt ist. **Erledigt 24.10.**, siehe oben.
 
 ### [P1, neu 24.10.] RL Team-Übersicht: Zeichenlimit bei vielen Teams
+- **Stand (24.10.): gebaut und geprüft, gesichert.** Entschieden: automatisch fortsetzen. Freigegeben: `builder/TeamView.ts`, `services/TeamService.ts`, `interfaces/services/teams/ITeams.ts`, `constants/TeamList.ts`, `scripts/CheckTeams.ts`, Doku zu den Teams.
+- **Ursache:** Die ganze Liste steckt in `{teams}` in einer Nachricht. Discord erlaubt in einer Components-V2-Nachricht 4000 Zeichen Text (Embeds: 4096 in der Beschreibung), danach kürzt der Bot mit „…“. Jede Spielerzeile kostet mit Emojis, Erwähnung und Tracker-Link rund 170 Zeichen.
+- **Lösung:** Passt die Liste nicht, schreibt der Bot darunter weitere Nachrichten im selben Stil. Getrennt wird nur zwischen Teams. Kopf in der ersten, alles nach `{teams}` in der letzten Nachricht. Wird die Liste kürzer, löscht er überzählige. Die IDs stehen in den Modul-Einstellungen, ohne Datenbank-Änderung.
+- **Gebaut:** `TeamListParts` (Liste je Team), `PackParts` und `BoardViews` (Verteilung und Nachrichten), `Publish` und `Withdraw` mit mehreren Nachrichten (`messageId` + `moreIds`). Gilt für Components V2, Embed und reinen Text. 17 neue Prüfungen in `check:teams` (Verteilung, 16 Teams mit je vier Spielern, Embed, Bearbeiten/Löschen/Neusenden im Kanal, Einsammeln). Alle Bot-Prüfungen, `tsc` und Build grün. Doku: `docs/Teams.md`.
+- **Auf dem Server prüfen:** Übersicht einmal neu senden. Bei vielen Teams stehen dann mehrere Nachrichten untereinander.
 - **Reihenfolge:** direkt nach Plan 23 (Wartung), vor der Server-Übersicht.
 - **Projekt:** Bot (Modul RL Team-Übersicht, Discord-Nachricht „Unsere Teams“)
 - **Was passiert:** Bei vielen Teams stößt die Nachricht an das Zeichenlimit von Discord. Die Liste bricht mitten in einer Zeile ab (`<@1…`), darunter steht nur noch „…“ (Bild 3 vom 24.10.).
@@ -247,7 +252,8 @@ Reihenfolge: P1 vor P2 vor P3 vor P4. Bei gleicher Priorität gilt die Reihenfol
 - **Was gewünscht ist:**
   - Nachdem man den Bot eingeladen hat, aktualisiert sich das Dashboard von selbst, und man kommt direkt ins Server-Dashboard.
   - Staff (Administrator und Developer) kann fremde Server voll bearbeiten, also Module an- und ausschalten und alles einstellen.
-- **Hinweise:** Heute sehen Administrator und Developer fremde Server nur (`DashboardService.IsStaff`).
+  - **Neu (24.10.):** Öffnet Administrator oder Developer einen fremden Server, auf dem sie selbst nicht sind, sehen sie oben, wem der Server gehört: Owner mit Name und Bild, dazu was zum Server gehört (Mitglieder, seit wann der Bot drauf ist, aktive Module). So ist klar, wessen Server man gerade bearbeitet.
+- **Hinweise:** Heute sehen Administrator und Developer fremde Server nur (`DashboardService.IsStaff`). Im Brainstorm klären, was genau „und alles“ umfasst und ob Änderungen durch Staff dem Owner angezeigt oder protokolliert werden.
 
 ### [P3] Neues Modul „Rollen-Übersicht“
 - **Projekt:** Bot

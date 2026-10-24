@@ -14,9 +14,10 @@ process.env.DEV_CLIENT_SECRET ||= "check-secret";
 import path from "path";
 import { existsSync } from "fs";
 import { createCanvas, loadImage } from "@napi-rs/canvas";
-import { ChannelType, Guild, GuildBasedChannel, PermissionFlagsBits, Role } from "discord.js";
+import { ChannelType, ComponentType, Guild, GuildBasedChannel, PermissionFlagsBits, Role } from "discord.js";
+import { ICustomView } from "../builder/CustomView";
 import BotClient from "../client/BotClient";
-import { BoardText, BoardView, ChannelsText, LeaguesText, LineupText, PLAYER_FIELDS, PlayerKey, PlayerList, PlayerValues, RoleValues, RosterText, StaffText, TeamMenuRow, TeamValues, ListTeams, Formats } from "../builder/TeamView";
+import { BoardText, BoardView, BoardViews, ChannelsText, PackParts, LeaguesText, LineupText, PLAYER_FIELDS, PlayerKey, PlayerList, PlayerValues, RoleValues, RosterText, StaffText, TeamMenuRow, TeamValues, ListTeams, Formats } from "../builder/TeamView";
 import { DefaultTeamList, MEMBER_FIELDS, TEAM_LIST_PRESETS, TeamListText } from "../constants/TeamList";
 import { CardsInOrder, DefaultTeamOrder, ITeamOrder, OrderTeams } from "../constants/TeamOrder";
 import { Fill } from "../constants/Placeholders";
@@ -1354,6 +1355,199 @@ async function checkCardOrder(client: BotClient): Promise<void> {
     }
 }
 
+/* ----------------------------------------------------------
+   Viele Teams: die Übersicht geht in weiteren Nachrichten weiter
+   ---------------------------------------------------------- */
+
+/** Aller Text einer Nachricht, wie Discord ihn zählt: Textbausteine bei V2, die Beschreibung beim Embed, sonst der Inhalt. */
+function TextOf(view: ICustomView): string {
+    const texts: string[] = [];
+    const walk = (node: unknown): void => {
+        if (Array.isArray(node)) return node.forEach(walk);
+        if (!node || typeof node !== "object") return;
+
+        const record = node as Record<string, unknown>;
+
+        if (record.type === ComponentType.TextDisplay && typeof record.content === "string") texts.push(record.content);
+
+        Object.values(record).forEach(walk);
+    };
+
+    walk(view.components.map((entry) => entry.toJSON()));
+
+    for (const embed of view.embeds ?? []) texts.push((embed as { data?: { description?: string } }).data?.description ?? "");
+    if (typeof view.content === "string") texts.push(view.content);
+
+    return texts.join("\n");
+}
+
+/** 16 Teams mit je vier Spielern, alle mit Erwähnung und Tracker: zu viel für eine Nachricht. */
+function ManyTeams(count = 16): ITeam[] {
+    return Array.from({ length: count }, (_, index) =>
+        FakeTeam(
+            Array.from({ length: 4 }, (_, slot) => ({
+                ...Player(`t${index}s${slot}`, slot === 0 ? "captain" : "player", 1500, 1450),
+                discordId: `1000000000000${String(index * 10 + slot).padStart(5, "0")}`,
+            })),
+            { id: index + 1, name: `Team ${index + 1}`, groupId: index < 8 ? 1 : 2, position: index }
+        )
+    );
+}
+
+async function checkLongBoard(client: BotClient): Promise<void> {
+    console.log("\n  — Viele Teams: Fortsetzung in weiteren Nachrichten —");
+
+    check("Stücke: passt alles, bleibt es eine Nachricht", JSON.stringify(PackParts(["a", "b"], 10, 10)) === JSON.stringify(["a\nb"]));
+    check("Stücke: getrennt wird nur zwischen Teams", JSON.stringify(PackParts(["aaaa", "bbbb", "cccc", "dddd"], 9, 9)) === JSON.stringify(["aaaa\nbbbb", "cccc\ndddd"]));
+    check("Stücke: in der letzten Nachricht bleibt Platz für das, was nach {teams} kommt", JSON.stringify(PackParts(["aaaa", "bbbb"], 9, 9, 3)) === JSON.stringify(["aaaa", "bbbb"]));
+    check("Stücke: ein Team länger als eine Nachricht geht an Zeilen auseinander", JSON.stringify(PackParts(["l1\nl2\nl3"], 5, 5)) === JSON.stringify(["l1\nl2", "l3"]));
+    check("Stücke: füllt der Kopf die erste Nachricht, beginnt die Liste in der zweiten", JSON.stringify(PackParts(["aaaa"], 2, 9)) === JSON.stringify(["", "aaaa"]));
+
+    let huge: string[] | string;
+
+    try {
+        huge = PackParts(["aaaa", "bbbb"], 9, 9, 20);
+    } catch (error) {
+        huge = String(error);
+    }
+
+    // Steht unter {teams} mehr, als in eine Nachricht passt, kürzt Discord das Ende wie bisher - die Liste bleibt ganz.
+    check("Stücke: riesiges Ende unter der Liste wirft nicht und verliert kein Team", Array.isArray(huge) && huge.join("\n").includes("aaaa") && huge.join("\n").includes("bbbb"), JSON.stringify(huge));
+
+    const guild = FakeGuild();
+    const service = client.teamService;
+    const groups: ITeamGroup[] = [
+        { id: 1, guildId: GUILD, name: "Main", position: 0 },
+        { id: 2, guildId: GUILD, name: "Academy", position: 1 },
+    ];
+    const base = DefaultTeamSettings();
+    // Wie bei Bild 3 vom 24.10.: Kopf, Liste, darunter klein der Stand.
+    const doc = {
+        accent: "#00afff",
+        blocks: [
+            { type: "text" as const, body: "# Unsere Teams\nSo sind wir aufgestellt." },
+            { type: "separator" as const, line: true },
+            { type: "text" as const, body: "{teams}" },
+            { type: "separator" as const, line: true },
+            { type: "text" as const, body: "-# Stand {updated}" },
+        ],
+    };
+    const settings: ITeamSettings = { ...base, layout: "single", board: { ...base.board, kind: "v2", doc } };
+    const views = ManyTeams().map((team) => service.Look(team, groups, settings));
+    const mentions = views.flatMap((view) => view.players.map((entry) => `<@${entry.player.discordId}>`));
+
+    check("Testdaten: die Liste ist länger als eine Nachricht", BoardText(views, groups, false, settings).length > 4000);
+
+    const payloads = await BoardViews(client, settings, views, groups, guild);
+    const texts = payloads.map(TextOf);
+
+    check(
+        "Zu viele Teams: mehrere Nachrichten, jede höchstens 4000 Zeichen, nichts abgeschnitten",
+        payloads.length > 1 && texts.every((text) => text.length <= 4000 && !text.includes("…")),
+        texts.map((text) => text.length).join(", ")
+    );
+    check(
+        "Jeder Spieler steht genau einmal da",
+        mentions.every((mention) => texts.join("\n").split(mention).length === 2),
+        mentions.filter((mention) => texts.join("\n").split(mention).length !== 2).join(", ")
+    );
+    check(
+        "Kopf nur in der ersten Nachricht, der Stand nur in der letzten",
+        texts[0].includes("# Unsere Teams") && !texts.slice(1).some((text) => text.includes("Unsere Teams")) && texts[texts.length - 1].includes("-# Stand") && !texts.slice(0, -1).some((text) => text.includes("-# Stand")),
+        texts.map((text) => text.slice(0, 40)).join(" | ")
+    );
+    check("Weitere Nachrichten beginnen mit einem Team oder einer Gruppe, nie mitten im Kader", texts.slice(1).every((text) => /^(### |\*\*Team )/.test(text)), texts.slice(1).map((text) => text.slice(0, 30)).join(" | "));
+    check("Weitere Nachrichten haben dieselbe Farbe", payloads.every((payload) => JSON.stringify(payload.components.map((entry) => entry.toJSON())).includes(`"accent_color":${0x00afff}`)));
+    check("Wenige Teams: eine Nachricht wie bisher", (await BoardViews(client, settings, views.slice(0, 2), groups, guild)).length === 1);
+
+    const embedded: ITeamSettings = { ...settings, board: { ...settings.board, kind: "embed", embed: { title: "Teams", description: "So sind wir aufgestellt.\n\n{teams}", color: "#00afff" } as never } };
+    const embeds = (await BoardViews(client, embedded, views, groups, guild)).map(TextOf);
+
+    check(
+        "Auch als Embed: mehrere Nachrichten, jede Beschreibung höchstens 4000 Zeichen, alle Spieler da",
+        embeds.length > 1 && embeds.every((text) => text.length <= 4000) && mentions.every((mention) => embeds.join("\n").includes(mention)),
+        embeds.map((text) => text.length).join(", ")
+    );
+
+    // Im Kanal: aus einer Nachricht werden mehrere, dann gleich viele, dann weniger.
+    const stored: ITeamSettings = { ...settings, channelId: TEXT, messageId: "100" };
+    const alive = new Set(["100"]);
+    const deleted: string[] = [];
+    const edited: string[] = [];
+    const sent: string[] = [];
+    let next = 400;
+    let shown = views;
+    const channel = {
+        id: TEXT,
+        type: ChannelType.GuildText,
+        isTextBased: () => true,
+        messages: {
+            fetch: async (id: string) => (alive.has(id) ? { id, edit: async () => void edited.push(id) } : Promise.reject(new Error("Unknown Message"))),
+            delete: async (id: string) => {
+                deleted.push(id);
+                alive.delete(id);
+            },
+        },
+        send: async () => {
+            const id = String(next++);
+
+            sent.push(id);
+            alive.add(id);
+
+            return { id };
+        },
+    };
+    const inChannel = { ...FakeGuild(), channels: { cache: new Map([[TEXT, channel]]) } } as unknown as Guild;
+    const original = { settings: service.Settings, views: service.Views, save: client.moduleSettings.Save };
+    const reset = (): void => {
+        edited.length = 0;
+        sent.length = 0;
+        deleted.length = 0;
+    };
+
+    service.Settings = async () => ({ ...stored });
+    service.Views = async () => ({ views: shown, groups, settings: stored });
+    client.moduleSettings.Save = (async (_guildId: string, _module: string, value: ITeamSettings) => void Object.assign(stored, value)) as never;
+
+    try {
+        await service.Publish(inChannel);
+
+        const ids = [stored.messageId, ...(stored.moreIds ?? [])];
+
+        check(
+            "Im Kanal: werden es mehr Nachrichten, gehen alle neu raus, in der richtigen Folge",
+            deleted.join() === "100" && edited.length === 0 && sent.length === payloads.length && ids.join() === sent.join(),
+            `deleted ${deleted} · edited ${edited} · sent ${sent} · ids ${ids}`
+        );
+
+        reset();
+        await service.Publish(inChannel);
+        check("Im Kanal: gleich viele Nachrichten werden nur bearbeitet", sent.length === 0 && deleted.length === 0 && edited.join() === ids.join(), `edited ${edited} · sent ${sent}`);
+
+        reset();
+        shown = views.slice(0, 2);
+        await service.Publish(inChannel);
+        check(
+            "Im Kanal: wird die Liste kürzer, verschwinden die überzähligen Nachrichten",
+            edited.join() === ids[0] && deleted.join() === ids.slice(1).join() && sent.length === 0 && stored.messageId === ids[0] && (stored.moreIds ?? []).length === 0,
+            `edited ${edited} · deleted ${deleted} · more ${stored.moreIds}`
+        );
+
+        shown = views;
+        await service.Publish(inChannel);
+        reset();
+
+        const all = [stored.messageId, ...(stored.moreIds ?? [])];
+
+        await service.Withdraw(inChannel, null, true);
+        check("Einsammeln nimmt auch die weiteren Nachrichten mit", all.length > 1 && deleted.join() === all.join() && stored.messageId === null && (stored.moreIds ?? []).length === 0, `deleted ${deleted} · all ${all}`);
+    } finally {
+        service.Settings = original.settings;
+        service.Views = original.views;
+        client.moduleSettings.Save = original.save;
+    }
+}
+
 async function main(): Promise<void> {
     console.log("\n🛡️  RL Team-Übersicht\n");
 
@@ -1365,6 +1559,7 @@ async function main(): Promise<void> {
     checkOrder(client);
     checkView(client);
     await checkMenu(client);
+    await checkLongBoard(client);
     checkClean(client);
     checkRoles(client);
     await checkRights(client);

@@ -179,6 +179,8 @@ export interface ITeamSettings {
     team: ITeamBody;
     /** Die Kopf-Nachricht im Kanal - bei "menu" und "single". */
     messageId: string | null;
+    /** Passt {teams} nicht in eine Nachricht: die weiteren darunter, in ihrer Folge. Fehlt bei älteren Einstellungen. */
+    moreIds?: string[];
 }
 
 /** Was eine Karte über ein Team weiß, nachdem gerechnet wurde. */

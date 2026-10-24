@@ -12,7 +12,7 @@ import {
 import { createHash } from "node:crypto";
 import BotClient from "../client/BotClient";
 import { ICustomView } from "../builder/CustomView";
-import { BoardView, TeamCardView } from "../builder/TeamView";
+import { BoardViews, TeamCardView } from "../builder/TeamView";
 import {
     COUNTING_ROLES,
     DefaultBoardBody,
@@ -276,6 +276,7 @@ export default class TeamService {
             roles: { sync: settings.roles?.sync ?? roles.sync, positions: { ...roles.positions, ...settings.roles?.positions } },
             list: { ...DefaultTeamList(), ...settings.list },
             order: { ...DefaultTeamOrder(), ...settings.order },
+            moreIds: Array.isArray(settings.moreIds) ? settings.moreIds.filter((id): id is string => typeof id === "string") : [],
         };
     }
 
@@ -298,6 +299,7 @@ export default class TeamService {
             board: this.CleanBody(guild, raw.board, previous.board, DefaultBoardBody()),
             team: this.CleanBody(guild, raw.team, previous.team, DefaultTeamBody()),
             messageId: previous.messageId,
+            moreIds: previous.moreIds ?? [],
         };
     }
 
@@ -475,10 +477,16 @@ export default class TeamService {
         return settings;
     }
 
-    private async SetMessage(guildId: string, messageId: string | null): Promise<void> {
+    /** Die Nachrichten der Übersicht im Kanal, in ihrer Folge. Leer: keine. */
+    private async SetMessages(guildId: string, ids: string[]): Promise<void> {
         const settings = await this.Settings(guildId);
 
-        await this.client.moduleSettings.Save(guildId, TEAMS_MODULE, { ...settings, messageId });
+        await this.client.moduleSettings.Save(guildId, TEAMS_MODULE, { ...settings, messageId: ids[0] ?? null, moreIds: ids.slice(1) });
+    }
+
+    /** Kopf und weitere Nachrichten der Übersicht. */
+    private static BoardIds(settings: ITeamSettings): string[] {
+        return [settings.messageId, ...(settings.moreIds ?? [])].filter((id): id is string => typeof id === "string" && id !== "");
     }
 
     /* ----------------------------------------------------------
@@ -1231,15 +1239,36 @@ export default class TeamService {
             if (view.team.messageId) await this.Withdraw(guild, view.team);
         }
 
-        const payload = await BoardView(this.client, settings, views, groups, guild);
-        const message = settings.messageId ? await channel.messages.fetch(settings.messageId).catch(() => null) : null;
+        // Bei vielen Teams mehrere Nachrichten: {teams} geht darunter weiter (BoardViews).
+        const payloads = await BoardViews(this.client, settings, views, groups, guild);
+        const ids = TeamService.BoardIds(settings);
+        const found = await Promise.all(ids.map((id) => channel.messages.fetch(id).catch(() => null)));
+        const kept = payloads.map((_, index) => found[index] ?? null);
 
-        // attachments: [] wirft die Bilder der vorigen Fassung weg - sonst
-        // haengen sie nach einem Wechsel doppelt daran.
-        if (message) await message.edit({ ...payload, attachments: [] });
-        else await this.SetMessage(guild.id, (await channel.send(payload)).id);
+        if (kept.every((message) => message !== null)) {
+            // attachments: [] wirft die Bilder der vorigen Fassung weg - sonst
+            // haengen sie nach einem Wechsel doppelt daran.
+            for (const [index, message] of kept.entries()) await message?.edit({ ...payloads[index], attachments: [] });
 
-        return { layout: settings.layout, sent: 1 };
+            // Wird die Liste kürzer, verschwinden die überzähligen.
+            for (const id of ids.slice(payloads.length)) await channel.messages.delete(id).catch(() => undefined);
+
+            if (ids.length !== payloads.length) await this.SetMessages(guild.id, ids.slice(0, payloads.length));
+        } else {
+            // Fehlt eine, oder braucht die Liste mehr Nachrichten als dastehen: alle neu, in der richtigen Folge.
+            // Eine angehängte Nachricht landete sonst hinter allem, was seitdem im Kanal geschrieben wurde.
+            for (const [index, id] of ids.entries()) {
+                if (found[index]) await channel.messages.delete(id).catch(() => undefined);
+            }
+
+            const sent: string[] = [];
+
+            for (const payload of payloads) sent.push((await channel.send(payload)).id);
+
+            await this.SetMessages(guild.id, sent);
+        }
+
+        return { layout: settings.layout, sent: payloads.length };
     }
 
     private async Send(guild: Guild, team: ITeam, payload: ICustomView): Promise<boolean> {
@@ -1307,9 +1336,12 @@ export default class TeamService {
             return;
         }
 
-        if (head && settings.messageId) {
-            await channel.messages.delete(settings.messageId).catch(() => undefined);
-            await this.SetMessage(guild.id, null);
+        const ids = TeamService.BoardIds(settings);
+
+        if (head && ids.length) {
+            for (const id of ids) await channel.messages.delete(id).catch(() => undefined);
+
+            await this.SetMessages(guild.id, []);
         }
     }
 

@@ -11,10 +11,12 @@ import BotClient from "../client/BotClient";
 import { CustomMessageView, ICustomView } from "./CustomView";
 import { BadgeOf, ITeamFormats, MAX_MENU_TEAMS, MMR_LABELS, PLAIN_FORMATS, PLAYING_ROLES, RankFormat, RankFormatter, RoleFormatter, ROLE_ORDER, TEAMS_PREFIX, UsedSlots } from "../constants/Teams";
 import { RankFromMMR, RankShort, TrackerURL } from "../constants/Prime";
-import { IListTeam, TeamListText } from "../constants/TeamList";
+import { IListTeam, TeamListParts, TeamListText } from "../constants/TeamList";
 import { DefaultTeamSettings } from "../constants/Teams";
 import { ITeamGroup, ITeamSettings, ITeamView, PlaylistSlot, TeamRole } from "../interfaces/services/teams/ITeams";
-import { AnyPlaceholderValues } from "../constants/Placeholders";
+import { AnyPlaceholderValues, Fill } from "../constants/Placeholders";
+import { IMessageBlock } from "../interfaces/builder/IMessageDoc";
+import { ICustomEmbed } from "../interfaces/services/messages/IMessages";
 
 /**
  * Die Übersicht als Nachricht: je Team eine Karte, eine Karte mit Auswahlmenü
@@ -387,6 +389,25 @@ export function Formats(client: BotClient, styles: Pick<ITeamSettings, "rankStyl
     };
 }
 
+/** Die Platzhalter der Kopf-Nachricht. */
+function BoardValues(client: BotClient, settings: ITeamSettings, views: ITeamView[], groups: ITeamGroup[], guild: Guild): AnyPlaceholderValues {
+    const stamps = views.map((view) => view.fetchedAt).filter((at) => at > 0);
+    const formats = Formats(client, settings);
+
+    return {
+        ...PlayerValues(views, settings, false, formats),
+        guild: guild.name,
+        "guild.id": guild.id,
+        "guild.icon": guild.iconURL({ size: 256 }) ?? "",
+        teams: BoardText(views, groups, settings.layout === "menu", settings, formats),
+        "teams.short": BoardText(views, groups, true),
+        "teams.count": String(views.length),
+        "groups.count": String(groups.filter((group) => views.some((view) => view.team.groupId === group.id)).length),
+        "mmr.mode": MMR_LABELS[settings.mmr.mode] ?? settings.mmr.mode,
+        updated: When(stamps.length ? Math.min(...stamps) : Date.now()),
+    };
+}
+
 /** Der Kopf: bei "menu" mit Menü, bei "single" mit allen Teams darin. */
 export async function BoardView(
     client: BotClient,
@@ -397,20 +418,7 @@ export async function BoardView(
 ): Promise<ICustomView> {
     const body = settings.board;
     const menu = settings.layout === "menu";
-    const stamps = views.map((view) => view.fetchedAt).filter((at) => at > 0);
-    const formats = Formats(client, settings);
-    const values: AnyPlaceholderValues = {
-        ...PlayerValues(views, settings, false, formats),
-        guild: guild.name,
-        "guild.id": guild.id,
-        "guild.icon": guild.iconURL({ size: 256 }) ?? "",
-        teams: BoardText(views, groups, menu, settings, formats),
-        "teams.short": BoardText(views, groups, true),
-        "teams.count": String(views.length),
-        "groups.count": String(groups.filter((group) => views.some((view) => view.team.groupId === group.id)).length),
-        "mmr.mode": MMR_LABELS[settings.mmr.mode] ?? settings.mmr.mode,
-        updated: When(stamps.length ? Math.min(...stamps) : Date.now()),
-    };
+    const values = BoardValues(client, settings, views, groups, guild);
 
     const rows = menu ? [TeamMenuRow(views)] : [];
     const view = await CustomMessageView(
@@ -431,6 +439,158 @@ export async function BoardView(
     }
 
     return { ...view, components: [...view.components, ...rows] };
+}
+
+/**
+ * So viel Text nimmt Discord in einer Nachricht: Components V2 zählt allen Text
+ * zusammen, beim Embed zählt die Beschreibung, sonst der Inhalt. Etwas Luft
+ * bleibt für Zeilenumbrüche und Leerzeichen, die beim Füllen wegfallen.
+ */
+const ROOM = { v2: 4000, embed: 4000, text: 2000 } as const;
+const SLACK = 16;
+
+/** Ein Stück, das allein nicht in eine Nachricht passt, an Zeilen geteilt. */
+function SplitLines(part: string, room: number): string[] {
+    const pieces: string[] = [];
+    let piece = "";
+
+    for (const line of part.split("\n").flatMap((entry) => entry.match(new RegExp(`[^]{1,${room}}`, "g")) ?? [""])) {
+        if (piece && piece.length + 1 + line.length > room) {
+            pieces.push(piece);
+            piece = line;
+        } else {
+            piece = piece ? `${piece}\n${line}` : line;
+        }
+    }
+
+    return [...pieces, piece];
+}
+
+/**
+ * Verteilt die Stücke von {teams} auf Nachrichten. first: Platz in der ersten
+ * (dort steht noch der Kopf), room: in jeder weiteren, tail: was in der
+ * letzten nach {teams} kommt. Getrennt wird nur zwischen Stücken; ein Stück,
+ * das allein zu lang ist, an Zeilen. Die erste darf leer bleiben, wenn der
+ * Kopf sie schon füllt.
+ */
+export function PackParts(parts: readonly string[], first: number, room: number, tail = 0): string[] {
+    // Steht unter {teams} mehr als eine halbe Nachricht, kürzt Discord das Ende wie bisher - die Liste bleibt ganz.
+    tail = Math.min(tail, Math.floor(room / 2));
+
+    const pieces = parts.flatMap((part) => (part.length <= room - tail ? [part] : SplitLines(part, room - tail)));
+    const chunks: string[] = [];
+    let index = 0;
+    let budget = first;
+
+    while (index < pieces.length) {
+        const rest = pieces.slice(index).join("\n");
+
+        if (rest.length <= budget - tail) {
+            chunks.push(rest);
+            break;
+        }
+
+        // Passte der Rest ohne das Ende ganz hinein, bleibt Platz dafür: sonst stünde es allein in einer Nachricht.
+        const limit = rest.length <= budget ? budget - tail : budget;
+        let text = "";
+
+        while (index < pieces.length) {
+            const next = text ? `${text}\n${pieces[index]}` : pieces[index];
+
+            if (next.length > limit) break;
+
+            text = next;
+            index++;
+        }
+
+        chunks.push(text);
+        budget = room;
+    }
+
+    return chunks;
+}
+
+/** Wie viel Text diese Bausteine füllen, so wie Discord ihn zählt. */
+function TextOf(blocks: IMessageBlock[], values: AnyPlaceholderValues): number {
+    return blocks.reduce((sum, block) => sum + (block.type === "text" || block.type === "section" ? Fill(block.body, values).trim().length : 0), 0);
+}
+
+/**
+ * Die Übersicht als eine oder mehrere Nachrichten. Passt {teams} nicht in eine
+ * Nachricht, geht die Liste in weiteren Nachrichten im selben Stil weiter:
+ * getrennt nur zwischen Teams, der Kopf in der ersten, was nach {teams} kommt
+ * (Components V2) oder Fußzeile, Felder und Bild (Embed) in der letzten. Mit
+ * Menü bleibt es eine Nachricht, dort steht nur die kurze Liste.
+ */
+export async function BoardViews(client: BotClient, settings: ITeamSettings, views: ITeamView[], groups: ITeamGroup[], guild: Guild): Promise<ICustomView[]> {
+    const one = async (): Promise<ICustomView[]> => [await BoardView(client, settings, views, groups, guild)];
+
+    if (settings.layout === "menu") return one();
+
+    const body = settings.board;
+    const values = BoardValues(client, settings, views, groups, guild);
+    const without = { ...values, teams: "" };
+    const parts = TeamListParts(ListTeams(views, settings, Formats(client, settings)), groups, settings.list);
+    const room = ROOM[body.kind] - SLACK;
+    const page = (source: { kind: ITeamSettings["board"]["kind"]; content?: string; embed?: ICustomEmbed | null; blocks?: IMessageBlock[] }, teams: string): Promise<ICustomView> =>
+        CustomMessageView(
+            client,
+            { id: 0, kind: source.kind, content: source.content ?? "", embed: source.embed ?? null, doc: { ...body.doc, blocks: source.blocks ?? body.doc.blocks }, buttons: [] },
+            { ...values, teams }
+        );
+
+    if (body.kind === "v2") {
+        const blocks = body.doc.blocks;
+        const at = blocks.findIndex((block) => (block.type === "text" || block.type === "section") && block.body.includes("{teams}"));
+
+        if (at === -1 || TextOf(blocks, values) <= room) return one();
+
+        const chunks = PackParts(parts, room - TextOf(blocks.slice(0, at + 1), without), room, TextOf(blocks.slice(at + 1), values));
+
+        if (chunks.length < 2) return one();
+
+        const list: IMessageBlock = { type: "text", body: "{teams}" };
+
+        return Promise.all(
+            chunks.map((chunk, index) =>
+                page({ kind: "v2", blocks: index === 0 ? blocks.slice(0, at + 1) : index === chunks.length - 1 ? [list, ...blocks.slice(at + 1)] : [list] }, chunk)
+            )
+        );
+    }
+
+    if (body.kind === "embed" && body.embed?.description?.includes("{teams}")) {
+        const embed = body.embed;
+        const description = embed.description ?? "";
+
+        if (Fill(description, values).length <= room) return one();
+
+        const chunks = PackParts(parts, room - Fill(description, without).length, room);
+
+        if (chunks.length < 2) return one();
+
+        // Weitere Nachrichten: nur die Liste in derselben Farbe, die letzte mit dem, was unten im Embed steht.
+        const more: ICustomEmbed = { title: null, description: "{teams}", color: embed.color, url: null, image: null, thumbnail: null, author: null, footer: null, timestamp: false, fields: [] };
+        const bottom = { footer: embed.footer, fields: embed.fields, image: embed.image, timestamp: embed.timestamp };
+        const top: ICustomEmbed = { ...embed, footer: null, fields: [], image: null, timestamp: false };
+
+        return Promise.all(
+            chunks.map((chunk, index) =>
+                page({ kind: "embed", content: index === 0 ? body.content : "", embed: index === 0 ? top : index === chunks.length - 1 ? { ...more, ...bottom } : more }, chunk)
+            )
+        );
+    }
+
+    if (body.kind === "text" && body.content.includes("{teams}")) {
+        if (Fill(body.content, values).length <= room) return one();
+
+        const chunks = PackParts(parts, room - Fill(body.content, without).length, room);
+
+        if (chunks.length < 2) return one();
+
+        return Promise.all(chunks.map((chunk, index) => page({ kind: "text", content: index === 0 ? body.content : "{teams}" }, chunk)));
+    }
+
+    return one();
 }
 
 /** Das Auswahlmenü mit den Teams. */
