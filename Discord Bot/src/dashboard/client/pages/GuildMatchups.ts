@@ -53,6 +53,9 @@ interface ISettings {
     remindMinutes: number;
     open: boolean;
     results: boolean;
+    discordResults: boolean;
+    resultRemindHours: number;
+    colorByStatus: boolean;
     maxAhead: number;
     leagues: string[];
     announce: IBody;
@@ -73,7 +76,7 @@ interface IPayload {
     bestOf: number[];
     entryRoles: string[];
     bodyKinds: Record<string, string>;
-    limits: { opponent: number; league: number; note: number; leagues: number; pings: number; remind: number; ahead: number; page: number };
+    limits: { opponent: number; league: number; note: number; leagues: number; pings: number; remind: number; resultRemind: number; ahead: number; page: number };
     guild: {
         name: string;
         roles: IRole[];
@@ -194,6 +197,7 @@ function mount(guildId: string, view: "base" | "list" | "all"): void {
                     remindMinutes: draft.remindMinutes,
                     open: draft.open,
                     results: draft.results,
+                    colorByStatus: draft.colorByStatus,
                     maxAhead: draft.maxAhead,
                     leagues: draft.leagues,
                 },
@@ -279,6 +283,19 @@ function mount(guildId: string, view: "base" | "list" | "all"): void {
                 )
             ),
             row("Erinnern", "Minuten vor Anpfiff – 0 heißt: keine Erinnerung", minutes),
+            row(
+                "Farbe nach Stand",
+                "Rot vor und während des Spiels, grün bei Sieg, rot bei Niederlage, grau bei Unentschieden und Absage. Aus: die Farbe aus dem Editor",
+                el(
+                    "label",
+                    "snitem__switch",
+                    toggle(draft.colorByStatus, "Farbe nach Stand", (on) => {
+                        draft.colorByStatus = on;
+                        touch();
+                    }),
+                    el("span", "", "an")
+                )
+            ),
             row("Höchstens im Voraus", "Tage – so weit dürfen Captains planen", ahead),
             row("Vorschläge für die Liga", "Mit | getrennt – im Formular stehen sie zur Auswahl", leagues),
             el("div", "mcsave lvsave", save)
@@ -308,7 +325,9 @@ function mount(guildId: string, view: "base" | "list" | "all"): void {
         save.addEventListener("click", async () => {
             save.disabled = true;
 
-            if (!(await call("", { action: "settings", settings: { open: draft.open, results: draft.results } }))) {
+            const settings = { open: draft.open, results: draft.results, discordResults: draft.discordResults, resultRemindHours: draft.resultRemindHours };
+
+            if (!(await call("", { action: "settings", settings }))) {
                 save.disabled = false;
 
                 return;
@@ -318,13 +337,25 @@ function mount(guildId: string, view: "base" | "list" | "all"): void {
             void reload();
         });
 
+        const hours = el("input", "text lfdays");
+
+        hours.type = "number";
+        hours.min = "0";
+        hours.max = String(data!.limits.resultRemind);
+        hours.value = String(draft.resultRemindHours);
+        hours.setAttribute("aria-label", "Stunden bis zur Erinnerung ans Ergebnis");
+        hours.addEventListener("input", () => {
+            draft.resultRemindHours = Math.max(0, Math.min(data!.limits.resultRemind, Number(hours.value) || 0));
+            touch();
+        });
+
         return card(
             "Der Link für die Captains",
             `Eintragen darf, wer im Kader als ${data!.entryRoles.join(", ")} steht – der Bot nimmt die Team-Übersicht als Grundlage. Wer den Server verwaltet, darf für jedes Team eintragen.`,
             row("Adresse", "Ohne Anmeldung sichtbar, eintragen nur angemeldet", el("div", "aplink", field, copy)),
             row(
                 "Link offen",
-                "Aus: niemand kann eintragen, auch nicht über den Link",
+                "Aus: die Seite ist zu, die Knöpfe zur Webseite fallen in Discord weg. In Discord eintragen geht weiter.",
                 el(
                     "label",
                     "snitem__switch",
@@ -348,6 +379,20 @@ function mount(guildId: string, view: "base" | "list" | "all"): void {
                     el("span", "", "an")
                 )
             ),
+            row(
+                "Ergebnis in Discord eintragen",
+                "Der Knopf unter der Ankündigung. Aus: nur noch über Link und Dashboard",
+                el(
+                    "label",
+                    "snitem__switch",
+                    toggle(draft.discordResults, "Ergebnis in Discord eintragen", (on) => {
+                        draft.discordResults = on;
+                        touch();
+                    }),
+                    el("span", "", "an")
+                )
+            ),
+            row("Erinnern, wenn das Ergebnis fehlt", `Stunden nach Anpfiff, einmal unter der Ankündigung – 0 heißt aus, höchstens ${data!.limits.resultRemind}`, hours),
             el("div", "mcsave lvsave", save)
         );
     }
@@ -374,6 +419,7 @@ function mount(guildId: string, view: "base" | "list" | "all"): void {
         });
 
         const announce = bodyEditor(draft.announce, {
+            pageSave: () => save,
             kinds: data!.bodyKinds,
             context: context(MATCHUP_PLACEHOLDERS),
             defaultEmbed: () => embedOf("{team} vs. {gegner}", "**Anpfiff** {zeit}\n{countdown}"),
@@ -384,6 +430,7 @@ function mount(guildId: string, view: "base" | "list" | "all"): void {
         });
 
         const remind = bodyEditor(draft.remind, {
+            pageSave: () => save,
             kinds: data!.bodyKinds,
             context: context(MATCHUP_PLACEHOLDERS),
             defaultEmbed: () => embedOf("Gleich geht es los", "{team} vs. {gegner} – {countdown}"),
@@ -394,6 +441,7 @@ function mount(guildId: string, view: "base" | "list" | "all"): void {
         });
 
         const result = bodyEditor(draft.result, {
+            pageSave: () => save,
             kinds: data!.bodyKinds,
             context: context(MATCHUP_RESULT_PLACEHOLDERS),
             defaultEmbed: () => embedOf("{ausgang} {team} {ergebnis} {gegner}", "{notiz}"),

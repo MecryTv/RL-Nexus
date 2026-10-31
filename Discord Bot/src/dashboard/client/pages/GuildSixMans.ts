@@ -404,6 +404,7 @@ function mount(guildId: string, view: "base" | "live" | "board"): void {
         });
 
         const panel = bodyEditor(draft.panel, {
+            pageSave: () => save,
             kinds: data!.bodyKinds,
             context: context(SIX_PANEL_PLACEHOLDERS),
             defaultEmbed: () => embedOf("2, 4 & 6 Mans", "{warteschlange}"),
@@ -414,6 +415,7 @@ function mount(guildId: string, view: "base" | "live" | "board"): void {
         });
 
         const round = bodyEditor(draft.round, {
+            pageSave: () => save,
             kinds: data!.bodyKinds,
             context: context(SIX_ROUND_PLACEHOLDERS),
             defaultEmbed: () => embedOf("{modus} · Runde #{runde}", "{blau}\n\n{orange}"),
@@ -424,6 +426,7 @@ function mount(guildId: string, view: "base" | "live" | "board"): void {
         });
 
         const result = bodyEditor(draft.result, {
+            pageSave: () => save,
             kinds: data!.bodyKinds,
             context: context(SIX_RESULT_PLACEHOLDERS),
             defaultEmbed: () => embedOf("Runde #{runde}", "{sieger.team} gewinnt"),
@@ -434,6 +437,7 @@ function mount(guildId: string, view: "base" | "live" | "board"): void {
         });
 
         const dm = bodyEditor(draft.dmBody, {
+            pageSave: () => save,
             kinds: data!.bodyKinds,
             context: context(SIX_ROUND_PLACEHOLDERS),
             defaultEmbed: () => embedOf("Deine Runde steht", "Lobby {lobby}, Passwort {passwort}"),

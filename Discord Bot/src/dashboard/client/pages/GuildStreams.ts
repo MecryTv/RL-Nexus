@@ -17,7 +17,8 @@ import { toast } from "../core/Toast.js";
 import { api, button, card, confirmButton, el, face, IRole, loading, pingSelect, row, select, stat, toggle } from "../core/Ui.js";
 import { TWITCH_IMAGES, TWITCH_PLACEHOLDERS, YOUTUBE_IMAGES, YOUTUBE_PLACEHOLDERS } from "../constants/Placeholders.js";
 import { IServerEmoji } from "../layout/EmojiPicker.js";
-import { IEditorContext, IMessageDoc, insertPlaceholder, renderEditor, renderPreview } from "../layout/MessageEditor.js";
+import { IMessageDoc } from "../layout/MessageEditor.js";
+import { bodyEditor, IBodyEditor } from "../layout/BodyEditor.js";
 
 type Platform = "twitch" | "youtube";
 type Kind = "live" | "video" | "short";
@@ -93,37 +94,6 @@ const BRAND: Record<Platform, { name: string; symbol: string; input: string; hin
         hint: "Der Bot liest alle fünf Minuten den Feed der Kanäle – neue Videos und Shorts ohne API-Schlüssel, Livestreams mit.",
     },
 };
-
-/**
- * Was man in die Nachricht schreiben kann: alle Platzhalter der Plattform zum
- * Nachlesen. Ein Klick setzt einen dorthin, wo der Cursor zuletzt stand.
- */
-function placeholderHint(platform: Platform, host: HTMLElement): HTMLElement {
-    const list = platform === "twitch" ? TWITCH_PLACEHOLDERS : YOUTUBE_PLACEHOLDERS;
-    const images = platform === "twitch" ? TWITCH_IMAGES : YOUTUBE_IMAGES;
-    const chips = el("div", "phhint__list");
-
-    for (const entry of list) {
-        const key = `{${entry.key}}`;
-        const chip = button("phchip", el("code", "", key), el("span", "phchip__label", entry.label));
-
-        chip.title = `${entry.label} – Beispiel: ${entry.sample || "Bild"}`;
-
-        if (images.includes(key)) chip.classList.add("is-image");
-
-        chip.addEventListener("click", () => {
-            if (!insertPlaceholder(key, host)) toast("info", "Kein Textfeld da", "Füge zuerst einen Text-Block hinzu.");
-        });
-        chips.append(chip);
-    }
-
-    return el(
-        "div",
-        "phhint",
-        el("p", "hintline phhint__lead", "Platzhalter setzt der Bot beim Senden ein – Knopf und Ping hängt er selbst an. Ein Klick setzt ihn ins Textfeld:"),
-        chips
-    );
-}
 
 export function renderStreams(guildId: string, platform: Platform): void {
     const host = need<HTMLElement>(`#${platform}Body`);
@@ -367,8 +337,8 @@ export function renderStreams(guildId: string, platform: Platform): void {
 
     function editor(notifier: INotifier, draft: IDraft): HTMLElement {
         const { config } = draft;
-        const preview = el("div", "tkside__body");
-        const editorHost = el("div", "tkeditor");
+        const studioHost = el("div", "");
+        let studio: IBodyEditor | null = null;
         const saveButton = button("btn btn--primary", icon("#i-check"), "Speichern");
         const reset = button("btn btn--quiet", "Verwerfen");
         const touch = (): void => {
@@ -380,35 +350,42 @@ export function renderStreams(guildId: string, platform: Platform): void {
         saveButton.disabled = !draft.dirty;
         reset.disabled = !draft.dirty;
 
-        const context = (): IEditorContext => ({
-            guildId,
-            values: values(notifier, draft.kind),
-            roles: new Map(data!.guild.roles.map((role) => [role.id, role.name])),
-            channels: new Map(data!.targets.channels.map((channel) => [channel.id, channel.name])),
-            emojis: data!.guild.emojis,
-            placeholders: platform === "twitch" ? TWITCH_PLACEHOLDERS : YOUTUBE_PLACEHOLDERS,
-            imagePlaceholders: platform === "twitch" ? TWITCH_IMAGES : YOUTUBE_IMAGES,
-            onChange: (structural?: boolean) => {
-                touch();
-                paintPreview();
+        // Plan 40: die Nachricht je Art im Nachrichten-Studio, nur als Karte. Ping darüber und Knopf darunter setzt der Bot selbst.
+        const paintStudio = (): void => {
+            studio = bodyEditor(
+                { kind: "v2", content: "", embed: null, doc: config.messages[draft.kind]! },
+                {
+                    pageSave: () => saveButton,
+                    kinds: { v2: "Karte" },
+                    title: KINDS[platform].length > 1 ? `Nachricht · ${KIND_LABEL[draft.kind]}` : "Nachricht",
+                    hint: "Knopf und Ping hängt der Bot beim Senden selbst an.",
+                    touch,
+                    context: () => ({
+                        guildId,
+                        values: values(notifier, draft.kind),
+                        roles: new Map(data!.guild.roles.map((role) => [role.id, role.name])),
+                        channels: new Map(data!.targets.channels.map((channel) => [channel.id, channel.name])),
+                        emojis: data!.guild.emojis,
+                        placeholders: platform === "twitch" ? TWITCH_PLACEHOLDERS : YOUTUBE_PLACEHOLDERS,
+                        imagePlaceholders: platform === "twitch" ? TWITCH_IMAGES : YOUTUBE_IMAGES,
+                        onChange: () => undefined,
+                    }),
+                    // Nur die Karte - ein Embed gibt es hier nicht.
+                    defaultEmbed: () => ({ title: null, description: null, color: null, url: null, image: null, thumbnail: null, author: null, footer: null, timestamp: false, fields: [] }),
+                    above: () =>
+                        config.ping
+                            ? el("p", "snprev__ping", config.ping === "everyone" || config.ping === "here" ? `@${config.ping}` : `@${data!.guild.roles.find((role) => role.id === config.ping)?.name ?? "Rolle"}`)
+                            : null,
+                    extras: () => el("div", "tkmock", el("span", "tkmock__btn", platform === "twitch" ? "📺 Zum Stream" : draft.kind === "live" ? "▶️ Zum Livestream" : "▶️ Ansehen")),
+                    test: async () => {
+                        // Gesendet wird, was gespeichert ist.
+                        if (draft.dirty && !(await save(notifier, null))) return;
 
-                if (structural) renderEditor(editorHost, config.messages[draft.kind]!, context());
-            },
-        });
-
-        const paintPreview = (): void => {
-            const ping = config.ping
-                ? el("p", "snprev__ping", config.ping === "everyone" || config.ping === "here" ? `@${config.ping}` : `@${data!.guild.roles.find((role) => role.id === config.ping)?.name ?? "Rolle"}`)
-                : null;
-            const body = el("div", "");
-            const mock = el(
-                "div",
-                "tkmock",
-                el("span", "tkmock__btn", platform === "twitch" ? "📺 Zum Stream" : draft.kind === "live" ? "▶️ Zum Livestream" : "▶️ Ansehen")
+                        if (await call("", { action: "test", id: notifier.id, kind: draft.kind })) toast("info", "Test gesendet", "Schau in den Kanal – so sieht die echte Meldung aus.");
+                    },
+                }
             );
-
-            renderPreview(body, config.messages[draft.kind]!, context(), mock);
-            preview.replaceChildren(...(ping ? [ping] : []), body);
+            studioHost.replaceChildren(studio.node);
         };
 
         // Kanal, Ping, was gemeldet wird.
@@ -432,7 +409,7 @@ export function renderStreams(guildId: string, platform: Platform): void {
         const ping = pingSelect(data!.guild.roles, config.ping, (value) => {
             config.ping = value;
             touch();
-            paintPreview();
+            studio?.refresh();
         });
 
         // Wer das in Discord ist: für {streamer.mention} und die Live-Rolle.
@@ -519,8 +496,7 @@ export function renderStreams(guildId: string, platform: Platform): void {
 
                     for (const other of kindTabs.children) other.setAttribute("aria-pressed", String(other === tab));
 
-                    renderEditor(editorHost, config.messages[kind]!, context());
-                    paintPreview();
+                    paintStudio();
                 });
                 kindTabs.append(tab);
             }
@@ -532,28 +508,10 @@ export function renderStreams(guildId: string, platform: Platform): void {
         template.addEventListener("click", () => {
             config.messages[draft.kind] = structuredClone(notifier.defaults[draft.kind]);
             touch();
-            renderEditor(editorHost, config.messages[draft.kind]!, context());
-            paintPreview();
+            paintStudio();
         });
 
-        renderEditor(editorHost, config.messages[draft.kind]!, context());
-        paintPreview();
-
-        const test = button("btn btn--quiet", icon("#i-play"), "Test senden");
-
-        test.addEventListener("click", async () => {
-            test.disabled = true;
-
-            if (draft.dirty && !(await save(notifier, null))) {
-                test.disabled = false;
-
-                return;
-            }
-
-            if (await call("", { action: "test", id: notifier.id, kind: draft.kind })) toast("info", "Test gesendet", "Schau in den Kanal – so sieht die echte Meldung aus.");
-
-            test.disabled = false;
-        });
+        paintStudio();
 
         saveButton.addEventListener("click", () => void save(notifier, "Gespeichert"));
         reset.addEventListener("click", () => {
@@ -563,21 +521,11 @@ export function renderStreams(guildId: string, platform: Platform): void {
 
         return el(
             "div",
-            "snitem__body",
-            el(
-                "div",
-                "sneditor",
-                el(
-                    "div",
-                    "sneditor__main",
-                    settings,
-                    el("div", "sneditor__bar", el("h4", "sneditor__title", "Nachricht"), kindTabs, template),
-                    placeholderHint(platform, editorHost),
-                    editorHost
-                ),
-                el("aside", "sneditor__side", el("div", "tkside__head", el("span", "tkside__live", "Live-Vorschau"), el("b", "", KIND_LABEL[draft.kind])), preview)
-            ),
-            el("div", "mcsave snitem__foot", test, reset, saveButton)
+            "snitem__body snitem__body--studio",
+            settings,
+            el("div", "sneditor__bar", el("h4", "sneditor__title", "Nachricht"), kindTabs, template),
+            studioHost,
+            el("div", "mcsave snitem__foot", reset, saveButton)
         );
     }
 

@@ -218,6 +218,8 @@ export function renderMessages(guildId: string): void {
             touch,
             templates: "message",
             extras: () => buttonPreview(draft) ?? null,
+            // Plan 40: „Speichern“ im Studio spiegelt den Knopf unten - samt Name und Kanal.
+            pageSave: () => saveButton,
         });
 
         saveButton.disabled = true;
@@ -243,7 +245,7 @@ export function renderMessages(guildId: string): void {
             "Kanal für die Nachricht"
         );
 
-        saveButton.addEventListener("click", async () => {
+        const store = async (): Promise<boolean> => {
             saveButton.disabled = true;
 
             const answer = await call<{ message: IMessage }>("", { action: "save", id: message.id, message: draft });
@@ -251,7 +253,7 @@ export function renderMessages(guildId: string): void {
             if (!answer) {
                 saveButton.disabled = false;
 
-                return;
+                return false;
             }
 
             const index = data!.messages.findIndex((entry) => entry.id === message.id);
@@ -260,7 +262,11 @@ export function renderMessages(guildId: string): void {
             drafts.delete(message.id);
             toast("info", "Gespeichert", answer.message.messageId ? "Die gesendete Nachricht wurde gleich mit geändert." : "Gilt beim nächsten Senden.");
             paint();
-        });
+
+            return true;
+        };
+
+        saveButton.addEventListener("click", () => void store());
 
         const send = button("btn btn--quiet", icon("#i-message"), message.messageId ? "Neu senden" : "Jetzt senden");
 
@@ -641,6 +647,7 @@ export function renderMessages(guildId: string): void {
             touch,
             title: "Antwort",
             templates: "message",
+            pageSave: () => saveButton,
         });
 
         saveButton.disabled = true;
@@ -668,7 +675,7 @@ export function renderMessages(guildId: string): void {
             touch();
         });
 
-        saveButton.addEventListener("click", async () => {
+        const store = async (): Promise<boolean> => {
             saveButton.disabled = true;
 
             const answer = await call<{ response: IResponse }>("", { action: "response-save", id: response.id, response: current });
@@ -676,7 +683,7 @@ export function renderMessages(guildId: string): void {
             if (!answer) {
                 saveButton.disabled = false;
 
-                return;
+                return false;
             }
 
             const index = data!.responses.findIndex((entry) => entry.id === response.id);
@@ -685,7 +692,11 @@ export function renderMessages(guildId: string): void {
             responseDrafts.delete(response.id);
             toast("info", "Gespeichert", "Gilt ab der nächsten Nachricht.");
             paint();
-        });
+
+            return true;
+        };
+
+        saveButton.addEventListener("click", () => void store());
 
         return el(
             "div",

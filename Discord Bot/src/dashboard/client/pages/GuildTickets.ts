@@ -16,7 +16,8 @@ import { clickSound } from "../core/Sound.js";
 import { toast } from "../core/Toast.js";
 import { emojiNode, emojiPicker, IServerEmoji } from "../layout/EmojiPicker.js";
 import { loadGallery } from "../layout/ImagePicker.js";
-import { IEditorContext, IMessageDoc, renderEditor, renderPreview } from "../layout/MessageEditor.js";
+import { IEditorContext, IMessageDoc, renderPreview } from "../layout/MessageEditor.js";
+import { bodyEditor } from "../layout/BodyEditor.js";
 
 interface IOption {
     id: string;
@@ -267,7 +268,6 @@ export function renderTickets(guildId: string, canManage: boolean, user: ITicket
     const tabs = el("div", "tktabs");
     const pane = el("div", "tkpane");
     const side = el("aside", "tkside");
-    let editorHost: HTMLElement | null = null;
 
     tabs.setAttribute("role", "tablist");
     tabs.setAttribute("aria-label", "Bereiche des Ticket-Systems");
@@ -336,6 +336,7 @@ export function renderTickets(guildId: string, canManage: boolean, user: ITicket
             panelChannel = data.panel?.channelId ?? config.panel.channelId;
             dirty = false;
             bar.hidden = true;
+            saveButton.disabled = true;
             warn(null);
 
             // Für die Bildauswahl und die Vorschau: die Galerie einmal holen.
@@ -476,6 +477,9 @@ export function renderTickets(guildId: string, canManage: boolean, user: ITicket
         const key = (document.activeElement as HTMLElement | null)?.dataset?.key;
 
         pane.setAttribute("aria-labelledby", `tktab-${tab}`);
+        // Im Reiter Nachrichten zeigt das Studio die Vorschau selbst.
+        side.hidden = tab === "messages";
+        pane.parentElement?.classList.toggle("tkgrid--wide", side.hidden);
         pane.replaceChildren(
             ...(tab === "setup"
                 ? setup()
@@ -1104,10 +1108,22 @@ export function renderTickets(guildId: string, canManage: boolean, user: ITicket
 
         const about = hint(current.startsWith("option:") ? "Diese Eröffnung gilt nur für dieses Thema – sonst gilt die allgemeine." : MESSAGE_HINTS[current] ?? "");
 
-        editorHost = el("div", "tkeditor");
-        renderEditor(editorHost, docOf(current), context());
+        // Plan 40: die Nachricht im Nachrichten-Studio, nur als Karte. Die Vorschau rechts ist in diesem Reiter aus.
+        const studio = bodyEditor(
+            { kind: "v2", content: "", embed: null, doc: docOf(current) },
+            {
+                pageSave: () => saveButton,
+                kinds: { v2: "Karte" },
+                title: labelOf(current),
+                touch,
+                context,
+                // Nur die Karte - ein Embed gibt es hier nicht.
+                defaultEmbed: () => ({ title: null, description: null, color: null, url: null, image: null, thumbnail: null, author: null, footer: null, timestamp: false, fields: [] }),
+                extras: () => mock(current) ?? null,
+            }
+        );
 
-        return [list, about, editorHost];
+        return [list, about, studio.node];
     }
 
     /* ------------------------------------------------------------
@@ -1313,11 +1329,7 @@ export function renderTickets(guildId: string, canManage: boolean, user: ITicket
             roles: new Map(resources.roles.map((entry) => [entry.id, entry.name])),
             channels: new Map(resources.channels.map((entry) => [entry.id, entry.name])),
             emojis: resources.emojis,
-            onChange: (structural?: boolean) => {
-                touch();
-
-                if (structural && editorHost) renderEditor(editorHost, docOf(current), context());
-            },
+            onChange: () => touch(),
         };
     }
 
@@ -1421,6 +1433,7 @@ export function renderTickets(guildId: string, canManage: boolean, user: ITicket
         config = structuredClone(data.config);
         dirty = false;
         bar.hidden = true;
+        saveButton.disabled = true;
         paintAll();
     });
 

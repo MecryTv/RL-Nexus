@@ -11,6 +11,7 @@ import { icon } from "../core/Dom.js";
 import { fill, IMAGE_PLACEHOLDERS, IPlaceholder, PLACEHOLDERS } from "../constants/Placeholders.js";
 import { emojiNode, emojiPicker, IServerEmoji } from "./EmojiPicker.js";
 import { galleryUrl, pickImage } from "./ImagePicker.js";
+import { BLOCK_BUDGET, docCost } from "./MessageStudioCore.js";
 
 export type IMessageBlock =
     | { type: "text"; body: string }
@@ -23,10 +24,6 @@ export interface IMessageDoc {
     blocks: IMessageBlock[];
 }
 
-/** Dieselben Kosten wie im Bot (src/builder/MessageDoc.ts). */
-const COST: Record<IMessageBlock["type"], number> = { text: 1, image: 1, separator: 1, section: 3 };
-
-const BUDGET = 39;
 
 const BLOCK_LABELS: Record<IMessageBlock["type"], string> = {
     text: "Text",
@@ -68,9 +65,6 @@ export interface IPlaceholderTree {
     branches: { label: string; placeholders: IPlaceholder[] }[];
 }
 
-export function docCost(doc: IMessageDoc): number {
-    return doc.blocks.reduce((sum, block) => sum + COST[block.type], 0);
-}
 
 /* ----------------------------------------------------------
    Editor
@@ -686,7 +680,7 @@ export function renderEditor(host: HTMLElement, doc: IMessageDoc, context: IEdit
     const used = docCost(doc);
 
     cost.className = "hintline";
-    cost.textContent = `${used} von ${BUDGET} Bausteinen belegt${used > BUDGET - 6 ? " – für Knöpfe und Menü sollte Platz bleiben." : "."}`;
+    cost.textContent = `${used} von ${BLOCK_BUDGET} Bausteinen belegt${used > BLOCK_BUDGET - 6 ? " – für Knöpfe und Menü sollte Platz bleiben." : "."}`;
 
     host.replaceChildren(bar, list, cost);
 }
@@ -849,7 +843,10 @@ export function renderPreview(host: HTMLElement, doc: IMessageDoc, context: IEdi
 
     if (doc.accent) card.style.setProperty("--accent", doc.accent);
 
-    for (const block of doc.blocks) {
+    // Plan 39: data-block - ein Klick im Studio wählt den Baustein.
+    for (const [index, block] of doc.blocks.entries()) {
+        const before = card.childElementCount;
+
         if (block.type === "text") {
             const body = document.createElement("div");
 
@@ -885,6 +882,8 @@ export function renderPreview(host: HTMLElement, doc: IMessageDoc, context: IEdi
             section.append(body, image(block.thumbnail, context, "tkprev__thumb"));
             card.append(section);
         }
+
+        if (card.childElementCount > before) (card.lastElementChild as HTMLElement).dataset.block = String(index);
     }
 
     if (doc.blocks.length === 0) {

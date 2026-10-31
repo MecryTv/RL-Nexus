@@ -21,7 +21,7 @@ Je Nachricht (Begrüßung und Abschied getrennt) wählt ihr oben im Editor, was 
 
 Über dem Editor stehen **Vorlagen** — fertige Begrüßungen zum Anklicken, mit „Zurück" für den Stand davor.
 
-Die Vorschau rechts zeigt jede Art so, wie sie in Discord aussieht — die Welcome Card zeichnet dafür der Bot und schickt sie als Bild zurück.
+Gebaut wird im Studio wie bei allen Nachrichten (siehe [Messages.md](Messages.md#das-nachrichten-studio)). Seit Plan 42 ist die **Welcome Card** dort eine eigene Bühne: links die Fächer **Layouts**, **Teile**, **Hintergrund** und **Stil** (Schrift, Farben der drei Zeilen, Akzent, Ring, Form des Avatars), in der Mitte die Karte mit Griffen, rechts das gewählte Teil – bei Texten die Zeile selbst (und bei der Überschrift die Schriftgröße, bei der kleinen Zeile das Beitrittsdatum), bei Avatar und Server-Icon der Schalter (und die Größe des Avatars), darunter seine **Position** und ganz unten der **Text über der Karte**. Rückgängig und Wiederholen (Strg+Z/Y, 50 Schritte) umfassen alles davon, auch den Wechsel zwischen den Arten. Karte, Embed und normale Nachricht zeigt die Mitte so, wie Discord sie zeigt.
 
 ---
 
@@ -45,8 +45,8 @@ Vier Layouts, alle mit denselben Einstellungen:
 | **Überschrift, Unterzeile, kleine Zeile** | Je eine Zeile mit Platzhaltern und je einer eigenen Farbe. Die kleine Zeile folgt ohne eigene Farbe dem Akzent |
 | **Schrift** | Für die Überschrift: Oxanium (Standard), Orbitron (breit) oder Rajdhani (schmal). Die Größe gleicht die Breite der Schrift aus, 48 wirkt bei allen dreien ähnlich |
 | **Schriftgröße** | 28 bis 72 Pixel. Ein langer Name wird erst bis auf gut 60 % kleiner, bevor er mit … endet |
-| **Avatar** | An oder aus, 96 bis 200 px groß, Ring 0 bis 12 px stark, rund oder abgeschrägt |
-| **Server-Icon** | Oben rechts |
+| **Avatar** | An oder aus, 96 bis 200 px groß, Ring 0 bis 12 px stark, rund oder abgeschrägt. Bei eigener Anordnung 48 bis 240 px |
+| **Server-Icon** | Oben rechts, bei eigener Anordnung frei |
 | **Beitrittsdatum** | Hängt hinten an der kleinen Zeile |
 
 Abgeschaltete Bausteine hinterlassen keine Löcher: Ohne Avatar rückt der Text nach links, ohne Zeile rückt der Block zusammen.
@@ -54,6 +54,32 @@ Abgeschaltete Bausteine hinterlassen keine Löcher: Ohne Avatar rückt der Text 
 Gezeichnet wird mit `@napi-rs/canvas` (`builder/WelcomeCard.ts`) in logischen 1000 × 340 px, aber auf einer doppelt so großen Fläche (`CARD_SCALE`): Discord zeigt das Bild verkleinert, und so bleibt die Schrift auch auf hochauflösenden Bildschirmen scharf. Mit Hintergrundbild wiegt eine Karte rund 1 MB. Die Vorschau im Dashboard zeichnet einfach aufgelöst und erst, wenn eine Drittelsekunde lang nichts mehr getippt wurde.
 
 Ältere Karten kennen die Layouts noch nicht. `NormalizeCard()` (`constants/Welcome.ts`) ergänzt sie beim Lesen: aus „mittig ausgerichtet“ wird das Layout Mittig, aus „ohne Ring“ die Ringstärke 0. Gespeichert wird die neue Form erst, wenn jemand speichert.
+
+### Anordnung
+
+Avatar, Server-Icon, Überschrift, Unterzeile und kleine Zeile lassen sich frei auf die Karte setzen, damit sie auf einem eigenen Hintergrundbild dort stehen, wo Platz ist. Dafür steht in der Mitte des Studios die Bühne: die Karte in 1000 × 340, darüber Raster, Einrasten und „Alles auf Layout zurück“; die Teile mit ihren Koordinaten stehen im Fach **Teile**, die Werte des gewählten Teils rechts unter **Position**.
+
+- **Ziehen** mit Maus oder Finger. Eine Marke zeigt „x 420 · y 102“, eine Linie zeigt, woran das Teil einrastet: an der Kartenmitte (waagrecht und senkrecht) und am Ankerpunkt der anderen Teile, unter 6 px Abstand. **Einrasten** lässt sich ausschalten, **Raster 10 px** einschalten.
+- **Pfeiltasten** schieben das gewählte Teil um 1 px, mit Umschalt um 10 px. Die Teile sind fokussierbar und tragen ihren Namen und ihre Lage als `aria-label`.
+- **X, Y, Größe** als Zahl, bei Texten die **Ausrichtung** (Links, Mitte, Rechts). Bei Texten ist der Punkt die Stelle, an der die Zeile beginnt, ihre Mitte oder ihr Ende.
+- **Waagrecht mittig** setzt ein Bild in die Mitte, eine Zeile mittig auf x 500. **Auf Layout zurück** holt das Teil an seinen Platz im Layout.
+- **Alles auf Layout zurück** löscht die eigene Anordnung. **Rückgängig** in der Studio-Leiste (oder Strg+Z) geht bis zu 50 Schritte zurück, auch über einen Layout-Wechsel hinweg.
+
+Wer zum ersten Mal etwas verschiebt, bekommt alle fünf Plätze aus dem Layout und ändert dann das eine Teil. Ab da gilt:
+
+- Das **Layout** bestimmt nur noch die Verzierung (Streifen, Panel-Fläche, HUD-Rahmen). Die Teile bleiben, wo sie sind. So geht zum Beispiel der HUD-Rahmen mit eigener Anordnung.
+- Die alten Regler **Größe** (Avatar) und **Schriftgröße** sind ausgegraut („Gilt nur ohne eigene Anordnung“). Die Größe kommt aus dem Feld auf der Bühne.
+
+| Grenze | |
+|---|---|
+| Größe | Avatar 48 bis 240 px, Icon 24 bis 160 px, Überschrift 20 bis 96 px, Unterzeile und kleine Zeile je 12 bis 48 px |
+| Bilder | Ganz auf der Karte: x von 0 bis 1000 − Größe, y von 0 bis 340 − Größe |
+| Texte | y von 0 bis 340 − Größe, die kleine Zeile von 0,9 × Größe bis 340 − 1,3 × Größe, damit Teiler und HUD-Marke ganz auf der Karte bleiben. Der Ankerpunkt bleibt so weit vom Rand, dass mindestens 120 px Zeile bleiben: links x höchstens 856, rechts mindestens 144, mittig 84 bis 916 |
+| Breite einer Zeile | Das Kleinere aus der Breite, die das Layout der Zeile gab, und dem Platz bis zum Kartenrand abzüglich 24 px (links `1000 − 24 − x`, rechts `x − 24`, mittig `2 · min(x, 1000 − x) − 48`). Ein langer Name wird darin erst kleiner und endet dann mit … |
+
+Karten ohne eigene Anordnung zeichnet der Bot auf den Pixel genau wie vorher, `check:welcome` vergleicht dafür Prüfsummen von je zwei Karten in allen vier Layouts.
+
+Die Bühne zeichnet die fünf Teile selbst auf einen Kanvas, mit denselben Regeln wie der Bot: Klemmen, Zeilenbreite, Verkleinern und Kürzen kommen aus `constants/Welcome.ts`. Darunter liegt die „nackte“ Karte des Bots, also Hintergrund und Verzierung ohne die Teile. Die Bühne ist seit Plan 42 auch die Vorschau; was rausgeht, zeigt „Test senden“. Die nackte Karte holt der Editor nur neu, wenn sich Hintergrund, Akzent, Layout, Zeilen oder Größen ändern. Beim Ziehen und bei Farben, Ring und Form zeichnet die Bühne selbst nach.
 
 ### Karte im Components-V2-Stil
 
@@ -95,14 +121,14 @@ Dieselben vier Arten, eigener Kanal, eigener Text — standardmäßig aus. Wer g
 
 ## Dashboard
 
-`/dashboard/guild/<id>/welcome` — oben die Zahlen (Begrüßung, Abschied, Auto-Rollen, gewählte Art), darunter zwei Reiter **Begrüßung** und **Abschied** mit Schalter, Kanal, Platzhalter-Leiste, Editor samt Vorschau und **Test senden**. Ganz unten die Auto-Rollen.
+`/dashboard/guild/<id>/welcome` — oben die Zahlen (Begrüßung, Abschied, Auto-Rollen, gewählte Art), darunter zwei Reiter **Begrüßung** und **Abschied** mit Schalter, Kanal, Platzhalter-Leiste und dem Studio (mit **Test senden** und **Speichern** in seiner Leiste). Jede Richtung hat ihre eigene Bühne und ihren eigenen Verlauf. Ganz unten die Auto-Rollen.
 
 Der Test schickt genau das, was gespeichert ist, mit den Daten dessen, der auf den Knopf drückt.
 
 | Route | |
 |---|---|
 | `GET <base>/api/guild/:id/welcome` | Einstellungen, Vorlagen, Platzhalter, Arten, Rollen und Kanäle |
-| `POST <base>/api/guild/:id/welcome` | `save`, `test`, `preview` (zeichnet die Karte) — nur JSON |
+| `POST <base>/api/guild/:id/welcome` | `save`, `test`, `preview` (zeichnet die Karte, mit `bare: true` die nackte Karte für die Bühne samt fertigen Zeilen, Bildern und Plätzen des Layouts) — nur JSON |
 
 Anfang wie überall: `ManageGate()` (`utils/managegate.ts`) — Sitzung, „Server verwalten", Datenbank, Modul an.
 
@@ -117,13 +143,17 @@ Anfang wie überall: `ManageGate()` (`utils/managegate.ts`) — Sitzung, „Serv
 | Beitritt | `WelcomeJoin` hört auf `GuildMemberAdd`: erst die Rollen, dann die Nachricht |
 | Abschied | `WelcomeLeave` hört auf `GuildMemberRemove` |
 | Nachricht | Für Embed, Text und Components V2 baut `CustomMessageView()` die Nachricht — dieselbe Stelle wie bei [Custom Message](Messages.md) |
+| Anordnung | `card.positions`: je Teil `x`, `y`, `size`, `align`, `width`, oder `null` für die Plätze des Layouts. Was aus dem Browser kommt, läuft durch `CleanPositions()`: gerundet, geklemmt, fremde oder kaputte Teile fallen weg |
+| Plätze des Layouts | `LayoutPositions()` in `builder/WelcomeCard.ts` rechnet sie wie vor der freien Anordnung. Fehlt in `positions` ein Teil, kommt es von dort |
+| Nackte Karte | `RenderWelcomeCard(…, { bare: true })` zeichnet Hintergrund und Verzierung ohne die fünf Teile |
+| Geteilte Regeln | `CleanPositions`, `LineWidth`, `FitTitle`, `Ellipsis`, `TitleFont` und `SnapPosition` liegen in `constants/Welcome.ts`. Bot und Bühne (`dashboard/client/layout/CardStage.ts`) nutzen dieselben |
 
 ---
 
 ## Prüfen
 
 ```bash
-npm run check:welcome   # Einstellungen, ältere Karten, Platzhalter, jedes Layout mit und ohne Akzent als PNG und was an Discord ginge
+npm run check:welcome   # Einstellungen, ältere Karten, Platzhalter, jedes Layout mit und ohne Akzent als PNG, eigene Anordnung, Einrasten und was an Discord ginge
 ```
 
 Wer wirklich kommt und geht, sieht nur ein echter Server.

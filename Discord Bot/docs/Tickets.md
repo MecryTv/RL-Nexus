@@ -37,7 +37,7 @@ Welche Kombination gilt, steht am Ticket selbst (`tickets.contact`): ein Umstell
 | `src/routes/DashboardApiTranscripts.ts` | Liste mit Suche für „Transcriptions“, Löschen |
 | `src/dashboard/client/pages/GuildTickets.ts` | Die Seite im Dashboard: Status-Kopf, Tabs, Live-Vorschau |
 | `src/dashboard/client/pages/GuildTranscripts.ts` | Die Seite „Transcriptions“ |
-| `src/dashboard/client/layout/MessageEditor.ts` | Baustein-Editor mit Live-Vorschau |
+| `src/dashboard/client/layout/MessageStudio.ts` | Das Nachrichten-Studio im Tab *Nachrichten* (über `bodyEditor`, nur Karte) |
 | `src/dashboard/client/layout/EmojiPicker.ts` | Emoji-Auswahl: Server-Emojis als Bild, Standard-Emojis, Suche |
 | `src/dashboard/client/layout/ImagePicker.ts` | Bildauswahl: Galerie, Hochladen, Adresse |
 | `src/config/ticketactions.json` | Name, Beschreibung und Emoji der 15 Aktionen |
@@ -48,7 +48,7 @@ Welche Kombination gilt, steht am Ticket selbst (`tickets.contact`): ein Umstell
 
 ## Einrichten
 
-**Dashboard:** Modul „Ticket System“ einschalten, dann unter *Ticket System*. Oben vier Kacheln mit dem Stand (Modus, Panel, Themen, Transcripts) — jede springt in ihren Tab. Darunter die Tabs **Einrichtung · Themen · Aktionen · Nachrichten · Panel · Sperrliste**, daneben die **Live-Vorschau** dessen, was man gerade ändert (unter 1180 px darunter). Der Tab steht in der Adresse (`#themen`), Pfeiltasten wechseln ihn. Gespeichert wird mit der Leiste unten; das Panel geht erst raus, wenn nichts mehr ungespeichert ist.
+**Dashboard:** Modul „Ticket System“ einschalten, dann unter *Ticket System*. Oben vier Kacheln mit dem Stand (Modus, Panel, Themen, Transcripts) — jede springt in ihren Tab. Darunter die Tabs **Einrichtung · Themen · Aktionen · Nachrichten · Panel · Sperrliste**, daneben die **Live-Vorschau** dessen, was man gerade ändert (unter 1180 px darunter). Im Tab *Nachrichten* zeigt das Studio die Vorschau selbst, dort nimmt es die ganze Breite. Der Tab steht in der Adresse (`#themen`), Pfeiltasten wechseln ihn. Gespeichert wird mit der Leiste unten; das Panel geht erst raus, wenn nichts mehr ungespeichert ist.
 
 **Emojis der Themen** wählt man im Emoji-Picker: die Server-Emojis als Bild (wie in Discord), gängige Standard-Emojis, eine Suche und ein Feld für jedes andere Emoji. Gespeichert wird, was der Bot erwartet: `🎫` oder `<:name:id>`.
 
