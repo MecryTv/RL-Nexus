@@ -539,6 +539,8 @@ export function renderStreams(guildId: string, platform: Platform): void {
 
         data!.notifiers[index] = answer.notifier;
         drafts.delete(notifier.id);
+        // Nach dem Speichern bleibt die gewählte Art offen (Video, Short, Live) - sonst spränge der Editor zurück.
+        draftOf(answer.notifier).kind = draft.kind;
 
         if (done) toast("info", done, `${answer.notifier.name}: so meldet der Bot sich ab jetzt.`);
 
