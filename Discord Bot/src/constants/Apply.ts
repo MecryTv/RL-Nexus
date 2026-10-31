@@ -1,5 +1,5 @@
 import { DASHBOARD_PATH } from "./Dashboard";
-import { ApplyStatus, IApplyForm, IApplyQuestion, IApplySettings, IFormSettings, QuestionKind } from "../interfaces/services/apply/IApply";
+import { AfterDecision, ApplyMode, ApplyStatus, ApplyTarget, IApplyForm, IApplyQuestion, IApplySettings, IFormSettings, QuestionKind } from "../interfaces/services/apply/IApply";
 
 /**
  * Apply System: Grenzen, Vorgaben und die Beschriftungen. Siehe docs/Apply.md.
@@ -8,6 +8,26 @@ export const APPLY_MODULE = "apply";
 
 /** Der Anfang der Custom-IDs: apply:ja:<bewerbung> und apply:nein:<bewerbung>. */
 export const APPLY_PREFIX = "apply";
+
+/**
+ * Der Anfang der IDs für alles, was zum Bewerben in Discord gehört (Panel,
+ * Fenster, DM). Ein eigener Anfang, damit nichts davon als Entscheidung gilt.
+ */
+export const APPLY_FLOW_PREFIX = "applyflow";
+
+export const APPLY_MODES: readonly ApplyMode[] = ["web", "modal", "dm"];
+
+/** Grenzen von Discord für ein Fenster (Modal). */
+export const MODAL_FIELDS = 5;
+export const MODAL_TITLE = 45;
+export const MODAL_LABEL = 45;
+export const MODAL_TEXT = 100;
+
+/** Bis zu so vielen Formularen hat das Panel je einen Knopf, darüber ein Menü. */
+export const PANEL_SECTIONS = 5;
+
+/** So lange bleibt eine halbe Bewerbung liegen, gerechnet ab der letzten Aktivität. */
+export const DRAFT_TTL = 30 * 60_000;
 
 export const MAX_FORMS = 15;
 export const MAX_QUESTIONS = 20;
@@ -35,6 +55,17 @@ export const STATUS_LABELS: Record<ApplyStatus, string> = {
     declined: "Abgelehnt",
 };
 
+/** Wer ohne Prüferrecht an eine Bewerbung will - an der Karte und im Dashboard (Plan 30). */
+export const STAFF_ONLY = "Bewerbungen werden nur vom Staff Team gesehen und bearbeitet.";
+
+/** Die Bestätigung nach dem Abschicken, auf jedem Weg gleich (Plan 30). */
+export const RECEIVED = "Deine Bewerbung ist bei uns eingegangen. Das Staff Team wird sich bei dir melden.";
+
+/** Die Pause nach einer Absage. free: ab wann es wieder geht, in Millisekunden. */
+export function CooldownText(days: number, free: number): string {
+    return `Nach einer Absage kannst du es in ${days} Tagen neu versuchen – du kannst es ab <t:${Math.floor(free / 1000)}:D> wieder versuchen.`;
+}
+
 export function DefaultFormSettings(): IFormSettings {
     return {
         channelId: null,
@@ -47,8 +78,47 @@ export function DefaultFormSettings(): IFormSettings {
     };
 }
 
+export const APPLY_TARGETS: readonly ApplyTarget[] = ["shared", "channel"];
+export const AFTER_DECISIONS: readonly AfterDecision[] = ["delete", "close", "keep"];
+
+/** So heißt ein eigener Kanal, wenn der Server nichts anderes einstellt. */
+export const DEFAULT_CHANNEL_NAME = "bewerbung-{user}";
+export const MAX_CHANNEL_NAME = 100;
+
 export function DefaultApplySettings(): IApplySettings {
-    return { reviewRoles: [], reviewUsers: [], channelId: null, open: true };
+    return {
+        mode: "web",
+        panel: { channelId: null, messageId: null },
+        reviewRoles: [],
+        reviewUsers: [],
+        channelId: null,
+        open: true,
+        // Plan 30: ab Werk wie bisher - die Karte geht in den Sammelkanal.
+        target: "shared",
+        categoryId: null,
+        channelName: DEFAULT_CHANNEL_NAME,
+        afterDecision: "close",
+    };
+}
+
+/**
+ * Der Name eines eigenen Kanals: Platzhalter einsetzen, dann so, wie Discord
+ * Textkanäle schreibt - klein, ohne Leer- und Sonderzeichen. Bleibt nichts
+ * übrig, heißt er nach der Nummer.
+ */
+export function ChannelName(pattern: string, input: { user: string; id: number; form: string }): string {
+    const name = pattern
+        .replace(/\{user\}/g, input.user)
+        .replace(/\{nummer\}/g, String(input.id))
+        .replace(/\{formular\}/g, input.form)
+        .toLowerCase()
+        .replace(/[^\p{L}\p{N}_-]+/gu, "-")
+        .replace(/-+/g, "-")
+        .slice(0, MAX_CHANNEL_NAME)
+        // Erst nach dem Kürzen: fällt der Schnitt auf einen Bindestrich, soll er nicht am Ende stehen.
+        .replace(/^-+|-+$/g, "");
+
+    return name || `bewerbung-${input.id}`;
 }
 
 /** Die Fragen, mit denen ein frisches Formular anfängt. */

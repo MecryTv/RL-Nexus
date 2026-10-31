@@ -12,7 +12,7 @@ import {
 import BotClient from "../client/BotClient";
 import { CustomMessageView, ICustomView } from "./CustomView";
 import { AnyPlaceholderValues } from "../constants/Placeholders";
-import { CANCEL_WORDS, KIND_LABELS, LFT_PREFIX } from "../constants/Lft";
+import { CANCEL_WORDS, KIND_LABELS, LFT_PREFIX, PANEL_BUTTONS } from "../constants/Lft";
 import { ILftAnswer, ILftBody, ILftQuestion, LftKind } from "../interfaces/services/lft/ILft";
 
 /**
@@ -121,13 +121,21 @@ export async function LftRender(
     client: BotClient,
     body: ILftBody,
     values: AnyPlaceholderValues,
-    rows: ActionRowBuilder<MessageActionRowComponentBuilder>[] = []
+    rows: ActionRowBuilder<MessageActionRowComponentBuilder>[] = [],
+    ping: string[] = []
 ): Promise<ICustomView> {
-    const view = await CustomMessageView(
-        client,
-        { id: 0, kind: body.kind, content: body.content, embed: body.embed, doc: body.doc, buttons: [], reserve: rows.length },
-        values
-    );
+    // Ping-Rollen: bei einer Karte als Zeile oben drin - Text über einer Karte lehnt Discord ab (wie MatchupView).
+    const top = ping.map((role) => `<@&${role}>`).join(" ");
+    const doc = top && body.kind === "v2" ? { ...body.doc, blocks: [{ type: "text" as const, body: top }, ...body.doc.blocks] } : body.doc;
+    let view = await CustomMessageView(client, { id: 0, kind: body.kind, content: body.content, embed: body.embed, doc, buttons: [], reserve: rows.length }, values);
+
+    if (top) {
+        view = {
+            ...view,
+            ...(body.kind === "v2" ? {} : { content: [top, view.content ?? ""].filter(Boolean).join("\n").slice(0, 2000) }),
+            allowedMentions: { parse: [], roles: ping },
+        };
+    }
 
     if (!rows.length) return view;
 
@@ -173,6 +181,27 @@ export function ChoiceRow(question: ILftQuestion): ActionRowBuilder<MessageActio
         .addOptions(question.choices.slice(0, 25).map((choice) => new StringSelectMenuOptionBuilder().setLabel(choice.slice(0, 100)).setValue(choice.slice(0, 100))));
 
     return new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(menu);
+}
+
+/**
+ * Unter dem Panel im Forum (Plan 30): je Seite, die an ist, ein Knopf. Ist
+ * keine an, steht ein abgeschalteter Knopf da, der das sagt.
+ */
+export function PanelRow(kinds: LftKind[]): ActionRowBuilder<MessageActionRowComponentBuilder> {
+    if (!kinds.length) {
+        return row(new ButtonBuilder().setCustomId(`${LFT_PREFIX}:none`).setLabel("Gerade läuft hier keine Suche").setStyle(ButtonStyle.Secondary).setDisabled(true));
+    }
+
+    return row(
+        ...kinds.map((kind) =>
+            new ButtonBuilder().setCustomId(`${LFT_PREFIX}:start:${kind}`).setLabel(PANEL_BUTTONS[kind].label).setEmoji(PANEL_BUTTONS[kind].emoji).setStyle(ButtonStyle.Primary)
+        )
+    );
+}
+
+/** Die Platzhalter des Panels - es gehört niemandem, deshalb nur der Server. */
+export function PanelValues(guild: Guild): AnyPlaceholderValues {
+    return { guild: guild.name, "guild.id": guild.id, "guild.icon": guild.iconURL?.({ extension: "png", size: 256 }) ?? "" };
 }
 
 /** Was der Bot sagt, wenn eine Antwort zu lang war. */

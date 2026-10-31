@@ -2,7 +2,7 @@ import { Guild, GuildMember } from "discord.js";
 import { FastifyReply, FastifyRequest } from "fastify";
 import BotClient from "../client/BotClient";
 import { SessionExpired } from "../services/DashboardService";
-import { APPLY_MODULE } from "../constants/Apply";
+import { APPLY_MODULE, STAFF_ONLY } from "../constants/Apply";
 import { ClearCookie, SESSION_COOKIE } from "../constants/Dashboard";
 import { SNOWFLAKE } from "../constants/Discord";
 import { SessionOf } from "./dashboard";
@@ -86,7 +86,7 @@ export async function ApplyGate(client: BotClient, request: FastifyRequest, repl
     }
 
     if (!manage && !(await client.applyService.CanReview(member))) {
-        reply.code(403).send({ error: "Forbidden", hint: "Bewerbungen sehen nur, wer dafür eingetragen ist." });
+        reply.code(403).send({ error: "Forbidden", hint: STAFF_ONLY });
 
         return null;
     }

@@ -3,7 +3,8 @@ import BotClient from "../client/BotClient";
 import Route from "../structures/Route";
 import { DASHBOARD_PATH } from "../constants/Dashboard";
 import { SNOWFLAKE } from "../constants/Discord";
-import { BEST_OF, ENTRY_ROLES, MAX_LEAGUE, MAX_NOTE, MAX_OPPONENT, MODE_LABELS, STATUS_LABELS } from "../constants/Matchups";
+import { BEST_OF, ENTRY_ROLES, MAX_LEAGUE, MAX_NOTE, MAX_OPPONENT, MODE_LABELS, PAGE_SIZE, RecordText, STATUS_LABELS, TeamRecords } from "../constants/Matchups";
+import { IMatchup } from "../interfaces/services/matchups/IMatchups";
 import { ROLE_LABELS } from "../constants/Teams";
 import { MatchupError } from "../services/MatchupService";
 import { SessionOf } from "../utils/dashboard";
@@ -56,12 +57,21 @@ export default class DashboardApiMatchupsPublic extends Route {
 
         if (request.method === "GET") {
             const teamIds = access?.teams.map((team) => team.id) ?? [];
+            // Lesen darf jeder, Notiz und Discord-ID dessen, der eingetragen hat, nur wer für das Team spricht.
+            const shown = (matchup: IMatchup): IMatchup =>
+                access?.manage || (matchup.teamId !== null && teamIds.includes(matchup.teamId)) ? matchup : { ...matchup, note: "", createdBy: "" };
+            const page = Math.max(1, Math.floor(Number((request.query as { seite?: string }).seite) || 1));
+            const results = await this.client.matchups.Played(open.guild.id, { page });
+            const records = TeamRecords((await this.client.matchups.Played(open.guild.id, { limit: 200 })).rows);
 
             return reply.send({
                 guild: { id: open.guild.id, name: open.guild.name, icon: open.guild.iconURL({ extension: "png", size: 128 }) },
                 // Ohne Anmeldung steht die Seite trotzdem - sie sagt dann, was fehlt.
                 me: session ? { id: session.userId, member: Boolean(member), manage: access?.manage ?? false, teams: access?.teams ?? [] } : null,
                 matchups: teamIds.length ? await this.client.matchups.OfTeams(open.guild.id, teamIds) : [],
+                upcoming: (await this.client.matchups.Upcoming(open.guild.id, Date.now(), { limit: 50 })).map(shown),
+                results: { rows: results.rows.map(shown), total: results.total, page, size: PAGE_SIZE },
+                records: records.map((entry) => ({ ...entry, text: RecordText(entry.record) })),
                 settings: {
                     results: open.settings.results,
                     maxAhead: open.settings.maxAhead,

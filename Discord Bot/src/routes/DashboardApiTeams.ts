@@ -1,17 +1,19 @@
 import path from "path";
-import { PermissionFlagsBits } from "discord.js";
+import { ChannelType, ForumChannel, PermissionFlagsBits } from "discord.js";
 import { FastifyReply, FastifyRequest } from "fastify";
 import BotClient from "../client/BotClient";
 import Route from "../structures/Route";
 import { DASHBOARD_PATH } from "../constants/Dashboard";
 import { KIND_LABELS as BODY_KINDS } from "../constants/Messages";
 import {
+    DEFAULT_HUB_LINE,
     DefaultBoardBody,
     DefaultTeamBody,
     FORMULA_HINTS,
     FORMULA_KEYS,
     FORMULA_PRESETS,
     LAYOUT_LABELS,
+    HUB_BUTTON_LABELS,
     MAX_DESCRIPTION,
     MAX_FORMULA,
     MAX_GROUPS,
@@ -30,9 +32,12 @@ import {
     ROLE_ORDER,
     TEAMS_MODULE,
 } from "../constants/Teams";
-import { TeamError } from "../services/TeamService";
-import { Formats, ListTeams, PlayerList, RoleValues } from "../builder/TeamView";
-import { MAX_LIST_MEMBER, MAX_LIST_TEAM } from "../constants/TeamList";
+import { ApplyCategoryDraft, ParseCategoryDraft, TeamError, ViewFacts } from "../services/TeamService";
+import { Formats, HubMessages, RoleValues } from "../builder/TeamView";
+import { OrderTeams } from "../constants/TeamOrder";
+import { ITeam, ITeamGroup } from "../interfaces/services/teams/ITeams";
+import { APPLY_MODULE } from "../constants/Apply";
+import { RenderTeamCard } from "../builder/TeamCard";
 import { GALLERY_ROOT } from "../constants/Gallery";
 import { ROLE_ICON_FILES, ROLE_ICON_ROOT } from "../services/RankIconService";
 import { TIERS } from "../constants/Prime";
@@ -43,6 +48,8 @@ import { GuildResources, IManageAccess, ManageGate } from "../utils/managegate";
 
 interface IBody {
     action?: unknown;
+    /** categories.save: false, wenn im selben Speichern noch ein Team folgt (W-0026). */
+    publish?: unknown;
     id?: unknown;
     userId?: unknown;
     team?: unknown;
@@ -52,6 +59,37 @@ interface IBody {
     formula?: unknown;
     setup?: unknown;
     cleanup?: unknown;
+    categories?: unknown;
+}
+
+/** Was die Vorschau des Hubs zeigt: Texte, Menüs (Platzhalter), Knöpfe, Bilder - in der Reihenfolge der Nachricht. */
+export type HubPart =
+    | { type: "text"; text: string }
+    | { type: "menu"; label: string; options: { label: string; description?: string }[] }
+    | { type: "button"; label: string; link: boolean }
+    | { type: "image" };
+
+/** Was die Vorschau im Dashboard zeigt, aus der fertigen Nachricht gelesen - das Menü samt Einträgen zum Aufklappen. */
+export function HubParts(node: unknown): HubPart[] {
+    if (Array.isArray(node)) return node.flatMap(HubParts);
+    if (typeof node !== "object" || node === null) return [];
+
+    const record = node as Record<string, unknown>;
+
+    if (record.type === 10 && typeof record.content === "string") return [{ type: "text", text: record.content }];
+    if (record.type === 3) {
+        const options = (Array.isArray(record.options) ? record.options : []).map((option: { label?: unknown; description?: unknown }) => ({
+            label: String(option.label ?? ""),
+            ...(typeof option.description === "string" ? { description: option.description } : {}),
+        }));
+
+        return [{ type: "menu", label: String(record.placeholder ?? "Team ansehen"), options }];
+    }
+    // Stil 5: ein Link-Knopf (Webseite oder Kanal) - in Discord grau mit Pfeil.
+    if (record.type === 2) return [{ type: "button", label: String(record.label ?? ""), link: record.style === 5 }];
+    if (record.type === 12) return [{ type: "image" }];
+
+    return HubParts(record.components ?? []);
 }
 
 /**
@@ -66,7 +104,8 @@ export default class DashboardApiTeams extends Route {
             description: "Teams, Gruppen und die Übersicht eines Servers",
             prefixed: false,
             requiresAuth: false,
-            rateLimit: { max: 60, timeWindow: "1 minute" },
+            // 120: Die Vorschau der gezeichneten Karte fragt bei jeder Änderung nach (Plan 26).
+            rateLimit: { max: 120, timeWindow: "1 minute" },
         });
     }
 
@@ -114,15 +153,10 @@ export default class DashboardApiTeams extends Route {
                 snapshots: Object.fromEntries(view.players.map((entry) => [entry.player.id, entry.player.snapshot ?? null])),
             })),
             prime: this.client.primeService.IsConfigured,
-            // Die Platzhalter je Spieler ({epicname.rank} …) samt dem, was eingesetzt würde - für Vorschlag und Vorschau.
-            players: PlayerList(views, settings, preview),
             // Die Icons des Bots, Ränge und Aufgaben - damit die Vorschau sie zeigt.
             icons: icons.List,
             // Die Platzhalter je Aufgabe ({team.captain.rank} …) am ersten Team - als Beispiel für die Vorschau der Team-Karte.
             roleSamples: views[0] ? RoleValues(views[0], settings, true, preview) : {},
-            // Alle Teams so, wie {teams} sie aufschreibt - die Vorschau im Reiter „Teams-Liste“ baut daraus
-            // dieselbe Liste wie der Bot (constants/TeamList.ts), mit dem ungespeicherten Entwurf.
-            listTeams: ListTeams(views, settings, preview, true),
             // Je Rang sein Icon, etwa "Grand Champion I" → "<:rl_gc1:…>". Fehlt eins, bleibt dort der Text.
             rankIcons: Object.fromEntries(TIERS.flatMap((name, tier) => {
                 const icon = icons.Of(tier);
@@ -148,15 +182,27 @@ export default class DashboardApiTeams extends Route {
             problems: this.client.teamService.RoleProblems(guild, views.map((view) => view.team), settings),
             bot: { roles: Boolean(me?.permissions.has(PermissionFlagsBits.ManageRoles)), channels: Boolean(me?.permissions.has(PermissionFlagsBits.ManageChannels)) },
             memberIntent: this.client.config.GUILD_MEMBER_INTENT,
-            defaults: { board: DefaultBoardBody(), team: DefaultTeamBody() },
+            defaults: { board: DefaultBoardBody(), team: DefaultTeamBody(), hubLine: DEFAULT_HUB_LINE },
             layouts: LAYOUT_LABELS,
+            hubButtonLabels: HUB_BUTTON_LABELS,
+            // Für „„Bei uns bewerben“ zeigen“: ohne Apply System erscheint der Knopf nicht.
+            apply: (await this.client.settings.Of(guild.id)).modules.includes(APPLY_MODULE),
             modes: MMR_LABELS,
             roles: ROLE_LABELS,
             playlists: PLAYLISTS,
             formula: { keys: FORMULA_KEYS, hints: FORMULA_HINTS, presets: FORMULA_PRESETS },
             bodyKinds: BODY_KINDS,
-            limits: { groups: MAX_GROUPS, teams: MAX_TEAMS, players: MAX_PLAYERS, name: MAX_NAME, tag: MAX_TAG, description: MAX_DESCRIPTION, formula: MAX_FORMULA, menu: MAX_MENU_TEAMS, links: MAX_LINKS, linkLabel: MAX_LINK_LABEL, listTeam: MAX_LIST_TEAM, listMember: MAX_LIST_MEMBER },
-            guild: { name: guild.name, ...GuildResources(guild) },
+            limits: { groups: MAX_GROUPS, teams: MAX_TEAMS, players: MAX_PLAYERS, name: MAX_NAME, tag: MAX_TAG, description: MAX_DESCRIPTION, formula: MAX_FORMULA, menu: MAX_MENU_TEAMS, links: MAX_LINKS, linkLabel: MAX_LINK_LABEL },
+            guild: {
+                name: guild.name,
+                icon: guild.iconURL({ size: 128 }),
+                ...GuildResources(guild),
+                // Der Knopf im Hub darf auch in ein Forum führen (W-0026), Sprachkanäle stehen schon in voice.
+                forums: [...guild.channels.cache.values()]
+                    .filter((channel): channel is ForumChannel => channel.type === ChannelType.GuildForum)
+                    .sort((a, b) => a.rawPosition - b.rawPosition)
+                    .map((channel) => ({ id: channel.id, name: channel.name })),
+            },
         };
     }
 
@@ -168,6 +214,53 @@ export default class DashboardApiTeams extends Route {
         switch (body.action) {
             case "settings":
                 return { ok: true, settings: await service.SaveSettings(guild, body.settings) };
+
+            case "hub.preview": {
+                // Der Hub mit dem ungespeicherten Entwurf - Einstellungen und Kategorien -, gerechnet und gepackt wie beim Senden.
+                const settings = service.CleanSettings(guild, body.settings, await service.Settings(guild.id));
+                const { groups, teams } = await this.Drafted(access, body);
+                const views = OrderTeams(teams.map((team) => service.Look(team, groups, settings)), ViewFacts, settings.order);
+
+                const apply = (await this.client.settings.Of(guild.id)).modules.includes(APPLY_MODULE);
+                const messages = await HubMessages(this.client, settings, views, groups, guild, apply);
+
+                // Für die Vorschau reicht, was zu lesen ist: Texte, Menüs, Knopf, Bilder als Platz.
+                return {
+                    ok: true,
+                    // parts: die ganze Nachricht. rest: ohne den Kopf - den zeichnet die Live-Vorschau im Reiter Nachrichten selbst.
+                    messages: messages.map((message) => {
+                        const json = message.view.components.map((entry) => entry.toJSON() as { components?: unknown[] });
+
+                        return {
+                            chars: message.chars,
+                            components: message.components,
+                            parts: HubParts(json),
+                            rest: HubParts(json.map((container) => ({ ...container, components: (container.components ?? []).slice(message.head) }))),
+                        };
+                    }),
+                };
+            }
+
+            case "card.preview": {
+                // Die gezeichnete Karte mit dem ungespeicherten Entwurf - Aussehen, Kategorien und die Angaben des
+                // Teams aus dem Karten-Editor. Nichts wird gespeichert, keine Emojis angelegt.
+                const settings = service.CleanSettings(guild, body.settings, await service.Settings(guild.id));
+                const { groups, teams } = await this.Drafted(access, body);
+                const saved = teams.find((team) => team.id === id);
+
+                if (!saved) throw new TeamError("Dieses Team gibt es nicht mehr.");
+
+                const drafted = body.team === undefined ? saved : await service.DraftTeam(guild, saved, body.team);
+                const everyone = teams.map((team) => service.Look(team.id === id ? drafted : team, groups, settings));
+                const view = everyone.find((entry) => entry.team.id === id)!;
+
+                const image = await RenderTeamCard(await service.CardData(guild, view, everyone, settings));
+
+                return { ok: true, image: `data:image/webp;base64,${image.toString("base64")}` };
+            }
+
+            case "categories.save":
+                return { ok: true, groups: await service.SaveCategories(guild, body.categories, body.publish !== false) };
 
             case "group.create":
                 return { ok: true, group: await service.CreateGroup(guild.id, body.group) };
@@ -259,5 +352,14 @@ export default class DashboardApiTeams extends Route {
             default:
                 throw new TeamError("Unbekannte Aktion.");
         }
+    }
+
+    /** Teams und Kategorien, mit dem Kategorien-Entwurf aus dem Dashboard darübergelegt, wenn einer mitkam. */
+    private async Drafted(access: IManageAccess, body: IBody): Promise<{ groups: ITeamGroup[]; teams: ITeam[] }> {
+        const { views, groups } = await this.client.teamService.Views(access.guild, false);
+        const teams = views.map((view) => view.team);
+        const draft = ParseCategoryDraft(body.categories);
+
+        return draft ? ApplyCategoryDraft(access.guild.id, groups, teams, draft) : { groups, teams };
     }
 }

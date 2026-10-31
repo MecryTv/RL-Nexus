@@ -158,6 +158,10 @@ export default class DashboardApiLft extends Route {
                 return { ok: true, settings };
             }
 
+            // Plan 30: das Panel im Forum anlegen oder nachziehen - sofort, mit dem gespeicherten Stand.
+            case "panel":
+                return { ok: true, ...(await service.SendPanel(guild)), settings: await service.Settings(guild.id) };
+
             case "close":
                 return { ok: true, request: await service.Close(guild, id, member.id) };
 

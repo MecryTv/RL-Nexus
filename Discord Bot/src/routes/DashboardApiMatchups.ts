@@ -15,6 +15,7 @@ import {
     MAX_OPPONENT,
     MAX_PINGS,
     MAX_REMIND,
+    MAX_RESULT_REMIND,
     MODE_LABELS,
     MatchupLink,
     PAGE_SIZE,
@@ -100,7 +101,7 @@ export default class DashboardApiMatchups extends Route {
             entryRoles: ENTRY_ROLES.map((role) => ROLE_LABELS[role]),
             keys: MATCHUP_KEYS,
             bodyKinds: BODY_KINDS,
-            limits: { opponent: MAX_OPPONENT, league: MAX_LEAGUE, note: MAX_NOTE, leagues: MAX_LEAGUES, pings: MAX_PINGS, remind: MAX_REMIND, ahead: MAX_AHEAD, page: PAGE_SIZE },
+            limits: { opponent: MAX_OPPONENT, league: MAX_LEAGUE, note: MAX_NOTE, leagues: MAX_LEAGUES, pings: MAX_PINGS, remind: MAX_REMIND, resultRemind: MAX_RESULT_REMIND, ahead: MAX_AHEAD, page: PAGE_SIZE },
             guild: { name: guild.name, ...GuildResources(guild) },
         };
     }

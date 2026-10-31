@@ -47,21 +47,13 @@ export default class DashboardApiApplyPublic extends Route {
         const session = SessionOf(this.client, request);
 
         if (request.method === "GET") {
-            const member = session ? await open.guild.members.fetch(session.userId).catch(() => null) : null;
+            const service = this.client.applyService;
+            const settings = await service.Settings(id);
+            // Ohne Anmeldung steht die Seite trotzdem - sie sagt dann nur, dass
+            // es zum Abschicken eine braucht. Bei Fenster und DM braucht es keine.
+            const member = session && settings.mode === "web" ? await open.guild.members.fetch(session.userId).catch(() => null) : null;
 
-            return reply.send({
-                guild: { id: open.guild.id, name: open.guild.name, icon: open.guild.iconURL({ extension: "png", size: 128 }) },
-                // Ohne Anmeldung steht die Seite trotzdem - sie sagt dann nur,
-                // dass es zum Abschicken eine braucht.
-                me: session ? { id: session.userId, member: Boolean(member) } : null,
-                forms: open.forms.map((form) => ({
-                    id: form.id,
-                    name: form.name,
-                    description: form.description,
-                    emoji: form.emoji,
-                    questions: form.questions,
-                })),
-            });
+            return reply.send(service.PublicPayload(open.guild, open.forms, settings, session ? { id: session.userId, member: Boolean(member) } : null));
         }
 
         if (!WantsJSON(request)) return reply.code(415).send({ error: "Nur application/json" });
@@ -73,11 +65,11 @@ export default class DashboardApiApplyPublic extends Route {
         const body = (request.body ?? {}) as IBody;
 
         try {
-            const submission = await this.client.applyService.Submit(id, session.userId, Number(body.formId), body.answers);
+            const submission = await this.client.applyService.Submit(id, session.userId, Number(body.formId), body.answers, "web");
 
             return reply.send({ ok: true, id: submission.id });
         } catch (error) {
-            if (error instanceof ApplyError) return reply.code(400).send({ error: error.message });
+            if (error instanceof ApplyError) return reply.code(error.status).send({ error: error.message });
 
             throw error;
         }

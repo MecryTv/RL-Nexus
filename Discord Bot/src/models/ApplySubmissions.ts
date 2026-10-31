@@ -16,6 +16,7 @@ export interface IApplySubmissionRow {
     decided_name: string | null;
     decided_at: number | string | null;
     message_id: string | null;
+    channel_id?: string | null;
     created_at: number | string;
 }
 
@@ -33,6 +34,7 @@ function ToSubmission(row: IApplySubmissionRow): IApplySubmission {
         decidedName: row.decided_name,
         decidedAt: row.decided_at === null ? null : Number(row.decided_at),
         messageId: row.message_id,
+        channelId: row.channel_id ?? null,
         createdAt: Number(row.created_at),
     };
 }
@@ -120,6 +122,24 @@ export default class ApplySubmissions extends Model<IApplySubmissionRow> {
 
     async SetMessage(id: number, messageId: string | null): Promise<void> {
         await this.Update([id], { message_id: messageId });
+    }
+
+    async SetChannel(id: number, channelId: string | null): Promise<void> {
+        await this.Update([id], { channel_id: channelId });
+    }
+
+    /** Die Kanäle einzelner Bewerbungen eines Servers - ein Server-Backup lässt sie aus (Plan 32). */
+    async ChannelsOf(guildId: string): Promise<string[]> {
+        const rows = await this.db.Query<{ channel_id: string }>(`SELECT channel_id FROM \`${this.Table}\` WHERE guild_id = ? AND channel_id IS NOT NULL`, [guildId]);
+
+        return rows.map((row) => row.channel_id);
+    }
+
+    /** Eine Bewerbung ganz weg - „Entfernen“ im Dashboard (Plan 30). */
+    async Remove(id: number): Promise<void> {
+        await this.db.Write(`DELETE FROM \`${this.Table}\` WHERE id = ?`, [id]);
+
+        this.db.Bump(this.Table);
     }
 
     async RemoveOfForm(formId: number): Promise<void> {

@@ -45,6 +45,12 @@ export interface IMatchup {
     messageId: string | null;
     /** Wann erinnert wurde - damit es genau einmal passiert. */
     remindedAt: number | null;
+    /** Wann die Ankündigung auf „läuft“ umgestellt wurde - genau einmal (Plan 28). */
+    liveAt: number | null;
+    /** Wann ans fehlende Ergebnis erinnert wurde - genau einmal. */
+    resultRemindedAt: number | null;
+    /** Die Ergebnis-Nachricht - „Ergebnis ändern“ bearbeitet sie. */
+    resultMessageId: string | null;
     createdBy: string;
     createdName: string;
     createdAt: number;
@@ -62,6 +68,12 @@ export interface IMatchupSettings {
     open: boolean;
     /** Ergebnisse dürfen eingetragen werden. */
     results: boolean;
+    /** Unter der Ankündigung steht „Ergebnis eintragen“ (Plan 28). */
+    discordResults: boolean;
+    /** So viele Stunden nach Anpfiff wird einmal ans fehlende Ergebnis erinnert. 0: nie. */
+    resultRemindHours: number;
+    /** Der Rand folgt dem Stand: rot vor und während des Spiels, grün bei Sieg, rot bei Niederlage, grau bei Unentschieden und Absage. */
+    colorByStatus: boolean;
     /** So viele Tage im Voraus darf eingetragen werden. */
     maxAhead: number;
     /** Vorschläge für das Feld „Liga" - frei tippen geht trotzdem. */
@@ -72,6 +84,20 @@ export interface IMatchupSettings {
     remind: IMatchupBody;
     /** Wenn das Ergebnis steht. */
     result: IMatchupBody;
+}
+
+/** Wie ein Spiel ausging - aus Sicht des eigenen Teams. */
+export type Outcome = "w" | "l" | "d";
+
+/** Die Bilanz eines Teams aus seinen gespielten Partien (Plan 28). */
+export interface IMatchupRecord {
+    wins: number;
+    losses: number;
+    draws: number;
+    /** Die letzten Spiele, das neueste zuerst. */
+    form: Outcome[];
+    /** Gleicher Ausgang in Folge, vom neuesten Spiel an. */
+    streak: { outcome: Outcome; count: number } | null;
 }
 
 /** Ein Team, für das jemand eintragen darf. */

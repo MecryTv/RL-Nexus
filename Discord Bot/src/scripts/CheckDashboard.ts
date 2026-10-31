@@ -12,7 +12,8 @@ process.env.DEV_CLIENT_SECRET ||= "check-secret";
 
 import path from "path";
 import { existsSync } from "node:fs";
-import { readdir, readFile } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import BotClient from "../client/BotClient";
 import { SNOWFLAKE } from "../constants/Discord";
 import { MAX_IMAGE_BYTES } from "../constants/Gallery";
@@ -348,6 +349,10 @@ function checkShopStatus(): void {
     check("Ohne Titel: Zugang", one({ source: "gift", title: null }).startsWith("**Zugang** läuft bis"), one({ source: "gift", title: null }));
     check("Abgelaufen oder noch nicht begonnen: nichts", ShopStatusLines([row({ ends_at: new Date(now.getTime() - 2 * DAY) }), row({ starts_at: later })], now).length === 0);
     check("Markdown im Titel bleibt Text", one({ title: "**x**" }).startsWith("**\\*\\*x\\*\\***"), one({ title: "**x**" }));
+
+    // W-0024: Bei Free und Beta ruht der Zugang - kein Datum, das sich noch verschiebt, und auch nach dem alten Ende sichtbar.
+    const resting = one({ frozen_at: new Date(now.getTime() - DAY), ends_at: new Date(now.getTime() - 2 * DAY) });
+    check("Ruhender Zugang: ohne Datum, auch nach dem alten Ende", resting === "**Monat** ruht gerade, die Tage bleiben stehen.", resting);
 }
 
 async function checkGroups(client: BotClient): Promise<void> {
@@ -633,6 +638,68 @@ async function checkLiveLists(): Promise<void> {
 }
 
 /** Das Modul Backups reicht an die interne Schnittstelle des Admin Dashboards weiter. */
+/**
+ * W-0033: Der Schalter folgt dem Klick sofort, der Eintrag in der Leiste erst
+ * dem gespeicherten Stand. Sonst öffnet man die Seite eines Moduls, bevor der
+ * Bot es eingeschaltet hat, und sie zeigt „Das Modul ist auf diesem Server aus.“
+ */
+async function checkModuleState(): Promise<void> {
+    console.log("\n  — Module: Schalter sofort, Leiste nach dem Speichern —");
+
+    const { pathToFileURL } = await import("node:url");
+    const file = path.join(process.cwd(), "src", "dashboard", "client", "core", "ModuleState.ts");
+
+    if (!existsSync(file)) return check("ModuleState.ts ist da", false, file);
+
+    const { moduleState } = (await import(pathToFileURL(file).href)) as {
+        moduleState: (id: string, saved: ReadonlySet<string>, shown: ReadonlySet<string>, always: boolean, pinned?: boolean) => { checked: boolean; linked: boolean };
+    };
+    const none = new Set<string>();
+    const on = new Set(["role-lists"]);
+    const clicked = moduleState("role-lists", none, on, false);
+
+    check("Gerade eingeschaltet: Schalter an", clicked.checked);
+    check("Gerade eingeschaltet: noch kein Eintrag in der Leiste", !clicked.linked);
+    check("Gespeichert: Schalter und Eintrag", JSON.stringify(moduleState("role-lists", on, on, false)) === '{"checked":true,"linked":true}');
+    check("Gerade ausgeschaltet: Schalter aus, Eintrag bis zum Speichern", JSON.stringify(moduleState("role-lists", on, none, false)) === '{"checked":false,"linked":true}');
+    // Plan 31: Anti Villain aus, aber noch Leute festgehalten - der Eintrag bleibt zum Freigeben.
+    check("Aus, aber festgehalten: Schalter aus, Eintrag bleibt", JSON.stringify(moduleState("anti-villain", none, none, false, true)) === '{"checked":false,"linked":true}');
+    check("Festes Modul: immer beides", JSON.stringify(moduleState("gallery", none, none, true)) === '{"checked":true,"linked":true}');
+}
+
+/**
+ * W-0023: „Nächstes Backup“ zeigt Tag und Uhrzeit in Berlin - so plant der Bot.
+ * Vorher kam der Tag aus der Zeitzone des Browsers und die Stunde aus Berlin.
+ */
+async function checkBerlinAt(): Promise<void> {
+    console.log("\n  — Backups: nächster Lauf in Berliner Zeit —");
+
+    const { pathToFileURL } = await import("node:url");
+    const format = (await import(pathToFileURL(path.join(process.cwd(), "src", "dashboard", "client", "core", "Format.ts")).href)) as { berlinAt?: (iso: string) => { day: string; time: string } };
+
+    if (!format.berlinAt) return check("berlinAt ist da", false);
+
+    // 23:30 UTC am Freitag ist in Berlin schon Samstag, 0:30.
+    check("Tag nach Berlin, nicht nach dem Browser", JSON.stringify(format.berlinAt("2026-10-30T23:30:00.000Z")) === '{"day":"Samstag, 31. Okt.","time":"0:30"}', JSON.stringify(format.berlinAt("2026-10-30T23:30:00.000Z")));
+    // Am Tag der Umstellung: 2:00 UTC ist 3:00 Winterzeit.
+    check("Am Tag der Zeitumstellung die richtige Stunde", format.berlinAt("2026-10-25T02:00:00.000Z").time === "3:00", format.berlinAt("2026-10-25T02:00:00.000Z").time);
+}
+
+/** W-0026: Der Kopf des Hubs ist immer eine Karte, die Teams setzt der Bot darunter - {teams} bliebe dort leer. */
+async function checkHubTemplates(): Promise<void> {
+    console.log("\n  — Team-Hub: Vorlagen und Platzhalter des Kopfs —");
+
+    const { pathToFileURL } = await import("node:url");
+    const dir = path.join(process.cwd(), "src", "dashboard", "client", "constants");
+    const { TEMPLATES } = (await import(pathToFileURL(path.join(dir, "Templates.ts")).href)) as { TEMPLATES: Record<string, { body: { kind: string } }[]> };
+    const { TEAM_BOARD_PLACEHOLDERS } = (await import(pathToFileURL(path.join(dir, "Placeholders.ts")).href)) as { TEAM_BOARD_PLACEHOLDERS: { key: string }[] };
+    const board = TEMPLATES.teamBoard ?? [];
+
+    check("Hub-Kopf: nur Vorlagen als Karte", board.length > 0 && board.every((template) => template.body.kind === "v2"), board.map((template) => template.body.kind).join(","));
+    check("Hub-Kopf: keine Vorlage mit {teams}", !board.some((template) => /\{teams(\.short)?\}/.test(JSON.stringify(template.body))));
+    check("Hub-Kopf: {teams} nicht im Platzhalter-Menü", !TEAM_BOARD_PLACEHOLDERS.some((entry) => entry.key === "teams" || entry.key === "teams.short"));
+}
+
 async function checkBackups(): Promise<void> {
     console.log("\n  — Backups: Weiterleitung an das Admin Dashboard —");
 
@@ -645,6 +712,11 @@ async function checkBackups(): Promise<void> {
         "Sichern: POST mit Notiz",
         shape(BackupCall("POST", {}, { action: "create", note: "vor dem Umbau" })) === 'POST  60000 {"note":"vor dem Umbau"}',
         shape(BackupCall("POST", {}, { action: "create", note: "vor dem Umbau" }))
+    );
+    check(
+        "Plan 32: Anlegen mit Discord-Server: Teile mit, längeres Zeitlimit",
+        shape(BackupCall("POST", {}, { action: "create", note: "x", parts: ["bot", "server"] })) === 'POST  130000 {"note":"x","parts":["bot","server"]}',
+        shape(BackupCall("POST", {}, { action: "create", note: "x", parts: ["bot", "server"] }))
     );
     check("Einstellung: PUT /plan mit dem Plan selbst", shape(BackupCall("POST", {}, { action: "plan", plan })) === `PUT /plan 10000 ${JSON.stringify(plan)}`, shape(BackupCall("POST", {}, { action: "plan", plan })));
     check("Löschen: DELETE /7", shape(BackupCall("POST", {}, { action: "delete", backup: 7 })) === "DELETE /7 10000 null", shape(BackupCall("POST", {}, { action: "delete", backup: 7 })));
@@ -990,6 +1062,59 @@ async function checkReports(client: BotClient): Promise<void> {
     check("404: keine Fehler-ID", missing.sent.headers["x-error-id"] === undefined && !String(missing.sent.body).includes("Fehler-ID"));
 }
 
+/**
+ * Wartung lokal (Plan 23): Im Betrieb zeigt nginx die Wartungsseite. Mit --dev
+ * spiegelt der Bot das fürs Bot-Dashboard, ohne --dev tut er nichts. Der
+ * Schalter liegt hier in einem eigenen Ordner, nichts Echtes wird angefasst.
+ */
+async function checkDevMaintenance(): Promise<void> {
+    console.log("\n  — Wartung lokal (Spiegel mit --dev) —");
+
+    const flags = await mkdtemp(path.join(tmpdir(), "rlnexus-flags-"));
+    const saved = process.env.FLAGS_DIR;
+    const page = { headers: { accept: "text/html" }, ...MANUAL };
+
+    process.env.FLAGS_DIR = flags;
+
+    try {
+        const before = await fetch(`${BASE}${P}/`, page);
+        check("Ohne Schalter: das Dashboard wie immer", before.status !== 503, `${before.status}`);
+
+        await writeFile(path.join(flags, "wartung-dashboard"), "{}");
+        const closed = await fetch(`${BASE}${P}/`, page);
+
+        if (P !== "/dashboard") {
+            check("Ohne --dev spiegelt der Bot nichts, das macht nginx", closed.status !== 503, `${closed.status}`);
+            return;
+        }
+
+        check("Schalter da: Seite 503 mit der Wartungsseite", closed.status === 503 && (await closed.text()).includes("Gleich wieder da."), `${closed.status}`);
+
+        const api = await fetch(`${BASE}${P}/api/me`, { headers: { accept: "application/json" } });
+        check("API: der JSON-Satz", api.status === 503 && ((await api.json()) as { error?: string }).error === "Gerade ist Wartung. Versuch es in ein paar Minuten noch einmal.", `${api.status}`);
+
+        check("/images/ läuft weiter", (await fetch(`${BASE}/images/fehlt.png`)).status !== 503);
+        check("/dcapi/ läuft weiter", (await fetch(`${BASE}/dcapi/health`)).status !== 503);
+        check("Impressum und Datenschutz gehen durch", (await fetch(`${BASE}${P}/impressum`, page)).status !== 503 && (await fetch(`${BASE}${P}/privacy`, page)).status !== 503);
+        check("Statusdatei ohne Plan: 404", (await fetch(`${BASE}/wartung/status.json`)).status === 404);
+
+        await writeFile(path.join(flags, "wartung.json"), JSON.stringify({ areas: ["dashboard"], title: "Test", text: "", since: new Date().toISOString(), until: null, steps: [], current: null }));
+        const status = await fetch(`${BASE}/wartung/status.json`);
+        check("Statusdatei mit Plan: 200, nicht zwischengespeichert", status.status === 200 && ((await status.json()) as { title?: string }).title === "Test" && status.headers.get("cache-control") === "no-store", `${status.status}`);
+
+        const script = await fetch(`${BASE}/wartung/wartung.js`);
+        check("Skript und Logo der Wartungsseite", script.status === 200 && (await script.text()).includes("wartungView") && (await fetch(`${BASE}/wartung/logo-n.webp`)).status === 200);
+        // W-0022: wie nginx (expires -1) - nach einem Update kein altes wartung.js aus dem Cache.
+        check("Skript der Wartungsseite: Browser fragt nach", script.headers.get("cache-control") === "no-cache", String(script.headers.get("cache-control")));
+        check("Kein Weg aus dem Ordner heraus", (await fetch(`${BASE}/wartung/..%2Fwartung.html`)).status !== 200);
+    } finally {
+        if (saved === undefined) delete process.env.FLAGS_DIR;
+        else process.env.FLAGS_DIR = saved;
+
+        await rm(flags, { recursive: true, force: true });
+    }
+}
+
 async function main(): Promise<void> {
     const client = new BotClient();
 
@@ -1006,6 +1131,7 @@ async function main(): Promise<void> {
     await checkPaywall(client);
     await checkBeta(client);
     await checkReports(client);
+    await checkDevMaintenance();
     checkShopStatus();
     checkSessions(client);
     await checkLogout(client);
@@ -1039,6 +1165,8 @@ async function main(): Promise<void> {
 
     const logo = await fetch(`${BASE}${P}/assets/images/RL%20Nexus%20N%20Logo.png`);
     check("Logo wird ausgeliefert", logo.status === 200, `${logo.status}`);
+    // 1,4 MB, die niemand liest: ohne Abbruch bleibt die Antwort im Server stecken und Stop() wartet ewig.
+    await logo.body?.cancel();
 
     const escape = await fetch(`${BASE}${P}/assets/images/..%2F..%2F..%2F..%2F.env`);
     check("Pfad aus images heraus ist 403", escape.status === 403, `${escape.status}`);
@@ -1226,6 +1354,16 @@ async function main(): Promise<void> {
         `Modul-Anker sind eindeutig und brauchbar (${ids.length})`,
         ids.length > 0 && new Set(ids).size === ids.length && misplaced.length === 0,
         misplaced.join(", ")
+    );
+
+    // Plan 31: Anti Villain kennt der Bot, die Leiste und guild.html - fehlt die
+    // Karte, bekaeme es nur die Platzkarte „kommt bald“.
+    check(
+        "Anti Villain steht in beiden Modullisten und hat seine Karte",
+        MODULE_IDS.includes("anti-villain" as never) &&
+            modules.some((entry) => entry.id === "anti-villain") &&
+            guildPage.includes('<section class="setcard" id="anti-villain"') &&
+            guildPage.includes('id="avBody"')
     );
 
     // Jedes Modul steht unter einer Ueberschrift der Leiste. Ohne Kategorie
@@ -1591,6 +1729,9 @@ async function main(): Promise<void> {
     await checkMfa(client);
     await checkLiveLists();
     await checkBackups();
+    await checkModuleState();
+    await checkBerlinAt();
+    await checkHubTemplates();
 
     await client.server.Stop();
 

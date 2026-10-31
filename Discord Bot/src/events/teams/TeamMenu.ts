@@ -15,7 +15,8 @@ export default class TeamMenu extends Event {
 
     async Execute(interaction: Interaction): Promise<void> {
         if (!interaction.isStringSelectMenu()) return;
-        if (interaction.customId !== `${TEAMS_PREFIX}:menu`) return;
+        // teams:menu bis 25 Teams, teams:menu:<n> darüber (Plan 26).
+        if (interaction.customId !== `${TEAMS_PREFIX}:menu` && !interaction.customId.startsWith(`${TEAMS_PREFIX}:menu:`)) return;
 
         try {
             await this.client.teamService.Handle(interaction);

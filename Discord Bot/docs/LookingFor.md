@@ -114,20 +114,33 @@ Ein unbekannter Platzhalter bleibt als `{platzhalter}` stehen — ein Tippfehler
 
 ---
 
+## Panel im Forum (Plan 30)
+
+Statt `/lookingfor` geht es auch über ein **Panel**: ein angepinnter, gesperrter Beitrag im Forum mit einer Karte aus dem Editor. Darunter hängt der Bot je Seite, die an ist, einen Knopf: **🔎 Ich suche ein Team** und **📣 Wir suchen Spieler**. Ist keine Seite an, steht dort ein abgeschalteter Knopf „Gerade läuft hier keine Suche“.
+
+- **Panel senden** im Dashboard legt den Beitrag an oder bearbeitet den bestehenden. Nie zwei: ist der gemerkte Beitrag weg, entsteht ein neuer; zieht das Panel in ein anderes Forum, verschwindet der alte.
+- Ohne eigenes Forum steht das Panel im Forum der Spieler-Suche, sonst in dem der Team-Suche. Verlangt das Forum einen Tag, bekommt es den der Spieler-Suche.
+- Nach jedem Speichern zieht der Bot ein liegendes Panel nach. Fehlt ihm „Beiträge verwalten“, steht es trotzdem, nur nicht angepinnt und gesperrt.
+- Platzhalter: `{guild}`, `{guild.id}`, `{guild.icon}`.
+
+## Wie gefragt wird (Plan 30)
+
+Unter *Ablauf und Rechte*: **Per DM** (Vorgabe, wie oben) oder **Im Fenster**. Im Fenster kommen die Fragen in Teilen zu je 5, wie beim Apply System („Spieler-Suche · Teil 1 von 3“, dazwischen „Weiter zu Teil 2“). Es gelten dieselben Regeln wie in der DM. Nach dem letzten Teil steht der Beitrag sofort, ohne Vorschau, und die Antwort ist die Nachricht „Abschluss“. Halbe Antworten liegen 30 Minuten im Speicher (`services/LftModal.ts`), nach einem Neustart sind sie weg. Panel-Knöpfe und `/lookingfor spieler|team` gehen beide über `LookingForService.Begin()`.
+
 ## Dashboard
 
 Drei Punkte in der Leiste:
 
 | | |
 |---|---|
-| `/dashboard/guild/<id>/lft` | Foren und Tags, Meldung ans Team, die drei DM-Nachrichten, Ablauf und Rechte |
+| `/dashboard/guild/<id>/lft` | Foren und Tags, Panel im Forum, Meldung ans Team, die drei DM-Nachrichten, Ablauf und Rechte (mit „Wie gefragt wird“) |
 | `…/lft-player` | Spieler-Suche: Schalter, Titel, Fragen, Beitrag, Vorschau — und alle Anfragen |
 | `…/lft-team` | Dasselbe für Teams, die Spieler suchen |
 
 | Route | |
 |---|---|
 | `GET <base>/api/guild/:id/lft` | Einstellungen, Anfragen (`kind`, `status`, `page`), Foren, Kanäle, Rollen, Emojis, Grenzen |
-| `POST <base>/api/guild/:id/lft` | `settings`, `tags`, `close`, `delete` — nur JSON |
+| `POST <base>/api/guild/:id/lft` | `settings`, `tags`, `panel`, `close`, `delete` — nur JSON |
 
 Gespeichert wird **nur der Teil, den die offene Seite zeigt**. Was nicht mitkommt, bleibt stehen: so überschreibt die Team-Seite nicht die Fragen der Spieler-Seite, wenn beide offen sind.
 
