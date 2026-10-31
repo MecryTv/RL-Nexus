@@ -67,7 +67,6 @@ export function DefaultRankRoleSettings(): IRankRoleSettings {
             "3v3": { on: true, roles: {} },
         },
         replace: true,
-        channelId: null,
         skipPlacement: true,
     };
 }

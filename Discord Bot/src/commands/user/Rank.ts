@@ -352,6 +352,17 @@ export default class Rank extends Command {
             interaction.user.username,
             interaction.user.displayAvatarURL({ extension: "png", size: 256 })
         );
+
+        // Mit Rank Roles: die Rang-Rollen zum eben gezeigten Rang. Neu dazu sieht nur, wer fragt.
+        if (!interaction.inCachedGuild()) return;
+
+        const result = await this.client.rankRoleService.AfterRankMe(interaction.member, profile).catch(() => null);
+
+        if (result?.added.length) {
+            await interaction
+                .followUp({ content: `🎖️ Neu dazu: ${result.added.map((id) => `<@&${id}>`).join(", ")}`, flags: MessageFlags.Ephemeral, allowedMentions: { parse: [] } })
+                .catch(() => undefined);
+        }
     }
 
     /* ------------------------------------------------------------------

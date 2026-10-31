@@ -23,7 +23,6 @@ interface IStep {
 interface ISettings {
     playlists: Record<Playlist, { on: boolean; roles: Record<string, string | null> }>;
     replace: boolean;
-    channelId: string | null;
     skipPlacement: boolean;
 }
 
@@ -131,11 +130,9 @@ export function renderRankRoles(guildId: string): void {
        Wie es läuft
        ------------------------------------------------------------ */
     function rules(): HTMLElement {
-        const channels: [string, string][] = [["", "— überall —"], ...data!.guild.channels.map((entry): [string, string] => [entry.id, `# ${entry.name}`])];
-
         return card(
             "Wie es läuft",
-            "Mitglieder holen sich die Rollen selbst mit /rangrollen holen. Der Bot fragt Rocket League nur dann – wer aufsteigt, gibt den Befehl noch einmal ein.",
+            "Mitglieder bekommen die Rollen mit /rank me, sobald ihr Epic-Konto mit /rank link verbunden ist. Der Bot fragt Rocket League nur dann – wer aufsteigt, ruft /rank me noch einmal auf.",
             row(
                 "Alte Rolle abnehmen",
                 "Beim Aufstieg geht die vorherige Rolle derselben Playlist weg",
@@ -151,14 +148,6 @@ export function renderRankRoles(guildId: string): void {
                     draft!.skipPlacement = on;
                     touch();
                 }), el("span", "", "überspringen"))
-            ),
-            row(
-                "Nur in diesem Kanal",
-                "Hält den Befehl aus dem restlichen Server heraus",
-                select(channels, draft!.channelId ?? "", (value) => {
-                    draft!.channelId = value || null;
-                    touch();
-                }, "Kanal für den Befehl")
             )
         );
     }

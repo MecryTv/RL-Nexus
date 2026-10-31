@@ -1,31 +1,26 @@
 # Rank Roles
 
-Rollen nach Rocket-League-Rang — **je Playlist eine eigene**. Wer den Befehl eingibt, bekommt die Rolle, die zu seinem aktuellen Rang gehört. Der Bot fragt von sich aus nichts: wer aufsteigt, gibt den Befehl noch einmal ein.
+Rollen nach Rocket-League-Rang — **je Playlist eine eigene**. Wer `/rank me` aufruft, bekommt die Rolle, die zu seinem aktuellen Rang gehört. Der Bot fragt von sich aus nichts: wer aufsteigt, ruft `/rank me` noch einmal auf.
 
 Das Modul heißt `rank-roles` und wird unter *Module* eingeschaltet (oder `/module an modul:rank-roles`).
 
 ---
 
-## Der Befehl
+## Über /rank me
 
-```
-/rangrollen holen     setzt deine Rang-Rollen auf den aktuellen Stand
-/rangrollen ablegen   nimmt dir alle Rang-Rollen wieder ab
-```
+Einen eigenen Befehl gibt es nicht (mehr): Ist das Modul an, setzt `/rank me` die Rang-Rollen (`RankRoleService.AfterRankMe`). Der Befehl nimmt dafür das Profil, das er für die Rangkarte ohnehin geholt hat; Prime wird kein zweites Mal gefragt. Kommen Rollen dazu, sieht nur der Fragende eine Zeile „🎖️ Neu dazu: …“, ohne Ping.
 
-Beide Antworten sieht nur, wer sie aufgerufen hat.
+Der Epic-Name kommt aus dem **verknüpften Konto** — verbunden wird es mit `/rank link epicname:DeinName`. `/rank search` mit fremdem Namen vergibt nie Rollen, sonst holte man sich Rollen mit dem Konto eines anderen.
 
-Der Epic-Name kommt aus dem **verknüpften Konto** — verbunden wird es mit `/rank link epicname:DeinName`. Ohne Verknüpfung sagt der Befehl genau das; einen fremden Namen kann niemand mitgeben, sonst holte man sich Rollen mit dem Konto eines anderen.
-
-| Woran es liegen kann | Was der Befehl sagt |
+| Woran es liegen kann | Was passiert |
 |---|---|
-| Modul aus | „Rank Roles ist auf diesem Server aus." |
-| Falscher Kanal | „Das geht nur in #kanal." |
-| Kein verknüpftes Konto | Hinweis auf `/rank link` |
-| Kein `PRIME_API_TOKEN` | „Das Rang-Tracking ist auf diesem Bot nicht eingerichtet." |
+| Modul aus, keine Playlist an | `/rank me` zeigt nur die Ränge |
+| Kein verknüpftes Konto | `/rank me` sagt, dass erst `/rank link` nötig ist |
 | Platzierungsspiele laufen | Diese Playlist bleibt ohne Rolle |
-| Keine Rolle hinterlegt | Steht als Hinweis bei der Playlist |
-| Rolle über dem Bot | „Die Rolle steht über der höchsten Rolle des Bots." |
+| Keine Rolle hinterlegt | Diese Playlist bleibt ohne Rolle |
+| Rolle über dem Bot | Diese Rolle vergibt er nicht; das Dashboard zeigt es schon beim Speichern |
+
+Abnehmen lassen sich Rang-Rollen nicht mehr per Befehl; das geht von Hand in Discord.
 
 ---
 
@@ -47,7 +42,6 @@ Die Farbe vor jedem Rang zeigt die Familie (Bronze, Silber, Gold …), damit die
 |---|---|
 | **Alte Rolle abnehmen** | Beim Aufstieg geht die vorherige Rolle **derselben** Playlist weg. Aus lässt alles stehen |
 | **Platzierungsspiele** | Wer noch platziert, bleibt ohne Rolle — im Spiel steht dort auch kein Rang |
-| **Nur in diesem Kanal** | Hält den Befehl aus dem restlichen Server heraus |
 
 Zeigt dieselbe Rolle in zwei Playlists auf denselben Rang, wird sie einmal vergeben und nicht im selben Zug wieder abgenommen.
 
