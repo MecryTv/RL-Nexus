@@ -1,18 +1,66 @@
 import { randomBytes } from "node:crypto";
-import fastify, { FastifyInstance } from "fastify";
+import { existsSync } from "node:fs";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+import fastify, { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import rateLimit from "@fastify/rate-limit";
-import { LogError, SendError } from "./utils/errorpage";
+import { LogError, SendError, WantsPage } from "./utils/errorpage";
 import BotClient from "./client/BotClient";
 import RouteManager from "./handler/RouteManager";
 import IServer from "./interfaces/services/server/IServer";
 import { AssertSecret } from "./utils/jwt";
 import logger from "./utils/logger";
 import { UPLOAD_TYPES } from "./constants/Gallery";
-import { DASHBOARD_HOME, DASHBOARD_PATH } from "./constants/Dashboard";
+import { DASHBOARD_HOME, DASHBOARD_PATH, DEVELOPER_MODE } from "./constants/Dashboard";
 
 import { EncodingOf, MIN_COMPRESS, Pack } from "./utils/compress";
 const DEFAULT_HOST = "0.0.0.0";
 const MAX_PORT = 65535;
+
+const MAINTENANCE_JSON = '{"error":"Gerade ist Wartung. Versuch es in ein paar Minuten noch einmal."}';
+// Nur Namen, wie es sie gibt: kein Weg aus public/wartung/ heraus.
+const MAINTENANCE_ASSET = /^\/wartung\/([a-z0-9-]+)\.(js|webp)$/;
+
+/**
+ * Wartung lokal (Plan 23). Im Betrieb zeigt nginx auf dem Host die
+ * Wartungsseite (nginx/dashboard.nexus-emb.de.conf), lokal steht keiner davor.
+ * Mit --dev tut der Bot deshalb dasselbe fürs Bot-Dashboard: gleicher Schalter
+ * im Ordner des lokalen Admin Dashboards, gleiche Ausnahmen, /wartung/* an der
+ * Wurzel. Bei jeder Anfrage frisch geprüft, wie nginx mit -f.
+ */
+async function DevMaintenance(request: FastifyRequest, reply: FastifyReply): Promise<unknown> {
+    const flags = process.env.FLAGS_DIR ?? path.join(process.cwd(), "..", "Admin Dashboard", "data", "flags");
+    const site = process.env.ADMIN_PUBLIC_DIR ?? path.join(process.cwd(), "..", "Admin Dashboard", "public");
+    const url = request.url.split("?")[0];
+
+    if (url === "/wartung/status.json") {
+        const file = path.join(flags, "wartung.json");
+
+        reply.header("Cache-Control", "no-store");
+
+        return existsSync(file) ? reply.type("application/json; charset=utf-8").send(await readFile(file)) : reply.code(404).send({ error: "Not Found" });
+    }
+
+    const asset = MAINTENANCE_ASSET.exec(url);
+
+    if (asset) {
+        const file = path.join(site, "wartung", `${asset[1]}.${asset[2]}`);
+
+        // Wie nginx (expires -1): nach einem Update kein altes wartung.js aus dem Cache (W-0022).
+        reply.header("Cache-Control", "no-cache");
+
+        return existsSync(file) ? reply.type(asset[2] === "js" ? "text/javascript; charset=utf-8" : "image/webp").send(await readFile(file)) : reply.code(404).send({ error: "Not Found" });
+    }
+
+    if (!existsSync(path.join(flags, "wartung-dashboard"))) return;
+
+    // Wie nginx: Discord holt Bilder selbst, /dcapi braucht das Admin Dashboard. Dazu die eigenen Rechtstexte.
+    if (/^\/(images|dcapi|wartung)\//.test(url) || url.startsWith(`${DASHBOARD_PATH}/assets/`) || url === `${DASHBOARD_PATH}/impressum` || url === `${DASHBOARD_PATH}/privacy`) return;
+
+    reply.code(503).header("Retry-After", "300").header("Cache-Control", "no-store");
+
+    return WantsPage(request) ? reply.type("text/html; charset=utf-8").send(await readFile(path.join(site, "wartung.html"))) : reply.type("application/json; charset=utf-8").send(MAINTENANCE_JSON);
+}
 
 export default class Server implements IServer {
     client: BotClient;
@@ -137,6 +185,9 @@ export default class Server implements IServer {
         });
 
         if (this.routes.Size === 0) await this.routes.Load();
+
+        // Im Betrieb übernimmt das nginx, siehe DevMaintenance.
+        if (DEVELOPER_MODE) instance.addHook("onRequest", DevMaintenance);
 
         this.routes.Apply(instance);
 

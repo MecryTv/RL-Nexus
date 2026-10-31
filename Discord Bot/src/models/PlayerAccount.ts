@@ -63,6 +63,14 @@ export default class PlayerAccount extends Model<IPlayerAccountRow> {
         );
     }
 
+    /**
+     * Plan 33: nur der Anzeigename, wenn sich derselbe Account umbenannt hat.
+     * changed_at bleibt - daran hängt die Sperrfrist, und das Konto ist ja dasselbe.
+     */
+    async Rename(userId: string, platform: Platform, displayName: string): Promise<void> {
+        await this.Update([userId, platform], { display_name: displayName });
+    }
+
     async Unlink(userId: string, platform: Platform): Promise<boolean> {
         const result = await this.Delete(userId, platform);
 

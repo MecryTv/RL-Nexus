@@ -25,6 +25,15 @@ export default class CommandHandler extends Event {
             return;
         }
 
+        // Kontextmenü an einem Mitglied (Plan 31: „Hack melden“).
+        if (interaction.isUserContextMenuCommand()) {
+            const target = this.client.commands.get(interaction.commandName);
+
+            await target?.ExecuteUser(interaction).catch((error) => logger.warn(`[CommandHandler] Kontextmenü „${interaction.commandName}“ fehlgeschlagen: ${error}`));
+
+            return;
+        }
+
         if (!interaction.isChatInputCommand()) return;
 
         const command: Command | undefined = this.client.commands.get(interaction.commandName);

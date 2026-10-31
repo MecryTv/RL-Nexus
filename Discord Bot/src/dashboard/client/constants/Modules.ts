@@ -205,6 +205,13 @@ export const MODULES: IModule[] = [
         category: "moderation",
     },
     {
+        id: "anti-villain",
+        name: "Anti Villain",
+        description: "Hält gekaperte Accounts, Raids und Nukes auf, bevor ein Moderator online ist.",
+        icon: "#i-shield-check",
+        category: "moderation",
+    },
+    {
         id: "logging",
         name: "Logging System",
         description: "Protokolliert Nachrichten, Rollen, Beitritte und Moderation in eigenen Kanälen.",
@@ -241,12 +248,32 @@ export const MODULES: IModule[] = [
         category: "community",
     },
     {
+        id: "role-lists",
+        name: "Rollen-Listen",
+        description: "Listen, die zeigen, wer welche Rolle hat – Staff, Teams, Creator. Als Karte oder gezeichnetes Bild, immer aktuell.",
+        icon: "#i-users",
+        category: "community",
+    },
+    {
         id: "levels",
         name: "Level System",
         description: "Punkte für Nachrichten und Zeit im Sprachkanal, mit Rangliste und Belohnungsrollen.",
         icon: "#i-chart-up",
-        category: "community",
+        category: "always",
+        always: true,
         parts: [
+            {
+                id: "level-rewards",
+                name: "Belohnungen",
+                description: "Rollen ab einem Level und was beim Aufstieg passiert.",
+                icon: "#i-gift",
+            },
+            {
+                id: "level-card",
+                name: "Level-Karte",
+                description: "Level-Karte, Aufstiegs-Bild und Ranglisten-Bild gestalten – mit Vorlagen und Baukasten.",
+                icon: "#i-image",
+            },
             {
                 id: "leaderboard",
                 name: "Rangliste",

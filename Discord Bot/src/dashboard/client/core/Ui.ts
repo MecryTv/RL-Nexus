@@ -387,3 +387,50 @@ export function localInput(ms: number): string {
 }
 
 export const WHEN = new Intl.DateTimeFormat("de-DE", { dateStyle: "medium", timeStyle: "short" });
+
+/**
+ * Kacheln als Radiogruppe: Klick oder Pfeiltasten, wie im Entwurf von Plan 24.
+ * onPick kommt nur bei einer Änderung, nicht beim ersten Zeichnen.
+ */
+export function radioTiles<T extends string>(entries: [T, string, string, string][], value: T, label: string, onPick: (value: T) => void): HTMLElement {
+    const group = el("div", "apways");
+    let current = value;
+    const tiles = entries.map(([key, name, text, tag]) => {
+        const tile = button("apway", el("b", "", name), el("span", "", text), el("small", "", tag));
+
+        tile.setAttribute("role", "radio");
+        tile.addEventListener("click", () => pick(key, true));
+
+        return tile;
+    });
+    const pick = (next: T, changed: boolean): void => {
+        current = next;
+        tiles.forEach((tile, index) => {
+            const on = entries[index][0] === next;
+
+            tile.classList.toggle("is-on", on);
+            tile.setAttribute("aria-checked", String(on));
+            tile.tabIndex = on ? 0 : -1;
+        });
+        if (changed) onPick(next);
+    };
+
+    group.setAttribute("role", "radiogroup");
+    group.setAttribute("aria-label", label);
+    group.append(...tiles);
+    group.addEventListener("keydown", (event) => {
+        const step = event.key === "ArrowRight" || event.key === "ArrowDown" ? 1 : event.key === "ArrowLeft" || event.key === "ArrowUp" ? -1 : 0;
+
+        if (!step) return;
+
+        event.preventDefault();
+
+        const next = (entries.findIndex(([key]) => key === current) + step + entries.length) % entries.length;
+
+        pick(entries[next][0], true);
+        tiles[next].focus();
+    });
+    pick(value, false);
+
+    return group;
+}

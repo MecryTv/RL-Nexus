@@ -14,9 +14,10 @@ export interface IManageAccess {
 /**
  * Der gemeinsame Anfang der Routen von Notifiern, Umfragen und Giveaways:
  * Sitzung, Server, "Server verwalten", Datenbank, Modul an, Mitglied. null
- * heißt: die Antwort ist schon raus.
+ * heißt: die Antwort ist schon raus. module null: ohne „Modul an“ - die Route
+ * entscheidet selbst, was bei ausgeschaltetem Modul noch geht (Anti Villain).
  */
-export async function ManageGate(client: BotClient, request: FastifyRequest, reply: FastifyReply, module: string): Promise<IManageAccess | null> {
+export async function ManageGate(client: BotClient, request: FastifyRequest, reply: FastifyReply, module: string | null): Promise<IManageAccess | null> {
     const service = client.dashboardService;
     const session = SessionOf(client, request);
 
@@ -62,7 +63,7 @@ export async function ManageGate(client: BotClient, request: FastifyRequest, rep
         return null;
     }
 
-    if (!(await client.settings.Of(id)).modules.includes(module)) {
+    if (module !== null && !(await client.settings.Of(id)).modules.includes(module)) {
         reply.code(409).send({ error: "Das Modul ist auf diesem Server aus." });
 
         return null;

@@ -21,7 +21,7 @@ interface IStream {
     listeners: Map<string, Set<Handler>>;
 }
 
-const KINDS = ["moderation", "voice", "sixmans", "matchups", "lft", "clips", "guild"] as const;
+const KINDS = ["moderation", "voice", "sixmans", "matchups", "lft", "clips", "guild", "levels"] as const;
 
 const streams = new Map<string, IStream>();
 

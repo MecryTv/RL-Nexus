@@ -47,9 +47,15 @@ export default class TicketMessages extends Event {
      * Was der User bis dahin schreibt, landet danach im Ticket.
      */
     private async Direct(message: Message): Promise<void> {
+        // Eine laufende Bewerbung per DM geht vor Mod Mail (Plan 24). Ohne eine geht alles weiter wie bisher.
+        if (await this.client.applyService.flow.OnDirectMessage(message)) return;
+
         const service = this.client.ticketService;
 
         if (await service.OnDirectMessage(message)) return;
+
+        // Offener Fall „Epic-Name geändert“ (Plan 33): Hinweis auf den Knopf statt Mod Mail.
+        if (await this.client.epicNameService.OnTyped(message)) return;
 
         const guilds = await service.ModMailGuildsFor(message.author);
 

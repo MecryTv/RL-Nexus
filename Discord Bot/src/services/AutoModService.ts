@@ -292,7 +292,11 @@ export default class AutoModService {
         const info = FILTERS.find((entry) => entry.id === hit.filter)!;
         const guild = message.guild!;
 
-        if (filter.delete) await message.delete().catch(() => undefined);
+        if (filter.delete) {
+            await message.delete().catch(() => undefined);
+            // Plan 34: gelöschte Nachrichten bringen keine Level-Punkte.
+            await this.client.levelService.Revoke(message).catch(() => undefined);
+        }
 
         if (filter.notice) await this.Notice(message, filter.notice);
 

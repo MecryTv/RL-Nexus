@@ -15,7 +15,7 @@ import { ForgetLogTargets } from "../utils/logtarget";
  * Live Tickets haben ihren eigenen Stream (LiveService): dort fließen ganze
  * Nachrichten, und wer was sehen darf, hängt am einzelnen Ticket.
  */
-export type PulseKind = "moderation" | "voice" | "sixmans" | "matchups" | "lft" | "clips" | "guild";
+export type PulseKind = "moderation" | "voice" | "sixmans" | "matchups" | "lft" | "clips" | "guild" | "levels";
 
 interface ISubscriber {
     userId: string;

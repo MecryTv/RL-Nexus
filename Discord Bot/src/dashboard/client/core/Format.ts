@@ -3,6 +3,16 @@
 export const numbers = new Intl.NumberFormat("de-DE");
 export const relative = new Intl.RelativeTimeFormat("de-DE", { numeric: "auto" });
 
+const BERLIN_DAY = new Intl.DateTimeFormat("de-DE", { weekday: "long", day: "numeric", month: "short", timeZone: "Europe/Berlin" });
+const BERLIN_TIME = new Intl.DateTimeFormat("de-DE", { hour: "numeric", minute: "2-digit", timeZone: "Europe/Berlin" });
+
+/** Ein Zeitpunkt als Tag und Uhrzeit in Berlin - so plant der Bot, egal wo der Browser steht (W-0023). */
+export function berlinAt(iso: string): { day: string; time: string } {
+    const date = new Date(iso);
+
+    return { day: BERLIN_DAY.format(date), time: BERLIN_TIME.format(date) };
+}
+
 // "vor 5 Minuten" statt eines Zeitstempels - Intl kennt die deutschen Formen.
 export function ago(at: number): string {
     const units: [Intl.RelativeTimeFormatUnit, number][] = [
@@ -46,4 +56,9 @@ export function monthOf(iso: string): string {
     return Number.isNaN(date.getTime())
         ? "unbekannt"
         : date.toLocaleDateString("de-DE", { month: "long", year: "numeric" });
+}
+
+/** Wann eine Nachricht entstand: steckt in ihrer ID (Discord-Snowflake). */
+export function sentOn(id: string): string {
+    return new Date(Number((BigInt(id) >> 22n) + 1420070400000n)).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" });
 }

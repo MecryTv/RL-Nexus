@@ -16,7 +16,7 @@ import BotClient from "../client/BotClient";
 import { ADMIN_ENV_KEYS, ADMIN_SCOPE, RESTART_DELAY } from "../constants/Admin";
 import { MODULE_IDS } from "../constants/Modules";
 import Command from "../structures/Command";
-import { FetchState, PanelDiff } from "../utils/guildpanels";
+import { ApplyPanelRef, FetchState, PanelDiff } from "../utils/guildpanels";
 import { CreateToken } from "../utils/jwt";
 
 const PORT = 3998;
@@ -100,6 +100,13 @@ async function main(): Promise<void> {
         "PanelDiff: neu angelegtes Panel fällt weg, gleiches bleibt",
         diff.remove.map((panel) => panel.label).join() === "B" && diff.keep.map((panel) => panel.label).join() === "A",
         JSON.stringify(diff)
+    );
+
+    const apply = ApplyPanelRef({ channelId: "1", messageId: "2" });
+    check(
+        "Bewerbungs-Panel zählt mit, wenn es liegt",
+        apply?.kind === "apply" && apply.key === "apply" && apply.messageId === "2" && ApplyPanelRef({ channelId: "1", messageId: null }) === null,
+        JSON.stringify(apply)
     );
 
     check(

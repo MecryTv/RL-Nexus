@@ -58,6 +58,29 @@ export function ResolveImagePath(relative: string): string | null {
 }
 
 /**
+ * Ein Bild aus dem Dashboard - nur ein Pfad in der Galerie, nie eine Adresse.
+ * Eine fremde Adresse ließe den Bot Verbindungen aufbauen, die niemand sieht
+ * (auch ins interne Netz), genau das hält die Galerie schon zurück. Welcome
+ * und der Level-Designer prüfen hiermit.
+ */
+export function CleanGalleryPath(value: unknown): string | null {
+    if (typeof value !== "string") return null;
+
+    const source = value.trim();
+    const segments = source.split("/");
+
+    if (segments.length < 3 || segments.length > 4) return null;
+
+    // Jedes Stück ist ein Name, kein Pfad: kein Punkt-Sprung, kein Laufwerk,
+    // kein Schema. Sonst hielte path.resolve unter Windows "https:" für einen
+    // Ordner und ließe die Adresse durch. Leerzeichen dürfen bleiben - die
+    // mitgelieferten Vorlagen heißen "Champion 1.png".
+    if (segments.some((segment) => !segment || segment === "." || segment === ".." || /[\\:]/.test(segment))) return null;
+
+    return ResolveImagePath(source) ? source : null;
+}
+
+/**
  * Was als internes Netz gilt - eine Liste fuer beide Stellen, die danach fragen:
  * IsPrivateHost (die eingetippte URL, vorab) und LookupPublic (die Adresse, zu der
  * wirklich verbunden wird). Zwei Listen liefen irgendwann auseinander.
