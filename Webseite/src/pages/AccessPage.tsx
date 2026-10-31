@@ -86,7 +86,7 @@ export function AccessPage(): JSX.Element {
     };
 
     const me = state?.me ?? null;
-    const rows = me ? accessRows(me, state?.products ?? []) : [];
+    const rows = me ? accessRows(me, state?.products ?? [], !sellsNow(state?.mode)) : [];
 
     return (
         <>

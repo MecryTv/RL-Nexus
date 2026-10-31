@@ -123,10 +123,6 @@ export function ModuleDetailView({ module, detail }: { readonly module: BotModul
                                         {access !== undefined && <Badge accent={module.accent}>{access.label}</Badge>}
                                     </div>
                                     <CommandList commands={module.commands} />
-                                    <Link className={styles.more} to="/commands">
-                                        Alle {moduleRegistry.commandCount} Commands
-                                        <Icon name="arrow-right" size={14} />
-                                    </Link>
                                 </section>
                             )}
                         </div>

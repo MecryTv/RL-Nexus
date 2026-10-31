@@ -57,19 +57,18 @@ export const COMMAND_ACCESS: Readonly<Record<string, ICommandAccess>> = {
     giveaways: MANAGE,
     polls: MANAGE,
     dashboard: MANAGE,
+    backups: MANAGE,
     gallery: ADMIN,
 };
 
 export const COMMAND_DETAILS: Readonly<Record<string, ICommandDetail>> = {
     /* --- RL Tracking ----------------------------------------------------- */
-    "rank me": { description: "Zeigt deine eigenen Ränge" },
+    "rank me": { description: "Zeigt deine eigenen Ränge und setzt mit Rank Roles deine Rang-Rollen" },
     "rank search": { description: "Zeigt die Ränge zu einem Epic-Namen", usage: "epicname" },
     "rank link": { description: "Verbindet dein Epic-Konto mit deinem Discord-Konto", usage: "epicname" },
     "rank unlink": { description: "Trennt dein Epic-Konto wieder, frühestens drei Tage nach dem Verbinden" },
 
     /* --- Rank Roles ------------------------------------------------------ */
-    "rangrollen holen": { description: "Setzt deine Rang-Rollen auf den aktuellen Stand" },
-    "rangrollen ablegen": { description: "Nimmt dir alle Rang-Rollen wieder ab" },
 
     /* --- Looking for ----------------------------------------------------- */
     "lookingfor spieler": { description: "Du suchst ein Team" },
@@ -120,6 +119,14 @@ export const COMMAND_DETAILS: Readonly<Record<string, ICommandDetail>> = {
 
     /* --- Gallery System -------------------------------------------------- */
     gallery: { description: "Öffnet die Bild-Verwaltung: ansehen, hochladen, verschieben, löschen" },
+
+    /* --- Backups -------------------------------------------------------- */
+    "backup neu": { description: "Legt ein Backup an", usage: "[notiz] [was]" },
+    "backup liste": { description: "Zeigt deine Backups, die letzten 14 Tage auf einen Blick" },
+    "backup ansehen": { description: "Was drin ist: Kanäle, Rollen, Bereiche im Bot", usage: "backup" },
+    "backup vergleichen": { description: "Was sich seitdem geändert hat, ohne etwas zu ändern", usage: "backup" },
+    "backup laden": { description: "Reparieren oder genau wie im Backup, mit Rückfrage", usage: "backup [modus]" },
+    "backup automatisch": { description: "Wann der Bot von selbst sichert, an oder aus" },
 
     /* --- Web-Dashboard --------------------------------------------------- */
     "module an": { description: "Schaltet ein Modul ein", usage: "modul" },

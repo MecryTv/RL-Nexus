@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { brotliCompressSync, constants, gzipSync } from "node:zlib";
 import react from "@vitejs/plugin-react";
 import { defineConfig, loadEnv, type Plugin } from "vite";
+import { maintenanceAnswer } from "./src/services/maintenance.ts";
 
 const styles = fileURLToPath(new URL("./src/styles", import.meta.url));
 
@@ -104,6 +105,89 @@ function localContent(): Plugin {
     };
 }
 
+/**
+ * Die Wartung im Entwicklungsserver, wie im Betrieb nginx (Plan 23): Liegt im
+ * lokalen Admin Dashboard der Schalter `wartung-webseite`, zeigen Seiten die
+ * Wartungsseite und die API den JSON-Satz, die Rechtstexte gehen durch
+ * (`maintenanceAnswer`). `/wartung/*` kommt aus dem `public` des Admin Dashboards,
+ * `/wartung/status.json` aus dessen Flags-Ordner.
+ */
+function localMaintenance(): Plugin {
+    const flags = process.env.FLAGS_DIR ?? fileURLToPath(new URL("../Admin Dashboard/data/flags", import.meta.url));
+    const admin = process.env.ADMIN_PUBLIC_DIR ?? fileURLToPath(new URL("../Admin Dashboard/public", import.meta.url));
+    const types: Record<string, string> = { js: "text/javascript", webp: "image/webp" };
+
+    return {
+        name: "rl-nexus:local-maintenance",
+        apply: "serve",
+        configureServer(server) {
+            server.middlewares.use((request, response, next) => {
+                const path = (request.url ?? "/").split("?")[0];
+
+                if (path === "/wartung/status.json") {
+                    const file = join(flags, "wartung.json");
+
+                    response.setHeader("Cache-Control", "no-store");
+                    if (!existsSync(file)) {
+                        response.statusCode = 404;
+                        response.end();
+                        return;
+                    }
+
+                    response.setHeader("Content-Type", "application/json; charset=utf-8");
+                    response.end(readFileSync(file));
+                    return;
+                }
+
+                // Nur Namen, wie es sie gibt. Kein Weg aus dem Ordner heraus.
+                const asset = /^\/wartung\/([a-z0-9-]+)\.(js|webp)$/.exec(path);
+
+                if (asset) {
+                    const file = join(admin, "wartung", `${asset[1]}.${asset[2]}`);
+
+                    if (!existsSync(file)) {
+                        response.statusCode = 404;
+                        response.end();
+                        return;
+                    }
+
+                    response.setHeader("Content-Type", types[asset[2]]);
+                    response.end(readFileSync(file));
+                    return;
+                }
+
+                // Vite lädt Module, Stile und Bilder von /src, /@vite, /node_modules: Die gehen
+                // immer durch, im Betrieb liegen sie unter /assets/. Geprüft werden Seiten und /api.
+                const accept = request.headers.accept ?? "";
+                if (!accept.includes("text/html") && !path.startsWith("/api/") && path !== "/") {
+                    next();
+                    return;
+                }
+
+                const answer = maintenanceAnswer(path, request.method ?? "GET", accept, existsSync(join(flags, "wartung-webseite")));
+
+                if (answer === "pass") {
+                    next();
+                    return;
+                }
+
+                response.statusCode = 503;
+                response.setHeader("Retry-After", "300");
+                response.setHeader("Cache-Control", "no-store");
+
+                if (answer === "json") {
+                    response.setHeader("Content-Type", "application/json; charset=utf-8");
+                    response.end('{"error":"Gerade ist Wartung. Versuch es in ein paar Minuten noch einmal."}');
+                    return;
+                }
+
+                response.setHeader("Content-Type", "text/html; charset=utf-8");
+                response.end(readFileSync(join(admin, "wartung.html")));
+            });
+        },
+    };
+}
+
 export default defineConfig(({ command, mode }) => {
     // Im Betrieb nimmt nginx /api/contact an und reicht es an den
     // Admin-Server. Steht in keiner .env etwas anderes, baut die Seite mit
@@ -125,6 +209,7 @@ export default defineConfig(({ command, mode }) => {
         plugins: [
             react(),
             localContent(),
+            localMaintenance(),
             preloadFonts([
                 "oxanium-latin-400-normal",
                 "oxanium-latin-800-normal",
