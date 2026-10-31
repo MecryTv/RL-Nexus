@@ -1,19 +1,24 @@
 /**
- * Abschnitt: Level System.
+ * Abschnitte: Level System und Belohnungen (Plan 34, Menü A).
  *
- * Oben die Zahlen, darunter drei Karten: Punkte (Chat, Voice, Kurve, Bonus,
- * Ausnahmen), Aufsteigen (Nachricht im Editor, Belohnungsrollen) und die
- * Rangliste samt Punkte-Verwaltung.
+ * „Level System“: oben die Zahlen, darunter Punkte (Chat, Voice, Kurve, Bonus,
+ * Ausnahmen), Schutz gegen Punkte-Farmen und der Nachtrag aus der
+ * Server-Übersicht, dazu doppelte Punkte (Plan 37). „Belohnungen“: Aufsteigen
+ * (wohin, löschen, Nachricht im Editor), die Belohnungsrollen und die
+ * Aktivsten der Woche und des Monats (Plan 37). Beide teilen sich dieselben Einstellungen;
+ * jede Seite speichert nur ihre eigenen Felder, damit keine die andere
+ * überschreibt.
  */
 
 import { BASE } from "../core/Base.js";
-import { icon, need } from "../core/Dom.js";
+import { icon, maybe, need } from "../core/Dom.js";
 import { toast } from "../core/Toast.js";
 import { api, button, card, el, IRole, loading, row, select, stat, toggle } from "../core/Ui.js";
 import { LEVEL_IMAGES, LEVEL_PLACEHOLDERS } from "../constants/Placeholders.js";
 import { IServerEmoji } from "../layout/EmojiPicker.js";
-import { IEditorContext, IMessageDoc, renderEditor, renderPreview } from "../layout/MessageEditor.js";
-import { templateBar } from "../layout/Templates.js";
+import { IMessageDoc } from "../layout/MessageEditor.js";
+import { bodyEditor, IBody } from "../layout/BodyEditor.js";
+import { LEVEL_FIELDS, LevelView } from "../constants/LevelFields.js";
 
 interface IBonus {
     id: string;
@@ -23,6 +28,32 @@ interface IBonus {
 interface IReward {
     level: number;
     roleId: string;
+}
+
+/** Plan 37: ein Zeitfenster mit mehr Punkten - wie ILevelBoost im Bot. */
+interface IBoost {
+    id: string;
+    kind: "once" | "weekly";
+    factor: number;
+    start: number | null;
+    end: number | null;
+    weekday: number | null;
+    from: string | null;
+    to: string | null;
+    announce: boolean;
+}
+
+interface ITopPost {
+    on: boolean;
+    channelId: string | null;
+    roleId: string | null;
+}
+
+/** Plan 37: der letzte Post der Aktivsten. */
+interface ITopStatus {
+    periodKey: string;
+    error: string | null;
+    postedAt: number;
 }
 
 interface ISettings {
@@ -39,7 +70,41 @@ interface ISettings {
     rewards: IReward[];
     stack: boolean;
     public: boolean;
+    fair: { length: boolean; repeat: boolean; punished: boolean; automod: boolean };
+    announceDelete: number;
+    /** Plan 35: Aufstieg als Bild oder Text, die Zeile über dem Bild. */
+    upMode?: "image" | "text";
+    upLine: string;
+    /** Plan 37 */
+    boosts: IBoost[];
+    boostChannelId: string | null;
+    top: { week: ITopPost; month: ITopPost };
 }
+
+interface IBackfill {
+    mode: "backfill" | "prefill" | "none";
+    cutoff: number;
+    members: number;
+    xp: number;
+    doneAt: number | null;
+}
+
+/** Plan 36: welche Felder zu welcher Seite gehören, steht in constants/LevelFields.ts. */
+const FIELDS = LEVEL_FIELDS;
+
+const NUMBER = new Intl.NumberFormat("de-DE");
+
+/** Plan 37: wie im Bot - 0 ist Sonntag. */
+const WEEKDAYS: [string, string][] = [
+    ["1", "Montag"],
+    ["2", "Dienstag"],
+    ["3", "Mittwoch"],
+    ["4", "Donnerstag"],
+    ["5", "Freitag"],
+    ["6", "Samstag"],
+    ["0", "Sonntag"],
+];
+const MAX_BOOSTS = 10;
 
 interface IRank {
     id: string;
@@ -58,16 +123,20 @@ interface IRank {
 interface IPayload {
     settings: ISettings;
     defaultMessage: IMessageDoc;
-    limits: { rewards: number; bonus: number; excluded: number };
+    limits: { rewards: number; bonus: number; excluded: number; upLine: number };
+    /** Plan 35: was gilt, auch wenn noch nichts gespeichert ist. */
+    upMode: "image" | "text";
     page: number;
     total: number;
     top: IRank[];
+    backfill: IBackfill | null;
+    topStatus?: { week: ITopStatus | null; month: ITopStatus | null };
     guild: { name: string; roles: IRole[]; channels: { id: string; name: string }[]; categories: { id: string; name: string }[]; emojis: IServerEmoji[] };
 }
 
-export function renderLevels(guildId: string): void {
-    const host = need<HTMLElement>("#levelBody");
-    const note = need<HTMLElement>("#levelNote");
+export function renderLevels(guildId: string, view: LevelView = "levels"): void {
+    const host = need<HTMLElement>(view === "levels" ? "#levelBody" : "#levelRewardsBody");
+    const note = need<HTMLElement>(view === "levels" ? "#levelNote" : "#levelRewardsNote");
     const call = api(`${BASE}/api/guild/${encodeURIComponent(guildId)}/levels`, note);
 
     let data: IPayload | null = null;
@@ -285,51 +354,32 @@ export function renderLevels(guildId: string): void {
        ------------------------------------------------------------ */
     function levelUp(): HTMLElement {
         const settings = draft!;
-        const editorHost = el("div", "");
-        const preview = el("div", "tkprev");
-        const doc = (): IMessageDoc => {
-            settings.message ??= structuredClone(data!.defaultMessage);
-
-            return settings.message;
-        };
         const values: Record<string, string> = Object.fromEntries(LEVEL_PLACEHOLDERS.map((entry) => [entry.key, entry.sample]));
-        const context = (): IEditorContext => ({
-            guildId,
-            values,
-            roles: new Map(data!.guild.roles.map((role) => [role.id, role.name])),
-            channels: new Map(data!.guild.channels.map((channel) => [channel.id, channel.name])),
-            emojis: data!.guild.emojis,
-            placeholders: LEVEL_PLACEHOLDERS,
-            imagePlaceholders: LEVEL_IMAGES,
-            onChange: () => {
-                touch();
-                paintPreview();
-            },
-        });
-        const paintPreview = (): void => renderPreview(preview, doc(), context());
 
-        renderEditor(editorHost, doc(), context());
-        paintPreview();
+        settings.message ??= structuredClone(data!.defaultMessage);
 
-        // Fertige Nachrichten statt eines einzelnen "Zuruecksetzen" - dieselbe
-        // Leiste wie im Inhalts-Editor der anderen Module.
-        const bar = templateBar<IMessageDoc>("levelUp", {
-            take: () => structuredClone(doc()),
-            put: (state) => {
-                settings.message = structuredClone(state);
-                touch();
-                renderEditor(editorHost, doc(), context());
-                paintPreview();
-            },
-            apply: (template) => {
-                if (!template.body.doc) return;
-
-                settings.message = structuredClone(template.body.doc);
-                touch();
-                renderEditor(editorHost, doc(), context());
-                paintPreview();
-            },
-        });
+        // Plan 39: das Nachrichten-Studio mit nur der Karte. Es ändert settings.message an Ort und Stelle (auch bei Vorlage und Rückgängig).
+        const message: IBody = { kind: "v2", content: "", embed: null, doc: settings.message };
+        const studio = (): HTMLElement =>
+            bodyEditor(message, {
+                pageSave: () => save,
+                kinds: { v2: "Karte" },
+                title: "Die Nachricht",
+                templates: "levelUp",
+                touch,
+                context: () => ({
+                    guildId,
+                    values,
+                    roles: new Map(data!.guild.roles.map((role) => [role.id, role.name])),
+                    channels: new Map(data!.guild.channels.map((channel) => [channel.id, channel.name])),
+                    emojis: data!.guild.emojis,
+                    placeholders: LEVEL_PLACEHOLDERS,
+                    imagePlaceholders: LEVEL_IMAGES,
+                    onChange: () => undefined,
+                }),
+                // Nur die Karte - ein Embed gibt es hier nicht.
+                defaultEmbed: () => ({ title: null, description: null, color: null, url: null, image: null, thumbnail: null, author: null, footer: null, timestamp: false, fields: [] }),
+            }).node;
 
         const where = select(
             [
@@ -357,33 +407,76 @@ export function renderLevels(guildId: string): void {
             "Kanal für die Aufstiegs-Nachricht"
         );
 
-        target.disabled = settings.announce !== "channel";
+        // Fester Kanal: für „In einem festen Kanal“ und für Aufstiege im Voice bei „Im Kanal, in dem es passiert“.
+        target.disabled = settings.announce === "dm" || settings.announce === "off";
+
+        const remove = select(
+            [
+                ["0", "Nein"],
+                ["1", "Nach 1 Minute"],
+                ["5", "Nach 5 Minuten"],
+                ["15", "Nach 15 Minuten"],
+                ["60", "Nach 60 Minuten"],
+            ],
+            String(settings.announceDelete ?? 0),
+            (value) => {
+                settings.announceDelete = Number(value);
+                touch();
+            },
+            "Aufstiegs-Nachricht im Chat wieder löschen"
+        );
+
+        remove.disabled = settings.announce === "dm" || settings.announce === "off";
+
+        // Plan 35: Bild oder Text. Ohne gespeicherte Wahl gilt, was der Bot sagt (eigene Nachricht: Text, sonst Bild).
+        settings.upMode ??= data!.upMode;
+
+        const mode = select(
+            [
+                ["image", "Als Bild"],
+                ["text", "Als Text-Nachricht"],
+            ],
+            settings.upMode,
+            (value) => {
+                settings.upMode = value as "image" | "text";
+                touch();
+                paint();
+            },
+            "Aufstieg als Bild oder als Text"
+        );
+        // Plan 36: Bild und Zeile darüber gestaltet man im Aufstiegs-Studio unter Level-Karte.
+        const studioLink = el("a", "", "Level-Karte › Aufstieg");
+
+        studioLink.href = `${BASE}/guild/${encodeURIComponent(guildId)}/level-card`;
+        // Review I2: wie ein Klick in der Leiste, ohne Neuladen - sonst wäre das gerade umgestellte „Als Bild“ weg.
+        studioLink.addEventListener("click", (event) => {
+            const nav = maybe<HTMLAnchorElement>('a[data-section="level-card"]');
+
+            if (!nav) return;
+
+            event.preventDefault();
+            (window as { levelCardTab?: string }).levelCardTab = "up";
+            document.dispatchEvent(new Event("level-card:tab"));
+            nav.click();
+        });
+
+        const asImage = settings.upMode === "image";
 
         return card(
             "Aufsteigen",
             "Was passiert, wenn jemand ein Level schafft.",
             row("Nachricht", "Im Kanal, an einer festen Stelle oder per DM", where),
-            row("Fester Kanal", "Nur nötig für „In einem festen Kanal“", target),
-            ...(settings.announce === "off"
+            row("Fester Kanal", "Für „In einem festen Kanal“. Bei „Im Kanal, in dem es passiert“ landen Aufstiege im Voice hier, ohne festen Kanal per DM", target),
+            row("Wieder löschen", "Nur im Chat, Direktnachrichten bleiben", remove),
+            ...(settings.announce === "off" ? [] : [row("Als Bild oder Text", "Das Bild gestaltest du unter Level-Karte › Aufstieg", mode)]),
+            ...(settings.announce === "off" || !asImage ? [] : [el("p", "hintline", "Das Bild und die Zeile darüber gestaltest du unter ", studioLink, ".")]),
+            ...(settings.announce === "off" || asImage
                 ? []
                 : [
-                      el("div", "sneditor", el("div", "sneditor__main", el("div", "sneditor__bar", el("h4", "sneditor__title", "Die Nachricht")), bar, placeholderHint(), editorHost), el("aside", "sneditor__side", el("div", "tkside__head", el("span", "tkside__live", "Live-Vorschau")), preview)),
+                      studio(),
                   ]),
             rewardBox()
         );
-    }
-
-    function placeholderHint(): HTMLElement {
-        const chips = el("div", "phhint__list");
-
-        for (const entry of LEVEL_PLACEHOLDERS) {
-            const chip = el("span", "phchip", el("code", "", `{${entry.key}}`), el("span", "phchip__label", entry.label));
-
-            chip.title = `Beispiel: ${entry.sample}`;
-            chips.append(chip);
-        }
-
-        return el("div", "phhint", el("p", "hintline phhint__lead", "Diese Platzhalter setzt der Bot beim Senden ein:"), chips);
     }
 
     /** Rollen ab Level X. */
@@ -467,6 +560,278 @@ export function renderLevels(guildId: string): void {
     }
 
     /* ------------------------------------------------------------
+       Schutz gegen Punkte-Farmen (Plan 34)
+       ------------------------------------------------------------ */
+    function fair(): HTMLElement {
+        const settings = draft!;
+
+        settings.fair ??= { length: true, repeat: true, punished: true, automod: true };
+
+        const flag = (key: keyof ISettings["fair"], label: string, hint: string): HTMLElement =>
+            row(
+                label,
+                hint,
+                el("label", "snitem__switch", toggle(settings.fair[key], label, (on) => {
+                    settings.fair[key] = on;
+                    touch();
+                }), el("span", "", "an"))
+            );
+
+        return card(
+            "Schutz gegen Punkte-Farmen",
+            "Gezählt wird jede Nachricht und jede Minute im Sprachkanal. Punkte gibt es nur nach diesen Regeln.",
+            flag("length", "Ab 5 Zeichen", "Nur Emojis, nur ein Link oder nur ein Sticker bringen keine Punkte"),
+            flag("repeat", "Doppelt", "Dieselbe Nachricht zweimal hintereinander zählt nur einmal"),
+            flag("punished", "Mod-Strafen", "Bei aktivem Timeout oder in der Quarantäne gibt es keine Punkte"),
+            flag("automod", "AutoMod", "Nachrichten, die AutoMod löscht, bringen nichts")
+        );
+    }
+
+    /* ------------------------------------------------------------
+       Doppelte Punkte (Plan 37)
+       ------------------------------------------------------------ */
+    function boosts(): HTMLElement {
+        const settings = draft!;
+        const box = el("div", "lvboosts");
+        // datetime-local rechnet in der Zeit des Browsers.
+        const local = (at: number | null): string => (at === null ? "" : new Date(at - new Date(at).getTimezoneOffset() * 60_000).toISOString().slice(0, 16));
+        const stamp = (value: number | null, onChange: (at: number | null) => void, label: string): HTMLInputElement => {
+            const input = el("input", "text lvstamp");
+
+            input.type = "datetime-local";
+            input.value = local(value);
+            input.setAttribute("aria-label", label);
+            input.addEventListener("input", () => {
+                const at = new Date(input.value).getTime();
+
+                onChange(Number.isFinite(at) ? at : null);
+                touch();
+            });
+
+            return input;
+        };
+        const time = (value: string | null, onChange: (text: string) => void, label: string): HTMLInputElement => {
+            const input = el("input", "text lvtime");
+
+            input.type = "time";
+            input.value = value ?? "";
+            input.setAttribute("aria-label", label);
+            input.addEventListener("input", () => {
+                onChange(input.value);
+                touch();
+            });
+
+            return input;
+        };
+
+        settings.boosts ??= [];
+
+        const draw = (): void => {
+            box.replaceChildren();
+
+            for (const boost of settings.boosts) {
+                const kind = select(
+                    [
+                        ["weekly", "Jede Woche"],
+                        ["once", "Einmal"],
+                    ],
+                    boost.kind,
+                    (value) => {
+                        const now = Date.now();
+
+                        Object.assign(
+                            boost,
+                            value === "once"
+                                ? { kind: "once", start: now, end: now + 2 * 3_600_000, weekday: null, from: null, to: null }
+                                : { kind: "weekly", start: null, end: null, weekday: 5, from: "18:00", to: "23:00" }
+                        );
+                        touch();
+                        draw();
+                    },
+                    "Wie oft"
+                );
+                const when =
+                    boost.kind === "weekly"
+                        ? [
+                              select(WEEKDAYS, String(boost.weekday ?? 5), (value) => {
+                                  boost.weekday = Number(value);
+                                  touch();
+                              }, "Wochentag"),
+                              time(boost.from, (value) => (boost.from = value), "Von"),
+                              el("span", "lvrange__to", "bis"),
+                              time(boost.to, (value) => (boost.to = value), "Bis"),
+                          ]
+                        : [stamp(boost.start, (at) => (boost.start = at), "Beginn"), el("span", "lvrange__to", "bis"), stamp(boost.end, (at) => (boost.end = at), "Ende")];
+                const factor = el("input", "text lvfactor");
+                const remove = button("btn btn--quiet btn--icon", icon("#i-x"));
+
+                factor.type = "number";
+                factor.min = "1.1";
+                factor.max = "3";
+                factor.step = "0.1";
+                factor.value = String(boost.factor);
+                factor.setAttribute("aria-label", "Faktor");
+                factor.addEventListener("input", () => {
+                    boost.factor = Math.max(1.1, Math.min(3, Number(factor.value) || 2));
+                    touch();
+                });
+                remove.title = "Entfernen";
+                remove.setAttribute("aria-label", "Fenster entfernen");
+                remove.addEventListener("click", () => {
+                    settings.boosts.splice(settings.boosts.indexOf(boost), 1);
+                    touch();
+                    draw();
+                });
+
+                box.append(
+                    el(
+                        "div",
+                        "lvboost",
+                        kind,
+                        ...when,
+                        el("span", "lvbonus__x", "×"),
+                        factor,
+                        el("label", "snitem__switch", toggle(boost.announce, "Beginn und Ende ankündigen", (on) => {
+                            boost.announce = on;
+                            touch();
+                        }), el("span", "", "ankündigen")),
+                        remove
+                    )
+                );
+            }
+
+            const add = button("btn btn--quiet", icon("#i-plus"), "Fenster hinzufügen");
+
+            add.disabled = settings.boosts.length >= MAX_BOOSTS;
+            add.addEventListener("click", () => {
+                settings.boosts.push({ id: Math.random().toString(36).slice(2, 10), kind: "weekly", factor: 2, start: null, end: null, weekday: 5, from: "18:00", to: "23:00", announce: false });
+                touch();
+                draw();
+            });
+            box.append(add);
+        };
+
+        draw();
+
+        const channel = select(
+            [["", "— kein Kanal —"], ...data!.guild.channels.map((entry): [string, string] => [entry.id, `# ${entry.name}`])],
+            settings.boostChannelId ?? "",
+            (value) => {
+                settings.boostChannelId = value || null;
+                touch();
+            },
+            "Kanal für die Ankündigungen"
+        );
+
+        return card(
+            "Doppelte Punkte",
+            "Zu festen Zeiten bringen Nachrichten und Voice-Minuten mehr, zusätzlich zu den Boni. Überschneiden sich zwei Fenster, gilt das höhere. Wöchentliche Zeiten sind deutsche Zeit, 22:00 bis 02:00 geht über Mitternacht.",
+            row("Zeitfenster", `Bis ${MAX_BOOSTS} Stück, Faktor 1,1 bis 3`, box),
+            row("Ankündigen in", "Für Fenster mit „ankündigen“: Beginn und Ende. Ohne Kanal sagt der Bot nichts", channel),
+            el("p", "hintline", "Solange ein Fenster läuft, zeigt {boost} auf Level-Karte und Aufstiegs-Bild etwa „2× XP bis Freitag 23:00“. Einmalige Fenster, die vorbei sind, verschwinden beim Speichern.")
+        );
+    }
+
+    /* ------------------------------------------------------------
+       Aktivste der Woche und des Monats (Plan 37)
+       ------------------------------------------------------------ */
+    function topCard(): HTMLElement {
+        const settings = draft!;
+        const off = (): ITopPost => ({ on: false, channelId: null, roleId: null });
+
+        settings.top ??= { week: off(), month: off() };
+
+        const date = (at: number) => new Date(at).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
+        const period = (kind: "week" | "month", key: string): string => {
+            const [year, month, day] = key.split("-").map(Number);
+
+            return kind === "week" ? `die Woche ab ${String(day).padStart(2, "0")}.${String(month).padStart(2, "0")}.` : new Date(Date.UTC(year, month - 1, 1)).toLocaleDateString("de-DE", { month: "long", year: "numeric", timeZone: "UTC" });
+        };
+        const part = (kind: "week" | "month", label: string, hint: string): HTMLElement => {
+            const post = settings.top[kind];
+            const state = data!.topStatus?.[kind] ?? null;
+            const channel = select(
+                [["", "— Kanal wählen —"], ...data!.guild.channels.map((entry): [string, string] => [entry.id, `# ${entry.name}`])],
+                post.channelId ?? "",
+                (value) => {
+                    post.channelId = value || null;
+                    touch();
+                },
+                `Kanal für ${label}`
+            );
+            const role = select(
+                [["", "Keine Rolle"], ...data!.guild.roles.map((entry): [string, string] => [entry.id, `@${entry.name}`])],
+                post.roleId ?? "",
+                (value) => {
+                    post.roleId = value || null;
+                    touch();
+                },
+                `Rolle für ${label}`
+            );
+
+            channel.disabled = role.disabled = !post.on;
+
+            return el(
+                "div",
+                "lvtop",
+                row(label, hint, el("label", "snitem__switch", toggle(post.on, label, (on) => {
+                    post.on = on;
+                    touch();
+                    paint();
+                }), el("span", "", "an"))),
+                row("Kanal", "Hier kommt das Bild hin", channel),
+                row("Rolle für Platz 1 bis 3", "Wandert beim nächsten Post zu den neuen Plätzen. Sie muss unter der höchsten Rolle des Bots stehen", role),
+                ...(state ? [el("p", `hintline${state.error ? " is-warn" : ""}`, `Zuletzt am ${date(state.postedAt)} für ${period(kind, state.periodKey)}.${state.error ? ` ${state.error}` : ""}`)] : [])
+            );
+        };
+
+        return card(
+            "Aktivste der Woche und des Monats",
+            "Das Podium als Ranglisten-Bild im Stil von Level-Karte › Rangliste. Gezählt werden nur die Punkte im Zeitraum.",
+            part("week", "Aktivste der Woche", "Montags um 18 Uhr, Montag bis Sonntag davor"),
+            part("month", "Aktivste des Monats", "Am 1. um 18 Uhr, der ganze Vormonat")
+        );
+    }
+
+    /* ------------------------------------------------------------
+       Nachtrag aus der Server-Übersicht (Plan 34)
+       ------------------------------------------------------------ */
+    function backfill(): HTMLElement {
+        const done = data!.backfill;
+        const day = (at: number) => new Date(at).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
+        const title = "Nachtrag aus der Server-Übersicht";
+        const lead = "Einmalig beim Start: Was die Server-Übersicht vorher getrackt hat, wird als Punkte gutgeschrieben.";
+
+        if (!done || done.doneAt === null) return card(title, lead, el("p", "hintline", done ? "Läuft gerade." : "Läuft beim nächsten Start des Bots."));
+        if (done.mode === "none") return card(title, lead, el("p", "hintline", `Am ${day(done.doneAt)} gab es nichts nachzutragen.`));
+
+        if (done.mode === "prefill") {
+            return card(
+                title,
+                lead,
+                el("p", "hintline", `Hier lief das Level System schon. Am ${day(done.doneAt)} wurden nur die Zeiträume 7 und 30 Tage vorgefüllt (${NUMBER.format(done.members)} Mitglieder). Lifetime blieb, wie es war.`)
+            );
+        }
+
+        return card(
+            title,
+            lead,
+            el(
+                "div",
+                "tkhead snhead",
+                stat("#i-users", "Mitglieder", NUMBER.format(done.members)),
+                stat("#i-chart-up", "Punkte gutgeschrieben", NUMBER.format(done.xp)),
+                stat("#i-check", "Erledigt", day(done.doneAt), "is-ok")
+            ),
+            el(
+                "p",
+                "hintline",
+                "Alles, was die Server-Übersicht getrackt hat, ohne Deckel: Nachrichten mal Ø Punkte je Nachricht, Voice-Minuten mal Punkte je Minute. Wer dadurch aufstieg, bekam eine Nachricht für den ganzen Sprung."
+            )
+        );
+    }
+
+    /* ------------------------------------------------------------
        Zeichnen und Laden
        ------------------------------------------------------------ */
     function paint(): void {
@@ -475,13 +840,14 @@ export function renderLevels(guildId: string): void {
         save.replaceChildren(icon("#i-check"), document.createTextNode("Speichern"));
         save.disabled = !dirty;
 
-        host.replaceChildren(head(), points(), levelUp(), el("div", "mcsave lvsave", save));
+        host.replaceChildren(...(view === "levels" ? [head(), points(), boosts(), fair(), backfill()] : [levelUp(), topCard()]), el("div", "mcsave lvsave", save));
     }
 
     save.addEventListener("click", async () => {
         save.disabled = true;
 
-        const answer = await call<{ settings: ISettings }>("", { action: "save", settings: draft });
+        const own = Object.fromEntries(FIELDS[view].map((key) => [key, draft![key as keyof ISettings]]));
+        const answer = await call<{ settings: ISettings }>("", { action: "save", settings: own });
 
         if (!answer) {
             save.disabled = false;

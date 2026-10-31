@@ -1,21 +1,20 @@
 import {
-    AttachmentBuilder,
     ChatInputCommandInteraction,
     GuildMember,
     InteractionContextType,
     MessageFlags,
+    PermissionFlagsBits,
     SlashCommandBuilder,
 } from "discord.js";
 import BotClient from "../../client/BotClient";
 import Command from "../../structures/Command";
 import Category from "../../enums/Category";
-import ComponentV2Builder from "../../builder/ComponentV2Builder";
 import { InfoCard } from "../../builder/CommunityView";
-import { RenderLevelCard } from "../../builder/LevelCard";
-import { LEVELS_ACCENT, LevelProgress } from "../../constants/Levels";
+import { LEVEL_PERIODS, LEVELS_ACCENT, MAX_REASON, MAX_XP_MANUAL, PERIOD_LABEL } from "../../constants/Levels";
+import { LevelAdjustMode } from "../../interfaces/services/levels/ILevels";
+import { BoardMessage, IsPeriod, RankPayload } from "../../services/levels/BoardMessage";
 import { LEVELS_MODULE } from "../../services/LevelService";
 
-const PER_PAGE = 10;
 
 /**
  * Der eigene Stand als Karte und die Rangliste des Servers. /rank ist schon
@@ -40,7 +39,34 @@ export default class Level extends Command {
                 sub
                     .setName("rangliste")
                     .setDescription("Die Besten des Servers")
-                    .addIntegerOption((option) => option.setName("seite").setDescription("Welche Seite?").setMinValue(1).setMaxValue(10))
+                    .addStringOption((option) =>
+                        option
+                            .setName("zeitraum")
+                            .setDescription("Lifetime, die letzten 7 oder 30 Tage")
+                            .addChoices(...LEVEL_PERIODS.map((period) => ({ name: PERIOD_LABEL[period], value: period })))
+                    )
+                    .addIntegerOption((option) => option.setName("seite").setDescription("Welche Seite?").setMinValue(1))
+            )
+            // Plan 37: nur mit „Server verwalten“ - geprüft in Points, weil /level allen offensteht.
+            .addSubcommand((sub) =>
+                sub
+                    .setName("punkte")
+                    .setDescription("Punkte von Hand geben, abziehen, setzen oder zurücksetzen (Server verwalten)")
+                    .addStringOption((option) =>
+                        option
+                            .setName("aktion")
+                            .setDescription("Was soll passieren?")
+                            .setRequired(true)
+                            .addChoices(
+                                { name: "Geben", value: "geben" },
+                                { name: "Abziehen", value: "abziehen" },
+                                { name: "Setzen", value: "setzen" },
+                                { name: "Zurücksetzen", value: "zuruecksetzen" }
+                            )
+                    )
+                    .addUserOption((option) => option.setName("user").setDescription("Bei wem?").setRequired(true))
+                    .addIntegerOption((option) => option.setName("punkte").setDescription("Wie viele Punkte? Beim Zurücksetzen egal").setMinValue(0).setMaxValue(MAX_XP_MANUAL))
+                    .addStringOption((option) => option.setName("grund").setDescription("Steht im Protokoll").setMaxLength(MAX_REASON))
             );
     }
 
@@ -61,12 +87,52 @@ export default class Level extends Command {
             return;
         }
 
-        if (interaction.options.getSubcommand() === "rangliste") return this.Board(interaction);
+        const sub = interaction.options.getSubcommand();
+
+        if (sub === "rangliste") return this.Board(interaction);
+        if (sub === "punkte") return this.Points(interaction, say);
 
         return this.Rank(interaction);
     }
 
-    /** Die Karte - sie zu zeichnen dauert, deshalb vorher aufschieben. */
+    /** Plan 37: Punkte von Hand mit Grund - steht im Protokoll wie im Dashboard. Antwort nur für den Fragenden. */
+    private async Points(interaction: ChatInputCommandInteraction<"cached">, say: (text: string) => Promise<unknown>): Promise<void> {
+        if (!interaction.memberPermissions.has(PermissionFlagsBits.ManageGuild)) {
+            await say("Dafür brauchst du das Recht „Server verwalten“.");
+
+            return;
+        }
+
+        const action = interaction.options.getString("aktion", true);
+        const target = interaction.options.getUser("user", true);
+        const points = interaction.options.getInteger("punkte");
+        const reason = interaction.options.getString("grund") ?? "";
+        const mode: LevelAdjustMode = action === "setzen" ? "set" : action === "zuruecksetzen" ? "reset" : "add";
+
+        if (target.bot) {
+            await say("Bots sammeln keine Punkte.");
+
+            return;
+        }
+
+        if (mode !== "reset" && points === null) {
+            await say("Gib an, wie viele Punkte.");
+
+            return;
+        }
+
+        // Review: erst bestätigen - Schreiben und Rollen dauern, nach 3 s zeigte Discord „reagiert nicht“, und ein zweiter Versuch gäbe doppelt.
+        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+        const amount = action === "abziehen" ? -(points ?? 0) : (points ?? 0);
+        const entry = await this.client.levelService.Adjust(interaction.guild, target.id, mode, amount, interaction.user.id, reason);
+        const name = `<@${target.id}>`;
+        const text = entry ? `${name} hat jetzt **${entry.xp.toLocaleString("de-DE")} Punkte** (Level ${entry.level}). Steht im Protokoll.` : `${name} fängt wieder bei 0 an. Steht im Protokoll.`;
+
+        await interaction.editReply({ ...InfoCard(text, LEVELS_ACCENT), flags: MessageFlags.IsComponentsV2 });
+    }
+
+    /** Die Karte als reines Bild (Plan 34) - sie zu zeichnen dauert, deshalb vorher aufschieben. */
     private async Rank(interaction: ChatInputCommandInteraction<"cached">): Promise<void> {
         const target = (interaction.options.getMember("user") as GuildMember | null) ?? interaction.member;
 
@@ -78,48 +144,26 @@ export default class Level extends Command {
             return;
         }
 
-        const { entry, rank, total, settings } = await this.client.levelService.Card(target);
-        const progress = LevelProgress(entry.xp, settings.base);
-        const png = await RenderLevelCard({
-            name: target.displayName,
-            avatarURL: target.displayAvatarURL({ extension: "png", size: 256 }),
-            level: progress.level,
-            xp: entry.xp,
-            into: progress.into,
-            need: progress.need,
-            rank,
-            total,
-            messages: entry.messages,
-            voiceMinutes: entry.voiceMinutes,
-        });
-        const file = new AttachmentBuilder(png, { name: "level.png" });
-        const card = new ComponentV2Builder({ accentColor: LEVELS_ACCENT }).gallery("attachment://level.png").build();
-
-        await interaction.editReply({ components: [card], files: [file], flags: MessageFlags.IsComponentsV2 });
+        await interaction.editReply(RankPayload(await this.client.levelService.CardImage(target)));
     }
 
+    /** Die Rangliste als Bild mit Knöpfen (Plan 34). Niemand im Zeitraum: kurzer Text nur für den Fragenden. */
     private async Board(interaction: ChatInputCommandInteraction<"cached">): Promise<void> {
+        const raw = interaction.options.getString("zeitraum");
+        const period = IsPeriod(raw) ? raw : "all";
         const page = interaction.options.getInteger("seite") ?? 1;
 
         await interaction.deferReply();
 
-        const top = await this.client.levels.Top(interaction.guildId, PER_PAGE, (page - 1) * PER_PAGE);
+        const payload = await BoardMessage(this.client, interaction.guild, period, page, interaction.user.id, interaction.user.id);
 
-        if (!top.length) {
-            await interaction.editReply({ ...InfoCard(page > 1 ? "So weit reicht die Liste nicht." : "Noch hat niemand Punkte gesammelt.", LEVELS_ACCENT), flags: MessageFlags.IsComponentsV2 });
+        if ("content" in payload) {
+            await interaction.deleteReply().catch(() => undefined);
+            await interaction.followUp({ content: payload.content, flags: MessageFlags.Ephemeral });
 
             return;
         }
 
-        const medal = ["🥇", "🥈", "🥉"];
-        const lines = top.map((entry) => `${medal[entry.rank - 1] ?? `**${entry.rank}.**`} <@${entry.userId}> — Level **${entry.level}** · ${entry.xp.toLocaleString("de-DE")} Punkte`);
-        const total = await this.client.levels.Total(interaction.guildId);
-        const card = new ComponentV2Builder({ accentColor: LEVELS_ACCENT })
-            .text(`## 📈 Rangliste von ${interaction.guild.name}`)
-            .text(lines.join("\n"))
-            .subtext(`Seite ${page} · ${total} Mitglieder mit Punkten`)
-            .build();
-
-        await interaction.editReply({ components: [card], flags: MessageFlags.IsComponentsV2, allowedMentions: { parse: [] } });
+        await interaction.editReply(payload);
     }
 }

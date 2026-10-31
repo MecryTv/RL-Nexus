@@ -24,7 +24,7 @@ interface IFact {
 }
 
 /** Stand der Datenschutzerklärung. Bei jeder inhaltlichen Änderung nachziehen. */
-const UPDATED = "17. Oktober 2026";
+const UPDATED = "31. Oktober 2026";
 
 /**
  * Impressum und Datenschutzerklärung.
@@ -562,6 +562,9 @@ const PRIVACY: readonly ILegalSection[] = [
                         Passwort.
                     </li>
                     <li>
+                        <strong>Rollen-Listen:</strong> je Liste die gewählten Rollen, Texte und Einstellungen, dazu Titel, die das Team einzelnen Mitgliedern gibt (Discord-ID und Titel). Wer in einer Liste steht, liest der Bot aus den Rollen in Discord und speichert es nicht. Ein Titel bleibt, solange die Person eine Rolle der Liste hat, und danach noch 30 Tage; dann löscht ihn der Bot beim nächsten Speichern. Profilbilder für das gezeichnete Bild lädt der Bot von Discord und hält sie höchstens zehn Minuten im Speicher.
+                    </li>
+                    <li>
                         <strong>Clips der Woche:</strong> jeder hochgeladene Clip als Kopie im Ordner des Bots, je
                         Runde mit einer Liste: wer welchen Clip eingereicht hat (Discord-ID und Anzeigename), wie viele
                         Stimmen er bekam und welchen Platz. Abgestimmt wird per Reaktion; der Bot merkt sich je Person,
@@ -603,10 +606,19 @@ const PRIVACY: readonly ILegalSection[] = [
                         Bewerbungen dazu die Entscheidung und wer sie getroffen hat.
                     </li>
                     <li>
-                        <strong>Level System:</strong> je Server deine Discord-ID, deine Punkte und wann du zuletzt
-                        Punkte bekommen hast. Keine Nachrichteninhalte. Schaltet ein Server seine Rangliste öffentlich,
-                        zeigt das Dashboard Platz, Anzeigename, Profilbild, Level und Punkte der ersten 100 auch ohne
-                        Anmeldung.
+                        <strong>Level System:</strong> läuft auf jedem Server, auf dem der Bot ist. Je Server deine
+                        Discord-ID, deine Punkte, wie viele Nachrichten und Voice-Minuten der Bot gezählt hat und wann
+                        du zuletzt Punkte bekommen hast. Dazu dieselben Zahlen je Tag, gelöscht nach 40 Tagen, für die
+                        Ranglisten der letzten 7 und 30 Tage. Einmal hat der Bot aus den Aktivitätszahlen der letzten 14
+                        Tage Punkte nachgetragen. Keine Nachrichteninhalte. Schaltet ein Server seine Rangliste
+                        öffentlich, zeigt das Dashboard Platz, Anzeigename, Profilbild, Level, Punkte, Nachrichten und
+                        Voice-Zeit auch ohne Anmeldung. Meldest du dich dort mit Discord an, sieht nur du zusätzlich
+                        deinen eigenen Platz. Ändert jemand mit dem Recht „Server verwalten“ deine Punkte von Hand,
+                        speichert der Bot, wer das wann getan hat, wie viel, deinen Stand davor und danach und den
+                        Grund, gelöscht nach 180 Tagen. Gehörst du in einer Woche oder einem Monat zu den zehn
+                        Aktivsten, zeigt der Bot dich auf Wunsch des Servers in einem Kanal mit Name, Profilbild,
+                        Level, Punkten, Nachrichten und Voice-Zeit. Die ersten drei bekommen auf Wunsch eine Rolle,
+                        bis die nächsten drei sie bekommen.
                     </li>
                     <li>
                         <strong>Giveaways und Umfragen:</strong> wer teilnimmt oder abstimmt, mit Discord-ID und

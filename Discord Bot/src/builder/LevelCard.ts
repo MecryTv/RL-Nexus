@@ -1,7 +1,7 @@
 import { SKRSContext2D, createCanvas, loadImage } from "@napi-rs/canvas";
 import { RegisterFonts } from "./RankCard";
 import { COLORS } from "../constants/RankCard";
-import { LEVELS_ACCENT } from "../constants/Levels";
+import { LEVELS_ACCENT, VoiceText } from "../constants/Levels";
 
 /**
  * Die Level-Karte als PNG - Avatar, Level, Platz und ein Fortschrittsbalken.
@@ -46,13 +46,9 @@ function number(value: number): string {
     return value.toLocaleString("de-DE");
 }
 
-/** "3 Std. 20 Min." aus Minuten - für die Zeit im Sprachkanal. */
-function minutes(value: number): string {
-    if (value < 60) return `${value} Min.`;
-
-    const hours = Math.floor(value / 60);
-
-    return `${hours} Std.${value % 60 ? ` ${value % 60} Min.` : ""}`;
+/** Plan 34: die Unterzeile - „1.248 Nachrichten · 2.310 Min. im Voice (38,5 Std.)“. */
+export function CardLine(messages: number, voiceMinutes: number): string {
+    return `${number(messages)} Nachrichten · ${VoiceText(voiceMinutes).replace(" (", " im Voice (")}`;
 }
 
 export async function RenderLevelCard(data: ILevelCardData): Promise<Buffer> {
@@ -122,7 +118,7 @@ export async function RenderLevelCard(data: ILevelCardData): Promise<Buffer> {
 
     ctx.font = "600 20px Rajdhani";
     ctx.fillStyle = COLORS.textDim;
-    ctx.fillText(`${number(data.messages)} Nachrichten · ${minutes(data.voiceMinutes)} im Voice`, left, ay + 74);
+    ctx.fillText(CardLine(data.messages, data.voiceMinutes), left, ay + 74);
 
     ctx.textAlign = "right";
     ctx.font = "600 22px Rajdhani";

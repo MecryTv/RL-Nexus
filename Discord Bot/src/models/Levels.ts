@@ -79,7 +79,7 @@ export default class Levels extends Model<ILevelRow> {
     /** Die Rangliste, beste zuerst. */
     async Top(guildId: string, limit = 25, offset = 0): Promise<ILevelRank[]> {
         const rows = await this.db.Query<ILevelRow>(
-            `SELECT * FROM \`${this.Table}\` WHERE guild_id = ? ORDER BY xp DESC, user_id ASC LIMIT ? OFFSET ?`,
+            `SELECT * FROM \`${this.Table}\` WHERE guild_id = ? AND xp > 0 ORDER BY xp DESC, user_id ASC LIMIT ? OFFSET ?`,
             [guildId, Math.min(100, Math.max(1, limit)), Math.max(0, offset)]
         );
 
@@ -98,9 +98,21 @@ export default class Levels extends Model<ILevelRow> {
     }
 
     async Total(guildId: string): Promise<number> {
-        const row = await this.db.One<{ total: number }>(`SELECT COUNT(*) AS total FROM \`${this.Table}\` WHERE guild_id = ?`, [guildId]);
+        const row = await this.db.One<{ total: number }>(`SELECT COUNT(*) AS total FROM \`${this.Table}\` WHERE guild_id = ? AND xp > 0`, [guildId]);
 
         return Number(row?.total ?? 0);
+    }
+
+    /** Plan 34: alle mit Punkten - für Rangliste und Trend. Zeilen mit 0 Punkten tragen nur Zähler. */
+    async All(guildId: string): Promise<ILevelEntry[]> {
+        return (await this.db.Query<ILevelRow>(`SELECT * FROM \`${this.Table}\` WHERE guild_id = ? AND xp > 0`, [guildId])).map(ToEntry);
+    }
+
+    /** Plan 34: Punkte zurücknehmen (AutoMod), nie unter 0. Level rechnet der Aufrufer neu. */
+    async Take(guildId: string, userId: string, xp: number): Promise<void> {
+        await this.db.Write(`UPDATE \`${this.Table}\` SET xp = GREATEST(CAST(xp AS SIGNED) - ?, 0), updated_at = ? WHERE guild_id = ? AND user_id = ?`, [Math.max(0, Math.round(xp)), Date.now(), guildId, userId]);
+
+        this.db.Bump(this.Table);
     }
 
     /** Alle, die mindestens dieses Level haben - für das Nachtragen der Rollen. */
