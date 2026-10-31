@@ -7,15 +7,25 @@
         <meta name="theme-color" content="#050608" />
         <title>Wartung · RL Nexus</title>
         <!--
-            Die Wartungsseite für Webseite und Bot-Dashboard. nginx zeigt sie mit
-            Status 503, solange in data/flags die passende Datei liegt (Schalter
-            unter /dev/wartung im Admin Dashboard). Alles steht in dieser einen
-            Datei, ohne Schriften, Bilder oder Skripte von außen: Sie muss auch
-            stehen, wenn sonst nichts läuft. Farben aus _tokens.scss der Webseite.
+            Die Wartungsseite für Webseite und Bot-Dashboard (Plan 23, Entwurf D
+            „Arena“). nginx zeigt sie mit Status 503, solange in data/flags der
+            passende Schalter liegt, lokal tun das Webseiten-Vite und der Bot mit
+            --dev. Restzeit, Ring und Fahrplan kommen aus /wartung/status.json
+            (wartung/wartung.js). Alles liegt hier oder unter /wartung/, nichts
+            von außen: Die Seite muss stehen, wenn sonst nichts läuft.
+            Ohne Skript zeigt sie den Rückfall „Gleich wieder da.“.
         -->
         <style>
             :root {
                 color-scheme: dark;
+                --bg: #050608;
+                --text: #f2f4f7;
+                --muted: #a8b0bc;
+                --dim: #8b93a0;
+                --red: #ff1e2d;
+                --red-deep: #d81424;
+                --ok: #35e07f;
+                --warn: #ffb020;
             }
 
             * {
@@ -23,40 +33,107 @@
             }
 
             body {
+                position: relative;
                 display: grid;
                 min-height: 100vh;
                 min-height: 100dvh;
                 margin: 0;
-                padding: 24px 16px;
+                padding: 40px 16px 28px;
                 place-items: center;
-                background:
-                    radial-gradient(circle at 50% 38%, rgb(255 30 45 / 12%), transparent 52%),
-                    #050608;
-                color: #f2f4f7;
+                overflow-x: hidden;
+                background: var(--bg);
+                color: var(--text);
                 font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
-                line-height: 1.6;
+                line-height: 1.55;
+                text-align: center;
+            }
+
+            /* Das Banner nur als unscharfe Glut: sein großes N stünde sonst hinter dem Logo im Ring. */
+            body::before,
+            body::after {
+                content: "";
+                position: fixed;
+                z-index: -1;
+                pointer-events: none;
+            }
+
+            body::before {
+                inset: -40px;
+                background: url("/wartung/banner.webp") center 30% / cover;
+                filter: blur(16px) saturate(1.2);
+                opacity: 0.55;
+            }
+
+            body::after {
+                inset: 0;
+                background: linear-gradient(180deg, rgb(5 6 8 / 35%), rgb(5 6 8 / 90%) 60%, var(--bg));
             }
 
             main {
                 width: 100%;
-                max-width: 520px;
-                text-align: center;
+                max-width: 640px;
             }
 
-            .wordmark {
-                margin: 0 0 32px;
-                font-size: 1.05rem;
-                font-weight: 800;
-                letter-spacing: 0.08em;
+            .ring {
+                position: relative;
+                width: 180px;
+                height: 180px;
+                margin: 0 auto;
             }
 
-            .wordmark span {
-                color: #ff1e2d;
+            .ring svg {
+                position: absolute;
+                inset: 0;
+                width: 100%;
+                height: 100%;
+                transform: rotate(-90deg);
+            }
+
+            .ring circle {
+                fill: none;
+                stroke-width: 6;
+            }
+
+            .track {
+                stroke: rgb(255 255 255 / 8%);
+            }
+
+            .arc {
+                stroke: var(--red);
+                stroke-linecap: round;
+                stroke-dasharray: 578;
+                stroke-dashoffset: 462;
+                filter: drop-shadow(0 0 7px rgb(255 30 45 / 70%));
+                transition: stroke-dashoffset 0.6s ease;
+            }
+
+            /* Offen oder ohne Status: ein Bogen läuft im Kreis statt eines Füllstands. */
+            .ring[data-state="open"] .arc,
+            .ring[data-state="fallback"] .arc,
+            .ring:not([data-state]) .arc {
+                stroke-dasharray: 120 458;
+                stroke-dashoffset: 0 !important;
+                transform-origin: 100px 100px;
+                animation: spin 2.4s linear infinite;
+            }
+
+            @keyframes spin {
+                to {
+                    transform: rotate(360deg);
+                }
+            }
+
+            .ring img {
+                position: absolute;
+                inset: 32px;
+                width: 116px;
+                height: 116px;
+                border-radius: 50%;
             }
 
             .label {
-                margin: 0 0 10px;
-                color: #ff1e2d;
+                margin: 18px 0 0;
+                color: var(--red);
                 font-size: 0.75rem;
                 font-weight: 700;
                 letter-spacing: 0.22em;
@@ -64,32 +141,153 @@
             }
 
             h1 {
-                margin: 0 0 14px;
-                font-size: clamp(1.9rem, 6vw, 2.6rem);
-                line-height: 1.1;
-                letter-spacing: -0.015em;
+                margin: 8px 0 0;
+                font-size: clamp(1.6rem, 5vw, 2.1rem);
+                line-height: 1.15;
+                letter-spacing: -0.01em;
             }
 
-            p {
-                margin: 0 0 28px;
-                color: #a8b0bc;
+            .big {
+                margin: 14px 0 0;
+                font-size: clamp(2.4rem, 9vw, 3rem);
+                font-weight: 800;
+                line-height: 1;
+                font-variant-numeric: tabular-nums;
             }
 
-            a {
+            .sub {
+                margin: 8px 0 0;
+                color: var(--muted);
+                font-size: 0.95rem;
+            }
+
+            .late {
                 display: inline-block;
-                padding: 12px 22px;
-                background: #d81424;
-                color: #fff;
+                margin: 16px 0 0;
+                padding: 10px 14px;
+                border: 1px solid rgb(255 176 32 / 35%);
+                background: rgb(255 176 32 / 8%);
+                color: var(--warn);
+                font-size: 0.85rem;
+            }
+
+            /* Der Fahrplan: eine Linie, darauf die Schritte, erledigte grün, der laufende rot. */
+            .steps {
+                --n: 4;
+                --run: 0;
+                position: relative;
+                display: grid;
+                grid-template-columns: repeat(var(--n), minmax(0, 1fr));
+                max-width: 600px;
+                margin: 26px auto 0;
+                padding: 0;
+                list-style: none;
+            }
+
+            .steps::before,
+            .steps::after {
+                content: "";
+                position: absolute;
+                top: 6px;
+                left: calc(50% / var(--n));
+                height: 2px;
+            }
+
+            .steps::before {
+                right: calc(50% / var(--n));
+                background: rgb(255 255 255 / 10%);
+            }
+
+            .steps::after {
+                width: calc((100% - 100% / var(--n)) * var(--run));
+                background: linear-gradient(90deg, var(--ok), var(--red));
+            }
+
+            .steps li {
+                position: relative;
+                z-index: 1;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 4px;
+                padding: 0 4px;
+                color: var(--dim);
+                font-size: 0.8rem;
+            }
+
+            .steps i {
+                width: 14px;
+                height: 14px;
+                border: 2px solid rgb(255 255 255 / 22%);
+                border-radius: 50%;
+                background: var(--bg);
+            }
+
+            .steps time {
+                font-size: 0.75rem;
+                font-variant-numeric: tabular-nums;
+            }
+
+            .steps .done {
+                color: var(--muted);
+            }
+
+            .steps .done i {
+                border-color: var(--ok);
+                background: var(--ok);
+            }
+
+            .steps .now {
+                color: var(--text);
+                font-weight: 600;
+            }
+
+            .steps .now i {
+                border-color: var(--red);
+                box-shadow: 0 0 0 5px rgb(255 30 45 / 22%);
+            }
+
+            .actions {
+                display: flex;
+                flex-wrap: wrap;
+                justify-content: center;
+                gap: 10px;
+                margin-top: 28px;
+            }
+
+            .btn,
+            .ghost {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                min-height: 44px;
+                padding: 10px 20px;
+                font-size: 0.8rem;
                 font-weight: 700;
-                letter-spacing: 0.06em;
+                letter-spacing: 0.08em;
                 text-decoration: none;
                 text-transform: uppercase;
+            }
+
+            .btn {
+                background: var(--red-deep);
+                color: #fff;
                 clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
             }
 
             /* Dunkler statt heller: Weiß auf #ff1e2d hätte nur 3,8:1. */
-            a:hover {
+            .btn:hover {
                 background: #b80f1d;
+            }
+
+            .ghost {
+                border: 1px solid rgb(255 255 255 / 18%);
+                background: rgb(5 6 8 / 50%);
+                color: var(--text);
+            }
+
+            .ghost:hover {
+                border-color: rgb(255 255 255 / 40%);
             }
 
             a:focus-visible {
@@ -97,38 +295,98 @@
                 outline-offset: 3px;
             }
 
-            /* Die Mailadresse als Text mit Link, nicht als zweiter Knopf. */
-            .mail {
-                margin: 24px 0 0;
-                font-size: 0.9rem;
+            .note {
+                margin: 18px 0 0;
+                color: var(--dim);
+                font-size: 0.8rem;
             }
 
-            .mail a {
-                display: inline;
-                padding: 0;
-                background: none;
-                color: #f2f4f7;
-                font-weight: 600;
-                letter-spacing: 0;
-                text-decoration: underline;
-                text-transform: none;
-                clip-path: none;
+            .legal {
+                display: flex;
+                flex-wrap: wrap;
+                justify-content: center;
+                gap: 6px 18px;
+                margin-top: 26px;
+                font-size: 0.8rem;
             }
 
-            .mail a:hover {
-                background: none;
-                color: #00afff;
+            .legal a {
+                color: var(--muted);
+                text-decoration: none;
+                border-bottom: 1px solid rgb(255 255 255 / 18%);
+            }
+
+            .legal a:hover {
+                color: var(--text);
+            }
+
+            [hidden] {
+                display: none !important;
+            }
+
+            @media (max-width: 480px) {
+                .ring {
+                    width: 140px;
+                    height: 140px;
+                }
+
+                .ring img {
+                    inset: 25px;
+                    width: 90px;
+                    height: 90px;
+                }
+
+                .actions {
+                    flex-direction: column;
+                    align-items: stretch;
+                }
+
+                .steps li {
+                    font-size: 0.75rem;
+                }
+            }
+
+            @media (prefers-reduced-motion: reduce) {
+                .arc {
+                    transition: none;
+                }
+
+                .ring[data-state="open"] .arc,
+                .ring[data-state="fallback"] .arc,
+                .ring:not([data-state]) .arc {
+                    animation: none;
+                }
             }
         </style>
     </head>
     <body>
         <main>
-            <p class="wordmark">RL <span>NEXUS</span></p>
-            <p class="label">Wartung</p>
-            <h1>Gleich wieder da.</h1>
-            <p>Gerade wird etwas umgebaut. In ein paar Minuten läuft alles wieder. Was los ist, steht im Support-Server.</p>
-            <a href="https://discord.gg/CjG2HFGw95">Zum Support-Server</a>
-            <p class="mail">Oder per Mail an <a href="mailto:support@nexus-emb.de">support@nexus-emb.de</a></p>
+            <div class="ring" id="ring">
+                <svg viewBox="0 0 200 200" aria-hidden="true">
+                    <circle class="track" cx="100" cy="100" r="92" />
+                    <circle class="arc" id="arc" cx="100" cy="100" r="92" />
+                </svg>
+                <img src="/wartung/logo-n.webp" alt="RL Nexus" width="116" height="116" />
+            </div>
+            <p class="label" id="label">Wartung</p>
+            <h1 id="title">Gleich wieder da.</h1>
+            <p class="big" id="big" aria-live="polite" hidden></p>
+            <p class="sub" id="sub">Gerade wird etwas umgebaut. Was los ist, steht im Support-Discord.</p>
+            <p class="late" id="late" hidden>Wir halten dich im Support-Discord auf dem Laufenden.</p>
+            <ol class="steps" id="steps" aria-label="Fahrplan" hidden></ol>
+            <div class="actions">
+                <a class="btn" href="https://discord.gg/CjG2HFGw95">Zum Support-Discord</a>
+                <a class="ghost" href="https://status.nexus-emb.de">Statusseite</a>
+            </div>
+            <p class="note" id="note" hidden>Lädt sich von selbst neu, sobald alles wieder läuft.</p>
+            <nav class="legal" aria-label="Rechtliches">
+                <a href="https://nexus-emb.de/impressum" data-legal="/impressum">Impressum</a>
+                <a href="https://nexus-emb.de/datenschutz" data-legal="/datenschutz">Datenschutz</a>
+                <a href="https://nexus-emb.de/agb" data-legal="/agb">AGB</a>
+                <a href="https://nexus-emb.de/widerruf" data-legal="/widerruf">Widerruf</a>
+                <a href="mailto:support@nexus-emb.de">support@nexus-emb.de</a>
+            </nav>
         </main>
+        <script src="/wartung/wartung.js"></script>
     </body>
 </html>

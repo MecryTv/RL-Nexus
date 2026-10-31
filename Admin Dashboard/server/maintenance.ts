@@ -49,10 +49,35 @@ export async function readMaintenance(config: IConfig): Promise<IMaintenance> {
     return { website, dashboard };
 }
 
+const isTime = (value: unknown): value is string => typeof value === "string" && !Number.isNaN(Date.parse(value));
+
+/** Passt die Datei zu IMaintenancePlan? Von Hand bearbeitet, fehlt schnell ein Feld, und das Admin bliebe weiß. */
+function isPlan(value: unknown): value is IMaintenancePlan {
+    if (typeof value !== "object" || value === null) return false;
+
+    const plan = value as Record<keyof IMaintenancePlan, unknown>;
+    const steps = plan.steps;
+
+    return (
+        Array.isArray(plan.areas) &&
+        plan.areas.length > 0 &&
+        plan.areas.every((area) => (AREAS as unknown[]).includes(area)) &&
+        typeof plan.title === "string" &&
+        typeof plan.text === "string" &&
+        isTime(plan.since) &&
+        (plan.until === null || isTime(plan.until)) &&
+        Array.isArray(steps) &&
+        steps.every((step) => typeof step?.name === "string" && (step.startedAt === null || isTime(step.startedAt))) &&
+        (plan.current === null || (typeof plan.current === "number" && Number.isInteger(plan.current) && plan.current >= 0 && plan.current < steps.length))
+    );
+}
+
 /** Der Plan oder null. Eine kaputte Datei zählt als keiner. */
 export async function readPlan(config: IConfig): Promise<IMaintenancePlan | null> {
     try {
-        return JSON.parse(await readFile(path.join(config.flagsDir, PLAN_FILE), "utf8")) as IMaintenancePlan;
+        const plan: unknown = JSON.parse(await readFile(path.join(config.flagsDir, PLAN_FILE), "utf8"));
+
+        return isPlan(plan) ? plan : null;
     } catch {
         return null;
     }
@@ -183,17 +208,16 @@ export async function setMaintenanceUntil(config: IConfig, until: unknown, now: 
 
 /**
  * Beendet die Wartung eines Bereichs. Erst der Schalter, dann der Plan: Bleibt
- * kein Bereich übrig, verschwindet er, und die Seite lädt sich neu.
+ * kein Bereich mit Schalter übrig, verschwindet er, und die Seite lädt sich neu.
+ * Das gilt auch, wenn ein Schalter von Hand gelöscht wurde oder der Plan
+ * unlesbar ist: Sonst bliebe wartung.json liegen und offene Seiten stehen.
  */
 export async function endMaintenance(config: IConfig, area: MaintenanceArea): Promise<void> {
     await removeFile(path.join(config.flagsDir, MAINTENANCE_FILES[area]));
 
-    const plan = await readPlan(config);
+    const [flags, plan] = await Promise.all([readMaintenance(config), readPlan(config)]);
+    const areas = plan ? plan.areas.filter((entry) => entry !== area && flags[entry] !== null) : [];
 
-    if (!plan) return;
-
-    const areas = plan.areas.filter((entry) => entry !== area);
-
-    if (areas.length === 0) await removeFile(path.join(config.flagsDir, PLAN_FILE));
-    else await writePlan(config, { ...plan, areas });
+    if (plan && areas.length > 0) await writePlan(config, { ...plan, areas });
+    else await removeFile(path.join(config.flagsDir, PLAN_FILE));
 }

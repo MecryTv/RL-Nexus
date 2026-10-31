@@ -149,7 +149,7 @@ async function runEnd(config: IConfig, customer: ICustomer, plan: IEndPlan, mail
             throw error;
         }
 
-        if (mail && person) await sendShopMail(config, cancelReceivedMail(config, { ...person, title, at: new Date(), endsAt: grant.endsAt }));
+        if (mail && person) await sendShopMail(config, cancelReceivedMail(config, { ...person, title, at: new Date(), endsAt: grant.endsAt, frozenRest: grant.frozenAt ? grant.frozenRest : null }));
 
         return { detail: `${title}, zum Ende gekündigt`, warning: null };
     }

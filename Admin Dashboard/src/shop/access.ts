@@ -68,7 +68,11 @@ export function stripeWarning(preview: IAccessPreview): string | null {
     const count = preview.stripePending;
     if (count === 0) return null;
 
-    return `${count} ${plural(count, "Abo hat", "Abos hat")} Stripe noch nicht ${preview.mode === "paid" ? "fortgesetzt" : "pausiert"}. Das Admin Dashboard versucht es jede Minute weiter.`;
+    // Welche, nicht nur wie viele (W-0024). Mehr als fünf Namen liest niemand.
+    const names = preview.stripePendingNames ?? [];
+    const who = names.length === 0 ? "" : `: ${names.slice(0, 5).join(", ")}${names.length > 5 ? ` und ${names.length - 5} weitere` : ""}`;
+
+    return `${count} ${plural(count, "Abo hat", "Abos hat")} Stripe noch nicht ${preview.mode === "paid" ? "fortgesetzt" : "pausiert"}${who}. Das Admin Dashboard versucht es jede Minute weiter.`;
 }
 
 /* --- Beta Access (Plan 22) --- */

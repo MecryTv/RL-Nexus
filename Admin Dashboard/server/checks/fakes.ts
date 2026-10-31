@@ -74,6 +74,12 @@ export const fake = {
     panelSubject: null as string | null,
     /** Der Bot läuft, ist aber noch nicht bereit: ready false, keine Server. */
     notReady: false,
+    /** Was der Bot als Stand des Discord-Servers liefert (Plan 32). null: Er kann ihn nicht lesen (502). */
+    snapshot: { version: 1, counts: { roles: 2, channels: 3, members: 1, emojis: 0, stickers: 0, bans: 0 }, roles: [], channels: [] } as Record<string, unknown> | null,
+    /** Wie oft der Stand gelesen wurde, und mit images=0/1. */
+    snapshotCalls: [] as string[],
+    /** „Backup nur halb“, wie es beim Bot ankam. */
+    backupFailed: [] as { guildId: string; reason: string }[],
 };
 
 function guild(index: number, name: string, members: number): IGuildRow {
@@ -287,6 +293,23 @@ globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit): P
         if (!String(headers.Authorization ?? "").startsWith("Bearer ")) return json({ error: "Unauthorized" }, 401);
 
         return json({ commands: fake.commands });
+    }
+
+    const snapshot = new RegExp(`^${config.botApiUrl}/dcapi/admin/guilds/(\\d+)/snapshot\\?images=([01])$`).exec(url);
+
+    if (snapshot) {
+        if (fake.botDown) throw new TypeError("fetch failed");
+        fake.snapshotCalls.push(`${snapshot[1]}:${snapshot[2]}`);
+
+        return fake.snapshot ? json(fake.snapshot) : json({ error: "Den Server konnte ich nicht lesen." }, 502);
+    }
+
+    const failed = new RegExp(`^${config.botApiUrl}/dcapi/admin/guilds/(\\d+)/backup-failed$`).exec(url);
+
+    if (failed) {
+        fake.backupFailed.push({ guildId: failed[1], reason: (JSON.parse(String(init?.body ?? "{}")) as { reason: string }).reason });
+
+        return json({ ok: true });
     }
 
     const panels = new RegExp(`^${config.botApiUrl}/dcapi/admin/guilds/(\\d+)/(panels|restored)$`).exec(url);

@@ -122,9 +122,10 @@ interface IGrantRow {
     readonly cancel_at_period_end: number;
     readonly order_id: number | null;
     readonly frozen_at: Date | null;
+    readonly frozen_rest: number | null;
 }
 
-const GRANT_COLUMNS = "id, user_id, source, product_id, starts_at, ends_at, ended_at, role_id, stripe_subscription_id, cancel_at_period_end, order_id, frozen_at";
+const GRANT_COLUMNS = "id, user_id, source, product_id, starts_at, ends_at, ended_at, role_id, stripe_subscription_id, cancel_at_period_end, order_id, frozen_at, frozen_rest";
 
 function grantOf(row: IGrantRow): IGrant {
     return {
@@ -139,6 +140,7 @@ function grantOf(row: IGrantRow): IGrant {
         cancelAtPeriodEnd: row.cancel_at_period_end === 1,
         orderId: row.order_id,
         frozenAt: row.frozen_at,
+        frozenRest: row.frozen_rest,
     };
 }
 
