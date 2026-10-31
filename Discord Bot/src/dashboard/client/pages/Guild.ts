@@ -622,17 +622,8 @@ function bindModules(guild: IGuild, only: Set<string> | null): (modules: string[
         tile.querySelector("b")!.textContent = module.name;
         tile.querySelector(".acct__text span")!.textContent = module.description;
 
-        if (module.parts) {
-            // Was mit angeht, steht auf der Kachel - sonst tauchen zwei Einträge
-            // in der Leiste auf, die niemand eingeschaltet hat.
-            const parts = document.createElement("span");
-
-            parts.className = "modparts";
-            parts.textContent = `Mit dabei: ${module.parts.map((part) => part.name).join(" · ")}`;
-            tile.querySelector(".acct__text")!.append(parts);
-
-            for (const part of module.parts) card(part);
-        }
+        // W-0040: Was mit angeht, steht nicht mehr auf der Kachel - die Unterpunkte zeigt die Leiste.
+        for (const part of module.parts ?? []) card(part);
 
         if (module.always) {
             const fixed = document.createElement("span");

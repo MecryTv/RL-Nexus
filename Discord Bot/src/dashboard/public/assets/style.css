@@ -1562,12 +1562,11 @@ body[data-page="guild"]{--shell:1440px}
    ist, wie dort. */
 .modlead{margin:-4px 0 18px;max-width:72ch;font-size:13.5px;color:var(--text-2)}
 .modnote{margin-bottom:16px}
-.modlist{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:8px}
+.modlist{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));grid-auto-rows:1fr;gap:8px}
 .modlist .acct{margin-top:0;align-items:flex-start}
 .modlist .acct__mark{margin-top:2px}
 /* Umbrechen statt abschneiden: lange Namen sollen ganz dastehen. */
 .modlist .acct__text b{white-space:normal}
-.modlist .modparts{display:block;margin-top:4px;color:var(--text-2)}
 
 /* ============================================================
    Uebersicht der Serverseite: Kennzahlen, Verlauf, Heatmap, Listen
