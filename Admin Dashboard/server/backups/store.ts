@@ -1,7 +1,7 @@
-import { AREAS, type AreaId, type BackupKind, type BackupOrigin, type IBackupMeta, type IBackupPlan, type PlanEvery } from "../../shared/backups.ts";
+import { AREAS, BACKUP_PARTS, type AreaId, type BackupKind, type BackupOrigin, type BackupPart, type IBackupMeta, type IBackupPlan, type IServerCounts, type IServerPartJson, type PlanEvery } from "../../shared/backups.ts";
 import type { IConfig } from "../config.ts";
 import { databaseReady, query, withTransaction } from "../db.ts";
-import { countAreas, packBackup, unpackBackup } from "./data.ts";
+import { countAreas, packBackup, unpackBackup, unpackServer } from "./data.ts";
 
 /**
  * Die Backup-Datenbank: eine zweite Datenbank auf demselben MariaDB-Server
@@ -10,6 +10,7 @@ import { countAreas, packBackup, unpackBackup } from "./data.ts";
  */
 
 const KEEP_AUTOMATIC_HOURS = 72;
+const KEEP_SAFETY_DAYS = 7;
 const KEEP_RUNS_DAYS = 14;
 
 let database = "rlnexus_backups";
@@ -65,13 +66,15 @@ export async function ensureBackupDatabase(config: IConfig): Promise<string | nu
             id         INT UNSIGNED NOT NULL AUTO_INCREMENT,
             guild_id   VARCHAR(20) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
             guild_name VARCHAR(100) NOT NULL,
-            kind       ENUM('nacht', 'vorher', 'hand', 'plan') NOT NULL,
+            kind       ENUM('nacht', 'vorher', 'hand', 'plan', 'schutz') NOT NULL,
             origin     ENUM('admin', 'server') NOT NULL DEFAULT 'admin',
             note       VARCHAR(200) NULL,
             by_name    VARCHAR(100) NULL,
             created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
             bytes      INT UNSIGNED NOT NULL,
+            parts      SET('bot', 'server') NOT NULL DEFAULT 'bot',
             counts     JSON NOT NULL,
+            server_counts JSON NULL,
             data       LONGBLOB NOT NULL,
             PRIMARY KEY (id),
             KEY idx_guild (guild_id, created_at),
@@ -99,6 +102,8 @@ export async function ensureBackupDatabase(config: IConfig): Promise<string | nu
             weekday       TINYINT UNSIGNED NOT NULL,
             hour          TINYINT UNSIGNED NOT NULL,
             keep_count    TINYINT UNSIGNED NOT NULL,
+            discord       TINYINT(1) NOT NULL DEFAULT 0,
+            risky         TINYINT(1) NOT NULL DEFAULT 1,
             enabled_at    TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
             last_ok       TIMESTAMP(3) NULL,
             last_error_at TIMESTAMP(3) NULL,
@@ -107,9 +112,14 @@ export async function ensureBackupDatabase(config: IConfig): Promise<string | nu
             updated_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY (guild_id)
         ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci`);
-        // Plan 19: Herkunft und die Art plan. Ältere Backups kommen alle aus dem Admin Dashboard.
-        await query(`ALTER TABLE ${table("guild_backups")} MODIFY COLUMN kind ENUM('nacht', 'vorher', 'hand', 'plan') NOT NULL`);
+        // Plan 19: Herkunft und die Art plan. Ältere Backups kommen alle aus dem Admin Dashboard. Plan 31: die Art schutz.
+        await query(`ALTER TABLE ${table("guild_backups")} MODIFY COLUMN kind ENUM('nacht', 'vorher', 'hand', 'plan', 'schutz') NOT NULL`);
         await query(`ALTER TABLE ${table("guild_backups")} ADD COLUMN IF NOT EXISTS origin ENUM('admin', 'server') NOT NULL DEFAULT 'admin' AFTER kind`);
+        // Plan 32: welche Teile ein Backup hat, die Zähler des Discord-Servers, und die beiden neuen Schalter im Plan.
+        await query(`ALTER TABLE ${table("guild_backups")} ADD COLUMN IF NOT EXISTS parts SET('bot', 'server') NOT NULL DEFAULT 'bot' AFTER origin`);
+        await query(`ALTER TABLE ${table("guild_backups")} ADD COLUMN IF NOT EXISTS server_counts JSON NULL AFTER counts`);
+        await query(`ALTER TABLE ${table("backup_plans")} ADD COLUMN IF NOT EXISTS discord TINYINT(1) NOT NULL DEFAULT 0 AFTER keep_count`);
+        await query(`ALTER TABLE ${table("backup_plans")} ADD COLUMN IF NOT EXISTS risky TINYINT(1) NOT NULL DEFAULT 1 AFTER discord`);
         // Auf die Millisekunde: Zwei Runden in derselben Sekunde wären sonst eine, mit jedem Server doppelt.
         await query(`ALTER TABLE ${table("backup_runs")} MODIFY COLUMN round_at TIMESTAMP(3) NOT NULL`);
         reason = null;
@@ -180,9 +190,11 @@ interface IBackupRow {
     readonly created_at: Date;
     readonly bytes: number;
     readonly counts: string | Record<string, number>;
+    readonly parts: string;
+    readonly server_counts: string | IServerCounts | null;
 }
 
-const META_COLUMNS = "id, guild_id, guild_name, kind, origin, note, by_name, created_at, bytes, counts";
+const META_COLUMNS = "id, guild_id, guild_name, kind, origin, parts, note, by_name, created_at, bytes, counts, server_counts";
 
 function toMeta(row: IBackupRow): IBackupMeta {
     return {
@@ -196,6 +208,8 @@ function toMeta(row: IBackupRow): IBackupMeta {
         createdAt: row.created_at.toISOString(),
         bytes: row.bytes,
         counts: (typeof row.counts === "string" ? JSON.parse(row.counts) : row.counts) as Partial<Record<AreaId, number>>,
+        parts: BACKUP_PARTS.filter((part) => String(row.parts ?? "bot").split(",").includes(part)),
+        server: row.server_counts === null || row.server_counts === undefined ? null : ((typeof row.server_counts === "string" ? JSON.parse(row.server_counts) : row.server_counts) as IServerCounts),
     };
 }
 
@@ -207,14 +221,21 @@ export async function createBackup(input: {
     byName: string | null;
     /** Ohne Angabe: aus dem Admin Dashboard. */
     origin?: BackupOrigin;
+    /** Plan 32: Ohne Angabe nur die Daten des Bots. */
+    parts?: readonly BackupPart[];
+    /** Der Server-Teil vom Bot, wenn parts "server" enthält. */
+    server?: IServerPartJson | null;
 }): Promise<IBackupMeta> {
-    const tables = await readGuild(input.guildId);
-    const data = packBackup(tables);
+    const parts = input.parts ?? ["bot"];
+    const server = parts.includes("server") ? (input.server ?? null) : null;
+    const tables = parts.includes("bot") ? await readGuild(input.guildId) : {};
+    const data = packBackup(tables, server);
     const counts = countAreas(tables);
+    const stored = BACKUP_PARTS.filter((part) => (part === "server" ? server !== null : parts.includes(part)));
 
     const result = await query<{ insertId: number }>(
-        `INSERT INTO ${table("guild_backups")} (guild_id, guild_name, kind, origin, note, by_name, bytes, counts, data) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [input.guildId, input.guildName.slice(0, 100), input.kind, input.origin ?? "admin", input.note, input.byName, data.length, JSON.stringify(counts), data]
+        `INSERT INTO ${table("guild_backups")} (guild_id, guild_name, kind, origin, parts, note, by_name, bytes, counts, server_counts, data) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [input.guildId, input.guildName.slice(0, 100), input.kind, input.origin ?? "admin", stored.join(","), input.note, input.byName, data.length, JSON.stringify(counts), server ? JSON.stringify(server.counts) : null, data]
     );
     const [row] = await query<IBackupRow[]>(`SELECT ${META_COLUMNS} FROM ${table("guild_backups")} WHERE id = ?`, [result.insertId]);
 
@@ -248,6 +269,28 @@ export async function backupGuilds(): Promise<{ guildId: string; guildName: stri
     return rows.map((row) => ({ guildId: row.guild_id, guildName: row.guild_name, last: { at: row.created_at, kind: row.kind } }));
 }
 
+/**
+ * Läuft im Bot gerade ein Laden für diesen Server (als Quelle oder Ziel)? Dann
+ * entsteht dort kein neues Backup (Plan 32). Fehlt die Tabelle (Bot noch nicht
+ * migriert), läuft auch keins.
+ */
+export async function restoreRunning(guildId: string): Promise<boolean> {
+    try {
+        const rows = await query<{ n: number }[]>("SELECT COUNT(*) AS n FROM server_restores WHERE status = 'running' AND (guild_id = ? OR target_guild_id = ?)", [guildId, guildId]);
+
+        return Number(rows[0]?.n ?? 0) > 0;
+    } catch {
+        return false;
+    }
+}
+
+/** Der Server-Teil eines Backups, null ohne ihn. */
+export async function backupServer(id: number, guildId: string): Promise<IServerPartJson | null> {
+    const [row] = await query<{ data: Buffer }[]>(`SELECT data FROM ${table("guild_backups")} WHERE id = ? AND guild_id = ?`, [id, guildId]);
+
+    return row ? unpackServer(row.data) : null;
+}
+
 export async function backupData(id: number, guildId: string): Promise<{ meta: IBackupMeta; tables: Record<string, Record<string, unknown>[]> } | null> {
     const [row] = await query<(IBackupRow & { data: Buffer })[]>(`SELECT ${META_COLUMNS}, data FROM ${table("guild_backups")} WHERE id = ? AND guild_id = ?`, [id, guildId]);
     if (!row) return null;
@@ -266,14 +309,16 @@ export async function deleteBackup(id: number, guildId: string, origin?: BackupO
     return "deleted";
 }
 
-/** Automatische nach 72 Stunden weg, nächtliche Runden nach 14 Tagen. Gibt die Zahl gelöschter Backups zurück. */
+/** Automatische nach 72 Stunden weg, Sicherheits-Backups nach 7 Tagen, nächtliche Runden nach 14 Tagen. Gibt die Zahl gelöschter Backups zurück. */
 export async function pruneBackups(now: Date): Promise<number> {
     const result = await query<{ affectedRows: number }>(`DELETE FROM ${table("guild_backups")} WHERE kind IN ('nacht', 'vorher') AND created_at < ?`, [
         new Date(now.getTime() - KEEP_AUTOMATIC_HOURS * 3_600_000),
     ]);
+    // Plan 31: Ein Nuke fällt manchmal erst Tage später auf - Sicherheits-Backups bleiben eine Woche.
+    const safety = await query<{ affectedRows: number }>(`DELETE FROM ${table("guild_backups")} WHERE kind = 'schutz' AND created_at < ?`, [new Date(now.getTime() - KEEP_SAFETY_DAYS * 86_400_000)]);
     await query(`DELETE FROM ${table("backup_runs")} WHERE round_at < ?`, [new Date(now.getTime() - KEEP_RUNS_DAYS * 86_400_000)]);
 
-    return result.affectedRows;
+    return result.affectedRows + safety.affectedRows;
 }
 
 /** Eine Zeile der Runde. full: Runde für alle Server; false beim Nachholen eines einzelnen. */
@@ -338,19 +383,21 @@ interface IPlanDbRow {
     weekday: number;
     hour: number;
     keep_count: number;
+    discord: number;
+    risky: number;
     enabled_at: Date;
     last_ok: Date | null;
     last_error_at: Date | null;
     last_error: string | null;
 }
 
-const PLAN_COLUMNS = "guild_id, guild_name, enabled, every, weekday, hour, keep_count, enabled_at, last_ok, last_error_at, last_error";
+const PLAN_COLUMNS = "guild_id, guild_name, enabled, every, weekday, hour, keep_count, discord, risky, enabled_at, last_ok, last_error_at, last_error";
 
 function toPlan(row: IPlanDbRow): IPlanRow {
     return {
         guildId: row.guild_id,
         guildName: row.guild_name,
-        plan: { enabled: row.enabled === 1, every: row.every, weekday: row.weekday, hour: row.hour, keep: row.keep_count },
+        plan: { enabled: row.enabled === 1, every: row.every, weekday: row.weekday, hour: row.hour, keep: row.keep_count, discord: row.discord === 1, risky: row.risky !== 0 },
         enabledAt: row.enabled_at,
         lastOk: row.last_ok,
         lastError: row.last_error_at && row.last_error ? { at: row.last_error_at, reason: row.last_error } : null,
@@ -375,11 +422,11 @@ export async function savePlan(guildId: string, guildName: string, plan: IBackup
     const enabledAt = plan.enabled && changed ? now : (current?.enabledAt ?? now);
 
     await query(
-        `INSERT INTO ${table("backup_plans")} (guild_id, guild_name, enabled, every, weekday, hour, keep_count, enabled_at, updated_by)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `INSERT INTO ${table("backup_plans")} (guild_id, guild_name, enabled, every, weekday, hour, keep_count, discord, risky, enabled_at, updated_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON DUPLICATE KEY UPDATE guild_name = VALUES(guild_name), enabled = VALUES(enabled), every = VALUES(every), weekday = VALUES(weekday),
-             hour = VALUES(hour), keep_count = VALUES(keep_count), enabled_at = VALUES(enabled_at), updated_by = VALUES(updated_by)`,
-        [guildId, guildName.slice(0, 100), plan.enabled ? 1 : 0, plan.every, plan.weekday, plan.hour, plan.keep, enabledAt, byName?.slice(0, 100) ?? null]
+             hour = VALUES(hour), keep_count = VALUES(keep_count), discord = VALUES(discord), risky = VALUES(risky), enabled_at = VALUES(enabled_at), updated_by = VALUES(updated_by)`,
+        [guildId, guildName.slice(0, 100), plan.enabled ? 1 : 0, plan.every, plan.weekday, plan.hour, plan.keep, plan.discord ? 1 : 0, plan.risky ? 1 : 0, enabledAt, byName?.slice(0, 100) ?? null]
     );
     await trimPlan(guildId, plan.keep);
 

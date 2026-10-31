@@ -1,5 +1,5 @@
 import { gunzipSync, gzipSync } from "node:zlib";
-import { AREAS, type AreaId } from "../../shared/backups.ts";
+import { AREAS, type AreaId, type IServerPartJson } from "../../shared/backups.ts";
 
 /**
  * Wie ein Backup gespeichert wird: die Zeilen je Tabelle als JSON, gzip-
@@ -35,10 +35,18 @@ export function decodeRows(rows: readonly unknown[]): Row[] {
     return rows.map((row) => Object.fromEntries(Object.entries(row as Row).map(([column, value]) => [column, decodeValue(value)])));
 }
 
-export function packBackup(tables: Readonly<Record<string, readonly Row[]>>): Buffer {
+/** Version 2 (Plan 32) trägt zusätzlich den Server-Teil. Version 1 bleibt lesbar und gilt als „nur Bot“. */
+export function packBackup(tables: Readonly<Record<string, readonly Row[]>>, server: IServerPartJson | null = null): Buffer {
     const encoded = Object.fromEntries(Object.entries(tables).map(([table, rows]) => [table, encodeRows(rows)]));
 
-    return gzipSync(JSON.stringify({ version: 1, tables: encoded }));
+    return gzipSync(JSON.stringify({ version: 2, tables: encoded, server }));
+}
+
+/** Der Server-Teil eines Backups, null bei Version 1 oder ohne ihn. */
+export function unpackServer(data: Buffer): IServerPartJson | null {
+    const parsed = JSON.parse(gunzipSync(data).toString("utf8")) as { server?: IServerPartJson | null };
+
+    return parsed.server ?? null;
 }
 
 export function unpackBackup(data: Buffer): Record<string, Row[]> {

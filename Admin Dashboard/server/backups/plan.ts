@@ -1,10 +1,10 @@
 import { DEFAULT_PLAN, type IBackupPlan, type IPlanState } from "../../shared/backups.ts";
-import { botOverview } from "../bot.ts";
+import { botBackupFailed, botOverview, botSnapshot } from "../bot.ts";
 import type { IConfig } from "../config.ts";
 import { databaseReady } from "../db.ts";
 import { publish } from "../events.ts";
 import { berlinDate, daysBefore } from "../status/history.ts";
-import { backupsReady, createBackup, enabledPlans, markPlan, trimPlan, type IPlanRow } from "./store.ts";
+import { backupsReady, createBackup, enabledPlans, markPlan, restoreRunning, trimPlan, type IPlanRow } from "./store.ts";
 
 /**
  * Automatische Backups, die ein Server im Bot-Dashboard selbst eingestellt
@@ -112,9 +112,16 @@ export async function runPlans(config: IConfig, now: number): Promise<{ ok: numb
 
         for (const row of due) {
             if (known && !known.has(row.guildId)) continue;
+            // Plan 32: Während eines Ladens kein neues Backup - sonst würfe trimPlan womöglich das, das gerade geladen wird.
+            // Nicht vermerkt: Zur nächsten vollen Stunde ist es wieder dran.
+            if (await restoreRunning(row.guildId)) continue;
 
             try {
-                await createBackup({ guildId: row.guildId, guildName: row.guildName, kind: "plan", note: null, byName: null, origin: "server" });
+                // Plan 32: mit dem Discord-Server, wenn eingestellt. Kommt er nicht, das Backup mit dem Bot - und der Bot sagt es im Meldekanal.
+                const server = row.plan.discord ? await botSnapshot(config, row.guildId, "backups") : null;
+
+                await createBackup({ guildId: row.guildId, guildName: row.guildName, kind: "plan", note: null, byName: null, origin: "server", parts: server ? ["bot", "server"] : ["bot"], server });
+                if (row.plan.discord && !server) await botBackupFailed(config, row.guildId, "Den Discord-Server konnte der Bot nicht lesen. Gesichert sind nur die Daten des Bots.");
                 await markPlan(row.guildId, { ok: true, at: new Date(now) });
                 await trimPlan(row.guildId, row.plan.keep);
                 ok++;

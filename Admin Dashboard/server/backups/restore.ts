@@ -4,6 +4,7 @@ import type { IConfig } from "../config.ts";
 import { withTransaction, type TransactionQuery } from "../db.ts";
 import { PublicError } from "../errors.ts";
 import { publish } from "../events.ts";
+import { idMapOf, remapValue } from "./remap.ts";
 import { backupData, createBackup, existingColumns } from "./store.ts";
 
 /**
@@ -68,6 +69,8 @@ export async function restoreBackup(
         readonly actor: { readonly id: string; readonly name: string };
         /** Woher das Zurückladen kommt: Das Backup davor bekommt dieselbe Herkunft, damit das Bot-Dashboard es sieht. */
         readonly origin?: BackupOrigin;
+        /** Plan 32: Das „vorher“ legte schon das Laden des Discord-Servers an (mit Bot-Daten). Dann kein zweites. */
+        readonly safetyId?: number;
     }
 ): Promise<IRestoreResult> {
     const found = await backupData(input.backupId, input.guildId);
@@ -78,15 +81,20 @@ export async function restoreBackup(
     const existing = new Set(columns.keys());
     // Nur was im Backup als Tabelle steht, wird ersetzt. Kam eine Tabelle erst später dazu, bleibt sie.
     const inBackup = (table: string): boolean => Object.hasOwn(found.tables, table);
+    // Plan 32: Wurde der Discord-Server seit dem Backup geladen, zeigen die Zeilen auf die neuen IDs.
+    const map = await idMapOf(input.guildId);
+    const rowsOf = (table: string): Row[] => (map.size === 0 ? (found.tables[table] ?? []) : (found.tables[table] ?? []).map((row) => remapValue(row, map) as Row));
     const before = await botGuildPanels(config, input.guildId, input.actor.id);
-    const safety = await createBackup({
-        guildId: input.guildId,
-        guildName: found.meta.guildName,
-        kind: "vorher",
-        note: `vor dem Zurückladen von ${STAMP.format(new Date(found.meta.createdAt))}`,
-        byName: input.actor.name,
-        origin: input.origin ?? "admin",
-    });
+    const safety = input.safetyId
+        ? { id: input.safetyId }
+        : await createBackup({
+              guildId: input.guildId,
+              guildName: found.meta.guildName,
+              kind: "vorher",
+              note: `vor dem Zurückladen von ${STAMP.format(new Date(found.meta.createdAt))}`,
+              byName: input.actor.name,
+              origin: input.origin ?? "admin",
+          });
 
     let current = "";
     const restored: { area: AreaId; rows: number }[] = [];
@@ -110,7 +118,7 @@ export async function restoreBackup(
                 }
 
                 for (const table of [...area.tables, ...area.children.map((child) => child.table)]) {
-                    const data = found.tables[table] ?? [];
+                    const data = rowsOf(table);
                     if (!existing.has(table) || data.length === 0) continue;
 
                     await insertRows(query, table, data, columns.get(table) ?? new Set());
