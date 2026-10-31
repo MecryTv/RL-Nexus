@@ -32,6 +32,7 @@ rlnexus-bot, rlnexus-admin ──► host.docker.internal:3306  MariaDB auf dem 
 | Datenbank | MariaDB 11.8 direkt auf dem Server, Daten unter `/var/lib/mysql`. Port 3306 lässt ufw nur aus den Docker-Netzen durch. Eingerichtet von `scripts/mariadb-einrichten.sh` |
 | phpMyAdmin | `https://db.nexus-emb.de`, aus Debian mit php-fpm, hinter Name und Passwort von nginx |
 | Zertifikate, Weiterleitungen | nginx auf dem Host, je Domain eine Datei unter `/etc/nginx/sites-available/` (Vorlagen: `nginx/` in diesem Repo), certbot |
+| Ersatzseite | `/var/www/ersatzseite` (Vorlage `nginx/ersatzseite/`). nginx zeigt sie bei unbekannten Adressen und wenn eine Nexus-Seite nicht antwortet |
 | Mailcow, SnappyMail | eigene Container außerhalb dieses Repos, Weboberflächen nur auf `127.0.0.1:8081` und `127.0.0.1:8082` |
 | Galerie-Bilder | Docker-Volume `rlnexus_images` |
 | Verläufe, Beweisbilder, Clips, Logs | `data/` im Ordner des Bots |
@@ -329,6 +330,8 @@ Die Konfiguration liegt wie bei Debian üblich unter `/etc/nginx/sites-available
 | `nginx/mail.nexus-emb.de.conf` | `/etc/nginx/sites-available/mail.nexus-emb.de` | Mailcow auf `127.0.0.1:8081`, dazu `autodiscover.` und `autoconfig.` |
 | `nginx/webmail.nexus-emb.de.conf` | `/etc/nginx/sites-available/webmail.nexus-emb.de` | SnappyMail auf `127.0.0.1:8082` |
 | `nginx/db.nexus-emb.de.conf` | `/etc/nginx/sites-available/db.nexus-emb.de` | phpMyAdmin über php-fpm, aus Schritt 5 |
+| `nginx/ersatzseite.conf` | `/etc/nginx/sites-available/ersatzseite` | Alles ohne eigene Seite, etwa die IP des Servers: die Ersatzseite mit 404, über https bricht nginx die Verbindung ab |
+| `nginx/snippets/rlnexus-ersatzseite.conf` | `/etc/nginx/snippets/rlnexus-ersatzseite.conf` | Kein eigenes Ziel: Hauptseite, Dashboard, Admin Dashboard und Statusseite binden es ein. Antwortet ihr Container nicht (502, 504), kommt die Ersatzseite |
 
 Die beiden Dateien unter `nginx/container/` gehören nicht hierher: Sie sind die Konfiguration von nginx **in** den Containern von Hauptseite und Statusseite, Compose hängt sie selbst ein.
 
@@ -346,15 +349,18 @@ Dann alle Seiten:
 
 ```bash
 sudo rm -f /etc/nginx/sites-enabled/default
+sudo rm -rf /var/www/html
 cd /home/rlnexus/nginx
-for site in nexus-emb.de dashboard.nexus-emb.de admin.nexus-emb.de status.nexus-emb.de db.nexus-emb.de mail.nexus-emb.de webmail.nexus-emb.de; do
+sudo mkdir -p /var/www/ersatzseite && sudo cp ersatzseite/* /var/www/ersatzseite/
+sudo cp snippets/rlnexus-ersatzseite.conf /etc/nginx/snippets/
+for site in ersatzseite nexus-emb.de dashboard.nexus-emb.de admin.nexus-emb.de status.nexus-emb.de db.nexus-emb.de mail.nexus-emb.de webmail.nexus-emb.de; do
   sudo cp "$site.conf" "/etc/nginx/sites-available/$site"
   sudo ln -sf "/etc/nginx/sites-available/$site" "/etc/nginx/sites-enabled/$site"
 done
 sudo nginx -t && sudo systemctl enable --now nginx && sudo systemctl reload nginx
 ```
 
-Die zweite Zeile nimmt Debians Beispielseite `default` heraus, sie würde sonst auf Port 80 jede unbekannte Domain beantworten. Liegt unter `/etc/nginx/sites-enabled/` noch eine alte Konfiguration für eine der Domains, vorher entfernen, sonst meldet `nginx -t` einen Konflikt (`conflicting server name`).
+Die ersten beiden Zeilen nehmen Debians Beispielseite `default` samt ihrem Ordner `/var/www/html` heraus. Unbekannte Domains beantwortet stattdessen die Ersatzseite (`ersatzseite`, als `default_server`). Bringt ein Update von nginx `/var/www/html` zurück, stört der Ordner nicht, es zeigt nichts mehr darauf. Liegt unter `/etc/nginx/sites-enabled/` noch eine alte Konfiguration für eine der Domains, vorher entfernen, sonst meldet `nginx -t` einen Konflikt (`conflicting server name`).
 
 ### Zertifikate
 
@@ -369,7 +375,7 @@ sudo certbot --nginx -d webmail.nexus-emb.de
 sudo certbot --nginx -d db.nexus-emb.de
 ```
 
-`mail.nexus-emb.de` fehlt hier mit Absicht: Dort nimmt nginx das Zertifikat von Mailcow. Verlängert wird automatisch, von certbot (`certbot.timer`) und von Mailcow.
+`mail.nexus-emb.de` fehlt hier mit Absicht: Dort nimmt nginx das Zertifikat von Mailcow. Die Ersatzseite bekommt keins, für unbekannte Namen gibt es keins. Verlängert wird automatisch, von certbot (`certbot.timer`) und von Mailcow.
 
 Ändert sich eine Vorlage unter `nginx/` später im Repo, die neue Fassung **nicht** einfach drüberkopieren: certbot hat die Datei unter `/etc/nginx/sites-available/` um Zertifikat und Umleitung ergänzt. Die Änderung dort von Hand nachziehen, dann `sudo nginx -t && sudo systemctl reload nginx`.
 
@@ -379,6 +385,7 @@ sudo certbot --nginx -d db.nexus-emb.de
 * **Hauptseite und Statusseite** (Container, `nginx/container/`) kommen aus ihrem `dist`, mit fertig gepackten `.gz`-Dateien. `/content/*` kommt aus `data/content`, sonst aus dem Stand des Builds. `/api/contact` geht über das Docker-Netz an das Admin Dashboard (höchstens 32 KB), `/public/status` ebenso. Sonst erreicht über diese beiden Domains niemand den Admin-Server.
 * **Bot-Dashboard:** alles an `127.0.0.1:3000`, Anfragen bis 10 MB. `/dcapi/admin/*` antwortet von außen mit 404, diese Routen erreicht nur das Admin Dashboard im Docker-Netz. Puls und Live Tickets kommen ohne Puffer durch, weil der Bot `X-Accel-Buffering: no` schickt.
 * **Admin Dashboard:** alles an `127.0.0.1:3001`, Anfragen bis 25 MB (Anhänge im Postfach). Der Container zeigt die Oberfläche aus `/var/www/admin.nexus-emb.de/dist` und beantwortet `/api/*`. `/internal/*` antwortet von außen mit 404: Das ruft nur der Bot im Docker-Netz auf, für das Modul Backups.
+* **Ersatzseite:** Antwortet der Container hinter einer Nexus-Seite nicht, zeigt nginx statt seiner grauen „502 Bad Gateway“ die Seite „Kurze Auszeit.“: mit dem Namen der Seite, und sie lädt alle 30 Sekunden neu, bis die echte Seite zurück ist. Die Wartungsseite bleibt davon unberührt, sie ist eine Antwort des Containers bzw. kommt mit 503. Unbekannte Adressen bekommen dieselbe Gestaltung mit „Falsch abgebogen.“ und Status 404. Seite, Skript, Bild und Schriften liegen alle unter `/var/www/ersatzseite` und werden als `/_ersatz/…` ausgeliefert, nichts von außen. Zum Ansehen ohne Ausfall: `https://dashboard.nexus-emb.de/_ersatz/index.html?vorschau=dashboard.nexus-emb.de`.
 * **phpMyAdmin:** zwei Anmeldungen hintereinander, erst nginx (`/etc/nginx/db.nexus-emb.de.htpasswd`), dann phpMyAdmin mit `DATABASE_USER`. Ohne die erste sieht niemand phpMyAdmin überhaupt. Einrichtungsassistent und Innereien (`/setup`, `/libraries` …) antworten mit 404, Importe gehen bis 64 MB.
 * **Mailcow und SnappyMail:** alles an `127.0.0.1:8081` und `127.0.0.1:8082`. Mailcow bekommt die Prüfung von Let's Encrypt auf Port 80 durchgereicht und lange Zeitlimits für ActiveSync.
 * **Sicherheitsheader:** Content-Security-Policy je Domain, HSTS, `nosniff`, Referrer-Policy. Für Hauptseite und Statusseite setzen sie die Container, sonst nginx auf dem Host. Die Hauptseite darf nur das Admin Dashboard einbetten (`frame-ancestors`), für die Live-Vorschau im Modul-Editor, und das Admin Dashboard darf die Hauptseite laden (`frame-src`).
@@ -471,7 +478,7 @@ sudo mariadb-dump --single-transaction --databases rlnexus rlnexus_backups > /ro
 | Hauptseite | `rm -rf /var/www/nexus-emb.de/dist && unzip -q /root/website.zip -d /var/www/nexus-emb.de/dist` |
 | Statusseite | `rm -rf /var/www/status.nexus-emb.de/dist && unzip -q /root/status.zip -d /var/www/status.nexus-emb.de/dist` |
 
-Bot und Admin Dashboard werden drüber ausgepackt: `.env` und `data/` stehen nicht im Paket und bleiben. Hauptseite, Statusseite und die Oberfläche des Admin Dashboards brauchen keinen Neustart, die Container lesen die Dateien bei jeder Anfrage. Der Server des Admin Dashboards schon: Er läuft aus dem Image. Hat sich beim Bot `docker-compose.prod.yml` geändert, zusätzlich `docker compose -f docker-compose.prod.yml up -d`, bei einer Datei unter `nginx/container/` `docker compose -f docker-compose.prod.yml restart website status`. Ändert sich eine Vorlage unter `nginx/`, die Datei unter `/etc/nginx/sites-available/` von Hand nachziehen, siehe [Schritt 6](#zertifikate).
+Bot und Admin Dashboard werden drüber ausgepackt: `.env` und `data/` stehen nicht im Paket und bleiben. Hauptseite, Statusseite und die Oberfläche des Admin Dashboards brauchen keinen Neustart, die Container lesen die Dateien bei jeder Anfrage. Der Server des Admin Dashboards schon: Er läuft aus dem Image. Hat sich beim Bot `docker-compose.prod.yml` geändert, zusätzlich `docker compose -f docker-compose.prod.yml up -d`, bei einer Datei unter `nginx/container/` `docker compose -f docker-compose.prod.yml restart website status`. Ändert sich eine Vorlage unter `nginx/`, die Datei unter `/etc/nginx/sites-available/` von Hand nachziehen, siehe [Schritt 6](#zertifikate). Neues unter `nginx/ersatzseite/` braucht nur `sudo cp /home/rlnexus/nginx/ersatzseite/* /var/www/ersatzseite/`, ohne Neuladen.
 
 Neue Migrationen laufen beim Start mit. Kamen neue **Galerie-Vorlagen** dazu, sieht der Bot sie nicht von allein: das Volume wurde beim ersten Start befüllt und wird danach nicht mehr angefasst. Einmal nachlegen:
 
@@ -515,11 +522,11 @@ Verläufe, Beweisbilder, Clips, Logs, die Inhalte der Hauptseite und die Wartung
 | `nginx -t`: `conflicting server name` | Eine alte Konfiguration für dieselbe Domain liegt noch unter `/etc/nginx/sites-enabled/`. Entfernen |
 | Hauptseite oder Statusseite `404` | Unter `/var/www/…/dist` fehlt die `index.html`: das Paket neu auspacken |
 | Admin Dashboard `404` oder leere Seite | `/var/www/admin.nexus-emb.de/dist` fehlt: `cd /var/www/admin.nexus-emb.de && npm ci && npm run build`. Wurde `dist` von Hand gelöscht und neu gebaut, sieht der Container den neuen Ordner erst nach `docker compose -f docker-compose.prod.yml restart admin` |
-| Hauptseite oder Statusseite `502` | Der Container läuft nicht: `docker compose -f docker-compose.prod.yml logs website` (oder `status`). Steht dort ein Fehler zur Konfiguration, ist eine Datei unter `nginx/container/` kaputt oder fehlt |
+| Hauptseite oder Statusseite zeigt „Kurze Auszeit.“ (502) | Der Container läuft nicht: `docker compose -f docker-compose.prod.yml logs website` (oder `status`). Steht dort ein Fehler zur Konfiguration, ist eine Datei unter `nginx/container/` kaputt oder fehlt |
 | `mail.nexus-emb.de` zeigt ein abgelaufenes Zertifikat | Mailcow hat verlängert, nginx hat die neue Datei noch nicht gelesen: `sudo systemctl reload nginx`. Fehlt der Cron aus [Schritt 6](#mailcow-nach-hinten), ihn anlegen |
 | `webmail.nexus-emb.de` `502` | SnappyMail läuft nicht oder auf einem anderen Port als 8082: `docker ps \| grep -i snappy` |
 | Admin Dashboard: Seite lädt, aber „Der Admin-Server antwortet gerade nicht“ | Die API läuft nicht: `docker compose -f docker-compose.prod.yml ps` im Ordner des Bots |
-| `502 Bad Gateway` | Der Container dahinter läuft nicht oder startet noch: `docker compose -f docker-compose.prod.yml ps` |
+| „Kurze Auszeit.“ oder `502 Bad Gateway` | Der Container dahinter läuft nicht oder startet noch: `docker compose -f docker-compose.prod.yml ps` |
 | certbot: `unauthorized` oder `timeout` | DNS zeigt noch nicht auf den Server, Port 80 ist zu, oder ein fremder AAAA-Eintrag hängt an der Domain |
 | Im Zugriffsprotokoll nur Adressen von Cloudflare | Cloudflare hat neue Netze. Die Liste in den sieben Dateien unter `/etc/nginx/sites-available/` mit <https://www.cloudflare.com/ips/> abgleichen |
 | `Used disallowed intents` | In der `.env` steht ein Intent auf `"true"`, im Developer Portal ist es aus |

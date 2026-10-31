@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="de">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="robots" content="noindex" />
+        <meta name="theme-color" content="#050608" />
+        <title>RL Nexus</title>
+        <link rel="icon" href="/_ersatz/logo-n.webp" />
+        <!--
+            Die Ersatzseite des Servers (Entwurf B „Auszeit“). nginx auf dem Host
+            zeigt sie in zwei Fällen, beide unter /_ersatz/ aus /var/www/ersatzseite:
+              - Eine Nexus-Seite antwortet nicht (502, 504): error_page in
+                nginx/snippets/rlnexus-ersatzseite.conf. Die Seite lädt alle 30
+                Sekunden neu, bis die echte Seite wieder da ist.
+              - Eine unbekannte Adresse, etwa die IP des Servers (404):
+                nginx/ersatzseite.conf als default_server.
+            Welcher Fall es ist, liest ersatz.js am Namen in der Adresszeile ab.
+            Ohne Skript bleibt der neutrale Text unten stehen. Nichts von außen:
+            Die Seite muss stehen, wenn sonst nichts läuft.
+            Zum Ansehen beider Fälle: ?vorschau=dashboard.nexus-emb.de oder ?vorschau=1.2.3.4
+        -->
+        <style>
+            @font-face { font-family: Oxanium; font-weight: 700; font-display: swap; src: url("/_ersatz/oxanium-700.woff2") format("woff2"); }
+            @font-face { font-family: Oxanium; font-weight: 800; font-display: swap; src: url("/_ersatz/oxanium-800.woff2") format("woff2"); }
+            @font-face { font-family: Rajdhani; font-weight: 600; font-display: swap; src: url("/_ersatz/rajdhani-600.woff2") format("woff2"); }
+            @font-face { font-family: Rajdhani; font-weight: 700; font-display: swap; src: url("/_ersatz/rajdhani-700.woff2") format("woff2"); }
+            @font-face { font-family: Orbitron; font-weight: 700; font-display: swap; src: url("/_ersatz/orbitron-700.woff2") format("woff2"); }
+
+            :root {
+                color-scheme: dark;
+                --bg: #050608;
+                --text: #f2f4f7;
+                --dim: #a8b0bc;
+                --faint: #8b93a0;
+                --red: #ff1e2d;
+                --red-button: #d81424;
+                --display: "Oxanium", "Segoe UI", system-ui, sans-serif;
+                --label: "Rajdhani", "Segoe UI", system-ui, sans-serif;
+                --accent: "Orbitron", "Oxanium", system-ui, sans-serif;
+            }
+
+            * {
+                box-sizing: border-box;
+            }
+
+            body {
+                position: relative;
+                display: grid;
+                min-height: 100vh;
+                min-height: 100dvh;
+                margin: 0;
+                padding: 48px 16px 88px;
+                place-items: center;
+                overflow-x: hidden;
+                background: var(--bg);
+                color: var(--text);
+                font-family: var(--display);
+                text-align: center;
+            }
+
+            /* Das Bannerbild nur als roter Schimmer: Schriftzug und N darin stünden sonst hinter dem Text. */
+            .art {
+                position: fixed;
+                inset: -60px;
+                z-index: -2;
+                background: url("/_ersatz/banner.webp") center 42% / cover;
+                filter: blur(18px) saturate(1.25);
+                opacity: 0.75;
+            }
+
+            .art::after {
+                content: "";
+                position: absolute;
+                inset: 0;
+                background:
+                    radial-gradient(70% 60% at 50% 45%, rgb(5 6 8 / 78%), rgb(5 6 8 / 94%) 70%),
+                    linear-gradient(0deg, var(--bg), transparent 30%);
+            }
+
+            .num {
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                z-index: -1;
+                transform: translate(-50%, -56%);
+                color: transparent;
+                font: 700 clamp(160px, 30vw, 330px) var(--accent);
+                letter-spacing: 0.04em;
+                -webkit-text-stroke: 1.5px rgb(255 255 255 / 9%);
+                pointer-events: none;
+                user-select: none;
+            }
+
+            main {
+                width: 100%;
+                max-width: 640px;
+            }
+
+            .logo {
+                width: 76px;
+                height: 76px;
+                object-fit: contain;
+            }
+
+            .chip {
+                display: inline-flex;
+                align-items: center;
+                gap: 10px;
+                max-width: 100%;
+                margin-top: 26px;
+                padding: 9px 16px;
+                border: 1px solid rgb(255 30 45 / 55%);
+                border-radius: 999px;
+                background: rgb(255 30 45 / 7%);
+                color: #ffd6d9;
+                font: 700 11.5px var(--accent);
+                letter-spacing: 0.14em;
+                text-transform: uppercase;
+                overflow-wrap: anywhere;
+            }
+
+            .chip::before {
+                content: "";
+                flex: none;
+                width: 7px;
+                height: 7px;
+                border-radius: 50%;
+                background: var(--red);
+            }
+
+            h1 {
+                margin: 22px 0 0;
+                font-weight: 800;
+                font-size: clamp(42px, 10vw, 66px);
+                line-height: 1.04;
+            }
+
+            .lead {
+                max-width: 500px;
+                margin: 20px auto 0;
+                color: var(--dim);
+                font-size: 17px;
+                line-height: 1.65;
+            }
+
+            .lead code {
+                padding: 3px 9px;
+                border-radius: 6px;
+                background: rgb(255 255 255 / 6%);
+                color: var(--text);
+                font: 600 0.95em ui-monospace, "Cascadia Mono", Consolas, monospace;
+                overflow-wrap: anywhere;
+            }
+
+            .retry {
+                max-width: 320px;
+                margin: 30px auto 0;
+            }
+
+            .retry span {
+                color: var(--faint);
+                font: 600 13px var(--label);
+                letter-spacing: 0.14em;
+                text-transform: uppercase;
+            }
+
+            .bar {
+                height: 3px;
+                margin-top: 10px;
+                overflow: hidden;
+                border-radius: 3px;
+                background: rgb(255 255 255 / 10%);
+            }
+
+            .bar i {
+                display: block;
+                width: 0;
+                height: 100%;
+                background: var(--red);
+            }
+
+            .bar i.run {
+                animation: fill var(--wait, 30s) linear forwards;
+            }
+
+            @keyframes fill {
+                to {
+                    width: 100%;
+                }
+            }
+
+            .btns {
+                display: flex;
+                flex-wrap: wrap;
+                justify-content: center;
+                gap: 12px;
+                margin-top: 28px;
+            }
+
+            .btn {
+                display: inline-flex;
+                align-items: center;
+                gap: 10px;
+                min-height: 48px;
+                padding: 14px 24px;
+                border: 1px solid transparent;
+                border-radius: 10px;
+                color: var(--text);
+                font: 700 14px var(--label);
+                letter-spacing: 0.12em;
+                text-decoration: none;
+                text-transform: uppercase;
+                cursor: pointer;
+            }
+
+            .btn.primary {
+                background: var(--red-button);
+                color: #fff;
+            }
+
+            .btn.ghost {
+                border-color: rgb(255 255 255 / 18%);
+                background: rgb(255 255 255 / 3%);
+            }
+
+            .btn:hover {
+                filter: brightness(1.12);
+            }
+
+            .btn:focus-visible,
+            footer a:focus-visible {
+                outline: 2px solid #fff;
+                outline-offset: 3px;
+            }
+
+            footer {
+                position: absolute;
+                right: 0;
+                bottom: 24px;
+                left: 0;
+                display: flex;
+                flex-wrap: wrap;
+                justify-content: center;
+                gap: 8px 26px;
+                padding: 0 16px;
+                font: 700 13px var(--label);
+                letter-spacing: 0.14em;
+                text-transform: uppercase;
+            }
+
+            footer a {
+                color: var(--faint);
+                text-decoration: none;
+            }
+
+            footer a:hover {
+                color: var(--text);
+            }
+
+            [hidden] {
+                display: none !important;
+            }
+
+            @media (prefers-reduced-motion: reduce) {
+                .bar {
+                    display: none;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <div class="art" aria-hidden="true"></div>
+        <div class="num" id="num" aria-hidden="true"></div>
+
+        <main>
+            <img class="logo" src="/_ersatz/logo-n.webp" alt="RL Nexus" width="76" height="76" />
+            <div><span class="chip" id="chip">RL Nexus</span></div>
+            <h1 id="title">Kurze Auszeit.</h1>
+            <p class="lead" id="lead">Unter dieser Adresse antwortet gerade keine Seite von RL Nexus. Versuch es gleich noch einmal oder schau auf der Statusseite nach.</p>
+
+            <div class="retry" id="retry" hidden>
+                <span id="countdown" aria-live="polite"></span>
+                <div class="bar"><i id="bar"></i></div>
+            </div>
+
+            <div class="btns">
+                <a class="btn primary" id="primary" href="https://nexus-emb.de/">Zur Hauptseite</a>
+                <a class="btn ghost" id="secondary" href="https://status.nexus-emb.de/">Status prüfen</a>
+            </div>
+        </main>
+
+        <footer>
+            <a href="https://nexus-emb.de/">Hauptseite</a>
+            <a href="https://dashboard.nexus-emb.de/">Dashboard</a>
+            <a href="https://status.nexus-emb.de/">Status</a>
+        </footer>
+
+        <script src="/_ersatz/ersatz.js" defer></script>
+    </body>
+</html>
