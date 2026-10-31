@@ -1,21 +1,22 @@
-# RL Nexus im Betrieb: Bot samt Dashboard, Admin Dashboard, Hauptseite,
-# Statusseite und MariaDB, jedes als eigener Container. Davor steht nginx auf
-# dem Host mit certbot und reicht jede Domain an ihren Container weiter (je
-# Domain eine Datei unter /etc/nginx/sites-available/, Vorlagen unter nginx/,
-# Anleitung in docs/Hosting.md).
+# RL Nexus im Betrieb: Bot samt Dashboard, Admin Dashboard, Hauptseite und
+# Statusseite, jedes als eigener Container. Davor steht nginx auf dem Host mit
+# certbot und reicht jede Domain an ihren Container weiter (je Domain eine Datei
+# unter /etc/nginx/sites-available/, Vorlagen unter nginx/, Anleitung in
+# docs/Hosting.md). MariaDB und phpMyAdmin laufen direkt auf dem Host
+# (scripts/mariadb-einrichten.sh), Bot und Admin Dashboard erreichen die
+# Datenbank als host.docker.internal.
 #
 #   docker compose -f docker-compose.prod.yml up -d --build              starten
 #   docker compose -f docker-compose.prod.yml logs -f bot                zusehen
 #   docker compose -f docker-compose.prod.yml down                       stoppen
-#   docker compose -f docker-compose.prod.yml --profile tools up -d      PHPMyAdmin Start
 #
 # Die Webseiten liegen auf dem Server unter /var/www und sind dort gebaut
 # (dist), die Container zeigen sie nur. Ohne Eintrag in der .env gelten diese
 # Ordner: ADMIN_DIR, WEBSITE_DIR und STATUS_DIR.
 
-# Fester Projektname: Die Volumes heißen damit immer rlnexus_mariadb-data und
-# rlnexus_images, egal aus welchem Ordner Compose läuft. Ohne diese Zeile sähe
-# die Datenbank nach einem Ordnerwechsel leer aus.
+# Fester Projektname: Das Volume heißt damit immer rlnexus_images, egal aus
+# welchem Ordner Compose läuft. Ohne diese Zeile sähe die Galerie nach einem
+# Ordnerwechsel leer aus.
 name: rlnexus
 
 # Docker hebt die Ausgabe jedes Containers auf, ohne Grenze. So bleiben es
@@ -39,7 +40,7 @@ services:
             CLIENT_SECRET: ${CLIENT_SECRET:?CLIENT_SECRET fehlt in der .env}
             CLIENT_TOKEN: ${CLIENT_TOKEN:?CLIENT_TOKEN fehlt in der .env}
             SERVER_JWT_SECRET: ${SERVER_JWT_SECRET:?SERVER_JWT_SECRET fehlt in der .env}
-            DATABASE_HOST: mariadb
+            DATABASE_HOST: host.docker.internal
             DATABASE_PORT: "3306"
             DATABASE_NAME: ${DATABASE_NAME:-rlnexus}
             DATABASE_USER: ${DATABASE_USER:-rlnexus}
@@ -97,10 +98,11 @@ services:
         # Die Hauptseite geht über nginx auf dem Host, IMAP und SMTP zu Mailcow,
         # beides auf diesem Server. So landen Prüfung und Postfach über den Host
         # dort, auch wenn der Server seine eigene öffentliche Adresse von innen
-        # nicht erreicht.
+        # nicht erreicht. host.docker.internal ist MariaDB auf dem Host.
         extra_hosts:
             - "${SITE_DOMAIN:-nexus-emb.de}:host-gateway"
             - "${MAIL_DOMAIN:-mail.nexus-emb.de}:host-gateway"
+            - "host.docker.internal:host-gateway"
         volumes:
             - ./data/logs:/data/logs:ro
             # Beide gehören UID 1000, dem Nutzer node im Container. Der Container
@@ -111,9 +113,6 @@ services:
             # Die Oberfläche, auf dem Server mit npm run build gebaut. Ein neuer
             # Build ist sofort zu sehen, ohne Neustart.
             - ${ADMIN_DIR:-/var/www/admin.nexus-emb.de}/dist:/app/dist:ro
-        depends_on:
-            mariadb:
-                condition: service_healthy
 
     # Die Hauptseite: nginx im Container zeigt das dist aus WEBSITE_DIR, mit
     # Wartung, Inhalten aus dem Admin Dashboard und Kontaktformular
@@ -153,7 +152,7 @@ services:
         logging: *logging
         env_file: .env
         environment:
-            DATABASE_HOST: mariadb
+            DATABASE_HOST: host.docker.internal
             DATABASE_PORT: "3306"
             SERVER_PORT: "3000"
             # Das Modul Backups reicht an das Admin Dashboard weiter, im Docker-Netz.
@@ -163,6 +162,9 @@ services:
         # hierher. Das Admin Dashboard erreicht den Bot im Docker-Netz unter bot:3000.
         ports:
             - "127.0.0.1:3000:3000"
+        # MariaDB auf dem Host.
+        extra_hosts:
+            - "host.docker.internal:host-gateway"
         volumes:
             - images:/app/src/images
             - ./data/transcripts:/app/transcripts
@@ -170,50 +172,6 @@ services:
             # Clips der Woche: alle Videos jeder Runde samt runde.json - der Bot liest sie selbst.
             - ./data/clips:/app/clips
             - ./data/logs:/app/logs
-        depends_on:
-            mariadb:
-                condition: service_healthy
-
-    mariadb:
-        image: mariadb:11.4
-        container_name: rlnexus-mariadb
-        restart: unless-stopped
-        logging: *logging
-        environment:
-            MARIADB_DATABASE: ${DATABASE_NAME:-rlnexus}
-            MARIADB_USER: ${DATABASE_USER:-rlnexus}
-            MARIADB_PASSWORD: ${DATABASE_PASSWORD:?DATABASE_PASSWORD fehlt in der .env}
-            MARIADB_ROOT_PASSWORD: ${DATABASE_ROOT_PASSWORD:?DATABASE_ROOT_PASSWORD fehlt in der .env}
-            TZ: Europe/Berlin
-        volumes:
-            - mariadb-data:/var/lib/mysql
-        healthcheck:
-            test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
-            interval: 10s
-            timeout: 5s
-            retries: 12
-            start_period: 30s
-
-    # Nur bei Bedarf aktivierbar:
-    # docker compose -f docker-compose.prod.yml --profile tools up -d
-    phpmyadmin:
-        image: phpmyadmin:5
-        container_name: rlnexus-phpmyadmin
-        restart: unless-stopped
-        logging: *logging
-        profiles: ["tools"]
-        environment:
-            PMA_HOST: mariadb
-            PMA_PORT: 3306
-            UPLOAD_LIMIT: 64M
-        ports:
-            # Nur auf dem Server selbst, von außen über einen SSH-Tunnel
-            # (docs/Hosting.md, Schritt 5), wie Portainer.
-            - "127.0.0.1:8080:80"
-        depends_on:
-            mariadb:
-                condition: service_healthy
 
 volumes:
     images:
-    mariadb-data:

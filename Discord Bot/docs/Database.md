@@ -14,7 +14,7 @@ Am einfachsten über Docker — MariaDB und phpMyAdmin stehen dann mit einem Bef
 docker compose up -d
 ```
 
-Der Container legt Datenbank und Nutzer beim ersten Start selbst aus der `.env` an. Die folgenden Schritte braucht nur, wer eine eigene MariaDB betreibt.
+Der Container legt Datenbank und Nutzer beim ersten Start selbst aus der `.env` an. Auf dem Server erledigt das `scripts/mariadb-einrichten.sh` ([Hosting.md](Hosting.md), Schritt 5). Die folgenden Schritte braucht nur, wer eine eigene MariaDB von Hand betreibt.
 
 ### 1. Datenbank und Nutzer anlegen
 
