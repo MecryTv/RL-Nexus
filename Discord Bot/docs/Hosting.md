@@ -254,7 +254,7 @@ MariaDB und phpMyAdmin kommen aus Debian, nicht aus Docker. Das Skript installie
 cd /home/rlnexus && sudo bash scripts/mariadb-einrichten.sh
 ```
 
-Bot und Admin Dashboard erreichen die Datenbank aus ihren Containern als `host.docker.internal` (`extra_hosts` in der Compose-Datei). MariaDB läuft in der Zeitzone `Europe/Berlin`, und Docker startet nach einem Neustart erst, wenn MariaDB steht: Findet der Bot beim Start keine Datenbank, läuft er ohne sie weiter. Beides richtet das Skript ein. Wer von der alten Datenbank im Container kommt: [MariaDB-Umzug.md](MariaDB-Umzug.md).
+Bot und Admin Dashboard erreichen die Datenbank aus ihren Containern als `host.docker.internal` (`extra_hosts` in der Compose-Datei). MariaDB läuft in der Zeitzone `Europe/Berlin` und kennt die Namen der Zeitzonen: Bot und Admin Dashboard setzen beim Verbinden `time_zone = 'Europe/Berlin'`, ohne die Tabellen dafür scheitert jede Anmeldung. Docker startet nach einem Neustart erst, wenn MariaDB steht: Findet der Bot beim Start keine Datenbank, läuft er ohne sie weiter. Alles drei richtet das Skript ein. Wer von der alten Datenbank im Container kommt: [MariaDB-Umzug.md](MariaDB-Umzug.md).
 
 ### Container
 
@@ -529,6 +529,7 @@ Verläufe, Beweisbilder, Clips, Logs, die Inhalte der Hauptseite und die Wartung
 | Admin Dashboard: Inhalte lassen sich nicht speichern | `data/content` gehört nicht UID 1000: `sudo chown -R 1000:1000 data/content data/flags` |
 | `EACCES: permission denied, open '/app/logs/…'` | `sudo chown -R 1000:1000 data` vergessen |
 | Portainer fragt nach einem Setup-Token | Der Token steht im Log: `docker logs portainer 2>&1 \| grep setup_token` |
+| Log sagt `pool failed to retrieve a connection from pool`, und `mariadb` auf dem Server meldet `SELECT COUNT(*) FROM mysql.time_zone_name` = 0 | Die Zeitzonen fehlen. `sudo sh -c 'mariadb-tzinfo-to-sql /usr/share/zoneinfo 2>/dev/null \| mariadb mysql'`, danach `docker compose -f docker-compose.prod.yml restart bot admin` |
 | Log sagt `Datenbank nicht erreichbar (host.docker.internal:3306/…)` | Läuft MariaDB? `sudo systemctl status mariadb`. Lässt ufw die Container durch? `sudo ufw status \| grep 3306` muss `172.16.0.0/12` zeigen. Fehlt etwas davon: `scripts/mariadb-einrichten.sh` noch einmal laufen lassen, an vorhandenen Daten ändert es nichts. Danach `docker compose -f docker-compose.prod.yml restart bot admin` |
 | Nach einem Neustart des Servers läuft der Bot ohne Datenbank | Docker war schneller als MariaDB. `systemctl cat docker` muss `After=mariadb.service` zeigen (`/etc/systemd/system/docker.service.d/nach-mariadb.conf`, legt das Skript an). Bis dahin: `docker compose -f docker-compose.prod.yml restart bot admin` |
 | `db.nexus-emb.de` zeigt 500 oder 502 | 500: `/etc/nginx/db.nexus-emb.de.htpasswd` fehlt (Schritt 6). 502: php-fpm läuft nicht oder der Socket heißt anders, `ls /run/php/` und `fastcgi_pass` in `/etc/nginx/sites-available/db.nexus-emb.de` |

@@ -28,6 +28,7 @@ import fastify from "fastify";
 import RouteManager from "../handler/RouteManager";
 import DashboardApiBackups from "../routes/DashboardApiBackups";
 import { DASHBOARD_PATH, SESSION_COOKIE } from "../constants/Dashboard";
+import RestoreResume from "../events/backups/RestoreResume";
 
 let failures = 0;
 
@@ -1327,6 +1328,33 @@ async function checkReviewFixes(): Promise<void> {
     }
 }
 
+/**
+ * Live am 01.11.: Beim ersten Start mit neuen Migrationen war die Datenbank noch
+ * nicht bereit, als Discord „bereit“ meldete. RestoreResume warf DatabaseUnavailable,
+ * der Guardian beendete den Bot, und das alle zwei Sekunden von vorn.
+ */
+async function checkResumeAtStart(): Promise<void> {
+    console.log("\n  Fortsetzen beim Start");
+
+    let ready = false;
+    let resumed = 0;
+    const slow = {
+        databaseService: { get Ready() { return ready; } },
+        serverBackupService: { Resume: async () => { if (!ready) throw new Error("Keine Datenbankverbindung."); resumed++; return 0; } },
+    } as unknown as BotClient;
+
+    setTimeout(() => (ready = true), 50);
+    const waited = await new RestoreResume(slow).Execute().then(() => true, () => false);
+    check("Wartet auf die Datenbank und setzt danach fort", waited && resumed === 1, `ohne Fehler: ${waited}, fortgesetzt: ${resumed}`);
+
+    const failing = {
+        databaseService: { Ready: true },
+        serverBackupService: { Resume: async () => { throw new Error("Abfrage gescheitert"); } },
+    } as unknown as BotClient;
+    const survived = await new RestoreResume(failing).Execute().then(() => true, () => false);
+    check("Ein Fehler beim Fortsetzen beendet den Bot nicht", survived);
+}
+
 async function main(): Promise<void> {
     console.log("\n💾  Backups für den Discord-Server\n");
 
@@ -1341,6 +1369,7 @@ async function main(): Promise<void> {
     await checkCommand();
     await checkApi();
     await checkReviewFixes();
+    await checkResumeAtStart();
 
     console.log(failures === 0 ? "\n✅ Alle Prüfungen bestanden.\n" : `\n❌ ${failures} Prüfung(en) fehlgeschlagen.\n`);
 

@@ -117,7 +117,11 @@ EOF
 systemctl daemon-reload
 systemctl enable mariadb >/dev/null 2>&1
 systemctl restart mariadb
-echo "$(mariadb -N -e 'SELECT VERSION()') läuft, Zeitzone $(mariadb -N -e 'SELECT @@system_time_zone')."
+# Bot und Admin Dashboard verbinden mit timezone "auto" und setzen dabei
+# time_zone = 'Europe/Berlin'. Ohne diese Tabellen scheitert jede Anmeldung
+# (ER_WRONG_IANA_TIMEZONE). Das Docker-Image lud sie von selbst, Debian nicht.
+mariadb-tzinfo-to-sql /usr/share/zoneinfo 2>/dev/null | mariadb mysql
+echo "$(mariadb -N -e 'SELECT VERSION()') läuft, Zeitzone $(mariadb -N -e 'SELECT @@system_time_zone'), $(mariadb -N -e 'SELECT COUNT(*) FROM mysql.time_zone_name') Zeitzonen geladen."
 
 if $alt; then
     schritt "Stand aus dem Container sichern"
@@ -184,13 +188,22 @@ echo "$db_user darf auf $db_name und $backup_name, von localhost und aus $docker
 bild=$(command -v docker >/dev/null && docker image ls --format '{{.Repository}}:{{.Tag}}' | grep -m1 '^mariadb:' || true)
 if [ -n "$bild" ]; then
     schritt "Verbindung aus einem Container"
-    netz=$(docker network ls --format '{{.Name}}' | grep -x rlnexus_default || echo bridge)
+    # Nicht über das Standardnetz bridge: Hat Docker dort IPv6 (für Mailcow),
+    # versucht der Test zuerst IPv6 und hängt an der Firewall. Das Netz von
+    # Compose hat nur IPv4, ein Testnetz bildet das nach.
+    netz=$(docker network ls --format '{{.Name}}' | grep -x rlnexus_default || true)
+    if [ -z "$netz" ]; then
+        netz=rlnexus-test
+        docker network create "$netz" >/dev/null
+    fi
     geheim=$(mktemp)
-    trap 'rm -f "$geheim"' EXIT
+    trap 'rm -f "$geheim"; [ "$netz" = rlnexus-test ] && docker network rm rlnexus-test >/dev/null 2>&1' EXIT
     printf 'MYSQL_PWD=%s\n' "$db_pass" > "$geheim"
+    # Mit SET time_zone wie Bot und Admin Dashboard: Das scheitert ohne die Zeitzonen-Tabellen.
     if docker run --rm --network "$netz" --add-host host.docker.internal:host-gateway --env-file "$geheim" \
-        "$bild" mariadb -h host.docker.internal -u "$db_user" -N -e 'SELECT 1' "$db_name" >/dev/null; then
-        echo "Aus dem Netz $netz klappt die Anmeldung als $db_user."
+        "$bild" mariadb --connect-timeout=10 -h host.docker.internal -u "$db_user" -N \
+        -e "SET time_zone = 'Europe/Berlin'; SELECT 1" "$db_name" >/dev/null; then
+        echo "Aus dem Netz $netz klappt die Anmeldung als $db_user, samt Zeitzone."
     else
         abbruch "aus dem Netz $netz kommt $db_user nicht an die Datenbank. ufw status und SELECT user, host FROM mysql.user prüfen."
     fi
