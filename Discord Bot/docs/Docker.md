@@ -2,7 +2,7 @@
 
 MariaDB und phpMyAdmin laufen in Containern — statt XAMPP. Die Beschreibung steht in `docker-compose.yml` im Projekt-Root.
 
-> **Nur für den eigenen Rechner.** Auf dem Server laufen Bot, Admin Dashboard und Datenbank aus `docker-compose.prod.yml`, davor nginx direkt auf dem Server mit Hauptseite und Statusseite. Das steht in [Hosting.md](Hosting.md).
+> **Nur für den eigenen Rechner.** Auf dem Server laufen Bot, Admin Dashboard, Hauptseite und Statusseite aus `docker-compose.prod.yml`, davor nginx direkt auf dem Server. MariaDB und phpMyAdmin stehen dort ohne Docker, aus den Paketen von Debian. Das steht in [Hosting.md](Hosting.md).
 
 > **Warum der Wechsel:** die Aria-Systemtabellen von XAMPP (`mysql.db`, `mysql.global_priv`) gingen wiederholt kaputt und mussten von Hand repariert werden. Der Container startet jedes Mal mit demselben, geprüften Zustand.
 

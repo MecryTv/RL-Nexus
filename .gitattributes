@@ -1,0 +1,2 @@
+# Skripte für den Server: Mit CRLF bricht bash dort ab.
+*.sh text eol=lf

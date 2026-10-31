@@ -163,7 +163,13 @@ Unter **Bot → Backups** sichert das Admin Dashboard jeden Discord-Server einze
 - **Zurückladen** in drei Schritten: Backup wählen, Bereiche an- und ausschalten, prüfen. Bestätigt wird mit dem Namen des Servers. Vorher legt der Server ein Backup vom jetzigen Stand an, mit dem sich alles rückgängig machen lässt. Alle gewählten Bereiche laufen in **einer** Transaktion: Scheitert etwas, bleibt alles, wie es war, und die Meldung nennt den Bereich. Danach sagt das Dashboard dem Bot Bescheid (`POST /dcapi/admin/guilds/:id/restored`, 30 s): Er vergisst seinen Cache, löscht eigene Panels, die zu nichts mehr gehören, und postet fehlende neu. Antwortet er nicht, bleibt das Zurückgeladene trotzdem stehen, „Panels jetzt prüfen“ holt das später nach.
 - **Fehlschlag:** nur im Admin Dashboard, auf *Backups* und als gelber Hinweis in der *Übersicht*. Keine Mail, keine DM.
 
-Hat der Datenbank-Nutzer keine Rechte auf die zweite Datenbank, zeigt die Seite das als Hinweis, und es wird nichts gesichert. Einmal als root anlegen und freigeben, auf dem VPS:
+Hat der Datenbank-Nutzer keine Rechte auf die zweite Datenbank, zeigt die Seite das als Hinweis, und es wird nichts gesichert. Auf dem VPS legt `scripts/mariadb-einrichten.sh` im Ordner des Bots sie samt Rechten an. Ein zweiter Lauf ändert an vorhandenen Daten nichts:
+
+```bash
+cd /home/rlnexus && sudo bash scripts/mariadb-einrichten.sh
+```
+
+Lokal im Container von Hand:
 
 ```bash
 docker exec -it rlnexus-mariadb mariadb -uroot -p -e "CREATE DATABASE IF NOT EXISTS rlnexus_backups CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci; GRANT ALL PRIVILEGES ON rlnexus_backups.* TO 'rlnexus'@'%'; FLUSH PRIVILEGES;"

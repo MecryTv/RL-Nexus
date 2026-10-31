@@ -1,6 +1,6 @@
 # Auf den Server bringen
 
-Vom leeren Debian 13 bis zu allem, was zu RL Nexus gehört: Hauptseite unter `https://nexus-emb.de`, Bot samt Dashboard unter `https://dashboard.nexus-emb.de`, Admin Dashboard unter `https://admin.nexus-emb.de`, Statusseite unter `https://status.nexus-emb.de`. Jede Seite läuft als eigener Container aus einer Compose-Datei, dazu die Datenbank: In Portainer oder mit `docker ps` stehen `rlnexus-website`, `rlnexus-status`, `rlnexus-admin`, `rlnexus-bot` und `rlnexus-mariadb`. Die Dateien der Webseiten liegen trotzdem unter `/var/www` und werden dort gebaut, die Container zeigen sie nur. Davor steht nginx direkt auf dem Server: Er hat die Ports 80 und 443, holt mit certbot die Zertifikate und reicht jede Domain an ihren Container weiter. Mailcow (`mail.`) und SnappyMail (`webmail.`) stehen genauso dahinter.
+Vom leeren Debian 13 bis zu allem, was zu RL Nexus gehört: Hauptseite unter `https://nexus-emb.de`, Bot samt Dashboard unter `https://dashboard.nexus-emb.de`, Admin Dashboard unter `https://admin.nexus-emb.de`, Statusseite unter `https://status.nexus-emb.de`. Jede Seite läuft als eigener Container aus einer Compose-Datei: In Portainer oder mit `docker ps` stehen `rlnexus-website`, `rlnexus-status`, `rlnexus-admin` und `rlnexus-bot`. MariaDB und phpMyAdmin (`https://db.nexus-emb.de`) laufen ohne Docker direkt auf dem Server, aus den Paketen von Debian. Die Dateien der Webseiten liegen trotzdem unter `/var/www` und werden dort gebaut, die Container zeigen sie nur. Davor steht nginx direkt auf dem Server: Er hat die Ports 80 und 443, holt mit certbot die Zertifikate und reicht jede Domain an ihren Container weiter. Mailcow (`mail.`) und SnappyMail (`webmail.`) stehen genauso dahinter.
 
 Für den eigenen Rechner ist das der falsche Text: dort laufen nur MariaDB und phpMyAdmin im Container, der Rest über `npm run dev`. Das steht in [Docker.md](Docker.md).
 
@@ -10,6 +10,7 @@ Internet ──► nginx auf dem Host (80, 443, Zertifikate über certbot)
               ├─ status.nexus-emb.de ─────► 127.0.0.1:8091  rlnexus-status
               ├─ admin.nexus-emb.de ──────► 127.0.0.1:3001  rlnexus-admin
               ├─ dashboard.nexus-emb.de ──► 127.0.0.1:3000  rlnexus-bot (/dcapi/admin/* ist von außen zu)
+              ├─ db.nexus-emb.de ─────────► php-fpm         phpMyAdmin (/usr/share/phpmyadmin)
               ├─ mail., autodiscover. ────► 127.0.0.1:8081  Mailcow
               └─ webmail.nexus-emb.de ────► 127.0.0.1:8082  SnappyMail
 
@@ -17,8 +18,9 @@ rlnexus-website ──► /var/www/nexus-emb.de/dist, data/content, data/flags
                     /api/contact ──► admin:3001 (Kontaktformular)
 rlnexus-status ───► /var/www/status.nexus-emb.de/dist
                     /public/status ──► admin:3001
-rlnexus-admin ────► /var/www/admin.nexus-emb.de/dist (Oberfläche), mariadb,
+rlnexus-admin ────► /var/www/admin.nexus-emb.de/dist (Oberfläche),
                     bot:3000/dcapi/admin/*, dist der Hauptseite (Standardinhalte)
+rlnexus-bot, rlnexus-admin ──► host.docker.internal:3306  MariaDB auf dem Host
 ```
 
 | Was | Wo |
@@ -27,7 +29,8 @@ rlnexus-admin ────► /var/www/admin.nexus-emb.de/dist (Oberfläche), ma
 | Statusseite | Container `rlnexus-status` (nginx), zeigt `/var/www/status.nexus-emb.de/dist`, Port nur auf `127.0.0.1:8091` |
 | Admin Dashboard | Container `rlnexus-admin`: API und die Oberfläche aus `/var/www/admin.nexus-emb.de/dist` (auf dem Server gebaut), Port nur auf `127.0.0.1:3001` |
 | Bot und Bot-Dashboard | Container `rlnexus-bot`, Port nur auf `127.0.0.1:3000` |
-| Datenbank | Container `rlnexus-mariadb`, nur im Netz von Compose |
+| Datenbank | MariaDB 11.8 direkt auf dem Server, Daten unter `/var/lib/mysql`. Port 3306 lässt ufw nur aus den Docker-Netzen durch. Eingerichtet von `scripts/mariadb-einrichten.sh` |
+| phpMyAdmin | `https://db.nexus-emb.de`, aus Debian mit php-fpm, hinter Name und Passwort von nginx |
 | Zertifikate, Weiterleitungen | nginx auf dem Host, je Domain eine Datei unter `/etc/nginx/sites-available/` (Vorlagen: `nginx/` in diesem Repo), certbot |
 | Mailcow, SnappyMail | eigene Container außerhalb dieses Repos, Weboberflächen nur auf `127.0.0.1:8081` und `127.0.0.1:8082` |
 | Galerie-Bilder | Docker-Volume `rlnexus_images` |
@@ -43,10 +46,10 @@ Im Folgenden steht **`/home/rlnexus`** für den Ordner des Bots. Die nginx-Konfi
 ## Vorher
 
 * **Debian 13 (trixie)**, ein Konto mit `sudo`.
-* **DNS** auf die IP des Servers: `nexus-emb.de`, `www`, `dashboard`, `admin`, `status` und `webmail` (dürfen hinter dem Proxy von Cloudflare liegen), dazu `mail`, `autodiscover` und `autoconfig` als **„Nur DNS“**: Über den Proxy gehen nur Webseiten, kein SMTP und kein IMAP. Prüfen:
+* **DNS** auf die IP des Servers: `nexus-emb.de`, `www`, `dashboard`, `admin`, `status`, `db` und `webmail` (dürfen hinter dem Proxy von Cloudflare liegen), dazu `mail`, `autodiscover` und `autoconfig` als **„Nur DNS“**: Über den Proxy gehen nur Webseiten, kein SMTP und kein IMAP. Prüfen:
 
     ```bash
-    for name in nexus-emb.de www.nexus-emb.de dashboard.nexus-emb.de admin.nexus-emb.de status.nexus-emb.de webmail.nexus-emb.de mail.nexus-emb.de; do echo "$name: $(dig +short "$name" | tail -1)"; done
+    for name in nexus-emb.de www.nexus-emb.de dashboard.nexus-emb.de admin.nexus-emb.de status.nexus-emb.de db.nexus-emb.de webmail.nexus-emb.de mail.nexus-emb.de; do echo "$name: $(dig +short "$name" | tail -1)"; done
     ```
 
     Hinter Cloudflare stehen dort Adressen von Cloudflare, bei `mail` die des Servers. Kommt bei `dig +short AAAA nexus-emb.de` eine fremde Adresse (oft die Parkseite des Anbieters), den AAAA-Eintrag löschen.
@@ -211,8 +214,8 @@ Was im Betrieb wirklich zählt. Die vollständige Liste steht in [Environment.md
 | `SERVER_PUBLIC_URL` | `https://dashboard.nexus-emb.de`. Daraus baut der Bot die Redirect-URI und die Bild-URLs für Discord |
 | `SITE_PUBLIC_URL` | `https://nexus-emb.de` |
 | `SERVER_JWT_SECRET` | Mindestens 32 Zeichen, siehe unten. Das Admin Dashboard leitet seine Schlüssel daraus ab |
-| `DATABASE_NAME`, `DATABASE_USER`, `DATABASE_PASSWORD`, `DATABASE_ROOT_PASSWORD` | Frei wählbar. MariaDB legt Datenbank und Nutzer beim **ersten** Start daraus an |
-| `DATABASE_HOST`, `DATABASE_PORT`, `SERVER_PORT` | Egal, was hier steht: Compose setzt `mariadb`, `3306` und `3000` als echte Umgebungsvariablen, und die stechen die Datei |
+| `DATABASE_NAME`, `DATABASE_USER`, `DATABASE_PASSWORD` | Frei wählbar. `scripts/mariadb-einrichten.sh` legt Datenbank und Nutzer daraus an (Schritt 5). `DATABASE_ROOT_PASSWORD` braucht nur Docker auf dem eigenen Rechner |
+| `DATABASE_HOST`, `DATABASE_PORT`, `SERVER_PORT` | Egal, was hier steht: Compose setzt `host.docker.internal`, `3306` und `3000` als echte Umgebungsvariablen, und die stechen die Datei |
 | `GUILD_MEMBER_INTENT` | `"true"`, wenn das [Welcome System](Welcome.md) laufen soll, und dann auch im Developer Portal anschalten |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM` | Ein Mailcow-Postfach, etwa `support@nexus-emb.de` mit `mail.nexus-emb.de` und Port 465. Darüber schickt der Bot `/fehler`. Leer: `/fehler` verschickt nichts. Das Admin Dashboard nimmt die Werte nur als Ersatz, siehe `CONTACT_MAIL` |
 | `CONTACT_MAIL`, `CONTACT_WEBHOOK_URL` | Wohin das Kontaktformular geht: an diese Adresse (leer: `support@nexus-emb.de`) und als Hinweis in einen Discord-Kanal. Verschickt wird über das Postfach mit dieser Adresse, das man im Admin Dashboard unter *Postfächer verwalten* anlegt (Schritt 8). Gibt es das nicht, nimmt das Admin Dashboard `SMTP_*`, ohne beides lehnt das Formular jede Nachricht mit 503 ab |
@@ -243,6 +246,18 @@ docker compose -f docker-compose.prod.yml config --quiet && echo ok
 
 ## 5. Starten
 
+### Datenbank
+
+MariaDB und phpMyAdmin kommen aus Debian, nicht aus Docker. Das Skript installiert beides, legt Datenbank, Backup-Datenbank und Nutzer mit den Werten aus der `.env` an und lässt Port 3306 nur aus den Docker-Netzen durch. Es verlangt deshalb eine laufende Firewall: auf einem neuen Server zuerst den Abschnitt [Firewall](#firewall) aus Schritt 6.
+
+```bash
+cd /home/rlnexus && sudo bash scripts/mariadb-einrichten.sh
+```
+
+Bot und Admin Dashboard erreichen die Datenbank aus ihren Containern als `host.docker.internal` (`extra_hosts` in der Compose-Datei). MariaDB läuft in der Zeitzone `Europe/Berlin`, und Docker startet nach einem Neustart erst, wenn MariaDB steht: Findet der Bot beim Start keine Datenbank, läuft er ohne sie weiter. Beides richtet das Skript ein. Wer von der alten Datenbank im Container kommt: [MariaDB-Umzug.md](MariaDB-Umzug.md).
+
+### Container
+
 ```bash
 docker compose -f docker-compose.prod.yml up -d --build
 docker compose -f docker-compose.prod.yml logs -f bot
@@ -264,15 +279,10 @@ Die Migrationen laufen beim Verbinden von selbst, eine eigene Einrichtung der Da
 | `docker compose -f docker-compose.prod.yml logs -f bot` | Log mitlesen, ebenso `admin`, `website` und `status` |
 | `docker compose -f docker-compose.prod.yml restart bot` | Neu starten (geht auch im Admin Dashboard) |
 | `docker compose -f docker-compose.prod.yml down` | Stoppen, Daten bleiben |
-| `docker compose -f docker-compose.prod.yml --profile tools up -d` | phpMyAdmin dazu, nur über einen SSH-Tunnel erreichbar (unten) |
+| `sudo systemctl status mariadb` | Zustand der Datenbank, Log mit `sudo journalctl -u mariadb` |
+| `sudo mariadb` | Konsole als root, ohne Passwort |
 
-phpMyAdmin hängt nur an `127.0.0.1:8080`. Der Weg dorthin führt wie bei Portainer über einen SSH-Tunnel, vom eigenen Rechner aus:
-
-```bash
-ssh -L 8080:127.0.0.1:8080 root@mail.nexus-emb.de
-```
-
-Danach im Browser <http://localhost:8080> öffnen. Fertig damit: `docker compose -f docker-compose.prod.yml stop phpmyadmin`.
+phpMyAdmin steht unter `https://db.nexus-emb.de`, sobald nginx die Seite kennt (Schritt 6). Angemeldet wird mit `DATABASE_USER` und `DATABASE_PASSWORD`, root kommt dort mit Absicht nicht hinein.
 
 ---
 
@@ -318,16 +328,26 @@ Die Konfiguration liegt wie bei Debian üblich unter `/etc/nginx/sites-available
 | `nginx/dashboard.nexus-emb.de.conf` | `/etc/nginx/sites-available/dashboard.nexus-emb.de` | Bot-Dashboard, Container `rlnexus-bot` auf `127.0.0.1:3000` |
 | `nginx/mail.nexus-emb.de.conf` | `/etc/nginx/sites-available/mail.nexus-emb.de` | Mailcow auf `127.0.0.1:8081`, dazu `autodiscover.` und `autoconfig.` |
 | `nginx/webmail.nexus-emb.de.conf` | `/etc/nginx/sites-available/webmail.nexus-emb.de` | SnappyMail auf `127.0.0.1:8082` |
+| `nginx/db.nexus-emb.de.conf` | `/etc/nginx/sites-available/db.nexus-emb.de` | phpMyAdmin über php-fpm, aus Schritt 5 |
 
 Die beiden Dateien unter `nginx/container/` gehören nicht hierher: Sie sind die Konfiguration von nginx **in** den Containern von Hauptseite und Statusseite, Compose hängt sie selbst ein.
 
 Jede Datei steht für sich und lässt sich einzeln an- und abschalten. Die gemeinsamen Teile (Cloudflare-Netze, gekürzte IP im Protokoll) bringt jede selbst mit, unter eigenen Namen.
 
+Vor phpMyAdmin fragt nginx nach Name und Passwort. `DEINNAME` ersetzen, `openssl` fragt das Passwort zweimal. Nimm ein anderes als `DATABASE_PASSWORD`:
+
 ```bash
 sudo apt install -y nginx certbot python3-certbot-nginx
+printf 'DEINNAME:%s\n' "$(openssl passwd -6)" | sudo tee /etc/nginx/db.nexus-emb.de.htpasswd >/dev/null
+sudo chown root:www-data /etc/nginx/db.nexus-emb.de.htpasswd && sudo chmod 640 /etc/nginx/db.nexus-emb.de.htpasswd
+```
+
+Dann alle Seiten:
+
+```bash
 sudo rm -f /etc/nginx/sites-enabled/default
 cd /home/rlnexus/nginx
-for site in nexus-emb.de dashboard.nexus-emb.de admin.nexus-emb.de status.nexus-emb.de mail.nexus-emb.de webmail.nexus-emb.de; do
+for site in nexus-emb.de dashboard.nexus-emb.de admin.nexus-emb.de status.nexus-emb.de db.nexus-emb.de mail.nexus-emb.de webmail.nexus-emb.de; do
   sudo cp "$site.conf" "/etc/nginx/sites-available/$site"
   sudo ln -sf "/etc/nginx/sites-available/$site" "/etc/nginx/sites-enabled/$site"
 done
@@ -346,6 +366,7 @@ sudo certbot --nginx -d dashboard.nexus-emb.de
 sudo certbot --nginx -d admin.nexus-emb.de
 sudo certbot --nginx -d status.nexus-emb.de
 sudo certbot --nginx -d webmail.nexus-emb.de
+sudo certbot --nginx -d db.nexus-emb.de
 ```
 
 `mail.nexus-emb.de` fehlt hier mit Absicht: Dort nimmt nginx das Zertifikat von Mailcow. Verlängert wird automatisch, von certbot (`certbot.timer`) und von Mailcow.
@@ -358,6 +379,7 @@ sudo certbot --nginx -d webmail.nexus-emb.de
 * **Hauptseite und Statusseite** (Container, `nginx/container/`) kommen aus ihrem `dist`, mit fertig gepackten `.gz`-Dateien. `/content/*` kommt aus `data/content`, sonst aus dem Stand des Builds. `/api/contact` geht über das Docker-Netz an das Admin Dashboard (höchstens 32 KB), `/public/status` ebenso. Sonst erreicht über diese beiden Domains niemand den Admin-Server.
 * **Bot-Dashboard:** alles an `127.0.0.1:3000`, Anfragen bis 10 MB. `/dcapi/admin/*` antwortet von außen mit 404, diese Routen erreicht nur das Admin Dashboard im Docker-Netz. Puls und Live Tickets kommen ohne Puffer durch, weil der Bot `X-Accel-Buffering: no` schickt.
 * **Admin Dashboard:** alles an `127.0.0.1:3001`, Anfragen bis 25 MB (Anhänge im Postfach). Der Container zeigt die Oberfläche aus `/var/www/admin.nexus-emb.de/dist` und beantwortet `/api/*`. `/internal/*` antwortet von außen mit 404: Das ruft nur der Bot im Docker-Netz auf, für das Modul Backups.
+* **phpMyAdmin:** zwei Anmeldungen hintereinander, erst nginx (`/etc/nginx/db.nexus-emb.de.htpasswd`), dann phpMyAdmin mit `DATABASE_USER`. Ohne die erste sieht niemand phpMyAdmin überhaupt. Einrichtungsassistent und Innereien (`/setup`, `/libraries` …) antworten mit 404, Importe gehen bis 64 MB.
 * **Mailcow und SnappyMail:** alles an `127.0.0.1:8081` und `127.0.0.1:8082`. Mailcow bekommt die Prüfung von Let's Encrypt auf Port 80 durchgereicht und lange Zeitlimits für ActiveSync.
 * **Sicherheitsheader:** Content-Security-Policy je Domain, HSTS, `nosniff`, Referrer-Policy. Für Hauptseite und Statusseite setzen sie die Container, sonst nginx auf dem Host. Die Hauptseite darf nur das Admin Dashboard einbetten (`frame-ancestors`), für die Live-Vorschau im Modul-Editor, und das Admin Dashboard darf die Hauptseite laden (`frame-src`).
 * **Wartungsmodus:** Liegt `data/flags/wartung-webseite` oder `data/flags/wartung-dashboard`, zeigt der Container der Hauptseite oder nginx auf dem Host (Bot-Dashboard) die Wartungsseite mit Status 503. Schreibende Anfragen und Skripte, die JSON wollen, bekommen stattdessen einen Satz als JSON. Eingeschaltet wird im Admin Dashboard unter *Developer → Wartung*, mit Überschrift, voraussichtlichem Ende und Fahrplan. Das Admin Dashboard schreibt dazu `data/flags/wartung.json`, die Seite liest sie als `/wartung/status.json` und zeigt Restzeit, Ring und Fahrplan. Sie fragt alle 30 Sekunden nach und lädt sich neu, sobald die Wartung vorbei ist. Es wirkt sofort, ohne Neustart.
@@ -365,7 +387,7 @@ sudo certbot --nginx -d webmail.nexus-emb.de
   * Die Seite selbst ist `public/wartung.html` im Ordner des Admin Dashboards, Skript, Logo und Banner liegen in `public/wartung/`.
   * Notweg ohne Admin Dashboard: `touch data/flags/wartung-webseite` (bzw. `-dashboard`) schaltet die Wartung ein, dann ohne Zeitstrahl („Gleich wieder da.“). Löschen schaltet sie aus. Lief sie mit Zeitstrahl, auch `data/flags/wartung.json` löschen, sonst zeigt das Admin Dashboard sie weiter als laufend. Offene Wartungsseiten laden trotzdem neu: Sie fragen alle 30 Sekunden ihre eigene Adresse und merken, wenn kein 503 mehr kommt.
   * Lokal ohne nginx spiegeln der Bot (`npm run dev`) und die Webseite (`npm run dev`) dasselbe. Sie lesen `../Admin Dashboard/data/flags`, abweichend per `FLAGS_DIR`.
-* **Cloudflare:** Die echte Adresse der Besucher kommt aus `CF-Connecting-IP`, aber nur bei Anfragen aus den Netzen von Cloudflare. Die Liste steht in jeder der sechs Dateien unter `/etc/nginx/sites-available/` und ändert sich selten. Neue Netze stehen unter <https://www.cloudflare.com/ips/>.
+* **Cloudflare:** Die echte Adresse der Besucher kommt aus `CF-Connecting-IP`, aber nur bei Anfragen aus den Netzen von Cloudflare. Die Liste steht in jeder der sieben Dateien unter `/etc/nginx/sites-available/` und ändert sich selten. Neue Netze stehen unter <https://www.cloudflare.com/ips/>.
 * **Datenschutz:** Im Zugriffsprotokoll steht die IP gekürzt (bei IPv4 ohne das letzte Stück, bei IPv6 nur die ersten drei Blöcke). Debian löscht die Protokolle nach 14 Tagen (`/etc/logrotate.d/nginx`). So steht es in der Datenschutzerklärung der Hauptseite. Die Container schreiben kein Zugriffsprotokoll und sehen die Adressen der Besucher gar nicht, nur die des Docker-Netzes.
 
 nginx setzt `X-Forwarded-For` und `X-Forwarded-Proto` (`/etc/nginx/proxy_params`), die Container von Hauptseite und Statusseite reichen beides weiter. Bot und Admin Dashboard lesen daraus die echte IP des Aufrufers, die Rate Limits zählen also weiter jede IP für sich.
@@ -380,7 +402,7 @@ sudo ufw allow 443/tcp
 sudo ufw enable
 ```
 
-Die Mail-Ports öffnet die Anleitung von Mailcow. Alle Container der Seiten, die Weboberfläche von Mailcow, Portainer und phpMyAdmin hängen an `127.0.0.1`, die Datenbank hat gar keinen Port nach außen. Bei SnappyMail lohnt ein Blick in `sudo ss -tlnp | grep 8082`: Steht dort `0.0.0.0:8082`, ist es von außen erreichbar, siehe den Kasten hier drunter.
+Die Mail-Ports öffnet die Anleitung von Mailcow. Alle Container der Seiten, die Weboberfläche von Mailcow und Portainer hängen an `127.0.0.1`. MariaDB lauscht auf allen Adressen, damit die Container sie erreichen. Die Regel dazu setzt `scripts/mariadb-einrichten.sh`: Port 3306 nur aus `172.16.0.0/12`, den Docker-Netzen. Der Nutzer der Datenbank darf sich ohnehin nur von dort und von `localhost` anmelden. Bei SnappyMail lohnt ein Blick in `sudo ss -tlnp | grep 8082`: Steht dort `0.0.0.0:8082`, ist es von außen erreichbar, siehe den Kasten hier drunter.
 
 > **ufw schützt keinen veröffentlichten Docker-Port.** Docker schreibt seine eigenen iptables-Regeln und hängt sie vor die von ufw: was mit `-p 9443:9443` heraussteht, steht heraus, auch wenn ufw den Port nicht erlaubt. Die Bindung an `127.0.0.1` ist die Sperre, nicht die Firewall.
 
@@ -406,7 +428,8 @@ Unter *Bot → Privileged Gateway Intents* gehört an, was in der `.env` auf `"t
 ## 8. Steht es?
 
 ```bash
-docker compose -f docker-compose.prod.yml ps                  # fünf Container "Up", Bot und Admin "healthy"
+docker compose -f docker-compose.prod.yml ps                  # vier Container "Up", Bot und Admin "healthy"
+systemctl is-active mariadb                                   # active
 curl -sI https://nexus-emb.de | head -1                       # HTTP/2 200
 curl -sI https://www.nexus-emb.de | grep -i location          # https://nexus-emb.de/
 curl -s https://dashboard.nexus-emb.de/dcapi/health           # 401 ohne Token, das ist richtig so
@@ -416,6 +439,7 @@ curl -sI https://status.nexus-emb.de | head -1                # HTTP/2 200
 curl -s https://status.nexus-emb.de/public/status | head -c 40   # {"checkedAt":…
 curl -sI https://mail.nexus-emb.de | head -1                  # HTTP/2 200
 curl -sI https://webmail.nexus-emb.de | head -1               # HTTP/2 200
+curl -s -o /dev/null -w "%{http_code}\n" https://db.nexus-emb.de/   # 401, nginx fragt nach Name und Passwort
 ```
 
 Die `401` beweist, dass der Bot antwortet: die Route verlangt einen Bearer-Token ([Server.md](Server.md#token-pflicht)). Zum Schluss beide Dashboards im Browser öffnen und einloggen. Landest du jeweils wieder auf der Startseite, stimmen Redirect-URI und `CLIENT_SECRET`. Im Admin Dashboard zeigt die Übersicht, ob Bot und Webseite antworten.
@@ -428,16 +452,14 @@ Das Postfach im Admin Dashboard füllt sich erst, wenn jemand mit der Developer-
 
 ## Updates
 
-**Einstellungen gehen bei einem Update nicht verloren.** Alles, was auf den Servern eingestellt ist (Module, Nachrichten, Level, Tickets …), steht in MariaDB im Volume `rlnexus_mariadb-data`. Der Projektname ist in `docker-compose.prod.yml` fest auf `rlnexus` gesetzt, das Volume heißt also immer gleich, egal aus welchem Ordner gestartet wird. Neuer Code wird drübergelegt, die Datenbank bleibt. Gefährlich sind nur diese Befehle, und keiner davon gehört zu einem Update:
+**Einstellungen gehen bei einem Update nicht verloren.** Alles, was auf den Servern eingestellt ist (Module, Nachrichten, Level, Tickets …), steht in MariaDB auf dem Server unter `/var/lib/mysql`. Docker kommt da nicht dran: Auch `docker compose … down -v` oder `docker system prune --volumes` lassen die Datenbank stehen. Neuer Code wird drübergelegt, die Datenbank bleibt. Ein Volume gibt es noch für die Galerie (`rlnexus_images`), dafür gilt weiter: kein `down -v`, kein `docker volume prune`.
 
-- `docker compose … down -v`: Das `-v` löscht die Volumes und damit die Datenbank.
-- `docker volume rm …` oder `docker volume prune` / `docker system prune --volumes`
-- Den Container `rlnexus-mariadb` mit einem anderen Volume oder einem anderen Projektnamen starten. Dann beginnt MariaDB mit einer leeren Datenbank.
+MariaDB und phpMyAdmin aktualisiert `apt` mit dem Rest des Systems (`sudo apt update && sudo apt upgrade`).
 
 Vor jedem Update trotzdem einmal sichern. Am einfachsten im Admin Dashboard unter *Bot → Backups* mit „Runde jetzt starten“. Das sichert jeden Server und lässt sich dort je Server und Bereich zurückladen. Dazu kommt die ganze Datenbank als Datei (siehe [Sicherungen](#sicherungen)):
 
 ```bash
-docker exec rlnexus-mariadb sh -c 'mariadb-dump -u root -p"$MARIADB_ROOT_PASSWORD" --all-databases' > /root/vor-dem-update.sql
+sudo mariadb-dump --single-transaction --databases rlnexus rlnexus_backups > /root/vor-dem-update.sql
 ```
 
 `pakete-bauen.cmd` laufen lassen und nur das Paket hochladen, das sich geändert hat. Danach auf dem Server:
@@ -462,10 +484,10 @@ docker compose -f docker-compose.prod.yml restart bot
 
 ## Sicherungen
 
-Die Datenbank, ohne das Passwort in die Shell-Historie zu schreiben:
+Die Datenbank, als root über `sudo`, ganz ohne Passwort:
 
 ```bash
-docker exec rlnexus-mariadb sh -c 'mariadb-dump -u root -p"$MARIADB_ROOT_PASSWORD" rlnexus' > sicherung.sql
+sudo mariadb-dump --single-transaction rlnexus > sicherung.sql
 ```
 
 Die Galerie liegt im Volume:
@@ -499,7 +521,7 @@ Verläufe, Beweisbilder, Clips, Logs, die Inhalte der Hauptseite und die Wartung
 | Admin Dashboard: Seite lädt, aber „Der Admin-Server antwortet gerade nicht“ | Die API läuft nicht: `docker compose -f docker-compose.prod.yml ps` im Ordner des Bots |
 | `502 Bad Gateway` | Der Container dahinter läuft nicht oder startet noch: `docker compose -f docker-compose.prod.yml ps` |
 | certbot: `unauthorized` oder `timeout` | DNS zeigt noch nicht auf den Server, Port 80 ist zu, oder ein fremder AAAA-Eintrag hängt an der Domain |
-| Im Zugriffsprotokoll nur Adressen von Cloudflare | Cloudflare hat neue Netze. Die Liste in den sechs Dateien unter `/etc/nginx/sites-available/` mit <https://www.cloudflare.com/ips/> abgleichen |
+| Im Zugriffsprotokoll nur Adressen von Cloudflare | Cloudflare hat neue Netze. Die Liste in den sieben Dateien unter `/etc/nginx/sites-available/` mit <https://www.cloudflare.com/ips/> abgleichen |
 | `Used disallowed intents` | In der `.env` steht ein Intent auf `"true"`, im Developer Portal ist es aus |
 | Bot-Dashboard antwortet `503` ohne Wartung | `CLIENT_SECRET` ist leer |
 | `Invalid OAuth2 redirect_uri` | Die Redirect-URI im Portal weicht ab, auch ein `/` am Ende zählt |
@@ -507,4 +529,6 @@ Verläufe, Beweisbilder, Clips, Logs, die Inhalte der Hauptseite und die Wartung
 | Admin Dashboard: Inhalte lassen sich nicht speichern | `data/content` gehört nicht UID 1000: `sudo chown -R 1000:1000 data/content data/flags` |
 | `EACCES: permission denied, open '/app/logs/…'` | `sudo chown -R 1000:1000 data` vergessen |
 | Portainer fragt nach einem Setup-Token | Der Token steht im Log: `docker logs portainer 2>&1 \| grep setup_token` |
-| Bot startet, Datenbank nicht erreichbar | `docker compose -f docker-compose.prod.yml logs mariadb`, beim ersten Start braucht sie eine halbe Minute |
+| Log sagt `Datenbank nicht erreichbar (host.docker.internal:3306/…)` | Läuft MariaDB? `sudo systemctl status mariadb`. Lässt ufw die Container durch? `sudo ufw status \| grep 3306` muss `172.16.0.0/12` zeigen. Fehlt etwas davon: `scripts/mariadb-einrichten.sh` noch einmal laufen lassen, an vorhandenen Daten ändert es nichts. Danach `docker compose -f docker-compose.prod.yml restart bot admin` |
+| Nach einem Neustart des Servers läuft der Bot ohne Datenbank | Docker war schneller als MariaDB. `systemctl cat docker` muss `After=mariadb.service` zeigen (`/etc/systemd/system/docker.service.d/nach-mariadb.conf`, legt das Skript an). Bis dahin: `docker compose -f docker-compose.prod.yml restart bot admin` |
+| `db.nexus-emb.de` zeigt 500 oder 502 | 500: `/etc/nginx/db.nexus-emb.de.htpasswd` fehlt (Schritt 6). 502: php-fpm läuft nicht oder der Socket heißt anders, `ls /run/php/` und `fastcgi_pass` in `/etc/nginx/sites-available/db.nexus-emb.de` |
