@@ -944,7 +944,11 @@ export function renderBackupList(guildId: string): void {
 
             cancel.addEventListener("click", async () => {
                 cancel.disabled = true;
-                await call("", { action: "cancel" });
+
+                // Nach den Schritten am Server lässt sich nichts mehr anhalten (Review M6).
+                const answer = await call<{ ok: boolean }>("", { action: "cancel" });
+
+                if (answer && !answer.ok) toast("info", "Nicht mehr abzubrechen", "Die Schritte am Server sind durch, der Bot räumt nur noch auf.");
             });
 
             return [

@@ -118,6 +118,9 @@ function ChannelOptions(channel: ISnapChannel, parent: string | null, maxBitrate
 export async function RunOps(guild: Guild, job: IRestoreJob, deps: IRunDeps): Promise<"finished" | "cancelled"> {
     const failed = [...job.failed];
     const names = Names(job.ops);
+    /** Welcher Schritt gerade läuft - für Zeilen in „Geht nicht“, die den Schritt nicht abbrechen (Review M12). */
+    let current = job.done;
+    const note = (op: IRestoreOp, reason: string): void => void failed.push({ op: current, reason: `${Label(op, names)}: ${reason}` });
     const lives = (kind: IdKind, id: string): boolean => (kind === "role" ? guild.roles : kind === "channel" ? guild.channels : kind === "emoji" ? guild.emojis : guild.stickers).cache.has(id);
 
     /** Die jetzige ID: lebt sie selbst, oder lebt das, was an ihrer Stelle angelegt wurde. */
@@ -147,6 +150,15 @@ export async function RunOps(guild: Guild, job: IRestoreJob, deps: IRunDeps): Pr
 
     const roles = (ids: readonly string[]): string[] => ids.map((id) => resolve("role", id)).filter((id): id is string => id !== null);
 
+    /** Review M14: Fallen alle Rollen eines Emojis weg, darf es nicht für jeden frei werden - dann bleibt es aus. */
+    const emojiRoles = (wanted: string[]): string[] => {
+        const ids = roles(wanted);
+
+        if (wanted.length && !ids.length) throw new Skip("Die Rollen dafür gibt es nicht - sonst dürfte es jeder benutzen");
+
+        return ids;
+    };
+
     const run = async (op: IRestoreOp): Promise<void> => {
         switch (op.kind) {
             case "role.create": {
@@ -166,7 +178,7 @@ export async function RunOps(guild: Guild, job: IRestoreJob, deps: IRunDeps): Pr
 
                 // Rollen-Bilder gehen erst ab Boost-Stufe 2 - die Rolle zählt trotzdem.
                 const icon = op.role.icon ?? (await deps.image("role", op.role.id));
-                if (icon) await role.setIcon(Buffer.from(icon, "base64"), REASON).catch(() => undefined);
+                if (icon) await role.setIcon(Buffer.from(icon, "base64"), REASON).catch((error: unknown) => note(op, `Rollen-Bild nicht gesetzt (${Why(error)})`));
                 return;
             }
             case "role.edit": {
@@ -210,8 +222,19 @@ export async function RunOps(guild: Guild, job: IRestoreJob, deps: IRunDeps): Pr
                 if (!id) throw new Skip("Gibt es nicht mehr");
 
                 const { name, topic, nsfw, rateLimitPerUser, bitrate, userLimit } = ChannelOptions(op.channel, null, guild.maximumBitrate);
+                const live = guild.channels.cache.get(id) as { topic?: string | null; rateLimitPerUser?: number } | undefined;
 
-                await guild.channels.edit(id, { name, topic, nsfw, rateLimitPerUser, bitrate, userLimit, parent: resolve("channel", op.channel.parentId), reason: REASON });
+                // Review M3: Kein Thema bzw. kein Slowmode im Backup setzt zurück, was der Kanal jetzt hat.
+                await guild.channels.edit(id, {
+                    name,
+                    topic: topic ?? (live?.topic ? "" : undefined),
+                    nsfw,
+                    rateLimitPerUser: rateLimitPerUser ?? (live?.rateLimitPerUser ? 0 : undefined),
+                    bitrate,
+                    userLimit,
+                    parent: resolve("channel", op.channel.parentId),
+                    reason: REASON,
+                });
                 return;
             }
             case "channel.delete": {
@@ -252,7 +275,7 @@ export async function RunOps(guild: Guild, job: IRestoreJob, deps: IRunDeps): Pr
                 const icon = settings.icon ?? (await deps.image("icon", guild.id));
                 const banner = settings.banner ?? (await deps.image("banner", guild.id));
                 if (icon) await guild.setIcon(Buffer.from(icon, "base64"), REASON);
-                if (banner) await guild.setBanner(Buffer.from(banner, "base64"), REASON).catch(() => undefined);
+                if (banner) await guild.setBanner(Buffer.from(banner, "base64"), REASON).catch((error: unknown) => note(op, `Banner nicht gesetzt (${Why(error)})`));
                 return;
             }
             case "emoji.create": {
@@ -261,7 +284,7 @@ export async function RunOps(guild: Guild, job: IRestoreJob, deps: IRunDeps): Pr
                 const image = op.emoji.image ?? (await deps.image("emoji", op.emoji.id));
                 if (!image) throw new Skip("Kein Bild im Backup");
 
-                const emoji = await guild.emojis.create({ attachment: Buffer.from(image, "base64"), name: op.emoji.name, roles: roles(op.emoji.roles), reason: REASON });
+                const emoji = await guild.emojis.create({ attachment: Buffer.from(image, "base64"), name: op.emoji.name, roles: emojiRoles(op.emoji.roles), reason: REASON });
 
                 await deps.remember("emoji", op.emoji.id, emoji.id);
                 return;
@@ -270,7 +293,7 @@ export async function RunOps(guild: Guild, job: IRestoreJob, deps: IRunDeps): Pr
                 const id = resolve("emoji", op.id);
                 if (!id) throw new Skip("Gibt es nicht mehr");
 
-                await guild.emojis.edit(id, { name: op.emoji.name, roles: roles(op.emoji.roles), reason: REASON });
+                await guild.emojis.edit(id, { name: op.emoji.name, roles: emojiRoles(op.emoji.roles), reason: REASON });
                 return;
             }
             case "emoji.delete": {
@@ -297,8 +320,12 @@ export async function RunOps(guild: Guild, job: IRestoreJob, deps: IRunDeps): Pr
             case "member.add":
             case "member.remove": {
                 const ids = roles(op.roles);
-                // Die Rollen gibt es nicht (ihr Anlegen scheiterte schon und steht dort).
-                if (ids.length === 0) return;
+
+                // Review M12: Gibt es keine der Rollen mehr, steht das Mitglied in „Geht nicht“ statt still wegzufallen.
+                if (ids.length === 0) {
+                    if (op.roles.length) throw new Skip("Die Rollen dafür gibt es nicht");
+                    return;
+                }
 
                 if (op.kind === "member.add" && (await deps.held?.(op.userId))) throw new Skip("Gerade von Anti Villain festgehalten, bekommt keine Rollen zurück");
 
@@ -331,6 +358,8 @@ export async function RunOps(guild: Guild, job: IRestoreJob, deps: IRunDeps): Pr
         }
 
         const op = job.ops[index]!;
+
+        current = index;
 
         try {
             await run(op);

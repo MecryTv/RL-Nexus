@@ -371,6 +371,8 @@ function LiveServer(fail: Record<string, string> = {}, id = GUILD) {
     const message = { id: "90071992547409000", edit: async () => void cards.push("edit") };
     /** Was beim Anlegen von Kanälen ankam. */
     const made: { name: string; bitrate?: number; permissionOverwrites?: { id: string }[] }[] = [];
+    /** Was beim Ändern von Kanälen ankam (Review M3). */
+    const edits: Record<string, unknown>[] = [];
     const newId = () => `9007199254747${String(next++).padStart(4, "0")}`;
     const guard = (key: string) => {
         if (fail[key]) throw new Error(fail[key]);
@@ -434,8 +436,9 @@ function LiveServer(fail: Record<string, string> = {}, id = GUILD) {
                 calls.push(`channel.create:${data.name}`);
                 return channel;
             },
-            edit: async (id: string) => {
+            edit: async (id: string, data: Record<string, unknown> = {}) => {
                 if (!channels.has(id)) throw new Error("Unknown Channel");
+                edits.push({ id, ...data });
                 calls.push(`channel.edit:${id}`);
             },
             delete: async (id: string) => void (channels.delete(id), calls.push(`channel.delete:${id}`)),
@@ -473,7 +476,7 @@ function LiveServer(fail: Record<string, string> = {}, id = GUILD) {
 
     const overwrites = (id: string) => ((channels.get(id)?.overwrites ?? []) as { id: string }[]).map((entry) => entry.id);
 
-    return { guild: guild as unknown as Guild, calls, cards, made, channels, roles, members, overwrites, created: (kind: string, name: string) => calls.filter((call) => call === `${kind}.create:${name}`).length };
+    return { guild: guild as unknown as Guild, calls, cards, made, edits, channels, roles, members, overwrites, created: (kind: string, name: string) => calls.filter((call) => call === `${kind}.create:${name}`).length };
 }
 
 function Job(ops: IRestoreOp[], done = 0): IRestoreJob {
@@ -538,6 +541,25 @@ async function checkRunner(): Promise<void> {
     const fullDeps = Deps();
     await RunOps(full.guild, Job([{ kind: "emoji.create", emoji: { id: "90071992547406010", name: "gg", animated: false, roles: [], image: "AAAA" } }, { kind: "ban", userId: "90071992547408302", reason: null }]), fullDeps.deps);
     check("Emoji-Platz voll: einzeln gescheitert, Rest läuft", (fullDeps.saved.at(-1)?.failed ?? []).some((entry) => entry.reason.includes("Emoji")) && full.calls.includes("ban:90071992547408302"), JSON.stringify(fullDeps.saved.at(-1)));
+
+    // Review M3: Leeres Thema und Slowmode 0 im Backup setzen zurück, was der Kanal jetzt hat.
+    const reset = LiveServer();
+    Object.assign(reset.channels.get(TEXT)!, { topic: "Altes Thema", rateLimitPerUser: 30 });
+    await RunOps(reset.guild, Job([{ kind: "channel.edit", id: TEXT, channel: snapChannel(TEXT, "allgemein", 0, CATEGORY) }]), Deps().deps);
+    const sent = reset.edits.at(-1);
+    check("Kanal ändern: leeres Thema und Slowmode 0 aus dem Backup setzen zurück", sent?.topic === "" && sent?.rateLimitPerUser === 0, JSON.stringify(sent));
+
+    // Review M12: Mitglied, dessen Rollen es nicht gibt, steht in „Geht nicht“ statt still wegzufallen.
+    const lost = LiveServer();
+    const lostDeps = Deps();
+    await RunOps(lost.guild, Job([{ kind: "member.add", userId: USER, roles: ["90071992547406099"] }]), lostDeps.deps);
+    check("Mitglied ohne vorhandene Rollen: Zeile in Geht nicht", (lostDeps.saved.at(-1)?.failed ?? []).length === 1, JSON.stringify(lostDeps.saved.at(-1)));
+
+    // Review M14: Fallen alle Rollen eines Emojis weg, wird es nicht für alle freigegeben.
+    const locked = LiveServer();
+    const lockedDeps = Deps();
+    await RunOps(locked.guild, Job([{ kind: "emoji.create", emoji: { id: "90071992547406011", name: "vip", animated: false, roles: ["90071992547406098"], image: "AAAA" } }]), lockedDeps.deps);
+    check("Emoji nur für Rollen, die es nicht gibt: nicht für alle angelegt, Zeile in Geht nicht", !locked.calls.includes("emoji.create:vip") && (lockedDeps.saved.at(-1)?.failed ?? []).some((entry) => entry.reason.includes("Rolle")), JSON.stringify(lockedDeps.saved.at(-1)));
 
     const racing = LiveServer();
     const racingDeps = Deps();
@@ -650,6 +672,28 @@ async function checkRunnerService(): Promise<void> {
     await running;
     check("Abbrechen mitten im Lauf: hält vor dem nächsten Schritt an", busy.store.get(3)!.status === "cancelled" && busy.store.get(3)!.done < ops.length, JSON.stringify(busy.store.get(3)));
     check("Nichts zum Abbrechen: nein", !(await busy.service.Cancel(GUILD, USER)));
+
+    // Review M6: Nach den Schritten am Server gibt es nichts mehr anzuhalten - dann kein „ok“.
+    const late = ServiceWith(LiveServer(), [{ ...Job(ops, ops.length), id: 4, phase: "panels" }]);
+    check("Abbrechen nach den Schritten am Server: nein, Auftrag läuft weiter", !(await late.service.Cancel(GUILD, USER)) && late.store.get(4)!.status === "running", JSON.stringify(late.store.get(4)));
+
+    // Review M4: Schreibt die Datenbank einmal nicht, macht der Dienst von selbst weiter statt hängenzubleiben.
+    const flaky = ServiceWith(LiveServer(), [{ ...Job(ops, ops.length), id: 5 }]);
+    const restores = (flaky.client as unknown as { serverRestores: { Save: (id: number, patch: Partial<IRestoreJob>) => Promise<void> } }).serverRestores;
+    const write = restores.Save;
+    let broken = true;
+    restores.Save = async (id, patch) => {
+        if (broken && patch.phase === "bot") {
+            broken = false;
+            throw new Error("Datenbank weg");
+        }
+
+        return write(id, patch);
+    };
+    (flaky.service as unknown as { retryMs: number }).retryMs = 5;
+    await flaky.service.Run(flaky.store.get(5)!);
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    check("Datenbank-Fehler mitten im Laden: macht von selbst weiter und wird fertig", flaky.store.get(5)!.status === "done", JSON.stringify(flaky.store.get(5)));
 }
 
 /* ----------------------------------------------------------
@@ -952,7 +996,7 @@ const STRANGER = "90071992547409979";
 const NO_ACCESS = "Für RL Nexus brauchst du einen Zugang aus dem Shop.";
 
 /** Eine Interaktion, die mitschreibt, was der Bot antwortet. */
-function Interaction(server: ReturnType<typeof LiveServer>, input: { user?: string; sub?: string; options?: Record<string, string>; customId?: string; modal?: string; focused?: string }) {
+function Interaction(server: ReturnType<typeof LiveServer>, input: { user?: string; sub?: string; options?: Record<string, string>; customId?: string; modal?: string; focused?: string; manage?: boolean }) {
     const out = { replies: [] as string[], modals: [] as string[], choices: [] as { name: string; value: string }[] };
     const record = async (payload: unknown) => void out.replies.push(Contents(Tree(payload as AnyMessage)));
     const interaction: Record<string, unknown> = {
@@ -961,7 +1005,7 @@ function Interaction(server: ReturnType<typeof LiveServer>, input: { user?: stri
         customId: input.customId ?? "",
         user: { id: input.user ?? USER, username: "sarah" },
         member: { displayName: "Sarah" },
-        memberPermissions: { has: () => true },
+        memberPermissions: { has: () => input.manage !== false },
         inCachedGuild: () => true,
         deferred: false,
         replied: false,
@@ -1016,6 +1060,9 @@ async function checkCommand(): Promise<void> {
     check("Ohne Dashboard-Zugang: Antwort mit Grund, nichts passiert", (stranger.replies[0] ?? "").includes(NO_ACCESS) && calls.length === 0, `${stranger.replies.join()} ${calls.join()}`);
 
     const auto = await run({ sub: "laden", options: {}, focused: "" });
+    // Review M8: Wer den Server nicht verwalten darf, sieht in der Auswahl keine Backups.
+    const noManage = await run({ sub: "laden", options: {}, focused: "", manage: false });
+    check("Autocomplete ohne „Server verwalten“: keine Backups", noManage.choices.length === 0, JSON.stringify(noManage.choices));
     check("Autocomplete: höchstens 25, lesbar, nur mit Discord-Server", auto.choices.length === 25 && auto.choices[0]!.name.includes("automatisch") && auto.choices.every((choice) => !choice.name.includes("nur Bot")), JSON.stringify(auto.choices.slice(0, 2)));
 
     const exact = await run({ sub: "laden", options: { backup: "7", modus: "genau" } });

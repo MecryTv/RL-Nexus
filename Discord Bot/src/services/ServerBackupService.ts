@@ -390,7 +390,8 @@ export default class ServerBackupService {
     async Cancel(guildId: string, actorId: string): Promise<boolean> {
         const job = await this.Lock(guildId);
 
-        if (!job) return false;
+        // Review M6: Nach den Schritten am Server gibt es nichts mehr anzuhalten - dann kein „ok“.
+        if (!job || job.phase !== "server") return false;
 
         logger.info(`💾 Laden ${job.id} auf ${job.targetGuildId} abgebrochen von ${actorId}`);
 
@@ -398,6 +399,19 @@ export default class ServerBackupService {
         else await this.client.serverRestores.Save(job.id, { status: "cancelled" });
 
         return true;
+    }
+
+    /** Review M4: Wartezeit, bis ein Laden nach einem Datenbank-Fehler von selbst weitermacht. */
+    retryMs = 60_000;
+
+    /** Holt den Auftrag neu und macht weiter, solange er läuft. Datenbank noch weg: später noch einmal. */
+    private Retry(id: number): void {
+        setTimeout(async () => {
+            const fresh = await this.client.serverRestores.Get(id).catch(() => undefined);
+
+            if (fresh === undefined) return this.Retry(id);
+            if (fresh?.status === "running" && !this.runs.has(id)) void this.Run(fresh);
+        }, this.retryMs);
     }
 
     /** Arbeitet einen Auftrag ab. Läuft er schon, kommt derselbe Lauf zurück. */
@@ -514,8 +528,9 @@ export default class ServerBackupService {
 
             await card.done();
         } catch (error) {
-            // Kommt nur, wenn die Datenbank nicht schreibt - der Auftrag bleibt „läuft“ und geht beim nächsten Start weiter.
+            // Kommt nur, wenn die Datenbank nicht schreibt - der Auftrag bleibt „läuft“ und geht gleich von selbst weiter (Review M4).
             logger.warn(`💾 Laden ${job.id} unterbrochen - ${String(error)}`);
+            this.Retry(job.id);
         }
     }
 
@@ -767,7 +782,10 @@ export default class ServerBackupService {
     async OnAutocomplete(interaction: AutocompleteInteraction): Promise<void> {
         const guild = interaction.guild;
 
-        if (!guild || !(await this.client.dashboardService.GuildAllowed(interaction.user.id, guild.id))) return void (await interaction.respond([]).catch(() => undefined));
+        // Review M8: Backups sieht nur, wer den Server verwalten darf - wie beim Befehl selbst.
+        if (!guild || !interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild) || !(await this.client.dashboardService.GuildAllowed(interaction.user.id, guild.id))) {
+            return void (await interaction.respond([]).catch(() => undefined));
+        }
 
         const list = await this.List(guild, { id: interaction.user.id, name: interaction.user.username });
         const typed = interaction.options.getFocused().toLowerCase();
