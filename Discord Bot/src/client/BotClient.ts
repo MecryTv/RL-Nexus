@@ -243,6 +243,10 @@ export default class BotClient extends Client implements IBotClient {
             partials: [Partials.Channel],
         });
 
+        // Jedes Modul hat seinen eigenen interactionCreate-Handler, inzwischen gut
+        // zwanzig. Das ist kein Leck, Node warnt aber ab elf.
+        this.setMaxListeners(50);
+
         this.config = config;
         this.constructionHandlers = new ConstructionHandler(this);
         this.commands = new Collection();
