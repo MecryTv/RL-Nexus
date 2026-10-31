@@ -67,7 +67,9 @@ export async function checkWartungPage(): Promise<void> {
     });
 
     await check("Restzeit: aufgerundet, ab einer Stunde mit Stunden", () => {
+        assert.equal(show(PLAN, "2026-10-24T12:59:00.000Z").remaining, "~1 Min.");
         assert.equal(show(PLAN, "2026-10-24T12:59:30.000Z").remaining, "~1 Min.");
+        assert.equal(show(PLAN, "2026-10-24T13:00:00.000Z").state, "late");
         assert.equal(show(PLAN, "2026-10-24T11:50:00.000Z").remaining, "~1 Std. 10 Min.");
     });
 
@@ -95,7 +97,7 @@ export async function checkWartungPage(): Promise<void> {
     });
 
     await check("Kaputter Status: kein Wurf, Rückfall „Gleich wieder da.“", () => {
-        for (const broken of [null, "x", 42, { areas: "website" }, { title: 5 }]) {
+        for (const broken of [null, "x", 42, { areas: "website" }, { title: 5 }, { ...PLAN, title: "  " }]) {
             const result = show(broken, "2026-10-24T12:35:00.000Z");
 
             assert.equal(result.state, "fallback", JSON.stringify(broken));

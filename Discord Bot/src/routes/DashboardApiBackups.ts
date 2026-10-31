@@ -1,4 +1,10 @@
+import { Guild } from "discord.js";
 import { FastifyReply, FastifyRequest } from "fastify";
+import { JobSummary } from "../builder/ServerBackupView";
+import { SNOWFLAKE } from "../constants/Discord";
+import { SERVER_PART_IDS } from "../constants/ServerBackup";
+import { RestoreMode, ServerPart } from "../interfaces/services/serverbackup/IServerBackup";
+import { SessionOf } from "../utils/dashboard";
 import BotClient from "../client/BotClient";
 import { DASHBOARD_PATH } from "../constants/Dashboard";
 import Route from "../structures/Route";
@@ -25,6 +31,9 @@ const TIMEOUT = 10_000;
  * Dashboard trotzdem weiter, und ein zweiter Klick belegte einen zweiten Platz.
  */
 const SLOW_TIMEOUT = 60_000;
+/** Plan 32: Mit Discord-Server liest das Admin Dashboard dabei den Server beim Bot (bis 120 s). */
+const SERVER_TIMEOUT = 130_000;
+const MODES: readonly RestoreMode[] = ["repair", "exact", "other"];
 /** CreateToken rechnet in Millisekunden. */
 const TOKEN_LIFETIME = 60_000;
 
@@ -33,6 +42,8 @@ export interface IBackupCall {
     /** Hinter /internal/backups/<Server>. */
     path: string;
     body?: unknown;
+    /** Plan 32: zusätzliche Kopfzeilen, etwa der Name des anderen Servers. */
+    headers?: Record<string, string>;
     timeout: number;
 }
 
@@ -54,7 +65,7 @@ export function BackupCall(method: "GET" | "POST", query: Record<string, unknown
 
     switch (body.action) {
         case "create":
-            return { method: "POST", path: "", body: { note: body.note ?? null }, timeout: SLOW_TIMEOUT };
+            return { method: "POST", path: "", body: { note: body.note ?? null, parts: body.parts }, timeout: Array.isArray(body.parts) && body.parts.includes("server") ? SERVER_TIMEOUT : SLOW_TIMEOUT };
         case "plan":
             return { method: "PUT", path: "/plan", body: body.plan, timeout: TIMEOUT };
         case "delete":
@@ -69,6 +80,18 @@ export function BackupCall(method: "GET" | "POST", query: Record<string, unknown
         default:
             return "Diese Aktion gibt es nicht.";
     }
+}
+
+/** Plan 32: Modus, Teile und Bereiche für Vorschau und Laden. Ein Satz, wenn etwas nicht passt. */
+export function LoadInput(body: Record<string, unknown>): { mode: RestoreMode; parts: ServerPart[]; areas: string[] } | string {
+    const mode = MODES.find((entry) => entry === body.mode);
+    const parts = Array.isArray(body.parts) ? SERVER_PART_IDS.filter((part) => (body.parts as unknown[]).includes(part)) : [];
+    const areas = Array.isArray(body.areas) ? body.areas.filter((area): area is string => typeof area === "string").slice(0, 20) : [];
+
+    if (!mode) return "So lässt sich ein Backup nicht laden.";
+    if (parts.length === 0) return "Wähl mindestens einen Teil des Discord-Servers.";
+
+    return { mode, parts, areas };
 }
 
 /**
@@ -98,6 +121,7 @@ export async function AskAdmin(
                 "X-Actor-Name": encodeURIComponent(actor.name),
                 "X-Guild-Name": encodeURIComponent(guildName),
                 ...(call.body === undefined ? {} : { "Content-Type": "application/json" }),
+                ...call.headers,
             },
             body: call.body === undefined ? undefined : JSON.stringify(call.body),
             signal: AbortSignal.timeout(call.timeout),
@@ -141,12 +165,117 @@ export default class DashboardApiBackups extends Route {
 
         reply.header("Cache-Control", "no-store");
 
-        const call = BackupCall(writing ? "POST" : "GET", (request.query ?? {}) as Record<string, unknown>, (request.body ?? {}) as Record<string, unknown>);
+        const service = this.client.serverBackupService;
+        const query = (request.query ?? {}) as Record<string, unknown>;
+        const body = (request.body ?? {}) as Record<string, unknown>;
+        const actor = { id: access.member.id, name: access.member.displayName || access.member.user.username };
+
+        // Plan 32: Ein Backup mit Discord-Server ansehen - der Stand, „Seitdem geändert“, wer gelöscht hat.
+        if (!writing && query.server === "1") {
+            const view = await service.ServerView(access.guild, Number(idOf(query.backup) ?? Number.NaN), actor);
+
+            return typeof view === "string" ? reply.code(400).send({ error: view }) : view;
+        }
+
+        if (writing) {
+            const own = await this.Server(request, access.guild, actor, body);
+
+            if (own) return reply.code(own.status).send(own.body);
+        }
+
+        const call = BackupCall(writing ? "POST" : "GET", query, body);
         if (typeof call === "string") return reply.code(400).send({ error: call });
 
-        const actor = { id: access.member.id, name: access.member.displayName || access.member.user.username };
-        const answer = await AskAdmin(this.client.config.ADMIN_INTERNAL_URL, this.client.config.SERVER_JWT_SECRET, access.guild.id, actor, access.guild.name, call);
+        const answer = await service.AskBackups(access.guild, actor, call);
+
+        // Die Liste bekommt den Stand des Discord-Servers und ein laufendes Laden dazu.
+        if (!writing && query.backup === undefined && answer.status === 200) {
+            const job = await service.Lock(access.guild.id);
+
+            return { ...(answer.body as object), server: await service.ServerInfo(access.guild), job: job ? JobSummary(job) : null };
+        }
 
         return reply.code(answer.status).send(answer.body);
+    }
+
+    /** Plan 32: was der Bot mit dem Discord-Server selbst macht. null: keine solche Aktion, dann ans Admin Dashboard. */
+    private async Server(request: FastifyRequest, guild: Guild, actor: { id: string; name: string }, body: Record<string, unknown>): Promise<{ status: number; body: unknown } | null> {
+        const service = this.client.serverBackupService;
+        const fail = (status: number, error: string) => ({ status, body: { error } });
+        const backupId = Number(idOf(body.backup) ?? Number.NaN);
+
+        switch (body.action) {
+            case "compare": {
+                const lines = await service.Compare(guild, backupId, actor);
+
+                return typeof lines === "string" ? fail(400, lines) : { status: 200, body: { lines } };
+            }
+            case "preview":
+            case "restore-server": {
+                const input = LoadInput(body);
+                if (typeof input === "string") return fail(400, input);
+
+                const found = await this.Target(request, guild, input.mode, body.target);
+                if (!("guild" in found)) return found;
+
+                const target = found.guild;
+
+                if (body.action === "preview") {
+                    const plan = await service.Preview(guild, { target, backupId, mode: input.mode, parts: input.parts }, actor);
+
+                    return typeof plan === "string" ? fail(400, plan) : { status: 200, body: { plan } };
+                }
+
+                if ((await service.Lock(guild.id)) || (await service.Lock(target.id))) return fail(409, "Gerade wird schon ein Backup geladen. Warte, bis es fertig ist.");
+
+                const job = await service.Start({ guild, target, actor, backupId, mode: input.mode, parts: input.parts, areas: input.areas, confirm: typeof body.confirm === "string" ? body.confirm : "" });
+
+                return typeof job === "string" ? fail(400, job) : { status: 200, body: { job: JobSummary(job) } };
+            }
+            case "job": {
+                const job = await service.Job(guild.id, Number(body.job));
+
+                return job ? { status: 200, body: { job: JobSummary(job) } } : fail(404, "Dieses Laden gibt es nicht.");
+            }
+            case "cancel":
+                return { status: 200, body: { ok: await service.Cancel(guild.id, actor.id) } };
+            case "undo": {
+                if (await service.Lock(guild.id)) return fail(409, "Gerade wird schon ein Backup geladen. Warte, bis es fertig ist.");
+
+                const job = await service.Undo(guild, actor, Number(body.job), typeof body.confirm === "string" ? body.confirm : "");
+
+                return typeof job === "string" ? fail(400, job) : { status: 200, body: { job: JobSummary(job) } };
+            }
+            case "settings":
+                return { status: 200, body: { settings: await service.SaveSettings(guild, body) } };
+            case "targets": {
+                const session = SessionOf(this.client, request);
+                const list = session ? await this.client.dashboardService.Manageable(session).catch(() => []) : [];
+
+                return { status: 200, body: { targets: list.filter((entry) => entry.id !== guild.id && this.client.guilds.cache.has(entry.id)) } };
+            }
+            default:
+                return null;
+        }
+    }
+
+    /** Das Ziel beim Laden: dieser Server, beim anderen Server einer, den dieselbe Sitzung verwaltet und auf dem der Bot ist. */
+    private async Target(request: FastifyRequest, guild: Guild, mode: RestoreMode, raw: unknown): Promise<{ guild: Guild } | { status: number; body: unknown }> {
+        const fail = (status: number, error: string) => ({ status, body: { error } });
+
+        if (mode !== "other") return { guild };
+        if (typeof raw !== "string" || !SNOWFLAKE.test(raw) || raw === guild.id) return fail(400, "Wähl den anderen Server.");
+
+        const session = SessionOf(this.client, request);
+        const manages = session ? await this.client.dashboardService.CanManage(session, raw).catch(() => false) : false;
+
+        if (!session || !manages) return fail(403, "Den anderen Server darfst du nicht verwalten.");
+
+        const target = this.client.guilds.cache.get(raw);
+
+        if (!target) return fail(404, "Der Bot ist auf dem anderen Server nicht dabei.");
+        if (!(await this.client.dashboardService.GuildAllowed(session.userId, raw))) return fail(403, "Für den anderen Server gibt es gerade keinen Zugang.");
+
+        return { guild: target };
     }
 }

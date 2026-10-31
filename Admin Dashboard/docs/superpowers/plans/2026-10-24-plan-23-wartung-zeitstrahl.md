@@ -181,7 +181,7 @@
   - `LEGAL_PATHS = ["/impressum", "/datenschutz", "/agb", "/widerruf"] as const`
   - `isLegalPath(path: string): boolean` (ein Schrägstrich am Ende zählt mit)
   - `maintenanceAnswer(path: string, method: string, accept: string, on: boolean): "pass" | "page" | "json"` — die Entscheidung von nginx für die Webseite (Ausnahmen wie Task 4 Step 1)
-  - `websiteInMaintenance(): Promise<boolean>` — `GET /wartung/status.json` (`cache: "no-store"`), `true`, wenn 200 und `areas` `"website"` enthält
+  - `websiteInMaintenance(): Promise<boolean>` — `HEAD /` (`cache: "no-store"`), `true` bei 503 *(beim Bau geändert, statt status.json: deckt auch Schalter ab, die von Hand gesetzt wurden)*
 - Produces (`useMaintenanceGuard()`): fragt einmal beim Start; ist Wartung, führt jede Änderung von `useLocation().pathname` auf einen Nicht-Rechtstext zu `window.location.assign(pfad)`.
 
 - [ ] **Step 1: Failing `check-maintenance.mjs`**: `isLegalPath` für `/impressum` true, `/impressum/` true, `/impressum-x` false, `/` false, `/module` false; `maintenanceAnswer`: `("/", "GET", "text/html", true) → "page"`, `("/impressum", …, true) → "pass"`, `("/assets/a.js", …) → "pass"`, `("/content/banner.json", …) → "pass"`, `("/wartung/status.json", …) → "pass"`, `("/api/shop/state", "GET", "application/json", true) → "pass"`, `("/api/shop/state", "POST", "application/json", true) → "json"`, `("/api/shop/stripe", "POST", "application/json", true) → "pass"`, `("/api/shop/checkout", "POST", "application/json", true) → "json"`, `("/api/contact", "POST", "application/json", true) → "json"`, `("/module", "GET", "application/json", true) → "json"`, alles mit `on: false` → `"pass"`.

@@ -30,6 +30,7 @@ import {
     trialStrip,
     waitingHint,
 } from "../src/shop/logic.ts";
+import { leavesPricing } from "../src/services/navigation.ts";
 
 let failures = 0;
 
@@ -220,6 +221,17 @@ check("Mein Zugang: Zeilen je nach Art des Zugangs", () => {
     assert.deepEqual(rows(me({ status: "one_time", productId: 9, productTitle: "Lifetime" }), []), { Produkt: "Lifetime", "Läuft bis": "unbegrenzt" });
     assert.deepEqual(rows(me({ status: "trial", until: UNTIL, productTitle: "Test" }), []), { Produkt: "Test", "Test bis": "12.10.2027" });
     assert.deepEqual(rows(me()), {});
+
+    // W-0024: Bei Free und Beta ruht das Abo - kein Tag, an dem abgebucht würde.
+    const paused = Object.fromEntries(accessRows(abo, [monthly], true).map((row) => [row.label, row.value]));
+    assert.deepEqual(paused, { Produkt: title, "Nächste Zahlung": "keine, solange dein Zugang ruht", "Discord-Rolle": "Nexus Plus", Kündbar: "jederzeit" });
+});
+
+check("Preise bei Free: weg, außer eine Bestellung kommt gerade von Stripe zurück (W-0024)", () => {
+    assert.equal(leavesPricing("free", false), true);
+    assert.equal(leavesPricing("beta", false), true);
+    assert.equal(leavesPricing("free", true), false, "?bestellung= zeigt noch das Freischalten");
+    assert.equal(leavesPricing("paid", false), false);
 });
 
 check("Mein Zugang: Kündigungshinweis nur beim laufenden Abo, Status in Worten", () => {

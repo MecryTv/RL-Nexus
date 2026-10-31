@@ -88,7 +88,7 @@ export function stripeGateway(config: IConfig): IStripeGateway {
     return cached.gateway;
 }
 
-function sdkGateway(stripe: Stripe, webhookSecret: string): IStripeGateway {
+export function sdkGateway(stripe: Stripe, webhookSecret: string): IStripeGateway {
     return {
         saveProduct: ({ id, name, description }) =>
             call(async () => {
@@ -200,10 +200,10 @@ function sdkGateway(stripe: Stripe, webhookSecret: string): IStripeGateway {
             call(async () => {
                 let paymentIntent: string | null = "paymentIntentId" in target ? target.paymentIntentId : null;
 
-                // Beim Abo die letzte Rechnung: Ihre Zahlung hängt an einem Payment Intent.
+                // Beim Abo die letzte bezahlte Rechnung: Ihre Zahlung hängt an einem Payment Intent. Die letzte überhaupt
+                // kann während Free eine verworfene ohne Zahlung sein (pause_collection: void, W-0024).
                 if ("subscriptionId" in target) {
-                    const subscription = await stripe.subscriptions.retrieve(target.subscriptionId);
-                    const invoice = typeof subscription.latest_invoice === "string" ? subscription.latest_invoice : (subscription.latest_invoice?.id ?? null);
+                    const invoice = (await stripe.invoices.list({ subscription: target.subscriptionId, status: "paid", limit: 1 })).data[0]?.id ?? null;
 
                     if (invoice) {
                         const intent = (await stripe.invoicePayments.list({ invoice, limit: 1 })).data[0]?.payment.payment_intent;

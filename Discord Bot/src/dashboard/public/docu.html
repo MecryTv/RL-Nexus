@@ -113,12 +113,13 @@
             <button class="docgroup__head" type="button" aria-expanded="false" aria-controls="docg-community">
               <svg class="docgroup__chev" aria-hidden="true"><use href="#i-chevron"/></svg>
               <span class="docgroup__name">Community</span>
-              <span class="docgroup__count">7</span>
+              <span class="docgroup__count">8</span>
             </button>
             <div class="docgroup__list" id="docg-community" hidden>
               <a href="#welcome">Welcome System</a>
               <a href="#apply">Apply System</a>
               <a href="#reaction-roles">Self Roles</a>
+              <a href="#role-lists">Rollen-Listen</a>
               <a href="#levels">Level System</a>
               <a href="#giveaways">Giveaways</a>
               <a href="#polls">Umfragen</a>
@@ -139,12 +140,13 @@
             <button class="docgroup__head" type="button" aria-expanded="false" aria-controls="docg-moderation">
               <svg class="docgroup__chev" aria-hidden="true"><use href="#i-chevron"/></svg>
               <span class="docgroup__name">Moderation</span>
-              <span class="docgroup__count">4</span>
+              <span class="docgroup__count">5</span>
             </button>
             <div class="docgroup__list" id="docg-moderation" hidden>
               <a href="#moderation">Moderation</a>
               <a href="#support-warteraum">Support-Warteraum</a>
               <a href="#automod">Auto Mod</a>
+              <a href="#anti-villain">Anti Villain</a>
               <a href="#logging">Logging System</a>
             </div>
           </div>
@@ -194,6 +196,23 @@
     Neu laden musst du das Dashboard nicht. Legst du in Discord einen Kanal, eine Rolle oder ein Emoji an, benennst
     etwas um oder löschst es, stehen die Auswahlfelder gleich richtig da, auch während du etwas einträgst. Was du
     noch nicht gespeichert hast, bleibt dabei stehen.
+  </p>
+
+  <h3>Nachrichten bauen</h3>
+  <p>
+    Jede Nachricht des Bots, ob Begrüßung, Looking-for-Beitrag oder Aufstieg, baust du im selben Studio. Oben wählst
+    du die Art: Karte, Embed oder normale Nachricht. In der Mitte steht die Nachricht so, wie Discord sie zeigt. Ein
+    Klick auf einen Teil wählt ihn, rechts bearbeitest du ihn mit Formatleiste, Platzhaltern und Emojis.
+  </p>
+  <ul class="doc__bullets">
+    <li><b>Vorlagen:</b> fertige Nachrichten. Eine Vorlage ersetzt die Nachricht, <b>Zurück</b> holt den Stand davor.</li>
+    <li><b>Bausteine:</b> bei der Karte Text, Bilder, Text mit Bild daneben und Trenner, beim Embed Autor, Titel, Beschreibung, Felder, Bilder und Fußzeile.</li>
+    <li><b>Aufbau:</b> alle Teile der Reihe nach. Hier oder an der kleinen Leiste am gewählten Teil schiebst du sie hoch und runter, verdoppelst oder löschst sie.</li>
+    <li><b>Stil:</b> der farbige Rand der Karte, beim Embed Farbe und Uhrzeit.</li>
+  </ul>
+  <p class="hintline">
+    Strg+Z macht rückgängig, Strg+Y wiederholt. Stehen mehrere Studios auf einer Seite, wirkt es dort, wo du zuletzt
+    geklickt hast. Gespeichert wird mit <b>Speichern</b>, in der Leiste des Studios oder unten auf der Seite.
   </p>
 
   <h3>Wer was darf</h3>
@@ -322,9 +341,9 @@
       <tr><td><code>/warn</code> <code>/unwarn</code> <code>/timeout</code> <code>/untimeout</code> <code>/kick</code> <code>/ban</code> <code>/unban</code> <code>/purge</code></td><td>Moderation</td><td>Moderatoren oder das passende Discord-Recht</td></tr>
       <tr><td><code>/fall zeigen · notiz · beweis</code> <code>/verlauf</code></td><td>Fälle nachlesen und ergänzen</td><td>Moderatoren</td></tr>
       <tr><td><code>/level rang · rangliste</code></td><td>Eigener Stand im Level System und die Besten</td><td>alle</td></tr>
+      <tr><td><code>/level punkte</code></td><td>Punkte von Hand geben, abziehen, setzen oder zurücksetzen, mit Grund</td><td>Server verwalten</td></tr>
       <tr><td><code>/lookingfor spieler · team · beenden</code></td><td>Ein Team oder Spieler suchen</td><td>alle</td></tr>
-      <tr><td><code>/rank me · search · link · unlink</code></td><td>Rocket-League-Ränge als Karte, Epic-Konto verbinden</td><td>alle</td></tr>
-      <tr><td><code>/rangrollen holen · ablegen</code></td><td>Die Rolle zum eigenen Rang</td><td>alle</td></tr>
+      <tr><td><code>/rank me · search · link · unlink</code></td><td>Rocket-League-Ränge als Karte, Epic-Konto verbinden. Mit Rank Roles setzt <code>/rank me</code> auch die Rang-Rollen</td><td>alle</td></tr>
       <tr><td><code>/fehler</code></td><td>Einen Fehler an das RL Nexus Team melden</td><td>alle</td></tr>
     </tbody>
   </table>
@@ -470,6 +489,12 @@
     Von Hand kommt nur der <b>Peak</b>, also die höchste MMR, die jemand schon erreicht hat. Aktuelle MMR und Rang
     holt der Bot über den Epic-Namen und frischt sie alle 30 Minuten auf. Bleibt der Peak leer, gilt der aktuelle
     Wert. Mit <b>Prime jetzt abfragen</b> unter <i>Anzeige</i> holt er alles sofort neu. Prime ist der Dienst, über den RL Nexus die Ränge aus Rocket League liest.
+  </p>
+  <p>
+    <b>Epic-Name geändert:</b> Findet der Bot einen Namen nicht mehr, holt er den neuen über das Epic-Konto selbst.
+    Klappt das nicht, schreibt er dem Spieler eine DM mit einem Knopf zum Eintragen. Der neue Name gilt dann in jedem
+    Kader der Person und bei <code>/rank link</code>. Antwortet niemand, bekommt der Captain nach 3 Tagen eine DM,
+    bei geschlossenen DMs sofort.
   </p>
 
   <h3>Rollen und Kanäle</h3>
@@ -642,11 +667,11 @@ WTSI   = TS_2s × Rel_2s + TS_3s × Rel_3s</code></pre>
   <h3>Für Mitglieder</h3>
   <ol class="doc__bullets doc__steps">
     <li>Einmal das Epic-Konto verbinden: <code>/rank link epicname:DeinName</code>. Wechseln oder trennen geht danach erst nach drei Tagen, damit niemand mit fremden Konten Rollen sammelt.</li>
-    <li><code>/rangrollen holen</code> setzt die Rollen zum aktuellen Rang. <code>/rangrollen ablegen</code> nimmt alle wieder ab.</li>
+    <li><code>/rank me</code> zeigt die eigenen Ränge als Karte und setzt dabei die Rollen zum aktuellen Rang. Neu dazugekommene Rollen sieht nur, wer fragt.</li>
   </ol>
   <p>
-    Der Bot fragt nicht von selbst nach: wer aufsteigt, gibt den Befehl noch einmal ein. <code>/rank me</code>
-    zeigt die eigenen Ränge als Karte, <code>/rank search</code> die eines anderen Epic-Namens.
+    Der Bot fragt nicht von selbst nach: wer aufsteigt, ruft <code>/rank me</code> noch einmal auf.
+    <code>/rank search</code> zeigt die Ränge eines anderen Epic-Namens und vergibt nie Rollen.
   </p>
 
   <h3>Einstellungen</h3>
@@ -656,7 +681,6 @@ WTSI   = TS_2s × Rel_2s + TS_3s × Rel_3s</code></pre>
       <tr><td>Je Playlist</td><td>1v1, 2v2 und 3v3 einzeln an oder aus, je mit einer Rolle für jeden der 22 Ränge von Bronze I bis Supersonic Legend. Wer grob unterteilen will, legt dieselbe Rolle auf mehrere Ränge.</td></tr>
       <tr><td>Alte Rolle abnehmen</td><td>Beim Aufstieg geht die vorige Rolle derselben Playlist weg.</td></tr>
       <tr><td>Platzierungsspiele</td><td>Wer noch platziert wird, bleibt ohne Rolle, im Spiel steht dort auch kein Rang.</td></tr>
-      <tr><td>Nur in diesem Kanal</td><td>Hält den Befehl aus dem restlichen Server heraus.</td></tr>
     </tbody>
   </table>
   <p class="hintline">Unranked bekommt nie eine Rolle. Der Bot braucht „Rollen verwalten“ und muss über allen Rang-Rollen stehen. Fehlt etwas davon, sagt die Antwort woran es liegt.</p>
@@ -729,6 +753,50 @@ WTSI   = TS_2s × Rel_2s + TS_3s × Rel_3s</code></pre>
     <li>Im Dashboard schaltest du eine Runde auch von Hand weiter: <b>Einreichen jetzt beenden</b> und <b>Abstimmung jetzt beenden</b>.</li>
   </ul>
 
+  <h2 id="role-lists">Rollen-Listen</h2>
+  <p class="doc__kicker">Community · Modul <code>role-lists</code></p>
+  <p>
+    Listen, die zeigen, wer welche Rolle hat: Staff, Teams, Creator oder was dein Server braucht. Der Bot schreibt
+    sie in einen Kanal und zieht sie nach, sobald jemand eine Rolle bekommt oder verliert. Jede Liste steht im
+    Dashboard als eigener Unterpunkt unter „Rollen-Listen“.
+  </p>
+
+  <h3>Eine Liste anlegen</h3>
+  <p>
+    „Neue Liste“ fragt nach einem Namen und einer Vorlage. <b>Staff</b> sucht Rollen wie Owner, Admin, Moderator und
+    Support über den Namen, <b>Teams</b> nimmt jede Rolle mit „Team“, „Main“ oder „Academy“. Angelegt wird dabei
+    nichts, alles lässt sich danach ändern. Im Kanal steht die Liste erst nach „Liste senden“.
+  </p>
+  <table class="doc__table">
+    <thead><tr><th>Design</th><th></th></tr></thead>
+    <tbody>
+      <tr><td>Kompakt</td><td>Eine Karte, je Rolle eine Überschrift und die Namen nebeneinander.</td></tr>
+      <tr><td>Mit Abschnitten</td><td>Je Rolle ein Abschnitt, die Namen untereinander, Titel dahinter.</td></tr>
+      <tr><td>Als Bild</td><td>Nur eine Bilddatei, ohne Karte, Text oder Knopf. Das Aussehen baust du im Reiter „Bild“, einem Studio wie bei den Nachrichten: links die Bereiche, in der Mitte das Bild, rechts die Regler.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Rollen, Symbole und Titel</h3>
+  <ul class="doc__bullets">
+    <li>Bis zu 20 Rollen je Liste, von oben nach unten. Jede mit eigenem Namen in der Liste und einem Symbol.</li>
+    <li>Symbole aus der Galerie und das Rollen-Icon aus Discord gibt es nur im Bild.</li>
+    <li>Über das Personen-Symbol bekommt jemand einen Titel, etwa „Head of Support“. Er bleibt, solange die Person die Rolle hat, und danach noch 30 Tage.</li>
+    <li><i>Jeder nur einmal</i>: Wer mehrere Rollen der Liste hat, steht nur bei der obersten.</li>
+    <li>Erwähnungen in der Liste pingen niemanden.</li>
+  </ul>
+
+  <h3>Nachziehen</h3>
+  <p>
+    Eine gesendete Liste zieht der Bot höchstens einmal pro Minute nach: wenn jemand eine Rolle bekommt oder
+    verliert, den Server verlässt, eine Rolle sich ändert oder du speicherst. Die Nachricht wird bearbeitet,
+    nicht neu geschickt. Wurde sie gelöscht, schickt er eine neue. „Jetzt aktualisieren“ zieht sofort nach.
+  </p>
+  <ul class="doc__bullets">
+    <li>Der Bot braucht den <b>Server Members Intent</b>, sonst kennt er nicht alle Mitglieder. Fehlt er, steht oben im Dashboard ein Hinweis.</li>
+    <li>Im Kanal braucht er „Nachrichten senden“, „Dateien anhängen“ und „Nachrichtenverlauf lesen“.</li>
+    <li>Grenzen: 10 Listen je Server, 20 Rollen je Liste, im Bild höchstens 120 Personen, danach „+N weitere“.</li>
+  </ul>
+
   <h2 id="matchups">Matchups</h2>
   <p class="doc__kicker">Rocket League · Modul <code>matchups</code></p>
   <p>
@@ -798,10 +866,18 @@ WTSI   = TS_2s × Rel_2s + TS_3s × Rel_3s</code></pre>
       <tr><td>Akzentfarbe</td><td>Streifen, Rahmen, Ring und die kleine Zeile. Lässt sich ganz abschalten, dann bleibt die Karte neutral.</td></tr>
       <tr><td>Texte</td><td>Überschrift, Unterzeile und kleine Zeile, jede mit eigener Farbe und mit Platzhaltern. Die kleine Zeile folgt ohne eigene Farbe dem Akzent.</td></tr>
       <tr><td>Schrift</td><td>Für die Überschrift: Oxanium, Orbitron oder Rajdhani, 28 bis 72 Pixel. Lange Namen werden von selbst kleiner, bevor sie abgeschnitten werden.</td></tr>
-      <tr><td>Avatar</td><td>An oder aus, 96 bis 200 px groß, Ring 0 bis 12 px stark, rund oder abgeschrägt.</td></tr>
-      <tr><td>Server-Icon, Beitrittsdatum</td><td>Das Icon oben rechts, das Datum hinten an der kleinen Zeile.</td></tr>
+      <tr><td>Avatar</td><td>An oder aus, 96 bis 200 px groß, Ring 0 bis 12 px stark, rund oder abgeschrägt. Bei eigener Anordnung 48 bis 240 px.</td></tr>
+      <tr><td>Server-Icon, Beitrittsdatum</td><td>Das Icon oben rechts (bei eigener Anordnung frei), das Datum hinten an der kleinen Zeile.</td></tr>
     </tbody>
   </table>
+  <p>
+    Die Karte baust du im Studio: links Layouts, Teile, Hintergrund und Stil, in der Mitte die Karte, rechts das
+    gewählte Teil mit seinem Text und seiner Position. Avatar, Server-Icon, Überschrift, Unterzeile und kleine Zeile
+    setzt du frei auf die Karte, damit sie auf deinem Hintergrundbild dort stehen, wo Platz ist. Du ziehst sie mit Maus oder Finger, die Pfeiltasten
+    schieben um 1 px, mit Umschalt um 10 px. Die Teile rasten an der Kartenmitte und aneinander ein.
+    <b>Auf Layout zurück</b> holt ein Teil an seinen Platz, <b>Alles auf Layout zurück</b> löscht die eigene Anordnung,
+    <b>Rückgängig</b> oben im Studio (oder Strg+Z) geht bis zu 50 Schritte zurück, auch über Farben und Texte.
+  </p>
   <p class="hintline">
     Über der Karte kann eine Textzeile stehen. Setz dort <code>{user}</code> hinein, dann bekommt das neue Mitglied
     eine Benachrichtigung. Auf dem Bild selbst kann Discord niemanden erwähnen.
@@ -809,10 +885,9 @@ WTSI   = TS_2s × Rel_2s + TS_3s × Rel_3s</code></pre>
 
   <h3>Karte, Embed oder Text</h3>
   <p>
-    Statt des Bildes geht auch eine Karte im Components-V2-Stil (die Farbe am Rand schaltest du dort mit
-    <b>Custom Color</b> an oder aus), ein klassisches Embed oder normaler Text. Über dem Editor stehen fertige Vorlagen, die
-    Vorschau rechts zeigt jede Art so, wie sie in Discord aussieht. <b>Test senden</b> schickt, was gespeichert ist,
-    mit deinen eigenen Daten.
+    Statt des Bildes geht auch eine Karte im Components-V2-Stil, ein klassisches Embed oder normaler Text. Oben im
+    Studio wählst du die Art, links liegen die Vorlagen, in der Mitte siehst du jede Art so, wie sie in Discord
+    aussieht. <b>Test senden</b> oben in der Leiste schickt, was gespeichert ist, mit deinen eigenen Daten.
   </p>
   <p>
     Platzhalter: <code>{user}</code> (Erwähnung), <code>{user.name}</code>, <code>{user.tag}</code>,
@@ -888,7 +963,7 @@ WTSI   = TS_2s × Rel_2s + TS_3s × Rel_3s</code></pre>
 
   <h2 id="levels">Level System</h2>
   <p class="doc__kicker">Community · Modul <code>levels</code></p>
-  <p>Punkte fürs Schreiben und für die Zeit im Sprachkanal, Rollen ab einem bestimmten Level und eine Rangliste.</p>
+  <p>Punkte fürs Schreiben und für die Zeit im Sprachkanal, Rollen ab einem bestimmten Level und eine Rangliste. Das Level System ist auf jedem Server immer an.</p>
 
   <h3>Punkte</h3>
   <table class="doc__table">
@@ -898,23 +973,63 @@ WTSI   = TS_2s × Rel_2s + TS_3s × Rel_3s</code></pre>
       <tr><td>Voice</td><td>5 Punkte je Minute im Sprachkanal. Nur, wenn noch jemand dabei ist und man sich nicht selbst stumm geschaltet hat. Der AFK-Kanal zählt nie.</td></tr>
       <tr><td>Bonus</td><td>Ein Faktor von 0,1 bis 5 je Rolle und je Kanal.</td></tr>
       <tr><td>Ohne Punkte</td><td>Kanäle, ganze Kategorien und Rollen, die leer ausgehen.</td></tr>
+      <tr><td>Doppelte Punkte</td><td>Bis zu 10 Zeitfenster, einmal oder jede Woche, mit Faktor 1,1 bis 3 zusätzlich zum Bonus. Überschneiden sich zwei, gilt das höhere.</td></tr>
       <tr><td>Kurve</td><td>Von Level <i>n</i> auf <i>n</i>+1 braucht es Basis × (<i>n</i>+1) Punkte. Mit der Basis 100 sind das 1.500 Punkte bis Level 5 und 5.500 bis Level 10.</td></tr>
     </tbody>
   </table>
+  <p>
+    Gezählt wird jede Nachricht und jede Minute im Sprachkanal, wie in der Server-Übersicht. Punkte gibt es nur nach
+    den Regeln oben und dem <b>Schutz gegen Punkte-Farmen</b>: erst ab 5 Zeichen, dieselbe Nachricht hintereinander nur
+    einmal, keine Punkte bei Timeout oder Quarantäne, und was AutoMod löscht, bringt nichts. Jeder Schalter lässt sich
+    abschalten.
+  </p>
+  <p>
+    <b>Doppelte Punkte</b> stellst du unter <b>Level System</b> ein. Wöchentliche Fenster sind deutsche Zeit, 22:00 bis
+    02:00 geht über Mitternacht. Auf Wunsch sagt der Bot Beginn und Ende in einem Kanal an, und auf Level-Karte und
+    Aufstiegs-Bild zeigt <code>{boost}</code> solange zum Beispiel „2× XP bis Freitag 23:00“.
+  </p>
+  <p>
+    Beim Start hat der Bot einmal nachgetragen, was die Server-Übersicht vorher getrackt hatte. Was dabei passiert ist,
+    steht unter <b>Level System</b>.
+  </p>
 
   <h3>Aufsteigen</h3>
   <ul class="doc__bullets">
     <li><b>Belohnungsrollen:</b> bis zu 25, je eine ab einem Level. Entweder bleiben alle erreichten Rollen, oder nur die höchste. <b>Rollen nachtragen</b> vergibt fehlende Rollen an alle, die das Level schon haben.</li>
-    <li><b>Die Nachricht:</b> im Kanal, in dem es passiert, in einem festen Kanal, per DM oder gar nicht. Platzhalter: <code>{user}</code>, <code>{level}</code>, <code>{level.old}</code>, <code>{xp}</code>, <code>{xp.next}</code>, <code>{rank}</code>, <code>{channel}</code>.</li>
+    <li><b>Die Nachricht:</b> unter <b>Belohnungen</b>: im Kanal, in dem es passiert, in einem festen Kanal, per DM oder gar nicht, im Chat auf Wunsch nach 1 bis 60 Minuten wieder gelöscht. Wer mehrere Level auf einmal schafft, bekommt eine Nachricht. Aufstiege im Sprachkanal gehen in den festen Kanal, ohne ihn per DM. Platzhalter: <code>{user}</code>, <code>{level}</code>, <code>{level.old}</code>, <code>{xp}</code>, <code>{xp.next}</code>, <code>{rank}</code>, <code>{channel}</code>.</li>
+    <li><b>Als Bild oder Text:</b> Standard ist das Aufstiegs-Bild mit einer Zeile darüber (<code>{user}</code>, gepingt wird nur die Person). Wer schon eine eigene Text-Nachricht gestaltet hat, bleibt bei Text. Klappt das Bild einmal nicht, kommt die Text-Nachricht.</li>
+    <li><b>Aktivste der Woche und des Monats:</b> ebenfalls unter <b>Belohnungen</b>. Montags um 18 Uhr postet der Bot das Podium der Vorwoche, am 1. um 18 Uhr das des Vormonats, als Ranglisten-Bild in einen Kanal deiner Wahl. Auf Wunsch bekommt Platz 1 bis 3 eine Rolle, die beim nächsten Post weiterwandert. Klappt etwas nicht, etwa weil der Kanal weg ist, steht der Grund im Dashboard.</li>
   </ul>
+
+  <h3>Level-Karte</h3>
+  <p>
+    Unter <b>Level-Karte</b> gestaltest du, wie <code>/level rang</code>, das Bild beim Aufstieg und die Rangliste aussehen.
+    Für Karte und Aufstieg gibt es Vorlagen (Klassisch, Mittig, Panel, HUD, beim Aufstieg dazu das Banner) und einen
+    Baukasten im Studio: links Vorlagen, Elemente, Hintergrund und Ebenen, in der Mitte die Bühne, rechts die Werte. Text
+    mit Platzhaltern, Bilder aus der Galerie, Formen, Balken, Avatar, Level-Ring und Server-Icon, bis zu 30 Stück. Ziehen,
+    Ecken zum Vergrößern, Einrasten, Raster, Zoom, Pfeiltasten, Rückgängig und Wiederholen; die Vorschau
+    zeichnet der Bot mit deinen eigenen Zahlen, <b>Test senden</b> schickt dir das gespeicherte Bild per DM. Die Zeile über
+    dem Aufstiegs-Bild stellst du im Reiter Aufstieg ein. Die Rangliste ist ebenfalls ein Baukasten mit vier Bereichen:
+    Kopf, Podium (ein Muster für Platz 1 bis 3), Zeile (ein Muster für alle weiteren Plätze) und Fuß, dazu die Vorlagen
+    Podium, Liste, Kompakt (zwei Spalten, 20 je Seite) und Arena. Farben können eine Bedeutung haben: Akzent, Medaille
+    oder Trend. Hintergrund und Akzent übernimmt auch der Kopf der öffentlichen Rangliste.
+  </p>
 
   <h3>Rangliste</h3>
   <p>
-    <code>/level rang</code> zeigt den eigenen Stand als Karte, <code>/level rangliste</code> die Besten. Im
-    Dashboard unter <b>Rangliste</b> stehen alle mit Level, Punkten, Nachrichten und Voice-Minuten. Dort setzt oder
-    verteilst du auch Punkte von Hand. Auf Wunsch ist die Rangliste öffentlich unter
-    <code>/rangliste/&lt;server&gt;</code>, mit den ersten 100 Plätzen. Das ist ab Werk aus, weil damit Namen und
-    Bilder deiner aktivsten Mitglieder öffentlich werden.
+    <code>/level rang</code> zeigt den eigenen Stand als Bild. <code>/level rangliste</code> zeigt die Besten als Bild
+    mit Podium: Lifetime, die letzten 7 oder 30 Tage, zehn je Seite, mit Knöpfen zum Blättern und für die eigene Seite.
+    Der Pfeil neben jedem Platz zeigt, wie viele Plätze jemand seit sieben Tagen gestiegen oder gefallen ist. Im
+    Dashboard unter <b>Rangliste</b> stehen alle mit Level, Punkten, Nachrichten und Voice-Zeit, ebenfalls in den drei
+    Zeiträumen; die Liste zieht von selbst nach, sobald jemand Punkte sammelt. Dort gibst, ziehst oder setzt du auch Punkte von Hand,
+    jeweils mit Grund. Jede solche Änderung, auch mit <code>/level punkte</code>, steht im <b>Protokoll</b> darunter und
+    bleibt 180 Tage.
+  </p>
+  <p>
+    Auf Wunsch ist die Rangliste öffentlich unter <code>/rangliste/&lt;server&gt;</code>: mit Podium, allen Plätzen,
+    Suche, den drei Zeiträumen und einer Vorschau, wenn jemand den Link teilt. Wer mit Discord angemeldet ist, sieht
+    unten seinen eigenen Platz. Das ist ab Werk aus, weil damit Namen und Bilder deiner aktivsten Mitglieder öffentlich
+    werden.
   </p>
 
   <h2 id="giveaways">Giveaways</h2>
@@ -1029,7 +1144,8 @@ WTSI   = TS_2s × Rel_2s + TS_3s × Rel_3s</code></pre>
   <h3>Einrichten</h3>
   <p>
     Im Dashboard unter <b>Ticket System</b>, mit den Reitern Einrichtung, Themen, Aktionen, Nachrichten, Panel und
-    Sperrliste und einer Live-Vorschau daneben. In Discord führt <code>/ticket setup</code> durch dieselben Schritte.
+    Sperrliste und einer Live-Vorschau daneben. Die Nachrichten baust du im Studio (siehe
+    <a href="#ueberblick">Nachrichten bauen</a>). In Discord führt <code>/ticket setup</code> durch dieselben Schritte.
     Es gibt ein Panel je Server: <code>/ticket panel</code> oder <b>Panel senden</b> legt nie ein zweites daneben,
     sondern aktualisiert oder zieht um.
   </p>
@@ -1163,6 +1279,35 @@ WTSI   = TS_2s × Rel_2s + TS_3s × Rel_3s</code></pre>
     <li>Auch bearbeitete Nachrichten werden geprüft. Jeder Eingriff landet auf Wunsch mit dem entfernten Text in einem Meldekanal.</li>
   </ul>
 
+  <h2 id="anti-villain">Anti Villain</h2>
+  <p class="doc__kicker">Moderation · Modul <code>anti-villain</code></p>
+  <p>
+    Hält gekaperte Accounts, Raids und Nukes auf, bevor ein Moderator online ist. Auto Mod prüft Nachrichten, Anti
+    Villain schaut auf Accounts: Mehrere Auffälligkeiten zusammen ergeben einen Verdacht, und ab einer Schwelle hält
+    der Bot die Person fest, bis das Team nachgesehen hat. Festhalten heißt nicht bestrafen.
+  </p>
+  <table class="doc__table">
+    <thead><tr><th>Wächter</th><th>Was er erkennt</th></tr></thead>
+    <tbody>
+      <tr><td>Kanal-Sprung</td><td>Gleiche Nachricht oder gleiches Bild in 3 Kanälen binnen einer Minute. 50 Punkte.</td></tr>
+      <tr><td>Betrugslink</td><td>Bekannte Maschen und nachgemachte Seiten wie <code>dlscord</code>. 40 Punkte.</td></tr>
+      <tr><td>QR-Code im Bild</td><td>„Scann für Nitro“: Der Bot liest QR-Codes in Bildern. 40 Punkte.</td></tr>
+      <tr><td>Doppelgänger</td><td>Name oder Avatar fast wie bei einem Teammitglied. 60 Punkte.</td></tr>
+      <tr><td>@everyone-Versuch</td><td><code>@everyone</code> oder <code>@here</code> ohne das Recht dazu. 30 Punkte.</td></tr>
+      <tr><td>Meldungen</td><td>Mitglieder melden über Rechtsklick → Apps → „Hack melden“. 25 Punkte je Melder, Accounts unter 7 Tagen zählen nicht.</td></tr>
+      <tr><td>Neuer Account, Schläfer</td><td>Jünger als 7 Tage, oder 90 Tage still und dann Links. Je 20 Punkte, nur zusammen mit anderem.</td></tr>
+      <tr><td>Köder</td><td>Schreibt in den Köder-Kanal <code>#nicht-schreiben</code> oder nimmt sich die Köder-Rolle. 100 Punkte.</td></tr>
+    </tbody>
+  </table>
+  <ul class="doc__bullets">
+    <li><b>Schutzstufe:</b> Locker meldet ab 40 nur ans Team, Normal meldet ab 40 und hält ab 70 fest, Streng ab 30 und 50. Die Punkte verfallen nach einer Stunde.</li>
+    <li><b>Festhalten:</b> Rollen werden gemerkt und abgenommen, die Rolle „Quarantäne“ sieht nur den Quarantäne-Kanal, Nachrichten der letzten Stunde verschwinden. Dort und per DM steht, was die Person tun soll.</li>
+    <li><b>Das Team entscheidet</b> in der Karte im Meldekanal oder im Dashboard: Freigeben (Rollen zurück), War kein Hack (30 Tage vertraut), Bannen. Team-Accounts werden ab Werk nur gemeldet.</li>
+    <li><b>Raid-Schutz:</b> ab 10 Beitritten in 30 Sekunden Einladungen pausieren, Slowmode, die Welle festhalten, Team anpingen. Endet nach 15 ruhigen Minuten oder von Hand. Braucht <code>GUILD_MEMBER_INTENT</code>.</li>
+    <li><b>Anti-Nuke:</b> Wer in 10 Minuten zu viele Kanäle oder Rollen löscht, bannt, Webhooks anlegt oder Bots einlädt, verliert sofort alle Rollen. Nur der Server-Besitzer ist ausgenommen. Vorher legt der Bot ein Sicherheits-Backup an, das 7 Tage unter „Meine Backups“ steht.</li>
+    <li>Läuft ein Raid, steht ein roter Balken über jeder Modulseite. Alles, was Anti Villain tut, steht 30 Tage im Protokoll.</li>
+  </ul>
+
   <h2 id="logging">Logging System</h2>
   <p class="doc__kicker">Moderation · Modul <code>logging</code></p>
   <p>
@@ -1240,8 +1385,8 @@ WTSI   = TS_2s × Rel_2s + TS_3s × Rel_3s</code></pre>
     Sperre in Sekunden und Filter nach Kanälen und Rollen. Bis zu 50 Stichwörter.
   </p>
   <p class="hintline">
-    Im Editor stehen Vorlagen, Platzhalter und die Emojis des Servers bereit. Bilder kommen aus der Galerie. Die
-    Farbe am Rand einer Karte schaltest du mit <b>Custom Color</b> an oder aus.
+    Gebaut wird im Studio (siehe <a href="#ueberblick">Nachrichten bauen</a>). Bilder kommen aus der Galerie, den
+    farbigen Rand einer Karte schaltest du im Fach <b>Stil</b> an oder aus.
   </p>
 
   <h2 id="gallery">Gallery System</h2>
@@ -1261,11 +1406,15 @@ WTSI   = TS_2s × Rel_2s + TS_3s × Rel_3s</code></pre>
   <p class="doc__kicker">Immer dabei · Modul <code>backups</code>, immer an</p>
   <p>
     Der Stand deines Servers zum Zurückholen: Module und Einstellungen, Nachrichten und Panels und die Daten der
-    Mitglieder wie Level, Tickets oder Verwarnungen.
+    Mitglieder wie Level, Tickets oder Verwarnungen. Auf Wunsch auch der Discord-Server selbst: Rollen, Kanäle,
+    Rechte, wer welche Rolle hat, Emojis, Bans und die Servereinstellungen.
   </p>
   <ul class="doc__bullets">
-    <li>Von Hand sicherst du unter <b>Backups</b>, auf Wunsch mit Notiz. Bis zu zehn Backups von Hand bleiben, bis du sie löschst.</li>
-    <li>Automatisch sichert der Bot jeden Tag, alle drei Tage, jede Woche oder jeden Monat zu einer vollen Stunde. Wie viele bleiben (1 bis 14), stellst du ein, ältere löscht er selbst.</li>
+    <li>Von Hand sicherst du unter <b>Backups</b>, auf Wunsch mit Notiz und mit den Teilen <b>Bot</b> und <b>Discord-Server</b>. Bis zu zehn Backups von Hand bleiben, bis du sie löschst.</li>
+    <li>Den Discord-Server lädst du mit <b>Reparieren</b> (legt an, was fehlt, löscht nichts), <b>Genau wie im Backup</b> (fragt vorher extra nach) oder <b>Auf einen anderen Server</b>. Danach zeigen die Einstellungen des Bots auf die neuen Kanäle und Rollen, und fehlende Panels stehen wieder da. Bans hebt der Bot nie auf.</li>
+    <li>Ein Laden läuft weiter, auch wenn du die Seite schließt oder der Bot neu startet. Den Fortschritt siehst du im Dashboard und im Meldekanal der Backups.</li>
+    <li>In Discord geht das meiste mit <code>/backup</code>: neu, liste, ansehen, vergleichen, laden, automatisch.</li>
+    <li>Automatisch sichert der Bot jeden Tag, alle drei Tage, jede Woche oder jeden Monat zu einer vollen Stunde, auf Wunsch mit dem Discord-Server. Wie viele bleiben (1 bis 14), stellst du ein, ältere löscht er selbst.</li>
     <li>Unter <b>Meine Backups</b> siehst du, was in einem Backup steckt, und holst einzelne Bereiche zurück. Bestätigt wird mit dem Namen des Servers.</li>
     <li>Vor jedem Zurückladen sichert der Bot den jetzigen Stand. 72 Stunden lang lässt es sich so rückgängig machen. Fehlende Panels postet er danach neu.</li>
     <li>Zusätzlich sichert RL Nexus jede Nacht alle Server für den Notfall. Diese Backups siehst du nicht, brauchst du eins, hilft dir der Support.</li>

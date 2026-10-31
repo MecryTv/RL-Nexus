@@ -9,7 +9,7 @@ import { ModuleRegistry } from "./ModuleRegistry";
  * Kein Context: Die Modulliste steht fest, bevor die erste Komponente
  * geladen ist. `main.tsx` holt die Module aus dem Admin Dashboard, setzt sie
  * hier und importiert erst danach `App`. Dadurch sehen auch Stellen, die
- * ihre Werte schon beim Import lesen (Zahlen im Hero, `CommandsPage`), die
+ * ihre Werte schon beim Import lesen (Zahlen im Hero), die
  * geladene Liste.
  */
 let definitions: readonly IModuleDefinition[] = MODULE_DEFINITIONS;

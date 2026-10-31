@@ -101,14 +101,12 @@ export const WELCOME_PLACEHOLDERS: IPlaceholder[] = [
 
 export const WELCOME_IMAGES = ["{user.avatar}", "{guild.icon}"];
 
-/** Die Übersicht der Teams - was in der einen Nachricht oben steht. */
+/** Der Kopf des Hubs. Ohne {teams}: die Teams setzt der Bot selbst darunter (W-0026). */
 export const TEAM_BOARD_PLACEHOLDERS: IPlaceholder[] = [
     { key: "guild", label: "Servername", sample: "Dein Server" },
     { key: "guild.icon", label: "Server-Icon (Bild)", sample: "" },
-    { key: "teams", label: "Alle Teams mit Kader", sample: "### Main\n**Vyrox Main** `VYX` · MMR 1386 · 4 Spieler\n-# @Nico, @Mo, Lena" },
-    { key: "teams.short", label: "Alle Teams, nur die Zeile", sample: "**Vyrox Main** `VYX` · MMR 1386" },
     { key: "teams.count", label: "Anzahl der Teams", sample: "2" },
-    { key: "groups.count", label: "Anzahl der Gruppen", sample: "2" },
+    { key: "groups.count", label: "Anzahl der Kategorien", sample: "2" },
     { key: "mmr.mode", label: "Grundlage der MMR", sample: "WTSI" },
     { key: "updated", label: "Stand der Werte", sample: "vor 5 Minuten" },
 ];
@@ -117,7 +115,8 @@ export const TEAM_BOARD_PLACEHOLDERS: IPlaceholder[] = [
 export const TEAM_CARD_PLACEHOLDERS: IPlaceholder[] = [
     { key: "team.name", label: "Name des Teams", sample: "Vyrox Main" },
     { key: "team.tag", label: "Kürzel", sample: "VYX" },
-    { key: "team.group", label: "Gruppe", sample: "Main" },
+    { key: "team.region", label: "Region", sample: "EU" },
+    { key: "team.group", label: "Kategorie", sample: "Main" },
     { key: "team.description", label: "Beschreibung", sample: "Unser Hauptkader für die Quali." },
     { key: "team.mmr", label: "Team-MMR", sample: "1386" },
     { key: "team.rank", label: "Team-Rang, nach „Ränge zeigen als“", sample: "Grand Champion I Div I" },
@@ -148,45 +147,6 @@ export const TEAM_CARD_PLACEHOLDERS: IPlaceholder[] = [
 ];
 
 export const TEAM_IMAGES = ["{team.logo}", "{guild.icon}"];
-
-/**
- * {teams}: was in der Zeile je Team geht - dieselben Werte wie in der
- * Team-Karte, dazu {team.members}. Beispiele braucht es keine, die Vorschau der
- * Teams-Liste zeigt die echten Teams.
- */
-export const TEAM_LIST_PLACEHOLDERS: IPlaceholder[] = [
-    { key: "team.name", label: "Name des Teams", sample: "" },
-    { key: "team.tag", label: "Kürzel – ohne fällt es samt Backticks weg", sample: "" },
-    { key: "team.rank", label: "Team-Rang, nach „Ränge zeigen als“", sample: "" },
-    { key: "team.rank.short", label: "Team-Rang kurz", sample: "" },
-    { key: "team.rank.icon", label: "Team-Rang immer als Icon", sample: "" },
-    { key: "team.mmr", label: "Team-MMR", sample: "" },
-    { key: "team.players", label: "Wie viele spielen", sample: "" },
-    { key: "team.members", label: "Die Spieler – wie unten eingestellt", sample: "" },
-    { key: "team.members.staff", label: "Coach und Manager – ebenso", sample: "" },
-    { key: "team.lineup", label: "Die Aufstellung (mehrzeilig)", sample: "" },
-    { key: "team.staff", label: "Der Staff (mehrzeilig)", sample: "" },
-    { key: "team.group", label: "Gruppe", sample: "" },
-    { key: "team.description", label: "Beschreibung", sample: "" },
-    { key: "team.leagues", label: "Liga-Links", sample: "" },
-    { key: "team.role", label: "Rolle des Teams", sample: "" },
-    { key: "team.channel", label: "Kanal des Teams", sample: "" },
-];
-
-/** Ein Spieler in {team.members} - dieselben Felder wie MEMBER_FIELDS (constants/TeamList.ts), check:teams vergleicht. */
-export const TEAM_MEMBER_PLACEHOLDERS: IPlaceholder[] = [
-    { key: "spieler", label: "Spieler (Erwähnung)", sample: "" },
-    { key: "spieler.name", label: "Name", sample: "" },
-    { key: "spieler.role", label: "Aufgabe, nach „Aufgaben zeigen als“", sample: "" },
-    { key: "spieler.role.icon", label: "Aufgabe immer als Abzeichen", sample: "" },
-    { key: "spieler.rank", label: "Rang nach der Rechnung", sample: "" },
-    { key: "spieler.rank.short", label: "Rang kurz", sample: "" },
-    { key: "spieler.rank.icon", label: "Rang immer als Icon", sample: "" },
-    { key: "spieler.mmr", label: "MMR-Wert", sample: "" },
-    { key: "spieler.current", label: "Aktuelle MMR", sample: "" },
-    { key: "spieler.peak", label: "Peak", sample: "" },
-    { key: "spieler.tracker", label: "Tracker-Link", sample: "" },
-];
 
 /** Ein ausgeschriebener Rang: "Grand Champion I Div II", "Champion III", "Supersonic Legend". */
 const RANK_TEXT = /(Grand Champion|Champion|Diamant|Platin|Gold|Silber|Bronze) (III|II|I)(?: Div (?:IV|III|II|I))?|Supersonic Legend|Unranked/g;
@@ -332,6 +292,9 @@ export const LFT_NOTICE_PLACEHOLDERS: IPlaceholder[] = [
     { key: "erstellt", label: "Erstellt (Zeitpunkt)", sample: "vor 2 Minuten" },
 ];
 
+/** Das Panel im Forum (Plan 30): gehört niemandem, deshalb nur der Server. Wie LFT_PANEL_KEYS im Bot. */
+export const LFT_PANEL_PLACEHOLDERS: IPlaceholder[] = LFT_WHO.filter((entry) => entry.key.startsWith("guild"));
+
 export const LFT_IMAGES = ["{user.avatar}", "{guild.icon}"];
 
 /* ----------------------------------------------------------
@@ -350,6 +313,7 @@ export const MATCHUP_PLACEHOLDERS: IPlaceholder[] = [
     { key: "team", label: "Eigenes Team", sample: "Vyrox Main" },
     { key: "team.tag", label: "Kürzel", sample: "VYX" },
     { key: "team.role", label: "Rolle des Teams (Erwähnung)", sample: "@Vyrox Main" },
+    { key: "team.logo", label: "Team-Logo (Bild, sonst Server-Icon)", sample: "" },
     { key: "gegner", label: "Gegner", sample: "Ascension" },
     { key: "liga", label: "Liga oder Turnier", sample: "RLCS Quali" },
     { key: "modus", label: "Modus", sample: "3v3 Standard" },
@@ -361,6 +325,9 @@ export const MATCHUP_PLACEHOLDERS: IPlaceholder[] = [
     { key: "stream.link", label: "Stream als reine Adresse", sample: "https://twitch.tv/mecrytv" },
     { key: "notiz", label: "Notiz", sample: "Server EU, Anpfiff pünktlich." },
     { key: "eingetragen", label: "Wer eingetragen hat", sample: "Nico" },
+    { key: "bilanz", label: "Bilanz des Teams", sample: "9 Siege · 3 Niederlagen" },
+    { key: "serie", label: "Serie (ab zwei gleichen)", sample: "3 Siege in Folge" },
+    { key: "form", label: "Form der letzten 5", sample: "🟩🟩🟩🟥🟩" },
 ];
 
 /** Die Ergebnis-Nachricht kennt zusätzlich den Ausgang. */
@@ -370,7 +337,7 @@ export const MATCHUP_RESULT_PLACEHOLDERS: IPlaceholder[] = [
     { key: "ausgang", label: "Sieg, Niederlage oder Unentschieden", sample: "✅ Sieg" },
 ];
 
-export const MATCHUP_IMAGES = ["{guild.icon}"];
+export const MATCHUP_IMAGES = ["{team.logo}", "{guild.icon}"];
 
 /* ----------------------------------------------------------
    2, 4 & 6 Mans

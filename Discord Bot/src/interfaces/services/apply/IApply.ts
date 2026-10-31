@@ -70,16 +70,42 @@ export interface IApplySubmission {
     decidedName: string | null;
     decidedAt: number | null;
     messageId: string | null;
+    /** Der eigene Kanal dieser Bewerbung (Plan 30). null: die Karte liegt im Sammelkanal. */
+    channelId: string | null;
     createdAt: number;
 }
 
+/** Wo man sich bewirbt: auf der Webseite, in einem Fenster in Discord oder per DM. */
+export type ApplyMode = "web" | "modal" | "dm";
+
+/** Das Panel in Discord, falls gesendet. Schreibt nur der Bot. */
+export interface IApplyPanel {
+    channelId: string | null;
+    messageId: string | null;
+}
+
+/** Wo die Karte landet (Plan 30): im Sammelkanal wie bisher oder in einem eigenen Kanal je Bewerbung. */
+export type ApplyTarget = "shared" | "channel";
+
+/** Was nach der Entscheidung mit dem eigenen Kanal passiert. */
+export type AfterDecision = "delete" | "close" | "keep";
+
 /** Was im Modul gilt - eine Zeile je Server in module_settings. */
 export interface IApplySettings {
+    /** Wo man sich bewirbt. Gilt für alle Formulare. */
+    mode: ApplyMode;
+    panel: IApplyPanel;
     /** Wer Bewerbungen sehen und entscheiden darf. */
     reviewRoles: string[];
     reviewUsers: string[];
     /** Der Kanal für die Karten, wenn ein Formular keinen eigenen hat. */
     channelId: string | null;
-    /** Der öffentliche Link steht offen. */
+    /** Bewerbungen werden angenommen, auf jedem Weg. */
     open: boolean;
+    target: ApplyTarget;
+    /** Kategorie für die eigenen Kanäle. null: ganz oben. */
+    categoryId: string | null;
+    /** Name des eigenen Kanals mit {user}, {nummer} und {formular}. */
+    channelName: string;
+    afterDecision: AfterDecision;
 }

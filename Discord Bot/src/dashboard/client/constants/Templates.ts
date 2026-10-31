@@ -309,81 +309,42 @@ export const TEMPLATES: Record<TemplateScope, ITemplate[]> = {
     ],
 
     /* ---------------------------------------------------- Team-Übersicht */
+    // Der Kopf des Hubs (Plan 27): immer eine Karte, die Teams setzt der Bot selbst darunter - deshalb ohne {teams} (W-0026).
     teamBoard: [
         {
             id: "starter",
             name: "Für den Anfang",
-            hint: "Aufgeräumt und selbsterklärend – gut, wenn du noch nichts eingerichtet hast",
+            hint: "Kurz und selbsterklärend, wie ab Werk",
             body: {
                 kind: "v2",
                 content: "",
-                doc: card(
-                    BLUE,
-                    "# 🛡️ Unsere Teams",
-                    "So sind wir aufgestellt. Die Ränge holt der Bot selbst – die Liste bleibt also aktuell.",
-                    "---",
-                    "{teams}",
-                    "---",
-                    "-# {teams.count} Teams · Stand {updated} · Fragen? Sprich das Team an."
-                ),
+                doc: card(BLUE, "# 🛡️ Unsere Teams", "Hier steht, wer für uns spielt. Wähl unten ein Team, dann siehst du Kader, Ränge und MMR."),
             },
         },
         {
-            id: "roster",
-            name: "Alle Teams",
-            hint: "Überschrift, darunter jede Gruppe mit ihren Kadern",
+            id: "numbers",
+            name: "Mit Zahlen",
+            hint: "Server, Anzahl der Teams und Kategorien, Grundlage der MMR",
             body: {
                 kind: "v2",
                 content: "",
                 doc: card(
                     BLUE,
-                    "# 🛡️ Competitive Teams",
-                    "-# {teams.count} Teams · Stand {updated}",
+                    "# 🛡️ {guild}",
+                    "{teams.count} Teams in {groups.count} Kategorien · Team-MMR nach {mmr.mode}",
                     "---",
-                    "{teams}"
+                    "-# Die Ränge holt der Bot aus Rocket League · Stand {updated}"
                 ),
             },
         },
         {
             id: "pick",
             name: "Zum Aussuchen",
-            hint: "Kurze Liste – die Kader kommen über das Menü",
+            hint: "Rot, mit kurzem Hinweis aufs Menü",
             body: {
                 kind: "v2",
                 content: "",
-                doc: card(
-                    RED,
-                    "# 🛡️ {guild}",
-                    "Wähl unten ein Team – den Kader siehst nur du.",
-                    "---",
-                    "{teams.short}",
-                    "-# Die Ränge kommen aus Rocket League · Stand {updated}"
-                ),
-            },
-        },
-        {
-            id: "board-embed",
-            name: "Als Embed",
-            hint: "Schlichter, für Kanäle mit vielen Karten",
-            body: {
-                kind: "embed",
-                content: "",
-                embed: embed({
-                    title: "🛡️ Competitive Teams",
-                    description: "{teams}",
-                    color: BLUE,
-                    thumbnail: "{guild.icon}",
-                    footer: { text: "{teams.count} Teams · Stand aktualisiert sich automatisch", icon: null },
-                }),
-            },
-        },
-        {
-            id: "board-plain",
-            name: "Nur Text",
-            hint: "Ohne Karte und Embed – mit Auswahlmenü trotzdem möglich",
-            body: {
-                kind: "text",
-                content: "**🛡️ Unsere Teams**\n\n{teams}\n\n-# {teams.count} Teams · Stand {updated}",
+                doc: card(RED, "# 🛡️ {guild}", "Wähl unten ein Team – den Kader siehst nur du.", "-# Die Ränge kommen aus Rocket League · Stand {updated}"),
             },
         },
     ],

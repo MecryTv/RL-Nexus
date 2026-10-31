@@ -1,6 +1,7 @@
 import { type JSX, lazy, Suspense } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { Layout } from "./components/layout/Layout";
+import { useMaintenanceGuard } from "./hooks/useMaintenanceGuard";
 import { HomePage } from "./pages/HomePage";
 import type { IBanner, ILoaded } from "./services/Content";
 
@@ -14,7 +15,6 @@ import type { IBanner, ILoaded } from "./services/Content";
 const ModulesPage = lazy(() => import("./pages/ModulesPage").then((m) => ({ default: m.ModulesPage })));
 const ModuleDetailPage = lazy(() => import("./pages/ModuleDetailPage").then((m) => ({ default: m.ModuleDetailPage })));
 const PreviewPage = lazy(() => import("./pages/PreviewPage").then((m) => ({ default: m.PreviewPage })));
-const CommandsPage = lazy(() => import("./pages/CommandsPage").then((m) => ({ default: m.CommandsPage })));
 const PricingPage = lazy(() => import("./pages/PricingPage").then((m) => ({ default: m.PricingPage })));
 const TeamPage = lazy(() => import("./pages/TeamPage").then((m) => ({ default: m.TeamPage })));
 const ContactPage = lazy(() => import("./pages/ContactPage").then((m) => ({ default: m.ContactPage })));
@@ -24,10 +24,18 @@ const AccessPage = lazy(() => import("./pages/AccessPage").then((m) => ({ defaul
 const CancelPage = lazy(() => import("./pages/CancelPage").then((m) => ({ default: m.CancelPage })));
 const NotFoundPage = lazy(() => import("./pages/NotFoundPage").then((m) => ({ default: m.NotFoundPage })));
 
+/** Braucht den Router, deshalb eine eigene kleine Komponente darin. */
+function MaintenanceGuard(): null {
+    useMaintenanceGuard();
+
+    return null;
+}
+
 /** `banner` lädt `main.tsx` vor dem ersten Bild, `null` heißt: kein Banner. */
 export function App({ banner }: { readonly banner: ILoaded<IBanner> | null }): JSX.Element {
     return (
         <BrowserRouter>
+            <MaintenanceGuard />
             <Routes>
                 {/* Für den Modul-Editor im Admin Dashboard: ohne Kopf, Fuß und Banner. */}
                 <Route
@@ -42,7 +50,8 @@ export function App({ banner }: { readonly banner: ILoaded<IBanner> | null }): J
                     <Route index element={<HomePage />} />
                     <Route path="module" element={<ModulesPage />} />
                     <Route path="module/:id" element={<ModuleDetailPage />} />
-                    <Route path="commands" element={<CommandsPage />} />
+                    {/* Die Befehle zeigt der Hilfe-Befehl in Discord (W-0013). Alte Links landen bei den Modulen. */}
+                    <Route path="commands" element={<Navigate to="/module" replace />} />
                     <Route path="preise" element={<PricingPage />} />
                     <Route path="team" element={<TeamPage />} />
                     {/* Die Kaderübersicht war einmal eine eigene Seite und ist

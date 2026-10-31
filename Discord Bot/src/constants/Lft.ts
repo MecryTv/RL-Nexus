@@ -1,4 +1,4 @@
-import { ILftBody, ILftDm, ILftNotice, ILftQuestion, ILftSettings, ILftSide, LftKind, LftQuestionKind } from "../interfaces/services/lft/ILft";
+import { ILftBody, ILftDm, ILftNotice, ILftPanel, ILftQuestion, ILftSettings, ILftSide, LftAsk, LftKind, LftQuestionKind } from "../interfaces/services/lft/ILft";
 
 /**
  * Looking for: Grenzen, Vorgaben und Beschriftungen. Siehe docs/LookingFor.md.
@@ -14,6 +14,19 @@ export const LFT_MODULE = "lft";
  * Gespräch und sind mit ihm zu Ende.
  */
 export const LFT_PREFIX = "lf";
+
+/**
+ * Plan 30: die Knöpfe und Fenster beim Fragen im Fenster. Sie tragen die ID
+ * des Entwurfs - nach einem Neustart sind sie abgelaufen:
+ *   lfflow:modal:<entwurf>:<teil>   ein Teil der Fragen
+ *   lfflow:next:<entwurf>           weiter zum nächsten Teil
+ *   lfflow:retry:<entwurf>          denselben Teil noch einmal
+ *   lfflow:cancel:<entwurf>         abbrechen
+ */
+export const LFT_FLOW_PREFIX = "lfflow";
+
+/** So lange bleiben halbe Antworten im Fenster liegen, ab der letzten Aktivität. */
+export const LFT_DRAFT_TTL = 30 * 60_000;
 
 export const LFT_ACCENT = "#00afff";
 
@@ -132,6 +145,17 @@ export const LFT_NOTICE_KEYS = [
     "forum",
     "erstellt",
 ] as const;
+
+/** Das Panel im Forum (Plan 30) - es gehört niemandem, deshalb nur der Server. */
+export const LFT_PANEL_KEYS = ["guild", "guild.id", "guild.icon"] as const;
+
+export const LFT_ASKS: readonly LftAsk[] = ["dm", "modal"];
+
+/** Die Knöpfe unter dem Panel, je Seite einer. Fest, damit jeder sofort weiß, welcher seiner ist. */
+export const PANEL_BUTTONS: Record<LftKind, { label: string; emoji: string }> = {
+    player: { label: "Ich suche ein Team", emoji: "🔎" },
+    team: { label: "Wir suchen Spieler", emoji: "📣" },
+};
 
 /** Was als Bildquelle taugt - beide ergeben eine Adresse. */
 export const LFT_IMAGES = ["{user.avatar}", "{guild.icon}"] as const;
@@ -261,12 +285,32 @@ export function DefaultSide(kind: LftKind): ILftSide {
     };
 }
 
+/** Das Panel im Forum, wie es ab Werk aussieht (Plan 30). Die Knöpfe hängt der Bot an. */
+export function DefaultPanel(): ILftPanel {
+    return {
+        forumId: null,
+        title: "📌 Hier geht's los",
+        body: card(
+            LFT_ACCENT,
+            "## 🔎 Looking for",
+            "Du suchst ein Team oder ihr sucht Spieler? Klick unten auf den passenden Knopf. Ich stelle dir ein paar Fragen, danach steht dein Beitrag hier im Forum.",
+            "---",
+            "-# Geht auch mit `/lookingfor`"
+        ),
+        threadId: null,
+        messageId: null,
+    };
+}
+
 export function DefaultLftSettings(): ILftSettings {
     return {
         player: DefaultSide("player"),
         team: DefaultSide("team"),
         notice: DefaultNotice(),
         dm: DefaultDm(),
+        // Plan 30: ab Werk wie bisher per DM.
+        ask: "dm",
+        panel: DefaultPanel(),
         expireDays: 30,
         manageRoles: [],
     };

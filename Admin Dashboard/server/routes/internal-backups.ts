@@ -1,10 +1,11 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
-import { AREAS, BACKUP_NOTE_MAX, PLAN_EVERY, PLAN_KEEP_MAX, SERVER_HAND_MAX, type IBackupDetail, type IBackupMeta, type IBackupPlan, type IPlanState, type IRestoreResult, type IServerBackups, type PlanEvery } from "../../shared/backups.ts";
+import { AREA_IDS, AREAS, BACKUP_NOTE_MAX, BACKUP_PARTS, DEFAULT_PLAN, PLAN_EVERY, PLAN_KEEP_MAX, RESTORE_MODES, SERVER_HAND_MAX, SERVER_PART_IDS, type AreaId, type BackupPart, type RestoreMode, type ServerPartId, type IBackupDetail, type IBackupMeta, type IBackupPlan, type IPlanState, type IRestoreResult, type IServerBackups, type IServerPartJson, type PlanEvery } from "../../shared/backups.ts";
 import { audit, type IActor } from "../audit.ts";
 import { planState } from "../backups/plan.ts";
+import { remapGuild } from "../backups/remap.ts";
 import { restoreBackup } from "../backups/restore.ts";
-import { backupData, countHand, createBackup, deleteBackup, listBackups, readPlan, savePlan } from "../backups/store.ts";
-import { verifyToken } from "../bot.ts";
+import { backupData, backupServer, countHand, createBackup, deleteBackup, listBackups, readPlan, restoreRunning, savePlan } from "../backups/store.ts";
+import { botSnapshot, verifyToken } from "../bot.ts";
 import type { IConfig } from "../config.ts";
 import { PublicError } from "../errors.ts";
 import { body, id, snowflake } from "../validate.ts";
@@ -21,6 +22,13 @@ import { needBackups, parseRestore } from "./backups.ts";
 const SCOPE = "backups";
 const SUBJECT = /^dashboard:(\d{17,20})$/;
 const VIA = "über das Bot-Dashboard";
+
+/**
+ * Server, für die gerade ein Backup von Hand entsteht. Sonst zählen zwei Klicks
+ * zugleich beide 9 von 10 und legen beide an (W-0023).
+ * ponytail: Sperre im Prozess, reicht für den einen Admin-Container; bei mehreren eine Sperre in der Datenbank.
+ */
+const creating = new Set<string>();
 
 function header(request: FastifyRequest, name: string): string | null {
     const raw = request.headers[name];
@@ -65,8 +73,75 @@ export function parsePlan(raw: unknown): IBackupPlan {
     if (!whole(input.weekday, 0, 6)) throw new PublicError(400, "Der Wochentag geht von 0 (Montag) bis 6 (Sonntag).");
     if (!whole(input.hour, 0, 23)) throw new PublicError(400, "Die Uhrzeit ist eine volle Stunde von 0 bis 23.");
     if (!whole(input.keep, 1, PLAN_KEEP_MAX)) throw new PublicError(400, `Behalten geht von 1 bis ${PLAN_KEEP_MAX}.`);
+    // Plan 32: Ein älteres Bot-Dashboard schickt die beiden Schalter nicht - dann gelten die Vorgaben.
+    if (input.discord !== undefined && typeof input.discord !== "boolean") throw new PublicError(400, "Sag, ob der Discord-Server mitgesichert werden soll.");
+    if (input.risky !== undefined && typeof input.risky !== "boolean") throw new PublicError(400, "Sag, ob vor riskanten Änderungen gesichert werden soll.");
 
-    return { enabled: input.enabled, every: input.every as PlanEvery, weekday: input.weekday as number, hour: input.hour as number, keep: input.keep as number };
+    return {
+        enabled: input.enabled,
+        every: input.every as PlanEvery,
+        weekday: input.weekday as number,
+        hour: input.hour as number,
+        keep: input.keep as number,
+        discord: (input.discord as boolean | undefined) ?? DEFAULT_PLAN.discord,
+        risky: (input.risky as boolean | undefined) ?? DEFAULT_PLAN.risky,
+    };
+}
+
+/** Plan 32: welche Teile ein Backup bekommen soll. Ohne Angabe nur der Bot. */
+function parseParts(raw: unknown): BackupPart[] {
+    if (raw === undefined) return ["bot"];
+    if (!Array.isArray(raw) || raw.length === 0 || !raw.every((part) => (BACKUP_PARTS as readonly unknown[]).includes(part))) throw new PublicError(400, "Sag, was ins Backup soll: Bot, Discord-Server oder beides.");
+
+    return BACKUP_PARTS.filter((part) => raw.includes(part));
+}
+
+/** Plan 32: was beim Laden des Discord-Servers kommen soll. */
+export function parseServerRestore(raw: unknown): { confirm: string; parts: ServerPartId[]; areas: AreaId[]; mode: RestoreMode; targetGuildId: string | null } {
+    const input = body(raw);
+    const confirm = typeof input.confirm === "string" ? input.confirm.trim() : "";
+    const list = (value: unknown, known: readonly string[]): value is string[] => Array.isArray(value) && value.every((entry) => typeof entry === "string" && known.includes(entry));
+
+    if (confirm === "") throw new PublicError(400, "Tipp zum Bestätigen den Namen des Servers ein.");
+    if (!list(input.parts, SERVER_PART_IDS) || input.parts.length === 0) throw new PublicError(400, "Wähl mindestens einen Teil des Discord-Servers.");
+    if (input.areas !== undefined && !list(input.areas, AREA_IDS)) throw new PublicError(400, "Diesen Bereich gibt es nicht.");
+    if (typeof input.mode !== "string" || !(RESTORE_MODES as readonly string[]).includes(input.mode)) throw new PublicError(400, "So lässt sich ein Backup nicht laden.");
+
+    const mode = input.mode as RestoreMode;
+    const targetGuildId = mode === "other" ? snowflake(input.targetGuildId, "Der andere Server") : null;
+
+    return {
+        confirm,
+        parts: SERVER_PART_IDS.filter((part) => (input.parts as string[]).includes(part)),
+        // Auf einen anderen Server kommen keine Bot-Daten (Spec).
+        areas: mode === "other" ? [] : [...new Set((input.areas ?? []) as AreaId[])],
+        mode,
+        targetGuildId,
+    };
+}
+
+/** Der Server-Teil vom Bot, wenn er gebraucht wird. Kommt er nicht, sagt der Fehler warum. */
+async function serverPart(config: IConfig, guildId: string, actor: IActor, parts: readonly BackupPart[]): Promise<IServerPartJson | null> {
+    if (!parts.includes("server")) return null;
+
+    const server = await botSnapshot(config, guildId, actor.id);
+    if (!server) throw new PublicError(502, "Den Discord-Server konnte der Bot gerade nicht lesen. Versuch es gleich noch einmal.");
+
+    return server;
+}
+
+/** Der Server-Teil ohne die Bilder - sie machen ihn um ein Vielfaches größer und braucht nur das Laden. */
+export function withoutImages(server: IServerPartJson): IServerPartJson {
+    const strip = (list: unknown, key: string): unknown => (Array.isArray(list) ? list.map((entry: Record<string, unknown>) => ({ ...entry, [key]: null })) : list);
+    const settings = server.settings as Record<string, unknown> | undefined;
+
+    return {
+        ...server,
+        roles: strip(server.roles, "icon"),
+        emojis: strip(server.emojis, "image"),
+        stickers: strip(server.stickers, "image"),
+        ...(settings ? { settings: { ...settings, icon: null, banner: null } } : {}),
+    };
 }
 
 export async function internalBackupRoutes(app: FastifyInstance, { config }: { config: IConfig }): Promise<void> {
@@ -91,15 +166,45 @@ export async function internalBackupRoutes(app: FastifyInstance, { config }: { c
     app.post("/internal/backups/:guildId", async (request): Promise<IBackupMeta> => {
         const actor = botActor(config, request);
         const guildId = guildOf(request);
-        const raw = body(request.body).note;
+        const input = body(request.body);
+        const raw = input.note;
         const note = typeof raw === "string" && raw.trim() !== "" ? raw.trim() : null;
         if (note !== null && note.length > BACKUP_NOTE_MAX) throw new PublicError(400, `Die Notiz darf höchstens ${BACKUP_NOTE_MAX} Zeichen haben.`);
+        if (input.kind !== undefined && input.kind !== "hand" && input.kind !== "schutz") throw new PublicError(400, "Diese Art von Backup gibt es hier nicht.");
+
+        const parts = parseParts(input.parts);
 
         await needBackups(config);
 
-        if ((await countHand(guildId, "server")) >= SERVER_HAND_MAX) throw new PublicError(409, `Alle ${SERVER_HAND_MAX} Plätze sind belegt. Lösch erst ein altes Backup.`);
+        // Plan 31: Anti Villain sichert vor einem Nuke. Ohne Plätze und ohne Sperre - es darf nie an einem vollen Server scheitern.
+        // Plan 32: nur mit „Vor riskanten Änderungen“, dann mit Bot und Server. Kommt der Server nicht, wenigstens der Bot.
+        if (input.kind === "schutz") {
+            if (!(await readPlan(guildId) ?? { plan: DEFAULT_PLAN }).plan.risky) return { skipped: "Vor riskanten Änderungen ist aus." } as unknown as IBackupMeta;
 
-        const meta = await createBackup({ guildId, guildName: header(request, "x-guild-name") ?? guildId, kind: "hand", note, byName: actor.name, origin: "server" });
+            const server = await botSnapshot(config, guildId, actor.id);
+            const safety = await createBackup({ guildId, guildName: header(request, "x-guild-name") ?? guildId, kind: "schutz", note, byName: actor.name, origin: "server", parts: ["bot", "server"], server });
+            await audit(actor, "backups.create", guildId, `Sicherheits-Backup · ${note ?? "Anti Villain"}`);
+
+            return safety;
+        }
+
+        if (await restoreRunning(guildId)) throw new PublicError(409, "Gerade wird ein Backup geladen. Danach geht es wieder.");
+        if (creating.has(guildId)) throw new PublicError(409, "Gerade entsteht schon ein Backup. Warte kurz.");
+
+        creating.add(guildId);
+
+        let meta: IBackupMeta;
+
+        try {
+            if ((await countHand(guildId, "server")) >= SERVER_HAND_MAX) throw new PublicError(409, `Alle ${SERVER_HAND_MAX} Plätze sind belegt. Lösch erst ein altes Backup.`);
+
+            const server = await serverPart(config, guildId, actor, parts);
+
+            meta = await createBackup({ guildId, guildName: header(request, "x-guild-name") ?? guildId, kind: "hand", note, byName: actor.name, origin: "server", parts, server });
+        } finally {
+            creating.delete(guildId);
+        }
+
         await audit(actor, "backups.create", guildId, note ? `${VIA} · ${note}` : VIA);
 
         return meta;
@@ -116,6 +221,71 @@ export async function internalBackupRoutes(app: FastifyInstance, { config }: { c
         await audit(actor, "backups.plan", guildId, plan.enabled ? `${VIA} · ${plan.every}, ${plan.hour}:00, ${plan.keep} behalten` : `${VIA} · aus`);
 
         return planState(row);
+    });
+
+    // Plan 32: der Server-Teil eines Backups - zum Ansehen, Vergleichen und Planen im Bot. Ohne Bilder, außer images=1.
+    app.get("/internal/backups/:guildId/:backupId/server", async (request) => {
+        botActor(config, request);
+
+        const guildId = guildOf(request);
+        const backupId = backupOf(request);
+
+        await needBackups(config);
+
+        if (!(await listBackups(guildId, "server")).some((entry) => entry.id === backupId)) throw new PublicError(404, "Dieses Backup gibt es nicht.");
+
+        const server = await backupServer(backupId, guildId);
+        if (!server) throw new PublicError(404, "Dieses Backup hat keinen Discord-Server.");
+        if ((request.query as { images?: string }).images === "1") return server;
+
+        return withoutImages(server);
+    });
+
+    // Plan 32: Laden des Discord-Servers beginnen. Prüft den Namen (beim anderen Server den des Ziels), legt
+    // „vorher“ mit dem an, was geladen wird, und gibt den Server-Teil ohne Bilder zurück. Die Schritte macht der Bot.
+    app.post("/internal/backups/:guildId/:backupId/server", async (request) => {
+        const actor = botActor(config, request);
+        const guildId = guildOf(request);
+        const backupId = backupOf(request);
+        const input = parseServerRestore(request.body);
+        const target = input.targetGuildId ?? guildId;
+
+        await needBackups(config);
+
+        const found = (await listBackups(guildId, "server")).find((entry) => entry.id === backupId);
+        if (!found) throw new PublicError(404, "Dieses Backup gibt es nicht.");
+
+        const server = await backupServer(backupId, guildId);
+        if (!server) throw new PublicError(404, "Dieses Backup hat keinen Discord-Server.");
+
+        const name = input.targetGuildId ? (header(request, "x-target-name") ?? target) : found.guildName;
+        if (input.confirm.toLowerCase() !== name.trim().toLowerCase()) throw new PublicError(400, `Tipp den Namen des Servers genau so ein: „${name}“.`);
+        if (await restoreRunning(target)) throw new PublicError(409, "Gerade wird dort schon ein Backup geladen.");
+
+        const parts: BackupPart[] = input.areas.length > 0 ? ["bot", "server"] : ["server"];
+        const safety = await createBackup({
+            guildId: target,
+            guildName: input.targetGuildId ? name : (header(request, "x-guild-name") ?? found.guildName),
+            kind: "vorher",
+            note: `vor dem Laden von Backup ${backupId}`,
+            byName: actor.name,
+            origin: "server",
+            parts,
+            server: await serverPart(config, target, actor, parts),
+        });
+        const how = input.mode === "repair" ? "Reparieren" : input.mode === "exact" ? "Genau wie im Backup" : `auf ${name}`;
+
+        await audit(actor, "backups.restore", target, `${VIA} · Discord-Server, ${how} · Backup ${backupId}${input.targetGuildId ? ` von ${guildId}` : ""}`);
+
+        // backup: Art und Zeit braucht der Bot für das Fenster der Anti-Nuke-Trümmer.
+        return { safetyId: safety.id, server: withoutImages(server), backup: found };
+    });
+
+    // Plan 32: nach dem Laden die Daten des Bots auf die neuen IDs bringen.
+    app.post("/internal/backups/:guildId/remap", async (request) => {
+        botActor(config, request);
+
+        return remapGuild(guildOf(request));
     });
 
     app.get("/internal/backups/:guildId/:backupId", async (request): Promise<IBackupDetail> => {
@@ -151,11 +321,17 @@ export async function internalBackupRoutes(app: FastifyInstance, { config }: { c
 
         await needBackups(config);
 
-        const found = (await listBackups(guildId, "server")).find((entry) => entry.id === backupId);
+        const backups = await listBackups(guildId, "server");
+        const found = backups.find((entry) => entry.id === backupId);
         if (!found) throw new PublicError(404, "Dieses Backup gibt es nicht.");
         if (input.confirm.toLowerCase() !== found.guildName.trim().toLowerCase()) throw new PublicError(400, `Tipp den Namen des Servers genau so ein: „${found.guildName}“.`);
 
-        const result = await restoreBackup(config, { guildId, backupId, areas: input.areas, actor, origin: "server" });
+        // Plan 32: Nach dem Laden des Discord-Servers gibt es das „vorher“ schon.
+        const raw = (request.body as { safetyId?: unknown } | null)?.safetyId;
+        const safetyId = raw === undefined ? undefined : id(String(raw));
+        if (safetyId !== undefined && !backups.some((entry) => entry.id === safetyId && entry.kind === "vorher")) throw new PublicError(400, "Dieses Sicherheits-Backup gibt es nicht.");
+
+        const result = await restoreBackup(config, { guildId, backupId, areas: input.areas, actor, origin: "server", safetyId });
         const labels = AREAS.filter((area) => input.areas.includes(area.id)).map((area) => area.label);
         await audit(actor, "backups.restore", guildId, `${VIA} · ${labels.join(", ")} · Backup ${backupId}`);
 

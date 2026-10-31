@@ -10,11 +10,13 @@ import { BASE } from "../core/Base.js";
 import { icon, need } from "../core/Dom.js";
 import { toast } from "../core/Toast.js";
 import { api, button, card, el, IRole, loading, rolePicker, row, select, stat, toggle } from "../core/Ui.js";
-import { bodyEditor, IBody, IBodyEditor, IEmbed } from "../layout/BodyEditor.js";
+import { bodyEditor, IBody, ICustomStage, ICustomStageTools, IEmbed } from "../layout/BodyEditor.js";
 import { IEditorContext, IMessageDoc } from "../layout/MessageEditor.js";
 import { IServerEmoji } from "../layout/EmojiPicker.js";
 import { galleryUrl, loadGallery, pickImage } from "../layout/ImagePicker.js";
-import { fill, WELCOME_PLACEHOLDERS } from "../constants/Placeholders.js";
+import { cardStage, IStageView } from "../layout/CardStage.js";
+import { WELCOME_PLACEHOLDERS } from "../constants/Placeholders.js";
+import { IWelcomePositions, WelcomePart } from "../../../interfaces/services/welcome/IWelcome.js";
 
 type Which = "join" | "leave";
 
@@ -40,6 +42,8 @@ interface ICard {
     count: boolean;
     icon: boolean;
     date: boolean;
+    /** Eigene Anordnung der fünf Teile. null: die Plätze des Layouts. */
+    positions: IWelcomePositions | null;
 }
 
 interface IMessage extends IBody {
@@ -90,8 +94,6 @@ export function renderWelcome(guildId: string): void {
     let draft: IConfig | null = null;
     let which: Which = "join";
     let dirty = false;
-    /** Die zuletzt gezeichnete Karte je Richtung - sie kommt vom Bot als Bild. */
-    const cards = new Map<Which, string>();
 
     const save = el("button", "btn btn--primary") as HTMLButtonElement;
 
@@ -166,36 +168,26 @@ export function renderWelcome(guildId: string): void {
             which === "join" ? "Kanal für die Begrüßung" : "Kanal für den Abschied"
         );
 
-        let editor: IBodyEditor;
-
-        editor = bodyEditor(current, {
+        const editor = bodyEditor(current, {
+            pageSave: () => save,
             kinds: data!.kinds,
             context,
             defaultEmbed: () => structuredClone(EMPTY_EMBED),
             touch,
             title: "Inhalt",
             templates: which === "join" ? "welcomeJoin" : "welcomeLeave",
-            custom: {
-                kind: "card",
-                form: (refresh) => cardForm(current, refresh),
-                preview: () => cardPreview(),
+            // Plan 42: die Begrüßungskarte als Bühne im Studio - Fächer, Karte mit Griffen, gewähltes Teil.
+            custom: { kind: "card", stage: (tools) => cardStudio(current, tools) },
+            // Plan 39: „Test senden“ steht in der Leiste des Studios.
+            test: async () => {
+                if (dirty) {
+                    toast("info", "Erst speichern", "Der Test schickt, was gespeichert ist.");
+
+                    return;
+                }
+
+                if (await call("", { action: "test", which })) toast("info", "Test gesendet", "Schau in den Kanal – so sieht es für neue Mitglieder aus.");
             },
-        });
-
-        const test = button("btn btn--quiet", icon("#i-play"), "Test senden");
-
-        test.addEventListener("click", async () => {
-            if (dirty) {
-                toast("info", "Erst speichern", "Der Test schickt, was gespeichert ist.");
-
-                return;
-            }
-
-            test.disabled = true;
-
-            if (await call("", { action: "test", which })) toast("info", "Test gesendet", "Schau in den Kanal – so sieht es für neue Mitglieder aus.");
-
-            test.disabled = false;
         });
 
         return card(
@@ -214,8 +206,7 @@ export function renderWelcome(guildId: string): void {
             ),
             row("Kanal", "Wohin die Nachricht geht", channel),
             placeholderHint(),
-            editor.node,
-            el("div", "mcsave", test)
+            editor.node
         );
     }
 
@@ -243,48 +234,110 @@ export function renderWelcome(guildId: string): void {
        ------------------------------------------------------------ */
     let pending = 0;
 
-    function cardForm(current: IMessage, refresh: () => void): HTMLElement {
+    const PART_NAMES: Record<WelcomePart, string> = { avatar: "Avatar", icon: "Server-Icon", title: "Überschrift", subtitle: "Unterzeile", footer: "Kleine Zeile" };
+
+    /**
+     * Plan 42: die Begrüßungskarte im Studio. Links Layouts, Teile, Hintergrund
+     * und Stil, in der Mitte die Bühne, rechts das gewählte Teil. Jede Änderung
+     * meldet sich vorher bei tools.remember - so umfasst Rückgängig die Karte.
+     */
+    function cardStudio(current: IMessage, tools: ICustomStageTools): ICustomStage {
         const entry = current.card;
-        const box = el("div", "wccard");
         // Gezeichnet wird beim Bot. Erst nach einer kurzen Pause, sonst ginge
         // bei jedem getippten Zeichen eine neue Karte hin und her.
-        const later = (): void => {
+        // what sagt, was die Bühne braucht: "stage" kam von ihr selbst, "paint"
+        // zeichnet sie gleich selbst (Farben, Ring, Form), "bare" braucht die
+        // nackte Karte neu (Hintergrund, Akzent, Layout, Zeilen, Größen).
+        const later = (what: "stage" | "paint" | "bare" = "bare"): void => {
             touch();
+            stageDirty ||= what === "bare";
+
+            if (what !== "stage" && view) stage.show(view);
+
             window.clearTimeout(pending);
-            pending = window.setTimeout(() => void drawCard(refresh), 320);
+            pending = window.setTimeout(() => {
+                if (stageDirty) void fetchStage();
+
+                stageDirty = false;
+            }, 320);
         };
 
-        const colorInput = (value: string, label: string, onChange: (value: string) => void): HTMLInputElement => {
+        /** Erst merken, dann ändern, dann zeichnen. */
+        const edit = (key: string, apply: () => void, what: "paint" | "bare" = "bare"): void => {
+            tools.remember(key);
+            apply();
+            later(what);
+        };
+
+        /*
+         * Die Bühne braucht die nackte Karte (Hintergrund und Verzierung), die
+         * fertigen Zeilen und die Plätze des Layouts. Neu geholt wird nur, wenn
+         * sich davon etwas ändert, beim Ziehen und bei Farben nie.
+         */
+        let view: IStageView | null = null;
+        let stageDirty = false;
+        let ticket = 0;
+
+        const fetchStage = async (): Promise<void> => {
+            const mine = ++ticket;
+            const answer = await call<Pick<IStageView, "image" | "parts" | "layout">>("", { action: "preview", which, message: current, bare: true });
+
+            // Kam inzwischen eine neuere Antwort, gilt die.
+            if (!answer || mine !== ticket) return;
+
+            view = { image: answer.image, parts: answer.parts, layout: answer.layout, card: entry };
+            stage.show(view);
+        };
+
+        const stage = cardStage({
+            onBefore: (key) => tools.remember(key),
+            onSelect: () => tools.repaint(),
+            onChange(state) {
+                const relayout = state.layout !== entry.layout;
+                const wasOwn = entry.positions !== null;
+
+                entry.positions = state.positions;
+
+                if (relayout) entry.layout = state.layout;
+
+                // Eigene Anordnung an oder aus: die Größenfelder im Inspektor gehen an oder aus.
+                // Review Plan 42: die Felder der Position ziehen dabei nur um - wer darin war, bleibt dort.
+                if (wasOwn !== (entry.positions !== null)) {
+                    const active = document.activeElement;
+
+                    tools.repaint();
+
+                    if (active instanceof HTMLElement && stage.fields.contains(active)) active.focus();
+                }
+
+                later(relayout ? "bare" : "stage");
+            },
+        });
+
+        const colorInput = (value: string, label: string, onChange: (value: string) => void, what: "paint" | "bare" = "paint"): HTMLInputElement => {
             const input = el("input", "tkcolor");
 
             input.type = "color";
             input.value = value;
             input.setAttribute("aria-label", label);
-            input.addEventListener("input", () => {
-                onChange(input.value);
-                later();
-            });
+            input.addEventListener("input", () => edit(label, () => onChange(input.value), what));
 
             return input;
         };
 
-        /** Eine Textzeile mit ihrer Farbe daneben. */
-        const line = (label: string, hint: string, value: string, onChange: (value: string) => void, color: HTMLElement): HTMLElement => {
+        const text = (label: string, value: string, onChange: (value: string) => void): HTMLInputElement => {
             const field = el("input", "text");
 
             field.type = "text";
             field.value = value;
             field.maxLength = 120;
             field.setAttribute("aria-label", label);
-            field.addEventListener("input", () => {
-                onChange(field.value);
-                later();
-            });
+            field.addEventListener("input", () => edit(label, () => onChange(field.value)));
 
-            return row(label, hint, el("div", "wcline", field, color));
+            return field;
         };
 
-        const range = (value: number, min: number, max: number, step: number, label: string, unit: string, onChange: (value: number) => void): HTMLElement => {
+        const range = (value: number, min: number, max: number, step: number, label: string, unit: string, onChange: (value: number) => void, what: "paint" | "bare" = "bare"): HTMLElement => {
             const input = el("input", "wcrange");
             const shown = el("span", "wcrange__value", `${value}${unit}`);
 
@@ -295,137 +348,199 @@ export function renderWelcome(guildId: string): void {
             input.value = String(value);
             input.setAttribute("aria-label", label);
             input.addEventListener("input", () => {
-                onChange(Number(input.value));
+                edit(label, () => onChange(Number(input.value)), what);
                 shown.textContent = `${input.value}${unit}`;
-                later();
             });
 
             return el("div", "wcrange__box", input, shown);
         };
 
         const switchRow = (label: string, hint: string, value: boolean, onChange: (on: boolean) => void): HTMLElement =>
-            row(
-                label,
-                hint,
-                el("label", "snitem__switch", toggle(value, label, (on) => {
-                    onChange(on);
-                    later();
-                }), el("span", "", "an"))
-            );
+            row(label, hint, el("label", "snitem__switch", toggle(value, label, (on) => edit("", () => onChange(on))), el("span", "", "an")));
+
+        /* --- Eigene Anordnung: Größe der Überschrift und des Avatars stehen dann auf der Bühne --- */
+        const SIZE_HINT = `${data!.limits.titleMin} bis ${data!.limits.titleMax} Pixel – lange Namen werden von selbst kleiner`;
+        const AVATAR_HINT = "Im Layout Mittig und Panel etwas kleiner, damit der Text Platz hat";
+        const OWN_HINT = "Gilt nur ohne eigene Anordnung – sonst über „Größe“ unter Position";
+
+        const group = (title: string, ...children: Node[]): HTMLElement => el("section", "sto-group sto-rows", el("h3", "sto-h", title), ...children);
+
+        /** Was nur das gewählte Teil hat. */
+        const partRows = (part: WelcomePart): HTMLElement[] => {
+            const own = entry.positions !== null;
+
+            if (part === "title") {
+                const size = el("input", "text gwnum");
+
+                size.type = "number";
+                size.min = String(data!.limits.titleMin);
+                size.max = String(data!.limits.titleMax);
+                size.value = String(entry.titleSize);
+                size.disabled = own;
+                size.setAttribute("aria-label", "Schriftgröße der Überschrift");
+                size.addEventListener("input", () => edit("titleSize", () => (entry.titleSize = Math.max(data!.limits.titleMin, Math.min(data!.limits.titleMax, Number(size.value) || 48)))));
+
+                return [row("Überschrift", "Die große Zeile", text("Überschrift", entry.title, (value) => (entry.title = value))), row("Schriftgröße", own ? OWN_HINT : SIZE_HINT, size)];
+            }
+
+            if (part === "subtitle") return [row("Unterzeile", "Die Zeile darunter", text("Unterzeile", entry.subtitle, (value) => (entry.subtitle = value)))];
+
+            if (part === "footer") {
+                return [
+                    row("Kleine Zeile", "Ganz unten", text("Kleine Zeile", entry.footer, (value) => (entry.footer = value))),
+                    switchRow("Beitrittsdatum", "Hängt hinten an der kleinen Zeile", entry.date, (on) => (entry.date = on)),
+                ];
+            }
+
+            if (part === "icon") return [switchRow("Server-Icon", "Oben rechts auf der Karte", entry.icon, (on) => (entry.icon = on))];
+
+            const avatarRange = range(entry.avatarSize, data!.limits.avatarMin, data!.limits.avatarMax, 4, "Größe des Avatars", " px", (value) => (entry.avatarSize = value));
+
+            avatarRange.querySelector("input")!.disabled = own;
+
+            return [switchRow("Avatar", "Das Bild des Mitglieds", entry.avatar, (on) => (entry.avatar = on)), row("Größe", own ? OWN_HINT : AVATAR_HINT, avatarRange)];
+        };
 
         const content = el("textarea", "text tkarea");
 
         content.rows = 2;
-        content.value = current.content;
         content.maxLength = 2000;
         content.setAttribute("aria-label", "Text über der Karte");
         content.addEventListener("input", () => {
+            tools.remember("content");
             current.content = content.value;
             touch();
         });
 
-        /* --- Akzent: an oder aus, und welche Farbe --- */
-        const accent = colorInput(entry.accent, "Akzentfarbe der Karte", (value) => (entry.accent = value));
+        /* --- Die Fächer --- */
+        const panel = (title: string, rows: () => Node[]) => (fly: HTMLElement): void => {
+            fly.replaceChildren(el("p", "sto-h", title), el("div", "sto-rows", ...rows()));
+        };
 
-        accent.disabled = !entry.accentOn;
+        const layouts = (): Node[] => {
+            const list = el("div", "sto-adds");
 
-        const accentSwitch = toggle(entry.accentOn, "Akzentfarbe an", (on) => {
-            entry.accentOn = on;
-            accent.disabled = !on;
-            later();
-        });
+            for (const [key, name] of Object.entries(data!.layouts)) {
+                const pick = button("sto-add", name);
 
-        /* --- Die kleine Zeile folgt dem Akzent oder hat eine eigene Farbe --- */
-        const footerColor = colorInput(entry.footerColor ?? entry.accent, "Farbe der kleinen Zeile", (value) => (entry.footerColor = value));
+                pick.setAttribute("aria-pressed", String(entry.layout === key));
+                pick.addEventListener("click", () => {
+                    if (entry.layout === key) return;
 
-        footerColor.disabled = entry.footerColor === null;
+                    edit("", () => (entry.layout = key));
 
-        const footerFollows = el(
-            "label",
-            "wcfollow",
-            toggle(entry.footerColor === null, "Wie der Akzent", (on) => {
-                entry.footerColor = on ? null : footerColor.value;
-                footerColor.disabled = on;
-                later();
-            }),
-            el("span", "", "wie Akzent")
-        );
+                    for (const other of list.querySelectorAll("button")) other.setAttribute("aria-pressed", String(other === pick));
+                });
+                list.append(pick);
+            }
 
-        const size = el("input", "text gwnum");
-
-        size.type = "number";
-        size.min = String(data!.limits.titleMin);
-        size.max = String(data!.limits.titleMax);
-        size.value = String(entry.titleSize);
-        size.setAttribute("aria-label", "Schriftgröße der Überschrift");
-        size.addEventListener("input", () => {
-            entry.titleSize = Math.max(data!.limits.titleMin, Math.min(data!.limits.titleMax, Number(size.value) || 48));
-            later();
-        });
+            return [list, el("p", "sto-note", "Das Layout setzt Streifen, Fläche oder Rahmen und wo die Teile stehen, bis du sie selbst setzt.")];
+        };
 
         const hint = data!.background;
-        // Die Namen tragen eine kurze Beschreibung - im schmalen Standardfeld würden sie abgeschnitten.
-        const layoutPick = select(Object.entries(data!.layouts), entry.layout, (value) => {
-            entry.layout = value;
-            later();
-        }, "Layout der Karte");
-        const fontPick = select(Object.entries(data!.fonts), entry.font, (value) => {
-            entry.font = value;
-            later();
-        }, "Schrift der Überschrift");
+        const accent = (): Node[] => {
+            const color = colorInput(entry.accent, "Akzentfarbe der Karte", (value) => (entry.accent = value), "bare");
 
-        layoutPick.classList.add("wcpick");
-        fontPick.classList.add("wcpick");
+            color.disabled = !entry.accentOn;
 
-        box.append(
-            el("label", "mcfield", el("span", "mcfield__label", "Text über der Karte"), content),
+            return [
+                row(
+                    "Akzentfarbe",
+                    "Streifen, Rahmen, Ring und die kleine Zeile – aus heißt: neutral, ohne Farbe",
+                    el(
+                        "div",
+                        "wcline",
+                        el("label", "snitem__switch", toggle(entry.accentOn, "Akzentfarbe an", (on) => {
+                            edit("", () => (entry.accentOn = on));
+                            color.disabled = !on;
+                        }), el("span", "", "an")),
+                        color
+                    )
+                ),
+            ];
+        };
 
-            el("h4", "srhead", "Aussehen"),
-            row("Layout", "Wie Avatar und Text auf der Karte stehen", layoutPick),
-            backgroundRow(entry, refresh),
-            el(
-                "p",
-                "hintline wcsize",
-                `Am besten ein Querformat um ${hint.width} × ${hint.height} px (etwa 3 : 1), höchstens ${hint.maxMegabytes} MB. ` +
-                    "Andere Formate schneidet der Bot mittig zu, größere verkleinert die Galerie beim Hochladen."
-            ),
-            row("Abdunkeln", "Macht den Text auf hellen Bildern lesbar", range(entry.dim, 0, 90, 5, "Hintergrund abdunkeln", " %", (value) => (entry.dim = value))),
-            row("Akzentfarbe", "Streifen, Rahmen, Ring und die kleine Zeile – aus heißt: neutral, ohne Farbe", el("div", "wcline", el("label", "snitem__switch", accentSwitch, el("span", "", "an")), accent)),
+        const colors = (): Node[] => {
+            const footer = colorInput(entry.footerColor ?? entry.accent, "Farbe der kleinen Zeile", (value) => (entry.footerColor = value));
 
-            el("h4", "srhead", "Texte"),
-            line("Überschrift", "Die große Zeile", entry.title, (value) => (entry.title = value), colorInput(entry.titleColor, "Farbe der Überschrift", (value) => (entry.titleColor = value))),
-            line("Unterzeile", "Die Zeile darunter", entry.subtitle, (value) => (entry.subtitle = value), colorInput(entry.subtitleColor, "Farbe der Unterzeile", (value) => (entry.subtitleColor = value))),
-            line("Kleine Zeile", "Ganz unten", entry.footer, (value) => (entry.footer = value), el("div", "wcline", footerColor, footerFollows)),
-            row("Schrift", "Für die Überschrift", fontPick),
-            row("Schriftgröße", `${data!.limits.titleMin} bis ${data!.limits.titleMax} Pixel – lange Namen werden von selbst kleiner`, size),
+            footer.disabled = entry.footerColor === null;
 
-            el("h4", "srhead", "Avatar"),
-            switchRow("Avatar", "Das Bild des Mitglieds", entry.avatar, (on) => (entry.avatar = on)),
-            row("Größe", "Im Layout Mittig und Panel etwas kleiner, damit der Text Platz hat", range(entry.avatarSize, data!.limits.avatarMin, data!.limits.avatarMax, 4, "Größe des Avatars", " px", (value) => (entry.avatarSize = value))),
-            row("Ring", "Stärke des Rahmens um den Avatar – 0 heißt keiner", range(entry.ringWidth, 0, data!.limits.ringMax, 1, "Stärke des Rings", " px", (value) => (entry.ringWidth = value))),
-            row(
-                "Form",
-                "Rund oder mit abgeschrägten Ecken",
-                select(
-                    [
-                        ["circle", "Rund"],
-                        ["bevel", "Abgeschrägt"],
-                    ],
-                    entry.avatarShape,
-                    (value) => {
-                        entry.avatarShape = value === "bevel" ? "bevel" : "circle";
-                        later();
-                    },
-                    "Form des Avatars"
-                )
-            ),
+            return [
+                row("Überschrift", "", colorInput(entry.titleColor, "Farbe der Überschrift", (value) => (entry.titleColor = value))),
+                row("Unterzeile", "", colorInput(entry.subtitleColor, "Farbe der Unterzeile", (value) => (entry.subtitleColor = value))),
+                row(
+                    "Kleine Zeile",
+                    "",
+                    el(
+                        "div",
+                        "wcline",
+                        footer,
+                        el("label", "wcfollow", toggle(entry.footerColor === null, "Wie der Akzent", (on) => {
+                            edit("", () => (entry.footerColor = on ? null : footer.value), "paint");
+                            footer.disabled = on;
+                        }), el("span", "", "wie Akzent"))
+                    )
+                ),
+            ];
+        };
 
-            el("h4", "srhead", "Extras"),
-            switchRow("Server-Icon", "Oben rechts auf der Karte", entry.icon, (on) => (entry.icon = on)),
-            switchRow("Beitrittsdatum", "Hängt hinten an der kleinen Zeile", entry.date, (on) => (entry.date = on))
-        );
+        const panels = [
+            { id: "layouts", label: "Layouts", icon: "#i-layout", render: panel("Layouts", layouts) },
+            { id: "parts", label: "Teile", icon: "#i-list", render: panel("Teile", () => [stage.layers, el("p", "sto-note", "Ein Klick wählt das Teil. Auf der Karte ziehen oder mit den Pfeiltasten schieben, mit Umschalt in 10er-Schritten.")]) },
+            {
+                id: "background",
+                label: "Hintergrund",
+                icon: "#i-image",
+                render: panel("Hintergrund", () => [
+                    backgroundRow(entry, () => later(), () => tools.remember()),
+                    el("p", "hintline wcsize", `Am besten ein Querformat um ${hint.width} × ${hint.height} px (etwa 3 : 1), höchstens ${hint.maxMegabytes} MB. Andere Formate schneidet der Bot mittig zu.`),
+                    row("Abdunkeln", "Macht den Text auf hellen Bildern lesbar", range(entry.dim, 0, 90, 5, "Hintergrund abdunkeln", " %", (value) => (entry.dim = value))),
+                ]),
+            },
+            {
+                id: "style",
+                label: "Stil",
+                icon: "#i-contrast",
+                render: panel("Stil", () => [
+                    row("Schrift", "Für die Überschrift", select(Object.entries(data!.fonts), entry.font, (value) => edit("", () => (entry.font = value)), "Schrift der Überschrift")),
+                    ...colors(),
+                    ...accent(),
+                    row("Ring", "Stärke des Rahmens um den Avatar – 0 heißt keiner", range(entry.ringWidth, 0, data!.limits.ringMax, 1, "Stärke des Rings", " px", (value) => (entry.ringWidth = value), "paint")),
+                    row(
+                        "Form des Avatars",
+                        "Rund oder mit abgeschrägten Ecken",
+                        select(
+                            [
+                                ["circle", "Rund"],
+                                ["bevel", "Abgeschrägt"],
+                            ],
+                            entry.avatarShape,
+                            (value) => edit("", () => (entry.avatarShape = value === "bevel" ? "bevel" : "circle"), "paint"),
+                            "Form des Avatars"
+                        )
+                    ),
+                ]),
+            },
+        ];
 
-        return box;
+        void fetchStage();
+
+        return {
+            panels,
+            canvas: stage.stage,
+            inspector: () => {
+                const part = stage.selected();
+
+                content.value = current.content;
+
+                return [group(PART_NAMES[part], ...partRows(part)), group("Position", stage.fields), group("Text über der Karte", content)];
+            },
+            take: () => structuredClone(entry),
+            put: (state) => {
+                Object.assign(entry, structuredClone(state));
+                later();
+            },
+        };
     }
 
     /**
@@ -434,7 +549,7 @@ export function renderWelcome(guildId: string): void {
      * Eine fremde Adresse geht hier nicht: die Karte zeichnet der Bot selbst,
      * und was er lädt, soll bei ihm liegen.
      */
-    function backgroundRow(entry: ICard, refresh: () => void): HTMLElement {
+    function backgroundRow(entry: ICard, changed: () => void, before: () => void = () => undefined): HTMLElement {
         const pick = button("btn btn--quiet", icon("#i-image"), "");
         const drop = button("btn btn--quiet btn--icon", icon("#i-trash"), "Entfernen");
         const warn = el("p", "hintline is-warn wcwarn");
@@ -476,61 +591,23 @@ export function renderWelcome(guildId: string): void {
 
             if (!source) return;
 
+            before();
             entry.background = source;
-            touch();
             sync();
-            void drawCard(refresh);
+            changed();
         });
 
         drop.addEventListener("click", () => {
+            before();
             entry.background = null;
-            touch();
             sync();
             toast("info", "Entfernt", "Die Karte nutzt wieder den Farbverlauf.");
-            void drawCard(refresh);
+            changed();
         });
 
         sync();
 
         return row("Hintergrund", "Aus der Galerie oder ein eigenes Bild – ohne zeichnet der Bot einen Farbverlauf", el("div", "wcbg", pick, drop, warn));
-    }
-
-    /** Die Karte kommt fertig gezeichnet vom Bot - die Schriften liegen dort. */
-    async function drawCard(refresh: () => void): Promise<void> {
-        const answer = await call<{ image: string }>("", { action: "preview", which, message: draft![which] });
-
-        if (!answer) return;
-
-        cards.set(which, answer.image);
-        refresh();
-    }
-
-    function cardPreview(): Node | null {
-        const image = cards.get(which);
-
-        if (!image) {
-            void drawCard(() => paintPreviewOnly());
-
-            return el("span", "tkempty", "Karte wird gezeichnet …");
-        }
-
-        const view = el("img", "wcpreview");
-
-        view.src = image;
-        view.alt = "Vorschau der Begrüßungskarte";
-        view.loading = "lazy";
-
-        const values = Object.fromEntries(WELCOME_PLACEHOLDERS.map((entry) => [entry.key, entry.sample]));
-
-        return el("div", "wcpreview__box", ...(draft![which].content ? [el("p", "cmtext", fill(draft![which].content, values))] : []), view);
-    }
-
-    /** Nur die Vorschau neu zeichnen - ohne die ganze Seite anzufassen. */
-    function paintPreviewOnly(): void {
-        const side = host.querySelector<HTMLElement>(".sneditor__side .tkprev");
-        const view = cardPreview();
-
-        if (side && view) side.replaceChildren(view);
     }
 
     /* ------------------------------------------------------------
@@ -598,7 +675,6 @@ export function renderWelcome(guildId: string): void {
         data!.config = answer.config;
         draft = structuredClone(answer.config);
         dirty = false;
-        cards.clear();
         toast("info", "Gespeichert", "Gilt ab dem nächsten Mitglied.");
         paint();
     });

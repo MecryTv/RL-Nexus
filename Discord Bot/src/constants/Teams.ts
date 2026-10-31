@@ -1,4 +1,21 @@
-import { IMMRSettings, ITeamBody, ITeamChannels, ITeamCreated, ITeamPlayer, ITeamRoleSettings, ITeamSettings, PlaylistSlot, RankStyle, TeamBadge, TeamRole } from "../interfaces/services/teams/ITeams";
+import {
+    BoardLayout,
+    HubButtonTarget,
+    ICardColumns,
+    IHubButton,
+    IMMRSettings,
+    ITeamBody,
+    ITeamCardDesign,
+    ITeamChannels,
+    ITeamCreated,
+    ITeamPlayer,
+    ITeamRoleSettings,
+    ITeamSettings,
+    PlaylistSlot,
+    RankStyle,
+    TeamBadge,
+    TeamRole,
+} from "../interfaces/services/teams/ITeams";
 import { RankText } from "./Prime";
 import { DefaultTeamList } from "./TeamList";
 import { DefaultTeamOrder } from "./TeamOrder";
@@ -53,11 +70,54 @@ export const COUNTING_ROLES: TeamRole[] = ["captain", "cocaptain", "player", "su
 export const MAX_LINKS = 5;
 export const MAX_LINK_LABEL = 40;
 
-export const LAYOUT_LABELS: Record<string, string> = {
-    cards: "Je Team eine Nachricht",
-    menu: "Eine Nachricht mit Auswahlmenü",
-    single: "Alles in einer Nachricht",
+export const LAYOUT_LABELS: Record<BoardLayout, string> = {
+    hub: "Team-Hub (empfohlen)",
+    cards: "Alle Teams einzeln",
 };
+
+export const MAX_REGION = 16;
+
+/** Gezeichnete Karte (Plan 27): Länge einer Zeile und Spanne fürs Abdunkeln. */
+export const CARD_LINE_MAX = 200;
+export const CARD_DIM = [0, 90] as const;
+
+/** Hub: der Knopf unter dem Menü. */
+export const HUB_BUTTON_LABEL_MAX = 80;
+export const HUB_URL_MAX = 512;
+export const HUB_BUTTON_LABEL = "Bei uns bewerben";
+export const HUB_BUTTON_LABELS: Record<HubButtonTarget, string> = {
+    apply: "Bewerbung im Bot",
+    web: "Einer Webseite",
+    channel: "Einem Discord-Kanal",
+};
+
+export function DefaultCardDesign(): ITeamCardDesign {
+    return {
+        background: { mode: "default", image: null },
+        dim: 45,
+        accent: null,
+        parts: { logo: true, leagues: true, mmr: true, peak: true, staff: true },
+        chips: { tag: true, group: true, place: true, region: true },
+        title: "{team.name}",
+        subtitle: "{team.description}",
+        footer: "{guild} · @{team.role}",
+    };
+}
+
+export function DefaultHubButton(): IHubButton {
+    return { on: true, to: "apply", url: null, channelId: null, label: HUB_BUTTON_LABEL };
+}
+
+/** Hub: Zeilen je Kategorie, kleinster und größter Wert. */
+export const HUB_ROWS = [1, 10] as const;
+
+/** Hub: die Zeile je Team ab Werk. Ohne Kürzel fallen die Backticks weg. */
+export const DEFAULT_HUB_LINE = "{team.rank.icon} **{team.name}** `{team.tag}` · {team.players} Spieler · {team.mmr} MMR";
+export const MAX_HUB_LINE = 300;
+
+export function DefaultCardColumns(): ICardColumns {
+    return { "2v2": true, "1v1": true, peak: true };
+}
 
 export const RANK_STYLES: Record<RankStyle, string> = {
     text: "Ausgeschrieben",
@@ -173,13 +233,12 @@ export function DefaultBoardBody(): ITeamBody {
         kind: "v2",
         content: "",
         embed: null,
+        // Der Kopf des Hubs - die Teams setzt der Bot selbst darunter (Plan 27).
         doc: {
             accent: "#00afff",
             blocks: [
-                { type: "text", body: "# 🛡️ Competitive Teams" },
-                { type: "text", body: "-# {teams.count} Teams · Stand {updated}" },
-                { type: "separator", line: true },
-                { type: "text", body: "{teams}" },
+                { type: "text", body: "# 🛡️ Unsere Teams" },
+                { type: "text", body: "Hier steht, wer für uns spielt. Wähl unten ein Team, dann siehst du Kader, Ränge und MMR." },
             ],
         },
     };
@@ -216,7 +275,7 @@ export function DefaultRoles(): ITeamRoleSettings {
 export function DefaultTeamSettings(): ITeamSettings {
     return {
         channelId: null,
-        layout: "cards",
+        layout: "hub",
         mmr: DefaultMMR(),
         roles: DefaultRoles(),
         rankStyle: "text",
@@ -227,6 +286,14 @@ export function DefaultTeamSettings(): ITeamSettings {
         board: DefaultBoardBody(),
         team: DefaultTeamBody(),
         messageId: null,
+        card: DefaultCardDesign(),
+        cardColumns: DefaultCardColumns(),
+        hubRows: 3,
+        hubThumbnail: "{guild.icon}",
+        hubImage: null,
+        hubButton: DefaultHubButton(),
+        hubLine: DEFAULT_HUB_LINE,
+        moreIds: [],
     };
 }
 

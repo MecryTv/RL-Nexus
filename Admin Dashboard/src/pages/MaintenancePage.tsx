@@ -1,121 +1,52 @@
-import { useState, type JSX } from "react";
-import type { IMaintenance, IMaintenanceFlag } from "../../shared/api";
-import { api } from "../api/client";
+import type { JSX } from "react";
+import type { IMaintenanceState } from "../../shared/api";
+import { useLive } from "../api/live";
 import { useApi } from "../api/useApi";
-import { Badge } from "../components/Badge";
-import { Button } from "../components/Button";
-import { ConfirmDialog } from "../components/ConfirmDialog";
 import { PageHeader } from "../components/PageHeader";
-import { Panel } from "../components/Panel";
 import { Failure, Loading } from "../components/Status";
-import { formatDateTime } from "../format";
-import { useToast } from "../toast/context";
+import { PlanForm } from "../maintenance/PlanForm";
+import { RunningPanel } from "../maintenance/RunningPanel";
+import { AREA_NAMES, clock } from "../maintenance/time";
 import { useTitle } from "../useTitle";
-import styles from "./dev.module.scss";
 
-type Area = keyof IMaintenance;
+/**
+ * Developer → Wartung (Plan 23). Aus: Wartung mit Text, Ende und Fahrplan
+ * planen. An: Schritte weiterschalten, Ende verschieben, beenden. Das Admin
+ * Dashboard schreibt dafür die Schalter und data/flags/wartung.json, die
+ * Wartungsseite (public/wartung.html) liest sie.
+ */
+function meta(state: IMaintenanceState): string {
+    const flag = state.website ?? state.dashboard;
 
-const AREAS: readonly { readonly area: Area; readonly name: string; readonly effect: string }[] = [
-    { area: "website", name: "Webseite", effect: "Wer nexus-emb.de öffnet, sieht nur noch die Wartungsseite. Das Kontaktformular nimmt nichts mehr an." },
-    {
-        area: "dashboard",
-        name: "Bot-Dashboard",
-        effect: "Das Bot-Dashboard zeigt die Wartungsseite. Der Bot selbst läuft weiter, Bilder für Discord und die API auch.",
-    },
-];
+    if (state.plan) return `Läuft seit ${clock(state.plan.since)}${flag?.by ? `, eingeschaltet von ${flag.by}` : ""}`;
+    if (flag) return `Läuft ohne Fahrplan${flag.since ? ` seit ${clock(flag.since)}` : ""}`;
 
-function since(flag: IMaintenanceFlag): string {
-    if (flag.since === null) return "An, seit wann ist unbekannt";
-
-    return `An seit ${formatDateTime(flag.since)}${flag.by ? `, von ${flag.by}` : ""}`;
+    return `${AREA_NAMES.website}: normal · ${AREA_NAMES.dashboard}: normal`;
 }
 
 export function MaintenancePage(): JSX.Element {
     useTitle("Wartung");
 
-    const notify = useToast();
-    const { data, error, reload } = useApi<IMaintenance>("/api/maintenance");
-    const [asking, setAsking] = useState<Area | null>(null);
-    const [busy, setBusy] = useState<Area | null>(null);
+    const { data, error, reload } = useApi<IMaintenanceState>("/api/maintenance");
 
-    async function switchArea(area: Area, on: boolean): Promise<void> {
-        const name = AREAS.find((entry) => entry.area === area)?.name ?? area;
+    // Schaltet jemand anders um, steht es hier sofort.
+    useLive("maintenance", reload);
 
-        setBusy(area);
-
-        try {
-            await api("/api/maintenance", { method: "PUT", body: { [area]: on } });
-            notify(on ? `${name}: Wartungsseite ist an.` : `${name}: wieder normal erreichbar.`);
-            reload();
-        } catch (failure) {
-            notify(failure instanceof Error ? failure.message : String(failure), "danger");
-        } finally {
-            setBusy(null);
-            setAsking(null);
-        }
-    }
-
-    const asked = AREAS.find((entry) => entry.area === asking);
+    const running = data !== null && (data.plan !== null || data.website !== null || data.dashboard !== null);
 
     return (
         <>
-            <PageHeader title="Wartung" meta="nginx prüft bei jeder Anfrage, ob der Schalter an ist. Es wirkt sofort, ohne Neustart." />
+            <PageHeader title="Wartung" meta={data ? meta(data) : undefined} />
 
             {error && !data ? (
                 <Failure message={error.message} onRetry={reload} />
             ) : !data ? (
                 <Loading label="Wartung wird geladen" />
+            ) : running ? (
+                <RunningPanel state={data} onChange={reload} />
             ) : (
-                <div className={styles.switches}>
-                    {AREAS.map(({ area, name, effect }) => {
-                        const flag = data[area];
-
-                        return (
-                            <Panel key={area} className={styles.switchRow}>
-                                <div className={styles.switchText}>
-                                    <h2 className={styles.switchName}>{name}</h2>
-                                    <p>{effect}</p>
-                                    <p className={styles.switchState}>
-                                        <Badge tone={flag ? "warn" : "ok"}>{flag ? "Wartung" : "Normal"}</Badge>
-                                        {flag && <span>{since(flag)}</span>}
-                                    </p>
-                                </div>
-                                {flag ? (
-                                    <Button icon="power" busy={busy === area} onClick={() => void switchArea(area, false)}>
-                                        Wartung beenden
-                                    </Button>
-                                ) : (
-                                    <Button variant="danger" icon="wrench" disabled={busy !== null} onClick={() => setAsking(area)}>
-                                        Wartung einschalten
-                                    </Button>
-                                )}
-                            </Panel>
-                        );
-                    })}
-                </div>
+                <PlanForm onStarted={reload} />
             )}
-
-            <section className={styles.section} aria-labelledby="wartung-vorschau">
-                <h2 id="wartung-vorschau" className={styles.heading}>
-                    So sieht die Wartungsseite aus
-                </h2>
-                {/* sandbox ohne Rechte: die Seite braucht kein Skript und bekommt keins. */}
-                <iframe src="/wartung.html" title="Vorschau der Wartungsseite" sandbox="" loading="lazy" className={styles.preview} />
-            </section>
-
-            <ConfirmDialog
-                open={asked !== undefined}
-                title={`${asked?.name ?? ""}: Wartung einschalten?`}
-                confirmLabel="Einschalten"
-                tone="danger"
-                busy={busy !== null}
-                onConfirm={() => {
-                    if (asked) void switchArea(asked.area, true);
-                }}
-                onCancel={() => setAsking(null)}
-            >
-                <p>{asked?.effect}</p>
-            </ConfirmDialog>
         </>
     );
 }

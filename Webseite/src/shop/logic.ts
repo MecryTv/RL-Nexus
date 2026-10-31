@@ -32,22 +32,26 @@ export function accessStatus(me: IShopMe): string {
     return me.status === "subscription" && me.cancelAtPeriodEnd ? "Abo gekündigt" : ACCESS_STATUS[me.status];
 }
 
-/** Die Zeilen auf „Mein Zugang“. Ohne laufenden Zugang keine. */
-export function accessRows(me: IShopMe, products: readonly IShopPublicProduct[]): { readonly label: string; readonly value: string }[] {
+/**
+ * Die Zeilen auf „Mein Zugang“. Ohne laufenden Zugang keine.
+ * paused: Free oder Beta Access, das Abo ruht. Dann kein Tag, an dem abgebucht würde (W-0024).
+ */
+export function accessRows(me: IShopMe, products: readonly IShopPublicProduct[], paused = false): { readonly label: string; readonly value: string }[] {
     if (me.productTitle === null) return [];
 
     const product = products.find((entry) => entry.id === me.productId);
     const day = me.until === null ? null : formatDay(me.until);
     const rows = [{ label: "Produkt", value: product ? `${me.productTitle} · ${formatPrice(product.priceCents)} ${priceSuffix(product.kind)}` : me.productTitle }];
 
-    if (me.status === "subscription") rows.push({ label: me.cancelAtPeriodEnd ? "Endet am" : "Nächste Zahlung", value: day ?? "unbekannt" });
+    if (me.status === "subscription" && paused && !me.cancelAtPeriodEnd) rows.push({ label: "Nächste Zahlung", value: "keine, solange dein Zugang ruht" });
+    else if (me.status === "subscription") rows.push({ label: me.cancelAtPeriodEnd ? "Endet am" : "Nächste Zahlung", value: day ?? "unbekannt" });
     else if (me.status === "trial") rows.push({ label: "Test bis", value: day ?? "unbekannt" });
     else rows.push({ label: "Läuft bis", value: day ?? "unbegrenzt" });
 
     if (me.roleName) rows.push({ label: "Discord-Rolle", value: me.roleName });
 
     const hint = cancelHint(me);
-    if (hint) rows.push({ label: "Kündbar", value: hint });
+    if (hint) rows.push({ label: "Kündbar", value: paused ? "jederzeit" : hint });
 
     return rows;
 }

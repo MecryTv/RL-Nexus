@@ -66,7 +66,8 @@ function byPosition(a: IOrderFacts, b: IOrderFacts): number {
 function compare<V extends number | string>(a: V | null, b: V | null, direction: TeamOrderDirection): number {
     if (a === null || b === null) return a === b ? 0 : a === null ? 1 : -1;
 
-    const raw = typeof a === "number" && typeof b === "number" ? a - b : String(a).localeCompare(String(b), "de");
+    // numeric: „Team 9“ vor „Team 10“ (W-0025).
+    const raw = typeof a === "number" && typeof b === "number" ? a - b : String(a).localeCompare(String(b), "de", { numeric: true });
 
     return direction === "asc" ? raw : -raw;
 }

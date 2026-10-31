@@ -15,10 +15,10 @@ import { Failure, Loading } from "../components/Status";
 import { formatBytes, formatDateTime, formatNumber } from "../format";
 import { useToast } from "../toast/context";
 import { useTitle } from "../useTitle";
-import { initials, kindLabel, planSentence, timelineLayout } from "./format";
+import { initials, kindLabel, partsLabel, planSentence, serverLabel, timelineLayout } from "./format";
 import styles from "./backups.module.scss";
 
-const KIND_TONES: Readonly<Record<IBackupMeta["kind"], BadgeTone>> = { nacht: "ok", vorher: "neutral", hand: "info", plan: "ok" };
+const KIND_TONES: Readonly<Record<IBackupMeta["kind"], BadgeTone>> = { nacht: "ok", vorher: "neutral", hand: "info", plan: "ok", schutz: "warn" };
 
 function message(reason: unknown): string {
     return reason instanceof Error ? reason.message : String(reason);
@@ -181,6 +181,14 @@ function Chosen({ guildId, backup, onDeleted }: { readonly guildId: string; read
                 )}
                 <dt>Größe</dt>
                 <dd>{formatBytes(backup.bytes)}</dd>
+                <dt>Teile</dt>
+                <dd>{partsLabel(backup.parts ?? ["bot"])}</dd>
+                {backup.server && (
+                    <>
+                        <dt>Discord-Server</dt>
+                        <dd>{serverLabel(backup.server)}. Laden geht nur im Bot-Dashboard des Servers.</dd>
+                    </>
+                )}
                 <dt>Bleibt</dt>
                 <dd>{backup.kind === "hand" ? "bis jemand es löscht" : `bis etwa ${formatDateTime(new Date(Date.parse(backup.createdAt) + 72 * 3_600_000).toISOString())}`}</dd>
             </dl>

@@ -73,11 +73,31 @@ export interface ILftDm {
     done: ILftBody;
 }
 
+/** Wie gefragt wird (Plan 30): per DM wie bisher oder im Fenster in Discord. */
+export type LftAsk = "dm" | "modal";
+
+/**
+ * Das Panel im Forum (Plan 30): ein angepinnter Beitrag mit einer Karte, unter
+ * die der Bot je Seite einen Knopf hängt.
+ */
+export interface ILftPanel {
+    /** Leer: das Forum der Spieler-Suche, sonst das der Team-Suche. */
+    forumId: string | null;
+    /** Der Titel des Beitrags. */
+    title: string;
+    body: ILftBody;
+    /** Schreibt nur der Bot beim Senden. */
+    threadId: string | null;
+    messageId: string | null;
+}
+
 export interface ILftSettings {
     player: ILftSide;
     team: ILftSide;
     notice: ILftNotice;
     dm: ILftDm;
+    ask: LftAsk;
+    panel: ILftPanel;
     /** Nach so vielen Tagen schließt der Bot eine Suche. 0: nie. */
     expireDays: number;
     /** Diese Rollen dürfen fremde Suchen beenden und Beiträge löschen. */

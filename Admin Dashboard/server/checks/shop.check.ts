@@ -14,9 +14,9 @@ import { makeLimiter, matchCancellation, parseCancelInput, rateKey } from "../sh
 import { legalPdf, legalText, legalVersions, parseLegal } from "../shop/legal.ts";
 import { paidProblem, parseProductInput, parseSettingsInput } from "../shop/rules.ts";
 import { escapeMarkdown, expiredDm, expiredFacts, orderDm, paymentFailedDm, trialDm, type IShopDm } from "../shop/dm.ts";
-import { cancelReceiptMail, dashboardUrl, endedMail, giftMail, orderMail, sendShopMail, setShopMailer, trialMail } from "../shop/mail.ts";
+import { cancelReceiptMail, cancelReceivedMail, dashboardUrl, endedMail, giftMail, orderMail, pausedMail, resumedMail, sendShopMail, setShopMailer, trialMail } from "../shop/mail.ts";
 import { SHOP_COOKIE, readShopSession, readShopState, shopSessionCookie } from "../shop/session.ts";
-import { setStripeGateway, syncToStripe } from "../shop/stripe.ts";
+import { sdkGateway, setStripeGateway, syncToStripe } from "../shop/stripe.ts";
 import { syncWith } from "../shop/sync.ts";
 import { FakeStripe } from "./fake-stripe.ts";
 import { USERS, fake } from "./fakes.ts";
@@ -708,6 +708,48 @@ section("Shop: Kündigen");
         assert.equal(stripeWarning({ ...free, stripePending: 2 }), "2 Abos hat Stripe noch nicht pausiert. Das Admin Dashboard versucht es jede Minute weiter.");
         assert.equal(stripeWarning({ ...free, stripePending: 1 }), "1 Abo hat Stripe noch nicht pausiert. Das Admin Dashboard versucht es jede Minute weiter.");
         assert.equal(stripeWarning({ ...free, mode: "paid", stripePending: 2 }), "2 Abos hat Stripe noch nicht fortgesetzt. Das Admin Dashboard versucht es jede Minute weiter.");
+        // W-0024: welche, nicht nur wie viele - höchstens fünf Namen.
+        assert.equal(stripeWarning({ ...free, stripePending: 2, stripePendingNames: ["Nico", "Lara"] }), "2 Abos hat Stripe noch nicht pausiert: Nico, Lara. Das Admin Dashboard versucht es jede Minute weiter.");
+        assert.equal(
+            stripeWarning({ ...free, stripePending: 7, stripePendingNames: ["A", "B", "C", "D", "E", "F", "G"] }),
+            "7 Abos hat Stripe noch nicht pausiert: A, B, C, D, E und 2 weitere. Das Admin Dashboard versucht es jede Minute weiter."
+        );
+    });
+
+    await check("Free und Paid: Mails sagen nur, was stimmt (W-0024)", () => {
+        const person = { to: "kaeufer@example.test", name: "Käufer" };
+
+        // Hat Stripe die Pause noch nicht angenommen, verspricht die Mail nicht „nichts abgebucht“.
+        assert.match(pausedMail(config, person).html, /Es wird nichts abgebucht/);
+        assert.doesNotMatch(pausedMail(config, { ...person, pending: true }).html, /nichts abgebucht/);
+        assert.match(pausedMail(config, { ...person, pending: true }).html, /zählen die Tage/);
+
+        // Abo und Geschenk: „bucht erst am“ nennt das Abo, „läuft weiter bis“ das späteste Ende.
+        const resumed = resumedMail(config, { ...person, until: new Date("2027-03-01T12:00:00Z"), charge: new Date("2026-11-20T12:00:00Z") }).html;
+        assert.match(resumed, /läuft weiter bis 01\.03\.2027/);
+        assert.match(resumed, /bucht erst am 20\.11\.2026/);
+        assert.doesNotMatch(resumedMail(config, { ...person, until: new Date("2027-03-01T12:00:00Z"), charge: null }).html, /bucht/);
+
+        // Gekündigt, während der Zugang ruht: kein Datum von Stripe, sondern die Resttage.
+        const base = { ...person, title: "Monat", at: new Date("2026-10-30T12:00:00Z"), endsAt: new Date("2026-11-05T12:00:00Z") };
+        assert.match(cancelReceivedMail(config, base).html, /05\.11\.2026/);
+        const paused = cancelReceivedMail(config, { ...base, frozenRest: 12 * 86_400 }).html;
+        assert.doesNotMatch(paused, /05\.11\.2026/);
+        assert.match(paused, /12 Tage/);
+    });
+
+    await check("Erstatten beim Abo: die letzte bezahlte Rechnung, nicht die letzte (W-0024)", async () => {
+        // Während Free verwirft Stripe Rechnungen (pause_collection: void). Die letzte hat dann keine Zahlung.
+        const refunds: unknown[] = [];
+        const client = {
+            subscriptions: { retrieve: async () => ({ latest_invoice: "in_void" }) },
+            invoices: { list: async (filter: { subscription: string; status: string }) => ({ data: filter.status === "paid" && filter.subscription === "sub_1" ? [{ id: "in_paid" }] : [] }) },
+            invoicePayments: { list: async (filter: { invoice: string }) => ({ data: filter.invoice === "in_paid" ? [{ payment: { payment_intent: "pi_paid" } }] : [] }) },
+            refunds: { create: async (input: unknown) => void refunds.push(input) },
+        };
+
+        await sdkGateway(client as never, "whsec_check").refund({ subscriptionId: "sub_1" }, 499);
+        assert.deepEqual(refunds, [{ payment_intent: "pi_paid", amount: 499 }]);
     });
 
     await check("Aus dem Formular wird ein Produkt und zurück", () => {

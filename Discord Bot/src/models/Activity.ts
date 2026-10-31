@@ -146,6 +146,16 @@ export default class Activity extends Model<IActivityRow> {
         );
     }
 
+    /** Plan 34: alle Tageszeilen eines Servers vor beforeDay - für den einmaligen Level-Nachtrag. */
+    async MemberDays(guildId: string, beforeDay: number): Promise<{ userId: string; day: number; messages: number; voice: number }[]> {
+        const rows = await this.db.Query<{ user_id: string; day: number; messages: number | string; voice: number | string }>(
+            `SELECT user_id, day, messages, voice FROM \`${TABLES.memberActivity}\` WHERE guild_id = ? AND day < ?`,
+            [guildId, beforeDay]
+        );
+
+        return rows.map((row) => ({ userId: row.user_id, day: Number(row.day), messages: Number(row.messages), voice: Number(row.voice) }));
+    }
+
     /** Nachrichten eines Mitglieds seit einem Tag - für die Bedingungen der Giveaways. */
     async MemberMessages(guildId: string, userId: string, from: number): Promise<number> {
         const row = await this.db.One<{ total: number | null }>(

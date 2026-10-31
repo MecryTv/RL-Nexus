@@ -115,6 +115,7 @@ Der Wartungsschalter im Admin Dashboard legt heute nur eine Datei in `data/flags
 - Bereich: `dashboard`, wenn der Host mit `dashboard.` beginnt oder der Pfad mit `/dashboard`, sonst `website`.
 - Das Skript liest `/wartung/status.json`, beim Laden und danach alle 30 Sekunden.
   - Neu laden nur, wenn die Seite ihren Bereich schon einmal im Status gesehen hat und er jetzt fehlt oder 404 kommt. Liegt ein Schalter ohne `wartung.json` (von Hand angelegt, Notweg ohne Admin Dashboard), bleibt der Rückfall stehen und lädt nicht in Schleife neu. *(Entscheidung des Entwicklers nach der Builder-Prüfung.)*
+  - Zusätzlich fragt sie per `HEAD` (mit `Accept: text/html`) ihre eigene Adresse. Kommt kein 503 mehr, lädt sie neu, egal was in `wartung.json` steht. Das fängt von Hand gelöschte Schalter und eine liegen gebliebene oder kaputte `wartung.json`. *(Nach dem finalen Review ergänzt.)*
   - Ohne Skript oder ohne Antwort steht die Seite mit Logo, Überschrift „Gleich wieder da.“, Support-Knöpfen und Rechtstexten trotzdem.
   - Mit `#vorschau=` zeigt es die übergebenen Daten, fragt nichts ab und lädt nie neu.
 - Die Rechnung steckt in einer reinen Funktion, die sich ohne Browser testen lässt: aus Status, jetzt und Bereich wird, was die Seite zeigt (Restzeit, Füllstand des Rings, Zustand normal/länger als geplant/offen, Schritte mit Zustand und Zeit).
@@ -136,7 +137,7 @@ Der Wartungsschalter im Admin Dashboard legt heute nur eine Datei in `data/flags
 
 ### Webseite
 
-- **Wächter:** Beim Start fragt die App `/wartung/status.json` ab. Steht `website` in `areas`, führt jede Navigation auf eine Seite außer den vier Rechtstexten zu einem vollen Seitenaufruf. nginx zeigt dann die Wartungsseite.
+- **Wächter:** Beim Start fragt die App per `HEAD /`, ob 503 kommt. *(Beim Bau geändert: Das deckt auch Schalter ab, die von Hand gesetzt wurden. Nicht auf status.json zurückbauen.)* Ist Wartung, führt jede Navigation auf eine Seite außer den vier Rechtstexten zu einem vollen Seitenaufruf. nginx zeigt dann die Wartungsseite.
 - **Lokal:** Ein Vite-Plugin (nur `serve`), gebaut wie das vorhandene `localContent`, spiegelt nginx: Schalterdatei und `wartung.json` aus `../Admin Dashboard/data/flags` (überschreibbar per `FLAGS_DIR`), Wartungsseite aus `../Admin Dashboard/public`.
 
 ### Bot-Dashboard lokal

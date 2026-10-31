@@ -107,11 +107,8 @@ export async function shopRoutes(app: FastifyInstance, { config }: { config: ICo
 
         requireDatabase();
 
-        const before = (await readSettings()).mode;
-        const result = await switchAccess(config, mode, actor);
-        if (before !== mode) await audit(actor, "shop.access", null, { free: "Free Access", paid: "Paid Access", beta: "Beta Access" }[mode]);
-
-        return result;
+        // Auch nach einem halben Umstellen kommt es ins Protokoll, eine abgewiesene zweite Umstellung nicht (W-0024).
+        return switchAccess(config, mode, actor, new Date(), (after) => audit(actor, "shop.access", null, { free: "Free Access", paid: "Paid Access", beta: "Beta Access" }[after]));
     });
 
     app.put("/api/shop/settings", async (request, reply) => {

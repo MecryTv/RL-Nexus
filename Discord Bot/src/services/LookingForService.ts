@@ -1,17 +1,24 @@
 import {
     ButtonInteraction,
+    ChannelFlags,
     ChannelType,
+    ChatInputCommandInteraction,
     DMChannel,
     ForumChannel,
     Guild,
     GuildForumTagData,
     GuildForumTagEmoji,
     GuildMember,
+    MessageEditOptions,
     MessageFlags,
     PermissionFlagsBits,
 } from "discord.js";
 import BotClient from "../client/BotClient";
-import { AnswersText, ChoiceRow, CloseRow, ConfirmRow, IValueInput, LftRender, LftValues, STEP_CANCEL, TooLong } from "../builder/LftView";
+import { AnswersText, ChoiceRow, CloseRow, ConfirmRow, IValueInput, LftRender, LftValues, PanelRow, PanelValues, STEP_CANCEL, TooLong } from "../builder/LftView";
+import { InfoCard } from "../builder/CommunityView";
+import { ICustomView } from "../builder/CustomView";
+import LftModal from "./LftModal";
+import { NeedsResend } from "./TeamService";
 import { Fill } from "../constants/Placeholders";
 import {
     ANSWER_TIMEOUT,
@@ -21,9 +28,12 @@ import {
     DefaultLftSettings,
     DefaultNotice,
     DefaultDm,
+    DefaultPanel,
     DefaultSide,
     KINDS,
     KIND_LABELS,
+    LFT_ACCENT,
+    LFT_ASKS,
     LFT_MODULE,
     MAX_ANSWER,
     MAX_CHOICES,
@@ -38,7 +48,21 @@ import {
     MAX_TITLE,
     SKIP_WORDS,
 } from "../constants/Lft";
-import { ILftAnswer, ILftBody, ILftDm, ILftNotice, ILftQuestion, ILftRequest, ILftSettings, ILftSide, LftKind, LftQuestionKind, LftStatus } from "../interfaces/services/lft/ILft";
+import {
+    ILftAnswer,
+    ILftBody,
+    ILftDm,
+    ILftNotice,
+    ILftPanel,
+    ILftQuestion,
+    ILftRequest,
+    ILftSettings,
+    ILftSide,
+    LftAsk,
+    LftKind,
+    LftQuestionKind,
+    LftStatus,
+} from "../interfaces/services/lft/ILft";
 import logger from "../utils/logger";
 
 export class LftError extends Error {}
@@ -67,6 +91,15 @@ function TagEmoji(emoji: string | null): GuildForumTagEmoji | null {
 
 const DAY = 86_400_000;
 
+/** Ist der Beitrag oder die Nachricht wirklich weg? Ein Aussetzer bei Discord ist es nicht. */
+function Gone(error: unknown): boolean {
+    const code = (error as { code?: unknown }).code;
+
+    return code === 10003 || code === 10008;
+}
+
+const NO_ANSWER = "Discord hat gerade nicht geantwortet. Versuch es gleich noch einmal.";
+
 /** Das Ergebnis einer Frage: eine Antwort, übersprungen oder Schluss. */
 type Step = { ok: true; value: string | null } | { ok: false; reason: "cancel" | "timeout" };
 
@@ -75,7 +108,8 @@ type Step = { ok: true; value: string | null } | { ok: false; reason: "cancel" |
  *
  * Gefragt wird in der DM - eine Frage je Nachricht, die Fragen selbst kommen
  * aus dem Dashboard. Am Ende steht eine Vorschau mit zwei Knöpfen; erst danach
- * entsteht der Beitrag im Forum. Siehe docs/LookingFor.md.
+ * entsteht der Beitrag im Forum. Seit Plan 30 geht es auch im Fenster
+ * (LftModal) und über ein Panel im Forum. Siehe docs/LookingFor.md.
  */
 export default class LookingForService {
     private readonly client: BotClient;
@@ -83,8 +117,15 @@ export default class LookingForService {
     /** Wer gerade in einem Gespräch steckt - zwei auf einmal wären ein Chaos. */
     private readonly talking = new Set<string>();
 
+    /** Server, deren Panel gerade gesendet wird - zwei Klicks sollen keine zwei Beiträge machen. */
+    private readonly sending = new Set<string>();
+
+    /** Fragen im Fenster (Plan 30). Hängt hier, weil der Client nur den Service kennt. */
+    readonly modal: LftModal;
+
     constructor(client: BotClient) {
         this.client = client;
+        this.modal = new LftModal(client);
     }
 
     /* ----------------------------------------------------------
@@ -104,6 +145,8 @@ export default class LookingForService {
             team: this.Whole("team", stored.team),
             notice: { ...DefaultNotice(), ...(IsRecord(stored.notice) ? stored.notice : {}) },
             dm: { ...DefaultDm(), ...(IsRecord(stored.dm) ? stored.dm : {}) },
+            ask: stored.ask === "modal" ? "modal" : "dm",
+            panel: { ...DefaultPanel(), ...(IsRecord(stored.panel) ? stored.panel : {}) },
         };
     }
 
@@ -123,6 +166,8 @@ export default class LookingForService {
             team: this.CleanSide(guild, "team", raw.team, previous.team),
             notice: this.CleanNotice(guild, raw.notice, previous.notice),
             dm: this.CleanDm(guild, raw.dm, previous.dm),
+            ask: LFT_ASKS.includes(raw.ask as LftAsk) ? (raw.ask as LftAsk) : previous.ask,
+            panel: this.CleanPanel(guild, raw.panel, previous.panel),
             expireDays: Int(raw.expireDays, 0, MAX_EXPIRE, previous.expireDays),
             manageRoles: this.Roles(guild, raw.manageRoles, previous.manageRoles, MAX_MANAGERS),
         };
@@ -236,6 +281,22 @@ export default class LookingForService {
         };
     }
 
+    /** Das Panel im Forum (Plan 30). Beitrag und Nachricht schreibt nur der Bot beim Senden. */
+    private CleanPanel(guild: Guild, input: unknown, previous: ILftPanel): ILftPanel {
+        if (input === undefined) return previous;
+
+        const raw = IsRecord(input) ? input : {};
+        const forum = typeof raw.forumId === "string" ? guild.channels.cache.get(raw.forumId) : null;
+
+        return {
+            forumId: raw.forumId === undefined ? previous.forumId : forum?.type === ChannelType.GuildForum ? forum.id : null,
+            title: Text(raw.title, MAX_TITLE) || previous.title,
+            body: this.CleanBody(guild, "Panel", raw.body, previous.body),
+            threadId: previous.threadId,
+            messageId: previous.messageId,
+        };
+    }
+
     private CleanDm(guild: Guild, input: unknown, previous: ILftDm): ILftDm {
         if (input === undefined) return previous;
 
@@ -260,8 +321,194 @@ export default class LookingForService {
             .catch((error: unknown) => (error instanceof LftError ? error.message : "Die Tags im Forum konnte der Bot nicht anlegen."));
 
         await this.client.moduleSettings.Save(guild.id, LFT_MODULE, settings);
+        await this.RefreshPanel(guild).catch(() => undefined);
 
         return { settings, warning };
+    }
+
+    /* ----------------------------------------------------------
+       Das Panel im Forum (Plan 30)
+       ---------------------------------------------------------- */
+    /** Wo das Panel steht: das eigene Forum, sonst das der Spieler-Suche, sonst das der Team-Suche. */
+    PanelForum(settings: ILftSettings): string | null {
+        return settings.panel.forumId ?? settings.player.forumId ?? settings.team.forumId;
+    }
+
+    /** Die Karte aus dem Dashboard, darunter je Seite mit Forum ein Knopf. */
+    private PanelView(guild: Guild, settings: ILftSettings): Promise<ICustomView> {
+        const kinds = KINDS.filter((kind) => settings[kind].on && settings[kind].forumId);
+
+        return LftRender(this.client, settings.panel.body, PanelValues(guild), [PanelRow(kinds)]);
+    }
+
+    /** panel schreibt nur der Bot - an CleanSettings vorbei. */
+    private async SavePanel(guildId: string, ids: Pick<ILftPanel, "threadId" | "messageId">): Promise<void> {
+        const settings = await this.Settings(guildId);
+
+        await this.client.moduleSettings.Save(guildId, LFT_MODULE, { ...settings, panel: { ...settings.panel, ...ids } });
+    }
+
+    /**
+     * Stellt das Panel ins Forum, aber nie ein zweites daneben: Steht der
+     * gemerkte Beitrag noch im selben Forum, wird er bearbeitet. Ist er weg,
+     * entsteht ein neuer. Zieht das Panel in ein anderes Forum, verschwindet
+     * der alte Beitrag.
+     */
+    async SendPanel(guild: Guild): Promise<{ url: string; warning: string | null }> {
+        if (this.sending.has(guild.id)) throw new LftError("Das Panel wird gerade schon gesendet.");
+
+        this.sending.add(guild.id);
+
+        try {
+            return await this.PlacePanel(guild);
+        } finally {
+            this.sending.delete(guild.id);
+        }
+    }
+
+    private async PlacePanel(guild: Guild): Promise<{ url: string; warning: string | null }> {
+        const settings = await this.Settings(guild.id);
+        const forumId = this.PanelForum(settings);
+        const forum = forumId ? guild.channels.cache.get(forumId) : null;
+
+        if (forum?.type !== ChannelType.GuildForum) throw new LftError("Wähl erst ein Forum für das Panel.");
+
+        const { title, threadId, messageId } = settings.panel;
+        const view = await this.PanelView(guild, settings);
+        // Nur „gibt es nicht“ heißt weg. Bei jedem anderen Fehler entstünde sonst ein zweites Panel.
+        const old = threadId
+            ? await this.client.channels.fetch(threadId).catch((error: unknown) => {
+                  if (Gone(error)) return null;
+
+                  throw new LftError(NO_ANSWER);
+              })
+            : null;
+        let thread = old?.isThread() ? old : null;
+
+        if (thread && thread.parentId !== forum.id) {
+            await thread.delete("Looking for: Panel zieht um").catch(() => undefined);
+            thread = null;
+        }
+
+        if (thread) {
+            if (thread.archived) await thread.setArchived(false).catch(() => undefined);
+
+            const message = await thread.messages.fetch(messageId ?? thread.id).catch((error: unknown) => {
+                if (Gone(error)) return null;
+
+                throw new LftError(NO_ANSWER);
+            });
+
+            // Ohne erste Nachricht ist es kein Panel mehr. Und zwischen Karte und Text bearbeitet Discord nicht: dann neu.
+            if (message && !NeedsResend(message, view)) {
+                await message.edit({ ...view, attachments: [] } as MessageEditOptions);
+                if (thread.name !== title) await thread.setName(title).catch(() => undefined);
+            } else {
+                await thread.delete("Looking for: Panel wird neu angelegt").catch(() => undefined);
+                thread = null;
+            }
+        }
+
+        if (!thread) {
+            // Verlangt das Forum einen Tag, muss es einer aus diesem Forum sein: der Tag der Seite, die hier sucht,
+            // sonst einer, den jeder setzen darf. Ohne lehnt Discord den Beitrag ab.
+            const needsTag = (forum as ForumChannel).flags.has(ChannelFlags.RequireTag);
+            const home = KINDS.find((kind) => settings[kind].forumId === forum.id && settings[kind].tag.id);
+            const tag = !needsTag ? null : home ? settings[home].tag.id : ((forum as ForumChannel).availableTags.find((entry) => !entry.moderated)?.id ?? null);
+
+            if (needsTag && !tag) throw new LftError("Das Forum verlangt einen Tag, und ich finde keinen, den ich setzen darf. Leg dort einen an oder stell das Forum bei einer der Suchen ein.");
+
+            thread = await (forum as ForumChannel).threads
+                .create({ name: title, message: view, appliedTags: tag ? [tag] : [], reason: "Looking for: Panel" })
+                .catch((error: unknown) => {
+                    logger.warn(`🔎 Panel auf ${guild.id} nicht erstellt: ${String(error)}`);
+
+                    throw new LftError("Im Forum durfte ich keinen Beitrag anlegen. Ich brauche dort „Beiträge erstellen“ und „Nachrichten senden“.");
+                });
+        }
+
+        const pinned = Boolean(thread.flags?.has(ChannelFlags.Pinned)) || (await thread.pin().then(() => true, () => false));
+        const locked = thread.locked || (await thread.setLocked(true).then(() => true, () => false));
+
+        await this.SavePanel(guild.id, { threadId: thread.id, messageId: thread.id });
+        logger.user(`🔎 Looking-for-Panel auf ${guild.id} in ${forum.id}`);
+
+        // Mit „Beiträge verwalten“ scheitert das Anpinnen nur, weil Discord je Forum einen angepinnten Beitrag erlaubt (W-0032).
+        const manage = (): boolean => Boolean(guild.members.me?.permissionsIn(forum).has(PermissionFlagsBits.ManageThreads));
+        const warning =
+            pinned && locked
+                ? null
+                : !manage()
+                  ? "Mir fehlt „Beiträge verwalten“: Das Panel steht, ist aber nicht angepinnt und gesperrt."
+                  : !pinned
+                    ? "Im Forum ist schon ein anderer Beitrag angepinnt, Discord erlaubt nur einen. Löse ihn und sende das Panel noch einmal."
+                    : "Das Panel steht, ließ sich aber nicht sperren.";
+
+        return { url: thread.url, warning };
+    }
+
+    /**
+     * Ein liegendes Panel an die Einstellungen anpassen, etwa wenn eine Seite
+     * an- oder ausgeht. Ist der Beitrag weg, vergisst der Bot ihn.
+     */
+    async RefreshPanel(guild: Guild): Promise<void> {
+        const settings = await this.Settings(guild.id);
+        const { threadId, messageId, title } = settings.panel;
+
+        if (!threadId) return;
+
+        try {
+            const thread = await this.client.channels.fetch(threadId);
+
+            if (!thread?.isThread()) throw Object.assign(new Error("Unknown Channel"), { code: 10003 });
+            if (thread.archived) await thread.setArchived(false);
+
+            const message = await thread.messages.fetch(messageId ?? thread.id);
+            const view = await this.PanelView(guild, settings);
+
+            // Karte und Text lassen sich nicht ineinander bearbeiten: dann legt „Panel senden“ es neu an.
+            if (NeedsResend(message, view)) {
+                await this.SendPanel(guild);
+
+                return;
+            }
+
+            await message.edit({ ...view, attachments: [] } as MessageEditOptions);
+            if (thread.name !== title) await thread.setName(title).catch(() => undefined);
+        } catch (error) {
+            const code = (error as { code?: unknown }).code;
+
+            if (code === 10003 || code === 10008) {
+                await this.SavePanel(guild.id, { threadId: null, messageId: null });
+
+                return;
+            }
+
+            logger.warn(`🔎 Looking-for-Panel auf ${guild.id} nicht aktualisiert: ${error instanceof Error ? error.message : String(error)}`);
+        }
+    }
+
+    /**
+     * Der Weg vom Knopf im Panel und von /lookingfor spieler|team (Plan 30):
+     * je nach Einstellung Fenster oder DM. Vor einem Fenster wird nichts
+     * aufgeschoben, sonst ginge es nicht auf.
+     */
+    async Begin(interaction: ButtonInteraction<"cached"> | ChatInputCommandInteraction<"cached">, kind: LftKind): Promise<void> {
+        const reply = async (text: string): Promise<void> => {
+            await interaction.reply({ ...InfoCard(text, LFT_ACCENT), flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral });
+        };
+        const on = this.client.databaseService.Ready && (await this.client.settings.Of(interaction.guildId)).modules.includes(LFT_MODULE);
+
+        if (!on) return reply("Looking for ist auf diesem Server aus.");
+        if ((await this.Settings(interaction.guildId)).ask === "modal") return this.modal.Start(interaction, kind);
+
+        try {
+            await reply(await this.Start(interaction.member, kind));
+        } catch (error) {
+            if (!(error instanceof LftError)) throw error;
+
+            await reply(error.message);
+        }
     }
 
     /* ----------------------------------------------------------
@@ -367,6 +614,34 @@ export default class LookingForService {
      * zehn Minuten auf eine Antwort.
      */
     async Start(member: GuildMember, kind: LftKind): Promise<string> {
+        const { settings, side } = await this.Check(member, kind);
+
+        if (this.talking.has(member.id)) throw new LftError("Ich habe dir schon geschrieben – schau in deine DMs. Mit **abbrechen** kommst du dort raus.");
+
+        const dm = await member.user.createDM().catch(() => null);
+
+        if (!dm) throw new LftError("Ich kann dir nicht schreiben. Erlaube in den Server-Einstellungen Nachrichten von Mitgliedern und versuch es erneut.");
+
+        this.talking.add(member.id);
+
+        // Losgelöst: der Befehl antwortet sofort, das Gespräch läuft weiter.
+        void this.Ask(dm, member, kind, settings)
+            .catch(async (error: unknown) => {
+                const normalized = error instanceof Error ? error : new Error(String(error));
+
+                await dm.send({ content: "Da ist etwas schiefgegangen – das Team weiß davon. Versuch es später noch einmal." }).catch(() => undefined);
+                await this.client.guardian.ReportError(normalized, null, `Looking for: Gespräch mit ${member.id}`);
+            })
+            .finally(() => this.talking.delete(member.id));
+
+        return `Ich habe dir eine Nachricht geschickt: dort stehen **${side.questions.length} Fragen** zur ${KIND_LABELS[kind]}.`;
+    }
+
+    /**
+     * Darf diese Person jetzt eine Suche dieser Art starten? Gilt für DM und
+     * Fenster gleich (Plan 30). Wirft LftError mit dem Satz für sie.
+     */
+    async Check(member: GuildMember, kind: LftKind): Promise<{ settings: ILftSettings; side: ILftSide }> {
         if (!this.client.databaseService.Ready) throw new LftError("Die Datenbank ist gerade nicht da – versuch es in einem Moment noch einmal.");
 
         const guild = member.guild;
@@ -391,37 +666,28 @@ export default class LookingForService {
             );
         }
 
-        if (this.talking.has(member.id)) throw new LftError("Ich habe dir schon geschrieben – schau in deine DMs. Mit **abbrechen** kommst du dort raus.");
-
-        const dm = await member.user.createDM().catch(() => null);
-
-        if (!dm) throw new LftError("Ich kann dir nicht schreiben. Erlaube in den Server-Einstellungen Nachrichten von Mitgliedern und versuch es erneut.");
-
-        this.talking.add(member.id);
-
-        // Losgelöst: der Befehl antwortet sofort, das Gespräch läuft weiter.
-        void this.Ask(dm, member, kind, settings)
-            .catch(async (error: unknown) => {
-                const normalized = error instanceof Error ? error : new Error(String(error));
-
-                await dm.send({ content: "Da ist etwas schiefgegangen – das Team weiß davon. Versuch es später noch einmal." }).catch(() => undefined);
-                await this.client.guardian.ReportError(normalized, null, `Looking for: Gespräch mit ${member.id}`);
-            })
-            .finally(() => this.talking.delete(member.id));
-
-        return `Ich habe dir eine Nachricht geschickt: dort stehen **${side.questions.length} Fragen** zur ${label}.`;
+        return { settings, side };
     }
 
-    private async Ask(dm: DMChannel, member: GuildMember, kind: LftKind, settings: ILftSettings): Promise<void> {
-        const side = settings[kind];
-        const guild = member.guild;
-        const base = {
-            guild,
+    /** Was jede Nachricht über die Suche weiß, bevor es Antworten gibt. */
+    BaseOf(member: GuildMember, kind: LftKind, side: ILftSide): Omit<IValueInput, "step"> {
+        return {
+            guild: member.guild,
             kind,
             user: { id: member.id, name: member.displayName, avatar: member.user.displayAvatarURL({ size: 256 }) },
             questions: side.questions,
             forumId: side.forumId,
         };
+    }
+
+    /** Der Titel des Beitrags aus der Vorlage. Bleibt nichts übrig, heißt er nach Art und Person. */
+    TitleOf(member: GuildMember, kind: LftKind, side: ILftSide, base: Omit<IValueInput, "step">, answers: ILftAnswer[]): string {
+        return Fill(side.title, LftValues({ ...base, answers })).trim().slice(0, MAX_TITLE) || `${KIND_LABELS[kind]} von ${member.displayName}`;
+    }
+
+    private async Ask(dm: DMChannel, member: GuildMember, kind: LftKind, settings: ILftSettings): Promise<void> {
+        const side = settings[kind];
+        const base = this.BaseOf(member, kind, side);
 
         await dm.send(await LftRender(this.client, settings.dm.intro, LftValues(base)));
 
@@ -450,7 +716,7 @@ export default class LookingForService {
             return;
         }
 
-        const title = Fill(side.title, LftValues({ ...base, answers })).trim().slice(0, MAX_TITLE) || `${KIND_LABELS[kind]} von ${member.displayName}`;
+        const title = this.TitleOf(member, kind, side, base, answers);
         const values = LftValues({ ...base, answers, title });
         const card = await dm.send(await LftRender(this.client, side.preview, values, [ConfirmRow()]));
         const click = await card.awaitMessageComponent({ time: CONFIRM_TIMEOUT }).catch(() => null);
@@ -468,7 +734,9 @@ export default class LookingForService {
             return;
         }
 
-        await this.Publish(member, kind, settings, answers, title, base);
+        const result = await this.Publish(member, kind, settings, answers, title, base);
+
+        await dm.send(result.ok ? result.done : { content: result.message }).catch(() => undefined);
     }
 
     /** Eine Frage stellen und auf die Antwort warten. */
@@ -548,41 +816,45 @@ export default class LookingForService {
     /* ----------------------------------------------------------
        Der Beitrag im Forum
        ---------------------------------------------------------- */
-    private async Publish(
+    /**
+     * Legt Anfrage und Beitrag an. Wem der Bot das Ergebnis sagt, entscheidet
+     * der Aufrufer: die DM oder die Antwort aufs Fenster (Plan 30). done ist
+     * die Nachricht „Abschluss“ aus dem Dashboard.
+     */
+    async Publish(
         member: GuildMember,
         kind: LftKind,
         settings: ILftSettings,
         answers: ILftAnswer[],
         title: string,
         base: Omit<IValueInput, "step">
-    ): Promise<void> {
+    ): Promise<{ ok: true; url: string; done: ICustomView } | { ok: false; message: string }> {
         const guild = member.guild;
         const side = settings[kind];
-        const dm = await member.user.createDM().catch(() => null);
 
         // Zwischen Vorschau und Klick kann viel passieren: ein zweiter Befehl in
         // einem anderen Fenster, ein geschlossenes Forum.
         const open = await this.client.lftRequests.Open(guild.id, member.id, kind);
 
-        if (open) {
-            await dm?.send({ content: `Du hast inzwischen schon eine laufende ${KIND_LABELS[kind]} – diese hier habe ich verworfen.` }).catch(() => undefined);
-
-            return;
-        }
+        if (open) return { ok: false, message: `Du hast inzwischen schon eine laufende ${KIND_LABELS[kind]} – diese hier habe ich verworfen.` };
 
         const forum = side.forumId ? guild.channels.cache.get(side.forumId) : null;
 
-        if (forum?.type !== ChannelType.GuildForum) {
-            await dm?.send({ content: "Das Forum gibt es nicht mehr – sag das jemandem vom Team. Deine Antworten sind leider weg." }).catch(() => undefined);
-
-            return;
-        }
+        if (forum?.type !== ChannelType.GuildForum) return { ok: false, message: "Das Forum gibt es nicht mehr – sag das jemandem vom Team. Deine Antworten sind leider weg." };
 
         // Fehlt der Tag noch, wird er jetzt angelegt: das Forum kann ihn
         // verlangen, und ohne Tag lehnt Discord den Beitrag ab.
         if (!side.tag.id) {
             await this.SyncTags(guild, settings).catch(() => undefined);
-            await this.client.moduleSettings.Save(guild.id, LFT_MODULE, settings);
+
+            // Nur die Tags zurückschreiben: seit dem Start des Gesprächs kann sich mehr geändert haben, etwa das Panel (W-0032).
+            const fresh = await this.Settings(guild.id);
+
+            await this.client.moduleSettings.Save(guild.id, LFT_MODULE, {
+                ...fresh,
+                player: { ...fresh.player, tag: settings.player.tag },
+                team: { ...fresh.team, tag: settings.team.tag },
+            });
         }
 
         const request = await this.client.lftRequests.Create({
@@ -610,11 +882,8 @@ export default class LookingForService {
 
         if (!thread) {
             await this.client.lftRequests.Remove(request.id);
-            await dm
-                ?.send({ content: `In ${side.forumId ? `<#${side.forumId}>` : "dem Forum"} durfte der Bot keinen Beitrag anlegen – sag das jemandem vom Team.` })
-                .catch(() => undefined);
 
-            return;
+            return { ok: false, message: `In ${side.forumId ? `<#${side.forumId}>` : "dem Forum"} durfte der Bot keinen Beitrag anlegen – sag das jemandem vom Team.` };
         }
 
         // Bei einem Forum-Beitrag hat die erste Nachricht dieselbe ID wie der
@@ -624,10 +893,11 @@ export default class LookingForService {
         const link = `https://discord.com/channels/${guild.id}/${thread.id}`;
         const done = LftValues({ ...base, answers, title, url: link, createdAt: request.createdAt });
 
-        await dm?.send(await LftRender(this.client, settings.dm.done, done)).catch(() => undefined);
         await this.Notify(guild, settings, { ...request, threadId: thread.id }, done).catch(() => undefined);
 
         logger.user(`🔎 ${KIND_LABELS[kind]} #${request.id} auf ${guild.id} von ${member.id}: ${thread.id}`);
+
+        return { ok: true, url: link, done: await LftRender(this.client, settings.dm.done, done) };
     }
 
     /** Die Meldung ans Team. Ohne Kanal bleibt sie aus. */
@@ -640,14 +910,8 @@ export default class LookingForService {
 
         if (!channel?.isTextBased()) return;
 
-        const ping = notice.roles.map((role) => `<@&${role}>`).join(" ");
-        const view = await LftRender(this.client, notice.body, values, [CloseRow(request.id, true)]);
-        const sent = await channel
-            .send({
-                ...view,
-                ...(ping ? { content: ping, allowedMentions: { roles: notice.roles } } : {}),
-            })
-            .catch(() => null);
+        const view = await LftRender(this.client, notice.body, values, [CloseRow(request.id, true)], notice.roles);
+        const sent = await channel.send(view).catch(() => null);
 
         if (sent) await this.client.lftRequests.SetNotice(request.id, sent.id);
     }
@@ -718,6 +982,8 @@ export default class LookingForService {
         const [, what, raw] = interaction.customId.split(":");
         const id = Number(raw);
 
+        // Plan 30: die Knöpfe im Panel starten eine Suche.
+        if (what === "start" && (raw === "player" || raw === "team")) return this.Begin(interaction, raw);
         if (!Number.isFinite(id)) return;
 
         // Aufschieben statt antworten: das Schliessen geht ueber Discord und die

@@ -1946,11 +1946,27 @@ try {
             const near = (actual: Date | null, expected: number, label: string): void => assert.ok(actual !== null && Math.abs(actual.getTime() - expected) < 120_000, `${label}: ${actual?.toISOString()} statt ${new Date(expected).toISOString()}`);
             const mine = Object.values(grant);
             const access = (mode: "free" | "paid" | "beta") => write("PUT", "/api/shop/access", { mode });
+            // W-0024: Was schon vorher eingefroren war, bleibt es. Alles andere taut der finally-Block auf, auch nach einem Abbruch.
+            const frozenBefore = (await query<{ id: number }[]>("SELECT id FROM shop_grants WHERE frozen_at IS NOT NULL OR stripe_paused IS NOT NULL")).map((row) => row.id);
 
             // Ausgangslage: Paid Access, ohne einzufrieren oder Stripe zu fragen.
             await setAccessMode("paid", USERS.admin, new Date());
 
             try {
+                await check("Rückfrage zählt nur Kunden, die eine Mail bekommen (W-0024)", async () => {
+                    const count = async (): Promise<number> => ((await get("/api/shop/access")).json() as IAccessPreview).customers;
+                    const before = await count();
+                    const banned = "99999999999999999968";
+                    const silent = "99999999999999999969";
+
+                    await records.upsertCustomer({ id: banned, name: "check gesperrt", email: `${banned}@example.test` });
+                    await records.setBanned(banned, USERS.admin, "check:db");
+                    await records.upsertCustomer({ id: silent, name: "check ohne Mail", email: "" });
+                    for (const userId of [banned, silent]) await records.insertGrant({ ...base, userId, source: "one_time", endsAt: new Date(Date.now() + 9 * DAY), stripeSubscriptionId: null });
+
+                    assert.equal(await count(), before, "gesperrt und ohne Adresse zählen nicht");
+                });
+
                 await check("Free friert ein, pausiert laufende Abos und schreibt jedem Kunden", async () => {
                     shopMails.length = 0;
 
@@ -2023,12 +2039,29 @@ try {
 
                 await check("Pausieren scheitert: trotzdem umgestellt, später nachgeholt", async () => {
                     accessStripe.failPause = true;
-                    const answer = await access("free");
-                    accessStripe.failPause = false;
+                    shopMails.length = 0;
+                    const logged: string[] = [];
+                    const error = console.error;
+                    console.error = (...parts: unknown[]) => void logged.push(parts.join(" "));
+                    let answer: Awaited<ReturnType<typeof access>>;
+
+                    try {
+                        answer = await access("free");
+                        // W-0024: Scheitert es dauerhaft, steht das einmal im Log, nicht jede Minute.
+                        await catchUpFree(config);
+                        await catchUpFree(config);
+                    } finally {
+                        console.error = error;
+                        accessStripe.failPause = false;
+                    }
 
                     const paused = async (): Promise<number | null> => (await query<{ p: number | null }[]>("SELECT stripe_paused AS p FROM shop_grants WHERE id = ?", [grant.sub]))[0].p;
                     assert.equal(answer.statusCode, 200, answer.body);
                     assert.ok((answer.json() as IAccessPreview).stripePending >= 1);
+                    assert.ok((answer.json() as IAccessPreview).stripePendingNames?.includes("check sub"), JSON.stringify((answer.json() as IAccessPreview).stripePendingNames));
+                    assert.equal(logged.filter((line) => line.includes("sub_checkdb_free1")).length, 1, logged.join(" | "));
+                    const pausedMail = shopMails.find((mail) => mail.to === `${ids.sub}@example.test` && mail.subject === "Dein Zugang ist pausiert");
+                    assert.ok(pausedMail && !/nichts abgebucht/.test(String(pausedMail.html)), "Pause nicht angenommen: kein „nichts abgebucht“");
                     assert.equal(await paused(), 0, "als nicht pausiert vermerkt");
                     assert.ok((await catchUpFree(config)) >= 1);
                     assert.equal(await paused(), 1);
@@ -2055,6 +2088,18 @@ try {
                 });
 
                 // --- Nach dem Abschluss-Review (Plan 20) ---
+
+                await check("Protokoll: eine Umstellung, ein Eintrag - auch bei einem Doppelklick (W-0024)", async () => {
+                    const entries = async (): Promise<number> => Number((await query<{ n: number }[]>("SELECT COUNT(*) AS n FROM admin_audit WHERE action = 'shop.access'"))[0].n);
+                    const before = await entries();
+
+                    const both = await Promise.all([access("free"), access("free")]);
+                    assert.deepEqual(both.map((answer) => answer.statusCode).sort(), [200, 409], both.map((answer) => answer.body).join(" | "));
+                    assert.equal(await entries(), before + 1);
+
+                    assert.equal((await access("paid")).statusCode, 200);
+                    assert.equal(await entries(), before + 2);
+                });
 
                 await check("Zwei Umstellungen auf einmal: die zweite bekommt einen Satz statt mitzulaufen", async () => {
                     const first = switchAccess(config, "free", { id: USERS.admin });
@@ -2149,6 +2194,22 @@ try {
                     assert.equal(((await get("/api/shop/access")).json() as IAccessPreview).stripePending, 0);
                 });
 
+                await check("Läuft weiter: „bucht erst am“ nennt das Abo, auch mit längerem Geschenk (W-0024)", async () => {
+                    const both = "99999999999999999970";
+                    await records.upsertCustomer({ id: both, name: "check beides", email: `${both}@example.test` });
+                    await records.insertGrant({ ...base, userId: both, source: "subscription", endsAt: new Date(Date.now() + 10 * DAY), stripeSubscriptionId: "sub_checkdb_free7" });
+                    await records.insertGrant({ ...base, userId: both, source: "gift", endsAt: new Date(Date.now() + 40 * DAY), stripeSubscriptionId: null });
+
+                    assert.equal((await access("free")).statusCode, 200);
+                    shopMails.length = 0;
+                    assert.equal((await access("paid")).statusCode, 200);
+
+                    const day = (offset: number): string => new Intl.DateTimeFormat("de-DE", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "Europe/Berlin" }).format(new Date(Date.now() + offset));
+                    const mail = String(shopMails.find((entry) => entry.to === `${both}@example.test` && entry.subject === "Dein Zugang läuft weiter")?.html ?? "");
+                    assert.ok(mail.includes(`bucht erst am ${day(10 * DAY)}`), mail);
+                    assert.ok(mail.includes(`bis ${day(40 * DAY)}`), mail);
+                });
+
                 await check("Zurück auf Paid schiebt nichts über 2037 hinaus", async () => {
                     const id = "99999999999999999967";
                     await records.upsertCustomer({ id, name: "check 2037", email: `${id}@example.test` });
@@ -2206,7 +2267,9 @@ try {
                 });
             } finally {
                 // Zurück auf den Stand vor dem Test, ohne noch einmal einzufrieren.
-                await query(`UPDATE shop_grants SET frozen_at = NULL, frozen_rest = NULL, stripe_paused = NULL WHERE (frozen_at IS NOT NULL OR stripe_paused IS NOT NULL) AND user_id LIKE '999999999999999999%'`);
+                await query(
+                    `UPDATE shop_grants SET frozen_at = NULL, frozen_rest = NULL, stripe_paused = NULL WHERE (frozen_at IS NOT NULL OR stripe_paused IS NOT NULL)${frozenBefore.length ? ` AND id NOT IN (${frozenBefore.join(",")})` : ""}`
+                );
                 await setAccessMode(original, USERS.admin, new Date());
                 setStripeGateway(kaufStripe);
             }

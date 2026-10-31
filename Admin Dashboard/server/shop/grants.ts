@@ -23,6 +23,8 @@ export interface IGrant {
     readonly orderId: number | null;
     /** Eingefroren, solange Free Access gilt. */
     readonly frozenAt?: Date | null;
+    /** Abos, eingefroren: Sekunden Rest bis zum Periodenende (W-0024: für die Kündigungsmail). */
+    readonly frozenRest?: number | null;
 }
 
 /** TIMESTAMP endet im Januar 2038. Später darf kein Zugang enden, sonst scheitert das Speichern nach der Zahlung. */

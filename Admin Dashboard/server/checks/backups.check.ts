@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import { AREAS, EXCLUDED_TABLES } from "../../shared/backups.ts";
-import { carriedAreas, initials, kindLabel, lossText, planSentence, roundSentence, timelineLayout } from "../../src/backups/format.ts";
-import { allTables, countAreas, packBackup, unpackBackup } from "../backups/data.ts";
+import { carriedAreas, initials, kindLabel, lossText, partsLabel, planSentence, roundSentence, serverLabel, timelineLayout } from "../../src/backups/format.ts";
+import { allTables, countAreas, packBackup, unpackBackup, unpackServer } from "../backups/data.ts";
+import { gzipSync } from "node:zlib";
+import { parsePlan } from "../routes/internal-backups.ts";
+import { remapValue, resolveChains } from "../backups/remap.ts";
 import { msUntilBerlinMidnight, nightsOf, shouldCatchUp, summarizeRound } from "../backups/round.ts";
 import { nextRun, shortReason } from "../backups/plan.ts";
 import type { IBackupPlan, PlanEvery } from "../../shared/backups.ts";
@@ -38,6 +41,82 @@ export async function checkBackups(): Promise<void> {
         assert.equal(new Set(tables).size, tables.length);
         assert.ok(tables.every((table) => !(EXCLUDED_TABLES as readonly string[]).includes(table)));
         assert.ok(tables.includes("poll_votes") && tables.includes("team_members") && tables.includes("clip_votes"));
+    });
+
+    await check("Anti Villain ist Live-Zustand: kein Bereich, beim Zurückladen bleibt er", () => {
+        // Ein Sicherheits-Backup entsteht vor dem Fall des Nukers - zurückgeladen, löschte es dessen gemerkte Rollen.
+        for (const table of ["av_cases", "av_trust", "av_reports", "av_incidents", "av_events"]) {
+            assert.ok(!allTables().includes(table), table);
+            assert.ok((EXCLUDED_TABLES as readonly string[]).includes(table), table);
+        }
+    });
+
+    section("Backups: Server-Teil (Plan 32)");
+
+    await check("Format v2: Tabellen und Server-Teil kommen zurück", () => {
+        const server = { counts: { roles: 2, channels: 3, members: 1, emojis: 0, stickers: 0, bans: 0 }, roles: [{ id: "1" }] };
+        const packed = packBackup({ levels: [{ guild_id: "1", xp: 5 }] }, server);
+
+        assert.deepEqual(unpackBackup(packed), { levels: [{ guild_id: "1", xp: 5 }] });
+        assert.deepEqual(unpackServer(packed), server);
+    });
+
+    await check("Format v1 (alt): kein Server-Teil", () => {
+        const old = gzipSync(JSON.stringify({ version: 1, tables: { levels: [] } }));
+
+        assert.equal(unpackServer(old), null);
+        assert.deepEqual(unpackBackup(old), { levels: [] });
+    });
+
+    await check("Plan ohne die neuen Schalter: Discord-Server aus, vor riskanten Änderungen an", () => {
+        const plan = parsePlan({ enabled: true, every: "tag", weekday: 0, hour: 3, keep: 5 });
+
+        assert.equal(plan.discord, false);
+        assert.equal(plan.risky, true);
+        assert.equal(parsePlan({ enabled: true, every: "tag", weekday: 0, hour: 3, keep: 5, discord: true, risky: false }).risky, false);
+    });
+
+    await check("Anzeige: welche Teile, und was im Server-Teil steckt", () => {
+        assert.equal(partsLabel(["bot"]), "nur Bot");
+        assert.equal(partsLabel(["server"]), "nur Discord-Server");
+        assert.equal(partsLabel(["bot", "server"]), "Bot und Discord-Server");
+        assert.equal(serverLabel({ roles: 18, channels: 42, members: 318, emojis: 24, stickers: 0, bans: 17 }), "42 Kanäle · 18 Rollen · 318 Mitglieder mit Rollen · 24 Emojis · 17 Bans");
+        assert.equal(serverLabel({ roles: 1, channels: 1, members: null, emojis: 0, stickers: 1, bans: 0 }), "1 Kanal · 1 Rolle · 1 Sticker");
+    });
+
+    await check("Ganze IDs ersetzt, in Text, JSON und Listen, auch als Schlüssel", () => {
+        const OLD = "300000000000000101";
+        const NEW = "300000000000000201";
+        const out = remapValue({ a: OLD, b: ["x", OLD], c: `{"channelId":"${OLD}"}`, [OLD]: true, n: 5, at: new Date(0) }, new Map([[OLD, NEW]])) as Record<string, unknown>;
+        const text = JSON.stringify(out);
+
+        assert.equal(out.a, NEW);
+        assert.deepEqual(out.b, ["x", NEW]);
+        assert.equal(out.c, `{"channelId":"${NEW}"}`);
+        assert.equal(out[NEW], true);
+        assert.ok(out.at instanceof Date && out.n === 5);
+        assert.ok(!text.includes(OLD), text);
+    });
+
+    await check("Teil einer längeren Zahl bleibt", () => {
+        const map = new Map([["300000000000000101", "300000000000000201"]]);
+
+        assert.equal(remapValue("9300000000000000101", map), "9300000000000000101");
+        assert.equal(remapValue("3000000000000001019", map), "3000000000000001019");
+        assert.equal(remapValue("<#300000000000000101>", map), "<#300000000000000201>");
+    });
+
+    await check("Ketten wie im Bot: A→B und B→C ergibt für A den Wert C", () => {
+        const map = resolveChains([
+            ["A", "B"],
+            ["B", "C"],
+            ["X", "Y"],
+            ["Y", "X"],
+        ]);
+
+        assert.equal(map.get("A"), "C");
+        assert.equal(map.get("B"), "C");
+        assert.ok(map.has("X"), "Zyklus bricht ab");
     });
 
     section("Backups: Zeitplan");
@@ -87,7 +166,7 @@ export async function checkBackups(): Promise<void> {
     });
 
     await check("Automatische Backups: nächster Termin", () => {
-        const plan = (every: PlanEvery, hour: number, weekday = 0): IBackupPlan => ({ enabled: true, every, weekday, hour, keep: 5 });
+        const plan = (every: PlanEvery, hour: number, weekday = 0): IBackupPlan => ({ enabled: true, every, weekday, hour, keep: 5, discord: false, risky: true });
         const at = (iso: string): Date => new Date(iso);
         const next = (value: IBackupPlan, lastOk: string | null, enabledAt: string): string => nextRun(value, lastOk ? at(lastOk) : null, at(enabledAt)).toISOString();
 
@@ -100,7 +179,7 @@ export async function checkBackups(): Promise<void> {
     });
 
     await check("Wieder eingeschaltet oder Rhythmus geändert: der Termin zählt ab dann", () => {
-        const plan = (every: PlanEvery): IBackupPlan => ({ enabled: true, every, weekday: 0, hour: 3, keep: 5 });
+        const plan = (every: PlanEvery): IBackupPlan => ({ enabled: true, every, weekday: 0, hour: 3, keep: 5, discord: false, risky: true });
 
         // Zuletzt am 2. Oktober gesichert, am 23. um 14:20 wieder eingeschaltet: nicht sofort, sondern am 24. um 3:00.
         assert.equal(nextRun(plan("tag"), new Date("2026-10-02T01:00:00.000Z"), new Date("2026-10-23T12:20:00.000Z")).toISOString(), "2026-10-24T01:00:00.000Z");
@@ -148,7 +227,7 @@ export async function checkBackups(): Promise<void> {
 
     await check("Automatische Backups eines Servers als Satz", () => {
         const state = (plan: Partial<IBackupPlan>, lastError: { at: string; reason: string } | null = null) => ({
-            plan: { enabled: true, every: "woche" as const, weekday: 6, hour: 3, keep: 5, ...plan },
+            plan: { enabled: true, every: "woche" as const, weekday: 6, hour: 3, keep: 5, discord: false, risky: true, ...plan },
             next: null,
             lastOk: null,
             lastError,
@@ -173,7 +252,7 @@ export async function checkBackups(): Promise<void> {
     });
 
     await check("Zeitleiste: ältestes links, neuestes rechts, Fähnchen für von Hand", () => {
-        const meta = (id: number, kind: BackupKind, createdAt: string): IBackupMeta => ({ id, guildId: "1", guildName: "A", kind, origin: "admin", note: null, byName: null, createdAt, bytes: 0, counts: {} });
+        const meta = (id: number, kind: BackupKind, createdAt: string): IBackupMeta => ({ id, guildId: "1", guildName: "A", kind, origin: "admin", note: null, byName: null, createdAt, bytes: 0, counts: {}, parts: ["bot"], server: null });
         // Wie von der API: neueste zuerst. Das von Hand ist Monate alt und drängt die Nächte trotzdem nicht an den Rand.
         const layout = timelineLayout([meta(3, "nacht", "2026-10-17T22:00:00.000Z"), meta(2, "vorher", "2026-10-17T10:00:00.000Z"), meta(1, "hand", "2026-08-01T10:00:00.000Z")]);
 

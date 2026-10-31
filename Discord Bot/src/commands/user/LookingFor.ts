@@ -10,8 +10,9 @@ import { LftKind } from "../../interfaces/services/lft/ILft";
 /**
  * /lookingfor - eine Anfrage erstellen.
  *
- * Der Befehl selbst fragt nichts: er schreibt eine DM und stellt dort die
- * Fragen, die im Dashboard stehen. Fertig wird daraus ein Beitrag im Forum.
+ * Der Befehl selbst fragt nichts: je nach Einstellung kommen die Fragen aus
+ * dem Dashboard per DM oder im Fenster (Plan 30). Fertig wird daraus ein
+ * Beitrag im Forum.
  * Siehe docs/LookingFor.md.
  */
 export default class LookingFor extends Command {
@@ -54,10 +55,11 @@ export default class LookingFor extends Command {
 
         const what = interaction.options.getSubcommand();
 
-        try {
-            if (what === "beenden") return await this.Stop(interaction);
+        // Plan 30: derselbe Weg wie die Knöpfe im Panel - je nach Einstellung Fenster oder DM.
+        if (what !== "beenden") return this.client.lookingForService.Begin(interaction, what === "team" ? "team" : "player");
 
-            await this.Say(interaction, await this.client.lookingForService.Start(interaction.member, what === "team" ? "team" : "player"));
+        try {
+            await this.Stop(interaction);
         } catch (error) {
             if (!(error instanceof LftError)) throw error;
 

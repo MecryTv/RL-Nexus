@@ -6,7 +6,7 @@ import { Button } from "../components/ui/Button";
 import { PageLoader } from "../components/ui/PageLoader";
 import { usePageMeta } from "../hooks/usePageMeta";
 import { siteConfig } from "../services/SiteConfig";
-import { sellsNow } from "../services/navigation.ts";
+import { leavesPricing, sellsNow } from "../services/navigation.ts";
 import { ShopError, loadState, loginUrl, logout, startTrial } from "../shop/api.ts";
 import { Avatar } from "../shop/Avatar";
 import { Checkout } from "../shop/Checkout";
@@ -158,7 +158,12 @@ export function PricingPage(): JSX.Element {
     }
 
     // Free und Beta Access: Es gibt nichts zu kaufen.
-    if (!sellsNow(state.mode)) return <Navigate to="/" replace />;
+    if (leavesPricing(state.mode, unlock !== null)) return <Navigate to="/" replace />;
+
+    // Eine Zahlung von kurz vor dem Umstellen kommt noch von Stripe zurück: das Freischalten zeigen, dann zur Startseite (W-0024).
+    if (!sellsNow(state.mode) && unlock !== null) {
+        return <Unlock initial={unlock.initial} orderNo={unlock.orderNo} me={state.me} dashboardUrl={siteConfig.dashboardURL} onClose={() => setUnlock(null)} />;
+    }
 
     const me = state.me;
     const sellable = state.open && state.stripeKey !== null;

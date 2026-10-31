@@ -1,7 +1,7 @@
 import { Image, SKRSContext2D, createCanvas, loadImage } from "@napi-rs/canvas";
 import { RegisterFonts } from "./RankCard";
-import { CARD_HEIGHT, CARD_SCALE, CARD_WIDTH, MAX_AVATAR, MAX_RING, MIN_AVATAR } from "../constants/Welcome";
-import { IWelcomeCard, WelcomeFont } from "../interfaces/services/welcome/IWelcome";
+import { CARD_BASELINE, CARD_HEIGHT, CARD_SCALE, CARD_WIDTH, CleanPositions, Ellipsis, FitTitle, LineWidth, MAX_AVATAR, MAX_RING, MIN_AVATAR, POSITION_LIMITS, TitleFont } from "../constants/Welcome";
+import { IWelcomeCard, IWelcomePosition, IWelcomePositions } from "../interfaces/services/welcome/IWelcome";
 
 /**
  * Die Begrüßungskarte als PNG, in vier Layouts.
@@ -61,56 +61,28 @@ function Rounded(ctx: SKRSContext2D, x: number, y: number, w: number, h: number,
     ctx.roundRect(x, y, w, h, r);
 }
 
-/**
- * Die Schrift der Überschrift. Orbitron läuft breit, Rajdhani schmal - die
- * Größe gleicht das aus, damit "48" bei jeder Schrift ungefähr gleich wirkt.
- */
-function TitleFont(font: WelcomeFont, size: number): string {
-    if (font === "orbitron") return `700 ${Math.round(size * 0.8)}px Orbitron`;
-    if (font === "rajdhani") return `700 ${Math.round(size * 1.12)}px Rajdhani`;
-
-    return `800 ${size}px Oxanium`;
-}
-
-/** Schneidet ab, was nicht in die Breite passt. */
-function Ellipsis(ctx: SKRSContext2D, text: string, max: number): string {
-    if (ctx.measureText(text).width <= max) return text;
-
-    let cut = text;
-
-    while (cut.length > 1 && ctx.measureText(`${cut}…`).width > max) cut = cut.slice(0, -1);
-
-    return `${cut}…`;
-}
-
-/** Erst kleiner, dann kürzen: ein langer Name soll lesbar bleiben, statt gleich mit … zu enden. */
-function FitTitle(ctx: SKRSContext2D, text: string, font: WelcomeFont, size: number, max: number): { text: string; size: number } {
-    const floor = Math.round(size * 0.62);
-    let current = size;
-
-    ctx.font = TitleFont(font, current);
-
-    while (current > floor && ctx.measureText(text).width > max) {
-        current -= 2;
-        ctx.font = TitleFont(font, current);
-    }
-
-    return { text: Ellipsis(ctx, text, max), size: current };
-}
-
 const cache = new Map<string, Promise<Image | null>>();
+/** So lange wartet eine Karte auf ein Bild - ein hängender CDN-Server hält sonst Aufstieg und Nachtrag an. */
+const LOAD_TIMEOUT = 3_000;
 
-/** Bilder einmal laden - Avatare ändern sich selten, ein Server-Icon fast nie. */
-function Load(source: string | null): Promise<Image | null> {
+/**
+ * Avatare und Server-Icons einmal laden - sie ändern sich selten. Auch der
+ * Level-Designer lädt hierüber. Was nicht kam (Fehler, nach 3 s noch nichts),
+ * bleibt nicht im Speicher: beim nächsten Mal wird es wieder versucht.
+ */
+export function Load(source: string | null): Promise<Image | null> {
     if (!source) return Promise.resolve(null);
 
     let image = cache.get(source);
 
     if (!image) {
-        image = loadImage(source).catch(() => null);
+        image = Promise.race([loadImage(source).catch(() => null), new Promise<null>((resolve) => setTimeout(() => resolve(null), LOAD_TIMEOUT).unref())]);
         // ponytail: kleiner Zwischenspeicher, geleert ab 200 Bildern. Reicht für Beitrittswellen.
         if (cache.size > 200) cache.clear();
         cache.set(source, image);
+        void image.then((loaded) => {
+            if (!loaded && cache.get(source) === image) cache.delete(source);
+        });
     }
 
     return image;
@@ -270,219 +242,313 @@ async function DrawIcon(paint: IPaint, x: number, y: number, size: number): Prom
     ctx.stroke();
 }
 
+/* ----------------------------------------------------------
+   Plätze (Plan 25)
+   ---------------------------------------------------------- */
+
+type Places = Required<IWelcomePositions>;
+type Lines = Pick<IWelcomeCardData, "title" | "subtitle" | "footer" | "iconURL">;
+
+/** Avatar und Icon brauchen keine Ausrichtung und keine Breite. */
+function Box(x: number, y: number, size: number): IWelcomePosition {
+    return { x, y, size, align: "left", width: POSITION_LIMITS.width[1] };
+}
+
 /**
- * Die drei Zeilen. align "left" beginnt bei x, "center" steht mittig um x.
- * top: wo der Block beginnt - ohne Angabe steht er senkrecht in der Mitte.
- * divider: eine kurze Linie zwischen Unterzeile und kleiner Zeile.
+ * Die drei Zeilen, wie die Layouts sie heute stellen: ein Block, senkrecht
+ * mittig (oder ab top), mit einem Teiler bzw. der kleinen Zeile als Marke. y
+ * ist so gewählt, dass die Grundlinie genau dort liegt, wo sie vor Plan 25 lag.
  */
-function DrawText(paint: IPaint, x: number, max: number, align: "left" | "center", options: { top?: number; divider?: boolean; chip?: boolean } = {}): void {
-    const { ctx, card, data } = paint;
-    const fitted = data.title ? FitTitle(ctx, data.title, card.font, Clamp(card.titleSize, 28, 72), max) : null;
-    const rows: { kind: "title" | "subtitle" | "divider" | "footer"; height: number }[] = [];
+function TextPlaces(
+    ctx: SKRSContext2D,
+    card: IWelcomeCard,
+    data: Lines,
+    x: number,
+    max: number,
+    align: "left" | "center",
+    options: { top?: number; divider?: boolean; chip?: boolean }
+): Pick<Places, "title" | "subtitle" | "footer"> {
+    const size = Clamp(card.titleSize, 28, 72);
+    const fitted = data.title ? FitTitle(ctx, data.title, card.font, size, max) : null;
+    const heights = {
+        title: fitted ? Math.round(fitted.size * 1.04) : 0,
+        subtitle: data.subtitle ? 34 : 0,
+        divider: data.footer && options.divider ? 22 : 0,
+        footer: data.footer ? (options.chip ? 50 : 30) : 0,
+    };
+    let y = options.top ?? Math.round(H / 2 - (heights.title + heights.subtitle + heights.divider + heights.footer) / 2);
 
-    if (fitted) rows.push({ kind: "title", height: Math.round(fitted.size * 1.04) });
-    if (data.subtitle) rows.push({ kind: "subtitle", height: 34 });
-    if (data.footer && options.divider) rows.push({ kind: "divider", height: 22 });
-    if (data.footer) rows.push({ kind: "footer", height: options.chip ? 50 : 30 });
+    const title = { x, y, size, align, width: max };
 
-    const block = rows.reduce((sum, row) => sum + row.height, 0);
-    let y = options.top ?? Math.round(H / 2 - block / 2);
+    y += heights.title;
 
-    ctx.textAlign = align;
-    ctx.textBaseline = "alphabetic";
+    const subtitle = { x, y: y + 26 - Math.round(26 * CARD_BASELINE), size: 26, align, width: max };
 
-    for (const row of rows) {
-        if (row.kind === "title" && fitted) {
-            ctx.save();
-            ctx.font = TitleFont(card.font, fitted.size);
-            ctx.fillStyle = card.titleColor;
-            ctx.shadowColor = "rgba(0,0,0,0.55)";
-            ctx.shadowBlur = 14;
-            ctx.shadowOffsetY = 2;
-            ctx.fillText(fitted.text, x, y + Math.round(fitted.size * 0.82));
-            ctx.restore();
-        }
+    y += heights.subtitle + heights.divider;
 
-        if (row.kind === "subtitle") {
-            ctx.save();
-            ctx.font = "600 26px Rajdhani";
-            ctx.fillStyle = card.subtitleColor;
-            ctx.shadowColor = "rgba(0,0,0,0.5)";
-            ctx.shadowBlur = 10;
-            ctx.fillText(Ellipsis(ctx, data.subtitle, max), x, y + 26);
-            ctx.restore();
-        }
+    const footer = { x, y: y + (options.chip ? 34 : 22) - Math.round(21 * CARD_BASELINE), size: 21, align, width: max };
 
-        if (row.kind === "divider") {
-            const width = 56;
-
-            ctx.fillStyle = paint.accentOn ? card.accent : "rgba(255,255,255,0.28)";
-            ctx.fillRect(align === "center" ? x - width / 2 : x, y + 9, width, 3);
-        }
-
-        if (row.kind === "footer") {
-            ctx.font = "600 21px Rajdhani";
-
-            if (options.chip) {
-                // Die kleine Zeile als Marke - im HUD-Layout wie die Abzeichen der Rang-Karte.
-                const text = Ellipsis(ctx, data.footer, max - 32);
-                const width = ctx.measureText(text).width + 32;
-                const left = align === "center" ? x - width / 2 : x;
-
-                Bevel(ctx, left, y + 10, width, 34, 9);
-                ctx.fillStyle = Alpha(paint.footerColor, 0.12);
-                ctx.fill();
-                ctx.lineWidth = 1.5;
-                ctx.strokeStyle = Alpha(paint.footerColor, 0.7);
-                ctx.stroke();
-                ctx.fillStyle = paint.footerColor;
-                ctx.textAlign = "left";
-                ctx.fillText(text, left + 16, y + 34);
-                ctx.textAlign = align;
-            } else {
-                ctx.fillStyle = paint.footerColor;
-                ctx.fillText(Ellipsis(ctx, data.footer, max), x, y + 22);
-            }
-        }
-
-        y += row.height;
-    }
+    return { title, subtitle, footer };
 }
 
 /* ----------------------------------------------------------
-   Die vier Layouts
+   Die vier Layouts: Verzierung und die Plätze, die sie den Teilen geben
    ---------------------------------------------------------- */
-async function Classic(paint: IPaint): Promise<void> {
-    const { ctx, card } = paint;
-
-    Scrim(paint, "left");
-
-    // Der Streifen am linken Rand, mit einem Schein, der in die Karte läuft.
-    if (paint.accentOn) {
-        const glow = ctx.createLinearGradient(0, 0, 140, 0);
-
-        glow.addColorStop(0, Alpha(card.accent, 0.22));
-        glow.addColorStop(1, Alpha(card.accent, 0));
-        ctx.fillStyle = glow;
-        ctx.fillRect(0, 0, 140, H);
-        ctx.fillStyle = card.accent;
-        ctx.fillRect(0, 0, 6, H);
-    }
-
-    const pad = 52;
-    const size = Clamp(card.avatarSize, MIN_AVATAR, MAX_AVATAR);
-    const left = card.avatar ? pad + size + 40 : pad;
-    const right = W - pad - (card.icon && paint.data.iconURL ? 70 : 0);
-
-    if (card.avatar) await DrawAvatar(paint, pad, Math.round(H / 2 - size / 2), size);
-
-    DrawText(paint, left, Math.max(160, right - left), "left", { divider: true });
-    await DrawIcon(paint, W - 28 - 54, 28, 54);
+interface ILayout {
+    divider: boolean;
+    chip: boolean;
+    before(paint: IPaint): void;
+    after?(paint: IPaint): void;
+    places(ctx: SKRSContext2D, card: IWelcomeCard, data: Lines): Places;
 }
 
-async function Center(paint: IPaint): Promise<void> {
-    const { card } = paint;
+const LAYOUTS: Record<IWelcomeCard["layout"], ILayout> = {
+    classic: {
+        divider: true,
+        chip: false,
+        before(paint) {
+            const { ctx, card } = paint;
 
-    Scrim(paint, "center");
+            Scrim(paint, "left");
 
-    // Mittig ist oben wenig Platz: der Avatar bleibt kleiner, sonst drückt er den Text aus der Karte.
-    const size = Clamp(card.avatarSize, MIN_AVATAR, 132);
-    const top = 30;
+            // Der Streifen am linken Rand, mit einem Schein, der in die Karte läuft.
+            if (paint.accentOn) {
+                const glow = ctx.createLinearGradient(0, 0, 140, 0);
 
-    if (card.avatar) await DrawAvatar(paint, Math.round(W / 2 - size / 2), top, size);
+                glow.addColorStop(0, Alpha(card.accent, 0.22));
+                glow.addColorStop(1, Alpha(card.accent, 0));
+                ctx.fillStyle = glow;
+                ctx.fillRect(0, 0, 140, H);
+                ctx.fillStyle = card.accent;
+                ctx.fillRect(0, 0, 6, H);
+            }
+        },
+        places(ctx, card, data) {
+            const pad = 52;
+            const size = Clamp(card.avatarSize, MIN_AVATAR, MAX_AVATAR);
+            const left = card.avatar ? pad + size + 40 : pad;
+            const right = W - pad - (card.icon && data.iconURL ? 70 : 0);
 
-    DrawText(paint, W / 2, W - 160, "center", { top: card.avatar ? top + size + 18 : undefined, divider: true });
-    await DrawIcon(paint, W - 26 - 50, 26, 50);
-    Frame(paint, 0.5);
+            return {
+                avatar: Box(pad, Math.round(H / 2 - size / 2), size),
+                icon: Box(W - 28 - 54, 28, 54),
+                ...TextPlaces(ctx, card, data, left, Math.max(160, right - left), "left", { divider: true }),
+            };
+        },
+    },
+    center: {
+        divider: true,
+        chip: false,
+        before(paint) {
+            Scrim(paint, "center");
+        },
+        after(paint) {
+            Frame(paint, 0.5);
+        },
+        places(ctx, card, data) {
+            // Mittig ist oben wenig Platz: der Avatar bleibt kleiner, sonst drückt er den Text aus der Karte.
+            const size = Clamp(card.avatarSize, MIN_AVATAR, 132);
+            const top = 30;
+
+            return {
+                avatar: Box(Math.round(W / 2 - size / 2), top, size),
+                icon: Box(W - 26 - 50, 26, 50),
+                ...TextPlaces(ctx, card, data, W / 2, W - 160, "center", { top: card.avatar ? top + size + 18 : undefined, divider: true }),
+            };
+        },
+    },
+    panel: {
+        divider: true,
+        chip: false,
+        before(paint) {
+            const { ctx, card } = paint;
+            const { x, y, width, height } = PANEL;
+
+            // Die Fläche: dunkel und leicht durchscheinend, damit das Bild noch durchkommt.
+            ctx.save();
+            ctx.shadowColor = "rgba(0,0,0,0.5)";
+            ctx.shadowBlur = 30;
+            Bevel(ctx, x, y, width, height, 22);
+            ctx.fillStyle = paint.hasImage ? "rgba(6,8,12,0.8)" : "rgba(13,17,24,0.92)";
+            ctx.fill();
+            ctx.restore();
+
+            ctx.lineWidth = 1.5;
+            ctx.strokeStyle = paint.accentOn ? Alpha(card.accent, 0.6) : "rgba(255,255,255,0.14)";
+            Bevel(ctx, x, y, width, height, 22);
+            ctx.stroke();
+
+            if (paint.accentOn) {
+                ctx.fillStyle = card.accent;
+                ctx.fillRect(x, y + 22, 4, height - 44);
+            }
+        },
+        places(ctx, card, data) {
+            const { x, width } = PANEL;
+            const size = Clamp(card.avatarSize, MIN_AVATAR, 156);
+            const inner = x + 34;
+            const left = card.avatar ? inner + size + 30 : inner;
+
+            return {
+                avatar: Box(inner, Math.round(H / 2 - size / 2), size),
+                icon: Box(W - 28 - 54, 28, 54),
+                ...TextPlaces(ctx, card, data, left, x + width - 30 - left, "left", { divider: true }),
+            };
+        },
+    },
+    hud: {
+        divider: false,
+        chip: true,
+        before(paint) {
+            const { ctx, card } = paint;
+
+            Scrim(paint, "left");
+
+            // Feine Zeilen wie auf einem Bildschirm - nur als Struktur, kaum zu sehen.
+            ctx.fillStyle = "rgba(255,255,255,0.022)";
+
+            for (let y = 0; y < H; y += 4) ctx.fillRect(0, y, W, 1);
+
+            // Kleinere Schräge als sonst: die Eckwinkel sitzen innen, die Schräge darf sie nicht schneiden.
+            Frame(paint, 1, 14);
+
+            // Eckwinkel in allen vier Ecken.
+            const corner = 34;
+            const inset = 18;
+            const color = paint.accentOn ? card.accent : "rgba(242,244,247,0.55)";
+
+            ctx.save();
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 3;
+
+            if (paint.accentOn) {
+                ctx.shadowColor = Alpha(card.accent, 0.7);
+                ctx.shadowBlur = 12;
+            }
+
+            for (const [cx, cy, dx, dy] of [
+                [inset, inset, 1, 1],
+                [W - inset, inset, -1, 1],
+                [inset, H - inset, 1, -1],
+                [W - inset, H - inset, -1, -1],
+            ] as const) {
+                ctx.beginPath();
+                ctx.moveTo(cx, cy + dy * corner);
+                ctx.lineTo(cx, cy);
+                ctx.lineTo(cx + dx * corner, cy);
+                ctx.stroke();
+            }
+
+            ctx.restore();
+        },
+        places(ctx, card, data) {
+            const pad = 58;
+            const size = Clamp(card.avatarSize, MIN_AVATAR, 180);
+            const left = card.avatar ? pad + size + 40 : pad;
+            const right = W - pad - (card.icon && data.iconURL ? 70 : 0);
+
+            return {
+                avatar: Box(pad, Math.round(H / 2 - size / 2), size),
+                icon: Box(W - 34 - 52, 34, 52),
+                ...TextPlaces(ctx, card, data, left, Math.max(160, right - left), "left", { chip: true }),
+            };
+        },
+    },
+};
+
+/** Die dunkle Fläche des Layouts Panel. */
+const PANEL = { x: 26, y: 26, width: 620, height: H - 52 } as const;
+
+function LayoutOf(card: IWelcomeCard): ILayout {
+    return LAYOUTS[card.layout] ?? LAYOUTS.classic;
 }
 
-async function Panel(paint: IPaint): Promise<void> {
-    const { ctx, card } = paint;
-    const x = 26;
-    const y = 26;
-    const width = 620;
-    const height = H - 52;
-
-    // Die Fläche: dunkel und leicht durchscheinend, damit das Bild noch durchkommt.
-    ctx.save();
-    ctx.shadowColor = "rgba(0,0,0,0.5)";
-    ctx.shadowBlur = 30;
-    Bevel(ctx, x, y, width, height, 22);
-    ctx.fillStyle = paint.hasImage ? "rgba(6,8,12,0.8)" : "rgba(13,17,24,0.92)";
-    ctx.fill();
-    ctx.restore();
-
-    ctx.lineWidth = 1.5;
-    ctx.strokeStyle = paint.accentOn ? Alpha(card.accent, 0.6) : "rgba(255,255,255,0.14)";
-    Bevel(ctx, x, y, width, height, 22);
-    ctx.stroke();
-
-    if (paint.accentOn) {
-        ctx.fillStyle = card.accent;
-        ctx.fillRect(x, y + 22, 4, height - 44);
-    }
-
-    const size = Clamp(card.avatarSize, MIN_AVATAR, 156);
-    const inner = x + 34;
-    const left = card.avatar ? inner + size + 30 : inner;
-
-    if (card.avatar) await DrawAvatar(paint, inner, Math.round(H / 2 - size / 2), size);
-
-    DrawText(paint, left, x + width - 30 - left, "left", { divider: true });
-    await DrawIcon(paint, W - 28 - 54, 28, 54);
+/** Die Plätze, die das Layout den fünf Teilen gibt - für genau diese Zeilen, weil ein langer Name kleiner wird. */
+export function LayoutPositions(ctx: SKRSContext2D, card: IWelcomeCard, data: Lines): Places {
+    return LayoutOf(card).places(ctx, card, data);
 }
 
-async function Hud(paint: IPaint): Promise<void> {
-    const { ctx, card } = paint;
+/** Dasselbe ohne eigenen Kanvas - für die Vorschau im Dashboard. */
+export async function WelcomePlaces(data: IWelcomeCardData): Promise<Places> {
+    await RegisterFonts();
 
-    Scrim(paint, "left");
+    return LayoutPositions(createCanvas(10, 10).getContext("2d"), data.card, data);
+}
 
-    // Feine Zeilen wie auf einem Bildschirm - nur als Struktur, kaum zu sehen.
-    ctx.fillStyle = "rgba(255,255,255,0.022)";
+/* ----------------------------------------------------------
+   Die Teile zeichnen
+   ---------------------------------------------------------- */
+function DrawLines(paint: IPaint, places: Places, layout: ILayout): void {
+    const { ctx, card, data } = paint;
 
-    for (let y = 0; y < H; y += 4) ctx.fillRect(0, y, W, 1);
+    ctx.textBaseline = "alphabetic";
 
-    // Kleinere Schräge als sonst: die Eckwinkel sitzen innen, die Schräge darf sie nicht schneiden.
-    Frame(paint, 1, 14);
+    if (data.title) {
+        const place = places.title;
+        const fitted = FitTitle(ctx, data.title, card.font, place.size, LineWidth(place.x, place.align, place.width));
 
-    // Eckwinkel in allen vier Ecken.
-    const corner = 34;
-    const inset = 18;
-    const color = paint.accentOn ? card.accent : "rgba(242,244,247,0.55)";
-
-    ctx.save();
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 3;
-
-    if (paint.accentOn) {
-        ctx.shadowColor = Alpha(card.accent, 0.7);
-        ctx.shadowBlur = 12;
+        ctx.save();
+        ctx.textAlign = place.align;
+        ctx.font = TitleFont(card.font, fitted.size);
+        ctx.fillStyle = card.titleColor;
+        ctx.shadowColor = "rgba(0,0,0,0.55)";
+        ctx.shadowBlur = 14;
+        ctx.shadowOffsetY = 2;
+        ctx.fillText(fitted.text, place.x, place.y + Math.round(fitted.size * CARD_BASELINE));
+        ctx.restore();
     }
 
-    for (const [cx, cy, dx, dy] of [
-        [inset, inset, 1, 1],
-        [W - inset, inset, -1, 1],
-        [inset, H - inset, 1, -1],
-        [W - inset, H - inset, -1, -1],
-    ] as const) {
-        ctx.beginPath();
-        ctx.moveTo(cx, cy + dy * corner);
-        ctx.lineTo(cx, cy);
-        ctx.lineTo(cx + dx * corner, cy);
+    if (data.subtitle) {
+        const place = places.subtitle;
+
+        ctx.save();
+        ctx.textAlign = place.align;
+        ctx.font = `600 ${place.size}px Rajdhani`;
+        ctx.fillStyle = card.subtitleColor;
+        ctx.shadowColor = "rgba(0,0,0,0.5)";
+        ctx.shadowBlur = 10;
+        ctx.fillText(Ellipsis(ctx, data.subtitle, LineWidth(place.x, place.align, place.width)), place.x, place.y + Math.round(place.size * CARD_BASELINE));
+        ctx.restore();
+    }
+
+    if (!data.footer) return;
+
+    const place = places.footer;
+    const baseline = place.y + Math.round(place.size * CARD_BASELINE);
+    const max = LineWidth(place.x, place.align, place.width);
+    const shift = (width: number): number => (place.align === "center" ? place.x - width / 2 : place.align === "right" ? place.x - width : place.x);
+
+    // Der kurze Strich über der kleinen Zeile, in der Akzentfarbe.
+    if (layout.divider) {
+        ctx.fillStyle = paint.accentOn ? card.accent : "rgba(255,255,255,0.28)";
+        ctx.fillRect(shift(56), baseline - Math.round(place.size * 1.667), 56, 3);
+    }
+
+    ctx.font = `600 ${place.size}px Rajdhani`;
+
+    if (layout.chip) {
+        // Die kleine Zeile als Marke - im HUD-Layout wie die Abzeichen der Rang-Karte.
+        const pad = Math.round(place.size * 0.76);
+        const text = Ellipsis(ctx, data.footer, max - 2 * pad);
+        const width = ctx.measureText(text).width + 2 * pad;
+        const left = shift(width);
+
+        Bevel(ctx, left, baseline - Math.round(place.size * 1.14), width, Math.round(place.size * 1.62), Math.round(place.size * 0.43));
+        ctx.fillStyle = Alpha(paint.footerColor, 0.12);
+        ctx.fill();
+        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = Alpha(paint.footerColor, 0.7);
         ctx.stroke();
+        ctx.fillStyle = paint.footerColor;
+        ctx.textAlign = "left";
+        ctx.fillText(text, left + pad, baseline);
+
+        return;
     }
 
-    ctx.restore();
-
-    const pad = 58;
-    const size = Clamp(card.avatarSize, MIN_AVATAR, 180);
-    const left = card.avatar ? pad + size + 40 : pad;
-    const right = W - pad - (card.icon && paint.data.iconURL ? 70 : 0);
-
-    if (card.avatar) await DrawAvatar(paint, pad, Math.round(H / 2 - size / 2), size);
-
-    DrawText(paint, left, Math.max(160, right - left), "left", { chip: true });
-    await DrawIcon(paint, W - 34 - 52, 34, 52);
+    ctx.textAlign = place.align;
+    ctx.fillStyle = paint.footerColor;
+    ctx.fillText(Ellipsis(ctx, data.footer, max), place.x, baseline);
 }
 
 /** Ein dünner, abgeschrägter Rahmen - in der Akzentfarbe oder neutral. */
@@ -503,8 +569,12 @@ function Frame(paint: IPaint, strength: number, cut = 24): void {
     ctx.restore();
 }
 
-/** scale 1 reicht für die Vorschau im Dashboard - ein Viertel der Bytes. */
-export async function RenderWelcomeCard(data: IWelcomeCardData, scale: number = CARD_SCALE): Promise<Buffer> {
+/**
+ * scale 1 reicht für die Vorschau im Dashboard - ein Viertel der Bytes. bare:
+ * nur Hintergrund und Verzierung, ohne die fünf Teile - die Bühne im
+ * Dashboard legt sie selbst darüber.
+ */
+export async function RenderWelcomeCard(data: IWelcomeCardData, scale: number = CARD_SCALE, options: { bare?: boolean } = {}): Promise<Buffer> {
     await RegisterFonts();
 
     const { card } = data;
@@ -524,13 +594,23 @@ export async function RenderWelcomeCard(data: IWelcomeCardData, scale: number = 
         hasImage: false,
         footerColor: card.footerColor && HEX.test(card.footerColor) ? card.footerColor : accentOn ? card.accent : card.subtitleColor,
     };
+    const layout = LayoutOf(card);
 
     await DrawBackground(paint);
 
-    if (card.layout === "center") await Center(paint);
-    else if (card.layout === "panel") await Panel(paint);
-    else if (card.layout === "hud") await Hud(paint);
-    else await Classic(paint);
+    layout.before(paint);
+
+    if (!options.bare) {
+        // Eigene Plätze gehen vor, was fehlt oder kaputt war, kommt vom Layout.
+        const places: Places = { ...layout.places(ctx, card, data), ...(CleanPositions(card.positions) ?? {}) };
+
+        if (card.avatar) await DrawAvatar(paint, places.avatar.x, places.avatar.y, places.avatar.size);
+
+        DrawLines(paint, places, layout);
+        await DrawIcon(paint, places.icon.x, places.icon.y, places.icon.size);
+    }
+
+    layout.after?.(paint);
 
     return canvas.toBuffer("image/png");
 }

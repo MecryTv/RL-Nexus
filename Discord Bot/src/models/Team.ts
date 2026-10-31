@@ -9,9 +9,11 @@ export interface ITeamRow {
     group_id: number | null;
     name: string;
     tag: string | null;
+    region: string | null;
     description: string | null;
     color: string | null;
     logo: string | null;
+    background?: string | null;
     role_id: string | null;
     channel_id: string | null;
     channels: ITeamChannels | string | null;
@@ -40,9 +42,11 @@ function ToTeam(row: ITeamRow): ITeam {
         groupId: row.group_id === null ? null : Number(row.group_id),
         name: row.name,
         tag: row.tag ?? "",
+        region: row.region ?? "",
         description: row.description ?? "",
         color: row.color,
         logo: row.logo,
+        background: row.background ?? null,
         roleId: row.role_id,
         // Vor 024 stand hier ein einzelner Kanal - der wandert beim Lesen in die
         // Liste, damit aus alten Zeilen nichts verschwindet.
@@ -66,7 +70,7 @@ function ToTeam(row: ITeamRow): ITeam {
     };
 }
 
-export type TeamPatch = Partial<Pick<ITeam, "groupId" | "name" | "tag" | "description" | "color" | "logo" | "roleId" | "channels" | "created" | "links" | "players" | "position">>;
+export type TeamPatch = Partial<Pick<ITeam, "groupId" | "name" | "tag" | "region" | "description" | "color" | "logo" | "background" | "roleId" | "channels" | "created" | "links" | "players" | "position">>;
 
 /**
  * Teams und ihre Mitglieder. Die Mitglieder stehen in einer eigenen Tabelle,
@@ -192,6 +196,13 @@ export default class Team extends Model<ITeamRow> {
         return row ? ToTeam(row) : null;
     }
 
+    /** Plan 33: aktive Teams aller Server, in deren Kader diese Discord-ID steht. */
+    async WithPlayer(discordId: string): Promise<ITeam[]> {
+        const rows = await this.db.Query<ITeamRow>(`SELECT * FROM \`${this.Table}\` WHERE active = 1 AND players LIKE ?`, [`%"discordId":"${discordId}"%`]);
+
+        return rows.map(ToTeam).filter((team) => team.players.some((player) => player.discordId === discordId));
+    }
+
     /** Alle Teams eines Servers in der Reihenfolge der Uebersicht. */
     async AllOfGuild(guildId: string): Promise<ITeam[]> {
         return (await this.Where({ guild_id: guildId, active: 1 }, "`position` ASC, `id` ASC")).map(ToTeam);
@@ -203,9 +214,11 @@ export default class Team extends Model<ITeamRow> {
             group_id: patch.groupId ?? null,
             name: patch.name ?? "",
             tag: OrNull(patch.tag),
+            region: OrNull(patch.region),
             description: patch.description ?? "",
             color: patch.color ?? null,
             logo: patch.logo ?? null,
+            background: patch.background ?? null,
             role_id: patch.roleId ?? null,
             channel_id: null,
             channels: JSON.stringify(patch.channels ?? EmptyChannels()),
@@ -224,9 +237,11 @@ export default class Team extends Model<ITeamRow> {
         if (patch.groupId !== undefined) row.group_id = patch.groupId;
         if (patch.name !== undefined) row.name = patch.name;
         if (patch.tag !== undefined) row.tag = patch.tag;
+        if (patch.region !== undefined) row.region = patch.region || null;
         if (patch.description !== undefined) row.description = patch.description;
         if (patch.color !== undefined) row.color = patch.color;
         if (patch.logo !== undefined) row.logo = patch.logo;
+        if (patch.background !== undefined) row.background = patch.background;
         if (patch.roleId !== undefined) row.role_id = patch.roleId;
         if (patch.channels !== undefined) row.channels = JSON.stringify(patch.channels);
         if (patch.created !== undefined) row.created = JSON.stringify(patch.created);

@@ -25,6 +25,8 @@ Neben jeder JS-, CSS- und HTML-Datei liegt dieselbe Datei als `.gz` und `.br`, f
 
 Einbetten darf die Seite nur das Admin Dashboard (`frame-ancestors` in der Content-Security-Policy), für die Live-Vorschau unter `/vorschau` im Modul-Editor.
 
+Skripte erlaubt die CSP nur von der eigenen Adresse, von Stripe (`https://js.stripe.com`, `https://*.js.stripe.com`, für das Zahlungsfeld im Shop) und das Intro-Skript direkt in `index.html` über seinen Hash (`script-src`). Ändert sich das Intro-Skript, ändert sich der Hash, und der Browser würde es blocken. `npm run check` vergleicht deshalb den Hash mit der nginx-Vorlage (`nginx/container/website.conf` im Bot-Repo, das dafür neben der Webseite liegen muss) und nennt den neuen Wert. Nach einer Änderung an der Vorlage den Container neu laden.
+
 ---
 
 ## Updates

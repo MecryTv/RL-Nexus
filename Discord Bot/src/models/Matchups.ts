@@ -1,6 +1,6 @@
 import Model from "../structures/Model";
 import { TABLES, TableName, Unpack } from "../constants/Database";
-import { PAGE_SIZE } from "../constants/Matchups";
+import { PAGE_SIZE, UPCOMING_GRACE_HOURS, LIVE_HOURS } from "../constants/Matchups";
 import { IMatchup, MatchupMode, MatchupStatus } from "../interfaces/services/matchups/IMatchups";
 
 export interface IMatchupRow {
@@ -19,6 +19,9 @@ export interface IMatchupRow {
     score: { us: number; them: number } | string | null;
     message_id: string | null;
     reminded_at: number | string | null;
+    live_at: number | string | null;
+    result_reminded_at: number | string | null;
+    result_message_id: string | null;
     created_by: string;
     created_name: string;
     created_at: number | string;
@@ -42,6 +45,9 @@ function ToMatchup(row: IMatchupRow): IMatchup {
         score: row.score === null ? null : Unpack<{ us: number; them: number } | null>(row.score, null),
         messageId: row.message_id,
         remindedAt: row.reminded_at === null ? null : Number(row.reminded_at),
+        liveAt: row.live_at === null || row.live_at === undefined ? null : Number(row.live_at),
+        resultRemindedAt: row.result_reminded_at === null || row.result_reminded_at === undefined ? null : Number(row.result_reminded_at),
+        resultMessageId: row.result_message_id ?? null,
         createdBy: row.created_by,
         createdName: row.created_name,
         createdAt: Number(row.created_at),
@@ -130,6 +136,13 @@ export default class Matchups extends Model<IMatchupRow> {
         return rows.map(ToMatchup);
     }
 
+    /** Geplante mit Ankündigung im Kanal - nach einem Laden des Discord-Servers wie Panels behandelt (Plan 32). */
+    async Announced(guildId: string): Promise<IMatchup[]> {
+        const rows = await this.db.Query<IMatchupRow>(`SELECT * FROM \`${this.Table}\` WHERE guild_id = ? AND status = 'planned' AND message_id IS NOT NULL`, [guildId]);
+
+        return rows.map(ToMatchup);
+    }
+
     /** Was bald anfängt und noch keine Erinnerung hatte. */
     async Due(guildId: string, from: number, until: number): Promise<IMatchup[]> {
         const rows = await this.db.Query<IMatchupRow>(
@@ -149,7 +162,8 @@ export default class Matchups extends Model<IMatchupRow> {
         if (patch.league !== undefined) row.league = patch.league;
         if (patch.mode !== undefined) row.mode = patch.mode;
         if (patch.bestOf !== undefined) row.best_of = patch.bestOf;
-        if (patch.at !== undefined) row.at = patch.at;
+        // Ein neuer Anpfiff bekommt seine Erinnerungen neu - sonst bliebe die alte Uhrzeit maßgeblich.
+        if (patch.at !== undefined) Object.assign(row, { at: patch.at, reminded_at: null, live_at: null, result_reminded_at: null });
         if (patch.stream !== undefined) row.stream = patch.stream;
         if (patch.note !== undefined) row.note = patch.note;
         if (patch.status !== undefined) row.status = patch.status;
@@ -164,6 +178,79 @@ export default class Matchups extends Model<IMatchupRow> {
 
     async SetReminded(id: number): Promise<void> {
         await this.Update([id], { reminded_at: Date.now() });
+    }
+
+    async SetLive(id: number): Promise<void> {
+        await this.Update([id], { live_at: Date.now() });
+    }
+
+    async SetResultReminded(id: number): Promise<void> {
+        await this.Update([id], { result_reminded_at: Date.now() });
+    }
+
+    async SetResultMessage(id: number, messageId: string | null): Promise<void> {
+        await this.Update([id], { result_message_id: messageId });
+    }
+
+    /** Was gerade angepfiffen wurde und noch nicht als „läuft“ in der Ankündigung steht (Plan 28). */
+    async Live(guildId: string, now: number): Promise<IMatchup[]> {
+        const rows = await this.db.Query<IMatchupRow>(
+            `SELECT * FROM \`${this.Table}\` WHERE guild_id = ? AND status = 'planned' AND live_at IS NULL AND at <= ? AND at > ? LIMIT 50`,
+            [guildId, now, now - LIVE_HOURS * 3_600_000]
+        );
+
+        return rows.map(ToMatchup);
+    }
+
+    /**
+     * Partien, deren Ergebnis seit hours Stunden fehlt und an die noch nicht
+     * erinnert wurde - nur die letzten UPCOMING_GRACE_HOURS darüber hinaus.
+     * Sonst fragte der Bot nach jedem alten Spiel, sobald jemand Ergebnisse
+     * einschaltet.
+     */
+    async MissingResults(guildId: string, now: number, hours: number): Promise<IMatchup[]> {
+        const rows = await this.db.Query<IMatchupRow>(
+            `SELECT * FROM \`${this.Table}\` WHERE guild_id = ? AND status = 'planned' AND result_reminded_at IS NULL AND at <= ? AND at > ? LIMIT 50`,
+            [guildId, now - hours * 3_600_000, now - (hours + UPCOMING_GRACE_HOURS) * 3_600_000]
+        );
+
+        return rows.map(ToMatchup);
+    }
+
+    /**
+     * Partien ohne Ergebnis, deren „läuft“ seit LIVE_HOURS vorbei ist: Die
+     * Ankündigung wird einmal ohne die Zeile nachgezogen. Erledigt heißt:
+     * live_at liegt nach dem Ende des Fensters (SetLive danach).
+     */
+    async Ended(guildId: string, now: number): Promise<IMatchup[]> {
+        const rows = await this.db.Query<IMatchupRow>(
+            `SELECT * FROM \`${this.Table}\` WHERE guild_id = ? AND status = 'planned' AND live_at IS NOT NULL AND live_at < at + ? AND at <= ? AND at > ? LIMIT 50`,
+            [guildId, LIVE_HOURS * 3_600_000, now - LIVE_HOURS * 3_600_000, now - (LIVE_HOURS + UPCOMING_GRACE_HOURS) * 3_600_000]
+        );
+
+        return rows.map(ToMatchup);
+    }
+
+    /** Was ansteht: geplant, und der Anpfiff liegt höchstens UPCOMING_GRACE_HOURS zurück. */
+    async Upcoming(guildId: string, now: number, filter: { teamId?: number; limit: number }): Promise<IMatchup[]> {
+        const rows = await this.db.Query<IMatchupRow>(
+            `SELECT * FROM \`${this.Table}\` WHERE guild_id = ? AND status = 'planned' AND at > ?${filter.teamId ? " AND team_id = ?" : ""} ORDER BY at ASC LIMIT ?`,
+            [guildId, now - UPCOMING_GRACE_HOURS * 3_600_000, ...(filter.teamId ? [filter.teamId] : []), filter.limit]
+        );
+
+        return rows.map(ToMatchup);
+    }
+
+    /** Gespielte Partien mit Ergebnis, die neuesten zuerst. */
+    async Played(guildId: string, filter: { teamId?: number; page?: number; limit?: number }): Promise<{ rows: IMatchup[]; total: number }> {
+        const limit = filter.limit ?? PAGE_SIZE;
+        const page = Math.max(1, Math.floor(filter.page ?? 1));
+        const where = `guild_id = ? AND status = 'played' AND score IS NOT NULL${filter.teamId ? " AND team_id = ?" : ""}`;
+        const values: unknown[] = [guildId, ...(filter.teamId ? [filter.teamId] : [])];
+        const rows = await this.db.Query<IMatchupRow>(`SELECT * FROM \`${this.Table}\` WHERE ${where} ORDER BY at DESC LIMIT ? OFFSET ?`, [...values, limit, (page - 1) * limit]);
+        const count = await this.db.One<{ total: number | string }>(`SELECT COUNT(*) AS total FROM \`${this.Table}\` WHERE ${where}`, values);
+
+        return { rows: rows.map(ToMatchup), total: Number(count?.total ?? 0) };
     }
 
     async Remove(id: number): Promise<void> {

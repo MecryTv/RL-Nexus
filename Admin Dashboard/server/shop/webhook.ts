@@ -208,7 +208,7 @@ async function subscriptionUpdated(config: IConfig, subscription: Json): Promise
             // Stripe nennt Zeitpunkt (canceled_at) und Ende (cancel_at). Fehlen sie, die Uhr und das Periodenende.
             const at = typeof subscription.canceled_at === "number" ? new Date(subscription.canceled_at * 1000) : new Date();
             const until = typeof subscription.cancel_at === "number" ? new Date(subscription.cancel_at * 1000) : endsAt;
-            if (person) await sendShopMail(config, cancelReceivedMail(config, { to: person.email, name: person.name, title: product?.title ?? "Abo", at, endsAt: until }));
+            if (person) await sendShopMail(config, cancelReceivedMail(config, { to: person.email, name: person.name, title: product?.title ?? "Abo", at, endsAt: until, frozenRest: grant.frozenAt ? grant.frozenRest : null }));
         }
     }
 

@@ -8,6 +8,7 @@
  * zeigte die eingebauten Daten, ohne dass es jemand merkt.
  */
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -204,6 +205,20 @@ check("Menü: Bei Beta Access wie bei Free ohne Preise", () => {
         navigationFor("beta").map((item) => item.to),
         navigationFor("free").map((item) => item.to)
     );
+});
+
+// W-0013: Die Befehle zeigt künftig der Hilfe-Befehl in Discord. Alte Links landen bei den Modulen.
+check("Menü: kein „Commands“ mehr im Kopf", () => {
+    for (const mode of ["free", "paid", "beta", null, "loading"]) {
+        assert.ok(!navigationFor(mode).some((item) => item.to === "/commands"), String(mode));
+    }
+});
+
+check("Alte Adresse /commands leitet auf die Module weiter", () => {
+    const app = readFileSync(fileURLToPath(new URL("../src/App.tsx", import.meta.url)), "utf8");
+
+    assert.match(app, /<Route path="commands" element=\{<Navigate to="\/module" replace \/>\} \/>/);
+    assert.ok(!app.includes("CommandsPage"));
 });
 
 console.log(failures === 0 ? "\n  Alles in Ordnung.\n" : `\n  ${failures} Prüfung(en) fehlgeschlagen.\n`);

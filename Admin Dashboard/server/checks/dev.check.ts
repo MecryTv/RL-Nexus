@@ -381,6 +381,39 @@ export async function checkDev(): Promise<void> {
             assert.ok(!existsSync(planFile));
         });
 
+        await check("Wartung: Schalter von Hand gelöscht, der Plan geht beim Beenden trotzdem mit", async () => {
+            assert.equal((await start()).statusCode, 200);
+            await rm(path.join(flagsDir, "wartung-dashboard"));
+
+            assert.equal((await send("PUT", "/api/maintenance", { website: false })).statusCode, 200);
+            assert.ok(!existsSync(planFile));
+            assert.equal((await start({ areas: ["website"] })).statusCode, 200);
+            assert.equal((await send("PUT", "/api/maintenance", { website: false })).statusCode, 200);
+        });
+
+        await check("Wartung: kaputte wartung.json zählt als kein Plan und verschwindet beim Beenden", async () => {
+            const valid = { areas: ["website"], title: "Update", text: "", since: inMinutes(-5), until: null, steps: [{ name: "Backup", startedAt: inMinutes(-5) }], current: 0 };
+            const broken = [
+                "{kaputt",
+                JSON.stringify({ ...valid, areas: "website" }),
+                JSON.stringify({ ...valid, areas: ["irgendwo"] }),
+                JSON.stringify({ ...valid, since: undefined }),
+                JSON.stringify({ ...valid, until: "morgen" }),
+                JSON.stringify({ ...valid, steps: [null] }),
+                JSON.stringify({ ...valid, current: 7 }),
+            ];
+
+            for (const raw of broken) {
+                await writeFile(planFile, raw);
+                await writeFile(path.join(flagsDir, "wartung-webseite"), "{}");
+
+                const state = (await get("/api/maintenance")).json() as IMaintenanceState;
+                assert.deepEqual([state.plan, state.website !== null], [null, true], raw);
+                assert.equal((await send("PUT", "/api/maintenance", { website: false })).statusCode, 200, raw);
+                assert.ok(!existsSync(planFile), raw);
+            }
+        });
+
         await check("Neustart: der Bot nimmt an, ohne Bot gibt es 503", async () => {
             assert.equal((await send("POST", "/api/bot/restart")).statusCode, 202);
 

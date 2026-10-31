@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import type { IBotCommand, IBotOverview, IBotStatus } from "../shared/api.ts";
-import type { IBotRestoreReport } from "../shared/backups.ts";
+import type { IBotRestoreReport, IServerPartJson } from "../shared/backups.ts";
 import type { IConfig } from "./config.ts";
 
 /**
@@ -89,6 +89,28 @@ export async function botGuildPanels(config: IConfig, guildId: string, userId: s
     } catch {
         return null;
     }
+}
+
+/** Den Discord-Server lesen dauert bei großen Servern (alle Mitglieder, Bans, Bilder). */
+const SNAPSHOT_TIMEOUT = 120_000;
+
+/** Plan 32: Der Stand des Discord-Servers für ein Backup. null: Der Bot kann ihn nicht liefern. */
+export async function botSnapshot(config: IConfig, guildId: string, userId: string, images = true): Promise<IServerPartJson | null> {
+    try {
+        const response = await callBot(config, userId, `/admin/guilds/${guildId}/snapshot?images=${images ? 1 : 0}`, "GET", { timeout: SNAPSHOT_TIMEOUT });
+        if (!response.ok) return null;
+
+        const snapshot = (await response.json()) as Partial<IServerPartJson>;
+
+        return snapshot && typeof snapshot.counts === "object" ? (snapshot as IServerPartJson) : null;
+    } catch {
+        return null;
+    }
+}
+
+/** Plan 32: Ein automatisches Backup kam ohne den Server-Teil zustande - der Bot meldet es im Meldekanal. */
+export async function botBackupFailed(config: IConfig, guildId: string, reason: string): Promise<void> {
+    await callBot(config, "backups", `/admin/guilds/${guildId}/backup-failed`, "POST", { body: { reason } }).catch(() => undefined);
 }
 
 /** Mehrere Panels neu zu senden dauert: eigenes, längeres Zeitlimit. */

@@ -8,6 +8,7 @@ import { monthOf, numbers } from "../core/Format.js";
 import { ROLE_ICONS, ROLE_LABELS } from "../constants/Groups.js";
 import { CATEGORIES, IModulePart, MODULES } from "../constants/Modules.js";
 import { clickSound } from "../core/Sound.js";
+import { moduleState } from "../core/ModuleState.js";
 import { BASE } from "../core/Base.js";
 import { debounce, onPulse } from "../core/Pulse.js";
 import { ActivityResult, fetchActivity, renderOverview } from "./GuildOverview.js";
@@ -251,6 +252,7 @@ export function renderGuild(data: IPayload): void {
         whenShown(["matchup-all"], () => void import("./GuildMatchups.js").then((module) => module.renderMatchupAll(guild.id)));
 
         // Looking for: die Grundlagen, dazu je Seite Fragen, Beitrag und Anfragen.
+        whenShown(["role-lists"], () => void import("./GuildRoleLists.js").then((module) => module.renderRoleLists(guild.id)));
         whenShown(["lft"], () => void import("./GuildLft.js").then((module) => module.renderLft(guild.id)));
         whenShown(["lft-player"], () => void import("./GuildLft.js").then((module) => module.renderLftPlayer(guild.id)));
         whenShown(["lft-team"], () => void import("./GuildLft.js").then((module) => module.renderLftTeam(guild.id)));
@@ -268,7 +270,9 @@ export function renderGuild(data: IPayload): void {
         // Community-Module: Code und Abfragen kommen erst, wenn der Abschnitt aufgeht.
         whenShown(["welcome"], () => void import("./GuildWelcome.js").then((module) => module.renderWelcome(guild.id)));
         whenShown(["custom-message"], () => void import("./GuildMessages.js").then((module) => module.renderMessages(guild.id)));
-        whenShown(["levels"], () => void import("./GuildLevels.js").then((module) => module.renderLevels(guild.id)));
+        whenShown(["levels"], () => void import("./GuildLevels.js").then((module) => module.renderLevels(guild.id, "levels")));
+        whenShown(["level-rewards"], () => void import("./GuildLevels.js").then((module) => module.renderLevels(guild.id, "level-rewards")));
+        whenShown(["level-card"], () => void import("./GuildLevelCard.js").then((module) => module.renderLevelCard(guild.id)));
         whenShown(["leaderboard"], () => void import("./GuildLeaderboard.js").then((module) => module.renderLeaderboard(guild.id)));
         whenShown(["voice-hub"], () => void import("./GuildVoice.js").then((module) => module.renderVoice(guild.id)));
         whenShown(["twitch-notifier"], () => void import("./GuildStreams.js").then((module) => module.renderStreams(guild.id, "twitch")));
@@ -277,6 +281,7 @@ export function renderGuild(data: IPayload): void {
         whenShown(["giveaways"], () => void import("./GuildGiveaways.js").then((module) => module.renderGiveaways(guild.id)));
         whenShown(["logging"], () => void import("./GuildLogging.js").then((module) => module.renderLogging(guild.id)));
         whenShown(["automod"], () => void import("./GuildAutoMod.js").then((module) => module.renderAutoMod(guild.id)));
+        whenShown(["anti-villain"], () => void import("./GuildAntiVillain.js").then((module) => module.renderAntiVillain(guild.id)));
         whenShown(["reaction-roles"], () => void import("./GuildSelfRoles.js").then((module) => module.renderSelfRoles(guild.id)));
     }
 
@@ -299,6 +304,9 @@ export function renderGuild(data: IPayload): void {
 
         loadModules(detail?.modules ?? null);
 
+        // Ein Raid betrifft jede Modulseite - der Balken steht über allen (Anti Villain).
+        if (!supportOnly && guild.canManage && (detail?.modules ?? guild.modules).includes("anti-villain")) watchRaid(guild.id);
+
         // Der Stand aus der Datenbank kann von dem aus /api/me abweichen - erst
         // jetzt steht fest, welcher Abschnitt überhaupt offen sein darf.
         show(route().section);
@@ -306,6 +314,76 @@ export function renderGuild(data: IPayload): void {
 
     // Die Übersicht zählt Kanäle und Rollen: ein neuer Kanal in Discord zählt gleich mit.
     if (!supportOnly) onPulse(guild.id, ["guild"], debounce(() => void fetchDetail(guild.id).then(paintDetails), 500));
+}
+
+/* ----------------------------------------------------------
+   Anti Villain (Plan 31)
+   ---------------------------------------------------------- */
+
+/**
+ * Der rote Balken über allen Modulseiten, solange ein Raid läuft. Gefragt wird
+ * beim Laden, danach alle 30 Sekunden, solange einer läuft - und wenn die Seite
+ * von Anti Villain einen gestartet oder beendet hat.
+ */
+function watchRaid(guildId: string): void {
+    const bar = need<HTMLElement>("#raidBar");
+    const text = bar.querySelector("span")!;
+    const end = bar.querySelector("button")!;
+    const base = `${BASE}/api/guild/${encodeURIComponent(guildId)}/anti-villain`;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    async function check(): Promise<void> {
+        if (timer) clearTimeout(timer);
+
+        timer = null;
+
+        const response = await fetch(`${base}/raid`, { headers: { Accept: "application/json" } }).catch(() => null);
+        const data = response?.ok ? ((await response.json().catch(() => null)) as { raid?: { since: number; joins: number } | null } | null) : null;
+        const raid = data?.raid ?? null;
+
+        bar.hidden = raid === null;
+
+        if (!raid) return;
+
+        const minutes = Math.max(1, Math.round((Date.now() - raid.since) / 60_000));
+
+        text.textContent = `Raid-Modus läuft seit ${minutes} ${minutes === 1 ? "Minute" : "Minuten"}, ${raid.joins} ${raid.joins === 1 ? "Beitritt" : "Beitritte"} in der Welle.`;
+        timer = setTimeout(() => void check(), 30_000);
+    }
+
+    end.addEventListener("click", async () => {
+        end.disabled = true;
+        await fetch(base, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Accept: "application/json" },
+            body: JSON.stringify({ action: "raid-end" }),
+        }).catch(() => null);
+        end.disabled = false;
+        window.dispatchEvent(new CustomEvent("antivillain:raid"));
+    });
+
+    window.addEventListener("antivillain:raid", () => void check());
+    void check();
+}
+
+/** Wie viele Anti Villain gerade festhält - auch bei ausgeschaltetem Modul. */
+async function heldCount(guildId: string): Promise<number> {
+    const response = await fetch(`${BASE}/api/guild/${encodeURIComponent(guildId)}/anti-villain/raid`, { headers: { Accept: "application/json" } }).catch(() => null);
+    const data = response?.ok ? ((await response.json().catch(() => null)) as { held?: number } | null) : null;
+
+    return data?.held ?? 0;
+}
+
+/** Ausschalten lässt Festgehaltene in Quarantäne (Spec: niemand wird von selbst frei). Sind welche da, erst fragen. */
+async function letGo(guildId: string): Promise<boolean> {
+    const held = await heldCount(guildId);
+
+    return (
+        held === 0 ||
+        window.confirm(
+            `${held === 1 ? "1 Person ist" : `${held} Personen sind`} festgehalten. Ausgeschaltet bleiben sie in Quarantäne, bis das Team sie freigibt: über die Karten im Meldekanal oder hier im Dashboard unter Anti Villain. Trotzdem ausschalten?`
+        )
+    );
 }
 
 /* ----------------------------------------------------------
@@ -448,6 +526,8 @@ function bindModules(guild: IGuild, only: Set<string> | null): (modules: string[
     let saved = new Set(guild.modules);
     let shown = new Set(saved);
     let ready = false;
+    // Aus, aber noch gebraucht: Anti Villain mit Festgehaltenen bleibt in der Leiste, damit das Team freigeben kann.
+    const pinned = new Set<string>();
 
     function link(entry: IModulePart, sub: boolean, into: HTMLElement): HTMLAnchorElement {
         const anchor = document.createElement("a");
@@ -542,17 +622,8 @@ function bindModules(guild: IGuild, only: Set<string> | null): (modules: string[
         tile.querySelector("b")!.textContent = module.name;
         tile.querySelector(".acct__text span")!.textContent = module.description;
 
-        if (module.parts) {
-            // Was mit angeht, steht auf der Kachel - sonst tauchen zwei Einträge
-            // in der Leiste auf, die niemand eingeschaltet hat.
-            const parts = document.createElement("span");
-
-            parts.className = "modparts";
-            parts.textContent = `Mit dabei: ${module.parts.map((part) => part.name).join(" · ")}`;
-            tile.querySelector(".acct__text")!.append(parts);
-
-            for (const part of module.parts) card(part);
-        }
+        // W-0040: Was mit angeht, steht nicht mehr auf der Kachel - die Unterpunkte zeigt die Leiste.
+        for (const part of module.parts ?? []) card(part);
 
         if (module.always) {
             const fixed = document.createElement("span");
@@ -566,7 +637,7 @@ function bindModules(guild: IGuild, only: Set<string> | null): (modules: string[
 
         const input = tile.querySelector<HTMLInputElement>("input")!;
 
-        if (!module.always) input.addEventListener("change", () => toggle(module.id, input.checked));
+        if (!module.always) input.addEventListener("change", () => void switched(module.id, input));
 
         entries.set(module.id, {
             links: bars.get(module.id) ?? [],
@@ -586,13 +657,14 @@ function bindModules(guild: IGuild, only: Set<string> | null): (modules: string[
 
     function paint(): void {
         for (const [id, entry] of entries) {
-            const on = shown.has(id) || entry.always;
+            // Der Schalter folgt dem Klick, die Leiste erst dem Bot (W-0033).
+            const { checked, linked } = moduleState(id, saved, shown, entry.always, pinned.has(id));
 
-            for (const anchor of entry.links) anchor.hidden = !on || (only !== null && !only.has(anchor.dataset.section ?? ""));
+            for (const anchor of entry.links) anchor.hidden = !linked || (only !== null && !only.has(anchor.dataset.section ?? ""));
 
-            entry.input.checked = on;
+            entry.input.checked = checked;
             entry.input.disabled = entry.always || !ready || !guild.canManage;
-            entry.tile.classList.toggle("acct--on", on);
+            entry.tile.classList.toggle("acct--on", checked);
         }
 
         // Eine Ueberschrift ohne eingeschaltetes Modul darunter waere eine
@@ -617,6 +689,19 @@ function bindModules(guild: IGuild, only: Set<string> | null): (modules: string[
         }
     }
 
+    async function pinHeld(): Promise<void> {
+        const off = guild.canManage && only === null && ready && !saved.has("anti-villain");
+        const held = off ? await heldCount(guild.id) : 0;
+
+        if (held > 0) pinned.add("anti-villain");
+        else pinned.delete("anti-villain");
+
+        paint();
+
+        // Wer direkt auf /anti-villain kam, landete vor dem Nachfragen auf der Übersicht - jetzt die richtige Seite.
+        if (held > 0 && route().section === "anti-villain") window.dispatchEvent(new PopStateEvent("popstate"));
+    }
+
     function warn(text: string | null): void {
         note.hidden = text === null;
         note.querySelector("span")!.textContent = text ?? "";
@@ -629,6 +714,16 @@ function bindModules(guild: IGuild, only: Set<string> | null): (modules: string[
     let queue: Promise<void> = Promise.resolve();
     let waiting = 0;
     let failure: string | null = null;
+
+    async function switched(id: string, input: HTMLInputElement): Promise<void> {
+        if (id === "anti-villain" && !input.checked && !(await letGo(guild.id))) {
+            input.checked = true;
+
+            return;
+        }
+
+        toggle(id, input.checked);
+    }
 
     function toggle(id: string, on: boolean): void {
         if (on) shown.add(id);
@@ -647,6 +742,9 @@ function bindModules(guild: IGuild, only: Set<string> | null): (modules: string[
             warn(failure === null ? null : `Nicht gespeichert: ${failure}`);
             failure = null;
             paint();
+            void pinHeld();
+            // Gerade eingeschaltet: die Listen gehören als Unterpunkte in die Leiste.
+            void loadRoleLists();
         });
     }
 
@@ -672,6 +770,74 @@ function bindModules(guild: IGuild, only: Set<string> | null): (modules: string[
         }
     }
 
+    /*
+     * Rollen-Listen (Plan 29): Jede gespeicherte Liste steht als Unterpunkt
+     * unter dem Modul. Die Unterpunkte hängen an den Links des Moduls, damit
+     * paint() sie mit ein- und ausblendet. Welcher markiert ist, sagt ?liste=.
+     */
+    const roleLists = entries.get("role-lists");
+
+    function markRoleList(): void {
+        if (!roleLists || !roleLists.links.some((anchor) => anchor.getAttribute("aria-current") === "page")) return;
+
+        const query = new URLSearchParams(window.location.search);
+        const wanted = query.get("neu") ? "neu" : (query.get("liste") ?? "");
+
+        for (const anchor of roleLists.links) {
+            if ((anchor.dataset.liste ?? "") === wanted) anchor.setAttribute("aria-current", "page");
+            else anchor.removeAttribute("aria-current");
+        }
+    }
+
+    async function loadRoleLists(): Promise<void> {
+        if (!roleLists || !saved.has("role-lists")) return;
+
+        const response = await fetch(`${BASE}/api/guild/${encodeURIComponent(guild.id)}/role-lists?nur=namen`, { headers: { Accept: "application/json" } }).catch(() => null);
+        const data = response?.ok ? ((await response.json().catch(() => null)) as { lists?: { id: number; name: string }[] } | null) : null;
+
+        if (!data?.lists) return;
+
+        const active = roleLists.links.some((anchor) => anchor.getAttribute("aria-current") === "page");
+
+        for (const anchor of roleLists.links.splice(1)) anchor.remove();
+
+        let after: HTMLElement = roleLists.links[0]!;
+        const sub = (key: string, symbol: string, text: string): void => {
+            const anchor = document.createElement("a");
+
+            anchor.href = `${BASE}/guild/${guild.id}/role-lists?${key === "neu" ? "neu=1" : `liste=${key}`}`;
+            anchor.dataset.section = "role-lists";
+            anchor.dataset.liste = key;
+            anchor.className = "is-sub";
+            anchor.append(icon(symbol), text);
+            after.after(anchor);
+            after = anchor;
+            roleLists.links.push(anchor);
+        };
+
+        for (const list of data.lists) sub(String(list.id), "#i-list", list.name);
+
+        sub("neu", "#i-plus", "Neue Liste");
+        paint();
+
+        if (active) roleLists.links[0]!.setAttribute("aria-current", "page");
+
+        markRoleList();
+    }
+
+    nav.addEventListener("click", (event) => {
+        const anchor = (event.target as HTMLElement).closest<HTMLAnchorElement>('a[data-section="role-lists"]');
+
+        if (!anchor || event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
+
+        // Erst nach bindSections: das setzt die Adresse und markiert alle Links des Moduls.
+        setTimeout(() => window.dispatchEvent(new CustomEvent("rolelists:navigate")));
+    });
+    // Auch die Seite selbst wechselt die Liste (Kachel, Anlegen, Löschen) - die Leiste zieht mit.
+    window.addEventListener("rolelists:navigate", markRoleList);
+    window.addEventListener("popstate", () => setTimeout(markRoleList));
+    window.addEventListener("rolelists:changed", () => void loadRoleLists());
+
     paint();
 
     return (modules) => {
@@ -684,5 +850,7 @@ function bindModules(guild: IGuild, only: Set<string> | null): (modules: string[
         }
 
         paint();
+        void pinHeld();
+        void loadRoleLists();
     };
 }

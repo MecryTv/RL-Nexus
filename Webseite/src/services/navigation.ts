@@ -8,11 +8,15 @@ export function sellsNow(mode: ShopMode | null | undefined): boolean {
     return mode !== "free" && mode !== "beta";
 }
 
+/** Führt /preise auf die Startseite? Bei Free und Beta ja, außer eine Bestellung kommt gerade von Stripe zurück (?bestellung=, W-0024). */
+export function leavesPricing(mode: ShopMode | null | undefined, unlocking: boolean): boolean {
+    return !sellsNow(mode) && !unlocking;
+}
+
 /** Die Hauptnavigation. Reihenfolge ist die im Kopf der Seite. */
 const NAVIGATION: readonly INavItem[] = [
     { label: "Home", to: "/" },
     { label: "Module", to: "/module" },
-    { label: "Commands", to: "/commands" },
     { label: "Preise", to: "/preise" },
     { label: "Team", to: "/team" },
     { label: "Kontakt", to: "/kontakt" },

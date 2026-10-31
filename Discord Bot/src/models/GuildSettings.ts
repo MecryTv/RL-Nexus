@@ -44,11 +44,34 @@ function WithPermanent(modules: string[]): string[] {
     return [...all].sort();
 }
 
+/**
+ * Die Spalte nach dem Umschalten. Feste Module kommen nie neu hinein, und was
+ * dort schon steht, bleibt: An der Spalte sieht der Level-Nachtrag (Plan 34),
+ * ob das Level System vor „immer an“ eingeschaltet war.
+ */
+export function NextModules(raw: string[], module: string, on: boolean): string[] {
+    const modules = new Set(raw);
+
+    if (!PERMANENT_MODULES.has(module as ModuleId)) {
+        if (on) modules.add(module);
+        else modules.delete(module);
+    }
+
+    return [...modules].sort();
+}
+
 export default class GuildSettings extends Model<IGuildSettingsRow> {
     readonly Table: TableName = TABLES.settings;
     readonly Key = ["guild_id"] as const;
 
     /** Immer eine Antwort: fehlt die Zeile, kommen die Standardwerte zurück. */
+    /** Plan 34: die Spalte, wie sie gespeichert ist - ohne die festen Module. Daran sieht der Nachtrag, ob Level an war. */
+    async RawModules(guildId: string): Promise<string[]> {
+        const row = await this.Find(guildId);
+
+        return row ? Unpack<string[]>(row.modules, []) : [];
+    }
+
     async Of(guildId: string): Promise<IGuildSettings> {
         const row = await this.Find(guildId);
 
@@ -84,21 +107,14 @@ export default class GuildSettings extends Model<IGuildSettingsRow> {
         await this.Upsert({ guild_id: guildId, modules: "[]", rank_roles: "{}", moderators: JSON.stringify(moderators) }, ["moderators"]);
     }
 
-    /** Ein Modul an- oder abschalten, ohne den Rest anzufassen. */
+    /** Ein Modul an- oder abschalten, ohne den Rest anzufassen. Zurück kommt die Liste samt der festen Module. */
     async Toggle(guildId: string, module: string, on: boolean): Promise<string[]> {
         const settings = await this.Of(guildId);
-        const modules = new Set(settings.modules);
-
-        // Ein festes Modul bliebe ohnehin in jeder Liste - hier stehen zu
-        // bleiben haelt auch die Spalte ehrlich.
-        if (on) modules.add(module);
-        else if (!PERMANENT_MODULES.has(module as ModuleId)) modules.delete(module);
-
-        const next = [...modules].sort();
+        const next = NextModules(await this.RawModules(guildId), module, on);
 
         await this.Save({ ...settings, modules: next });
 
-        return next;
+        return WithPermanent(next);
     }
 
     /**

@@ -31,6 +31,7 @@ interface IBody {
     page?: unknown;
     formId?: unknown;
     query?: unknown;
+    channelId?: unknown;
 }
 
 /**
@@ -109,7 +110,13 @@ export default class DashboardApiApply extends Route {
             case "settings":
                 onlyManage();
 
-                return { ok: true, settings: await service.SaveSettings(guild, body.settings) };
+                return { ok: true, ...(await service.SaveSettings(guild, body.settings)) };
+
+            // Gesendet wird sofort, nicht erst mit Speichern - wie beim Ticket-Panel.
+            case "panel":
+                onlyManage();
+
+                return { ok: true, ...(await service.SendPanel(guild, typeof body.channelId === "string" ? body.channelId : "")) };
 
             case "create":
                 onlyManage();
@@ -140,6 +147,10 @@ export default class DashboardApiApply extends Route {
 
                 return { ok: true, submission: await service.Decide(guild, member, id, status, body.note) };
             }
+
+            // Plan 30: wie Entscheiden für jeden Prüfer, nicht nur fürs Verwalten.
+            case "remove":
+                return { ok: true, ...(await service.Remove(guild, member, id)) };
 
             default:
                 throw new ApplyError("Unbekannte Aktion.");

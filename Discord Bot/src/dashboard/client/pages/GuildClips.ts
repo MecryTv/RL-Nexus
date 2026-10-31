@@ -530,6 +530,7 @@ export function renderClipMessages(guildId: string): void {
 
         const blocks = NOTICES.map((notice) => {
             const editor = bodyEditor(draft.messages[notice], {
+                pageSave: () => save,
                 kinds: data.bodyKinds,
                 context: context(notice === "winners" ? CLIP_WINNER_PLACEHOLDERS : CLIP_PLACEHOLDERS),
                 defaultEmbed: DEFAULT_EMBEDS[notice],

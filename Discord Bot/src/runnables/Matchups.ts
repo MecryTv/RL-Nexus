@@ -4,8 +4,9 @@ import TaskTypes from "../enums/TaskTypes";
 import logger from "../utils/logger";
 
 /**
- * Erinnert kurz vor Anpfiff an die eingetragenen Partien. Der Lauf merkt sich
- * nichts: was erinnert wurde, steht an der Partie selbst.
+ * Der Minutenlauf der Matchups: Erinnerung vor dem Anpfiff, „läuft“ in der
+ * Ankündigung, Nachfrage, wenn das Ergebnis fehlt. Der Lauf merkt sich nichts:
+ * was erledigt ist, steht an der Partie selbst.
  */
 export default class MatchupReminder extends Runnable {
     constructor(client: BotClient) {
@@ -18,8 +19,8 @@ export default class MatchupReminder extends Runnable {
     }
 
     async Execute(): Promise<void> {
-        const sent = await this.client.matchupService.Remind();
+        const { reminded, live, missing } = await this.client.matchupService.Tick();
 
-        if (sent) logger.tasks(`⚔️ ${sent} Erinnerung(en) für anstehende Matchups`);
+        if (reminded || live || missing) logger.tasks(`⚔️ Matchups: ${reminded} Erinnerung(en), ${live} angepfiffen, ${missing} Nachfrage(n) zum Ergebnis`);
     }
 }

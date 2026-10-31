@@ -1,6 +1,7 @@
 import { Guild, GuildMember, PermissionFlagsBits } from "discord.js";
 import BotClient from "../client/BotClient";
 import { DefaultRankRoleSettings, EmptyPlaylist, PLAYLISTS, RANK_ROLES_MODULE, StepOf, Steps } from "../constants/RankRoles";
+import { IPrimeProfile } from "../interfaces/services/prime/IPrimeService";
 import { IRankRoleChange, IRankRoleResult, IRankRoleSettings, Playlist } from "../interfaces/services/rankroles/IRankRoles";
 import logger from "../utils/logger";
 
@@ -34,7 +35,6 @@ export default class RankRoleService {
     CleanSettings(guild: Guild, input: unknown, previous: IRankRoleSettings): IRankRoleSettings {
         const raw = IsRecord(input) ? input : {};
         const steps = new Set(Steps().map((step) => step.key));
-        const channel = typeof raw.channelId === "string" ? guild.channels.cache.get(raw.channelId) : null;
         const given = IsRecord(raw.playlists) ? raw.playlists : {};
         const playlists = {} as IRankRoleSettings["playlists"];
 
@@ -65,7 +65,6 @@ export default class RankRoleService {
         return {
             playlists,
             replace: typeof raw.replace === "boolean" ? raw.replace : previous.replace,
-            channelId: raw.channelId === undefined ? previous.channelId : channel?.isTextBased() ? channel.id : null,
             skipPlacement: typeof raw.skipPlacement === "boolean" ? raw.skipPlacement : previous.skipPlacement,
         };
     }
@@ -135,9 +134,11 @@ export default class RankRoleService {
        ---------------------------------------------------------- */
     /**
      * Holt die Ränge und setzt die Rollen. Wirft, wenn schon der Weg dorthin
-     * nicht geht - alles andere steht als Problem im Ergebnis.
+     * nicht geht - alles andere steht als Problem im Ergebnis. Mit known: das
+     * Profil, das der Aufrufer schon hat (/rank me), Prime wird nicht noch
+     * einmal gefragt.
      */
-    async Apply(member: GuildMember): Promise<IRankRoleResult> {
+    async Apply(member: GuildMember, known?: IPrimeProfile): Promise<IRankRoleResult> {
         const guild = member.guild;
         const settings = await this.Settings(guild.id);
 
@@ -153,7 +154,7 @@ export default class RankRoleService {
 
         if (!epicName) throw new RankRoleError("Verbinde erst dein Epic-Konto: **/rank link epicname:DeinName**.");
 
-        const profile = await this.client.primeService.Profile(epicName).catch(() => null);
+        const profile = known ?? (await this.client.primeService.Profile(epicName).catch(() => null));
 
         if (!profile) throw new RankRoleError(`Prime kennt **${epicName}** gerade nicht. Versuch es später noch einmal.`);
 
@@ -221,13 +222,18 @@ export default class RankRoleService {
         return { epicName: profile.name, added: [...add], removed: [...remove], changes, blocked: [...blocked] };
     }
 
-    /** Alle Rang-Rollen wieder abnehmen. */
-    async Strip(member: GuildMember): Promise<string[]> {
-        const settings = await this.Settings(member.guild.id);
-        const mine = [...this.Managed(settings)].filter((id) => member.roles.cache.has(id) && !this.Blocked(member.guild, id));
+    /**
+     * Nach /rank me: die Rang-Rollen zum eben geholten Profil - der einzige Weg,
+     * über den Mitglieder sie bekommen. Still - null heißt, hier passiert nichts
+     * (Modul aus, keine Playlist, kein Konto).
+     */
+    async AfterRankMe(member: GuildMember, profile: IPrimeProfile): Promise<IRankRoleResult | null> {
+        if (!(await this.client.settings.Of(member.guild.id)).modules.includes(RANK_ROLES_MODULE)) return null;
 
-        if (mine.length) await member.roles.remove(mine, "Rank Roles: abgelegt");
+        return this.Apply(member, profile).catch((error) => {
+            if (error instanceof RankRoleError) return null;
 
-        return mine;
+            throw error;
+        });
     }
 }

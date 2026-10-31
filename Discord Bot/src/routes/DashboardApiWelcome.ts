@@ -15,6 +15,7 @@ interface IBody {
     config?: unknown;
     which?: unknown;
     message?: unknown;
+    bare?: unknown;
 }
 
 /**
@@ -29,7 +30,8 @@ export default class DashboardApiWelcome extends Route {
             description: "Begrüßung, Abschied und Auto-Rollen eines Servers",
             prefixed: false,
             requiresAuth: false,
-            rateLimit: { max: 60, timeWindow: "1 minute" },
+            // 120: Wer ein Teil der Welcome Card pixelweise setzt, löst je Pause eine Vorschau aus (Plan 25).
+            rateLimit: { max: 120, timeWindow: "1 minute" },
         });
     }
 
@@ -95,10 +97,11 @@ export default class DashboardApiWelcome extends Route {
             case "preview": {
                 // Die Karte aus dem Entwurf - gezeichnet mit den Daten dessen, der zuschaut.
                 const current = await service.Settings(guild.id);
-                const message: IWelcomeMessage = service.CleanMessage(guild, body.message, current[which], which);
-                const png = await service.Card(member, message, which, 1);
-
-                return { ok: true, image: `data:image/png;base64,${png.toString("base64")}` };
+                // on: false - gezeichnet wird auch ohne Kanal; was nur beim Speichern zählt, prüft "save".
+                const draft = typeof body.message === "object" && body.message !== null ? body.message : {};
+                const message: IWelcomeMessage = service.CleanMessage(guild, { ...draft, on: false }, current[which], which);
+                // bare: ohne die fünf Teile, dazu Zeilen und Plätze - für die Bühne (Plan 25).
+                return { ok: true, ...(await service.Preview(member, message, which, body.bare === true)) };
             }
 
             default:

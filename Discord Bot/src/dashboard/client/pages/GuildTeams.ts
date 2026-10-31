@@ -1,7 +1,7 @@
 /**
  * Abschnitt: RL Team-Übersicht.
  *
- * Zwei Punkte in der Leiste: die Teams selbst (Gruppen, Kader, Rechnung) und
+ * Zwei Punkte in der Leiste: die Teams selbst (Kategorien, Kader, Rechnung) und
  * die Anzeige (Kanal, Darstellung, Nachrichten). Beide hängen an derselben
  * Route und laden dieselben Daten.
  *
@@ -10,12 +10,13 @@
  */
 
 import { BASE } from "../core/Base.js";
-import { icon, need } from "../core/Dom.js";
+import { icon, link, need } from "../core/Dom.js";
 import { toast } from "../core/Toast.js";
 import { api, button, card, channelPicker, confirmButton, el, IPerson, IRole, loading, personPicker, row, select, stat, toggle } from "../core/Ui.js";
 import { bodyEditor, IBody, IEmbed } from "../layout/BodyEditor.js";
+import { ICardColumns, ICardDesign, teamCardEditor } from "../layout/TeamCardEditor.js";
 import { galleryUrl, loadGallery, pickImage } from "../layout/ImagePicker.js";
-import { formatTools, IEditorContext, insertPlaceholder, IPlaceholderTree, markdown, placeholderMarks, placeholderPicker, placeholderTree, trackField } from "../layout/MessageEditor.js";
+import { IEditorContext, IPlaceholderTree, markdown, placeholderPicker } from "../layout/MessageEditor.js";
 import {
     IPlaceholder,
     styleRanks,
@@ -24,15 +25,12 @@ import {
     TEAM_BOARD_PLACEHOLDERS,
     TEAM_CARD_PLACEHOLDERS,
     TEAM_IMAGES,
-    TEAM_LIST_PLACEHOLDERS,
-    TEAM_MEMBER_PLACEHOLDERS,
     TEAM_PLAYER_FIELDS,
 } from "../constants/Placeholders.js";
-import { IListTeam, ITeamListPreset, ITeamListSettings, TEAM_LIST_PRESETS, TeamListText } from "../../../constants/TeamList.js";
 import { DefaultTeamOrder, IOrderFacts, ITeamOrder, OrderTeams, TEAM_ORDER_BY, TEAM_ORDER_DIRECTIONS, TEAM_ORDER_LABELS } from "../../../constants/TeamOrder.js";
-import { presetBar } from "../layout/Templates.js";
+import { TrackerURL } from "../../../constants/Prime.js";
 import { clickSound } from "../core/Sound.js";
-import { emojiNode, emojiPicker, IServerEmoji, openEmojiPicker } from "../layout/EmojiPicker.js";
+import { emojiNode, IServerEmoji, openEmojiPicker } from "../layout/EmojiPicker.js";
 
 type Slot = "1v1" | "2v2" | "3v3";
 
@@ -68,9 +66,13 @@ interface ITeam {
     groupId: number | null;
     name: string;
     tag: string;
+    /** Wo das Team spielt, etwa "EU" (Plan 26). */
+    region?: string;
     description: string;
     color: string | null;
     logo: string | null;
+    /** Eigener Hintergrund der gezeichneten Karte (Plan 30). */
+    background?: string | null;
     roleId: string | null;
     channels: IChannels;
     /** Was der Bot für das Team angelegt hat - nur das bietet das Löschen zum Mitlöschen an. */
@@ -92,22 +94,38 @@ interface IGroup {
     position: number;
 }
 
+/** Kategorien als Entwurf - wie ICategoryDraft im Bot (TeamService.ts). Negative ID: neu. */
+interface ICategoryDraft {
+    categories: { id: number; name: string }[];
+    teams: Record<string, number | null>;
+}
+
 /** Ein eigenes Abzeichen statt des Standards - wie TeamBadge im Bot. */
 type Badge = { kind: "emoji"; value: string } | { kind: "image"; value: string; emoji: string | null };
 
 interface ISettings {
     channelId: string | null;
-    layout: "cards" | "menu" | "single";
+    layout: "hub" | "cards";
     mmr: { mode: "wtsi" | "formula"; formula: string };
     roles: { sync: boolean; positions: Record<string, string | null> };
     rankStyle: "text" | "icon" | "both";
     roleStyle: "text" | "icon" | "both";
     badges: Partial<Record<string, Badge>>;
-    list: ITeamListSettings;
+    /** Die alte Teams-Liste - nur noch gespeichert, das Dashboard zeigt sie nicht mehr (Plan 27). */
+    list: unknown;
     order: ITeamOrder;
     board: IBody;
     team: IBody;
     messageId: string | null;
+    /** Aussehen der gezeichneten Karte im Hub (Plan 27). */
+    card: ICardDesign;
+    cardColumns: ICardColumns;
+    hubRows: number;
+    hubThumbnail: string | null;
+    hubImage: string | null;
+    hubButton: { on: boolean; to: "apply" | "web" | "channel"; url: string | null; channelId: string | null; label: string };
+    hubLine: string;
+    moreIds: string[];
 }
 
 /** Wer spielt - dieselbe Liste wie PLAYING_ROLES im Bot (constants/Teams.ts, wird nicht ins Dashboard gebündelt). */
@@ -131,8 +149,6 @@ interface IPayload {
     groups: IGroup[];
     teams: ITeam[];
     prime: boolean;
-    /** Je Spieler mit Epic-Namen sein Schlüssel ({mecrytv.rank} …) und was der Bot einsetzen würde. */
-    players: { key: string; name: string; team: string; values: Record<string, string> }[];
     /** Die Platzhalter je Aufgabe am ersten Team - Beispiel für die Vorschau der Team-Karte. */
     roleSamples: Record<string, string>;
     /** Je Rang sein Icon ("Grand Champion I" → "<:rl_gc1:…>") - für „Ränge zeigen als“ in der Vorschau. */
@@ -141,8 +157,6 @@ interface IPayload {
     roleIcons: Record<string, string>;
     /** Je Aufgabe das Bild ihres Abzeichens aus der Galerie (teamicons) - für die Aufgaben im Dashboard. */
     roleImages: Record<string, string>;
-    /** Alle Teams so, wie {teams} sie aufschreibt - Grundlage der Vorschau im Reiter „Teams-Liste“. */
-    listTeams: IListTeam[];
     /** Die Icons des Bots, Ränge und Aufgaben - nur für die Vorschau. */
     icons: IServerEmoji[];
     rankStyles: Record<string, string>;
@@ -151,8 +165,12 @@ interface IPayload {
     /** Was der Bot anlegen darf. */
     bot: { roles: boolean; channels: boolean };
     memberIntent: boolean;
-    defaults: { board: IBody; team: IBody };
+    defaults: { board: IBody; team: IBody; hubLine: string };
     layouts: Record<string, string>;
+    /** Wohin der Knopf unter dem Menü im Hub führen kann. */
+    hubButtonLabels: Record<string, string>;
+    /** Ist das Apply System an? Nur dann zeigt der Hub „Bei uns bewerben“. */
+    apply: boolean;
     modes: Record<string, string>;
     roles: Record<string, string>;
     playlists: Slot[];
@@ -169,14 +187,16 @@ interface IPayload {
         menu: number;
         links: number;
         linkLabel: number;
-        listTeam: number;
-        listMember: number;
     };
     guild: {
         name: string;
+        /** Das Server-Icon für die Vorschau von {guild.icon}. */
+        icon: string | null;
         roles: IRole[];
         channels: { id: string; name: string }[];
         voice: { id: string; name: string }[];
+        /** Foren - nur für den Knopf im Hub (W-0026). */
+        forums: { id: string; name: string }[];
         categories: { id: string; name: string }[];
         emojis: IServerEmoji[];
     };
@@ -206,44 +226,7 @@ function ago(at: number): string {
     return Math.abs(minutes) < 60 ? AGO.format(minutes, "minute") : AGO.format(Math.round(minutes / 60), "hour");
 }
 
-/**
- * Die Ebenen der Teams-Liste, im Menü am Reiter. Sie bauen aufeinander auf:
- * die Zeile je Team setzt {team.members} und {team.members.staff} ein, und wie
- * jeder darin aussieht, steht eine Ebene tiefer.
- */
-type ListLevel = "team" | "members" | "staff";
-
-const LIST_LEVELS: { id: ListLevel; icon: string; label: string; key: string; hint: string; title: string; lead: string }[] = [
-    {
-        id: "team",
-        icon: "#i-list-checks",
-        label: "Team",
-        key: "{teams}",
-        hint: "Die Zeile je Team",
-        title: "So steht ein Team in {teams}",
-        lead: "Eine Vorlage für jedes Team. Zeilen, deren Platzhalter alle leer sind, fallen weg – etwa „Ligen:“ bei einem Team ohne Liga-Links.",
-    },
-    {
-        id: "members",
-        icon: "#i-users",
-        label: "Spieler",
-        key: "{team.members}",
-        hint: "Wie jeder Spieler dasteht",
-        title: "So steht ein Spieler in {team.members}",
-        lead: "Eine Vorlage für jeden Spieler, gern über mehrere Zeilen. {team.members} in der Zeile je Team setzt alle untereinander ein.",
-    },
-    {
-        id: "staff",
-        icon: "#i-clipboard",
-        label: "Staff",
-        key: "{team.members.staff}",
-        hint: "Wie Coach und Manager dastehen",
-        title: "So steht der Staff in {team.members.staff}",
-        lead: "Coach und Manager, jeder in eigener Zeile. {team.members.staff} in der Zeile je Team setzt sie ein.",
-    },
-];
-
-/** Der Abschnitt „RL Team-Übersicht" - Gruppen, Teams, Rechnung. */
+/** Der Abschnitt „RL Team-Übersicht" - Kategorien, Teams, Rechnung. */
 export function renderTeams(guildId: string): void {
     mount(guildId, "teams");
 }
@@ -253,17 +236,31 @@ export function renderTeamBoard(guildId: string): void {
     mount(guildId, "board");
 }
 
+/** Was Teams oder Kategorien ändert - danach lädt der andere Abschnitt nach (siehe mount). */
+const TEAM_WRITES = new Set(["settings", "categories.save", "group.create", "group.save", "group.delete", "team.create", "team.save", "team.delete", "team.setup"]);
+const TEAMS_CHANGED = "rlnexus:teams-changed";
+
 function mount(guildId: string, view: "teams" | "board"): void {
     const host = need<HTMLElement>(view === "board" ? "#teamBoardBody" : "#teamsBody");
     const note = need<HTMLElement>(view === "board" ? "#teamBoardNote" : "#teamsNote");
-    const call = api(`${BASE}/api/guild/${encodeURIComponent(guildId)}/teams`, note);
+    const request = api(`${BASE}/api/guild/${encodeURIComponent(guildId)}/teams`, note);
+    // Teams-Seite und Anzeige laufen nebeneinander, jede mit eigenem Stand. Speichert die eine, sagt sie es der anderen.
+    const call = async <T,>(query: string, body?: Record<string, unknown>): Promise<T | null> => {
+        const answer = await request<T>(query, body);
+
+        if (answer && body && TEAM_WRITES.has(String(body.action))) window.dispatchEvent(new CustomEvent(TEAMS_CHANGED, { detail: view }));
+
+        return answer;
+    };
+    // Ob gerade etwas Ungespeichertes offen ist - dann lädt dieser Abschnitt nicht von selbst nach.
+    let unsaved = (): boolean => (view === "teams" ? openTeam !== null : false);
 
     let data: IPayload | null = null;
     let openTeam: number | null = null;
     // Welcher Reiter der Anzeige offen ist - bleibt nach dem Speichern derselbe.
     let boardTab: "where" | "messages" | "list" = "where";
-    // Welche Ebene der Teams-Liste offen ist - bleibt beim Wechsel der Reiter dieselbe.
-    let listLevel: ListLevel = "team";
+    // Welches Team im Karten-Editor dran ist - bleibt nach dem Speichern dasselbe.
+    let cardTeam: number | null = null;
 
     const reload = async (): Promise<void> => {
         const answer = await call<IPayload>("");
@@ -274,34 +271,18 @@ function mount(guildId: string, view: "teams" | "board"): void {
         paint();
     };
 
+    // Hat der andere Abschnitt gespeichert, gilt dessen Stand - sonst überschriebe ein Speichern hier, was dort geändert wurde.
+    window.addEventListener(TEAMS_CHANGED, (event) => {
+        if ((event as CustomEvent<string>).detail === view || !data || unsaved()) return;
+
+        void reload();
+    });
+
     /**
      * Die Vorschau zeigt Beispielwerte - echte Kader kommen erst in Discord
      * dazu. Ein eigener Zusammenhang je Nachricht: in der Uebersicht gibt es
      * kein {team.roster}, in der Karte kein {teams}.
      */
-    /**
-     * Die Platzhalter je Spieler, nach Teams: im zweiten Menü erst das Team, dann
-     * seine Spieler mit allem, was es je Spieler gibt. So bleibt das erste Menü
-     * bei den festen Platzhaltern, auch wenn der Server vierzig Spieler hat.
-     */
-    const playerTree = (): IPlaceholderTree["branches"] => {
-        const teams = new Map<string, IPlaceholder[]>();
-
-        for (const player of data!.players) {
-            const list = teams.get(player.team) ?? [];
-
-            for (const [field, label] of TEAM_PLAYER_FIELDS) {
-                const key = field ? `${player.key}.${field}` : player.key;
-
-                list.push({ key, label, sample: player.values[key] ?? "", group: player.name });
-            }
-
-            teams.set(player.team, list);
-        }
-
-        return [...teams].map(([label, placeholders]) => ({ label, placeholders }));
-    };
-
     /**
      * Die Platzhalter je Aufgabe für die Team-Karte: {team.captain.rank} und so
      * weiter. Sie gelten für das Team, dessen Karte gerade gebaut wird - die
@@ -387,34 +368,13 @@ function mount(guildId: string, view: "teams" | "board"): void {
     /** Die Teams in der Reihenfolge, wie die Karte „Reihenfolge“ gerade steht - mit derselben Funktion wie der Bot. */
     const orderedTeams = (order: ITeamOrder | undefined): ITeam[] => OrderTeams(data!.teams, clientFacts, order ?? DefaultTeamOrder());
 
-    /** Die Teams für {teams}, Ränge, Aufgaben und Reihenfolge so, wie die Einstellungen gerade stehen. */
-    const shownTeams = (look: Pick<ISettings, "rankStyle" | "roleStyle" | "badges"> & { order?: ITeamOrder }): IListTeam[] => {
-        const values = (record: Record<string, string>): Record<string, string> =>
-            Object.fromEntries(Object.entries(record).map(([key, value]) => [key, styled(key, value, look)]));
-        // data.teams[i] und data.listTeams[i] gehören zusammen: beide kommen in derselben Folge aus der Route.
-        const lists = new Map(data!.teams.map((team, index) => [team.id, data!.listTeams[index]]));
-
-        return orderedTeams(look.order).flatMap((entry) => (lists.get(entry.id) ? [lists.get(entry.id)!] : [])).map((team) => ({
-            ...team,
-            values: values(team.values),
-            members: team.members.map((member) => ({ role: member.role, values: values(member.values) })),
-        }));
-    };
-
     /**
      * Was der Editor anbietet. Die Team-Karte ist eine Vorlage für jedes Team:
-     * dort helfen die Aufgaben-Platzhalter. Die Übersicht kennt die Spieler mit
-     * Namen - aber nur, wenn alles in einer Nachricht ohne Auswahlmenü steht
-     * (players), sonst kommen dieselben Spieler gleich mehrfach vor.
+     * dort helfen die Aufgaben-Platzhalter. Der Kopf des Hubs kennt die festen.
      */
-    const context = (scope: "board" | "team", players: () => boolean = () => false, look: () => ISettings = () => data!.settings) => (): IEditorContext => {
+    const context = (scope: "board" | "team", look: () => ISettings = () => data!.settings) => (): IEditorContext => {
         const fixed = scope === "board" ? TEAM_BOARD_PLACEHOLDERS : TEAM_CARD_PLACEHOLDERS;
-        const tree: IPlaceholderTree | undefined =
-            scope === "team"
-                ? { label: "Aufgaben-Platzhalter …", back: "‹ Andere Aufgabe", branches: roles() }
-                : players()
-                  ? { label: "Spieler-Platzhalter …", back: "‹ Anderes Team", branches: playerTree() }
-                  : undefined;
+        const tree: IPlaceholderTree | undefined = scope === "team" ? { label: "Aufgaben-Platzhalter …", back: "‹ Andere Aufgabe", branches: roles() } : undefined;
 
         const now = look();
         // Die Vorschau kennt die festen Beispiele und die echten Werte aus dem Menü daneben -
@@ -423,8 +383,11 @@ function mount(guildId: string, view: "teams" | "board"): void {
             [...fixed, ...(tree?.branches.flatMap((branch) => branch.placeholders) ?? [])].map((entry) => [entry.key, styled(entry.key, entry.sample, now)])
         );
 
-        // {teams} so, wie die Teams-Liste es gerade aufschreibt - aus den echten Teams, auch ungespeichert.
-        if (scope === "board" && now.layout === "single" && data!.listTeams.length) values.teams = TeamListText(shownTeams(now), data!.groups, now.list);
+        // Im Team-Hub stehen die Teams unter dem Kopf - {teams} bleibt dort leer, wie beim Bot.
+        if (scope === "board") {
+            values.teams = "";
+            values["teams.short"] = "";
+        }
 
         return {
             guildId,
@@ -441,6 +404,12 @@ function mount(guildId: string, view: "teams" | "board"): void {
     };
 
     const channelOptions = (empty: string): [string, string][] => [["", empty], ...data!.guild.channels.map((entry): [string, string] => [entry.id, `# ${entry.name}`])];
+    // Wohin der Knopf im Hub springen darf: wie LINKABLE_CHANNELS im Bot, also auch Foren und Sprachkanäle (W-0026).
+    const linkOptions = (empty: string): [string, string][] => [
+        ...channelOptions(empty),
+        ...data!.guild.forums.map((entry): [string, string] => [entry.id, `💬 ${entry.name}`]),
+        ...data!.guild.voice.map((entry): [string, string] => [entry.id, `🔊 ${entry.name}`]),
+    ];
     const roleOptions = (): [string, string][] => [["", "— keine —"], ...data!.guild.roles.map((role): [string, string] => [role.id, `@${role.name}`])];
 
     /* ------------------------------------------------------------
@@ -460,20 +429,20 @@ function mount(guildId: string, view: "teams" | "board"): void {
     }
 
     /* ------------------------------------------------------------
-       Gruppen
+       Kategorien
        ------------------------------------------------------------ */
     function groups(): HTMLElement {
         const name = el("input", "text snadd__input");
-        const add = button("btn btn--primary snadd__go", icon("#i-plus"), "Gruppe anlegen");
+        const add = button("btn btn--primary snadd__go", icon("#i-plus"), "Kategorie anlegen");
 
         name.type = "text";
         name.maxLength = data!.limits.name;
         name.placeholder = "Etwa „Main“, „Academy“ oder „Div 2“";
-        name.setAttribute("aria-label", "Name der neuen Gruppe");
+        name.setAttribute("aria-label", "Name der neuen Kategorie");
 
         const create = async (): Promise<void> => {
             if (!name.value.trim()) {
-                toast("info", "Ohne Namen geht nicht", "Die Gruppe steht so auch in der Übersicht.");
+                toast("info", "Ohne Namen geht nicht", "Die Kategorie steht so als Überschrift im Hub.");
 
                 return;
             }
@@ -504,13 +473,13 @@ function mount(guildId: string, view: "teams" | "board"): void {
                 field.type = "text";
                 field.value = group.name;
                 field.maxLength = data!.limits.name;
-                field.setAttribute("aria-label", `Name der Gruppe ${group.name}`);
+                field.setAttribute("aria-label", `Name der Kategorie ${group.name}`);
                 field.addEventListener("change", () => void call("", { action: "group.save", id: group.id, group: { name: field.value } }).then(() => reload()));
 
-                const remove = confirmButton("btn btn--quiet btn--icon is-danger", "#i-trash", "Gruppe löschen", "Wirklich löschen?", async () => {
+                const remove = confirmButton("btn btn--quiet btn--icon is-danger", "#i-trash", "Kategorie löschen", "Wirklich löschen?", async () => {
                     if (!(await call("", { action: "group.delete", id: group.id }))) return;
 
-                    toast("info", "Gelöscht", "Die Teams stehen jetzt ohne Gruppe da.");
+                    toast("info", "Gelöscht", "Die Teams stehen jetzt ohne Kategorie da.");
                     void reload();
                 });
 
@@ -521,9 +490,9 @@ function mount(guildId: string, view: "teams" | "board"): void {
         );
 
         return card(
-            "Gruppen",
-            `Damit stehen die Teams in der Übersicht unter Überschriften. Bis zu ${data!.limits.groups} Stück – ohne Gruppe geht es auch.`,
-            ...(data!.groups.length ? [list] : [el("div", "tkempty", icon("#i-folder"), el("span", "", "Noch keine Gruppe – alle Teams stehen untereinander."))]),
+            "Kategorien",
+            `Damit stehen die Teams im Hub unter Überschriften. Bis zu ${data!.limits.groups} Stück – ohne Kategorie geht es auch. Anlegen und zuordnen geht auch direkt im Hub unter Anzeige › Nachrichten.`,
+            ...(data!.groups.length ? [list] : [el("div", "tkempty", icon("#i-folder"), el("span", "", "Noch keine Kategorie – alle Teams stehen untereinander."))]),
             el("div", "snadd__row", icon("#i-folder"), name, add)
         );
     }
@@ -649,7 +618,9 @@ function mount(guildId: string, view: "teams" | "board"): void {
         save.addEventListener("click", async () => {
             save.disabled = true;
 
-            const answer = await call("", { action: "team.save", id: team.id, team: draft });
+            // Nur was hier geändert wurde - sonst überschriebe ein älterer Stand, was etwa der Karten-Editor gespeichert hat.
+            const changed = Object.fromEntries(Object.entries(draft).filter(([key, value]) => JSON.stringify(value) !== JSON.stringify((team as unknown as Record<string, unknown>)[key])));
+            const answer = await call("", { action: "team.save", id: team.id, team: changed });
 
             if (!answer) {
                 save.disabled = false;
@@ -715,18 +686,19 @@ function mount(guildId: string, view: "teams" | "board"): void {
                 "snitem__body",
                 text("Name", "So steht er auf der Karte", draft.name, data!.limits.name, (value) => (draft.name = value)),
                 text("Kürzel", "Zwei bis vier Zeichen, etwa VYX", draft.tag, data!.limits.tag, (value) => (draft.tag = value.toUpperCase())),
+                text("Region", "Wo das Team spielt, etwa EU – steht auf der gezeichneten Karte", draft.region ?? "", 16, (value) => (draft.region = value)),
                 text("Beschreibung", "Ein Satz über das Team", draft.description, data!.limits.description, (value) => (draft.description = value), true),
                 row(
-                    "Gruppe",
+                    "Kategorie",
                     "Unter welcher Überschrift das Team steht",
                     select(
-                        [["", "— ohne Gruppe —"], ...data!.groups.map((entry): [string, string] => [String(entry.id), entry.name])],
+                        [["", "— ohne Kategorie —"], ...data!.groups.map((entry): [string, string] => [String(entry.id), entry.name])],
                         draft.groupId ? String(draft.groupId) : "",
                         (value) => {
                             draft.groupId = value ? Number(value) : null;
                             touch();
                         },
-                        "Gruppe des Teams"
+                        "Kategorie im Hub"
                     )
                 ),
                 row("Farbe", "Der Rand der Karte im Kanal", color),
@@ -964,12 +936,12 @@ function mount(guildId: string, view: "teams" | "board"): void {
                     draft.channels.categoryId = value || null;
                     touch();
                 },
-                "Kategorie des Teams"
+                "Discord-Kategorie des Teams"
             );
 
             box.replaceChildren(
                 draft.channels.kind === "category"
-                    ? row("Kategorie", "Alles darin gehört dem Team", category)
+                    ? row("Discord-Kategorie", "Alles darin gehört dem Team", category)
                     : el(
                           "div",
                           "tmchannels__lists",
@@ -1128,15 +1100,29 @@ function mount(guildId: string, view: "teams" | "board"): void {
             touch();
         });
 
+        // W-0035: der Weg zum Profil bei RL Tracker Network, er folgt dem Tippen. Steht in der Zeile der Peaks, rechts unter dem Epic-Namen - eine eigene Zeile ließe eine Lücke.
+        const tracker = link("btn btn--quiet tmtracker", "RL Tracker Network", "#", true);
+        const drawTracker = (): void => {
+            const epicName = player.epicName.trim();
+
+            tracker.hidden = !epicName;
+            tracker.href = epicName ? TrackerURL(epicName) : "#";
+            tracker.setAttribute("aria-label", `Profil von ${epicName || "Spieler"} bei RL Tracker Network öffnen`);
+        };
+
+        tracker.append(icon("#i-external"));
+
         epic.type = "text";
         epic.value = player.epicName;
         epic.maxLength = 100;
-        epic.placeholder = "Epic-Name für Prime";
+        epic.placeholder = "Epic Games Account";
         epic.setAttribute("aria-label", `Epic-Name von Spieler ${index + 1}`);
         epic.addEventListener("input", () => {
             player.epicName = epic.value;
+            drawTracker();
             touch();
         });
+        drawTracker();
 
         /** Holt den Epic-Namen aus der Verknüpfung - von Hand geht es weiter. */
         const adopt = async (userId: string): Promise<void> => {
@@ -1149,6 +1135,7 @@ function mount(guildId: string, view: "teams" | "board"): void {
             if (answer.epicName) {
                 player.epicName = answer.epicName;
                 epic.value = answer.epicName;
+                drawTracker();
                 hint.textContent = `Epic-Konto übernommen: ${answer.epicName}`;
                 touch();
 
@@ -1159,6 +1146,7 @@ function mount(guildId: string, view: "teams" | "board"): void {
             // der Bot gleich die Raenge von jemand anderem.
             player.epicName = "";
             epic.value = "";
+            drawTracker();
             touch();
             hint.textContent = "Kein Epic-Konto verknüpft – trag den Namen selbst ein (/rank link verbindet es).";
         };
@@ -1271,7 +1259,7 @@ function mount(guildId: string, view: "teams" | "board"): void {
             "div",
             `tmplayer${snapshot?.error ? " is-problem" : ""}`,
             el("span", "tmplayer__no", String(index + 1)),
-            el("div", "tmplayer__main", who, el("div", "tmplayer__line", roleSelect, name, epic), peaks, hint),
+            el("div", "tmplayer__main", who, el("div", "tmplayer__line", roleSelect, name, el("div", "tmepic", epic)), el("div", "tmpeakrow", peaks, tracker), hint),
             el("div", "tmplayer__side", up, remove)
         );
     }
@@ -1488,28 +1476,71 @@ function mount(guildId: string, view: "teams" | "board"): void {
        ------------------------------------------------------------ */
     function board(): HTMLElement[] {
         const draft = structuredClone(data!.settings);
-        // Ein Entwurf für alle drei Reiter: jeder hat seinen Speichern-Knopf, alle
-        // speichern denselben Stand - wer im Reiter „Nachrichten“ schreibt, muss
-        // nicht erst zurück nach vorn.
+        // Kategorien als Entwurf (Plan 27): wie Kopf und Karte erst mit „Speichern“ gesichert. Eine negative ID ist neu.
+        const categories: ICategoryDraft = {
+            categories: [...data!.groups].sort((a, b) => a.position - b.position).map((group) => ({ id: group.id, name: group.name })),
+            teams: Object.fromEntries(data!.teams.map((team) => [String(team.id), team.groupId])),
+        };
+        const categoriesAtStart = JSON.stringify(categories);
+        const startTeams = { ...categories.teams };
+        const startIds = categories.categories.map((entry) => entry.id);
+        /**
+         * Was an den Bot geht: die Kategorien, die ausdrücklich gelöschten und nur
+         * die geänderten Zuordnungen. Was dieser Entwurf nicht kennt (inzwischen auf
+         * der Teams-Seite angelegt oder umgehängt), lässt der Bot, wie es ist.
+         */
+        const categoryDraft = (): ICategoryDraft & { removed: number[] } => ({
+            categories: categories.categories,
+            removed: startIds.filter((id) => !categories.categories.some((entry) => entry.id === id)),
+            teams: Object.fromEntries(Object.entries(categories.teams).filter(([team, id]) => startTeams[team] !== id)),
+        });
+        let nextCategory = -1;
+        // Ein Entwurf für alle Reiter: jeder hat seinen Speichern-Knopf, alle speichern denselben Stand.
         const saves: HTMLButtonElement[] = [];
         let dirty = false;
+        let cardEditor: ReturnType<typeof teamCardEditor> | null = null;
+
+        // Offener Entwurf in der Anzeige: dann lädt sie nicht nach, wenn die Teams-Seite speichert.
+        unsaved = () => dirty;
         const touch = (): void => {
             dirty = true;
 
             for (const knob of saves) knob.disabled = false;
         };
-        const saveAll = async (): Promise<void> => {
+        const categoriesChanged = (): boolean => JSON.stringify(categories) !== categoriesAtStart;
+
+        /**
+         * Speichert alles der Reihe nach: die Einstellungen, dann die Kategorien
+         * (nur wenn sie sich geändert haben), dann das Team aus dem Karten-Editor.
+         * Neu geladen wird erst danach - sonst ginge ein Teil des Entwurfs verloren.
+         */
+        const persist = async (): Promise<boolean> => {
             for (const knob of saves) knob.disabled = true;
 
-            if (!(await call("", { action: "settings", settings: draft }))) {
+            const fail = (): false => {
                 for (const knob of saves) knob.disabled = false;
 
-                return;
-            }
+                return false;
+            };
 
+            if (!(await call("", { action: "settings", settings: draft }))) return fail();
+
+            const moved = categoriesChanged();
+            const team = cardEditor?.teamDraft() ?? null;
+
+            // Folgt noch ein Team, schickt dessen Speichern den Hub - sonst ginge er zweimal raus (W-0026).
+            if (moved && !(await call("", { action: "categories.save", categories: categoryDraft(), publish: !team }))) return fail();
+
+            if (team && !(await call("", { action: "team.save", id: team.id, team: team.changes }))) return fail();
+
+            cardEditor?.saved();
             dirty = false;
-            toast("info", "Gespeichert", "Mit „Übersicht senden“ geht sie raus.");
-            void reload();
+            toast("info", "Gespeichert", data!.settings.messageId && (moved || team) ? "Der Hub im Kanal zieht gleich nach." : "Mit „Übersicht senden“ geht sie raus.");
+
+            return true;
+        };
+        const saveAll = async (): Promise<void> => {
+            if (await persist()) void reload();
         };
         const saveButton = (): HTMLButtonElement => {
             const knob = button("btn btn--primary", icon("#i-check"), "Speichern");
@@ -1521,14 +1552,9 @@ function mount(guildId: string, view: "teams" | "board"): void {
             return knob;
         };
 
-        // Was gezeigt wird, haengt an der Darstellung: bei "je Team eine
-        // Nachricht" gibt es keinen Kopf, bei "alles in einer" keine
-        // Team-Karte. Beides immer zu zeigen waere ein Feld, das nichts tut.
-        let menuOn = draft.layout === "menu";
-        // Die Karte „Reihenfolge“ zeigt die Vorschau je nach Darstellung - sie zeichnet mit, wenn die wechselt.
+        // Die Karte „Reihenfolge“ zeichnet mit, wenn die Darstellung wechselt.
         let orderView: { node: HTMLElement; draw: () => void } | null = null;
-        const needsBoard = (): boolean => draft.layout !== "cards";
-        const needsTeam = (): boolean => draft.layout !== "single";
+        const hub = (): boolean => draft.layout === "hub";
 
         /* --- Die Abzeichen je Aufgabe: Standard aus teamicons, ein Emoji oder ein Bild aus der Galerie --- */
         const badges = el("div", "tmbadges");
@@ -1583,29 +1609,58 @@ function mount(guildId: string, view: "teams" | "board"): void {
             );
         };
 
-        // Das Spieler-Menü gibt es nur ohne Auswahlmenü - wechselt das, baut sich der Editor neu, der Entwurf bleibt.
-        const single = (): boolean => draft.layout === "single";
+        // Der Kopf des Hubs ist immer eine Karte (Components V2). board.kind bleibt dabei, wie es ist.
+        const hubBody = {
+            get kind(): string {
+                return "v2";
+            },
+            set kind(_value: string) {},
+            get content(): string {
+                return draft.board.content;
+            },
+            set content(value: string) {
+                draft.board.content = value;
+            },
+            get embed(): IBody["embed"] {
+                return draft.board.embed;
+            },
+            set embed(value: IBody["embed"]) {
+                draft.board.embed = value;
+            },
+            get doc(): IBody["doc"] {
+                return draft.board.doc;
+            },
+            set doc(value: IBody["doc"]) {
+                draft.board.doc = value;
+            },
+        } as IBody;
+        // Die Live-Vorschau zeigt unter dem Kopf, was der Bot darunter setzt - gefüllt von previewChannel().
+        const hubLive = el("div", "tmhub tmhub--live");
         const makeBoardEditor = (): ReturnType<typeof bodyEditor> =>
-            bodyEditor(draft.board, {
-                kinds: data!.bodyKinds,
-                context: context("board", single, () => draft),
-                defaultEmbed: () => structuredClone({ ...EMPTY_EMBED, title: "Unsere Teams", description: "{teams}" }),
-                touch,
-                title: "Die Übersicht",
-                hint: single()
-                    ? "{teams} setzt alle Teams ein, {teams.short} nur die Namen. Je Spieler gibt es {epicname.rank} und mehr – im Menü „Spieler-Platzhalter“."
-                    : "{teams} setzt alle Teams ein, {teams.short} nur die Namen.",
+            bodyEditor(hubBody, {
+                pageSave: () => saves[0] ?? null,
+                kinds: { v2: data!.bodyKinds.v2 ?? "Karte" },
+                context: context("board", () => draft),
+                defaultEmbed: () => structuredClone({ ...EMPTY_EMBED, title: "Unsere Teams", description: "" }),
+                touch: () => {
+                    touch();
+                    // Ein längerer Kopf kann den Hub auf zwei Nachrichten verteilen - der Bot packt neu.
+                    previewChannel();
+                },
+                extras: () => hubLive,
+                title: "Der Kopf des Hubs",
+                hint: "Banner, Überschrift und Text über den Teams. Die Teams setzt der Bot selbst darunter, nach Kategorien.",
                 templates: "teamBoard",
             });
         let boardEditor = makeBoardEditor();
-        let boardSingle = single();
 
         const teamEditor = bodyEditor(draft.team, {
+            pageSave: () => saves[0] ?? null,
             kinds: data!.bodyKinds,
-            context: context("team", undefined, () => draft),
+            context: context("team", () => draft),
             defaultEmbed: () => structuredClone(EMPTY_EMBED),
             touch,
-            title: "Eine Team-Karte",
+            title: "Die Nachricht je Team",
             hint: "{team.roster} ist der Kader, {team.mmr} die Team-MMR. Je Aufgabe gibt es {team.captain.rank} und mehr – im Menü „Aufgaben-Platzhalter“.",
             templates: "teamCard",
         });
@@ -1615,13 +1670,22 @@ function mount(guildId: string, view: "teams" | "board"): void {
         publish.addEventListener("click", async () => {
             publish.disabled = true;
 
-            const answer = await call<{ sent: number }>("", { action: "publish" });
+            // Gesendet wird, was gespeichert ist, danach lädt die Seite neu - also erst alles speichern, dann senden.
+            if (dirty && !(await persist())) {
+                publish.disabled = false;
+
+                return;
+            }
+
+            const answer = await call<{ sent: number; failed?: number }>("", { action: "publish" });
 
             publish.disabled = false;
 
             if (!answer) return;
 
-            toast("info", "Steht im Kanal", `${answer.sent} Nachricht${answer.sent === 1 ? "" : "en"} geschrieben.`);
+            const missing = answer.failed ? ` ${answer.failed} kam${answer.failed === 1 ? "" : "en"} nicht durch – darf der Bot im Kanal schreiben?` : "";
+
+            toast("info", answer.failed ? "Nicht alles steht im Kanal" : "Steht im Kanal", `${answer.sent} Nachricht${answer.sent === 1 ? "" : "en"} geschrieben.${missing}`);
             void reload();
         });
 
@@ -1649,74 +1713,567 @@ function mount(guildId: string, view: "teams" | "board"): void {
         });
 
         const layoutHint: Record<string, string> = {
-            cards: "Jedes Team bekommt eine eigene Nachricht. Gut zum Verlinken – einen Kopf gibt es dabei nicht.",
-            menu: "Eine Nachricht mit Auswahlmenü darunter. Der Kader kommt als Antwort, die nur sieht, wer klickt.",
-            single: "Eine Nachricht, in der {teams} alle Teams samt Kadern einsetzt. Bei vielen Teams wird sie lang.",
+            hub: "Eine Nachricht: oben dein Kopf, darunter Kennzahlen, die Teams nach Kategorien und ein Menü. Wer ein Team wählt, bekommt die gezeichnete Team-Karte – nur für sich.",
+            cards: "Je Team eine eigene Nachricht, untereinander im Kanal. Wie sie aussieht, stellst du unter „Nachrichten“ im Editor ein.",
+        };
+        const messageHint: Record<string, string> = {
+            hub: "Oben der Kopf des Hubs, darunter Kategorien, Menü und Knopf. Ganz unten die Team-Karte, die bekommt, wer im Menü ein Team wählt.",
+            cards: "Die Nachricht geht so oft raus, wie es Teams gibt – je Team eine eigene.",
         };
 
         const hint = el("p", "hintline", layoutHint[draft.layout]);
         const menuRow = el("div", "tmmenu");
         const messages = el("div", "tmmsgs");
-
-        // Das Auswahlmenue haengt der Bot an die fertige Nachricht - deshalb
-        // geht es mit Karte, Embed und normalem Text gleichermassen. Ohne
-        // diesen Satz sucht man die Einstellung in der Art der Nachricht.
-        const messageHint: Record<string, string> = {
-            cards: "Die Team-Karte geht so oft raus, wie es Teams gibt – je Team eine eigene Nachricht.",
-            menu: "Der Bot hängt das Auswahlmenü unten an die Übersicht – egal ob Karte, Embed oder normale Nachricht. Die Team-Karte ist die Antwort darauf und sieht nur, wer klickt.",
-            single: "Alles steht in der Übersicht: {teams} setzt die Teams samt Kadern ein.",
-        };
-
         const note = el("p", "hintline", messageHint[draft.layout]);
-        const drawMessages = (): void => {
-            note.textContent = messageHint[draft.layout];
-            boardEditor.node.hidden = !needsBoard();
-            teamEditor.node.hidden = !needsTeam();
-            messages.replaceChildren(
-                note,
-                ...(needsBoard() ? [boardEditor.node] : []),
-                ...(needsTeam() ? [teamEditor.node] : [])
+        const bar = (title: string): HTMLElement => el("div", "sneditor__bar", el("h4", "sneditor__title", title));
+
+        /* --- Thumbnail und großes Bild im Kopf (Plan 27) --- */
+        const hubPictures = el("div", "tmhubpics");
+        /** Wie ein Bild in der Vorschau aussieht: Galerie, Link oder das Server-Icon. */
+        const imageOf = (source: string | null): string | null =>
+            !source ? null : source === "{guild.icon}" ? data!.guild.icon : source.startsWith("{") ? null : galleryUrl(guildId, source);
+        const pictureRow = (key: "hubThumbnail" | "hubImage", label: string, hint: string): HTMLElement => {
+            const current = draft[key];
+            const url = imageOf(current);
+            const choose = button("btn btn--quiet", icon("#i-image"), current ? "Bild tauschen" : "Bild wählen");
+            const parts: HTMLElement[] = [];
+
+            choose.setAttribute("aria-label", `${label}: ${current ? "Bild tauschen" : "Bild wählen"}`);
+            choose.addEventListener("click", () =>
+                void pickImage(guildId, ["{guild.icon}"], ["gallery", "upload", "url"]).then((picked) => {
+                    if (!picked) return;
+
+                    draft[key] = picked;
+                    touch();
+                    paintPictures();
+                    previewChannel();
+                })
+            );
+
+            if (url) {
+                const image = el("img", key === "hubImage" ? "tmpick__img is-wide" : "tmpick__img");
+
+                image.src = url;
+                image.alt = "";
+                parts.push(image);
+            } else if (current === "{guild.icon}") {
+                parts.push(el("span", "tmpick__name", "Server-Icon"));
+            }
+
+            parts.push(choose);
+
+            if (current) {
+                const remove = button("iconbtn is-danger", icon("#i-trash"));
+
+                remove.title = `${label} entfernen`;
+                remove.setAttribute("aria-label", `${label} entfernen`);
+                remove.addEventListener("click", () => {
+                    draft[key] = null;
+                    touch();
+                    paintPictures();
+                    previewChannel();
+                });
+                parts.push(remove);
+            }
+
+            return row(label, hint, el("div", "tmpick", ...parts));
+        };
+        const paintPictures = (): void => {
+            // Wie HubDoc im Bot: der erste Baustein mit Text - Trenner und Bilder davor zählen nicht (W-0026).
+            const first = draft.board.doc.blocks.find((block) => block.type === "text" || block.type === "section");
+
+            hubPictures.replaceChildren(
+                pictureRow("hubThumbnail", "Thumbnail", "Klein, oben rechts neben der ersten Textzeile. Aus der Galerie, hochgeladen oder das Server-Icon"),
+                ...(draft.hubThumbnail && first?.type !== "text" ? [el("div", "notice", icon("#i-info"), el("span", "", "Das Thumbnail braucht einen Text-Baustein, vor dem kein Abschnitt mit eigenem Bild steht."))] : []),
+                pictureRow("hubImage", "Großes Bild", "Breit, unter dem Text und über den Teams")
             );
         };
 
-        /**
-         * Das Auswahlmenue ist eine eigene Frage: es haengt unter der fertigen
-         * Nachricht und geht deshalb mit Karte, Embed und normalem Text
-         * gleichermassen. Bei "je Team eine Nachricht" faellt es weg.
-         */
-        const drawLayout = (): void => {
-            orderView?.draw();
-            const cards = draft.layout === "cards";
+        /* --- Kategorien und Zuordnung als Entwurf (Plan 27) --- */
+        const categoryBox = el("div", "");
+        const assignBox = el("div", "tmassign");
+        const changeCategories = (): void => {
+            touch();
+            paintAssign();
+            previewChannel();
+            cardEditor?.redraw();
+        };
+        const newCategory = el("input", "text snadd__input");
+        const addCategory = button("btn btn--primary snadd__go", icon("#i-plus"), "Kategorie anlegen");
+        const createCategory = (): void => {
+            const name = newCategory.value.trim();
 
-            if (single() !== boardSingle) {
-                boardSingle = single();
-                boardEditor = makeBoardEditor();
+            if (!name) {
+                toast("info", "Ohne Namen geht nicht", "Die Kategorie steht so als Überschrift im Hub.");
+                newCategory.focus();
+
+                return;
             }
 
-            menuRow.replaceChildren(
-                ...(cards
-                    ? []
-                    : [
+            if (categories.categories.length >= data!.limits.groups) {
+                toast("info", "Mehr geht nicht", `Bis zu ${data!.limits.groups} Kategorien.`);
+
+                return;
+            }
+
+            categories.categories.push({ id: nextCategory--, name: name.slice(0, data!.limits.name) });
+            newCategory.value = "";
+            paintCategories();
+            changeCategories();
+            newCategory.focus();
+        };
+
+        newCategory.type = "text";
+        newCategory.maxLength = data!.limits.name;
+        newCategory.placeholder = "Etwa „Main“, „Academy“ oder „Div 2“";
+        newCategory.setAttribute("aria-label", "Name der neuen Kategorie");
+        newCategory.addEventListener("keydown", (event) => {
+            if (event.key === "Enter") createCategory();
+        });
+        addCategory.addEventListener("click", createCategory);
+
+        const paintCategories = (): void => {
+            const count = (id: number): number => Object.values(categories.teams).filter((entry) => entry === id).length;
+            const list = categories.categories.map((entry, index) => {
+                const field = el("input", "text tmgroup__name");
+                const knob = (symbol: string, label: string, run: () => void, disabled = false): HTMLButtonElement => {
+                    const control = button(symbol === "#i-trash" ? "iconbtn is-danger" : "iconbtn", icon(symbol));
+
+                    control.title = label;
+                    control.setAttribute("aria-label", `${label}: ${entry.name || "Kategorie ohne Namen"}`);
+                    control.disabled = disabled;
+                    control.addEventListener("click", run);
+
+                    return control;
+                };
+                const move = (step: number): void => {
+                    categories.categories.splice(index + step, 0, categories.categories.splice(index, 1)[0]!);
+                    paintCategories();
+                    changeCategories();
+                    categoryBox.querySelectorAll<HTMLButtonElement>(".tmgroup")[index + step]?.querySelector<HTMLButtonElement>(step < 0 ? "[data-up]" : "[data-down]")?.focus();
+                };
+                const up = knob("#i-up", "Nach oben", () => move(-1), index === 0);
+                const down = knob("#i-down", "Nach unten", () => move(1), index === categories.categories.length - 1);
+                const remove = knob("#i-trash", "Kategorie löschen", () => {
+                    categories.categories.splice(index, 1);
+
+                    for (const [team, id] of Object.entries(categories.teams)) if (id === entry.id) categories.teams[team] = null;
+
+                    paintCategories();
+                    changeCategories();
+                });
+                const n = count(entry.id);
+
+                up.dataset.up = "";
+                down.dataset.down = "";
+                field.type = "text";
+                field.value = entry.name;
+                field.maxLength = data!.limits.name;
+                field.setAttribute("aria-label", `Name der Kategorie ${entry.name}`);
+                field.addEventListener("input", () => {
+                    entry.name = field.value;
+                    changeCategories();
+                });
+
+                return el("div", "tmgroup", field, el("span", "tmgroup__count", `${n} Team${n === 1 ? "" : "s"}`), up, down, remove);
+            });
+
+            categoryBox.replaceChildren(
+                list.length ? el("div", "tmgroups", ...list) : el("div", "tkempty", icon("#i-folder"), el("span", "", "Noch keine Kategorie – alle Teams stehen ohne Überschrift untereinander.")),
+                el("div", "snadd__row", icon("#i-folder"), newCategory, addCategory)
+            );
+        };
+
+        const paintAssign = (): void => {
+            const options: [string, string][] = [["", "— ohne Kategorie —"], ...categories.categories.map((entry): [string, string] => [String(entry.id), entry.name || "(ohne Namen)"])];
+
+            assignBox.replaceChildren(
+                ...(data!.teams.length
+                    ? orderedTeams(draft.order).map((team) =>
                           row(
-                              "Mit Auswahlmenü",
-                              "Unter der Nachricht steht ein Menü mit allen Teams – wer eins wählt, bekommt dessen Karte",
-                              el("label", "snitem__switch", toggle(menuOn, "Auswahlmenü anhängen", (on) => {
-                                  menuOn = on;
-                                  draft.layout = on ? "menu" : "single";
-                                  drawLayout();
-                                  touch();
-                              }), el("span", "", menuOn ? "an" : "aus")),
-                          ),
-                      ]),
-                ...(draft.layout === "menu" && data!.teams.length > data!.limits.menu
-                    ? [el("div", "notice", icon("#i-warn"), el("span", "", `Ein Auswahlmenü fasst ${data!.limits.menu} Teams – die übrigen fallen weg.`))]
+                              team.name,
+                              `${team.players.filter((player) => PLAYING.includes(player.role)).length} Spieler · ${team.mmr === null ? "noch keine" : team.mmr} MMR`,
+                              select(
+                                  options,
+                                  String(categories.teams[String(team.id)] ?? ""),
+                                  (value) => {
+                                      categories.teams[String(team.id)] = value ? Number(value) : null;
+                                      paintCategories();
+                                      changeCategories();
+                                  },
+                                  `Kategorie von ${team.name}`
+                              )
+                          )
+                      )
+                    : [el("p", "hintline", "Noch keine Teams.")])
+            );
+        };
+
+        /* --- Menü und Knopf (Plan 27) --- */
+        const buttonBox = el("div", "");
+        const validUrl = (value: string | null): boolean => Boolean(value && value.startsWith("https://") && URL.canParse(value));
+        const paintButton = (): void => {
+            const now = draft.hubButton;
+            const state = el("span", "", now.on ? "an" : "aus");
+            const parts: HTMLElement[] = [
+                row(
+                    "Knopf unter dem Menü",
+                    "Etwa „Bei uns bewerben“",
+                    el("label", "snitem__switch", toggle(now.on, "Knopf unter dem Menü", (on) => {
+                        draft.hubButton = { ...draft.hubButton, on };
+                        touch();
+                        paintButton();
+                        previewChannel();
+                    }), state)
+                ),
+            ];
+
+            if (now.on) {
+                const url = el("input", "text");
+                const label = el("input", "text");
+
+                url.type = "url";
+                url.value = now.url ?? "";
+                url.placeholder = "https://nexus-emb.de/bewerben";
+                url.addEventListener("input", () => {
+                    draft.hubButton = { ...draft.hubButton, url: url.value.trim() || null };
+                    touch();
+                    previewChannel();
+                });
+                url.addEventListener("change", paintButton);
+                label.type = "text";
+                label.maxLength = 80;
+                label.value = now.label;
+                label.addEventListener("input", () => {
+                    draft.hubButton = { ...draft.hubButton, label: label.value };
+                    touch();
+                    previewChannel();
+                });
+
+                const missing =
+                    now.to === "apply" && !data!.apply
+                        ? "Das Apply System ist aus – so steht kein Knopf da."
+                        : now.to === "web" && !validUrl(now.url)
+                          ? "Ohne Adresse steht kein Knopf da."
+                          : now.to === "channel" && !linkOptions("").some(([id]) => id !== "" && id === now.channelId)
+                            ? "Ohne Kanal steht kein Knopf da. Ist er gelöscht, wähl einen anderen."
+                            : null;
+                const targetHint: Record<string, string> = {
+                    apply: "Derselbe Weg wie /bewerben",
+                    web: "Discord fragt beim Klick kurz nach, ob die Seite geöffnet werden soll",
+                    channel: "Ein Klick springt direkt in den Kanal",
+                };
+
+                parts.push(
+                    row(
+                        "Der Knopf führt zu",
+                        targetHint[now.to] ?? "",
+                        select(Object.entries(data!.hubButtonLabels), now.to, (value) => {
+                            draft.hubButton = { ...draft.hubButton, to: value as ISettings["hubButton"]["to"] };
+                            touch();
+                            paintButton();
+                            previewChannel();
+                        }, "Wohin der Knopf führt")
+                    ),
+                    ...(now.to === "web" ? [row("Adresse", "Beginnt mit https://", url)] : []),
+                    ...(now.to === "channel"
+                        ? [
+                              row(
+                                  "Kanal",
+                                  "Wer ihn nicht sehen darf, landet nirgends",
+                                  select(linkOptions("— Kanal wählen —"), now.channelId ?? "", (value) => {
+                                      draft.hubButton = { ...draft.hubButton, channelId: value || null };
+                                      touch();
+                                      paintButton();
+                                      previewChannel();
+                                  }, "Kanal für den Knopf")
+                              ),
+                          ]
+                        : []),
+                    row("Text auf dem Knopf", "Bis zu 80 Zeichen", label),
+                    ...(missing ? [el("div", "notice", icon("#i-info"), el("span", "", missing))] : [])
+                );
+            }
+
+            buttonBox.replaceChildren(
+                el("p", "hintline", "Unter den Teams steht ein Menü mit allen Teams, die Kategorie steht beim Team mit dabei. Ab 26 Teams kommt ein zweites Menü dazu – mehr Einträge lässt Discord in einem Menü nicht zu."),
+                ...parts
+            );
+        };
+
+        /* --- Vorschau des Hubs: der Bot packt wie beim Senden, auch ungespeichert --- */
+        const hubPreview = el("div", "tmhub");
+        // Reiter „Zeile im Hub“: so steht jedes Team als Zeile da.
+        const hubListPreview = el("div", "tmhub");
+        let hubTimer = 0;
+        let hubTicket = 0;
+        let beforeHub: IBody["doc"] | null = null;
+        // Die Vorlage, wie sie beim Umstellen eingesetzt wurde - nur unverändert kommt beim Zurückwechseln der alte Kopf wieder.
+        let hubHead = "";
+        // Die Reiter entstehen erst nach dem ersten drawLayout() - bis dahin nichts neu beschriften.
+        let tabsReady = false;
+
+        const HUB_HEAD = (): IBody["doc"] => ({ ...structuredClone(data!.defaults.board.doc), accent: draft.board.doc.accent ?? "#00afff" });
+
+        /** Was der Bot gepackt hat, zum Lesen: Texte, Menüs, Knopf, Bilder als Platz. */
+        type HubPart =
+            | { type: "text"; text: string }
+            | { type: "menu"; label: string; options?: { label: string; description?: string }[] }
+            | { type: "button"; label: string; link?: boolean }
+            | { type: "image" };
+        type HubMessage = { chars: number; components: number; parts: HubPart[]; rest: HubPart[] };
+
+        /** Das Menü wie in Discord: ein Klick klappt die Einträge auf - Team, darunter Kürzel, Kategorie und MMR. */
+        const menuPart = (label: string, options: { label: string; description?: string }[]): HTMLElement => {
+            const menu = el(
+                "details",
+                "tmhub__menu",
+                el("summary", "", el("span", "", label), icon("#i-chevron")),
+                el("div", "tmhub__options", ...options.map((option) => el("div", "tmhub__option", el("b", "", option.label), ...(option.description ? [el("small", "", option.description)] : []))))
+            );
+
+            return menu;
+        };
+
+        const drawParts = (parts: HubPart[]): HTMLElement[] => {
+            const look = context("board", () => draft)();
+
+            return parts.map((part) =>
+                part.type === "text"
+                    ? el("div", "tmhub__text", markdown(part.text, look))
+                    : part.type === "menu"
+                      ? menuPart(part.label, part.options ?? [])
+                      : part.type === "button"
+                        ? el("span", part.link ? "tmhub__button is-link" : "tmhub__button", part.label, ...(part.link ? [icon("#i-external")] : []))
+                        : el("div", "tmhub__image", "Bild aus dem Kopf")
+            );
+        };
+
+        const drawHub = (messages: HubMessage[]): void => {
+            const split = messages.length > 1 ? [el("p", "hintline", `Geht in ${messages.length} Nachrichten raus, getrennt zwischen zwei Kategorien.`)] : [];
+
+            hubPreview.replaceChildren(
+                el("span", "tmhub__label", "So steht der Hub im Kanal"),
+                ...messages.map((message, index) =>
+                    el("div", "tmhub__msg", ...(messages.length > 1 ? [el("span", "tmhub__count", `Nachricht ${index + 1} von ${messages.length}`)] : []), ...drawParts(message.parts))
+                ),
+                ...split
+            );
+
+            hubListPreview.replaceChildren(
+                el("span", "tmhub__label", "So steht es im Kanal"),
+                el("div", "tmhub__msg", ...drawParts(messages.flatMap((message, index) => (index === 0 ? message.rest : message.parts)).filter((part) => part.type === "text")))
+            );
+
+            // Live-Vorschau unter dem Kopf: das große Bild, dann der Rest der ersten Nachricht, dann die weiteren.
+            // Das Thumbnail steht oben rechts im Rahmen, neben der ersten Textzeile - wie in Discord.
+            const banner = imageOf(draft.hubImage);
+            const thumb = imageOf(draft.hubThumbnail);
+            const frame = hubLive.parentElement;
+            const picture = (url: string, className: string): HTMLImageElement => {
+                const image = el("img", className);
+
+                image.src = url;
+                image.alt = "";
+
+                return image;
+            };
+
+            hubLive.replaceChildren(
+                ...(banner ? [picture(banner, "tmhub__banner")] : []),
+                ...drawParts(messages[0]?.rest ?? []),
+                ...messages.slice(1).map((message, index) => el("div", "tmhub__msg", el("span", "tmhub__count", `Nachricht ${index + 2} von ${messages.length}`), ...drawParts(message.parts))),
+                ...split
+            );
+            frame?.querySelector(":scope > .tmhub__thumb")?.remove();
+            frame?.classList.toggle("has-thumb", Boolean(thumb && draft.board.doc.blocks[0]?.type === "text"));
+
+            if (thumb && frame && draft.board.doc.blocks[0]?.type === "text") frame.prepend(picture(thumb, "tmhub__thumb"));
+        };
+
+        const previewChannel = (): void => {
+            window.clearTimeout(hubTimer);
+            // Was jetzt noch unterwegs ist, gilt nicht mehr - auch wenn gleich gar nicht neu gefragt wird.
+            hubTicket++;
+            hubPreview.replaceChildren();
+
+            if (!hub() || !data!.teams.length) return;
+
+            paintPictures();
+            hubTimer = window.setTimeout(async () => {
+                const mine = hubTicket;
+                const answer = await call<{ messages: HubMessage[] }>("", { action: "hub.preview", settings: draft, categories: categoryDraft() });
+
+                if (answer && mine === hubTicket) drawHub(answer.messages);
+            }, 400);
+        };
+
+        /* --- Reiter „Zeile im Hub“: die Zeile je Team --- */
+        const lineInput = el("input", "text");
+
+        lineInput.type = "text";
+        lineInput.maxLength = 300;
+        lineInput.value = draft.hubLine;
+        lineInput.setAttribute("aria-label", "Zeile je Team im Hub");
+        lineInput.addEventListener("input", () => {
+            draft.hubLine = lineInput.value;
+            touch();
+            previewChannel();
+        });
+
+        // Platzhalter der Team-Karte, die in eine Zeile passen - Kader, Aufstellung und Staff wären mehrzeilig.
+        const linePick = placeholderPicker(
+            TEAM_CARD_PLACEHOLDERS.filter((entry) => !/lineup|roster|staff|logo|channels/.test(entry.key)),
+            (value) => {
+                const at = lineInput.selectionStart ?? lineInput.value.length;
+
+                lineInput.value = `${lineInput.value.slice(0, at)}${value}${lineInput.value.slice(lineInput.selectionEnd ?? at)}`;
+                lineInput.dispatchEvent(new Event("input"));
+                lineInput.focus();
+            }
+        );
+        const lineReset = button("btn btn--quiet", "Vorgabe");
+
+        lineReset.addEventListener("click", () => {
+            lineInput.value = data!.defaults.hubLine;
+            lineInput.dispatchEvent(new Event("input"));
+        });
+
+        const hubLineCard = card(
+            "Zeile je Team im Hub",
+            "Im Team-Hub steht jedes Team als eine Zeile unter seiner Kategorie. Hier stellst du ein, was darin steht – mit den Platzhaltern der Team-Karte. Wie viele Teams je Kategorie dastehen, steht unter „Kanal & Darstellung“.",
+            row("Zeile je Team", "Etwa {team.rank.icon}, {team.name}, {team.tag}, {team.players}, {team.mmr}. Ohne Kürzel fallen die Backticks weg", lineInput),
+            el("div", "tmline", linePick, lineReset),
+            hubListPreview,
+            el("div", "mcsave lvsave", saveButton())
+        );
+
+        const rows = el("input", "text gwnum");
+
+        rows.type = "number";
+        rows.min = "1";
+        rows.max = "10";
+        rows.step = "1";
+        rows.value = String(draft.hubRows);
+        rows.setAttribute("aria-label", "Zeilen je Kategorie");
+        rows.addEventListener("change", () => {
+            draft.hubRows = Math.min(10, Math.max(1, Math.round(Number(rows.value)) || 3));
+            rows.value = String(draft.hubRows);
+            touch();
+            previewChannel();
+        });
+
+        /* --- Der Karten-Editor (Plan 27, layout/TeamCardEditor.ts) --- */
+        cardEditor = teamCardEditor({
+            guildId,
+            teams: () =>
+                orderedTeams(draft.order).map((team) => ({
+                    id: team.id,
+                    name: team.name,
+                    logo: team.logo,
+                    background: team.background ?? null,
+                    description: team.description,
+                    region: team.region ?? "",
+                    links: team.links,
+                })),
+            draft,
+            // Was das Bild nicht zeigen kann (mehrzeilig, Kanäle, Icons, Bilder), steht gar nicht erst zur Wahl.
+            placeholders: TEAM_CARD_PLACEHOLDERS.filter((entry) => !/lineup|roster|staff|logo|channel|icon/.test(entry.key)),
+            limits: { description: data!.limits.description, links: data!.limits.links, linkLabel: data!.limits.linkLabel },
+            chosen: cardTeam,
+            onChoose: (id) => {
+                cardTeam = id;
+            },
+            touch,
+            pageSave: () => saves[0] ?? null,
+            preview: async (id, team) => (await call<{ image: string }>("", { action: "card.preview", id, settings: draft, team, categories: categoryDraft() }))?.image ?? null,
+            save: async () => {
+                const ok = await persist();
+
+                if (ok) void reload();
+
+                return ok;
+            },
+        });
+
+        const hubArea = el(
+            "div",
+            "sneditor",
+            el(
+                "div",
+                "sneditor__main",
+                bar("Kategorien"),
+                el("p", "hintline", "Die Teams stehen im Hub unter diesen Überschriften. Es sind dieselben wie unter RL Team-Übersicht › Teams. Ohne Kategorie stehen alle Teams ohne Überschrift untereinander."),
+                categoryBox,
+                bar("Teams zuordnen"),
+                assignBox,
+                bar("Menü und Knopf"),
+                buttonBox
+            ),
+            el("aside", "sneditor__side", el("div", "tkside__head", el("span", "tkside__live", "Live-Vorschau")), hubPreview)
+        );
+        const cardArea = el(
+            "div",
+            "tmdrawn",
+            bar("Eine Team-Karte"),
+            el("p", "hintline", "Die zeichnet der Bot. So bekommt sie, wer im Menü ein Team wählt – nur für sich."),
+            cardEditor.node
+        );
+
+        const drawMessages = (): void => {
+            note.textContent = messageHint[draft.layout];
+            messages.replaceChildren(note, ...(hub() ? [boardEditor.node, el("div", "", bar("Thumbnail und großes Bild"), hubPictures), hubArea, cardArea] : [teamEditor.node]));
+        };
+
+        /** „Im Kanal“: Team-Hub oder alle Teams einzeln. Darunter, was zur Wahl gehört. */
+        const drawLayout = (): void => {
+            orderView?.draw();
+            menuRow.replaceChildren(
+                ...(hub()
+                    ? [
+                          row("Zeilen je Kategorie", "So viele Teams stehen je Kategorie als Zeile da, danach „… und N weitere“. Das Menü zeigt immer alle", rows),
+                          ...(beforeHub
+                              ? [
+                                    el(
+                                        "div",
+                                        "notice",
+                                        icon("#i-info"),
+                                        el("span", "", "Im Kopf stand {teams}. Im Hub bliebe das leer, deshalb steht jetzt die Vorlage „Team-Hub“ darin."),
+                                        (() => {
+                                            const back = button("btn btn--quiet", "Alten Kopf zurück");
+
+                                            back.addEventListener("click", () => {
+                                                if (beforeHub) draft.board.doc = beforeHub;
+
+                                                beforeHub = null;
+                                                boardEditor = makeBoardEditor();
+                                                touch();
+                                                drawLayout();
+                                            });
+
+                                            return back;
+                                        })()
+                                    ),
+                                ]
+                              : []),
+                      ]
                     : [])
             );
 
             hint.textContent = layoutHint[draft.layout];
             drawMessages();
+            previewChannel();
+
+            // Bei „Alle Teams einzeln“ gibt es den Reiter „Zeile im Hub“ nicht.
+            if (!hub() && boardTab === "list") boardTab = "where";
+
+            if (tabsReady) paintTabs(false);
         };
 
+        paintPictures();
+        paintCategories();
+        paintAssign();
+        paintButton();
         drawLayout();
 
         const where = card(
@@ -1731,26 +2288,37 @@ function mount(guildId: string, view: "teams" | "board"): void {
                 }, "Kanal für die Übersicht")
             ),
             row(
-                "Darstellung",
-                "Wie die Teams im Kanal stehen",
+                "Im Kanal",
+                "Was dauerhaft im Kanal steht",
                 select(
-                    [
-                        ["single", "Eine Nachricht für alle Teams"],
-                        ["cards", "Je Team eine eigene Nachricht"],
-                    ],
-                    draft.layout === "cards" ? "cards" : "single",
+                    Object.entries(data!.layouts),
+                    draft.layout,
                     (value) => {
-                        // Das Menue haengt an der einen Nachricht - bei einer
-                        // Nachricht je Team gibt es nichts zum Auswaehlen.
-                        draft.layout = value === "cards" ? "cards" : menuOn ? "menu" : "single";
+                        const next: ISettings["layout"] = value === "cards" ? "cards" : "hub";
+
+                        // Steht {teams} im Kopf, bliebe der Kopf im Hub leer: dann die Vorlage „Team-Hub“, zurück geht es mit einem Knopf.
+                        if (next === "hub" && draft.layout !== "hub" && /\{teams(\.short)?\}/i.test(JSON.stringify(draft.board.doc))) {
+                            beforeHub = structuredClone(draft.board.doc);
+                            draft.board.doc = HUB_HEAD();
+                            hubHead = JSON.stringify(draft.board.doc);
+                            boardEditor = makeBoardEditor();
+                        } else if (next !== "hub" && draft.layout === "hub") {
+                            // Weg vom Hub: was das Umstellen geändert hat, kommt zurück - außer es wurde seitdem selbst geändert.
+                            if (beforeHub && JSON.stringify(draft.board.doc) === hubHead) draft.board.doc = beforeHub;
+
+                            beforeHub = null;
+                            boardEditor = makeBoardEditor();
+                        }
+
+                        draft.layout = next;
                         drawLayout();
                         touch();
                     },
-                    "Darstellung der Übersicht"
+                    "Was im Kanal steht"
                 )
             ),
-            menuRow,
             hint,
+            menuRow,
             row(
                 "Ränge zeigen als",
                 Object.keys(data!.rankIcons).length
@@ -1799,135 +2367,31 @@ function mount(guildId: string, view: "teams" | "board"): void {
         );
 
         /* --- Die Reiter: gebaut wie bei der Moderation --- */
-        const BOARD_TABS: ["where" | "messages" | "list", string, string][] = [
+        const boardTabs = (): ["where" | "messages" | "list", string, string][] => [
             ["where", "#i-layout", "Kanal & Darstellung"],
             ["messages", "#i-message", "Nachrichten"],
-            ["list", "#i-list-checks", "Teams-Liste"],
+            ...(hub() ? [["list", "#i-list-checks", "Zeile im Hub"] as ["list", string, string]] : []),
         ];
         const tabs = el("div", "tktabs");
         const pane = el("div", "tkpane");
-        // Das Menü mit den Ebenen der Teams-Liste. Ein Popover liegt in der obersten
-        // Ebene - im Reiterstreifen schnitte dessen overflow es sonst ab.
-        const levels = el("div", "menu tmlevels");
-        let listView: ReturnType<typeof listPane> | null = null;
-        let closedAt = 0;
 
         tabs.setAttribute("role", "tablist");
         tabs.setAttribute("aria-label", "Bereiche der Anzeige");
         pane.id = "tmBoardPane";
         pane.setAttribute("role", "tabpanel");
-        levels.id = "tmLevels";
-        levels.popover = "auto";
-        levels.setAttribute("role", "menu");
-        levels.setAttribute("aria-label", "Ebene der Teams-Liste");
-
-        const listTab = (): HTMLElement | null => document.getElementById("tmtab-list");
-
-        const showLevels = (): void => {
-            const anchor = listTab();
-
-            if (!anchor) return;
-
-            levels.replaceChildren(
-                ...LIST_LEVELS.map((entry) => {
-                    const item = button(`menu__item tmlevels__item${entry.id === "team" ? "" : " is-sub"}`, icon(entry.icon), el("span", "tmlevels__text", el("b", "", entry.label), el("code", "", entry.key)));
-
-                    item.title = entry.hint;
-                    item.setAttribute("role", "menuitemradio");
-                    item.setAttribute("aria-checked", String(entry.id === listLevel));
-                    item.addEventListener("click", () => {
-                        levels.hidePopover();
-                        pickLevel(entry.id, "tab");
-                    });
-
-                    return item;
-                })
-            );
-            levels.showPopover();
-
-            // Unter dem Reiter, linksbündig - nie aus dem Fenster.
-            const box = anchor.getBoundingClientRect();
-            const width = Math.min(300, window.innerWidth - 16);
-
-            levels.style.width = `${width}px`;
-            levels.style.left = `${Math.max(8, Math.min(box.left, window.innerWidth - width - 8))}px`;
-            levels.style.top = `${box.bottom + 6}px`;
-            anchor.setAttribute("aria-expanded", "true");
-            levels.querySelector<HTMLElement>('[aria-checked="true"]')?.focus();
-        };
-
-        // Der Klick auf den Reiter schließt das offene Menü schon beim Drücken (daneben
-        // geklickt) - derselbe Klick darf es danach nicht gleich wieder öffnen.
-        levels.addEventListener("beforetoggle", (event) => {
-            if ((event as Event & { newState?: string }).newState === "closed") closedAt = performance.now();
-        });
-        levels.addEventListener("toggle", (event) => {
-            if ((event as Event & { newState?: string }).newState !== "closed") return;
-
-            listTab()?.setAttribute("aria-expanded", "false");
-
-            // Escape oder Klick daneben: der Fokus gehört zurück an den Reiter.
-            if (document.activeElement === document.body || levels.contains(document.activeElement)) listTab()?.focus();
-        });
-        levels.addEventListener("keydown", (event) => {
-            const items = [...levels.querySelectorAll<HTMLElement>(".tmlevels__item")];
-            const at = items.indexOf(document.activeElement as HTMLElement);
-            const next = event.key === "ArrowDown" ? at + 1 : event.key === "ArrowUp" ? at - 1 : event.key === "Home" ? 0 : event.key === "End" ? items.length - 1 : null;
-
-            if (next === null) return;
-
-            event.preventDefault();
-            items[(next + items.length) % items.length]?.focus();
-        });
-        // Mit Tab aus dem Menü heraus: dann ist es zu.
-        levels.addEventListener("focusout", (event) => {
-            if (!levels.contains(event.relatedTarget as Node | null) && levels.matches(":popover-open")) levels.hidePopover();
-        });
 
         const paintTabs = (focus: boolean): void => {
+            tabsReady = true;
             tabs.replaceChildren(
-                ...BOARD_TABS.map(([id, symbol, label]) => {
-                    const sub = LIST_LEVELS.find((entry) => entry.id === listLevel);
-                    // Steht man tiefer als die Team-Zeile, sagt es der Reiter: „Teams-Liste · Spieler“.
-                    const text = id === "list" && sub && listLevel !== "team" ? `${label} · ${sub.label}` : label;
-                    const knob = button("tktab", icon(symbol), el("span", "", text));
+                ...boardTabs().map(([id, symbol, label]) => {
+                    const knob = button("tktab", icon(symbol), el("span", "", label));
 
                     knob.id = `tmtab-${id}`;
                     knob.tabIndex = id === boardTab ? 0 : -1;
                     knob.setAttribute("role", "tab");
                     knob.setAttribute("aria-selected", String(id === boardTab));
                     knob.setAttribute("aria-controls", pane.id);
-
-                    if (id !== "list") {
-                        knob.addEventListener("click", () => open(id));
-
-                        return knob;
-                    }
-
-                    // Die Teams-Liste ist ein Reiter mit Menü: ein Klick öffnet sie samt ihren Ebenen.
-                    knob.classList.add("tktab--menu");
-                    knob.append(icon("#i-chevron"));
-                    knob.setAttribute("aria-haspopup", "menu");
-                    knob.setAttribute("aria-expanded", "false");
-                    knob.addEventListener("click", () => {
-                        if (levels.matches(":popover-open")) {
-                            levels.hidePopover();
-
-                            return;
-                        }
-
-                        if (performance.now() - closedAt < 300) return;
-
-                        if (boardTab !== "list") open("list");
-
-                        showLevels();
-                    });
-                    knob.addEventListener("keydown", (event) => {
-                        if (event.key !== "ArrowDown" || boardTab !== "list") return;
-
-                        event.preventDefault();
-                        showLevels();
-                    });
+                    knob.addEventListener("click", () => open(id));
 
                     return knob;
                 })
@@ -1942,35 +2406,16 @@ function mount(guildId: string, view: "teams" | "board"): void {
 
             if (next !== boardTab) clickSound("primary");
 
-            // Was in der Teams-Liste geändert wurde, steht gleich in der Vorschau der Übersicht.
             if (next === "messages") boardEditor.refresh();
 
-            boardTab = next;
+            boardTab = next === "list" && !hub() ? "where" : next;
             paintTabs(focused);
             pane.setAttribute("aria-labelledby", `tmtab-${boardTab}`);
             // Die Editoren bleiben dieselben Knoten - ein Wechsel des Reiters verliert nichts.
-            // Die Teams-Liste baut sich neu: sie zeigt dann gleich, was in den anderen Reitern steht.
-            listView = boardTab === "list" ? listPane(draft, touch, saveButton, (id) => pickLevel(id, "field")) : null;
             orderView = boardTab === "where" ? orderPane(draft, touch, saveButton) : null;
-            pane.replaceChildren(...(boardTab === "where" ? [where, orderView!.node] : boardTab === "messages" ? [texts] : listView!.nodes));
-        };
+            pane.replaceChildren(...(boardTab === "where" ? [where, orderView!.node] : boardTab === "messages" ? [texts] : [hubLineCard]));
 
-        /** Eine Ebene der Teams-Liste zeigen. focus: aus dem Menü zurück an den Reiter, aus der Seite ins Feld. */
-        const pickLevel = (id: ListLevel, focus: "tab" | "field"): void => {
-            if (id !== listLevel) clickSound("primary");
-
-            listLevel = id;
-
-            if (boardTab !== "list" || !listView) {
-                open("list");
-            } else {
-                paintTabs(false);
-            }
-
-            listView!.level(id);
-
-            if (focus === "tab") listTab()?.focus();
-            else listView!.focus();
+            if (boardTab !== "where") previewChannel();
         };
 
         tabs.addEventListener("keydown", (event) => {
@@ -1980,14 +2425,15 @@ function mount(guildId: string, view: "teams" | "board"): void {
 
             event.preventDefault();
 
-            const index = BOARD_TABS.findIndex(([id]) => id === boardTab);
+            const list = boardTabs();
+            const index = list.findIndex(([id]) => id === boardTab);
 
-            open(BOARD_TABS[(index + step + BOARD_TABS.length) % BOARD_TABS.length][0]);
+            open(list[(index + step + list.length) % list.length]![0]);
         });
 
         open(boardTab);
 
-        return [tabs, levels, pane];
+        return [tabs, pane];
     }
 
     /**
@@ -2002,40 +2448,40 @@ function mount(guildId: string, view: "teams" | "board"): void {
         const order = draft.order;
         const settingsBox = el("div", "tmorder__set");
         const preview = el("div", "tmorder__preview");
-        const groupName = (team: ITeam): string => data!.groups.find((group) => group.id === team.groupId)?.name ?? "Ohne Gruppe";
+        const groupName = (team: ITeam): string => data!.groups.find((group) => group.id === team.groupId)?.name ?? "Ohne Kategorie";
         const byId = (id: number): ITeam | undefined => data!.teams.find((team) => team.id === id);
-        const context: IEditorContext = {
-            guildId,
-            values: {},
-            roles: new Map(data!.guild.roles.map((role) => [role.id, role.name])),
-            channels: new Map(data!.guild.channels.map((channel) => [channel.id, channel.name])),
-            emojis: data!.guild.emojis,
-            previewEmojis: [...data!.icons, ...badgePreviews(draft)],
-            onChange: () => undefined,
-        };
-
-        /** Eine Zeile mit Pfeilen: move(-1) einen Platz höher, move(1) einen tiefer. */
-        const arrows = (index: number, total: number, move: (step: -1 | 1) => void): HTMLButtonElement[] => {
+        /**
+         * Eine Zeile mit Pfeilen: move(-1) einen Platz höher, move(1) einen tiefer. key: Liste und Team,
+         * etwa "pin-12" - nach dem Neuzeichnen bekommt derselbe Pfeil den Fokus zurück (W-0025).
+         */
+        const arrows = (key: string, index: number, total: number, move: (step: -1 | 1, ...focus: string[]) => void): HTMLButtonElement[] => {
             const up = button("mcdur__chip tmorder__arrow", "↑");
             const down = button("mcdur__chip tmorder__arrow", "↓");
+            const own = (direction: "up" | "down"): string => `[data-arrow="${key}:${direction}"]`;
 
+            up.dataset.arrow = `${key}:up`;
+            down.dataset.arrow = `${key}:down`;
             up.setAttribute("aria-label", "Einen Platz höher");
             down.setAttribute("aria-label", "Einen Platz tiefer");
             up.disabled = index === 0;
             down.disabled = index === total - 1;
-            up.addEventListener("click", () => move(-1));
-            down.addEventListener("click", () => move(1));
+            up.addEventListener("click", () => move(-1, own("up"), own("down")));
+            down.addEventListener("click", () => move(1, own("down"), own("up")));
 
             return [up, down];
         };
         const swap = (list: number[], index: number, step: -1 | 1): void => {
             [list[index], list[index + step]] = [list[index + step], list[index]];
         };
-        const change = (focus?: string): void => {
+        // focus: Kandidaten der Reihe nach - der erste, der da und nicht ausgegraut ist, bekommt den Fokus.
+        const change = (...focus: string[]): void => {
             touch();
             draw();
 
-            if (focus) settingsBox.querySelector<HTMLElement>(focus)?.focus();
+            focus
+                .map((selector) => settingsBox.querySelector<HTMLButtonElement>(selector))
+                .find((knob) => knob && !knob.disabled)
+                ?.focus();
         };
 
         const draw = (): void => {
@@ -2058,9 +2504,9 @@ function mount(guildId: string, view: "teams" | "board"): void {
                     el("span", "tmorder__pos", String(index + 1)),
                     el("b", "", `📌 ${team.name}`),
                     el("span", "tmorder__meta", groupName(team)),
-                    ...arrows(index, order.pinned.length, (step) => {
+                    ...arrows(`pin-${team.id}`, index, order.pinned.length, (step, ...focus) => {
                         swap(order.pinned, index, step);
-                        change();
+                        change(...focus);
                     }),
                     remove
                 );
@@ -2127,12 +2573,12 @@ function mount(guildId: string, view: "teams" | "board"): void {
                                 el("span", "tmorder__pos is-quiet", String(index + 1)),
                                 el("b", "", team.name),
                                 el("span", "tmorder__meta", groupName(team)),
-                                ...arrows(index, shown.length, (step) => {
+                                ...arrows(`custom-${team.id}`, index, shown.length, (step, ...focus) => {
                                     const ids = shown.map((entry) => entry.id);
 
                                     swap(ids, index, step);
                                     order.custom = ids;
-                                    change();
+                                    change(...focus);
                                 })
                             )
                         )
@@ -2166,19 +2612,21 @@ function mount(guildId: string, view: "teams" | "board"): void {
 
             settingsBox.replaceChildren(...parts);
 
-            // Rechts: so, wie die gewählte Darstellung es ordnet. Die Liste mit Gruppen wie {teams}, Karten und Menü flach.
+            // Rechts: so, wie Hub-Menü und Karten es ordnen.
+            const line = (team: ITeam): HTMLElement =>
+                el("li", "", el("b", "", team.name), el("span", "tmorder__meta", [team.tag, team.mmr === null ? "" : `${team.mmr} MMR`].filter(Boolean).join(" · ")));
+
             if (!data!.teams.length) preview.replaceChildren(el("p", "hintline", "Noch keine Teams."));
-            else if (draft.layout === "single") preview.replaceChildren(markdown(TeamListText(shownTeams(draft), data!.groups, draft.list), context));
+            else if (draft.layout !== "hub" || !data!.groups.length) preview.replaceChildren(el("ol", "tmorder__flat", ...orderedTeams(order).map(line)));
             else {
-                preview.replaceChildren(
-                    el(
-                        "ol",
-                        "tmorder__flat",
-                        ...orderedTeams(order).map((team) =>
-                            el("li", "", el("b", "", team.name), el("span", "tmorder__meta", [team.tag, team.mmr === null ? "" : `${team.mmr} MMR`].filter(Boolean).join(" · ")))
-                        )
-                    )
-                );
+                // Im Hub sortiert jede Kategorie für sich, Teams ohne Kategorie zuletzt - wie HubSections im Bot (W-0026).
+                const ordered = orderedTeams(order);
+                const sections = [
+                    ...[...data!.groups].sort((a, b) => a.position - b.position).map((group) => ({ name: group.name, teams: ordered.filter((team) => team.groupId === group.id) })),
+                    { name: "Ohne Kategorie", teams: ordered.filter((team) => !data!.groups.some((group) => group.id === team.groupId)) },
+                ].filter((section) => section.teams.length);
+
+                preview.replaceChildren(...sections.flatMap((section) => [el("p", "tmorder__label", section.name), el("ol", "tmorder__flat", ...section.teams.map(line))]));
             }
         };
 
@@ -2186,7 +2634,7 @@ function mount(guildId: string, view: "teams" | "board"): void {
 
         const node = card(
             "Reihenfolge",
-            "Gilt für die ganze Übersicht: für Karten, Menü und Liste. In der Liste mit Gruppen sortiert jede Gruppe für sich.",
+            "Gilt für die ganze Übersicht: für das Menü im Hub und die Karten. Im Hub sortiert jede Kategorie für sich.",
             el(
                 "div",
                 "tmorder",
@@ -2203,231 +2651,6 @@ function mount(guildId: string, view: "teams" | "board"): void {
         );
 
         return { node, draw };
-    }
-
-    /**
-     * Der Reiter „Teams-Liste“: wie {teams} jedes Team aufschreibt, in drei
-     * Ebenen, die aufeinander aufbauen - die Zeile je Team setzt mit
-     * {team.members} die Spieler ein und mit {team.members.staff} den Staff, und
-     * wie jeder von ihnen aussieht, steht eine Ebene tiefer. Die Ebenen teilen
-     * sich Vorlagen, Vorschau und Speichern; ein Wechsel tauscht nur den Editor,
-     * Entwürfe und „Zurück“ bleiben. Die Vorschau baut die Liste mit derselben
-     * Funktion wie der Bot (constants/TeamList.ts), aus den echten Teams und dem
-     * ungespeicherten Entwurf.
-     */
-    function listPane(draft: ISettings, touch: () => void, saveButton: () => HTMLButtonElement, go: (id: ListLevel) => void): { nodes: HTMLElement[]; level: (id: ListLevel) => void; focus: () => void } {
-        const list = draft.list;
-        const preview = el("div", "tkprev");
-        const shown: IEditorContext = {
-            guildId,
-            values: {},
-            roles: new Map(data!.guild.roles.map((role) => [role.id, role.name])),
-            channels: new Map(data!.guild.channels.map((channel) => [channel.id, channel.name])),
-            emojis: data!.guild.emojis,
-            previewEmojis: [...data!.icons, ...badgePreviews(draft)],
-            onChange: () => undefined,
-        };
-        const paintPreview = (): void => {
-            preview.replaceChildren(markdown(TeamListText(shownTeams(draft), data!.groups, list), shown));
-        };
-        const change = (): void => {
-            touch();
-            paintPreview();
-        };
-
-        /** Ein Vorlagen-Feld mit allem drum herum: Platzhalter-Menüs, Emojis, Formatieren, farbige Platzhalter. */
-        const field = (label: string, value: string, max: number, onInput: (value: string) => void, menus: (insert: (value: string) => void) => HTMLElement[]): { box: HTMLElement; area: HTMLTextAreaElement } => {
-            const area = el("textarea", "text tkarea tmlist__area");
-            const insert = (text: string): void => {
-                insertPlaceholder(text, box);
-            };
-
-            area.rows = 4;
-            area.value = value;
-            area.maxLength = max;
-            area.setAttribute("aria-label", label);
-            trackField(area);
-            area.addEventListener("input", () => {
-                onInput(area.value);
-                change();
-            });
-
-            // Vorn die Icons des Bots (Rang-Icons, Abzeichen), dahinter die des Servers.
-            const box: HTMLElement = el(
-                "div",
-                "tmlist__field",
-                el(
-                    "div",
-                    "tktools",
-                    ...menus(insert),
-                    emojiPicker({
-                        value: null,
-                        emojis: [...data!.icons, ...data!.guild.emojis],
-                        label: "Emoji einfügen",
-                        insert: true,
-                        onPick: (picked) => {
-                            if (picked) insert(picked);
-                        },
-                    }),
-                    formatTools(area)
-                ),
-                placeholderMarks(area)
-            );
-
-            return { box, area };
-        };
-
-        const block = (label: string, hint: string, ...controls: HTMLElement[]): HTMLElement =>
-            el("div", "tmlist__block", el("b", "tmlist__label", label), el("p", "hintline", hint), ...controls);
-
-        /* --- Ebene „Team“: die Zeile je Team --- */
-        const team = field("Zeile je Team", list.team, data!.limits.listTeam, (value) => (list.team = value), (insert) => [
-            placeholderPicker(TEAM_LIST_PLACEHOLDERS, insert),
-            placeholderTree({ label: "Aufgaben-Platzhalter …", back: "‹ Andere Aufgabe", branches: roles() }, insert),
-        ]);
-        const down = (id: ListLevel, label: string): HTMLButtonElement => {
-            const link = button("tmlist__down", el("span", "", label), icon("#i-chevron"));
-
-            link.addEventListener("click", () => go(id));
-
-            return link;
-        };
-
-        team.area.rows = 5;
-
-        /* --- Ebene „Spieler“: jeder Spieler in {team.members} --- */
-        const member = field("So steht ein Spieler in {team.members}", list.member, data!.limits.listMember, (value) => (list.member = value), (insert) => [
-            placeholderPicker(TEAM_MEMBER_PLACEHOLDERS, insert),
-        ]);
-        const chipFor = new Map<string, HTMLButtonElement>();
-        const chips = el(
-            "div",
-            "mcdur",
-            ...Object.entries(data!.roles).map(([role, label]) => {
-                // Das Abzeichen vor dem Namen - Schmuck, der Name sagt schon alles.
-                const chip = button("mcdur__chip tmchip", badgeFace(role, draft), label);
-
-                chipFor.set(role, chip);
-                chip.setAttribute("aria-pressed", String(list.roles.includes(role)));
-                chip.addEventListener("click", () => {
-                    list.roles = list.roles.includes(role) ? list.roles.filter((entry) => entry !== role) : [...list.roles, role];
-                    chip.setAttribute("aria-pressed", String(list.roles.includes(role)));
-                    change();
-                });
-
-                return chip;
-            })
-        );
-
-        /* --- Ebene „Staff“: Coach und Manager in {team.members.staff} --- */
-        const staff = field("So steht jemand vom Staff in {team.members.staff}", list.staff, data!.limits.listMember, (value) => (list.staff = value), (insert) => [
-            placeholderPicker(TEAM_MEMBER_PLACEHOLDERS, insert),
-        ]);
-
-        const mains: Record<ListLevel, HTMLElement> = {
-            team: el(
-                "div",
-                "sneditor__main",
-                block(
-                    "Zeile je Team",
-                    "Fett, Links und -# für kleine Schrift wie in Discord. {team.members} setzt die Spieler ein, {team.members.staff} Coach und Manager – jeden in eigener Zeile. Was in der Zeile davor steht, etwa -#, steht vor jeder ihrer Zeilen.",
-                    team.box,
-                    el("div", "tmlist__next", el("span", "", "Wie sie dastehen:"), down("members", "Spieler"), down("staff", "Staff"))
-                )
-            ),
-            members: el(
-                "div",
-                "sneditor__main",
-                block("Ein Spieler", "Jede Zeile gilt für jeden Spieler – etwa „{spieler.role.icon} {spieler}“ und darunter „-# {spieler.rank.icon} `{spieler.mmr}`“. Zeilen, deren Platzhalter alle leer sind, fallen weg.", member.box),
-                block("Wer in {team.members} steht", "Die Aufgaben, die mitkommen. Coach und Manager stehen in {team.members.staff}.", chips)
-            ),
-            staff: el(
-                "div",
-                "sneditor__main",
-                block("Coach und Manager", "Etwa „{spieler.role.icon} {spieler}“ – Rang und Tracker haben sie meist nicht, darum eine eigene Vorlage.", staff.box)
-            ),
-        };
-        const areas: Record<ListLevel, HTMLTextAreaElement> = { team: team.area, members: member.area, staff: staff.area };
-
-        // Eine Vorlage setzt alle Ebenen auf einmal; „Zurück“ holt den Stand davor. Gespeichert wird mit Speichern.
-        const show = (): void => {
-            for (const [role, chip] of chipFor) chip.setAttribute("aria-pressed", String(list.roles.includes(role)));
-
-            // Über input: jedes Feld meldet sich selbst, die Marker und die Vorschau gehen mit.
-            for (const [area, value] of [
-                [team.area, list.team],
-                [member.area, list.member],
-                [staff.area, list.staff],
-            ] as const) {
-                area.value = value;
-                area.dispatchEvent(new Event("input"));
-            }
-        };
-        const presets = presetBar<ITeamListSettings, ITeamListPreset>(TEAM_LIST_PRESETS, {
-            take: () => structuredClone(list),
-            put: (state) => {
-                Object.assign(list, state);
-                show();
-            },
-            apply: (preset) => {
-                Object.assign(list, structuredClone(preset.list));
-                show();
-            },
-        });
-
-        // Wo {teams} gerade gar nicht in voller Länge steht, sagt es die Seite gleich oben.
-        const scope =
-            draft.layout === "menu"
-                ? "Mit Auswahlmenü setzt {teams} nur die Kopfzeile je Team ein. Diese Liste gilt bei „Eine Nachricht für alle Teams“ ohne Auswahlmenü."
-                : draft.layout === "cards"
-                  ? "Bei „Je Team eine eigene Nachricht“ gibt es keine Übersicht und damit kein {teams}. Die Liste gilt, sobald du auf eine Nachricht für alle Teams stellst."
-                  : null;
-
-        const path = el("nav", "tmpath");
-        const title = el("h3", "tkcard__title");
-        const lead = el("p", "tkcard__lead");
-        const editor = el("div", "sneditor");
-        const side = el("aside", "sneditor__side", el("div", "tkside__head", el("span", "tkside__live", "Live-Vorschau")), preview);
-
-        path.setAttribute("aria-label", "Ebene");
-
-        const level = (id: ListLevel): void => {
-            const { label, key, title: heading, lead: intro } = LIST_LEVELS.find((entry) => entry.id === id)!;
-
-            title.textContent = heading;
-            lead.textContent = intro;
-            editor.replaceChildren(mains[id], side);
-
-            // Der Pfad zurück: {teams} › {team.members} - auf der obersten Ebene gibt es keinen.
-            const up = button("tmpath__up", "{teams}");
-
-            up.addEventListener("click", () => go("team"));
-            path.hidden = id === "team";
-            path.replaceChildren(up, el("span", "tmpath__sep", "›"), el("span", "tmpath__here", key));
-            path.querySelector(".tmpath__here")?.setAttribute("aria-current", "page");
-            path.title = `Teams-Liste › ${label}`;
-        };
-
-        paintPreview();
-        level(listLevel);
-
-        return {
-            nodes: [
-                el(
-                    "section",
-                    "tkcard",
-                    path,
-                    title,
-                    lead,
-                    ...(scope ? [el("div", "notice", icon("#i-info"), el("span", "", scope))] : []),
-                    presets,
-                    editor,
-                    el("div", "mcsave lvsave", saveButton())
-                ),
-            ],
-            level,
-            focus: () => areas[listLevel].focus(),
-        };
     }
 
     /* ------------------------------------------------------------

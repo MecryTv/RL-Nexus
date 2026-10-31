@@ -11,6 +11,7 @@
 
 var WARTUNG_LABELS = { website: "Wartung · Webseite", dashboard: "Wartung · Bot-Dashboard" };
 var WARTUNG_FALLBACK = "Gleich wieder da.";
+var WARTUNG_FALLBACK_TEXT = "Gerade wird etwas umgebaut. Was los ist, steht im Support-Discord.";
 
 /**
  * Was die Seite zeigt. status: der Inhalt von wartung.json (kann alles sein),
@@ -21,7 +22,7 @@ function wartungView(status, now, area, timeZone) {
     var label = WARTUNG_LABELS[area] || WARTUNG_LABELS.website;
     var since = status && typeof status === "object" && typeof status.since === "string" ? Date.parse(status.since) : NaN;
 
-    if (!status || typeof status !== "object" || typeof status.title !== "string" || isNaN(since)) {
+    if (!status || typeof status !== "object" || typeof status.title !== "string" || !status.title.trim() || isNaN(since)) {
         return { state: "fallback", label: label, title: WARTUNG_FALLBACK, text: "", remaining: null, until: null, since: null, progress: null, steps: [], late: null };
     }
 
@@ -105,9 +106,11 @@ if (typeof document !== "undefined") {
                       ? view.late
                       : view.state === "open"
                         ? "Seit " + view.since + " Uhr" + (view.text ? " · " + view.text : "")
-                        : view.text
+                        : WARTUNG_FALLBACK_TEXT
             );
             byId("late").hidden = view.state !== "late";
+            // Ohne Status lädt die Seite nicht von selbst neu, also verspricht sie es auch nicht.
+            byId("note").hidden = view.state === "fallback";
 
             ring.setAttribute("data-state", view.state);
             byId("arc").style.strokeDashoffset = String(view.progress === null ? RING * 0.8 : RING * (1 - view.progress));
@@ -147,7 +150,7 @@ if (typeof document !== "undefined") {
                 try {
                     status = JSON.parse(decodeURIComponent(location.hash.slice("#vorschau=".length)));
                     area = Array.isArray(status.areas) && status.areas[0] === "dashboard" ? "dashboard" : "website";
-                } catch (error) {
+                } catch {
                     status = null;
                 }
 
@@ -160,6 +163,14 @@ if (typeof document !== "undefined") {
         }
 
         function poll() {
+            // Unabhängig vom Plan: Kommt die eigene Adresse nicht mehr mit 503, ist die Wartung vorbei.
+            // Fängt Schalter, die von Hand gelöscht wurden, und eine wartung.json, die liegen blieb.
+            fetch(location.pathname + location.search, { method: "HEAD", cache: "no-store", headers: { Accept: "text/html" } })
+                .then(function (response) {
+                    if (response.ok) location.reload();
+                })
+                .catch(function () {});
+
             fetch("/wartung/status.json", { cache: "no-store" })
                 .then(function (response) {
                     if (response.status === 404) return null;

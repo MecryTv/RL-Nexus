@@ -13,17 +13,19 @@ process.env.DEV_CLIENT_SECRET ||= "check-secret";
 
 import path from "path";
 import { existsSync } from "fs";
-import { ChannelType, Guild, GuildBasedChannel, Role } from "discord.js";
+import { ChannelType, Guild, GuildBasedChannel, GuildMember, Role } from "discord.js";
 import BotClient from "../client/BotClient";
-import { AnswersText, ChoiceRow, CloseRow, ConfirmRow, LftRender, LftValues, STEP_CANCEL, STEP_PICK, STEP_SEND } from "../builder/LftView";
+import { AnswersText, ChoiceRow, CloseRow, ConfirmRow, LftRender, LftValues, PanelRow, STEP_CANCEL, STEP_PICK, STEP_SEND } from "../builder/LftView";
 import { Fill } from "../constants/Placeholders";
 import {
     CLOSED_TAG,
     DefaultLftSettings,
     DefaultPlayerQuestions,
+    KIND_LABELS,
     LFT_DONE_KEYS,
     LFT_INTRO_KEYS,
     LFT_NOTICE_KEYS,
+    LFT_PANEL_KEYS,
     LFT_POST_KEYS,
     LFT_PREVIEW_KEYS,
     LFT_QUESTION_KEYS,
@@ -33,6 +35,8 @@ import {
 } from "../constants/Lft";
 import { ILftAnswer, ILftQuestion, ILftSettings } from "../interfaces/services/lft/ILft";
 import { LftError } from "../services/LookingForService";
+import { CleanLftAnswers } from "../services/LftModal";
+import { ModalParts, ModalTitle } from "../services/ApplyFlow";
 
 const GUILD = "90071992547409961";
 const FORUM = "90071992547409962";
@@ -52,6 +56,16 @@ function check(name: string, passed: boolean, detail = ""): void {
 function refuses(name: string, action: () => unknown): void {
     try {
         action();
+        check(name, false, "ging durch");
+    } catch (error) {
+        check(name, error instanceof LftError, String(error));
+    }
+}
+
+/** Wie refuses, nur für async. */
+async function rejects(name: string, action: () => Promise<unknown>): Promise<void> {
+    try {
+        await action();
         check(name, false, "ging durch");
     } catch (error) {
         check(name, error instanceof LftError, String(error));
@@ -127,6 +141,22 @@ function checkClean(client: BotClient): void {
     check("Titel, Beitrag und Vorschau bleiben", partial.player.title === base.player.title && partial.player.post.doc.blocks.length === base.player.post.doc.blocks.length);
     check("Die Meldung und die DM bleiben", partial.notice.channelId === base.notice.channelId && partial.dm.intro.doc.blocks.length === base.dm.intro.doc.blocks.length);
     check("Ablauf und Rechte bleiben", partial.expireDays === base.expireDays);
+    check("Wie gefragt wird und das Panel bleiben", partial.ask === base.ask && partial.panel.title === base.panel.title);
+
+    console.log("\n  — Panel und wie gefragt wird (Plan 30) —");
+
+    check("Ab Werk per DM", base.ask === "dm");
+    check("Ab Werk kein Panel im Forum", base.panel.threadId === null && base.panel.forumId === null);
+
+    const stored = { ...base, panel: { ...base.panel, threadId: "111", messageId: "111" } };
+    const panel = service.CleanSettings(guild, { ask: "modal", panel: { forumId: TEXT, title: "  ", threadId: "999", messageId: "999" } }, stored);
+
+    check("Fenster wird übernommen", panel.ask === "modal");
+    check("Ein Textkanal ist kein Forum fürs Panel", panel.panel.forumId === null);
+    check("Leerer Titel: bleibt wie vorher", panel.panel.title === base.panel.title, panel.panel.title);
+    check("Beitrag und Nachricht schreibt nur der Bot", panel.panel.threadId === "111" && panel.panel.messageId === "111");
+    check("Ein Forum fürs Panel kommt an", service.CleanSettings(guild, { panel: { forumId: FORUM } }, base).panel.forumId === FORUM);
+    check("Unbekannte Art: bleibt", service.CleanSettings(guild, { ask: "fax" }, base).ask === "dm");
 
     console.log("\n  — Fragen —");
 
@@ -289,6 +319,20 @@ async function checkViews(client: BotClient): Promise<void> {
     check("Die Meldung verlinkt den Beitrag", notice.includes("https://discord.com/channels/1/2"));
     check("Sie kann beenden und löschen", notice.includes("lf:close:42") && notice.includes("lf:kill:42"));
 
+    // Ping-Rollen: Text über einer Karte lehnt Discord ab - die Rolle gehört oben in die Karte.
+    const pinged = await LftRender(client, settings.notice.body, values, [CloseRow(42, true)], [ROLE]);
+
+    check(
+        "Meldung mit Ping als Karte: kein Text darüber, die Rolle steht oben in der Karte",
+        !pinged.content && JSON.stringify(pinged.components[0].toJSON()).includes(`<@&${ROLE}>`),
+        String(pinged.content)
+    );
+    check("…gepingt wird genau diese Rolle", JSON.stringify(pinged.allowedMentions) === JSON.stringify({ parse: [], roles: [ROLE] }), JSON.stringify(pinged.allowedMentions));
+
+    const pingText = await LftRender(client, { kind: "text", content: "Neu: {user.name}", embed: null, doc: { blocks: [] } }, values, [], [ROLE]);
+
+    check("Meldung mit Ping als Text: der Ping steht vor dem Text", (pingText.content ?? "").startsWith(`<@&${ROLE}>\n`), String(pingText.content));
+
     const choice = DefaultPlayerQuestions().find((entry) => entry.kind === "choice")!;
     const question = JSON.stringify(
         (
@@ -325,6 +369,244 @@ async function checkViews(client: BotClient): Promise<void> {
 /* ----------------------------------------------------------
    Bot und Dashboard
    ---------------------------------------------------------- */
+/** Plan 30: das Panel im Forum - Knöpfe je Seite, nie zwei Beiträge. */
+async function checkPanel(): Promise<void> {
+    console.log("\n  — Panel im Forum (Plan 30) —");
+
+    const both = JSON.stringify(PanelRow(["player", "team"]).toJSON());
+
+    check("Je Seite ein Knopf", both.includes('"custom_id":"lf:start:player"') && both.includes('"custom_id":"lf:start:team"'), both);
+    check("Keine Seite an: ein abgeschalteter Knopf", JSON.stringify(PanelRow([]).toJSON()).includes('"disabled":true'));
+
+    const client = new BotClient();
+    const service = client.lookingForService;
+    const base = DefaultLftSettings();
+
+    check("Panel-Forum fällt auf das der Spieler-Suche zurück", service.PanelForum({ ...base, player: { ...base.player, forumId: "F1" } }) === "F1");
+    check("Eigenes Panel-Forum geht vor", service.PanelForum({ ...base, player: { ...base.player, forumId: "F1" }, panel: { ...base.panel, forumId: "F2" } }) === "F2");
+
+    // Der gemerkte Beitrag ist von Hand gelöscht worden: genau ein neuer, beim zweiten Senden keiner mehr.
+    let saved: ILftSettings = { ...base, player: { ...base.player, forumId: FORUM }, panel: { ...base.panel, threadId: "OLD", messageId: "OLD" } };
+    // Liegt im Forum noch ein Panel als normaler Text, die Karte ist aber eine V2-Karte (oder umgekehrt)?
+    let textPanel = false;
+    const loose = client as unknown as Record<string, Record<string, unknown>>;
+    const calls: string[] = [];
+    let created = 0;
+    let known: unknown = null;
+    const thread = {
+        id: "NEW",
+        url: "https://discord.com/channels/1/NEW",
+        name: base.panel.title,
+        parentId: FORUM,
+        archived: false,
+        locked: false,
+        isThread: () => true,
+        messages: { fetch: async () => ({ flags: { has: () => !textPanel }, edit: async () => void calls.push("edit") }) },
+        setName: async () => undefined,
+        setArchived: async () => undefined,
+        pin: async () => void calls.push("pin"),
+        setLocked: async () => void calls.push("lock"),
+        delete: async () => void calls.push("delete"),
+    };
+    const forum = {
+        id: FORUM,
+        type: ChannelType.GuildForum,
+        flags: { has: () => false },
+        threads: {
+            create: async () => {
+                created++;
+
+                return thread;
+            },
+        },
+    };
+    const guild = { id: GUILD, name: "Dev Server", iconURL: () => null, channels: { cache: new Map([[FORUM, forum]]) } } as unknown as Guild;
+
+    loose.moduleSettings.Of = async (_guild: string, _module: string, fallback: object) => ({ ...fallback, ...structuredClone(saved) });
+    loose.moduleSettings.Save = async (_guild: string, _module: string, config: ILftSettings) => void (saved = config);
+    (client.channels as unknown as Record<string, unknown>).fetch = async (id: string) => {
+        if (known && id === "NEW") return known;
+
+        throw Object.assign(new Error("Unknown Channel"), { code: 10003 });
+    };
+
+    const first = await service.SendPanel(guild);
+
+    check("Gelöschter Beitrag: genau ein neuer", created === 1 && saved.panel.threadId === "NEW", `${created} · ${saved.panel.threadId}`);
+    check("Neuer Beitrag: angepinnt und gesperrt", calls.includes("pin") && calls.includes("lock"), calls.join(", "));
+    check("Mit Rechten keine Warnung", first.warning === null, String(first.warning));
+
+    known = thread;
+    await service.SendPanel(guild);
+    check("Liegt einer: wird bearbeitet, kein zweiter", created === 1 && calls.includes("edit"), `${created} · ${calls.join(", ")}`);
+
+    // Review Plan 30: Discord bearbeitet keine Nachricht zwischen Karte und Text - dann neu statt hängen.
+    textPanel = true;
+    calls.length = 0;
+    await service.SendPanel(guild);
+    check("Art gewechselt: alter Beitrag weg, genau ein neuer", calls.includes("delete") && !calls.includes("edit") && created === 2, `${created} · ${calls.join(", ")}`);
+    textPanel = false;
+
+    // Review Plan 30: Ein Aussetzer bei Discord ist kein gelöschter Beitrag - sonst stünden zwei Panels im Forum.
+    (client.channels as unknown as Record<string, unknown>).fetch = async () => {
+        throw Object.assign(new Error("Service Unavailable"), { code: 503, status: 503 });
+    };
+    await rejects("Discord antwortet nicht: Fehler statt zweitem Panel", () => service.SendPanel(guild));
+    check("Discord antwortet nicht: kein neuer Beitrag", created === 2, String(created));
+
+    // W-0032: Anpinnen scheitert. Mit „Beiträge verwalten“ liegt es daran, dass schon ein anderer Beitrag oben ist.
+    const failingPin = { ...thread, flags: undefined, pin: async () => Promise.reject(Object.assign(new Error("Maximum number of pinned threads"), { code: 30047 })) };
+    const pinGuild = (rights: boolean) =>
+        ({ ...(guild as unknown as Record<string, unknown>), members: { me: { permissionsIn: () => ({ has: () => rights }) } } }) as unknown as Guild;
+
+    (client.channels as unknown as Record<string, unknown>).fetch = async (id: string) => {
+        if (known && id === "NEW") return known;
+
+        throw Object.assign(new Error("Unknown Channel"), { code: 10003 });
+    };
+    known = failingPin;
+    check("Pin scheitert mit Rechten: anderer Beitrag angepinnt", (await service.SendPanel(pinGuild(true))).warning?.includes("schon ein anderer Beitrag") === true);
+    check("Pin scheitert ohne Rechte: „Beiträge verwalten“ fehlt", (await service.SendPanel(pinGuild(false))).warning?.includes("Beiträge verwalten") === true);
+    known = thread;
+
+    saved = { ...saved, player: { ...saved.player, forumId: null }, panel: { ...saved.panel, forumId: null } };
+    await rejects("Ohne Forum geht kein Panel", () => service.SendPanel(guild));
+
+    // Review Plan 30: Verlangt das Forum einen Tag, muss es einer aus diesem Forum sein.
+    const tagged = (id: string, tags: { id: string; moderated: boolean }[]) => {
+        const seen: { appliedTags?: string[] } = {};
+
+        return {
+            seen,
+            forum: {
+                id,
+                type: ChannelType.GuildForum,
+                flags: { has: () => true },
+                availableTags: tags,
+                threads: {
+                    create: async (options: { appliedTags?: string[] }) => {
+                        seen.appliedTags = options.appliedTags;
+
+                        return thread;
+                    },
+                },
+            },
+        };
+    };
+    const teamForum = tagged("TEAMFORUM", [{ id: "T", moderated: false }]);
+    const otherForum = tagged("OTHERFORUM", [{ id: "MOD", moderated: true }, { id: "FREE", moderated: false }]);
+    const tagGuild = {
+        id: GUILD,
+        name: "Dev Server",
+        iconURL: () => null,
+        channels: { cache: new Map<string, unknown>([["TEAMFORUM", teamForum.forum], ["OTHERFORUM", otherForum.forum]]) },
+    } as unknown as Guild;
+
+    (client.channels as unknown as Record<string, unknown>).fetch = async () => {
+        throw Object.assign(new Error("Unknown Channel"), { code: 10003 });
+    };
+    saved = {
+        ...base,
+        player: { ...base.player, forumId: FORUM, tag: { ...base.player.tag, id: "P" } },
+        team: { ...base.team, forumId: "TEAMFORUM", tag: { ...base.team.tag, id: "T" } },
+        panel: { ...base.panel, forumId: "TEAMFORUM" },
+    };
+    await service.SendPanel(tagGuild);
+    check("Panel im Team-Forum: Tag der Team-Suche", JSON.stringify(teamForum.seen.appliedTags) === '["T"]', JSON.stringify(teamForum.seen.appliedTags));
+
+    saved = { ...saved, panel: { ...saved.panel, forumId: "OTHERFORUM", threadId: null, messageId: null } };
+    await service.SendPanel(tagGuild);
+    check("Fremdes Forum: ein freier Tag von dort", JSON.stringify(otherForum.seen.appliedTags) === '["FREE"]', JSON.stringify(otherForum.seen.appliedTags));
+}
+
+/**
+ * W-0032: Legt Publish die Tags nach, speichert es nur die Tags - nicht den
+ * ganzen Stand vom Start des Gesprächs. Sonst ginge etwa ein inzwischen
+ * gesendetes Panel verloren, und das nächste „Panel senden“ legte ein zweites an.
+ */
+async function checkPublishSave(): Promise<void> {
+    console.log("\n  — Beitrag: nur die Tags zurückschreiben —");
+
+    const client = new BotClient();
+    const service = client.lookingForService;
+    const loose = client as unknown as Record<string, Record<string, unknown>>;
+    const base = DefaultLftSettings();
+    const stored: ILftSettings = { ...base, player: { ...base.player, forumId: FORUM }, panel: { ...base.panel, threadId: "NEW", messageId: "NEW" } };
+    const stale: ILftSettings = structuredClone({ ...stored, panel: { ...stored.panel, threadId: "OLD", messageId: "OLD" } });
+    let saved: ILftSettings | null = null;
+
+    loose.moduleSettings.Of = async (_guild: string, _module: string, fallback: object) => ({ ...fallback, ...structuredClone(stored) });
+    loose.moduleSettings.Save = async (_guild: string, _module: string, config: ILftSettings) => void (saved = config);
+    loose.lftRequests.Open = async () => null;
+    loose.lftRequests.Create = async (input: Record<string, unknown>) => ({ ...input, id: 1, createdAt: Date.now(), status: "open" });
+    loose.lftRequests.SetPost = async () => undefined;
+    (service as unknown as Record<string, unknown>).SyncTags = async (_guild: Guild, settings: ILftSettings) => {
+        settings.player.tag.id = "P";
+    };
+
+    const forum = { id: FORUM, type: ChannelType.GuildForum, threads: { create: async () => ({ id: "T1" }) } };
+    const guild = { id: GUILD, name: "Dev Server", iconURL: () => null, channels: { cache: new Map([[FORUM, forum]]) } } as unknown as Guild;
+    const member = { id: USER, displayName: "Kandidat", guild, user: { tag: "kandidat", displayAvatarURL: () => "" } } as unknown as GuildMember;
+    const result = await service.Publish(member, "player", stale, [{ id: "q1", label: "Rang", value: "GC" }], "Titel", service.BaseOf(member, "player", stale.player));
+    const after = saved as ILftSettings | null;
+
+    check("Beitrag steht", result.ok, JSON.stringify(result).slice(0, 120));
+    check("Neuer Tag ist gespeichert", after?.player.tag.id === "P", String(after?.player.tag.id));
+    check("Das Panel von inzwischen bleibt", after?.panel.threadId === "NEW", String(after?.panel.threadId));
+}
+
+/** Review Plan 30: Vor dem Veröffentlichen werden alle Antworten noch einmal geprüft. */
+async function checkModalFinish(): Promise<void> {
+    console.log("\n  — Fenster: letzte Prüfung vor dem Beitrag —");
+
+    const client = new BotClient();
+    const service = client.lookingForService as unknown as Record<string, unknown>;
+    const base = DefaultLftSettings();
+    const questions: ILftQuestion[] = [
+        { id: "q1", label: "Rang", hint: "", kind: "short", choices: [], required: true, max: 20 },
+        { id: "q2", label: "Neu dazugekommen", hint: "", kind: "short", choices: [], required: true, max: 20 },
+    ];
+    let published = false;
+    let shown = "";
+
+    service.Check = async () => ({ settings: base, side: { ...base.player, questions } });
+    service.Publish = async () => {
+        published = true;
+
+        return { ok: false, message: "nicht erreicht" };
+    };
+
+    const interaction = {
+        member: { id: USER, displayName: "Kandidat", guild: { id: GUILD, name: "Dev Server", iconURL: () => null }, user: { displayAvatarURL: () => "" } },
+        deferReply: async () => undefined,
+        editReply: async (payload: { components?: unknown[] }) => void (shown = JSON.stringify(payload.components)),
+    };
+    const draft = { id: "d1", userId: USER, guildId: GUILD, kind: "player", answers: { q1: "GC 2" }, step: 1, touched: Date.now() };
+
+    await (client.lookingForService.modal as unknown as { Finish: (...args: unknown[]) => Promise<void> }).Finish(interaction, draft);
+    check("Pflichtfrage kam nach dem Ausfüllen dazu: nicht veröffentlicht", !published);
+    check("… und die Person erfährt, was fehlt", shown.includes("fehlt noch"), shown.slice(0, 200));
+}
+
+/** Plan 30: die Fragen im Fenster - dieselben Regeln wie in der DM. */
+function checkModal(): void {
+    console.log("\n  — Fragen im Fenster (Plan 30) —");
+
+    const questions: ILftQuestion[] = [
+        { id: "q1", label: "Rang", hint: "", kind: "short", choices: [], required: true, max: 20 },
+        { id: "q2", label: "Plattform", hint: "", kind: "choice", choices: ["PC", "PS"], required: true, max: 100 },
+        { id: "q3", label: "Sonst noch was", hint: "", kind: "long", choices: [], required: false, max: 200 },
+    ];
+    const ok = CleanLftAnswers(questions, { q1: " GC 2 ", q2: "PC", q3: "" });
+
+    check("Antworten mit Frage", ok.length === 2 && ok[0].label === "Rang" && ok[0].value === "GC 2", JSON.stringify(ok));
+    refuses("Pflicht fehlt (auch wenn das Feld im Fenster fehlte)", () => CleanLftAnswers(questions, { q2: "PC" }));
+    refuses("Zu lang", () => CleanLftAnswers(questions, { q1: "x".repeat(21), q2: "PC" }));
+    refuses("Erfundene Auswahl", () => CleanLftAnswers(questions, { q1: "GC", q2: "Xbox" }));
+    check("Fenstertitel", ModalTitle(KIND_LABELS.player, 1, 3) === "Spieler-Suche · Teil 1 von 3", ModalTitle(KIND_LABELS.player, 1, 3));
+    check("15 Fragen sind drei Fenster", ModalParts(Array.from({ length: 15 }, (_, index) => ({ ...questions[0], id: `q${index}` }))).length === 3);
+}
+
 async function checkLists(): Promise<void> {
     console.log("\n  — Dieselben Platzhalter im Dashboard —");
 
@@ -341,6 +623,7 @@ async function checkLists(): Promise<void> {
         ["Frage", LFT_QUESTION_KEYS, "LFT_QUESTION_PLACEHOLDERS"],
         ["Abschluss", LFT_DONE_KEYS, "LFT_DONE_PLACEHOLDERS"],
         ["Meldung", LFT_NOTICE_KEYS, "LFT_NOTICE_PLACEHOLDERS"],
+        ["Panel", LFT_PANEL_KEYS, "LFT_PANEL_PLACEHOLDERS"],
     ];
 
     for (const [label, keys, name] of pairs) {
@@ -367,6 +650,10 @@ async function main(): Promise<void> {
     checkClean(client);
     checkValues();
     await checkViews(client);
+    await checkPanel();
+    checkModal();
+    await checkPublishSave();
+    await checkModalFinish();
     await checkLists();
 
     console.log(failures === 0 ? "\n✅ Alle Prüfungen bestanden.\n" : `\n❌ ${failures} Prüfung(en) fehlgeschlagen.\n`);

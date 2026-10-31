@@ -6,7 +6,7 @@
  * Fokusring abschneiden, und an Feldern ist der wichtiger als die Form.
  */
 
-input:where([type="text"], [type="search"], [type="url"], [type="email"], [type="number"], [type="datetime-local"], [type="date"], [type="password"]),
+input:where([type="text"], [type="search"], [type="url"], [type="email"], [type="number"], [type="datetime-local"], [type="date"], [type="time"], [type="password"]),
 select,
 textarea {
     width: 100%;

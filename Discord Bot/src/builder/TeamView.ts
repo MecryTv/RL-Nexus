@@ -1,6 +1,8 @@
 import {
     ActionRowBuilder,
+    AttachmentBuilder,
     ContainerBuilder,
+    escapeMarkdown,
     Guild,
     MessageActionRowComponentBuilder,
     MessageFlags,
@@ -9,16 +11,22 @@ import {
 } from "discord.js";
 import BotClient from "../client/BotClient";
 import { CustomMessageView, ICustomView } from "./CustomView";
-import { BadgeOf, ITeamFormats, MAX_MENU_TEAMS, MMR_LABELS, PLAIN_FORMATS, PLAYING_ROLES, RankFormat, RankFormatter, RoleFormatter, ROLE_ORDER, TEAMS_PREFIX, UsedSlots } from "../constants/Teams";
+import { BLOCK_COST, RenderDoc } from "./MessageDoc";
+import { IMessageDoc } from "../interfaces/builder/IMessageDoc";
+import { ButtonOptions, ISelectMenuOptions } from "../interfaces/builder/IComponentV2Builder";
+import ComponentV2Builder from "./ComponentV2Builder";
+import { RenderTeamCard } from "./TeamCard";
+import logger from "../utils/logger";
+import { BadgeOf, HUB_BUTTON_LABEL, ITeamFormats, MAX_MENU_TEAMS, MMR_LABELS, PLAIN_FORMATS, PLAYING_ROLES, RankFormat, RankFormatter, RoleFormatter, ROLE_ORDER, TEAMS_PREFIX, UsedSlots } from "../constants/Teams";
 import { RankFromMMR, RankShort, TrackerURL } from "../constants/Prime";
-import { IListTeam, TeamListText } from "../constants/TeamList";
 import { DefaultTeamSettings } from "../constants/Teams";
 import { ITeamGroup, ITeamSettings, ITeamView, PlaylistSlot, TeamRole } from "../interfaces/services/teams/ITeams";
-import { AnyPlaceholderValues } from "../constants/Placeholders";
+import { AnyPlaceholderValues, Fill } from "../constants/Placeholders";
 
 /**
- * Die Übersicht als Nachricht: je Team eine Karte, eine Karte mit Auswahlmenü
- * oder alles in einer. Was darin steht, baut der Server im Dashboard - hier
+ * Die Übersicht als Nachricht: der Team-Hub (Kopf, Teams nach Kategorien,
+ * Menü, Knopf, die gezeichnete Karte auf Abruf) oder je Team eine Karte aus
+ * dem Editor (Plan 27). Was darin steht, baut der Server im Dashboard - hier
  * werden nur die Platzhalter gefüllt.
  *
  * Die Custom-ID des Menüs trägt nichts als den Anfang: welches Team gemeint
@@ -208,35 +216,6 @@ export function RoleValues(view: ITeamView, settings: ITeamSettings, preview = f
     return values;
 }
 
-/** Fürs Dashboard: je Spieler mit Epic-Namen sein Schlüssel, sein Team und was eingesetzt würde. */
-export function PlayerList(
-    views: ITeamView[],
-    settings: ITeamSettings,
-    formats: ITeamFormats = PLAIN_FORMATS
-): { key: string; name: string; team: string; values: Record<string, string> }[] {
-    const values = PlayerValues(views, settings, true, formats);
-    const seen = new Set<string>();
-    const list: { key: string; name: string; team: string; values: Record<string, string> }[] = [];
-
-    for (const view of views) {
-        for (const entry of view.players) {
-            const key = PlayerKey(entry.player.epicName);
-
-            if (!key || seen.has(key)) continue;
-
-            seen.add(key);
-            list.push({
-                key,
-                name: entry.player.epicName,
-                team: view.team.name,
-                values: Object.fromEntries(PLAYER_FIELDS.map((field) => (field ? `${key}.${field}` : key)).map((full) => [full, values[full] ?? ""])),
-            });
-        }
-    }
-
-    return list;
-}
-
 /**
  * Die Werte eines Teams für die Platzhalter. everyone: alle Teams des Servers -
  * daraus kommen die Platzhalter je Spieler, damit {epicname.rank} in jeder Karte
@@ -266,7 +245,8 @@ export function TeamOwnValues(view: ITeamView, settings: ITeamSettings, formats:
         ...RoleValues(view, settings, preview, formats),
         "team.name": view.team.name,
         "team.tag": view.team.tag || "—",
-        "team.group": view.group?.name ?? "ohne Gruppe",
+        "team.region": view.team.region || "",
+        "team.group": view.group?.name ?? "ohne Kategorie",
         "team.description": view.team.description || "",
         "team.mmr": Number_(view.mmr),
         "team.rank": team ? formats.rank(team.tier, team.division) : "—",
@@ -286,83 +266,42 @@ export function TeamOwnValues(view: ITeamView, settings: ITeamSettings, formats:
     };
 }
 
-/**
- * Die Teams so, wie {teams} sie braucht (constants/TeamList.ts): je Team seine
- * Platzhalter, je Spieler {spieler} und was dahinter geht. preview: für das
- * Dashboard - Namen statt Erwähnungen, die könnte die Vorschau nicht auflösen.
- */
-export function ListTeams(views: ITeamView[], settings: ITeamSettings, formats: ITeamFormats = PLAIN_FORMATS, preview = false): IListTeam[] {
-    return views.map((view) => {
-        const names = new Map(view.players.flatMap((entry) => (entry.player.discordId ? [[entry.player.discordId, entry.label] as const] : [])));
-        const shown = (text: string): string => (preview ? text.replace(/<@(\d{17,20})>/g, (match: string, id: string) => `@${names.get(id) ?? id}`) : text);
-        // In der Liste steht ein Team ohne Kürzel ohne Kürzel - in der Karte als Strich.
-        const own = { ...TeamOwnValues(view, settings, formats, preview), "team.tag": view.team.tag };
-
-        return {
-            group: view.team.groupId,
-            values: Object.fromEntries(Object.entries(own).map(([key, value]) => [key, shown(value)])),
-            members: view.players.map((entry) => {
-                const fields = PlayerFields(entry, settings, preview, formats);
-
-                return {
-                    role: entry.player.role,
-                    values: {
-                        spieler: entry.player.discordId ? (preview ? `@${entry.label}` : `<@${entry.player.discordId}>`) : entry.label,
-                        "spieler.name": entry.label,
-                        "spieler.role": formats.role(entry.player.role),
-                        "spieler.role.icon": formats.roleIcon(entry.player.role),
-                        "spieler.rank": fields.rank,
-                        "spieler.rank.short": fields["rank.short"],
-                        "spieler.rank.icon": fields["rank.icon"],
-                        "spieler.mmr": fields.mmr,
-                        "spieler.current": fields.current,
-                        "spieler.peak": fields.peak,
-                        "spieler.tracker": fields.tracker,
-                    },
-                };
-            }),
-        };
-    });
-}
-
-/**
- * Alle Teams als Text - das steckt in {teams}. Lang nach den Vorlagen der
- * Teams-Liste; kurz ({teams.short} und mit Auswahlmenü) nur die Kopfzeile.
- */
-export function BoardText(views: ITeamView[], groups: ITeamGroup[], short = false, settings: ITeamSettings = DefaultTeamSettings(), formats: ITeamFormats = PLAIN_FORMATS): string {
-    if (!short) return TeamListText(ListTeams(views, settings, formats), groups, settings.list);
-
-    const lines: string[] = [];
-    const write = (list: ITeamView[]): void => {
-        for (const view of list) {
-            const tag = view.team.tag ? ` \`${view.team.tag}\`` : "";
-
-            lines.push(`**${view.team.name}**${tag} · MMR ${Number_(view.mmr)}`);
-        }
-    };
-
-    for (const group of groups) {
-        const members = views.filter((view) => view.team.groupId === group.id);
-
-        if (!members.length) continue;
-
-        lines.push(`### ${group.name}`);
-        write(members);
-    }
-
-    const loose = views.filter((view) => !groups.some((group) => group.id === view.team.groupId));
-
-    if (loose.length) {
-        if (lines.length) lines.push("### Ohne Gruppe");
-
-        write(loose);
-    }
-
-    return lines.join("\n") || "Noch keine Teams.";
-}
-
 /** Eine Karte für ein Team. everyone: alle Teams des Servers, für die Platzhalter je Spieler. */
+/**
+ * Die gezeichnete Team-Karte als Nachricht (Plan 26): das Bild in einer
+ * V2-Karte in der Teamfarbe, darunter klein die Tracker-Links - im Bild
+ * wären sie nicht anklickbar.
+ */
+export async function DrawnCardView(client: BotClient, settings: ITeamSettings, view: ITeamView, guild: Guild, everyone: ITeamView[] = [view]): Promise<ICustomView> {
+    const data = await client.teamService.CardData(guild, view, everyone, settings);
+    const name = `team-${view.team.id}.webp`;
+    const file = new AttachmentBuilder(await RenderTeamCard(data), { name });
+    const builder = new ComponentV2Builder({ accentColor: data.accent as `#${string}` }).gallery(`attachment://${name}`);
+    const trackers = view.players
+        .filter((entry) => PLAYING_ROLES.includes(entry.player.role) && entry.player.epicName)
+        .map((entry) => `[${escapeMarkdown(entry.label.replace(/[[\]()]/g, ""))}](${TrackerURL(entry.player.epicName)})`);
+
+    if (trackers.length) builder.subtext(`Tracker: ${trackers.join(" · ")}`);
+
+    // Plan 30: die Ligen des Teams als Link-Knöpfe - dort steht das Standing. Höchstens 5, so viele hat ein Team.
+    const leagues = view.team.links.slice(0, 5);
+
+    if (leagues.length) builder.buttons(...leagues.map((link) => ({ url: link.url, label: link.label.slice(0, 80) })));
+
+    return { components: [builder.build()], files: [file], flags: MessageFlags.IsComponentsV2, allowedMentions: { parse: [] } };
+}
+
+/** Im Hub kommt die Karte gezeichnet, bei „Alle Teams einzeln“ aus dem Editor (Plan 27). */
 export async function TeamCardView(client: BotClient, settings: ITeamSettings, view: ITeamView, guild: Guild, everyone: ITeamView[] = [view]): Promise<ICustomView> {
+    if (settings.layout === "hub") {
+        try {
+            return await DrawnCardView(client, settings, view, guild, everyone);
+        } catch (error) {
+            // Lieber die Karte aus dem Editor als gar keine.
+            logger.warn(`🖼️  Team-Karte ${view.team.id} nicht gezeichnet, nehme die aus dem Editor: ${String(error)}`);
+        }
+    }
+
     const body = settings.team;
     const doc = view.team.color ? { ...body.doc, accent: view.team.color } : body.doc;
 
@@ -387,69 +326,305 @@ export function Formats(client: BotClient, styles: Pick<ITeamSettings, "rankStyl
     };
 }
 
-/** Der Kopf: bei "menu" mit Menü, bei "single" mit allen Teams darin. */
-export async function BoardView(
-    client: BotClient,
-    settings: ITeamSettings,
-    views: ITeamView[],
-    groups: ITeamGroup[],
-    guild: Guild
-): Promise<ICustomView> {
-    const body = settings.board;
-    const menu = settings.layout === "menu";
+/**
+ * Was im Kopf des Hubs eingesetzt wird. {teams} bleibt leer: Die Teams setzt
+ * der Hub selbst darunter, je Kategorie mit einer Zeile je Team.
+ */
+function BoardValues(client: BotClient, settings: ITeamSettings, views: ITeamView[], groups: ITeamGroup[], guild: Guild): AnyPlaceholderValues {
     const stamps = views.map((view) => view.fetchedAt).filter((at) => at > 0);
     const formats = Formats(client, settings);
-    const values: AnyPlaceholderValues = {
+
+    return {
         ...PlayerValues(views, settings, false, formats),
         guild: guild.name,
         "guild.id": guild.id,
         "guild.icon": guild.iconURL({ size: 256 }) ?? "",
-        teams: BoardText(views, groups, menu, settings, formats),
-        "teams.short": BoardText(views, groups, true),
+        teams: "",
+        "teams.short": "",
         "teams.count": String(views.length),
         "groups.count": String(groups.filter((group) => views.some((view) => view.team.groupId === group.id)).length),
         "mmr.mode": MMR_LABELS[settings.mmr.mode] ?? settings.mmr.mode,
         updated: When(stamps.length ? Math.min(...stamps) : Date.now()),
     };
-
-    const rows = menu ? [TeamMenuRow(views)] : [];
-    const view = await CustomMessageView(
-        client,
-        { id: 0, kind: body.kind, content: body.content, embed: body.embed, doc: body.doc, buttons: [], reserve: rows.length },
-        values
-    );
-
-    if (!rows.length) return view;
-
-    // In einer Components-V2-Nachricht steht alles im Container - auch das Menü.
-    if (view.flags === MessageFlags.IsComponentsV2) {
-        const container = view.components[0] as ContainerBuilder;
-
-        for (const row of rows) container.addActionRowComponents(row);
-
-        return view;
-    }
-
-    return { ...view, components: [...view.components, ...rows] };
 }
 
-/** Das Auswahlmenü mit den Teams. */
-export function TeamMenuRow(views: ITeamView[]): ActionRowBuilder<MessageActionRowComponentBuilder> {
-    const menu = new StringSelectMenuBuilder()
-        .setCustomId(`${TEAMS_PREFIX}:menu`)
-        .setPlaceholder("Team ansehen")
-        .setMinValues(1)
-        .setMaxValues(1)
-        .addOptions(
-            views.slice(0, MAX_MENU_TEAMS).map((view) => {
-                const option = new StringSelectMenuOptionBuilder().setLabel(`${view.team.name}`.slice(0, 100)).setValue(String(view.team.id));
-                const parts = [view.team.tag, view.group?.name, `MMR ${Number_(view.mmr)}`].filter(Boolean).join(" · ");
+/* ----------------------------------------------------------
+   Der Team-Hub (Plan 26)
+   ---------------------------------------------------------- */
 
-                if (parts) option.setDescription(parts.slice(0, 100));
+/** Eine Nachricht des Hubs, dazu was sie gegen Discords Grenzen zählt. */
+export interface IHubMessage {
+    view: ICustomView;
+    chars: number;
+    components: number;
+    /** Wie viele Bausteine oben im Container zum Kopf aus dem Editor gehören - nur in der ersten Nachricht, sonst 0. */
+    head: number;
+}
 
-                return option;
-            })
-        );
+/** Discords Grenzen einer Components-V2-Nachricht. */
+const HUB_LIMIT = { components: 40, chars: 4000 };
+/** Eine Zeile je Team höchstens so lang: zehn davon samt Überschrift passen sicher in eine Nachricht. */
+const HUB_LINE_MAX = 300;
+const NUMBER = new Intl.NumberFormat("de-DE");
 
-    return new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(menu);
+interface IHubSection {
+    title: string | null;
+    views: ITeamView[];
+    text: string;
+}
+
+function Counted(count: number, one: string, many: string): string {
+    return `${count} ${count === 1 ? one : many}`;
+}
+
+function Playing(view: ITeamView): number {
+    return view.players.filter((entry) => PLAYING_ROLES.includes(entry.player.role)).length;
+}
+
+/** „12 Teams · 48 Spieler · Ø 1.412 MMR · 3 Kategorien“ - was fehlt, fällt weg. */
+function HubStats(views: ITeamView[], groups: ITeamGroup[]): string {
+    const players = views.reduce((sum, view) => sum + Playing(view), 0);
+    const mmrs = views.map((view) => view.mmr).filter((mmr): mmr is number => mmr !== null);
+    const used = groups.filter((group) => views.some((view) => view.team.groupId === group.id)).length;
+
+    return [
+        `**${views.length}** ${views.length === 1 ? "Team" : "Teams"}`,
+        `**${players}** Spieler`,
+        ...(mmrs.length ? [`Ø **${NUMBER.format(Math.round(mmrs.reduce((sum, mmr) => sum + mmr, 0) / mmrs.length))}** MMR`] : []),
+        ...(used ? [`**${used}** ${used === 1 ? "Kategorie" : "Kategorien"}`] : []),
+    ].join(" · ");
+}
+
+/**
+ * Eine Zeile je Team nach der Vorlage des Servers (hubLine, Reiter Teams-Liste).
+ * Die Platzhalter der Team-Karte gelten, dazu: das Rang-Icon nur, wenn es eins
+ * gibt, die MMR mit Tausenderpunkt, und ohne Kürzel fallen die Backticks weg.
+ */
+function HubLine(client: BotClient, view: ITeamView, settings: ITeamSettings, formats: ITeamFormats): string {
+    const rank = view.mmr !== null ? RankFromMMR(view.mmr) : null;
+    const values: Record<string, string> = {
+        ...TeamOwnValues(view, settings, formats),
+        "team.name": escapeMarkdown(view.team.name),
+        "team.tag": view.team.tag.replace(/`/g, ""),
+        "team.rank.icon": rank ? (client.rankIconService.Of(rank.tier) ?? "") : "",
+        "team.mmr": view.mmr !== null ? NUMBER.format(view.mmr) : "—",
+    };
+
+    const line = Fill(settings.hubLine, values).replace(/``/g, "").replace(/\s+/g, " ").replace(/ ·( ·)+/g, " ·").trim();
+
+    // Eine Vorlage mit {team.description} oder {team.leagues} kann lang werden - gekürzt, damit jede Gruppe in eine Nachricht passt.
+    return line.length > HUB_LINE_MAX ? `${line.slice(0, HUB_LINE_MAX - 1)}…` : line;
+}
+
+/** Je Gruppe ein Abschnitt in ihrer Reihenfolge, Teams ohne Gruppe zuletzt. Ohne Gruppen ein Abschnitt ohne Überschrift. */
+function HubSections(client: BotClient, settings: ITeamSettings, views: ITeamView[], groups: ITeamGroup[]): IHubSection[] {
+    const formats = Formats(client, settings);
+    const sections: { title: string | null; views: ITeamView[] }[] = [];
+
+    for (const group of [...groups].sort((a, b) => a.position - b.position)) {
+        const members = views.filter((view) => view.team.groupId === group.id);
+
+        if (members.length) sections.push({ title: group.name, views: members });
+    }
+
+    const loose = views.filter((view) => !groups.some((group) => group.id === view.team.groupId));
+
+    if (loose.length) sections.push({ title: sections.length ? "Ohne Kategorie" : null, views: loose });
+
+    return sections.map((section) => {
+        const shown = section.views.slice(0, settings.hubRows);
+        const more = section.views.length - shown.length;
+        const lines = [
+            ...(section.title ? [`### ${escapeMarkdown(section.title)} · ${Counted(section.views.length, "Team", "Teams")}`] : []),
+            ...shown.map((view) => HubLine(client, view, settings, formats)),
+            ...(more > 0 ? [`-# … und ${more} weitere`] : []),
+        ];
+
+        return { ...section, text: lines.join("\n") };
+    });
+}
+
+/**
+ * Ein Menü mit allen Teams in der Reihenfolge der Abschnitte, die Kategorie in
+ * der Beschreibung (Plan 27). Mehr als 25 Einträge lässt Discord nicht zu -
+ * dann Menüs zu 25, „Teams 1–25“ usw.
+ */
+function HubMenus(sections: IHubSection[]): ISelectMenuOptions[] {
+    const all = sections.flatMap((section) => section.views);
+    const menus: ISelectMenuOptions[] = [];
+
+    for (let start = 0; start < all.length; start += MAX_MENU_TEAMS) {
+        const chunk = all.slice(start, start + MAX_MENU_TEAMS);
+
+        menus.push({
+            customId: `${TEAMS_PREFIX}:menu:${menus.length + 1}`,
+            placeholder: all.length <= MAX_MENU_TEAMS ? "Team ansehen" : `Teams ${start + 1}–${start + chunk.length}`,
+            options: chunk.map((view) => {
+                const description = [view.team.tag, view.group?.name, `MMR ${Number_(view.mmr)}`].filter(Boolean).join(" · ").slice(0, 100);
+
+                return { label: view.team.name.slice(0, 100), value: String(view.team.id), ...(description ? { description } : {}) };
+            }),
+        });
+    }
+
+    return menus;
+}
+
+/**
+ * Thumbnail und großes Bild in den Kopf (Plan 27): Das Thumbnail kommt an die
+ * erste Textzeile. Trenner und Bilder davor werden übersprungen (W-0026), ein
+ * Abschnitt davor hat schon sein Bild - dann kommt keins dazu. Das große Bild
+ * steht am Ende des Kopfs, über den Kennzahlen.
+ */
+export function HubDoc(doc: IMessageDoc, thumbnail: string | null, image: string | null): IMessageDoc {
+    const blocks = [...doc.blocks];
+    const index = blocks.findIndex((block) => block.type === "text" || block.type === "section");
+    const first = blocks[index];
+
+    if (thumbnail && first?.type === "text") blocks[index] = { type: "section", body: first.body, thumbnail };
+    if (image) blocks.push({ type: "image", images: [image] });
+
+    return { ...doc, blocks };
+}
+
+/** Der Knopf unter dem Menü - oder keiner, wenn sein Ziel fehlt. */
+export function HubButton(settings: ITeamSettings, guild: Guild, apply: boolean): ButtonOptions | null {
+    const { on, to, url, channelId, label } = settings.hubButton;
+    const text = label || HUB_BUTTON_LABEL;
+
+    if (!on) return null;
+    if (to === "apply") return apply ? { customId: "applyflow:entry", label: text, tone: "primary" } : null;
+    if (to === "web") return url ? { url, label: text } : null;
+
+    return channelId && guild.channels.cache.has(channelId) ? { url: `https://discord.com/channels/${guild.id}/${channelId}`, label: text } : null;
+}
+
+/**
+ * Der Kopf aus dem Editor mit fertig eingesetzten Platzhaltern, so gekürzt,
+ * dass Kennzahlen und das Ende nie abgeschnitten werden. Nur der Kopf darf
+ * gekürzt werden - das tat RenderDoc schon immer, hier mit Platz für den Hub.
+ */
+function HubHead(doc: IMessageDoc, values: AnyPlaceholderValues, budget: number): { doc: IMessageDoc; components: number; chars: number } {
+    let left = budget;
+    let components = 0;
+    let chars = 0;
+    const blocks: IMessageDoc["blocks"] = [];
+
+    for (const block of doc.blocks) {
+        if (block.type === "separator" || block.type === "image") {
+            if (block.type === "image" && !block.images.length) continue;
+
+            blocks.push(block);
+            components += 1;
+            continue;
+        }
+
+        let body = Fill(block.body, values).trim();
+
+        if (!body || left < 20) continue;
+        if (body.length > left) body = `${body.slice(0, left - 1)}…`;
+
+        blocks.push({ ...block, body });
+        components += BLOCK_COST[block.type];
+        chars += body.length;
+        left -= body.length;
+    }
+
+    return { doc: { ...doc, blocks }, components, chars };
+}
+
+/** Bausteine und Text einer fertigen Nachricht, wie Discord sie zählt. */
+function Measure(node: unknown): { components: number; chars: number } {
+    if (Array.isArray(node)) {
+        return node.map(Measure).reduce((sum, entry) => ({ components: sum.components + entry.components, chars: sum.chars + entry.chars }), { components: 0, chars: 0 });
+    }
+
+    if (typeof node !== "object" || node === null) return { components: 0, chars: 0 };
+
+    const record = node as Record<string, unknown>;
+    const inner = Measure([record.components ?? [], record.accessory ?? []]);
+
+    return {
+        components: (typeof record.type === "number" ? 1 : 0) + inner.components,
+        chars: (record.type === 10 && typeof record.content === "string" ? record.content.length : 0) + inner.chars,
+    };
+}
+
+/**
+ * Der Team-Hub als Nachrichten (Plan 26): Kopf aus dem Editor, Kennzahlen, je
+ * Gruppe ein Abschnitt, dann Menüs, „Bei uns bewerben“ und der Fuß. Passt
+ * nicht alles in eine Nachricht, geht es in weiteren direkt darunter weiter -
+ * geschnitten wird nur zwischen Gruppen, das Ende steht immer in der letzten.
+ * Senden, Vorschau und Prüfung nutzen diese eine Funktion.
+ */
+export async function HubMessages(client: BotClient, settings: ITeamSettings, views: ITeamView[], groups: ITeamGroup[], guild: Guild, apply: boolean): Promise<IHubMessage[]> {
+    const values = BoardValues(client, settings, views, groups, guild);
+    const sections = HubSections(client, settings, views, groups);
+    const menus = HubMenus(sections);
+    const button = HubButton(settings, guild, apply);
+    const stamps = views.map((view) => view.fetchedAt).filter((at) => at > 0);
+    // Ohne -# davor: das setzt subtext() selbst.
+    const footer = stamps.length ? `Ränge und MMR vom <t:${Math.floor(Math.min(...stamps) / 1000)}:f>` : "Ränge und MMR noch nicht geholt";
+    const stats = HubStats(views, groups);
+    const tail = { components: menus.length * 2 + (button ? 2 : 0) + 1, chars: footer.length + 3 };
+    const accent = settings.board.doc.accent;
+    const head = HubHead(HubDoc(settings.board.doc, settings.hubThumbnail, settings.hubImage), values, HUB_LIMIT.chars - stats.length - tail.chars);
+    // Der Kopf behält Platz für Container, Kennzahlen und das Ende - was darüber hinausgeht, lässt RenderDoc weg.
+    const headComponents = Math.min(head.components, HUB_LIMIT.components - 2 - tail.components);
+    const pages: { sections: IHubSection[]; components: number; chars: number }[] = [{ sections: [], components: 2 + headComponents, chars: head.chars + stats.length }];
+
+    for (const section of sections) {
+        let page = pages[pages.length - 1]!;
+
+        if (page.components + 1 > HUB_LIMIT.components || page.chars + section.text.length > HUB_LIMIT.chars) {
+            page = { sections: [], components: 1, chars: 0 };
+            pages.push(page);
+        }
+
+        page.sections.push(section);
+        page.components += 1;
+        page.chars += section.text.length;
+    }
+
+    // Das Ende muss in die letzte Nachricht. Passt es nicht dazu, bekommt es eine eigene - so bleibt
+    // nie eine Nachricht leer zurück, und Menüs, Knopf und Fuß stehen trotzdem ganz unten.
+    const last = pages[pages.length - 1]!;
+
+    if (last.components + tail.components > HUB_LIMIT.components || last.chars + tail.chars > HUB_LIMIT.chars) {
+        pages.push({ sections: [], components: 1, chars: 0 });
+    }
+
+    const messages: IHubMessage[] = [];
+
+    for (const [index, page] of pages.entries()) {
+        const final = index === pages.length - 1;
+        let builder: ComponentV2Builder;
+        let files: AttachmentBuilder[] = [];
+        let headCount = 0;
+
+        if (index === 0) {
+            ({ builder, files } = await RenderDoc(client, head.doc, values, { reserve: 1 + page.sections.length + (final ? tail.components : 0) }));
+            // Was bis hier im Container steht, ist der Kopf - die Vorschau im Dashboard zeichnet ihn selbst.
+            headCount = (builder.build().toJSON() as { components?: unknown[] }).components?.length ?? 0;
+            builder.text(stats);
+        } else {
+            builder = new ComponentV2Builder(accent ? { accentColor: accent as `#${string}` } : {});
+        }
+
+        for (const section of page.sections) builder.text(section.text);
+
+        if (final) {
+            for (const menu of menus) builder.select(menu);
+
+            if (button) builder.buttons(button);
+
+            builder.subtext(footer);
+        }
+
+        const container = builder.build();
+
+        messages.push({ view: { components: [container], files, flags: MessageFlags.IsComponentsV2, allowedMentions: { parse: [] } }, ...Measure(container.toJSON()), head: headCount });
+    }
+
+    return messages;
 }

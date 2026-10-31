@@ -30,7 +30,7 @@ const isModules = (data: unknown): data is IModulesContent => isModuleList(data,
 /**
  * Erst die Inhalte aus dem Admin Dashboard, dann die Anwendung.
  *
- * `App` kommt bewusst erst nach `setModules` dazu: Hero, Commands-Seite und
+ * `App` kommt bewusst erst nach `setModules` dazu: der Hero und
  * „Warum Nexus“ lesen die Modulzahlen schon beim Import. Beide Dateien laden
  * parallel und brauchen höchstens zwei Sekunden, sonst gelten die
  * eingebauten Daten.

@@ -92,6 +92,8 @@ export interface IAccessPreview {
     readonly testers: number;
     /** Bei Free: Abos, die Stripe noch nicht pausiert hat. Bei Paid: Abos, die Stripe noch nicht fortgesetzt hat. Der Ablauf-Job versucht es weiter. */
     readonly stripePending: number;
+    /** Wessen Abos das sind, für die Warnung (W-0024). */
+    readonly stripePendingNames?: readonly string[];
 }
 
 /** Was die Seite Shop-Einstellungen speichert. Modus, Shop und Bezahlschranke stehen nicht darin. */

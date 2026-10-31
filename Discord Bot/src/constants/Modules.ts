@@ -16,8 +16,10 @@ export const MODULE_IDS = [
     "rank-roles",
     "clips",
     "matchups",
+    "role-lists",
     "moderation",
     "automod",
+    "anti-villain",
     "logging",
     "welcome",
     "apply",
@@ -48,7 +50,7 @@ export function IsModule(value: unknown): value is ModuleId {
  * Stelle davon wissen. Die Schalter-Route weist ein Ausschalten zusaetzlich mit
  * 400 ab, damit die Antwort erklaert, was passiert ist.
  */
-export const PERMANENT_MODULES = new Set<ModuleId>(["gallery", "backups"]);
+export const PERMANENT_MODULES = new Set<ModuleId>(["gallery", "backups", "levels"]);
 
 export function IsPermanent(value: unknown): value is ModuleId {
     return IsModule(value) && PERMANENT_MODULES.has(value);

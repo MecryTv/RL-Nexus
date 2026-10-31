@@ -187,18 +187,22 @@ function Running(grant: IShopGrantRow, now: Date): boolean {
 /** Eine Zeile aus shop_grants mit dem Titel des Produkts (fehlt bei Test und gelöschtem Produkt). */
 export interface IShopStatusRow extends IShopGrantRow {
     readonly title: string | null;
+    /** Eingefroren bei Free und Beta Access (W-0024). */
+    readonly frozen_at?: Date | null;
 }
 
 /**
  * Die Antwort auf „Zugang anzeigen“ in der Shop-DM: eine Zeile je laufendem
  * Zugang, mit Discord-Zeitstempeln. Leer, wenn nichts läuft. „Läuft“ wie in
- * der Bezahlschranke (Running).
+ * der Bezahlschranke (Running). Ein eingefrorener Zugang läuft auch nach dem
+ * alten Ende, wie activeGrant im Admin-Server - nur ohne Datum, das sich noch verschiebt.
  */
 export function ShopStatusLines(rows: readonly IShopStatusRow[], now: Date): string[] {
     return rows
-        .filter((row) => Running(row, now))
+        .filter((row) => (row.frozen_at ? row.ended_at === null : Running(row, now)))
         .map((row) => {
             const name = `**${row.source === "trial" ? "Test" : escapeMarkdown(row.title ?? "Zugang")}**`;
+            if (row.frozen_at) return `${name} ruht gerade, die Tage bleiben stehen.`;
             if (row.ends_at === null) return `${name} läuft unbegrenzt.`;
 
             const unix = Math.floor(row.ends_at.getTime() / 1000);
@@ -729,7 +733,7 @@ export default class DashboardService implements IDashboardService {
         if (!db.Ready) return null;
 
         const rows = await db.Query<IShopStatusRow>(
-            "SELECT g.source, g.starts_at, g.ends_at, g.ended_at, g.cancel_at_period_end, p.title FROM shop_grants g LEFT JOIN shop_products p ON p.id = g.product_id WHERE g.user_id = ?",
+            "SELECT g.source, g.starts_at, g.ends_at, g.ended_at, g.cancel_at_period_end, g.frozen_at, p.title FROM shop_grants g LEFT JOIN shop_products p ON p.id = g.product_id WHERE g.user_id = ?",
             [userId]
         );
 
@@ -835,6 +839,11 @@ export default class DashboardService implements IDashboardService {
      * stellt - die Galerie-Routen stellen sie auch, und sie soll an genau einer
      * Stelle beantwortet werden. Wirft SessionExpired.
      */
+    /** Server, die diese Sitzung verwalten darf (Plan 32: Ziel für „Auf einen anderen Server“). Wirft SessionExpired. */
+    async Manageable(session: IDashboardSession): Promise<{ id: string; name: string }[]> {
+        return (await this.GuildsOf(session)).filter((guild) => guild.canManage).map((guild) => ({ id: guild.id, name: guild.name }));
+    }
+
     async CanManage(session: IDashboardSession, guildId: string): Promise<boolean> {
         const guild = (await this.GuildsOf(session)).find((entry) => entry.id === guildId);
 

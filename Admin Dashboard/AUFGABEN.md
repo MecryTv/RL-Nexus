@@ -63,125 +63,94 @@ Reihenfolge: P1 vor P2 vor P3 vor P4. Bei gleicher Priorität gilt die Reihenfol
   - Abmelden im Bot-Dashboard widerruft den Discord-Token, ein kopiertes Cookie ist danach wertlos.
   - CSP `script-src 'self'` fürs Bot-Dashboard (nginx-Vorlage), lokal ohne Verstöße geprüft. Die Wartungsseiten haben jetzt dieselben Sicherheits-Header.
   - Live-Ticket-Filter entfernt auch `xlink:href`, `action` und `formaction` mit fremden Zielen.
+- **Plan 23, Wartung mit Zeitstrahl** (Spec `docs/superpowers/specs/2026-10-24-wartung-zeitstrahl-design.md`, Plan `docs/superpowers/plans/2026-10-24-plan-23-wartung-zeitstrahl.md`):
+  - Unter Developer → Wartung planst du die Wartung mit Bereichen, Überschrift, voraussichtlichem Ende und Fahrplan. Während sie läuft, schaltest du Schritte weiter, verschiebst das Ende oder beendest sie, je Bereich oder ganz. Rechts steht die echte Seite als Vorschau.
+  - Die Wartungsseite (Entwurf D „Arena“) zeigt Logo, Ring, Restzeit und Fahrplan. Sie rückt alle 30 Sekunden nach und lädt sich nach dem Ende von selbst neu. Ohne Plan (Schalter von Hand) zeigt sie „Gleich wieder da.“.
+  - Impressum, Datenschutz, AGB und Widerruf bleiben erreichbar. Ein Wächter in der Webseite verhindert, dass man von dort aus weiterklickt.
+  - Lokal testbar: Bot (`npm run dev`) und Webseite (`npm run dev`) spiegeln nginx und lesen den Flags-Ordner des lokalen Admin Dashboards.
+  - Ein offener Tab des Bot-Dashboards bekommt während der Wartung auf API-Aufrufe den Satz „Gerade ist Wartung …“ statt „Datenbank nicht erreichbar“.
+  - Nach dem Abschluss-Review: Löscht jemand einen Schalter von Hand oder ist `wartung.json` kaputt, lässt sich die Wartung im Admin trotzdem beenden, und offene Wartungsseiten laden neu, sobald ihre Adresse kein 503 mehr liefert. Impressum und Datenschutz des Bot-Dashboards bleiben während der Wartung erreichbar.
 - **Alte Ordnernamen nach der Umbenennung:** `Webseite/vite.config.ts` (lokale Inhalte aus dem Admin), `Admin Dashboard/server/config.ts` (Logs), `server/checks/fakes.ts` und `.claude/launch.json` zeigen jetzt auf `Webseite`, `Discord Bot` und `Admin Dashboard`. Damit laufen auch zwei Admin-Checks wieder.
+- **Plan 24, Apply System: Webseite, Fenster oder DM** (Spec `docs/superpowers/specs/2026-10-24-apply-wege-design.md`, Plan `docs/superpowers/plans/2026-10-24-plan-24-apply-wege.md`):
+  - Unter Apply System → Einstellungen wählst du, wo man sich bewirbt: Webseite (wie bisher), Fenster in Discord oder DM von RL Nexus. Dazu „Panel senden“ und `/bewerben`.
+  - Alle Wege schicken über dieselbe Prüfung ab. Eine laufende DM-Bewerbung geht vor Mod Mail und endet nach 30 Minuten ohne Antwort.
+  - Bei Fenster oder DM zeigt `/bewerben/<server>` den Weg in Discord mit Kanal und Direktlink, die Webseite nimmt dann nichts an.
+  - Behoben dabei: Ein Knopf mit `apply:` vorne, der nicht „ja“ hieß, zählte als Ablehnen. Und `check:dashboard` hing manchmal am Ende, weil der Check das Logo lud und nie las.
+  - Nach dem Abschluss-Review behoben:
+    - Die Team-Karte pingt nur noch die eingestellten Rollen, nie `@everyone` aus einer Antwort. Mit Ping-Rollen kommt sie jetzt überhaupt an (vorher `content` plus Components V2).
+    - Die Panel-Erkennung lässt Custom Messages in Ruhe.
+    - Zwei Emojis an einem Formular brechen das Panel nicht mehr.
+    - Schnelle DM-Antworten kommen beide an.
+    - Ändert sich das Formular während einer DM-Bewerbung, richtet sich der Bot an der angezeigten Frage aus.
 
-## Vor dem Livegang
+## Erledigt (25.10.)
 
-- **Reihenfolge beim Ausrollen:** erst Bot und Webseite, dann das Admin Dashboard, erst danach auf Beta Access stellen.
-  - Ein alter Bot sähe im Beta-Modus nur „Schranke aus“ und ließe alle herein.
-  - Zurückrollen auf einen älteren Admin-Stand nur, nachdem du vorher auf Free oder Paid gestellt hast.
-- **Migrationen:** Das Admin Dashboard bringt `010_access_mode`, `011_beta` und `012_beta_fixes` mit. Sie laufen beim Start von selbst.
-- **Stripe-Testlauf mit Test Clock:** Abo auf Free bzw. Beta stellen, Zeit über das Periodenende vorspulen, zurück auf Paid. Dazu dasselbe mit einem gekündigten Abo. Prüfen, dass nichts abgebucht wird und `trial_end` angenommen wird.
-- **Rechtstexte:** AGB, Widerruf, Impressum und Datenschutz von jemandem mit Rechtskenntnis prüfen lassen. Der Bot wird verkauft und speichert Nutzerdaten.
+- **Plan 25, Welcome Card: Text und Bilder frei setzen** (Spec `docs/superpowers/specs/2026-10-24-welcome-card-frei-design.md`, Plan `docs/superpowers/plans/2026-10-25-plan-25-welcome-card-frei.md`):
+  - Im Bot-Dashboard unter Welcome → Karte gibt es den Abschnitt **Anordnung** mit einer Bühne wie im Prototyp: Avatar, Server-Icon und die drei Zeilen ziehen, mit Pfeiltasten schieben (1 px, mit Umschalt 10 px) oder als Zahl setzen. Dazu Einrasten, Raster 10 px, „Waagrecht mittig“, „Auf Layout zurück“, „Alles auf Layout zurück“ und Rückgängig.
+  - Mit eigener Anordnung tauscht das Layout nur die Verzierung, die Plätze bleiben. So geht etwa der HUD-Rahmen mit eigener Anordnung.
+  - Karten ohne eigene Anordnung zeichnet der Bot auf den Pixel wie vorher, `check:welcome` vergleicht dafür Prüfsummen aller vier Layouts.
+  - Die Bühne zeichnet mit denselben Regeln wie der Bot. Im Browser gegen das Bild des Bots verglichen: Die Plätze stimmen, Unterschiede gibt es nur in der Kantenglättung der Schrift.
+  - Nach dem Abschluss-Review behoben: Ein getippter Wert landet beim richtigen Teil, auch wenn man vor dem Bestätigen ein anderes anklickt. Ein Klick ohne Ziehen verschiebt nichts mehr. Teiler und HUD-Marke bleiben ganz auf der Karte. Die Vorschau zeichnet auch, solange noch kein Kanal gewählt ist.
 
----
+## Erledigt (29.10.)
 
-## Offen
+- **Plan 26, RL Team-Übersicht: Team-Hub und gezeichnete Team-Karte** (Spec `docs/superpowers/specs/2026-10-25-team-hub-design.md`, Plan `docs/superpowers/plans/2026-10-25-plan-26-team-hub.md`):
+  - **Ein Team** unter Anzeige → Kanal & Darstellung: die gezeichnete, ausführliche Team-Karte wie im Entwurf, mit Schnitt je Spieler hinter Peak, oder wie bisher die Karte aus dem Editor. 2v2, 1v1 und Peak lassen sich abschalten, die Karte wird dann schmaler. Region ist ein neues Feld am Team.
+  - **Im Kanal** hat jetzt vier Wahlen, neu ist der **Team-Hub**: Kopf aus dem Editor, Kennzahlen, je Gruppe die Teams als Zeile, Menüs je Gruppe (sonst zu 25), „Bei uns bewerben“ und der Stand der Ränge. Passt er nicht in eine Nachricht, geht er in weiteren direkt darunter weiter, geschnitten zwischen Gruppen.
+  - Kein Team fehlt mehr im Menü: ab 26 Teams teilt es sich in Menüs zu 25. Bis 25 bleibt alles wie vorher.
+  - „Alles in einer Nachricht“ warnt im Dashboard, wenn die Übersicht zu lang wird, und nennt das Team, ab dem Discord abschneidet.
+  - Bestehende Server bleiben bei der Karte aus dem Editor und ihrer Darstellung, bis jemand umstellt. Wechselt eine Nachricht zwischen Components V2 und Text/Embed, schickt der Bot sie neu, statt dass Discord das Bearbeiten ablehnt.
+  - Geprüft mit `check:teams` und `check:apply` und im Browser gegen die echte Route und den echten Renderer, mit nachgestellten Teams.
 
-### [P1] Backups im Bot-Dashboard laden nicht
-- **Projekt:** Bot (Bot-Dashboard), eventuell Admin Dashboard
-- **Was passiert:** Unter „Backups“ und „Meine Backups“ steht nur der Text der Karte, kein Inhalt. Es gibt keine Fehlermeldung und keine Ladeanzeige (Bilder 1 und 2 vom 23.10.).
-- **Hinweise:**
-  - Gebaut in Plan 19.
-  - Die Seite steckt in `src/dashboard/client/pages/GuildBackups.ts` (`renderBackups`, `reloadWhenShown`). Eingehängt wird sie in `Guild.ts` (`whenShown`) und `guild.html`.
-  - Die Daten kommen über `src/routes/DashboardApiBackups.ts` vom Admin Dashboard (`ADMIN_INTERNAL_URL`).
-  - Weil gar nichts kommt, nicht einmal ein Fehler, liegt die Ursache eher im Client: Die Funktion zum Zeichnen läuft nicht, oder ein JavaScript-Fehler bricht ab. Zuerst die Browser-Konsole und den Netzwerk-Tab prüfen.
-  - Danach prüfen, ob `ADMIN_INTERNAL_URL` gesetzt ist.
-- **Stand 24.10.:** Lokal getestet. Mit dem aktuellen Bau laden beide Seiten (direkt, über die Leiste, unter `/dashboard`), Fehler der API werden angezeigt. Vermutung: Am 23.10. lief ein veralteter Client-Bau, denn `npm run dev` baut den Client nur beim Start. **Nachtest:** `npm run dev` neu starten und noch einmal öffnen. Bleibt es leer, Browser-Konsole und Netzwerk-Tab ansehen.
-- **Freigaben:** Die Plan-19-Dateien sind freigegeben.
+- **Plan 27, RL Team-Übersicht: Team-Hub ausbauen** (Spec `docs/superpowers/specs/2026-10-29-team-hub-ausbau-design.md`, Plan `docs/superpowers/plans/2026-10-29-plan-27-team-hub-ausbau.md`):
+  - **Im Kanal** gibt es nur noch „Team-Hub (empfohlen)“ und „Alle Teams einzeln“. Neue Server starten mit dem Hub. „Hauptnachricht mit Menü“ und „Alles in einer Nachricht“ werden beim Laden zum Hub, ein Hub-Server behält seinen Kopf. Die frühere Teams-Liste und „Ein Team“ sind weg: Der Hub zeichnet die Karte immer, „Alle Teams einzeln“ nimmt die aus dem Editor.
+  - **Karten-Editor** im Reiter „Nachrichten“: je Team Logo, Beschreibung, Region und Ligen, für alle Karten Hintergrund (Standard-Motiv, eigenes Bild, ohne), Abdunkeln, Farbe, Bausteine, Marken, drei Zeilen mit Platzhaltern und die Spalten. Rechts zeichnet der Bot die Karte mit dem ungespeicherten Stand.
+  - **Die Karte:** kein Plattform-Symbol mehr, „Rang Schnitt“ mit „GC 3 · Div 1“ aus dem Schnitt des Spielers, im MMR-Block der Rang in Zahlen.
+  - **Kategorien** (vorher Gruppen) direkt im Hub anlegen, sortieren, löschen und zuordnen. Gespeichert wird mit „Speichern“, danach geht der Hub einmal neu raus.
+  - **Kopf des Hubs** mit Thumbnail und großem Bild. Darunter **ein Menü** für alle Teams (ab 26 Teams Menüs zu 25) und ein abschaltbarer **Knopf** zur Bewerbung, zu einer Webseite oder in einen Kanal.
+  - Nach dem Abschluss-Review behoben: Teams-Seite und Anzeige halten keinen alten Stand mehr gegeneinander. Eine Kategorie, die auf der anderen Seite angelegt wurde, bleibt beim Speichern, und das Team-Formular überschreibt keine Änderungen aus dem Karten-Editor. Platzhalter wie `{updated}` oder `{team.leagues}` stehen im Bild als Datum und Namen. Ein eigener Kopf mit `{teams.count}` bleibt bei der Umstellung. Das Menü in der Vorschau klappt auf, und ein gelöschter Kanal am Knopf zeigt einen Hinweis.
+  - Geprüft mit `check:teams` (392), `check:apply`, `check:welcome`, `check:matchups`, `check:dashboard`, `tsc` und Build, dazu im Browser gegen die echte Route und den echten Renderer mit nachgestellten Teams.
+  - **Offen, nicht freigegeben:** Die Vorlagen für den Kopf („Alle Teams“, „Zum Aussuchen“, „Als Embed“, „Nur Text“) in `src/dashboard/client/constants/Templates.ts` stammen aus der Zeit vor dem Hub. Im Hub bleibt `{teams}` leer, Embed und Text gibt es dort nicht. Aufräumen geht nur mit Freigabe der Datei.
 
-### [P1] Wartungsmodus: auf dem Server prüfen
-- **Projekt:** Admin Dashboard, nginx im Bot-Repo, Server
-- **Stand 24.10.:** Lokal getestet, dort wirkt der Schalter nie, weil nginx fehlt. Beide nginx-Konfigurationen sind in Docker geprüft: Schalter an ergibt 503 mit Wartungsseite und `Retry-After`, POST bekommt einen JSON-Satz, `/images/` und `/dcapi/` laufen weiter, Schalter aus wirkt sofort.
-- **Auf dem Server prüfen:**
-  - Liegt die aktuelle Vorlage aktiv in nginx? `sudo grep -c wartung-dashboard /etc/nginx/sites-enabled/dashboard.nexus-emb.de`
-  - Entsteht die Datei beim Umschalten? `ls -la /home/rlnexus/data/flags`
-  - Darf das Admin Dashboard dort schreiben? Sonst `sudo chown -R 1000:1000 /home/rlnexus/data/flags`
-- **Offen:** Soll der Bot die Wartung auch selbst zeigen, ohne nginx (dann auch lokal sichtbar)?
+- **Plan 28, Matchups ausbauen** (Spec `docs/superpowers/specs/2026-10-29-matchups-ausbau-design.md`, Plan `docs/superpowers/plans/2026-10-29-plan-28-matchups-ausbau.md`):
+  - **Ankündigung mit vier Ständen:** vor dem Anpfiff, „🔴 Läuft gerade“ (höchstens 3 Stunden), mit Ergebnis („✅ Sieg 3 : 1“ usw.) und „❌ Abgesagt“. Sie wird bearbeitet, nicht neu geschickt. Der Rand folgt dem Stand (abschaltbar), die Knöpfe setzt der Bot selbst.
+  - **In Discord:** „Ergebnis eintragen“ bzw. „ändern“ öffnet ein Fenster mit zwei Zahlen. „⋯ Verwalten“ bietet Zeit ändern, Absagen mit Rückfrage und den Link aufs ausgefüllte Formular. Jeder Klick prüft das Recht neu, wer es nicht hat, bekommt nur einen Hinweis.
+  - **`/matchup neu`, `liste`, `ergebnisse`:** Anpfiff in deutscher Zeit („morgen 20:00“, „Sa 18:00“, „31.10. 20:00“) mit Vorschlägen beim Tippen.
+  - **Ergebnis-Nachricht** mit Bilanz, Form und Serie. Ein geändertes Ergebnis bearbeitet sie. Neue Platzhalter `{team.logo}`, `{bilanz}`, `{serie}`, `{form}`.
+  - **Erinnerung, wenn das Ergebnis fehlt:** einmal als Antwort unter der Ankündigung, mit Team-Rolle, ab Werk nach 2 Stunden.
+  - **Der Ping-Fehler ist behoben:** Bei einer Karte stehen die Ping-Rollen in der Karte. Beim Bearbeiten pingt niemand.
+  - **Webseite:** Reiter „Anstehend“ und „Ergebnisse“, lesbar ohne Anmeldung, die Notiz nur fürs eigene Team. Bilanz-Karten mit Form-Kästchen, Ergebnisse seitenweise.
+  - **Dashboard:** neue Schalter „Ergebnis in Discord eintragen“, „Erinnern, wenn das Ergebnis fehlt“ und „Farbe nach Stand“. „Link offen“ gilt nur noch für die Webseite.
+  - Migration 036 legt drei Spalten an und markiert alles schon Angepfiffene als erledigt, damit der erste Lauf keine alten Partien anfasst.
+  - Nach dem Abschluss-Review behoben: Eine Änderung ohne neuen Anpfiff (etwa nur der Stream-Link) löst keine zweite Erinnerung mehr aus. „Läuft gerade“ verschwindet nach 3 Stunden wieder. Ohne Discord-Knopf, Stream und Link scheitert das Nachziehen nicht mehr an einer leeren Knopfreihe. Fenster und „Wirklich absagen?“ bestätigen sofort, bevor der Bot arbeitet. Wer Ergebnisse einschaltet, bekommt keine Nachfragen zu alten Spielen. Alte Vorlagen werden auch dann zu den neuen, wenn sie schon einmal gespeichert wurden. `{team.logo}` steht jetzt in der Bild-Liste des Bots (`src/constants/Placeholders.ts`, dafür freigegeben): Beim Speichern im Dashboard bleibt der Abschnitt mit dem Logo stehen, in Matchups und im Teams-Modul.
+  - Geprüft mit `check:matchups` (167), `check:teams` (397), `check:dashboard` (250), beiden `tsc` und Build, dazu die öffentliche Seite im Browser gegen die echte Route mit nachgestellten Partien.
 
-### [P2] Rest aus der Sicherheitsprüfung
-- **Admin Dashboard: Pakete einspielen.** Das Lockfile ist schon aktualisiert (0 Lücken), `node_modules` noch nicht: Dein laufender Vite-Server hielt `sass-embedded` gesperrt. Admin-Vite kurz stoppen, dann `npm install` im Ordner `Admin Dashboard`.
-- **Bot: nginx-Vorlage auf den Server.** Die neue CSP und die Header der Wartungsseite wirken erst, wenn `nginx/dashboard.nexus-emb.de.conf` nach `/etc/nginx/sites-available/` kopiert und nginx neu geladen ist. Danach einmal durchs Dashboard klicken und in der Konsole nach „Content Security Policy“ suchen.
-- **Webseite: noch keine Skript-Sperre per CSP.** Das Intro-Skript steht inline in `index.html`, `script-src 'self'` würde es blockieren. Zwei Wege: Skript als eigene Datei auslagern (ein Request mehr vor dem ersten Bild), oder seinen Hash in die CSP schreiben und im Webseiten-Check prüfen, dass er passt.
+- **Webseite: Skript-Sperre per CSP** (aus der Sicherheitsprüfung): `script-src` mit `'self'`, Stripe (`js.stripe.com`, `*.js.stripe.com`, wie Stripe es für das Zahlungsfeld verlangt) und dem Hash des Intro-Skripts, ohne `'unsafe-inline'`. Neuer Check `scripts/check-csp.mjs` in `npm run check`: Er rechnet den Hash aus `index.html` und meldet, wenn er in der nginx-Vorlage fehlt oder ein alter dort steht. Im Browser geprüft: Mit dieser CSP läuft das Intro, ein fremdes Inline-Skript blockt der Browser.
 
-### [P2] Apply System: Webseite oder Discord
-- **Projekt:** Bot (Modul Bewerbungen), Webseite
-- **Was gewünscht ist:**
-  - Im Dashboard einstellen, ob man sich über die Webseite oder über Discord bewirbt. Über Discord gehen die Fragen per DM.
-  - Außerdem einstellen, ob die Fragen per Discord-DM, auf der Webseite oder als Modal gestellt werden.
-  - Darf sich nicht mit dem Ticket-System beißen, das Mod Mail hat (DMs an den Bot).
-- **Hinweise:** `utils/applygate.ts` existiert, Doku `docs/Apply.md`. Brainstorm zuerst, vor allem dazu, wie DM-Bewerbungen und Mod Mail auseinandergehalten werden.
+## Offene Aufgaben: jetzt in `.works/`
 
-### [P2] Matchups: Ergebnisse eintragen und besser machen
-- **Projekt:** Bot (Modul Matchups)
-- **Was gewünscht ist:** Ergebnisse eintragen können, über einen öffentlichen Link oder über Discord, und das Modul generell besser machen.
-- **Hinweise:** Doku `docs/Matchups.md`. Im Brainstorm klären, wer eintragen darf (Captains, Staff?), wie ein Link abgesichert ist und was mit den Ergebnissen passiert (Tabelle, Verlauf?).
+Seit dem 29.10.2026 stehen alle offenen Aufgaben im works-Skill unter `RL Nexus/.works/` (Übersicht: `.works/WORKS.md`, Board: `works board`). Diese Datei behält die Arbeitsweise oben und die erledigten Pläne als Verlauf.
 
-### [P3] Rangrollen nach `/rank me`
-- **Projekt:** Bot
-- **Was gewünscht ist:** Nach `/rank me` bekommt man die passende Rangrolle automatisch.
-- **Hinweise:** Doku `docs/RankRoles.md`.
-
-### [P3] Dashboard: live nach dem Einladen und fremde Server bearbeiten
-- **Projekt:** Bot (Bot-Dashboard)
-- **Was gewünscht ist:**
-  - Nachdem man den Bot eingeladen hat, aktualisiert sich das Dashboard von selbst, und man kommt direkt ins Server-Dashboard.
-  - Staff (Administrator und Developer) kann fremde Server voll bearbeiten, also Module an- und ausschalten und alles einstellen.
-- **Hinweise:** Heute sehen Administrator und Developer fremde Server nur (`DashboardService.IsStaff`).
-
-### [P3] Neues Modul „Rollen-Übersicht“
-- **Projekt:** Bot
-- **Was gewünscht ist:** Ein Modul, das die Mitglieder mit einer bestimmten Rolle zeigt (Team-Liste und Co.). Nachrichten und Aussehen sind anpassbar, das Design soll professionell sein.
-- **Hinweise:** Ähnlich zur Teams-Liste (`constants/TeamList.ts` mit Vorlagen und Live-Vorschau), das lässt sich als Muster nehmen.
-
-### [P3] TempVoice
-- **Projekt:** Bot
-- **Was gewünscht ist:** Offene Channels als eigener Unterpunkt. Im Moderations-Tab lässt sich ein Support-Warteraum einstellen.
-
-### [P3] Webseite: Commands-Seite entfernen
-- **Projekt:** Webseite
-- **Was gewünscht ist:** „Commands“ aus dem Kopf und die Commands-Seite entfernen.
-- **Hinweise:** Der Menüeintrag steht in `src/services/navigation.ts`. Passt gut direkt vor die nächste Aufgabe, weil der Hilfe-Befehl die Befehle dann in Discord zeigt.
-
-### [P3] Slash-Befehle für alles und ein Hilfe-Befehl
-- **Projekt:** Bot
-- **Was gewünscht ist:** Alles, was im Bot-Dashboard geht, auch per Discord-Befehl, dazu ein Hilfe-Befehl, der alle Befehle erklärt.
-- **Hinweise:** Großer Umbau, vorher im Brainstorm aufteilen (welche Module zuerst).
-
-### [P4] Voice Invite
-- **Projekt:** Bot
-- **Was gewünscht ist:** Ein Befehl, mit dem man jemanden in den eigenen Voice einlädt, oder eine bessere Idee dafür.
-
-### [P4] Neues Modul „Anti Villain“
-- **Projekt:** Bot
-- **Was gewünscht ist:** Schutz gegen Spam, gehackte Accounts und Ähnliches, modern umgesetzt.
-
-### [P4] Kleinkram
-- **Ende des Zugangs im Bot-Dashboard** (`Settings.ts`): braucht eine Freigabe.
-- **Admin-Check „Status“ wackelt, solange deine Dev-Server laufen:** Er misst die Webseite unter `localhost:5173` (Standard von `WEBSITE_URL`) und erwartet höchstens 1,5 Sekunden. Der Vite-Dev-Server ist manchmal langsamer. Die Prüfung sollte eine eigene Adresse bekommen statt des echten Ports.
-- **Wartung im offenen Tab:** Ruft das Bot-Dashboard während der Wartung eine API ab, kommt die Wartungsseite als HTML. Die Seite zeigt dann „Datenbank nicht erreichbar“ statt „Wartung“. Lösung in nginx: bei `Accept: application/json` auch für GET den JSON-Satz.
-- **Aus Plan 19 (Backup-Modul):**
-  - Die Plan-Einstellungen zeigen kurz nicht gespeicherte Werte.
-  - „Nächstes“ mischt Browser-Zeitzone und Berliner Stunde.
-  - Zwei gleichzeitige Backups bei 9 von 10 ergeben 11.
-  - „Inhalt ansehen“ lädt bei jedem Neuzeichnen.
-- **Aus Plan 20 (Free/Paid):**
-  - Die „Läuft weiter“-Mail nennt bei Geschenken das falsche Datum.
-  - Die Kundenzahl in der Rückfrage zählt Gesperrte mit.
-  - Scheitert ein Umstellen halb, fehlt der Protokolleintrag.
-  - Erstatten eines Abos während Free zielt auf eine Rechnung ohne Zahlung.
-  - Kundentexte während Free: „Nächste Zahlung“, das Kündigungsdatum, „nichts abgebucht“ auch bei gescheiterter Pause.
-  - `/preise` verliert bei Free `?bestellung=`.
-  - Die Rückfrage nennt nur die Zahl nicht pausierter Abos, nicht welche.
-  - check:db friert und taut alle lokalen Zugänge mit.
-  - Scheiterndes Pausieren schreibt jede Minute ins Log.
-- **Aus Plan 21 (Team-Reihenfolge):**
-  - Die Menü-Vorschau zeigt mehr als 25 Teams.
-  - Die flache Vorschau hat keine Nummern.
-  - Die Pfeile verlieren den Tastaturfokus.
-  - „Ränge zeigen als“ zeichnet die Vorschau nicht neu.
-  - Das Neu-Senden ist bei 40 Karten langsam.
-  - „Team 10“ wird vor „Team 9“ sortiert.
-  - In der Doku fehlt ein Satz zur Karten-Sortierung.
-
-Einzelheiten zu jeder Kleinigkeit stehen in den Ledgern unter `.superpowers/sdd/<plan>/progress.md`.
+| Bisher in dieser Datei | Jetzt |
+|---|---|
+| [P1] Staff- und Team-Liste (Rollen-Übersicht) | W-0001 |
+| [P1] Backups im Bot-Dashboard laden nicht | W-0002 |
+| [P1] Wartung mit Zeitstrahl ausrollen | W-0003 |
+| [P2] Rest aus der Sicherheitsprüfung | W-0004 |
+| [P2] Apply System in Discord prüfen | W-0005 |
+| [P2] Welcome Card in Discord prüfen | W-0006 |
+| [P2] Team-Hub in Discord prüfen | W-0007 |
+| [P2] Matchups in Discord prüfen | W-0008 |
+| Vor dem Livegang | W-0009 (Meilenstein M1 „Livegang“, dazu W-0003 und W-0004) |
+| [P3] Rangrollen nach `/rank me` | W-0010 |
+| [P3] Dashboard: live nach dem Einladen und fremde Server | W-0011 |
+| [P3] TempVoice | W-0012 |
+| [P3] Webseite: Commands-Seite entfernen | W-0013 |
+| [P3] Slash-Befehle für alles und ein Hilfe-Befehl | W-0014 |
+| [P4] Voice Invite | W-0015 |
+| [P4] Neues Modul „Anti Villain“ | W-0016 |
+| Kleinkram: Ende des Zugangs (`Settings.ts`) | W-0017 |
+| Kleinkram: Admin-Check „Status“ wackelt | W-0018 |
+| Kleinkram: LookingFor-Ping mit Karte | W-0019 |
+| Kleinkram aus Plan 24, 25, 23, 19, 20, 21 | W-0020 bis W-0025 |
+| Offene Punkte aus Plan 27 (inklusive `Templates.ts`) und Plan 28 | W-0026, W-0027 |

@@ -30,10 +30,11 @@ export type PlaceholderValues = Partial<Record<PlaceholderKey, string>>;
 
 /**
  * Was als Bildquelle taugt: sie ergeben eine URL. Die ersten beiden gehören den
- * Tickets, die übrigen den Notifiern (constants/Streams.ts) - in einer fremden
- * Nachricht ergeben sie nichts, und der Baustein fällt weg.
+ * Tickets, die nächsten vier den Notifiern (constants/Streams.ts), {team.logo}
+ * den Matchups - in einer fremden Nachricht ergeben sie nichts, und der
+ * Baustein fällt weg.
  */
-export const IMAGE_PLACEHOLDERS = ["{user.avatar}", "{guild.icon}", "{streamer.avatar}", "{stream.preview}", "{channel.avatar}", "{video.thumbnail}"] as const;
+export const IMAGE_PLACEHOLDERS = ["{user.avatar}", "{guild.icon}", "{streamer.avatar}", "{stream.preview}", "{channel.avatar}", "{video.thumbnail}", "{team.logo}"] as const;
 
 /** Werte irgendeiner Platzhalter-Liste - Tickets, Twitch, YouTube. */
 export type AnyPlaceholderValues = Readonly<Record<string, string | undefined>>;

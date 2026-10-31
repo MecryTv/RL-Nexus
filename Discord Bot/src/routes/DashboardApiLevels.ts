@@ -2,9 +2,12 @@ import { FastifyReply, FastifyRequest } from "fastify";
 import BotClient from "../client/BotClient";
 import Route from "../structures/Route";
 import { DASHBOARD_PATH } from "../constants/Dashboard";
-import { DefaultLevelMessage, LEVEL_PLACEHOLDER_KEYS, LevelProgress, MAX_BONUS, MAX_EXCLUDED, MAX_REWARDS } from "../constants/Levels";
+import { DefaultLevelMessage, LEVEL_PLACEHOLDER_KEYS, LevelProgress, MAX_BONUS, MAX_EXCLUDED, MAX_REWARDS, MAX_UP_LINE, UpMode } from "../constants/Levels";
+import { BOARD_ENTRY_PLACEHOLDERS, BOARD_FRAME_PLACEHOLDERS, BOARD_PLACEHOLDERS, BOARD_TEMPLATES, CARD_TEMPLATES, DESIGN_FONTS, DESIGN_PLACEHOLDERS, DESIGN_SIZE, DefaultBoardStyle, MAX_ELEMENTS, UP_TEMPLATES } from "../constants/LevelDesign";
+import { DesignKind } from "../interfaces/services/levels/ILevelDesign";
 import { ILevelRank } from "../interfaces/services/levels/ILevels";
 import { LevelError, LEVELS_MODULE } from "../services/LevelService";
+import { IsPeriod } from "../services/levels/BoardMessage";
 import { WantsJSON } from "../utils/admin";
 import { PersonOf, SearchMembers } from "../utils/dashboard";
 import logger from "../utils/logger";
@@ -17,6 +20,25 @@ interface IBody {
     amount?: unknown;
     mode?: unknown;
     query?: unknown;
+    period?: unknown;
+    page?: unknown;
+    kind?: unknown;
+    design?: unknown;
+    upLine?: unknown;
+    style?: unknown;
+    reason?: unknown;
+}
+
+/** Plan 35: die Vorlagen als fertige Designs fürs Dashboard. */
+function Templates<T extends string>(makers: Record<T, () => unknown>): Record<T, unknown> {
+    return Object.fromEntries(Object.entries(makers).map(([name, make]) => [name, (make as () => unknown)()])) as Record<T, unknown>;
+}
+
+/** Plan 38: "board" ist das Ranglisten-Bild im Baukasten. */
+function Kind(value: unknown): DesignKind | "board" {
+    if (value === "card" || value === "up" || value === "board") return value;
+
+    throw new LevelError("Unbekannte Art.");
 }
 
 /**
@@ -31,7 +53,8 @@ export default class DashboardApiLevels extends Route {
             description: "Level System eines Servers",
             prefixed: false,
             requiresAuth: false,
-            rateLimit: { max: 60, timeWindow: "1 minute" },
+            // Plan 35: Der Designer fragt nach jeder Änderung eine neue Vorschau an.
+            rateLimit: { max: 120, timeWindow: "1 minute" },
         });
     }
 
@@ -87,10 +110,24 @@ export default class DashboardApiLevels extends Route {
             settings,
             defaultMessage: DefaultLevelMessage(),
             placeholders: LEVEL_PLACEHOLDER_KEYS,
-            limits: { rewards: MAX_REWARDS, bonus: MAX_BONUS, excluded: MAX_EXCLUDED },
+            limits: { rewards: MAX_REWARDS, bonus: MAX_BONUS, excluded: MAX_EXCLUDED, elements: MAX_ELEMENTS, upLine: MAX_UP_LINE },
+            // Plan 35: der Designer.
+            upMode: UpMode(settings),
+            designs: { card: settings.cardDesign ?? null, up: settings.upDesign ?? null, board: settings.boardStyle ?? DefaultBoardStyle(), boardDesign: settings.boardDesign ?? null },
+            // Plan 38: die Vorlagen der Rangliste im bisherigen Stil des Servers.
+            templates: { card: Templates(CARD_TEMPLATES), up: Templates(UP_TEMPLATES), board: Object.fromEntries(Object.entries(BOARD_TEMPLATES).map(([name, make]) => [name, make(settings.boardStyle ?? DefaultBoardStyle())])) },
+            boardFramePlaceholders: BOARD_FRAME_PLACEHOLDERS,
+            boardEntryPlaceholders: BOARD_ENTRY_PLACEHOLDERS,
+            designPlaceholders: DESIGN_PLACEHOLDERS,
+            boardPlaceholders: BOARD_PLACEHOLDERS,
+            designSize: DESIGN_SIZE,
+            fonts: DESIGN_FONTS,
             page,
             total: await this.client.levels.Total(guild.id),
             top: top.map((entry) => this.Out(entry, access, settings.base)),
+            backfill: await this.client.levelBackfill.Of(guild.id),
+            // Plan 37: was beim letzten Post der Aktivsten passiert ist.
+            topStatus: { week: await this.client.levelTop.Of(guild.id, "week"), month: await this.client.levelTop.Of(guild.id, "month") },
             guild: { name: guild.name, ...GuildResources(guild) },
         };
     }
@@ -123,15 +160,78 @@ export default class DashboardApiLevels extends Route {
 
                 if (mode !== "reset" && !Number.isFinite(amount)) throw new LevelError("Gib eine Zahl an.");
 
-                const entry = await service.Adjust(guild, userId, mode, amount);
+                const entry = await service.Adjust(guild, userId, mode, amount, member.id, typeof body.reason === "string" ? body.reason : "");
 
                 logger.user(`📈 Punkte von ${userId} auf ${guild.id} geändert (${mode}, von ${member.id})`);
 
                 return { ok: true, entry };
             }
 
+            // Plan 37: das Protokoll der Punkte von Hand.
+            case "log":
+                return { entries: await service.Log(guild) };
+
+            // Plan 34: eine Seite der Rangliste in einem Zeitraum, mit Trend.
+            case "board":
+                return service.Board(guild, IsPeriod(body.period) ? body.period : "all", Number(body.page) || 1, null, 25);
+
             case "sync":
                 return { ok: true, touched: await service.Sync(guild) };
+
+            // Plan 35: der Designer.
+            case "design.preview": {
+                const kind = Kind(body.kind);
+
+                return kind === "board" ? service.BoardDesignPreview(member, body.design) : service.DesignPreview(member, kind, body.design);
+            }
+
+            case "design.save": {
+                const kind = Kind(body.kind);
+
+                // null heißt ausdrücklich „zurück zur Vorgabe“ - fehlt das Design, ist das ein Fehler, kein Zurücksetzen.
+                if (body.design === undefined) throw new LevelError("Kein Design mitgeschickt.");
+
+                if (kind === "board") {
+                    const board = await service.SaveBoardDesign(guild, body.design);
+
+                    logger.user(`📈 Ranglisten-Bild auf ${guild.id} ${board.design ? "gespeichert" : "zurückgesetzt"} (von ${member.id})`);
+
+                    return { ok: true, ...board };
+                }
+
+                const saved = await service.SaveDesign(guild, kind, body.design, body.upLine);
+
+                logger.user(`📈 ${kind === "card" ? "Level-Karte" : "Aufstiegs-Bild"} auf ${guild.id} ${saved.design ? "gespeichert" : "zurückgesetzt"} (von ${member.id})`);
+
+                return { ok: true, ...saved };
+            }
+
+            // Plan 36: die Vorlagen als kleine Bilder fürs Studio.
+            case "design.thumbs": {
+                const kind = Kind(body.kind);
+
+                return { thumbs: kind === "board" ? await service.BoardThumbs(member) : await service.DesignThumbs(member, kind) };
+            }
+
+            case "design.test": {
+                const kind = Kind(body.kind);
+
+                if (kind === "board") await service.TestBoard(member);
+                else await service.TestDesign(member, kind);
+
+                return { ok: true };
+            }
+
+            case "board.preview":
+                return { image: await service.BoardPreview(guild, member.id, body.style) };
+
+            case "board.save": {
+                const style = await service.SaveBoardStyle(guild, body.style);
+
+                logger.user(`📈 Ranglisten-Stil auf ${guild.id} gespeichert (von ${member.id})`);
+
+                return { ok: true, style };
+            }
 
             case "reset":
                 await service.Reset(guild);

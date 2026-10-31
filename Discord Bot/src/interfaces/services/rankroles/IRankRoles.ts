@@ -16,8 +16,6 @@ export interface IRankRoleSettings {
     playlists: Record<Playlist, IPlaylistRoles>;
     /** Die alte Rang-Rolle derselben Playlist abnehmen. */
     replace: boolean;
-    /** Nur in diesem Kanal darf der Befehl laufen. null: überall. */
-    channelId: string | null;
     /** Platzierungsspiele zählen als kein Rang. */
     skipPlacement: boolean;
 }

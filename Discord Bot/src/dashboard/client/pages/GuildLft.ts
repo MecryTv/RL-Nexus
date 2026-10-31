@@ -13,7 +13,8 @@
 import { BASE } from "../core/Base.js";
 import { icon, need } from "../core/Dom.js";
 import { toast } from "../core/Toast.js";
-import { api, button, card, confirmButton, el, IRole, loading, rolePicker, row, select, stat, toggle } from "../core/Ui.js";
+import { api, button, card, confirmButton, el, IRole, loading, radioTiles, rolePicker, row, select, stat, toggle } from "../core/Ui.js";
+import { sentOn } from "../core/Format.js";
 import { bodyEditor, IBody, IEmbed } from "../layout/BodyEditor.js";
 import { loadGallery } from "../layout/ImagePicker.js";
 import { IEditorContext } from "../layout/MessageEditor.js";
@@ -24,6 +25,7 @@ import {
     LFT_IMAGES,
     LFT_INTRO_PLACEHOLDERS,
     LFT_NOTICE_PLACEHOLDERS,
+    LFT_PANEL_PLACEHOLDERS,
     LFT_POST_PLACEHOLDERS,
     LFT_PREVIEW_PLACEHOLDERS,
     LFT_QUESTION_PLACEHOLDERS,
@@ -32,6 +34,7 @@ import {
 type Kind = "player" | "team";
 type QuestionKind = "short" | "long" | "choice";
 type Status = "open" | "closed";
+type Ask = "dm" | "modal";
 
 interface IQuestion {
     id: string;
@@ -58,6 +61,10 @@ interface ISettings {
     team: ISide;
     notice: { channelId: string | null; roles: string[]; body: IBody };
     dm: { intro: IBody; question: IBody; done: IBody };
+    /** Plan 30: per DM oder im Fenster. */
+    ask: Ask;
+    /** Plan 30: das Panel im Forum. threadId und messageId schreibt nur der Bot. */
+    panel: { forumId: string | null; title: string; body: IBody; threadId: string | null; messageId: string | null };
     expireDays: number;
     manageRoles: string[];
 }
@@ -111,6 +118,15 @@ interface IPayload {
         emojis: IServerEmoji[];
     };
 }
+
+/** Plan 30: wie gefragt wird. */
+const ASKS: [Ask, string, string, string][] = [
+    ["dm", "Per DM", "Der Bot schreibt und fragt nacheinander. Geht nur mit offenen DMs.", "Wie bisher"],
+    ["modal", "Im Fenster", "Die Fragen kommen direkt in Discord, bis zu 5 je Fenster.", "Ohne DM"],
+];
+
+/** So viele Zeichen nimmt Discord als Beschriftung im Fenster. */
+const MODAL_LABEL = 45;
 
 const WHEN = new Intl.DateTimeFormat("de-DE", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" });
 const AGO = new Intl.RelativeTimeFormat("de", { numeric: "auto" });
@@ -383,6 +399,109 @@ function mount(guildId: string, view: "base" | Kind | "requests"): void {
     /* ------------------------------------------------------------
        Grundlagen: Meldung, DM, Ablauf
        ------------------------------------------------------------ */
+    /* ------------------------------------------------------------
+       Panel im Forum (Plan 30)
+       ------------------------------------------------------------ */
+    function panel(): HTMLElement {
+        const draft = structuredClone(data!.settings.panel);
+        const save = button("btn btn--primary", icon("#i-check"), "Speichern");
+        const post = button("btn btn--quiet", icon("#i-forum"), "Panel senden");
+        // Beitrag und Nachricht gehören dem Bot - mit geht nur, was hier zu sehen ist.
+        const part = (): Record<string, unknown> => ({ panel: { forumId: draft.forumId, title: draft.title, body: draft.body } });
+        let dirty = false;
+        const touch = (): void => {
+            dirty = true;
+            save.disabled = false;
+        };
+
+        save.disabled = true;
+        save.addEventListener("click", async () => {
+            save.disabled = true;
+
+            if (await send(part(), "Liegt das Panel schon im Forum, zieht der Bot es nach.")) dirty = false;
+            else save.disabled = false;
+        });
+
+        // Gesendet wird der gespeicherte Stand: Ungespeichertes geht vorher mit.
+        post.addEventListener("click", async () => {
+            post.disabled = true;
+
+            if (dirty && !(await call("", { action: "settings", settings: part() }))) {
+                post.disabled = false;
+
+                return;
+            }
+
+            const answer = await call<{ url: string; warning: string | null }>("", { action: "panel" });
+
+            post.disabled = false;
+
+            if (!answer) return;
+
+            toast("info", answer.warning ? "Panel gesendet, aber …" : "Panel gesendet", answer.warning ?? "Es steht angepinnt im Forum.");
+            void reload();
+        });
+
+        const title = el("input", "text");
+
+        title.type = "text";
+        title.maxLength = data!.limits.title;
+        title.value = draft.title;
+        title.setAttribute("aria-label", "Titel des Beitrags");
+        title.addEventListener("input", () => {
+            draft.title = title.value;
+            touch();
+        });
+
+        const editor = bodyEditor(draft.body, {
+            pageSave: () => save,
+            kinds: data!.bodyKinds,
+            context: context(LFT_PANEL_PLACEHOLDERS),
+            defaultEmbed: () => embedOf("Looking for", "Klick unten auf den passenden Knopf."),
+            touch,
+            title: "Die Karte",
+            hint: "Die Knöpfe hängt der Bot selbst an, je Seite, die an ist.",
+        });
+
+        const { threadId } = data!.settings.panel;
+        const shownForum = forumName(draft.forumId ?? data!.settings.player.forumId ?? data!.settings.team.forumId);
+        const state = el("span", "apstate");
+
+        if (threadId) {
+            const open = el("a", "", `#${shownForum ?? "Forum"}`);
+
+            open.href = `https://discord.com/channels/${encodeURIComponent(guildId)}/${threadId}`;
+            open.target = "_blank";
+            open.rel = "noopener";
+            state.classList.add("is-ok");
+            state.append("liegt in ", open, `, gesendet am ${sentOn(threadId)}`);
+        } else {
+            state.textContent = "Noch kein Panel. Ohne Panel geht es nur mit /lookingfor.";
+        }
+
+        return card(
+            "Panel im Forum",
+            "Ein angepinnter Beitrag mit Knöpfen. Wer klickt, beantwortet die Fragen, danach steht sein eigener Beitrag im Forum.",
+            row(
+                "Forum",
+                "Wo das Panel steht",
+                select(
+                    [["", "— Forum der Spieler-Suche —"], ...data!.guild.forums.map((entry): [string, string] => [entry.id, `# ${entry.name}`])],
+                    draft.forumId ?? "",
+                    (value) => {
+                        draft.forumId = value || null;
+                        touch();
+                    },
+                    "Forum fürs Panel"
+                )
+            ),
+            row("Titel", "So heißt der Beitrag im Forum", title),
+            editor.node,
+            row("Stand", "Ein zweites Senden bearbeitet das Panel, statt ein neues anzulegen", state),
+            el("div", "mcsave lvsave", save, post)
+        );
+    }
+
     function notice(): HTMLElement {
         const draft = structuredClone(data!.settings.notice);
         const save = button("btn btn--primary", icon("#i-check"), "Speichern");
@@ -398,6 +517,7 @@ function mount(guildId: string, view: "base" | Kind | "requests"): void {
         });
 
         const editor = bodyEditor(draft.body, {
+            pageSave: () => save,
             kinds: data!.bodyKinds,
             context: context(LFT_NOTICE_PLACEHOLDERS),
             defaultEmbed: () => embedOf("Neue {art}: {user.name}", "{antworten.kurz}"),
@@ -472,6 +592,7 @@ function mount(guildId: string, view: "base" | Kind | "requests"): void {
         });
 
         const intro = bodyEditor(draft.intro, {
+            pageSave: () => save,
             kinds: data!.bodyKinds,
             context: context(LFT_INTRO_PLACEHOLDERS),
             defaultEmbed: () => embedOf("{art}", "Ich stelle dir jetzt {fragen.anzahl} Fragen."),
@@ -482,6 +603,7 @@ function mount(guildId: string, view: "base" | Kind | "requests"): void {
         });
 
         const question = bodyEditor(draft.question, {
+            pageSave: () => save,
             kinds: data!.bodyKinds,
             context: context(LFT_QUESTION_PLACEHOLDERS),
             defaultEmbed: () => embedOf("Frage {frage.nummer} von {fragen.anzahl}", "{frage}{frage.hinweis}"),
@@ -492,6 +614,7 @@ function mount(guildId: string, view: "base" | Kind | "requests"): void {
         });
 
         const done = bodyEditor(draft.done, {
+            pageSave: () => save,
             kinds: data!.bodyKinds,
             context: context(LFT_DONE_PLACEHOLDERS),
             defaultEmbed: () => embedOf("Dein Beitrag steht", "[{post.titel}]({post.url})"),
@@ -521,8 +644,24 @@ function mount(guildId: string, view: "base" | Kind | "requests"): void {
         save.addEventListener("click", async () => {
             save.disabled = true;
 
-            if (!(await send({ expireDays: draft.expireDays, manageRoles: draft.manageRoles }, "Gilt ab jetzt."))) save.disabled = false;
+            if (!(await send({ expireDays: draft.expireDays, manageRoles: draft.manageRoles, ask: draft.ask }, "Gilt ab jetzt."))) save.disabled = false;
         });
+
+        // Plan 30: per DM oder im Fenster. Im Fenster hat eine Beschriftung höchstens 45 Zeichen.
+        const askNote = el("p", "aplong");
+        const drawAsk = (): void => {
+            const long = [...data!.settings.player.questions, ...data!.settings.team.questions].filter((question) => question.label.length > MODAL_LABEL).length;
+
+            askNote.hidden = draft.ask !== "modal" || long === 0;
+            askNote.textContent = `Im Fenster darf eine Beschriftung höchstens ${MODAL_LABEL} Zeichen haben. Längere Fragen stehen dort gekürzt, der ganze Satz steht darunter. Betrifft gerade ${long === 1 ? "1 Frage" : `${long} Fragen`}.`;
+        };
+        const asks = radioTiles(ASKS, draft.ask, "Wie gefragt wird", (value) => {
+            draft.ask = value;
+            drawAsk();
+            touch();
+        });
+
+        drawAsk();
 
         days.type = "number";
         days.min = "0";
@@ -537,6 +676,9 @@ function mount(guildId: string, view: "base" | Kind | "requests"): void {
         return card(
             "Ablauf und Rechte",
             "Eine Suche endet von allein oder von Hand. Beendet heißt: der Beitrag bekommt den Tag und wird geschlossen – lesen kann ihn weiter jeder.",
+            el("span", "apopen__label", "Wie gefragt wird"),
+            asks,
+            askNote,
             row("Läuft ab nach", "Tagen – 0 heißt: läuft, bis jemand sie beendet", days),
             row(
                 "Fremde Suchen beenden dürfen",
@@ -602,6 +744,7 @@ function mount(guildId: string, view: "base" | Kind | "requests"): void {
         });
 
         const post = bodyEditor(draft.post, {
+            pageSave: () => save,
             kinds: data!.bodyKinds,
             context: context(LFT_POST_PLACEHOLDERS, () => draft.questions),
             defaultEmbed: () => embedOf("{art}: {user.name}", "{antworten}"),
@@ -612,6 +755,7 @@ function mount(guildId: string, view: "base" | Kind | "requests"): void {
         });
 
         const preview = bodyEditor(draft.preview, {
+            pageSave: () => save,
             kinds: data!.bodyKinds,
             context: context(LFT_PREVIEW_PLACEHOLDERS, () => draft.questions),
             defaultEmbed: () => embedOf("Passt das so?", "{antworten}"),
@@ -955,7 +1099,7 @@ function mount(guildId: string, view: "base" | Kind | "requests"): void {
 
         host.replaceChildren(
             head(),
-            ...(kind ? [...questions(), requests()] : view === "requests" ? [requests()] : [forums(), notice(), messages(), rules()])
+            ...(kind ? [...questions(), requests()] : view === "requests" ? [requests()] : [forums(), panel(), notice(), messages(), rules()])
         );
     }
 

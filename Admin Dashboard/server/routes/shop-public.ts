@@ -581,7 +581,7 @@ export async function publicShopRoutes(app: FastifyInstance, { config }: { confi
             if (!grant || grant.source !== "subscription") throw new PublicError(409, "Es läuft kein Abo, das sich kündigen ließe.");
 
             await setCancelAtPeriodEnd(grant.id, true);
-            await sendShopMail(config, cancelReceivedMail(config, { to: email, name: session.name, title: "Abo", at: new Date(), endsAt: grant.endsAt }));
+            await sendShopMail(config, cancelReceivedMail(config, { to: email, name: session.name, title: "Abo", at: new Date(), endsAt: grant.endsAt, frozenRest: grant.frozenAt ? grant.frozenRest : null }));
             publish("shop");
 
             return reply.code(204).send();

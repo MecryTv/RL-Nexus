@@ -202,13 +202,27 @@ export function paymentFailedMail(config: IConfig, input: { readonly to: string;
     };
 }
 
-export function cancelReceivedMail(_config: IConfig, input: { readonly to: string; readonly name: string; readonly title: string; readonly at: Date; readonly endsAt: Date | null }): IShopMail {
+/**
+ * frozenRest: Der Zugang ruht gerade (Free oder Beta Access), mit so vielen
+ * Sekunden Rest. Dann stimmt das Periodenende von Stripe nicht: Der Vertrag
+ * endet erst nach den Resttagen, die ab Paid Access wieder zählen (W-0024).
+ */
+export function cancelReceivedMail(
+    _config: IConfig,
+    input: { readonly to: string; readonly name: string; readonly title: string; readonly at: Date; readonly endsAt: Date | null; readonly frozenRest?: number | null }
+): IShopMail {
+    const days = input.frozenRest == null ? null : Math.max(1, Math.ceil(input.frozenRest / 86_400));
+    const end =
+        days !== null
+            ? `Dein Zugang ruht gerade. Der Vertrag endet, wenn deine restlichen ${days} ${days === 1 ? "Tag" : "Tage"} gelaufen sind. Die zählen erst, wenn es wieder Preise gibt, und abgebucht wird nichts mehr.`
+            : input.endsAt === null
+              ? "Der Vertrag endet zum nächstmöglichen Zeitpunkt."
+              : `Der Vertrag endet am <b>${esc(formatDay(input.endsAt))}</b>. Bis dahin kannst du das Dashboard weiter nutzen, danach wird nichts mehr abgebucht.`;
+
     return {
         to: input.to,
         subject: "Deine Kündigung ist eingegangen",
-        html:
-            `<p>Hallo ${esc(input.name)}, deine Kündigung für „${esc(input.title)}“ ist am ${esc(TIME_FORMAT.format(input.at))} Uhr eingegangen.</p>` +
-            `<p>${input.endsAt === null ? "Der Vertrag endet zum nächstmöglichen Zeitpunkt." : `Der Vertrag endet am <b>${esc(formatDay(input.endsAt))}</b>. Bis dahin kannst du das Dashboard weiter nutzen, danach wird nichts mehr abgebucht.`}</p>`,
+        html: `<p>Hallo ${esc(input.name)}, deine Kündigung für „${esc(input.title)}“ ist am ${esc(TIME_FORMAT.format(input.at))} Uhr eingegangen.</p>` + `<p>${end}</p>`,
     };
 }
 
@@ -222,8 +236,11 @@ export function expiredMail(config: IConfig, input: { readonly to: string; reado
     };
 }
 
-/** Free oder Beta Access: Der Zugang ist pausiert, es wird nichts abgebucht. beta: Ins Bot-Dashboard geht es dann nur mit Beta-Code. */
-export function pausedMail(config: IConfig, input: { readonly to: string; readonly name: string; readonly beta?: boolean }): IShopMail {
+/**
+ * Free oder Beta Access: Der Zugang ist pausiert, es wird nichts abgebucht. beta: Ins Bot-Dashboard geht es dann nur mit Beta-Code.
+ * pending: Stripe hat die Pause eines Abos noch nicht angenommen. Dann kein „nichts abgebucht“, denn bis es klappt, kann Stripe noch abbuchen (W-0024).
+ */
+export function pausedMail(config: IConfig, input: { readonly to: string; readonly name: string; readonly beta?: boolean; readonly pending?: boolean }): IShopMail {
     const why = input.beta ? "RL Nexus ist gerade in der geschlossenen Beta" : "RL Nexus ist gerade kostenlos";
     const meanwhile = input.beta
         ? `<p>In der Beta kommst du mit einem Beta-Code ins Bot-Dashboard. Hast du noch keinen, frag beim Support nach.</p>`
@@ -233,14 +250,17 @@ export function pausedMail(config: IConfig, input: { readonly to: string; readon
         to: input.to,
         subject: "Dein Zugang ist pausiert",
         html:
-            `<p>Hallo ${esc(input.name)}, ${why}. Dein Zugang ist deshalb pausiert: Es wird nichts abgebucht, und deine Tage bleiben stehen. Sobald es wieder Preise gibt, läuft er genau da weiter, wo er jetzt steht.</p>` +
+            `<p>Hallo ${esc(input.name)}, ${why}. Dein Zugang ist deshalb pausiert: ${input.pending ? "Deine Tage bleiben stehen. Bucht Stripe doch noch einmal ab, zählen die Tage zu deinem Zugang dazu" : "Es wird nichts abgebucht, und deine Tage bleiben stehen"}. Sobald es wieder Preise gibt, läuft er genau da weiter, wo er jetzt steht.</p>` +
             meanwhile +
             button(dashboardUrl(config), "Zum Dashboard"),
     };
 }
 
-/** Zurück auf Paid Access: Der Zugang läuft weiter, mit den Tagen aus der Pause. */
-export function resumedMail(config: IConfig, input: { readonly to: string; readonly name: string; readonly until: Date | null; readonly subscription: boolean }): IShopMail {
+/**
+ * Zurück auf Paid Access: Der Zugang läuft weiter, mit den Tagen aus der Pause.
+ * until: das späteste Ende. charge: wann das laufende Abo wieder abbucht - ein Geschenk kann länger laufen (W-0024).
+ */
+export function resumedMail(config: IConfig, input: { readonly to: string; readonly name: string; readonly until: Date | null; readonly charge: Date | null }): IShopMail {
     const until = input.until ? ` bis ${esc(formatDay(input.until))}` : "";
 
     return {
@@ -248,7 +268,7 @@ export function resumedMail(config: IConfig, input: { readonly to: string; reado
         subject: "Dein Zugang läuft weiter",
         html:
             `<p>Hallo ${esc(input.name)}, bei RL Nexus gibt es wieder Preise, und dein Zugang läuft weiter${until}. Die Tage aus der Pause hast du nicht verloren.</p>` +
-            (input.subscription && input.until ? `<p>Dein Abo bucht erst am ${esc(formatDay(input.until))} wieder ab.</p>` : "") +
+            (input.charge ? `<p>Dein Abo bucht erst am ${esc(formatDay(input.charge))} wieder ab.</p>` : "") +
             button(dashboardUrl(config), "Zum Dashboard"),
     };
 }

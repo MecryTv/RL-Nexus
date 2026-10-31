@@ -11,12 +11,15 @@
 process.env.CLIENT_SECRET ||= "check-secret";
 process.env.DEV_CLIENT_SECRET ||= "check-secret";
 
+import { createHash } from "node:crypto";
+import { createCanvas } from "@napi-rs/canvas";
 import path from "path";
 import { ChannelType, Guild, GuildBasedChannel, GuildMember, Role } from "discord.js";
 import BotClient from "../client/BotClient";
-import { RenderWelcomeCard } from "../builder/WelcomeCard";
-import { DefaultCard, DefaultWelcomeConfig, MAX_AVATAR, MAX_TITLE_SIZE, MIN_TITLE_SIZE, NormalizeCard, WELCOME_PLACEHOLDER_KEYS } from "../constants/Welcome";
-import { IWelcomeMessage } from "../interfaces/services/welcome/IWelcome";
+import { IWelcomeCardData, RenderWelcomeCard, WelcomePlaces } from "../builder/WelcomeCard";
+import { RegisterFonts } from "../builder/RankCard";
+import { CleanPositions, DefaultCard, DefaultWelcomeConfig, FitTitle, LineWidth, MAX_AVATAR, MAX_TITLE_SIZE, MIN_TITLE_SIZE, NormalizeCard, SnapPosition, TitleFont, WELCOME_PLACEHOLDER_KEYS } from "../constants/Welcome";
+import { IWelcomeCard, IWelcomeMessage, WelcomeLayout as LayoutName } from "../interfaces/services/welcome/IWelcome";
 import { WelcomeError } from "../services/WelcomeService";
 
 const GUILD = "90071992547409931";
@@ -155,6 +158,196 @@ function checkClean(client: BotClient): void {
 }
 
 /* ----------------------------------------------------------
+   Gleich wie vorher (Plan 25)
+   ---------------------------------------------------------- */
+const LAYOUTS: readonly LayoutName[] = ["classic", "center", "panel", "hud"];
+const RANKS = path.join(process.cwd(), "src", "images", "default", "rocketleague", "rlranks");
+const TITLES = { kurz: "Willkommen, Lara!", lang: "Ein wirklich sehr langer Name, der nicht in die Karte passt" } as const;
+
+/** Mit dem Code von vor Plan 25 gezeichnet (scale 1): ohne eigene Anordnung muss genau das herauskommen. */
+const GOLDEN: Record<string, string> = {
+    "classic:kurz": "b74bdbe818c534e5ce6f97c95b201d2b9a5d1e93cdcf9be5e9b050e19eebf064",
+    "classic:lang": "510618751825bbcaff6d0a2d4d8b2b435848cb2f48bc2ea4093ced543e493803",
+    "center:kurz": "c0252f2642ae905bd421691adc68e45da2bc35dfa188e562ef6c69dbdd0f4f06",
+    "center:lang": "cabc0b5182fac1827725fa6a7b4c7c095d0c55522c9ba8f822f7c865e0428571",
+    "panel:kurz": "40b3147038bbdbf2f06de11929d2e53eebe9e84c63d09ef2b128d62317e3926f",
+    "panel:lang": "736a8e520c440faa72226d2e6d4e5f01c7b679ed8b6609a3cdba4d0964adcc99",
+    "hud:kurz": "b23087630c01e9df3b69e0d056ea2efde4a728a8d8ce9e42a05cca0474ce23b9",
+    "hud:lang": "83ecaf930d7f309f0375b8ad72934fef629951279d0f073b056b54e1a87bbf82",
+};
+
+/** W-0021: Varianten neben der Standardkarte - Hintergrund, ohne Avatar, Orbitron, lange kleine Zeile. */
+const VARIANTS: Record<string, { layout: LayoutName; card?: Partial<IWelcomeCard>; data?: Partial<IWelcomeCardData>; hash: string }> = {
+    hintergrund: { layout: "panel", card: { dim: 40 }, data: { backgroundPath: path.join(RANKS, "Super Sonic Legend.png") }, hash: "4afed28a1b2f8f5ed797792f5c9f809b094828812d9e6e0cad3915220c47cff6" },
+    "ohne-avatar": { layout: "classic", card: { avatar: false }, hash: "4d1906883df68584b1d53063d992a89b1499480a8916ac0169167eff5de0941a" },
+    orbitron: { layout: "center", card: { font: "orbitron" }, hash: "57176b117cac4e0ff1769a9e768b00fd644f7ee64e20d91204a4e9f60db33815" },
+    "lange-zeile": { layout: "hud", data: { footer: "Mitglied Nr. 148 · beigetreten über den Einladungslink von Nico · willkommen im Team" }, hash: "55e235763bdddb7cb912d82c604cd85e690d04d80b577e5df35076797cac18da" },
+};
+
+/** Eine Karte mit Avatar und Icon aus lokalen Dateien - damit das Ergebnis jedes Mal gleich ist. */
+function Fixture(layout: LayoutName, title: string, card: Partial<IWelcomeCard> = {}): IWelcomeCardData {
+    return {
+        card: { ...DefaultCard("join"), layout, dim: 0, ...card },
+        title,
+        subtitle: "Schön, dass du da bist.",
+        footer: "Mitglied Nr. 148",
+        avatarURL: path.join(RANKS, "Champion 1.png"),
+        iconURL: path.join(RANKS, "Grand Champion 1.png"),
+        backgroundPath: null,
+    };
+}
+
+function Hash(png: Buffer): string {
+    return createHash("sha256").update(png).digest("hex");
+}
+
+async function checkGolden(): Promise<void> {
+    console.log("\n  — Ohne eigene Anordnung wie vorher —");
+
+    for (const layout of LAYOUTS) {
+        for (const [key, title] of Object.entries(TITLES)) {
+            const hash = Hash(await RenderWelcomeCard(Fixture(layout, title), 1));
+
+            check(`Ohne eigene Anordnung wie vor Plan 25: ${layout}, ${key}`, hash === GOLDEN[`${layout}:${key}`], hash.slice(0, 16));
+        }
+    }
+
+    for (const [key, variant] of Object.entries(VARIANTS)) {
+        const hash = Hash(await RenderWelcomeCard({ ...Fixture(variant.layout, TITLES.kurz, variant.card), ...variant.data }, 1));
+
+        check(`Variante wie bisher: ${key}`, hash === variant.hash, hash);
+    }
+}
+
+async function checkLayout(): Promise<void> {
+    console.log("\n  — Plätze der Layouts —");
+
+    const classic = await WelcomePlaces(Fixture("classic", TITLES.kurz, { avatarSize: 170 }));
+
+    check("Klassisch: Avatar bei 52/85 mit 170", JSON.stringify([classic.avatar.x, classic.avatar.y, classic.avatar.size]) === "[52,85,170]", JSON.stringify(classic.avatar));
+    check("Klassisch: Überschrift links neben dem Avatar", classic.title.x === 262 && classic.title.align === "left", JSON.stringify(classic.title));
+    check("Ohne Avatar rückt die Überschrift nach links", (await WelcomePlaces(Fixture("classic", TITLES.kurz, { avatar: false }))).title.x === 52);
+
+    const center = await WelcomePlaces(Fixture("center", TITLES.kurz));
+    check("Mittig: Texte mittig auf 500, 840 breit", center.title.x === 500 && center.title.align === "center" && center.title.width === 840, JSON.stringify(center.title));
+    check("Panel: Überschrift so breit wie die Fläche", (await WelcomePlaces(Fixture("panel", TITLES.kurz))).title.width === 370);
+    check("Icon: Klassisch 918/28/54", JSON.stringify(classic.icon).startsWith('{"x":918,"y":28,"size":54'), JSON.stringify(classic.icon));
+    check("Icon: HUD 914/34/52", JSON.stringify((await WelcomePlaces(Fixture("hud", TITLES.kurz))).icon).startsWith('{"x":914,"y":34,"size":52'));
+
+    check("Breite links bis zum Rand", LineWidth(856, "left", 952) === 120);
+    check("Breite mittig nach dem Layout", LineWidth(500, "center", 840) === 840);
+    check("Breite rechts bis zum Rand", LineWidth(144, "right", 952) === 120);
+
+    console.log("\n  — Zeichnen über Plätze —");
+
+    for (const layout of LAYOUTS) {
+        for (const [key, title] of Object.entries(TITLES)) {
+            const data = Fixture(layout, title);
+            const places = await WelcomePlaces(data);
+            const free = await RenderWelcomeCard({ ...data, card: { ...data.card, positions: places } }, 1);
+
+            check(`Mit den Plätzen des Layouts dasselbe Bild: ${layout}, ${key}`, Hash(free) === GOLDEN[`${layout}:${key}`]);
+        }
+    }
+
+    const data = Fixture("classic", TITLES.kurz);
+    const places = await WelcomePlaces(data);
+    const plain = await RenderWelcomeCard(data, 1);
+    const moved = await RenderWelcomeCard({ ...data, card: { ...data.card, positions: { ...places, avatar: { ...places.avatar, x: places.avatar.x + 300 } } } }, 1);
+    const bare = await RenderWelcomeCard(data, 1, { bare: true });
+    const onlyAvatar = await RenderWelcomeCard({ ...data, card: { ...data.card, positions: { avatar: { ...places.avatar, x: places.avatar.x + 300 } } } }, 1);
+
+    check("Ein verschobener Avatar ändert das Bild", !moved.equals(plain));
+    check("Die nackte Karte hat keine Teile", !bare.equals(plain));
+    check("Fehlende Teile kommen vom Layout", onlyAvatar.equals(moved));
+}
+
+async function checkPreview(client: BotClient): Promise<void> {
+    console.log("\n  — Vorschau für die Bühne —");
+
+    const member = FakeMember(FakeGuild());
+    const message: IWelcomeMessage = { ...DefaultWelcomeConfig().join, channelId: TEXT };
+    const bare = await client.welcomeService.Preview(member, message, "join", true);
+    const full = await client.welcomeService.Preview(member, message, "join", false);
+
+    check("Nackt: ein PNG als data-URL", bare.image.startsWith("data:image/png;base64,"));
+    check("Nackt: die fertigen Texte", bare.parts?.title === "Willkommen, Lara!", String(bare.parts?.title));
+    check("Nackt: die Plätze des Layouts", bare.layout?.avatar.x === 52 && bare.layout.title.align === "left", JSON.stringify(bare.layout?.avatar));
+    check("Voll: ohne Texte und Plätze", full.parts === undefined && full.layout === undefined);
+    check("Nackt und voll sind verschieden", bare.image !== full.image);
+}
+
+/**
+ * Die Bühne im Dashboard klemmt und misst mit CleanPositions und LineWidth aus
+ * constants/Welcome.ts, also denselben Regeln wie der Bot. Dort liegt auch das Einrasten.
+ */
+async function checkEdges(): Promise<void> {
+    console.log("\n  — Ränder (Plan 25, Review) —");
+
+    // Ein Name mit 80 Zeichen ganz rechts: erst kleiner, dann gekürzt, nie breiter als die Regel erlaubt.
+    await RegisterFonts();
+
+    const ctx = createCanvas(10, 10).getContext("2d");
+    const max = LineWidth(856, "left", 952);
+    const fitted = FitTitle(ctx, "Willkommen, ".padEnd(80, "Lara"), "oxanium", 48, max);
+
+    ctx.font = TitleFont("oxanium", fitted.size);
+    check("Langer Name am Rand bleibt in der Breite", ctx.measureText(fitted.text).width <= max && fitted.text.endsWith("…"), `${fitted.text} (${fitted.size})`);
+
+    // Teiler (0,85 × size darüber) und HUD-Marke (1,3 × size darunter) bleiben ganz auf der Karte.
+    const top = CleanPositions({ footer: { x: 300, y: 0, size: 48, align: "left", width: 618 } })?.footer;
+    const bottom = CleanPositions({ footer: { x: 300, y: 340, size: 48, align: "left", width: 618 } })?.footer;
+
+    check("Kleine Zeile oben: Platz für den Teiler", top?.y === 44, JSON.stringify(top));
+    check("Kleine Zeile unten: Platz für die Marke", bottom?.y === 340 - 63, JSON.stringify(bottom));
+
+    // W-0021: Oxanium reicht mit der Unterlänge bis 1,04 × size - ganz unten bleibt sie auf der Karte.
+    const low = CleanPositions({ title: { x: 40, y: 340, size: 96, align: "left", width: 618 } })?.title;
+
+    check("Große Überschrift ganz unten: Platz für die Unterlänge", low?.y === 340 - 101, JSON.stringify(low));
+}
+
+function checkStage(): void {
+    console.log("\n  — Bühne: Einrasten —");
+
+    const avatar = { x: 413, y: 90, size: 170, align: "left" as const, width: 952 };
+    const others = { avatar, icon: { x: 918, y: 28, size: 54, align: "left" as const, width: 952 }, title: { x: 262, y: 98, size: 48, align: "left" as const, width: 618 }, subtitle: { x: 262, y: 160, size: 26, align: "left" as const, width: 618 }, footer: { x: 262, y: 226, size: 21, align: "left" as const, width: 618 } };
+    const snapped = SnapPosition("avatar", avatar, others, { width: 170, height: 170 }, { snap: true, grid: false });
+
+    check("Einrasten an der Kartenmitte", snapped.position.x === 415 && snapped.guides.x === 500, JSON.stringify(snapped));
+    check("Ohne Einrasten bleibt es", SnapPosition("avatar", avatar, others, { width: 170, height: 170 }, { snap: false, grid: false }).position.x === 413);
+    check("Raster rundet auf 10", SnapPosition("avatar", avatar, others, { width: 170, height: 170 }, { snap: false, grid: true }).position.x === 410);
+}
+
+/* ----------------------------------------------------------
+   Eigene Anordnung (Plan 25)
+   ---------------------------------------------------------- */
+function checkPositions(client: BotClient): void {
+    console.log("\n  — Eigene Anordnung —");
+
+    const service = client.welcomeService;
+
+    check("Ab Werk keine eigene Anordnung", DefaultCard("join").positions === null);
+    check("Eine alte Karte hat keine", NormalizeCard({ layout: "classic" }, "join").positions === null);
+
+    const avatar = CleanPositions({ avatar: { x: 1000, y: 500, size: 300, align: "x" } })?.avatar;
+    check("Avatar: erst die Größe, dann ganz auf die Karte", avatar?.size === 240 && avatar.x === 760 && avatar.y === 100, JSON.stringify(avatar));
+
+    const title = CleanPositions({ title: { x: 990, y: 10.6, size: 10, align: "left" } })?.title;
+    check("Überschrift: gerundet, geklemmt, volle Breite", JSON.stringify(title) === JSON.stringify({ x: 856, y: 11, size: 20, align: "left", width: 952 }), JSON.stringify(title));
+
+    check("Rechtsbündig bleibt Platz", CleanPositions({ subtitle: { x: 5, y: 100, size: 26, align: "right" } })?.subtitle?.x === 144);
+    check("Mittig auch", CleanPositions({ subtitle: { x: 10, y: 100, size: 26, align: "center" } })?.subtitle?.x === 84);
+    check("Fremde und kaputte Teile fallen weg", CleanPositions({ logo: { x: 1, y: 1, size: 50 }, icon: { x: "a", y: 1, size: 50 } }) === null);
+    check("Eine unbekannte Ausrichtung wird links", CleanPositions({ footer: { x: 300, y: 200, size: 21, align: "oben" } })?.footer?.align === "left");
+
+    const moved = service.CleanCard({ positions: { avatar: { x: 40, y: 40, size: 120 } } }, DefaultCard("join"), "join");
+    check("Die Anordnung kommt durch die Prüfung", moved.positions?.avatar?.x === 40, JSON.stringify(moved.positions));
+    check("Ohne Angabe bleibt die alte", service.CleanCard({}, moved, "join").positions?.avatar?.x === 40);
+    check("null heißt: wieder das Layout", service.CleanCard({ positions: null }, moved, "join").positions === null);
+}
+
+/* ----------------------------------------------------------
    Platzhalter
    ---------------------------------------------------------- */
 function checkValues(client: BotClient): void {
@@ -259,6 +452,12 @@ async function main(): Promise<void> {
     await client.configService.Initialize();
 
     checkClean(client);
+    checkPositions(client);
+    await checkGolden();
+    await checkLayout();
+    await checkPreview(client);
+    await checkEdges();
+    checkStage();
     checkValues(client);
     await checkCard(client);
 

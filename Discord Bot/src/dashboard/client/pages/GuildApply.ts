@@ -9,7 +9,8 @@
 import { BASE } from "../core/Base.js";
 import { icon, need } from "../core/Dom.js";
 import { toast } from "../core/Toast.js";
-import { api, button, card, confirmButton, el, IPerson, IRole, loading, personPicker, rolePicker, row, select, stat, toggle, WHEN } from "../core/Ui.js";
+import { api, button, card, confirmButton, el, IPerson, IRole, loading, personPicker, radioTiles, rolePicker, row, select, stat, toggle, WHEN } from "../core/Ui.js";
+import { sentOn } from "../core/Format.js";
 
 type Status = "open" | "accepted" | "declined";
 type Kind = "short" | "long" | "choice";
@@ -57,11 +58,24 @@ interface ISubmission {
     createdAt: number;
 }
 
+type Mode = "web" | "modal" | "dm";
+type Target = "shared" | "channel";
+type After = "delete" | "close" | "keep";
+
 interface ISettings {
+    /** Wo man sich bewirbt (Plan 24). */
+    mode: Mode;
+    /** Das Panel in Discord, schreibt nur der Bot. */
+    panel: { channelId: string | null; messageId: string | null };
     reviewRoles: string[];
     reviewUsers: string[];
     channelId: string | null;
     open: boolean;
+    /** Plan 30: Sammelkanal oder eigener Kanal je Bewerbung. */
+    target: Target;
+    categoryId: string | null;
+    channelName: string;
+    afterDecision: After;
 }
 
 interface IPayload {
@@ -78,8 +92,30 @@ interface IPayload {
     kinds: Record<string, string>;
     statuses: Record<string, string>;
     limits: { forms: number; questions: number; choices: number; note: number; reviewers: number };
-    guild: { name: string; roles: IRole[]; channels: { id: string; name: string }[] };
+    guild: { name: string; roles: IRole[]; channels: { id: string; name: string }[]; categories: { id: string; name: string }[] };
 }
+
+/** Die drei Wege, wie im abgenommenen Entwurf: Name, was passiert, ein kurzes Etikett. */
+const MODES: [Mode, string, string, string][] = [
+    ["web", "Webseite", "Das Formular unter dem Link, angemeldet mit Discord.", "Wie bisher"],
+    ["modal", "Fenster in Discord", "Klick auf „Bewerben“ öffnet ein Fenster. Bis zu 5 Fragen je Fenster, danach geht es mit „Weiter“.", "Ohne Seitenwechsel"],
+    ["dm", "DM von RL Nexus", "Der Bot schreibt dem Bewerber und stellt die Fragen nacheinander. Geantwortet wird im Chat.", "Fühlt sich an wie ein Gespräch"],
+];
+
+/** Plan 30: wo die Karte landet und was danach mit dem eigenen Kanal passiert. */
+const TARGETS: [Target, string, string, string][] = [
+    ["shared", "Sammelkanal", "Alle Karten in einem Kanal. Wer den Kanal sieht, sieht jede Bewerbung.", "Wie bisher"],
+    ["channel", "Eigener Kanal", "Für jede Bewerbung ein Kanal, nur für die Person und die Prüfer.", "Wie bei Tickets"],
+];
+
+const AFTERS: [After, string, string, string][] = [
+    ["close", "Für die Person schließen", "Die Prüfer behalten den Kanal, die Person sieht ihn nicht mehr.", "Vorgabe"],
+    ["delete", "Löschen", "Der Kanal ist sofort weg.", "Aufgeräumt"],
+    ["keep", "Offen lassen", "Alles bleibt. Aufräumen geht mit „Kanal löschen“ an der Karte.", "Zum Nachfragen"],
+];
+
+/** So viele Zeichen nimmt Discord als Beschriftung im Fenster. */
+const MODAL_LABEL = 45;
 
 const DAYS: [number, string][] = [
     [0, "Keine Pause"],
@@ -145,7 +181,7 @@ function mount(guildId: string, view: "inbox" | "manage"): void {
             stat("#i-inbox", "Offen", String(data!.open), data!.open ? "is-warn" : "is-ok"),
             stat("#i-clipboard", "Formulare", `${data!.forms.length} / ${data!.limits.forms}`),
             stat("#i-shield-users", "Prüfer", reviewers ? String(reviewers) : "nur Verwalter"),
-            stat("#i-link", "Öffentlicher Link", data!.settings.open ? "an" : "aus", data!.settings.open ? "is-ok" : "")
+            stat("#i-link", "Bewerbungen", data!.settings.open ? "an" : "aus", data!.settings.open ? "is-ok" : "")
         );
     }
 
@@ -271,6 +307,23 @@ function mount(guildId: string, view: "inbox" | "manage"): void {
 
         yes.addEventListener("click", () => void decide("accepted"));
 
+        // Plan 30: Entschiedenes wieder wegnehmen - bei Annahme samt Rolle.
+        const remove = async (): Promise<void> => {
+            const answer = await call<{ left: string[] }>("", { action: "remove", id: entry.id });
+
+            if (!answer) return;
+
+            openId = null;
+            toast("info", answer.left.length ? "Entfernt, aber …" : "Entfernt", answer.left.length ? answer.left.join(" ") : "Die Person kann sich jetzt neu bewerben.");
+            void reload();
+        };
+        const roleName = form?.settings.acceptRole ? data!.guild.roles.find((role) => role.id === form.settings.acceptRole)?.name : null;
+        const removeHint =
+            entry.status === "accepted"
+                ? `Entfernen ${roleName ? `zieht die Rolle @${roleName} ab und ` : ""}löscht die Bewerbung. Danach kann sich die Person neu bewerben.`
+                : "Entfernen löscht die Bewerbung. Die Pause nach der Absage fällt damit weg.";
+        const drop = confirmButton("btn btn--quiet", "#i-trash", "Entfernen", "Wirklich entfernen?", remove);
+
         box.append(
             el(
                 "div",
@@ -284,6 +337,8 @@ function mount(guildId: string, view: "inbox" | "manage"): void {
                               "hintline",
                               `${data!.statuses[entry.status]} von ${entry.decidedName ?? "unbekannt"}${entry.decidedAt ? ` · ${WHEN.format(new Date(entry.decidedAt))}` : ""}${entry.note ? ` · „${entry.note}"` : ""}`
                           ),
+                          el("p", "hintline", removeHint),
+                          el("div", "mcsave", drop),
                       ])
             )
         );
@@ -640,21 +695,30 @@ function mount(guildId: string, view: "inbox" | "manage"): void {
     function settings(): HTMLElement[] {
         const draft = structuredClone(data!.settings);
         const save = button("btn btn--primary", icon("#i-check"), "Speichern");
+        const send = button("btn btn--quiet", icon("#i-discord"), "Panel senden");
+        const later = el("i", "apsavefirst", "Erst speichern");
         const touch = (): void => {
             save.disabled = false;
+            // Gesendet wird mit dem gespeicherten Stand: erst speichern, dann senden.
+            send.disabled = true;
+            later.hidden = false;
         };
+
+        later.hidden = true;
 
         save.disabled = true;
         save.addEventListener("click", async () => {
             save.disabled = true;
 
-            if (!(await call("", { action: "settings", settings: draft }))) {
+            const answer = await call<{ warning: string | null }>("", { action: "settings", settings: draft });
+
+            if (!answer) {
                 save.disabled = false;
 
                 return;
             }
 
-            toast("info", "Gespeichert", "Gilt ab sofort.");
+            toast("info", answer.warning ? "Gespeichert, aber …" : "Gespeichert", answer.warning ?? "Gilt ab sofort.");
             void reload();
         });
 
@@ -694,6 +758,136 @@ function mount(guildId: string, view: "inbox" | "manage"): void {
 
         const copy = button("btn btn--quiet", icon("#i-copy"), "Kopieren");
 
+        const longNote = el("p", "aplong");
+        const drawNote = (): void => {
+            const hits = data!.forms
+                .filter((form) => form.open)
+                .map((form): [string, number] => [form.name, form.questions.filter((question) => question.label.length > MODAL_LABEL).length])
+                .filter(([, count]) => count > 0);
+
+            longNote.hidden = draft.mode !== "modal" || hits.length === 0;
+            longNote.textContent =
+                "Im Fenster darf eine Beschriftung höchstens 45 Zeichen haben. Längere Fragen stehen dort gekürzt, der ganze Satz steht darunter. Betrifft gerade " +
+                hits.map(([name, count], index) => `${index === 0 ? (count === 1 ? "1 Frage" : `${count} Fragen`) : count} in „${name}“`).join(" und ") +
+                ".";
+        };
+        const ways = radioTiles(MODES, draft.mode, "Wo man sich bewirbt", (value) => {
+            draft.mode = value;
+            drawNote();
+            touch();
+        });
+
+        drawNote();
+
+        // Plan 30: Wo die Karte landet. Die Zeilen zum eigenen Kanal stehen nur da, wenn er gewählt ist.
+        const sharedPick = select(
+            [["", "— kein Kanal —"], ...data!.guild.channels.map((entry): [string, string] => [entry.id, `# ${entry.name}`])],
+            draft.channelId ?? "",
+            (value) => {
+                draft.channelId = value || null;
+                touch();
+            },
+            "Sammelkanal"
+        );
+        const categoryPick = select(
+            [["", "— keine Kategorie —"], ...data!.guild.categories.map((entry): [string, string] => [entry.id, entry.name])],
+            draft.categoryId ?? "",
+            (value) => {
+                draft.categoryId = value || null;
+                touch();
+            },
+            "Kategorie für die Kanäle"
+        );
+        const nameField = el("input", "text");
+
+        nameField.type = "text";
+        nameField.maxLength = 100;
+        nameField.value = draft.channelName;
+        nameField.setAttribute("aria-label", "Name des Kanals");
+        nameField.addEventListener("input", () => {
+            draft.channelName = nameField.value;
+            touch();
+        });
+
+        const deleteNote = el("p", "aplong");
+        const drawDeleteNote = (): void => {
+            const silent = data!.forms.filter((form) => !form.settings.dm).map((form) => `„${form.name}“`);
+
+            deleteNote.hidden = draft.afterDecision !== "delete" || silent.length === 0;
+            deleteNote.textContent = `Bei ${silent.join(" und ")} ist die Nachricht an den Bewerber aus. Wird der Kanal gelöscht, erfährt die Person nichts von der Entscheidung.`;
+        };
+        const afterTiles = radioTiles(AFTERS, draft.afterDecision, "Nach der Entscheidung", (value) => {
+            draft.afterDecision = value;
+            drawDeleteNote();
+            touch();
+        });
+        const targetRows = el("div");
+        const drawTarget = (): void => {
+            const own = draft.target === "channel";
+
+            targetRows.replaceChildren(
+                ...(own
+                    ? [
+                          row("Kategorie", "Hier entstehen die Kanäle", categoryPick),
+                          row("Kanalname", "{user}, {nummer} und {formular} gehen", nameField),
+                          el("span", "apopen__label", "Nach der Entscheidung"),
+                          afterTiles,
+                          deleteNote,
+                      ]
+                    : []),
+                row("Sammelkanal", own ? "Nur, wenn ein Kanal nicht angelegt werden kann. Formulare dürfen einen eigenen haben" : "Formulare dürfen einen eigenen haben", sharedPick)
+            );
+        };
+        const targets = radioTiles(TARGETS, draft.target, "Wo die Karte landet", (value) => {
+            draft.target = value;
+            drawTarget();
+            touch();
+        });
+
+        drawDeleteNote();
+        drawTarget();
+
+        // Das Panel: Kanal wählen und sofort senden, wie beim Ticket-Panel.
+        const { channelId: panelChannel, messageId: panelMessage } = data!.settings.panel;
+        let target = panelChannel ?? draft.channelId ?? data!.guild.channels[0]?.id ?? "";
+        const panelPick = select(
+            data!.guild.channels.map((entry): [string, string] => [entry.id, `# ${entry.name}`]),
+            target,
+            (value) => {
+                target = value;
+            },
+            "Kanal fürs Panel"
+        );
+        const placed = panelChannel && panelMessage ? data!.guild.channels.find((entry) => entry.id === panelChannel) : undefined;
+        const panelState = el("span", "apstate");
+
+        if (placed && panelMessage) {
+            const open = el("a", "", `#${placed.name}`);
+
+            open.href = `https://discord.com/channels/${encodeURIComponent(guildId)}/${placed.id}/${panelMessage}`;
+            open.target = "_blank";
+            open.rel = "noopener";
+            panelState.classList.add("is-ok");
+            panelState.append("liegt in ", open, `, gesendet am ${sentOn(panelMessage)}`);
+        } else {
+            panelState.textContent = "Noch kein Panel. Ohne Panel geht es nur mit /bewerben.";
+        }
+
+        send.addEventListener("click", async () => {
+            if (!target) return;
+
+            send.disabled = true;
+
+            const answer = await call<{ ok: boolean; url: string }>("", { action: "panel", channelId: target });
+
+            send.disabled = false;
+
+            if (!answer) return;
+
+            toast("info", "Panel gesendet", "Es liegt jetzt im Kanal.");
+            void reload();
+        });
+
         copy.addEventListener("click", async () => {
             await navigator.clipboard.writeText(data!.link).catch(() => undefined);
             toast("info", "Kopiert", "Der Link steht in der Zwischenablage.");
@@ -714,30 +908,28 @@ function mount(guildId: string, view: "inbox" | "manage"): void {
                 row("Einzelne Personen", "Für alle, die keine passende Rolle haben", users)
             ),
             card(
-                "Kanal und Link",
-                "Wohin neue Bewerbungen gehen und unter welcher Adresse man sich bewirbt.",
+                "Wo man sich bewirbt",
+                "Gilt für alle Formulare. Kontoalter, Voraussetzung und Pause nach Absage prüft RL Nexus überall gleich.",
+                el("span", "apopen__label", "Art"),
+                ways,
+                row("Panel", "Die Nachricht mit den Knöpfen", el("div", "aplink", panelPick, send, later, panelState)),
                 row(
-                    "Kanal für die Karten",
-                    "Formulare dürfen einen eigenen haben",
-                    select(
-                        [["", "— kein Kanal —"], ...data!.guild.channels.map((entry): [string, string] => [entry.id, `# ${entry.name}`])],
-                        draft.channelId ?? "",
-                        (value) => {
-                            draft.channelId = value || null;
-                            touch();
-                        },
-                        "Kanal für Bewerbungen"
-                    )
-                ),
-                row(
-                    "Öffentlicher Link",
-                    "Aus heißt: die Seite sagt, dass gerade niemand gesucht wird",
-                    el("label", "snitem__switch", toggle(draft.open, "Öffentlichen Link anschalten", (on) => {
+                    "Bewerbungen annehmen",
+                    "Aus heißt: Panel und Seite sagen, dass gerade niemand gesucht wird",
+                    el("label", "snitem__switch", toggle(draft.open, "Bewerbungen annehmen", (on) => {
                         draft.open = on;
                         touch();
-                    }), el("span", "", "offen"))
+                    }), el("span", "", "an"))
                 ),
-                row("Adresse", "Die kann jeder aufrufen – ausgefüllt wird sie angemeldet", el("div", "aplink", link, copy))
+                row("Öffentlicher Link", "Bei Fenster und DM sagt die Seite, wo man sich bewirbt", el("div", "aplink", link, copy)),
+                longNote
+            ),
+            card(
+                "Wo die Karte landet",
+                "Wer die Bewerbung sieht, entscheidet sich hier. Im eigenen Kanal sehen sie nur die Person selbst und die Prüfer.",
+                el("span", "apopen__label", "Art"),
+                targets,
+                targetRows
             ),
             el("div", "mcsave lvsave", save),
         ];

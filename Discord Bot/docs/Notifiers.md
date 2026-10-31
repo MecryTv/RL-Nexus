@@ -60,7 +60,7 @@ Shorts erkennt der Bot daran, dass `youtube.com/shorts/<id>` ohne Umleitung antw
 
 ## Die Nachricht
 
-Geschrieben wird sie im selben Editor wie die Ticket-Nachrichten (Text, Bild, Galerie, Trennlinie; siehe [ComponentV2Builder.md](ComponentV2Builder.md)), mit Live-Vorschau daneben. Ohne eigene Nachricht gilt die Vorlage.
+Geschrieben wird sie im Nachrichten-Studio (siehe [Messages.md](Messages.md#das-nachrichten-studio)), nur als Karte: in der Mitte die Meldung wie in Discord mit Ping darüber und Knopf darunter, *Test senden* oben in der Leiste speichert vorher, wenn etwas offen ist. Bei YouTube wählt man über dem Studio die Art (Video, Short, Live); „Vorlage“ setzt nur die gewählte zurück. Ohne eigene Nachricht gilt die Vorlage.
 
 | Twitch | | YouTube | |
 |---|---|---|---|
@@ -111,7 +111,7 @@ Eine Rolle für alle, die gerade live sind — zurück, sobald der Stream endet.
 
 ## Dashboard
 
-`/dashboard/guild/<id>/twitch-notifier` und `…/youtube-notifier` — oben die Zahlen (Streamer bzw. Kanäle, zuletzt gemeldet, Live-Rolle, Meldungen), darunter das Feld zum Hinzufügen und je Streamer eine Karte: Bild, Name, Stand („live seit 20 Minuten", „Video vor 3 Stunden", „noch nichts gemeldet"), ein Schalter zum Pausieren und **Bearbeiten**. Aufgeklappt links Kanal, Ping, „Was melden" und der Nachrichten-Editor, rechts die Vorschau.
+`/dashboard/guild/<id>/twitch-notifier` und `…/youtube-notifier` — oben die Zahlen (Streamer bzw. Kanäle, zuletzt gemeldet, Live-Rolle, Meldungen), darunter das Feld zum Hinzufügen und je Streamer eine Karte: Bild, Name, Stand („live seit 20 Minuten", „Video vor 3 Stunden", „noch nichts gemeldet"), ein Schalter zum Pausieren und **Bearbeiten**. Aufgeklappt oben Kanal, Ping und „Was melden", darunter das Nachrichten-Studio.
 
 | Route | |
 |---|---|

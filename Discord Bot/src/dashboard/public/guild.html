@@ -157,6 +157,12 @@
       </div>
 
       <div class="setcards" id="moduleCards">
+        <!-- Läuft ein Raid, steht dieser Balken über jeder Modulseite. Guild.ts. -->
+        <div class="avraid" id="raidBar" role="alert" hidden>
+          <svg><use href="#i-warn"/></svg>
+          <span></span>
+          <button class="btn btn--quiet" type="button"><svg><use href="#i-unlock"/></svg>Raid-Modus beenden</button>
+        </div>
         <!-- Hier wird eingeschaltet, für den ganzen Server. Ein frischer Server
              beginnt links mit genau zwei Einträgen. -->
         <!-- Custom Message: Nachrichten, Knoepfe, Termine, Stichwoerter. GuildMessages.ts. -->
@@ -190,6 +196,28 @@
             <span></span>
           </div>
           <div id="levelBody"></div>
+        </section>
+
+        <!-- Belohnungen: Teil des Level Systems (Plan 34), gefuellt von GuildLevels.ts. -->
+        <section class="setcard" id="level-rewards" hidden>
+          <h2 class="modhead"><svg><use href="#i-gift"/></svg>Belohnungen</h2>
+          <p class="modlead">Rollen ab einem Level und was beim Aufstieg passiert – im Chat oder per DM.</p>
+          <div class="notice modnote" id="levelRewardsNote" hidden>
+            <svg><use href="#i-warn"/></svg>
+            <span></span>
+          </div>
+          <div id="levelRewardsBody"></div>
+        </section>
+
+        <!-- Level-Karte: Teil des Level Systems (Plan 35), gefuellt von GuildLevelCard.ts. -->
+        <section class="setcard" id="level-card" hidden>
+          <h2 class="modhead"><svg><use href="#i-image"/></svg>Level-Karte</h2>
+          <p class="modlead">So sehen /level rang, das Bild beim Aufstieg und die Rangliste aus. Nimm eine Vorlage oder bau dir eigene Bausteine zusammen.</p>
+          <div class="notice modnote" id="levelCardNote" hidden>
+            <svg><use href="#i-warn"/></svg>
+            <span></span>
+          </div>
+          <div id="levelCardBody"></div>
         </section>
 
         <!-- Rangliste: Teil des Level Systems, gefuellt von GuildLeaderboard.ts. -->
@@ -303,6 +331,17 @@
           <div id="sixmansBoardBody"></div>
         </section>
 
+        <!-- Rollen-Listen (Plan 29): Staff- und Team-Listen, als Karte oder Bild. GuildRoleLists.ts. -->
+        <section class="setcard" id="role-lists" hidden>
+          <h2 class="modhead"><svg><use href="#i-users"/></svg>Rollen-Listen</h2>
+          <p class="modlead">Listen, die zeigen, wer welche Rolle hat: Staff, Teams, Creator oder was du brauchst. Der Bot schreibt sie selbst und zieht sie nach, sobald jemand eine Rolle bekommt oder verliert.</p>
+          <div class="notice modnote" id="roleListsNote" hidden>
+            <svg><use href="#i-warn"/></svg>
+            <span></span>
+          </div>
+          <div id="roleListsBody"></div>
+        </section>
+
         <!-- Matchups: Kanal, Erinnerung, Link und die Nachrichten. GuildMatchups.ts. -->
         <section class="setcard" id="matchups" hidden>
           <h2 class="modhead"><svg><use href="#i-swords"/></svg>Matchups</h2>
@@ -383,7 +422,7 @@
         <!-- Rank Roles: Rollen nach Rocket-League-Rang. GuildRankRoles.ts. -->
         <section class="setcard" id="rank-roles" hidden>
           <h2 class="modhead"><svg><use href="#i-shield-check"/></svg>Rank Roles</h2>
-          <p class="modlead">Rollen nach Rocket-League-Rang: je Playlist eine eigene. Mitglieder holen sie sich mit <code>/rangrollen holen</code> – der Bot fragt Rocket League nur dann.</p>
+          <p class="modlead">Rollen nach Rocket-League-Rang: je Playlist eine eigene. Mitglieder bekommen sie mit <code>/rank me</code> – der Bot fragt Rocket League nur dann.</p>
           <div class="notice modnote" id="rankRolesNote" hidden>
             <svg><use href="#i-warn"/></svg>
             <span></span>
@@ -488,6 +527,17 @@
             <span></span>
           </div>
           <div id="autoModBody"></div>
+        </section>
+
+        <!-- Anti Villain: gekaperte Accounts, Raids und Nukes. GuildAntiVillain.ts. -->
+        <section class="setcard" id="anti-villain" hidden>
+          <h2 class="modhead"><svg><use href="#i-shield-check"/></svg>Anti Villain</h2>
+          <p class="modlead">Auto Mod prüft Nachrichten nach Regeln. Anti Villain schaut auf Accounts: Mehrere Auffälligkeiten zusammen ergeben einen Verdacht, und ab einer Schwelle hält der Bot die Person fest, bis das Team nachgesehen hat.</p>
+          <div class="notice modnote" id="avNote" hidden>
+            <svg><use href="#i-warn"/></svg>
+            <span></span>
+          </div>
+          <div id="avBody"></div>
         </section>
 
         <!-- Logging System: Ereignisse in eigenen Kanaelen. GuildLogging.ts. -->
@@ -614,10 +664,10 @@
           </div>
         </section>
 
-        <!-- Backups: festes Modul, die Arbeit macht das Admin Dashboard. GuildBackups.ts. -->
+        <!-- Backups: festes Modul. Bot-Daten speichert das Admin Dashboard, den Discord-Server baut der Bot (Plan 32). GuildBackups.ts. -->
         <section class="setcard" id="backups" hidden>
           <h2 class="modhead"><svg><use href="#i-archive"/></svg>Backups</h2>
-          <p class="modlead">Sichert eure Module, Einstellungen, Nachrichten und die Daten eurer Mitglieder, etwa Level und Tickets. Geht etwas schief, holst du unter „Meine Backups“ den alten Stand zurück, ganz oder nur einzelne Bereiche.</p>
+          <p class="modlead">Sichert die Einstellungen des Bots für diesen Server und auf Wunsch auch den Discord-Server selbst, mit Rollen, Kanälen, Rechten und wer welche Rolle hat. Geht etwas schief, holst du unter „Meine Backups“ den alten Stand zurück, ganz oder nur einzelne Teile.</p>
           <div class="notice modnote" id="backupNote" hidden>
             <svg><use href="#i-warn"/></svg>
             <span></span>
@@ -628,7 +678,7 @@
         <!-- Meine Backups: Teil von Backups, die Liste mit Zurückladen. GuildBackups.ts. -->
         <section class="setcard" id="meine-backups" hidden>
           <h2 class="modhead"><svg><use href="#i-list"/></svg>Meine Backups</h2>
-          <p class="modlead">Alle Backups dieses Servers. Wähl eins aus, schau rein und hol zurück, was du brauchst. Vorher sichert der Bot den jetzigen Stand, du kannst also jederzeit zurück.</p>
+          <p class="modlead">Links alle Backups nach Tagen, rechts das gewählte mit allem, was drin ist, und was du damit tun kannst. Vorher sichert der Bot den jetzigen Stand, du kannst also jederzeit zurück.</p>
           <div class="notice modnote" id="backupListNote" hidden>
             <svg><use href="#i-warn"/></svg>
             <span></span>

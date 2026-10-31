@@ -1,4 +1,4 @@
-import { ChatInputCommandInteraction, AutocompleteInteraction } from "discord.js";
+import { ChatInputCommandInteraction, AutocompleteInteraction, UserContextMenuCommandInteraction } from "discord.js";
 import Category from "../enums/Category";
 import BotClient from "../client/BotClient";
 import SlashCommandData from "../types/ISlashCommandData";
@@ -29,4 +29,7 @@ export default abstract class Command implements ICommand {
     abstract Execute(interaction: ChatInputCommandInteraction): Promise<void>;
 
     async AutoComplete(interaction: AutocompleteInteraction): Promise<void> {}
+
+    /** Kontextmenü an einem Mitglied (Rechtsklick → Apps). Nur Befehle mit ContextMenuCommandBuilder. */
+    async ExecuteUser(interaction: UserContextMenuCommandInteraction): Promise<void> {}
 }

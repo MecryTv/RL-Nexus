@@ -3,11 +3,13 @@ import { EXCLUDED_TABLES } from "../../shared/backups.ts";
 import { allTables } from "../backups/data.ts";
 import { packBackup } from "../backups/data.ts";
 import { restoreBackup } from "../backups/restore.ts";
+import { idMapOf, remapGuild } from "../backups/remap.ts";
 import { runRound } from "../backups/round.ts";
 import { runPlans } from "../backups/plan.ts";
 import { backupData, backupDatabaseName, backupsReason, countHand, createBackup, deleteBackup, ensureBackupDatabase, listBackups, pruneBackups, readPlan, savePlan } from "../backups/store.ts";
 import { forgetBotOverview, signToken } from "../bot.ts";
-import type { IBackupMeta, IPlanState, IRestoreResult, IServerBackups } from "../../shared/backups.ts";
+import { gzipSync } from "node:zlib";
+import type { IBackupMeta, IPlanState, IRestoreResult, IServerBackups, IServerPartJson } from "../../shared/backups.ts";
 import { fake } from "./fakes.ts";
 import type { IConfig } from "../config.ts";
 import { query } from "../db.ts";
@@ -30,7 +32,7 @@ export async function tidyBackups(config: IConfig): Promise<void> {
     );
 
     await query("DELETE FROM poll_votes WHERE poll_id IN (SELECT id FROM polls WHERE guild_id IN (?, ?))", [GUILD, OTHER]).catch(() => undefined);
-    for (const table of ["polls", "levels", "guild_settings", "teams"]) {
+    for (const table of ["polls", "levels", "guild_settings", "teams", "module_settings", "server_id_map"]) {
         if (existing.has(table)) await query(`DELETE FROM ${table} WHERE guild_id IN (?, ?)`, [GUILD, OTHER]);
     }
 
@@ -132,7 +134,7 @@ export async function checkBackupsDb(config: IConfig, http: IHttp): Promise<void
         });
 
         const DAY = 86_400_000;
-        const daily = { enabled: true, every: "tag", weekday: 0, hour: 3, keep: 5 } as const;
+        const daily = { enabled: true, every: "tag", weekday: 0, hour: 3, keep: 5, discord: false, risky: true } as const;
         const planned = async (guildId: string): Promise<number> => (await listBackups(guildId, "server")).filter((entry) => entry.kind === "plan").length;
 
         await check("Fälliges automatisches Backup läuft einmal, nicht doppelt", async () => {
@@ -436,6 +438,130 @@ export async function checkBackupsDb(config: IConfig, http: IHttp): Promise<void
             assert.equal((await http.raw("DELETE", `${internal}/${mine.id}`, botHeaders())).statusCode, 204);
         });
 
+        await check("Nur Server: Backup ohne Bot-Daten, Teile stimmen, zählt zu den Plätzen", async () => {
+            const before = await countHand(GUILD, "server");
+            const made = await http.raw("POST", internal, botHeaders(), { parts: ["server"] });
+            assert.equal(made.statusCode, 200, made.body);
+            const meta = made.json() as IBackupMeta;
+
+            assert.deepEqual(meta.parts, ["server"]);
+            assert.equal(meta.server?.channels, 3);
+            assert.deepEqual((await backupData(meta.id, GUILD))?.tables, {});
+            assert.equal(await countHand(GUILD, "server"), before + 1);
+            assert.ok(fake.snapshotCalls.at(-1) === `${GUILD}:1`, "mit Bildern gelesen");
+
+            const server = await http.raw("GET", `${internal}/${meta.id}/server`, botHeaders());
+            assert.equal(server.statusCode, 200, server.body);
+            assert.equal((server.json() as { counts: { roles: number } }).counts.roles, 2);
+            assert.ok(fake.snapshotCalls.length >= 1);
+            await deleteBackup(meta.id, GUILD);
+        });
+
+        await check("Bot kann den Server nicht lesen: kein Backup, Satz dazu", async () => {
+            const saved = fake.snapshot;
+            fake.snapshot = null;
+
+            try {
+                const made = await http.raw("POST", internal, botHeaders(), { parts: ["bot", "server"] });
+                assert.equal(made.statusCode, 502, made.body);
+            } finally {
+                fake.snapshot = saved;
+            }
+        });
+
+        await check("Altes Backup (v1) gilt als nur Bot", async () => {
+            const data = gzipSync(JSON.stringify({ version: 1, tables: {} }));
+            const inserted = await query<{ insertId: number }>(
+                `INSERT INTO \`${backupDatabaseName()}\`.guild_backups (guild_id, guild_name, kind, origin, bytes, counts, data) VALUES (?, 'check:db Server', 'hand', 'server', ?, '{}', ?)`,
+                [GUILD, data.length, data]
+            );
+            const meta = (await listBackups(GUILD, "server")).find((entry) => entry.id === inserted.insertId);
+
+            assert.deepEqual(meta?.parts, ["bot"]);
+            assert.equal(meta?.server, null);
+            await deleteBackup(inserted.insertId, GUILD);
+        });
+
+        await check("Sicherheits-Backup bei „Vor riskanten Änderungen“ aus: übersprungen, nichts angelegt", async () => {
+            await savePlan(GUILD, "check:db Server", { enabled: false, every: "woche", weekday: 6, hour: 3, keep: 5, discord: false, risky: false }, "nutzer1", new Date());
+            const count = (await listBackups(GUILD)).length;
+            const answer = await http.raw("POST", internal, botHeaders(), { kind: "schutz", note: "vor dem Anti-Nuke: Test" });
+
+            assert.equal(answer.statusCode, 200, answer.body);
+            assert.equal(typeof (answer.json() as { skipped?: string }).skipped, "string");
+            assert.equal((await listBackups(GUILD)).length, count);
+
+            await savePlan(GUILD, "check:db Server", { enabled: false, every: "woche", weekday: 6, hour: 3, keep: 5, discord: false, risky: true }, "nutzer1", new Date());
+            const made = await http.raw("POST", internal, botHeaders(), { kind: "schutz", note: "vor dem Anti-Nuke: Test" });
+            assert.deepEqual((made.json() as IBackupMeta).parts, ["bot", "server"]);
+            await query(`DELETE FROM \`${backupDatabaseName()}\`.guild_backups WHERE id = ?`, [(made.json() as IBackupMeta).id]);
+        });
+
+        await check("Während eines Ladens: kein neues Backup (409)", async () => {
+            const row = await query<{ insertId: number }>(
+                "INSERT INTO server_restores (guild_id, target_guild_id, backup_id, mode, status, phase, done, state, actor_id, actor_name, started_at, updated_at) VALUES (?, ?, 1, 'repair', 'running', 'server', 0, '{}', '1', 'check', 0, 0)",
+                [GUILD, GUILD]
+            );
+
+            try {
+                const answer = await http.raw("POST", internal, botHeaders(), { note: "während des Ladens" });
+                assert.equal(answer.statusCode, 409, answer.body);
+            } finally {
+                await query("DELETE FROM server_restores WHERE id = ?", [row.insertId]);
+            }
+        });
+
+        await check("Plan mit Discord-Server: automatisches Backup mit beiden Teilen; Bot nicht lesbar: nur Bot, Bot erfährt es", async () => {
+            await savePlan(GUILD, "check:db Server", { enabled: true, every: "tag", weekday: 0, hour: 0, keep: 5, discord: true, risky: true }, "nutzer1", new Date(Date.now() - 2 * 86_400_000));
+            await query(`UPDATE \`${backupDatabaseName()}\`.backup_plans SET enabled_at = ?, last_ok = NULL WHERE guild_id = ?`, [new Date(Date.now() - 2 * 86_400_000), GUILD]);
+            // Der nachgestellte Bot nennt GUILD nicht: „noch nicht bereit“, dann wird trotzdem gesichert, und den Server liest er weiter.
+            fake.notReady = true;
+            forgetBotOverview();
+            await runPlans(config, Date.now());
+            const both = (await listBackups(GUILD, "server")).find((entry) => entry.kind === "plan");
+            assert.deepEqual(both?.parts, ["bot", "server"]);
+
+            const saved = fake.snapshot;
+            fake.snapshot = null;
+            fake.backupFailed.length = 0;
+
+            try {
+                await query(`UPDATE \`${backupDatabaseName()}\`.backup_plans SET last_ok = NULL WHERE guild_id = ?`, [GUILD]);
+                await runPlans(config, Date.now() + 1000);
+                const latest = (await listBackups(GUILD, "server")).filter((entry) => entry.kind === "plan")[0];
+                assert.deepEqual(latest?.parts, ["bot"]);
+                assert.ok(fake.backupFailed.some((entry) => entry.guildId === GUILD), JSON.stringify(fake.backupFailed));
+            } finally {
+                fake.snapshot = saved;
+                fake.notReady = false;
+                forgetBotOverview();
+                await savePlan(GUILD, "check:db Server", { enabled: false, every: "woche", weekday: 6, hour: 3, keep: 5, discord: false, risky: true }, "nutzer1", new Date());
+            }
+        });
+
+        await check("Review I4: Während eines Ladens entsteht kein automatisches Backup", async () => {
+            await savePlan(GUILD, "check:db Server", { enabled: true, every: "tag", weekday: 0, hour: 0, keep: 5, discord: false, risky: true }, "nutzer1", new Date(Date.now() - 2 * 86_400_000));
+            await query(`UPDATE \`${backupDatabaseName()}\`.backup_plans SET enabled_at = ?, last_ok = NULL WHERE guild_id = ?`, [new Date(Date.now() - 2 * 86_400_000), GUILD]);
+            const count = async () => (await listBackups(GUILD)).filter((entry) => entry.kind === "plan").length;
+            const before = await count();
+            const running = await query<{ insertId: number }>(
+                "INSERT INTO server_restores (guild_id, target_guild_id, backup_id, mode, status, phase, done, state, actor_id, actor_name, started_at, updated_at) VALUES (?, ?, 1, 'repair', 'running', 'server', 0, '{}', '1', 'check', 0, 0)",
+                [GUILD, GUILD]
+            );
+            fake.notReady = true;
+            forgetBotOverview();
+
+            try {
+                await runPlans(config, Date.now() + 5000);
+                assert.equal(await count(), before, "kein neues während des Ladens");
+            } finally {
+                fake.notReady = false;
+                forgetBotOverview();
+                await query("DELETE FROM server_restores WHERE id = ?", [running.insertId]);
+                await savePlan(GUILD, "check:db Server", { enabled: false, every: "woche", weekday: 6, hour: 3, keep: 5, discord: false, risky: true }, "nutzer1", new Date());
+            }
+        });
+
         await check("Interne Schnittstelle: Einstellung prüfen und speichern", async () => {
             const wrong = await http.raw("PUT", `${internal}/plan`, botHeaders(), { enabled: true, every: "tag", weekday: 0, hour: 3, keep: 15 });
             assert.deepEqual([wrong.statusCode, wrong.json().error], [400, "Behalten geht von 1 bis 14."]);
@@ -455,12 +581,144 @@ export async function checkBackupsDb(config: IConfig, http: IHttp): Promise<void
             assert.equal((page.json() as { plan: IPlanState | null }).plan?.plan.every, "woche", "aus dem Test davor");
         });
 
+        // W-0023: Zwei Klicks zugleich bei 9 von 10 - beide zählten 9 und legten an, dann waren es 11.
+        await check("Interne Schnittstelle: zwei Backups zugleich bei 9 von 10 ergeben 10", async () => {
+            const used = await countHand(GUILD, "server");
+            for (let index = used; index < 9; index++) await createBackup({ guildId: GUILD, guildName: "check:db Server", kind: "hand", note: null, byName: null, origin: "server" });
+
+            const both = await Promise.all([http.raw("POST", internal, botHeaders(), { note: null }), http.raw("POST", internal, botHeaders(), { note: null })]);
+            assert.deepEqual(both.map((answer) => answer.statusCode).sort(), [200, 409], both.map((answer) => answer.body).join(" | "));
+            assert.equal(await countHand(GUILD, "server"), 10);
+        });
+
         await check("Interne Schnittstelle: höchstens 10 Backups von Hand", async () => {
             const used = await countHand(GUILD, "server");
             for (let index = used; index < 10; index++) await createBackup({ guildId: GUILD, guildName: "check:db Server", kind: "hand", note: null, byName: null, origin: "server" });
 
             const full = await http.raw("POST", internal, botHeaders(), { note: null });
             assert.deepEqual([full.statusCode, full.json().error], [409, "Alle 10 Plätze sind belegt. Lösch erst ein altes Backup."]);
+        });
+
+        // Plan 31: Anti Villain legt vor einem Nuke ein Sicherheits-Backup an.
+        await check("Sicherheits-Backup: nur der Bot, zählt nicht zu den Plätzen, bleibt 7 Tage", async () => {
+            assert.equal(await countHand(GUILD, "server"), 10, "Ausgangslage: alle Plätze belegt");
+
+            const safety = await http.raw("POST", internal, botHeaders(), { note: "vor dem Anti-Nuke: Tim löschte #regeln", kind: "schutz" });
+            assert.equal(safety.statusCode, 200, safety.body);
+            const made = safety.json() as IBackupMeta;
+            assert.deepEqual([made.kind, made.origin, made.note], ["schutz", "server", "vor dem Anti-Nuke: Tim löschte #regeln"]);
+            assert.equal(await countHand(GUILD, "server"), 10, "zählt nicht zu den Plätzen");
+            assert.equal((await http.raw("POST", internal, botHeaders(token(["admin"])), { kind: "schutz" })).statusCode, 401, "falscher Scope");
+            assert.equal((await http.raw("POST", internal, botHeaders(), { kind: "nacht" })).statusCode, 400, "andere Arten nicht");
+
+            await query(`UPDATE \`${backupDatabaseName()}\`.guild_backups SET created_at = NOW() - INTERVAL 6 DAY WHERE id = ?`, [made.id]);
+            await pruneBackups(new Date());
+            assert.ok((await listBackups(GUILD, "server")).some((entry) => entry.id === made.id), "6 Tage: bleibt");
+            await query(`UPDATE \`${backupDatabaseName()}\`.guild_backups SET created_at = NOW() - INTERVAL 8 DAY WHERE id = ?`, [made.id]);
+            await pruneBackups(new Date());
+            assert.ok(!(await listBackups(GUILD, "server")).some((entry) => entry.id === made.id), "8 Tage: weg");
+        });
+
+        const OLD_CH = "300000000000000101";
+        const NEW_CH = "300000000000000201";
+        const OLD_ROLE = "300000000000000102";
+        const NEW_ROLE = "300000000000000202";
+        const pollChannel = async (guildId: string): Promise<string | undefined> => (await query<{ channel_id: string }[]>("SELECT channel_id FROM polls WHERE guild_id = ? ORDER BY id DESC LIMIT 1", [guildId]))[0]?.channel_id;
+        const addPoll = (guildId: string, number: number) =>
+            query("INSERT INTO polls (guild_id, number, kind, channel_id, question, options, settings, created_by, created_at) VALUES (?, ?, 'buttons', ?, 'Frage?', '[]', '{}', '1', 1)", [guildId, number, OLD_CH]);
+
+        await check("Zuordnung: Ketten aufgelöst, nur dieser Server", async () => {
+            await query("INSERT INTO server_id_map (guild_id, old_id, new_id, kind, created_at) VALUES (?, ?, '300000000000000150', 'channel', 1), (?, '300000000000000150', ?, 'channel', 2), (?, ?, ?, 'role', 3)", [GUILD, OLD_CH, GUILD, NEW_CH, GUILD, OLD_ROLE, NEW_ROLE]);
+
+            const map = await idMapOf(GUILD);
+            assert.equal(map.get(OLD_CH), NEW_CH);
+            assert.equal(map.get(OLD_ROLE), NEW_ROLE);
+            assert.equal((await idMapOf(OTHER)).size, 0);
+        });
+
+        await check("Umschreiben: alte IDs in Spalten und JSON werden neu, andere Server bleiben", async () => {
+            await addPoll(GUILD, 90);
+            await addPoll(OTHER, 90);
+            await query("INSERT INTO module_settings (guild_id, module, config) VALUES (?, 'checkremap', ?), (?, 'checkremap', ?)", [GUILD, JSON.stringify({ channelId: OLD_CH, roles: [OLD_ROLE] }), OTHER, JSON.stringify({ channelId: OLD_CH })]);
+
+            const result = await remapGuild(GUILD);
+            const [settings] = await query<{ config: unknown }[]>("SELECT config FROM module_settings WHERE guild_id = ? AND module = 'checkremap'", [GUILD]);
+            const [other] = await query<{ config: unknown }[]>("SELECT config FROM module_settings WHERE guild_id = ? AND module = 'checkremap'", [OTHER]);
+            const text = (value: unknown) => (typeof value === "string" ? value : JSON.stringify(value));
+
+            assert.equal(await pollChannel(GUILD), NEW_CH);
+            assert.equal(await pollChannel(OTHER), OLD_CH, "anderer Server");
+            assert.ok(text(settings?.config).includes(NEW_CH) && text(settings?.config).includes(NEW_ROLE) && !text(settings?.config).includes(OLD_CH), text(settings?.config));
+            assert.ok(text(other?.config).includes(OLD_CH), "anderer Server, JSON");
+            assert.ok(result.rows >= 2 && result.tables >= 2, JSON.stringify(result));
+            assert.equal((await idMapOf(GUILD)).get(OLD_CH), NEW_CH, "die Zuordnung selbst bleibt");
+            assert.deepEqual(await remapGuild(GUILD), { tables: 0, rows: 0 }, "zweimal ändert nichts");
+        });
+
+        await check("Review C2: Die Server-ID wird nie umgeschrieben, auch wenn sie in der Zuordnung steht", async () => {
+            await query("INSERT INTO server_id_map (guild_id, old_id, new_id, kind, created_at) VALUES (?, ?, '300000000000000999', 'channel', 4)", [GUILD, GUILD]);
+
+            try {
+                assert.ok(!(await idMapOf(GUILD)).has(GUILD), "nicht in der Zuordnung");
+                await remapGuild(GUILD);
+                const [row] = await query<{ n: number }[]>("SELECT COUNT(*) AS n FROM polls WHERE guild_id = ?", [GUILD]);
+                assert.ok(Number(row?.n) > 0, "Zeilen hängen weiter am Server");
+            } finally {
+                await query("DELETE FROM server_id_map WHERE guild_id = ? AND old_id = ?", [GUILD, GUILD]);
+            }
+        });
+
+        await check("Altes Backup laden: Zeilen kommen mit den neuen IDs zurück", async () => {
+            const backup = await insertRaw({ polls: [{ guild_id: GUILD, number: 91, kind: "buttons", channel_id: OLD_CH, question: "Alt?", options: "[]", settings: "{}", created_by: "1", created_at: 1 }] });
+
+            await restoreBackup(config, { guildId: GUILD, backupId: backup, areas: ["community"], actor });
+
+            assert.equal(await pollChannel(GUILD), NEW_CH);
+            await query(`DELETE FROM \`${backupDatabaseName()}\`.guild_backups WHERE id = ?`, [backup]);
+        });
+
+        await check("Interne Schnittstelle: Discord-Server laden nur mit Namen, vorher mit Server-Teil", async () => {
+            const made = await createBackup({ guildId: GUILD, guildName: "check:db Server", kind: "hand", note: null, byName: null, origin: "server", parts: ["bot", "server"], server: { ...(fake.snapshot as IServerPartJson), emojis: [{ id: "300000000000000301", name: "gg", image: "AAAA" }] } });
+            const url = `${internal}/${made.id}/server`;
+            const before = (await listBackups(GUILD, "server")).length;
+
+            const wrong = await http.raw("POST", url, botHeaders(), { confirm: "Falsch", parts: ["roles", "channels"], areas: [], mode: "repair" });
+            assert.equal(wrong.statusCode, 400, wrong.body);
+            assert.match(wrong.json().error, /check:db Server/);
+            assert.equal((await listBackups(GUILD, "server")).length, before, "ohne Namen kein vorher");
+
+            const bad = await http.raw("POST", url, botHeaders(), { confirm: "check:db Server", parts: ["gibtsnicht"], areas: [], mode: "repair" });
+            assert.equal(bad.statusCode, 400, bad.body);
+
+            const right = await http.raw("POST", url, botHeaders(), { confirm: " CHECK:DB server ", parts: ["roles", "channels"], areas: ["level"], mode: "repair" });
+            assert.equal(right.statusCode, 200, right.body);
+            const answer = right.json() as { safetyId: number; server: { counts: { roles: number }; emojis?: { image: unknown }[] } };
+            const safety = (await listBackups(GUILD, "server")).find((entry) => entry.id === answer.safetyId);
+
+            assert.deepEqual([safety?.kind, safety?.origin, safety?.parts], ["vorher", "server", ["bot", "server"]]);
+            assert.equal(answer.server.counts.roles, 2);
+            assert.deepEqual(answer.server.emojis?.map((emoji) => emoji.image), [null], "ohne Bilder");
+            assert.deepEqual([(right.json() as { backup?: IBackupMeta }).backup?.id, (right.json() as { backup?: IBackupMeta }).backup?.kind], [made.id, "hand"], "Art und Zeit für das Trümmer-Fenster");
+
+            // Danach lädt der Bot die Bot-Daten mit demselben „vorher“, statt ein zweites anzulegen.
+            const count = (await listBackups(GUILD, "server")).length;
+            const data = await http.raw("POST", `${internal}/${made.id}/restore`, botHeaders(), { areas: ["level"], confirm: "check:db Server", safetyId: answer.safetyId });
+            assert.equal(data.statusCode, 200, data.body);
+            assert.equal((data.json() as IRestoreResult).safetyId, answer.safetyId);
+            assert.equal((await listBackups(GUILD, "server")).length, count, "kein zweites vorher");
+            const notSafety = await http.raw("POST", `${internal}/${made.id}/restore`, botHeaders(), { areas: ["level"], confirm: "check:db Server", safetyId: made.id });
+            assert.equal(notSafety.statusCode, 400, "nur ein vorher taugt");
+
+            const other = await http.raw("POST", url, { ...botHeaders(), "x-target-name": encodeURIComponent("Zweiter Server") }, { confirm: "check:db Server", parts: ["roles"], areas: [], mode: "other", targetGuildId: OTHER });
+            assert.equal(other.statusCode, 400, "beim anderen Server zählt dessen Name");
+            const otherRight = await http.raw("POST", url, { ...botHeaders(), "x-target-name": encodeURIComponent("Zweiter Server") }, { confirm: "zweiter server", parts: ["roles"], areas: ["level"], mode: "other", targetGuildId: OTHER });
+            assert.equal(otherRight.statusCode, 200, otherRight.body);
+            const otherSafety = (await listBackups(OTHER, "server")).find((entry) => entry.id === (otherRight.json() as { safetyId: number }).safetyId);
+            assert.deepEqual([otherSafety?.kind, otherSafety?.parts], ["vorher", ["server"]], "ohne Bot-Daten auf dem anderen Server");
+
+            const remap = await http.raw("POST", `${internal}/remap`, botHeaders());
+            assert.equal(remap.statusCode, 200, remap.body);
+            assert.equal(typeof (remap.json() as { rows: number }).rows, "number");
         });
 
         await check("Route: Zurückladen nur mit dem richtigen Namen, steht im Protokoll", async () => {

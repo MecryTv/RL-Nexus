@@ -1,12 +1,33 @@
-import { ButtonInteraction, Guild, GuildMember, MessageEditOptions, PermissionFlagsBits } from "discord.js";
-import BotClient from "../client/BotClient";
-import { ApplyCard } from "../builder/ApplyView";
 import {
+    ButtonInteraction,
+    ChannelType,
+    DiscordAPIError,
+    Guild,
+    GuildMember,
+    Message,
+    MessageCreateOptions,
+    MessageEditOptions,
+    OverwriteResolvable,
+    OverwriteType,
+    PermissionFlagsBits,
+    PermissionsString,
+} from "discord.js";
+import BotClient from "../client/BotClient";
+import { ApplyCard, ApplyPanelView, IsApplyPanel } from "../builder/ApplyView";
+import {
+    AFTER_DECISIONS,
+    APPLY_MODES,
     APPLY_MODULE,
+    APPLY_TARGETS,
+    ApplyLink,
+    ChannelName,
+    CooldownText,
+    DEFAULT_CHANNEL_NAME,
     DefaultApplySettings,
     DefaultForm,
     DefaultFormSettings,
     MAX_ANSWER,
+    MAX_CHANNEL_NAME,
     MAX_CHOICES,
     MAX_DESCRIPTION,
     MAX_FORMS,
@@ -16,11 +37,16 @@ import {
     MAX_NOTE,
     MAX_QUESTIONS,
     MAX_REVIEWERS,
+    STAFF_ONLY,
 } from "../constants/Apply";
 import {
+    AfterDecision,
+    ApplyMode,
     ApplyStatus,
+    ApplyTarget,
     IApplyAnswer,
     IApplyForm,
+    IApplyPanel,
     IApplyQuestion,
     IApplySettings,
     IApplySubmission,
@@ -28,8 +54,21 @@ import {
     QuestionKind,
 } from "../interfaces/services/apply/IApply";
 import logger from "../utils/logger";
+import ApplyFlow from "./ApplyFlow";
 
-export class ApplyError extends Error {}
+/**
+ * Ein Satz für den Bewerber oder das Dashboard. status: was die Webseite als
+ * HTTP-Code bekommt. title: die Überschrift, wenn Discord die Meldung zeigt.
+ */
+export class ApplyError extends Error {
+    constructor(
+        message: string,
+        readonly status = 400,
+        readonly title = "Gerade nicht"
+    ) {
+        super(message);
+    }
+}
 
 function IsRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -47,6 +86,50 @@ function Text(value: unknown, max: number, fallback = ""): string {
 
 const DAY = 86_400_000;
 
+/** Was Bewerber und Prüfer im eigenen Kanal dürfen - dieselben Rechte wie im Ticket (TicketService). */
+const MEMBER_ALLOW: PermissionsString[] = ["ViewChannel", "SendMessages", "ReadMessageHistory", "AttachFiles", "EmbedLinks"];
+const BOT_ALLOW: PermissionsString[] = [...MEMBER_ALLOW, "ManageChannels", "ManageMessages"];
+
+/** Ein Overwrite darf nichts erlauben, was der Bot selbst nicht hat - sonst lehnt Discord den ganzen Kanal ab. */
+function Allowed(guild: Guild, wanted: PermissionsString[]): PermissionsString[] {
+    const mine = guild.members.me?.permissions;
+
+    return wanted.filter((permission) => mine?.has(permission));
+}
+
+/**
+ * Wer einen eigenen Bewerbungskanal sieht (Plan 30): wie bei Tickets
+ * niemand außer dem Bewerber, den Prüfern und dem Bot. allow und botAllow
+ * sind schon auf das gekürzt, was der Bot selbst darf.
+ */
+export function ApplyChannelOverwrites(input: {
+    everyoneId: string;
+    botId: string;
+    applicantId: string;
+    reviewRoles: string[];
+    reviewUsers: string[];
+    allow: PermissionsString[];
+    botAllow: PermissionsString[];
+}): OverwriteResolvable[] {
+    const users = [...new Set([input.applicantId, ...input.reviewUsers])].filter((id) => id !== input.botId);
+
+    return [
+        { id: input.everyoneId, deny: ["ViewChannel"] },
+        { id: input.botId, type: OverwriteType.Member, allow: input.botAllow },
+        ...users.map((id) => ({ id, type: OverwriteType.Member, allow: input.allow })),
+        ...[...new Set(input.reviewRoles)].map((id) => ({ id, type: OverwriteType.Role, allow: input.allow })),
+    ];
+}
+
+/** Fehlende Rechte als Satz fürs Dashboard, alles andere bleibt, wie es ist. */
+function Explain(error: unknown): Error {
+    if (error instanceof DiscordAPIError && (error.code === 50013 || error.code === 50001)) {
+        return new ApplyError("Mir fehlen Rechte in diesem Kanal: „Kanal ansehen“ und „Nachrichten senden“.");
+    }
+
+    return error instanceof Error ? error : new Error(String(error));
+}
+
 /**
  * Apply System: Bewerbungen. Formulare kommen aus dem Dashboard, abgeschickt
  * wird über einen öffentlichen Link, entschieden wird im Dashboard oder direkt
@@ -54,9 +137,12 @@ const DAY = 86_400_000;
  */
 export default class ApplyService {
     private readonly client: BotClient;
+    /** Bewerben in Discord: Fenster und DM (Plan 24). Hängt hier, weil der Client nur den Service kennt. */
+    readonly flow: ApplyFlow;
 
     constructor(client: BotClient) {
         this.client = client;
+        this.flow = new ApplyFlow(client);
     }
 
     /* ----------------------------------------------------------
@@ -78,19 +164,43 @@ export default class ApplyService {
         const channel = typeof raw.channelId === "string" ? guild.channels.cache.get(raw.channelId) : null;
 
         return {
+            mode: APPLY_MODES.includes(raw.mode as ApplyMode) ? (raw.mode as ApplyMode) : previous.mode,
+            // Das Panel schreibt nur der Bot beim Senden.
+            panel: previous.panel,
             reviewRoles: ids(raw.reviewRoles, previous.reviewRoles, (id) => guild.roles.cache.has(id) && id !== guild.id),
             reviewUsers: ids(raw.reviewUsers, previous.reviewUsers, (id) => /^\d{17,20}$/.test(id)),
             channelId: raw.channelId === undefined ? previous.channelId : channel?.isTextBased() ? channel.id : null,
             open: typeof raw.open === "boolean" ? raw.open : previous.open,
+            target: APPLY_TARGETS.includes(raw.target as ApplyTarget) ? (raw.target as ApplyTarget) : previous.target,
+            categoryId:
+                raw.categoryId === undefined
+                    ? previous.categoryId
+                    : typeof raw.categoryId === "string" && guild.channels.cache.get(raw.categoryId)?.type === ChannelType.GuildCategory
+                      ? raw.categoryId
+                      : null,
+            channelName: raw.channelName === undefined ? previous.channelName : Text(raw.channelName, MAX_CHANNEL_NAME) || DEFAULT_CHANNEL_NAME,
+            afterDecision: AFTER_DECISIONS.includes(raw.afterDecision as AfterDecision) ? (raw.afterDecision as AfterDecision) : previous.afterDecision,
         };
     }
 
-    async SaveSettings(guild: Guild, input: unknown): Promise<IApplySettings> {
+    /** warning: gespeichert, aber der eigene Kanal geht so noch nicht (Plan 30). */
+    async SaveSettings(guild: Guild, input: unknown): Promise<{ settings: IApplySettings; warning: string | null }> {
         const settings = this.CleanSettings(guild, input, await this.Settings(guild.id));
 
         await this.client.moduleSettings.Save(guild.id, APPLY_MODULE, settings);
+        await this.RefreshPanel(guild).catch(() => undefined);
 
-        return settings;
+        const can = (flag: bigint): boolean => Boolean(guild.members.me?.permissions.has(flag));
+        const warning =
+            settings.target !== "channel"
+                ? null
+                : !can(PermissionFlagsBits.ManageChannels)
+                  ? "Mir fehlt „Kanäle verwalten“. Bis das da ist, landen die Karten im Sammelkanal."
+                  : settings.afterDecision === "close" && !can(PermissionFlagsBits.ManageRoles)
+                    ? "Mir fehlt „Rollen verwalten“. Ohne kann ich die Person nach der Entscheidung nicht aus ihrem Kanal nehmen."
+                    : null;
+
+        return { settings, warning };
     }
 
     /**
@@ -211,6 +321,7 @@ export default class ApplyService {
         const form = await this.client.applyForms.Create({ guildId: guild.id, createdBy: member.id, ...clean });
 
         logger.user(`📋 Bewerbungs-Formular "${form.name}" auf ${guild.id} angelegt (von ${member.id})`);
+        await this.RefreshPanel(guild).catch(() => undefined);
 
         return form;
     }
@@ -219,6 +330,7 @@ export default class ApplyService {
         const previous = await this.Form(guild.id, id);
 
         await this.client.applyForms.Save(id, this.CleanForm(guild, input, previous));
+        await this.RefreshPanel(guild).catch(() => undefined);
 
         return this.Form(guild.id, id);
     }
@@ -228,6 +340,131 @@ export default class ApplyService {
         await this.Form(guild.id, id);
         await this.client.applySubmissions.RemoveOfForm(id);
         await this.client.applyForms.Remove(id);
+        await this.RefreshPanel(guild).catch(() => undefined);
+    }
+
+    /* ----------------------------------------------------------
+       Das Panel in Discord (Plan 24)
+       ---------------------------------------------------------- */
+    private readonly sending = new Set<string>();
+
+    private async PanelView(guild: Guild, settings: IApplySettings): Promise<MessageCreateOptions> {
+        return ApplyPanelView(guild, settings, await this.Forms(guild.id), ApplyLink(this.client.server.BaseURL, guild.id));
+    }
+
+    /** panel schreibt nur der Bot - an CleanSettings vorbei. */
+    private async SavePanel(guildId: string, panel: IApplyPanel): Promise<void> {
+        await this.client.moduleSettings.Save(guildId, APPLY_MODULE, { ...(await this.Settings(guildId)), panel });
+    }
+
+    /**
+     * Stellt das Panel in einen Kanal, aber nie ein zweites daneben. Wie beim
+     * Ticket-Panel: Steht dort schon eins (unter den letzten 50 Nachrichten
+     * oder das gemerkte), wird es bearbeitet und jedes weitere gelöscht. Zieht
+     * es in einen anderen Kanal, verschwindet das alte.
+     */
+    async SendPanel(guild: Guild, channelId: string): Promise<{ url: string; panel: IApplyPanel }> {
+        if (this.sending.has(guild.id)) throw new ApplyError("Das Panel wird gerade schon gesendet.");
+
+        this.sending.add(guild.id);
+
+        try {
+            return await this.PlacePanel(guild, channelId);
+        } finally {
+            this.sending.delete(guild.id);
+        }
+    }
+
+    /** Das Panel neu zeichnen, an dem gerade gewählt wurde. Andere Nachrichten mit Menü bleiben, wie sie sind (W-0020). */
+    async ResetPanel(message: Message): Promise<void> {
+        const guild = message.guild;
+
+        if (!guild || !IsApplyPanel(message, this.client.user!.id, guild.id)) return;
+
+        const view = await this.PanelView(guild, await this.Settings(guild.id));
+
+        await message.edit({ ...view, attachments: [] } as MessageEditOptions).catch(() => undefined);
+    }
+
+    private async PlacePanel(guild: Guild, channelId: string): Promise<{ url: string; panel: IApplyPanel }> {
+        const channel = guild.channels.cache.get(channelId);
+
+        if (!channel || (channel.type !== ChannelType.GuildText && channel.type !== ChannelType.GuildAnnouncement)) {
+            throw new ApplyError("Das Panel braucht einen Textkanal.");
+        }
+
+        const settings = await this.Settings(guild.id);
+        const botId = this.client.user!.id;
+        const recent = await channel.messages.fetch({ limit: 50 }).catch(() => null);
+        const found = recent ? [...recent.values()].filter((entry) => IsApplyPanel(entry, botId, guild.id)) : [];
+        const tracked = settings.panel.channelId === channelId ? settings.panel.messageId : null;
+
+        // Das gemerkte Panel kann älter sein als die letzten 50 Nachrichten oder ohne Knöpfe dastehen.
+        if (tracked && !found.some((entry) => entry.id === tracked)) {
+            const known = await channel.messages.fetch(tracked).catch(() => null);
+
+            if (known) found.push(known);
+        }
+
+        const view = await this.PanelView(guild, settings);
+        const target = found.find((entry) => entry.id === tracked) ?? found[0] ?? null;
+        const edited = target ? await target.edit({ ...view, attachments: [] } as MessageEditOptions).catch(() => null) : null;
+        const message =
+            edited ??
+            (await channel.send(view).catch((error) => {
+                throw Explain(error);
+            }));
+
+        for (const extra of found) {
+            if (extra.id !== message.id) await extra.delete().catch(() => undefined);
+        }
+
+        const { channelId: before, messageId: old } = settings.panel;
+
+        if (before && before !== channelId && old) {
+            const previous = guild.channels.cache.get(before);
+
+            if (previous?.isTextBased()) await previous.messages.delete(old).catch(() => undefined);
+        }
+
+        const panel = { channelId, messageId: message.id };
+
+        await this.SavePanel(guild.id, panel);
+        logger.user(`📋 Bewerbungs-Panel auf ${guild.id} in ${channelId}`);
+
+        return { url: message.url, panel };
+    }
+
+    /**
+     * Ein liegendes Panel an Formulare und Einstellungen anpassen. Ist die
+     * Nachricht oder der Kanal weg, vergisst der Bot das Panel. Andere Fehler
+     * (Rechte, Discord hakt) brechen nichts ab.
+     */
+    async RefreshPanel(guild: Guild): Promise<void> {
+        const settings = await this.Settings(guild.id);
+        const { channelId, messageId } = settings.panel;
+
+        if (!channelId || !messageId) return;
+
+        try {
+            const channel = guild.channels.cache.get(channelId);
+
+            if (!channel?.isTextBased()) throw Object.assign(new Error("Unknown Channel"), { code: 10003 });
+
+            const message = await channel.messages.fetch(messageId);
+
+            await message.edit({ ...(await this.PanelView(guild, settings)), attachments: [] } as MessageEditOptions);
+        } catch (error) {
+            const code = (error as { code?: unknown }).code;
+
+            if (code === 10008 || code === 10003) {
+                await this.SavePanel(guild.id, { channelId: null, messageId: null });
+
+                return;
+            }
+
+            logger.warn(`📋 Bewerbungs-Panel auf ${guild.id} nicht aktualisiert: ${error instanceof Error ? error.message : String(error)}`);
+        }
     }
 
     /* ----------------------------------------------------------
@@ -250,10 +487,29 @@ export default class ApplyService {
     }
 
     /**
-     * Eine Bewerbung geht ein. Geprüft wird alles hier - die Route weiß nur,
-     * wer angemeldet ist.
+     * Was GET /api/public/apply/:id liefert. Bei Fenster und DM nimmt die Seite
+     * nichts an: dann nur, wo das Panel liegt und wie viele Fragen es gibt.
      */
-    async Submit(guildId: string, userId: string, formId: number, input: unknown): Promise<IApplySubmission> {
+    PublicPayload(guild: Guild, forms: IApplyForm[], settings: IApplySettings, me: { id: string; member: boolean } | null): object {
+        const channel = settings.panel.channelId && settings.panel.messageId ? guild.channels.cache.get(settings.panel.channelId) : null;
+        const head = {
+            guild: { id: guild.id, name: guild.name, icon: guild.iconURL?.({ extension: "png", size: 128 }) ?? null },
+            mode: settings.mode,
+            panel: channel ? { channelId: channel.id, name: channel.name, url: `https://discord.com/channels/${guild.id}/${channel.id}` } : null,
+        };
+        const about = (form: IApplyForm) => ({ id: form.id, name: form.name, description: form.description, emoji: form.emoji });
+
+        if (settings.mode === "web") return { ...head, me, forms: forms.map((form) => ({ ...about(form), questions: form.questions })) };
+
+        return { ...head, forms: forms.map((form) => ({ ...about(form), questions: form.questions.length })) };
+    }
+
+    /**
+     * Darf diese Person sich auf dieses Formular bewerben? Gilt für jeden Weg:
+     * der Klick im Panel fragt vorher, Submit am Ende noch einmal. Wirft
+     * ApplyError mit dem Satz für den Bewerber.
+     */
+    async Eligible(guildId: string, userId: string, formId: number): Promise<{ guild: Guild; member: GuildMember; form: IApplyForm; settings: IApplySettings }> {
         const open = await this.Public(guildId);
 
         if (!open) throw new ApplyError("Auf diesem Server kann man sich gerade nicht bewerben.");
@@ -268,13 +524,13 @@ export default class ApplyService {
         if (!member) throw new ApplyError("Du musst auf dem Server sein, um dich zu bewerben.");
 
         if (form.settings.requireRole && !member.roles.cache.has(form.settings.requireRole)) {
-            throw new ApplyError("Dir fehlt die Rolle, die dieses Formular voraussetzt.");
+            throw new ApplyError("Dir fehlt die Rolle, die dieses Formular voraussetzt.", 400, "Das geht noch nicht");
         }
 
         const age = Date.now() - member.user.createdTimestamp;
 
         if (form.settings.minAccountDays && age < form.settings.minAccountDays * DAY) {
-            throw new ApplyError(`Dein Discord-Konto muss mindestens ${form.settings.minAccountDays} Tage alt sein.`);
+            throw new ApplyError(`Dein Discord-Konto muss mindestens ${form.settings.minAccountDays} Tage alt sein.`, 400, "Das geht noch nicht");
         }
 
         const last = await this.client.applySubmissions.Last(form.id, userId);
@@ -285,11 +541,30 @@ export default class ApplyService {
             const free = last.decidedAt + form.settings.cooldownDays * DAY;
 
             if (Date.now() < free) {
-                throw new ApplyError(`Nach einer Absage sind ${form.settings.cooldownDays} Tage Pause – du kannst es ab <t:${Math.floor(free / 1000)}:D> wieder versuchen.`);
+                throw new ApplyError(CooldownText(form.settings.cooldownDays, free));
             }
         }
 
         if (last?.status === "accepted") throw new ApplyError("Du bist hier schon angenommen.");
+
+        return { guild, member, form, settings: await this.Settings(guildId) };
+    }
+
+    /**
+     * Eine Bewerbung geht ein. Geprüft wird alles hier - die Route und die
+     * Abläufe in Discord wissen nur, wer sich bewirbt und auf welchem Weg.
+     */
+    async Submit(guildId: string, userId: string, formId: number, input: unknown, via: ApplyMode): Promise<IApplySubmission> {
+        const { guild, member, form, settings } = await this.Eligible(guildId, userId, formId);
+
+        if (via !== settings.mode) {
+            throw new ApplyError(
+                via === "web"
+                    ? "Auf diesem Server bewirbt man sich in Discord."
+                    : "Auf diesem Server bewirbt man sich gerade anders. Klick im Kanal noch einmal auf „Bewerben“.",
+                409
+            );
+        }
 
         const answers = this.CleanAnswers(form, input);
         const submission = await this.client.applySubmissions.Create({
@@ -300,11 +575,11 @@ export default class ApplyService {
             answers,
         });
 
-        await this.Post(guild, form, submission).catch(() => undefined);
+        const channelId = await this.Post(guild, form, submission).catch(() => null);
 
         logger.user(`📋 Bewerbung #${submission.id} auf ${guildId} für "${form.name}" (von ${userId})`);
 
-        return submission;
+        return { ...submission, channelId };
     }
 
     CleanAnswers(form: IApplyForm, input: unknown): IApplyAnswer[] {
@@ -333,31 +608,100 @@ export default class ApplyService {
     /* ----------------------------------------------------------
        Die Karte in Discord
        ---------------------------------------------------------- */
-    private async Post(guild: Guild, form: IApplyForm, submission: IApplySubmission): Promise<void> {
+    /**
+     * Die Karte senden. Bei „Eigener Kanal“ (Plan 30) entsteht erst der Kanal,
+     * geht das nicht, landet die Karte im Sammelkanal - die Bewerbung ist ja
+     * schon gespeichert. Gibt die ID des eigenen Kanals zurück.
+     */
+    private async Post(guild: Guild, form: IApplyForm, submission: IApplySubmission): Promise<string | null> {
         const settings = await this.Settings(guild.id);
+
+        if (settings.target === "channel") {
+            const own = await this.OpenChannel(guild, form, submission, settings).catch((error: unknown) => {
+                logger.warn(`📋 Kanal für Bewerbung #${submission.id} auf ${guild.id} nicht angelegt: ${error instanceof Error ? error.message : String(error)}`);
+
+                return null;
+            });
+
+            if (own) return own;
+        }
+
         const channelId = form.settings.channelId ?? settings.channelId;
 
-        if (!channelId) return;
+        if (!channelId) return null;
 
         const channel = guild.channels.cache.get(channelId);
 
-        if (!channel?.isTextBased()) return;
+        if (!channel?.isTextBased()) return null;
 
-        const ping = form.settings.pingRoles.map((role) => `<@&${role}>`).join(" ");
-        const sent = await channel
-            .send({
-                ...ApplyCard(this.client, form, submission),
-                ...(ping ? { content: ping, allowedMentions: { roles: form.settings.pingRoles } } : {}),
-            })
-            .catch(() => null);
+        const sent = await channel.send(ApplyCard(this.client, form, submission, true)).catch(() => null);
 
         if (sent) await this.client.applySubmissions.SetMessage(submission.id, sent.id);
+
+        return null;
+    }
+
+    /** Der eigene Kanal samt Karte. Steht die Karte nicht drin, verschwindet der Kanal wieder - nie einer ohne Karte. */
+    private async OpenChannel(guild: Guild, form: IApplyForm, submission: IApplySubmission, settings: IApplySettings): Promise<string> {
+        // Eine gelöschte Rolle oder ein Prüfer, der den Server verlassen hat, ließe Discord den ganzen Kanal ablehnen.
+        const reviewRoles = settings.reviewRoles.filter((id) => guild.roles.cache.has(id));
+        const reviewUsers = (await Promise.all(settings.reviewUsers.map((id) => guild.members.fetch(id).then(() => id, () => null)))).filter((id): id is string => id !== null);
+        const channel = await guild.channels.create({
+            name: ChannelName(settings.channelName, { user: submission.userName, id: submission.id, form: form.name }),
+            type: ChannelType.GuildText,
+            parent: settings.categoryId ?? undefined,
+            permissionOverwrites: ApplyChannelOverwrites({
+                everyoneId: guild.roles.everyone.id,
+                botId: this.client.user!.id,
+                applicantId: submission.userId,
+                reviewRoles,
+                reviewUsers,
+                allow: Allowed(guild, MEMBER_ALLOW),
+                botAllow: Allowed(guild, BOT_ALLOW),
+            }),
+            reason: `Bewerbung #${submission.id}`,
+        });
+
+        try {
+            const sent = await channel.send(ApplyCard(this.client, form, { ...submission, channelId: channel.id }, true));
+
+            await this.client.applySubmissions.SetChannel(submission.id, channel.id);
+            await this.client.applySubmissions.SetMessage(submission.id, sent.id);
+
+            return channel.id;
+        } catch (error) {
+            await channel.delete().catch(() => undefined);
+
+            throw error;
+        }
+    }
+
+    /**
+     * Was nach der Entscheidung mit dem eigenen Kanal passiert (Plan 30):
+     * löschen, für den Bewerber schließen oder stehen lassen.
+     */
+    async AfterDecision(guild: Guild, submission: IApplySubmission, settings: IApplySettings): Promise<void> {
+        if (!submission.channelId || settings.afterDecision === "keep") return;
+
+        const channel = guild.channels.cache.get(submission.channelId);
+
+        if (!channel || !("permissionOverwrites" in channel)) return;
+
+        if (settings.afterDecision === "delete") {
+            await channel.delete(`Bewerbung #${submission.id} entschieden`);
+            await this.client.applySubmissions.SetChannel(submission.id, null);
+            await this.client.applySubmissions.SetMessage(submission.id, null);
+
+            return;
+        }
+
+        await channel.permissionOverwrites.delete(submission.userId, `Bewerbung #${submission.id} entschieden`);
     }
 
     /** Die Karte nachziehen, nachdem entschieden wurde. */
     private async Refresh(guild: Guild, form: IApplyForm, submission: IApplySubmission): Promise<void> {
         const settings = await this.Settings(guild.id);
-        const channelId = form.settings.channelId ?? settings.channelId;
+        const channelId = submission.channelId ?? form.settings.channelId ?? settings.channelId;
 
         if (!channelId || !submission.messageId) return;
 
@@ -377,7 +721,7 @@ export default class ApplyService {
        Entscheiden
        ---------------------------------------------------------- */
     async Decide(guild: Guild, actor: GuildMember, id: number, status: Exclude<ApplyStatus, "open">, note: unknown): Promise<IApplySubmission> {
-        if (!(await this.CanReview(actor))) throw new ApplyError("Bewerbungen sehen und entscheiden nur, wer dafür eingetragen ist.");
+        if (!(await this.CanReview(actor))) throw new ApplyError(STAFF_ONLY);
 
         const submission = await this.client.applySubmissions.Get(id);
 
@@ -412,10 +756,67 @@ export default class ApplyService {
         }
 
         await this.Refresh(guild, form, done).catch(() => undefined);
+        await this.AfterDecision(guild, done, await this.Settings(guild.id)).catch(() => undefined);
 
         logger.user(`📋 Bewerbung #${id} auf ${guild.id} ${status === "accepted" ? "angenommen" : "abgelehnt"} (von ${actor.id})`);
 
         return done;
+    }
+
+    /**
+     * Eine entschiedene Bewerbung entfernen (Plan 30): bei Annahme die Rolle
+     * zurück, die Karte weg, der Eintrag weg. Danach kann sich die Person neu
+     * bewerben. Was in Discord nicht klappt, hält das Löschen nicht auf - es
+     * steht in left, damit das Dashboard es sagen kann.
+     */
+    async Remove(guild: Guild, actor: GuildMember, id: number): Promise<{ left: string[] }> {
+        if (!(await this.CanReview(actor))) throw new ApplyError(STAFF_ONLY);
+
+        const submission = await this.client.applySubmissions.Get(id);
+
+        if (!submission || submission.guildId !== guild.id) throw new ApplyError("Diese Bewerbung gibt es nicht.");
+        if (submission.status === "open") throw new ApplyError("Entscheide erst über die Bewerbung, dann kannst du sie entfernen.");
+
+        const left: string[] = [];
+        const form = await this.Form(guild.id, submission.formId).catch(() => null);
+        const role = submission.status === "accepted" ? form?.settings.acceptRole : null;
+
+        if (role) {
+            const member = guild.members.cache.get(submission.userId) ?? (await guild.members.fetch(submission.userId).catch(() => null));
+
+            // Wer den Server verlassen hat, hat die Rolle ohnehin nicht mehr.
+            if (member) {
+                await member.roles.remove(role, `Bewerbung #${id} entfernt`).catch(() => {
+                    left.push(`Die Rolle @${guild.roles.cache.get(role)?.name ?? role} konnte ich nicht abziehen.`);
+                });
+            }
+        }
+
+        // Der eigene Kanal geht samt Karte, sonst nur die Karte im Sammelkanal. Ist der Kanal
+        // schon weg, war die Karte darin - im Sammelkanal gibt es dann nichts zu suchen.
+        const own = submission.channelId ? guild.channels.cache.get(submission.channelId) : null;
+
+        if (submission.channelId) {
+            await own?.delete(`Bewerbung #${id} entfernt`).catch(() => {
+                left.push(`Den Kanal #${own.name} konnte ich nicht löschen.`);
+            });
+        } else if (submission.messageId && form) {
+            const settings = await this.Settings(guild.id);
+            const channel = guild.channels.cache.get(form.settings.channelId ?? settings.channelId ?? "");
+
+            if (channel?.isTextBased()) {
+                await channel.messages.delete(submission.messageId).catch((error: unknown) => {
+                    // Schon gelöscht ist auch gut.
+                    if ((error as { code?: unknown }).code !== 10008) left.push("Die Karte in Discord konnte ich nicht löschen.");
+                });
+            }
+        }
+
+        await this.client.applySubmissions.Remove(id);
+
+        logger.user(`📋 Bewerbung #${id} auf ${guild.id} entfernt (von ${actor.id})`);
+
+        return { left };
     }
 
     /** Die Knöpfe an der Karte. */
@@ -425,22 +826,46 @@ export default class ApplyService {
         const [, what, raw] = interaction.customId.split(":");
         const id = Number(raw);
 
-        if (!Number.isFinite(id)) return;
+        if (what === "kanal" && Number.isFinite(id)) return this.DropChannel(interaction, id);
+
+        // Nur ja und nein sind Entscheidungen. Alles andere ist kein Ablehnen.
+        if ((what !== "ja" && what !== "nein") || !Number.isFinite(id)) return;
+
+        // Rolle, DM, Karte und eigener Kanal dauern - Discord wartet nur 3 Sekunden auf die erste Antwort.
+        await interaction.deferReply({ flags: 64 });
 
         try {
             const done = await this.Decide(interaction.guild, interaction.member, id, what === "ja" ? "accepted" : "declined", null);
 
-            await interaction.reply({
-                content: `Bewerbung #${done.id} ist ${done.status === "accepted" ? "angenommen" : "abgelehnt"}.`,
-                flags: 64,
-            });
+            // Bei „Löschen nach der Entscheidung“ ist der Kanal mit dem Knopf schon weg.
+            await interaction.editReply({ content: `Bewerbung #${done.id} ist ${done.status === "accepted" ? "angenommen" : "abgelehnt"}.` }).catch(() => undefined);
         } catch (error) {
-            await interaction.reply({
-                content: error instanceof ApplyError ? error.message : "Das hat nicht geklappt.",
-                flags: 64,
-            });
+            await interaction.editReply({ content: error instanceof ApplyError ? error.message : "Das hat nicht geklappt." }).catch(() => undefined);
 
             if (!(error instanceof ApplyError)) throw error;
         }
+    }
+
+    /** „Kanal löschen“ an einer entschiedenen Karte (Plan 30). */
+    private async DropChannel(interaction: ButtonInteraction<"cached">, id: number): Promise<void> {
+        if (!(await this.CanReview(interaction.member))) {
+            await interaction.reply({ content: STAFF_ONLY, flags: 64 });
+
+            return;
+        }
+
+        const submission = await this.client.applySubmissions.Get(id);
+        const channel = submission?.guildId === interaction.guildId && submission.channelId ? interaction.guild.channels.cache.get(submission.channelId) : null;
+
+        if (!submission || !channel) {
+            await interaction.reply({ content: "Diesen Kanal gibt es nicht mehr.", flags: 64 });
+
+            return;
+        }
+
+        await interaction.reply({ content: "Der Kanal wird gelöscht.", flags: 64 });
+        await channel.delete(`Bewerbung #${id}: Kanal gelöscht von ${interaction.user.id}`).catch(() => undefined);
+        await this.client.applySubmissions.SetChannel(id, null);
+        await this.client.applySubmissions.SetMessage(id, null);
     }
 }

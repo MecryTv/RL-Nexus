@@ -49,7 +49,8 @@ export const MODULE_DEFINITIONS: readonly IModuleDefinition[] = [
         name: "Apply System",
         tagline: "Bewerbungen, die nicht in Direktnachrichten versanden.",
         description:
-            "Bewerbungen laufen über einen öffentlichen Link mit Formularen, die dein Server selbst baut. Jede " +
+            "Bewerbungen laufen über Formulare, die dein Server selbst baut. Beworben wird auf der Webseite, in " +
+            "einem Fenster in Discord oder per DM von RL Nexus, ganz wie es zu deinem Server passt. Jede " +
             "Bewerbung landet als Karte im Team-Kanal und im Dashboard, mit Annehmen und Ablehnen. Wer " +
             "angenommen wird, bekommt die Rolle automatisch.",
         category: ModuleCategory.Community,
@@ -57,6 +58,7 @@ export const MODULE_DEFINITIONS: readonly IModuleDefinition[] = [
         icon: "clipboard",
         featured: true,
         highlights: [
+            "Bewerben auf der Webseite, im Discord-Fenster oder per DM",
             "Bis zu 15 Formulare mit je bis zu 20 Fragen",
             "Karte im Team-Kanal mit Annehmen und Ablehnen",
             "Rolle bei Annahme und Nachricht an den Bewerber",
@@ -80,6 +82,25 @@ export const MODULE_DEFINITIONS: readonly IModuleDefinition[] = [
             "Höchstzahl und Voraussetzungsrolle je Panel",
             "Gesperrte Rollen, die sich nicht wieder abwählen lassen",
             "Bis zu 25 Panels je Server",
+        ],
+    },
+    {
+        id: "role-lists",
+        name: "Rollen-Listen",
+        tagline: "Wer zum Staff gehört und wer in welchem Team spielt, immer aktuell.",
+        description:
+            "Listen, die zeigen, wer welche Rolle hat: Staff, Teams, Creator oder was dein Server braucht. " +
+            "Der Bot schreibt sie als Karte oder als gezeichnetes Bild in einen Kanal und zieht sie nach, sobald " +
+            "jemand eine Rolle bekommt oder verliert.",
+        category: ModuleCategory.Community,
+        status: ModuleStatus.Live,
+        icon: "users",
+        highlights: [
+            "Bis zu 10 Listen je Server, je bis zu 20 Rollen",
+            "Vorlagen für Staff und Teams, Symbol je Rolle, Titel je Person",
+            "Als Text-Karte oder als Bild mit sechs Looks und eigenen Vorlagen",
+            "Zieht von selbst nach, gebündelt und ohne jemanden anzupingen",
+            "Vorschau im Dashboard, so wie es in Discord aussieht",
         ],
     },
     {
@@ -143,9 +164,9 @@ export const MODULE_DEFINITIONS: readonly IModuleDefinition[] = [
             "1v1, 2v2 und 3v3 getrennt eingestellt",
             "Beim Aufstieg geht die alte Rolle derselben Playlist",
             "Keine Rolle, solange die Platzierungsspiele laufen",
-            "Command auf Wunsch nur in einem Kanal",
+            "Vergeben über /rank me, ohne eigenen Befehl",
         ],
-        commands: ["rangrollen holen", "rangrollen ablegen"],
+        commands: ["rank me", "rank link"],
     },
     {
         id: "teams",
@@ -284,6 +305,25 @@ export const MODULE_DEFINITIONS: readonly IModuleDefinition[] = [
             "Erkennt Schreibtricks wie „1d10t“ oder „i.d.i.o.t“",
             "Ausnahmen für Kanäle, Kategorien und Rollen",
             "Probe im Dashboard, ohne jemanden zu bestrafen",
+        ],
+    },
+    {
+        id: "anti-villain",
+        name: "Anti Villain",
+        tagline: "Wenn ein Account gekapert ist, zählt jede Minute.",
+        description:
+            "Hält gekaperte Accounts, Raids und Nukes auf, bevor ein Moderator online ist. Mehrere " +
+            "Auffälligkeiten zusammen ergeben einen Verdacht, ab einer Schwelle sieht die Person nur noch die " +
+            "Quarantäne, bis das Team entschieden hat.",
+        category: ModuleCategory.Moderation,
+        status: ModuleStatus.Live,
+        icon: "lock",
+        highlights: [
+            "Verdachtspunkte statt starrer Regeln, mit Schutzstufe",
+            "Quarantäne: Rollen gemerkt, Nachrichten weg, Freigabe durchs Team",
+            "Köder-Kanal, QR-Codes in Bildern, Doppelgänger vom Team",
+            "Raid-Schutz und Anti-Nuke mit Sicherheits-Backup",
+            "„Hack melden“ per Rechtsklick für alle Mitglieder",
         ],
     },
     {
@@ -522,19 +562,21 @@ export const MODULE_DEFINITIONS: readonly IModuleDefinition[] = [
         name: "Backups",
         tagline: "Der alte Stand ist nur ein paar Klicks entfernt.",
         description:
-            "Sichert Module, Einstellungen, Nachrichten und die Daten deiner Mitglieder, von Hand oder automatisch " +
-            "in deinem Rhythmus. Geht etwas schief, holst du im Dashboard den alten Stand zurück, ganz oder nur " +
-            "einzelne Bereiche wie Level oder Tickets.",
+            "Sichert Module, Einstellungen, Nachrichten und die Daten deiner Mitglieder, auf Wunsch auch den " +
+            "Discord-Server selbst mit Rollen, Kanälen und Rechten. Von Hand oder automatisch in deinem Rhythmus. " +
+            "Geht etwas schief, repariert der Bot den Server, und seine Einstellungen zeigen danach auf die neuen Kanäle.",
         category: ModuleCategory.Utility,
         status: ModuleStatus.Live,
         icon: "archive",
         builtIn: true,
         highlights: [
             "Von Hand sichern, mit Notiz, bis zu zehn Backups je Server",
+            "Auch den Discord-Server: Rollen, Kanäle, Rechte, Emojis, Bans",
+            "Reparieren legt an, was fehlt, und löscht nichts",
             "Automatisch jeden Tag, alle drei Tage, jede Woche oder jeden Monat",
-            "Einzelne Bereiche zurückladen statt alles auf einmal",
-            "Vor jedem Zurückladen sichert der Bot den jetzigen Stand",
+            "Vor jedem Laden sichert der Bot den jetzigen Stand",
             "Fehlende Panels postet der Bot danach von selbst neu",
         ],
+        commands: ["backup neu", "backup liste", "backup ansehen", "backup vergleichen", "backup laden", "backup automatisch"],
     },
 ];

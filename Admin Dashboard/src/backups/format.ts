@@ -1,13 +1,33 @@
-import { AREA_IDS, type AreaId, type BackupKind, type IBackupMeta, type IBackupsOverview, type IPlanState, type NightState } from "../../shared/backups.ts";
+import { AREA_IDS, type AreaId, type BackupKind, type BackupPart, type IBackupMeta, type IBackupsOverview, type IPlanState, type IServerCounts, type NightState } from "../../shared/backups.ts";
 import { formatDuration } from "../format.ts";
 
 /**
  * Kleine Texte der Backup-Seiten, ohne DOM, damit sie im Check mitlaufen.
  */
 
-export const KIND_LABELS: Readonly<Record<BackupKind, string>> = { nacht: "nachts", vorher: "vor dem Zurückladen", hand: "von Hand", plan: "automatisch (Server)" };
+export const KIND_LABELS: Readonly<Record<BackupKind, string>> = { nacht: "nachts", vorher: "vor dem Zurückladen", hand: "von Hand", plan: "automatisch (Server)", schutz: "Sicherheit (Anti Villain)" };
 
 /** Art mit Herkunft: Was ein Server im Bot-Dashboard angelegt hat, trägt „(Server)“. */
+/** Plan 32: welche Teile ein Backup hat. */
+export function partsLabel(parts: readonly BackupPart[]): string {
+    if (parts.includes("bot") && parts.includes("server")) return "Bot und Discord-Server";
+
+    return parts.includes("server") ? "nur Discord-Server" : "nur Bot";
+}
+
+/** Plan 32: was im Server-Teil steckt, nur was es gibt. */
+export function serverLabel(counts: IServerCounts): string {
+    const count = (n: number, one: string, many: string): string => `${n} ${n === 1 ? one : many}`;
+    const parts = [count(counts.channels, "Kanal", "Kanäle"), count(counts.roles, "Rolle", "Rollen")];
+
+    if (counts.members) parts.push(count(counts.members, "Mitglied mit Rollen", "Mitglieder mit Rollen"));
+    if (counts.emojis) parts.push(count(counts.emojis, "Emoji", "Emojis"));
+    if (counts.stickers) parts.push(count(counts.stickers, "Sticker", "Sticker"));
+    if (counts.bans) parts.push(count(counts.bans, "Ban", "Bans"));
+
+    return parts.join(" · ");
+}
+
 export function kindLabel(meta: Pick<IBackupMeta, "kind" | "origin">): string {
     const label = KIND_LABELS[meta.kind];
 

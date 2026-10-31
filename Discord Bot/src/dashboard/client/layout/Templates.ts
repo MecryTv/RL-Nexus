@@ -9,6 +9,7 @@
 import { icon } from "../core/Dom.js";
 import { button, el } from "../core/Ui.js";
 import { ITemplate, TEMPLATES, TemplateScope } from "../constants/Templates.js";
+import { offered } from "./MessageStudioCore.js";
 
 export interface ITemplateHandlers<T, P = ITemplate> {
     /** Der Stand vor dem Klick - er landet hinter „Zurück". */
@@ -19,8 +20,9 @@ export interface ITemplateHandlers<T, P = ITemplate> {
     apply: (template: P) => void;
 }
 
-export function templateBar<T>(scope: TemplateScope, handlers: ITemplateHandlers<T>): HTMLElement {
-    return presetBar(TEMPLATES[scope] ?? [], handlers);
+/** kinds: nur Vorlagen dieser Arten - die übrigen kann die Seite nicht speichern. */
+export function templateBar<T>(scope: TemplateScope, handlers: ITemplateHandlers<T>, kinds: readonly string[]): HTMLElement {
+    return presetBar(offered(TEMPLATES[scope] ?? [], kinds), handlers);
 }
 
 /** Dieselbe Leiste für alles, was einen Namen und einen Satz dazu hat - etwa die Vorlagen der Teams-Liste. */

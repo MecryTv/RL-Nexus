@@ -11,7 +11,7 @@ process.env.DEV_CLIENT_SECRET ||= "check-secret";
 
 import { ChannelType, Guild, GuildBasedChannel, GuildMember, Role } from "discord.js";
 import BotClient from "../client/BotClient";
-import { DefaultRankRoleSettings, RANK_GROUPS, StepOf, Steps } from "../constants/RankRoles";
+import { DefaultRankRoleSettings, RANK_GROUPS, RANK_ROLES_MODULE, StepOf, Steps } from "../constants/RankRoles";
 import { IPrimeProfile, IPrimeRank } from "../interfaces/services/prime/IPrimeService";
 import { IRankRoleSettings } from "../interfaces/services/rankroles/IRankRoles";
 import { RankRoleError } from "../services/RankRoleService";
@@ -194,13 +194,13 @@ function checkClean(client: BotClient): void {
     check("Eine erfundene Stufe fällt weg", !("erfunden" in clean.playlists["3v3"].roles));
     check("Eine alte Gruppen-Stufe auch", !("champion" in clean.playlists["3v3"].roles));
     check("Der Schalter kommt an", clean.playlists["2v2"].on === false);
-    check("Der Kanal kommt an", clean.channelId === TEXT);
-    check("Ein Sprachkanal fällt weg", service.CleanSettings(guild, { channelId: VOICE }, DefaultRankRoleSettings()).channelId === null);
+    // Rollen kommen über /rank me, einen eigenen Befehl mit Kanalsperre gibt es nicht mehr.
+    check("Kein Befehlskanal mehr in den Einstellungen", !("channelId" in clean) && !("channelId" in DefaultRankRoleSettings()), JSON.stringify(Object.keys(clean)));
     check("Abnehmen lässt sich abschalten", clean.replace === false);
 
     const kept = service.CleanSettings(guild, {}, clean);
 
-    check("Ohne Angabe bleibt alles stehen", kept.playlists["3v3"].roles.t17 === HIGH && kept.channelId === TEXT);
+    check("Ohne Angabe bleibt alles stehen", kept.playlists["3v3"].roles.t17 === HIGH && kept.replace === false);
 
     console.log("\n  — Welche Rolle zu welchem Rang —");
 
@@ -295,15 +295,38 @@ async function checkApply(client: BotClient): Promise<void> {
     Stub(client, Settings({ playlists: { "1v1": { on: false, roles: {} }, "2v2": { on: false, roles: {} }, "3v3": { on: false, roles: {} } } }), []);
     await refuses("Ohne eingeschaltete Playlist auch nicht", () => service.Apply(FakeMember(FakeGuild(), []).member));
 
-    console.log("\n  — Ablegen —");
+    console.log("\n  — Nach /rank me —");
+
+    // /rank me hat das Profil schon geholt - Prime wird kein zweites Mal gefragt.
+    let lookups = 0;
+    const shown = { name: "MecryTv", ranks: [FakeRank("2v2", 17, 1400), FakeRank("3v3", 14, 1300)] } as unknown as IPrimeProfile;
+    const modules = (on: boolean) => ((client.settings as unknown as Record<string, unknown>).Of = async () => ({ modules: on ? [RANK_ROLES_MODULE] : [] }));
 
     Stub(client, Settings(), []);
+    client.primeService.Profile = (async () => {
+        lookups++;
+        return shown;
+    }) as typeof client.primeService.Profile;
+    modules(true);
 
-    const strip = FakeMember(FakeGuild(), [LOW, MID, HIGH]);
-    const gone = await service.Strip(strip.member);
+    const ranked = FakeMember(FakeGuild(), []);
+    const after = await service.AfterRankMe(ranked.member, shown);
 
-    check("Die eigenen Rollen gehen ab", gone.includes(LOW) && gone.includes(MID), gone.join(","));
-    check("Eine zu hohe Rolle rührt er nicht an", !gone.includes(HIGH));
+    check("/rank me vergibt die Rang-Rollen", ranked.added.length === 2 && after?.added.length === 2, ranked.added.join(","));
+    check("…mit dem schon geholten Profil, ohne Prime ein zweites Mal zu fragen", lookups === 0, String(lookups));
+
+    modules(false);
+
+    const off = FakeMember(FakeGuild(), []);
+
+    check("Rank Roles aus: /rank me vergibt nichts", (await service.AfterRankMe(off.member, shown)) === null && off.added.length === 0);
+
+    modules(true);
+    Stub(client, Settings({ playlists: { "1v1": { on: false, roles: {} }, "2v2": { on: false, roles: {} }, "3v3": { on: false, roles: {} } } }), []);
+    check("Keine Playlist an: /rank me bleibt still, ohne Fehler", (await service.AfterRankMe(FakeMember(FakeGuild(), []).member, shown)) === null);
+
+    Stub(client, Settings(), [], null);
+    check("Kein verknüpftes Konto: /rank me bleibt still, ohne Fehler", (await service.AfterRankMe(FakeMember(FakeGuild(), []).member, shown)) === null);
 }
 
 async function main(): Promise<void> {

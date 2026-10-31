@@ -281,6 +281,7 @@ export function renderSelfRoles(guildId: string): void {
 
         /* --- Der Kopf der Nachricht --- */
         const editor = bodyEditor(draft.body, {
+            pageSave: () => save,
             kinds: data!.bodyKinds,
             context,
             defaultEmbed: () => structuredClone(EMPTY_EMBED),

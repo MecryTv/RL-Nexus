@@ -15,8 +15,48 @@ import { ITeamOrder } from "../../../constants/TeamOrder";
  */
 export type TeamRole = "captain" | "cocaptain" | "player" | "sub" | "trial" | "manager" | "coach";
 
-/** Wie die Übersicht im Kanal steht. */
-export type BoardLayout = "cards" | "menu" | "single";
+/**
+ * Wie die Übersicht im Kanal steht. "hub": Hauptnachricht mit Kennzahlen, je Team
+ * einer Zeile und Menü, die Karte kommt gezeichnet. "cards": je Team eine Nachricht
+ * aus dem Editor. Gespeichertes "menu" und "single" stellt NormalizeTeamSettings um (Plan 27).
+ */
+export type BoardLayout = "hub" | "cards";
+
+/** Spalten der gezeichneten Karte, die sich abschalten lassen. */
+export interface ICardColumns {
+    "2v2": boolean;
+    "1v1": boolean;
+    peak: boolean;
+}
+
+/** Wie die gezeichnete Karte aussieht - gilt für alle Teams im Hub (Plan 27). */
+export interface ITeamCardDesign {
+    /** "default": das Motiv von RL Nexus, "own": Bild aus der Galerie, "none": dunkler Grund. */
+    background: { mode: "default" | "own" | "none"; image: string | null };
+    /** Wie stark der Hintergrund abgedunkelt wird (0-90). */
+    dim: number;
+    /** Kante, Kürzel und Schein. null: die Farbe des Teams. */
+    accent: string | null;
+    parts: { logo: boolean; leagues: boolean; mmr: boolean; peak: boolean; staff: boolean };
+    chips: { tag: boolean; group: boolean; place: boolean; region: boolean };
+    /** Die drei Zeilen - mit Platzhaltern der Team-Karte. */
+    title: string;
+    subtitle: string;
+    footer: string;
+}
+
+/** Wohin der Knopf unter dem Menü im Hub führt. */
+export type HubButtonTarget = "apply" | "web" | "channel";
+
+export interface IHubButton {
+    on: boolean;
+    to: HubButtonTarget;
+    /** Bei "web", nur https. */
+    url: string | null;
+    /** Bei "channel". */
+    channelId: string | null;
+    label: string;
+}
 
 /** Woher die Team-MMR kommt. */
 export type MMRMode = "wtsi" | "formula";
@@ -49,6 +89,10 @@ export interface IPlayerSnapshot {
     at: number;
     /** Prime kannte den Namen nicht oder antwortete nicht. */
     error: string | null;
+    /** Plan 33: die Epic-Konto-ID vom letzten Treffer. Daran erkennt der Bot ein umbenanntes Konto. */
+    accountId?: string | null;
+    /** Plan 33: true nur, wenn Prime sagte „kenne den Namen nicht“ - nicht bei Zeitüberschreitung oder Fehler. */
+    missing?: boolean;
 }
 
 export interface ITeamPlayer {
@@ -117,6 +161,8 @@ export interface ITeam {
     color: string | null;
     /** Bild der Karte: Galerie-Pfad oder Link. */
     logo: string | null;
+    /** Eigener Hintergrund der gezeichneten Karte, Galerie-Pfad (Plan 30). Leer: der für alle Teams. Optional wie region. */
+    background?: string | null;
     /** Die Rolle des Teams: steht in der Karte als {team.role} und geht an jeden im Kader. */
     roleId: string | null;
     /** Die Kanäle des Teams, für {team.channels} und {team.voice}. */
@@ -124,6 +170,8 @@ export interface ITeam {
     created: ITeamCreated;
     /** Ligen und Turniere, für {team.leagues}. */
     links: ITeamLink[];
+    /** Wo das Team spielt, etwa "EU". Leer oder fehlend: keine Angabe (Plan 26). Optional, weil ältere Nachbauten in den Checks sie nicht kennen. */
+    region?: string;
     players: ITeamPlayer[];
     position: number;
     /** Die Nachricht dieses Teams im Kanal - nur bei "cards". */
@@ -173,12 +221,28 @@ export interface ITeamSettings {
     list: ITeamListSettings;
     /** In welcher Reihenfolge die Teams stehen: Karten, Menü und {teams} (Karte „Reihenfolge“). */
     order: ITeamOrder;
-    /** Der Kopf: bei "menu" und "single" die ganze Nachricht. */
+    /** Der Kopf des Hubs. */
     board: ITeamBody;
-    /** Eine Team-Karte: bei "cards" je Nachricht, bei "menu" die Antwort auf die Auswahl. */
+    /** Eine Team-Karte bei "cards", je Nachricht. */
     team: ITeamBody;
-    /** Die Kopf-Nachricht im Kanal - bei "menu" und "single". */
+    /** Die Kopf-Nachricht des Hubs im Kanal. */
     messageId: string | null;
+    /** Aussehen der gezeichneten Karte (Plan 27). */
+    card: ITeamCardDesign;
+    /** Abschaltbare Spalten der gezeichneten Karte. */
+    cardColumns: ICardColumns;
+    /** Hub: wie viele Teams je Kategorie als Zeile dastehen. */
+    hubRows: number;
+    /** Hub: kleines Bild neben der ersten Textzeile des Kopfs. Galerie, Link oder Platzhalter-Bild. */
+    hubThumbnail: string | null;
+    /** Hub: großes Bild unter dem Text des Kopfs. */
+    hubImage: string | null;
+    /** Hub: der Knopf unter dem Menü. */
+    hubButton: IHubButton;
+    /** Hub: wie jedes Team als Zeile dasteht, mit Platzhaltern der Team-Karte (Reiter Teams-Liste). */
+    hubLine: string;
+    /** Hub: die weiteren Nachrichten unter der Kopf-Nachricht. Gehören dem Bot, nie aus dem Browser. */
+    moreIds: string[];
 }
 
 /** Was eine Karte über ein Team weiß, nachdem gerechnet wurde. */

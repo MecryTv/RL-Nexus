@@ -4,10 +4,12 @@
  * austauschen.
  */
 
-export const BACKUP_KINDS = ["nacht", "vorher", "hand", "plan"] as const;
+export const BACKUP_KINDS = ["nacht", "vorher", "hand", "plan", "schutz"] as const;
 /**
  * nacht: jede Nacht um 0:00, vorher: vor einem Zurückladen, hand: von Hand,
  * plan: automatisch nach der Einstellung eines Servers im Bot-Dashboard.
+ * schutz: Sicherheits-Backup, das Anti Villain vor einem Nuke anlegt (Plan 31). Bleibt 7 Tage,
+ * zählt nicht zu den Plätzen von Hand und kommt nur vom Bot.
  * nacht und vorher löschen sich nach 72 Stunden, plan nach „wie viele behalten“.
  */
 export type BackupKind = (typeof BACKUP_KINDS)[number];
@@ -32,6 +34,10 @@ export interface IBackupPlan {
     readonly hour: number;
     /** Wie viele automatische Backups bleiben, 1 bis PLAN_KEEP_MAX. */
     readonly keep: number;
+    /** Plan 32: Den Discord-Server gleich mit sichern. Ab Werk aus. */
+    readonly discord: boolean;
+    /** Plan 32: Sicherheits-Backup vor riskanten Änderungen (Anti-Nuke von Anti Villain). Ab Werk an. */
+    readonly risky: boolean;
 }
 
 export const PLAN_KEEP_MAX = 14;
@@ -45,7 +51,33 @@ export interface IPlanState {
     /** Der letzte Fehlschlag, bis das nächste klappt. */
     readonly lastError: { readonly at: string; readonly reason: string } | null;
 }
-export const DEFAULT_PLAN: IBackupPlan = { enabled: false, every: "woche", weekday: 6, hour: 3, keep: 5 };
+export const DEFAULT_PLAN: IBackupPlan = { enabled: false, every: "woche", weekday: 6, hour: 3, keep: 5, discord: false, risky: true };
+
+/** Plan 32: was ein Backup enthält - die Daten des Bots, den Discord-Server oder beides. */
+export const BACKUP_PARTS = ["bot", "server"] as const;
+export type BackupPart = (typeof BACKUP_PARTS)[number];
+
+/** Plan 32: die Teile des Discord-Servers und die Arten zu laden, wie im Bot (constants/ServerBackup.ts). */
+export const SERVER_PART_IDS = ["roles", "channels", "permissions", "settings", "expressions", "members", "bans"] as const;
+export type ServerPartId = (typeof SERVER_PART_IDS)[number];
+export const RESTORE_MODES = ["repair", "exact", "other"] as const;
+export type RestoreMode = (typeof RESTORE_MODES)[number];
+
+/** Die Zähler des Server-Teils. members null: ohne Members Intent nicht gelesen. */
+export interface IServerCounts {
+    readonly roles: number;
+    readonly channels: number;
+    readonly members: number | null;
+    readonly emojis: number;
+    readonly stickers: number;
+    readonly bans: number;
+}
+
+/** Der Server-Teil, wie der Bot ihn liefert. Das Admin Dashboard kennt nur die Zähler und reicht den Rest durch. */
+export interface IServerPartJson {
+    readonly counts: IServerCounts;
+    readonly [key: string]: unknown;
+}
 
 export const AREA_IDS = ["einstellungen", "nachrichten", "bewerbungen", "voice", "level", "tickets", "moderation", "community", "teams", "clips"] as const;
 export type AreaId = (typeof AREA_IDS)[number];
@@ -70,7 +102,7 @@ export interface IArea {
 
 export const AREAS: readonly IArea[] = [
     { id: "einstellungen", label: "Module und Einstellungen", tables: ["guild_settings", "module_settings", "ticket_settings", "mod_settings"], children: [], members: false },
-    { id: "nachrichten", label: "Nachrichten und Panels", tables: ["custom_messages", "self_role_panels", "auto_responses"], children: [], members: false },
+    { id: "nachrichten", label: "Nachrichten und Panels", tables: ["custom_messages", "self_role_panels", "auto_responses", "role_lists"], children: [], members: false },
     { id: "bewerbungen", label: "Bewerbungen", tables: ["apply_forms", "apply_submissions"], children: [], members: true },
     { id: "voice", label: "Voice und Streams", tables: ["voice_hubs", "stream_notifiers"], children: [], members: false },
     { id: "level", label: "Level und Aktivität", tables: ["levels", "member_activity", "guild_activity", "channel_activity"], children: [], members: true },
@@ -97,7 +129,10 @@ export const AREAS: readonly IArea[] = [
 ];
 
 /** Tabellen mit guild_id, die bewusst nicht gesichert werden: offene Kanäle und Warteschlangen, ein alter Stand wäre falsch. */
-export const EXCLUDED_TABLES = ["temp_voices", "support_waits"] as const;
+// av_*: Anti Villain ist Live-Zustand, der zu einem Zeitpunkt gehört. Ein Sicherheits-Backup entsteht vor dem Fall
+// des Nukers - zurückgeladen, löschte es dessen gemerkte Rollen. Also nie im Backup, nie überschrieben.
+// server_*: Zuordnung alter zu neuer IDs und laufende Ladevorgänge (Plan 32), ebenfalls Live-Zustand.
+export const EXCLUDED_TABLES = ["temp_voices", "support_waits", "av_cases", "av_trust", "av_reports", "av_incidents", "av_events", "av_debris", "server_id_map", "server_restores"] as const;
 
 export interface IBackupMeta {
     readonly id: number;
@@ -110,6 +145,10 @@ export interface IBackupMeta {
     readonly createdAt: string;
     readonly bytes: number;
     readonly counts: Readonly<Partial<Record<AreaId, number>>>;
+    /** Plan 32: welche Teile drin sind. Ältere Backups: nur bot. */
+    readonly parts: readonly BackupPart[];
+    /** Die Zähler des Server-Teils, null ohne ihn. */
+    readonly server: IServerCounts | null;
 }
 
 /** Ein Backup mit der Anzahl Zeilen je Tabelle, für „Ansehen“. */

@@ -91,6 +91,7 @@ export function forgetMember(userId: string): void {
 /** Nur eigene Pfade: keine volle Adresse, kein //fremde.seite, kein Backslash. */
 export function safeReturn(value: unknown): string {
     // Steuerzeichen streicht der Browser aus der Adresse: Aus "/\t/evil" würde "//evil".
+    // oxlint-disable-next-line no-control-regex -- genau diese Zeichen sollen abgelehnt werden.
     if (typeof value !== "string" || !value.startsWith("/") || value.startsWith("//") || value.includes("\\") || /[\u0000-\u001f\u007f]/.test(value)) return "/";
 
     return value;

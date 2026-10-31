@@ -20,6 +20,26 @@ export type WelcomeLayout = "classic" | "center" | "panel" | "hud";
 /** Die Schrift der Überschrift - alle drei liegen beim Bot. */
 export type WelcomeFont = "oxanium" | "orbitron" | "rajdhani";
 
+/** Die fünf Teile der Karte, die sich frei setzen lassen (Plan 25). */
+export type WelcomePart = "avatar" | "icon" | "title" | "subtitle" | "footer";
+
+/**
+ * Ein Platz auf der Karte, in logischen Pixeln (1000 × 340). Avatar und Icon:
+ * x/y ist die linke obere Ecke, size die Kantenlänge. Texte: x ist der
+ * Ankerpunkt je nach align, y die Oberkante der Zeile, size die Schriftgröße,
+ * width die Breite, die das Layout der Zeile gab.
+ */
+export interface IWelcomePosition {
+    x: number;
+    y: number;
+    size: number;
+    align: "left" | "center" | "right";
+    width: number;
+}
+
+/** Eigene Anordnung. Der Editor schreibt alle fünf - fehlt eins, kommt es vom Layout. */
+export type IWelcomePositions = Partial<Record<WelcomePart, IWelcomePosition>>;
+
 /** Die gezeichnete Begrüßungskarte - jedes Stück einzeln einstellbar. */
 export interface IWelcomeCard {
     /** Bild aus der Galerie, null: Farbverlauf. */
@@ -53,6 +73,8 @@ export interface IWelcomeCard {
     count: boolean;
     icon: boolean;
     date: boolean;
+    /** Eigene Anordnung. null: die Plätze des Layouts wie bisher. */
+    positions: IWelcomePositions | null;
 }
 
 /** Eine Nachricht des Moduls - Begrüßung oder Abschied. */

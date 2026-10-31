@@ -240,6 +240,70 @@ export const MODULE_DETAILS: Readonly<Record<string, IModuleDetail>> = {
         },
     },
 
+    "role-lists": {
+        intro: [
+            "„Wen frage ich, wenn etwas ist?“ Auf den meisten Servern steht die Antwort in einer Nachricht, die irgendwer vor Monaten geschrieben hat. Seitdem sind zwei Moderatoren gegangen, einer ist dazugekommen, und die Liste stimmt nicht mehr.",
+            "Rollen-Listen schreibt der Bot selbst. Du wählst, welche Rollen hineingehören, in welcher Reihenfolge und unter welchem Namen. Wer die Rolle hat, steht drin. Bekommt jemand eine Rolle oder gibt sie ab, zieht der Bot die Liste nach, ohne dass jemand daran denken muss.",
+            "Eine Liste steht als Karte im Kanal oder als gezeichnetes Bild im Stil deiner Org. Staff, Teams, Creator: so viele Listen, wie der Server braucht, jede mit eigenem Kanal und eigenem Aussehen.",
+        ],
+        concepts: {
+            title: "Drei Designs",
+            lead: "Dieselbe Liste, drei Arten, sie zu zeigen.",
+            entries: [
+                {
+                    label: "Kompakt",
+                    text: "Eine Karte, je Rolle eine Überschrift und alle Namen nebeneinander. Passt auch bei vielen Leuten auf einen Blick.",
+                    color: "var(--c-mod-community)",
+                },
+                {
+                    label: "Mit Abschnitten",
+                    text: "Je Rolle ein eigener Abschnitt, die Namen untereinander, eigene Titel dahinter.",
+                    color: "var(--c-blue)",
+                },
+                {
+                    label: "Als Bild",
+                    text: "Nur eine Bilddatei, ohne Karte und ohne Text. Hintergrund, Farben, Kacheln und Schrift stellst du selbst ein.",
+                    color: "var(--c-mod-engagement)",
+                },
+            ],
+        },
+        automations: {
+            title: "Was von selbst passiert",
+            lead: "Damit die Liste stimmt, ohne dass sie jemand pflegt.",
+            entries: [
+                {
+                    title: "Zieht von selbst nach",
+                    text: "Rolle bekommen, Rolle abgegeben, Server verlassen: Spätestens eine Minute später stimmt die Liste. Die Nachricht wird bearbeitet, nicht neu geschickt.",
+                    icon: "refresh",
+                },
+                {
+                    title: "Niemand wird gepingt",
+                    text: "Namen stehen als Erwähnung in der Liste und sind anklickbar, aber niemand bekommt deshalb eine Benachrichtigung.",
+                    icon: "bell",
+                },
+                {
+                    title: "Titel bleiben",
+                    text: "Ein Titel wie „Head of Support“ bleibt, solange die Person die Rolle hat, und noch 30 Tage danach. Wer zurückkommt, hat ihn wieder.",
+                    icon: "tag",
+                },
+                {
+                    title: "Gelöscht? Kommt wieder",
+                    text: "Wird die Nachricht im Kanal gelöscht, schickt der Bot beim nächsten Nachziehen eine neue.",
+                    icon: "check",
+                },
+            ],
+        },
+        setup: {
+            title: "Einrichten",
+            lead: "Vorlage wählen, Kanal wählen, senden.",
+            entries: [
+                { title: "Neue Liste anlegen", text: "Name und Vorlage: Staff und Teams suchen passende Rollen schon über den Namen." },
+                { title: "Rollen ordnen", text: "Reihenfolge, Name in der Liste und ein Symbol je Rolle, auf Wunsch Titel für einzelne Personen." },
+                { title: "Design wählen", text: "Karte oder Bild. Beim Bild eine der sechs Vorlagen nehmen und anpassen, daneben die Vorschau." },
+                { title: "Liste senden", text: "Kanal wählen und senden. Ab dann hält der Bot sie aktuell." },
+            ],
+        },
+    },
     "voice-hub": {
         intro: [
             "Sprachkanäle sind das einzige, was auf einem Rocket-League-Server wirklich dauerhaft belegt ist, und gleichzeitig das, was die Kanalliste am schnellsten unbrauchbar macht. Irgendwann stehen dort dreißig Kanäle mit Namen wie „3v3 #7“, von denen zwei benutzt werden.",
@@ -408,8 +472,8 @@ export const MODULE_DETAILS: Readonly<Record<string, IModuleDetail>> = {
     "rank-roles": {
         intro: [
             "Rangrollen sind auf fast jedem Rocket-League-Server Handarbeit. Jemand schreibt „bin jetzt Champ“ in einen Kanal, ein Moderator vergibt die Rolle, und nach der nächsten Season stimmt die Hälfte davon nicht mehr, weil niemand die Abstiege nachträgt.",
-            "Rank Roles holt den Rang aus dem Spiel statt aus dem Chat. Wer /rangrollen holen eingibt, bekommt die Rolle, die zu seinem aktuellen Rang gehört, je Playlist eine eigene. Grundlage ist das verknüpfte Epic-Konto. Einen fremden Namen kann niemand angeben, sonst holte man sich Rollen mit dem Konto eines anderen.",
-            "Der Bot fragt dabei von sich aus nichts nach. Wer aufsteigt, gibt den Command noch einmal ein, und die alte Rolle derselben Playlist geht auf Wunsch im selben Zug weg.",
+            "Rank Roles holt den Rang aus dem Spiel statt aus dem Chat. Wer /rank me aufruft, bekommt die Rolle, die zu seinem aktuellen Rang gehört, je Playlist eine eigene. Grundlage ist das verknüpfte Epic-Konto. Einen fremden Namen kann niemand angeben, sonst holte man sich Rollen mit dem Konto eines anderen.",
+            "Der Bot fragt dabei von sich aus nichts nach. Wer aufsteigt, ruft /rank me noch einmal auf, und die alte Rolle derselben Playlist geht auf Wunsch im selben Zug weg.",
         ],
         concepts: {
             title: "Wie ein Rang zur Rolle wird",
@@ -474,7 +538,7 @@ export const MODULE_DETAILS: Readonly<Record<string, IModuleDetail>> = {
                 },
                 {
                     title: "Mitglieder verknüpfen sich",
-                    text: "Einmal /rank link mit dem Epic-Namen, danach reicht /rangrollen holen.",
+                    text: "Einmal /rank link mit dem Epic-Namen, danach reicht /rank me.",
                 },
             ],
         },
@@ -974,6 +1038,84 @@ export const MODULE_DETAILS: Readonly<Record<string, IModuleDetail>> = {
                 {
                     title: "Probe machen",
                     text: "Einen Text eingeben und sehen, welcher Filter greifen würde, ohne dass jemand bestraft wird.",
+                },
+            ],
+        },
+    },
+
+    "anti-villain": {
+        intro: [
+            "Gekaperte Accounts sind auf Discord der häufigste Ärger, den kein Filter sieht. Ein Mitglied, das seit drei Jahren dabei ist, postet plötzlich „Steam verschenkt Skins“ in jeden Kanal, und weil der Account bekannt ist, klicken Leute drauf. Bis jemand aus dem Team online ist, sind fünf weitere Accounts gekapert.",
+            "Anti Villain schaut nicht auf einzelne Nachrichten, sondern auf das Verhalten eines Accounts. Derselbe Link in drei Kanälen binnen einer Minute, eine nachgemachte Steam-Seite, ein QR-Code im Bild, ein Name fast wie der eines Admins: Jede Auffälligkeit gibt Punkte, und ab einer Schwelle hält der Bot die Person fest. Sie sieht dann nur noch den Quarantäne-Kanal, ihre Nachrichten sind weg, ihre Rollen gemerkt.",
+            "Festhalten heißt nicht bestrafen. Die Person liest, was sie tun soll, und das Team entscheidet mit einem Klick: freigeben, „War kein Hack“ oder bannen. Dazu kommen Raid-Schutz und Anti-Nuke, falls es einmal einen Team-Account trifft.",
+        ],
+        concepts: {
+            title: "Woran der Bot es merkt",
+            lead: "Ein Treffer allein reicht selten, zwei zusammen fast immer. Die Punkte verfallen nach einer Stunde.",
+            entries: [
+                {
+                    label: "Kanal-Sprung, Betrugslink",
+                    text: "Dieselbe Nachricht in drei Kanälen, bekannte Maschen und Seiten wie „steamcommunlty“.",
+                    color: "var(--c-red)",
+                },
+                {
+                    label: "QR-Code, Doppelgänger",
+                    text: "„Scann für Nitro“ in Bildern, Namen und Avatare fast wie die vom Team.",
+                    color: "var(--c-mod-moderation)",
+                },
+                {
+                    label: "Köder",
+                    text: "Ein Kanal, in den nur Bots schreiben. Wer es doch tut, ist sofort festgehalten.",
+                    color: "var(--c-blue)",
+                },
+                {
+                    label: "Hack melden",
+                    text: "Mitglieder melden per Rechtsklick. Jede Meldung zählt, je Melder einmal am Tag. Frische Zweit-Accounts zählen nicht.",
+                    color: "var(--c-mod-engagement)",
+                },
+            ],
+        },
+        automations: {
+            title: "Was von selbst passiert",
+            lead: "Und was das Team entscheidet.",
+            entries: [
+                {
+                    title: "Quarantäne",
+                    text: "Rollen gemerkt und abgenommen, Nachrichten der letzten Stunde gelöscht, eine Anleitung im Quarantäne-Kanal und per DM.",
+                    icon: "lock",
+                },
+                {
+                    title: "Raid-Schutz",
+                    text: "Bei einer Welle neuer Accounts: Einladungen pausieren, Slowmode, die Welle festhalten. Danach ist alles wie vorher.",
+                    icon: "users",
+                },
+                {
+                    title: "Anti-Nuke",
+                    text: "Wer zu viele Kanäle oder Rollen löscht, verliert sofort alle Rollen. Vorher legt der Bot ein Sicherheits-Backup an.",
+                    icon: "alert",
+                },
+                {
+                    title: "Ein Protokoll",
+                    text: "Alles, was Anti Villain getan hat, 30 Tage lang. Entscheiden tut immer das Team.",
+                    icon: "scroll",
+                },
+            ],
+        },
+        setup: {
+            title: "Einrichten",
+            lead: "Einschalten, einrichten lassen, Meldekanal wählen.",
+            entries: [
+                {
+                    title: "Einrichten",
+                    text: "Der Bot legt die Quarantäne-Rolle, den Kanal und den Köder-Kanal an und sperrt die übrigen Kanäle für die Rolle.",
+                },
+                {
+                    title: "Meldekanal wählen",
+                    text: "Dorthin kommen die Karten mit den Knöpfen fürs Team, auf Wunsch mit Ping.",
+                },
+                {
+                    title: "Schutzstufe prüfen",
+                    text: "Normal passt für die meisten. Locker meldet nur, Streng hält früher fest.",
                 },
             ],
         },
@@ -1629,8 +1771,8 @@ export const MODULE_DETAILS: Readonly<Record<string, IModuleDetail>> = {
     backups: {
         intro: [
             "Eine falsch gesetzte Einstellung, ein gelöschtes Panel, ein Test, der mehr geändert hat als gedacht: Auf einem Server mit vielen Modulen ist schnell etwas weg, das jemand über Wochen eingerichtet hat.",
-            "Backups sichert den ganzen Stand eines Servers. Welche Module an sind und wie sie eingestellt sind, Nachrichten und Panels, dazu die Daten der Mitglieder wie Level, Tickets oder Verwarnungen. Von Hand vor einem Umbau oder automatisch in dem Rhythmus, den du einstellst.",
-            "Zurückgeladen wird im Dashboard in drei Schritten, und nur das, was du auswählst. Vorher sichert der Bot den jetzigen Stand, damit sich auch das Zurückladen wieder rückgängig machen lässt.",
+            "Backups sichert den ganzen Stand eines Servers. Welche Module an sind und wie sie eingestellt sind, Nachrichten und Panels, dazu die Daten der Mitglieder wie Level, Tickets oder Verwarnungen. Auf Wunsch auch den Discord-Server selbst: Rollen, Kanäle, Rechte, wer welche Rolle hat, Emojis, Bans und die Servereinstellungen.",
+            "Zurückgeladen wird im Dashboard in vier Schritten, mit den Unterschieden zu jetzt, bevor etwas passiert. Reparieren legt an, was fehlt, und löscht nichts. Danach zeigen die Einstellungen des Bots auf die neuen Kanäle und Rollen. Vorher sichert der Bot den jetzigen Stand, damit sich auch das wieder rückgängig machen lässt.",
         ],
         concepts: {
             title: "Welche Backups es gibt",
@@ -1650,6 +1792,11 @@ export const MODULE_DETAILS: Readonly<Record<string, IModuleDetail>> = {
                     label: "Vor dem Zurückladen",
                     text: "Legt der Bot selbst an, bevor er zurücklädt. Damit lässt sich das Zurückladen 72 Stunden lang rückgängig machen.",
                     color: "var(--c-mod-engagement)",
+                },
+                {
+                    label: "Discord-Server",
+                    text: "Rollen, Kanäle und Rechte, wer welche Rolle hat, Emojis, Bans und Einstellungen. Bans hebt der Bot beim Laden nie auf, und was über seiner Rolle steht, fasst er nicht an.",
+                    color: "var(--c-blue)",
                 },
                 {
                     label: "Bereiche",
@@ -1674,8 +1821,13 @@ export const MODULE_DETAILS: Readonly<Record<string, IModuleDetail>> = {
                 },
                 {
                     title: "Panels kommen zurück",
-                    text: "Nach dem Zurückladen prüft der Bot Rollen-, Ticket- und Voice-Panels und postet fehlende neu.",
+                    text: "Nach dem Laden postet der Bot fehlende Panels neu, und Panels mit neuen Rollen oder Kanälen zeichnet er neu.",
                     icon: "refresh",
+                },
+                {
+                    title: "Läuft weiter",
+                    text: "Ein Laden übersteht einen Neustart des Bots und macht beim nächsten Schritt weiter, ohne etwas doppelt anzulegen.",
+                    icon: "clock",
                 },
                 {
                     title: "Nichts bleibt halb",
@@ -1698,7 +1850,7 @@ export const MODULE_DETAILS: Readonly<Record<string, IModuleDetail>> = {
                 },
                 {
                     title: "Zurückladen",
-                    text: "Unter Meine Backups das Backup wählen, Bereiche aussuchen und mit dem Namen des Servers bestätigen.",
+                    text: "Unter Meine Backups das Backup wählen, Teile und Modus aussuchen, die Unterschiede ansehen und mit dem Namen des Servers bestätigen. Oder in Discord mit /backup laden.",
                 },
             ],
         },

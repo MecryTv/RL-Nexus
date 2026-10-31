@@ -2,10 +2,10 @@ import { AttachmentBuilder, Guild, GuildMember, MessageCreateOptions, Permission
 import BotClient from "../client/BotClient";
 import { CleanDoc } from "../builder/MessageDoc";
 import { CustomMessageView } from "../builder/CustomView";
-import { RenderWelcomeCard } from "../builder/WelcomeCard";
-import { ResolveImagePath } from "../constants/Gallery";
-import { DefaultDoc, DefaultWelcomeConfig, FONT_LABELS, LAYOUT_LABELS, MAX_AVATAR, MAX_LINE, MAX_RING, MAX_ROLES, MAX_TITLE_SIZE, MIN_AVATAR, MIN_TITLE_SIZE, NormalizeCard } from "../constants/Welcome";
-import { IWelcomeCard, IWelcomeConfig, IWelcomeMessage, WelcomeFont, WelcomeKind, WelcomeLayout } from "../interfaces/services/welcome/IWelcome";
+import { IWelcomeCardData, RenderWelcomeCard, WelcomePlaces } from "../builder/WelcomeCard";
+import { CleanGalleryPath, ResolveImagePath } from "../constants/Gallery";
+import { CleanPositions, DefaultDoc, DefaultWelcomeConfig, FONT_LABELS, LAYOUT_LABELS, MAX_AVATAR, MAX_LINE, MAX_RING, MAX_ROLES, MAX_TITLE_SIZE, MIN_AVATAR, MIN_TITLE_SIZE, NormalizeCard } from "../constants/Welcome";
+import { IWelcomeCard, IWelcomeConfig, IWelcomeMessage, IWelcomePositions, WelcomeFont, WelcomeKind, WelcomeLayout } from "../interfaces/services/welcome/IWelcome";
 import { ICustomEmbed } from "../interfaces/services/messages/IMessages";
 import logger from "../utils/logger";
 
@@ -108,7 +108,7 @@ export default class WelcomeService {
         const base = NormalizeCard(previous, which);
 
         return {
-            background: raw.background === undefined ? base.background : this.CleanBackground(raw.background),
+            background: raw.background === undefined ? base.background : CleanGalleryPath(raw.background),
             accent: Hex(raw.accent, base.accent),
             accentOn: typeof raw.accentOn === "boolean" ? raw.accentOn : base.accentOn,
             dim: Int(raw.dim, 0, 90, base.dim),
@@ -129,30 +129,9 @@ export default class WelcomeService {
             count: typeof raw.count === "boolean" ? raw.count : base.count,
             icon: typeof raw.icon === "boolean" ? raw.icon : base.icon,
             date: typeof raw.date === "boolean" ? raw.date : base.date,
+            // null heißt: wieder die Plätze des Layouts.
+            positions: raw.positions === undefined ? base.positions : CleanPositions(raw.positions),
         };
-    }
-
-    /**
-     * Der Hintergrund ist ein Bild der Galerie - "server/album[/ordner]/datei".
-     * Nichts anderes: die Karte zeichnet der Bot, und er lädt nur, was bei ihm
-     * liegt. Eine fremde Adresse ließe ihn Verbindungen aufbauen, die niemand
-     * sieht (auch ins interne Netz), genau das hält die Galerie schon zurück.
-     */
-    private CleanBackground(value: unknown): string | null {
-        if (typeof value !== "string") return null;
-
-        const source = value.trim();
-        const segments = source.split("/");
-
-        if (segments.length < 3 || segments.length > 4) return null;
-
-        // Jedes Stück ist ein Name, kein Pfad: kein Punkt-Sprung, kein Laufwerk,
-        // kein Schema. Sonst hielte path.resolve unter Windows "https:" für einen
-        // Ordner und ließe die Adresse durch. Leerzeichen dürfen bleiben - die
-        // mitgelieferten Vorlagen heißen "Champion 1.png".
-        if (segments.some((segment) => !segment || segment === "." || segment === ".." || /[\\:]/.test(segment))) return null;
-
-        return ResolveImagePath(source) ? source : null;
     }
 
     /** Wo das Bild wirklich liegt - null heißt: der Bot zeichnet einen Farbverlauf. */
@@ -239,13 +218,13 @@ export default class WelcomeService {
         return { ...(content ? { content } : {}), files: [file], allowedMentions: { users: [member.id] } };
     }
 
-    /** Die gezeichnete Karte eines Mitglieds. scale 1: die leichte Fassung für die Vorschau. */
-    async Card(member: GuildMember, message: IWelcomeMessage, which: "join" | "leave", scale?: number): Promise<Buffer> {
+    /** Was die Karte eines Mitglieds zum Zeichnen braucht: Zeilen mit eingesetzten Platzhaltern, Bilder, Hintergrund. */
+    CardData(member: GuildMember, message: IWelcomeMessage, which: "join" | "leave"): IWelcomeCardData {
         const values = this.CardValues(member, which);
         const { card } = message;
         const footer = [card.footer ? this.Fill(card.footer, values) : "", card.date ? values.joined : ""].filter(Boolean).join(" · ");
 
-        return RenderWelcomeCard({
+        return {
             card,
             title: this.Fill(card.title, values),
             subtitle: this.Fill(card.subtitle, values),
@@ -254,7 +233,38 @@ export default class WelcomeService {
             avatarURL: card.avatar ? member.displayAvatarURL({ extension: "png", size: 512 }) : null,
             iconURL: card.icon ? member.guild.iconURL({ extension: "png", size: 256 }) : null,
             backgroundPath: this.Background(card.background),
-        }, scale);
+        };
+    }
+
+    /** Die gezeichnete Karte eines Mitglieds. scale 1: die leichte Fassung für die Vorschau. */
+    async Card(member: GuildMember, message: IWelcomeMessage, which: "join" | "leave", scale?: number): Promise<Buffer> {
+        return RenderWelcomeCard(this.CardData(member, message, which), scale);
+    }
+
+    /**
+     * Die Vorschau im Dashboard. bare (Plan 25): die Karte ohne die fünf Teile,
+     * dazu die fertigen Zeilen, die Bilder und die Plätze des Layouts - daraus
+     * baut die Bühne die Teile selbst, damit sie sich beim Ziehen sofort bewegen.
+     * Avatar und Icon kommen auch, wenn sie aus sind: die Bühne zeigt sie blass.
+     */
+    async Preview(member: GuildMember, message: IWelcomeMessage, which: "join" | "leave", bare: boolean): Promise<{ image: string; parts?: { title: string; subtitle: string; footer: string; avatar: string | null; icon: string | null }; layout?: Required<IWelcomePositions> }> {
+        const data = this.CardData(member, message, which);
+        const png = await RenderWelcomeCard(data, 1, { bare });
+        const image = `data:image/png;base64,${png.toString("base64")}`;
+
+        if (!bare) return { image };
+
+        return {
+            image,
+            parts: {
+                title: data.title,
+                subtitle: data.subtitle,
+                footer: data.footer,
+                avatar: member.displayAvatarURL({ extension: "png", size: 256 }),
+                icon: member.guild.iconURL({ extension: "png", size: 128 }),
+            },
+            layout: await WelcomePlaces(data),
+        };
     }
 
     private Fill(text: string, values: Record<string, string>): string {

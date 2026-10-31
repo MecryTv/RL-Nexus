@@ -31,8 +31,24 @@ interface IForm {
 
 interface IPayload {
     guild: { id: string; name: string; icon: string | null };
+    mode: "web";
+    panel: IPanel | null;
     me: { id: string; member: boolean } | null;
     forms: IForm[];
+}
+
+/** Bei Fenster und DM (Plan 24): keine Fragen, nur wie viele es sind. */
+interface IDiscordPayload {
+    guild: { id: string; name: string; icon: string | null };
+    mode: "modal" | "dm";
+    panel: IPanel | null;
+    forms: (Omit<IForm, "questions"> & { questions: number })[];
+}
+
+interface IPanel {
+    channelId: string;
+    name: string;
+    url: string;
 }
 
 /** Anmelden und danach wieder auf dieser Seite landen. */
@@ -42,6 +58,88 @@ function login(): string {
 
 function empty(title: string, text: string): HTMLElement {
     return el("div", "tkempty tkempty--big", icon("#i-warn"), el("b", "", title), el("span", "", text));
+}
+
+function questions(count: number): string {
+    return count === 1 ? "1 Frage" : `${count} Fragen`;
+}
+
+/** Kopf: Wappen, Name und wie viele Stellen offen sind. */
+function head(data: IPayload | IDiscordPayload): HTMLElement {
+    const crest = el("span", "aphead__crest");
+
+    if (data.guild.icon) crest.style.backgroundImage = `url("${data.guild.icon.replace(/["\\]/g, "")}")`;
+    else crest.textContent = data.guild.name.slice(0, 1).toUpperCase();
+
+    return el(
+        "div",
+        "aphead",
+        crest,
+        el("div", "aphead__text", el("h1", "", data.guild.name), el("p", "", data.forms.length === 1 ? "Eine offene Stelle" : `${data.forms.length} offene Stellen`))
+    );
+}
+
+/**
+ * Bewirbt man sich auf diesem Server in Discord, nimmt die Seite nichts an.
+ * Sie sagt, wo es langgeht: Kanal, Direktlink, /bewerben, die offenen Stellen.
+ */
+function discord(data: IDiscordPayload): HTMLElement {
+    const dm = data.mode === "dm";
+    const command = (): HTMLElement => el("code", "", "/bewerben");
+    const steps: (Node | string)[][] = data.panel
+        ? [
+              ["Geh in den Kanal ", el("b", "", `#${data.panel.name}`), "."],
+              dm
+                  ? ["Klick beim passenden Formular auf ", el("b", "", "Bewerben"), ". RL Nexus schreibt dir eine DM und stellt dir dort die Fragen."]
+                  : ["Klick beim passenden Formular auf ", el("b", "", "Bewerben"), ". Es öffnet sich ein Fenster mit den Fragen."],
+              ["Kein Panel zu sehen? Tipp ", command(), " in irgendeinen Kanal des Servers."],
+          ]
+        : [["Tipp ", command(), " in irgendeinen Kanal des Servers."]];
+    const go = el("a", "btn btn--primary apgo", icon("#i-discord"), `#${data.panel?.name ?? ""} in Discord öffnen →`);
+
+    if (data.panel) {
+        go.href = data.panel.url;
+        go.target = "_blank";
+        go.rel = "noopener";
+    }
+
+    return el(
+        "div",
+        "apdiscord-page",
+        el(
+            "div",
+            "apdiscord",
+            el("h2", "", "Bewerbungen laufen bei uns in Discord"),
+            el(
+                "p",
+                "",
+                dm
+                    ? "Hier auf der Seite geht es nicht. Du bewirbst dich auf dem Server, RL Nexus stellt dir die Fragen per DM."
+                    : "Hier auf der Seite geht es nicht. Du bewirbst dich direkt auf dem Server, in einem Fenster in Discord."
+            ),
+            el("ol", "apsteps", ...steps.map((parts) => el("li", "", el("span", "", ...parts)))),
+            ...(data.panel ? [go] : []),
+            el("p", "apfine", data.panel ? "Der Link klappt, wenn du schon auf dem Server bist. Die Antwort vom Team kommt per DM." : "Die Antwort vom Team kommt per DM.")
+        ),
+        el(
+            "div",
+            "apopen",
+            el("span", "apopen__label", "Gerade offen"),
+            el(
+                "div",
+                "apopen__list",
+                ...data.forms.map((form) =>
+                    el(
+                        "div",
+                        "apopen__item",
+                        el("span", "apopen__mark", form.emoji ?? icon("#i-clipboard")),
+                        el("div", "apopen__text", el("b", "", form.name), ...(form.description ? [el("span", "", form.description)] : [])),
+                        el("span", "apopen__n", questions(form.questions))
+                    )
+                )
+            )
+        )
+    );
 }
 
 export async function renderApplyPage(): Promise<void> {
@@ -62,25 +160,18 @@ export async function renderApplyPage(): Promise<void> {
         return;
     }
 
-    const data = (await response.json()) as IPayload;
-    let open: IForm | null = data.forms.length === 1 ? data.forms[0] : null;
+    const payload = (await response.json()) as IPayload | IDiscordPayload;
 
-    /* ------------------------------------------------------------
-       Kopf
-       ------------------------------------------------------------ */
-    function header(): HTMLElement {
-        const crest = el("span", "aphead__crest");
+    if (payload.mode !== "web") {
+        host.replaceChildren(head(payload), discord(payload));
 
-        if (data.guild.icon) crest.style.backgroundImage = `url("${data.guild.icon.replace(/["\\]/g, "")}")`;
-        else crest.textContent = data.guild.name.slice(0, 1).toUpperCase();
-
-        return el(
-            "div",
-            "aphead",
-            crest,
-            el("div", "aphead__text", el("h1", "", data.guild.name), el("p", "", data.forms.length === 1 ? "Eine offene Stelle" : `${data.forms.length} offene Stellen`))
-        );
+        return;
     }
+
+    const data = payload;
+    // Aus dem Panel: ?formular=<id> öffnet dieses Formular direkt, wenn es offen ist.
+    const wanted = Number(new URLSearchParams(window.location.search).get("formular"));
+    let open: IForm | null = data.forms.find((form) => form.id === wanted) ?? (data.forms.length === 1 ? data.forms[0] : null);
 
     /* ------------------------------------------------------------
        Auswahl
@@ -203,13 +294,14 @@ export async function renderApplyPage(): Promise<void> {
             }
 
             host.replaceChildren(
-                header(),
+                head(data),
                 el(
                     "div",
                     "tkempty tkempty--big",
                     icon("#i-check"),
                     el("b", "", "Abgeschickt"),
-                    el("span", "", `Deine Bewerbung als ${form.name} liegt beim Team (#${body.id}). Die Antwort kommt als Nachricht von RL Nexus.`)
+                    // Derselbe Satz wie RECEIVED im Bot (constants/Apply.ts) - der Client importiert keine Bot-Konstanten.
+                    el("span", "", "Deine Bewerbung ist bei uns eingegangen. Das Staff Team wird sich bei dir melden.")
                 )
             );
         });
@@ -241,7 +333,7 @@ export async function renderApplyPage(): Promise<void> {
     }
 
     function paint(): void {
-        host.replaceChildren(header(), open ? sheet(open) : choice());
+        host.replaceChildren(head(data), open ? sheet(open) : choice());
     }
 
     paint();

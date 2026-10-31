@@ -14,15 +14,18 @@ process.env.DEV_CLIENT_SECRET ||= "check-secret";
 import path from "path";
 import { existsSync } from "fs";
 import { createCanvas, loadImage } from "@napi-rs/canvas";
-import { ChannelType, Guild, GuildBasedChannel, PermissionFlagsBits, Role } from "discord.js";
+import { ChannelType, Guild, GuildBasedChannel, MessageFlags, PermissionFlagsBits, Role } from "discord.js";
 import BotClient from "../client/BotClient";
-import { BoardText, BoardView, ChannelsText, LeaguesText, LineupText, PLAYER_FIELDS, PlayerKey, PlayerList, PlayerValues, RoleValues, RosterText, StaffText, TeamMenuRow, TeamValues, ListTeams, Formats } from "../builder/TeamView";
-import { DefaultTeamList, MEMBER_FIELDS, TEAM_LIST_PRESETS, TeamListText } from "../constants/TeamList";
+import { HubDoc, ChannelsText, LeaguesText, LineupText, PLAYER_FIELDS, PlayerKey, PlayerValues, RoleValues, RosterText, StaffText, HubMessages, IHubMessage, TeamCardView, TeamOwnValues, TeamValues, Formats } from "../builder/TeamView";
+import { BestPeak, CardRank, ITeamCardData, ITeamCardImages, Lines, RenderTeamCard, TeamCardWidth, TeamPlaces } from "../builder/TeamCard";
+import { RegisterFonts } from "../builder/RankCard";
 import { CardsInOrder, DefaultTeamOrder, ITeamOrder, OrderTeams } from "../constants/TeamOrder";
 import { Fill } from "../constants/Placeholders";
 import { DIVISIONS, RankFromMMR, RankShort, RankText, TIERS } from "../constants/Prime";
 import {
     COUNTING_ROLES,
+    DEFAULT_HUB_LINE,
+    DefaultBoardBody,
     DefaultRoles,
     DefaultTeamSettings,
     FORMULA_KEYS,
@@ -42,8 +45,9 @@ import {
 } from "../constants/Teams";
 import { IconImage, RANK_ICON_FILES, RANK_ICON_ROOT, RankIconImage, RankIconName, ROLE_ICON_COLORS, ROLE_ICON_FILES, ROLE_ICON_ROOT, RoleBadge, RoleIconImage, RoleIconName } from "../services/RankIconService";
 import { IsImageFile } from "../constants/Gallery";
-import { ITeam, ITeamGroup, ITeamPlayer, ITeamSettings, TeamRole } from "../interfaces/services/teams/ITeams";
-import { RolePlan, RoleTargets, TeamError, TeamOverwrites, TextName, ViewFacts } from "../services/TeamService";
+import { ITeam, ITeamGroup, ITeamPlayer, ITeamSettings, ITeamView, TeamRole } from "../interfaces/services/teams/ITeams";
+import { HubParts } from "../routes/DashboardApiTeams";
+import { ApplyCategoryDraft, ParseCategoryDraft, EmojiId, NeedsResend, NormalizeTeamSettings, RolePlan, RoleTargets, SameMessage, TeamError, TeamOverwrites, TextName, ViewFacts } from "../services/TeamService";
 import { Evaluate, FormulaError } from "../utils/formula";
 
 const GUILD = "90071992547409951";
@@ -128,6 +132,7 @@ function FakeTeam(players: ITeamPlayer[], over: Partial<ITeam> = {}): ITeam {
         channels: { kind: "channels", categoryId: null, textIds: [TEXT], voiceIds: [VOICE] },
         created: { roleId: null, categoryId: null, textIds: [], voiceIds: [] },
         links: [],
+        region: "",
         players,
         position: 0,
         messageId: null,
@@ -210,13 +215,14 @@ function checkSettings(client: BotClient): void {
 
     const guild = FakeGuild();
     const service = client.teamService;
-    const clean = service.CleanSettings(guild, { channelId: TEXT, layout: "menu", mmr: { mode: "formula", formula: "{peak3s} * 2" } }, DefaultTeamSettings());
+    const clean = service.CleanSettings(guild, { channelId: TEXT, layout: "cards", mmr: { mode: "formula", formula: "{peak3s} * 2" } }, DefaultTeamSettings());
 
     check("Der Kanal kommt an", clean.channelId === TEXT);
-    check("Das Layout auch", clean.layout === "menu");
+    check("Das Layout auch", clean.layout === "cards");
+    check("„Hauptnachricht mit Menü“ gibt es nicht mehr", service.CleanSettings(guild, { layout: "menu" }, { ...DefaultTeamSettings(), layout: "cards" }).layout === "cards");
     check("Die eigene Rechnung wird übernommen", clean.mmr.formula === "{peak3s} * 2");
     check("Ein Sprachkanal fällt weg", service.CleanSettings(guild, { channelId: VOICE }, DefaultTeamSettings()).channelId === null);
-    check("Ein erfundenes Layout bleibt beim alten", service.CleanSettings(guild, { layout: "quatsch" }, DefaultTeamSettings()).layout === "cards");
+    check("Ein erfundenes Layout bleibt beim alten", service.CleanSettings(guild, { layout: "quatsch" }, { ...DefaultTeamSettings(), layout: "cards" }).layout === "cards");
 
     // Eine kaputte Formel wird beim Speichern abgewiesen und nicht erst, wenn
     // die Uebersicht rausgeht.
@@ -228,6 +234,328 @@ function checkSettings(client: BotClient): void {
     const keepsBad = service.CleanSettings(guild, { mmr: { mode: "wtsi", formula: "{kaputt}" } }, DefaultTeamSettings());
 
     check("Bei WTSI stört eine unbenutzte Formel nicht", keepsBad.mmr.mode === "wtsi" && keepsBad.mmr.formula === "{kaputt}");
+}
+
+/** Plan 26: die gezeichnete Karte. */
+async function checkDrawnCard(client: BotClient): Promise<void> {
+    console.log("\n  — Gezeichnete Karte —");
+
+    const service = client.teamService;
+    const base = DefaultTeamSettings();
+    const groups: ITeamGroup[] = [{ id: 1, guildId: GUILD, name: "Main", position: 0 }];
+    const roster = (count: number): ITeamPlayer[] => [
+        ...Array.from({ length: count }, (_, index) => Player(`s${index}`, index === 0 ? "captain" : index === count - 1 ? "trial" : "player", 1500 + index * 10, 1450 + index * 10, 1400, 1380)),
+        { ...Player("c1", "coach", null, null), snapshot: undefined },
+        { ...Player("m1", "manager", null, null), snapshot: undefined },
+    ];
+    const images: ITeamCardImages = { logo: null, background: null, badges: { captain: null, cocaptain: null, player: null, sub: null, trial: null, coach: null, manager: null } };
+    const card = (players: ITeamPlayer[], over: Partial<ITeamCardData> = {}, settings = base): ITeamCardData => ({
+        view: service.Look(FakeTeam(players, { region: "EU", links: [{ label: "RLCS Quali", url: "https://example.com" }] }), groups, settings),
+        columns: settings.cardColumns,
+        place: { place: 1, of: 3 },
+        guildName: "RL Nexus",
+        roleName: "Vyrox Main",
+        accent: "#00afff",
+        images,
+        design: settings.card,
+        lines: { title: "Vyrox Main", subtitle: "Der Hauptkader.", footer: "RL Nexus · @Vyrox Main" },
+        ...over,
+    });
+    const size = async (buffer: Buffer): Promise<{ width: number; height: number }> => {
+        const picture = await loadImage(buffer);
+
+        return { width: picture.width, height: picture.height };
+    };
+
+    const five = await RenderTeamCard(card(roster(5)));
+
+    check("Ein Team mit fünf Spielern und Staff wird ein WebP", five.subarray(0, 4).toString() === "RIFF" && five.subarray(8, 12).toString() === "WEBP");
+
+    const four = await size(await RenderTeamCard(card(roster(4))));
+    const twelve = await size(await RenderTeamCard(card(roster(MAX_PLAYERS - 2))));
+
+    check("Mehr Spieler, höhere Karte", twelve.height > four.height, `${four.height} / ${twelve.height}`);
+
+    const narrow = await size(await RenderTeamCard(card(roster(4), { columns: { "2v2": false, "1v1": false, peak: true } })));
+
+    check("Ohne 2v2 und 1v1 wird die Karte schmaler", narrow.width < four.width, `${four.width} / ${narrow.width}`);
+    check("Nie schmaler als 760", TeamCardWidth({ "2v2": false, "1v1": false, peak: false }) >= 760);
+
+    const bare = roster(3).map((player) => ({ ...player, snapshot: undefined }));
+    const blank = await RenderTeamCard(card(bare, { place: null }));
+
+    check("Spieler ohne Stand von Prime brechen nichts ab", blank.length > 0);
+
+    const facts = (mmr: number | null, id: number): ITeamView => ({ ...card(roster(2)).view, team: FakeTeam([], { id }), mmr });
+    const places = TeamPlaces([facts(1700, 1), facts(1700, 2), facts(1600, 3), facts(null, 4)]);
+
+    check("Gleiche MMR teilt sich den Platz", places.get(1)?.place === 1 && places.get(2)?.place === 1 && places.get(3)?.place === 3, JSON.stringify([...places]));
+    check("Ohne MMR kein Platz, „von“ zählt nur Teams mit MMR", !places.has(4) && places.get(1)?.of === 3);
+
+    // Der Schnitt ist der Wert nach der eingestellten Rechnung - gezeichnet wird, was Look() rechnet.
+    const formula: ITeamSettings = { ...base, mmr: { mode: "formula", formula: "{peak3s}" } };
+    const wtsi = card(roster(4));
+    const own = card(roster(4), {}, formula);
+
+    check("Schnitt folgt der Rechnung", wtsi.view.players[0]!.value !== own.view.players[0]!.value && own.view.players[0]!.value === 1500, `${wtsi.view.players[0]!.value} / ${own.view.players[0]!.value}`);
+    check("Andere Rechnung, anderes Bild", !(await RenderTeamCard(wtsi)).equals(await RenderTeamCard(own)));
+
+    // Plan 27: Ränge mit Zahlen, Rang zum Schnitt, Aussehen aus den Einstellungen.
+    check("Rang aus 1.748: GC 3 · Div 1", JSON.stringify(CardRank(1748)) === JSON.stringify({ tier: 21, name: "GC 3", division: "Div 1" }), JSON.stringify(CardRank(1748)));
+    check("Rang aus 1.705: GC 2 · Div 4", CardRank(1705)?.name === "GC 2" && CardRank(1705)?.division === "Div 4");
+    check("SSL hat keine Division", CardRank(1900)?.name === "SSL" && CardRank(1900)?.division === null);
+    check("Ohne Wert kein Rang", CardRank(null) === null);
+
+    // Der Peak ist der höchste Wert über 1v1, 2v2 und 3v3 - eingetragen oder, wenn die aktuelle MMR schon höher steht, die.
+    check("Peak: 2v2 aktuell über dem eingetragenen 3v3-Peak", BestPeak(Player("b1", "captain", 1199, 1109, null, 1307)) === 1307, String(BestPeak(Player("b1", "captain", 1199, 1109, null, 1307))));
+    check("Peak: ein eingetragener 2v2-Peak gewinnt, wenn er am höchsten ist", BestPeak(Player("b2", "captain", 1199, 1109, 1400, 1307)) === 1400);
+    check("Peak: 3v3 bleibt, wenn er am höchsten ist", BestPeak(Player("b3", "captain", 1600, 1500, 1400, 1300)) === 1600);
+    check("Peak: ohne Werte keiner", BestPeak({ ...Player("b4", "coach", null, null), snapshot: undefined }) === null);
+
+    const off = { ...base.card, parts: { logo: false, leagues: false, mmr: false, peak: false, staff: false }, chips: { tag: false, group: false, place: false, region: false } };
+    const naked = await RenderTeamCard({ ...card(roster(3)), design: off, lines: { title: "", subtitle: "", footer: "" } });
+
+    check("Ohne alle Bausteine zeichnet sie trotzdem", naked.subarray(0, 4).toString() === "RIFF" && naked.subarray(8, 12).toString() === "WEBP");
+
+    // Einmal gebaut: neue Spieler hätten einen neuen Zeitstempel, und springt die Minute, wäre das Bild ein anderes.
+    const sample = card(roster(3));
+    const lost = await RenderTeamCard({ ...sample, design: { ...base.card, background: { mode: "own", image: "123456789012345678/weg/fehlt.png" } } });
+    const none = await RenderTeamCard({ ...sample, design: { ...base.card, background: { mode: "none", image: null } } });
+    const standard = await RenderTeamCard(sample);
+
+    check("Eigener Hintergrund fehlt: zeichnet mit Standard", lost.equals(standard));
+    check("Ohne Hintergrund ist ein anderes Bild als der Standard", !none.equals(standard));
+    check("Bausteine aus ändern das Bild", !naked.equals(standard));
+
+    const guild = FakeGuild();
+    const settings: ITeamSettings = { ...base, card: { ...base.card, title: "{team.name} · {team.tag}", accent: "#ff0000" } };
+    const view = service.Look(FakeTeam([Player("p1", "captain", 1500, 1450)], { description: "", color: "#00ff00" }), groups, settings);
+    const data = await service.CardData(guild, view, [view], settings);
+
+    check("Große Zeile mit Platzhaltern", data.lines.title === "Vyrox Main · VYX", data.lines.title);
+    check("Ohne Beschreibung bleibt die Unterzeile leer", data.lines.subtitle === "", data.lines.subtitle);
+    check("Fußzeile mit Rollennamen statt Erwähnung", data.lines.footer === "Dev Server · @Team", data.lines.footer);
+    check("Eigene Farbe der Karte schlägt die Teamfarbe", data.accent === "#ff0000");
+    check("Ohne eigene Farbe gilt die Teamfarbe", (await service.CardData(guild, view, [view], base)).accent === "#00ff00");
+
+    const noRole = await service.CardData(guild, service.Look(FakeTeam([], { roleId: null }), groups, base), [], base);
+
+    check("Ohne Rolle kein „@—“ im Fuß", noRole.lines.footer === "Dev Server", noRole.lines.footer);
+
+    // Review: Was das Platzhalter-Menü anbietet, steht im Bild ohne Discord-Schreibweise.
+    const linked = service.Look(
+        FakeTeam([{ ...Player("p1", "captain", 1500, 1450), name: "Nico", discordId: "100000000000000001" }], {
+            links: [{ label: "RLCS Quali", url: "https://rlcs.gg/" }, { label: "Nexus Liga", url: "https://start.gg/nexus" }],
+        }),
+        groups,
+        base
+    );
+    const plain = await service.CardData(guild, linked, [linked], { ...base, card: { ...base.card, title: "Stand {updated}", subtitle: "{team.leagues}", footer: "Captain {team.captain}" } });
+
+    check("{updated} als Datum, nicht als <t:…>", !plain.lines.title.includes("<t:") && /\d{2}\.\d{2}\./.test(plain.lines.title), plain.lines.title);
+    check("{team.leagues} nur mit Namen", plain.lines.subtitle === "RLCS Quali · Nexus Liga", plain.lines.subtitle);
+    check("{team.captain} mit Namen statt Erwähnung", plain.lines.footer === "Captain @Nico", plain.lines.footer);
+}
+
+/** Plan 30: ein Zeilenumbruch in der Beschreibung ist auf der Karte einer. */
+async function checkDescriptionLines(client: BotClient): Promise<void> {
+    console.log("\n  — Beschreibung mit Zeilenumbruch —");
+
+    // Der Weg vom Team bis zur Unterzeile darf den Umbruch nicht verschlucken.
+    const base = DefaultTeamSettings();
+    const settings: ITeamSettings = { ...base, card: { ...base.card, subtitle: "{team.description}" } };
+    const view = client.teamService.Look(FakeTeam([], { description: "Main Team von Noir-Esport.\nRepräsentiert" }), [], settings);
+    const data = await client.teamService.CardData(FakeGuild(), view, [view], settings);
+
+    check("Unterzeile behält den Umbruch", data.lines.subtitle === "Main Team von Noir-Esport.\nRepräsentiert", JSON.stringify(data.lines.subtitle));
+
+    // W-0032: Groß- und Fußzeile sind je eine Zeile - dort wird ein Umbruch zum Leerzeichen.
+    const oneLine: ITeamSettings = { ...settings, card: { ...settings.card, title: "{team.description}", footer: "{team.description}" } };
+    const single = await client.teamService.CardData(FakeGuild(), view, [view], oneLine);
+
+    check("Großzeile ohne Umbruch", single.lines.title === "Main Team von Noir-Esport. Repräsentiert", JSON.stringify(single.lines.title));
+    check("Fußzeile ohne Umbruch", single.lines.footer === "Main Team von Noir-Esport. Repräsentiert", JSON.stringify(single.lines.footer));
+
+    await RegisterFonts();
+
+    const ctx = createCanvas(10, 10).getContext("2d");
+
+    ctx.font = "600 19px Rajdhani";
+
+    const two = Lines(ctx, "Main Team von Noir-Esport.\nRepräsentiert", 600);
+    const four = Lines(ctx, "A\nB\nC\nD", 600);
+
+    check("Zeilenumbruch bleibt", JSON.stringify(two) === JSON.stringify(["Main Team von Noir-Esport.", "Repräsentiert"]), JSON.stringify(two));
+    check("Leere Zeilen fallen weg", Lines(ctx, "A\n\n\nB", 600).length === 2);
+    check("Windows-Umbruch auch", Lines(ctx, "A\r\nB", 600).length === 2);
+    check("Höchstens drei Zeilen", four.length === 3, JSON.stringify(four));
+    check("Ohne Umbruch wie bisher", Lines(ctx, "Ein Satz", 600).join("|") === "Ein Satz");
+}
+
+/** Plan 26: woher die Bilder der Karte kommen - nie von einer Adresse aus dem Dashboard. */
+async function checkCardImages(client: BotClient): Promise<void> {
+    console.log("\n  — Bilder der Karte —");
+
+    const guild = FakeGuild();
+    const service = client.teamService;
+    const asked: string[] = [];
+    const png = await RoleIconImage("captain");
+    const download = async (url: string): Promise<Buffer | null> => {
+        asked.push(url);
+
+        return url.includes("111111111111111111") ? png : null;
+    };
+    const settings: ITeamSettings = {
+        ...DefaultTeamSettings(),
+        badges: {
+            captain: { kind: "image", value: "default/rocketleague/teamicons/Coach.png", emoji: "<:x:222222222222222222>" },
+            cocaptain: { kind: "emoji", value: "<:fire:111111111111111111>" },
+            player: { kind: "emoji", value: "🔥" },
+            sub: { kind: "emoji", value: "<:gone:333333333333333333>" },
+        },
+    };
+    const images = await service.CardImages(guild, FakeTeam([], { logo: "https://evil.example/x.png" }), settings, download);
+
+    check("Ein Logo als Link wird nie geladen", images.logo === null && asked.every((url) => url.startsWith("https://cdn.discordapp.com/emojis/")), asked.join(", "));
+    check("Bild aus der Galerie geht vor dem Emoji", images.badges.captain !== null && !asked.some((url) => url.includes("222222222222222222")));
+    check("Ein Emoji kommt von Discords CDN", images.badges.cocaptain !== null && asked.includes("https://cdn.discordapp.com/emojis/111111111111111111.png"));
+    check("Unicode-Emoji: Standard-Abzeichen", images.badges.player === null);
+    check("Emoji nicht ladbar: Standard-Abzeichen", images.badges.sub === null);
+    check("Ohne eigenes Abzeichen: Standard", images.badges.trial === null);
+    check("Emoji-ID nur aus der Zahl", EmojiId("<:xx:123456789012345678>") === "123456789012345678" && EmojiId("<:xx:12/../a>") === null && EmojiId("🔥") === null);
+
+    const gallery = await service.CardImages(guild, FakeTeam([], { logo: "default/rocketleague/teamicons/Coach.png" }), DefaultTeamSettings(), download);
+
+    check("Ein Logo aus den Vorlagen wird geladen", gallery.logo !== null);
+
+    const ownBackground = { ...DefaultTeamSettings(), card: { ...DefaultTeamSettings().card, background: { mode: "own" as const, image: "default/rocketleague/teamicons/Coach.png" } } };
+
+    check("Eigener Hintergrund kommt aus der Galerie", (await service.CardImages(guild, FakeTeam([]), ownBackground, download)).background !== null);
+    check("Standard-Hintergrund braucht kein Bild", (await service.CardImages(guild, FakeTeam([]), DefaultTeamSettings(), download)).background === null);
+
+    // Plan 30: ein Team kann seinen eigenen Hintergrund haben.
+    const teamBg = "default/rocketleague/teamicons/Coach.png";
+    const noBackground = { ...DefaultTeamSettings(), card: { ...DefaultTeamSettings().card, background: { mode: "none" as const, image: null } } };
+
+    check("Hintergrund des Teams geht vor", (await service.CardImages(guild, FakeTeam([], { background: teamBg }), DefaultTeamSettings(), download)).background !== null);
+    check("Auch wenn allgemein keiner gewählt ist", (await service.CardImages(guild, FakeTeam([], { background: teamBg }), noBackground, download)).background !== null);
+    check("Fehlt sein Bild: der allgemeine", (await service.CardImages(guild, FakeTeam([], { background: "fehlt/gibts-nicht.png" }), ownBackground, download)).background !== null);
+    check("Ein Link als Hintergrund wird nie geladen", (await service.CardImages(guild, FakeTeam([], { background: "https://evil.example/x.png" }), DefaultTeamSettings(), download)).background === null);
+
+    // Die Nachricht: gezeichnet ist sie eine V2-Karte mit genau einem Bild, sonst die aus dem Editor wie bisher.
+    const groups: ITeamGroup[] = [{ id: 1, guildId: GUILD, name: "Main", position: 0 }];
+    const view = service.Look(FakeTeam([Player("p1", "captain", 1500, 1450)], { id: 7 }), groups, DefaultTeamSettings());
+    const drawn = await TeamCardView(client, { ...DefaultTeamSettings(), layout: "hub" }, view, guild, [view]);
+    const json = JSON.stringify(drawn.components.map((entry) => entry.toJSON()));
+
+    check("Im Hub gezeichnet: eine V2-Karte", drawn.flags === MessageFlags.IsComponentsV2);
+    check("… mit genau dem Bild team-7.webp", drawn.files?.length === 1 && json.includes("attachment://team-7.webp"), json.slice(0, 160));
+
+    // Plan 30: die Liga des Teams als Link-Knopf unter der Karte, für das Standing.
+    const league = service.Look(FakeTeam([Player("p1", "captain", 1500, 1450)], { id: 8, links: [{ label: "Rival Rush Div 4.4", url: "https://example.com/liga" }] }), groups, DefaultTeamSettings());
+    const withLeague = JSON.stringify((await TeamCardView(client, { ...DefaultTeamSettings(), layout: "hub" }, league, guild, [league])).components.map((entry) => entry.toJSON()));
+
+    check("Liga als Link-Knopf", withLeague.includes('"url":"https://example.com/liga"') && withLeague.includes("Rival Rush Div 4.4"), withLeague.slice(-300));
+    check("Ohne Liga kein Link-Knopf", !json.includes('"style":5'));
+
+    const editor = await TeamCardView(client, { ...DefaultTeamSettings(), layout: "cards" }, view, guild, [view]);
+
+    check("Alle Teams einzeln: Karte aus dem Editor, kein Bild", !editor.files?.length && !JSON.stringify(editor.components.map((entry) => entry.toJSON())).includes("team-7.webp"));
+}
+
+/** Plan 26/27: Hub-Einstellungen, Umstellung alter Darstellungen und Region. */
+async function checkHubSettings(client: BotClient): Promise<void> {
+    console.log("\n  — Einstellungen des Hubs —");
+
+    const guild = FakeGuild();
+    const service = client.teamService;
+    const base = DefaultTeamSettings();
+
+    // Plan 27: nur noch Hub und „Alle Teams einzeln“, alte Darstellungen werden umgestellt.
+    const head = (doc: unknown): string => JSON.stringify(doc);
+    const own = { accent: "#123456", blocks: [{ type: "text", body: "# Unser eigener Kopf" }] };
+    const withTeams = { accent: "#00afff", blocks: [{ type: "text", body: "{teams}" }] };
+    const body = (kind: string, doc: unknown) => ({ kind, content: "", embed: null, doc });
+
+    check("Neuer Server startet mit dem Hub", NormalizeTeamSettings(null).layout === "hub");
+
+    const menuEmbed = NormalizeTeamSettings({ layout: "menu", board: body("embed", own) });
+
+    check("Menü mit Embed-Kopf wird Hub mit Vorlage", menuEmbed.layout === "hub" && head(menuEmbed.board.doc) === head(DefaultBoardBody().doc) && menuEmbed.board.kind === "v2");
+    check("Alles in einer Nachricht mit {teams} bekommt die Vorlage", head(NormalizeTeamSettings({ layout: "single", board: body("v2", withTeams) }).board.doc) === head(DefaultBoardBody().doc));
+    check("Menü mit tauglichem V2-Kopf behält ihn", head(NormalizeTeamSettings({ layout: "menu", board: body("v2", own) }).board.doc) === head(own));
+
+    // Review: {teams.count} geht im Hub - ein Kopf damit taugt und bleibt.
+    const counted = { accent: "#00afff", blocks: [{ type: "text", body: "# Unsere {teams.count} Teams" }] };
+
+    check("Menü mit {teams.count} im Kopf behält ihn", head(NormalizeTeamSettings({ layout: "menu", board: body("v2", counted) }).board.doc) === head(counted));
+
+    const hubEmbed = NormalizeTeamSettings({ layout: "hub", board: body("embed", own) });
+
+    check("Hub mit Embed-Art behält seinen Kopf", hubEmbed.layout === "hub" && hubEmbed.board.kind === "v2" && head(hubEmbed.board.doc) === head(own));
+
+    const cards = NormalizeTeamSettings({ layout: "cards", teamStyle: "drawn" });
+
+    check("Karten bleiben Karten, ohne Stil", cards.layout === "cards" && !("teamStyle" in cards));
+    check(
+        "hubApply wird zum Knopf",
+        JSON.stringify(NormalizeTeamSettings({ hubApply: false }).hubButton) === JSON.stringify({ on: false, to: "apply", url: null, channelId: null, label: "Bei uns bewerben" })
+    );
+    check(
+        "Ab Werk: Thumbnail Server-Icon, kein großes Bild, Karte mit Vorgaben",
+        NormalizeTeamSettings(null).hubThumbnail === "{guild.icon}" &&
+            NormalizeTeamSettings(null).hubImage === null &&
+            NormalizeTeamSettings(null).card.dim === 45 &&
+            NormalizeTeamSettings(null).card.title === "{team.name}" &&
+            NormalizeTeamSettings(null).card.footer === "{guild} · @{team.role}"
+    );
+
+    const button = (value: Record<string, unknown>) => service.CleanSettings(guild, { hubButton: { on: true, to: "web", ...value } }, base).hubButton;
+
+    check("Knopf: http:// gilt nicht", button({ url: "http://x.de" }).url === null);
+    check("Knopf: https:// bleibt", button({ url: "https://nexus-emb.de/bewerben" }).url === "https://nexus-emb.de/bewerben");
+    check("Knopf: über 512 Zeichen gilt nicht", button({ url: `https://nexus-emb.de/${"a".repeat(493)}` }).url === null);
+    check("Knopf: keine Kategorie als Kanal", button({ to: "channel", channelId: CATEGORY }).channelId === null);
+    check("Knopf: Textkanal bleibt", button({ to: "channel", channelId: TEXT }).channelId === TEXT);
+    check("Knopf: leerer Text wird „Bei uns bewerben“", button({ label: "" }).label === "Bei uns bewerben");
+    check("Knopf: Text höchstens 80 Zeichen", button({ label: "x".repeat(81) }).label.length === 80);
+    check("Knopf: unbekanntes Ziel bleibt beim alten", button({ to: "mond" }).to === base.hubButton.to);
+
+    const card = (value: Record<string, unknown>) => service.CleanSettings(guild, { card: value }, base).card;
+
+    check("Karte: Abdunkeln höchstens 90", card({ dim: 120 }).dim === 90);
+    check("Karte: Farbe nur als #rrggbb", card({ accent: "red" }).accent === null && card({ accent: "#FF0000" }).accent === "#ff0000");
+    check("Karte: Zeile höchstens 200 Zeichen", card({ title: "t".repeat(250) }).title.length === 200);
+    check("Karte: unbekannter Hintergrund bleibt beim alten", card({ background: { mode: "foo", image: null } }).background.mode === base.card.background.mode);
+    check("Karte: Bausteine nur als Schalter", card({ parts: { logo: "nein", staff: false } }).parts.logo === true && card({ parts: { staff: false } }).parts.staff === false);
+    check("Thumbnail: Platzhalter-Bild bleibt", service.CleanSettings(guild, { hubThumbnail: "{guild.icon}" }, { ...base, hubThumbnail: null }).hubThumbnail === "{guild.icon}");
+    check("Thumbnail: kein Bild, alter Wert bleibt", service.CleanSettings(guild, { hubThumbnail: "javascript:alert(1)" }, base).hubThumbnail === base.hubThumbnail);
+    check("Großes Bild: null leert", service.CleanSettings(guild, { hubImage: null }, { ...base, hubImage: "{guild.icon}" }).hubImage === null);
+    check(
+        "Spalten werden ergänzt",
+        JSON.stringify(NormalizeTeamSettings({ cardColumns: { "1v1": false } }).cardColumns) === JSON.stringify({ "2v2": true, "1v1": false, peak: true })
+    );
+
+    const rows = (value: unknown): number => service.CleanSettings(guild, { hubRows: value }, base).hubRows;
+
+    check("Zeilen je Kategorie: 0 wird 1", rows(0) === 1);
+    check("Zeilen je Kategorie: 99 wird 10", rows(99) === 10);
+    check("Zeilen je Gruppe: 2,6 wird 3", rows(2.6) === 3);
+    check("Weitere Nachrichten kommen nie aus dem Browser", JSON.stringify(service.CleanSettings(guild, { moreIds: ["1"] }, { ...base, moreIds: ["9"] }).moreIds) === '["9"]');
+    check("Hub ist ein Layout", service.CleanSettings(guild, { layout: "hub" }, base).layout === "hub");
+    check("Zeile je Team: ab Werk die Vorgabe", NormalizeTeamSettings(null).hubLine === DEFAULT_HUB_LINE && NormalizeTeamSettings({ hubLine: "" }).hubLine === DEFAULT_HUB_LINE);
+    check("Zeile je Team: eine Zeile, leer heißt Vorgabe", service.CleanSettings(guild, { hubLine: "A\nB" }, base).hubLine === "A B" && service.CleanSettings(guild, { hubLine: "  " }, base).hubLine === DEFAULT_HUB_LINE);
+    check("Spalten nur als Schalter", service.CleanSettings(guild, { cardColumns: { "2v2": "ja", peak: false } }, base).cardColumns["2v2"] === true);
+
+    // CleanTeam ist privat: was von der Seite kommt, geht durch sie.
+    const cleanTeam = (service as unknown as { CleanTeam: (guild: Guild, input: unknown) => Promise<Partial<ITeam>> }).CleanTeam.bind(service);
+    const region = (await cleanTeam(guild, { name: "Vyrox", groupId: null, region: "EU\nWest aber viel zu lang" })).region;
+
+    check("Region: ohne Umbruch, höchstens 16 Zeichen", region === "EU West aber vie", String(region));
+
+    const view = service.Look(FakeTeam([Player("p1", "captain", 1500, 1450)], { region: "EU" }), [], base);
+
+    check("{team.region} steht in der Karte", TeamOwnValues(view, base)["team.region"] === "EU");
 }
 
 /* ----------------------------------------------------------
@@ -309,7 +637,7 @@ function checkView(client: BotClient): void {
     check("Eine Kategorie steht als Kategorie da", ChannelsText(onCategory, "text") === `<#${CATEGORY}>`, ChannelsText(onCategory, "text"));
     check("Und {team.category} zeigt sie auch dann", ChannelsText(onCategory, "category") === `<#${CATEGORY}>`);
     check("Ohne Kanäle steht ein Strich", ChannelsText(service.Look(FakeTeam([], { channels: { kind: "channels", categoryId: null, textIds: [], voiceIds: [] } }), groups, settings), "text") === "—");
-    check("Ohne Gruppe steht das da", TeamValues(service.Look(FakeTeam([], { groupId: null }), groups, settings), guild, settings)["team.group"] === "ohne Gruppe");
+    check("Ohne Kategorie steht das da", TeamValues(service.Look(FakeTeam([], { groupId: null }), groups, settings), guild, settings)["team.group"] === "ohne Kategorie");
 
     console.log("\n  — Liga-Links —");
 
@@ -322,25 +650,6 @@ function checkView(client: BotClient): void {
     check("{team.leagues} setzt die Links hintereinander", LeaguesText(linked) === "[RLCS Quali](https://rlcs.gg/) · [Nexus Liga](https://start.gg/nexus)", LeaguesText(linked));
     check("Ohne Links bleibt es leer", LeaguesText(view) === "");
     check("{team.leagues} steht in den Werten", TeamValues(linked, guild, settings)["team.leagues"]?.includes("[RLCS Quali]") === true);
-    check("Die Übersicht nennt die Ligen", BoardText([linked], groups).includes("Ligen: [RLCS Quali]"));
-
-    const board = BoardText([view], groups);
-
-    check("Die Übersicht führt die Gruppe auf", board.includes("### Main"));
-    check("Und das Team darin", board.includes("Vyrox Main"));
-    check("Der Staff steht auch in der Übersicht", board.split("\n").some((line) => line.startsWith("-# ") && line.includes("Spieler p1")), board);
-    check("Ohne Teams sagt sie das", BoardText([], groups) === "Noch keine Teams.");
-
-    const loose = service.Look(FakeTeam([], { id: 2, name: "Ohne", groupId: null }), groups, settings);
-
-    check("Teams ohne Gruppe stehen unten", BoardText([view, loose], groups).includes("### Ohne Gruppe"));
-
-    const many = Array.from({ length: MAX_MENU_TEAMS + 5 }, (_, index) => service.Look(FakeTeam([], { id: index + 1, name: `Team ${index + 1}` }), groups, settings));
-    const row = TeamMenuRow(many);
-    const json = JSON.stringify(row.toJSON());
-
-    check("Das Menü nimmt nur, was Discord erlaubt", (JSON.parse(json) as { components: { options: unknown[] }[] }).components[0].options.length === MAX_MENU_TEAMS);
-    check("Die Custom-ID trägt den Anfang", json.includes("teams:menu"));
 }
 
 /* ----------------------------------------------------------
@@ -421,36 +730,6 @@ function checkClean(client: BotClient): void {
 
     check("Der Kader ist gedeckelt", capped.length === MAX_PLAYERS, String(capped.length));
     check("Die nächste Spieler-ID ist frei", !capped.some((player) => player.id === NextPlayerId(capped)));
-}
-
-/* ----------------------------------------------------------
-   Die Uebersicht mit Auswahlmenue
-   ---------------------------------------------------------- */
-async function checkMenu(client: BotClient): Promise<void> {
-    console.log("\n  — Auswahlmenü bei jeder Art von Nachricht —");
-
-    const guild = FakeGuild();
-    const service = client.teamService;
-    const groups: ITeamGroup[] = [{ id: 1, guildId: GUILD, name: "Main", position: 0 }];
-    const base = DefaultTeamSettings();
-    const views = [service.Look(FakeTeam([Player("p1", "captain", 1500, 1450)]), groups, base)];
-
-    for (const kind of ["v2", "embed", "text"] as const) {
-        const settings: ITeamSettings = {
-            ...base,
-            layout: "menu",
-            board: { ...base.board, kind, content: "Unsere Teams", embed: kind === "embed" ? ({ title: "Teams", description: "{teams}" } as never) : null },
-        };
-
-        const view = await BoardView(client, settings, views, groups, guild);
-        const json = JSON.stringify(view.components.map((entry) => entry.toJSON()));
-
-        check(`Das Menü hängt an der Art "${kind}"`, json.includes("teams:menu"), json.slice(0, 120));
-    }
-
-    const without = await BoardView(client, { ...base, layout: "single" }, views, groups, guild);
-
-    check("Ohne Menü-Layout hängt keins daran", !JSON.stringify(without.components.map((entry) => entry.toJSON())).includes("teams:menu"));
 }
 
 /* ----------------------------------------------------------
@@ -611,11 +890,6 @@ async function checkPlayers(client: BotClient): Promise<void> {
     check("{constructor} ist kein Platzhalter", Fill("{constructor}", {}) === "{constructor}");
     check("Die Aufstellung schreibt die Division mit Div", LineupText(main).includes("Champion III Div II"), LineupText(main).split("\n")[0]);
 
-    const list = PlayerList([main, academy], settings);
-
-    check("Das Dashboard bekommt jeden Spieler einmal", list.length === 3 && list[0]?.key === "nicorl" && list[0].team === "Vyrox Main");
-    check("In der Vorschau steht der Name statt der Erwähnung", list[0]?.values.nicorl === "@Spieler p1", list[0]?.values.nicorl);
-
     console.log("\n  — Ränge als Icon oder Text —");
 
     const icon = (tier: number): string | null => (tier === 19 ? "<:rl_gc1:1>" : null);
@@ -711,9 +985,9 @@ async function checkPlayers(client: BotClient): Promise<void> {
 }
 
 /* ----------------------------------------------------------
-   Die Teams-Liste: {teams} nach Vorlage, dazu der Team-Rang
+   Der Team-Rang
    ---------------------------------------------------------- */
-async function checkList(client: BotClient): Promise<void> {
+async function checkTeamRank(client: BotClient): Promise<void> {
     console.log("\n  — Team-Rang —");
 
     const guild = FakeGuild();
@@ -735,87 +1009,6 @@ async function checkList(client: BotClient): Promise<void> {
     check("{team.rank.short} kurz", values["team.rank.short"] === RankShort(rank.tier, rank.division));
     check("Er folgt „Ränge zeigen als“", TeamValues(view, guild, settings, [view], { ...PLAIN_FORMATS, rank: RankFormatter("icon", (tier) => `<:rl:${tier}>`) })["team.rank"] === `<:rl:${rank.tier}>`);
     check("Ohne Team-MMR steht ein Strich", TeamValues(service.Look(FakeTeam([Player("p1", "coach", null, null)]), groups, settings), guild, settings)["team.rank"] === "—");
-
-    console.log("\n  — Teams-Liste —");
-
-    // Ab Werk je Spieler eine Zeile - ohne Icons (wie hier) steht statt Abzeichen und Rang-Icon der Text.
-    const board = BoardText([view], groups, false, settings);
-    const lines = board.split("\n");
-
-    check("Die Liste ab Werk: Kopf mit Team-Rang und MMR", lines[1] === `**Vyrox Main** \`VYX\` · ${values["team.rank"]} ${values["team.rank.short"]} · ${view.mmr} MMR`, lines[1]);
-    check("Darunter je Spieler eine Zeile", lines[2]?.startsWith("Captain ") === true && lines[2].includes("<@100000000000000001> · `") && lines[2].includes("[Tracker](") && lines[3]?.startsWith("Stamm ") === true, lines.slice(2, 4).join(" | "));
-    check("Der Staff klein, nur mit Aufgabe und Name", lines[4] === "-# Coach <@100000000000000003>", lines[4]);
-    check("Die Ligen auch", lines[5] === "-# Ligen: [RLCS](https://rlcs.gg/)" && lines.length === 6, lines.slice(5).join(" | "));
-
-    const compact = TEAM_LIST_PRESETS.find((entry) => entry.id === "compact")?.list ?? DefaultTeamList();
-    const classic = { ...settings, list: compact };
-    const short = BoardText([view], groups, false, classic);
-
-    check("Vorlage „Kompakt“: Kopf mit Team-Rang", short.split("\n")[1] === `**Vyrox Main** \`VYX\` · ${values["team.rank"]} · MMR ${view.mmr} · 2 Spieler`, short.split("\n")[1]);
-    check("Darunter jeder Spieler klein in eigener Zeile", short.includes("\n-# <@100000000000000001>\n-# Mo\n"), short);
-    check("Der Staff in eigener Zeile", short.includes("-# Staff: <@100000000000000003>"));
-
-    const lone = service.Look(FakeTeam([Player("p1", "captain", 1500, 1450)], { tag: "" }), groups, settings);
-    const bare = BoardText([lone], groups, false, classic);
-    const plain = BoardText([lone], groups, false, settings);
-
-    check("Ohne Staff und Ligen fallen die Zeilen weg", !bare.includes("Staff:") && !bare.includes("Ligen:") && !plain.includes("-#"), `${bare} | ${plain}`);
-    check("Ohne Kürzel bleiben keine leeren Backticks", !bare.includes("``") && bare.includes("**Vyrox Main** ·") && plain.split("\n")[1]?.startsWith("**Vyrox Main** · ") === true, plain.split("\n")[1]);
-
-    const own = { ...settings, list: { ...DefaultTeamList(), team: "{Team.Name}: {team.captain} ({team.captain.rank.short})\n-# {team.members}", member: "{spieler.name} {spieler.rank.short}", roles: ["player"] } };
-    const custom = BoardText([view], groups, false, own).split("\n");
-
-    check("Eigene Vorlage mit Aufgaben-Platzhaltern", custom[1]?.startsWith("Vyrox Main: <@100000000000000001> (") === true, custom[1]);
-    check("Jeder Spieler eine eigene Zeile, der Rest der Zeile davor", custom[2]?.startsWith("-# Mo ") === true && custom.length === 3, custom.join(" | "));
-    check("Nur die gewählten Aufgaben", !custom.join(" ").includes("Nico "), custom.join(" | "));
-    check("Die Kurzfassung bleibt beim Kopf", BoardText([view], groups, true) === "### Main\n**Vyrox Main** `VYX` · MMR " + view.mmr);
-
-    const preview = ListTeams([view], settings, PLAIN_FORMATS, true)[0];
-
-    check("In der Vorschau stehen Namen statt Erwähnungen", preview?.values["team.lineup"]?.includes("@Nico") === true && !preview.values["team.lineup"].includes("<@"), preview?.values["team.lineup"]);
-    check("Die Vorschau baut dieselbe Liste wie der Bot", TeamListText(ListTeams([view], settings), groups, settings.list) === board);
-
-    const clean = service.CleanSettings(guild, { list: { team: "  ", member: "{spieler}", roles: ["captain", "erfunden"], separator: "comma" } }, settings);
-
-    check("Eine leere Vorlage nimmt die von Werk", clean.list.team === DefaultTeamList().team);
-    check("Ohne Staff-Vorlage gilt die von Werk", clean.list.staff === DefaultTeamList().staff);
-    check("Unbekannte Aufgaben fallen weg", clean.list.roles.join() === "captain");
-    check("Einen Trenner gibt es nicht mehr - ein alter fällt beim Speichern weg", !("separator" in clean.list));
-
-    // Die Ebenen bauen aufeinander auf: ein Spieler über zwei Zeilen, und was in der Zeile je Team
-    // um {team.members} steht, steht um jede seiner Zeilen - auch in anderer Schreibweise.
-    const tall = { ...settings, list: { ...DefaultTeamList(), team: "**{team.name}**\n> {Team.Members}", member: "{spieler}\n-# {spieler.rank.short}", roles: ["captain", "player"] } };
-    const stacked = BoardText([view], groups, false, tall).split("\n");
-
-    check("Ein Spieler darf mehrere Zeilen haben", stacked[2] === "> <@100000000000000001>" && stacked[3]?.startsWith("> -# ") === true && stacked[4] === "> Mo" && stacked.length === 6, stacked.join(" | "));
-
-    const blank = { ...settings, list: { ...DefaultTeamList(), member: "{spieler}\n   \n{spieler.name}" } };
-
-    check("Leere Zeilen eines Spielers fallen weg", !BoardText([view], groups, false, blank).split("\n").some((line) => !line.trim()), BoardText([view], groups, false, blank));
-
-    const { pathToFileURL } = await import("node:url");
-    const file = path.join(process.cwd(), "src", "dashboard", "client", "constants", "Placeholders.ts");
-    const loaded = (await import(pathToFileURL(file).href)) as { TEAM_MEMBER_PLACEHOLDERS?: { key: string }[]; TEAM_LIST_PLACEHOLDERS?: { key: string }[] };
-    const fields = MEMBER_FIELDS.map((field) => (field ? `spieler.${field}` : "spieler"));
-    const known = new Set([...Object.keys(preview?.values ?? {}), "team.members", "team.members.staff"]);
-    const unknown = (loaded.TEAM_LIST_PLACEHOLDERS ?? []).map((entry) => entry.key).filter((key) => !known.has(key));
-
-    check("Dashboard und Bot kennen dieselben Felder je Spieler in der Liste", (loaded.TEAM_MEMBER_PLACEHOLDERS ?? []).map((entry) => entry.key).join() === fields.join());
-    check("Jeder Platzhalter der Teams-Liste hat einen Wert", (loaded.TEAM_LIST_PLACEHOLDERS ?? []).length > 0 && unknown.length === 0, unknown.join(", "));
-    check("Jeder Spieler bringt alle Felder mit", preview?.members.every((member) => fields.every((field) => member.values[field] !== undefined)) === true);
-
-    const ranked = { ...settings, list: { ...compact, member: "{spieler} {spieler.rank.short} {spieler.tracker}" } };
-
-    check("Der Staff hat seine eigene Vorlage - ohne Rang und Tracker", BoardText([view], groups, false, ranked).includes("-# Staff: <@100000000000000003>\n"), BoardText([view], groups, false, ranked));
-
-    const keysOf = (text: string): string[] => [...text.matchAll(/\{([A-Za-z0-9._-]+)\}/g)].map((match) => match[1]);
-    const strange = TEAM_LIST_PRESETS.flatMap((entry) =>
-        [...keysOf(entry.list.team).filter((key) => !known.has(key)), ...[entry.list.member, entry.list.staff].flatMap(keysOf).filter((key) => !fields.includes(key))].map((key) => `${entry.name}: {${key}}`)
-    );
-
-    check("Jede Vorlage der Teams-Liste nutzt nur Platzhalter, die es gibt", TEAM_LIST_PRESETS.length > 1 && strange.length === 0, strange.join(", "));
-    check("„Spieler untereinander“ ist die Liste ab Werk", JSON.stringify(TEAM_LIST_PRESETS.find((entry) => entry.id === "rows")?.list) === JSON.stringify(DefaultTeamList()));
-    check("Jede Vorlage hat eine eigene ID", new Set(TEAM_LIST_PRESETS.map((entry) => entry.id)).size === TEAM_LIST_PRESETS.length);
 }
 
 /* ----------------------------------------------------------
@@ -858,26 +1051,6 @@ async function checkRoleIcons(client: BotClient): Promise<void> {
     check("Das gibt es auch, wenn niemand die Aufgabe hat", roles["team.manager.icon"] === "<:rl_role_manager:1>" && roles["team.manager"] === "—");
     check("{team.captain.rank.icon} ist immer das Rang-Icon", roles["team.captain.rank.icon"]?.startsWith("<:rl_") === true && roles["team.captain.rank"]?.startsWith("<:") === false, `${roles["team.captain.rank.icon"]} / ${roles["team.captain.rank"]}`);
     check("{team.rank.icon} auch fürs Team", TeamValues(view, guild, settings, [view], formats)["team.rank.icon"]?.startsWith("<:rl_") === true);
-
-    const member = ListTeams([view], settings, formats)[0]?.members[0]?.values ?? {};
-
-    check("{spieler.role} folgt „Aufgaben zeigen als“", member["spieler.role"] === "<:rl_role_captain:1>");
-    check("{spieler.role.icon} ist das Abzeichen", member["spieler.role.icon"] === "<:rl_role_captain:1>");
-    check("{spieler.rank.icon} immer das Rang-Icon, egal wie „Ränge zeigen als“ steht", member["spieler.rank.icon"]?.startsWith("<:rl_") === true && member["spieler.rank"]?.startsWith("<:") === false, `${member["spieler.rank.icon"]} / ${member["spieler.rank"]}`);
-    check("Ohne Icons steht auch {spieler.role.icon} als Text da", ListTeams([view], settings)[0]?.members[0]?.values["spieler.role.icon"] === "Captain");
-
-    // So wie gewünscht: {teamrang} {rankicon} {memberPing} {trackerlink}
-    const wish = { ...settings, list: { ...DefaultTeamList(), member: "{spieler.role.icon} {spieler.rank.icon} {spieler} {spieler.tracker}" } };
-    const line = BoardText([view], groups, false, wish, formats).split("\n")[2] ?? "";
-
-    check("Ein Spieler mit Abzeichen, Rang-Icon, Erwähnung und Tracker", /^<:rl_role_captain:1> <:rl_\d+:2> <@100000000000000001> \[Tracker\]\(/.test(line), line);
-
-    const rows = TEAM_LIST_PRESETS.find((entry) => entry.id === "rows");
-    const board = rows ? BoardText([view], groups, false, { ...settings, list: rows.list }, formats).split("\n") : [];
-
-    check("Vorlage „Spieler untereinander“: Kopf mit Rang-Icon und MMR", /^\*\*Vyrox Main\*\* `VYX` · <:rl_\d+:2> \S+ D\d · \d+ MMR$/.test(board[1] ?? ""), board[1]);
-    check("Je Spieler eine Zeile", /^<:rl_role_captain:1> <:rl_\d+:2> <@100000000000000001> · `\d+` · \[Tracker\]\(/.test(board[2] ?? "") && board[3]?.startsWith("<:rl_role_player:1> ") === true, board.slice(2, 4).join(" | "));
-    check("Der Staff klein, ohne Striche", board[4] === "-# <:rl_role_coach:1> <@100000000000000003>" && board.length === 5, board.slice(4).join(" | "));
 
     check("Ab Werk stehen Aufgaben ausgeschrieben", DefaultTeamSettings().roleStyle === "text");
     check("Die Einstellung wird übernommen", service.CleanSettings(guild, { roleStyle: "both" }, DefaultTeamSettings()).roleStyle === "both");
@@ -1044,7 +1217,7 @@ async function checkRoleIcons(client: BotClient): Promise<void> {
 /* ----------------------------------------------------------
    Die Reihenfolge der Übersicht (Plan 21)
    ---------------------------------------------------------- */
-function checkOrder(client: BotClient): void {
+async function checkOrder(client: BotClient): Promise<void> {
     console.log("\n  — Reihenfolge —");
 
     const team = (id: number, name: string, position: number, createdAt: number, mmr: number | null, players: number, league: string | null, group: number) => ({
@@ -1074,6 +1247,12 @@ function checkOrder(client: BotClient): void {
     check("Team-MMR: höchste zuerst, ohne MMR am Ende", ids({ by: "mmr", direction: "desc" }) === "1,2,5,4,3", ids({ by: "mmr", direction: "desc" }));
     check("Team-MMR: niedrigste zuerst, ohne MMR trotzdem am Ende", ids({ by: "mmr", direction: "asc" }) === "4,5,2,1,3", ids({ by: "mmr", direction: "asc" }));
     check("Alphabetisch A bis Z und Z bis A", ids({ by: "name", direction: "asc" }) === "2,4,3,5,1" && ids({ by: "name", direction: "desc" }) === "1,5,3,4,2");
+
+    // W-0025: Zahlen im Namen zählen als Zahl - „Team 9“ steht vor „Team 10“, auch in Liga-Namen.
+    const numbered = [team(1, "Team 10", 0, 1, null, 3, "Div 10", 1), team(2, "Team 9", 1, 2, null, 3, "Div 9", 1), team(3, "Team 2", 2, 3, null, 3, "Div 2", 1)];
+
+    check("Alphabetisch mit Zahlen: 2, 9, 10", ids({ by: "name", direction: "asc" }, numbered) === "3,2,1", ids({ by: "name", direction: "asc" }, numbered));
+    check("Liga mit Zahlen: Div 2, Div 9, Div 10", ids({ by: "league", direction: "asc" }, numbered) === "3,2,1", ids({ by: "league", direction: "asc" }, numbered));
     check("Neueste zuerst und älteste zuerst", ids({ by: "created", direction: "desc" }) === "3,2,4,5,1" && ids({ by: "created", direction: "asc" }) === "1,5,4,2,3");
     check(
         "Anzahl Spieler: bei Gleichstand die heutige Reihenfolge",
@@ -1088,16 +1267,6 @@ function checkOrder(client: BotClient): void {
     check("Immer oben: Plätze in der eingestellten Folge, auch gegen die Sortierung", ids({ by: "mmr", direction: "desc", pinned: [3, 1] }) === "3,1,2,5,4");
     check("Eigene Reihenfolge: Neue Teams ans Ende in heutiger Reihenfolge", ids({ by: "custom", custom: [5, 2] }) === "5,2,1,3,4");
     check("Gelöschte IDs in pinned und custom fallen weg", ids({ by: "custom", pinned: [99], custom: [98, 2] }) === "2,1,3,4,5");
-
-    // Die Liste mit Gruppen filtert nur: angeheftet steht dann oben in der eigenen Gruppe.
-    const list = OrderTeams(teams, (entry) => entry, { ...DefaultTeamOrder(), pinned: [5] }).map((entry) => ({
-        group: entry.group,
-        values: { "team.name": entry.name },
-        members: [],
-    }));
-    const text = TeamListText(list, [{ id: 1, name: "Main" }, { id: 2, name: "Academy" }], { ...DefaultTeamList(), team: "{team.name}" });
-
-    check("Gruppen in der Liste: angeheftet steht oben in der eigenen Gruppe", text === "### Main\nNexus Main\nAtlas\n### Academy\nNexus Academy\nComet\nBlitz", text);
 
     const guild = FakeGuild();
     const service = client.teamService;
@@ -1135,13 +1304,10 @@ function checkOrder(client: BotClient): void {
     const many = Array.from({ length: 30 }, (_, index) =>
         service.Look(FakeTeam([Player(`m${index}`, "captain", 1500, 1400)], { id: index + 1, name: `Team ${String(index + 1).padStart(2, "0")}`, position: index }), groups, base)
     );
-    const options = (TeamMenuRow(OrderTeams(many, ViewFacts, { ...DefaultTeamOrder(), pinned: [30] })).toJSON().components[0] as { options: { value: string }[] }).options;
+    const ordered = await HubMessages(client, { ...base, layout: "hub" }, OrderTeams(many, ViewFacts, { ...DefaultTeamOrder(), pinned: [30] }), groups, FakeGuild(), false);
+    const first = /"custom_id":"teams:menu:1"[^]*?"value":"(\d+)"/.exec(JSON.stringify(ordered.map((message) => message.view.components.map((entry) => entry.toJSON()))))?.[1];
 
-    check("Menü: ein angeheftetes Team steht ganz oben, auch als 30. Team", options[0]?.value === "30" && options.length <= MAX_MENU_TEAMS, options[0]?.value);
-
-    const named = ListTeams(OrderTeams(many.slice(0, 3), ViewFacts, { ...DefaultTeamOrder(), by: "name", direction: "desc" }), base).map((entry) => entry.values["team.name"]);
-
-    check("Liste: {teams} in der eingestellten Folge", JSON.stringify(named) === JSON.stringify(["Team 03", "Team 02", "Team 01"]), JSON.stringify(named));
+    check("Menü: ein angeheftetes Team steht ganz oben, auch als 30. Team", first === "30", first);
 }
 
 /* ----------------------------------------------------------
@@ -1306,7 +1472,8 @@ async function checkCardOrder(client: BotClient): Promise<void> {
         type: ChannelType.GuildText,
         isTextBased: () => true,
         messages: {
-            fetch: async (id: string) => (alive.has(id) ? { id, edit: async () => void edited.push(id) } : Promise.reject(new Error("Unknown Message"))),
+            // Die Karten aus dem Editor sind V2 (Vorgabe) - die Nachrichten im Kanal auch.
+            fetch: async (id: string) => (alive.has(id) ? { id, flags: { has: () => true }, edit: async () => void edited.push(id) } : Promise.reject(new Error("Unknown Message"))),
             delete: async (id: string) => {
                 deleted.push(id);
                 alive.delete(id);
@@ -1354,6 +1521,603 @@ async function checkCardOrder(client: BotClient): Promise<void> {
     }
 }
 
+/** Zählt Bausteine wie Discord: jede Komponente, auch die verschachtelten. */
+function Components(node: unknown): number {
+    if (Array.isArray(node)) return node.reduce((sum: number, entry) => sum + Components(entry), 0);
+    if (typeof node !== "object" || node === null) return 0;
+
+    const record = node as Record<string, unknown>;
+    const own = typeof record.type === "number" && record.type !== 0 ? 1 : 0;
+
+    return own + Components(record.components) + (record.accessory ? Components(record.accessory) : 0);
+}
+
+/** Plan 26: Menüs ab 26 Teams, Wechsel über die V2-Grenze, Antwort mit Aufschub. */
+async function checkSending(client: BotClient): Promise<void> {
+    console.log("\n  — Senden (Plan 26) —");
+
+    const service = client.teamService;
+    const groups: ITeamGroup[] = [{ id: 1, guildId: GUILD, name: "Main", position: 0 }];
+    const base: ITeamSettings = DefaultTeamSettings();
+    const many = (count: number): ITeamView[] =>
+        Array.from({ length: count }, (_, index) => service.Look(FakeTeam([Player(`p${index}`, "captain", 1500, 1450)], { id: index + 1, name: `Team ${index + 1}` }), groups, base));
+    const v2 = { components: [], flags: MessageFlags.IsComponentsV2, allowedMentions: {} } as never;
+    const text = { content: "Hallo", components: [], allowedMentions: {} } as never;
+
+    check("V2-Fassung auf Text-Nachricht: neu senden", NeedsResend({ flags: { has: () => false } }, v2));
+    check("V2 auf V2: bearbeiten", !NeedsResend({ flags: { has: () => true } }, v2));
+    check("Text auf V2-Nachricht: neu senden", NeedsResend({ flags: { has: () => true } }, text));
+
+    // Der Kopf steht als Text im Kanal, die neue Fassung ist V2: löschen und neu senden, nicht bearbeiten.
+    const settings: ITeamSettings = { ...base, channelId: TEXT, layout: "hub", messageId: "500" };
+    const log: string[] = [];
+    const channel = {
+        id: TEXT,
+        type: ChannelType.GuildText,
+        isTextBased: () => true,
+        messages: {
+            fetch: async (id: string) => ({ id, flags: { has: () => false }, edit: async () => void log.push(`edit ${id}`) }),
+            delete: async (id: string) => void log.push(`delete ${id}`),
+        },
+        send: async (): Promise<{ id: string }> => {
+            log.push("send");
+
+            return { id: "600" };
+        },
+    };
+    const guild = { ...FakeGuild(), channels: { cache: new Map([[TEXT, channel]]) } } as unknown as Guild;
+    const original = {
+        settings: service.Settings,
+        views: service.Views,
+        save: client.moduleSettings.Save,
+        full: client.teams.Full,
+        sync: service.Sync,
+        groups: service.Groups,
+        setMessage: client.teams.SetMessage,
+    };
+    const saved: unknown[] = [];
+
+    service.Settings = async () => settings;
+    service.Views = async () => ({ views: many(3), groups, settings });
+    client.moduleSettings.Save = async (_guild: string, _module: string, config: object) => void saved.push(config);
+
+    try {
+        await service.Publish(guild);
+
+        check("Über die V2-Grenze: löschen und neu senden", log.join(",") === "delete 500,send" && (saved.at(-1) as ITeamSettings | undefined)?.messageId === "600", log.join(","));
+
+        // Eine Karte, die nicht rausgeht, hält die anderen nicht auf.
+        let calls = 0;
+        const cards: ITeamSettings = { ...base, channelId: TEXT, layout: "cards" };
+        const teams = many(3).map((view) => view.team);
+
+        service.Settings = async () => cards;
+        service.Views = async () => ({ views: teams.map((team) => service.Look(team, groups, cards)), groups, settings: cards });
+        channel.send = async () => {
+            calls++;
+
+            if (calls === 2) throw new Error("Discord sagt nein");
+
+            return { id: String(700 + calls) };
+        };
+        client.teams.SetMessage = async () => undefined;
+
+        const result = await service.Publish(guild);
+
+        check("Eine Karte scheitert, die anderen gehen raus", result.sent === 2 && result.failed === 1, JSON.stringify(result));
+
+        // Menüauswahl: erst aufschieben, dann Prime fragen, dann antworten.
+        const steps: string[] = [];
+        const team = FakeTeam([Player("p1", "captain", 1500, 1450)], { id: 9 });
+
+        service.Settings = async () => ({ ...base, layout: "hub" });
+        service.Groups = async () => groups;
+        service.Sync = async () => void steps.push("sync");
+        service.Views = async () => ({ views: [service.Look(team, groups, base)], groups, settings: base });
+        client.teams.Full = async () => team;
+
+        let followed: { flags?: number } | null = null;
+        let reset: { components?: unknown[] } | null = null;
+        // Die Hub-Nachricht, wie Discord sie zurückgibt: Bild im Kopf als Anhang mit ablaufendem Link, darunter das Menü.
+        const cdn = "https://cdn.discordapp.com/attachments/1/2/kopf.png?ex=aa&is=bb&hm=cc";
+        const hub = {
+            components: [
+                {
+                    toJSON: () => ({
+                        type: 17,
+                        components: [
+                            { type: 12, items: [{ media: { url: cdn, proxy_url: "https://media.discordapp.net/x", attachment_id: "555" } }] },
+                            { type: 9, components: [{ type: 10, content: "Team" }], accessory: { type: 11, media: { url: cdn } } },
+                            { type: 1, components: [{ type: 3, custom_id: "teams:menu:1", options: [] }] },
+                        ],
+                    }),
+                },
+            ],
+            attachments: new Map([["555", { id: "555", name: "kopf.png", url: cdn }]]),
+        };
+        const same = SameMessage(hub);
+        const sameJson = JSON.stringify(same.components);
+
+        check("Menü zurücksetzen: dieselben Teile, Menü dabei", sameJson.includes("teams:menu:1") && same.components.length === 1, sameJson.slice(0, 200));
+        check("Menü zurücksetzen: Bilder zeigen auf den Anhang, nicht auf den ablaufenden Link", !sameJson.includes("cdn.discordapp.com") && (sameJson.match(/attachment:\/\/kopf\.png/g) ?? []).length === 2 && same.attachments.length === 1, sameJson.slice(0, 300));
+
+        await service.Handle({
+            inCachedGuild: () => true,
+            guildId: GUILD,
+            guild: FakeGuild(),
+            message: hub,
+            values: ["9"],
+            deferUpdate: async () => void steps.push("update"),
+            deferReply: async () => void steps.push("defer"),
+            editReply: async (payload: { components?: unknown[] }) => {
+                reset = payload;
+                steps.push("edit");
+            },
+            followUp: async (payload: { flags?: number }) => {
+                followed = payload;
+                steps.push("follow");
+            },
+            reply: async () => void steps.push("reply"),
+        } as never);
+
+        // Ein Update setzt das Menü in Discord zurück - so lässt sich dasselbe Team gleich noch einmal wählen.
+        check("Menüauswahl: erst Update (Menü zurück), dann Prime, dann die Karte nach", steps[0] === "update" && steps.includes("sync") && steps.at(-1) === "follow" && !steps.includes("defer") && !steps.includes("reply"), steps.join(","));
+        check("Menüauswahl: die Karte sieht nur, wer gewählt hat", Boolean(((followed as { flags?: number } | null)?.flags ?? 0) & MessageFlags.Ephemeral));
+        // W-0035: Erst ein neues Setzen der Nachricht setzt das Menü in Discord zurück - gleich nach dem Bestätigen.
+        check("Menüauswahl: Hub-Nachricht gleich neu gesetzt, Menü wieder leer", steps[1] === "edit" && JSON.stringify((reset as { components?: unknown[] } | null)?.components ?? []).includes("teams:menu:1"), steps.join(","));
+    } finally {
+        service.Settings = original.settings;
+        service.Views = original.views;
+        service.Sync = original.sync;
+        service.Groups = original.groups;
+        client.moduleSettings.Save = original.save;
+        client.teams.Full = original.full;
+        client.teams.SetMessage = original.setMessage;
+    }
+}
+
+/** Die Texte einer Nachricht zusammen, wie Discord sie gegen die 4.000 zählt. */
+function TextOf(node: unknown): string {
+    if (Array.isArray(node)) return node.map(TextOf).join("\n");
+    if (typeof node !== "object" || node === null) return "";
+
+    const record = node as Record<string, unknown>;
+
+    return [record.type === 10 && typeof record.content === "string" ? record.content : "", TextOf(record.components)].filter(Boolean).join("\n");
+}
+
+/** Plan 26: der Team-Hub, gepackt von HubMessages(). */
+async function checkHub(client: BotClient): Promise<void> {
+    console.log("\n  — Team-Hub —");
+
+    const service = client.teamService;
+    const base: ITeamSettings = { ...DefaultTeamSettings(), layout: "hub" };
+    const named = ["Main", "Academy", "Div 2", "Div 3", "Female", "U18", "Content", "Pro", "Semi", "Trial", "Legacy", "Backup"];
+    const make = (groupCount: number, teamCount: number, longNames = false): { views: ITeamView[]; groups: ITeamGroup[] } => {
+        const groups: ITeamGroup[] = Array.from({ length: groupCount }, (_, index) => ({ id: index + 1, guildId: GUILD, name: named[index]!, position: index }));
+        const views = Array.from({ length: teamCount }, (_, index) =>
+            service.Look(
+                FakeTeam([Player(`p${index}`, "captain", 1500 + index, 1450), Player(`q${index}`, "player", 1400, 1380)], {
+                    id: index + 1,
+                    groupId: groupCount ? (index % groupCount) + 1 : null,
+                    name: longNames ? `Ein sehr langer Teamname Nummer ${index + 1} mit noch mehr Text dran`.slice(0, 60) : `Team ${index + 1}`,
+                    tag: `T${index + 1}`,
+                }),
+                groups,
+                base
+            )
+        );
+
+        return { views, groups };
+    };
+    const json = (messages: IHubMessage[]): unknown[] => messages.map((message) => message.view.components.map((entry) => entry.toJSON()));
+    const menus = (messages: IHubMessage[]): { id: string; placeholder: string; values: string[] }[] =>
+        JSON.stringify(json(messages))
+            .match(/\{"type":3[^]*?"custom_id":"teams:menu:\d+"[^]*?\}\]\}/g)
+            ?.map((raw) => {
+                const id = /"custom_id":"(teams:menu:\d+)"/.exec(raw)![1]!;
+                const placeholder = /"placeholder":"([^"]*)"/.exec(raw)?.[1] ?? "";
+                const values = [...raw.matchAll(/"value":"(\d+)"/g)].map((match) => match[1]!);
+
+                return { id, placeholder, values };
+            }) ?? [];
+
+    const three = make(3, 6);
+    const small = await HubMessages(client, base, three.views, three.groups, FakeGuild(), true);
+    const smallMenus = menus(small);
+
+    // Plan 27: ein Menü für alle Teams, die Kategorie steht in der Beschreibung.
+    check(
+        "Drei Kategorien: eine Nachricht, ein Menü mit allen sechs",
+        small.length === 1 && smallMenus.length === 1 && smallMenus[0]!.placeholder === "Team ansehen" && smallMenus[0]!.values.length === 6,
+        JSON.stringify(smallMenus.map((menu) => menu.placeholder))
+    );
+    check("Die Kategorie steht beim Team im Menü", JSON.stringify(json(small)).includes('"description":"T1 · Main · MMR') && JSON.stringify(json(small)).includes('"description":"T2 · Academy · MMR'));
+    check("Mit Apply System: der Knopf", JSON.stringify(json(small)).includes("applyflow:entry"));
+
+    // Review: Die Vorschau im Dashboard klappt das Menü auf - dafür liefert die Route die Einträge mit.
+    const parts = HubParts(json(small)).filter((part) => part.type === "menu");
+    const entries = parts[0]?.type === "menu" ? parts[0].options : [];
+
+    check("Vorschau: das Menü bringt seine Einträge mit", entries.length === 6 && entries[0]?.label === "Team 1" && entries[0]?.description?.includes("Main") === true, JSON.stringify(entries.slice(0, 2)));
+    check("Kennzahlen stehen drin", TextOf(json(small)).includes("**6** Teams") && TextOf(json(small)).includes("**3** Kategorien"), TextOf(json(small)).slice(0, 200));
+
+    const seven = make(7, 14);
+    const sevenMenus = menus(await HubMessages(client, base, seven.views, seven.groups, FakeGuild(), true));
+
+    check("Sieben Kategorien, 14 Teams: ein Menü", sevenMenus.length === 1 && sevenMenus[0]!.placeholder === "Team ansehen", JSON.stringify(sevenMenus.map((menu) => menu.placeholder)));
+
+    const thirty = make(3, 30);
+    const thirtyMenus = menus(await HubMessages(client, base, thirty.views, thirty.groups, FakeGuild(), true));
+    const thirtyValues = thirtyMenus.flatMap((menu) => menu.values);
+
+    check(
+        "30 Teams: zwei Menüs zu 25 und 5",
+        thirtyMenus.length === 2 && thirtyMenus[0]!.values.length === 25 && thirtyMenus[1]!.values.length === 5 && thirtyMenus[0]!.placeholder === "Teams 1–25" && thirtyMenus[1]!.placeholder === "Teams 26–30",
+        JSON.stringify(thirtyMenus.map((menu) => [menu.placeholder, menu.values.length]))
+    );
+    check("… jedes Team genau einmal", thirtyValues.length === 30 && new Set(thirtyValues).size === 30);
+
+    // Der Knopf: Bewerbung, Webseite oder Kanal - fehlt das Ziel, steht keiner da.
+    const knob = async (button: Partial<ITeamSettings["hubButton"]>, apply = true): Promise<Record<string, unknown> | null> => {
+        const raw = JSON.stringify(json(await HubMessages(client, { ...base, hubButton: { ...base.hubButton, ...button } }, three.views, three.groups, FakeGuild(), apply)));
+        const found = /\{"type":2,[^}]*\}/.exec(raw);
+
+        return found ? (JSON.parse(found[0]) as Record<string, unknown>) : null;
+    };
+
+    check("Bewerbung ohne Apply System: kein Knopf", (await knob({ to: "apply" }, false)) === null);
+    check("Webseite: Link-Knopf", (await knob({ to: "web", url: "https://nexus-emb.de/bewerben" }))?.url === "https://nexus-emb.de/bewerben" && (await knob({ to: "web", url: "https://nexus-emb.de/bewerben" }))?.style === 5);
+    check("Webseite ohne Adresse: kein Knopf", (await knob({ to: "web", url: null })) === null);
+    check("Kanal: Link in den Kanal", (await knob({ to: "channel", channelId: TEXT }))?.url === `https://discord.com/channels/${GUILD}/${TEXT}`);
+    check("Kanal gelöscht: kein Knopf", (await knob({ to: "channel", channelId: "90071992547409999" })) === null);
+    check("Knopf aus: kein Knopf", (await knob({ on: false })) === null);
+    check("Eigener Text auf dem Knopf", (await knob({ to: "web", url: "https://nexus-emb.de/regeln", label: "Unsere Regeln" }))?.label === "Unsere Regeln");
+
+    // Thumbnail und großes Bild im Kopf.
+    const doc = { accent: "#00afff", blocks: [{ type: "text" as const, body: "# A" }, { type: "text" as const, body: "B" }] };
+    const withThumb = HubDoc(doc, "{guild.icon}", null);
+
+    check("Thumbnail: die erste Textzeile wird Abschnitt mit Bild", JSON.stringify(withThumb.blocks[0]) === JSON.stringify({ type: "section", body: "# A", thumbnail: "{guild.icon}" }) && withThumb.blocks[1]?.type === "text");
+    check("Großes Bild kommt ans Ende", JSON.stringify(HubDoc(doc, null, "https://x.de/b.png").blocks.at(-1)) === JSON.stringify({ type: "image", images: ["https://x.de/b.png"] }));
+
+    const sectioned = { accent: "#00afff", blocks: [{ type: "section" as const, body: "S", thumbnail: "https://x.de/s.png" }] };
+    const separated = { accent: "#00afff", blocks: [{ type: "separator" as const, line: true }, { type: "text" as const, body: "T" }] };
+
+    check("Schon ein Abschnitt: bleibt", JSON.stringify(HubDoc(sectioned, "{guild.icon}", null).blocks[0]) === JSON.stringify(sectioned.blocks[0]));
+    // W-0026: Trenner und Banner davor werden übersprungen - das Thumbnail kommt an die erste Textzeile.
+    const bannered = { accent: "#00afff", blocks: [{ type: "image" as const, images: ["https://x.de/banner.png"] }, { type: "text" as const, body: "# Teams" }] };
+    const sectionFirst = { accent: "#00afff", blocks: [{ type: "section" as const, body: "S", thumbnail: "https://x.de/s.png" }, { type: "text" as const, body: "T" }] };
+
+    check("Oben ein Trenner: Thumbnail an der Textzeile darunter", JSON.stringify(HubDoc(separated, "{guild.icon}", null).blocks[1]) === JSON.stringify({ type: "section", body: "T", thumbnail: "{guild.icon}" }));
+    check("Oben ein Banner: Thumbnail an der ersten Textzeile", JSON.stringify(HubDoc(bannered, "{guild.icon}", null).blocks[1]) === JSON.stringify({ type: "section", body: "# Teams", thumbnail: "{guild.icon}" }));
+    check("Erst ein Abschnitt mit Bild: nichts dazu", JSON.stringify(HubDoc(sectionFirst, "{guild.icon}", null).blocks) === JSON.stringify(sectionFirst.blocks));
+
+    let noIcon = "";
+
+    try {
+        noIcon = JSON.stringify(json(await HubMessages(client, { ...base, hubThumbnail: "{guild.icon}" }, three.views, three.groups, FakeGuild(), false)));
+    } catch (error) {
+        noIcon = `Fehler: ${String(error)}`;
+    }
+
+    check("Server ohne Icon: Hub ohne Thumbnail, ohne Fehler", !noIcon.startsWith("Fehler") && !noIcon.includes('"type":11'), noIcon.slice(0, 120));
+
+    let missing = "";
+
+    try {
+        missing = TextOf(json(await HubMessages(client, { ...base, hubImage: `${GUILD}/album/weg.png` }, three.views, three.groups, FakeGuild(), false)));
+    } catch (error) {
+        missing = `Fehler: ${String(error)}`;
+    }
+
+    check("Galerie-Bild fehlt: Hub steht trotzdem", !missing.startsWith("Fehler") && missing.includes("**6** Teams"), missing.slice(0, 120));
+
+    // Viele Teams, lange Namen, großer Kopf: keine Nachricht über Discords Grenzen.
+    const blocks = Array.from({ length: 12 }, (_, index) => ({ type: "text" as const, body: `Absatz ${index}: ${"Viel Text über unsere Teams und wie man mitmacht. ".repeat(5)}` }));
+    const heavy = { ...base, hubRows: 10, board: { ...base.board, kind: "v2" as const, doc: { accent: "#00afff", blocks } } };
+    const forty = make(12, 40, true);
+    const hub = await HubMessages(client, { ...heavy, hubThumbnail: "https://x.de/t.png", hubImage: "https://x.de/b.png" }, forty.views, forty.groups, FakeGuild(), true);
+    const all = menus(hub);
+    const values = all.flatMap((menu) => menu.values);
+    const sizes = hub.map((message, index) => ({ components: Components(json([message])), chars: TextOf(json([message])).length, index }));
+
+    check("40 Teams in 12 Kategorien, mit Thumbnail und Bild: mehrere Nachrichten, jede in Discords Grenzen", hub.length > 1 && sizes.every((size) => size.components <= 40 && size.chars <= 4000), JSON.stringify(sizes));
+    check("Jedes Team genau einmal in einem Menü", values.length === 40 && new Set(values).size === 40, `${values.length}`);
+    check(
+        "Menüs, Knopf und Fuß nur in der letzten Nachricht",
+        hub.slice(0, -1).every((message) => !JSON.stringify(json([message])).includes("teams:menu") && !JSON.stringify(json([message])).includes("applyflow:entry")) &&
+            TextOf(json(hub.slice(-1))).includes("Ränge und MMR vom") && !TextOf(json(hub)).includes("-# -#"),
+        `${hub.length} Nachrichten`
+    );
+
+    const headings = TextOf(json(hub)).match(/^### .+$/gm) ?? [];
+
+    check("Geschnitten wird zwischen Kategorien: jede genau einmal", headings.length === 12 && new Set(headings).size === 12, headings.join(" | "));
+
+    const onlyTeams = { ...base, board: { ...base.board, kind: "v2" as const, doc: { accent: "#00afff", blocks: [{ type: "text" as const, body: "{teams}" }] } } };
+    const bare = TextOf(json(await HubMessages(client, onlyTeams, three.views, three.groups, FakeGuild(), false)));
+
+    check("{teams} im Kopf bleibt leer, kein „Leere Nachricht“", !bare.includes("Leere Nachricht") && !bare.includes("MMR 1"), bare.slice(0, 120));
+    check("Ohne Apply System kein Knopf", !JSON.stringify(json(await HubMessages(client, base, three.views, three.groups, FakeGuild(), false))).includes("applyflow:entry"));
+
+    const crowded = make(1, 6);
+    const rows = TextOf(json(await HubMessages(client, { ...base, hubRows: 3 }, crowded.views, crowded.groups, FakeGuild(), false)));
+
+    check("Mehr Teams als Zeilen: „… und 3 weitere“", rows.includes("… und 3 weitere"), rows.slice(0, 300));
+
+    const loose = make(0, 3);
+    const flat = TextOf(json(await HubMessages(client, base, loose.views, [], FakeGuild(), false)));
+
+    check("Ohne Kategorien keine Überschrift „Ohne Kategorie“", !flat.includes("Ohne Kategorie") && flat.includes("Team 1"), flat.slice(0, 200));
+
+    const mixed = make(2, 4);
+
+    mixed.views[3]!.team.groupId = null;
+
+    check("Teams ohne Kategorie stehen unter „Ohne Kategorie“", TextOf(json(await HubMessages(client, base, mixed.views, mixed.groups, FakeGuild(), false))).includes("### Ohne Kategorie · 1 Team"));
+
+    // Die Zeile je Team stellt der Server ein (Reiter Teams-Liste beim Hub).
+    const standard = TextOf(json(await HubMessages(client, base, three.views, three.groups, FakeGuild(), false)));
+    const own = TextOf(json(await HubMessages(client, { ...base, hubLine: "{team.name} | {team.tag}" }, three.views, three.groups, FakeGuild(), false)));
+    const untagged = make(1, 1);
+
+    untagged.views[0]!.team.tag = "";
+
+    const noTag = TextOf(json(await HubMessages(client, base, untagged.views, untagged.groups, FakeGuild(), false)));
+
+    check("Vorgabe-Zeile: Name fett, Kürzel, Spieler, MMR", standard.includes("**Team 1** `T1` · 2 Spieler ·") && standard.includes("MMR"), standard.slice(0, 300));
+    check("Eigene Zeile je Team", own.includes("Team 1 | T1") && !own.includes("2 Spieler"), own.slice(0, 300));
+    check("Ohne Kürzel keine leeren Backticks", !noTag.includes("``") && noTag.includes("**Team 1** · 2 Spieler"), noTag.slice(0, 200));
+
+    // Review: eine eigene Zeile mit langer Beschreibung macht eine Gruppe länger als eine Nachricht.
+    const wide = make(1, 10);
+
+    for (const view of wide.views) view.team.description = "Sehr lange Beschreibung des Teams. ".repeat(15).slice(0, 500);
+
+    const long = await HubMessages(client, { ...base, hubRows: 10, hubLine: "{team.rank.icon} **{team.name}** `{team.tag}` · {team.description}" }, wide.views, wide.groups, FakeGuild(), true);
+    const longSizes = long.map((message) => ({ components: Components(json([message])), chars: TextOf(json([message])).length }));
+
+    check(
+        "Lange Zeilen: keine leere Nachricht, keine über 4.000 Zeichen",
+        longSizes.every((size) => size.chars > 0 && size.chars <= 4000 && size.components > 1) && menus(long).flatMap((menu) => menu.values).length === 10,
+        JSON.stringify(longSizes)
+    );
+}
+
+/** Plan 26: der Hub im Kanal - Kette aus Kopf und Folgenachrichten, nur ein Senden je Server. */
+async function checkHubChannel(client: BotClient): Promise<void> {
+    console.log("\n  — Hub im Kanal —");
+
+    const service = client.teamService;
+    const named = ["Main", "Academy", "Div 2", "Div 3", "Female", "U18", "Content", "Pro", "Semi", "Trial", "Legacy", "Backup"];
+    const groups: ITeamGroup[] = named.map((name, index) => ({ id: index + 1, guildId: GUILD, name, position: index }));
+    const blocks = Array.from({ length: 12 }, (_, index) => ({ type: "text" as const, body: `Absatz ${index}: ${"Viel Text über unsere Teams und wie man mitmacht. ".repeat(5)}` }));
+    const big: ITeamSettings = { ...DefaultTeamSettings(), channelId: TEXT, layout: "hub", hubRows: 10, board: { ...DefaultTeamSettings().board, kind: "v2", doc: { accent: "#00afff", blocks } } };
+    const small: ITeamSettings = { ...big, hubRows: 3, board: DefaultTeamSettings().board };
+    const teams = Array.from({ length: 40 }, (_, index) =>
+        FakeTeam([Player(`p${index}`, "captain", 1500 + index, 1450)], { id: index + 1, groupId: (index % 12) + 1, name: `Ein sehr langer Teamname Nummer ${index + 1} mit noch mehr Text`, tag: `T${index + 1}` })
+    );
+    const alive = new Map<string, string>();
+    const log: string[] = [];
+    let next = 1000;
+    let settings: ITeamSettings = big;
+    const channel = {
+        id: TEXT,
+        type: ChannelType.GuildText,
+        isTextBased: () => true,
+        messages: {
+            fetch: async (id: string) =>
+                alive.has(id) ? { id, flags: { has: () => true }, edit: async () => void log.push(`edit ${id}`) } : Promise.reject(new Error("Unknown Message")),
+            delete: async (id: string) => {
+                log.push(`delete ${id}`);
+                alive.delete(id);
+            },
+        },
+        send: async () => {
+            // Ein langsames Discord: so überholen sich zwei Sendungen, wenn nichts sie ordnet.
+            await new Promise((resolve) => setTimeout(resolve, 5));
+
+            const id = String(next++);
+
+            log.push(`send ${id}`);
+            alive.set(id, "hub");
+
+            return { id };
+        },
+    };
+    const guild = { ...FakeGuild(), channels: { cache: new Map([[TEXT, channel]]) } } as unknown as Guild;
+    const original = { settings: service.Settings, views: service.Views, save: client.moduleSettings.Save, of: client.settings.Of };
+
+    service.Settings = async () => settings;
+    service.Views = async () => ({ views: teams.map((team) => service.Look(team, groups, settings)), groups, settings });
+    client.moduleSettings.Save = async (_guild: string, _module: string, config: object) => void (settings = config as ITeamSettings);
+    (client.settings as unknown as { Of: unknown }).Of = async () => ({ modules: ["teams", "apply"] });
+
+    try {
+        await service.Publish(guild);
+
+        check("Großer Hub: Kopf und Folgenachrichten gemerkt", settings.messageId !== null && settings.moreIds.length >= 1 && alive.size === 1 + settings.moreIds.length, JSON.stringify({ head: settings.messageId, more: settings.moreIds }));
+
+        const firstChain = [settings.messageId, ...settings.moreIds];
+
+        settings = { ...small, messageId: settings.messageId, moreIds: settings.moreIds };
+        log.length = 0;
+        await service.Publish(guild);
+
+        check(
+            "Kleiner Hub: der Kopf wird bearbeitet, überzählige gelöscht",
+            log.includes(`edit ${firstChain[0]}`) && firstChain.slice(1).every((id) => log.includes(`delete ${id}`)) && settings.moreIds.length === 0 && alive.size === 1,
+            log.join(",")
+        );
+
+        // Fehlt eine Nachricht der Kette, geht die ganze Kette neu raus.
+        settings = { ...big, messageId: settings.messageId, moreIds: [] };
+        await service.Publish(guild);
+
+        const chain = [settings.messageId!, ...settings.moreIds];
+
+        alive.delete(chain[1]!);
+        log.length = 0;
+        await service.Publish(guild);
+
+        check("Folgenachricht weg: die ganze Kette neu", chain.every((id) => !alive.has(id)) && log.filter((entry) => entry.startsWith("send")).length === 1 + settings.moreIds.length, log.join(","));
+
+        // Zwei Speichern kurz hintereinander, noch ohne Nachricht im Kanal: ohne
+        // Reihenfolge schickten beide eine eigene Kette. Am Ende genau eine.
+        for (const id of [...alive.keys()]) alive.delete(id);
+        settings = { ...settings, messageId: null, moreIds: [] };
+        await Promise.all([service.Publish(guild), service.Publish(guild)]);
+
+        check("Zweimal gleichzeitig senden: genau eine Kette im Kanal", alive.size === 1 + settings.moreIds.length, `${alive.size} Nachrichten, Kette ${1 + settings.moreIds.length}`);
+
+        // Weg vom Hub: die Folgenachrichten verschwinden mit.
+        settings = { ...settings, layout: "cards" };
+        await service.Withdraw(guild, null, true);
+
+        check("Einsammeln nimmt die Folgenachrichten mit", alive.size === 0 && settings.messageId === null && settings.moreIds.length === 0, `${alive.size}`);
+
+        // Review: scheitert das Bearbeiten einer Nachricht der Kette, bleibt keine verwaiste stehen.
+        settings = { ...big, messageId: null, moreIds: [] };
+        await service.Publish(guild);
+
+        const before = [settings.messageId!, ...settings.moreIds];
+        const fetch = channel.messages.fetch;
+
+        channel.messages.fetch = async (id: string) => {
+            const message = await fetch(id);
+
+            return id === before[1] ? { ...message, edit: async () => Promise.reject(new Error("Discord 500")) } : message;
+        };
+
+        try {
+            await service.Publish(guild);
+        } finally {
+            channel.messages.fetch = fetch;
+        }
+
+        const chainNow = [settings.messageId!, ...settings.moreIds];
+
+        check("Bearbeiten scheitert: keine verwaiste Nachricht im Kanal", alive.size === chainNow.length && chainNow.every((id) => alive.has(id)), `${alive.size} im Kanal, Kette ${chainNow.length}`);
+    } finally {
+        service.Settings = original.settings;
+        service.Views = original.views;
+        client.moduleSettings.Save = original.save;
+        (client.settings as unknown as { Of: unknown }).Of = original.of;
+    }
+}
+
+/** Plan 27: Kategorien als Entwurf - Vorschau ohne Datenbank, Speichern gebündelt mit einem Versand. */
+async function checkCategories(client: BotClient): Promise<void> {
+    console.log("\n  — Kategorien —");
+
+    const guild = FakeGuild();
+    const service = client.teamService;
+    const groups: ITeamGroup[] = [
+        { id: 1, guildId: GUILD, name: "Main", position: 0 },
+        { id: 2, guildId: GUILD, name: "Academy", position: 1 },
+    ];
+    const teams = [1, 2, 3, 4].map((id) => FakeTeam([], { id, name: `Team ${id}`, groupId: id <= 2 ? 1 : 2 }));
+    const draft = ParseCategoryDraft({ categories: [{ id: 2, name: "Academy" }, { id: 1, name: "Main" }, { id: -1, name: "Ladies" }], teams: { 1: -1, 3: 999 } })!;
+    const applied = ApplyCategoryDraft(GUILD, groups, teams, draft);
+
+    check("Entwurf: drei Kategorien in der Reihenfolge des Entwurfs", JSON.stringify(applied.groups.map((group) => [group.id, group.position])) === JSON.stringify([[2, 0], [1, 1], [-1, 2]]), JSON.stringify(applied.groups));
+    check("Entwurf: ein Team in der neuen Kategorie", applied.teams.find((team) => team.id === 1)?.groupId === -1);
+    check("Entwurf: unbekannte Kategorie wird „ohne“", applied.teams.find((team) => team.id === 3)?.groupId === null);
+    check("Entwurf: ohne Angabe bleibt das Team, wo es war", applied.teams.find((team) => team.id === 2)?.groupId === 1);
+
+    const dropped = ApplyCategoryDraft(GUILD, groups, teams, ParseCategoryDraft({ categories: [{ id: 1, name: "Main" }], removed: [2], teams: {} })!);
+
+    check("Entwurf: gelöschte Kategorie fehlt, ihre Teams stehen ohne", dropped.groups.length === 1 && dropped.teams.filter((team) => team.groupId === null).length === 2);
+
+    // Review: Eine Kategorie, die der Entwurf nicht kennt (inzwischen woanders angelegt), bleibt - gelöscht wird nur, was er entfernt hat.
+    const unknown = ApplyCategoryDraft(GUILD, groups, teams, ParseCategoryDraft({ categories: [{ id: 1, name: "Main" }], teams: {} })!);
+
+    check("Entwurf: eine Kategorie von woanders bleibt samt Teams", unknown.groups.some((group) => group.id === 2) && unknown.teams.filter((team) => team.groupId === 2).length === 2, JSON.stringify(unknown.groups));
+    check("Ohne Entwurf: null", ParseCategoryDraft(undefined) === null);
+    refuses("Mehr als 12 Kategorien gehen nicht", () => ParseCategoryDraft({ categories: Array.from({ length: 13 }, (_, index) => ({ id: -index - 1, name: `K${index}` })), teams: {} }));
+    refuses("Eine Kategorie braucht einen Namen", () => ParseCategoryDraft({ categories: [{ id: -1, name: "  " }], teams: {} }));
+
+    // Speichern: anlegen, umbenennen, löschen, umhängen - und genau ein Versand.
+    const calls = { publish: 0, save: 0, create: 0, rename: 0, remove: 0 };
+    const stored = groups.map((group) => ({ ...group }));
+    const original = {
+        groups: service.Groups,
+        teams: service.Teams,
+        settings: service.Settings,
+        publish: service.Publish,
+        create: client.teamGroups.Create,
+        saveGroup: client.teamGroups.Save,
+        remove: client.teamGroups.Remove,
+        save: client.teams.Save,
+        clear: client.teams.ClearGroup,
+    };
+    let layout: ITeamSettings["layout"] = "hub";
+
+    service.Groups = async () => stored.map((group) => ({ ...group }));
+    service.Teams = async () => teams.map((team) => ({ ...team }));
+    service.Settings = async () => ({ ...DefaultTeamSettings(), layout, channelId: TEXT, messageId: "500" });
+    service.Publish = async () => {
+        calls.publish++;
+
+        return { layout, sent: 1, failed: 0 };
+    };
+    client.teamGroups.Create = (async (_guild: string, name: string, position: number) => {
+        calls.create++;
+
+        return { id: 10 + calls.create, guildId: GUILD, name, position };
+    }) as never;
+    client.teamGroups.Save = (async () => void calls.rename++) as never;
+    client.teamGroups.Remove = (async () => void calls.remove++) as never;
+    client.teams.Save = (async () => void calls.save++) as never;
+    client.teams.ClearGroup = (async () => undefined) as never;
+
+    try {
+        // Main umbenennen, Academy löschen, Ladies neu; Team 1 zu Ladies, Team 2 bleibt bei Main, Team 3 und 4 standen in Academy.
+        await service.SaveCategories(guild, { categories: [{ id: 1, name: "Main Team" }, { id: -1, name: "Ladies" }], removed: [2], teams: { 1: -1, 3: -1 } });
+
+        check("Speichern: eine neu, eine umbenannt, eine gelöscht", calls.create === 1 && calls.rename === 1 && calls.remove === 1, JSON.stringify(calls));
+        check("Speichern: nur geänderte Teams werden geschrieben", calls.save === 2, JSON.stringify(calls));
+        check("Speichern: der Hub geht genau einmal raus", calls.publish === 1, JSON.stringify(calls));
+
+        // Review: Was die andere Seite inzwischen angelegt hat, kennt der Entwurf nicht - es bleibt.
+        calls.remove = 0;
+        await service.SaveCategories(guild, { categories: [{ id: 1, name: "Main" }], teams: {} });
+
+        check("Speichern: eine Kategorie von woanders wird nicht gelöscht", calls.remove === 0, JSON.stringify(calls));
+
+        layout = "cards";
+        calls.publish = 0;
+        await service.SaveCategories(guild, { categories: [{ id: 1, name: "Neu" }], teams: {} });
+
+        check("Bei „Alle Teams einzeln“ kein Versand des Hubs", calls.publish === 0);
+
+        // W-0026: Kommt im selben Speichern noch ein Team, schickt das den Hub - hier also keiner.
+        layout = "hub";
+        calls.publish = 0;
+        await service.SaveCategories(guild, { categories: [{ id: 1, name: "Main" }], teams: { 2: -1 } }, false);
+
+        check("Ohne Versand gespeichert: der Hub geht nicht raus", calls.publish === 0, JSON.stringify(calls));
+    } finally {
+        Object.assign(service, { Groups: original.groups, Teams: original.teams, Settings: original.settings, Publish: original.publish });
+        Object.assign(client.teamGroups, { Create: original.create, Save: original.saveGroup, Remove: original.remove });
+        Object.assign(client.teams, { Save: original.save, ClearGroup: original.clear });
+    }
+
+    // Team-Entwurf für die Vorschau der Karte: geprüft, nicht gespeichert.
+    const team = FakeTeam([], { name: "Vyrox Main" });
+    const drafted = await service.DraftTeam(guild, team, {
+        name: "Anderer Name",
+        region: "  EU   West ",
+        links: [{ label: "Alt", url: "http://x.de" }, { label: "RLCS", url: "https://liquipedia.net/rl" }],
+        description: "Neu",
+    });
+
+    check("Entwurf: Region ohne doppelte Leerzeichen", drafted.region === "EU West", drafted.region);
+    check("Entwurf: nur https-Links, die anderen fallen still weg", drafted.links.length === 1 && drafted.links[0]!.label === "RLCS", JSON.stringify(drafted.links));
+    check("Entwurf: der Name bleibt", drafted.name === "Vyrox Main" && drafted.description === "Neu");
+}
+
 async function main(): Promise<void> {
     console.log("\n🛡️  RL Team-Übersicht\n");
 
@@ -1362,15 +2126,22 @@ async function main(): Promise<void> {
     checkFormula();
     checkValues(client);
     checkSettings(client);
-    checkOrder(client);
+    await checkHubSettings(client);
+    await checkDrawnCard(client);
+    await checkDescriptionLines(client);
+    await checkCardImages(client);
+    await checkOrder(client);
     checkView(client);
-    await checkMenu(client);
     checkClean(client);
     checkRoles(client);
     await checkRights(client);
     await checkCardOrder(client);
+    await checkSending(client);
+    await checkHub(client);
+    await checkHubChannel(client);
+    await checkCategories(client);
     await checkPlayers(client);
-    await checkList(client);
+    await checkTeamRank(client);
     await checkRoleIcons(client);
 
     if (await client.databaseService.Connect()) {

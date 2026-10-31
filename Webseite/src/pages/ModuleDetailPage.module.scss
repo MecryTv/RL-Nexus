@@ -148,22 +148,6 @@
     gap: 10px 14px;
 }
 
-.more {
-    display: inline-flex;
-    align-self: flex-start;
-    align-items: center;
-    gap: 8px;
-    transition: color var(--t-fast);
-    color: var(--c-text-dim);
-
-    @include label(0.68rem, 0.14em);
-    @include touch-target;
-
-    &:hover {
-        color: var(--accent);
-    }
-}
-
 .highlights {
     display: flex;
     flex-direction: column;
