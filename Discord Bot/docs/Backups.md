@@ -114,6 +114,7 @@ Rollen verwalten (und seine Rolle über den Rollen, die er anlegen oder zurücks
 | Einstellungen | `module_settings` unter `backups` (Meldekanal) |
 | Tabellen | `server_id_map` (Zuordnung), `server_restores` (Aufträge), `av_debris` (Trümmer), Migration `041_server_backups.sql`. Alle drei sind Live-Zustand und kommen nicht ins Backup |
 | Dienst | `services/ServerBackupService.ts` mit `services/serverbackup/` (`Snapshot` lesen, `Diff` vergleichen, `Plan` Schritte je Modus, `IdMap` Zuordnung, `Runner` gegen Discord) |
+| Aufräumen | `ActivityPrune` (täglich 04:30) löscht abgeschlossene, abgebrochene und gescheiterte Aufträge in `server_restores` nach 30 Tagen, laufende nie (W-0041) |
 | Karten | `builder/ServerBackupView.ts` |
 | Befehl und Knöpfe | `commands/admin/Backup.ts`, `events/backups/` (Knöpfe und Fenster `bk:`, Fortsetzen nach dem Start) |
 | Routen | `routes/DashboardApiBackups.ts`, `routes/AdminGuildSnapshot.ts` (Admin Dashboard liest den Server), `routes/AdminGuildBackupFailed.ts` |

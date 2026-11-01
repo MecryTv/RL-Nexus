@@ -92,6 +92,8 @@ interface IJob {
     safetyId: number | null;
     startedAt: number;
     parts: ServerPart[];
+    /** W-0041 M9: nur beim Server, auf den geladen wurde. */
+    undo: boolean;
 }
 
 interface IPayload {
@@ -911,6 +913,15 @@ export function renderBackupList(guildId: string): void {
     function follow(panel: HTMLElement, jobId: number): void {
         following = jobId;
 
+        // Vorgelesen wird nur diese Zeile, und nur wenn sich Phase oder ein Zehntel ändert - nicht alle 2 s der ganze Bereich (W-0041 M13).
+        const status = el("p", "bk-status", "");
+        let said = "";
+
+        if (panel.nextElementSibling?.classList.contains("bk-status")) panel.nextElementSibling.remove();
+
+        status.setAttribute("role", "status");
+        panel.after(status);
+
         const tick = async (): Promise<void> => {
             if (following !== jobId || !panel.isConnected) return;
 
@@ -929,6 +940,15 @@ export function renderBackupList(guildId: string): void {
             // Auch die Liste soll wissen, wie es steht: sonst zeigte ein Klick links wieder „läuft“.
             if (data?.job?.id === jobId) data.job = job;
             panel.replaceChildren(...progressView(panel, job));
+
+            const line =
+                job.status === "running"
+                    ? `Laden läuft: ${PHASE[job.phase]}, ${job.total ? Math.floor((job.done / job.total) * 10) * 10 : 100} Prozent.`
+                    : job.status === "cancelled"
+                      ? `Laden abgebrochen nach ${job.done} von ${job.total} Schritten.`
+                      : `Laden fertig.${job.failed.length ? ` ${job.failed.length} Schritte gingen nicht.` : ""}`;
+
+            if (line !== said) status.textContent = said = line;
             if (job.status === "running") window.setTimeout(() => void tick(), POLL_MS);
             else following = null;
         };
@@ -976,7 +996,7 @@ export function renderBackupList(guildId: string): void {
             await load();
         });
 
-        if (job.safetyId !== null) {
+        if (job.undo) {
             const undo = button("btn btn--quiet", icon("#i-refresh"), "Rückgängig machen");
             const slot = el("div", "");
 

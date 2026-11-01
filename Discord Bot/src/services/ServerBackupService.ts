@@ -21,7 +21,7 @@ import {
 import BotClient from "../client/BotClient";
 import { AutoFailedCard, AutomaticReply, BackupLabel, BackupReply, ChoiceLabel, CompareReply, CreatedReply, DayLabel, DoneCard, ListReply, LoadConfirm, Note, RunningCard, SafetyNotice, Strip } from "../builder/ServerBackupView";
 import { DASHBOARD_PATH } from "../constants/Dashboard";
-import { BACKUPS_MODULE, DEBRIS_WINDOW_MS, DefaultBackupSettings, IBackupSettings, SERVER_PART_IDS } from "../constants/ServerBackup";
+import { BACKUPS_MODULE, DEBRIS_WINDOW_MS, DefaultBackupSettings, IBackupSettings, SERVER_PART_IDS, SNAPSHOT_WAIT_MS } from "../constants/ServerBackup";
 import { IBackupInfo, IBackupMeta, IBackupPlanState, IProtect, IServerBackupList, IRestoreJob, IRestoreLine, IRestorePlan, IRestoreReport, IServerSnapshot, RestoreMode, ServerPart } from "../interfaces/services/serverbackup/IServerBackup";
 import { AskAdmin, IBackupCall } from "../routes/DashboardApiBackups";
 import { AfterServerRestore } from "../utils/guildpanels";
@@ -314,7 +314,7 @@ export default class ServerBackupService {
                 path: `/${input.backupId}/server`,
                 body: { confirm: input.confirm, parts: input.parts, areas: other ? [] : input.areas, mode: input.mode, ...(other ? { targetGuildId: target.id } : {}) },
                 headers: other ? { "X-Target-Name": encodeURIComponent(target.name) } : undefined,
-                timeout: SLOW,
+                timeout: SNAPSHOT_WAIT_MS,
             });
 
             if (answer.status !== 200) return ErrorOf(answer);
@@ -556,18 +556,30 @@ export default class ServerBackupService {
         return answer.status === 200 ? null : `Bot-Daten nicht geladen: ${ErrorOf(answer)}`;
     }
 
-    /** Bilder, die im Auftrag fehlen: einmal das ganze Backup mit Bildern holen, dann nachsehen. */
+    /**
+     * Bilder, die im Auftrag fehlen: einmal das ganze Backup mit Bildern holen,
+     * dann nachsehen. Scheitert das Holen, versucht es das nächste Bild noch
+     * einmal - höchstens dreimal je Lauf (W-0041 M10).
+     */
     private Images(source: Guild, actor: Actor, backupId: number): (kind: ImageKind, id: string) => Promise<string | null> {
         let full: Promise<IServerSnapshot | null> | null = null;
+        let tries = 0;
 
         return async (kind, id) => {
-            full ??= this.AskBackups(source, actor, { method: "GET", path: `/${backupId}/server?images=1`, timeout: SLOW }).then((answer) =>
-                answer.status === 200 && Array.isArray((answer.body as IServerSnapshot | null)?.roles) ? (answer.body as IServerSnapshot) : null
-            );
+            if (!full && tries < 3) {
+                tries++;
+                full = this.AskBackups(source, actor, { method: "GET", path: `/${backupId}/server?images=1`, timeout: SLOW })
+                    .then((answer) => (answer.status === 200 && Array.isArray((answer.body as IServerSnapshot | null)?.roles) ? (answer.body as IServerSnapshot) : null))
+                    .catch(() => null);
+            }
 
             const server = await full;
 
-            if (!server) return null;
+            if (!server) {
+                full = null;
+
+                return null;
+            }
 
             switch (kind) {
                 case "role":
@@ -665,7 +677,7 @@ export default class ServerBackupService {
 
     private async CreateView(guild: Guild, actor: Actor, note: string | null, what: string): Promise<MessageCreateOptions> {
         const parts = what === "bot" ? ["bot"] : what === "server" ? ["server"] : ["bot", "server"];
-        const made = await this.AskBackups(guild, actor, { method: "POST", path: "", body: { note, parts }, timeout: SLOW });
+        const made = await this.AskBackups(guild, actor, { method: "POST", path: "", body: { note, parts }, timeout: SNAPSHOT_WAIT_MS });
 
         if (made.status !== 200) return Note(ErrorOf(made));
 

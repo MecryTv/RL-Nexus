@@ -183,6 +183,9 @@ export default class DashboardApiBackups extends Route {
             if (own) return reply.code(own.status).send(own.body);
         }
 
+        // Nur die Bot-Daten laden, während der Server geladen wird, käme dem Laden in die Quere (W-0041 M5).
+        if (writing && body.action === "restore" && (await service.Lock(access.guild.id))) return reply.code(409).send({ error: "Gerade wird ein Backup geladen. Warte, bis es fertig ist." });
+
         const call = BackupCall(writing ? "POST" : "GET", query, body);
         if (typeof call === "string") return reply.code(400).send({ error: call });
 
@@ -192,7 +195,7 @@ export default class DashboardApiBackups extends Route {
         if (!writing && query.backup === undefined && answer.status === 200) {
             const job = await service.Lock(access.guild.id);
 
-            return { ...(answer.body as object), server: await service.ServerInfo(access.guild), job: job ? JobSummary(job) : null };
+            return { ...(answer.body as object), server: await service.ServerInfo(access.guild), job: job ? JobSummary(job, access.guild.id) : null };
         }
 
         return reply.code(answer.status).send(answer.body);
@@ -230,12 +233,12 @@ export default class DashboardApiBackups extends Route {
 
                 const job = await service.Start({ guild, target, actor, backupId, mode: input.mode, parts: input.parts, areas: input.areas, confirm: typeof body.confirm === "string" ? body.confirm : "" });
 
-                return typeof job === "string" ? fail(400, job) : { status: 200, body: { job: JobSummary(job) } };
+                return typeof job === "string" ? fail(400, job) : { status: 200, body: { job: JobSummary(job, guild.id) } };
             }
             case "job": {
                 const job = await service.Job(guild.id, Number(body.job));
 
-                return job ? { status: 200, body: { job: JobSummary(job) } } : fail(404, "Dieses Laden gibt es nicht.");
+                return job ? { status: 200, body: { job: JobSummary(job, guild.id) } } : fail(404, "Dieses Laden gibt es nicht.");
             }
             case "cancel":
                 return { status: 200, body: { ok: await service.Cancel(guild.id, actor.id) } };
@@ -244,7 +247,7 @@ export default class DashboardApiBackups extends Route {
 
                 const job = await service.Undo(guild, actor, Number(body.job), typeof body.confirm === "string" ? body.confirm : "");
 
-                return typeof job === "string" ? fail(400, job) : { status: 200, body: { job: JobSummary(job) } };
+                return typeof job === "string" ? fail(400, job) : { status: 200, body: { job: JobSummary(job, guild.id) } };
             }
             case "settings":
                 return { status: 200, body: { settings: await service.SaveSettings(guild, body) } };

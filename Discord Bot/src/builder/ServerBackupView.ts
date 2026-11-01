@@ -136,6 +136,24 @@ function Fit(rows: readonly string[], max = TEXT_MAX): string {
     return kept.length < rows.length ? `${kept.join("\n")}\nund ${rows.length - kept.length} weitere` : kept.join("\n");
 }
 
+/**
+ * Namen mit Komma bis zur Grenze, der Rest als „und N weitere“ (W-0041 M1:
+ * vorher war die ganze Liste eine Zeile). Kleiner als TEXT_MAX, weil Discord
+ * die ganze Nachricht begrenzt und davor schon steht, was geändert wird.
+ */
+function FitNames(names: readonly string[], max = 1_200): string {
+    const kept: string[] = [];
+    let length = 0;
+
+    for (const name of names) {
+        if (length + name.length + 2 > max) break;
+        kept.push(name);
+        length += name.length + 2;
+    }
+
+    return kept.length < names.length ? `${kept.join(", ")} und ${names.length - kept.length} weitere` : kept.join(", ");
+}
+
 function Message(card: ComponentV2Builder): MessageCreateOptions {
     return { ...card.toMessage(), allowedMentions: { parse: [] } };
 }
@@ -177,10 +195,11 @@ export function Progress(job: Pick<IRestoreJob, "ops" | "done">): { name: string
 }
 
 /** Ein Auftrag fürs Dashboard: alles außer den Schritten selbst (das können Tausende sein), dazu der Fortschritt je Teil. */
-export function JobSummary(job: IRestoreJob): Omit<IRestoreJob, "ops"> & { total: number; progress: { name: string; done: number; total: number }[] } {
+/** guildId: wer fragt. „Rückgängig“ gibt es nur beim Server, auf den geladen wurde (W-0041 M9). */
+export function JobSummary(job: IRestoreJob, guildId: string): Omit<IRestoreJob, "ops"> & { total: number; progress: { name: string; done: number; total: number }[]; undo: boolean } {
     const { ops, ...rest } = job;
 
-    return { ...rest, total: ops.length, progress: Progress(job) };
+    return { ...rest, total: ops.length, progress: Progress(job), undo: job.safetyId !== null && job.targetGuildId === guildId };
 }
 
 export function RunningCard(input: { job: IRestoreJob; backupLabel: string; etaMs: number; resumed?: boolean }): MessageCreateOptions {
@@ -324,7 +343,7 @@ export function LoadConfirm(plan: IRestorePlan, label: string, mode: Exclude<Res
         )
         .text(doing.length ? Fit(doing) : "Nichts zu tun. Der Server sieht aus wie im Backup.");
 
-    if (mode === "exact" && plan.deletes.length) card.text(`**Verschwindet**\n${Fit([plan.deletes.join(", ")])}`);
+    if (mode === "exact" && plan.deletes.length) card.text(`**Verschwindet**\n${FitNames(plan.deletes)}`);
     if (stays.length) card.text(`**Bleibt**\n${Fit(stays)}`);
     if (impossible.length) card.text(`**Geht nicht**\n${Fit(impossible)}`);
 

@@ -361,13 +361,17 @@ export async function RunOps(guild: Guild, job: IRestoreJob, deps: IRunDeps): Pr
 
         current = index;
 
+        const before = failed.length;
+
         try {
             await run(op);
         } catch (error) {
             failed.push({ op: index, reason: `${Label(op, names)}: ${error instanceof Skip ? error.message : Why(error)}` });
         }
 
-        await deps.save({ done: index + 1, failed: [...failed] });
+        // Nur bei einem neuen Eintrag in „Geht nicht“ den ganzen Stand schreiben, sonst nur „done“ (W-0041 M11).
+        // Neu heißt auch ein Hinweis ohne Abbruch (note, etwa „Rollen-Bild nicht gesetzt“ - Review).
+        await deps.save(failed.length > before ? { done: index + 1, failed: [...failed] } : { done: index + 1 });
         deps.progress();
     }
 
