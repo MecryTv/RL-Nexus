@@ -63,7 +63,7 @@ export default class DashboardApiModerationEvidence extends Route {
         if (!Buffer.isBuffer(request.body)) return reply.code(400).send({ error: "Das Bild fehlt." });
 
         const { name } = request.query as { name?: string };
-        const actor = { id: access.member.id, name: access.member.displayName, member: access.member };
+        const actor = { id: access.actor.id, name: access.actor.name, member: access.member };
 
         try {
             await this.client.moderationService.AddImage(

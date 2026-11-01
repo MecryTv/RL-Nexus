@@ -571,7 +571,7 @@ async function checkLive(client: BotClient): Promise<void> {
     check("Transcripts: eine Themen-Rolle sieht nur ihr Thema", visible([RECRUIT]) === JSON.stringify({ include: ["bewerbung"] }));
     check("Transcripts: ohne Rolle nichts", visible([]) === JSON.stringify({ include: [] }));
 
-    const access = (roles: string[]): ILiveAccess => ({ guild: { id: GUILD } as Guild, member: member(roles), config, manage: false });
+    const access = (roles: string[]): ILiveAccess => ({ guild: { id: GUILD } as Guild, member: member(roles), config, manage: false, actor: { id: "check", name: "Check", staff: false } });
 
     check("Live: die Support-Rolle sieht Support-Tickets", client.liveService.CanSee(access([ROLE]), FakeTicket()));
     check("Live: aber keine Bewerbungen mit eigener Rolle", !client.liveService.CanSee(access([ROLE]), FakeTicket({ optionId: "bewerbung" })));

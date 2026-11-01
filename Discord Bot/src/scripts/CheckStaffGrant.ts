@@ -14,9 +14,10 @@ import Route from "../structures/Route";
 import { DASHBOARD_PATH, SESSION_COOKIE } from "../constants/Dashboard";
 import IDashboardGuild from "../interfaces/services/dashboard/IDashboardGuild";
 import { StaffOverlay } from "../services/DashboardService";
-import { ManageGate } from "../utils/managegate";
+import { ManageGate, PrivateGate, PrivateItem } from "../utils/managegate";
+import { SessionOf } from "../utils/dashboard";
 import BotClient from "../client/BotClient";
-import { REQUEST_TTL_MS } from "../constants/StaffGrant";
+import { PRIVATE_HINT, REQUEST_TTL_MS } from "../constants/StaffGrant";
 import { IStaffGrant, IStaffLogEntry } from "../interfaces/services/staffgrant/IStaffGrant";
 import PulseService from "../services/PulseService";
 import StaffGrantService, { StaffGrantBlocked } from "../services/StaffGrantService";
@@ -489,6 +490,88 @@ async function checkGate(): Promise<void> {
     check("Bot-Mitglied fehlt: 403 mit Hinweis", nobot.statusCode === 403 && (nobot.json() as { hint?: string }).hint === "Der Bot fehlt gerade im Speicher dieses Servers. Bitte gleich noch mal.", nobot.body);
 }
 
+/* ----------------------------------------------------------
+   Task 4: Private Bereiche
+   ---------------------------------------------------------- */
+
+class PrivateProbe extends Route {
+    constructor(client: BotClient) {
+        super(client, {
+            method: ["GET", "POST"],
+            path: `${DASHBOARD_PATH}/api/guild/:id/private/:ticket?`,
+            description: "Prüft PrivateGate",
+            prefixed: false,
+            requiresAuth: false,
+        });
+    }
+
+    async Handle(request: FastifyRequest, reply: FastifyReply): Promise<unknown> {
+        const session = SessionOf(this.client, request)!;
+        const { id } = request.params as { id: string };
+
+        if (!PrivateGate(this.client, session, id, reply, "Live Tickets", PrivateItem(request))) return reply;
+
+        return reply.send({ ok: true });
+    }
+}
+
+function PrivateApp(grant: IStaffGrant | null) {
+    const logged: string[] = [];
+    const client = {
+        dashboardService: {
+            Session: (cookie: string | undefined) =>
+                cookie === "gueltig" ? { id: "s", userId: "900", username: "Joe", avatar: null, accessToken: "x", mfa: true, expiresAt: Date.now() + 60_000 } : null,
+            Secure: false,
+        },
+        staffGrantService: {
+            Active: () => grant,
+            Seen: (_grant: IStaffGrant, area: string, item: string) => logged.push(`${area} › ${item} geöffnet`),
+            Log: (_grant: IStaffGrant, _area: string, text: string) => logged.push(text),
+        },
+    } as unknown as BotClient;
+    const instance = fastify({ logger: false });
+    const manager = new RouteManager(client);
+
+    manager.Register(new PrivateProbe(client));
+    manager.Apply(instance);
+
+    const call = (method: "GET" | "POST", suffix = "") =>
+        instance.inject({
+            method,
+            url: `${DASHBOARD_PATH}/api/guild/${GATE_GUILD}/private${suffix}`,
+            headers: { cookie: `${SESSION_COOKIE}=gueltig`, ...(method === "POST" ? { "content-type": "application/json" } : {}) },
+            ...(method === "POST" ? { payload: JSON.stringify({ action: "send" }) } : {}),
+        });
+
+    return { call, logged };
+}
+
+async function checkPrivateGate(): Promise<void> {
+    console.log("\n🔏 Riegel vor den privaten Bereichen\n");
+
+    const item = (params: Record<string, string>, query: Record<string, string> = {}) => PrivateItem({ params, query } as unknown as FastifyRequest);
+
+    check("Gegenstand: Ticket", item({ ticket: "12" }) === "Ticket #12");
+    check("Gegenstand: Fall aus der Adresse", item({ case: "7" }) === "Fall #7");
+    check("Gegenstand: Fall aus der Abfrage", item({}, { case: "8" }) === "Fall #8");
+    check("Gegenstand: sonst Liste", item({}) === "Liste");
+
+    let app = PrivateApp(Running({ endsAt: Date.now() + 60 * MIN }));
+    const shut = await app.call("GET", "/12");
+    check("Freigabe ohne private Bereiche: 403 mit Hinweis", shut.statusCode === 403 && (shut.json() as { hint?: string }).hint === PRIVATE_HINT, shut.body);
+    check("Gesperrt: nichts im Protokoll", app.logged.length === 0);
+
+    app = PrivateApp(Running({ endsAt: Date.now() + 60 * MIN, private: "on" }));
+    check("Mit privaten Bereichen: durch", (await app.call("GET", "/12")).statusCode === 200);
+    check("Ansehen steht im Protokoll", app.logged[0] === "Live Tickets › Ticket #12 geöffnet", app.logged.join(" | "));
+    check("Schreiben: durch", (await app.call("POST", "/12")).statusCode === 200);
+    await flush();
+    check("Schreiben steht im Protokoll", app.logged.includes("Live Tickets › gesendet"), app.logged.join(" | "));
+
+    app = PrivateApp(null);
+    check("Ohne Staff-Freigabe: durch, nichts im Protokoll", (await app.call("GET", "/12")).statusCode === 200 && app.logged.length === 0);
+}
+
 async function main(): Promise<void> {
     checkRules();
     checkAnswer();
@@ -500,6 +583,7 @@ async function main(): Promise<void> {
     await checkService();
     checkOverlay();
     await checkGate();
+    await checkPrivateGate();
 
     console.log(failures ? `\n❌ ${failures} Prüfung(en) fehlgeschlagen` : "\n✅ Alles in Ordnung");
     process.exit(failures ? 1 : 0);

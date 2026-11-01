@@ -5,12 +5,15 @@ import { SessionExpired } from "../services/DashboardService";
 import { ClearCookie, SESSION_COOKIE } from "../constants/Dashboard";
 import { SNOWFLAKE } from "../constants/Discord";
 import { SessionOf } from "./dashboard";
+import { IActor, MemberOrStandIn, PrivateGate, PrivateItem } from "./managegate";
 
 export interface IModAccess {
     guild: Guild;
     member: GuildMember;
     /** "Server verwalten": Einstellungen, fremde Notizen und Beweise entfernen. */
     manage: boolean;
+    /** Wer handelt - mit Staff-Freigabe Staff, das Mitglied ist dann der Bot (W-0011). */
+    actor: IActor;
 }
 
 /**
@@ -34,6 +37,9 @@ export async function ModGate(client: BotClient, request: FastifyRequest, reply:
 
         return null;
     }
+
+    // W-0011: Staff mit Freigabe nur mit dem extra Ja für die privaten Bereiche.
+    if (!PrivateGate(client, session, id, reply, "Fälle Moderation", PrivateItem(request))) return null;
 
     try {
         if (!(await service.CanModerate(session, id))) {
@@ -69,13 +75,9 @@ export async function ModGate(client: BotClient, request: FastifyRequest, reply:
         return null;
     }
 
-    const member = guild.members.cache.get(session.userId) ?? (await guild.members.fetch(session.userId).catch(() => null));
+    const stand = await MemberOrStandIn(client, guild, session, reply);
 
-    if (!member) {
-        reply.code(403).send({ error: "Forbidden", hint: "Du bist auf diesem Server kein Mitglied." });
+    if (!stand) return null;
 
-        return null;
-    }
-
-    return { guild, member, manage: client.moderationService.CanManage(member) };
+    return { guild, member: stand.member, manage: client.moderationService.CanManage(stand.member), actor: stand.actor };
 }

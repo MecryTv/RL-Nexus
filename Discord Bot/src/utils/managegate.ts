@@ -3,6 +3,7 @@ import { MODULES } from "../dashboard/client/constants/Modules";
 import IDashboardSession from "../interfaces/services/dashboard/IDashboardSession";
 import { IStaffGrant } from "../interfaces/services/staffgrant/IStaffGrant";
 import { ActionText } from "../services/staffgrant/Rules";
+import { PRIVATE_HINT } from "../constants/StaffGrant";
 import { FastifyReply, FastifyRequest } from "fastify";
 import BotClient from "../client/BotClient";
 import { SessionExpired } from "../services/DashboardService";
@@ -55,6 +56,44 @@ export function StaffWrite(client: BotClient, request: FastifyRequest, reply: Fa
     reply.raw.once("finish", () => {
         if (reply.statusCode < 400) client.staffGrantService.Log(grant, area, ActionText(area, action));
     });
+}
+
+/** W-0011: was in einem privaten Bereich angesehen wurde, aus der Adresse. */
+export function PrivateItem(request: FastifyRequest): string {
+    const params = (request.params ?? {}) as Record<string, string | undefined>;
+    const query = (request.query ?? {}) as Record<string, string | undefined>;
+
+    if (params.ticket) return `Ticket #${params.ticket}`;
+
+    const found = params.case ?? query.case;
+
+    return found ? `Fall #${found}` : "Liste";
+}
+
+/**
+ * W-0011: der Riegel vor den privaten Bereichen (Live Tickets, Transcripts,
+ * Bewerbungen, Fälle). Staff mit Freigabe, aber ohne das extra Ja, bekommt
+ * 403 mit PRIVATE_HINT. Mit dem Ja zählt jedes Ansehen im Protokoll, jede
+ * erfolgreiche Änderung auch. Alle anderen gehen unverändert durch.
+ * false heißt: die Antwort ist schon raus.
+ */
+export function PrivateGate(client: BotClient, session: IDashboardSession, guildId: string, reply: FastifyReply, area: string, item: string): boolean {
+    const grant = client.staffGrantService.Active(session.userId, guildId);
+
+    if (!grant) return true;
+
+    if (grant.private !== "on") {
+        reply.code(403).send({ error: "Forbidden", hint: PRIVATE_HINT });
+
+        return false;
+    }
+
+    const request = reply.request;
+
+    if (request.method === "GET") client.staffGrantService.Seen(grant, area, item);
+    else StaffWrite(client, request, reply, guildId, area);
+
+    return true;
 }
 
 /**

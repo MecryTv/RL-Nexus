@@ -1,3 +1,4 @@
+import { IActor } from "../utils/managegate";
 import { Events, Guild, GuildMember, Message, PartialMessage, PermissionFlagsBits, SnowflakeUtil } from "discord.js";
 import BotClient from "../client/BotClient";
 import { OptionOf } from "../builder/TicketPanel";
@@ -47,9 +48,17 @@ export interface ILiveMessage {
 }
 
 /** Wer Live Tickets eines Servers gerade offen hat. */
+/** W-0011: Staff schreibt im Ticket unter eigenem Namen, nicht als Bot. */
+export function StaffDisplay(access: ILiveAccess): { name: string; avatar: string | null } | undefined {
+    return access.actor.staff ? { name: access.actor.name, avatar: null } : undefined;
+}
+
 export interface ILiveAccess {
     guild: Guild;
+    /** Mit Staff-Freigabe der Bot selbst (W-0011). */
     member: GuildMember;
+    /** Wer schreibt - für den Namen im Ticket und „ich“ im Chat. */
+    actor: IActor;
     config: ITicketConfig;
     /** "Server verwalten" - sieht jedes Ticket und darf Transcripts löschen. */
     manage: boolean;
@@ -134,13 +143,15 @@ export default class LiveService {
 
         if (!guild || !this.client.databaseService.Ready) return null;
 
-        const member = guild.members.cache.get(userId) ?? (await guild.members.fetch(userId).catch(() => null));
+        // W-0011: Staff mit Freigabe arbeitet über den Bot.
+        const member = this.client.staffGrantService.StandIn(userId, guild) ?? guild.members.cache.get(userId) ?? (await guild.members.fetch(userId).catch(() => null));
 
         if (!member) return null;
 
         return {
             guild,
             member,
+            actor: { id: member.id, name: member.displayName, staff: false },
             config: await this.client.ticketSettings.Of(guildId),
             manage: member.permissions.has(PermissionFlagsBits.ManageGuild),
         };

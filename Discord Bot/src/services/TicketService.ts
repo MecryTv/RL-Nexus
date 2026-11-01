@@ -1329,7 +1329,9 @@ export default class TicketService {
         context: ITicketContext,
         member: GuildMember,
         content: string,
-        files: { attachment: Buffer | string; name: string }[] = []
+        files: { attachment: Buffer | string; name: string }[] = [],
+        // W-0011: Staff mit Freigabe schreibt über den Bot, aber unter eigenem Namen.
+        display?: { name: string; avatar: string | null }
     ): Promise<void> {
         this.RequireStaff(context, member);
         this.RequireOpen(context);
@@ -1340,7 +1342,7 @@ export default class TicketService {
         if (!text && files.length === 0) throw new TicketError("Die Nachricht ist leer.");
 
         const anonymous = context.ticket.anonymous.includes(member.id);
-        const name = anonymous ? AliasOf(context.guild) : member.displayName;
+        const name = anonymous ? AliasOf(context.guild) : (display?.name ?? member.displayName);
         const scope = channel.isThread() ? channel.parent : channel;
         const hook =
             scope && (scope.type === ChannelType.GuildText || scope.type === ChannelType.GuildForum) ? await this.Webhook(scope) : null;
@@ -1351,7 +1353,9 @@ export default class TicketService {
                     username: HookName(name),
                     avatarURL: anonymous
                         ? (context.guild.iconURL({ extension: "png", size: 256 }) ?? undefined)
-                        : member.displayAvatarURL({ extension: "png", size: 256 }),
+                        : display
+                          ? (display.avatar ?? undefined)
+                          : member.displayAvatarURL({ extension: "png", size: 256 }),
                     content: text || undefined,
                     files,
                     threadId: channel.isThread() ? channel.id : undefined,
