@@ -2,13 +2,13 @@
 
 Listen, die zeigen, wer welche Rolle hat: Staff, Teams, Creator oder was ein Server braucht. Der Bot schreibt sie selbst in einen Kanal und zieht sie nach, sobald jemand eine Rolle bekommt oder verliert. Eine Liste steht entweder als **Text-Karte** (Components V2) oder als **gezeichnetes Bild** im Kanal.
 
-Das Modul heißt `role-lists` und wird unter *Module* eingeschaltet (Kategorie Community). Im Dashboard steht jede Liste als eigener Unterpunkt unter „Rollen-Listen“ in der Leiste, darunter „Neue Liste“.
+Das Modul heißt `role-lists` und wird unter *Module* eingeschaltet (Kategorie Community). Im Dashboard steht jede Liste als Kachel auf der Seite „Rollen-Listen“, daneben „Neue Liste“. Die Suche der Leiste findet jede Liste nach ihrem Namen (W-0055).
 
 ---
 
 ## Listen anlegen
 
-Ein Server hat höchstens **10 Listen**. „Neue Liste“ fragt nach einem Namen (nur für die Leiste, Mitglieder sehen ihn nicht) und einer Vorlage:
+Ein Server hat höchstens **10 Listen**. „Neue Liste“ fragt nach einem Namen (nur fürs Dashboard, Mitglieder sehen ihn nicht) und einer Vorlage:
 
 | Vorlage | Was sie mitbringt |
 |---|---|

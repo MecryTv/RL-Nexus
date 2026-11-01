@@ -526,11 +526,15 @@ RL 6Mans · Looking for · RL Team-Übersicht · Clips der Woche · Matchups · 
 
 Jedes Modul trägt einen Satz, worum es geht — auf seiner Kachel unter dem Namen und auf seiner Karte.
 
-Was zusammengehört, hängt am Modul selbst: **Teile** (`parts`) kommen mit ihrem Modul. Das Ticket System bringt **Live Tickets** und **Transcriptions** mit; sie haben keinen eigenen Schalter, stehen eingerückt unter ihm in der Leiste und haben eine eigene Karte. In `guild_settings.modules` steht dafür nur `tickets` — die IDs der Teile nie, und der Bot kennt sie auch nicht.
+Was zusammengehört, hängt am Modul selbst: **Teile** (`parts`) kommen mit ihrem Modul. Das Ticket System bringt **Live Tickets** und **Transcriptions** mit; sie haben keinen eigenen Schalter, stehen als Reiter über seiner Seite und haben eine eigene Karte. In `guild_settings.modules` steht dafür nur `tickets` — die IDs der Teile nie, und der Bot kennt sie auch nicht.
 
 In der Seitenleiste steht ein Modul erst, wenn es eingeschaltet ist. Ein frischer Server beginnt links also mit Übersicht, Module und **Moderatoren** (die Liste für Tickets und Moderation, nur für wer verwaltet) — statt mit zwei Dutzend auf einmal. Gebaut sind Ticket System, Gallery System, [Moderation](Moderation.md), [Twitch- und YouTube-Notifier](Notifiers.md), [Umfragen](Polls.md), [Giveaways](Giveaways.md), [Temp Voice](Voice.md), [Level System](Levels.md), [Custom Message](Messages.md) und [Welcome System](Welcome.md); jedes andere eingeschaltete Modul zeigt bis dahin seinen Namen, seinen Satz und „Dieses Modul kommt noch“.
 
 Eine gespeicherte ID, deren Modul es nicht mehr gibt, zählt als aus — auf der Serverseite und in der Anzahl auf den Karten. So verschwinden `rl-tracking` (entfernt) und `embed-builder` (heute Custom Message, `custom-message`) ohne Migration.
+
+**Die Leiste** (W-0055, `pages/GuildNav.ts`): Links eine schmale Bereichsleiste mit Übersicht, Module und Mods (Moderatoren), darunter die Bereiche aus `CATEGORIES` mit Symbol, kurzem Namen und der Zahl ihrer Module in der Leiste. Ein Bereich ohne solches Modul fehlt. Daneben stehen nur die Module des gewählten Bereichs, eine Zeile je Modul. Gewählt ist der Bereich der offenen Seite; ein Klick auf einen anderen zeigt dessen Module, ohne die Seite zu wechseln. Teile stehen nicht in der Leiste, sondern als **Reiter** über der Seite ihres Moduls: „Einstellungen“ und die Teile, nur die erreichbaren, unter zwei Reitern keine Zeile. Ihre Links bleiben trotzdem versteckt in der Leiste stehen, denn deren `hidden` sagt `bindSections`, welche Seite offen sein darf.
+
+**Suche** (`pages/GuildSearch.ts`, Treffer in `core/NavSearch.ts`, geprüft in `check:dashboard`): die rechte Umschalttaste kurz drücken und loslassen, `/` oder `Strg K`, oder „Suchen …“ über den Modulen. Nie beim Tippen in einem Feld und nicht über einem offenen Dialog; die linke Umschalttaste öffnet nichts. Gefunden wird, was man auch über Leiste und Reiter erreicht: Seiten, Module, Teile und Rollen-Listen, ohne Groß- und Kleinschreibung und Umlaute. Wer verwaltet (ohne `only`), sieht ausgeschaltete Module am Ende mit „aus“, Enter führt dann zu Module.
 
 **Gespeichert wird beim Bot**, in `guild_settings.modules`, nicht im Browser. Es gilt für alle, die den Server verwalten, und später liest der Bot dort, was an ist. Ein Schalter schickt `POST <base>/api/guild/:id/modules` mit `{ "module": "tickets", "on": true }`, zurück kommt die neue Liste.
 
@@ -549,7 +553,7 @@ Die Liste steht zweimal, und das ist Absicht: `src/constants/Modules.ts` sagt de
 
 Die **ID** eines Moduls ist sein Schlüssel: der Abschnitt in der Adresse und der Eintrag in `guild_settings.modules`. Wo es das Modul auf der Webseite schon gibt, ist es dieselbe ID wie dort (`src/data/modules.data.ts`) — Self Roles heißt deshalb `reaction-roles`, Temp Voice `voice-hub`. Sie beginnt mit einem Buchstaben, weil `#6mans` kein gültiger Selektor wäre; RL 6Mans heißt `rl-6mans`.
 
-Die Seite ist breiter als die übrigen (`--shell` 1440 statt 1180 px). Auf schmalen Bildschirmen wird die Leiste wie in den Einstellungen zur waagerechten Reihe, ohne Kategorie-Überschriften.
+Die Seite ist breiter als die übrigen (`--shell` 1440 statt 1180 px). Auf schmalen Bildschirmen stehen die Bereiche als waagerechte Zeile über der Seite, darunter die Suche und die Module des Bereichs, ebenfalls waagerecht.
 
 ---
 
