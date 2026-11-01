@@ -12,9 +12,10 @@ import { glob } from "glob";
 import path from "path";
 import { pathToFileURL } from "url";
 import BotClient from "../client/BotClient";
-import { HelpCatalog, IHelpText, IsGroupText } from "../constants/Help";
+import { HELP_PREFIX, HelpCatalog, IHelpText, IsGroupText, STATUS_URL, SUPPORT_URL } from "../constants/Help";
 import { HELP_CATALOG } from "../constants/HelpCatalog";
 import { BuildHelp, CatalogProblems, IHelpSource } from "../services/help/HelpModel";
+import { AreaOf, HelpAreaView, HelpCommandView, HelpStartView, IHelpContext, IHelpPayload, IHelpStart } from "../builder/HelpView";
 
 let failures = 0;
 
@@ -46,7 +47,7 @@ function FakeCommands() {
 }
 
 function Text(fields: Record<string, string> = {}) {
-    return { emoji: "⏱️", area: "moderation" as const, module: "moderation", who: "team" as const, whoText: "Team mit „Mitglieder moderieren“", what: "Macht etwas.", examples: [], fields, after: [] };
+    return { emoji: "⏱️", area: "moderation" as const, module: "moderation", who: "team" as const, whoText: "Team mit „Mitglieder moderieren“", what: "Macht etwas.", examples: [{ code: "/probe user:@nico", text: "Ein Beispiel" }], fields, after: ["Etwas passiert"] };
 }
 
 function FakeCatalog(): HelpCatalog {
@@ -148,11 +149,122 @@ async function checkCatalog(client: BotClient): Promise<void> {
     const wrong = texts.filter(([key, text]) => text.examples.some((example) => !example.code.startsWith(`/${key}`)));
 
     check("Beispiele beginnen mit dem eigenen Befehl", wrong.length === 0, wrong.map(([key]) => key).join(", "));
+    const real = BuildHelp(commands, HELP_CATALOG);
+    const views: [string, ReturnType<typeof Flat>][] = [];
+
+    for (const entry of real) {
+        for (const key of [null, ...entry.commands.map((command) => command.key)]) {
+            for (let page = 0; page < 6; page++) views.push([`${key ?? entry.name} S${page + 1}`, Flat(HelpCommandView(entry, key, page, CONTEXT))]);
+        }
+    }
+
+    for (const area of new Set(real.map(AreaOf))) for (let page = 0; page < 4; page++) views.push([`Bereich ${area} S${page + 1}`, Flat(HelpAreaView(area, real, CONTEXT, page))]);
+
+    const big = views.filter(([, view]) => view.texts.length >= 4000 || view.count > 40 || view.texts.includes("…"));
+
+    check(`Alle ${views.length} echten Seiten passen in eine Nachricht`, big.length === 0, big.map(([name, view]) => `${name}: ${view.texts.length}/${view.count}`).slice(0, 6).join(", "));
     check("Jeder Slash-Befehl hat ein Beispiel", texts.filter(([key, text]) => key !== "Hack melden" && text.examples.length === 0).length === 0, texts.filter(([key, text]) => key !== "Hack melden" && text.examples.length === 0).map(([key]) => key).join(", "));
+}
+
+const CONTEXT: IHelpContext = {
+    guildId: "123456789012345678",
+    dashboard: "https://example.test/dashboard",
+    docs: "https://example.test/dashboard/docu.html",
+    enabled: new Set(["moderation"]),
+};
+
+/** Alle Texte einer Nachricht in einem String, dazu die Zahl der Bausteine. */
+function Flat(payload: IHelpPayload): { json: string; texts: string; count: number } {
+    const json = JSON.stringify(payload.components);
+    const texts: string[] = [];
+    let count = 0;
+    const walk = (node: unknown): void => {
+        if (Array.isArray(node)) return node.forEach(walk);
+        if (!node || typeof node !== "object") return;
+
+        const record = node as Record<string, unknown>;
+
+        if (typeof record.type === "number") count++;
+        if (typeof record.content === "string") texts.push(record.content);
+
+        Object.values(record).forEach(walk);
+    };
+
+    walk(JSON.parse(json));
+
+    return { json, texts: texts.join("\n"), count };
+}
+
+function checkPages(): void {
+    console.log("\n  — Seiten —");
+
+    const entries = BuildHelp(FakeCommands(), FakeCatalog());
+    const start: IHelpStart = { name: "Joe", banner: "hilfe.png", modules: { on: 9, all: 24 }, commands: 38, access: { value: "Paid", sub: "bis 01.12." }, version: "v1.0" };
+    const page = Flat(HelpStartView(start, entries, CONTEXT));
+
+    check("Start: Banner als Bild", page.json.includes("attachment://hilfe.png"));
+    check("Start: mit Banner kein Willkommen im Text", !page.texts.includes("Willkommen, Joe"));
+    check("Start: ohne Banner Willkommen im Text", Flat(HelpStartView({ ...start, banner: null }, entries, CONTEXT)).texts.includes("Willkommen, Joe"));
+    check("Start: vier Kacheln", ["Module an", "9/24", "Befehle", "38", "Zugang", "Paid", "bis 01.12.", "Version", "v1.0"].every((part) => page.texts.includes(part)), page.texts.slice(0, 300));
+    check("Start: In drei Schritten startklar", page.texts.includes("In drei Schritten startklar") && page.texts.includes("/module") && page.texts.includes("/hilfe befehl:"));
+    check("Start: Bereich mit Zahl", page.texts.includes("Moderation") && page.texts.includes("4 Befehle"), page.texts);
+    check("Start: leere Bereiche fehlen", !page.texts.includes("Rocket League"));
+    check("Start: Menü Bereich öffnen", page.json.includes(`"custom_id":"${HELP_PREFIX}bereich"`));
+    check(
+        "Start: vier Links",
+        [`${CONTEXT.dashboard}/guild/${CONTEXT.guildId}`, CONTEXT.docs, STATUS_URL, SUPPORT_URL].every((url) => page.json.includes(`"url":"${url}`)),
+        page.json.slice(0, 200)
+    );
+    check("Start: pingt niemanden", JSON.stringify(HelpStartView(start, entries, CONTEXT).allowedMentions) === JSON.stringify({ parse: [] }));
+
+    const area = Flat(HelpAreaView("moderation", entries, CONTEXT));
+
+    check("Bereich: jeder Befehl mit Abzeichen", area.texts.includes("/probe") && area.texts.includes("Team") && area.texts.includes("/gruppe a") && area.texts.includes("alle"), area.texts);
+    check("Bereich: Felder grau darunter", area.texts.includes("user*") && area.texts.includes("dauer"), area.texts);
+    check("Bereich: Modul aus bei abgeschaltetem Modul", area.texts.includes("Modul aus") && area.texts.includes("/module an modul:anti-villain"), area.texts);
+    check("Bereich: kein Modul aus bei eingeschaltetem", (area.texts.match(/Modul aus/g) ?? []).length === 1, String((area.texts.match(/Modul aus/g) ?? []).length));
+    check("Bereich: Menü Befehl erklären", area.json.includes(`"custom_id":"${HELP_PREFIX}befehl"`));
+    check("Bereich: zurück zur Übersicht", area.json.includes(`"custom_id":"${HELP_PREFIX}start"`));
+    check("Bereich: Im Dashboard", area.json.includes(`"url":"${CONTEXT.dashboard}/guild/${CONTEXT.guildId}/moderation"`));
+
+    const probe = entries.find((entry) => entry.name === "probe")!;
+    const single = Flat(HelpCommandView(probe, null, 0, CONTEXT));
+
+    check("Befehl: Abschnitte", ["Was er macht", "So nutzt du ihn", "Felder", "Was danach passiert"].every((part) => single.texts.includes(part)), single.texts);
+    check("Befehl: Pflichtfeld mit Stern", single.texts.includes("user*"), single.texts);
+    check("Befehl: Auswahl genannt", single.texts.includes("1h, 1d"), single.texts);
+    check("Befehl: zurück zum Bereich", single.json.includes(`"custom_id":"${HELP_PREFIX}a:moderation"`));
+    check("Befehl: Doku zum Bereich", single.json.includes(`"url":"${CONTEXT.docs}#docg-moderation"`));
+
+    const gruppe = entries.find((entry) => entry.name === "gruppe")!;
+    const group = Flat(HelpCommandView(gruppe, null, 0, CONTEXT));
+
+    check("Gruppe: Kapitel nummeriert in Katalog-Reihenfolge", group.texts.indexOf("Zuerst") < group.texts.indexOf("Danach") && group.texts.includes("**1**") && group.texts.includes("**2**"), group.texts);
+    check("Gruppe: Unterbefehl erklären per Menü", group.json.includes(`"value":"gruppe a"`));
+
+    const sub = Flat(HelpCommandView(gruppe, "gruppe a", 0, CONTEXT));
+
+    check("Unterbefehl: eigene Seite A", sub.texts.includes("/gruppe a") && sub.texts.includes("Was er macht") && sub.texts.includes("nummer*"), sub.texts);
+    check("Unterbefehl: zurück zur Gruppe", sub.json.includes(`"custom_id":"${HELP_PREFIX}seite:gruppe:-:0"`));
+
+    const long = { ...probe, commands: [{ ...probe.commands[0], text: { ...probe.commands[0].text, examples: Array.from({ length: 12 }, (_, index) => ({ code: `/probe ${"x".repeat(380)} ${index}`, text: `Beispiel ${index}` })) } }] };
+    const first = Flat(HelpCommandView(long, null, 0, CONTEXT));
+    const second = Flat(HelpCommandView(long, null, 1, CONTEXT));
+
+    check("Lang: wird geteilt, nicht gekürzt", !first.texts.includes("…") && first.json.includes(`"custom_id":"${HELP_PREFIX}seite:probe:-:1"`), first.json.slice(-400));
+    check("Lang: Seite 2 hat den Rest", second.texts.includes("Beispiel 11") && second.json.includes(`"custom_id":"${HELP_PREFIX}seite:probe:-:0"`));
+    check("Lang: jede Seite unter 4000 Zeichen und 40 Bausteinen", [first, second].every((part) => part.texts.length < 4000 && part.count <= 40), `${first.texts.length}/${first.count}, ${second.texts.length}/${second.count}`);
+
+    const many = Array.from({ length: 30 }, (_, index) => ({ ...probe, name: `probe${index}`, commands: [{ ...probe.commands[0], key: `probe${index}`, display: `/probe${index}` }] }));
+    const crowded = Flat(HelpAreaView("moderation", many, CONTEXT));
+
+    check("Viele Befehle: Menü höchstens 25", (crowded.json.match(/"value":"probe\d+"/g) ?? []).length <= 25);
+    check("Viele Befehle: unter 4000 Zeichen und 40 Bausteinen", crowded.texts.length < 4000 && crowded.count <= 40, `${crowded.texts.length}/${crowded.count}`);
 }
 
 async function main(): Promise<void> {
     checkModel();
+    checkPages();
     await checkCatalog(new BotClient());
 
     console.log(failures === 0 ? "\n✅ Alle Prüfungen bestanden.\n" : `\n❌ ${failures} Prüfung(en) fehlgeschlagen.\n`);
