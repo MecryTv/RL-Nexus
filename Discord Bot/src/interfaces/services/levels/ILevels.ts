@@ -107,6 +107,8 @@ export interface ILevelSettings {
     boosts: ILevelBoost[];
     /** Plan 37: hier kündigt der Bot Beginn und Ende der Fenster an. */
     boostChannelId: string | null;
+    /** Plan 43: Beginn und Ende als eigene Nachricht. null: der bisherige Satz. */
+    boostMessages: { start: IMessageDoc | null; end: IMessageDoc | null };
     /** Plan 37: Aktivste der Woche und des Monats. */
     top: { week: ITopPost; month: ITopPost };
     /** Plan 43: die Rangliste fest in einem Kanal. */

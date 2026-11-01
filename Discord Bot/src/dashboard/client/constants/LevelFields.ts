@@ -6,9 +6,11 @@
  * Plan 36: Die Zeile über dem Aufstiegs-Bild (`upLine`) steht nur noch im
  * Aufstiegs-Studio unter Level-Karte und wird dort mit dem Design gespeichert.
  * Plan 37: doppelte Punkte unter Level System, Aktivste unter Belohnungen.
+ * Plan 43: die Boost-Nachrichten mit den doppelten Punkten; die Rangliste im
+ * Kanal speichert die Ranglisten-Seite selbst (nur boardPost).
  */
 export const LEVEL_FIELDS = {
-    levels: ["chat", "voice", "base", "roleBonus", "channelBonus", "noChannels", "noRoles", "fair", "boosts", "boostChannelId"],
+    levels: ["chat", "voice", "base", "roleBonus", "channelBonus", "noChannels", "noRoles", "fair", "boosts", "boostChannelId", "boostMessages"],
     "level-rewards": ["announce", "announceChannelId", "announceDelete", "message", "rewards", "stack", "upMode", "top"],
 } as const satisfies Record<string, readonly string[]>;
 

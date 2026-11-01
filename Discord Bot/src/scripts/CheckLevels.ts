@@ -20,7 +20,7 @@ import { CardLine, RenderLevelCard } from "../builder/LevelCard";
 import { RenderLeaderboard } from "../builder/LeaderboardImage";
 import { BoardChannelPayload, BoardMessage, HandleBoardButton, RankPayload } from "../services/levels/BoardMessage";
 import { BoardFingerprint, PostBoard } from "../services/levels/BoardPost";
-import { CountsForPoints, VoiceHours, VoiceText, DefaultLevelMessage, DefaultLevelSettings, LEVEL_LOG_KEEP_DAYS, LEVEL_PULSE_MS, LevelFromXp, LevelProgress, MAX_FACTOR, MAX_XP_MANUAL, Today, XpForLevel } from "../constants/Levels";
+import { BOOST_PLACEHOLDER_KEYS, CountsForPoints, VoiceHours, VoiceText, DefaultLevelMessage, DefaultLevelSettings, LEVEL_LOG_KEEP_DAYS, LEVEL_PULSE_MS, LevelFromXp, LevelProgress, MAX_FACTOR, MAX_XP_MANUAL, Today, XpForLevel } from "../constants/Levels";
 import LevelService, { LevelError } from "../services/LevelService";
 import { IBoardPage, ILevelBoardPost, ILevelEntry, ILevelSettings, LevelBackfillMode } from "../interfaces/services/levels/ILevels";
 import { PERMANENT_MODULES } from "../constants/Modules";
@@ -34,6 +34,7 @@ import DashboardLeaderboard from "../routes/DashboardLeaderboard";
 import DashboardLeaderboardImage from "../routes/DashboardLeaderboardImage";
 import { RankOrder, Trend } from "../services/levels/Board";
 import { MODULES as CLIENT_MODULES } from "../dashboard/client/constants/Modules";
+import { BOOST_PLACEHOLDERS as CLIENT_BOOST_PLACEHOLDERS } from "../dashboard/client/constants/Placeholders";
 import { LEVEL_FIELDS } from "../dashboard/client/constants/LevelFields";
 import { BOARD_TEMPLATES, CARD_TEMPLATES, DefaultBoardStyle, UP_TEMPLATES } from "../constants/LevelDesign";
 import { RenderDesign } from "../builder/DesignRenderer";
@@ -1293,6 +1294,8 @@ function checkAlwaysOn(): void {
         (LEVEL_FIELDS.levels as readonly string[]).includes("boosts") && (LEVEL_FIELDS.levels as readonly string[]).includes("boostChannelId") && (LEVEL_FIELDS["level-rewards"] as readonly string[]).includes("top"),
         JSON.stringify(LEVEL_FIELDS)
     );
+    // Plan 43: die Boost-Nachrichten speichert die Seite Level System mit den Fenstern.
+    check("Level System speichert die Boost-Nachrichten mit", (LEVEL_FIELDS.levels as readonly string[]).includes("boostMessages"), JSON.stringify(LEVEL_FIELDS.levels));
     check("Belohnungen speichern die Zeile nicht mehr", !(LEVEL_FIELDS["level-rewards"] as readonly string[]).includes("upLine") && (LEVEL_FIELDS["level-rewards"] as readonly string[]).includes("upMode"), JSON.stringify(LEVEL_FIELDS["level-rewards"]));
     check("Belohnungen ist ein Teil des Level Systems", levels?.parts?.some((part) => part.id === "level-rewards") === true, JSON.stringify(levels?.parts?.map((part) => part.id)));
     // Plan 35: Menü A - Belohnungen, Level-Karte, Rangliste.
@@ -2074,6 +2077,45 @@ async function checkTop(): Promise<void> {
 
     await new LevelSchedule(silent.client).Execute(t0 + 30_000);
     check("Ohne Ankündigen: still", silent.sent.length === 0);
+
+    // Plan 43: ohne Gestaltung genau die bisherigen Sätze, ohne Pings.
+    const plain = announce.sent.map((entry) => entry.payload as { content?: string; allowedMentions?: unknown });
+
+    check("Ohne Gestaltung: die bisherigen Sätze", plain[0]?.content === "Ab jetzt: **2× XP bis 21:00**." && plain[1]?.content === "Die 2× XP sind vorbei.", JSON.stringify(plain.map((entry) => entry.content)));
+
+    // Plan 43: Beginn gestaltet, Ende nicht - die Platzhalter gefüllt, Rollen pingen, @everyone nicht.
+    const ROLE_PING = `<@&${ROLE}>`;
+    const designed = World({
+        boosts: [{ id: "party", kind: "once", factor: 2, start: t0, end: t0 + 3_600_000, weekday: null, from: null, to: null, announce: true }],
+        boostChannelId: TEXT,
+        boostMessages: { start: { accent: "#22c55e", blocks: [{ type: "text", body: `Los: {boost} | {boost.factor}× | {boost.start} bis {boost.end} ({boost.end.relative}) auf {guild} ${ROLE_PING} @everyone` }] }, end: null },
+    });
+    const designedRunner = new LevelSchedule(designed.client);
+
+    await designedRunner.Execute(t0 + 30_000);
+    await designedRunner.Execute(t0 + 3_600_000 + 10_000);
+
+    const second = (ms: number) => Math.floor(ms / 1000);
+    const card = designed.sent[0]?.payload as { components?: unknown[]; flags?: number; allowedMentions?: { parse?: string[] }; content?: string } | undefined;
+    const cardText = JSON.stringify(card?.components ?? []);
+
+    check(
+        "Gestalteter Beginn: als Karte, Platzhalter gefüllt",
+        Boolean(card?.components?.length) && cardText.includes(`Los: 2× XP bis 21:00 | 2× | <t:${second(t0)}:F> bis <t:${second(t0 + 3_600_000)}:F> (<t:${second(t0 + 3_600_000)}:R>) auf Dev Server`),
+        cardText.slice(0, 400)
+    );
+    check("Gestalteter Beginn: Rollen pingen, @everyone nicht", JSON.stringify(card?.allowedMentions) === JSON.stringify({ parse: ["roles"] }), JSON.stringify(card?.allowedMentions));
+    check("Ende ohne Gestaltung: der bisherige Satz", (designed.sent[1]?.payload as { content?: string } | undefined)?.content === "Die 2× XP sind vorbei.", JSON.stringify(designed.sent.map((entry) => entry.text.slice(0, 80))));
+
+    // Bereinigung
+    const cleaner = new LevelService({} as BotClient);
+    const fresh = DefaultLevelSettings();
+    const boostDocs = cleaner.Clean(FakeGuild(), { boostMessages: { start: { accent: null, blocks: [{ type: "text", body: "Ab jetzt {boost}" }] }, end: "quatsch" } }, fresh).boostMessages;
+
+    check("Vorgabe: keine eigene Boost-Nachricht", JSON.stringify(fresh.boostMessages) === JSON.stringify({ start: null, end: null }), JSON.stringify(fresh.boostMessages));
+    check("Bereinigung: Gestaltung bleibt, Unsinn wird null", boostDocs.start?.blocks.length === 1 && boostDocs.end === null, JSON.stringify(boostDocs));
+    check("Ohne Angabe bleibt die Gestaltung", cleaner.Clean(FakeGuild(), {}, { ...fresh, boostMessages: boostDocs }).boostMessages.start?.blocks.length === 1);
+    check("Platzhalter der Boost-Nachricht: Bot und Dashboard gleich", JSON.stringify([...BOOST_PLACEHOLDER_KEYS]) === JSON.stringify(CLIENT_BOOST_PLACEHOLDERS.map((entry) => entry.key)), JSON.stringify(CLIENT_BOOST_PLACEHOLDERS.map((entry) => entry.key)));
 }
 
 /* ----------------------------------------------------------

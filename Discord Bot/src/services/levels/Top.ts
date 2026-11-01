@@ -4,7 +4,7 @@
  * dazu eine Rolle für Platz 1 bis 3, die beim nächsten Post wandert. Und die
  * Ankündigung der Zeitfenster mit mehr Punkten. Siehe docs/Levels.md.
  */
-import { AttachmentBuilder, ChannelType, Guild, GuildMember, SendableChannels } from "discord.js";
+import { AttachmentBuilder, ChannelType, Guild, GuildMember, MessageFlags, SendableChannels } from "discord.js";
 import { LRUCache } from "lru-cache";
 import BotClient from "../../client/BotClient";
 import { ZoneParts } from "../../constants/Matchups";
@@ -13,6 +13,7 @@ import { DefaultBoardStyle } from "../../constants/LevelDesign";
 import { IBoardHooks } from "../../builder/BoardRenderer";
 import { ILevelSettings, ITopPost, LevelTopKind } from "../../interfaces/services/levels/ILevels";
 import { ActiveBoost, BoostText, FactorText, Occurrence } from "./Boost";
+import { RenderDoc } from "../../builder/MessageDoc";
 import logger from "../../utils/logger";
 
 /** Ab dieser Stunde (Berlin) wird gepostet - bis Mitternacht holt der Minutenlauf nach. */
@@ -171,13 +172,20 @@ async function Post(
     if (errors.length) logger.warn(`📈 ${TOP_TITLE[kind]} auf ${guild.id}: ${errors.join(" ")}`);
 }
 
+/** Discord-Zeit, die jeder in seiner Zeitzone sieht. */
+function Stamp(ms: number, style: "F" | "R"): string {
+    return `<t:${Math.floor(ms / 1000)}:${style}>`;
+}
+
 /**
  * Beginn und Ende der Fenster mit „ankündigen“ in boostChannelId - je Fenster
- * einmal, höchstens zwei Minuten danach. seen merkt sich, was schon raus ist.
- * ponytail: nur im Speicher; ein Neustart innerhalb der zwei Minuten kündigt
+ * einmal, höchstens fünf Minuten danach. seen merkt sich, was schon raus ist.
+ * Plan 43: Mit eigener Gestaltung (boostMessages) als Karte mit Platzhaltern,
+ * Rollen darin pingen, @everyone und @here nicht; ohne sie der bisherige Satz.
+ * ponytail: nur im Speicher; ein Neustart innerhalb der fünf Minuten kündigt
  * ein zweites Mal an.
  */
-export async function AnnounceBoosts(guild: Guild, settings: ILevelSettings, now: number, seen: LRUCache<string, true>): Promise<void> {
+export async function AnnounceBoosts(client: BotClient, guild: Guild, settings: ILevelSettings, now: number, seen: LRUCache<string, true>): Promise<void> {
     if (!settings.boostChannelId || !settings.boosts?.some((boost) => boost.announce)) return;
 
     const channel = guild.channels.cache.get(settings.boostChannelId);
@@ -190,9 +198,18 @@ export async function AnnounceBoosts(guild: Guild, settings: ILevelSettings, now
         if (!occurrence) continue;
 
         const edges = [
-            { at: occurrence.start, live: now < occurrence.end, text: () => `Ab jetzt: **${BoostText(ActiveBoost([boost], now), now)}**.` },
-            { at: occurrence.end, live: true, text: () => `Die ${FactorText(boost.factor)}× XP sind vorbei.` },
+            { at: occurrence.start, live: now < occurrence.end, doc: settings.boostMessages?.start ?? null, text: () => `Ab jetzt: **${BoostText(ActiveBoost([boost], now), now)}**.` },
+            { at: occurrence.end, live: true, doc: settings.boostMessages?.end ?? null, text: () => `Die ${FactorText(boost.factor)}× XP sind vorbei.` },
         ];
+        // {boost} ist der Text vom Beginn - am Ende läuft das Fenster nicht mehr.
+        const values = (): Record<string, string> => ({
+            boost: BoostText(ActiveBoost([boost], occurrence.start), occurrence.start),
+            "boost.factor": FactorText(boost.factor),
+            "boost.start": Stamp(occurrence.start, "F"),
+            "boost.end": Stamp(occurrence.end, "F"),
+            "boost.end.relative": Stamp(occurrence.end, "R"),
+            guild: guild.name,
+        });
 
         for (const [index, edge] of edges.entries()) {
             const key = `${guild.id}:${boost.id}:${occurrence.start}:${index}`;
@@ -200,7 +217,15 @@ export async function AnnounceBoosts(guild: Guild, settings: ILevelSettings, now
             if (!edge.live || now < edge.at || now - edge.at >= ANNOUNCE_WINDOW || seen.has(key)) continue;
 
             seen.set(key, true);
-            await (channel as SendableChannels).send({ content: edge.text(), allowedMentions: { parse: [] } }).catch(() => undefined);
+
+            if (!edge.doc) {
+                await (channel as SendableChannels).send({ content: edge.text(), allowedMentions: { parse: [] } }).catch(() => undefined);
+                continue;
+            }
+
+            const { builder, files } = await RenderDoc(client, edge.doc, values(), { fallback: edge.text() });
+
+            await (channel as SendableChannels).send({ components: [builder.build()], files, flags: MessageFlags.IsComponentsV2, allowedMentions: { parse: ["roles"] } }).catch(() => undefined);
         }
     }
 }

@@ -37,6 +37,7 @@ import { CleanBoardDesign, CleanBoardStyle, CleanDesign } from "./levels/Design"
 import { ActiveBoost, BoostText, CleanBoosts } from "./levels/Boost";
 import { BoardArea, DesignKind, IBoardDesign, IBoardStyle, ICardDesign, IDesignBox } from "../interfaces/services/levels/ILevelDesign";
 import { CleanDoc } from "../builder/MessageDoc";
+import { IMessageDoc } from "../interfaces/builder/IMessageDoc";
 import { IBoardEntry, IBoardPage, ILevelBonus, ILevelEntry, ILevelLogEntry, ILevelSettings, ITopPost, LevelAdjustMode, LevelPeriod } from "../interfaces/services/levels/ILevels";
 import { ILevelDaySum } from "../models/LevelDays";
 import { PeriodDays, PreviousWindow, RankOrder, Trend } from "./levels/Board";
@@ -150,6 +151,16 @@ export default class LevelService {
             };
         };
         const topBefore = previous.top ?? DefaultLevelSettings().top;
+        // Plan 43: Beginn und Ende der Boost-Ankündigung. Leer heißt: der bisherige Satz.
+        const boostRaw = IsRecord(raw.boostMessages) ? raw.boostMessages : {};
+        const boostBefore = previous.boostMessages ?? DefaultLevelSettings().boostMessages;
+        const boostDoc = (value: unknown, before: IMessageDoc | null): IMessageDoc | null => {
+            if (value === undefined) return before;
+
+            const cleaned = value === null ? null : CleanDoc(value, guild.id);
+
+            return cleaned?.blocks.length ? cleaned : null;
+        };
         // Plan 43: die Rangliste fest im Kanal.
         const boardRaw = IsRecord(raw.boardPost) ? raw.boardPost : {};
         const boardBefore = previous.boardPost ?? DefaultLevelSettings().boardPost;
@@ -194,6 +205,7 @@ export default class LevelService {
             boostChannelId: raw.boostChannelId === undefined ? (previous.boostChannelId ?? null) : boostChannel?.isTextBased() ? boostChannel.id : null,
             // Plan 37: Aktivste der Woche und des Monats.
             top: { week: post(top.week, topBefore.week), month: post(top.month, topBefore.month) },
+            boostMessages: { start: boostDoc(boostRaw.start, boostBefore.start), end: boostDoc(boostRaw.end, boostBefore.end) },
             boardPost: {
                 on: typeof boardRaw.on === "boolean" ? boardRaw.on : boardBefore.on,
                 channelId: boardRaw.channelId === undefined ? boardBefore.channelId : boardChannel?.isTextBased() && boardChannel.type !== ChannelType.GuildStageVoice ? boardChannel.id : null,

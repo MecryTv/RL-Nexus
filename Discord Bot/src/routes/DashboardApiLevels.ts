@@ -2,7 +2,7 @@ import { FastifyReply, FastifyRequest } from "fastify";
 import BotClient from "../client/BotClient";
 import Route from "../structures/Route";
 import { DASHBOARD_PATH } from "../constants/Dashboard";
-import { DefaultLevelMessage, LEVEL_PLACEHOLDER_KEYS, LevelProgress, MAX_BONUS, MAX_EXCLUDED, MAX_REWARDS, MAX_UP_LINE, UpMode } from "../constants/Levels";
+import { DefaultBoostMessage, DefaultLevelMessage, LEVEL_PLACEHOLDER_KEYS, LevelProgress, MAX_BONUS, MAX_EXCLUDED, MAX_REWARDS, MAX_UP_LINE, UpMode } from "../constants/Levels";
 import { BOARD_ENTRY_PLACEHOLDERS, BOARD_FRAME_PLACEHOLDERS, BOARD_PLACEHOLDERS, BOARD_TEMPLATES, CARD_TEMPLATES, DESIGN_FONTS, DESIGN_PLACEHOLDERS, DESIGN_SIZE, DefaultBoardStyle, MAX_ELEMENTS, UP_TEMPLATES } from "../constants/LevelDesign";
 import { DesignKind } from "../interfaces/services/levels/ILevelDesign";
 import { ILevelRank } from "../interfaces/services/levels/ILevels";
@@ -110,6 +110,8 @@ export default class DashboardApiLevels extends Route {
         return {
             settings,
             defaultMessage: DefaultLevelMessage(),
+            // Plan 43: die bisherigen Sätze als Vorlage für eigene Boost-Nachrichten.
+            defaultBoostMessages: { start: DefaultBoostMessage("start"), end: DefaultBoostMessage("end") },
             placeholders: LEVEL_PLACEHOLDER_KEYS,
             limits: { rewards: MAX_REWARDS, bonus: MAX_BONUS, excluded: MAX_EXCLUDED, elements: MAX_ELEMENTS, upLine: MAX_UP_LINE },
             // Plan 35: der Designer.
