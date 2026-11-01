@@ -84,6 +84,16 @@ export const LEVEL_PLACEHOLDERS: IPlaceholder[] = [
 
 export const LEVEL_IMAGES: string[] = [];
 
+/** Plan 43: Ankündigung der doppelten Punkte - dieselben Schlüssel wie BOOST_PLACEHOLDER_KEYS im Bot. */
+export const BOOST_PLACEHOLDERS: IPlaceholder[] = [
+    { key: "boost", label: "Das Fenster als Text", sample: "2× XP bis Freitag 23:00" },
+    { key: "boost.factor", label: "Faktor", sample: "2" },
+    { key: "boost.start", label: "Beginn (Discord-Zeit)", sample: "Samstag, 1. November 2026 18:00" },
+    { key: "boost.end", label: "Ende (Discord-Zeit)", sample: "Sonntag, 2. November 2026 23:00" },
+    { key: "boost.end.relative", label: "Ende, relativ", sample: "in 5 Stunden" },
+    { key: "guild", label: "Servername", sample: "Dein Server" },
+];
+
 /** Welcome System - dieselben Schlüssel wie WELCOME_PLACEHOLDER_KEYS im Bot. */
 export const WELCOME_PLACEHOLDERS: IPlaceholder[] = [
     { key: "user", label: "User (Erwähnung)", sample: "@du" },

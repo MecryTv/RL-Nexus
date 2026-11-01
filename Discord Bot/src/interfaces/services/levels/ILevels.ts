@@ -53,6 +53,13 @@ export interface ITopPost {
     roleId: string | null;
 }
 
+/** Plan 43: die Rangliste als feste Nachricht im Kanal - Seite 1 des Zeitraums. */
+export interface IBoardPostSettings {
+    on: boolean;
+    channelId: string | null;
+    period: LevelPeriod;
+}
+
 export interface ILevelSettings {
     /** Punkte je Nachricht - zufällig zwischen min und max. */
     chat: { on: boolean; min: number; max: number; cooldown: number };
@@ -66,8 +73,9 @@ export interface ILevelSettings {
     /** Hier gibt es gar keine Punkte. */
     noChannels: string[];
     noRoles: string[];
-    /** Wo die Aufstiegs-Nachricht landet. */
-    announce: "current" | "channel" | "dm" | "off";
+    /** Wo die Aufstiegs-Nachricht landet. Per DM nicht mehr (W-0043): Gespeichertes „dm“ gilt als „channel“. */
+    announce: "current" | "channel" | "off";
+    /** Pflicht, solange die Nachricht an ist - bei „current“ für Voice und Nachtrag. */
     announceChannelId: string | null;
     /** Die Nachricht selbst - ohne eigene gilt die Vorlage. */
     message: IMessageDoc | null;
@@ -99,8 +107,12 @@ export interface ILevelSettings {
     boosts: ILevelBoost[];
     /** Plan 37: hier kündigt der Bot Beginn und Ende der Fenster an. */
     boostChannelId: string | null;
+    /** Plan 43: Beginn und Ende als eigene Nachricht. null: der bisherige Satz. */
+    boostMessages: { start: IMessageDoc | null; end: IMessageDoc | null };
     /** Plan 37: Aktivste der Woche und des Monats. */
     top: { week: ITopPost; month: ITopPost };
+    /** Plan 43: die Rangliste fest in einem Kanal. */
+    boardPost: IBoardPostSettings;
     /** Plan 38: das Ranglisten-Bild im Baukasten. null: die Vorlage Podium aus boardStyle. */
     boardDesign: IBoardDesign | null;
 }
@@ -189,6 +201,18 @@ export interface ILevelTop {
     /** Was beim letzten Post schiefging. null: nichts. */
     error: string | null;
     postedAt: number;
+}
+
+/** Plan 43: was im Kanal steht. Getrennt von den Einstellungen, damit Speichern die Nachricht nicht vergisst. */
+export interface ILevelBoardPost {
+    guildId: string;
+    channelId: string;
+    /** null: noch keine oder nicht geschickt (error sagt warum). */
+    messageId: string | null;
+    /** Was zuletzt gezeichnet wurde - gleich, dann bleibt die Nachricht stehen. */
+    fingerprint: string;
+    error: string | null;
+    updatedAt: number;
 }
 
 /** Ein Platz in der Rangliste. */

@@ -88,6 +88,14 @@ export function CountsForPoints(content: string): boolean {
 
 export const LEVEL_PLACEHOLDER_KEYS =["user", "user.name", "user.id", "level", "level.old", "xp", "xp.next", "rank", "guild", "channel"] as const;
 
+/** Plan 43: Platzhalter der Boost-Ankündigung - dieselben wie BOOST_PLACEHOLDERS im Dashboard. */
+export const BOOST_PLACEHOLDER_KEYS = ["boost", "boost.factor", "boost.start", "boost.end", "boost.end.relative", "guild"] as const;
+
+/** Plan 43: die bisherigen Sätze, als Vorlage, wenn jemand Beginn oder Ende selbst gestaltet. */
+export function DefaultBoostMessage(edge: "start" | "end"): IMessageDoc {
+    return { accent: LEVELS_ACCENT, blocks: [{ type: "text", body: edge === "start" ? "Ab jetzt: **{boost}**." : "Die {boost.factor}× XP sind vorbei." }] };
+}
+
 export function DefaultLevelSettings(): ILevelSettings {
     return {
         chat: { on: true, min: 15, max: 25, cooldown: 60 },
@@ -111,7 +119,9 @@ export function DefaultLevelSettings(): ILevelSettings {
         boardStyle: DefaultBoardStyle(),
         boosts: [],
         boostChannelId: null,
+        boostMessages: { start: null, end: null },
         top: { week: { on: false, channelId: null, roleId: null }, month: { on: false, channelId: null, roleId: null } },
+        boardPost: { on: false, channelId: null, period: "all" },
         boardDesign: null,
     };
 }

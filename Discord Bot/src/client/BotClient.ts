@@ -72,6 +72,7 @@ import LevelDays from "../models/LevelDays";
 import LevelBackfill from "../models/LevelBackfill";
 import LevelLog from "../models/LevelLog";
 import LevelTop from "../models/LevelTop";
+import LevelBoardPosts from "../models/LevelBoardPosts";
 import CustomMessages from "../models/CustomMessages";
 import AutoResponses from "../models/AutoResponses";
 import Polls from "../models/Polls";
@@ -173,6 +174,7 @@ export default class BotClient extends Client implements IBotClient {
     levelBackfill: LevelBackfill;
     levelLog: LevelLog;
     levelTop: LevelTop;
+    levelBoardPosts: LevelBoardPosts;
     customMessages: CustomMessages;
     autoResponses: AutoResponses;
     polls: Polls;
@@ -320,6 +322,7 @@ export default class BotClient extends Client implements IBotClient {
         this.levelBackfill = new LevelBackfill(this);
         this.levelLog = new LevelLog(this);
         this.levelTop = new LevelTop(this);
+        this.levelBoardPosts = new LevelBoardPosts(this);
         this.customMessages = new CustomMessages(this);
         this.autoResponses = new AutoResponses(this);
         this.polls = new Polls(this);

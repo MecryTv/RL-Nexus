@@ -82,7 +82,8 @@ export async function renderBoard(): Promise<void> {
     const heroHost = el("div", "");
     const controlsHost = el("div", "");
     const bodyHost = el("div", "arena__body");
-    const dockHost = el("div", "");
+    // Die Hülle klebt, nicht die Leiste: allein in ihrer Hülle hätte sie keinen Platz zum Mitrutschen.
+    const dockHost = el("div", "arena__dockhost");
     let period: Period = "all";
     let loaded: IEntry[] = [];
     let last: IBoard | null = null;

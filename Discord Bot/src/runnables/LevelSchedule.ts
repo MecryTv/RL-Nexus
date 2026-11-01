@@ -35,7 +35,7 @@ export default class LevelSchedule extends Runnable {
                 if (settings.top?.week.on) await PostTop(this.client, guild, "week", now);
                 if (settings.top?.month.on) await PostTop(this.client, guild, "month", now);
 
-                await AnnounceBoosts(guild, settings, now, this.seen);
+                await AnnounceBoosts(this.client, guild, settings, now, this.seen);
             } catch (error) {
                 logger.warn(`📈 Level-Zeitplan auf ${guild.id} - ${String(error)}`);
             }

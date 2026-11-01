@@ -2,12 +2,13 @@ import { FastifyReply, FastifyRequest } from "fastify";
 import BotClient from "../client/BotClient";
 import Route from "../structures/Route";
 import { DASHBOARD_PATH } from "../constants/Dashboard";
-import { DefaultLevelMessage, LEVEL_PLACEHOLDER_KEYS, LevelProgress, MAX_BONUS, MAX_EXCLUDED, MAX_REWARDS, MAX_UP_LINE, UpMode } from "../constants/Levels";
+import { DefaultBoostMessage, DefaultLevelMessage, LEVEL_PLACEHOLDER_KEYS, LevelProgress, MAX_BONUS, MAX_EXCLUDED, MAX_REWARDS, MAX_UP_LINE, UpMode } from "../constants/Levels";
 import { BOARD_ENTRY_PLACEHOLDERS, BOARD_FRAME_PLACEHOLDERS, BOARD_PLACEHOLDERS, BOARD_TEMPLATES, CARD_TEMPLATES, DESIGN_FONTS, DESIGN_PLACEHOLDERS, DESIGN_SIZE, DefaultBoardStyle, MAX_ELEMENTS, UP_TEMPLATES } from "../constants/LevelDesign";
 import { DesignKind } from "../interfaces/services/levels/ILevelDesign";
 import { ILevelRank } from "../interfaces/services/levels/ILevels";
 import { LevelError, LEVELS_MODULE } from "../services/LevelService";
 import { IsPeriod } from "../services/levels/BoardMessage";
+import { PostBoard } from "../services/levels/BoardPost";
 import { WantsJSON } from "../utils/admin";
 import { PersonOf, SearchMembers } from "../utils/dashboard";
 import logger from "../utils/logger";
@@ -109,6 +110,8 @@ export default class DashboardApiLevels extends Route {
         return {
             settings,
             defaultMessage: DefaultLevelMessage(),
+            // Plan 43: die bisherigen Sätze als Vorlage für eigene Boost-Nachrichten.
+            defaultBoostMessages: { start: DefaultBoostMessage("start"), end: DefaultBoostMessage("end") },
             placeholders: LEVEL_PLACEHOLDER_KEYS,
             limits: { rewards: MAX_REWARDS, bonus: MAX_BONUS, excluded: MAX_EXCLUDED, elements: MAX_ELEMENTS, upLine: MAX_UP_LINE },
             // Plan 35: der Designer.
@@ -128,6 +131,8 @@ export default class DashboardApiLevels extends Route {
             backfill: await this.client.levelBackfill.Of(guild.id),
             // Plan 37: was beim letzten Post der Aktivsten passiert ist.
             topStatus: { week: await this.client.levelTop.Of(guild.id, "week"), month: await this.client.levelTop.Of(guild.id, "month") },
+            // Plan 43: was im Kanal steht und was zuletzt schiefging.
+            boardPostStatus: await this.client.levelBoardPosts.Of(guild.id),
             guild: { name: guild.name, ...GuildResources(guild) },
         };
     }
@@ -139,11 +144,22 @@ export default class DashboardApiLevels extends Route {
 
         switch (body.action) {
             case "save": {
+                const before = (await service.Settings(guild.id)).boardPost;
                 const settings = await service.Save(guild, body.settings);
 
                 logger.user(`📈 Level-Einstellungen auf ${guild.id} gespeichert (von ${member.id})`);
 
-                return { ok: true, settings };
+                // Plan 43: an, aus, anderer Kanal oder Zeitraum - gleich sichtbar, nicht erst beim nächsten Blick.
+                if (JSON.stringify(before) !== JSON.stringify(settings.boardPost)) await PostBoard(this.client, guild, settings, true);
+
+                return { ok: true, settings, boardPostStatus: await this.client.levelBoardPosts.Of(guild.id) };
+            }
+
+            // Plan 43: „Jetzt neu zeichnen“.
+            case "boardpost.draw": {
+                const result = await PostBoard(this.client, guild, await service.Settings(guild.id), true);
+
+                return { result, boardPostStatus: await this.client.levelBoardPosts.Of(guild.id) };
             }
 
             case "members": {

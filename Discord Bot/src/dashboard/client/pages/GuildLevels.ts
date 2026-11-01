@@ -14,7 +14,7 @@ import { BASE } from "../core/Base.js";
 import { icon, maybe, need } from "../core/Dom.js";
 import { toast } from "../core/Toast.js";
 import { api, button, card, el, IRole, loading, row, select, stat, toggle } from "../core/Ui.js";
-import { LEVEL_IMAGES, LEVEL_PLACEHOLDERS } from "../constants/Placeholders.js";
+import { BOOST_PLACEHOLDERS, LEVEL_IMAGES, LEVEL_PLACEHOLDERS } from "../constants/Placeholders.js";
 import { IServerEmoji } from "../layout/EmojiPicker.js";
 import { IMessageDoc } from "../layout/MessageEditor.js";
 import { bodyEditor, IBody } from "../layout/BodyEditor.js";
@@ -64,7 +64,7 @@ interface ISettings {
     channelBonus: IBonus[];
     noChannels: string[];
     noRoles: string[];
-    announce: "current" | "channel" | "dm" | "off";
+    announce: "current" | "channel" | "off";
     announceChannelId: string | null;
     message: IMessageDoc | null;
     rewards: IReward[];
@@ -78,6 +78,8 @@ interface ISettings {
     /** Plan 37 */
     boosts: IBoost[];
     boostChannelId: string | null;
+    /** Plan 43: Beginn und Ende als eigene Nachricht. null: der bisherige Satz. */
+    boostMessages?: { start: IMessageDoc | null; end: IMessageDoc | null };
     top: { week: ITopPost; month: ITopPost };
 }
 
@@ -123,6 +125,8 @@ interface IRank {
 interface IPayload {
     settings: ISettings;
     defaultMessage: IMessageDoc;
+    /** Plan 43: die bisherigen Sätze als Vorlage, wenn jemand Beginn oder Ende selbst gestaltet. */
+    defaultBoostMessages: { start: IMessageDoc; end: IMessageDoc };
     limits: { rewards: number; bonus: number; excluded: number; upLine: number };
     /** Plan 35: was gilt, auch wenn noch nichts gespeichert ist. */
     upMode: "image" | "text";
@@ -385,7 +389,6 @@ export function renderLevels(guildId: string, view: LevelView = "levels"): void 
             [
                 ["current", "Im Kanal, in dem es passiert"],
                 ["channel", "In einem festen Kanal"],
-                ["dm", "Als Direktnachricht"],
                 ["off", "Gar nicht"],
             ],
             settings.announce,
@@ -403,12 +406,13 @@ export function renderLevels(guildId: string, view: LevelView = "levels"): void 
             (value) => {
                 settings.announceChannelId = value || null;
                 touch();
+                paint();
             },
             "Kanal für die Aufstiegs-Nachricht"
         );
 
-        // Fester Kanal: für „In einem festen Kanal“ und für Aufstiege im Voice bei „Im Kanal, in dem es passiert“.
-        target.disabled = settings.announce === "dm" || settings.announce === "off";
+        // W-0043: Pflicht, solange die Nachricht an ist - per DM geht nichts mehr. Bei „Im Kanal, in dem es passiert“ landen hier Voice und Nachtrag.
+        target.disabled = settings.announce === "off";
 
         const remove = select(
             [
@@ -426,7 +430,7 @@ export function renderLevels(guildId: string, view: LevelView = "levels"): void 
             "Aufstiegs-Nachricht im Chat wieder löschen"
         );
 
-        remove.disabled = settings.announce === "dm" || settings.announce === "off";
+        remove.disabled = settings.announce === "off";
 
         // Plan 35: Bild oder Text. Ohne gespeicherte Wahl gilt, was der Bot sagt (eigene Nachricht: Text, sonst Bild).
         settings.upMode ??= data!.upMode;
@@ -465,9 +469,10 @@ export function renderLevels(guildId: string, view: LevelView = "levels"): void 
         return card(
             "Aufsteigen",
             "Was passiert, wenn jemand ein Level schafft.",
-            row("Nachricht", "Im Kanal, an einer festen Stelle oder per DM", where),
-            row("Fester Kanal", "Für „In einem festen Kanal“. Bei „Im Kanal, in dem es passiert“ landen Aufstiege im Voice hier, ohne festen Kanal per DM", target),
-            row("Wieder löschen", "Nur im Chat, Direktnachrichten bleiben", remove),
+            row("Nachricht", "Im Kanal, in dem es passiert, oder an einer festen Stelle. Per DM schickt der Bot keine", where),
+            row("Kanal", "Pflicht, solange die Nachricht an ist. Bei „Im Kanal, in dem es passiert“ landen hier die Aufstiege aus dem Voice", target),
+            ...(settings.announce !== "off" && !settings.announceChannelId ? [el("p", "hintline", "Noch kein Kanal gewählt. Ohne Kanal kommt keine Aufstiegs-Nachricht, und speichern geht erst mit Kanal.")] : []),
+            row("Wieder löschen", "Die Nachricht verschwindet nach dieser Zeit aus dem Kanal", remove),
             ...(settings.announce === "off" ? [] : [row("Als Bild oder Text", "Das Bild gestaltest du unter Level-Karte › Aufstieg", mode)]),
             ...(settings.announce === "off" || !asImage ? [] : [el("p", "hintline", "Das Bild und die Zeile darüber gestaltest du unter ", studioLink, ".")]),
             ...(settings.announce === "off" || asImage
@@ -723,12 +728,56 @@ export function renderLevels(guildId: string, view: LevelView = "levels"): void 
             "Kanal für die Ankündigungen"
         );
 
+        // Plan 43: Beginn und Ende im Nachrichten-Studio. Aus heißt: der bisherige Satz, ohne Pings.
+        const messages = (settings.boostMessages ??= { start: null, end: null });
+        const values: Record<string, string> = Object.fromEntries(BOOST_PLACEHOLDERS.map((entry) => [entry.key, entry.sample]));
+        const announcement = (edge: "start" | "end", label: string, plain: string): HTMLElement[] => {
+            const doc = messages[edge];
+            const own = el(
+                "label",
+                "snitem__switch",
+                toggle(Boolean(doc), `Eigene Nachricht: ${label}`, (on) => {
+                    messages[edge] = on ? structuredClone(data!.defaultBoostMessages[edge]) : null;
+                    touch();
+                    paint();
+                }),
+                el("span", "", doc ? "an" : "aus")
+            );
+
+            if (!doc) return [row(label, `Aus: „${plain}“`, own)];
+
+            const body: IBody = { kind: "v2", content: "", embed: null, doc };
+
+            return [
+                row(label, "Rollen in der Nachricht werden angepingt, @everyone und @here nicht", own),
+                bodyEditor(body, {
+                    pageSave: () => save,
+                    kinds: { v2: "Karte" },
+                    title: label,
+                    touch,
+                    context: () => ({
+                        guildId,
+                        values,
+                        roles: new Map(data!.guild.roles.map((role) => [role.id, role.name])),
+                        channels: new Map(data!.guild.channels.map((entry) => [entry.id, entry.name])),
+                        emojis: data!.guild.emojis,
+                        placeholders: BOOST_PLACEHOLDERS,
+                        imagePlaceholders: [],
+                        onChange: () => undefined,
+                    }),
+                    defaultEmbed: () => ({ title: null, description: null, color: null, url: null, image: null, thumbnail: null, author: null, footer: null, timestamp: false, fields: [] }),
+                }).node,
+            ];
+        };
+
         return card(
             "Doppelte Punkte",
             "Zu festen Zeiten bringen Nachrichten und Voice-Minuten mehr, zusätzlich zu den Boni. Überschneiden sich zwei Fenster, gilt das höhere. Wöchentliche Zeiten sind deutsche Zeit, 22:00 bis 02:00 geht über Mitternacht.",
             row("Zeitfenster", `Bis ${MAX_BOOSTS} Stück, Faktor 1,1 bis 3`, box),
             row("Ankündigen in", "Für Fenster mit „ankündigen“: Beginn und Ende. Ohne Kanal sagt der Bot nichts", channel),
-            el("p", "hintline", "Solange ein Fenster läuft, zeigt {boost} auf Level-Karte und Aufstiegs-Bild etwa „2× XP bis Freitag 23:00“. Einmalige Fenster, die vorbei sind, verschwinden beim Speichern.")
+            ...announcement("start", "Nachricht zum Beginn", "Ab jetzt: 2× XP bis Freitag 23:00."),
+            ...announcement("end", "Nachricht zum Ende", "Die 2× XP sind vorbei."),
+            el("p", "hintline", "Solange ein Fenster läuft, zeigt {boost} auf Level-Karte und Aufstiegs-Bild etwa „2× XP bis Freitag 23:00“. In den eigenen Nachrichten gibt es dazu {boost.factor}, {boost.start}, {boost.end} und {boost.end.relative}. Einmalige Fenster, die vorbei sind, verschwinden beim Speichern.")
         );
     }
 

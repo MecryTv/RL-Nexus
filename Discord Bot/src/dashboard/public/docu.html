@@ -986,7 +986,11 @@ WTSI   = TS_2s × Rel_2s + TS_3s × Rel_3s</code></pre>
   <p>
     <b>Doppelte Punkte</b> stellst du unter <b>Level System</b> ein. Wöchentliche Fenster sind deutsche Zeit, 22:00 bis
     02:00 geht über Mitternacht. Auf Wunsch sagt der Bot Beginn und Ende in einem Kanal an, und auf Level-Karte und
-    Aufstiegs-Bild zeigt <code>{boost}</code> solange zum Beispiel „2× XP bis Freitag 23:00“.
+    Aufstiegs-Bild zeigt <code>{boost}</code> solange zum Beispiel „2× XP bis Freitag 23:00“. Beginn und Ende kannst du
+    im Nachrichten-Studio selbst gestalten, eine Gestaltung für alle Fenster, mit <code>{boost}</code>,
+    <code>{boost.factor}</code>, <code>{boost.start}</code>, <code>{boost.end}</code>, <code>{boost.end.relative}</code>
+    und <code>{guild}</code>. Rollen darin werden angepingt, <code>@everyone</code> und <code>@here</code> nicht. Ohne
+    eigene Gestaltung kommt der bisherige Satz.
   </p>
   <p>
     Beim Start hat der Bot einmal nachgetragen, was die Server-Übersicht vorher getrackt hatte. Was dabei passiert ist,
@@ -996,7 +1000,7 @@ WTSI   = TS_2s × Rel_2s + TS_3s × Rel_3s</code></pre>
   <h3>Aufsteigen</h3>
   <ul class="doc__bullets">
     <li><b>Belohnungsrollen:</b> bis zu 25, je eine ab einem Level. Entweder bleiben alle erreichten Rollen, oder nur die höchste. <b>Rollen nachtragen</b> vergibt fehlende Rollen an alle, die das Level schon haben.</li>
-    <li><b>Die Nachricht:</b> unter <b>Belohnungen</b>: im Kanal, in dem es passiert, in einem festen Kanal, per DM oder gar nicht, im Chat auf Wunsch nach 1 bis 60 Minuten wieder gelöscht. Wer mehrere Level auf einmal schafft, bekommt eine Nachricht. Aufstiege im Sprachkanal gehen in den festen Kanal, ohne ihn per DM. Platzhalter: <code>{user}</code>, <code>{level}</code>, <code>{level.old}</code>, <code>{xp}</code>, <code>{xp.next}</code>, <code>{rank}</code>, <code>{channel}</code>.</li>
+    <li><b>Die Nachricht:</b> unter <b>Belohnungen</b>: im Kanal, in dem es passiert, in einem festen Kanal oder gar nicht, auf Wunsch nach 1 bis 60 Minuten wieder gelöscht. Per DM schickt der Bot keine. Solange die Nachricht an ist, muss ein fester Kanal gewählt sein: Dorthin gehen die Aufstiege im Sprachkanal. Wer mehrere Level auf einmal schafft, bekommt eine Nachricht. Platzhalter: <code>{user}</code>, <code>{level}</code>, <code>{level.old}</code>, <code>{xp}</code>, <code>{xp.next}</code>, <code>{rank}</code>, <code>{channel}</code>.</li>
     <li><b>Als Bild oder Text:</b> Standard ist das Aufstiegs-Bild mit einer Zeile darüber (<code>{user}</code>, gepingt wird nur die Person). Wer schon eine eigene Text-Nachricht gestaltet hat, bleibt bei Text. Klappt das Bild einmal nicht, kommt die Text-Nachricht.</li>
     <li><b>Aktivste der Woche und des Monats:</b> ebenfalls unter <b>Belohnungen</b>. Montags um 18 Uhr postet der Bot das Podium der Vorwoche, am 1. um 18 Uhr das des Vormonats, als Ranglisten-Bild in einen Kanal deiner Wahl. Auf Wunsch bekommt Platz 1 bis 3 eine Rolle, die beim nächsten Post weiterwandert. Klappt etwas nicht, etwa weil der Kanal weg ist, steht der Grund im Dashboard.</li>
   </ul>
@@ -1019,11 +1023,19 @@ WTSI   = TS_2s × Rel_2s + TS_3s × Rel_3s</code></pre>
   <p>
     <code>/level rang</code> zeigt den eigenen Stand als Bild. <code>/level rangliste</code> zeigt die Besten als Bild
     mit Podium: Lifetime, die letzten 7 oder 30 Tage, zehn je Seite, mit Knöpfen zum Blättern und für die eigene Seite.
+    Steht man nicht auf der gezeigten Seite, kommt unter die Liste eine hervorgehobene Zeile mit dem eigenen Platz.
     Der Pfeil neben jedem Platz zeigt, wie viele Plätze jemand seit sieben Tagen gestiegen oder gefallen ist. Im
     Dashboard unter <b>Rangliste</b> stehen alle mit Level, Punkten, Nachrichten und Voice-Zeit, ebenfalls in den drei
     Zeiträumen; die Liste zieht von selbst nach, sobald jemand Punkte sammelt. Dort gibst, ziehst oder setzt du auch Punkte von Hand,
     jeweils mit Grund. Jede solche Änderung, auch mit <code>/level punkte</code>, steht im <b>Protokoll</b> darunter und
     bleibt 180 Tage.
+  </p>
+  <p>
+    <b>Rangliste im Kanal:</b> Ebenfalls unter <b>Rangliste</b> stellst du sie fest in einen Kanal, mit Zeitraum. Der Bot
+    schickt Seite 1 als Bild und sieht alle 10 Minuten nach; nur wenn sich etwas geändert hat, zeichnet er neu. Darunter
+    stehen alle Knöpfe samt <b>Meine Karte</b>. Jeder Klick öffnet eine Ansicht nur für den, der klickt, die Nachricht
+    im Kanal bleibt bei Seite 1. Wird sie gelöscht, kommt sie beim nächsten Blick neu. Ausschalten löscht sie. Der Bot
+    braucht im Kanal: Nachrichten senden, Dateien anhängen, Verlauf lesen.
   </p>
   <p>
     Auf Wunsch ist die Rangliste öffentlich unter <code>/rangliste/&lt;server&gt;</code>: mit Podium, allen Plätzen,

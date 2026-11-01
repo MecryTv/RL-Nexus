@@ -4,7 +4,8 @@
  * Steht in der Leiste unter dem Level System, so wie Live Tickets unter dem
  * Ticket System. Hier stehen die Plätze, der Schalter für die öffentliche
  * Liste und die Punkte, die von Hand vergeben werden - mit Grund und, seit
- * Plan 37, dem Protokoll aller Änderungen von Hand.
+ * Plan 37, dem Protokoll aller Änderungen von Hand. Plan 43: die Rangliste
+ * fest in einem Kanal.
  */
 
 import { BASE } from "../core/Base.js";
@@ -53,11 +54,28 @@ interface IRank {
     voiceMinutes: number;
 }
 
+/** Plan 43: die Rangliste fest im Kanal. */
+interface IBoardPost {
+    on: boolean;
+    channelId: string | null;
+    period: Period;
+}
+
+/** Plan 43: was im Kanal steht, wie LevelBoardPosts.Of es liefert. */
+interface IBoardPostStatus {
+    channelId: string;
+    messageId: string | null;
+    error: string | null;
+    updatedAt: number;
+}
+
 interface IPayload {
-    settings: { public: boolean; [key: string]: unknown };
+    settings: { public: boolean; boardPost?: IBoardPost; [key: string]: unknown };
     page: number;
     total: number;
     top: IRank[];
+    boardPostStatus?: IBoardPostStatus | null;
+    guild: { channels: { id: string; name: string }[] };
 }
 
 /** Plan 37: ein Eintrag im Protokoll, wie LevelService.Log ihn liefert. */
@@ -87,6 +105,8 @@ export function renderLeaderboard(guildId: string): void {
     let chosen: IPerson | null = null;
     let page = 1;
     let period: Period = "all";
+    /** Plan 43: Entwurf der Rangliste im Kanal - „Speichern“ schickt nur diesen Teil. */
+    let post: IBoardPost | null = null;
 
     /* ------------------------------------------------------------
        Kopf und öffentliche Liste
@@ -131,6 +151,120 @@ export function renderLeaderboard(guildId: string): void {
             "An heißt: jeder mit dem Link sieht die Liste – ohne Anmeldung, ohne Discord-Konto. Zu sehen sind Platz, Name, Bild, Level, Punkte, Nachrichten und Voice-Zeit. Wer mit Discord angemeldet ist, sieht dazu seinen eigenen Platz.",
             row("Öffentlich", "Gilt sofort", el("label", "snitem__switch", box, el("span", "", data!.settings.public ? "an" : "aus"))),
             ...(data!.settings.public ? [el("div", "lvlink", el("code", "lvlink__url", link), copy, open)] : [])
+        );
+    }
+
+    /* ------------------------------------------------------------
+       Rangliste im Kanal (Plan 43)
+       ------------------------------------------------------------ */
+    function postCard(): HTMLElement {
+        const saved: IBoardPost = data!.settings.boardPost ?? { on: false, channelId: null, period: "all" };
+        const draft = (post ??= { ...saved });
+        const status = data!.boardPostStatus ?? null;
+        const changed = JSON.stringify(draft) !== JSON.stringify(saved);
+        const when = (at: number) => new Date(at).toLocaleString("de-DE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+        const channel = select(
+            [["", "— Kanal wählen —"], ...data!.guild.channels.map((entry): [string, string] => [entry.id, `# ${entry.name}`])],
+            draft.channelId ?? "",
+            (value) => {
+                draft.channelId = value || null;
+                paint();
+            },
+            "Kanal für die Rangliste"
+        );
+        const range = select(
+            (Object.keys(PERIOD_LABEL) as Period[]).map((key): [string, string] => [key, PERIOD_LABEL[key]]),
+            draft.period,
+            (value) => {
+                draft.period = value as Period;
+                paint();
+            },
+            "Zeitraum der Rangliste im Kanal"
+        );
+        const save = button("btn btn--primary", "Speichern");
+        const redraw = button("btn btn--quiet", icon("#i-refresh"), "Jetzt neu zeichnen");
+        const open = el("a", "btn btn--quiet", icon("#i-external"), "Zur Nachricht") as HTMLAnchorElement;
+        const shown = saved.on && status?.messageId ? status : null;
+
+        channel.disabled = range.disabled = !draft.on;
+        save.disabled = !changed;
+        redraw.disabled = !saved.on || changed;
+
+        if (shown) {
+            open.href = `https://discord.com/channels/${encodeURIComponent(guildId)}/${shown.channelId}/${shown.messageId}`;
+            open.target = "_blank";
+            open.rel = "noopener";
+        }
+
+        save.addEventListener("click", async () => {
+            save.disabled = true;
+
+            // Nur dieser Teil - so überschreibt die Seite nichts, was anderswo gerade geändert wurde.
+            const answer = await call<{ settings: IPayload["settings"]; boardPostStatus: IBoardPostStatus | null }>("", { action: "save", settings: { boardPost: draft } });
+
+            if (!answer) {
+                save.disabled = false;
+
+                return;
+            }
+
+            data!.settings = answer.settings;
+            data!.boardPostStatus = answer.boardPostStatus;
+            post = null;
+
+            const error = answer.boardPostStatus?.error;
+
+            toast("info", draft.on ? "Rangliste im Kanal an" : "Rangliste im Kanal aus", error ?? (draft.on ? "Die Nachricht steht im Kanal." : "Die Nachricht ist gelöscht."));
+            paint();
+        });
+
+        redraw.addEventListener("click", async () => {
+            redraw.disabled = true;
+
+            const answer = await call<{ result: string; boardPostStatus: IBoardPostStatus | null }>("", { action: "boardpost.draw" });
+
+            if (!answer) {
+                redraw.disabled = false;
+
+                return;
+            }
+
+            data!.boardPostStatus = answer.boardPostStatus;
+            toast("info", answer.result === "failed" ? "Nicht gezeichnet" : "Neu gezeichnet", answer.boardPostStatus?.error ?? (answer.result === "sent" ? "Die Nachricht war weg und steht jetzt neu im Kanal." : "Die Nachricht im Kanal ist auf dem neuesten Stand."));
+            paint();
+        });
+
+        const state = !saved.on
+            ? []
+            : [
+                  el(
+                      "p",
+                      `hintline${status?.error ? " is-warn" : ""}`,
+                      status?.messageId ? `Zuletzt gezeichnet am ${when(status.updatedAt)}. Alle 10 Minuten sieht der Bot nach und zeichnet neu, wenn sich etwas geändert hat.` : "Noch nicht im Kanal.",
+                      status?.error ? ` ${status.error}` : ""
+                  ),
+              ];
+
+        return card(
+            "Rangliste im Kanal",
+            "Seite 1 als Bild, fest in einem Kanal – wie /level rangliste und mit der Gestaltung aus Level-Karte › Rangliste. Die Knöpfe darunter öffnen jedem eine eigene Ansicht, die Nachricht selbst bleibt bei Seite 1.",
+            row(
+                "Im Kanal zeigen",
+                "Ausschalten löscht die Nachricht",
+                el(
+                    "label",
+                    "snitem__switch",
+                    toggle(draft.on, "Rangliste im Kanal", (on) => {
+                        draft.on = on;
+                        paint();
+                    }),
+                    el("span", "", draft.on ? "an" : "aus")
+                )
+            ),
+            row("Kanal", "Der Bot braucht dort: Nachrichten senden, Dateien anhängen, Verlauf lesen", channel),
+            row("Zeitraum", "Welche Punkte zählen", range),
+            ...state,
+            el("div", "mcsave", ...(shown ? [open] : []), redraw, save)
         );
     }
 
@@ -330,7 +464,7 @@ export function renderLeaderboard(guildId: string): void {
 
         headNode = head();
         boardNode = board();
-        host.replaceChildren(headNode, publicCard(), boardNode, manage(), logCard());
+        host.replaceChildren(headNode, publicCard(), postCard(), boardNode, manage(), logCard());
     }
 
     /**
@@ -423,6 +557,7 @@ export function renderLeaderboard(guildId: string): void {
             if (!answer) return;
 
             data = answer;
+            post = null;
             void call<{ entries: ILogEntry[] }>("", { action: "log" }).then((entries) => {
                 log = entries?.entries ?? [];
                 void loadBoard(next);

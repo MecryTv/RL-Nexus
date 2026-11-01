@@ -49,6 +49,8 @@ Plan 37. Unter *Level System* legt der Server bis zu **10 Zeitfenster** an: **ei
 
 Auf Wunsch kündigt der Bot Beginn und Ende in einem Kanal an („Ab jetzt: **2× XP bis 23:00**.“, „Die 2× XP sind vorbei.“). Das macht der Minutenlauf `LevelSchedule`, höchstens fünf Minuten nach Beginn bzw. Ende; nach einem Neustart mitten im Fenster kommt keine verspätete Ankündigung. Einmalige Fenster, die vorbei sind, verschwinden beim nächsten Speichern.
 
+**Eigene Nachricht** (Plan 43): Beginn und Ende lassen sich unabhängig voneinander im Nachrichten-Studio gestalten (Schalter „Nachricht zum Beginn“ bzw. „zum Ende“, Vorlage ist der bisherige Satz). Eine Gestaltung gilt für alle Fenster. Platzhalter: `{boost}` („2× XP bis 23:00“, beim Ende der Text vom Beginn), `{boost.factor}` („2“), `{boost.start}` und `{boost.end}` (Discord-Zeit, jeder sieht seine Zeitzone), `{boost.end.relative}` („in 3 Stunden“), `{guild}`. Rollen in der Nachricht werden angepingt, `@everyone` und `@here` nicht. Ohne eigene Nachricht kommt der bisherige Satz, ganz ohne Pings.
+
 Auf Level-Karte und Aufstiegs-Bild zeigt `{boost}` während eines Fensters „2× XP bis Freitag 23:00“ (am selben Tag nur die Uhrzeit, in mehr als sechs Tagen das Datum), sonst nichts. Die Rechnung steht ohne Discord in `services/levels/Boost.ts`.
 
 ### Nachtrag aus der Server-Übersicht
@@ -78,7 +80,7 @@ Wer genug Punkte hat, steigt auf. Dann passiert zweierlei:
 
 Im Dashboard gibt es dazu **Rollen nachtragen**: Der Bot geht alle durch, die das Level schon haben, und vergibt, was fehlt — praktisch, wenn ihr eine Rolle später hinzufügt.
 
-**Die Nachricht** — im Kanal, in dem es passiert, in einem festen Kanal, per DM oder gar nicht. Je Gutschrift kommt höchstens **eine** Nachricht, auch bei einem Sprung über mehrere Level („0 → 12“). Steigt jemand im Voice auf oder durch den Nachtrag, gibt es keinen Chat, in dem es passiert: dann der feste Kanal, ohne ihn per DM. Im Chat lässt sich die Nachricht nach 1, 5, 15 oder 60 Minuten wieder löschen (nach einem Neustart bleibt sie stehen). Ist der Kanal weg, geht sie per DM. Geschrieben wird sie im selben Editor wie alle anderen Nachrichten des Bots; darüber stehen **Vorlagen** zum Anklicken (Standard, Laut, Nüchtern, Esports), mit „Zurück" für den Stand davor. Diese Platzhalter kennt sie:
+**Die Nachricht** — im Kanal, in dem es passiert, in einem festen Kanal oder gar nicht. Per DM schickt der Bot keine (seit W-0043; wer das gewählt hatte, bekommt sie im festen Kanal). Solange die Nachricht an ist, ist der feste Kanal Pflicht, ohne ihn lässt sich nicht speichern. Je Gutschrift kommt höchstens **eine** Nachricht, auch bei einem Sprung über mehrere Level („0 → 12“). Steigt jemand im Voice auf oder durch den Nachtrag, gibt es keinen Chat, in dem es passiert: dann der feste Kanal. Die Nachricht lässt sich nach 1, 5, 15 oder 60 Minuten wieder löschen (nach einem Neustart bleibt sie stehen). Ist der Kanal weg, kommt keine Nachricht. Geschrieben wird sie im selben Editor wie alle anderen Nachrichten des Bots; darüber stehen **Vorlagen** zum Anklicken (Standard, Laut, Nüchtern, Esports), mit „Zurück" für den Stand davor. Diese Platzhalter kennt sie:
 
 | | | | |
 |---|---|---|---|
@@ -168,6 +170,18 @@ Unsere Schriften kennen keinen Pfeil – „→“ zeichnet der Bot als Linie mi
 
 ---
 
+## Rangliste im Kanal
+
+Plan 43. Dashboard › *Rangliste* › **Rangliste im Kanal**: Schalter, Kanal und Zeitraum (Lifetime, 7 Tage, 30 Tage). Der Bot stellt Seite 1 als Bild in den Kanal – dasselbe Bild wie `/level rangliste`, mit der Gestaltung aus Level-Karte › Rangliste, ohne Zusatzzeile. Darunter alle Knöpfe: Lifetime, 7 Tage, 30 Tage, ◀ Zurück, Seite x von y, Weiter ▶, Meine Seite und **Meine Karte**.
+
+- **Die Knöpfe gehören niemandem** (Besitzer `kanal` in der ID). Jeder Klick öffnet eine Ansicht nur für den Klickenden, die Nachricht im Kanal bleibt bei Seite 1. „Meine Karte“ antwortet mit der eigenen Level-Karte wie `/level rang`.
+- **Alle 10 Minuten** sieht der Runnable `LevelBoards` nach: Hat sich der Fingerabdruck geändert (Plätze, Punkte, Level, Namen, Avatare, Zeitraum, Gestaltung, Name und Icon des Servers), wird neu gezeichnet und die Nachricht bearbeitet, sonst nichts. Server kommen nacheinander, nach jeder Nachricht eine Sekunde Pause.
+- **Gelöscht?** Beim nächsten Blick schickt der Bot sie neu. Nur „Unknown Message“ zählt als gelöscht; antwortet Discord gerade nicht, wartet er bis zum nächsten Blick, statt eine zweite zu schicken.
+- **Ausschalten, Kanal wechseln oder das Level System ausschalten** löscht die alte Nachricht. Speichern im Dashboard zeichnet sofort, wenn sich an der Rangliste im Kanal etwas geändert hat; „Jetzt neu zeichnen“ zeichnet immer.
+- **Rechte im Kanal:** Nachrichten senden, Dateien anhängen, Verlauf lesen. Fehlt etwas, steht es im Dashboard unter dem Block („Ich darf im Kanal nicht posten …“), und der nächste Blick versucht es wieder.
+
+Der Zustand (Kanal, Nachricht, Fingerabdruck, Fehler, zuletzt gezeichnet) steht in `level_board_posts`, getrennt von den Einstellungen – so vergisst Speichern im Dashboard die Nachricht nicht.
+
 ## Rangliste ohne Anmeldung
 
 Jeder Server kann seine Rangliste öffentlich stellen: Dashboard › *Rangliste* › **Öffentlich**. Dann liegt sie unter
@@ -185,7 +199,7 @@ Die Seite (Plan 34, Variante A „Arena“):
 - **Podium** für Platz 1 bis 3, darunter alle weiteren Plätze mit Level, Fortschritt, Punkten (immer beschriftet) und Trend. **Weitere Plätze laden** holt je 50, bis alle da sind.
 - Die Seite holt **jede Minute** den neuen Stand, ohne Neuladen. (Die Rangliste im Dashboard zieht schneller nach, siehe unten.)
 - **Kopf im Stil des Ranglisten-Bilds** (Plan 35): Hintergrund aus der Galerie, abgedunkelt, und der Akzent als Schein. Die API gibt dafür `style` mit der öffentlichen `/images/…`-Adresse heraus – nur Galerie-Pfade.
-- **Eigener Platz:** Wer im Dashboard mit Discord angemeldet ist, sieht unten eine Leiste mit seinem Platz (Cyan) und „Zu meinem Platz“; die eigene Zeile trägt „Du“. Steht sie gerade im Bild, blendet sich die Leiste aus. Ohne Anmeldung steht dort „Mit Discord anmelden“.
+- **Eigener Platz:** Wer im Dashboard mit Discord angemeldet ist, sieht unten eine Leiste mit seinem Platz (Cyan) und „Zu meinem Platz“; die eigene Zeile trägt „Du“. Die Leiste klebt beim Scrollen am unteren Rand (Plan 43: die Hülle `arena__dockhost` klebt, nicht die Leiste selbst). Steht die eigene Zeile gerade im Bild, blendet sich die Leiste aus. Ohne Anmeldung steht dort „Mit Discord anmelden“.
 - **Vorschau beim Teilen:** Open-Graph-Tags mit dem Podium-Bild (`/rangliste/<id>/bild.png`), nur solange die Rangliste öffentlich ist. Der Servername darin ist entschärft.
 
 Zu sehen sind Platz, Anzeigename, Profilbild, Level, Punkte, Nachrichten und Voice-Zeit, sonst nichts – auch keine Discord-IDs; die eigene Zeile erkennt die Seite an `me`. Die Antwort hängt am Cookie (`Vary: Cookie`), nach dem Anmelden kommt also nicht die alte aus dem Cache. Die Aktualisierung wartet, solange jemand sucht oder nachlädt; Steuerung und Suchfeld bleiben stehen. Antworten mit eigenem Platz sind persönlich (`Cache-Control: private, no-store`), alle anderen werden 60 Sekunden öffentlich gecacht.
@@ -201,6 +215,8 @@ Zu sehen sind Platz, Anzeigename, Profilbild, Level, Punkte, Nachrichten und Voi
 | `/level punkte aktion user [punkte] [grund]` | Plan 37: Punkte von Hand – geben, abziehen, setzen, zurücksetzen. Nur mit „Server verwalten“; ohne antwortet der Bot nur dem Fragenden und ändert nichts. Die Antwort sieht nur, wer fragt |
 
 Drückt jemand anderes als der Fragende einen Knopf, bekommt er die Seite als eigene Antwort, die nur er sieht – die Nachricht im Kanal bleibt. Eine Seite außerhalb des Bereichs (alter Knopf) wird auf die letzte geklemmt. Hat im Zeitraum niemand Punkte, kommt ein kurzer Text nur für den Fragenden.
+
+**Die eigene Zeile** (Plan 43): Steht der Betrachter nicht auf der gezeigten Seite, hat aber Punkte im Zeitraum, hängt das Bild unter die Liste mit etwas Abstand eine weitere, hervorgehobene Zeile mit ihm (in Spalte 1, mit der Farbe zum Hervorheben aus dem Design). Das Bild wird um diese Zeile höher. Das gilt für `/level rangliste` und jede persönliche Ansicht, nicht für die Rangliste im Kanal.
 
 Beide Bilder werden mit `@napi-rs/canvas` gezeichnet, in denselben Schriften wie die Rang-Karte. Wie sie aussehen, stellt der Server im Designer ein (siehe oben); `/level rang` nimmt das eigene Design, sonst die bisherige Karte.
 
@@ -265,7 +281,8 @@ Anfang wie überall: `ManageGate()` (`utils/managegate.ts`) — Sitzung, „Serv
 | Ranglisten-Baukasten | `IBoardDesign` in den Einstellungen (`boardDesign`), Vorlagen `BOARD_TEMPLATES`, Prüfung `CleanBoardDesign`, Zeichnen `builder/BoardRenderer.ts` (Bausteine über `DrawElements` aus `DesignRenderer.ts`), `LevelService.BoardImage` / `PerPage` / `BoardDesignPreview` / `SaveBoardDesign` |
 | Designer | Typen `interfaces/services/levels/ILevelDesign.ts`, Größen und Vorlagen `constants/LevelDesign.ts`, Prüfung `services/levels/Design.ts`, Zeichnen `builder/DesignRenderer.ts`; gespeichert in den Level-Einstellungen (`cardDesign`, `upDesign`, `upMode`, `upLine`, `boardStyle`). Dashboard: `layout/Studio.ts` (Hülle), `layout/StudioCore.ts` (Rechnen ohne DOM), `layout/LevelStudio.ts`, `pages/GuildLevelCard.ts`, Feldlisten `constants/LevelFields.ts` |
 | Live | `LevelService.Changed()` → `PulseService.Emit(…, "levels")`; Dashboard `onPulse` in `pages/GuildLeaderboard.ts` |
-| Doppelte Punkte | Einstellungen `boosts`, `boostChannelId`; Rechnung `services/levels/Boost.ts` (`Occurrence`, `ActiveBoost`, `BoostText`, `CleanBoosts`), wirkt in `LevelService.Factor` |
+| Doppelte Punkte | Einstellungen `boosts`, `boostChannelId`, `boostMessages` (Plan 43); Rechnung `services/levels/Boost.ts` (`Occurrence`, `ActiveBoost`, `BoostText`, `CleanBoosts`), wirkt in `LevelService.Factor`; Platzhalter `BOOST_PLACEHOLDER_KEYS`, Vorlage `DefaultBoostMessage` |
+| Rangliste im Kanal | Einstellungen `boardPost`; `level_board_posts` (Migration 046, `models/LevelBoardPosts.ts`), `services/levels/BoardPost.ts` (`BoardFingerprint`, `PostBoard`), `BoardChannelPayload` und `lv:card` in `BoardMessage.ts`, Runnable `LevelBoards` (10 Min.), Dashboard-Aktion `boardpost.draw` |
 | Aktivste | Einstellungen `top`; `level_top` (Migration 045), `services/levels/Top.ts` (`TopDue`, `PostTop`, `AnnounceBoosts`), Runnable `LevelSchedule` (jede Minute) |
 | Protokoll | `level_log` (Migration 045), `LevelService.Adjust()` / `Log()`, `ActivityPrune` nach 180 Tagen |
 
@@ -274,8 +291,8 @@ Anfang wie überall: `ManageGate()` (`utils/managegate.ts`) — Sitzung, „Serv
 ## Prüfen
 
 ```bash
-npm run check:levels   # Kurve, Einstellungen, Karte, immer an, Zählen und Farm-Schutz, Aufstieg, Nachtrag, Zeiträume und Trend, Ranglisten-Bild und Knöpfe, Dashboard-Route, Web-Rangliste; Plan 35: Karte und Aufstieg mit Design, Ranglisten-Stil, Designer-API, Live-Puls; Plan 37: doppelte Punkte, Punkte von Hand und /level punkte, Aktivste und Ankündigungen; mit Datenbank: Rangliste, Belohnungsrollen, Protokoll und level_top
-npm run check:leveldesign   # Plan 35: Designs prüfen, Vorlagen, Zeichnen samt Rahmen, gelöschtes Galeriebild, lange Namen; Plan 38: Ranglisten-Baukasten (Modell, Vorlagen, Bereiche, Zeichnen)
+npm run check:levels   # Kurve, Einstellungen, Karte, immer an, Zählen und Farm-Schutz, Aufstieg, Nachtrag, Zeiträume und Trend, Ranglisten-Bild und Knöpfe, Dashboard-Route, Web-Rangliste; Plan 35: Karte und Aufstieg mit Design, Ranglisten-Stil, Designer-API, Live-Puls; Plan 37: doppelte Punkte, Punkte von Hand und /level punkte, Aktivste und Ankündigungen; Plan 43: Aufstieg ohne DM, Rangliste im Kanal, gestaltete Boost-Ankündigung; mit Datenbank: Rangliste, Belohnungsrollen, Protokoll, level_top und level_board_posts
+npm run check:leveldesign   # Plan 35: Designs prüfen, Vorlagen, Zeichnen samt Rahmen, gelöschtes Galeriebild, lange Namen; Plan 38: Ranglisten-Baukasten (Modell, Vorlagen, Bereiche, Zeichnen); Plan 43: Zusatzzeile mit dem Betrachter
 npm run check:studio        # Plan 36: Rückgängig und Wiederholen, Einrasten, Klemmen, Eckgriffe, Tastenkürzel
 ```
 
