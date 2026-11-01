@@ -73,6 +73,9 @@ import LevelBackfill from "../models/LevelBackfill";
 import LevelLog from "../models/LevelLog";
 import LevelTop from "../models/LevelTop";
 import LevelBoardPosts from "../models/LevelBoardPosts";
+import StaffGrants from "../models/StaffGrants";
+import StaffGrantLog from "../models/StaffGrantLog";
+import StaffGrantService from "../services/StaffGrantService";
 import CustomMessages from "../models/CustomMessages";
 import AutoResponses from "../models/AutoResponses";
 import Polls from "../models/Polls";
@@ -136,6 +139,7 @@ export default class BotClient extends Client implements IBotClient {
     rankRoleService: RankRoleService;
     lookingForService: LookingForService;
     pulseService: PulseService;
+    staffGrantService: StaffGrantService;
     presenceService: PresenceService;
     rankIconService: RankIconService;
     matchupService: MatchupService;
@@ -175,6 +179,8 @@ export default class BotClient extends Client implements IBotClient {
     levelLog: LevelLog;
     levelTop: LevelTop;
     levelBoardPosts: LevelBoardPosts;
+    staffGrants: StaffGrants;
+    staffGrantLog: StaffGrantLog;
     customMessages: CustomMessages;
     autoResponses: AutoResponses;
     polls: Polls;
@@ -286,6 +292,7 @@ export default class BotClient extends Client implements IBotClient {
         this.rankRoleService = new RankRoleService(this);
         this.lookingForService = new LookingForService(this);
         this.pulseService = new PulseService(this);
+        this.staffGrantService = new StaffGrantService(this);
         this.presenceService = new PresenceService(this);
         this.rankIconService = new RankIconService(this);
         this.matchupService = new MatchupService(this);
@@ -323,6 +330,8 @@ export default class BotClient extends Client implements IBotClient {
         this.levelLog = new LevelLog(this);
         this.levelTop = new LevelTop(this);
         this.levelBoardPosts = new LevelBoardPosts(this);
+        this.staffGrants = new StaffGrants(this);
+        this.staffGrantLog = new StaffGrantLog(this);
         this.customMessages = new CustomMessages(this);
         this.autoResponses = new AutoResponses(this);
         this.polls = new Polls(this);

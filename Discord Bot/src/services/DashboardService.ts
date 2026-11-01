@@ -662,7 +662,7 @@ export default class DashboardService implements IDashboardService {
      * Beta-Modus (shop_settings.access_mode = 'beta'), eine Minute gemerkt. Ohne Datenbank, Tabelle oder
      * Spalte: aus. Jeder andere Fehler geht nach oben, der alte Stand bleibt stehen (LoadShopAccess).
      */
-    private async BetaMode(): Promise<boolean> {
+    async BetaMode(): Promise<boolean> {
         if (this.betaMode && Date.now() - this.betaMode.at < 60_000) return this.betaMode.on;
 
         let on = false;
@@ -686,12 +686,12 @@ export default class DashboardService implements IDashboardService {
      * Hat die Person einen Beta-Code eingelöst? Ein Datenbankfehler geht nach
      * oben: LoadShopAccess sperrt dann, ohne es zu merken - im Zweifel zu.
      */
-    private async BetaMember(userId: string): Promise<boolean> {
+    async BetaMember(userId: string): Promise<boolean> {
         return (await this.client.databaseService.One<{ user_id: string }>("SELECT user_id FROM beta_members WHERE user_id = ?", [userId])) != null;
     }
 
     /** shop_settings.paywall, eine Minute gemerkt. Ohne Datenbank oder Tabelle: aus. */
-    private async Paywall(): Promise<boolean> {
+    async Paywall(): Promise<boolean> {
         if (this.paywall && Date.now() - this.paywall.at < 60_000) return this.paywall.on;
 
         let on = false;

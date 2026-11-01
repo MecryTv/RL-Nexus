@@ -22,6 +22,9 @@ export default class Ready extends Event {
         // Wer beim Start schon im Sprachkanal sitzt, zählt ab jetzt mit.
         this.client.activityService.Warm();
 
+        // Staff-Freigaben (W-0011): offene und laufende gelten nach dem Neustart weiter.
+        this.client.staffGrantService.Load().catch((error) => logger.warn(`🔐 Staff-Freigaben nicht geladen: ${String(error)}`));
+
         // Der Status unter dem Namen des Bots - fünf Ansagen im Wechsel.
         this.client.presenceService.Start();
 

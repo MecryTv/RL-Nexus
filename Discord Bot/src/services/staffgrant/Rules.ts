@@ -48,3 +48,13 @@ export function ActionText(area: string, action: unknown): string {
 
     return `${area} › ${key ? (ACTION_LABELS[key] ?? key) : "geändert"}`;
 }
+
+/** „30 Min.“, „1 Std.“, „1 Std. 30 Min.“ für Protokoll und Texte. */
+export function DurationText(minutes: number): string {
+    const hours = Math.floor(minutes / 60);
+    const rest = minutes % 60;
+
+    if (hours === 0) return `${rest} Min.`;
+
+    return rest === 0 ? `${hours} Std.` : `${hours} Std. ${rest} Min.`;
+}

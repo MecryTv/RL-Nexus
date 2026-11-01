@@ -7,8 +7,12 @@
 process.env.CLIENT_SECRET ||= "check-secret";
 process.env.DEV_CLIENT_SECRET ||= "check-secret";
 
+import { Guild } from "discord.js";
+import BotClient from "../client/BotClient";
 import { REQUEST_TTL_MS } from "../constants/StaffGrant";
-import { IStaffGrant } from "../interfaces/services/staffgrant/IStaffGrant";
+import { IStaffGrant, IStaffLogEntry } from "../interfaces/services/staffgrant/IStaffGrant";
+import PulseService from "../services/PulseService";
+import StaffGrantService, { StaffGrantBlocked } from "../services/StaffGrantService";
 import { ActionText, AskList, ParseDuration } from "../services/staffgrant/Rules";
 import { Answer, AnswerPrivate, AskPrivate, CanRequest, End, Extend, RemovePrivate, StaffGrantError, Tick, Withdraw } from "../services/staffgrant/Machine";
 
@@ -201,6 +205,157 @@ function checkCanRequest(): void {
     check("Beendete: geht", CanRequest([Running({ status: "ended", endedAt: T0 })], "900", T0 + MIN) === null);
 }
 
+/* ----------------------------------------------------------
+   Task 2: Dienst mit gefakten Modellen, persönlicher Puls
+   ---------------------------------------------------------- */
+
+function FakeStore() {
+    const grants = new Map<number, IStaffGrant>();
+    const log: IStaffLogEntry[] = [];
+    let next = 1;
+
+    return {
+        grants,
+        log,
+        staffGrants: {
+            Live: async () => [...grants.values()].filter((g) => g.status === "open" || g.status === "active").map((g) => ({ ...g })),
+            Save: async (g: IStaffGrant) => {
+                const id = g.id || next++;
+
+                grants.set(id, { ...g, id });
+
+                return id;
+            },
+            OfGuild: async (guildId: string, since: number) =>
+                [...grants.values()].filter((g) => g.guildId === guildId && (g.createdAt >= since || (g.endedAt ?? 0) >= since)).map((g) => ({ ...g })),
+            Prune: async () => 0,
+        },
+        staffGrantLog: {
+            Add: async (entry: Omit<IStaffLogEntry, "id">) => {
+                log.push({ ...entry, id: log.length + 1 });
+            },
+            Of: async (grantId: number, limit: number) => log.filter((entry) => entry.grantId === grantId).slice(-limit).reverse(),
+            OfGuild: async (guildId: string, since: number) => log.filter((entry) => entry.guildId === guildId && entry.at >= since).reverse(),
+            Prune: async () => 0,
+        },
+    };
+}
+
+function FakeClient(store: ReturnType<typeof FakeStore>): BotClient {
+    return {
+        ...store,
+        pulseService: new PulseService({} as BotClient),
+        databaseService: { Ready: true },
+        guilds: { cache: new Map() },
+        users: { cache: new Map() },
+    } as unknown as BotClient;
+}
+
+const flush = (): Promise<void> => new Promise((resolve) => setImmediate(resolve));
+
+function FakeService(store: ReturnType<typeof FakeStore>, asked: Record<string, string[]> = { "100": ["1", "2"] }): StaffGrantService {
+    const service = new StaffGrantService(FakeClient(store));
+
+    service.Askees = async (guild: Guild) => ({ mode: "free", users: asked[guild.id] ?? [] });
+    service.dm = {
+        Send: async (_grant: IStaffGrant, userId: string) => {
+            if (userId === "2") throw new Error("Cannot send messages to this user");
+
+            return { channelId: "dm", messageId: `m${userId}` };
+        },
+        Changed: () => undefined,
+        Logged: () => undefined,
+    };
+
+    return service;
+}
+
+const GUILD = { id: "100", name: "Nova Esports" } as unknown as Guild;
+const OTHER = { id: "101", name: "Leer" } as unknown as Guild;
+
+function RequestOf(guild: Guild, staffId = "900") {
+    return { guild, staffId, staffName: staffId === "900" ? "Joe" : "Ana", staffRole: "Developer" as const, reason: "Zeige dir die Rangliste", minutes: 60, private: false };
+}
+
+async function checkService(): Promise<void> {
+    console.log("\n🗄️  Dienst\n");
+
+    const store = FakeStore();
+    const service = FakeService(store);
+    const heard: string[] = [];
+
+    service["client"].pulseService.SubscribeUser("1", (kind) => heard.push(kind), () => undefined);
+
+    const grant = await service.Request(RequestOf(GUILD));
+    await flush();
+
+    check("Anfrage ist offen und gespeichert", grant.status === "open" && store.grants.get(grant.id)?.status === "open");
+    check("DM an 1 ging raus, an 2 nicht (Review 5)", grant.dms["1"]?.messageId === "m1" && grant.dms["2"] === null);
+    check("Protokoll: Angefragt", store.log.some((entry) => entry.text === "Angefragt von Joe für 1 Std."), store.log.map((entry) => entry.text).join(" | "));
+    check("Current kennt sie", service.Current("100")?.id === grant.id);
+    check("Gefragter hört den Puls", heard.includes("staff"));
+    check("OpenFor zeigt sie dem Gefragten", service.OpenFor("1").length === 1 && service.OpenFor("3").length === 0);
+
+    let error = await service.Request(RequestOf(GUILD, "901")).then(() => null, (thrown: unknown) => thrown);
+    check("Zweite Anfrage im Server: blockiert", error instanceof StaffGrantBlocked && error.message === "Gerade läuft schon eine Anfrage für diesen Server.");
+
+    error = await service.Request(RequestOf(OTHER)).then(() => null, (thrown: unknown) => thrown);
+    check("Ohne Gefragte: abgewiesen", error instanceof StaffGrantError && error.message === "Niemand kann gerade gefragt werden.");
+
+    await service.Answer(grant.id, "1", true, 60, false);
+    await flush();
+
+    const active = service.Active("900", "100");
+    check("Nach dem Ja: Active", active?.status === "active");
+    check("Protokoll: Erteilt", store.log.some((entry) => entry.text === "Erteilt von 1 für 1 Std."));
+    check("Active ist null, sobald die Zeit um ist, auch vor dem Tick (Review 1)", service.Active("900", "100", active!.endsAt!) === null);
+
+    // Neustart: ein frischer Dienst auf demselben Speicher (Review 2).
+    const restarted = FakeService(store);
+    await restarted.Load();
+    check("Nach Load gilt die Freigabe weiter", restarted.Active("900", "100")?.id === grant.id);
+
+    await restarted.Tick(active!.endsAt! + 1);
+    await flush();
+    check("Tick beendet sie", restarted.Active("900", "100") === null && store.grants.get(grant.id)?.status === "ended");
+    check("Protokoll: Zeit abgelaufen", store.log.some((entry) => entry.text === "Zeit abgelaufen"));
+
+    const seenStore = FakeStore();
+    const seen = FakeService(seenStore);
+    const open = await seen.Request(RequestOf(GUILD));
+    const running = await seen.Answer(open.id, "1", true, 60, true);
+    const before = seenStore.log.length;
+
+    seen.Seen(running, "Live Tickets", "Ticket #12", T0);
+    seen.Seen(running, "Live Tickets", "Ticket #12", T0 + 9 * MIN);
+    await flush();
+    check("Dasselbe Ansehen in 10 Min.: ein Eintrag", seenStore.log.length === before + 1);
+
+    seen.Seen(running, "Live Tickets", "Ticket #12", T0 + 11 * MIN);
+    await flush();
+    check("Nach 11 Min.: zweiter Eintrag", seenStore.log.length === before + 2);
+    check("Text des Ansehens", seenStore.log.at(-1)?.text === "Live Tickets › Ticket #12 geöffnet" && seenStore.log.at(-1)?.area === "Live Tickets");
+}
+
+function checkPulse(): void {
+    console.log("\n📡 Persönlicher Puls\n");
+
+    const pulse = new PulseService({} as BotClient);
+    const got: string[] = [];
+
+    pulse.SubscribeUser("1", (kind) => got.push(`1:${kind}`), () => undefined);
+    pulse.SubscribeUser("2", (kind) => got.push(`2:${kind}`), () => undefined);
+    pulse.EmitUser("1", "staff");
+
+    check("Nur der Nutzer selbst hört", got.length === 1 && got[0] === "1:staff");
+    check("Online stimmt", pulse.Online("1") && !pulse.Online("3"));
+
+    for (let i = 0; i < 3; i++) pulse.SubscribeUser("1", () => undefined, () => undefined);
+
+    check("Fünftes persönliches Fenster: abgewiesen", pulse.SubscribeUser("1", () => undefined, () => undefined) === null);
+    check("Server-Puls zählt getrennt", pulse.Subscribe("100", "1", () => undefined, () => undefined) !== null);
+}
+
 async function main(): Promise<void> {
     checkRules();
     checkAnswer();
@@ -208,6 +363,8 @@ async function main(): Promise<void> {
     checkExtendEnd();
     checkPrivate();
     checkCanRequest();
+    checkPulse();
+    await checkService();
 
     console.log(failures ? `\n❌ ${failures} Prüfung(en) fehlgeschlagen` : "\n✅ Alles in Ordnung");
     process.exit(failures ? 1 : 0);
