@@ -40,7 +40,9 @@ interface INote {
 
 interface IEvidence {
     id: number;
-    kind: "image" | "link";
+    kind: "image" | "link" | "message";
+    /** Eine gesicherte Nachricht: wer, wo, was. url führt zu ihr. */
+    message?: { authorName: string; channelName: string; content: string };
     url: string;
     name: string | null;
     by: string;
@@ -98,6 +100,8 @@ interface IConfig {
     warnDays: number;
     stages: IStage[];
     support: ISupport;
+    /** Welche Strafen einen Beweis brauchen - timeoutFrom in Sekunden, null: keiner. */
+    proof: { ban: boolean; kick: boolean; timeoutFrom: number | null; warn: boolean };
 }
 
 interface IStats {
@@ -123,7 +127,7 @@ interface ITarget {
 interface IMeta {
     me: { id: string; name: string; manage: boolean; actions: Action[] };
     config: IConfig;
-    presets: { durations: [string, number][]; deletes: [number, string][] };
+    presets: { durations: [string, number][]; deletes: [number, string][]; proof: [number | null, string][] };
     channels: { id: string; name: string }[];
     targets?: ILogTargets;
     /** Nur für wer den Server verwaltet: woraus der Support-Warteraum gewählt wird. */
@@ -160,6 +164,9 @@ const ACTIONS: Record<Action, { label: string; verb: string; symbol: string; ton
 const ORDER: Action[] = ["warn", "timeout", "kick", "ban", "unwarn", "untimeout", "unban", "purge"];
 const SOURCES: Record<ICase["source"], string> = { discord: "per Befehl", dashboard: "im Dashboard", auto: "automatisch" };
 // Diese brauchen einen zweiten Klick - danach ist es passiert.
+/** Strafen mit Beweis-Link (W-0014). */
+const PROOFED = new Set<Action>(["warn", "timeout", "kick", "ban"]);
+
 const CONFIRM = new Set<Action>(["ban", "kick", "purge"]);
 // Aufheben aus der großen Ansicht: was hebt welchen Fall auf.
 const LIFT: Partial<Record<Action, Action>> = { ban: "unban", timeout: "untimeout", warn: "unwarn" };
@@ -984,6 +991,9 @@ export function renderModeration(guildId: string): void {
                           image.alt = item.name ?? "Beweisbild";
                           image.loading = "lazy";
                           open.append(image);
+                      } else if (item.kind === "message" && item.message) {
+                          open.title = `Nachricht von ${item.message.authorName} in #${item.message.channelName} · gesichert von ${item.byName}`;
+                          open.append(icon("#i-link"), el("span", "", `${item.message.authorName}: ${item.message.content || "Ohne Text"}`));
                       } else {
                           open.append(icon("#i-link"), el("span", "", item.name ?? new URL(item.url).hostname));
                       }
@@ -1026,17 +1036,21 @@ export function renderModeration(guildId: string): void {
         count: 20,
         channelId: null as string | null,
         caseNumber: null as number | null,
+        proofLink: "",
     };
     // Zeitpunkt des ersten Klicks bei Bann, Kick und Löschen - der zweite zählt.
     let sure = 0;
     let pickTimer = 0;
 
     async function act(request: Record<string, unknown>): Promise<ICase | null> {
-        const answer = await call<{ case: ICase }>("", { action: "act", request });
+        const answer = await call<{ case: ICase; problems?: string[] }>("", { action: "act", request });
 
         if (!answer) return null;
 
         const entry = answer.case;
+
+        // Die Strafe gilt - nur der Beweis kam nicht an.
+        if (answer.problems?.length) toast("info", "Beweis nicht gesichert", answer.problems.join(" "));
 
         toast("info", `${ACTIONS[entry.action].label} · Fall #${entry.number}`, entry.target ? `${entry.target.name} – erledigt.` : "Erledigt.");
         void load(true, true);
@@ -1191,8 +1205,20 @@ export function renderModeration(guildId: string): void {
         }
     }
 
+    /** Wie ProofNeeded im Bot: braucht diese Strafe hier einen Beweis? */
+    function proofNeeded(): boolean {
+        const proof = meta?.config.proof;
+
+        if (!proof) return false;
+        if (draft.action === "timeout") return proof.timeoutFrom !== null && (draft.duration ?? 0) >= proof.timeoutFrom;
+
+        return (draft.action === "ban" && proof.ban) || (draft.action === "kick" && proof.kick) || (draft.action === "warn" && proof.warn);
+    }
+
     function paintSubmit(): void {
-        const { text, missing } = summary();
+        const summed = summary();
+        const text = summed.text;
+        const missing = summed.missing ?? (proofNeeded() && !draft.proofLink.trim() ? "Hier braucht das einen Beweis-Link. Bilder lädst du nach dem Anlegen am Fall hoch." : null);
         const info = ACTIONS[draft.action];
         const armed = CONFIRM.has(draft.action) && Date.now() - sure < 4_000;
         const go = button(`btn btn--primary mcgo-main${armed ? " is-sure" : ""}`, icon(info.symbol), armed ? `Wirklich: ${info.verb}?` : info.verb);
@@ -1221,6 +1247,7 @@ export function renderModeration(guildId: string): void {
                 count: draft.action === "purge" ? draft.count : null,
                 channelId: draft.action === "purge" ? draft.channelId : null,
                 caseNumber: draft.action === "unwarn" ? draft.caseNumber : null,
+                proofLink: PROOFED.has(draft.action) ? draft.proofLink.trim() || null : null,
             });
 
             if (!entry) {
@@ -1232,6 +1259,7 @@ export function renderModeration(guildId: string): void {
             draft.target = null;
             draft.reason = "";
             draft.caseNumber = null;
+            draft.proofLink = "";
             paintPane();
             await view(entry.number);
         });
@@ -1420,6 +1448,20 @@ export function renderModeration(guildId: string): void {
             details.push(field("Dauer", durationPicker(true, 365 * 86_400)), field("Nachrichten mitlöschen", wipe));
         }
 
+        if (PROOFED.has(draft.action)) {
+            const proof = el("input", "text");
+
+            proof.type = "url";
+            proof.maxLength = 500;
+            proof.value = draft.proofLink;
+            proof.placeholder = "https://… oder ein Nachrichtenlink aus Discord";
+            proof.addEventListener("input", () => {
+                draft.proofLink = proof.value;
+                paintSubmit();
+            });
+            details.push(field(proofNeeded() ? "Beweis-Link (Pflicht)" : "Beweis-Link", proof, "Ein Nachrichtenlink sichert die Nachricht selbst. Bilder lädst du nach dem Anlegen hoch."));
+        }
+
         if (draft.action === "warn" && meta.config.stages.length) {
             details.push(
                 el(
@@ -1585,6 +1627,31 @@ export function renderModeration(guildId: string): void {
 
         paintStages();
 
+        /* --- Beweis-Pflicht --- */
+        const proof = cfg.proof;
+        const flag = (key: "ban" | "kick" | "warn", label: string): HTMLInputElement => {
+            const box = el("input", "switch");
+
+            box.type = "checkbox";
+            box.checked = proof[key];
+            box.setAttribute("aria-label", `${label} braucht einen Beweis`);
+            box.addEventListener("change", () => {
+                proof[key] = box.checked;
+                touch();
+            });
+
+            return box;
+        };
+        const timeoutFrom = el("select", "pick");
+
+        timeoutFrom.append(...meta.presets.proof.map(([seconds, label]) => new Option(label, seconds === null ? "" : String(seconds))));
+        timeoutFrom.value = proof.timeoutFrom === null ? "" : String(proof.timeoutFrom);
+        timeoutFrom.setAttribute("aria-label", "Ab welcher Länge ein Timeout einen Beweis braucht");
+        timeoutFrom.addEventListener("change", () => {
+            proof.timeoutFrom = timeoutFrom.value ? Number(timeoutFrom.value) : null;
+            touch();
+        });
+
         /* --- Support-Warteraum --- */
         const line = (label: string, hint: string, control: HTMLElement): HTMLElement =>
             el("div", "row", el("div", "row__text", el("b", "", label), el("i", "", hint)), control);
@@ -1671,6 +1738,14 @@ export function renderModeration(guildId: string): void {
                 el("div", "row", el("div", "row__text", el("b", "", "Verwarnungen zählen"), el("i", "", "Ältere zählen für die Stufen nicht mehr mit")), days),
                 stages,
                 add
+            ),
+            card(
+                "Beweise",
+                "Welche Strafen ohne Beweis nicht gehen. In Discord reicht ein Bild, ein Link oder „Als Beweis sichern“ per Rechtsklick, hier ein Link.",
+                line("Bann", "Auch befristete Banns", flag("ban", "Ein Bann")),
+                line("Kick", "", flag("kick", "Ein Kick")),
+                line("Timeout", "Kurze Timeouts gehen ohne", timeoutFrom),
+                line("Verwarnung", "", flag("warn", "Eine Verwarnung"))
             ),
             card(
                 "Support-Warteraum",

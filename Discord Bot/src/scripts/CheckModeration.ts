@@ -20,6 +20,7 @@ import { CaseView, DirectView, DoneView, EvidenceId, HistoryView, ReadEvidenceId
 import { DefaultModConfig, FormatDuration, MAX_EVIDENCE, MAX_REASON, MAX_SUPPORT_REMIND, MAX_SUPPORT_ROLES, ParseDuration, ParseMessageLink, ProofNeeded, StageFor } from "../constants/Moderation";
 import { IModCase, IModEvidence } from "../interfaces/services/moderation/IModeration";
 import { ModerationError } from "../services/ModerationService";
+import { ActInput } from "../routes/DashboardApiModeration";
 import { IsLogTarget } from "../utils/logtarget";
 import { ReadDuration } from "../utils/modcommand";
 
@@ -290,6 +291,11 @@ function checkProof(client: BotClient): void {
     check("Eine erfundene Dauer wird zu keiner", service.Clean(guild, { proof: { timeoutFrom: 1_234 } }, strict).proof.timeoutFrom === null);
     check("Ohne Angabe bleibt die Pflicht", service.Clean(guild, {}, strict).proof.warn === true);
 
+    const input = ActInput({ action: "warn", targetId: USER, reason: "Spam", proofLink: "  https://clips.example.com/1  " });
+
+    check("Dashboard: der Beweis-Link wird gelesen", input.proof.link === "https://clips.example.com/1" && input.request.action === "warn" && input.request.reason === "Spam");
+    check("Dashboard: ohne Link kein Beweis", ActInput({ action: "warn", proofLink: 5 }).proof.link === null && ActInput({ action: "warn", proofLink: "  " }).proof.link === null);
+
     console.log("\n  — Rechtsklick „Als Beweis sichern“ —");
 
     const id = EvidenceId("fall", TEXT, THREAD);
@@ -528,6 +534,21 @@ async function checkEvidence(client: BotClient): Promise<void> {
     }
 
     check("Knöpfe ohne Team-Recht: abgelehnt", gate === "Das sieht nur das Moderations-Team.", gate);
+
+    await client.modSettings.Save(GUILD, { ...DefaultModConfig(), proof: { ban: false, kick: false, timeoutFrom: null, warn: true } });
+
+    const owner = { id: MOD, displayName: "Hanna", guild: { id: GUILD, ownerId: MOD }, permissions: { has: () => true }, roles: { cache: new Map() } } as unknown as GuildMember;
+    const before = (await client.modCases.List(GUILD, {}, null, 50)).length;
+    let refused = "";
+
+    try {
+        await service.ActWithProof(guild, owner, { action: "warn", targetId: USER, reason: "Test" }, "dashboard");
+    } catch (error) {
+        refused = error instanceof ModerationError ? error.message : String(error);
+    }
+
+    check("Pflicht ohne Beweis: abgelehnt", refused.startsWith("Auf diesem Server braucht eine Verwarnung einen Beweis."), refused);
+    check("Und es entsteht kein Fall", (await client.modCases.List(GUILD, {}, null, 50)).length === before);
 }
 
 async function cleanup(client: BotClient): Promise<void> {
