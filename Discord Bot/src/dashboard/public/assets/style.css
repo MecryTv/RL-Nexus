@@ -1500,61 +1500,69 @@ body:has(dialog[open]){overflow:hidden}
    --shell, Kopf- und Fusszeile wachsen also mit und bleiben buendig. */
 body[data-page="guild"]{--shell:1440px}
 
-/* Ihre Leiste: dieselbe Spalte wie in den Einstellungen, nur mit Kategorien.
-   Sind viele Module an, wird sie hoeher als das Fenster - dann scrollt sie
-   selbst, statt unten aus dem Bild zu laufen. Etwas breiter als dort, passend
-   zur breiteren Seite. Muss vor der Media-Query unten stehen, sonst bliebe die
+/* Ihre Leiste (W-0055): links die Bereiche, daneben die Module des gewaehlten
+   Bereichs, eine Zeile je Modul. Teile eines Moduls sind Reiter ueber der
+   Seite, nicht hier. Muss vor der Media-Query unten stehen, sonst bliebe die
    Seite auch schmal zweispaltig. */
-.setpage--modules{grid-template-columns:240px minmax(0,1fr)}
-/* Die Spalte geht auf volle Hoehe, die Leiste darin klebt. Waere die Spalte
-   nur so hoch wie die Leiste, haette sticky keinen Weg - die Leiste wanderte
+.setpage--modules{grid-template-columns:284px minmax(0,1fr)}
+/* Die Spalte geht auf volle Hoehe, die beiden Leisten darin kleben. Waere die
+   Spalte nur so hoch wie die Leisten, haette sticky keinen Weg - sie wanderten
    beim Scrollen eines langen Moduls einfach mit nach oben aus dem Bild.
    Dieselbe Loesung wie auf der Doku-Seite. */
 .setpage--modules{align-items:stretch}
-.setside{min-width:0}
-.setnav--modules{
+.setside{min-width:0;display:flex;align-items:flex-start}
+.setrail,.setcol{
   position:sticky;top:calc(var(--topbar-h) + 16px);
   max-height:calc(100vh - var(--topbar-h) - 32px);
-  overflow-y:auto;overscroll-behavior:contain;
-  scrollbar-width:thin;scrollbar-color:var(--line-strong) transparent;padding-right:4px;
+  overflow-y:auto;overscroll-behavior:contain;scrollbar-width:none;
 }
-/* Etwas dichter als in den Einstellungen: hier stehen bis zu zwanzig Punkte
-   untereinander. Auf Finger-Geraeten bleiben es 44px, siehe unten. */
+/* Bereichsleiste: Symbol, kurzer Name, Zahl der Module. */
+.setrail{flex:none;width:74px;display:flex;flex-direction:column;align-items:center;gap:3px;padding:2px 0}
+.setrail > a,.setrail__area{
+  position:relative;display:grid;justify-items:center;gap:3px;width:64px;padding:7px 0 6px;
+  border:0;border-radius:10px;background:none;cursor:pointer;
+  font-family:var(--f-display);font-size:10.5px;font-weight:600;line-height:1.2;color:var(--text-3);text-align:center;
+  transition:color var(--t-fast) var(--ease),background var(--t-fast) var(--ease);
+}
+.setrail svg{width:18px;height:18px;flex:none}
+.setrail > a:hover,.setrail__area:hover{color:var(--text);background:var(--glass)}
+.setrail > a:focus-visible,.setrail__area:focus-visible{outline:none;box-shadow:inset 0 0 0 2px var(--blue)}
+.setrail > a[aria-current="page"],.setrail__area[aria-pressed="true"]{color:var(--text);background:color-mix(in srgb,var(--brand) 14%,transparent)}
+.setrail > a[aria-current="page"] svg,.setrail__area[aria-pressed="true"] svg{color:var(--brand)}
+.setrail__area[aria-pressed="true"]::before{content:"";position:absolute;left:-5px;top:10px;bottom:10px;width:3px;border-radius:0 3px 3px 0;background:var(--brand)}
+.setrail__count{
+  position:absolute;top:3px;right:8px;min-width:15px;height:15px;padding:0 4px;border-radius:8px;
+  background:var(--glass-2);color:var(--text-2);font-size:9.5px;font-weight:700;line-height:15px;
+}
+.setrail__area[aria-pressed="true"] .setrail__count{background:var(--brand);color:var(--brand-ink)}
+.setrail__sep{width:36px;height:1px;flex:none;background:var(--line-strong);margin:4px 0}
+/* Ohne feste Seite (Moderatoren) gaebe der Strich keinen Sinn. */
+.setrail:not(:has(> a:not([hidden]))) .setrail__sep{display:none}
+/* Die Module des Bereichs. */
+.setcol{flex:1;min-width:0;padding:0 2px 0 10px;border-left:1px solid var(--line)}
+.setfind{
+  display:flex;align-items:center;gap:8px;width:100%;margin:0 0 10px;padding:7px 10px;
+  border:1px solid var(--line);border-radius:var(--r-sm);background:var(--glass);cursor:pointer;
+  font:inherit;font-size:13px;color:var(--text-3);text-align:left;
+  transition:color var(--t-fast) var(--ease),border-color var(--t-fast) var(--ease);
+}
+.setfind svg{width:14px;height:14px;flex:none}
+.setfind:hover{color:var(--text-2);border-color:var(--line-strong)}
+.setfind:focus-visible{outline:none;box-shadow:0 0 0 2px var(--blue)}
+.setfind kbd{margin-left:auto;padding:0 5px;border:1px solid var(--line-strong);border-radius:4px;font:600 10.5px var(--f-display);color:var(--text-2)}
+.sethead{padding:2px 12px 8px;margin-bottom:6px;border-bottom:1px solid var(--line)}
+.sethead:empty{display:none}
+.sethead b{display:block;font-family:var(--f-display);font-size:15px;font-weight:700;color:var(--text)}
+.sethead small{font-size:11.5px;color:var(--text-3)}
+.setnav__group{display:grid;gap:2px}
 .setnav--modules a{padding:7px 12px}
-/* Die Gruppe bleibt beim Scrollen der Leiste oben stehen - sonst weiss man
-   bei zwanzig Eintraegen nicht mehr, in welchem Bereich man gerade ist. */
-.setnav--modules .setnav__cap{
-  position:sticky;top:0;z-index:1;margin:12px 0 2px;padding:6px 12px 4px;
-  background:linear-gradient(to bottom,var(--bg) 72%,transparent);
-}
-.setnav--modules .setnav__cap:first-of-type{margin-top:6px}
-/* Unterpunkte haengen sichtbar an ihrem Modul statt nur eingerueckt zu sein. */
-.setnav a.is-sub{position:relative}
-.setnav a.is-sub::before{content:"";position:absolute;left:21px;top:0;bottom:0;width:1px;background:var(--line)}
-.setnav a.is-sub[aria-current="page"]::before{background:var(--brand)}
-@media (pointer:coarse){.setnav--modules a{min-height:44px}}
+/* Teile stehen als Reiter ueber ihrer Seite. In der Gruppe bleiben sie nur fuer
+   bindSections: ihr hidden sagt, ob die Seite offen sein darf. */
+.setnav--modules a.is-sub{display:none}
+@media (pointer:coarse){.setnav--modules a,.setrail > a,.setrail__area{min-height:44px}}
 /* Kopf einer Modulkarte: Symbol und Name. */
 .modhead{display:flex;align-items:center;gap:10px;margin:16px 0 14px;font-size:20px;font-weight:700}
 .modhead svg{width:20px;height:20px;flex:none;color:var(--brand)}
-/* Teile eines Moduls stehen eingerueckt darunter. Sie haben keinen eigenen
-   Schalter: sie kommen mit ihrem Modul und gehen mit ihm. */
-.setnav a.is-sub{padding-left:34px;font-size:13px}
-.setnav a.is-sub svg{width:13px;height:13px}
-/* Ueberschrift einer Modulgruppe. Kein Link, nur Beschriftung - sie
-   verschwindet, solange kein Modul darunter eingeschaltet ist. Der erste
-   Abstand faellt weg, damit sie nicht vom Rand abrutscht. */
-.setnav__cap{
-  display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;
-  margin:14px 0 4px;padding:0 12px;border:0;background:none;text-align:left;cursor:pointer;
-  font-family:inherit;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;
-  color:var(--text-3);transition:color var(--t-fast) var(--ease);
-}
-.setnav__cap:hover{color:var(--text-2)}
-.setnav__cap:focus-visible{outline:none;box-shadow:inset 0 0 0 2px var(--blue)}
-.setnav__cap svg{width:12px;height:12px;flex:none;transition:transform var(--t-fast) var(--ease)}
-.setnav__cap[aria-expanded="false"] svg{transform:rotate(-90deg)}
-.setnav__group{display:grid;gap:2px}
-.setnav__cap:first-of-type{margin-top:10px}
 /* Ein festes Modul: der Schalter steht da, laesst sich aber nicht bewegen. */
 .modlist .modalways{display:block;margin-top:4px;color:var(--text-2)}
 /* "Module": ein Raster aus Kacheln mit Schalter, ohne Kategorien. Die Kacheln

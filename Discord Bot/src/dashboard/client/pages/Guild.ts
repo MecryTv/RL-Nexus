@@ -12,6 +12,7 @@ import { moduleState } from "../core/ModuleState.js";
 import { BASE } from "../core/Base.js";
 import { debounce, onPulse } from "../core/Pulse.js";
 import { ActivityResult, fetchActivity, renderOverview } from "./GuildOverview.js";
+import { bindNav, INav } from "./GuildNav.js";
 
 // Was ein Supporter ohne "Server verwalten" sieht - die Teile des Ticket-Systems.
 const SUPPORT_SECTIONS = ["live-tickets", "transcriptions"];
@@ -25,32 +26,6 @@ const SUPPORT_SECTIONS = ["live-tickets", "transcriptions"];
    zurückgeht. Geladen wird beim Wechsel nichts neu.
    ---------------------------------------------------------- */
 const ROUTE = /\/guild\/(\d{17,20})(?:\/([a-z0-9-]+))?\/?$/;
-
-/** Welche Kategorien in der Leiste zugeklappt sind - im Browser des Nutzers. */
-const FOLD_KEY = "rlnexus.nav.folded";
-
-function foldedGroups(): Set<string> {
-    try {
-        const raw = window.localStorage.getItem(FOLD_KEY);
-
-        return new Set(raw ? (JSON.parse(raw) as string[]) : []);
-    } catch {
-        return new Set();
-    }
-}
-
-function foldGroup(id: string, folded: boolean): void {
-    const all = foldedGroups();
-
-    if (folded) all.add(id);
-    else all.delete(id);
-
-    try {
-        window.localStorage.setItem(FOLD_KEY, JSON.stringify([...all]));
-    } catch {
-        // Kein Speicher - dann gilt es nur fuer diesen Besuch.
-    }
-}
 
 function route(): { id: string; section: string } {
     const found = ROUTE.exec(window.location.pathname);
@@ -230,7 +205,7 @@ export function renderGuild(data: IPayload): void {
 
     // Erst die Leiste mit dem Stand aus /api/me, dann die Abschnitte: sonst
     // landete eine Adresse auf einem ausgeschalteten Modul auf dessen Karte.
-    const loadModules = bindModules(guild, only);
+    const loadModules = bindModules(guild, only, bindNav());
     const show = bindSections(guild.id, supportOnly ? "live-tickets" : "uebersicht");
 
     const user = { id: data.user.id, name: data.user.name, avatar: data.user.avatar };
@@ -430,34 +405,17 @@ function whenShown(ids: string[], start: () => void): void {
     check();
 }
 
-// Den markierten Eintrag in den sichtbaren Teil der Leiste holen: bei einem Link
-// auf ein Modul weit unten stünde er sonst außer Sicht. Es scrollt nur die
-// Leiste, nie die Seite, und erst mit den Schriften - vorher stimmen die Höhen
-// der Einträge noch nicht.
-function reveal(link: HTMLElement, nav: HTMLElement): void {
-    void document.fonts.ready.then(() => {
-        const item = link.getBoundingClientRect();
-        const box = nav.getBoundingClientRect();
-        // Ganz oben ragt die Leiste noch unter den Fensterrand.
-        const bottom = Math.min(box.bottom, window.innerHeight);
-
-        if (item.bottom > bottom) nav.scrollTop += item.bottom - bottom;
-        else if (item.top < box.top) nav.scrollTop -= box.top - item.top;
-
-        if (item.right > box.right) nav.scrollLeft += item.right - box.right;
-        else if (item.left < box.left) nav.scrollLeft -= box.left - item.left;
-    });
-}
-
 /**
  * Verbindet Leiste und Karten mit der Adresse. Ein Klick tauscht die Karte und
  * hängt einen Eintrag in den Verlauf - neu geladen wird nichts, die Seite hat
- * schon alles. Zurück und Vorwärts funktionieren trotzdem.
+ * schon alles. Zurück und Vorwärts funktionieren trotzdem. Was offen sein darf,
+ * sagen die Links der Leiste (hidden heißt: aus oder nicht erlaubt), auch die
+ * der Teile, die dort nicht zu sehen sind (W-0055: sie sind Reiter).
  */
 function bindSections(guildId: string, fallback: string): (section: string) => void {
-    const nav = need<HTMLElement>("#setNav");
+    const side = need<HTMLElement>("#setSide");
     const cards = [...document.querySelectorAll<HTMLElement>("#moduleCards > section")];
-    const links = (): HTMLAnchorElement[] => [...nav.querySelectorAll<HTMLAnchorElement>("a[data-section]")];
+    const links = (): HTMLAnchorElement[] => [...side.querySelectorAll<HTMLAnchorElement>("a[data-section]")];
 
     // Die beiden festen Einträge stehen im HTML, ihre Adresse kann erst hier
     // stehen: vorher ist nicht klar, um welchen Server es geht.
@@ -480,16 +438,19 @@ function bindSections(guildId: string, fallback: string): (section: string) => v
             }
 
             link.setAttribute("aria-current", "page");
-            reveal(link, nav);
         }
 
         const path = `${BASE}/guild/${guildId}/${section}`;
 
         if (window.location.pathname !== path) history.replaceState(null, "", path);
+
+        // Bereich, Markierung und Reiter folgen (GuildNav.ts).
+        window.dispatchEvent(new CustomEvent("guild:shown", { detail: section }));
     }
 
-    nav.addEventListener("click", (event) => {
-        const link = (event.target as HTMLElement).closest<HTMLAnchorElement>("a[data-section]");
+    // Leiste und Reiter über der Seite führen gleich.
+    document.addEventListener("click", (event) => {
+        const link = (event.target as HTMLElement).closest<HTMLAnchorElement>("#setSide a[data-section], #modTabs a[data-section]");
 
         // Mit Strg, Shift oder Mittelklick will jemand einen neuen Tab - dann
         // gehört die Adresse dem Browser.
@@ -533,8 +494,9 @@ const FAILED: Record<number, string> = {
  * einem Stand. Zurück kommt der Weg, den Stand aus der Datenbank nachzureichen;
  * null heißt, es gibt keinen, und die Schalter bleiben gesperrt.
  */
-function bindModules(guild: IGuild, only: Set<string> | null): (modules: string[] | null) => void {
+function bindModules(guild: IGuild, only: Set<string> | null, side: INav): (modules: string[] | null) => void {
     const nav = need<HTMLElement>("#setNav");
+    const rail = need<HTMLElement>("#setRail");
     const cards = need<HTMLElement>("#moduleCards");
     const list = need<HTMLElement>("#moduleList");
     const note = need<HTMLElement>("#moduleNote");
@@ -583,43 +545,23 @@ function bindModules(guild: IGuild, only: Set<string> | null): (modules: string[
         { links: HTMLElement[]; tile: HTMLElement; input: HTMLInputElement; always: boolean }
     >();
 
-    // Die Leiste steht nach Kategorien: erst die Ueberschrift, dann ihre Module.
-    // Die Kacheln unter "Module" bleiben flach - dort gibt es keine Kategorien.
-    const groups: { cap: HTMLButtonElement; box: HTMLElement; ids: string[] }[] = [];
+    // Je Bereich eine Gruppe mit seinen Modulen und deren Teilen. Zu sehen ist
+    // nur die Gruppe des gewählten Bereichs, die Teile nie (GuildNav.ts) - in
+    // der Gruppe stehen sie trotzdem: ihr hidden sagt bindSections, was offen
+    // sein darf. Die Kacheln unter "Module" bleiben flach.
     const bars = new Map<string, HTMLElement[]>();
-    const folded = foldedGroups();
 
     for (const category of CATEGORIES) {
         const members = MODULES.filter((entry) => entry.category === category.id);
 
         if (members.length === 0) continue;
 
-        // Die Ueberschrift ist ein Knopf: bei zwanzig Eintraegen will man
-        // Bereiche zuklappen koennen. Was zu ist, merkt sich der Browser.
-        const cap = document.createElement("button");
         const box = document.createElement("div");
-        const open = !folded.has(category.id);
 
         box.className = "setnav__group";
-        box.id = `navgroup-${category.id}`;
-        box.hidden = !open;
-
-        cap.type = "button";
-        cap.className = "setnav__cap";
-        cap.hidden = true;
-        cap.setAttribute("aria-expanded", String(open));
-        cap.setAttribute("aria-controls", box.id);
-        cap.append(document.createElement("span"), icon("#i-chevron"));
-        cap.firstElementChild!.textContent = category.name;
-        cap.addEventListener("click", () => {
-            const next = cap.getAttribute("aria-expanded") !== "true";
-
-            cap.setAttribute("aria-expanded", String(next));
-            box.hidden = !next;
-            foldGroup(category.id, !next);
-        });
-
-        nav.append(cap, box);
+        box.dataset.area = category.id;
+        box.hidden = true;
+        nav.append(box);
 
         for (const module of members) {
             const own = [link(module, false, box)];
@@ -628,8 +570,6 @@ function bindModules(guild: IGuild, only: Set<string> | null): (modules: string[
 
             bars.set(module.id, own);
         }
-
-        groups.push({ cap, box, ids: members.map((entry) => entry.id) });
     }
 
     for (const module of MODULES) {
@@ -668,11 +608,11 @@ function bindModules(guild: IGuild, only: Set<string> | null): (modules: string[
 
     // Moderatoren sehen weder Übersicht noch Module - nur, was in only steht.
     if (only) {
-        for (const fixed of nav.querySelectorAll<HTMLElement>('a[data-section="uebersicht"], a[data-section="module"]')) fixed.hidden = true;
+        for (const fixed of rail.querySelectorAll<HTMLElement>('a[data-section="uebersicht"], a[data-section="module"]')) fixed.hidden = true;
     }
 
     // Die Moderatoren stellt nur ein, wer den Server verwalten darf.
-    nav.querySelector<HTMLElement>('a[data-section="team"]')!.hidden = !guild.canManage || only !== null;
+    rail.querySelector<HTMLElement>('a[data-section="team"]')!.hidden = !guild.canManage || only !== null;
 
     function paint(): void {
         for (const [id, entry] of entries) {
@@ -686,26 +626,8 @@ function bindModules(guild: IGuild, only: Set<string> | null): (modules: string[
             entry.tile.classList.toggle("acct--on", checked);
         }
 
-        // Eine Ueberschrift ohne eingeschaltetes Modul darunter waere eine
-        // Zeile, die auf nichts zeigt.
-        for (const group of groups) {
-            const any = group.ids.some((id) => entries.get(id)?.links.some((anchor) => !anchor.hidden));
-
-            group.cap.hidden = !any;
-            group.box.hidden = !any || group.cap.getAttribute("aria-expanded") !== "true";
-        }
-
-        // Der offene Abschnitt darf nicht in einer zugeklappten Gruppe
-        // verschwinden - sonst sieht man nicht, wo man gerade ist.
-        const current = nav.querySelector<HTMLAnchorElement>('a[data-section][aria-current="page"]');
-        const home = current?.closest<HTMLElement>(".setnav__group");
-
-        if (home?.hidden) {
-            const cap = groups.find((group) => group.box === home)?.cap;
-
-            home.hidden = false;
-            cap?.setAttribute("aria-expanded", "true");
-        }
+        // Bereiche ohne Modul verschwinden, die Zahlen folgen.
+        side.refresh();
     }
 
     async function pinHeld(): Promise<void> {
@@ -802,7 +724,8 @@ function bindModules(guild: IGuild, only: Set<string> | null): (modules: string[
         const query = new URLSearchParams(window.location.search);
         const wanted = query.get("neu") ? "neu" : (query.get("liste") ?? "");
 
-        for (const anchor of roleLists.links) {
+        // Das Modul selbst (links[0]) bleibt markiert - in der Spalte steht nur es, die Listen nicht.
+        for (const anchor of roleLists.links.slice(1)) {
             if ((anchor.dataset.liste ?? "") === wanted) anchor.setAttribute("aria-current", "page");
             else anchor.removeAttribute("aria-current");
         }

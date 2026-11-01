@@ -146,18 +146,25 @@
       </div>
     </div>
 
-    <!-- Links Übersicht, Module und die eingeschalteten Module, rechts genau
-         einer davon. Welcher, steht im Pfad: /guild/<id>/tickets ist eine eigene
-         Adresse, die sich teilen lässt und im Verlauf zurückgeht. Die Einträge
-         der Module setzt Guild.ts aus constants/Modules.ts ein, die Adressen
-         der beiden festen ebenfalls - erst dort ist klar, welcher Server. -->
+    <!-- Links die Bereiche, daneben die eingeschalteten Module des gewählten
+         Bereichs, rechts genau eine Seite. Welche, steht im Pfad:
+         /guild/<id>/tickets ist eine eigene Adresse, die sich teilen lässt und im
+         Verlauf zurückgeht. Bereiche, Module und die Adressen der festen Seiten
+         setzt Guild.ts ein (W-0055, GuildNav.ts) - erst dort ist klar, welcher
+         Server und was an ist. -->
     <div class="setpage setpage--modules">
-      <div class="setside">
-      <nav class="setnav setnav--modules" id="setNav" aria-label="Server-Einstellungen">
-        <a data-section="uebersicht" href=""><svg><use href="#i-grid"/></svg>Übersicht</a>
-        <a data-section="module" href=""><svg><use href="#i-puzzle"/></svg>Module</a>
-        <a data-section="team" href="" hidden><svg><use href="#i-shield-check"/></svg>Moderatoren</a>
-      </nav>
+      <div class="setside" id="setSide">
+        <nav class="setrail" id="setRail" aria-label="Bereiche">
+          <a data-section="uebersicht" href="" title="Übersicht"><svg><use href="#i-grid"/></svg><span>Übersicht</span></a>
+          <a data-section="module" href="" title="Module"><svg><use href="#i-puzzle"/></svg><span>Module</span></a>
+          <a data-section="team" href="" title="Moderatoren" aria-label="Moderatoren" hidden><svg><use href="#i-shield-check"/></svg><span>Mods</span></a>
+          <i class="setrail__sep" aria-hidden="true"></i>
+        </nav>
+        <div class="setcol">
+          <button class="setfind" id="navFind" type="button"><svg><use href="#i-search"/></svg><span>Suchen …</span><kbd>⇧ rechts</kbd></button>
+          <div class="sethead" id="navHead"></div>
+          <nav class="setnav setnav--modules" id="setNav" aria-label="Module"></nav>
+        </div>
       </div>
 
       <div class="setcards" id="moduleCards">
