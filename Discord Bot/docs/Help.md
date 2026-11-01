@@ -2,6 +2,8 @@
 
 Erklärt alle Befehle des Bots in Discord (W-0014, Plan 45). Nur für den, der fragt; Menüs und Knöpfe tauschen den Inhalt derselben Nachricht.
 
+Der Inhalt jeder Seite ist **gezeichnet** (Wunsch des Nutzers: Design der Entwürfe 1 zu 1): oben das Banner, darunter Bilder 900 × höchstens 560 Pixel, jedes mit dem Text als Bildbeschreibung. Discord begrenzt die Höhe eines Bilds; flachere Bilder füllen die volle Breite und bleiben lesbar. Menüs und Knöpfe bleiben Discord-Bausteine. Emojis kommen als Twemoji-Bild, ohne Netz fehlen sie still.
+
 | Seite | Was |
 |---|---|
 | Start | Banner mit „Willkommen, <Name>“, vier Kacheln (Module an, Befehle, Zugang, Version), „In drei Schritten startklar“, Bereiche mit Zahl, Links zu Dashboard, Doku, Status und Support-Server |
@@ -18,7 +20,8 @@ Erklärt alle Befehle des Bots in Discord (W-0014, Plan 45). Nur für den, der f
 | `src/constants/HelpCatalog.ts` | Die Texte, von Hand, je Befehl und Unterbefehl |
 | `src/constants/Help.ts` | Bereiche, Links, Typen der Texte |
 | `src/services/help/HelpModel.ts` | Verbindet Texte und echte Befehle; Felder kommen nur aus der Definition |
-| `src/builder/HelpView.ts` | Die Seiten |
+| `src/builder/HelpView.ts` | Die Seiten als Blöcke, zusammengesetzt mit `ComposeHelp` |
+| `src/builder/HelpImage.ts` | Zeichnet die Blöcke als Bilder, teilt auf mehrere, Überschrift bleibt beim Inhalt |
 | `src/builder/HelpBanner.ts` | Das Banner (1100 × 280) |
 | `src/services/help/HelpService.ts` | Vorschläge, Suchen, Kachel „Zugang“, Startseite |
 | `src/commands/user/Help.ts` · `src/events/help/HelpButtons.ts` | Befehl und die `hilfe:`-Menüs und -Knöpfe |
