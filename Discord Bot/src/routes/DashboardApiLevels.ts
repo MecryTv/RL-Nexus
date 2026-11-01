@@ -150,7 +150,10 @@ export default class DashboardApiLevels extends Route {
                 logger.user(`📈 Level-Einstellungen auf ${guild.id} gespeichert (von ${member.id})`);
 
                 // Plan 43: an, aus, anderer Kanal oder Zeitraum - gleich sichtbar, nicht erst beim nächsten Blick.
-                if (JSON.stringify(before) !== JSON.stringify(settings.boardPost)) await PostBoard(this.client, guild, settings, true);
+                // Gespeichert ist schon - scheitert das Zeichnen, zeigt es der Stand, nicht ein Fehler beim Speichern (W-0045).
+                if (JSON.stringify(before) !== JSON.stringify(settings.boardPost)) {
+                    await PostBoard(this.client, guild, settings, true).catch((error: unknown) => logger.warn(`📈 Rangliste im Kanal auf ${guild.id} nach dem Speichern nicht gezeichnet - ${String(error)}`));
+                }
 
                 return { ok: true, settings, boardPostStatus: await this.client.levelBoardPosts.Of(guild.id) };
             }

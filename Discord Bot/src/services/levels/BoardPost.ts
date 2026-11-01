@@ -50,14 +50,26 @@ async function Channel(guild: Guild, id: string): Promise<SendableChannels | nul
     return found?.isTextBased() && found.type !== ChannelType.GuildStageVoice ? (found as SendableChannels) : null;
 }
 
-/** Die alte Nachricht des Bots löschen, soweit sie noch da ist. */
-async function Remove(guild: Guild, post: ILevelBoardPost): Promise<void> {
-    if (!post.messageId) return;
+/**
+ * Die alte Nachricht des Bots löschen, soweit sie noch da ist. false: ein
+ * Aussetzer bei Discord - der Zustand bleibt, der nächste Blick versucht es
+ * wieder (W-0045). Ohne Rechte im alten Kanal gilt sie als erledigt, dort
+ * kommt der Bot nie wieder hin.
+ */
+async function Remove(guild: Guild, post: ILevelBoardPost): Promise<boolean> {
+    if (!post.messageId) return true;
 
     const channel = await Channel(guild, post.channelId);
-    const message = await channel?.messages.fetch(post.messageId).catch(() => null);
 
-    await message?.delete().catch(() => undefined);
+    if (!channel) return true;
+
+    try {
+        await (await channel.messages.fetch(post.messageId)).delete();
+
+        return true;
+    } catch (error) {
+        return Gone(error) || Denied(error);
+    }
 }
 
 /** Je Server läuft ein Blick nach dem anderen - sonst schicken Runde und Dashboard beide eine neue Nachricht (Review). */
@@ -83,7 +95,8 @@ async function Look(client: BotClient, guild: Guild, settings: ILevelSettings, f
     const before = await client.levelBoardPosts.Of(guild.id);
 
     if (before && (!want?.on || before.channelId !== want.channelId)) {
-        await Remove(guild, before);
+        if (!(await Remove(guild, before))) return "failed";
+
         await client.levelBoardPosts.Remove(guild.id);
     }
 
@@ -91,8 +104,10 @@ async function Look(client: BotClient, guild: Guild, settings: ILevelSettings, f
 
     const channelId = want.channelId;
     const current = before?.channelId === channelId ? before : null;
-    // updatedAt heißt „zuletzt gezeichnet“ - ein Fehler ändert es nicht.
+    // updatedAt heißt „zuletzt gezeichnet“ - ein Fehler ändert es nicht. Derselbe Fehler wie beim letzten Blick steht schon da (W-0045).
     const fail = async (error: string): Promise<"failed"> => {
+        if (current?.error === error) return "failed";
+
         logger.warn(`📈 Rangliste im Kanal auf ${guild.id}: ${error}`);
         await client.levelBoardPosts.Set({ guildId: guild.id, channelId, messageId: current?.messageId ?? null, fingerprint: current?.fingerprint ?? "", error, updatedAt: current?.updatedAt ?? Date.now() });
 
