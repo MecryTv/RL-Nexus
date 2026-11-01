@@ -944,7 +944,7 @@ async function checkImages(): Promise<void> {
 function BoardChannels(world: IWorld) {
     const messages = new Map<string, { channelId: string; payload: unknown }>();
     const log: string[] = [];
-    const state = { deny: false, flaky: false };
+    const state = { deny: false, flaky: false, cached: null as string | null };
     let next = 1;
 
     for (const channel of world.guild.channels.cache.values()) {
@@ -962,6 +962,9 @@ function BoardChannels(world: IWorld) {
             messages: {
                 fetch: async (id: string) => {
                     if (state.flaky) throw Object.assign(new Error("Service Unavailable"), { status: 503 });
+
+                    // Gelöscht, discord.js hat sie aber noch im Zwischenspeicher: Holen klappt, Bearbeiten nicht.
+                    if (state.cached === id) return { id, edit: async () => Promise.reject(Object.assign(new Error("Unknown Message"), { code: 10008 })), delete: async () => undefined };
 
                     const found = messages.get(id);
 
@@ -1069,6 +1072,23 @@ async function checkBoardPost(): Promise<void> {
     check("Keine Rechte: Fehler im Zustand statt Abbruch", (await PostBoard(world.client, world.guild, world.settings, false)) === "failed" && Boolean((await state())?.error?.includes("posten")), JSON.stringify(await state()));
     discord.state.deny = false;
     check("Rechte wieder da: beim nächsten Blick geschickt, Fehler weg", (await PostBoard(world.client, world.guild, world.settings, false)) === "sent" && (await state())?.error === null, JSON.stringify(await state()));
+
+    // Review: nur noch im Zwischenspeicher - beim nächsten Blick neu geschickt statt „keine Rechte“.
+    const cachedId = (await state())?.messageId ?? null;
+
+    discord.messages.delete(cachedId!);
+    discord.state.cached = cachedId;
+    check("Nachricht nur noch im Zwischenspeicher: neu geschickt", (await PostBoard(world.client, world.guild, world.settings, true)) === "sent" && (await state())?.messageId !== cachedId && (await state())?.error === null, JSON.stringify({ log: discord.log.slice(-2), state: await state() }));
+    discord.state.cached = null;
+
+    // Review: Runde und Dashboard gleichzeitig - genau eine Nachricht.
+    const twice = World({ boardPost: { on: true, channelId: TEXT, period: "all" } });
+    const twiceDiscord = BoardChannels(twice);
+
+    twice.member(USER);
+    await twice.client.levels.Add(GUILD, USER, 100, { messages: 1 });
+    await Promise.all([PostBoard(twice.client, twice.guild, twice.settings, false), PostBoard(twice.client, twice.guild, twice.settings, true)]);
+    check("Zwei Blicke gleichzeitig: genau eine Nachricht", twiceDiscord.log.filter((line) => line.startsWith("send")).length === 1 && twiceDiscord.messages.size === 1, twiceDiscord.log.join());
 
     // Knöpfe der Nachricht: immer eine eigene Ansicht
     const deferred: unknown[] = [];

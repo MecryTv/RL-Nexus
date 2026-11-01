@@ -35,6 +35,15 @@ function Gone(error: unknown): boolean {
     return code === 10003 || code === 10008;
 }
 
+/** Fehlende Rechte (Missing Access, Missing Permissions) - sonst war es ein Aussetzer. */
+function Denied(error: unknown): boolean {
+    const code = (error as { code?: unknown }).code;
+
+    return code === 50001 || code === 50013;
+}
+
+const NO_ANSWER = "Discord hat nicht geantwortet. Beim nächsten Blick versuche ich es wieder.";
+
 async function Channel(guild: Guild, id: string): Promise<SendableChannels | null> {
     const found = guild.channels.cache.get(id) ?? (await guild.channels.fetch(id).catch(() => null));
 
@@ -51,12 +60,24 @@ async function Remove(guild: Guild, post: ILevelBoardPost): Promise<void> {
     await message?.delete().catch(() => undefined);
 }
 
+/** Je Server läuft ein Blick nach dem anderen - sonst schicken Runde und Dashboard beide eine neue Nachricht (Review). */
+const looking = new Map<string, Promise<unknown>>();
+
 /**
  * Ein Blick auf die Rangliste im Kanal. Aus, Modul aus oder anderer Kanal:
  * die alte Nachricht verschwindet. force: neu zeichnen, auch wenn sich nichts
  * geändert hat („Jetzt neu zeichnen“ im Dashboard).
  */
-export async function PostBoard(client: BotClient, guild: Guild, settings: ILevelSettings, force: boolean): Promise<BoardPostResult> {
+export function PostBoard(client: BotClient, guild: Guild, settings: ILevelSettings, force: boolean): Promise<BoardPostResult> {
+    const next = (looking.get(guild.id) ?? Promise.resolve()).catch(() => undefined).then(() => Look(client, guild, settings, force));
+
+    looking.set(guild.id, next);
+    void next.catch(() => undefined).finally(() => looking.get(guild.id) === next && looking.delete(guild.id));
+
+    return next;
+}
+
+async function Look(client: BotClient, guild: Guild, settings: ILevelSettings, force: boolean): Promise<BoardPostResult> {
     const active = (await client.settings.Of(guild.id)).modules.includes(LEVELS_MODULE);
     const want = active ? settings.boardPost : null;
     const before = await client.levelBoardPosts.Of(guild.id);
@@ -91,7 +112,7 @@ export async function PostBoard(client: BotClient, guild: Guild, settings: ILeve
             if (!Gone(error)) {
                 const code = (error as { code?: unknown }).code;
 
-                return fail(code === 50001 || code === 50013 ? "Ich darf den Kanal nicht sehen oder den Verlauf nicht lesen." : "Discord hat nicht geantwortet. Beim nächsten Blick versuche ich es wieder.");
+                return fail(code === 50001 || code === 50013 ? "Ich darf den Kanal nicht sehen oder den Verlauf nicht lesen." : NO_ANSWER);
             }
         }
     }
@@ -111,23 +132,28 @@ export async function PostBoard(client: BotClient, guild: Guild, settings: ILeve
 
         if (message) {
             // Von Bild zu Text und zurück: was nicht dazugehört, kommt weg.
-            const edited = await message
+            const failed = await message
                 .edit("content" in payload ? { content: payload.content, files: [], attachments: [], components: [] } : { content: null, ...payload, attachments: [] })
-                .then(() => true)
-                .catch(() => false);
+                .then(() => null, (error: unknown) => error ?? new Error("edit"));
 
-            if (!edited) return fail("Ich darf die Nachricht nicht bearbeiten (Kanal sehen, Dateien anhängen).");
+            if (!failed) {
+                await saved(message.id);
 
-            await saved(message.id);
+                return "edited";
+            }
 
-            return "edited";
+            // Doch weg, nur noch im Zwischenspeicher von discord.js (Review): dann eine neue.
+            if (!Gone(failed)) return fail(Denied(failed) ? "Ich darf die Nachricht nicht bearbeiten (Kanal sehen, Dateien anhängen)." : NO_ANSWER);
         }
 
-        const sent = await channel.send(payload).catch(() => null);
+        const sent = await channel.send(payload).then(
+            (posted) => ({ posted, error: null as unknown }),
+            (error: unknown) => ({ posted: null, error })
+        );
 
-        if (!sent) return fail("Ich darf im Kanal nicht posten (Nachrichten senden, Dateien anhängen).");
+        if (!sent.posted) return fail(Denied(sent.error) ? "Ich darf im Kanal nicht posten (Nachrichten senden, Dateien anhängen)." : NO_ANSWER);
 
-        await saved(sent.id);
+        await saved(sent.posted.id);
 
         return "sent";
     } catch (error) {
