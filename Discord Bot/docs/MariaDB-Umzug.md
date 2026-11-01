@@ -108,7 +108,7 @@ sudo certbot --nginx -d db.nexus-emb.de
 ```bash
 systemctl is-active mariadb php8.4-fpm                     # active, active
 sudo ss -tlnp | grep 3306                                  # 0.0.0.0:3306 … mariadbd
-sudo ufw status | grep 3306                                # 3306/tcp  ALLOW  172.16.0.0/12
+sudo ufw status | grep 3306                                # 3306/tcp  ALLOW  172.30.10.0/24
 docker compose -f docker-compose.prod.yml ps               # admin, bot, status, website, kein mariadb mehr
 docker compose -f docker-compose.prod.yml logs admin | tail -n 20
 curl -s https://admin.nexus-emb.de/healthz                 # {"ok":true}
@@ -149,7 +149,7 @@ Die beiden SQL-Dateien unter `/root/` (`vor-dem-umzug.sql`, `mariadb-umzug-….s
 | `Port 3306 belegt schon etwas anderes` | `sudo ss -tlnp \| grep 3306` zeigt was. Der alte Container hat keinen Port nach außen, er ist es also nicht |
 | `die Zeilen weichen ab` | Die Liste darüber zeigt die Tabellen, links Container, rechts Server. Bot und Admin Dashboard wieder starten (oben) und die Ausgabe klären, bevor es weitergeht |
 | Nach Schritt 4: `pool failed to retrieve a connection from pool` im Log von Bot oder Admin Dashboard | Meist fehlen die Zeitzonen (`sudo mariadb -e "SELECT COUNT(*) FROM mysql.time_zone_name"` zeigt 0). `sudo sh -c 'mariadb-tzinfo-to-sql /usr/share/zoneinfo 2>/dev/null \| mariadb mysql'`, danach `docker compose -f docker-compose.prod.yml restart bot admin` |
-| Nach Schritt 4: `Datenbank nicht erreichbar (host.docker.internal:3306/…)` | `sudo ufw status \| grep 3306` (Regel da?), `sudo mariadb -e "SELECT user, host FROM mysql.user"` (`rlnexus` mit `localhost` und `172.16.0.0/255.240.0.0`), `docker network inspect rlnexus_default \| grep Subnet` (muss zwischen 172.16 und 172.31 liegen). Danach `docker compose -f docker-compose.prod.yml restart bot admin` |
+| Nach Schritt 4: `Datenbank nicht erreichbar (host.docker.internal:3306/…)` | `sudo ufw status \| grep 3306` (Regel da?), `sudo mariadb -e "SELECT user, host FROM mysql.user"` (`rlnexus` mit `localhost` und `172.30.10.0/255.255.255.0`), `docker network inspect rlnexus_default \| grep Subnet` (muss `172.30.10.0/24` sein, W-0044). Danach `docker compose -f docker-compose.prod.yml restart bot admin` |
 | `db.nexus-emb.de` zeigt nach der Eingabe von Name und Passwort 403 | Die Datei `/etc/nginx/db.nexus-emb.de.htpasswd` fehlt (Schritt 5). nginx fragt trotzdem erst nach Name und Passwort |
 | `db.nexus-emb.de` zeigt 500 | nginx darf `/etc/nginx/db.nexus-emb.de.htpasswd` nicht lesen (`chown root:www-data`, `chmod 640`), oder `/etc/phpmyadmin/rlnexus-ohne-hinweise.php` fehlt: das Skript noch einmal laufen lassen. `sudo tail /var/log/nginx/error.log` |
 | `db.nexus-emb.de` zeigt 502 | php-fpm läuft nicht oder der Socket heißt anders: `ls /run/php/`, dann `fastcgi_pass` in `/etc/nginx/sites-available/db.nexus-emb.de` anpassen |

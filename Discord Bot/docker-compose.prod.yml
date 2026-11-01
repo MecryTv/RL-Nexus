@@ -175,3 +175,12 @@ services:
 
 volumes:
     images:
+
+# W-0044: ein festes Netz für alle Container hier. ufw und MariaDB lassen Port
+# 3306 nur aus genau diesem Netz durch (scripts/mariadb-einrichten.sh), nicht
+# aus allen Docker-Netzen - die von Mailcow und SnappyMail bleiben draußen.
+networks:
+    default:
+        ipam:
+            config:
+                - subnet: 172.30.10.0/24
