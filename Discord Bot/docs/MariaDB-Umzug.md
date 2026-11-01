@@ -26,7 +26,7 @@ Wie es danach dauerhaft aussieht, steht in [Hosting.md](Hosting.md). Diese Datei
 
 ```bash
 cd /home/rlnexus
-docker exec rlnexus-mariadb sh -c 'mariadb-dump -u root -p"$MARIADB_ROOT_PASSWORD" --all-databases' > /root/vor-dem-umzug.sql
+docker exec rlnexus-mariadb sh -c 'MYSQL_PWD="$MARIADB_ROOT_PASSWORD" mariadb-dump -u root --all-databases' | sudo tee /root/vor-dem-umzug.sql >/dev/null
 cp docker-compose.prod.yml /root/docker-compose.prod.yml.vor-umzug
 ```
 
@@ -144,13 +144,14 @@ Die beiden SQL-Dateien unter `/root/` (`vor-dem-umzug.sql`, `mariadb-umzug-….s
 | Wann | Was tun |
 |---|---|
 | Skript bricht vor „Stand aus dem Container sichern“ ab | Am Betrieb hat sich nichts geändert. Ursache beheben, Skript neu starten |
-| Skript bricht danach ab | Bot und Admin Dashboard sind gestoppt, der alte Container läuft. Zurück zum alten Stand: `docker start rlnexus-bot rlnexus-admin`. Ein zweiter Lauf des Skripts spielt nichts doppelt ein: Hat die Datenbank auf dem Server schon Tabellen, lässt es den Import aus |
+| Skript bricht danach ab | Bot und Admin Dashboard sind gestoppt, der alte Container läuft. Zurück zum alten Stand: `docker start rlnexus-bot rlnexus-admin`. Ein zweiter Lauf hält nichts an, solange auf dem Server schon Tabellen ohne fertigen Umzug liegen: Er bricht vorher ab und nennt den Befehl, mit dem du sie löschst. Danach spielt er alles neu ein und vermerkt den fertigen Umzug in `/etc/mysql/rlnexus-umzug-fertig` |
 | `ufw läuft nicht` | Siehe [Vorher](#vorher). Nicht einfach `ufw enable`: Ohne die Mail-Ports von Mailcow steht danach die Post |
 | `Port 3306 belegt schon etwas anderes` | `sudo ss -tlnp \| grep 3306` zeigt was. Der alte Container hat keinen Port nach außen, er ist es also nicht |
 | `die Zeilen weichen ab` | Die Liste darüber zeigt die Tabellen, links Container, rechts Server. Bot und Admin Dashboard wieder starten (oben) und die Ausgabe klären, bevor es weitergeht |
 | Nach Schritt 4: `pool failed to retrieve a connection from pool` im Log von Bot oder Admin Dashboard | Meist fehlen die Zeitzonen (`sudo mariadb -e "SELECT COUNT(*) FROM mysql.time_zone_name"` zeigt 0). `sudo sh -c 'mariadb-tzinfo-to-sql /usr/share/zoneinfo 2>/dev/null \| mariadb mysql'`, danach `docker compose -f docker-compose.prod.yml restart bot admin` |
 | Nach Schritt 4: `Datenbank nicht erreichbar (host.docker.internal:3306/…)` | `sudo ufw status \| grep 3306` (Regel da?), `sudo mariadb -e "SELECT user, host FROM mysql.user"` (`rlnexus` mit `localhost` und `172.16.0.0/255.240.0.0`), `docker network inspect rlnexus_default \| grep Subnet` (muss zwischen 172.16 und 172.31 liegen). Danach `docker compose -f docker-compose.prod.yml restart bot admin` |
-| `db.nexus-emb.de` zeigt 500 | Die Datei `/etc/nginx/db.nexus-emb.de.htpasswd` fehlt oder nginx darf sie nicht lesen (Schritt 5). `sudo tail /var/log/nginx/error.log` |
+| `db.nexus-emb.de` zeigt nach der Eingabe von Name und Passwort 403 | Die Datei `/etc/nginx/db.nexus-emb.de.htpasswd` fehlt (Schritt 5). nginx fragt trotzdem erst nach Name und Passwort |
+| `db.nexus-emb.de` zeigt 500 | nginx darf `/etc/nginx/db.nexus-emb.de.htpasswd` nicht lesen (`chown root:www-data`, `chmod 640`), oder `/etc/phpmyadmin/rlnexus-ohne-hinweise.php` fehlt: das Skript noch einmal laufen lassen. `sudo tail /var/log/nginx/error.log` |
 | `db.nexus-emb.de` zeigt 502 | php-fpm läuft nicht oder der Socket heißt anders: `ls /run/php/`, dann `fastcgi_pass` in `/etc/nginx/sites-available/db.nexus-emb.de` anpassen |
 
 Ganz zurück zum Container, auch nach Schritt 4:
