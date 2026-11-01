@@ -15,3 +15,15 @@ export const LEVEL_FIELDS = {
 } as const satisfies Record<string, readonly string[]>;
 
 export type LevelView = keyof typeof LEVEL_FIELDS;
+
+/** W-0045: der Hinweis unter „Kanal“ beim Aufsteigen, wenn keiner gewählt ist - je nach Wahl. */
+export function NoChannelHint(announce: "current" | "channel" | "off"): string {
+    return announce === "current"
+        ? "Noch kein Kanal gewählt. Aufstiege im Chat kommen weiter dort an, die aus dem Voice und dem Nachtrag nicht. Speichern geht erst mit Kanal."
+        : "Noch kein Kanal gewählt. Ohne Kanal kommt keine Aufstiegs-Nachricht, und speichern geht erst mit Kanal.";
+}
+
+/** W-0045: die Meldung nach dem Speichern der Rangliste im Kanal. */
+export function BoardPostTitle(on: boolean, error: string | null | undefined): string {
+    return error ? "Nicht gezeichnet" : on ? "Rangliste im Kanal an" : "Rangliste im Kanal aus";
+}

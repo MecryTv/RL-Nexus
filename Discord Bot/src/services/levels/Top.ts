@@ -223,9 +223,13 @@ export async function AnnounceBoosts(client: BotClient, guild: Guild, settings: 
                 continue;
             }
 
-            const { builder, files } = await RenderDoc(client, edge.doc, values(), { fallback: edge.text() });
+            // Geht die Karte nicht raus (Zeichnen, keine Rechte für Anhänge), kommt der bisherige Satz - nie gar nichts (W-0045).
+            const card = await RenderDoc(client, edge.doc, values(), { fallback: edge.text() })
+                .then(({ builder, files }): Promise<unknown> => (channel as SendableChannels).send({ components: [builder.build()], files, flags: MessageFlags.IsComponentsV2, allowedMentions: { parse: ["roles"] } }))
+                .then(() => true)
+                .catch(() => false);
 
-            await (channel as SendableChannels).send({ components: [builder.build()], files, flags: MessageFlags.IsComponentsV2, allowedMentions: { parse: ["roles"] } }).catch(() => undefined);
+            if (!card) await (channel as SendableChannels).send({ content: edge.text(), allowedMentions: { parse: [] } }).catch(() => undefined);
         }
     }
 }

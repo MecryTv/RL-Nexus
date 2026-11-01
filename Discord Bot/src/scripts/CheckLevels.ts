@@ -35,7 +35,7 @@ import DashboardLeaderboardImage from "../routes/DashboardLeaderboardImage";
 import { RankOrder, Trend } from "../services/levels/Board";
 import { MODULES as CLIENT_MODULES } from "../dashboard/client/constants/Modules";
 import { BOOST_PLACEHOLDERS as CLIENT_BOOST_PLACEHOLDERS } from "../dashboard/client/constants/Placeholders";
-import { LEVEL_FIELDS } from "../dashboard/client/constants/LevelFields";
+import { BoardPostTitle, LEVEL_FIELDS, NoChannelHint } from "../dashboard/client/constants/LevelFields";
 import { BOARD_TEMPLATES, CARD_TEMPLATES, DefaultBoardStyle, UP_TEMPLATES } from "../constants/LevelDesign";
 import { RenderDesign } from "../builder/DesignRenderer";
 import { IBoardDesign } from "../interfaces/services/levels/ILevelDesign";
@@ -682,6 +682,18 @@ async function checkAnnounce(): Promise<void> {
     const mo = voice.member(OTHER);
 
     await voice.service.Credit(mo, XpForLevel(1, voice.settings.base), { voiceMinutes: 1 }, voice.settings, null);
+    // W-0045 (4): Ohne Kanal wird beim Aufstieg nicht erst der Rang gezählt.
+    const quietRank = World();
+    let ranked = 0;
+
+    (quietRank.client.levels as unknown as { Rank: () => Promise<number> }).Rank = async () => {
+        ranked++;
+
+        return 1;
+    };
+    await quietRank.service.Credit(quietRank.member(OTHER), XpForLevel(1, quietRank.settings.base), { voiceMinutes: 1 }, quietRank.settings, null);
+    check("Aufstieg ohne Kanal: keine Rang-Abfrage", ranked === 0, String(ranked));
+
     // W-0043: Aufstiege nie mehr per DM.
     check("Voice ohne festen Kanal: keine Nachricht, keine DM", voice.sent.length === 0, JSON.stringify(voice.sent));
 
@@ -944,7 +956,7 @@ async function checkImages(): Promise<void> {
 function BoardChannels(world: IWorld) {
     const messages = new Map<string, { channelId: string; payload: unknown }>();
     const log: string[] = [];
-    const state = { deny: false, flaky: false, cached: null as string | null };
+    const state = { deny: false, flaky: false, cached: null as string | null, deleteFlaky: false };
     let next = 1;
 
     for (const channel of world.guild.channels.cache.values()) {
@@ -979,6 +991,8 @@ function BoardChannels(world: IWorld) {
                             return { id };
                         },
                         delete: async () => {
+                            if (state.deleteFlaky) throw Object.assign(new Error("Service Unavailable"), { status: 503 });
+
                             messages.delete(id);
                             log.push(`delete ${id}`);
                         },
@@ -1090,6 +1104,35 @@ async function checkBoardPost(): Promise<void> {
     await Promise.all([PostBoard(twice.client, twice.guild, twice.settings, false), PostBoard(twice.client, twice.guild, twice.settings, true)]);
     check("Zwei Blicke gleichzeitig: genau eine Nachricht", twiceDiscord.log.filter((line) => line.startsWith("send")).length === 1 && twiceDiscord.messages.size === 1, twiceDiscord.log.join());
 
+    // W-0045 (1): Scheitert das Löschen beim Ausschalten, bleibt der Zustand - der nächste Blick löscht.
+    const keep = World({ boardPost: { on: true, channelId: TEXT, period: "all" } });
+    const keepDiscord = BoardChannels(keep);
+    const kept = () => keep.client.levelBoardPosts.Of(GUILD);
+
+    keep.member(USER);
+    await keep.client.levels.Add(GUILD, USER, 100, { messages: 1 });
+    await PostBoard(keep.client, keep.guild, keep.settings, false);
+    keep.settings.boardPost = { on: false, channelId: TEXT, period: "all" };
+    keepDiscord.state.deleteFlaky = true;
+    await PostBoard(keep.client, keep.guild, keep.settings, false);
+    check("Aussetzer beim Löschen: Zustand bleibt stehen", (await kept())?.messageId === "m1" && keepDiscord.messages.has("m1"), JSON.stringify(await kept()));
+    keepDiscord.state.deleteFlaky = false;
+    await PostBoard(keep.client, keep.guild, keep.settings, false);
+    check("Nächster Blick: alte Nachricht gelöscht, Zustand weg", !keepDiscord.messages.has("m1") && (await kept()) === null, keepDiscord.log.join());
+
+    // W-0045 (6): Ein gleichbleibender Fehler wird nur einmal geschrieben (und geloggt).
+    const lost = World({ boardPost: { on: true, channelId: "999", period: "all" } });
+    let writes = 0;
+    const write = lost.client.levelBoardPosts.Set.bind(lost.client.levelBoardPosts);
+
+    (lost.client.levelBoardPosts as unknown as { Set: typeof write }).Set = async (post) => {
+        writes++;
+        await write(post);
+    };
+    await PostBoard(lost.client, lost.guild, lost.settings, false);
+    await PostBoard(lost.client, lost.guild, lost.settings, false);
+    check("Kanal weg, zweimal nachgesehen: Fehler nur einmal geschrieben", writes === 1 && Boolean((await lost.client.levelBoardPosts.Of(GUILD))?.error), String(writes));
+
     // Knöpfe der Nachricht: immer eine eigene Ansicht
     const deferred: unknown[] = [];
     let updates = 0;
@@ -1156,6 +1199,26 @@ async function checkBoardPost(): Promise<void> {
     check("Speichern ohne Änderung an der Rangliste: Nachricht bleibt, wie sie ist", deskDiscord.log.length === 2, deskDiscord.log.join());
 
     const turnedOff = await route.Write(access, { action: "save", settings: { ...desk.settings, boardPost: { on: false, channelId: TEXT, period: "all" } } });
+
+    // W-0045 (2): Scheitert das Zeichnen nach dem Speichern, ist das Speichern trotzdem geglückt.
+    const shaky = World();
+    const shakyRoute = new DashboardApiLevels(shaky.client) as unknown as { Write: (access: unknown, body: unknown) => Promise<Record<string, unknown>> };
+    const original = shaky.client.levelBoardPosts.Of.bind(shaky.client.levelBoardPosts);
+    let broken = true;
+
+    BoardChannels(shaky);
+    (shaky.client.levelBoardPosts as unknown as { Of: typeof original }).Of = async (guildId) => {
+        if (broken) {
+            broken = false;
+            throw new Error("Datenbank weg");
+        }
+
+        return original(guildId);
+    };
+
+    const shakySave = await shakyRoute.Write({ guild: shaky.guild, member: { id: USER } }, { action: "save", settings: { boardPost: { on: true, channelId: TEXT, period: "all" } } }).catch((error: Error) => error);
+
+    check("Zeichnen scheitert nach dem Speichern: kein Fehler, gespeichert", !(shakySave instanceof Error) && shakySave.ok === true && shaky.settings.boardPost.on === true, String(shakySave instanceof Error ? shakySave.message : JSON.stringify(shakySave)));
 
     check("Ausschalten im Dashboard: Nachricht gleich weg", deskDiscord.log.at(-1) === "delete m1" && turnedOff.boardPostStatus === null, JSON.stringify({ log: deskDiscord.log, status: turnedOff.boardPostStatus }));
 }
@@ -1314,6 +1377,12 @@ function checkAlwaysOn(): void {
         (LEVEL_FIELDS.levels as readonly string[]).includes("boosts") && (LEVEL_FIELDS.levels as readonly string[]).includes("boostChannelId") && (LEVEL_FIELDS["level-rewards"] as readonly string[]).includes("top"),
         JSON.stringify(LEVEL_FIELDS)
     );
+    // W-0045 (3): Der Hinweis ohne Kanal passt zur Wahl.
+    check("Hinweis ohne Kanal bei „Im Kanal, in dem es passiert“: nur Voice und Nachtrag fehlen", /Voice/.test(NoChannelHint("current")) && !/kommt keine Aufstiegs-Nachricht/.test(NoChannelHint("current")), NoChannelHint("current"));
+    check("Hinweis ohne Kanal bei „In einem festen Kanal“: gar keine Nachricht", /keine Aufstiegs-Nachricht/.test(NoChannelHint("channel")), NoChannelHint("channel"));
+    // W-0045 (7): Nach dem Speichern mit Fehler heißt die Meldung „Nicht gezeichnet“.
+    check("Meldung nach dem Speichern: mit Fehler „Nicht gezeichnet“, sonst an/aus", BoardPostTitle(true, "Keine Rechte") === "Nicht gezeichnet" && BoardPostTitle(true, null) === "Rangliste im Kanal an" && BoardPostTitle(false, null) === "Rangliste im Kanal aus");
+
     // Plan 43: die Boost-Nachrichten speichert die Seite Level System mit den Fenstern.
     check("Level System speichert die Boost-Nachrichten mit", (LEVEL_FIELDS.levels as readonly string[]).includes("boostMessages"), JSON.stringify(LEVEL_FIELDS.levels));
     check("Belohnungen speichern die Zeile nicht mehr", !(LEVEL_FIELDS["level-rewards"] as readonly string[]).includes("upLine") && (LEVEL_FIELDS["level-rewards"] as readonly string[]).includes("upMode"), JSON.stringify(LEVEL_FIELDS["level-rewards"]));
@@ -2126,6 +2195,19 @@ async function checkTop(): Promise<void> {
     );
     check("Gestalteter Beginn: Rollen pingen, @everyone nicht", JSON.stringify(card?.allowedMentions) === JSON.stringify({ parse: ["roles"] }), JSON.stringify(card?.allowedMentions));
     check("Ende ohne Gestaltung: der bisherige Satz", (designed.sent[1]?.payload as { content?: string } | undefined)?.content === "Die 2× XP sind vorbei.", JSON.stringify(designed.sent.map((entry) => entry.text.slice(0, 80))));
+
+    // W-0045 (5): Geht die Karte nicht raus (etwa ohne „Dateien anhängen“), kommt der bisherige Satz.
+    const noCard = World(
+        {
+            boosts: [{ id: "party", kind: "once", factor: 2, start: t0, end: t0 + 3_600_000, weekday: null, from: null, to: null, announce: true }],
+            boostChannelId: TEXT,
+            boostMessages: { start: { accent: "#22c55e", blocks: [{ type: "text", body: "Los: {boost}" }] }, end: null },
+        },
+        { noFiles: true }
+    );
+
+    await new LevelSchedule(noCard.client).Execute(t0 + 30_000);
+    check("Karte scheitert: der bisherige Satz ohne Pings", (noCard.sent.at(-1)?.payload as { content?: string; allowedMentions?: unknown } | undefined)?.content === "Ab jetzt: **2× XP bis 21:00**." && JSON.stringify((noCard.sent.at(-1)?.payload as { allowedMentions?: unknown }).allowedMentions) === JSON.stringify({ parse: [] }), JSON.stringify(noCard.sent.map((entry) => entry.text.slice(0, 80))));
 
     // Bereinigung
     const cleaner = new LevelService({} as BotClient);

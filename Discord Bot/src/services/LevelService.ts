@@ -500,6 +500,14 @@ export default class LevelService {
     ): Promise<void> {
         if (settings.announce === "off") return;
 
+        // Der Kanal, in dem es passiert, oder der feste. Ohne Kanal keine Nachricht - per DM nicht mehr (W-0043), und erst
+        // dann den Rang zählen (W-0045).
+        const target = settings.announce === "current" ? (channelId ?? settings.announceChannelId) : settings.announceChannelId;
+        const found = target ? (member.guild.channels.cache.get(target) ?? (await member.guild.channels.fetch(target).catch(() => null))) : null;
+        const channel = found?.isTextBased() && found.type !== ChannelType.GuildStageVoice ? found : null;
+
+        if (!channel) return;
+
         const rank = await this.client.levels.Rank(member.guild.id, member.id);
         const values: Record<string, string> = {
             user: `<@${member.id}>`,
@@ -524,13 +532,6 @@ export default class LevelService {
 
             return { ...(content ? { content } : {}), files: [new AttachmentBuilder(png, { name: "aufstieg.png" })], allowedMentions: { users: [member.id] } };
         };
-        // Der Kanal, in dem es passiert, oder der feste. Ohne Kanal keine Nachricht - per DM nicht mehr (W-0043).
-        const target = settings.announce === "current" ? (channelId ?? settings.announceChannelId) : settings.announceChannelId;
-        const found = target ? (member.guild.channels.cache.get(target) ?? (await member.guild.channels.fetch(target).catch(() => null))) : null;
-        const channel = found?.isTextBased() && found.type !== ChannelType.GuildStageVoice ? found : null;
-
-        if (!channel) return;
-
         const send = (payload: MessageCreateOptions): Promise<Message | null> => channel.send(payload).catch(() => null);
         let sent: Message | null = null;
 

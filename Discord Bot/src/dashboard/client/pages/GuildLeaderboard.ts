@@ -14,6 +14,7 @@ import { toast } from "../core/Toast.js";
 import { api, button, card, confirmButton, el, face, IPerson, loading, personPicker, row, select, stat, toggle } from "../core/Ui.js";
 import { PERIOD_LABEL, VoiceText } from "../../../constants/Levels.js";
 import { debounce, onPulse } from "../core/Pulse.js";
+import { BoardPostTitle } from "../constants/LevelFields.js";
 
 type Period = "all" | "7d" | "30d";
 
@@ -214,7 +215,7 @@ export function renderLeaderboard(guildId: string): void {
 
             const error = answer.boardPostStatus?.error;
 
-            toast("info", draft.on ? "Rangliste im Kanal an" : "Rangliste im Kanal aus", error ?? (draft.on ? "Die Nachricht steht im Kanal." : "Die Nachricht ist gelöscht."));
+            toast("info", BoardPostTitle(draft.on, error), error ?? (draft.on ? "Die Nachricht steht im Kanal." : "Die Nachricht ist gelöscht."));
             paint();
         });
 

@@ -18,7 +18,7 @@ import { BOOST_PLACEHOLDERS, LEVEL_IMAGES, LEVEL_PLACEHOLDERS } from "../constan
 import { IServerEmoji } from "../layout/EmojiPicker.js";
 import { IMessageDoc } from "../layout/MessageEditor.js";
 import { bodyEditor, IBody } from "../layout/BodyEditor.js";
-import { LEVEL_FIELDS, LevelView } from "../constants/LevelFields.js";
+import { LEVEL_FIELDS, LevelView, NoChannelHint } from "../constants/LevelFields.js";
 
 interface IBonus {
     id: string;
@@ -471,7 +471,7 @@ export function renderLevels(guildId: string, view: LevelView = "levels"): void 
             "Was passiert, wenn jemand ein Level schafft.",
             row("Nachricht", "Im Kanal, in dem es passiert, oder an einer festen Stelle. Per DM schickt der Bot keine", where),
             row("Kanal", "Pflicht, solange die Nachricht an ist. Bei „Im Kanal, in dem es passiert“ landen hier die Aufstiege aus dem Voice", target),
-            ...(settings.announce !== "off" && !settings.announceChannelId ? [el("p", "hintline", "Noch kein Kanal gewählt. Ohne Kanal kommt keine Aufstiegs-Nachricht, und speichern geht erst mit Kanal.")] : []),
+            ...(settings.announce !== "off" && !settings.announceChannelId ? [el("p", "hintline", NoChannelHint(settings.announce))] : []),
             row("Wieder löschen", "Die Nachricht verschwindet nach dieser Zeit aus dem Kanal", remove),
             ...(settings.announce === "off" ? [] : [row("Als Bild oder Text", "Das Bild gestaltest du unter Level-Karte › Aufstieg", mode)]),
             ...(settings.announce === "off" || !asImage ? [] : [el("p", "hintline", "Das Bild und die Zeile darüber gestaltest du unter ", studioLink, ".")]),
