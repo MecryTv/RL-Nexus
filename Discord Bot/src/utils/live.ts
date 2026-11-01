@@ -6,7 +6,7 @@ import { ClearCookie, SESSION_COOKIE } from "../constants/Dashboard";
 import { SNOWFLAKE } from "../constants/Discord";
 import { ITicket } from "../interfaces/services/tickets/ITicket";
 import { SessionOf } from "./dashboard";
-import { PrivateGate, PrivateItem, StaffActor } from "./managegate";
+import { PrivateGate, PrivateItem, StaffActor, StaffGrantOf } from "./managegate";
 
 /**
  * Der gemeinsame Anfang aller Routen von Live Tickets: Sitzung, Server, darf
@@ -31,7 +31,7 @@ export async function LiveGate(client: BotClient, request: FastifyRequest, reply
     }
 
     // W-0011: Staff mit Freigabe nur mit dem extra Ja für die privaten Bereiche.
-    if (!PrivateGate(client, session, id, reply, "Live Tickets", PrivateItem(request))) return null;
+    if (!(await PrivateGate(client, session, id, reply, "Live Tickets", PrivateItem(request)))) return null;
 
     try {
         if (!(await service.CanSupport(session, id))) {
@@ -61,7 +61,7 @@ export async function LiveGate(client: BotClient, request: FastifyRequest, reply
         return null;
     }
 
-    return client.staffGrantService.Active(session.userId, id) ? { ...access, actor: StaffActor(session) } : access;
+    return (await StaffGrantOf(client, session, id)) ? { ...access, actor: StaffActor(session) } : access;
 }
 
 /** Das Ticket aus der Adresse - nur ein offenes, nur eins dieses Servers, nur wenn man es sehen darf. */

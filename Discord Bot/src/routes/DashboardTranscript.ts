@@ -5,6 +5,7 @@ import { FastifyReply, FastifyRequest } from "fastify";
 import BotClient from "../client/BotClient";
 import Route from "../structures/Route";
 import { PRIVATE_HINT } from "../constants/StaffGrant";
+import { StaffGrantOf } from "../utils/managegate";
 import { DASHBOARD_PATH } from "../constants/Dashboard";
 import { INLINE_TYPES, STORED_FILE } from "../constants/Transcripts";
 import { SessionOf, Unconfigured } from "../utils/dashboard";
@@ -71,7 +72,7 @@ export default class DashboardTranscript extends Route {
         const paid = !entry || own || (await this.client.dashboardService.GuildAllowed(session.userId, entry.guildId));
 
         // W-0011: Staff mit Freigabe liest mit dem extra Ja, ohne Mitglied zu sein - sonst nicht.
-        const grant = entry ? this.client.staffGrantService.Active(session.userId, entry.guildId) : null;
+        const grant = entry ? await StaffGrantOf(this.client, session, entry.guildId) : null;
 
         if (grant && grant.private !== "on") {
             return file !== undefined ? reply.code(403).send({ error: "Forbidden", hint: PRIVATE_HINT }) : Missing(reply, 403, PRIVATE_HINT);

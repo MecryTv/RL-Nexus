@@ -18,7 +18,8 @@ import Route from "../structures/Route";
 import { DASHBOARD_PATH, SESSION_COOKIE } from "../constants/Dashboard";
 import IDashboardGuild from "../interfaces/services/dashboard/IDashboardGuild";
 import DashboardService, { StaffOverlay } from "../services/DashboardService";
-import { ManageGate, PrivateGate, PrivateItem } from "../utils/managegate";
+import { ManageGate, PrivateGate, PrivateItem, StaffGrantOf } from "../utils/managegate";
+import LiveService from "../services/LiveService";
 import { SessionOf } from "../utils/dashboard";
 import BotClient from "../client/BotClient";
 import { PRIVATE_HINT, REQUEST_TTL_MS } from "../constants/StaffGrant";
@@ -415,7 +416,7 @@ class GateProbe extends Route {
     }
 }
 
-function GateApp(options: { grant: IStaffGrant | null; canManage: boolean; bot?: boolean; member?: boolean }) {
+function GateApp(options: { grant: IStaffGrant | null; canManage: boolean; bot?: boolean; member?: boolean; staff?: boolean }) {
     const logged: string[] = [];
     const guild = {
         id: GATE_GUILD,
@@ -432,6 +433,7 @@ function GateApp(options: { grant: IStaffGrant | null; canManage: boolean; bot?:
             Session: (cookie: string | undefined) =>
                 cookie === "gueltig" ? { id: "s", userId: "900", username: "Joe", avatar: null, accessToken: "x", mfa: true, expiresAt: Date.now() + 60_000 } : null,
             CanManage: async () => options.canManage,
+            IsStaff: async () => options.staff !== false,
             Secure: false,
         },
         databaseService: { Ready: true },
@@ -513,7 +515,7 @@ class PrivateProbe extends Route {
         const session = SessionOf(this.client, request)!;
         const { id } = request.params as { id: string };
 
-        if (!PrivateGate(this.client, session, id, reply, "Live Tickets", PrivateItem(request))) return reply;
+        if (!(await PrivateGate(this.client, session, id, reply, "Live Tickets", PrivateItem(request)))) return reply;
 
         return reply.send({ ok: true });
     }
@@ -525,6 +527,7 @@ function PrivateApp(grant: IStaffGrant | null) {
         dashboardService: {
             Session: (cookie: string | undefined) =>
                 cookie === "gueltig" ? { id: "s", userId: "900", username: "Joe", avatar: null, accessToken: "x", mfa: true, expiresAt: Date.now() + 60_000 } : null,
+            IsStaff: async () => true,
             Secure: false,
         },
         staffGrantService: {
@@ -879,6 +882,104 @@ function checkJoined(): void {
     check("Seine Liste wird neu geladen, die andere bleibt", !inner.guilds.has("s1") && inner.guilds.has("s2"));
 }
 
+/* ----------------------------------------------------------
+   Final Review: Fixes (je ein Test, erst rot)
+   ---------------------------------------------------------- */
+
+async function checkReviewFixes(): Promise<void> {
+    console.log("\n🩹 Funde aus dem Review\n");
+
+    // I1: zwei gleichzeitige Anfragen im selben Server
+    {
+        const store = FakeStore();
+        const service = FakeService(store);
+        const results = await Promise.allSettled([service.Request(RequestOf(GUILD)), service.Request(RequestOf(GUILD, "901"))]);
+        const fulfilled = results.filter((result) => result.status === "fulfilled").length;
+        const blocked = results.some((result) => result.status === "rejected" && result.reason instanceof StaffGrantBlocked);
+
+        check("I1: Zwei gleichzeitige Anfragen: nur eine kommt durch", fulfilled === 1 && blocked, results.map((result) => result.status).join(","));
+    }
+
+    // I2: Live Tickets melden Staff mit privatem Ja live, ohne Ja nicht
+    {
+        const sent: string[] = [];
+        let open = true;
+        const bot = { id: "bot" };
+        const live = new LiveService({
+            guilds: { cache: new Map([["100", { id: "100", members: { cache: new Map(), me: bot } }]]) },
+            ticketSettings: { Of: async () => ({ options: [] }) },
+            ticketService: { IsStaff: (member: { id: string }) => member.id === "bot" },
+            staffGrantService: { Active: (userId: string) => (userId === "900" ? Running({ private: open ? "on" : "none", endsAt: Date.now() + 60 * MIN }) : null) },
+        } as unknown as BotClient);
+
+        live.Subscribe("100", "900", (event) => sent.push(event), () => undefined);
+        await live["Broadcast"]({ guildId: "100", optionId: null } as never, "message", {}, { event: "ticket", data: { closed: true } });
+        open = false;
+        await live["Broadcast"]({ guildId: "100", optionId: null } as never, "message", {}, { event: "ticket", data: { closed: true } });
+
+        check("I2: Staff mit privatem Ja bekommt die Nachricht live", sent[0] === "message", sent.join(","));
+        check("I2: Ohne privates Ja: nur die Abmeldung", sent[1] === "ticket", sent.join(","));
+    }
+
+    // I3: Freigabe gilt nur, solange die Sitzung Staff ist
+    {
+        const grant = Running({ endsAt: Date.now() + 60 * MIN, private: "on" });
+        const client = (staff: boolean) =>
+            ({ staffGrantService: { Active: () => grant }, dashboardService: { IsStaff: async () => staff } }) as unknown as BotClient;
+        const session = { userId: "900" } as never;
+
+        check("I3: Gruppe noch da: Freigabe gilt", (await StaffGrantOf(client(true), session, "100")) === grant);
+        check("I3: Gruppe weg: Freigabe gilt nicht mehr", (await StaffGrantOf(client(false), session, "100")) === null);
+
+        const app = GateApp({ grant, canManage: true, staff: false });
+        check("I3: ManageGate ohne Gruppe: kein Ersatz-Mitglied (403)", (await app.call("GET")).statusCode === 403);
+    }
+
+    // I4: Backups: Server mit Staff-Freigabe sind kein Ziel „auf einen anderen Server“
+    {
+        const dashboard = new DashboardService({ staffGrantService: { Active: () => null } } as unknown as BotClient);
+
+        (dashboard as unknown as { GuildsOf: () => Promise<IDashboardGuild[]> }).GuildsOf = async () => [
+            { ...Card("500", "Owner") },
+            { ...Card("600", "Staff"), canManage: true, staff: { grantId: 1, until: Date.now() + 60_000, private: false, by: "1" } },
+        ];
+
+        const list = await dashboard.Manageable({ userId: "900" } as never);
+        check("I4: Manageable ohne Server, die nur über eine Freigabe verwaltet werden", list.length === 1 && list[0].id === "500", JSON.stringify(list));
+    }
+
+    // I5: Laden beim Start holt nach, wenn die Datenbank erst später bereit ist
+    {
+        const store = FakeStore();
+        const seed = FakeService(store);
+        const open = await seed.Request(RequestOf(GUILD));
+
+        await seed.Answer(open.id, "1", true, 60, false);
+
+        const late = FakeService(store);
+        const db = late["client"].databaseService as unknown as { Ready: boolean };
+
+        db.Ready = false;
+        await late.Load();
+        db.Ready = true;
+        await late.Tick(Date.now());
+
+        check("I5: Tick lädt nach, wenn Load zu früh kam", late.Active("900", "100")?.id === open.id);
+    }
+
+    // I6: Ohne Members-Intent keine Abfrage aller Mitglieder (sie hinge bis zum Timeout)
+    {
+        const service = new StaffGrantService({
+            config: { GUILD_MEMBER_INTENT: false },
+            dashboardService: { BetaMode: async () => false, Paywall: async () => true, ShopAccess: async () => ({ allowed: true }), BetaMember: async () => false },
+        } as unknown as BotClient);
+        const guild = { id: "100", ownerId: "1", members: { cache: new Map(), fetch: () => new Promise(() => undefined) } } as unknown as Guild;
+        const result = await Promise.race([service.Askees(guild).then((value) => value.users.join(",")), new Promise<string>((resolve) => setTimeout(() => resolve("hängt"), 1500))]);
+
+        check("I6: Askees ohne Intent wartet nicht auf alle Mitglieder", result === "1", result);
+    }
+}
+
 async function main(): Promise<void> {
     checkRules();
     checkAnswer();
@@ -895,6 +996,7 @@ async function main(): Promise<void> {
     await checkDmButtons();
     await checkApi();
     checkJoined();
+    await checkReviewFixes();
 
     console.log(failures ? `\n❌ ${failures} Prüfung(en) fehlgeschlagen` : "\n✅ Alles in Ordnung");
     process.exit(failures ? 1 : 0);

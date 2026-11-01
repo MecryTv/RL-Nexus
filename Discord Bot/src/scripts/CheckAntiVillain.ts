@@ -1132,6 +1132,8 @@ async function checkApiStaff(): Promise<void> {
 
     service.Active = () => ({ id: 1, guildId: GUILD, staffId: MOD, status: "active", endsAt: Date.now() + 60_000, private: open ? "on" : "none" });
     service.Seen = (_grant: unknown, area: string, item: string) => seen.push(`${area} › ${item}`);
+    // Die Freigabe gilt nur, solange die Sitzung Staff ist (StaffGrantOf).
+    (world.client.dashboardService as unknown as Record<string, unknown>).IsStaff = async () => true;
 
     const shut = await ask("GET");
     const body = (shut.statusCode === 200 ? shut.json() : {}) as { cases?: unknown[]; casesLocked?: boolean };

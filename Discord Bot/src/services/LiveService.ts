@@ -327,7 +327,9 @@ export default class LiveService {
         const option = OptionOf(config, ticket);
 
         for (const subscriber of subscribers) {
-            const member = guild.members.cache.get(subscriber.userId);
+            // W-0011: Staff hört über den Bot mit - nur mit privatem Ja, endet es, geht die Leitung zu (Review I2).
+            const grant = this.client.staffGrantService.Active(subscriber.userId, ticket.guildId);
+            const member = grant ? (grant.private === "on" ? guild.members.me : null) : guild.members.cache.get(subscriber.userId);
             const allowed = member ? this.client.ticketService.IsStaff(member, { config, option }) : false;
 
             if (allowed) subscriber.send(event, data);

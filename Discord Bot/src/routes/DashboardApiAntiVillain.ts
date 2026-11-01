@@ -15,7 +15,7 @@ import { QuarantineError } from "../services/antivillain/Quarantine";
 import { CreateLogThread, LogTargetError, LogTargets } from "../utils/logtarget";
 import { WantsJSON } from "../utils/admin";
 import logger from "../utils/logger";
-import { GuildResources, IManageAccess, ManageGate } from "../utils/managegate";
+import { GuildResources, IManageAccess, ManageGate, StaffGrantOf } from "../utils/managegate";
 
 interface IBody {
     action?: unknown;
@@ -89,7 +89,7 @@ export default class DashboardApiAntiVillain extends Route {
 
         // W-0011: Die Fälle sind ein privater Bereich - Staff mit Freigabe sieht sie nur mit dem extra Ja.
         const session = SessionOf(this.client, request);
-        const grant = session ? this.client.staffGrantService.Active(session.userId, access.guild.id) : null;
+        const grant = session ? await StaffGrantOf(this.client, session, access.guild.id) : null;
         const locked = grant !== null && grant.private !== "on";
 
         if (writing && locked && CASE_ACTIONS.has(String((request.body as IBody | undefined)?.action))) {

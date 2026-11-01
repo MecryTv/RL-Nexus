@@ -44,7 +44,7 @@ export default class DashboardApiTranscripts extends Route {
         if (writing && !WantsJSON(request)) return reply.code(415).send({ error: "Nur application/json" });
 
         // W-0011: Staff mit Freigabe nur mit dem extra Ja für die privaten Bereiche.
-        if (!PrivateGate(this.client, session, id, reply, "Transcripts", "Liste")) return reply;
+        if (!(await PrivateGate(this.client, session, id, reply, "Transcripts", "Liste"))) return reply;
 
         let manage: boolean;
 

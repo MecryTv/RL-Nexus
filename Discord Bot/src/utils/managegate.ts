@@ -58,6 +58,17 @@ export function StaffWrite(client: BotClient, request: FastifyRequest, reply: Fa
     });
 }
 
+/**
+ * W-0011: die laufende Freigabe dieser Sitzung - aber nur, solange sie noch
+ * Staff ist. Verliert jemand die Gruppe, endet sein Zugriff sofort, auch wenn
+ * die Freigabe noch läuft (Review I3).
+ */
+export async function StaffGrantOf(client: BotClient, session: IDashboardSession, guildId: string): Promise<IStaffGrant | null> {
+    const grant = client.staffGrantService.Active(session.userId, guildId);
+
+    return grant && (await client.dashboardService.IsStaff(session.userId)) ? grant : null;
+}
+
 /** W-0011: was in einem privaten Bereich angesehen wurde, aus der Adresse. */
 export function PrivateItem(request: FastifyRequest): string {
     const params = (request.params ?? {}) as Record<string, string | undefined>;
@@ -77,8 +88,8 @@ export function PrivateItem(request: FastifyRequest): string {
  * erfolgreiche Änderung auch. Alle anderen gehen unverändert durch.
  * false heißt: die Antwort ist schon raus.
  */
-export function PrivateGate(client: BotClient, session: IDashboardSession, guildId: string, reply: FastifyReply, area: string, item: string): boolean {
-    const grant = client.staffGrantService.Active(session.userId, guildId);
+export async function PrivateGate(client: BotClient, session: IDashboardSession, guildId: string, reply: FastifyReply, area: string, item: string): Promise<boolean> {
+    const grant = await StaffGrantOf(client, session, guildId);
 
     if (!grant) return true;
 
@@ -108,7 +119,7 @@ export async function MemberOrStandIn(
     reply: FastifyReply,
     missing = "Du bist auf diesem Server kein Mitglied."
 ): Promise<{ member: GuildMember; actor: IActor; grant: IStaffGrant | null } | null> {
-    const grant = client.staffGrantService.Active(session.userId, guild.id);
+    const grant = await StaffGrantOf(client, session, guild.id);
 
     if (grant) {
         const me = guild.members.me;

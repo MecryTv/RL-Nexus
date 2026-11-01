@@ -32,6 +32,7 @@ export interface IStaffRequest {
 }
 
 const AREA = "Freigabe";
+const PENDING = "Gerade läuft schon eine Anfrage für diesen Server.";
 const CLOCK = new Intl.DateTimeFormat("de-DE", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Berlin" });
 
 /**
@@ -47,6 +48,8 @@ export default class StaffGrantService {
     private readonly seen = new Map<string, number>();
     /** Server, für die gerade eine Anfrage angelegt wird - gegen zwei gleichzeitige. */
     private readonly pending = new Set<string>();
+    /** Load lief schon mit Datenbank (sonst holt Tick es nach, Review I5). */
+    private loaded = false;
     dm: IStaffDm | null = null;
 
     constructor(client: BotClient) {
@@ -58,6 +61,8 @@ export default class StaffGrantService {
         if (!this.client.databaseService.Ready) return;
 
         for (const grant of await this.client.staffGrants.Live()) this.live.set(grant.id, grant);
+
+        this.loaded = true;
     }
 
     /** Wer gefragt wird: Free der Owner, Paid wer Zugang hat, Beta wer einen Code eingelöst hat (siehe AskList). */
@@ -67,7 +72,8 @@ export default class StaffGrantService {
 
         if (mode === "free") return { mode, users: [guild.ownerId] };
 
-        const members = await guild.members.fetch().catch(() => guild.members.cache);
+        // Ohne Members-Intent hinge fetch() bis zum Timeout - dann reicht, wer im Speicher ist (Review I6).
+        const members = this.client.config.GUILD_MEMBER_INTENT ? await guild.members.fetch().catch(() => guild.members.cache) : guild.members.cache;
         const managers = [...members.values()]
             .filter((member) => !member.user.bot && member.id !== guild.ownerId && member.permissions.has(PermissionFlagsBits.ManageGuild))
             .map((member) => member.id);
@@ -86,13 +92,18 @@ export default class StaffGrantService {
 
     /** null heißt: dieser Staff darf jetzt fragen. Sonst der Satz, warum nicht. */
     async Blocked(guildId: string, staffId: string, now = Date.now()): Promise<string | null> {
-        if (this.pending.has(guildId)) return "Gerade läuft schon eine Anfrage für diesen Server.";
+        if (this.pending.has(guildId)) return PENDING;
 
+        return Machine.CanRequest(await this.Known(guildId, now), staffId, now);
+    }
+
+    /** Offene und laufende aus dem Speicher, dazu was in den letzten 10 Minuten endete (für die Sperre nach Nein). */
+    private async Known(guildId: string, now: number): Promise<IStaffGrant[]> {
         const live = [...this.live.values()].filter((grant) => grant.guildId === guildId);
         const ids = new Set(live.map((grant) => grant.id));
         const recent = this.client.databaseService.Ready ? await this.client.staffGrants.OfGuild(guildId, now - COOLDOWN_MS) : [];
 
-        return Machine.CanRequest([...live, ...recent.filter((grant) => !ids.has(grant.id))], staffId, now);
+        return [...live, ...recent.filter((grant) => !ids.has(grant.id))];
     }
 
     async Request(input: IStaffRequest): Promise<IStaffGrant> {
@@ -100,13 +111,17 @@ export default class StaffGrantService {
 
         const reason = Machine.CheckRequest(input.reason, input.minutes);
         const now = Date.now();
-        const blocked = await this.Blocked(input.guild.id, input.staffId, now);
 
-        if (blocked) throw new StaffGrantBlocked(blocked);
+        // Sperre vor dem ersten await: Zwei gleichzeitige Anfragen kommen sonst beide durch (Review I1).
+        if (this.pending.has(input.guild.id)) throw new StaffGrantBlocked(PENDING);
 
         this.pending.add(input.guild.id);
 
         try {
+            const blocked = Machine.CanRequest(await this.Known(input.guild.id, now), input.staffId, now);
+
+            if (blocked) throw new StaffGrantBlocked(blocked);
+
             const { mode, users } = await this.Askees(input.guild);
 
             if (users.length === 0) throw new StaffGrantError("Niemand kann gerade gefragt werden.");
@@ -250,6 +265,8 @@ export default class StaffGrantService {
 
     /** Jede Minute (Runnable StaffGrants): Verfall, Ablauf, verfallene späte private Anfrage. */
     async Tick(now: number): Promise<void> {
+        if (!this.loaded) await this.Load();
+
         for (const grant of [...this.live.values()]) {
             const next = Machine.Tick(grant, now);
 

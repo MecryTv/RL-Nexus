@@ -62,7 +62,7 @@ export async function ApplyGate(client: BotClient, request: FastifyRequest, repl
     }
 
     // W-0011: Staff mit Freigabe nur mit dem extra Ja für die privaten Bereiche.
-    if (!PrivateGate(client, session, id, reply, "Bewerbungen", PrivateItem(request))) return null;
+    if (!(await PrivateGate(client, session, id, reply, "Bewerbungen", PrivateItem(request)))) return null;
 
     // Bezahlschranke: Prüfer und Owner brauchen einen eigenen Zugang oder einen zahlenden Owner (wie in GuildsOf).
     if (!(await service.GuildAllowed(session.userId, id))) {

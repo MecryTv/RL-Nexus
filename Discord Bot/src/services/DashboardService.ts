@@ -900,7 +900,8 @@ export default class DashboardService implements IDashboardService {
      */
     /** Server, die diese Sitzung verwalten darf (Plan 32: Ziel für „Auf einen anderen Server“). Wirft SessionExpired. */
     async Manageable(session: IDashboardSession): Promise<{ id: string; name: string }[]> {
-        return (await this.GuildsOf(session)).filter((guild) => guild.canManage).map((guild) => ({ id: guild.id, name: guild.name }));
+        // W-0011: Server, die die Sitzung nur über eine Staff-Freigabe verwaltet, sind kein Ziel (Review I4).
+        return (await this.GuildsOf(session)).filter((guild) => guild.canManage && !guild.staff).map((guild) => ({ id: guild.id, name: guild.name }));
     }
 
     async CanManage(session: IDashboardSession, guildId: string): Promise<boolean> {

@@ -39,7 +39,7 @@ export async function ModGate(client: BotClient, request: FastifyRequest, reply:
     }
 
     // W-0011: Staff mit Freigabe nur mit dem extra Ja für die privaten Bereiche.
-    if (!PrivateGate(client, session, id, reply, "Fälle Moderation", PrivateItem(request))) return null;
+    if (!(await PrivateGate(client, session, id, reply, "Fälle Moderation", PrivateItem(request)))) return null;
 
     try {
         if (!(await service.CanModerate(session, id))) {
