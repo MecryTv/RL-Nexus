@@ -45,7 +45,8 @@ export default class SettingsButtons extends Event {
 
                 const current = field.get(await PANEL_MODULES[id].load(this.client, guild));
                 const value = field.kind === "stages" ? StagesText(current as IModStage[]) : String(current ?? "");
-                const long = field.kind === "stages" || (field.max ?? 0) > 100;
+                // Bei Zahlen ist max der höchste Wert, nicht die Länge - nur Stufen und lange Texte bekommen ein großes Feld.
+                const long = field.kind === "stages" || (field.kind === "text" && (field.max ?? 0) > 100);
 
                 await interaction.showModal(
                     new ModalBuilder()
