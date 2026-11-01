@@ -24,14 +24,21 @@ export type HelpBlock =
     | { kind: "chapter"; n: number; when?: string; display: string; who: string; text: string; code?: string; fields: string };
 
 /**
- * 900 × höchstens 560: Discord begrenzt die Höhe eines Bilds in der Nachricht. Flacher als
- * etwa 0,62 füllt es die volle Breite, und 30 px Schrift landen bei etwa normaler Discord-Größe.
+ * Gezeichnet wird in 900 logischen Pixeln Breite, ausgegeben in 1100 - so breit wie
+ * das Banner. Discord zeigt ein Bild höchstens etwa 350 Pixel hoch; flacher als 1100 × 580
+ * bleibt es deshalb in jeder Fenstergröße so breit wie das Banner darüber.
  */
 const WIDTH = 900;
-const MAX_HEIGHT = 560;
+const OUT_WIDTH = 1100;
+const SCALE = OUT_WIDTH / WIDTH;
+/** Höhe eines fertigen Bilds, in Pixeln der Ausgabe. */
+const MAX_HEIGHT = 580;
 const PAD = 40;
 const INNER = WIDTH - PAD * 2;
 const GAP = 26;
+/** Rand und Abstand in Pixeln der Ausgabe. */
+const OUT_PAD = Math.round(PAD * SCALE);
+const OUT_GAP = Math.round(GAP * SCALE);
 const SCRATCH = 3200;
 
 const C = {
@@ -462,12 +469,15 @@ async function DrawBlock(ctx: SKRSContext2D, block: HelpBlock, y: number): Promi
 async function BlockImage(scratch: Canvas, block: HelpBlock): Promise<Canvas> {
     const ctx = scratch.getContext("2d");
 
-    ctx.clearRect(0, 0, WIDTH, SCRATCH);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, scratch.width, scratch.height);
+    // Logisch zeichnen, scharf in voller Ausgabegröße.
+    ctx.setTransform(SCALE, 0, 0, SCALE, 0, 0);
 
-    const height = Math.min(Math.ceil(await DrawBlock(ctx, block, 0)), SCRATCH);
-    const piece = createCanvas(WIDTH, Math.max(height, 1));
+    const height = Math.min(Math.ceil((await DrawBlock(ctx, block, 0)) * SCALE), scratch.height);
+    const piece = createCanvas(OUT_WIDTH, Math.max(height, 1));
 
-    piece.getContext("2d").drawImage(scratch, 0, 0, WIDTH, height, 0, 0, WIDTH, height);
+    piece.getContext("2d").drawImage(scratch, 0, 0, OUT_WIDTH, height, 0, 0, OUT_WIDTH, height);
 
     return piece;
 }
@@ -481,7 +491,7 @@ export interface IHelpImage {
 export async function RenderHelpImages(blocks: HelpBlock[]): Promise<IHelpImage[]> {
     await RegisterFonts();
 
-    const scratch = createCanvas(WIDTH, SCRATCH);
+    const scratch = createCanvas(OUT_WIDTH, Math.ceil(SCRATCH * SCALE));
     // Nacheinander: alle Blöcke teilen sich die eine Arbeitsfläche.
     const pieces: Canvas[] = [];
 
@@ -489,12 +499,12 @@ export async function RenderHelpImages(blocks: HelpBlock[]): Promise<IHelpImage[
 
     const images: Canvas[][] = [[]];
     const owners: HelpBlock[][] = [[]];
-    let used = PAD;
+    let used = OUT_PAD;
 
     for (const [index, canvas] of pieces.entries()) {
-        const height = Math.min(canvas.height, MAX_HEIGHT - PAD * 2);
+        const height = Math.min(canvas.height, MAX_HEIGHT - OUT_PAD * 2);
 
-        if (images[images.length - 1].length && used + height + PAD > MAX_HEIGHT) {
+        if (images[images.length - 1].length && used + height + OUT_PAD > MAX_HEIGHT) {
             // Eine Überschrift geht mit ihrem Inhalt ins nächste Bild, statt allein unten zu stehen.
             const last = owners[owners.length - 1];
             const carry = last.length > 1 && last[last.length - 1].kind === "heading";
@@ -503,28 +513,28 @@ export async function RenderHelpImages(blocks: HelpBlock[]): Promise<IHelpImage[
 
             images.push(heading ? [heading] : []);
             owners.push(headingBlock ? [headingBlock] : []);
-            used = PAD + (heading ? Math.min(heading.height, MAX_HEIGHT - PAD * 2) + GAP : 0);
+            used = OUT_PAD + (heading ? Math.min(heading.height, MAX_HEIGHT - OUT_PAD * 2) + OUT_GAP : 0);
         }
 
         images[images.length - 1].push(canvas);
         owners[owners.length - 1].push(blocks[index]);
-        used += height + GAP;
+        used += height + OUT_GAP;
     }
 
     return images.map((group, index) => {
-        const height = Math.min(MAX_HEIGHT, PAD + group.reduce((sum, piece) => sum + Math.min(piece.height, MAX_HEIGHT - PAD * 2) + GAP, 0) - GAP + PAD);
-        const canvas = createCanvas(WIDTH, height);
+        const height = Math.min(MAX_HEIGHT, OUT_PAD + group.reduce((sum, piece) => sum + Math.min(piece.height, MAX_HEIGHT - OUT_PAD * 2) + OUT_GAP, 0) - OUT_GAP + OUT_PAD);
+        const canvas = createCanvas(OUT_WIDTH, height);
         const ctx = canvas.getContext("2d");
-        let y = PAD;
+        let y = OUT_PAD;
 
         ctx.fillStyle = C.bg;
-        ctx.fillRect(0, 0, WIDTH, height);
+        ctx.fillRect(0, 0, OUT_WIDTH, height);
 
         for (const piece of group) {
-            const part = Math.min(piece.height, MAX_HEIGHT - PAD * 2);
+            const part = Math.min(piece.height, MAX_HEIGHT - OUT_PAD * 2);
 
-            ctx.drawImage(piece, 0, 0, WIDTH, part, 0, y, WIDTH, part);
-            y += part + GAP;
+            ctx.drawImage(piece, 0, 0, OUT_WIDTH, part, 0, y, OUT_WIDTH, part);
+            y += part + OUT_GAP;
         }
 
         return { png: canvas.toBuffer("image/png"), alt: HelpAlt(owners[index]) };

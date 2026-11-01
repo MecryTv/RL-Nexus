@@ -389,7 +389,7 @@ async function checkImages(): Promise<void> {
     const sizes = await Promise.all(images.map(async (image) => loadImage(image.png)));
 
     check("Alle Blockarten zeichnen", images.length >= 1);
-    check("PNG, 900 breit, höchstens 560 hoch", sizes.every((image) => image.width === 900 && image.height <= 560), sizes.map((image) => `${image.width}×${image.height}`).join(", "));
+    check("PNG so breit wie das Banner (1100), höchstens 580 hoch", sizes.every((image) => image.width === 1100 && image.height <= 580), sizes.map((image) => `${image.width}×${image.height}`).join(", "));
     check("Emoji ohne Netz bricht nichts", asked > 0);
 
     const many: HelpBlock[] = Array.from({ length: 40 }, (_, index) => ({ kind: "text", text: `Absatz ${index}: ${"viel Text ".repeat(20)}` }));
@@ -399,7 +399,7 @@ async function checkImages(): Promise<void> {
     check("Jedes Bild hat seinen Alt-Text", split.every((image) => image.alt.length > 0) && split[1].alt !== split[0].alt);
 
     check("Viel Inhalt: mehrere Bilder", split.length > 1, String(split.length));
-    check("Viel Inhalt: jedes höchstens 560 hoch", splitSizes.every((image) => image.height <= 560), splitSizes.map((image) => image.height).join(", "));
+    check("Viel Inhalt: jedes höchstens 580 hoch", splitSizes.every((image) => image.height <= 580), splitSizes.map((image) => image.height).join(", "));
 
     const orphans: HelpBlock[] = Array.from({ length: 12 }, (_, index): HelpBlock[] => [{ kind: "heading", text: `Abschnitt ${index}` }, { kind: "text", text: "Inhalt ".repeat(25 + index * 3) }]).flat();
     const kept = await RenderHelpImages(orphans);
@@ -408,7 +408,7 @@ async function checkImages(): Promise<void> {
 
     const giant = await RenderHelpImages([{ kind: "text", text: "Riesig ".repeat(2000) }]);
 
-    check("Ein Riesenblock wird trotzdem gezeichnet", giant.length >= 1 && (await loadImage(giant[0].png)).height <= 560);
+    check("Ein Riesenblock wird trotzdem gezeichnet", giant.length >= 1 && (await loadImage(giant[0].png)).height <= 580);
 
     const alt = HelpAlt(blocks);
 
