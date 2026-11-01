@@ -13,6 +13,7 @@ import { BASE } from "../core/Base.js";
 import { debounce, onPulse } from "../core/Pulse.js";
 import { ActivityResult, fetchActivity, renderOverview } from "./GuildOverview.js";
 import { bindNav, INav } from "./GuildNav.js";
+import { bindNavSearch } from "./GuildSearch.js";
 
 // Was ein Supporter ohne "Server verwalten" sieht - die Teile des Ticket-Systems.
 const SUPPORT_SECTIONS = ["live-tickets", "transcriptions"];
@@ -205,7 +206,10 @@ export function renderGuild(data: IPayload): void {
 
     // Erst die Leiste mit dem Stand aus /api/me, dann die Abschnitte: sonst
     // landete eine Adresse auf einem ausgeschalteten Modul auf dessen Karte.
-    const loadModules = bindModules(guild, only, bindNav());
+    const nav = bindNav();
+    const loadModules = bindModules(guild, only, nav);
+
+    bindNavSearch(guild.canManage && only === null, nav);
     const show = bindSections(guild.id, supportOnly ? "live-tickets" : "uebersicht");
 
     const user = { id: data.user.id, name: data.user.name, avatar: data.user.avatar };
