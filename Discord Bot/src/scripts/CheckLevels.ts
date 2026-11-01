@@ -18,10 +18,11 @@ import { GALLERY_ROOT } from "../constants/Gallery";
 import BotClient from "../client/BotClient";
 import { CardLine, RenderLevelCard } from "../builder/LevelCard";
 import { RenderLeaderboard } from "../builder/LeaderboardImage";
-import { BoardMessage, HandleBoardButton, RankPayload } from "../services/levels/BoardMessage";
+import { BoardChannelPayload, BoardMessage, HandleBoardButton, RankPayload } from "../services/levels/BoardMessage";
+import { BoardFingerprint, PostBoard } from "../services/levels/BoardPost";
 import { CountsForPoints, VoiceHours, VoiceText, DefaultLevelMessage, DefaultLevelSettings, LEVEL_LOG_KEEP_DAYS, LEVEL_PULSE_MS, LevelFromXp, LevelProgress, MAX_FACTOR, MAX_XP_MANUAL, Today, XpForLevel } from "../constants/Levels";
 import LevelService, { LevelError } from "../services/LevelService";
-import { ILevelEntry, ILevelSettings, LevelBackfillMode } from "../interfaces/services/levels/ILevels";
+import { IBoardPage, ILevelBoardPost, ILevelEntry, ILevelSettings, LevelBackfillMode } from "../interfaces/services/levels/ILevels";
 import { PERMANENT_MODULES } from "../constants/Modules";
 import { SESSION_COOKIE } from "../constants/Dashboard";
 import { RunBackfill, StartBackfill } from "../services/levels/Backfill";
@@ -44,6 +45,7 @@ import { ILevelBoost, ILevelLogEntry } from "../interfaces/services/levels/ILeve
 import LevelCommand from "../commands/user/Level";
 import { PostTop, TopDue } from "../services/levels/Top";
 import LevelSchedule from "../runnables/LevelSchedule";
+import LevelBoards from "../runnables/LevelBoards";
 
 const GUILD = "90071992547409951";
 const USER = "90071992547409952";
@@ -337,6 +339,16 @@ async function checkExtrasDatabase(client: BotClient): Promise<void> {
 
     check("Protokoll: neuester Eintrag zuerst, mit allem", log.length === 2 && log[0].userId === USER && log[0].amount === -50 && log[0].before === 120 && log[0].after === 70 && log[0].reason === "Spam im Chat" && log[0].actorId === OTHER, JSON.stringify(log[0]));
     check("Protokoll: nach 180 Tagen weg", (await client.levelLog.Prune(now - LEVEL_LOG_KEEP_DAYS * 86_400_000)) === 1 && (await client.levelLog.Recent(GUILD)).length === 1);
+
+    // Plan 43: die Rangliste im Kanal - ein Eintrag je Server, Fehler gekürzt.
+    await client.levelBoardPosts.Set({ guildId: GUILD, channelId: TEXT, messageId: "123", fingerprint: "a".repeat(40), error: null, updatedAt: now });
+    await client.levelBoardPosts.Set({ guildId: GUILD, channelId: SPAM, messageId: null, fingerprint: "b".repeat(40), error: "x".repeat(300), updatedAt: now + 1 });
+
+    const boardPost = await client.levelBoardPosts.Of(GUILD);
+
+    check("Rangliste im Kanal (Datenbank): überschrieben statt doppelt, Fehler gekürzt", boardPost?.channelId === SPAM && boardPost.messageId === null && boardPost.fingerprint === "b".repeat(40) && boardPost.error?.length === 200 && boardPost.updatedAt === now + 1, JSON.stringify(boardPost));
+    await client.levelBoardPosts.Remove(GUILD);
+    check("Rangliste im Kanal (Datenbank): entfernt", (await client.levelBoardPosts.Of(GUILD)) === null);
 }
 
 async function cleanup(client: BotClient): Promise<void> {
@@ -407,6 +419,7 @@ function World(extra: Partial<ILevelSettings> = {}, env: IWorldEnv = {}): IWorld
     const pulses: { guildId: string; kind: string }[] = [];
     const logs: ILevelLogEntry[] = [];
     const tops = new Map<string, { periodKey: string; holders: string[]; error: string | null; postedAt: number }>();
+    const boardPosts = new Map<string, ILevelBoardPost>();
     const key = (guildId: string, userId: string) => `${guildId}:${userId}`;
     const empty = (guildId: string, userId: string): ILevelEntry => ({ guildId, userId, xp: 0, level: 0, messages: 0, voiceMinutes: 0, lastMessage: 0 });
     const text = (payload: unknown) => JSON.stringify(payload);
@@ -474,6 +487,11 @@ function World(extra: Partial<ILevelSettings> = {}, env: IWorldEnv = {}): IWorld
                 return true;
             },
             Finish: async (guildId: string, kind: string, holders: string[], error: string | null) => void Object.assign(tops.get(`${guildId}:${kind}`)!, { holders, error }),
+        },
+        levelBoardPosts: {
+            Of: async (guildId: string) => (boardPosts.has(guildId) ? { ...boardPosts.get(guildId)! } : null),
+            Set: async (post: ILevelBoardPost) => void boardPosts.set(post.guildId, { ...post }),
+            Remove: async (guildId: string) => void boardPosts.delete(guildId),
         },
         levelLog: { Add: async (entry: Omit<ILevelLogEntry, "id">) => void logs.push({ id: logs.length + 1, ...entry }), Recent: async (_guildId: string, limit = 50) => [...logs].reverse().slice(0, limit) },
         galleryService: { GetImage: async () => null, Attach: () => ({ media: new Map(), files: [] }) },
@@ -911,6 +929,211 @@ async function checkImages(): Promise<void> {
     const none = (await BoardMessage(empty.client, empty.guild, "30d", 1, OWNER, OWNER)) as { content?: string };
     check("Niemand im Zeitraum: kurzer Text", none.content === "Im Zeitraum hat noch niemand Punkte.", JSON.stringify(none));
 }
+
+/* ----------------------------------------------------------
+   Plan 43, Task 3: Rangliste als feste Nachricht im Kanal
+   ---------------------------------------------------------- */
+
+/** Kanäle mit echten Nachrichten: senden, holen, bearbeiten, löschen. deny: Senden verboten, flaky: Holen scheitert vorübergehend. */
+function BoardChannels(world: IWorld) {
+    const messages = new Map<string, { channelId: string; payload: unknown }>();
+    const log: string[] = [];
+    const state = { deny: false, flaky: false };
+    let next = 1;
+
+    for (const channel of world.guild.channels.cache.values()) {
+        Object.assign(channel, {
+            send: async (payload: unknown) => {
+                if (state.deny) throw Object.assign(new Error("Missing Permissions"), { code: 50013 });
+
+                const id = `m${next++}`;
+
+                messages.set(id, { channelId: channel.id, payload });
+                log.push(`send ${channel.id} ${id}`);
+
+                return { id, channelId: channel.id };
+            },
+            messages: {
+                fetch: async (id: string) => {
+                    if (state.flaky) throw Object.assign(new Error("Service Unavailable"), { status: 503 });
+
+                    const found = messages.get(id);
+
+                    if (!found || found.channelId !== channel.id) throw Object.assign(new Error("Unknown Message"), { code: 10008 });
+
+                    return {
+                        id,
+                        edit: async (payload: unknown) => {
+                            found.payload = payload;
+                            log.push(`edit ${id}`);
+
+                            return { id };
+                        },
+                        delete: async () => {
+                            messages.delete(id);
+                            log.push(`delete ${id}`);
+                        },
+                    };
+                },
+            },
+        });
+    }
+
+    return { messages, log, state };
+}
+
+async function checkBoardPost(): Promise<void> {
+    console.log("\n  — Plan 43: Rangliste im Kanal —");
+
+    // Fingerabdruck
+    const page = (xp: number, name = "Lara", period: IBoardPage["period"] = "all"): IBoardPage => ({
+        period,
+        page: 1,
+        pages: 1,
+        total: 1,
+        entries: [{ rank: 1, userId: USER, name, avatar: null, level: 3, xp, messages: 1, voiceMinutes: 0, trend: 0, into: 1, need: 2 }],
+        range: null,
+        viewer: null,
+        sum: { xp, voiceMinutes: 0 },
+    });
+
+    check("Fingerabdruck: gleiche Seite, gleicher Abdruck", BoardFingerprint(page(100), "d") === BoardFingerprint(page(100), "d"));
+    check(
+        "Fingerabdruck: anders bei Punkten, Namen, Zeitraum, Design",
+        new Set([BoardFingerprint(page(100), "d"), BoardFingerprint(page(101), "d"), BoardFingerprint(page(100, "Mo"), "d"), BoardFingerprint(page(100, "Lara", "7d"), "d"), BoardFingerprint(page(100), "e")]).size === 5
+    );
+
+    // Einstellungen
+    const base = DefaultLevelSettings();
+    const service = new LevelService({} as BotClient);
+
+    check("Vorgabe: Rangliste im Kanal aus", JSON.stringify(base.boardPost) === JSON.stringify({ on: false, channelId: null, period: "all" }), JSON.stringify(base.boardPost));
+
+    const wrong = service.Clean(FakeGuild(), { boardPost: { on: true, channelId: "999", period: "quatsch" } }, base).boardPost;
+    const right = service.Clean(FakeGuild(), { boardPost: { on: true, channelId: TEXT, period: "7d" } }, base).boardPost;
+
+    check("Bereinigung: fremder Kanal → null, unbekannter Zeitraum → Lifetime", wrong.on && wrong.channelId === null && wrong.period === "all", JSON.stringify(wrong));
+    check("Bereinigung: echter Kanal und Zeitraum bleiben", right.channelId === TEXT && right.period === "7d", JSON.stringify(right));
+    check("Ohne Angabe bleibt die Rangliste im Kanal, wie sie war", service.Clean(FakeGuild(), {}, { ...base, boardPost: right }).boardPost.channelId === TEXT);
+
+    const noChannel = await World().service.Save(FakeGuild(), { announceChannelId: TEXT, boardPost: { on: true, channelId: null } }).catch((error: Error) => error);
+
+    check("An ohne Kanal: Speichern abgelehnt", noChannel instanceof LevelError && noChannel.message.includes("Rangliste"), String(noChannel));
+
+    // Die Nachricht
+    const world = World({ boardPost: { on: true, channelId: TEXT, period: "all" } });
+    const discord = BoardChannels(world);
+    const state = () => world.client.levelBoardPosts.Of(GUILD);
+
+    world.member(USER);
+    await world.client.levels.Add(GUILD, USER, 500, { messages: 3 });
+
+    const payload = await BoardChannelPayload(world.client, world.guild, await world.service.Board(world.guild, "all", 1, null));
+    const buttons = Buttons(payload);
+
+    check("Knöpfe im Kanal: alle acht in Reihenfolge", buttons.map((button) => button.label).join("|") === "Lifetime|7 Tage|30 Tage|◀ Zurück|Seite 1 von 1|Weiter ▶|Meine Seite|Meine Karte", buttons.map((button) => button.label).join("|"));
+    check("Knöpfe im Kanal gehören niemandem", buttons.every((button) => button.custom_id === "lv:x" || button.custom_id === "lv:card" || button.custom_id?.endsWith(":kanal")), JSON.stringify(buttons.map((button) => button.custom_id)));
+
+    check("Erster Blick: Nachricht geschickt", (await PostBoard(world.client, world.guild, world.settings, false)) === "sent" && discord.log.join() === `send ${TEXT} m1`, discord.log.join());
+
+    const first = await state();
+
+    check("Zustand: Kanal, Nachricht, Fingerabdruck, kein Fehler", first?.channelId === TEXT && first.messageId === "m1" && first.fingerprint.length > 0 && first.error === null, JSON.stringify(first));
+    check("Nichts geändert: nichts bearbeitet", (await PostBoard(world.client, world.guild, world.settings, false)) === "unchanged" && discord.log.length === 1, discord.log.join());
+
+    await world.client.levels.Add(GUILD, USER, 50, { messages: 1 });
+    check("Punkte geändert: Nachricht bearbeitet", (await PostBoard(world.client, world.guild, world.settings, false)) === "edited" && discord.log.at(-1) === "edit m1", discord.log.join());
+    check("Jetzt neu zeichnen: bearbeitet auch ohne Änderung", (await PostBoard(world.client, world.guild, world.settings, true)) === "edited" && discord.log.at(-1) === "edit m1", discord.log.join());
+
+    discord.messages.delete("m1");
+    check("Nachricht gelöscht: neu geschickt", (await PostBoard(world.client, world.guild, world.settings, false)) === "sent" && discord.log.at(-1) === `send ${TEXT} m2` && (await state())?.messageId === "m2", discord.log.join());
+
+    discord.state.flaky = true;
+    check("Aussetzer bei Discord: nicht doppelt geschickt", (await PostBoard(world.client, world.guild, world.settings, true)) === "failed" && discord.log.at(-1) === `send ${TEXT} m2` && (await state())?.messageId === "m2", discord.log.join());
+    discord.state.flaky = false;
+
+    world.settings.boardPost = { on: true, channelId: SPAM, period: "all" };
+    check("Kanal gewechselt: alte weg, neue im neuen Kanal", (await PostBoard(world.client, world.guild, world.settings, false)) === "sent" && discord.log.slice(-2).join() === `delete m2,send ${SPAM} m3` && (await state())?.channelId === SPAM, discord.log.join());
+
+    world.settings.boardPost = { on: false, channelId: SPAM, period: "all" };
+    check("Ausgeschaltet: Nachricht weg, Zustand weg", (await PostBoard(world.client, world.guild, world.settings, false)) === "off" && discord.log.at(-1) === "delete m3" && (await state()) === null, discord.log.join());
+
+    world.settings.boardPost = { on: true, channelId: TEXT, period: "all" };
+    discord.state.deny = true;
+    check("Keine Rechte: Fehler im Zustand statt Abbruch", (await PostBoard(world.client, world.guild, world.settings, false)) === "failed" && Boolean((await state())?.error?.includes("posten")), JSON.stringify(await state()));
+    discord.state.deny = false;
+    check("Rechte wieder da: beim nächsten Blick geschickt, Fehler weg", (await PostBoard(world.client, world.guild, world.settings, false)) === "sent" && (await state())?.error === null, JSON.stringify(await state()));
+
+    // Knöpfe der Nachricht: immer eine eigene Ansicht
+    const deferred: unknown[] = [];
+    let updates = 0;
+    const replies: unknown[] = [];
+    const click = (customId: string) =>
+        HandleBoardButton(world.client, {
+            customId,
+            user: { id: USER },
+            guild: world.guild,
+            deferUpdate: async () => void updates++,
+            deferReply: async (options: unknown) => void deferred.push(options),
+            editReply: async (reply: unknown) => void replies.push(reply),
+            followUp: async (reply: unknown) => void replies.push(reply),
+        } as unknown as ButtonInteraction);
+
+    await click("lv:p:all:1:kanal");
+
+    const own = Buttons(replies.at(-1));
+
+    check("Klick im Kanal: eigene Ansicht, Nachricht bleibt", updates === 0 && deferred.length === 1 && own.some((button) => button.custom_id === `lv:p:all:1:${USER}`) && !own.some((button) => button.custom_id === "lv:card"), JSON.stringify(own.map((button) => button.custom_id)));
+
+    await click("lv:card");
+
+    const card = replies.at(-1) as { files?: { name?: string }[] };
+
+    check("Meine Karte: die eigene Karte nur für den Drücker", updates === 0 && deferred.length === 2 && (deferred[1] as { flags?: number }).flags === 64 && card.files?.[0]?.name === "level.png", JSON.stringify({ deferred, card: card.files?.map((file) => file.name) }));
+
+    // Der Lauf alle 10 Minuten: Server nacheinander, Modul aus heißt Nachricht weg.
+    const looked = World({ boardPost: { on: true, channelId: TEXT, period: "all" } });
+    const seen = BoardChannels(looked);
+    const pauses: number[] = [];
+
+    looked.member(USER);
+    await looked.client.levels.Add(GUILD, USER, 100, { messages: 1 });
+    await new LevelBoards(looked.client).Execute(async (ms) => void pauses.push(ms));
+    check("Lauf: Nachricht geschickt, danach kurze Pause", seen.log.join() === `send ${TEXT} m1` && pauses.length === 1 && pauses[0] > 0, JSON.stringify({ log: seen.log, pauses }));
+
+    (looked.client.settings as unknown as { Of: () => Promise<unknown> }).Of = async () => ({ modules: [] });
+    await new LevelBoards(looked.client).Execute(async (ms) => void pauses.push(ms));
+    check("Lauf: Modul aus, Nachricht weg", seen.log.at(-1) === "delete m1" && (await looked.client.levelBoardPosts.Of(GUILD)) === null, seen.log.join());
+
+    // Dashboard: Speichern schickt oder löscht sofort, Stand und „Jetzt neu zeichnen“
+    const desk = World();
+    const deskDiscord = BoardChannels(desk);
+    const route = new DashboardApiLevels(desk.client) as unknown as { Read: (access: unknown, query: unknown) => Promise<Record<string, unknown>>; Write: (access: unknown, body: unknown) => Promise<Record<string, unknown>> };
+    const access = { guild: desk.guild, member: { id: USER } };
+    const status = (value: unknown) => value as { channelId?: string; messageId?: string | null; error?: string | null } | null;
+
+    desk.member(USER);
+    (desk.guild as unknown as { emojis: { cache: Map<string, unknown> } }).emojis = { cache: new Map() };
+    (desk.client.levels as unknown as { Top: () => Promise<unknown[]> }).Top = async () => [];
+    await desk.client.levels.Add(GUILD, USER, 100, { messages: 1 });
+
+    const turnedOn = await route.Write(access, { action: "save", settings: { ...desk.settings, announceChannelId: TEXT, boardPost: { on: true, channelId: TEXT, period: "all" } } });
+
+    check("Speichern mit Rangliste im Kanal: Nachricht gleich da", deskDiscord.log.join() === `send ${TEXT} m1` && status(turnedOn.boardPostStatus)?.messageId === "m1", JSON.stringify({ log: deskDiscord.log, status: turnedOn.boardPostStatus }));
+
+    const redrawn = await route.Write(access, { action: "boardpost.draw" });
+
+    check("Jetzt neu zeichnen: bearbeitet, Stand dabei", redrawn.result === "edited" && deskDiscord.log.at(-1) === "edit m1" && status(redrawn.boardPostStatus)?.messageId === "m1", JSON.stringify(redrawn));
+    check("Stand beim Laden der Seite", status((await route.Read(access, {})).boardPostStatus)?.channelId === TEXT);
+
+    await route.Write(access, { action: "save", settings: { ...desk.settings, fair: { ...desk.settings.fair, repeat: false } } });
+    check("Speichern ohne Änderung an der Rangliste: Nachricht bleibt, wie sie ist", deskDiscord.log.length === 2, deskDiscord.log.join());
+
+    const turnedOff = await route.Write(access, { action: "save", settings: { ...desk.settings, boardPost: { on: false, channelId: TEXT, period: "all" } } });
+
+    check("Ausschalten im Dashboard: Nachricht gleich weg", deskDiscord.log.at(-1) === "delete m1" && turnedOff.boardPostStatus === null, JSON.stringify({ log: deskDiscord.log, status: turnedOff.boardPostStatus }));
+}
+
 
 /* ----------------------------------------------------------
    Plan 34, Task 7: Dashboard Menü A
@@ -1978,6 +2201,7 @@ async function main(): Promise<void> {
     await checkManual();
     await checkTop();
     await checkBoardBot();
+    await checkBoardPost();
     await checkBoardApi();
     checkSettings(client);
     await checkCard();

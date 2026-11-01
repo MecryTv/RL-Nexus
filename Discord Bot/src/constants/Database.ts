@@ -43,6 +43,7 @@ export const TABLES = {
     levelBackfill: "level_backfill",
     levelLog: "level_log",
     levelTop: "level_top",
+    levelBoardPosts: "level_board_posts",
     customMessages: "custom_messages",
     autoResponses: "auto_responses",
     selfRolePanels: "self_role_panels",

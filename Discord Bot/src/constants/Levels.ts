@@ -112,6 +112,7 @@ export function DefaultLevelSettings(): ILevelSettings {
         boosts: [],
         boostChannelId: null,
         top: { week: { on: false, channelId: null, roleId: null }, month: { on: false, channelId: null, roleId: null } },
+        boardPost: { on: false, channelId: null, period: "all" },
         boardDesign: null,
     };
 }

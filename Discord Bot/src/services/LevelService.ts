@@ -17,6 +17,7 @@ import {
     MAX_REWARDS,
     MAX_UP_LINE,
     MAX_XP_PER_ACTION,
+    LEVEL_PERIODS,
     LEVEL_PULSE_MS,
     MAX_REASON,
     MAX_XP_MANUAL,
@@ -149,6 +150,10 @@ export default class LevelService {
             };
         };
         const topBefore = previous.top ?? DefaultLevelSettings().top;
+        // Plan 43: die Rangliste fest im Kanal.
+        const boardRaw = IsRecord(raw.boardPost) ? raw.boardPost : {};
+        const boardBefore = previous.boardPost ?? DefaultLevelSettings().boardPost;
+        const boardChannel = typeof boardRaw.channelId === "string" ? guild.channels.cache.get(boardRaw.channelId) : null;
         const flag = (key: keyof ILevelSettings["fair"]): boolean => (typeof fair[key] === "boolean" ? (fair[key] as boolean) : (previous.fair?.[key] ?? true));
 
         return {
@@ -189,6 +194,11 @@ export default class LevelService {
             boostChannelId: raw.boostChannelId === undefined ? (previous.boostChannelId ?? null) : boostChannel?.isTextBased() ? boostChannel.id : null,
             // Plan 37: Aktivste der Woche und des Monats.
             top: { week: post(top.week, topBefore.week), month: post(top.month, topBefore.month) },
+            boardPost: {
+                on: typeof boardRaw.on === "boolean" ? boardRaw.on : boardBefore.on,
+                channelId: boardRaw.channelId === undefined ? boardBefore.channelId : boardChannel?.isTextBased() && boardChannel.type !== ChannelType.GuildStageVoice ? boardChannel.id : null,
+                period: boardRaw.period === undefined ? boardBefore.period : (LEVEL_PERIODS as readonly unknown[]).includes(boardRaw.period) ? (boardRaw.period as LevelPeriod) : "all",
+            },
         };
     }
 
@@ -198,6 +208,7 @@ export default class LevelService {
         if (settings.announce !== "off" && !settings.announceChannelId) throw new LevelError("Wähle einen Kanal für die Aufstiegs-Nachricht. Per DM schickt der Bot keine mehr.");
         if (settings.top.week.on && !settings.top.week.channelId) throw new LevelError("Wähle einen Kanal für die Aktivsten der Woche.");
         if (settings.top.month.on && !settings.top.month.channelId) throw new LevelError("Wähle einen Kanal für die Aktivsten des Monats.");
+        if (settings.boardPost.on && !settings.boardPost.channelId) throw new LevelError("Wähle einen Kanal für die Rangliste.");
 
         await this.client.moduleSettings.Save(guild.id, LEVELS_MODULE, settings);
 
