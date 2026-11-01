@@ -198,6 +198,9 @@ npm run dev
 | `GET,POST <base>/api/guild/:id/matchups` | Matchups: Kanal, Erinnerung, Nachrichten und alle Partien — siehe [Matchups.md](Matchups.md#dashboard) |
 | `GET,POST <base>/api/guild/:id/sixmans` | 2, 4 & 6 Mans: Einstellungen, Warteschlangen, Runden und Ranglisten — siehe [SixMans.md](SixMans.md#dashboard) |
 | `GET <base>/api/guild/:id/pulse` | Der Puls eines Servers als Server-Sent Events — siehe unten |
+| `GET <base>/api/me/pulse` | Der persönliche Puls (`staff`, `guilds`) — siehe unten |
+| `GET\|POST <base>/api/guild/:id/staff` | Staff-Freigabe eines Servers: Infokarte und Anfrage für Staff, Live-Stand und letzte 30 Tage für Verwalter |
+| `GET\|POST <base>/api/me/staff` | Offene Anfragen an mich und die Antwort darauf |
 | `GET <base>/api/guild/:id/resources` | Alle Kanäle, Rollen, Kategorien, Foren und Emojis, ungekürzt — für die Live-Listen, siehe unten |
 | `GET,POST <base>/api/guild/:id/streams/:platform` | Twitch- und YouTube-Notifier: Streamer, Nachrichten, Live-Rolle — siehe [Notifiers.md](Notifiers.md#dashboard) |
 | `GET,POST <base>/api/guild/:id/polls` | Umfragen anlegen, beenden, löschen und ihre Stimmen — siehe [Polls.md](Polls.md#dashboard) |
@@ -250,7 +253,9 @@ Drei Dinge halten das klein und sicher:
 - **Eine Leitung je Server**, geteilt von allen Abschnitten (`core/Pulse.ts`). Wer zuhört, meldet seine Stichworte an; hört niemand mehr zu, geht die Leitung wieder zu. Höchstens vier Fenster je Person.
 - **Gesammelt statt sofort**: Meldungen, die dicht hintereinander kommen, lösen eine einzige Abfrage aus.
 
-Zuhören darf, wer zum Team des Servers gehört — dieselbe Grenze wie bei Live Tickets. Reisst die Leitung ab, baut der Browser sie von selbst wieder auf.
+Zuhören darf, wer zum Team des Servers gehört — dieselbe Grenze wie bei Live Tickets — und Staff mit Freigabe. Reisst die Leitung ab, baut der Browser sie von selbst wieder auf.
+
+Dazu kommt der **persönliche Puls** `GET <base>/api/me/pulse` (W-0011): Meldungen an genau eine Person, egal auf welcher Seite sie ist. `staff` heißt, an einer Anfrage oder Freigabe hat sich etwas geändert (Pop-up, Leisten, Neuladen bei Staff). `guilds` heißt, der Bot ist einem Server beigetreten, den diese Person verwaltet: Der Tab, der ihn eingeladen hat, springt in dessen Dashboard, alle anderen laden ihre Serverliste neu. Er zählt getrennt vom Server-Puls, ebenfalls höchstens vier Fenster je Person.
 
 ### Live-Listen
 
@@ -307,17 +312,37 @@ Anmelden darf sich **jeder** Discord-Account. Was danach in der Liste steht, hä
 | `MANAGE_GUILD` oder `ADMINISTRATOR` | ja | ja |
 | Moderator (Moderatoren-Liste des Servers, selbst oder per Rolle, oder eine Support-Rolle der Tickets) | ja, Marke „Moderator“, eigener Abschnitt und Filter „Moderation“ | nein — nur **Live Tickets**, **Transcriptions** und, von der Moderatoren-Liste, die **Moderation**; siehe [Tickets.md](Tickets.md#moderatoren) und [Moderation.md](Moderation.md) |
 | Weder noch | nein | — |
-| Gruppe `administrator` oder `developer` | zusätzlich **jeder** Server, auf dem der Bot ist | nur mit eigenem Recht auf dem Server |
+| Gruppe `administrator` oder `developer` | zusätzlich **jeder** Server, auf dem der Bot ist | mit eigenem Recht auf dem Server oder mit einer [Staff-Freigabe](#staff-freigabe) |
 
 Die Serverliste holt der Bot je Sitzung höchstens einmal gleichzeitig: Eine Seite fragt mehrere Routen auf einmal ab, und alle warten auf denselben Abruf. Antwortet Discord trotzdem mit 429, wartet er die genannte Zeit (bis 5 Sekunden) und fragt einmal nach (`DashboardService.Guilds()` / `Fetch()`).
 
 Moderatoren kommen nicht aus Discords Serverliste, sondern vom Bot: er schaut, ob das Mitglied als Moderator eingetragen ist, eine Moderatoren-Rolle oder eine Support-Rolle (allgemein oder eines Themas) trägt. Nur auf Servern mit eingeschaltetem Ticket- oder Moderations-Modul, und nur für Server, die sonst nicht in der Liste stünden. Die Moderation (`canModerate`) gibt es nur über die Moderatoren-Liste, nicht über eine Support-Rolle. Die Übersicht mit Aktivität bleibt für sie zu.
 
-Karten ohne Bearbeitungsrecht tragen die Marke „Nur Ansicht“, die Detailseite blendet dort einen Hinweis ein. Wer Seiten-Admins auch dort schreiben lassen will, setzt in `DashboardService.Guilds()` beim Staff-Zweig `canManage` auf `true` — eine Zeile.
+Karten ohne Bearbeitungsrecht tragen die Marke „Nur Ansicht“, die Detailseite blendet dort einen Hinweis ein. Staff schreibt auf fremden Servern nur mit einer [Staff-Freigabe](#staff-freigabe).
 
 Server, die nur über die eigene Gruppe sichtbar sind, tragen die violette Marke **„Staff-Zugriff“** und einen Satz auf der Karte, warum sie da stehen. Dazu gibt es den Filter **Fremde Server** — der steht für Administrator und Developer **immer** in der Leiste, auch bei null Treffern, sonst wäre nicht zu sehen, dass es die Ansicht gibt. Gibt es solche Server wirklich, erscheint zusätzlich ein Hinweis über der Liste.
 
 Zeigt eine Ansicht beides, wird das Raster in zwei Abschnitte geteilt: **Deine Server** zuerst (samt der Kachel zum Einladen), darunter **Fremde Server**. Stehen nur eigene oder nur fremde in der Liste, entfallen die Überschriften.
+
+### Staff-Freigabe
+
+Seit W-0011 (Plan 44) bearbeitet Staff (Gruppe `administrator` oder `developer`) einen fremden Server nur mit dem Ja dessen, dem der Server „gehört“. Vorher sieht Staff dort nur die **Übersicht** mit einer **Infokarte**: Server, Owner, Zugang und wer gefragt wird. Die Seiten der Module bleiben zu.
+
+**Wer gefragt wird** (`StaffGrantService.Askees`, `staffgrant/Rules.ts`):
+
+| Zugang | Gefragt wird |
+|---|---|
+| Free | der Owner |
+| Paid (Bezahlschranke an) | der Owner, wenn er irgendeinen laufenden Zugang hat (gekauft, geschenkt, Testphase, Gruppe); sonst alle Verwalter („Server verwalten“) mit eigenem Zugang |
+| Beta | Owner und Verwalter, die einen Beta-Code eingelöst haben |
+
+Höchstens zehn Personen. Das erste Ja gibt frei, abgelehnt ist die Anfrage erst, wenn alle Nein gesagt haben. Findet sich niemand, bleibt „Bearbeiten anfragen“ aus.
+
+**Ablauf** (`staffgrant/Machine.ts`): Staff gibt einen Grund an (Pflicht, bis 200 Zeichen) und eine Dauer (30 Min., 1 Std., 3 Std. oder eigene von 10 Minuten bis 24 Stunden). Die Gefragten bekommen ein Pop-up auf jeder Seite des Dashboards (`layout/StaffPrompt.ts`) und immer auch eine DM vom Bot (`builder/StaffGrantView.ts`, Knöpfe `sg:…`). Die Anfrage verfällt nach 10 Minuten. Je Server gibt es höchstens eine offene oder laufende Freigabe, nach einem Nein fragt derselbe Staff frühestens nach 10 Minuten wieder. Verwalter sehen während der Freigabe eine rote Leiste mit Countdown, +30 Min. (bis zusammen 24 Stunden), Beenden und einer Live-Liste, was Staff ändert.
+
+**Rechte**: Mit Freigabe legt `StaffOverlay` die Freigabe über die Staff-Karte (`canManage: true`, Feld `staff`). Damit gehen alle Routen auf, die über `CanManage` prüfen. Wo eine Route ein Mitglied braucht, nimmt sie den Bot selbst (`MemberOrStandIn`); „von wem“ steht dann in `actor`. Ausgenommen sind die **privaten Bereiche**: Live Tickets, Transcripts, Bewerbungen (samt System), Fälle der Moderation und von Anti Villain. Die öffnet nur ein eigenes, zweites Ja (`PrivateGate`). Es gilt nur, solange die Freigabe läuft; Verwalter können es mit „Private wegnehmen“ wieder schließen.
+
+**Protokoll**: Jede erfolgreiche Änderung von Staff steht in `staff_grant_log` als „<Bereich> › <Aktion>“, in privaten Bereichen auch jedes Ansehen (derselbe Gegenstand höchstens einmal in 10 Minuten). Dazu kommen alle Schritte der Freigabe selbst. Verwalter sehen die letzten 30 Tage auf der Übersicht unter „Staff-Zugriffe“, im Admin Dashboard steht alles unter Developer › Datenbank, Tabelle `staff_grant_log`. `ActivityPrune` löscht Protokoll und beendete Freigaben nach 180 Tagen.
 
 ### Gruppen
 
