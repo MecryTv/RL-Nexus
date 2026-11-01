@@ -108,4 +108,6 @@ export interface IApplySettings {
     /** Name des eigenen Kanals mit {user}, {nummer} und {formular}. */
     channelName: string;
     afterDecision: AfterDecision;
+    /** Vor dem Löschen kommt der eigene Kanal als HTML-Datei hierhin (W-0047). null: kein Transcript. */
+    transcriptChannelId: string | null;
 }

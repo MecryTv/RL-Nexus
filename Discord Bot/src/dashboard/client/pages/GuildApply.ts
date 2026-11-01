@@ -76,6 +76,8 @@ interface ISettings {
     categoryId: string | null;
     channelName: string;
     afterDecision: After;
+    /** W-0047: Vor dem Löschen kommt der Kanal als Datei hierhin. */
+    transcriptChannelId: string | null;
 }
 
 interface IPayload {
@@ -821,6 +823,15 @@ function mount(guildId: string, view: "inbox" | "manage"): void {
             drawDeleteNote();
             touch();
         });
+        const transcriptPick = select(
+            [["", "— kein Transcript —"], ...data!.guild.channels.map((entry): [string, string] => [entry.id, `# ${entry.name}`])],
+            draft.transcriptChannelId ?? "",
+            (value) => {
+                draft.transcriptChannelId = value || null;
+                touch();
+            },
+            "Transcript-Kanal"
+        );
         const targetRows = el("div");
         const drawTarget = (): void => {
             const own = draft.target === "channel";
@@ -833,6 +844,7 @@ function mount(guildId: string, view: "inbox" | "manage"): void {
                           el("span", "apopen__label", "Nach der Entscheidung"),
                           afterTiles,
                           deleteNote,
+                          row("Transcript-Kanal", "Vor dem Löschen kommt der Kanal als Datei hierhin. Ohne Kanal kein Transcript", transcriptPick),
                       ]
                     : []),
                 row("Sammelkanal", own ? "Nur, wenn ein Kanal nicht angelegt werden kann. Formulare dürfen einen eigenen haben" : "Formulare dürfen einen eigenen haben", sharedPick)

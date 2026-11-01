@@ -22,6 +22,8 @@ export interface ITranscriptRenderOptions {
     embed?: boolean;
     /** Live Tickets: die Discord-Links sind frisch - nichts ist "nicht gesichert". */
     live?: boolean;
+    /** Eine Bewerbung statt eines Tickets (W-0047): eigener Kopf, die Entscheidung statt des Grunds. */
+    apply?: { decision: string };
 }
 
 interface IContext {
@@ -722,6 +724,25 @@ export function RenderTranscript(transcript: ITranscript, options: ITranscriptRe
     const { meta, guild } = transcript;
     const number = TicketNumber(transcript.number, transcript.code);
     const icon = SafeUrl(guild.icon);
+    const apply = options.apply;
+    const title = apply ? `Bewerbung #${transcript.number}` : `Ticket ${number}`;
+    const facts = apply
+        ? [
+              Fact("Bewerber", Person(meta.opener, "–")),
+              Fact("Entscheidung", Escape(apply.decision)),
+              Fact("Entschieden von", Person(meta.closer, "unbekannt")),
+              Fact("Notiz", meta.reason ? Escape(meta.reason) : "–"),
+              Fact("Eingegangen", Stamp(meta.openedAt)),
+              Fact("Entschieden", Stamp(meta.closedAt)),
+          ]
+        : [
+              Fact("Ersteller", `${Person(meta.opener, "–")}${meta.openerCode ? ` · U-${Escape(meta.openerCode)}` : ""}`),
+              Fact("Bearbeiter", Person(meta.claimer, "niemand")),
+              Fact("Geschlossen von", Person(meta.closer, "unbekannt")),
+              Fact("Grund", meta.reason ? Escape(meta.reason) : "–"),
+              Fact("Geöffnet", Stamp(meta.openedAt)),
+              Fact("Geschlossen", Stamp(meta.closedAt)),
+          ];
 
     const messages: string[] = [];
     let previous: ITranscriptMessage | null = null;
@@ -748,21 +769,16 @@ export function RenderTranscript(transcript: ITranscript, options: ITranscriptRe
 <meta name="robots" content="noindex, nofollow">
 <meta name="referrer" content="no-referrer">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self' https: data:; media-src 'self' https: data:; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
-<title>Ticket ${number} · ${Escape(guild.name)}</title>
+<title>${title} · ${Escape(guild.name)}</title>
 <style>${CSS}</style>
 </head>
 <body>
 ${options.embed ? "" : bar}
 ${options.embed ? "" : `<header class="head">
 <div class="head__in">
-<div class="guild"><span class="guild__icon"${icon ? ` style="background-image:url('${CssUrl(icon)}')"` : ""}>${icon ? "" : Initials(guild.name)}</span><div><h1>Ticket ${number} · ${Escape(meta.option)}</h1><p>${Escape(guild.name)} · #${Escape(transcript.channel.name)} · ${meta.contact === "modmail" ? "ModMail" : "Klassisch"}</p></div></div>
+<div class="guild"><span class="guild__icon"${icon ? ` style="background-image:url('${CssUrl(icon)}')"` : ""}>${icon ? "" : Initials(guild.name)}</span><div><h1>${title} · ${Escape(meta.option)}</h1><p>${Escape(guild.name)} · #${Escape(transcript.channel.name)}${apply ? "" : ` · ${meta.contact === "modmail" ? "ModMail" : "Klassisch"}`}</p></div></div>
 <div class="facts">
-${Fact("Ersteller", `${Person(meta.opener, "–")}${meta.openerCode ? ` · U-${Escape(meta.openerCode)}` : ""}`)}
-${Fact("Bearbeiter", Person(meta.claimer, "niemand"))}
-${Fact("Geschlossen von", Person(meta.closer, "unbekannt"))}
-${Fact("Grund", meta.reason ? Escape(meta.reason) : "–")}
-${Fact("Geöffnet", Stamp(meta.openedAt))}
-${Fact("Geschlossen", Stamp(meta.closedAt))}
+${facts.join("\n")}
 ${Fact("Dauer", Duration(meta.closedAt - meta.openedAt))}
 ${Fact("Nachrichten", `${meta.messages} · ${meta.files} ${meta.files === 1 ? "Anhang" : "Anhänge"}`)}
 </div>
@@ -770,7 +786,7 @@ ${participants ? `<div class="people"><b>Beteiligt</b><span>${participants}</spa
 </div>
 </header>`}
 <main class="log">
-${transcript.truncated ? `<p class="note">Das Ticket hatte mehr Nachrichten, als ein Transcript fasst – die ältesten fehlen.</p>` : ""}
+${transcript.truncated ? `<p class="note">${apply ? "Der Kanal" : "Das Ticket"} hatte mehr Nachrichten, als ein Transcript fasst – die ältesten fehlen.</p>` : ""}
 ${messages.join("\n")}
 </main>
 <footer class="foot">Transcript von RL Nexus · erstellt ${Stamp(meta.closedAt)} · Anhänge, die der Bot nicht sichern konnte, sind als „nicht gesichert“ markiert.</footer>

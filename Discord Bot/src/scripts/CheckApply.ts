@@ -9,10 +9,10 @@
 process.env.CLIENT_SECRET ||= "check-secret";
 process.env.DEV_CLIENT_SECRET ||= "check-secret";
 
-import { ButtonInteraction, ChannelType, Guild, GuildBasedChannel, GuildMember, InteractionContextType, Message, PermissionFlagsBits, Role } from "discord.js";
+import { AttachmentBuilder, ButtonInteraction, ChannelType, Collection, Guild, GuildBasedChannel, GuildMember, InteractionContextType, Message, MessageCreateOptions, PermissionFlagsBits, Role } from "discord.js";
 import ApplyCommand from "../commands/user/Apply";
 import ComponentV2Builder from "../builder/ComponentV2Builder";
-import { ApplyCard, ApplyPanelView, DmQuestionView, DmSummaryView, IsApplyPanel } from "../builder/ApplyView";
+import { ApplyCard, ApplyPanelView, ApplyTranscriptCard, DmQuestionView, DmSummaryView, IsApplyPanel } from "../builder/ApplyView";
 import BotClient from "../client/BotClient";
 import { APPLY_FLOW_PREFIX, ApplyLink, ChannelName, CooldownText, DEFAULT_CHANNEL_NAME, DefaultApplySettings, DefaultForm, DRAFT_TTL, MAX_CHOICES, MAX_QUESTIONS, MAX_REVIEWERS, NextQuestionId, RECEIVED, STAFF_ONLY } from "../constants/Apply";
 import { DASHBOARD_PATH } from "../constants/Dashboard";
@@ -263,6 +263,10 @@ function checkChannelSettings(client: BotClient): void {
     check("Unbekannte Wahl: bleibt wie vorher", clean.afterDecision === "close");
     check("Kategorie wird übernommen", service.CleanSettings(guild, { categoryId: CATEGORY }, defaults).categoryId === CATEGORY);
     check("Ohne Angabe bleibt die Kategorie", service.CleanSettings(guild, {}, { ...defaults, categoryId: CATEGORY }).categoryId === CATEGORY);
+    check("Ab Werk kein Transcript-Kanal", defaults.transcriptChannelId === null);
+    check("Transcript-Kanal wird übernommen", service.CleanSettings(guild, { transcriptChannelId: TEXT }, defaults).transcriptChannelId === TEXT);
+    check("Ein Sprachkanal ist kein Transcript-Kanal", service.CleanSettings(guild, { transcriptChannelId: VOICE }, { ...defaults, transcriptChannelId: TEXT }).transcriptChannelId === null);
+    check("Ohne Angabe bleibt der Transcript-Kanal", service.CleanSettings(guild, {}, { ...defaults, transcriptChannelId: TEXT }).transcriptChannelId === TEXT);
 
     const name = (pattern: string, user: string, id: number, form: string) => ChannelName(pattern, { user, id, form });
 
@@ -1081,6 +1085,197 @@ async function checkChannelFlow(form: IApplyForm): Promise<void> {
 }
 
 /* ----------------------------------------------------------
+   Eigener Kanal: Transcript vor dem Löschen (W-0047)
+   ---------------------------------------------------------- */
+async function checkTranscript(client: BotClient, form: IApplyForm): Promise<void> {
+    console.log("\n  — Eigener Kanal: Transcript vor dem Löschen —");
+
+    const service = client.applyService;
+    const loose = client as unknown as Record<string, Record<string, unknown>>;
+    const ARCHIVE = "90071992547409946";
+    const DECIDER = "234567890123456789";
+    const at = Date.UTC(2026, 10, 1, 11, 5);
+    const decided = {
+        id: 42,
+        formId: form.id,
+        guildId: GUILD,
+        userId: USER,
+        userName: "Kandidat",
+        answers: [],
+        status: "accepted",
+        note: "Willkommen im Team",
+        decidedBy: DECIDER,
+        decidedName: "Joe",
+        decidedAt: at + 75 * 60_000,
+        messageId: "m9",
+        channelId: "556",
+        createdAt: at,
+    } as IApplySubmission;
+    const json = (payload: MessageCreateOptions | null) => JSON.stringify(payload?.components ?? []);
+
+    const card = ApplyTranscriptCard(decided, "Coach", "Dev Server", { messages: 14, files: 2 }, Buffer.from("<html>"), "https://cdn.discordapp.com/avatars/x.webp");
+
+    check("Karte: grün bei angenommen", json(card).includes(`"accent_color":${0x3ba55d}`), json(card).slice(0, 120));
+    check("Karte: Bewerbung, Formular und Entscheidung im Kopf", json(card).includes("Bewerbung #42 · angenommen") && json(card).includes("Coach · Dev Server"));
+    check("Karte: wer wen angenommen hat", json(card).includes(`<@${USER}> wurde von <@${DECIDER}> angenommen.`));
+    check("Karte: Bild des Bewerbers", json(card).includes("avatars/x.webp"));
+    check("Karte: Notiz als Zitat", json(card).includes('"content":"> Willkommen im Team"'));
+    check("Karte: Nachrichten und Anhänge", json(card).includes("14 Nachrichten · 2 Anhänge"));
+    check("Karte: Datei bewerbung-42.html", card.files?.length === 1 && json(card).includes("attachment://bewerbung-42.html"));
+    check("Karte: pingt niemanden", JSON.stringify(card.allowedMentions) === JSON.stringify({ parse: [] }));
+
+    const declined = ApplyTranscriptCard({ ...decided, status: "declined", note: null }, "Coach", "Dev Server", { messages: 1, files: 1 }, null, null);
+
+    check("Karte: rot bei abgelehnt", json(declined).includes(`"accent_color":${0xf23f43}`), json(declined).slice(0, 120));
+    check("Karte: ohne Notiz kein Zitat, ohne Datei kein Anhang", !json(declined).includes('"content":"> ') && !json(declined).includes("attachment://") && !declined.files?.length);
+    check("Karte: Einzahl bei einem", json(declined).includes("1 Nachricht · 1 Anhang"), json(declined));
+
+    // Ein echter Ablauf: zwei Nachrichten im Kanal, eine mit Bild.
+    const calls: string[] = [];
+    let payload: MessageCreateOptions | null = null;
+    const person = (id: string, name: string) => ({ id, displayName: name, bot: false, displayAvatarURL: () => `https://cdn.discordapp.com/avatars/${name}.webp` });
+    const member = (id: string, name: string) => ({ id, displayName: name, displayHexColor: "#000000", user: { bot: false }, displayAvatarURL: () => `https://cdn.discordapp.com/avatars/${name}.webp` });
+    const message = (id: string, author: ReturnType<typeof person>, content: string, minutes: number, files: [string, unknown][] = []) => ({
+        id,
+        type: 0,
+        author,
+        webhookId: null,
+        createdTimestamp: at + minutes * 60_000,
+        editedTimestamp: null,
+        content,
+        reference: null,
+        embeds: [],
+        components: [],
+        attachments: new Collection(files),
+        stickers: new Collection(),
+        reactions: { cache: new Collection() },
+    });
+    const image = {
+        name: "rank.png",
+        size: 4,
+        contentType: "image/png",
+        url: "https://cdn.discordapp.com/attachments/1/2/rank.png?ex=1",
+        width: 10,
+        height: 10,
+        spoiler: false,
+        description: null,
+    };
+    let history = async () =>
+        new Collection<string, unknown>([
+            ["2", message("2", person(DECIDER, "Joe"), "Passt, willkommen!", 70)],
+            ["1", message("1", person(USER, "Kandidat"), "Hallo, hier mein Rank", 5, [["a1", image]])],
+        ]);
+    const room = {
+        id: "556",
+        name: "bewerbung-kandidat",
+        type: ChannelType.GuildText,
+        isTextBased: () => true,
+        messages: { fetch: () => history() },
+        delete: async () => void calls.push("delete"),
+        permissionOverwrites: { delete: async (id: string) => void calls.push(`close:${id}`) },
+    };
+    const archive = {
+        id: ARCHIVE,
+        type: ChannelType.GuildText,
+        isTextBased: () => true,
+        send: async (sent: MessageCreateOptions) => ((payload = sent), calls.push("transcript"), { id: "t1" }),
+    };
+    const people = new Map([[USER, member(USER, "Kandidat")], [DECIDER, member(DECIDER, "Joe")]]);
+    const guild = {
+        id: GUILD,
+        name: "Dev Server",
+        iconURL: () => null,
+        roles: { cache: new Map() },
+        members: { cache: people, fetch: async (id: string) => people.get(id) ?? null },
+        channels: { cache: new Map<string, unknown>([["556", room], [ARCHIVE, archive]]), fetch: async () => null },
+    } as unknown as Guild;
+    const stored: Record<string, unknown> = {};
+
+    loose.applyForms.Get = async () => ({ ...form, guildId: GUILD, name: "Coach" });
+    loose.applySubmissions.SetChannel = async (id: number, channel: string | null) => void (stored[`channel:${id}`] = channel);
+    loose.applySubmissions.SetMessage = async (id: number, message: string | null) => void (stored[`message:${id}`] = message);
+
+    const realFetch = globalThis.fetch;
+    const downloads: string[] = [];
+
+    // Das Bild kommt aus dem Speicher statt von Discord.
+    globalThis.fetch = (async (url: string) => (downloads.push(String(url)), new Response(new Uint8Array([137, 80, 78, 71])))) as typeof fetch;
+
+    const settings = { ...DefaultApplySettings(), target: "channel" as const, afterDecision: "delete" as const, transcriptChannelId: ARCHIVE };
+
+    try {
+        await service.AfterDecision(guild, decided, settings);
+    } finally {
+        globalThis.fetch = realFetch;
+    }
+
+    const sent = payload as MessageCreateOptions | null;
+    const file = sent?.files?.[0] as AttachmentBuilder | undefined;
+    const html = Buffer.isBuffer(file?.attachment) ? file.attachment.toString("utf8") : "";
+
+    check("Löschen: erst das Transcript, dann der Kanal", calls.join(",") === "transcript,delete", calls.join(","));
+    check("Löschen: Kanal und Karte vergessen", stored["channel:42"] === null && stored["message:42"] === null);
+    check("Karte zählt, was im Kanal stand", json(sent).includes("2 Nachrichten · 1 Anhang"), json(sent).slice(0, 400));
+    check("Karte: Bild des Bewerbers aus Discord", json(sent).includes("avatars/Kandidat.webp"));
+    check("Datei heißt bewerbung-42.html", file?.name === "bewerbung-42.html", String(file?.name));
+    check("Datei: Kopf sagt Bewerbung, nicht Ticket", html.includes("<h1>Bewerbung #42 · Coach</h1>") && !html.includes("<h1>Ticket") && !html.includes("<title>Ticket"), html.slice(0, 300));
+    check("Datei: Bewerber, Entscheidung, wer entschieden hat", html.includes("Bewerber") && html.includes("Angenommen") && html.includes("Entschieden von") && html.includes("Joe"));
+    check("Datei: Notiz steht drin", html.includes("Willkommen im Team"));
+    check("Datei: die Nachrichten in Reihenfolge", html.indexOf("Hallo, hier mein Rank") > 0 && html.indexOf("Hallo, hier mein Rank") < html.indexOf("Passt, willkommen!"));
+    check("Datei: das Bild ist eingebettet", html.includes("data:image/png;base64,"));
+    check("Nur von Discord geladen", downloads.length === 1 && downloads[0].startsWith("https://cdn.discordapp.com/"), downloads.join(", "));
+
+    calls.length = 0;
+    await service.AfterDecision(guild, decided, { ...settings, transcriptChannelId: null });
+    check("Ohne Transcript-Kanal: nur gelöscht", calls.join(",") === "delete", calls.join(","));
+
+    // Review-Gedanke: Geht das Transcript schief, wäre das Gespräch mit dem Löschen weg.
+    calls.length = 0;
+    history = async () => {
+        throw Object.assign(new Error("Missing Access"), { code: 50001 });
+    };
+    await service.AfterDecision(guild, decided, settings);
+    check("Transcript scheitert: Kanal bleibt, Bewerber ist raus", calls.join(",") === `close:${USER}`, calls.join(","));
+
+    calls.length = 0;
+    archive.send = async () => {
+        throw Object.assign(new Error("Missing Permissions"), { code: 50013 });
+    };
+    history = async () => new Collection<string, unknown>([["1", message("1", person(USER, "Kandidat"), "Hallo", 5)]]);
+    await service.AfterDecision(guild, decided, settings);
+    check("Transcript-Kanal nimmt nichts an: Kanal bleibt", calls.join(",") === `close:${USER}`, calls.join(","));
+
+    // Der Knopf „Kanal löschen“ an der Karte.
+    archive.send = async (sent: MessageCreateOptions) => ((payload = sent), calls.push("transcript"), { id: "t2" });
+    loose.applySubmissions.Get = async () => decided;
+    loose.moduleSettings.Of = async (_guild: string, _module: string, fallback: object) => ({ ...fallback, target: "channel", afterDecision: "close", transcriptChannelId: ARCHIVE });
+
+    const replies: string[] = [];
+    const interaction = {
+        guildId: GUILD,
+        guild,
+        user: { id: DECIDER },
+        member: { permissions: { has: () => true } },
+        reply: async (options: { content: string }) => void replies.push(options.content),
+        editReply: async (options: { content: string } | string) => void replies.push(typeof options === "string" ? options : options.content),
+    };
+    const drop = (service as unknown as { DropChannel: (interaction: unknown, id: number) => Promise<void> }).DropChannel.bind(service);
+
+    calls.length = 0;
+    await drop(interaction, 42);
+    check("Knopf „Kanal löschen“: auch mit Transcript", calls.join(",") === "transcript,delete", calls.join(","));
+
+    calls.length = 0;
+    replies.length = 0;
+    archive.send = async () => {
+        throw Object.assign(new Error("Missing Permissions"), { code: 50013 });
+    };
+    await drop(interaction, 42);
+    check("Knopf: Transcript geht nicht, Kanal bleibt", !calls.includes("delete"), calls.join(","));
+    check("Knopf: und sagt warum", replies.some((reply) => reply.includes("Transcript")), replies.join(" | "));
+}
+
+/* ----------------------------------------------------------
    Antworten
    ---------------------------------------------------------- */
 function checkAnswers(client: BotClient, form: IApplyForm): void {
@@ -1245,6 +1440,7 @@ async function main(): Promise<void> {
     await checkDecisionIds(client);
     await checkRemove(form);
     await checkChannelFlow(form);
+    await checkTranscript(client, form);
     checkRealign();
     await checkDmQueue(client, form);
     await checkSweepDm(client);

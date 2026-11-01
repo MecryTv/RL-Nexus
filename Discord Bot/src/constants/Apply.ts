@@ -98,6 +98,7 @@ export function DefaultApplySettings(): IApplySettings {
         categoryId: null,
         channelName: DEFAULT_CHANNEL_NAME,
         afterDecision: "close",
+        transcriptChannelId: null,
     };
 }
 

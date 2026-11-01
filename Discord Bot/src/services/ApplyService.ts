@@ -3,6 +3,7 @@ import {
     ChannelType,
     DiscordAPIError,
     Guild,
+    GuildBasedChannel,
     GuildMember,
     Message,
     MessageCreateOptions,
@@ -13,7 +14,7 @@ import {
     PermissionsString,
 } from "discord.js";
 import BotClient from "../client/BotClient";
-import { ApplyCard, ApplyPanelView, IsApplyPanel } from "../builder/ApplyView";
+import { ApplyCard, ApplyPanelView, ApplyTranscriptCard, IsApplyPanel } from "../builder/ApplyView";
 import {
     AFTER_DECISIONS,
     APPLY_MODES,
@@ -38,6 +39,7 @@ import {
     MAX_QUESTIONS,
     MAX_REVIEWERS,
     STAFF_ONLY,
+    STATUS_LABELS,
 } from "../constants/Apply";
 import {
     AfterDecision,
@@ -54,6 +56,7 @@ import {
     QuestionKind,
 } from "../interfaces/services/apply/IApply";
 import logger from "../utils/logger";
+import { IsLogTarget, SendLog } from "../utils/logtarget";
 import ApplyFlow from "./ApplyFlow";
 
 /**
@@ -180,6 +183,12 @@ export default class ApplyService {
                       : null,
             channelName: raw.channelName === undefined ? previous.channelName : Text(raw.channelName, MAX_CHANNEL_NAME) || DEFAULT_CHANNEL_NAME,
             afterDecision: AFTER_DECISIONS.includes(raw.afterDecision as AfterDecision) ? (raw.afterDecision as AfterDecision) : previous.afterDecision,
+            transcriptChannelId:
+                raw.transcriptChannelId === undefined
+                    ? previous.transcriptChannelId
+                    : typeof raw.transcriptChannelId === "string" && IsLogTarget(guild.channels.cache.get(raw.transcriptChannelId))
+                      ? raw.transcriptChannelId
+                      : null,
         };
     }
 
@@ -687,15 +696,57 @@ export default class ApplyService {
 
         if (!channel || !("permissionOverwrites" in channel)) return;
 
-        if (settings.afterDecision === "delete") {
-            await channel.delete(`Bewerbung #${submission.id} entschieden`);
-            await this.client.applySubmissions.SetChannel(submission.id, null);
-            await this.client.applySubmissions.SetMessage(submission.id, null);
-
-            return;
-        }
+        // Ging das Transcript nicht, bleibt der Kanal - dann wenigstens wie „schließen“.
+        if (settings.afterDecision === "delete" && (await this.DropRoom(guild, channel, submission, settings, `Bewerbung #${submission.id} entschieden`))) return;
 
         await channel.permissionOverwrites.delete(submission.userId, `Bewerbung #${submission.id} entschieden`);
+    }
+
+    /**
+     * Den eigenen Kanal löschen (W-0047). Mit Transcript-Kanal geht er vorher als
+     * HTML-Datei dorthin. Klappt das nicht, bleibt er stehen und das Ergebnis ist
+     * false - sonst wäre das Gespräch weg.
+     */
+    private async DropRoom(guild: Guild, channel: GuildBasedChannel, submission: IApplySubmission, settings: IApplySettings, reason: string): Promise<boolean> {
+        if (settings.transcriptChannelId) {
+            const sent = await this.Archive(guild, channel, submission, settings.transcriptChannelId).catch((error) => {
+                logger.warn(`📋 Transcript für Bewerbung #${submission.id} auf ${guild.id}: ${error instanceof Error ? error.message : String(error)}`);
+
+                return false;
+            });
+
+            if (!sent) return false;
+        }
+
+        await channel.delete(reason);
+        await this.client.applySubmissions.SetChannel(submission.id, null);
+        await this.client.applySubmissions.SetMessage(submission.id, null);
+
+        return true;
+    }
+
+    /** Das Transcript in den Transcript-Kanal. false: nicht angekommen. */
+    private async Archive(guild: Guild, channel: GuildBasedChannel, submission: IApplySubmission, targetId: string): Promise<boolean> {
+        if (!channel.isTextBased()) return false;
+
+        const form = await this.client.applyForms.Get(submission.formId).catch(() => null);
+        const { transcript, file } = await this.client.transcriptService.Application(guild, channel, {
+            id: submission.id,
+            form: form?.name ?? "Bewerbung",
+            applicantId: submission.userId,
+            deciderId: submission.decidedBy,
+            decision: STATUS_LABELS[submission.status],
+            note: submission.note,
+            openedAt: submission.createdAt,
+            closedAt: submission.decidedAt ?? Date.now(),
+        });
+
+        // ponytail: über 10 MB nimmt Discord die Datei nicht - der Kanal bleibt dann, bis jemand ihn von Hand löscht.
+        if (!file) return false;
+
+        const { meta } = transcript;
+
+        return Boolean(await SendLog(guild, targetId, ApplyTranscriptCard(submission, meta.option, guild.name, meta, file, meta.opener.avatar)));
     }
 
     /** Die Karte nachziehen, nachdem entschieden wurde. */
@@ -864,8 +915,13 @@ export default class ApplyService {
         }
 
         await interaction.reply({ content: "Der Kanal wird gelöscht.", flags: 64 });
-        await channel.delete(`Bewerbung #${id}: Kanal gelöscht von ${interaction.user.id}`).catch(() => undefined);
-        await this.client.applySubmissions.SetChannel(id, null);
-        await this.client.applySubmissions.SetMessage(id, null);
+
+        const dropped = await this.DropRoom(interaction.guild, channel, submission, await this.Settings(interaction.guildId), `Bewerbung #${id}: Kanal gelöscht von ${interaction.user.id}`).catch(() => null);
+
+        if (dropped === false) {
+            await interaction.editReply({ content: "Das Transcript ließ sich nicht senden, deshalb bleibt der Kanal. Darf ich im Transcript-Kanal schreiben und Dateien anhängen?" }).catch(() => undefined);
+        } else if (dropped === null) {
+            await interaction.editReply({ content: "Den Kanal konnte ich nicht löschen. Mir fehlt wohl „Kanäle verwalten“." }).catch(() => undefined);
+        }
     }
 }
