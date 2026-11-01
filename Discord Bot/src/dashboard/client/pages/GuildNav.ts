@@ -87,6 +87,13 @@ export function bindNav(): INav {
         for (const [id, button] of buttons) button.setAttribute("aria-pressed", String(id === area));
         for (const box of nav.querySelectorAll<HTMLElement>(".setnav__group")) box.hidden = box.dataset.area !== area;
 
+        // Auf dem Handy scrollt die Zeile der Bereiche seitlich - der gewählte soll zu sehen sein.
+        const pressed = area ? buttons.get(area) : undefined;
+
+        if (pressed && rail.scrollWidth > rail.clientWidth) {
+            rail.scrollLeft += pressed.getBoundingClientRect().left - rail.getBoundingClientRect().left - 8;
+        }
+
         const category = CATEGORIES.find((entry) => entry.id === area);
 
         if (!area || !category) return void head.replaceChildren();

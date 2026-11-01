@@ -1582,6 +1582,7 @@ body[data-page="guild"]{--shell:1440px}
 .modtabs__row a[aria-current="page"] svg{color:var(--brand)}
 @media (pointer:coarse){.modtabs__row a{min-height:44px}}
 #moduleCards.is-tabbed > section > .modhead{display:none}
+#moduleCards.is-tabbed > section{padding-top:16px}
 /* Suche der Serverseite (W-0055): rechte Umschalttaste, / oder Strg K. Ein
    .modal, nur weiter oben, damit die Treffer nach unten Platz haben. */
 .navfind{margin:12vh auto auto;width:min(580px,calc(100vw - 32px));max-height:min(70vh,560px)}
