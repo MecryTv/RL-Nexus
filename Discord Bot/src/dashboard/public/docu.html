@@ -986,7 +986,11 @@ WTSI   = TS_2s × Rel_2s + TS_3s × Rel_3s</code></pre>
   <p>
     <b>Doppelte Punkte</b> stellst du unter <b>Level System</b> ein. Wöchentliche Fenster sind deutsche Zeit, 22:00 bis
     02:00 geht über Mitternacht. Auf Wunsch sagt der Bot Beginn und Ende in einem Kanal an, und auf Level-Karte und
-    Aufstiegs-Bild zeigt <code>{boost}</code> solange zum Beispiel „2× XP bis Freitag 23:00“.
+    Aufstiegs-Bild zeigt <code>{boost}</code> solange zum Beispiel „2× XP bis Freitag 23:00“. Beginn und Ende kannst du
+    im Nachrichten-Studio selbst gestalten, eine Gestaltung für alle Fenster, mit <code>{boost}</code>,
+    <code>{boost.factor}</code>, <code>{boost.start}</code>, <code>{boost.end}</code>, <code>{boost.end.relative}</code>
+    und <code>{guild}</code>. Rollen darin werden angepingt, <code>@everyone</code> und <code>@here</code> nicht. Ohne
+    eigene Gestaltung kommt der bisherige Satz.
   </p>
   <p>
     Beim Start hat der Bot einmal nachgetragen, was die Server-Übersicht vorher getrackt hatte. Was dabei passiert ist,
@@ -1019,11 +1023,19 @@ WTSI   = TS_2s × Rel_2s + TS_3s × Rel_3s</code></pre>
   <p>
     <code>/level rang</code> zeigt den eigenen Stand als Bild. <code>/level rangliste</code> zeigt die Besten als Bild
     mit Podium: Lifetime, die letzten 7 oder 30 Tage, zehn je Seite, mit Knöpfen zum Blättern und für die eigene Seite.
+    Steht man nicht auf der gezeigten Seite, kommt unter die Liste eine hervorgehobene Zeile mit dem eigenen Platz.
     Der Pfeil neben jedem Platz zeigt, wie viele Plätze jemand seit sieben Tagen gestiegen oder gefallen ist. Im
     Dashboard unter <b>Rangliste</b> stehen alle mit Level, Punkten, Nachrichten und Voice-Zeit, ebenfalls in den drei
     Zeiträumen; die Liste zieht von selbst nach, sobald jemand Punkte sammelt. Dort gibst, ziehst oder setzt du auch Punkte von Hand,
     jeweils mit Grund. Jede solche Änderung, auch mit <code>/level punkte</code>, steht im <b>Protokoll</b> darunter und
     bleibt 180 Tage.
+  </p>
+  <p>
+    <b>Rangliste im Kanal:</b> Ebenfalls unter <b>Rangliste</b> stellst du sie fest in einen Kanal, mit Zeitraum. Der Bot
+    schickt Seite 1 als Bild und sieht alle 10 Minuten nach; nur wenn sich etwas geändert hat, zeichnet er neu. Darunter
+    stehen alle Knöpfe samt <b>Meine Karte</b>. Jeder Klick öffnet eine Ansicht nur für den, der klickt, die Nachricht
+    im Kanal bleibt bei Seite 1. Wird sie gelöscht, kommt sie beim nächsten Blick neu. Ausschalten löscht sie. Der Bot
+    braucht im Kanal: Nachrichten senden, Dateien anhängen, Verlauf lesen.
   </p>
   <p>
     Auf Wunsch ist die Rangliste öffentlich unter <code>/rangliste/&lt;server&gt;</code>: mit Podium, allen Plätzen,
