@@ -12,11 +12,13 @@
 process.env.CLIENT_SECRET ||= "check-secret";
 process.env.DEV_CLIENT_SECRET ||= "check-secret";
 
-import { ChannelType, Guild, GuildBasedChannel, Message, Role } from "discord.js";
+import { ChannelType, Guild, GuildBasedChannel, GuildMember, Message, Role } from "discord.js";
+import { SetEmojiLoader } from "../builder/HelpImage";
+import { CaseBlocks, CaseCard, EvidenceView, ReadCaseId } from "../builder/ModerationCard";
 import BotClient from "../client/BotClient";
 import { CaseView, DirectView, DoneView, EvidenceId, HistoryView, ReadEvidenceId, SaveEvidenceView, StatusText, SupportCard } from "../builder/ModerationView";
 import { DefaultModConfig, FormatDuration, MAX_EVIDENCE, MAX_REASON, MAX_SUPPORT_REMIND, MAX_SUPPORT_ROLES, ParseDuration, ParseMessageLink, ProofNeeded, StageFor } from "../constants/Moderation";
-import { IModCase } from "../interfaces/services/moderation/IModeration";
+import { IModCase, IModEvidence } from "../interfaces/services/moderation/IModeration";
 import { ModerationError } from "../services/ModerationService";
 import { IsLogTarget } from "../utils/logtarget";
 import { ReadDuration } from "../utils/modcommand";
@@ -313,6 +315,64 @@ function checkProof(client: BotClient): void {
     check("Ohne Fälle: kein Menü, nur der Knopf", !none.includes(`mbw:fall:`) && none.includes(`mbw:warn:${TEXT}:${THREAD}`));
 }
 
+async function checkCard(): Promise<void> {
+    console.log("\n  — Log-Karte und Beweis-Ansicht —");
+
+    SetEmojiLoader(async () => null);
+
+    const at = Date.now();
+    const by = { by: MOD, byName: "Joe", at };
+    const evidence: IModEvidence[] = [
+        { id: 1, kind: "image", value: "1.png", name: "chat.png", ...by },
+        {
+            id: 2,
+            kind: "message",
+            value: `https://discord.com/channels/${GUILD}/${TEXT}/${THREAD}`,
+            name: "kauft alle",
+            message: { authorId: USER, authorName: "Lena", channelId: TEXT, channelName: "allgemein", content: "kauft alle meinen discord nitro", sentAt: at },
+            ...by,
+        },
+        { id: 3, kind: "link", value: "https://clips.example.com/1", name: null, ...by },
+        { id: 4, kind: "link", value: "https://clips.example.com/2", name: null, ...by },
+    ];
+    const withProof = SampleCase({ number: 128, evidence });
+    const toJson = (parts: { toJSON(): unknown }[]) => JSON.stringify(parts.map((part) => part.toJSON()));
+    const card = await CaseCard(withProof, { link: "https://example.com/fall", recent: 3 });
+    const json = toJson(card.components);
+
+    check("Karte: ein Bild als Anhang", card.files.length >= 1 && json.includes("attachment://fall-128"), json.slice(0, 200));
+    check("Karte: Knöpfe „Alle 4 ansehen“, „Fall“, „Notiz“", json.includes("Alle 4 ansehen") && json.includes("mf:ev:128:0") && json.includes("mf:fall:128") && json.includes("mf:notiz:128"));
+    check("Karte: Link ins Dashboard", json.includes("https://example.com/fall"));
+    check("Karte: der User bleibt per Erwähnung auffindbar", json.includes(`<@${USER}>`));
+
+    const blocks = CaseBlocks(withProof, { link: null, recent: 3 });
+    const text = JSON.stringify(blocks);
+    const rows = blocks.find((block) => block.kind === "evidence");
+
+    check("Kopf: Fall, Aktion und Zählung", text.includes("Fall #128 · Verwarnung") && text.includes("3. Fall in 30 Tagen"), text.slice(0, 300));
+    check("Kopf: von wem und warum", text.includes("Helfer Hanna") && text.includes("Spam in #allgemein"));
+    check("Höchstens drei Beweise in der Karte", rows?.kind === "evidence" && rows.items.length === 3);
+    check("Die Nachricht als Zitat mit Kanal", text.includes("„kauft alle meinen discord nitro“") && text.includes("#allgemein"));
+
+    const bare = toJson((await CaseCard(SampleCase({ number: 129 }), { link: null, recent: 1 })).components);
+
+    check("Ohne Beweise kein Knopf „Alle ansehen“", !bare.includes("mf:ev:") && bare.includes("mf:fall:129"));
+
+    const view = await EvidenceView(withProof, 1, { link: "https://example.com/fall" });
+    const viewJson = toJson(view.components);
+    const options = (viewJson.match(/"value":"\d+"/g) ?? []).length;
+
+    check("Ansicht: Kopf als Bild", view.files.length >= 1 && viewJson.includes("attachment://") && viewJson.includes("Beweis 2 von 4"));
+    check("Ansicht: blättert vor und zurück", viewJson.includes("mf:ev:128:0") && viewJson.includes("mf:ev:128:2"));
+    check("Ansicht: Menü mit allen Beweisen", options === 4 && viewJson.includes(`"custom_id":"mf:ev:128"`), String(options));
+    check("Ansicht: „Original öffnen“ führt zur Nachricht", viewJson.includes(evidence[1].value) && viewJson.includes("Original öffnen"));
+    check("Ansicht: zu weit blättern bleibt beim letzten", toJson((await EvidenceView(withProof, 99, { link: null })).components).includes("Beweis 4 von 4"));
+
+    check("IDs der Karte werden gelesen", JSON.stringify(ReadCaseId("mf:ev:128:2")) === JSON.stringify({ kind: "ev", number: 128, index: 2 }));
+    check("Auch ohne Index und für Fall und Notiz", ReadCaseId("mf:ev:128")?.index === null && ReadCaseId("mf:fall:128")?.kind === "fall" && ReadCaseId("mf:notiz:128")?.kind === "notiz");
+    check("Fremde IDs nicht", ReadCaseId(`mbw:fall:${TEXT}:${THREAD}`) === null && ReadCaseId("mf:boom:1") === null);
+}
+
 async function checkDatabase(client: BotClient): Promise<void> {
     console.log("\n  — Datenbank —");
 
@@ -452,14 +512,32 @@ async function checkEvidence(client: BotClient): Promise<void> {
     const fullProof = await service.AddProof(guild, author, entry.number, { link: "https://clips.example.com/43" });
 
     check("AddProof meldet das als Problem", fullProof.problems.some((problem) => problem.includes(`Mehr als ${MAX_EVIDENCE}`)), fullProof.problems.join(" | "));
+
+    // Zwei Fälle aus checkDatabase und dieser: alle drei in 30 Tagen.
+    check("„3. Fall in 30 Tagen“ zählt Verwarnungen und Timeouts", (await client.modCases.RecentPenalties(GUILD, USER, entry.createdAt)) === 3);
+
+    await client.settings.Save({ ...(await client.settings.Of(GUILD)), modules: ["moderation"] });
+
+    const stranger = { id: USER, guild: { id: GUILD, ownerId: MOD }, permissions: { has: () => false }, roles: { cache: new Map() } } as unknown as GuildMember;
+    let gate = "";
+
+    try {
+        await service.TeamGate(stranger);
+    } catch (error) {
+        gate = error instanceof ModerationError ? error.message : String(error);
+    }
+
+    check("Knöpfe ohne Team-Recht: abgelehnt", gate === "Das sieht nur das Moderations-Team.", gate);
 }
 
 async function cleanup(client: BotClient): Promise<void> {
     await client.databaseService.Write("DELETE FROM mod_cases WHERE guild_id = ?", [GUILD]);
     await client.databaseService.Write("DELETE FROM mod_settings WHERE guild_id = ?", [GUILD]);
+    await client.databaseService.Write(`DELETE FROM \`${client.settings.Table}\` WHERE guild_id = ?`, [GUILD]);
 
     client.modCases.Forget();
     client.modSettings.Forget();
+    client.settings.Forget();
 
     check("Aufgeräumt", (await client.modCases.List(GUILD, {}, null, 10)).length === 0);
 }
@@ -476,6 +554,7 @@ async function main(): Promise<void> {
     checkConfig(client);
     checkViews();
     checkProof(client);
+    await checkCard();
 
     if (await client.databaseService.Connect()) {
         try {

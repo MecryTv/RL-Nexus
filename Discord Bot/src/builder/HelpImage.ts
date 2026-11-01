@@ -21,7 +21,11 @@ export type HelpBlock =
     | { kind: "steps"; title: string; items: string[] }
     | { kind: "areas"; items: { emoji: string; name: string; count: string }[] }
     | { kind: "command"; emoji: string; display: string; who: string; text: string; fields: string; off?: string }
-    | { kind: "chapter"; n: number; when?: string; display: string; who: string; text: string; code?: string; fields: string };
+    | { kind: "chapter"; n: number; when?: string; display: string; who: string; text: string; code?: string; fields: string }
+    /** Kopf einer Fall-Karte (Moderation): Titel, User als Pille, Zeile darunter, Bild rechts. */
+    | { kind: "caseHead"; emoji: string; title: string; user?: string; sub: string; by?: string; avatar?: Buffer }
+    /** Beweise als Zeilen: Vorschau oder Emoji, Titel, wer und wann. */
+    | { kind: "evidence"; items: { thumb?: Buffer; icon: string; title: string; sub: string; quote?: boolean }[] };
 
 /**
  * Gezeichnet wird in 900 logischen Pixeln Breite, ausgegeben in 1100 - so breit wie
@@ -191,6 +195,17 @@ function Paragraph(ctx: SKRSContext2D, markup: string, x: number, y: number, wid
     });
 
     return lines.length * lineHeight;
+}
+
+/** Kürzt auf eine Zeile mit „…“ - für Namen und Gründe, die nie umbrechen sollen. */
+function Fit(ctx: SKRSContext2D, text: string, width: number): string {
+    if (ctx.measureText(text).width <= width) return text;
+
+    let cut = text;
+
+    while (cut.length > 1 && ctx.measureText(`${cut}…`).width > width) cut = cut.slice(0, -1);
+
+    return `${cut.trimEnd()}…`;
 }
 
 function Badge(ctx: SKRSContext2D, label: string, x: number, y: number): number {
@@ -462,6 +477,100 @@ async function DrawBlock(ctx: SKRSContext2D, block: HelpBlock, y: number): Promi
 
             return height + 6 + Paragraph(ctx, `Felder: ${block.fields}`, left, y + height + 6, width, { color: C.muted, size: "small" });
         }
+
+        case "caseHead": {
+            const size = 104;
+            const width = INNER - (block.avatar ? size + 24 : 0);
+            const has = await DrawEmoji(ctx, block.emoji, x, y + 2, 46);
+            const left = x + (has ? 60 : 0);
+
+            ctx.font = "800 44px Oxanium";
+            ctx.fillStyle = C.strong;
+            ctx.fillText(Fit(ctx, block.title, width - (left - x)), left, y + 42);
+
+            let cursor = x;
+
+            if (block.user) {
+                ctx.font = "700 28px Rajdhani";
+                cursor += Pill(ctx, Fit(ctx, block.user, width / 2), x, y + 56, "700 28px Rajdhani") + 12;
+            }
+
+            ctx.font = FONT.small;
+            ctx.fillStyle = C.muted;
+            ctx.fillText(Fit(ctx, block.sub, width - (cursor - x)), cursor, y + 87);
+
+            let height = 104;
+
+            if (block.by) {
+                ctx.fillText(Fit(ctx, block.by, width), x, y + height + 26);
+                height += 34;
+            }
+
+            const avatar = block.avatar ? await loadImage(block.avatar).catch(() => null) : null;
+
+            if (avatar) {
+                const left = x + INNER - size;
+
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(left + size / 2, y + size / 2, size / 2, 0, Math.PI * 2);
+                ctx.clip();
+                ctx.drawImage(avatar, left, y, size, size);
+                ctx.restore();
+            }
+
+            return Math.max(height, avatar ? size : 0);
+        }
+
+        case "evidence": {
+            const row = 66;
+            let height = 0;
+
+            for (const item of block.items) {
+                const top = y + height;
+                const box = { x: x + 10, y: top + 10, w: 80, h: row - 20 };
+                const thumb = item.thumb ? await loadImage(item.thumb).catch(() => null) : null;
+
+                ctx.fillStyle = C.tile;
+                ctx.beginPath();
+                ctx.roundRect(x, top, INNER, row, 12);
+                ctx.fill();
+
+                ctx.save();
+                ctx.beginPath();
+                ctx.roundRect(box.x, box.y, box.w, box.h, 8);
+                ctx.clip();
+                ctx.fillStyle = C.codeBg;
+                ctx.fillRect(box.x, box.y, box.w, box.h);
+
+                if (thumb) {
+                    // Wie object-fit: cover - die Mitte des Bilds füllt die Vorschau.
+                    const scale = Math.max(box.w / thumb.width, box.h / thumb.height);
+                    const w = thumb.width * scale;
+                    const h = thumb.height * scale;
+
+                    ctx.drawImage(thumb, box.x + (box.w - w) / 2, box.y + (box.h - h) / 2, w, h);
+                }
+
+                ctx.restore();
+
+                if (!thumb) await DrawEmoji(ctx, item.icon, box.x + box.w / 2 - 15, box.y + box.h / 2 - 15, 30);
+
+                const left = box.x + box.w + 16;
+                const width = INNER - (left - x) - 14;
+
+                ctx.font = FONT.bold;
+                ctx.fillStyle = item.quote ? C.text : C.strong;
+                ctx.fillText(Fit(ctx, item.title, width), left, top + 29);
+                ctx.font = FONT.small;
+                ctx.fillStyle = C.muted;
+                ctx.fillText(Fit(ctx, item.sub, width), left, top + 56);
+
+                height += row + 10;
+            }
+
+            return Math.max(0, height - 10);
+        }
     }
 }
 
@@ -573,6 +682,10 @@ export function HelpAlt(blocks: HelpBlock[]): string {
                 return `${block.display} (${block.who}): ${Plain(block.text)}`;
             case "chapter":
                 return `${block.n}. ${block.display}: ${Plain(block.text)}`;
+            case "caseHead":
+                return `${block.title}. ${[block.user, block.sub].filter(Boolean).join(", ")}${block.by ? `. ${block.by}` : ""}`;
+            case "evidence":
+                return block.items.map((item) => `${item.title} (${item.sub})`).join(". ");
         }
     });
     const text = lines.join(" ").replace(/\s+/g, " ").trim();

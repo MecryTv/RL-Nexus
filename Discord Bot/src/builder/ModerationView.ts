@@ -88,7 +88,19 @@ function Facts(entry: IModCase, mentions: boolean): string[] {
     return lines;
 }
 
-function Footer(entry: IModCase): string {
+/** Was Log-Karte und Bild nicht im Kopf zeigen: mitgelöschte Nachrichten, Kanal, Stufe, Bezug. */
+export function ExtraFacts(entry: IModCase): string[] {
+    const shown = ["**User:**", "**Moderator:**", "**Grund:**", "**Dauer:**"];
+
+    return Facts(entry, true).filter((line) => !shown.some((start) => line.startsWith(start)));
+}
+
+/** Farbe der Karte: die der Aktion, grau, sobald der Fall beendet ist. */
+export function CaseAccent(entry: IModCase): `#${string}` {
+    return entry.active || !entry.details.ended ? ACTION_INFO[entry.action].color : "#6b7683";
+}
+
+export function CaseFooter(entry: IModCase): string {
     const parts = [StatusText(entry)];
 
     if (entry.notes.length) parts.push(`${entry.notes.length} ${entry.notes.length === 1 ? "Notiz" : "Notizen"}`);
@@ -101,12 +113,12 @@ function Footer(entry: IModCase): string {
 /** Die Karte im Log-Kanal - sie wird bei jeder Änderung am Fall nachgezogen. */
 export function CaseView(entry: IModCase, link: string | null): IModView {
     const info = ACTION_INFO[entry.action];
-    const builder = new ComponentV2Builder({ accentColor: entry.active || !entry.details.ended ? info.color : "#6b7683" })
+    const builder = new ComponentV2Builder({ accentColor: CaseAccent(entry) })
         .title(`${info.emoji} | ${info.label} · Fall ${CaseRef(entry.number)}`, `${SOURCE[entry.source]} · ${Stamp(entry.createdAt)}`)
         .separator()
         .text(Facts(entry, true).join("\n"));
 
-    const footer = Footer(entry);
+    const footer = CaseFooter(entry);
 
     if (footer) builder.subtext(footer);
     if (link) builder.buttons({ url: link, label: "Im Dashboard öffnen", emoji: "🛡️" });
@@ -151,7 +163,7 @@ export function DoneView(entry: IModCase, logged: boolean, problems: string[] = 
         entry.action === "purge"
             ? `${info.emoji} ${entry.details.deleted ?? 0} Nachrichten in <#${entry.details.channelId}> gelöscht`
             : `${info.emoji} ${target ?? "Der User"} wurde ${info.past}`;
-    const extra = [Footer(entry), logged ? "im Log-Kanal vermerkt" : ""].filter(Boolean).join(" · ");
+    const extra = [CaseFooter(entry), logged ? "im Log-Kanal vermerkt" : ""].filter(Boolean).join(" · ");
     const builder = new ComponentV2Builder({ accentColor: info.color })
         .text(`### ${headline} – Fall ${CaseRef(entry.number)}`)
         .text(Facts(entry, false).filter((line) => !line.startsWith("**Moderator:**") && !line.startsWith("**User:**")).join("\n") || "Ohne Grund.");

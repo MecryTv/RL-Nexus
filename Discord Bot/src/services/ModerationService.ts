@@ -1,7 +1,8 @@
 import path from "path";
-import { mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { ChannelType, DiscordAPIError, Guild, GuildMember, Message, MessageFlags, PermissionFlagsBits, User } from "discord.js";
 import BotClient from "../client/BotClient";
+import { CaseCard, ICaseExtra, ICaseMessage } from "../builder/ModerationCard";
 import { CaseView, DirectView } from "../builder/ModerationView";
 import { DASHBOARD_PATH } from "../constants/Dashboard";
 import { SNOWFLAKE } from "../constants/Discord";
@@ -32,7 +33,7 @@ import {
     StageFor,
     STORED_EVIDENCE,
 } from "../constants/Moderation";
-import { IModCase, IModConfig, IModDetails, IModEnded, IModMessageProof, IModProofRules, IModStage, IModSupport, ModAction, ModSource } from "../interfaces/services/moderation/IModeration";
+import { IModCase, IModConfig, IModDetails, IModEnded, IModEvidence, IModMessageProof, IModProofRules, IModStage, IModSupport, ModAction, ModSource } from "../interfaces/services/moderation/IModeration";
 import { NewModCase } from "../models/ModCases";
 import { Shrink } from "../utils/image";
 import logger from "../utils/logger";
@@ -80,6 +81,9 @@ function ProofProblem(what: string, error: unknown): string {
     return `${what}: ${error instanceof ModerationError ? error.message : "Das ließ sich nicht sichern."}`;
 }
 
+/** Diese Strafen zählt die Karte („3. Fall in 30 Tagen“). */
+const PENALTIES: ReadonlySet<ModAction> = new Set<ModAction>(["warn", "timeout", "kick", "ban"]);
+
 const EVIDENCE_TYPES = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"]);
 
 function IsRecord(value: unknown): value is Record<string, unknown> {
@@ -99,6 +103,8 @@ export default class ModerationService {
     private readonly client: BotClient;
     // Ein Bann, der sich nicht aufheben lässt, meldet sich nur einmal im Log.
     private readonly stuck = new Set<number>();
+    /** Je Fall die laufende Nachbesserung der Log-Karte (UpdateLog). */
+    private readonly logQueue = new Map<number, Promise<void>>();
 
     constructor(client: BotClient) {
         this.client = client;
@@ -695,7 +701,7 @@ export default class ModerationService {
             : entry;
         const { logChannelId } = await this.client.modSettings.Of(guild.id);
         const message = await SendLog(guild, logChannelId, {
-            ...CaseView(current, this.Link(current)),
+            ...(await this.LogCard(current)),
             flags: MessageFlags.IsComponentsV2,
             allowedMentions: { parse: [] },
         });
@@ -711,8 +717,25 @@ export default class ModerationService {
         return current;
     }
 
-    /** Zieht die Karte im Log-Kanal nach - Status, Notizen, Beweise. */
+    /**
+     * Zieht die Karte im Log-Kanal nach - Status, Notizen, Beweise. Je Fall
+     * eins nach dem anderen und immer mit dem neuesten Stand: sonst überholt ein
+     * langsames Zeichnen ein schnelleres und die Karte zeigt einen alten.
+     */
     async UpdateLog(entry: IModCase): Promise<void> {
+        if (!entry.logChannel || !entry.logMessage) return;
+
+        const next = (this.logQueue.get(entry.id) ?? Promise.resolve()).then(() => this.EditLog(entry)).catch(() => undefined);
+
+        this.logQueue.set(entry.id, next);
+        await next;
+
+        if (this.logQueue.get(entry.id) === next) this.logQueue.delete(entry.id);
+    }
+
+    private async EditLog(stale: IModCase): Promise<void> {
+        const entry = (await this.client.modCases.ById(stale.id)) ?? stale;
+
         if (!entry.logChannel || !entry.logMessage) return;
 
         const guild = this.client.guilds.cache.get(entry.guildId);
@@ -722,7 +745,50 @@ export default class ModerationService {
 
         const message = await channel.messages.fetch(entry.logMessage).catch(() => null);
 
-        await message?.edit({ ...CaseView(entry, this.Link(entry)), allowedMentions: { parse: [] } }).catch(() => undefined);
+        // attachments: [] nimmt die Bilder der alten Karte weg, files bringt die neuen.
+        await message?.edit({ ...(await this.LogCard(entry)), attachments: [], allowedMentions: { parse: [] } }).catch(() => undefined);
+    }
+
+    /** Die gezeichnete Karte (W-0014) - klappt das Zeichnen nicht, die alte als Text. */
+    async LogCard(entry: IModCase): Promise<ICaseMessage> {
+        return CaseCard(entry, await this.CaseExtra(entry)).catch((error: unknown) => {
+            logger.warn(`🛡️ Fall ${CaseRef(entry.number)}: Karte nicht gezeichnet - ${String(error)}`);
+
+            return { ...CaseView(entry, this.Link(entry)), files: [] };
+        });
+    }
+
+    /** Was die Karte braucht und der Fall nicht selbst weiß: Zählung, Bild des Users, Vorschauen. */
+    private async CaseExtra(entry: IModCase): Promise<ICaseExtra> {
+        const target = entry.targetId;
+        const thumbs = new Map<number, Buffer>();
+
+        for (const item of entry.evidence.slice(0, 3)) {
+            const file = await this.EvidenceFile(entry, item);
+
+            if (file) thumbs.set(item.id, file);
+        }
+
+        return {
+            link: this.Link(entry),
+            recent: target && PENALTIES.has(entry.action) ? await this.client.modCases.RecentPenalties(entry.guildId, target, entry.createdAt).catch(() => null) : null,
+            avatar: target ? await this.Avatar(target) : null,
+            thumbs,
+        };
+    }
+
+    private async Avatar(userId: string): Promise<Buffer | null> {
+        const user = await this.client.users.fetch(userId).catch(() => null);
+        const response = user ? await fetch(user.displayAvatarURL({ extension: "png", size: 128 }), { signal: AbortSignal.timeout(3000) }).catch(() => null) : null;
+
+        return response?.ok ? Buffer.from(await response.arrayBuffer()) : null;
+    }
+
+    /** Die gespeicherte Datei eines Bild-Beweises - null, wenn sie fehlt oder es keiner ist. */
+    async EvidenceFile(entry: IModCase, item: IModEvidence): Promise<Buffer | null> {
+        if (item.kind !== "image" || !STORED_EVIDENCE.test(item.value)) return null;
+
+        return readFile(path.join(EVIDENCE_ROOT, entry.guildId, String(entry.id), item.value)).catch(() => null);
     }
 
     /** Der Fall im Dashboard. */
