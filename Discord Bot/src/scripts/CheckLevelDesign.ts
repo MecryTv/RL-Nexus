@@ -346,6 +346,29 @@ async function checkBoardRender(): Promise<void> {
     await RenderBoard(BOARD_TEMPLATES.podium(), input(boardPage(10), { title: "Aktivste der Woche", period: "26.10.–01.11." }), 1, hooks);
     check("Vorlage: Titel und Zeitraum des Wochenposts", texts.includes("Aktivste der Woche") && texts.includes("26.10.–01.11."));
 
+    // Plan 43: Wer nicht auf der Seite steht, aber Punkte hat, bekommt unter der Liste eine Zusatzzeile.
+    const away = { ...boardPage(10), viewer: { ...boardPage(1, 3, 25).entries[0] } };
+    const base = 140 + 320 + 7 * 82 + 10 + 80;
+    const extra = BOARD_TEMPLATES.podium().row.h + BOARD_TEMPLATES.podium().row.gap;
+
+    texts.length = 0;
+
+    const below = await RenderBoard(BOARD_TEMPLATES.podium(), input(away, { viewerId: "u25" }), 1, hooks);
+
+    check("Betrachter nicht auf der Seite: Zusatzzeile mit ihm, Bild um eine Zeile höher", layout.mine === 1 && texts.includes("Spieler 25") && below.height === base + extra, `${JSON.stringify(layout)} ${below.height} statt ${base + extra}`);
+
+    const onPage = await RenderBoard(BOARD_TEMPLATES.podium(), input({ ...boardPage(10), viewer: boardPage(10).entries[4] }), 1, hooks);
+
+    check("Betrachter auf der Seite: keine Zusatzzeile", layout.mine === 1 && onPage.height === base, `${JSON.stringify(layout)} ${onPage.height}`);
+
+    const nobody = await RenderBoard(BOARD_TEMPLATES.podium(), input(away, { viewerId: null }), 1, hooks);
+
+    check("Ohne Betrachter (Kanal): keine Zusatzzeile", layout.mine === 0 && nobody.height === base, `${JSON.stringify(layout)} ${nobody.height}`);
+
+    const twoColumns = await RenderBoard(BOARD_TEMPLATES.kompakt(), input({ ...boardPage(20), viewer: away.viewer }, { viewerId: "u25" }), 1, hooks);
+
+    check("Zwei Spalten: Zusatzzeile in Spalte 1, eine Zeile höher", layout.mine === 1 && twoColumns.height === compact.height + BOARD_TEMPLATES.kompakt().row.h + BOARD_TEMPLATES.kompakt().row.gap, `${JSON.stringify(layout)} ${twoColumns.height}`);
+
     const lost = await RenderBoard({ ...BOARD_TEMPLATES.podium(), background: { ...BOARD_TEMPLATES.podium().background, mode: "image", image: "gallery/0/fehlt.png" } }, input(boardPage(10)), 1, hooks);
 
     check("Gelöschtes Galeriebild im Hintergrund: Bild entsteht trotzdem", lost.png.length > 1_000);

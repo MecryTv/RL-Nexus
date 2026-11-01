@@ -113,9 +113,12 @@ export async function RenderBoard(design: IBoardDesign, input: IBoardRenderInput
     const onPodium = podium.on && page.page === 1 ? page.entries.slice(0, 3) : [];
     const rows = page.entries.slice(onPodium.length);
     const lines = Math.ceil(rows.length / row.columns);
+    // Plan 43: Wer zuschaut und nicht auf der Seite steht, aber Punkte hat, kommt mit Abstand unter die Liste.
+    const away = input.viewerId && page.viewer?.userId === input.viewerId && !page.entries.some((entry) => entry.userId === input.viewerId) ? page.viewer : null;
     const podiumTop = head.h;
     const rowsTop = podiumTop + (onPodium.length ? podium.h : 0);
-    const footTop = rowsTop + lines * (row.h + row.gap) + 10;
+    const awayTop = rowsTop + lines * (row.h + row.gap) + row.gap;
+    const footTop = (away ? awayTop + row.h : rowsTop + lines * (row.h + row.gap)) + 10;
     const width = BOARD_WIDTH;
     const height = footTop + foot.h;
     const canvas = createCanvas(width * scale, height * scale);
@@ -125,8 +128,9 @@ export async function RenderBoard(design: IBoardDesign, input: IBoardRenderInput
 
     // Avatare gleichzeitig laden - gezeichnet wird danach der Reihe nach aus dem Zwischenspeicher. Was nicht kam,
     // wird nicht noch einmal je Platz versucht (Load merkt sich Fehlschläge nicht): sonst 3 s je Platz (Review).
-    const loaded = await Promise.all(page.entries.map((entry) => Load(entry.avatar)));
-    const hasAvatar = new Set(page.entries.filter((_, index) => loaded[index]).map((entry) => entry.userId));
+    const shown = away ? [...page.entries, away] : page.entries;
+    const loaded = await Promise.all(shown.map((entry) => Load(entry.avatar)));
+    const hasAvatar = new Set(shown.filter((_, index) => loaded[index]).map((entry) => entry.userId));
 
     const period = input.period ?? PERIOD_LABEL[page.period];
     const range = page.range ? `${Day(page.range.from)}–${Day(page.range.to)}` : PERIOD_LABEL[page.period];
@@ -217,6 +221,18 @@ export async function RenderBoard(design: IBoardDesign, input: IBoardRenderInput
         if (highlight) mine++;
         if (index === 0) areas.row = { x, y, w: row.w, h: row.h, boxes, repeats: [] };
         else areas.row?.repeats.push({ x, y, w: row.w, h: row.h });
+    }
+
+    if (away) {
+        const colors = colorsOf(away);
+
+        ctx.save();
+        ctx.translate(row.x, awayTop);
+        Plate(ctx, row, row.w, row.h, colors, row.highlight);
+        await DrawElements(ctx, row.elements, entryData(away), hooks, colors);
+        ctx.restore();
+        mine++;
+        areas.row?.repeats.push({ x: row.x, y: awayTop, w: row.w, h: row.h });
     }
 
     // Fuß
