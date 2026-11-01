@@ -7,6 +7,7 @@ import {
     ContainerBuilder,
     FileBuilder,
     MediaGalleryBuilder,
+    MediaGalleryItemBuilder,
     MessageActionRowComponentBuilder,
     MessageFlags,
     resolveColor,
@@ -145,6 +146,19 @@ export default class ComponentV2Builder {
         this.container.addMediaGalleryComponents(
             new MediaGalleryBuilder().addItems(urls.map((url) => ({ media: { url } })))
         );
+
+        return this;
+    }
+
+    /** Ein einzelnes Bild über die volle Breite, mit Beschreibung für Screenreader. */
+    public image(url: string, description?: string): this {
+        this.spend(1);
+
+        const item = new MediaGalleryItemBuilder().setURL(url);
+
+        if (description) item.setDescription(description.slice(0, 1024));
+
+        this.container.addMediaGalleryComponents(new MediaGalleryBuilder().addItems(item));
 
         return this;
     }

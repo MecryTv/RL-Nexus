@@ -20,7 +20,7 @@ import BotClient from "../client/BotClient";
 import { HELP_PREFIX, HelpCatalog, IHelpText, IsGroupText, STATUS_URL, SUPPORT_URL } from "../constants/Help";
 import { HELP_CATALOG } from "../constants/HelpCatalog";
 import { BuildHelp, CatalogProblems, IHelpSource } from "../services/help/HelpModel";
-import { AreaOf, HelpAreaView, HelpCommandView, HelpStartView, IHelpContext, IHelpPayload, IHelpStart } from "../builder/HelpView";
+import { AreaOf, ComposeHelp, HelpAreaPage, HelpCommandPage, HelpStartPage, IHelpContext, IHelpPage, IHelpStart, PageContainer } from "../builder/HelpView";
 
 let failures = 0;
 
@@ -155,19 +155,21 @@ async function checkCatalog(client: BotClient): Promise<void> {
 
     check("Beispiele beginnen mit dem eigenen Befehl", wrong.length === 0, wrong.map(([key]) => key).join(", "));
     const real = BuildHelp(commands, HELP_CATALOG);
-    const views: [string, ReturnType<typeof Flat>][] = [];
+    const pages: [string, IHelpPage][] = [];
 
-    for (const entry of real) {
-        for (const key of [null, ...entry.commands.map((command) => command.key)]) {
-            for (let page = 0; page < 6; page++) views.push([`${key ?? entry.name} S${page + 1}`, Flat(HelpCommandView(entry, key, page, CONTEXT))]);
-        }
+    for (const entry of real) for (const key of [null, ...entry.commands.map((command) => command.key)]) pages.push([key ?? entry.name, HelpCommandPage(entry, key, 0, CONTEXT)]);
+    for (const area of new Set(real.map(AreaOf))) pages.push([`Bereich ${area}`, HelpAreaPage(area, real, CONTEXT, 0)]);
+
+    const tooBig: string[] = [];
+
+    for (const [name, page] of pages) {
+        const message = await ComposeHelp(page, null);
+        const count = Flat(page).count;
+
+        if (message.files.length > 10 || count > 40) tooBig.push(`${name}: ${message.files.length} Bilder, ${count} Bausteine`);
     }
 
-    for (const area of new Set(real.map(AreaOf))) for (let page = 0; page < 4; page++) views.push([`Bereich ${area} S${page + 1}`, Flat(HelpAreaView(area, real, CONTEXT, page))]);
-
-    const big = views.filter(([, view]) => view.texts.length >= 4000 || view.count > 40 || view.texts.includes("…"));
-
-    check(`Alle ${views.length} echten Seiten passen in eine Nachricht`, big.length === 0, big.map(([name, view]) => `${name}: ${view.texts.length}/${view.count}`).slice(0, 6).join(", "));
+    check(`Alle ${pages.length} echten Seiten passen in eine Nachricht`, tooBig.length === 0, tooBig.slice(0, 6).join(", "));
     check("Jeder Slash-Befehl hat ein Beispiel", texts.filter(([key, text]) => key !== "Hack melden" && text.examples.length === 0).length === 0, texts.filter(([key, text]) => key !== "Hack melden" && text.examples.length === 0).map(([key]) => key).join(", "));
 }
 
@@ -178,39 +180,34 @@ const CONTEXT: IHelpContext = {
     enabled: new Set(["moderation"]),
 };
 
-/** Alle Texte einer Nachricht in einem String, dazu die Zahl der Bausteine. */
-function Flat(payload: IHelpPayload): { json: string; texts: string; count: number } {
-    const json = JSON.stringify(payload.components);
-    const texts: string[] = [];
+/** Inhalt einer Seite als Text, dazu die Bausteine der Nachricht (mit Platzhaltern für die Bilder). */
+function Flat(page: IHelpPage): { json: string; texts: string; count: number } {
+    const json = JSON.stringify(PageContainer(page, [...(page.banner ? [{ name: "hilfe.png", alt: "Banner" }] : []), { name: "hilfe-1.png", alt: "Bild" }]).toJSON());
     let count = 0;
     const walk = (node: unknown): void => {
         if (Array.isArray(node)) return node.forEach(walk);
         if (!node || typeof node !== "object") return;
+        if (typeof (node as { type?: unknown }).type === "number") count++;
 
-        const record = node as Record<string, unknown>;
-
-        if (typeof record.type === "number") count++;
-        if (typeof record.content === "string") texts.push(record.content);
-
-        Object.values(record).forEach(walk);
+        Object.values(node as Record<string, unknown>).forEach(walk);
     };
 
     walk(JSON.parse(json));
 
-    return { json, texts: texts.join("\n"), count };
+    return { json, texts: JSON.stringify(page.blocks), count };
 }
 
 function checkPages(): void {
     console.log("\n  — Seiten —");
 
     const entries = BuildHelp(FakeCommands(), FakeCatalog());
-    const start: IHelpStart = { name: "Joe", banner: "hilfe.png", modules: { on: 9, all: 24 }, commands: 38, access: { value: "Paid", sub: "bis 01.12." }, version: "v1.0" };
-    const page = Flat(HelpStartView(start, entries, CONTEXT));
+    const start: IHelpStart = { name: "Joe", modules: { on: 9, all: 24 }, commands: 38, access: { value: "Paid", sub: "bis 01.12." }, version: "v1.0" };
+    const startPage = HelpStartPage(start, entries, CONTEXT);
+    const page = Flat(startPage);
 
-    check("Start: Banner als Bild", page.json.includes("attachment://hilfe.png"));
-    check("Start: mit Banner kein Willkommen im Text", !page.texts.includes("Willkommen, Joe"));
-    check("Start: ohne Banner Willkommen im Text", Flat(HelpStartView({ ...start, banner: null }, entries, CONTEXT)).texts.includes("Willkommen, Joe"));
-    check("Start: vier Kacheln", ["Module an", "9/24", "Befehle", "38", "Zugang", "Paid", "bis 01.12.", "Version", "v1.0"].every((part) => page.texts.includes(part)), page.texts.slice(0, 300));
+    check("Start: Banner als Bild vorn", startPage.banner && page.json.indexOf("attachment://hilfe.png") < page.json.indexOf("attachment://hilfe-1.png"));
+    check("Start: Willkommen nur ohne Banner", !page.texts.includes("Willkommen, Joe") && JSON.stringify(startPage.fallback).includes("Willkommen, Joe"));
+    check("Start: vier Kacheln", ["Module an", "9/24", "Befehle", "38", "Paid", "bis 01.12.", "Version", "v1.0"].every((part) => page.texts.includes(part)), page.texts.slice(0, 300));
     check("Start: In drei Schritten startklar", page.texts.includes("In drei Schritten startklar") && page.texts.includes("/module") && page.texts.includes("/hilfe befehl:"));
     check("Start: Bereich mit Zahl", page.texts.includes("Moderation") && page.texts.includes("4 Befehle"), page.texts);
     check("Start: leere Bereiche fehlen", !page.texts.includes("Rocket League"));
@@ -220,15 +217,16 @@ function checkPages(): void {
         [`${CONTEXT.dashboard}/guild/${CONTEXT.guildId}`, CONTEXT.docs, STATUS_URL, SUPPORT_URL].every((url) => page.json.includes(`"url":"${url}`)),
         page.json.slice(0, 200)
     );
-    check("Start: pingt niemanden", JSON.stringify(HelpStartView(start, entries, CONTEXT).allowedMentions) === JSON.stringify({ parse: [] }));
+    check("Bilder mit Beschreibung", page.json.includes(`"description":"Bild"`));
 
-    const area = Flat(HelpAreaView("moderation", entries, CONTEXT));
+    const area = Flat(HelpAreaPage("moderation", entries, CONTEXT));
 
     check("Bereich: jeder Befehl mit Abzeichen", area.texts.includes("/probe") && area.texts.includes("Team") && area.texts.includes("/gruppe a") && area.texts.includes("alle"), area.texts);
     check("Bereich: Felder grau darunter", area.texts.includes("user*") && area.texts.includes("dauer"), area.texts);
     check("Bereich: Modul aus bei abgeschaltetem Modul", area.texts.includes("Modul aus") && area.texts.includes("/module an modul:anti-villain"), area.texts);
     check("Bereich: kein Modul aus bei eingeschaltetem", (area.texts.match(/Modul aus/g) ?? []).length === 1, String((area.texts.match(/Modul aus/g) ?? []).length));
-    const allOff = Flat(HelpAreaView("moderation", entries, { ...CONTEXT, enabled: new Set() }));
+
+    const allOff = Flat(HelpAreaPage("moderation", entries, { ...CONTEXT, enabled: new Set() }));
 
     check("Bereich: Modul aus nur einmal je Modul", (allOff.texts.match(/Modul aus/g) ?? []).length === 2, String((allOff.texts.match(/Modul aus/g) ?? []).length));
     check("Bereich: Menü Befehl erklären", area.json.includes(`"custom_id":"${HELP_PREFIX}befehl"`));
@@ -236,39 +234,43 @@ function checkPages(): void {
     check("Bereich: Im Dashboard", area.json.includes(`"url":"${CONTEXT.dashboard}/guild/${CONTEXT.guildId}/moderation"`));
 
     const probe = entries.find((entry) => entry.name === "probe")!;
-    const single = Flat(HelpCommandView(probe, null, 0, CONTEXT));
+    const singlePage = HelpCommandPage(probe, null, 0, CONTEXT);
+    const single = Flat(singlePage);
+    const fields = singlePage.blocks.find((block) => block.kind === "fields");
 
     check("Befehl: Abschnitte", ["Was er macht", "So nutzt du ihn", "Felder", "Was danach passiert"].every((part) => single.texts.includes(part)), single.texts);
-    check("Befehl: Pflichtfeld mit Stern", single.texts.includes("user*"), single.texts);
-    check("Befehl: Hinweis zum Stern ohne Aufzählungszeichen", single.texts.includes("Felder mit Stern sind Pflicht") && !single.texts.includes("-# *"), single.texts);
+    check("Befehl: Pflichtfeld markiert", fields?.kind === "fields" && fields.rows[0].name === "user" && fields.rows[0].required, JSON.stringify(fields));
+    check("Befehl: Hinweis zum Stern", single.texts.includes("Felder mit **Stern** sind Pflicht"), single.texts);
     check("Befehl: Auswahl genannt", single.texts.includes("1h, 1d"), single.texts);
     check("Befehl: zurück zum Bereich", single.json.includes(`"custom_id":"${HELP_PREFIX}a:moderation"`));
     check("Befehl: Doku zum Bereich", single.json.includes(`"url":"${CONTEXT.docs}#docg-moderation"`));
 
     const gruppe = entries.find((entry) => entry.name === "gruppe")!;
-    const group = Flat(HelpCommandView(gruppe, null, 0, CONTEXT));
+    const groupPage = HelpCommandPage(gruppe, null, 0, CONTEXT);
+    const group = Flat(groupPage);
+    const chapters = groupPage.blocks.filter((block) => block.kind === "chapter");
 
-    check("Gruppe: Kapitel nummeriert in Katalog-Reihenfolge", group.texts.indexOf("Zuerst") < group.texts.indexOf("Danach") && group.texts.includes("**1**") && group.texts.includes("**2**"), group.texts);
+    check("Gruppe: Kapitel nummeriert in Katalog-Reihenfolge", chapters.map((block) => (block.kind === "chapter" ? `${block.n}:${block.when}` : "")).join(",") === "1:Zuerst,2:Danach", JSON.stringify(chapters));
     check("Gruppe: Unterbefehl erklären per Menü", group.json.includes(`"value":"gruppe a"`));
 
-    const sub = Flat(HelpCommandView(gruppe, "gruppe a", 0, CONTEXT));
+    const sub = Flat(HelpCommandPage(gruppe, "gruppe a", 0, CONTEXT));
 
-    check("Unterbefehl: eigene Seite A", sub.texts.includes("/gruppe a") && sub.texts.includes("Was er macht") && sub.texts.includes("nummer*"), sub.texts);
+    check("Unterbefehl: eigene Seite A", sub.texts.includes("/gruppe a") && sub.texts.includes("Was er macht") && sub.texts.includes("nummer"), sub.texts);
     check("Unterbefehl: zurück zur Gruppe", sub.json.includes(`"custom_id":"${HELP_PREFIX}seite:gruppe:-:0"`));
 
     const long = { ...probe, commands: [{ ...probe.commands[0], text: { ...probe.commands[0].text, examples: Array.from({ length: 12 }, (_, index) => ({ code: `/probe ${"x".repeat(380)} ${index}`, text: `Beispiel ${index}` })) } }] };
-    const first = Flat(HelpCommandView(long, null, 0, CONTEXT));
-    const second = Flat(HelpCommandView(long, null, 1, CONTEXT));
+    const first = Flat(HelpCommandPage(long, null, 0, CONTEXT));
+    const second = Flat(HelpCommandPage(long, null, 99, CONTEXT));
 
-    check("Lang: wird geteilt, nicht gekürzt", !first.texts.includes("…") && first.json.includes(`"custom_id":"${HELP_PREFIX}seite:probe:-:1"`), first.json.slice(-400));
-    check("Lang: Seite 2 hat den Rest", second.texts.includes("Beispiel 11") && second.json.includes(`"custom_id":"${HELP_PREFIX}seite:probe:-:0"`));
-    check("Lang: jede Seite unter 4000 Zeichen und 40 Bausteinen", [first, second].every((part) => part.texts.length < 4000 && part.count <= 40), `${first.texts.length}/${first.count}, ${second.texts.length}/${second.count}`);
+    check("Lang: wird geteilt", !first.texts.includes("Beispiel 11") && first.json.includes(`"custom_id":"${HELP_PREFIX}seite:probe:-:1"`), first.json.slice(-400));
+    check("Lang: die letzte Seite hat den Rest und führt zurück", second.texts.includes("Beispiel 11") && second.json.includes(`"custom_id":"${HELP_PREFIX}seite:probe:-:`) && second.json.includes('"disabled":true'));
+    check("Lang: Kopf auf jeder Seite", first.texts.includes('"kind":"title"') && second.texts.includes('"kind":"title"'));
 
     const many = Array.from({ length: 30 }, (_, index) => ({ ...probe, name: `probe${index}`, commands: [{ ...probe.commands[0], key: `probe${index}`, display: `/probe${index}` }] }));
-    const crowded = Flat(HelpAreaView("moderation", many, CONTEXT));
+    const crowded = Flat(HelpAreaPage("moderation", many, CONTEXT));
 
     check("Viele Befehle: Menü höchstens 25", (crowded.json.match(/"value":"probe\d+"/g) ?? []).length <= 25);
-    check("Viele Befehle: unter 4000 Zeichen und 40 Bausteinen", crowded.texts.length < 4000 && crowded.count <= 40, `${crowded.texts.length}/${crowded.count}`);
+    check("Viele Befehle: höchstens 40 Bausteine", crowded.count <= 40, String(crowded.count));
 }
 
 async function checkBanner(): Promise<void> {
@@ -345,7 +347,8 @@ async function checkCommand(client: BotClient): Promise<void> {
         guild,
         user: { id: "222222222222222222", username: "joe" },
         member: { displayName: "Joe" },
-        update: async (payload: { components?: unknown[]; files?: unknown[] }) => void (updated = payload),
+        deferUpdate: async () => undefined,
+        editReply: async (payload: { components?: unknown[]; files?: unknown[] }) => void (updated = payload),
     };
 
     await new HelpButtons(client).Execute(interaction as never);
@@ -353,7 +356,9 @@ async function checkCommand(client: BotClient): Promise<void> {
     const shown = updated as { components?: unknown[]; files?: unknown[] } | null;
 
     check("Alter Knopf: zurück zur Startseite", JSON.stringify(shown?.components ?? []).includes("In drei Schritten startklar"), JSON.stringify(shown).slice(0, 200));
-    check("Startseite bringt das Banner mit", (shown?.files?.length ?? 0) === 1);
+    const names = (shown?.files ?? []).map((file) => (file as { name?: string }).name);
+
+    check("Startseite: Banner vorn, dann die Bilder", names[0] === "hilfe.png" && names.length >= 2 && names.length <= 10, names.join(", "));
 }
 
 async function checkImages(): Promise<void> {
@@ -381,22 +386,29 @@ async function checkImages(): Promise<void> {
         { kind: "chapter", n: 1, when: "Später mehr gefunden", display: "/fall beweis", who: "Team", text: "Hängt ein Bild an.", code: "/fall beweis nummer:128", fields: "nummer* · bild · link" },
     ];
     const images = await RenderHelpImages(blocks);
-    const sizes = await Promise.all(images.map(async (png) => loadImage(png)));
+    const sizes = await Promise.all(images.map(async (image) => loadImage(image.png)));
 
     check("Alle Blockarten zeichnen", images.length >= 1);
-    check("PNG, 1100 breit, höchstens 900 hoch", sizes.every((image) => image.width === 1100 && image.height <= 900), sizes.map((image) => `${image.width}×${image.height}`).join(", "));
+    check("PNG, 900 breit, höchstens 560 hoch", sizes.every((image) => image.width === 900 && image.height <= 560), sizes.map((image) => `${image.width}×${image.height}`).join(", "));
     check("Emoji ohne Netz bricht nichts", asked > 0);
 
     const many: HelpBlock[] = Array.from({ length: 40 }, (_, index) => ({ kind: "text", text: `Absatz ${index}: ${"viel Text ".repeat(20)}` }));
     const split = await RenderHelpImages(many);
-    const splitSizes = await Promise.all(split.map(async (png) => loadImage(png)));
+    const splitSizes = await Promise.all(split.map(async (image) => loadImage(image.png)));
+
+    check("Jedes Bild hat seinen Alt-Text", split.every((image) => image.alt.length > 0) && split[1].alt !== split[0].alt);
 
     check("Viel Inhalt: mehrere Bilder", split.length > 1, String(split.length));
-    check("Viel Inhalt: jedes höchstens 900 hoch", splitSizes.every((image) => image.height <= 900), splitSizes.map((image) => image.height).join(", "));
+    check("Viel Inhalt: jedes höchstens 560 hoch", splitSizes.every((image) => image.height <= 560), splitSizes.map((image) => image.height).join(", "));
+
+    const orphans: HelpBlock[] = Array.from({ length: 12 }, (_, index): HelpBlock[] => [{ kind: "heading", text: `Abschnitt ${index}` }, { kind: "text", text: "Inhalt ".repeat(25 + index * 3) }]).flat();
+    const kept = await RenderHelpImages(orphans);
+
+    check("Überschrift bleibt beim Inhalt", kept.length > 1 && kept.every((image) => !image.alt.endsWith(":")), kept.map((image) => image.alt.slice(-30)).join(" | "));
 
     const giant = await RenderHelpImages([{ kind: "text", text: "Riesig ".repeat(2000) }]);
 
-    check("Ein Riesenblock wird trotzdem gezeichnet", giant.length >= 1 && (await loadImage(giant[0])).height <= 900);
+    check("Ein Riesenblock wird trotzdem gezeichnet", giant.length >= 1 && (await loadImage(giant[0].png)).height <= 560);
 
     const alt = HelpAlt(blocks);
 

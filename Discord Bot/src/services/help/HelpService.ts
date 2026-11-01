@@ -1,9 +1,9 @@
 import { readFileSync } from "fs";
 import path from "path";
-import { AttachmentBuilder, Guild } from "discord.js";
+import { Guild } from "discord.js";
 import BotClient from "../../client/BotClient";
 import { RenderHelpBanner } from "../../builder/HelpBanner";
-import { HelpStartView, IHelpContext, IHelpPayload } from "../../builder/HelpView";
+import { ComposeHelp, HelpStartPage, IHelpContext, IHelpMessage } from "../../builder/HelpView";
 import { DASHBOARD_PATH } from "../../constants/Dashboard";
 import { HELP_CATALOG } from "../../constants/HelpCatalog";
 import { MODULE_IDS } from "../../constants/Modules";
@@ -15,11 +15,8 @@ import logger from "../../utils/logger";
  * Startseite. Die Seiten selbst baut builder/HelpView.ts.
  */
 
-const BANNER = "hilfe.png";
 const MAX_SUGGEST = 25;
 const DATE = new Intl.DateTimeFormat("de-DE", { day: "2-digit", month: "2-digit", timeZone: "Europe/Berlin" });
-
-export type HelpStartPayload = IHelpPayload & { files: AttachmentBuilder[] };
 
 function Normalize(value: string): string {
     return value.trim().replace(/^\//, "").replace(/\s+/g, " ").toLowerCase();
@@ -127,32 +124,29 @@ export default class HelpService {
         return { guildId: guild.id, dashboard: base, docs: `${base}/docu`, enabled: new Set(modules) };
     }
 
-    /** Die Startseite samt Banner. Ohne Bild des Bots zeichnet das Banner ein N. */
-    async Start(guild: Guild, name: string, developer: boolean): Promise<HelpStartPayload> {
+    /** Die Startseite samt Banner. Ohne Bild des Bots zeichnet das Banner ein N, ohne Banner steht oben ein Titel. */
+    async Start(guild: Guild, name: string, developer: boolean): Promise<IHelpMessage> {
         const entries = this.Entries(developer);
         const context = await this.Context(guild);
-        const files: AttachmentBuilder[] = [];
-        let banner: string | null = null;
+        let banner: Buffer | null = null;
 
         try {
             const url = this.client.user?.displayAvatarURL({ extension: "png", size: 256 });
             const avatar = url ? await fetch(url, { signal: AbortSignal.timeout(3000) }).then((response) => (response.ok ? response.arrayBuffer() : null)).catch(() => null) : null;
 
-            files.push(new AttachmentBuilder(await RenderHelpBanner({ name, avatar: avatar ? Buffer.from(avatar) : null }), { name: BANNER }));
-            banner = BANNER;
+            banner = await RenderHelpBanner({ name, avatar: avatar ? Buffer.from(avatar) : null });
         } catch (error) {
             logger.warn(`❔ Banner von /hilfe nicht gezeichnet: ${String(error)}`);
         }
 
         const start = {
             name,
-            banner,
             modules: { on: MODULE_IDS.filter((id) => context.enabled.has(id)).length, all: MODULE_IDS.length },
             commands: entries.reduce((sum, entry) => sum + entry.commands.length, 0),
             access: await this.Access(guild),
             version: this.version,
         };
 
-        return { ...HelpStartView(start, entries, context), files };
+        return ComposeHelp(HelpStartPage(start, entries, context), banner);
     }
 }

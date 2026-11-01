@@ -4,7 +4,7 @@ import { TwemojiUrl } from "../services/RoleListService";
 
 /**
  * Die Seiten von /hilfe als Bilder (W-0014, Nachtrag Plan 45): der Look der
- * Entwürfe, 1100 breit. Eine Seite wird zu mehreren Bildern, keins höher als
+ * Entwürfe, 900 breit. Eine Seite wird zu mehreren Bildern, keins höher als
  * MAX_HEIGHT - ein sehr hohes Bild verkleinert Discord bis zur Unlesbarkeit.
  * Ein Block wird nie zerschnitten, außer er ist allein schon zu hoch.
  */
@@ -23,9 +23,13 @@ export type HelpBlock =
     | { kind: "command"; emoji: string; display: string; who: string; text: string; fields: string; off?: string }
     | { kind: "chapter"; n: number; when?: string; display: string; who: string; text: string; code?: string; fields: string };
 
-const WIDTH = 1100;
-const MAX_HEIGHT = 900;
-const PAD = 48;
+/**
+ * 900 × höchstens 560: Discord begrenzt die Höhe eines Bilds in der Nachricht. Flacher als
+ * etwa 0,62 füllt es die volle Breite, und 30 px Schrift landen bei etwa normaler Discord-Größe.
+ */
+const WIDTH = 900;
+const MAX_HEIGHT = 560;
+const PAD = 40;
 const INNER = WIDTH - PAD * 2;
 const GAP = 26;
 const SCRATCH = 3200;
@@ -468,7 +472,13 @@ async function BlockImage(scratch: Canvas, block: HelpBlock): Promise<Canvas> {
     return piece;
 }
 
-export async function RenderHelpImages(blocks: HelpBlock[]): Promise<Buffer[]> {
+/** Ein Bild und der Text darauf für die Bildbeschreibung. */
+export interface IHelpImage {
+    png: Buffer;
+    alt: string;
+}
+
+export async function RenderHelpImages(blocks: HelpBlock[]): Promise<IHelpImage[]> {
     await RegisterFonts();
 
     const scratch = createCanvas(WIDTH, SCRATCH);
@@ -478,21 +488,30 @@ export async function RenderHelpImages(blocks: HelpBlock[]): Promise<Buffer[]> {
     for (const block of blocks) pieces.push(await BlockImage(scratch, block));
 
     const images: Canvas[][] = [[]];
+    const owners: HelpBlock[][] = [[]];
     let used = PAD;
 
-    for (const canvas of pieces) {
+    for (const [index, canvas] of pieces.entries()) {
         const height = Math.min(canvas.height, MAX_HEIGHT - PAD * 2);
 
         if (images[images.length - 1].length && used + height + PAD > MAX_HEIGHT) {
-            images.push([]);
-            used = PAD;
+            // Eine Überschrift geht mit ihrem Inhalt ins nächste Bild, statt allein unten zu stehen.
+            const last = owners[owners.length - 1];
+            const carry = last.length > 1 && last[last.length - 1].kind === "heading";
+            const heading = carry ? images[images.length - 1].pop()! : null;
+            const headingBlock = carry ? last.pop()! : null;
+
+            images.push(heading ? [heading] : []);
+            owners.push(headingBlock ? [headingBlock] : []);
+            used = PAD + (heading ? Math.min(heading.height, MAX_HEIGHT - PAD * 2) + GAP : 0);
         }
 
         images[images.length - 1].push(canvas);
+        owners[owners.length - 1].push(blocks[index]);
         used += height + GAP;
     }
 
-    return images.map((group) => {
+    return images.map((group, index) => {
         const height = Math.min(MAX_HEIGHT, PAD + group.reduce((sum, piece) => sum + Math.min(piece.height, MAX_HEIGHT - PAD * 2) + GAP, 0) - GAP + PAD);
         const canvas = createCanvas(WIDTH, height);
         const ctx = canvas.getContext("2d");
@@ -508,7 +527,7 @@ export async function RenderHelpImages(blocks: HelpBlock[]): Promise<Buffer[]> {
             y += part + GAP;
         }
 
-        return canvas.toBuffer("image/png");
+        return { png: canvas.toBuffer("image/png"), alt: HelpAlt(owners[index]) };
     });
 }
 

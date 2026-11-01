@@ -2,7 +2,7 @@ import { AutocompleteInteraction, ChatInputCommandInteraction, InteractionContex
 import BotClient from "../../client/BotClient";
 import Command from "../../structures/Command";
 import Category from "../../enums/Category";
-import { HelpCommandView } from "../../builder/HelpView";
+import { ComposeHelp, HelpCommandPage } from "../../builder/HelpView";
 
 /** /hilfe: alle Befehle erklärt, nur für den, der fragt (W-0014, Plan 45). Siehe docs/Help.md. */
 export default class Help extends Command {
@@ -40,15 +40,11 @@ export default class Help extends Command {
                 return;
             }
 
-            const { flags: _flags, ...page } = HelpCommandView(found.entry, found.key, 0, await help.Context(interaction.guild));
-
-            await interaction.editReply({ ...page, flags: MessageFlags.IsComponentsV2 });
+            await interaction.editReply(await ComposeHelp(HelpCommandPage(found.entry, found.key, 0, await help.Context(interaction.guild)), null));
 
             return;
         }
 
-        const { flags: _flags, ...start } = await help.Start(interaction.guild, interaction.member.displayName, developer);
-
-        await interaction.editReply({ ...start, flags: MessageFlags.IsComponentsV2 });
+        await interaction.editReply(await help.Start(interaction.guild, interaction.member.displayName, developer));
     }
 }

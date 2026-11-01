@@ -1,7 +1,7 @@
 import { Events, Interaction } from "discord.js";
 import BotClient from "../../client/BotClient";
 import Event from "../../structures/Event";
-import { HelpAreaView, HelpCommandView } from "../../builder/HelpView";
+import { ComposeHelp, HelpAreaPage, HelpCommandPage } from "../../builder/HelpView";
 import { HELP_AREAS, HELP_PREFIX, HelpAreaId } from "../../constants/Help";
 
 /**
@@ -28,16 +28,19 @@ export default class HelpButtons extends Event {
             const [kind, ...rest] = interaction.customId.slice(HELP_PREFIX.length).split(":");
             const value = interaction.isStringSelectMenu() ? (interaction.values[0] ?? "") : "";
             const isArea = (id: string): id is HelpAreaId => HELP_AREAS.some((area) => area.id === id);
-            // Unterseiten zeigen kein Banner: die Datei der Startseite geht mit attachments: [] weg.
-            const show = (payload: object) => interaction.update({ ...payload, attachments: [] });
+            // Bilder zeichnen kann länger dauern, als Discord für eine Antwort lässt: erst bestätigen.
+            await interaction.deferUpdate();
 
-            if (kind === "bereich" && isArea(value)) return void (await show(HelpAreaView(value, entries, await help.Context(interaction.guild))));
-            if (kind === "a" && isArea(rest[0])) return void (await show(HelpAreaView(rest[0], entries, await help.Context(interaction.guild), Number(rest[1]) || 0)));
+            // Jede Seite bringt ihre Bilder mit; attachments: [] nimmt die der vorigen weg.
+            const show = async (page: Parameters<typeof ComposeHelp>[0]) => interaction.editReply({ ...(await ComposeHelp(page, null)), attachments: [] });
+
+            if (kind === "bereich" && isArea(value)) return void (await show(HelpAreaPage(value, entries, await help.Context(interaction.guild))));
+            if (kind === "a" && isArea(rest[0])) return void (await show(HelpAreaPage(rest[0], entries, await help.Context(interaction.guild), Number(rest[1]) || 0)));
 
             if (kind === "befehl") {
                 const found = help.Find(value, developer);
 
-                if (found) return void (await show(HelpCommandView(found.entry, found.key, 0, await help.Context(interaction.guild))));
+                if (found) return void (await show(HelpCommandPage(found.entry, found.key, 0, await help.Context(interaction.guild))));
             }
 
             if (kind === "seite") {
@@ -46,14 +49,14 @@ export default class HelpButtons extends Event {
                 const key = sub && sub !== "-" ? `${name} ${sub}` : null;
 
                 if (entry && (key === null || entry.commands.some((command) => command.key === key))) {
-                    return void (await show(HelpCommandView(entry, key, Number(page) || 0, await help.Context(interaction.guild))));
+                    return void (await show(HelpCommandPage(entry, key, Number(page) || 0, await help.Context(interaction.guild))));
                 }
             }
 
             // hilfe:start, oder ein Ziel, das es nicht mehr gibt.
             const name = (interaction.member as { displayName?: string } | null)?.displayName ?? interaction.user.username;
 
-            await interaction.update({ ...(await help.Start(interaction.guild, name, developer)), attachments: [] });
+            await interaction.editReply({ ...(await help.Start(interaction.guild, name, developer)), attachments: [] });
         } catch (error) {
             const normalized = error instanceof Error ? error : new Error(String(error));
 
