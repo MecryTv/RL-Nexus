@@ -153,6 +153,8 @@ Unter *Einstellungen → Wo die Karte landet*:
 
 Beim eigenen Kanal stellt man die **Kategorie**, den **Kanalnamen** (ab Werk `bewerbung-{user}`, dazu `{nummer}` und `{formular}`) und ein, was **nach der Entscheidung** passiert: *Für die Person schließen* (Vorgabe, die Prüfer behalten den Kanal), *Löschen* oder *Offen lassen*. Bei einer entschiedenen Karte mit eigenem Kanal gibt es den Knopf **Kanal löschen**.
 
+Mit einem **Transcript-Kanal** (W-0047) hält der Bot den Kanal vor dem Löschen fest, bei *Löschen* nach der Entscheidung genauso wie beim Knopf. In den Transcript-Kanal kommt eine Nachricht in der Farbe der Entscheidung (grün angenommen, rot abgelehnt) mit Bild des Bewerbers, Notiz, Zeiten, Zahl der Nachrichten und Anhänge und der Datei `bewerbung-<nr>.html`. Bilder sind in der Datei eingebettet, bis 6 MB zusammen; größere Anhänge bleiben Discord-Links und laufen ab. Die Nachricht pingt niemanden. Kommt das Transcript nicht an (keine Rechte im Transcript-Kanal, Datei über 10 MB), bleibt der Kanal stehen: nach der Entscheidung nimmt der Bot dann nur die Person heraus wie bei *schließen*, beim Knopf sagt er, warum. Ohne Transcript-Kanal wird wie bisher einfach gelöscht. Beim **Entfernen** einer Bewerbung gibt es kein Transcript.
+
 Kann der Bot keinen Kanal anlegen (fehlt „Kanäle verwalten“, Kategorie voll), bleibt die Bewerbung gespeichert und die Karte geht in den Sammelkanal. Fehlt das Recht schon beim Speichern, sagt das Dashboard es. Die Kanal-ID steht in `apply_submissions.channel_id` (Migration `038`).
 
 ---

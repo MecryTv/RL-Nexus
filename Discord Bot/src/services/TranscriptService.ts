@@ -5,6 +5,7 @@ import {
     escapeMarkdown,
     Guild,
     GuildMember,
+    GuildTextBasedChannel,
     Message,
     MessageFlags,
     MessageType,
@@ -53,6 +54,30 @@ function Extension(url: string): string {
     const match = /\.([a-z0-9]{1,8})$/i.exec(name);
 
     return match ? match[1].toLowerCase() : "bin";
+}
+
+/** Alle, die geschrieben haben (ohne Bots), höchstens 20. */
+function Participants(list: ITranscriptMessage[]): ITranscriptUser[] {
+    const participants = new Map<string, ITranscriptUser>();
+
+    for (const message of list) {
+        if (!message.author.bot && participants.size < 20) participants.set(message.author.id, message.author);
+    }
+
+    return [...participants.values()];
+}
+
+/** Was eine Bewerbung für ihr Transcript mitbringt (W-0047). */
+export interface IApplyTranscript {
+    id: number;
+    form: string;
+    applicantId: string;
+    deciderId: string | null;
+    /** „Angenommen“ oder „Abgelehnt“. */
+    decision: string;
+    note: string | null;
+    openedAt: number;
+    closedAt: number;
 }
 
 /**
@@ -118,32 +143,11 @@ export default class TranscriptService {
     private async Capture(context: ITicketContext): Promise<ITranscript> {
         const { ticket, guild } = context;
         const channel = context.channel!;
-        const fetched: Message[] = [];
-        let before: string | undefined;
-
-        while (fetched.length < MAX_TRANSCRIPT_MESSAGES) {
-            const batch = await channel.messages.fetch({ limit: 100, before, cache: false });
-
-            if (batch.size === 0) break;
-
-            fetched.push(...batch.values());
-            before = batch.last()?.id;
-
-            if (batch.size < 100) break;
-        }
-
-        const messages = fetched.slice(0, MAX_TRANSCRIPT_MESSAGES).reverse();
+        const { messages, truncated } = await this.Read(channel);
         const people = await this.People(guild, messages, ticket);
         const media = await this.SaveMedia(guild.id, ticket.id, messages);
 
         const list = messages.map((message) => this.Snapshot(message, people, ticket.openerId));
-
-        const participants = new Map<string, ITranscriptUser>();
-
-        for (const message of list) {
-            if (!message.author.bot && participants.size < 20) participants.set(message.author.id, message.author);
-        }
-
         const known = (id: string | null): ITranscriptUser | null => (id ? (people.get(id) ?? null) : null);
 
         return {
@@ -167,13 +171,103 @@ export default class TranscriptService {
                 closedAt: ticket.closedAt?.getTime() ?? Date.now(),
                 messages: list.length,
                 files: list.reduce((sum, message) => sum + message.files.length, 0),
-                participants: [...participants.values()],
+                participants: Participants(list),
             },
             messages: list,
             mentions: await this.Mentions(guild, messages, people),
             media,
-            truncated: fetched.length >= MAX_TRANSCRIPT_MESSAGES,
+            truncated,
         };
+    }
+
+    /**
+     * Der eigene Kanal einer Bewerbung als HTML-Datei (W-0047). Eine Online-Ansicht
+     * gibt es dafür nicht: Bilder kommen eingebettet mit, bis TRANSCRIPT_INLINE_BYTES,
+     * alles andere bleibt ein Discord-Link. file ist null, wenn Discord sie nicht nähme.
+     */
+    async Application(guild: Guild, channel: GuildTextBasedChannel, apply: IApplyTranscript): Promise<{ transcript: ITranscript; file: Buffer | null }> {
+        const { messages, truncated } = await this.Read(channel);
+        const ids = [apply.applicantId, ...(apply.deciderId ? [apply.deciderId] : []), ...messages.filter((message) => !message.webhookId).map((message) => message.author.id)];
+        const people = await this.Lookup(guild, ids, (member) => member.id !== apply.applicantId, apply.applicantId);
+        const list = messages.map((message) => this.Snapshot(message, people, apply.applicantId));
+        const inline = await this.Inline(messages);
+
+        const transcript: ITranscript = {
+            version: 1,
+            ticketId: apply.id,
+            number: apply.id,
+            code: null,
+            guild: { id: guild.id, name: guild.name, icon: guild.iconURL({ extension: "png", size: 128 }) },
+            channel: { id: channel.id, name: channel.name },
+            meta: {
+                optionId: "apply",
+                option: apply.form,
+                contact: "direct",
+                openerCode: null,
+                opener: people.get(apply.applicantId) ?? { id: apply.applicantId, name: apply.applicantId, avatar: null, bot: false, color: null },
+                claimer: null,
+                closer: apply.deciderId ? (people.get(apply.deciderId) ?? null) : null,
+                reason: apply.note,
+                members: [],
+                openedAt: apply.openedAt,
+                closedAt: apply.closedAt,
+                messages: list.length,
+                files: list.reduce((sum, message) => sum + message.files.length, 0),
+                participants: Participants(list),
+            },
+            messages: list,
+            mentions: await this.Mentions(guild, messages, people),
+            // Eingebettet gilt als gesichert - der Schlüssel ist zugleich der Name für file().
+            media: Object.fromEntries([...inline.keys()].map((key) => [key, key])),
+            truncated,
+        };
+
+        const html = Buffer.from(RenderTranscript(transcript, { file: (stored) => inline.get(stored) ?? null, apply: { decision: apply.decision } }), "utf8");
+
+        return { transcript, file: html.length <= MAX_DISCORD_UPLOAD ? html : null };
+    }
+
+    /** Bis zu MAX_TRANSCRIPT_MESSAGES Nachrichten eines Kanals, die älteste zuerst. */
+    private async Read(channel: GuildTextBasedChannel): Promise<{ messages: Message[]; truncated: boolean }> {
+        const fetched: Message[] = [];
+        let before: string | undefined;
+
+        while (fetched.length < MAX_TRANSCRIPT_MESSAGES) {
+            const batch = await channel.messages.fetch({ limit: 100, before, cache: false });
+
+            if (batch.size === 0) break;
+
+            fetched.push(...batch.values());
+            before = batch.last()?.id;
+
+            if (batch.size < 100) break;
+        }
+
+        return { messages: fetched.slice(0, MAX_TRANSCRIPT_MESSAGES).reverse(), truncated: fetched.length >= MAX_TRANSCRIPT_MESSAGES };
+    }
+
+    /** Bild-Anhänge als data:-URI, zusammen höchstens TRANSCRIPT_INLINE_BYTES. Schlüssel wie in media. */
+    private async Inline(messages: Message[]): Promise<Map<string, string>> {
+        const inline = new Map<string, string>();
+        let room = TRANSCRIPT_INLINE_BYTES;
+
+        for (const message of messages) {
+            for (const attachment of message.attachments.values()) {
+                const key = AttachmentKey(attachment.url);
+                const type = key ? INLINE_TYPES[`.${Extension(attachment.url)}`] : undefined;
+
+                if (!key || inline.has(key) || !type?.startsWith("image/") || attachment.size > room) continue;
+
+                const data = await this.Fetch(attachment.url, room);
+
+                if (!data) continue;
+
+                room -= data.length;
+                inline.set(key, `data:${type};base64,${data.toString("base64")}`);
+            }
+        }
+
+        return inline;
     }
 
     /** Eine Nachricht, wie sie im Transcript steht - auch für den Chat in Live Tickets. */
@@ -233,17 +327,21 @@ export default class TranscriptService {
      * MAX_LOOKUPS. Wer den Server verlassen hat, erscheint mit seinem Profil.
      */
     async People(guild: Guild, messages: Message[], ticket: ITicket): Promise<Map<string, ITranscriptUser>> {
-        const ids = new Set<string>([ticket.openerId, ...ticket.members]);
+        const ids = [ticket.openerId, ...ticket.members];
 
-        if (ticket.claimedBy) ids.add(ticket.claimedBy);
-        if (ticket.closedBy) ids.add(ticket.closedBy);
+        if (ticket.claimedBy) ids.push(ticket.claimedBy);
+        if (ticket.closedBy) ids.push(ticket.closedBy);
 
-        for (const message of messages) if (!message.webhookId) ids.add(message.author.id);
+        for (const message of messages) if (!message.webhookId) ids.push(message.author.id);
 
+        return this.Lookup(guild, ids, await this.TeamOf(ticket), ticket.openerId);
+    }
+
+    /** Die Personen zu ids, höchstens MAX_LOOKUPS - team sagt, wer zum Team zählt. */
+    private async Lookup(guild: Guild, ids: string[], team: (member: GuildMember) => boolean, openerId: string): Promise<Map<string, ITranscriptUser>> {
         const people = new Map<string, ITranscriptUser>();
-        const team = await this.TeamOf(ticket);
 
-        for (const id of [...ids].slice(0, MAX_LOOKUPS)) {
+        for (const id of [...new Set(ids)].slice(0, MAX_LOOKUPS)) {
             const member = guild.members.cache.get(id) ?? (await guild.members.fetch(id).catch(() => null));
 
             if (member) {
@@ -261,7 +359,7 @@ export default class TranscriptService {
                     bot: user.bot,
                     color: null,
                     // Nicht mehr auf dem Server: beim Ersteller ist trotzdem klar, auf welcher Seite er steht.
-                    ...(id === ticket.openerId && !user.bot ? { team: false } : {}),
+                    ...(id === openerId && !user.bot ? { team: false } : {}),
                 });
             }
         }
@@ -394,6 +492,24 @@ export default class TranscriptService {
     }
 
     private async Download(url: string, directory: string, index: number, limit: number): Promise<{ name: string; size: number } | null> {
+        const buffer = await this.Fetch(url, limit);
+
+        if (!buffer) return null;
+
+        const name = `${index}.${Extension(url)}`;
+
+        try {
+            await writeFile(path.join(directory, name), buffer);
+        } catch (error) {
+            logger.warn(`📄 Anhang nicht gesichert: ${String(error)}`);
+
+            return null;
+        }
+
+        return { name, size: buffer.length };
+    }
+
+    private async Fetch(url: string, limit: number): Promise<Buffer | null> {
         try {
             // Keine Umleitungen: die Adresse ist geprüft, ihr Ziel wäre es nicht.
             const response = await fetch(url, { signal: AbortSignal.timeout(30_000), redirect: "error" });
@@ -408,13 +524,7 @@ export default class TranscriptService {
 
             const buffer = Buffer.from(await response.arrayBuffer());
 
-            if (buffer.length > limit) return null;
-
-            const name = `${index}.${Extension(url)}`;
-
-            await writeFile(path.join(directory, name), buffer);
-
-            return { name, size: buffer.length };
+            return buffer.length > limit ? null : buffer;
         } catch (error) {
             logger.warn(`📄 Anhang nicht gesichert: ${String(error)}`);
 

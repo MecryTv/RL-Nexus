@@ -1,4 +1,4 @@
-import { ContainerBuilder, Guild, Message, MessageCreateOptions, escapeMarkdown } from "discord.js";
+import { AttachmentBuilder, ContainerBuilder, Guild, Message, MessageCreateOptions, MessageFlags, escapeMarkdown } from "discord.js";
 import BotClient from "../client/BotClient";
 import ComponentV2Builder from "../builder/ComponentV2Builder";
 import { APPLY_FLOW_PREFIX, APPLY_PREFIX, PANEL_SECTIONS, STATUS_LABELS } from "../constants/Apply";
@@ -274,4 +274,47 @@ export function DmSummaryView(form: IApplyForm, answers: IApplyAnswer[], draftId
     }
 
     return { ...card.toMessage(), allowedMentions: { parse: [] } };
+}
+
+/**
+ * Die Nachricht im Transcript-Kanal, bevor der eigene Kanal geht (W-0047, Entwurf B):
+ * grün oder rot nach der Entscheidung, das Bild des Bewerbers, die Notiz als Zitat.
+ */
+export function ApplyTranscriptCard(
+    submission: IApplySubmission,
+    form: string,
+    guild: string,
+    counts: { messages: number; files: number },
+    file: Buffer | null,
+    avatar: string | null
+): MessageCreateOptions {
+    const accepted = submission.status === "accepted";
+    const word = accepted ? "angenommen" : "abgelehnt";
+    const name = `bewerbung-${submission.id}.html`;
+    const count = (value: number, one: string, many: string): string => `${value} ${value === 1 ? one : many}`;
+    const head = [
+        `# 📄 Bewerbung #${submission.id} · ${word}`,
+        `-# ${escapeMarkdown(form)} · ${escapeMarkdown(guild)}`,
+        `<@${submission.userId}> wurde von ${submission.decidedBy ? `<@${submission.decidedBy}>` : "jemandem"} ${word}.`,
+    ].join("\n");
+    const builder = new ComponentV2Builder({ accentColor: accepted ? 0x3ba55d : 0xf23f43 });
+
+    if (avatar) builder.section(head, { type: "thumbnail", url: avatar });
+    else builder.text(head);
+
+    if (submission.note) builder.text(submission.note.split("\n").map((line) => `> ${line}`).join("\n"));
+
+    builder.separator().list([
+        `**Eingegangen** <t:${Math.floor(submission.createdAt / 1000)}:f> · **entschieden** <t:${Math.floor((submission.decidedAt ?? Date.now()) / 1000)}:f>`,
+        `**Im Kanal** ${count(counts.messages, "Nachricht", "Nachrichten")} · ${count(counts.files, "Anhang", "Anhänge")}`,
+    ]);
+
+    if (file) builder.file(name);
+
+    return {
+        components: [builder.build()],
+        files: file ? [new AttachmentBuilder(file, { name })] : [],
+        flags: MessageFlags.IsComponentsV2,
+        allowedMentions: { parse: [] },
+    };
 }
