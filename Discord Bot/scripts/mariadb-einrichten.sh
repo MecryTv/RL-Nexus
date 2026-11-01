@@ -228,6 +228,20 @@ $cfg['AllowArbitraryServer'] = false;
 $cfg['PmaNoRelation_DisableWarning'] = true;
 $cfg['VersionCheck'] = false;
 EOF
+# Twig 3.21 aus Debian 13 meldet bei jedem Seitenaufbau, dass phpMyAdmin 5.2.2
+# veraltete Aufrufe nutzt, und phpMyAdmin zeigt jede Meldung oben an. nginx lädt
+# diese Datei vor phpMyAdmin (auto_prepend_file in nginx/db.nexus-emb.de.conf).
+cat > /etc/phpmyadmin/rlnexus-ohne-hinweise.php <<'EOF'
+<?php
+// Leer statt der Fassung aus symfony/deprecation-contracts: Sonst stehen auf jeder
+// Seite von phpMyAdmin Hinweise „Since twig/twig 3.21: … is deprecated“.
+if (!function_exists('trigger_deprecation')) {
+    function trigger_deprecation(string $package, string $version, string $message, mixed ...$args): void
+    {
+    }
+}
+EOF
+chmod 644 /etc/phpmyadmin/rlnexus-ohne-hinweise.php
 grep -q 'conf.d' /etc/phpmyadmin/config.inc.php \
     || echo "Achtung: /etc/phpmyadmin/config.inc.php liest conf.d nicht, /etc/phpmyadmin/conf.d/rlnexus.php wirkt dann nicht."
 [ -S /run/php/php-fpm.sock ] \
