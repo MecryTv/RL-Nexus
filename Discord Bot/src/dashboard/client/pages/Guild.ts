@@ -308,6 +308,8 @@ export function renderGuild(data: IPayload): void {
 
     // W-0011: Leiste, Infokarte und Anfrage für Staff.
     if (staffView) void import("./GuildStaff.js").then((module) => module.renderStaffView(guild));
+    // Wer verwaltet: rote Leiste, solange Staff hier arbeitet, und „Staff-Zugriffe“ auf der Übersicht.
+    else if (guild.canManage) void import("./GuildStaff.js").then((module) => module.renderManagerBar(guild));
 
     void waiting.detail.then((detail) => {
         paintDetails(detail);

@@ -160,6 +160,9 @@ async function boot(): Promise<void> {
     void pullNotes();
     window.setInterval(() => void pullNotes(), NOTES_POLL);
 
+    // W-0011: Fragt der RL Nexus Staff nach einer Freigabe, kommt das Pop-up auf jeder Seite.
+    void import("./layout/StaffPrompt.js").then((module) => module.watchStaffPrompts());
+
     const module = await code;
 
     if ("renderGuild" in module) module.renderGuild(data);

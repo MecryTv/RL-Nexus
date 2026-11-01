@@ -10,7 +10,7 @@ import { IGuild } from "../interfaces/IGuild.js";
 import { AccessText } from "../constants/Access.js";
 import { url } from "../core/Base.js";
 import { icon, maybe, need } from "../core/Dom.js";
-import { onMyPulse } from "../core/Pulse.js";
+import { onMyPulse, onPulse } from "../core/Pulse.js";
 import { toast } from "../core/Toast.js";
 import { button, el, face, toggle } from "../core/Ui.js";
 
@@ -549,5 +549,101 @@ export function lockPrivate(section: HTMLElement, guild: IGuild): void {
         );
     };
 
+    void paint();
+}
+
+/* ----------------------------------------------------------
+   Verwalter: rote Leiste mit Live-Liste, „Staff-Zugriffe“ auf der Übersicht
+   ---------------------------------------------------------- */
+
+interface ILogEntry {
+    id: number;
+    grantId: number;
+    at: number;
+    area: string;
+    text: string;
+}
+
+interface IManagerState {
+    me: "manager";
+    grant: IGrantView | null;
+    log: ILogEntry[];
+    recent: { grants: IGrantView[]; log: ILogEntry[] };
+}
+
+const WHEN = new Intl.DateTimeFormat("de-DE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+
+function logList(entries: ILogEntry[], format: Intl.DateTimeFormat): HTMLElement {
+    return el(
+        "ol",
+        "sglog",
+        ...entries.map((entry) => el("li", "", el("time", "", format.format(entry.at)), el("span", "", `${entry.text.endsWith(" geöffnet") ? "🔏 " : ""}${entry.text}`)))
+    );
+}
+
+export function renderManagerBar(guild: IGuild): void {
+    const bar = need<HTMLElement>("#managerBar");
+    const recent = maybe<HTMLElement>("#staffRecent");
+
+    const paint = async (): Promise<void> => {
+        const { data } = await staffApi<IManagerState>(guild.id);
+
+        if (!data) return;
+
+        const grant = data.grant;
+        const act = (action: string): void =>
+            void staffApi(guild.id, { action }).then(({ error }) => {
+                if (error) toast("info", "Staff-Freigabe", error);
+
+                void paint();
+            });
+
+        if (grant?.status === "active" && grant.endsAt) {
+            const more = button("btn btn--quiet sgbar__btn", "+30 Min.");
+            const end = button("btn btn--primary sgbar__btn", "Beenden");
+            const off = button("btn btn--quiet sgbar__btn", "Private wegnehmen");
+
+            more.addEventListener("click", () => act("extend"));
+            end.addEventListener("click", () => act("end"));
+            off.addEventListener("click", () => act("private-off"));
+
+            bar.hidden = false;
+            bar.replaceChildren(
+                el(
+                    "div",
+                    "sgbar__row",
+                    face(grant.staff, "sgface"),
+                    el("span", "sgbar__text", el("b", "", grant.staff.name), ` (${grant.staff.role}) bearbeitet gerade deinen Server`),
+                    ...(grant.private === "on" ? [pill("sgpill--warn", "+ private Bereiche")] : []),
+                    el("span", "sgbar__grow"),
+                    timer(grant.endsAt),
+                    ...(grant.private === "on" ? [off] : []),
+                    more,
+                    end
+                ),
+                el(
+                    "div",
+                    "sglive",
+                    el("div", "sglive__head", el("span", "sglabel", "Live: was Staff ändert und ansieht"), el("span", "sghint", "aktualisiert sich selbst")),
+                    data.log.length ? logList(data.log, CLOCK) : el("p", "sghint", "Noch nichts geändert.")
+                )
+            );
+        } else {
+            bar.hidden = true;
+            bar.replaceChildren();
+        }
+
+        if (recent) {
+            recent.hidden = data.recent.log.length === 0;
+            recent.replaceChildren(
+                el("h2", "", "Staff-Zugriffe"),
+                el("p", "ovcard__sub", "Was der RL Nexus Staff hier in den letzten 30 Tagen geändert und angesehen hat."),
+                logList(data.recent.log.slice(0, 30), WHEN)
+            );
+        }
+    };
+
+    tick(() => void paint());
+    onPulse(guild.id, ["staff"], () => void paint());
     void paint();
 }
