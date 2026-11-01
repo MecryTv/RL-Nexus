@@ -76,7 +76,7 @@ export default class DashboardApiWelcome extends Route {
     }
 
     private async Write(access: IManageAccess, body: IBody): Promise<unknown> {
-        const { guild, member } = access;
+        const { guild, member, actor } = access;
         const service = this.client.welcomeService;
         const which = body.which === "leave" ? "leave" : "join";
 
@@ -84,7 +84,7 @@ export default class DashboardApiWelcome extends Route {
             case "save": {
                 const config = await service.Save(guild, body.config);
 
-                logger.user(`👋 Welcome-Einstellungen auf ${guild.id} gespeichert (von ${member.id})`);
+                logger.user(`👋 Welcome-Einstellungen auf ${guild.id} gespeichert (von ${actor.id})`);
 
                 return { ok: true, config };
             }

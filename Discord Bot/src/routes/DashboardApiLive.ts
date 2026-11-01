@@ -32,7 +32,7 @@ export default class DashboardApiLive extends Route {
         const enabled = new Set<string>([...CORE_ACTIONS, ...access.config.actions]);
 
         return reply.header("Cache-Control", "no-store").send({
-            me: { id: access.member.id, manage: access.manage },
+            me: { id: access.actor.id, manage: access.manage },
             // Dieselben Aktionen wie im Menü unter dem Ticket - nur, was der Server eingeschaltet hat.
             actions: ActionEntries(this.client)
                 .filter((entry) => enabled.has(entry.value))

@@ -107,7 +107,7 @@ export default class DashboardApiMatchups extends Route {
     }
 
     private async Write(access: IManageAccess, body: IBody): Promise<unknown> {
-        const { guild, member } = access;
+        const { guild, member, actor } = access;
         const service = this.client.matchupService;
         const id = Number(body.id ?? 0);
 
@@ -115,7 +115,7 @@ export default class DashboardApiMatchups extends Route {
             case "settings": {
                 const settings = await service.SaveSettings(guild, body.settings);
 
-                logger.user(`⚔️ Matchups auf ${guild.id} gespeichert (von ${member.id})`);
+                logger.user(`⚔️ Matchups auf ${guild.id} gespeichert (von ${actor.id})`);
 
                 return { ok: true, settings };
             }

@@ -2,6 +2,11 @@ import { FastifyReply, FastifyRequest } from "fastify";
 import { Guild, PermissionFlagsBits } from "discord.js";
 import BotClient from "../client/BotClient";
 import Route from "../structures/Route";
+import { PRIVATE_HINT } from "../constants/StaffGrant";
+import { SessionOf } from "../utils/dashboard";
+
+/** Aktionen an einzelnen Fällen - mit Staff-Freigabe nur mit dem extra Ja (W-0011). */
+const CASE_ACTIONS = new Set(["release", "trust", "ban", "deleted"]);
 import { DASHBOARD_PATH } from "../constants/Dashboard";
 import { ANTI_VILLAIN_MODULE, CLEANUP_OPTIONS, GUARDS, LEVELS, MAX_TRUSTED, NUKE_ACTIONS, NUKE_LIMIT_RANGE, PROTOCOL_KEEP_MS, RAID_END_RANGE, RAID_JOINS_RANGE } from "../constants/AntiVillain";
 import { IAvCase } from "../interfaces/services/antivillain/IAntiVillain";
@@ -10,7 +15,7 @@ import { QuarantineError } from "../services/antivillain/Quarantine";
 import { CreateLogThread, LogTargetError, LogTargets } from "../utils/logtarget";
 import { WantsJSON } from "../utils/admin";
 import logger from "../utils/logger";
-import { GuildResources, IManageAccess, ManageGate } from "../utils/managegate";
+import { GuildResources, IManageAccess, ManageGate, StaffGrantOf } from "../utils/managegate";
 
 interface IBody {
     action?: unknown;
@@ -82,8 +87,19 @@ export default class DashboardApiAntiVillain extends Route {
 
         reply.header("Cache-Control", "no-store");
 
+        // W-0011: Die Fälle sind ein privater Bereich - Staff mit Freigabe sieht sie nur mit dem extra Ja.
+        const session = SessionOf(this.client, request);
+        const grant = session ? await StaffGrantOf(this.client, session, access.guild.id) : null;
+        const locked = grant !== null && grant.private !== "on";
+
+        if (writing && locked && CASE_ACTIONS.has(String((request.body as IBody | undefined)?.action))) {
+            return reply.code(403).send({ error: "Forbidden", hint: PRIVATE_HINT });
+        }
+
+        if (!writing && grant && !locked) this.client.staffGrantService.Seen(grant, "Fälle Anti Villain", "Liste");
+
         try {
-            if (!writing) return reply.send({ ...(await this.Read(access)), off: !on });
+            if (!writing) return reply.send({ ...(await this.Read(access, locked)), off: !on });
 
             return reply.send(await this.Write(access, (request.body ?? {}) as IBody));
         } catch (error) {
@@ -112,7 +128,7 @@ export default class DashboardApiAntiVillain extends Route {
         };
     }
 
-    private async Read(access: IManageAccess) {
+    private async Read(access: IManageAccess, locked = false) {
         const { guild } = access;
         const service = this.client.antiVillainService;
         const settings = await service.Settings(guild.id);
@@ -127,7 +143,8 @@ export default class DashboardApiAntiVillain extends Route {
                 raid: settings.raid.on,
                 nuke: settings.nuke.on,
             },
-            cases: open.map((found) => this.CaseView(guild, found)),
+            cases: locked ? [] : open.map((found) => this.CaseView(guild, found)),
+            casesLocked: locked,
             protocol: await this.client.avEvents.Recent(guild.id),
             raid: service.RaidBanner(guild.id),
             readiness: Readiness(guild),
@@ -148,7 +165,7 @@ export default class DashboardApiAntiVillain extends Route {
     }
 
     private async Write(access: IManageAccess, body: IBody): Promise<unknown> {
-        const { guild, member } = access;
+        const { guild, member, actor } = access;
         const service = this.client.antiVillainService;
         const id = Number(body.id);
 
@@ -156,7 +173,7 @@ export default class DashboardApiAntiVillain extends Route {
             case "save": {
                 const settings = await service.Save(guild, body.settings);
 
-                logger.user(`🛡️  Anti-Villain-Einstellungen auf ${guild.id} gespeichert (von ${member.id})`);
+                logger.user(`🛡️  Anti-Villain-Einstellungen auf ${guild.id} gespeichert (von ${actor.id})`);
 
                 return { ok: true, settings };
             }
@@ -187,12 +204,12 @@ export default class DashboardApiAntiVillain extends Route {
             }
 
             case "raid-start":
-                await service.raid.Start(guild, member.id);
+                await service.raid.Start(guild, actor.id);
 
                 return { ok: true, raid: service.RaidBanner(guild.id) };
 
             case "raid-end":
-                await service.raid.End(guild, member.id);
+                await service.raid.End(guild, actor.id);
 
                 return { ok: true, raid: null };
 

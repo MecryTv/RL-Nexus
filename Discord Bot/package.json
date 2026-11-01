@@ -44,6 +44,7 @@
         "check:epicname": "tsx src/scripts/CheckEpicName.ts",
         "check:selfroles": "tsx src/scripts/CheckSelfRoles.ts",
         "check:sixmans": "tsx src/scripts/CheckSixMans.ts",
+        "check:staffgrant": "tsx src/scripts/CheckStaffGrant.ts",
         "check:teams": "tsx src/scripts/CheckTeams.ts",
         "icons:teams": "tsx src/scripts/RenderTeamIcons.ts",
         "check:tickets": "tsx src/scripts/CheckTickets.ts",

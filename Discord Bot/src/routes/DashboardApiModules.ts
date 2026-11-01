@@ -1,6 +1,7 @@
 import { FastifyReply, FastifyRequest } from "fastify";
 import BotClient from "../client/BotClient";
 import Route from "../structures/Route";
+import { ModuleLabel } from "../utils/managegate";
 import { SessionExpired } from "../services/DashboardService";
 import { ClearCookie, DASHBOARD_PATH, SESSION_COOKIE } from "../constants/Dashboard";
 import { SNOWFLAKE } from "../constants/Discord";
@@ -71,6 +72,11 @@ export default class DashboardApiModules extends Route {
             }
 
             logger.user(`🧩 Modul ${moduleId} ${on ? "an" : "aus"} auf ${id} (von ${session.userId})`);
+
+            // W-0011: Staff mit Freigabe - ins Protokoll.
+            const grant = this.client.staffGrantService.Active(session.userId, id);
+
+            if (grant) this.client.staffGrantService.Log(grant, "Module", `${ModuleLabel(moduleId)} ${on ? "an" : "aus"}`);
 
             return reply.header("Cache-Control", "no-store").send({ ok: true, modules });
         } catch (error) {

@@ -9,6 +9,7 @@
 process.env.CLIENT_SECRET ||= "check-secret";
 process.env.DEV_CLIENT_SECRET ||= "check-secret";
 
+import { PRIVATE_HINT } from "../constants/StaffGrant";
 import { AuditLogEvent, ButtonInteraction, ChannelType, Guild, GuildBasedChannel, GuildMember, GuildAuditLogsEntry, Message, PermissionFlagsBits, Role, StringSelectMenuInteraction, UserContextMenuCommandInteraction } from "discord.js";
 import HackReport from "../commands/user/HackReport";
 import BotClient from "../client/BotClient";
@@ -1118,6 +1119,37 @@ function ApiWorld(canManage = true) {
     return { world, ask };
 }
 
+/** W-0011: Staff mit Freigabe sieht die Fälle nur mit dem extra Ja. */
+async function checkApiStaff(): Promise<void> {
+    console.log("\n  — Dashboard-Schnittstelle: Staff-Freigabe —");
+
+    const { world, ask } = ApiWorld();
+    const create = world.client.avCases.Create as unknown as (input: Partial<IAvCase>) => Promise<IAvCase>;
+    const held = await create({ guildId: GUILD, userId: USER, score: 90, hits: [], timeline: [], savedRoles: [], partial: [], deleted: [], incidentId: null });
+    const seen: string[] = [];
+    let open = false;
+    const service = world.client.staffGrantService as unknown as Record<string, unknown>;
+
+    service.Active = () => ({ id: 1, guildId: GUILD, staffId: MOD, status: "active", endsAt: Date.now() + 60_000, private: open ? "on" : "none" });
+    service.Seen = (_grant: unknown, area: string, item: string) => seen.push(`${area} › ${item}`);
+    // Die Freigabe gilt nur, solange die Sitzung Staff ist (StaffGrantOf).
+    (world.client.dashboardService as unknown as Record<string, unknown>).IsStaff = async () => true;
+
+    const shut = await ask("GET");
+    const body = (shut.statusCode === 200 ? shut.json() : {}) as { cases?: unknown[]; casesLocked?: boolean };
+    check("Staff ohne private Bereiche: keine Fälle, gesperrt", shut.statusCode === 200 && body.cases?.length === 0 && body.casesLocked === true, shut.body.slice(0, 200));
+
+    const release = await ask("POST", { action: "release", id: held.id });
+    check("Staff ohne private Bereiche: Freigeben 403", release.statusCode === 403 && (release.json() as { hint?: string }).hint === PRIVATE_HINT, release.body);
+    check("Gesperrt: nichts angesehen", seen.length === 0);
+
+    open = true;
+    const read = await ask("GET");
+    const opened = (read.statusCode === 200 ? read.json() : {}) as { cases?: unknown[]; casesLocked?: boolean };
+    check("Mit privaten Bereichen: Fälle da", (opened.cases?.length ?? 0) > 0 && opened.casesLocked === false);
+    check("Ansehen steht im Protokoll", seen[0] === "Fälle Anti Villain › Liste", seen.join(" | "));
+}
+
 async function checkApi(): Promise<void> {
     console.log("\n  — Dashboard-Schnittstelle —");
 
@@ -1594,6 +1626,7 @@ async function main(): Promise<void> {
     await checkNuke();
     await checkSafety();
     await checkApi();
+    await checkApiStaff();
     await checkPrune();
     await checkDebris();
     await checkReview();

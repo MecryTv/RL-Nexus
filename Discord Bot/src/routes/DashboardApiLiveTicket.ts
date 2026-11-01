@@ -2,6 +2,7 @@ import path from "path";
 import { FastifyReply, FastifyRequest } from "fastify";
 import BotClient from "../client/BotClient";
 import Route from "../structures/Route";
+import { StaffDisplay } from "../services/LiveService";
 import { IsImageSource } from "../builder/MessageDoc";
 import { DASHBOARD_PATH } from "../constants/Dashboard";
 import { ResolveImagePath } from "../constants/Gallery";
@@ -93,7 +94,7 @@ export default class DashboardApiLiveTicket extends Route {
         const action = body.action;
 
         if (action === "send") {
-            await service.SendAsMember(context, member, Text(body.content, 2000), this.Gallery(access.guild.id, body.gallery));
+            await service.SendAsMember(context, member, Text(body.content, 2000), this.Gallery(access.guild.id, body.gallery), StaffDisplay(access));
 
             return {};
         }

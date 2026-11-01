@@ -69,7 +69,7 @@ export default class DashboardApiSelfRoles extends Route {
     }
 
     private async Write(access: IManageAccess, body: IBody): Promise<unknown> {
-        const { guild, member } = access;
+        const { guild, member, actor } = access;
         const service = this.client.selfRoleService;
         const id = Number(body.id ?? 0);
 
@@ -83,7 +83,7 @@ export default class DashboardApiSelfRoles extends Route {
             case "send": {
                 const panel = await service.Send(guild, await service.Panel(guild.id, id));
 
-                logger.user(`🎭 Self-Role-Panel ${id} auf ${guild.id} gesendet (von ${member.id})`);
+                logger.user(`🎭 Self-Role-Panel ${id} auf ${guild.id} gesendet (von ${actor.id})`);
 
                 return { ok: true, panel };
             }

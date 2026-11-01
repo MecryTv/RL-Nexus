@@ -77,7 +77,7 @@ export default class DashboardApiLogging extends Route {
     }
 
     private async Write(access: IManageAccess, body: IBody): Promise<unknown> {
-        const { guild, member } = access;
+        const { guild, member, actor } = access;
         const service = this.client.logService;
 
         switch (body.action) {
@@ -86,7 +86,7 @@ export default class DashboardApiLogging extends Route {
 
                 const settings = await service.Save(guild, body.settings);
 
-                logger.user(`📜 Logging-Einstellungen auf ${guild.id} gespeichert (von ${member.id})`);
+                logger.user(`📜 Logging-Einstellungen auf ${guild.id} gespeichert (von ${actor.id})`);
 
                 return { ok: true, settings };
             }

@@ -44,6 +44,8 @@ export const TABLES = {
     levelLog: "level_log",
     levelTop: "level_top",
     levelBoardPosts: "level_board_posts",
+    staffGrants: "staff_grants",
+    staffGrantLog: "staff_grant_log",
     customMessages: "custom_messages",
     autoResponses: "auto_responses",
     selfRolePanels: "self_role_panels",

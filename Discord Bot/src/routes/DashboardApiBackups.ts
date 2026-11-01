@@ -168,7 +168,7 @@ export default class DashboardApiBackups extends Route {
         const service = this.client.serverBackupService;
         const query = (request.query ?? {}) as Record<string, unknown>;
         const body = (request.body ?? {}) as Record<string, unknown>;
-        const actor = { id: access.member.id, name: access.member.displayName || access.member.user.username };
+        const actor = { id: access.actor.id, name: access.actor.name, staff: access.actor.staff };
 
         // Plan 32: Ein Backup mit Discord-Server ansehen - der Stand, „Seitdem geändert“, wer gelöscht hat.
         if (!writing && query.server === "1") {
@@ -202,7 +202,7 @@ export default class DashboardApiBackups extends Route {
     }
 
     /** Plan 32: was der Bot mit dem Discord-Server selbst macht. null: keine solche Aktion, dann ans Admin Dashboard. */
-    private async Server(request: FastifyRequest, guild: Guild, actor: { id: string; name: string }, body: Record<string, unknown>): Promise<{ status: number; body: unknown } | null> {
+    private async Server(request: FastifyRequest, guild: Guild, actor: { id: string; name: string; staff?: boolean }, body: Record<string, unknown>): Promise<{ status: number; body: unknown } | null> {
         const service = this.client.serverBackupService;
         const fail = (status: number, error: string) => ({ status, body: { error } });
         const backupId = Number(idOf(body.backup) ?? Number.NaN);
@@ -218,7 +218,7 @@ export default class DashboardApiBackups extends Route {
                 const input = LoadInput(body);
                 if (typeof input === "string") return fail(400, input);
 
-                const found = await this.Target(request, guild, input.mode, body.target);
+                const found = await this.Target(request, guild, input.mode, body.target, actor.staff === true);
                 if (!("guild" in found)) return found;
 
                 const target = found.guild;
@@ -263,16 +263,18 @@ export default class DashboardApiBackups extends Route {
     }
 
     /** Das Ziel beim Laden: dieser Server, beim anderen Server einer, den dieselbe Sitzung verwaltet und auf dem der Bot ist. */
-    private async Target(request: FastifyRequest, guild: Guild, mode: RestoreMode, raw: unknown): Promise<{ guild: Guild } | { status: number; body: unknown }> {
+    private async Target(request: FastifyRequest, guild: Guild, mode: RestoreMode, raw: unknown, staff = false): Promise<{ guild: Guild } | { status: number; body: unknown }> {
         const fail = (status: number, error: string) => ({ status, body: { error } });
 
         if (mode !== "other") return { guild };
+        // W-0011: Mit einer Staff-Freigabe nichts vom Server des Nutzers woandershin und nichts dorthin (Review I4).
+        if (staff) return fail(403, "Mit einer Staff-Freigabe lädt Staff keine Backups auf einen anderen Server.");
         if (typeof raw !== "string" || !SNOWFLAKE.test(raw) || raw === guild.id) return fail(400, "Wähl den anderen Server.");
 
         const session = SessionOf(this.client, request);
         const manages = session ? await this.client.dashboardService.CanManage(session, raw).catch(() => false) : false;
 
-        if (!session || !manages) return fail(403, "Den anderen Server darfst du nicht verwalten.");
+        if (!session || !manages || this.client.staffGrantService.Active(session.userId, raw)) return fail(403, "Den anderen Server darfst du nicht verwalten.");
 
         const target = this.client.guilds.cache.get(raw);
 

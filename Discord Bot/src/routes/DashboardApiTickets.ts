@@ -2,6 +2,7 @@ import { ChannelType, Guild } from "discord.js";
 import { FastifyReply, FastifyRequest } from "fastify";
 import BotClient from "../client/BotClient";
 import Route from "../structures/Route";
+import { StaffWrite } from "../utils/managegate";
 import { SessionExpired } from "../services/DashboardService";
 import { TicketError } from "../services/TicketService";
 import { ActionEntries } from "../builder/TicketPanel";
@@ -84,6 +85,9 @@ export default class DashboardApiTickets extends Route {
             if (!(await service.CanManage(session, id))) {
                 return reply.code(403).send({ error: "Forbidden", hint: "Nur wer den Server verwalten darf." });
             }
+
+            // W-0011: Staff mit Freigabe - erfolgreiche Änderungen ins Protokoll.
+            StaffWrite(this.client, request, reply, id, "Tickets");
         } catch (error) {
             if (!(error instanceof SessionExpired)) throw error;
 

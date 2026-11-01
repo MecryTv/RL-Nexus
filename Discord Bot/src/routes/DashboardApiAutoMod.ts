@@ -72,14 +72,14 @@ export default class DashboardApiAutoMod extends Route {
     }
 
     private async Write(access: IManageAccess, body: IBody): Promise<unknown> {
-        const { guild, member } = access;
+        const { guild, actor } = access;
         const service = this.client.autoModService;
 
         switch (body.action) {
             case "save": {
                 const settings = await service.Save(guild, body.settings);
 
-                logger.user(`🛡️  Auto-Mod-Einstellungen auf ${guild.id} gespeichert (von ${member.id})`);
+                logger.user(`🛡️  Auto-Mod-Einstellungen auf ${guild.id} gespeichert (von ${actor.id})`);
 
                 return { ok: true, settings };
             }

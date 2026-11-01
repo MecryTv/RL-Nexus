@@ -1,4 +1,5 @@
 import { randomBytes } from "node:crypto";
+import { IStaffGrant } from "../interfaces/services/staffgrant/IStaffGrant";
 import { escapeMarkdown } from "discord.js";
 import { LRUCache } from "lru-cache";
 import BotClient from "../client/BotClient";
@@ -284,6 +285,32 @@ export function LockPlaceholders(access: IShopAccess, betaError: string | null =
  * auch als Co-Admin eines zahlenden Owners, ist Guardian, sonst Testphase (und
  * sieht die Sperrseite). Nur Anzeige, die Rechte regelt GuildsOf.
  */
+/**
+ * W-0011: Staff-Karten mit laufender Freigabe dürfen verwalten. Die privaten
+ * Bereiche (Live Tickets, Transcripts, Bewerbungen, Moderation) nur mit dem
+ * extra Ja. Alle anderen Karten bleiben, wie sie sind.
+ */
+export function StaffOverlay(cards: IDashboardGuild[], grantOf: (guildId: string) => IStaffGrant | null): IDashboardGuild[] {
+    return cards.map((card) => {
+        if (card.role !== "Staff") return card;
+
+        const grant = grantOf(card.id);
+
+        if (!grant) return card;
+
+        const open = grant.private === "on";
+
+        return {
+            ...card,
+            canManage: true,
+            canSupport: open,
+            canModerate: open,
+            canReview: open,
+            staff: { grantId: grant.id, until: grant.endsAt ?? 0, private: open, by: grant.answeredBy ?? "" },
+        };
+    });
+}
+
 export function DisplayGroup(group: DashboardGroup, access: IShopAccess, guilds: readonly Pick<IDashboardGuild, "role" | "canManage">[], paywall: boolean): DashboardGroup {
     if (FREE_GROUPS.includes(group)) return group;
     if (access.betaMember) return "beta";
@@ -340,6 +367,8 @@ export default class DashboardService implements IDashboardService {
     // Eine Seite fragt mehrere Routen auf einmal. Alle warten auf denselben Abruf der
     // Serverliste - jede für sich hätte Discord ab der zweiten mit 429 beantwortet.
     private guildsLoading = new Map<string, Promise<IDashboardGuild[]>>();
+    // W-0011: wem eine Sitzung gehört - damit Joined weiß, wem der Puls gilt.
+    private sessionUsers = new LRUCache<string, string>({ max: MAX_SESSIONS });
 
     // Läuft höchstens einmal gleichzeitig - sonst stößt jeder Seitenaufruf eine
     // weitere Mitglieder-Abfrage an.
@@ -662,7 +691,7 @@ export default class DashboardService implements IDashboardService {
      * Beta-Modus (shop_settings.access_mode = 'beta'), eine Minute gemerkt. Ohne Datenbank, Tabelle oder
      * Spalte: aus. Jeder andere Fehler geht nach oben, der alte Stand bleibt stehen (LoadShopAccess).
      */
-    private async BetaMode(): Promise<boolean> {
+    async BetaMode(): Promise<boolean> {
         if (this.betaMode && Date.now() - this.betaMode.at < 60_000) return this.betaMode.on;
 
         let on = false;
@@ -686,12 +715,12 @@ export default class DashboardService implements IDashboardService {
      * Hat die Person einen Beta-Code eingelöst? Ein Datenbankfehler geht nach
      * oben: LoadShopAccess sperrt dann, ohne es zu merken - im Zweifel zu.
      */
-    private async BetaMember(userId: string): Promise<boolean> {
+    async BetaMember(userId: string): Promise<boolean> {
         return (await this.client.databaseService.One<{ user_id: string }>("SELECT user_id FROM beta_members WHERE user_id = ?", [userId])) != null;
     }
 
     /** shop_settings.paywall, eine Minute gemerkt. Ohne Datenbank oder Tabelle: aus. */
-    private async Paywall(): Promise<boolean> {
+    async Paywall(): Promise<boolean> {
         if (this.paywall && Date.now() - this.paywall.at < 60_000) return this.paywall.on;
 
         let on = false;
@@ -799,7 +828,8 @@ export default class DashboardService implements IDashboardService {
     private async GuildsOf(session: IDashboardSession): Promise<IDashboardGuild[]> {
         try {
             // Der Filter sitzt hier, damit er für jede Dashboard-API gilt, die über diese Liste prüft.
-            return await this.Paywalled(session.userId, await this.Guilds(session));
+            // W-0011: Eine laufende Staff-Freigabe gilt sofort und endet sofort - nie aus dem Cache.
+            return StaffOverlay(await this.Paywalled(session.userId, await this.Guilds(session)), (guildId) => this.client.staffGrantService.Active(session.userId, guildId));
         } catch (error) {
             if (error instanceof SessionExpired) this.Destroy(session);
 
@@ -870,13 +900,46 @@ export default class DashboardService implements IDashboardService {
      */
     /** Server, die diese Sitzung verwalten darf (Plan 32: Ziel für „Auf einen anderen Server“). Wirft SessionExpired. */
     async Manageable(session: IDashboardSession): Promise<{ id: string; name: string }[]> {
-        return (await this.GuildsOf(session)).filter((guild) => guild.canManage).map((guild) => ({ id: guild.id, name: guild.name }));
+        // W-0011: Server, die die Sitzung nur über eine Staff-Freigabe verwaltet, sind kein Ziel (Review I4).
+        return (await this.GuildsOf(session)).filter((guild) => guild.canManage && !guild.staff).map((guild) => ({ id: guild.id, name: guild.name }));
     }
 
     async CanManage(session: IDashboardSession, guildId: string): Promise<boolean> {
         const guild = (await this.GuildsOf(session)).find((entry) => entry.id === guildId);
 
         return Boolean(guild?.canManage);
+    }
+
+    /**
+     * W-0011: Der Bot ist einem Server beigetreten. Jede Sitzung, deren Liste ihn
+     * kennt (Owner oder Admin, bisher ohne Bot), lädt ihre Liste neu; zurück
+     * kommen die Nutzer, denen der persönliche Puls Bescheid sagt.
+     */
+    Joined(guildId: string): string[] {
+        const sessions = [...this.guilds.entries()].filter(([, list]) => list.some((entry) => entry.id === guildId)).map(([sessionId]) => sessionId);
+        const users = new Set<string>();
+
+        for (const sessionId of sessions) {
+            this.guilds.delete(sessionId);
+
+            const userId = this.sessionUsers.get(sessionId);
+
+            if (userId) users.add(userId);
+        }
+
+        return [...users];
+    }
+
+    /** W-0011: die Karte dieser Sitzung für einen Server (Rolle, Rechte, laufende Freigabe). Wirft SessionExpired. */
+    async CardFor(session: IDashboardSession, guildId: string): Promise<IDashboardGuild | null> {
+        return (await this.GuildsOf(session)).find((entry) => entry.id === guildId) ?? null;
+    }
+
+    /** W-0011: Staff mit Freigabe, aber ohne Ja zu den privaten Bereichen. Wirft SessionExpired. */
+    async PrivateBlocked(session: IDashboardSession, guildId: string): Promise<boolean> {
+        const guild = (await this.GuildsOf(session)).find((entry) => entry.id === guildId);
+
+        return Boolean(guild?.staff && !guild.staff.private);
     }
 
     /**
@@ -1033,6 +1096,7 @@ export default class DashboardService implements IDashboardService {
         );
 
         this.guilds.set(session.id, list);
+        this.sessionUsers.set(session.id, session.userId);
 
         return list;
     }

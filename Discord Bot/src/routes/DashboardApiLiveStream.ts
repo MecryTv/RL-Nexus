@@ -30,7 +30,7 @@ export default class DashboardApiLiveStream extends Route {
         const raw = reply.raw;
         const stop = this.client.liveService.Subscribe(
             access.guild.id,
-            access.member.id,
+            access.actor.id,
             (event, data) => raw.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`),
             () => raw.write(": ping\n\n")
         );

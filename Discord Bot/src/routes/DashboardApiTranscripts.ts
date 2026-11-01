@@ -1,6 +1,7 @@
 import { FastifyReply, FastifyRequest } from "fastify";
 import BotClient from "../client/BotClient";
 import Route from "../structures/Route";
+import { PrivateGate } from "../utils/managegate";
 import { SessionExpired } from "../services/DashboardService";
 import { ClearCookie, DASHBOARD_PATH, SESSION_COOKIE } from "../constants/Dashboard";
 import { SNOWFLAKE } from "../constants/Discord";
@@ -41,6 +42,9 @@ export default class DashboardApiTranscripts extends Route {
         const writing = request.method === "POST";
 
         if (writing && !WantsJSON(request)) return reply.code(415).send({ error: "Nur application/json" });
+
+        // W-0011: Staff mit Freigabe nur mit dem extra Ja für die privaten Bereiche.
+        if (!(await PrivateGate(this.client, session, id, reply, "Transcripts", "Liste"))) return reply;
 
         let manage: boolean;
 

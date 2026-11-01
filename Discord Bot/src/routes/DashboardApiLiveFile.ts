@@ -1,6 +1,7 @@
 import { FastifyReply, FastifyRequest } from "fastify";
 import BotClient from "../client/BotClient";
 import Route from "../structures/Route";
+import { StaffDisplay } from "../services/LiveService";
 import { DASHBOARD_PATH } from "../constants/Dashboard";
 import { TicketError } from "../services/TicketService";
 import { LiveGate, LiveTicket } from "../utils/live";
@@ -56,7 +57,7 @@ export default class DashboardApiLiveFile extends Route {
         try {
             const context = await this.client.ticketService.Context(ticket.id);
 
-            await this.client.ticketService.SendAsMember(context, access.member, "", [{ attachment: body, name: SafeFileName(name) }]);
+            await this.client.ticketService.SendAsMember(context, access.member, "", [{ attachment: body, name: SafeFileName(name) }], StaffDisplay(access));
         } catch (error) {
             if (error instanceof TicketError) return reply.code(400).send({ error: error.message });
 

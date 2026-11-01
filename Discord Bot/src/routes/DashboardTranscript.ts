@@ -4,6 +4,8 @@ import { stat } from "node:fs/promises";
 import { FastifyReply, FastifyRequest } from "fastify";
 import BotClient from "../client/BotClient";
 import Route from "../structures/Route";
+import { PRIVATE_HINT } from "../constants/StaffGrant";
+import { StaffGrantOf } from "../utils/managegate";
 import { DASHBOARD_PATH } from "../constants/Dashboard";
 import { INLINE_TYPES, STORED_FILE } from "../constants/Transcripts";
 import { SessionOf, Unconfigured } from "../utils/dashboard";
@@ -69,7 +71,14 @@ export default class DashboardTranscript extends Route {
         const own = entry?.meta.contact === "direct" && (session.userId === entry.meta.opener?.id || entry.meta.members?.includes(session.userId) === true);
         const paid = !entry || own || (await this.client.dashboardService.GuildAllowed(session.userId, entry.guildId));
 
-        if (!entry || !paid || !(await service.CanRead(session.userId, entry))) {
+        // W-0011: Staff mit Freigabe liest mit dem extra Ja, ohne Mitglied zu sein - sonst nicht.
+        const grant = entry ? await StaffGrantOf(this.client, session, entry.guildId) : null;
+
+        if (grant && grant.private !== "on") {
+            return file !== undefined ? reply.code(403).send({ error: "Forbidden", hint: PRIVATE_HINT }) : Missing(reply, 403, PRIVATE_HINT);
+        }
+
+        if (!entry || (!grant && (!paid || !(await service.CanRead(session.userId, entry))))) {
             return file !== undefined
                 ? reply.code(404).send({ error: "Not Found" })
                 : Missing(reply, 404, "Dieses Transcript gibt es nicht – oder du darfst es nicht sehen.");
@@ -91,6 +100,8 @@ export default class DashboardTranscript extends Route {
                 .header("Cache-Control", "private, max-age=3600")
                 .send(createReadStream(target));
         }
+
+        if (grant) this.client.staffGrantService.Seen(grant, "Transcripts", `Transcript #${entry.number}`);
 
         const { download: wanted, embed } = request.query as { download?: string; embed?: string };
         const download = wanted === "1";

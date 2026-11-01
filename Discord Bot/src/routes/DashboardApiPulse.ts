@@ -39,7 +39,8 @@ export default class DashboardApiPulse extends Route {
         try {
             // Wer zum Team des Servers gehört, darf wissen, dass sich etwas tut -
             // dieselbe Grenze wie bei Live Tickets.
-            if (!(await service.CanSupport(session, id))) return reply.code(403).send({ error: "Forbidden", hint: "Der Puls ist für das Team dieses Servers." });
+            // W-0011: Staff mit Freigabe verwaltet, ohne zum Team zu zählen - im Puls stehen nur Stichworte.
+            if (!(await service.CanSupport(session, id)) && !(await service.CanManage(session, id))) return reply.code(403).send({ error: "Forbidden", hint: "Der Puls ist für das Team dieses Servers." });
         } catch (error) {
             if (!(error instanceof SessionExpired)) throw error;
 

@@ -123,14 +123,14 @@ export default class DashboardApiSixMans extends Route {
     }
 
     private async Write(access: IManageAccess, body: IBody): Promise<unknown> {
-        const { guild, member } = access;
+        const { guild, actor } = access;
         const service = this.client.sixMansService;
 
         switch (body.action) {
             case "settings": {
                 const settings = await service.SaveSettings(guild, body.settings);
 
-                logger.user(`🎮 2, 4 & 6 Mans auf ${guild.id} gespeichert (von ${member.id})`);
+                logger.user(`🎮 2, 4 & 6 Mans auf ${guild.id} gespeichert (von ${actor.id})`);
 
                 return { ok: true, settings };
             }
@@ -175,7 +175,7 @@ export default class DashboardApiSixMans extends Route {
 
                 await this.client.sixPlayers.Reset(guild.id, mode);
 
-                logger.user(`🎮 Mans-Wertung auf ${guild.id} zurückgesetzt (${mode ? MODE_LABELS[mode] : "alle Modi"}, von ${member.id})`);
+                logger.user(`🎮 Mans-Wertung auf ${guild.id} zurückgesetzt (${mode ? MODE_LABELS[mode] : "alle Modi"}, von ${actor.id})`);
 
                 return { ok: true };
             }

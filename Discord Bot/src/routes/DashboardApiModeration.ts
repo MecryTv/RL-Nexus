@@ -94,7 +94,7 @@ export default class DashboardApiModeration extends Route {
                 case: this.Out(guild, entry),
                 related: [...(origin ? [origin] : []), ...related].map((other) => this.Out(guild, other)),
                 target: entry.targetId ? await this.Target(guild, entry.targetId, counts) : null,
-                me: { id: member.id, manage },
+                me: { id: access.actor.id, manage },
             };
         }
 
@@ -119,7 +119,7 @@ export default class DashboardApiModeration extends Route {
         if (query.meta === "1") {
             const config = await this.client.modSettings.Of(guild.id);
 
-            result.me = { id: member.id, name: member.displayName, manage, actions: await this.client.moderationService.AllowedActions(member) };
+            result.me = { id: access.actor.id, name: access.actor.name, manage, actions: await this.client.moderationService.AllowedActions(member) };
             result.config = config;
             result.presets = { durations: DURATION_PRESETS, deletes: DELETE_CHOICES };
             // Für "Nachrichten löschen": wo der Bot und das Mitglied lesen können.
@@ -192,7 +192,7 @@ export default class DashboardApiModeration extends Route {
     private async Write(access: IModAccess, body: IBody): Promise<unknown> {
         const { guild, member, manage } = access;
         const service = this.client.moderationService;
-        const actor: IModActor = { id: member.id, name: member.displayName, member };
+        const actor: IModActor = { id: access.actor.id, name: access.actor.name, member };
         const number = Number(body.case);
 
         switch (body.action) {

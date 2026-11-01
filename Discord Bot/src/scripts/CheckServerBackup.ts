@@ -1114,6 +1114,8 @@ function ApiWorld(manage: (guildId: string) => boolean = () => true) {
 
     (client.guilds as { cache: Map<string, Guild> }).cache.set(OTHER_GUILD, other.guild);
     (server.guild.members as unknown as Record<string, unknown>).cache = new Map([[USER, { id: USER, displayName: "Sarah", user: { id: USER, username: "sarah" } }]]);
+    // W-0011: ohne Staff-Freigabe.
+    client.staffGrantService = { Active: () => null };
     Object.assign(client.dashboardService as object, {
         Session: (cookie?: string) => (cookie === API_COOKIE ? { id: "s", userId: USER, username: "sarah", avatar: null, accessToken: "x", mfa: true, expiresAt: Date.now() + 60_000 } : null),
         CanManage: async (_session: unknown, guildId: string) => manage(guildId),
@@ -1174,6 +1176,12 @@ async function checkApi(): Promise<void> {
 
     const preview = await ask("POST", { action: "preview", backup: 7, mode: "other", parts, target: OTHER_GUILD });
     check("Vorschau auf den anderen Server: Schritte ohne Auftrag", preview.statusCode === 200 && Array.isArray((preview.json() as { plan?: { lines: unknown[] } }).plan?.lines) && store.size === 0, preview.body.slice(0, 200));
+
+    // W-0011: Server, die die Sitzung nur über eine Staff-Freigabe verwaltet, sind kein Ziel.
+    const granted = ApiWorld();
+    (granted.client as unknown as Record<string, unknown>).staffGrantService = { Active: (_userId: string, guildId: string) => (guildId === OTHER_GUILD ? { id: 1, private: "none" } : null) };
+    const viaGrant = await granted.ask("POST", { action: "preview", backup: 7, mode: "other", parts, target: OTHER_GUILD });
+    check("W-0011: Ziel nur über eine Staff-Freigabe: 403", viaGrant.statusCode === 403, viaGrant.body.slice(0, 200));
 
     const targets = await ask("POST", { action: "targets" });
     check("Andere Server: nur verwaltete mit Bot, ohne diesen", targets.statusCode === 200 && JSON.stringify((targets.json() as { targets?: unknown }).targets) === JSON.stringify([{ id: OTHER_GUILD, name: "Zweiter Server" }]), targets.body);

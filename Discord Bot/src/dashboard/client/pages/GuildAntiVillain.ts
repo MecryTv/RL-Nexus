@@ -58,6 +58,8 @@ interface IPayload {
     settings: ISettings;
     lage: { held: number; level: Level; bait: { on: boolean; caught: number }; raid: boolean; nuke: boolean };
     cases: ICase[];
+    /** W-0011: Staff mit Freigabe, aber ohne das extra Ja - die Fälle sind privat. */
+    casesLocked?: boolean;
     protocol: { id: number; at: number; kind: string; title: string; detail: string }[];
     raid: { since: number; joins: number; invitesUntil: number | null } | null;
     readiness: { missing: string[]; aboveBot: string[] };
@@ -501,9 +503,11 @@ export function renderAntiVillain(guildId: string): void {
     }
 
     function quarantinePane(): HTMLElement[] {
-        const cases = data!.cases.length
-            ? el("div", "avcases", ...data!.cases.map(caseCard))
-            : el("p", "avempty", icon("#i-shield-check"), "Niemand festgehalten.");
+        const cases = data!.casesLocked
+            ? el("p", "avempty", icon("#i-lock"), "Privater Bereich: Die Fälle siehst du nur mit dem extra Ja für die privaten Bereiche.")
+            : data!.cases.length
+              ? el("div", "avcases", ...data!.cases.map(caseCard))
+              : el("p", "avempty", icon("#i-shield-check"), "Niemand festgehalten.");
 
         return [
             cases,

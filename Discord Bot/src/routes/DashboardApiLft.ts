@@ -134,7 +134,7 @@ export default class DashboardApiLft extends Route {
     }
 
     private async Write(access: IManageAccess, body: IBody): Promise<unknown> {
-        const { guild, member } = access;
+        const { guild, actor } = access;
         const service = this.client.lookingForService;
         const id = Number(body.id ?? 0);
 
@@ -142,7 +142,7 @@ export default class DashboardApiLft extends Route {
             case "settings": {
                 const { settings, warning } = await service.SaveSettings(guild, body.settings);
 
-                logger.user(`🔎 Looking for auf ${guild.id} gespeichert (von ${member.id})`);
+                logger.user(`🔎 Looking for auf ${guild.id} gespeichert (von ${actor.id})`);
 
                 return { ok: true, settings, warning };
             }
@@ -163,10 +163,10 @@ export default class DashboardApiLft extends Route {
                 return { ok: true, ...(await service.SendPanel(guild)), settings: await service.Settings(guild.id) };
 
             case "close":
-                return { ok: true, request: await service.Close(guild, id, member.id) };
+                return { ok: true, request: await service.Close(guild, id, actor.id) };
 
             case "delete":
-                await service.Kill(guild, id, member.id);
+                await service.Kill(guild, id, actor.id);
 
                 return { ok: true };
 

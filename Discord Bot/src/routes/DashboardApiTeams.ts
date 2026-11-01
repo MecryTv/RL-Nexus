@@ -207,7 +207,7 @@ export default class DashboardApiTeams extends Route {
     }
 
     private async Write(access: IManageAccess, body: IBody): Promise<unknown> {
-        const { guild, member } = access;
+        const { guild, actor } = access;
         const service = this.client.teamService;
         const id = Number(body.id ?? 0);
 
@@ -294,7 +294,7 @@ export default class DashboardApiTeams extends Route {
 
                 const result = await service.SetupTeam(guild, id, body.setup);
 
-                logger.user(`🛡️ Team ${id} auf ${guild.id} eingerichtet (von ${member.id})`);
+                logger.user(`🛡️ Team ${id} auf ${guild.id} eingerichtet (von ${actor.id})`);
 
                 return { ok: true, ...result };
             }
@@ -303,7 +303,7 @@ export default class DashboardApiTeams extends Route {
             case "team.permissions": {
                 const result = await service.AlignRights(guild, id);
 
-                logger.user(`🛡️ Team ${id} auf ${guild.id}: Rechte angeglichen (von ${member.id})`);
+                logger.user(`🛡️ Team ${id} auf ${guild.id}: Rechte angeglichen (von ${actor.id})`);
 
                 return { ok: true, ...result };
             }
@@ -314,7 +314,7 @@ export default class DashboardApiTeams extends Route {
             case "publish": {
                 const result = await service.Publish(guild);
 
-                logger.user(`🛡️ Team-Übersicht auf ${guild.id} gesendet (${result.layout}, von ${member.id})`);
+                logger.user(`🛡️ Team-Übersicht auf ${guild.id} gesendet (${result.layout}, von ${actor.id})`);
 
                 return { ok: true, ...result };
             }

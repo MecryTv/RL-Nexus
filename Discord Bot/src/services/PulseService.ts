@@ -15,7 +15,10 @@ import { ForgetLogTargets } from "../utils/logtarget";
  * Live Tickets haben ihren eigenen Stream (LiveService): dort fließen ganze
  * Nachrichten, und wer was sehen darf, hängt am einzelnen Ticket.
  */
-export type PulseKind = "moderation" | "voice" | "sixmans" | "matchups" | "lft" | "clips" | "guild" | "levels";
+export type PulseKind = "moderation" | "voice" | "sixmans" | "matchups" | "lft" | "clips" | "guild" | "levels" | "staff" | "guilds";
+
+/** Der persönliche Puls (W-0011) hängt unter diesem Schlüssel statt unter einer Server-ID. */
+const USER_KEY = "user:";
 
 interface ISubscriber {
     userId: string;
@@ -94,9 +97,15 @@ export default class PulseService {
      * sonst wächst die Liste.
      */
     Subscribe(guildId: string, userId: string, send: ISubscriber["send"], ping: ISubscriber["ping"]): (() => void) | null {
+        // Persönlicher und Server-Puls zählen getrennt: ein Tab hat oft beide offen.
+        const personal = guildId.startsWith(USER_KEY);
         let open = 0;
 
-        for (const set of this.subscribers.values()) for (const subscriber of set) if (subscriber.userId === userId) open++;
+        for (const [key, set] of this.subscribers) {
+            if (key.startsWith(USER_KEY) !== personal) continue;
+
+            for (const subscriber of set) if (subscriber.userId === userId) open++;
+        }
 
         if (open >= MAX_PER_USER) return null;
 
@@ -120,6 +129,20 @@ export default class PulseService {
                 this.pinger = null;
             }
         };
+    }
+
+    /** Der persönliche Puls einer Person (W-0011): Anfragen von Staff, ein neu eingeladener Server. */
+    SubscribeUser(userId: string, send: ISubscriber["send"], ping: ISubscriber["ping"]): (() => void) | null {
+        return this.Subscribe(`${USER_KEY}${userId}`, userId, send, ping);
+    }
+
+    EmitUser(userId: string, kind: PulseKind, data: Record<string, unknown> = {}): void {
+        this.Emit(`${USER_KEY}${userId}`, kind, data);
+    }
+
+    /** Hat die Person gerade ein Dashboard-Fenster offen? */
+    Online(userId: string): boolean {
+        return (this.subscribers.get(`${USER_KEY}${userId}`)?.size ?? 0) > 0;
     }
 
     /**

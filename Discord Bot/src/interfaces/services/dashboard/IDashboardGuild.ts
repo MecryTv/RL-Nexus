@@ -3,6 +3,14 @@
 // Transcriptions und, von der Liste, die Moderation (docs/Tickets.md, docs/Moderation.md).
 export type DashboardRole = "Owner" | "Admin" | "Staff" | "Moderator";
 
+/** Eine laufende Staff-Freigabe auf dieser Karte (W-0011). by ist die ID dessen, der erlaubt hat. */
+export interface IStaffCard {
+    grantId: number;
+    until: number;
+    private: boolean;
+    by: string;
+}
+
 // Eine Karte im Dashboard. "teams" ist ein Platzhalter, solange der Bot keine
 // Teams führt. "modules" sind die eingeschalteten Module aus
 // guild_settings.modules - siehe docs/Dashboard.md.
@@ -30,6 +38,8 @@ export default interface IDashboardGuild {
     joined: string | null;
     teams: number;
     modules: string[];
+    // Nur bei Staff mit laufender Freigabe (W-0011, StaffOverlay).
+    staff?: IStaffCard | null;
     c1: string;
     c2: string;
 }
