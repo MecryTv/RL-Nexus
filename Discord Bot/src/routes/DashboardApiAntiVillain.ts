@@ -148,7 +148,7 @@ export default class DashboardApiAntiVillain extends Route {
     }
 
     private async Write(access: IManageAccess, body: IBody): Promise<unknown> {
-        const { guild, member } = access;
+        const { guild, member, actor } = access;
         const service = this.client.antiVillainService;
         const id = Number(body.id);
 
@@ -156,7 +156,7 @@ export default class DashboardApiAntiVillain extends Route {
             case "save": {
                 const settings = await service.Save(guild, body.settings);
 
-                logger.user(`🛡️  Anti-Villain-Einstellungen auf ${guild.id} gespeichert (von ${member.id})`);
+                logger.user(`🛡️  Anti-Villain-Einstellungen auf ${guild.id} gespeichert (von ${actor.id})`);
 
                 return { ok: true, settings };
             }
@@ -187,12 +187,12 @@ export default class DashboardApiAntiVillain extends Route {
             }
 
             case "raid-start":
-                await service.raid.Start(guild, member.id);
+                await service.raid.Start(guild, actor.id);
 
                 return { ok: true, raid: service.RaidBanner(guild.id) };
 
             case "raid-end":
-                await service.raid.End(guild, member.id);
+                await service.raid.End(guild, actor.id);
 
                 return { ok: true, raid: null };
 

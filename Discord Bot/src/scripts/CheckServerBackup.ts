@@ -1114,6 +1114,8 @@ function ApiWorld(manage: (guildId: string) => boolean = () => true) {
 
     (client.guilds as { cache: Map<string, Guild> }).cache.set(OTHER_GUILD, other.guild);
     (server.guild.members as unknown as Record<string, unknown>).cache = new Map([[USER, { id: USER, displayName: "Sarah", user: { id: USER, username: "sarah" } }]]);
+    // W-0011: ohne Staff-Freigabe.
+    client.staffGrantService = { Active: () => null };
     Object.assign(client.dashboardService as object, {
         Session: (cookie?: string) => (cookie === API_COOKIE ? { id: "s", userId: USER, username: "sarah", avatar: null, accessToken: "x", mfa: true, expiresAt: Date.now() + 60_000 } : null),
         CanManage: async (_session: unknown, guildId: string) => manage(guildId),

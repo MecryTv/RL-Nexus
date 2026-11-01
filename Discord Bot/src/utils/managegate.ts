@@ -1,4 +1,8 @@
 import { ChannelType, Guild, GuildMember } from "discord.js";
+import { MODULES } from "../dashboard/client/constants/Modules";
+import IDashboardSession from "../interfaces/services/dashboard/IDashboardSession";
+import { IStaffGrant } from "../interfaces/services/staffgrant/IStaffGrant";
+import { ActionText } from "../services/staffgrant/Rules";
 import { FastifyReply, FastifyRequest } from "fastify";
 import BotClient from "../client/BotClient";
 import { SessionExpired } from "../services/DashboardService";
@@ -6,9 +10,88 @@ import { ClearCookie, SESSION_COOKIE } from "../constants/Dashboard";
 import { SNOWFLAKE } from "../constants/Discord";
 import { SessionOf } from "./dashboard";
 
+/** Wer etwas tut: das Mitglied selbst oder Staff mit Freigabe (W-0011). Für „von wem“, nie für Rechte. */
+export interface IActor {
+    id: string;
+    name: string;
+    staff: boolean;
+}
+
 export interface IManageAccess {
     guild: Guild;
+    /** Mit Staff-Freigabe der Bot selbst - er prüft die Rechte in Discord. */
     member: GuildMember;
+    actor: IActor;
+}
+
+const BOT_MISSING = "Der Bot fehlt gerade im Speicher dieses Servers. Bitte gleich noch mal.";
+
+/** Der Name eines Moduls fürs Protokoll, wie er im Dashboard steht. */
+export function ModuleLabel(module: string | null): string {
+    if (module === null) return "Anti Villain";
+
+    return MODULES.find((entry) => entry.id === module)?.name ?? module;
+}
+
+export function StaffActor(session: IDashboardSession): IActor {
+    return { id: session.userId, name: `${session.username} (RL Nexus Staff)`, staff: true };
+}
+
+/**
+ * W-0011: Schreibt Staff mit Freigabe, kommt nach einer erfolgreichen Antwort
+ * ein Eintrag ins Protokoll: „<Bereich> › <Aktion>“ aus body.action.
+ */
+export function StaffWrite(client: BotClient, request: FastifyRequest, reply: FastifyReply, guildId: string, area: string): void {
+    if (request.method === "GET" || request.method === "HEAD") return;
+
+    const session = SessionOf(client, request);
+    const grant = session ? client.staffGrantService.Active(session.userId, guildId) : null;
+
+    if (!grant) return;
+
+    const body = request.body;
+    const action = typeof body === "object" && body !== null && !Buffer.isBuffer(body) ? (body as { action?: unknown }).action : undefined;
+
+    reply.raw.once("finish", () => {
+        if (reply.statusCode < 400) client.staffGrantService.Log(grant, area, ActionText(area, action));
+    });
+}
+
+/**
+ * Mitglied und Akteur für die Gates. Mit Staff-Freigabe der Bot als Mitglied
+ * und Staff als Akteur, auch wenn Staff selbst auf dem Server ist. Sonst das
+ * echte Mitglied. null heißt: die Antwort ist schon raus.
+ */
+export async function MemberOrStandIn(
+    client: BotClient,
+    guild: Guild,
+    session: IDashboardSession,
+    reply: FastifyReply,
+    missing = "Du bist auf diesem Server kein Mitglied."
+): Promise<{ member: GuildMember; actor: IActor; grant: IStaffGrant | null } | null> {
+    const grant = client.staffGrantService.Active(session.userId, guild.id);
+
+    if (grant) {
+        const me = guild.members.me;
+
+        if (!me) {
+            reply.code(403).send({ error: "Forbidden", hint: BOT_MISSING });
+
+            return null;
+        }
+
+        return { member: me, actor: StaffActor(session), grant };
+    }
+
+    const member = guild.members.cache.get(session.userId) ?? (await guild.members.fetch(session.userId).catch(() => null));
+
+    if (!member) {
+        reply.code(403).send({ error: "Forbidden", hint: missing });
+
+        return null;
+    }
+
+    return { member, actor: { id: member.id, name: member.displayName, staff: false }, grant: null };
 }
 
 /**
@@ -69,15 +152,13 @@ export async function ManageGate(client: BotClient, request: FastifyRequest, rep
         return null;
     }
 
-    const member = guild.members.cache.get(session.userId) ?? (await guild.members.fetch(session.userId).catch(() => null));
+    const stand = await MemberOrStandIn(client, guild, session, reply);
 
-    if (!member) {
-        reply.code(403).send({ error: "Forbidden", hint: "Du bist auf diesem Server kein Mitglied." });
+    if (!stand) return null;
 
-        return null;
-    }
+    if (stand.grant) StaffWrite(client, request, reply, guild.id, ModuleLabel(module));
 
-    return { guild, member };
+    return { guild, member: stand.member, actor: stand.actor };
 }
 
 /** Was jedes Auswahlfeld braucht: Rollen (ohne @everyone und verwaltete) und Server-Emojis. */

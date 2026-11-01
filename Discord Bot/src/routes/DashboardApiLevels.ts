@@ -138,7 +138,7 @@ export default class DashboardApiLevels extends Route {
     }
 
     private async Write(access: IManageAccess, body: IBody): Promise<unknown> {
-        const { guild, member } = access;
+        const { guild, member, actor } = access;
         const service = this.client.levelService;
         const userId = typeof body.userId === "string" ? body.userId : "";
 
@@ -147,7 +147,7 @@ export default class DashboardApiLevels extends Route {
                 const before = (await service.Settings(guild.id)).boardPost;
                 const settings = await service.Save(guild, body.settings);
 
-                logger.user(`📈 Level-Einstellungen auf ${guild.id} gespeichert (von ${member.id})`);
+                logger.user(`📈 Level-Einstellungen auf ${guild.id} gespeichert (von ${actor.id})`);
 
                 // Plan 43: an, aus, anderer Kanal oder Zeitraum - gleich sichtbar, nicht erst beim nächsten Blick.
                 // Gespeichert ist schon - scheitert das Zeichnen, zeigt es der Stand, nicht ein Fehler beim Speichern (W-0045).
@@ -179,9 +179,9 @@ export default class DashboardApiLevels extends Route {
 
                 if (mode !== "reset" && !Number.isFinite(amount)) throw new LevelError("Gib eine Zahl an.");
 
-                const entry = await service.Adjust(guild, userId, mode, amount, member.id, typeof body.reason === "string" ? body.reason : "");
+                const entry = await service.Adjust(guild, userId, mode, amount, actor.id, typeof body.reason === "string" ? body.reason : "");
 
-                logger.user(`📈 Punkte von ${userId} auf ${guild.id} geändert (${mode}, von ${member.id})`);
+                logger.user(`📈 Punkte von ${userId} auf ${guild.id} geändert (${mode}, von ${actor.id})`);
 
                 return { ok: true, entry };
             }
@@ -213,14 +213,14 @@ export default class DashboardApiLevels extends Route {
                 if (kind === "board") {
                     const board = await service.SaveBoardDesign(guild, body.design);
 
-                    logger.user(`📈 Ranglisten-Bild auf ${guild.id} ${board.design ? "gespeichert" : "zurückgesetzt"} (von ${member.id})`);
+                    logger.user(`📈 Ranglisten-Bild auf ${guild.id} ${board.design ? "gespeichert" : "zurückgesetzt"} (von ${actor.id})`);
 
                     return { ok: true, ...board };
                 }
 
                 const saved = await service.SaveDesign(guild, kind, body.design, body.upLine);
 
-                logger.user(`📈 ${kind === "card" ? "Level-Karte" : "Aufstiegs-Bild"} auf ${guild.id} ${saved.design ? "gespeichert" : "zurückgesetzt"} (von ${member.id})`);
+                logger.user(`📈 ${kind === "card" ? "Level-Karte" : "Aufstiegs-Bild"} auf ${guild.id} ${saved.design ? "gespeichert" : "zurückgesetzt"} (von ${actor.id})`);
 
                 return { ok: true, ...saved };
             }
@@ -242,12 +242,12 @@ export default class DashboardApiLevels extends Route {
             }
 
             case "board.preview":
-                return { image: await service.BoardPreview(guild, member.id, body.style) };
+                return { image: await service.BoardPreview(guild, actor.id, body.style) };
 
             case "board.save": {
                 const style = await service.SaveBoardStyle(guild, body.style);
 
-                logger.user(`📈 Ranglisten-Stil auf ${guild.id} gespeichert (von ${member.id})`);
+                logger.user(`📈 Ranglisten-Stil auf ${guild.id} gespeichert (von ${actor.id})`);
 
                 return { ok: true, style };
             }

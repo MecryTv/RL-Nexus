@@ -105,18 +105,18 @@ export default class DashboardApiVoice extends Route {
     }
 
     private async Write(access: IManageAccess, body: IBody): Promise<unknown> {
-        const { guild, member } = access;
+        const { guild, actor } = access;
         const service = this.client.voiceService;
         const id = Number(body.id);
 
         switch (body.action) {
             case "add":
-                return { ok: true, hub: this.Out(await service.AddHub(guild, body.channelId, member.id), guild) };
+                return { ok: true, hub: this.Out(await service.AddHub(guild, body.channelId, actor.id), guild) };
 
             case "save": {
                 const hub = await service.SaveHub(guild, id, body.config);
 
-                logger.user(`🔊 Voice-Hub ${hub.channelId} auf ${guild.id} gespeichert (von ${member.id})`);
+                logger.user(`🔊 Voice-Hub ${hub.channelId} auf ${guild.id} gespeichert (von ${actor.id})`);
 
                 return { ok: true, hub: this.Out(hub, guild) };
             }

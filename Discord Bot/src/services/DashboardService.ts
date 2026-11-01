@@ -1,4 +1,5 @@
 import { randomBytes } from "node:crypto";
+import { IStaffGrant } from "../interfaces/services/staffgrant/IStaffGrant";
 import { escapeMarkdown } from "discord.js";
 import { LRUCache } from "lru-cache";
 import BotClient from "../client/BotClient";
@@ -284,6 +285,32 @@ export function LockPlaceholders(access: IShopAccess, betaError: string | null =
  * auch als Co-Admin eines zahlenden Owners, ist Guardian, sonst Testphase (und
  * sieht die Sperrseite). Nur Anzeige, die Rechte regelt GuildsOf.
  */
+/**
+ * W-0011: Staff-Karten mit laufender Freigabe dürfen verwalten. Die privaten
+ * Bereiche (Live Tickets, Transcripts, Bewerbungen, Moderation) nur mit dem
+ * extra Ja. Alle anderen Karten bleiben, wie sie sind.
+ */
+export function StaffOverlay(cards: IDashboardGuild[], grantOf: (guildId: string) => IStaffGrant | null): IDashboardGuild[] {
+    return cards.map((card) => {
+        if (card.role !== "Staff") return card;
+
+        const grant = grantOf(card.id);
+
+        if (!grant) return card;
+
+        const open = grant.private === "on";
+
+        return {
+            ...card,
+            canManage: true,
+            canSupport: open,
+            canModerate: open,
+            canReview: open,
+            staff: { grantId: grant.id, until: grant.endsAt ?? 0, private: open, by: grant.answeredBy ?? "" },
+        };
+    });
+}
+
 export function DisplayGroup(group: DashboardGroup, access: IShopAccess, guilds: readonly Pick<IDashboardGuild, "role" | "canManage">[], paywall: boolean): DashboardGroup {
     if (FREE_GROUPS.includes(group)) return group;
     if (access.betaMember) return "beta";
@@ -799,7 +826,8 @@ export default class DashboardService implements IDashboardService {
     private async GuildsOf(session: IDashboardSession): Promise<IDashboardGuild[]> {
         try {
             // Der Filter sitzt hier, damit er für jede Dashboard-API gilt, die über diese Liste prüft.
-            return await this.Paywalled(session.userId, await this.Guilds(session));
+            // W-0011: Eine laufende Staff-Freigabe gilt sofort und endet sofort - nie aus dem Cache.
+            return StaffOverlay(await this.Paywalled(session.userId, await this.Guilds(session)), (guildId) => this.client.staffGrantService.Active(session.userId, guildId));
         } catch (error) {
             if (error instanceof SessionExpired) this.Destroy(session);
 
@@ -877,6 +905,13 @@ export default class DashboardService implements IDashboardService {
         const guild = (await this.GuildsOf(session)).find((entry) => entry.id === guildId);
 
         return Boolean(guild?.canManage);
+    }
+
+    /** W-0011: Staff mit Freigabe, aber ohne Ja zu den privaten Bereichen. Wirft SessionExpired. */
+    async PrivateBlocked(session: IDashboardSession, guildId: string): Promise<boolean> {
+        const guild = (await this.GuildsOf(session)).find((entry) => entry.id === guildId);
+
+        return Boolean(guild?.staff && !guild.staff.private);
     }
 
     /**

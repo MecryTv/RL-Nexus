@@ -158,6 +158,8 @@ function FakeRouteClient(dashboardService: unknown, galleryService?: unknown): B
 
     const mutable = client as unknown as Record<string, unknown>;
     mutable.dashboardService = dashboardService;
+    // W-0011: ohne Staff-Freigabe.
+    mutable.staffGrantService = { Active: () => null };
     mutable.galleryService = galleryService ?? new GalleryService(client);
 
     return client;

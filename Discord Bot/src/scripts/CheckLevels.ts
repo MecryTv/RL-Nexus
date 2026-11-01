@@ -1178,7 +1178,7 @@ async function checkBoardPost(): Promise<void> {
     const desk = World();
     const deskDiscord = BoardChannels(desk);
     const route = new DashboardApiLevels(desk.client) as unknown as { Read: (access: unknown, query: unknown) => Promise<Record<string, unknown>>; Write: (access: unknown, body: unknown) => Promise<Record<string, unknown>> };
-    const access = { guild: desk.guild, member: { id: USER } };
+    const access = { guild: desk.guild, member: { id: USER }, actor: { id: USER, name: "Check", staff: false } };
     const status = (value: unknown) => value as { channelId?: string; messageId?: string | null; error?: string | null } | null;
 
     desk.member(USER);
@@ -1216,7 +1216,7 @@ async function checkBoardPost(): Promise<void> {
         return original(guildId);
     };
 
-    const shakySave = await shakyRoute.Write({ guild: shaky.guild, member: { id: USER } }, { action: "save", settings: { boardPost: { on: true, channelId: TEXT, period: "all" } } }).catch((error: Error) => error);
+    const shakySave = await shakyRoute.Write({ guild: shaky.guild, member: { id: USER }, actor: { id: USER, name: "Check", staff: false } }, { action: "save", settings: { boardPost: { on: true, channelId: TEXT, period: "all" } } }).catch((error: Error) => error);
 
     check("Zeichnen scheitert nach dem Speichern: kein Fehler, gespeichert", !(shakySave instanceof Error) && shakySave.ok === true && shaky.settings.boardPost.on === true, String(shakySave instanceof Error ? shakySave.message : JSON.stringify(shakySave)));
 
@@ -1239,7 +1239,7 @@ async function checkDashboard(): Promise<void> {
     await world.client.levelDays.Add(GUILD, USER, Today(), { xp: 30, messages: 1, voiceMinutes: 0 });
 
     const route = new DashboardApiLevels(world.client) as unknown as { Read: (access: unknown, query: unknown) => Promise<Record<string, unknown>>; Write: (access: unknown, body: unknown) => Promise<Record<string, unknown>> };
-    const access = { guild: world.guild, member: { id: USER } };
+    const access = { guild: world.guild, member: { id: USER }, actor: { id: USER, name: "Check", staff: false } };
     const payload = await route.Read(access, {});
     const board = (await route.Write(access, { action: "board", period: "7d", page: 1 })) as unknown as { period: string; entries: { trend: unknown }[] };
     const saved = (await route.Write(access, { action: "save", settings: { ...world.settings, announceChannelId: TEXT, fair: { ...world.settings.fair, repeat: false }, announceDelete: 15 } })) as { settings?: ILevelSettings };
@@ -1665,7 +1665,7 @@ async function checkDesignApi(): Promise<void> {
 
     type Api = { Read: (access: unknown, query: unknown) => Promise<Record<string, unknown>>; Write: (access: unknown, body: unknown) => Promise<Record<string, unknown>> };
     const route = new DashboardApiLevels(world.client) as unknown as Api;
-    const access = { guild: world.guild, member: lara };
+    const access = { guild: world.guild, member: lara, actor: { id: lara.id, name: "Check", staff: false } };
     const payload = (await route.Read(access, {})) as { templates?: { card?: Record<string, unknown>; up?: Record<string, unknown> }; designs?: { card: unknown; up: unknown; board: { podium: boolean } }; upMode?: string; limits?: { elements?: number } };
 
     check(
@@ -1731,7 +1731,7 @@ async function checkDesignApi(): Promise<void> {
 
     (closed.client.levels as unknown as { Top: () => Promise<unknown[]> }).Top = async () => [];
 
-    const shut = await (new DashboardApiLevels(closed.client) as unknown as Api).Write({ guild: closed.guild, member: mo }, { action: "design.test", kind: "card" }).catch((error: Error) => error);
+    const shut = await (new DashboardApiLevels(closed.client) as unknown as Api).Write({ guild: closed.guild, member: mo, actor: { id: mo.id, name: "Check", staff: false } }, { action: "design.test", kind: "card" }).catch((error: Error) => error);
 
     check("DMs zu: klare Meldung", shut instanceof LevelError && shut.message.includes("DM"), String(shut));
 
@@ -1969,10 +1969,10 @@ async function checkManual(): Promise<void> {
     type Api = { Write: (access: unknown, body: unknown) => Promise<Record<string, unknown>> };
     const route = new DashboardApiLevels(world.client) as unknown as Api;
 
-    await route.Write({ guild: world.guild, member: mo }, { action: "adjust", userId: USER, mode: "add", amount: 5, reason: "Dashboard" });
+    await route.Write({ guild: world.guild, member: mo, actor: { id: mo.id, name: "Check", staff: false } }, { action: "adjust", userId: USER, mode: "add", amount: 5, reason: "Dashboard" });
     check("Dashboard: wer geändert hat, steht drin", world.logs[world.logs.length - 1].actorId === OTHER && world.logs[world.logs.length - 1].reason === "Dashboard");
 
-    const log = (await route.Write({ guild: world.guild, member: mo }, { action: "log" })) as { entries?: { name: string; actorName: string; reason: string }[] };
+    const log = (await route.Write({ guild: world.guild, member: mo, actor: { id: mo.id, name: "Check", staff: false } }, { action: "log" })) as { entries?: { name: string; actorName: string; reason: string }[] };
 
     check("Dashboard: Protokoll mit Namen, neuester zuerst", log.entries?.[0]?.name === "Lara" && log.entries[0].actorName === "Mo" && log.entries[0].reason === "Dashboard" && log.entries.length === world.logs.length, JSON.stringify(log.entries?.[0]));
 
@@ -2290,7 +2290,7 @@ async function checkBoardApi(): Promise<void> {
 
     type Api = { Read: (access: unknown, query: unknown) => Promise<Record<string, unknown>>; Write: (access: unknown, body: unknown) => Promise<Record<string, unknown>> };
     const route = new DashboardApiLevels(world.client) as unknown as Api;
-    const access = { guild: world.guild, member: lara };
+    const access = { guild: world.guild, member: lara, actor: { id: lara.id, name: "Check", staff: false } };
     const payload = (await route.Read(access, {})) as { templates?: { board?: Record<string, { template: string }> }; designs?: { boardDesign?: unknown }; boardEntryPlaceholders?: string[]; boardFramePlaceholders?: string[] };
 
     check(

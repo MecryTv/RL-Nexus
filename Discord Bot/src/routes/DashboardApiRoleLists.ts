@@ -177,7 +177,7 @@ export default class DashboardApiRoleLists extends Route {
     }
 
     private async Write(access: IManageAccess, body: IBody): Promise<unknown> {
-        const { guild, member } = access;
+        const { guild, actor } = access;
         const service = this.client.roleListService;
         const id = Number(body.id ?? 0);
 
@@ -185,7 +185,7 @@ export default class DashboardApiRoleLists extends Route {
             case "create": {
                 const list = await service.Create(guild, { name: body.name, template: body.template });
 
-                logger.user(`📋 Rollen-Liste #${list.id} auf ${guild.id} angelegt (von ${member.id})`);
+                logger.user(`📋 Rollen-Liste #${list.id} auf ${guild.id} angelegt (von ${actor.id})`);
 
                 return { ok: true, list };
             }
@@ -195,7 +195,7 @@ export default class DashboardApiRoleLists extends Route {
 
             case "remove":
                 await service.Remove(guild, id);
-                logger.user(`📋 Rollen-Liste #${id} auf ${guild.id} gelöscht (von ${member.id})`);
+                logger.user(`📋 Rollen-Liste #${id} auf ${guild.id} gelöscht (von ${actor.id})`);
 
                 return { ok: true };
 

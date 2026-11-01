@@ -8,6 +8,13 @@ process.env.CLIENT_SECRET ||= "check-secret";
 process.env.DEV_CLIENT_SECRET ||= "check-secret";
 
 import { Guild } from "discord.js";
+import fastify, { FastifyReply, FastifyRequest } from "fastify";
+import RouteManager from "../handler/RouteManager";
+import Route from "../structures/Route";
+import { DASHBOARD_PATH, SESSION_COOKIE } from "../constants/Dashboard";
+import IDashboardGuild from "../interfaces/services/dashboard/IDashboardGuild";
+import { StaffOverlay } from "../services/DashboardService";
+import { ManageGate } from "../utils/managegate";
 import BotClient from "../client/BotClient";
 import { REQUEST_TTL_MS } from "../constants/StaffGrant";
 import { IStaffGrant, IStaffLogEntry } from "../interfaces/services/staffgrant/IStaffGrant";
@@ -356,6 +363,132 @@ function checkPulse(): void {
     check("Server-Puls zählt getrennt", pulse.Subscribe("100", "1", () => undefined, () => undefined) !== null);
 }
 
+/* ----------------------------------------------------------
+   Task 3: Zugriff mit Freigabe
+   ---------------------------------------------------------- */
+
+function Card(id: string, role: IDashboardGuild["role"]): IDashboardGuild {
+    const manage = role === "Owner" || role === "Admin";
+
+    return { id, name: id, role, canManage: manage, canSupport: manage, canModerate: manage, canReview: manage } as IDashboardGuild;
+}
+
+function checkOverlay(): void {
+    console.log("\n🪪 Karte mit Freigabe\n");
+
+    const running = Running({ endsAt: T0 + 60 * MIN });
+    const cards = [Card("100", "Staff"), Card("101", "Owner"), Card("102", "Staff")];
+    const out = StaffOverlay(cards, (guildId) => (guildId === "100" || guildId === "101" ? running : null));
+
+    check("Staff mit Freigabe darf verwalten", out[0].canManage && out[0].staff?.grantId === running.id && out[0].staff?.until === running.endsAt);
+    check("Ohne private Bereiche: kein Support, keine Moderation, keine Bewerbungen", !out[0].canSupport && !out[0].canModerate && !out[0].canReview && out[0].staff?.private === false);
+    check("Mit privaten Bereichen: alles offen", StaffOverlay([Card("100", "Staff")], () => Running({ private: "on" }))[0].canSupport);
+    check("Owner-Karte bleibt, wie sie ist", out[1] === cards[1]);
+    check("Staff ohne Freigabe bleibt nur lesend", !out[2].canManage && !out[2].staff);
+}
+
+const GATE_GUILD = "112233445566778899";
+
+class GateProbe extends Route {
+    constructor(client: BotClient) {
+        super(client, {
+            method: ["GET", "POST"],
+            path: `${DASHBOARD_PATH}/api/guild/:id/probe`,
+            description: "Prüft ManageGate",
+            prefixed: false,
+            requiresAuth: false,
+        });
+    }
+
+    async Handle(request: FastifyRequest, reply: FastifyReply): Promise<unknown> {
+        const access = await ManageGate(this.client, request, reply, "levels");
+
+        if (!access) return reply;
+        if (request.method === "POST" && (request.body as { action?: string } | undefined)?.action === "bad") return reply.code(400).send({ error: "nein" });
+
+        return reply.send({ actor: access.actor, member: access.member.id });
+    }
+}
+
+function GateApp(options: { grant: IStaffGrant | null; canManage: boolean; bot?: boolean; member?: boolean }) {
+    const logged: string[] = [];
+    const guild = {
+        id: GATE_GUILD,
+        members: {
+            cache: new Map(options.member ? [["900", { id: "900", displayName: "Joe als Mitglied" }]] : []),
+            fetch: async () => {
+                throw new Error("Unknown Member");
+            },
+            me: options.bot === false ? null : { id: "bot", displayName: "RL Nexus" },
+        },
+    };
+    const client = {
+        dashboardService: {
+            Session: (cookie: string | undefined) =>
+                cookie === "gueltig" ? { id: "s", userId: "900", username: "Joe", avatar: null, accessToken: "x", mfa: true, expiresAt: Date.now() + 60_000 } : null,
+            CanManage: async () => options.canManage,
+            Secure: false,
+        },
+        databaseService: { Ready: true },
+        guilds: { cache: new Map([[GATE_GUILD, guild]]) },
+        settings: { Of: async () => ({ modules: ["levels"] }) },
+        staffGrantService: {
+            Active: () => options.grant,
+            Log: (_grant: IStaffGrant, _area: string, text: string) => logged.push(text),
+        },
+    } as unknown as BotClient;
+    const instance = fastify({ logger: false });
+    const manager = new RouteManager(client);
+
+    manager.Register(new GateProbe(client));
+    manager.Apply(instance);
+
+    const call = (method: "GET" | "POST", action?: string) =>
+        instance.inject({
+            method,
+            url: `${DASHBOARD_PATH}/api/guild/${GATE_GUILD}/probe`,
+            headers: { cookie: `${SESSION_COOKIE}=gueltig`, ...(method === "POST" ? { "content-type": "application/json" } : {}) },
+            ...(method === "POST" ? { payload: JSON.stringify({ action }) } : {}),
+        });
+
+    return { call, logged };
+}
+
+async function checkGate(): Promise<void> {
+    console.log("\n🚪 ManageGate mit Freigabe\n");
+
+    const running = Running({ endsAt: Date.now() + 60 * MIN });
+
+    let app = GateApp({ grant: null, canManage: false });
+    check("Staff ohne Freigabe: 403", (await app.call("GET")).statusCode === 403);
+
+    app = GateApp({ grant: running, canManage: true });
+    const read = await app.call("GET");
+    const body = read.json() as { actor: { id: string; name: string; staff: boolean }; member: string };
+    check("Mit Freigabe, ohne Mitgliedschaft: 200", read.statusCode === 200, read.body);
+    check("Akteur ist Staff, Mitglied ist der Bot", body.actor?.id === "900" && body.actor.name === "Joe (RL Nexus Staff)" && body.actor.staff && body.member === "bot", read.body);
+
+    check("Speichern: 200", (await app.call("POST", "save")).statusCode === 200);
+    await flush();
+    check("Speichern schreibt „Level System › gespeichert“", app.logged.length === 1 && app.logged[0] === "Level System › gespeichert", app.logged.join(" | "));
+    check("Abgewiesen (400): kein Eintrag", (await app.call("POST", "bad")).statusCode === 400 && (await flush(), app.logged.length === 1));
+    check("Lesen: kein Eintrag", (await app.call("GET")).statusCode === 200 && (await flush(), app.logged.length === 1));
+
+    app = GateApp({ grant: running, canManage: true, member: true });
+    const both = (await app.call("GET")).json() as { actor: { staff: boolean }; member: string };
+    check("Staff ist auch Mitglied: trotzdem Bot und Staff-Akteur", both.actor?.staff === true && both.member === "bot");
+
+    app = GateApp({ grant: null, canManage: false });
+    check("Nach dem Ende: 403 (Review 1)", (await app.call("POST", "save")).statusCode === 403);
+
+    app = GateApp({ grant: running, canManage: false });
+    check("Freigabe da, aber Karte weg (Gruppe verloren): 403 (Review 3)", (await app.call("GET")).statusCode === 403);
+
+    app = GateApp({ grant: running, canManage: true, bot: false });
+    const nobot = await app.call("GET");
+    check("Bot-Mitglied fehlt: 403 mit Hinweis", nobot.statusCode === 403 && (nobot.json() as { hint?: string }).hint === "Der Bot fehlt gerade im Speicher dieses Servers. Bitte gleich noch mal.", nobot.body);
+}
+
 async function main(): Promise<void> {
     checkRules();
     checkAnswer();
@@ -365,6 +498,8 @@ async function main(): Promise<void> {
     checkCanRequest();
     checkPulse();
     await checkService();
+    checkOverlay();
+    await checkGate();
 
     console.log(failures ? `\n❌ ${failures} Prüfung(en) fehlgeschlagen` : "\n✅ Alles in Ordnung");
     process.exit(failures ? 1 : 0);

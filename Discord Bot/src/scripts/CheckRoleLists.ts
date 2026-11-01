@@ -564,7 +564,7 @@ async function checkRoute(client: BotClient): Promise<void> {
     const route = new DashboardApiRoleLists(client) as unknown as { Read(access: unknown): Promise<Record<string, any>>; Write(access: unknown, body: unknown): Promise<Record<string, any>> };
     const log = { sent: [] as Record<string, unknown>[], edits: [] as { id: string; options: Record<string, unknown> }[], deleted: [] as string[], missing: new Set<string>() };
     const guild = LiveGuild(log);
-    const access = { guild, member: { id: MEMBERS[0]!.id } };
+    const access = { guild, member: { id: MEMBERS[0]!.id }, actor: { id: MEMBERS[0]!.id, name: "Check", staff: false } };
     const service = client.roleListService;
     const first = (await client.roleLists.OfGuild(GUILD))[0]!;
 
@@ -776,7 +776,7 @@ async function checkMinors(client: BotClient): Promise<void> {
     const log: ILog = { sent: [], edits: [], deleted: [], missing: new Set() };
     const guild = LiveGuild(log);
     const route = new DashboardApiRoleLists(client) as unknown as { Read(access: unknown, query?: unknown): Promise<Record<string, any>>; Write(access: unknown, body: unknown): Promise<Record<string, any>> };
-    const access = { guild, member: { id: MEMBERS[0]!.id } };
+    const access = { guild, member: { id: MEMBERS[0]!.id }, actor: { id: MEMBERS[0]!.id, name: "Check", staff: false } };
 
     (client.guilds.cache as unknown as Map<string, Guild>).set(GUILD, guild);
 

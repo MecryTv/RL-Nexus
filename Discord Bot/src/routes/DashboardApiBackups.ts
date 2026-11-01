@@ -168,7 +168,7 @@ export default class DashboardApiBackups extends Route {
         const service = this.client.serverBackupService;
         const query = (request.query ?? {}) as Record<string, unknown>;
         const body = (request.body ?? {}) as Record<string, unknown>;
-        const actor = { id: access.member.id, name: access.member.displayName || access.member.user.username };
+        const actor = { id: access.actor.id, name: access.actor.name };
 
         // Plan 32: Ein Backup mit Discord-Server ansehen - der Stand, „Seitdem geändert“, wer gelöscht hat.
         if (!writing && query.server === "1") {

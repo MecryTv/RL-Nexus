@@ -118,7 +118,7 @@ export default class DashboardApiClips extends Route {
     }
 
     private async Write(access: IManageAccess, body: IBody): Promise<unknown> {
-        const { guild, member } = access;
+        const { guild, actor } = access;
         const service = this.client.clipService;
         const userId = typeof body.userId === "string" ? body.userId : "";
 
@@ -130,7 +130,7 @@ export default class DashboardApiClips extends Route {
             case "close":
             case "finish":
                 await service.Advance(guild, body.action);
-                logger.user(`🎬 Clips der Woche auf ${guild.id}: ${body.action} von Hand (von ${member.id})`);
+                logger.user(`🎬 Clips der Woche auf ${guild.id}: ${body.action} von Hand (von ${actor.id})`);
 
                 return { ok: true };
 
@@ -146,9 +146,9 @@ export default class DashboardApiClips extends Route {
             }
 
             case "block": {
-                const blocked = await service.Block(guild, userId, body.reason, member.id);
+                const blocked = await service.Block(guild, userId, body.reason, actor.id);
 
-                logger.user(`🎬 Clips der Woche auf ${guild.id}: ${userId} gesperrt (von ${member.id})`);
+                logger.user(`🎬 Clips der Woche auf ${guild.id}: ${userId} gesperrt (von ${actor.id})`);
 
                 return { ok: true, blocked };
             }
@@ -158,7 +158,7 @@ export default class DashboardApiClips extends Route {
 
             case "deleteRound":
                 await service.DeleteRound(guild, Number(body.id));
-                logger.user(`🎬 Clips der Woche auf ${guild.id}: Runde ${String(body.id)} gelöscht (von ${member.id})`);
+                logger.user(`🎬 Clips der Woche auf ${guild.id}: Runde ${String(body.id)} gelöscht (von ${actor.id})`);
 
                 return { ok: true };
 

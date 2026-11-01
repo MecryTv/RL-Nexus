@@ -112,18 +112,18 @@ export default class DashboardApiStreams extends Route {
     }
 
     private async Write(access: IManageAccess, platform: StreamPlatform, body: IBody): Promise<unknown> {
-        const { guild, member } = access;
+        const { guild, actor } = access;
         const service = this.client.streamService;
         const id = Number(body.id);
 
         switch (body.action) {
             case "add":
-                return { ok: true, notifier: this.Out(await service.Add(guild, platform, body.input, member.id)) };
+                return { ok: true, notifier: this.Out(await service.Add(guild, platform, body.input, actor.id)) };
 
             case "save": {
                 const saved = await service.Save(guild, id, body.config);
 
-                logger.user(`📡 ${platform} ${saved.accountName} auf ${guild.id} gespeichert (von ${member.id})`);
+                logger.user(`📡 ${platform} ${saved.accountName} auf ${guild.id} gespeichert (von ${actor.id})`);
 
                 return { ok: true, notifier: this.Out(saved) };
             }
