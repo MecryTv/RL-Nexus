@@ -195,6 +195,42 @@ Eine Seite **Coaching** mit Teilen als Reiter (wie seit W-0055 üblich):
 
 Eine Gruppe `/coaching` (Namen sind Claudes Vorschlag): `anfragen`, `start` (Sitzung ohne Anfrage, nur Coaches), `akte`, `plan`, `profil`, `zeiten`, `termine`, `session` (Gruppen-Session anlegen). Jeder Befehl verschwindet, wenn sein Baustein aus ist, und steht im Hilfe-Katalog (`/hilfe`, `check:help`).
 
+## 16. Aussehen: Bilder statt Text
+
+Entwurf `w0056-coaching-bilder.html`, Nutzer: „Passt so das design“. Was der Bot zeigt, ist ein **gezeichnetes Bild** im Stil von `/hilfe` und dem Einstellungs-Panel (Grund `#2b2d31`, Kacheln `#232428`, Akzentlinie oben, Titel in Oxanium, Text in Rajdhani, Gold für Zahlen). Darunter stehen nur Knöpfe, Menüs und was man kopieren oder anklicken muss.
+
+| Ausgabe | Auf dem Bild |
+|---|---|
+| Panel | „Werde besser. Mit Plan.“ mit Satz, drei Schritte (Anfragen, Sitzung, Bericht und Plan; je nach Bausteinen), Zeile mit Coaches, gerade frei, Bewertung (ohne Bewertungen fehlt sie). Titel und Satz im Dashboard änderbar |
+| Coach-Board | „Unsere Coaches“, je Coach eine Kachel: Bild, Name, Rang-Abzeichen, Schwerpunkte, Sprachen, Status (frei grün, in Sitzung gelb, abwesend grau mit „bis …“), Sterne und Zahl der Sitzungen |
+| Coach-Profil | Bild, Name, Rang, Sterne, ein Satz des Coaches als Zitat, Kacheln Schwerpunkte, Coacht (Rangbereich), Sprachen, die nächsten drei freien Termine |
+| Anfrage (Coaches) | „Mecry möchte Coaching“, Nummer, Art, wie lange auf dem Server, Ränge aller Playlists (gewählte markiert), Skills, der Freitext als Zitat, Zeit, bisherige Sitzungen; weitere Antworten als Zeilen |
+| Warteraum | „Sprechstunde“, Schlange mit Platz, Bild, Name, Rang (oder „nicht verknüpft“), Wartezeit. Knopf „▶ Name holen“ |
+| Sitzungsraum | „Spieler × Coach“, Nummer, Art, „nur ihr seht diesen Raum“, Fokus, Ziel, Rang seit dem ersten Coaching, Plan als Fortschrittsring, was beim letzten Mal offen blieb |
+| Bericht (R2) | „Sitzung N mit Coach“, Datum, Skill-Netz (diese Sitzung als Fläche, letzte gestrichelt), Kästen „Das lief gut“, „Daran arbeiten wir“, „Dein Ziel bis …“, Veränderung je Skill |
+| Plan | „Dein Plan: Name“, Coach, Woche, geschaffte Tage, Fortschrittsring, die Woche mit Haken und dem heutigen Tag markiert (bei Zielen: die Liste mit Häkchen, bei Phasen: die Phasen oben) |
+| Akte (R3) | Bild, Name, Sitzungen, Coach, Rang-Kurve je Playlist, Balken je Skill mit Veränderung, Sitzungen als Zeitleiste |
+| Gruppen-Session | „Gruppen-Session“, großer Titel, Beschreibung, Wann, Für (Rangbereich, Playlist), Coach, Plätze als Balken |
+| Termine | „Freie Termine bei Coach“, Länge, Wochenblick mit frei und belegt |
+
+- **Text bleibt:** Trainingspack-Codes und Links (unter dem Bild, kopierbar), Zeitstempel (`<t:…>`, in der Zeit des Lesers), Knöpfe und Menüs.
+- **Alt-Text:** jedes Bild hat einen Alt-Text mit allem, was darauf steht.
+- Rang-Abzeichen aus den Rang-Symbolen, die der Bot schon hat.
+- Die Größen wie bei `/hilfe`: logisch 900 breit, höchstens 580 hoch je Bild, bei mehr ein zweites Bild.
+
+**Texte ohne Bild** (Vorlagen, im Nachrichten-Baukasten änderbar):
+
+| Wo | Text |
+|---|---|
+| Anfrage abgeschickt | Deine Anfrage ist da. Sobald ein Coach sie übernimmt, schreibe ich dir. |
+| Anfrage übernommen | {coach} übernimmt dein Coaching. Euer Raum ist offen: {kanal} |
+| Anfrage abgelehnt | {coach} kann dein Coaching gerade nicht übernehmen: „{grund}“. Du kannst gern neu anfragen. |
+| Grenze erreicht | Du hast schon eine offene Anfrage. Sobald sie erledigt ist, kannst du die nächste stellen. |
+| Nicht verknüpft | Verbinde dein Epic-Konto mit /rank link, dann sieht dein Coach deinen Rang von selbst. |
+| Erinnerung Plan | Kurzer Schubs von {coach}: Heute steht {übung} auf deinem Plan. {minuten} Minuten reichen. |
+| Erinnerung Termin | {wann} hast du Coaching mit {coach}. Passt es nicht mehr? Sag kurz Bescheid. |
+| Bericht | Dein Bericht von {coach} ist da. Weiter so! |
+
 ## Entscheidungen von Claude (zum Gegenlesen)
 
 1. Team-Coaches ohne Coach-Rolle sehen nur die Akten ihres Kaders, Server-Coaches alle.
@@ -240,7 +276,7 @@ Das Modul ist zu groß für einen Plan. Vorschlag für die Teile, jeder einzeln 
 ## Vorgaben
 
 - Modul-ID `coaching`, Bereich Rocket League, in `MODULE_IDS` und der Dashboard-Liste (`check:dashboard` prüft beide).
-- Nachrichten in Components V2, Bilder mit `@napi-rs/canvas` wie Level-Karte und `/hilfe`, mit Alt-Text.
+- Nachrichten in Components V2, Bilder mit `@napi-rs/canvas` wie Level-Karte und `/hilfe` (Abschnitt 16), mit Alt-Text.
 - Ränge nur über das verknüpfte Epic-Konto und Prime, nie aus Selbstauskunft.
 - Texte auf Deutsch, du-Form. Jede Ablehnung als Satz, was zu tun ist.
 - Je Teil ein Prüfskript `check:coaching` wie bei den anderen Modulen, Test auf dem Dev Server in der Kategorie Claude.
