@@ -1282,6 +1282,8 @@ async function checkDebris(): Promise<void> {
     await both.run(AuditLogEvent.ChannelDelete, MOD, "s1", [{ key: "name", old: "regeln" }]);
     await new Promise((resolve) => setImmediate(resolve));
     check("Sicherheits-Backup mit Bot und Server", both.calls[0]?.body.parts?.join() === "bot,server", JSON.stringify(both.calls));
+    // W-0041: Das Admin Dashboard liest dabei den Server mit 120 s Zeitlimit - der Bot wartet länger.
+    check("Sicherheits-Backup wartet 130 s auf das Admin Dashboard", (both.calls[0] as { timeout?: number } | undefined)?.timeout === 130_000, String((both.calls[0] as { timeout?: number } | undefined)?.timeout));
     check("Danach die kleine Karte „Gesichert vor dem Anti-Nuke“", (notices[0] as { backupId?: number } | undefined)?.backupId === 42, JSON.stringify(notices));
 
     const off = make({ status: 200, body: { skipped: "Vor riskanten Änderungen ist aus." } });

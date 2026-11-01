@@ -56,6 +56,7 @@ import {
 } from "../constants/AntiVillain";
 import { CleanupMinutes, GuardId, IAntiVillainSettings, IAvCase, IHit, SafetyResult, ShieldLevel } from "../interfaces/services/antivillain/IAntiVillain";
 import { IsLogTarget, WarmLogTarget } from "../utils/logtarget";
+import { SNAPSHOT_WAIT_MS } from "../constants/ServerBackup";
 
 export class AntiVillainError extends Error {}
 
@@ -412,7 +413,7 @@ export default class AntiVillainService {
         if (last && now - last.at < SAFETY_DEBOUNCE_MS) return last.result;
 
         // Plan 32: mit dem Discord-Server, damit „Reparieren“ ihn aus diesem Backup zurückholen kann.
-        const answer = await this.AskBackups(guild, { method: "POST", path: "", body: { kind: "schutz", note: `vor dem Anti-Nuke: ${why}`.slice(0, 200), parts: ["bot", "server"] }, timeout: 120_000 });
+        const answer = await this.AskBackups(guild, { method: "POST", path: "", body: { kind: "schutz", note: `vor dem Anti-Nuke: ${why}`.slice(0, 200), parts: ["bot", "server"] }, timeout: SNAPSHOT_WAIT_MS });
         const made = answer.body as { id?: unknown; createdAt?: unknown; error?: unknown; skipped?: unknown } | null;
 
         if (answer.status === 200 && typeof made?.skipped === "string") {

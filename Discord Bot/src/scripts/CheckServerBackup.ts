@@ -1490,11 +1490,23 @@ async function checkLeftovers(): Promise<void> {
         check("M11: Alte, fertige Aufträge werden gelöscht, laufende nie", removed === 3 && /DELETE/.test(sql[1] ?? "") && /running/.test(sql[1] ?? ""), sql[1] ?? "");
     }
 
-    /* M13: Fortschritt und Bericht im Dashboard werden vorgelesen. */
+    /* Review: Ein Hinweis ohne Abbruch (Rollen-Bild nicht gesetzt) wird gespeichert, auch wenn danach nichts mehr scheitert. */
     {
-        const page = readFileSync(path.join(process.cwd(), "src", "dashboard", "client", "pages", "GuildBackups.ts"), "utf8");
+        const server = LiveServer();
+        const create = server.guild.roles.create.bind(server.guild.roles);
+        const deps = Deps();
 
-        check("M13: Der Bereich mit Fortschritt und Bericht ist aria-live", /aria-live", "polite"/.test(page), "");
+        (server.guild.roles as unknown as { create: typeof create }).create = (async (data: Parameters<typeof create>[0]) =>
+            Object.assign(await create(data), { setIcon: async () => Promise.reject(new Error("Erst ab Boost-Stufe 2")) })) as typeof create;
+        await RunOps(server.guild, Job([{ kind: "role.create", role: snapRole("90071992547406321", "Mit Bild", 1, { icon: "AAAA" }) }, { kind: "channel.create", channel: snapChannel("90071992547406322", "danach", 0, null) }]), deps.deps);
+        check("M11: „Rollen-Bild nicht gesetzt“ steht gespeichert in „Geht nicht“", deps.saved.some((patch) => (patch.failed ?? []).some((entry) => entry.reason.includes("Rollen-Bild"))), JSON.stringify(deps.saved));
+    }
+
+    /* M13: Vorgelesen wird eine kurze Statuszeile, nicht alle 2 s der ganze Bereich (Review). */
+    {
+        const page = readFileSync(path.join(__dirname, "..", "dashboard", "client", "pages", "GuildBackups.ts"), "utf8");
+
+        check("M13: Eine Statuszeile mit role=status, der Bereich selbst ist nicht aria-live", /"role", "status"/.test(page) && !/panel\.setAttribute\("aria-live"/.test(page), "");
     }
 }
 

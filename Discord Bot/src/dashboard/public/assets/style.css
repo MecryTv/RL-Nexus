@@ -5176,3 +5176,5 @@ details.tkcard > summary .tkcard__title{margin:0}
   .sto__top{gap:4px}
   .sto-zoom{display:none}
 }
+/* W-0041 M13: nur für Bildschirmleser */
+.bk-status{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}

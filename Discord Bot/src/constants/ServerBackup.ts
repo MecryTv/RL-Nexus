@@ -6,6 +6,13 @@ import { RestoreMode, ServerPart } from "../interfaces/services/serverbackup/ISe
  */
 export const BACKUPS_MODULE = "backups";
 
+/**
+ * Backups, die den Discord-Server mitnehmen: Das Admin Dashboard liest ihn
+ * beim Bot mit 120 s Zeitlimit (SNAPSHOT_TIMEOUT). Der Bot wartet länger,
+ * damit dessen Antwort ankommt (W-0041 M7).
+ */
+export const SNAPSHOT_WAIT_MS = 130_000;
+
 /** Die Teile in der Reihenfolge, in der sie geladen werden. */
 export const SERVER_PARTS: readonly { id: ServerPart; label: string }[] = [
     { id: "roles", label: "Rollen" },

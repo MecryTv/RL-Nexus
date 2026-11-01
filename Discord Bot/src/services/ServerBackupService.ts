@@ -21,7 +21,7 @@ import {
 import BotClient from "../client/BotClient";
 import { AutoFailedCard, AutomaticReply, BackupLabel, BackupReply, ChoiceLabel, CompareReply, CreatedReply, DayLabel, DoneCard, ListReply, LoadConfirm, Note, RunningCard, SafetyNotice, Strip } from "../builder/ServerBackupView";
 import { DASHBOARD_PATH } from "../constants/Dashboard";
-import { BACKUPS_MODULE, DEBRIS_WINDOW_MS, DefaultBackupSettings, IBackupSettings, SERVER_PART_IDS } from "../constants/ServerBackup";
+import { BACKUPS_MODULE, DEBRIS_WINDOW_MS, DefaultBackupSettings, IBackupSettings, SERVER_PART_IDS, SNAPSHOT_WAIT_MS } from "../constants/ServerBackup";
 import { IBackupInfo, IBackupMeta, IBackupPlanState, IProtect, IServerBackupList, IRestoreJob, IRestoreLine, IRestorePlan, IRestoreReport, IServerSnapshot, RestoreMode, ServerPart } from "../interfaces/services/serverbackup/IServerBackup";
 import { AskAdmin, IBackupCall } from "../routes/DashboardApiBackups";
 import { AfterServerRestore } from "../utils/guildpanels";
@@ -55,8 +55,6 @@ export interface IStartInput {
 
 /** Den Server lesen und ein Laden beginnen dauert: Das Admin Dashboard fragt dabei selbst beim Bot nach. */
 const SLOW = 120_000;
-/** Dabei liest das Admin Dashboard den Server mit 120 s Zeitlimit (SNAPSHOT_TIMEOUT) - der Bot wartet länger, damit dessen Antwort ankommt (W-0041 M7). */
-const SNAPSHOTTING = 130_000;
 const QUICK = 10_000;
 /** Die Karte im Meldekanal wird höchstens so oft bearbeitet. */
 const CARD_EVERY_MS = 5_000;
@@ -316,7 +314,7 @@ export default class ServerBackupService {
                 path: `/${input.backupId}/server`,
                 body: { confirm: input.confirm, parts: input.parts, areas: other ? [] : input.areas, mode: input.mode, ...(other ? { targetGuildId: target.id } : {}) },
                 headers: other ? { "X-Target-Name": encodeURIComponent(target.name) } : undefined,
-                timeout: SNAPSHOTTING,
+                timeout: SNAPSHOT_WAIT_MS,
             });
 
             if (answer.status !== 200) return ErrorOf(answer);
@@ -679,7 +677,7 @@ export default class ServerBackupService {
 
     private async CreateView(guild: Guild, actor: Actor, note: string | null, what: string): Promise<MessageCreateOptions> {
         const parts = what === "bot" ? ["bot"] : what === "server" ? ["server"] : ["bot", "server"];
-        const made = await this.AskBackups(guild, actor, { method: "POST", path: "", body: { note, parts }, timeout: SNAPSHOTTING });
+        const made = await this.AskBackups(guild, actor, { method: "POST", path: "", body: { note, parts }, timeout: SNAPSHOT_WAIT_MS });
 
         if (made.status !== 200) return Note(ErrorOf(made));
 
