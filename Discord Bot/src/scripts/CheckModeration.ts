@@ -14,7 +14,7 @@ process.env.DEV_CLIENT_SECRET ||= "check-secret";
 
 import { ChannelType, Guild, GuildBasedChannel, Message, Role } from "discord.js";
 import BotClient from "../client/BotClient";
-import { CaseView, DirectView, DoneView, HistoryView, StatusText, SupportCard } from "../builder/ModerationView";
+import { CaseView, DirectView, DoneView, EvidenceId, HistoryView, ReadEvidenceId, SaveEvidenceView, StatusText, SupportCard } from "../builder/ModerationView";
 import { DefaultModConfig, FormatDuration, MAX_EVIDENCE, MAX_REASON, MAX_SUPPORT_REMIND, MAX_SUPPORT_ROLES, ParseDuration, ParseMessageLink, ProofNeeded, StageFor } from "../constants/Moderation";
 import { IModCase } from "../interfaces/services/moderation/IModeration";
 import { ModerationError } from "../services/ModerationService";
@@ -287,6 +287,30 @@ function checkProof(client: BotClient): void {
     check("Clean übernimmt die Pflicht", cleaned.proof.ban && !cleaned.proof.kick && cleaned.proof.timeoutFrom === 604_800 && !cleaned.proof.warn, JSON.stringify(cleaned.proof));
     check("Eine erfundene Dauer wird zu keiner", service.Clean(guild, { proof: { timeoutFrom: 1_234 } }, strict).proof.timeoutFrom === null);
     check("Ohne Angabe bleibt die Pflicht", service.Clean(guild, {}, strict).proof.warn === true);
+
+    console.log("\n  — Rechtsklick „Als Beweis sichern“ —");
+
+    const id = EvidenceId("fall", TEXT, THREAD);
+
+    check("Die ID trägt Kanal und Nachricht", id === `mbw:fall:${TEXT}:${THREAD}` && id.length <= 100, id);
+    check("Und wird wieder gelesen", JSON.stringify(ReadEvidenceId(id)) === JSON.stringify({ kind: "fall", channelId: TEXT, messageId: THREAD }));
+    check("Fenster-ID auch", ReadEvidenceId(EvidenceId("grund", TEXT, THREAD))?.kind === "grund");
+    check("Fremde IDs nicht", ReadEvidenceId("mf:ev:12:1") === null && ReadEvidenceId(`mbw:boom:${TEXT}:${THREAD}`) === null && ReadEvidenceId("mbw:fall:abc:def") === null);
+
+    const preview = { channelId: TEXT, messageId: THREAD, authorName: "Kevin", channelName: "allgemein", content: "Du bist so schlecht", sentAt: 1_700_000_000_000 };
+    const many = Array.from({ length: 30 }, (_, index) => SampleCase({ number: ((index * 7) % 30) + 1 }));
+    const menu = SaveEvidenceView(preview, many).components[0].toJSON() as unknown as { components: { type: number; components?: { type: number; custom_id?: string; options?: { value: string }[] }[] }[] };
+    const select = menu.components.flatMap((row) => row.components ?? []).find((part) => part.type === 3);
+    const json = JSON.stringify(menu);
+
+    check("Menü: höchstens 25 Fälle", select?.options?.length === 25, String(select?.options?.length));
+    check("Menü: neueste zuerst", select?.options?.[0].value === "30" && select.options[24].value === "6", select?.options?.map((option) => option.value).join(","));
+    check("Menü: mit Knopf für eine neue Verwarnung", json.includes(`mbw:warn:${TEXT}:${THREAD}`) && json.includes("Neue Verwarnung damit"));
+    check("Menü: zeigt die Nachricht", json.includes("Du bist so schlecht") && json.includes("Kevin") && json.includes("allgemein"));
+
+    const none = JSON.stringify(SaveEvidenceView(preview, []).components[0].toJSON());
+
+    check("Ohne Fälle: kein Menü, nur der Knopf", !none.includes(`mbw:fall:`) && none.includes(`mbw:warn:${TEXT}:${THREAD}`));
 }
 
 async function checkDatabase(client: BotClient): Promise<void> {

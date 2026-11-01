@@ -21,8 +21,8 @@ export interface IHelpCommand {
     display: string;
     text: IHelpText;
     fields: IHelpField[];
-    /** Ein Rechtsklick-Befehl statt eines Slash-Befehls. */
-    menu: boolean;
+    /** Ein Rechtsklick-Befehl statt eines Slash-Befehls: auf eine Person oder eine Nachricht. */
+    menu: false | "user" | "message";
 }
 
 export interface IHelpEntry {
@@ -54,8 +54,10 @@ interface IRawCommand {
 
 const SUBCOMMAND = 1;
 const SUBCOMMAND_GROUP = 2;
-/** ApplicationCommandType.ChatInput - alles andere ist ein Rechtsklick. */
+/** ApplicationCommandType: ChatInput, User, Message. */
 const CHAT_INPUT = 1;
+const USER_MENU = 2;
+const MESSAGE_MENU = 3;
 
 function Raw(source: IHelpSource): IRawCommand {
     return source.data.toJSON() as IRawCommand;
@@ -81,7 +83,8 @@ export function BuildHelp(commands: ReadonlyArray<IHelpSource>, catalog: HelpCat
         if (!text) continue;
 
         const raw = Raw(source);
-        const menu = (raw.type ?? CHAT_INPUT) !== CHAT_INPUT;
+        const type = raw.type ?? CHAT_INPUT;
+        const menu = type === MESSAGE_MENU ? "message" : type === USER_MENU ? "user" : false;
 
         if (IsGroupText(text)) {
             const subs = new Map((raw.options ?? []).filter((option) => option.type === SUBCOMMAND).map((option) => [option.name, option]));

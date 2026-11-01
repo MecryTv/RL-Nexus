@@ -92,7 +92,7 @@ function checkModel(): void {
 
     const menu = entries.find((entry) => entry.name === "Hack melden");
 
-    check("Rechtsklick erkannt", menu?.commands[0].menu === true && menu.commands[0].display === "Rechtsklick › Apps › Hack melden", menu?.commands[0].display);
+    check("Rechtsklick erkannt", menu?.commands[0].menu === "user" && menu.commands[0].display === "Rechtsklick › Apps › Hack melden", menu?.commands[0].display);
 
     check("Richtiger Katalog: keine Probleme", CatalogProblems(FakeCommands(), FakeCatalog()).length === 0, CatalogProblems(FakeCommands(), FakeCatalog()).join(" | "));
 
@@ -190,7 +190,16 @@ async function checkCatalog(client: BotClient): Promise<void> {
     }
 
     check("/unwarn hat kein solches Kapitel", !blocksOf("unwarn").some((block) => block.kind === "steps" && block.title === "Beweise anhängen"));
-    check("Jeder Slash-Befehl hat ein Beispiel", texts.filter(([key, text]) => key !== "Hack melden" && text.examples.length === 0).length === 0, texts.filter(([key, text]) => key !== "Hack melden" && text.examples.length === 0).map(([key]) => key).join(", "));
+
+    const save = real.find((entry) => entry.name === "Als Beweis sichern");
+
+    check("„Als Beweis sichern“ ist ein Rechtsklick auf eine Nachricht", save?.commands[0].menu === "message", String(save?.commands[0].menu));
+    check("Die Hilfe sagt „Rechtsklick auf die Nachricht“", JSON.stringify(blocksOf("Als Beweis sichern")).includes("Rechtsklick auf die Nachricht"));
+    check("„Hack melden“ bleibt ein Rechtsklick auf die Person", JSON.stringify(blocksOf("Hack melden")).includes("Rechtsklick auf die Person"));
+    const menus = new Set(real.flatMap((entry) => entry.commands.filter((command) => command.menu).map((command) => command.key)));
+    const bare = texts.filter(([key, text]) => !menus.has(key) && text.examples.length === 0).map(([key]) => key);
+
+    check("Jeder Slash-Befehl hat ein Beispiel", bare.length === 0, bare.join(", "));
 }
 
 const CONTEXT: IHelpContext = {

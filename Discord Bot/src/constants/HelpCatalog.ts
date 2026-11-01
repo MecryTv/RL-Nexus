@@ -162,6 +162,15 @@ export const HELP_CATALOG: HelpCatalog = {
             }),
         },
     },
+    "Als Beweis sichern": Mod({
+        emoji: "📎",
+        whoText: "Das Moderations-Team",
+        what: "Sichert eine Nachricht als Beweis: Text, Bilder, Verfasser, Kanal und Zeit. Sie bleibt am Fall, auch wenn sie später gelöscht wird. Du wählst einen Fall des Verfassers oder legst gleich eine Verwarnung damit an.",
+        examples: [],
+        fields: {},
+        after: ["Nur du siehst das Menü", "Der Beweis steht am Fall, die Karte im Log-Kanal wird nachgezogen", "Mit „Neue Verwarnung damit“ fragt der Bot nach dem Grund"],
+        tip: "Nur das Team sieht Beweise, bis zu 20 je Fall. Jedes Bild der Nachricht zählt als eigener Beweis.",
+    }),
     "Hack melden": {
         emoji: "🚨",
         area: "moderation",

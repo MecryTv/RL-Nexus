@@ -215,6 +215,70 @@ export function ModErrorView(text: string): IModView {
     return { components: [new ComponentV2Builder({ accentColor: "Red" }).text(`❌ ${text}`).build()] };
 }
 
+/** Hängt an eine Antwort, welche Beweise nicht ankamen. */
+export function WithProblems(view: IModView, problems: string[]): IModView {
+    return problems.length ? { components: [...view.components, ...ModErrorView(`Nicht gesichert:\n${problems.join("\n")}`).components] } : view;
+}
+
+/* ----------------------------------------------------------
+   Rechtsklick „Als Beweis sichern“
+   ---------------------------------------------------------- */
+export type EvidenceStep = "fall" | "warn" | "grund";
+
+/** mbw:<schritt>:<kanal>:<nachricht> - die Nachricht steckt in der ID, so gehen Menü und Knopf auch nach einem Neustart. */
+export function EvidenceId(step: EvidenceStep, channelId: string, messageId: string): string {
+    return `mbw:${step}:${channelId}:${messageId}`;
+}
+
+export function ReadEvidenceId(customId: string): { kind: EvidenceStep; channelId: string; messageId: string } | null {
+    const match = /^mbw:(fall|warn|grund):(\d{17,20}):(\d{17,20})$/.exec(customId);
+
+    return match ? { kind: match[1] as EvidenceStep, channelId: match[2], messageId: match[3] } : null;
+}
+
+/** Was das Menü von der Nachricht zeigt. */
+export interface IEvidencePreview {
+    channelId: string;
+    messageId: string;
+    authorName: string;
+    channelName: string;
+    content: string;
+    sentAt: number;
+}
+
+/** Das Menü nach dem Rechtsklick: die Nachricht, die Fälle des Verfassers (neueste zuerst) und „Neue Verwarnung damit“. */
+export function SaveEvidenceView(preview: IEvidencePreview, cases: IModCase[]): IModView {
+    const quote = preview.content.trim()
+        ? escapeMarkdown(preview.content.slice(0, 300))
+              .split("\n")
+              .map((line) => `> ${line}`)
+              .join("\n")
+        : "-# Ohne Text, nur Anhänge.";
+    const builder = new ComponentV2Builder({ accentColor: "#00afff" })
+        .text(`### 📎 Als Beweis sichern\n${quote}`)
+        .subtext(`von **${escapeMarkdown(preview.authorName)}** in #${escapeMarkdown(preview.channelName)} · ${Stamp(preview.sentAt, "R")}`);
+    const newest = [...cases].sort((a, b) => b.number - a.number).slice(0, 25);
+
+    if (newest.length) {
+        builder.select({
+            customId: EvidenceId("fall", preview.channelId, preview.messageId),
+            placeholder: "An welchen Fall?",
+            options: newest.map((entry) => ({
+                label: `${CaseRef(entry.number)} · ${ACTION_INFO[entry.action].label}`,
+                value: String(entry.number),
+                emoji: ACTION_INFO[entry.action].emoji,
+                description: (entry.reason ?? "Ohne Grund").slice(0, 100),
+            })),
+        });
+    } else {
+        builder.text(`**${escapeMarkdown(preview.authorName)}** hat hier noch keinen Fall.`);
+    }
+
+    builder.buttons({ customId: EvidenceId("warn", preview.channelId, preview.messageId), label: "Neue Verwarnung damit", emoji: "⚠️", tone: "danger" });
+
+    return { components: [builder.build()] };
+}
+
 /** Wie weit ein Wartender im Support-Warteraum ist. */
 export type SupportState = "waiting" | "claimed" | "moved" | "left";
 

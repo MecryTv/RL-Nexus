@@ -233,7 +233,11 @@ function CommandGroups(command: IHelpCommand): HelpBlock[][] {
     const { text } = command;
     const groups: HelpBlock[][] = [[{ kind: "heading", text: "Was er macht" }, { kind: "text", text: text.what }]];
 
-    if (command.menu) groups.push([{ kind: "heading", text: "So nutzt du ihn" }, { kind: "text", text: `Rechtsklick auf die Person, dann Apps › ${command.display.split(" › ").pop()}.` }]);
+    if (command.menu) {
+        const on = command.menu === "message" ? "die Nachricht" : "die Person";
+
+        groups.push([{ kind: "heading", text: "So nutzt du ihn" }, { kind: "text", text: `Rechtsklick auf ${on}, dann Apps › ${command.display.split(" › ").pop()}.` }]);
+    }
 
     text.examples.forEach((example, index) => {
         groups.push([...(index === 0 ? [{ kind: "heading", text: "So nutzt du ihn" } as HelpBlock] : []), { kind: "code", code: example.code, note: example.text }]);

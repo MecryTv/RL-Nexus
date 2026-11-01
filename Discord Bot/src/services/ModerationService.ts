@@ -131,6 +131,13 @@ export default class ModerationService {
     }
 
     /** Den Verlauf sieht, wer irgendeine Aktion darf. */
+    /** Rechtsklick und Knöpfe an Beweisen: Modul an, Datenbank da, und nur fürs Team. */
+    async TeamGate(member: GuildMember): Promise<void> {
+        await this.Ready(member.guild);
+
+        if (!(await this.CanView(member))) throw new ModerationError("Das sieht nur das Moderations-Team.");
+    }
+
     async CanView(member: GuildMember): Promise<boolean> {
         return (await this.AllowedActions(member)).length > 0;
     }

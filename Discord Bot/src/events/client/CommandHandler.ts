@@ -34,6 +34,15 @@ export default class CommandHandler extends Event {
             return;
         }
 
+        // Kontextmenü an einer Nachricht (W-0014: „Als Beweis sichern“).
+        if (interaction.isMessageContextMenuCommand()) {
+            const target = this.client.commands.get(interaction.commandName);
+
+            await target?.ExecuteMessage(interaction).catch((error) => logger.warn(`[CommandHandler] Kontextmenü „${interaction.commandName}“ fehlgeschlagen: ${error}`));
+
+            return;
+        }
+
         if (!interaction.isChatInputCommand()) return;
 
         const command: Command | undefined = this.client.commands.get(interaction.commandName);

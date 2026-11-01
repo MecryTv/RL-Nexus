@@ -2,7 +2,7 @@ import { ChatInputCommandInteraction, InteractionContextType, MessageFlags, Slas
 import BotClient from "../../client/BotClient";
 import Command from "../../structures/Command";
 import Category from "../../enums/Category";
-import { DetailView, ModErrorView } from "../../builder/ModerationView";
+import { DetailView, WithProblems } from "../../builder/ModerationView";
 import { CaseRef, MAX_NOTE } from "../../constants/Moderation";
 import { ModerationError } from "../../services/ModerationService";
 import { ActorOf, Fail, MemberOf, ModSay } from "../../utils/modcommand";
@@ -74,9 +74,7 @@ export default class Case extends Command {
                 problems = result.problems;
             }
 
-            const view = DetailView(entry, service.Link(entry));
-
-            await ModSay(interaction, problems.length ? { components: [...view.components, ...ModErrorView(`Nicht gesichert:\n${problems.join("\n")}`).components] } : view);
+            await ModSay(interaction, WithProblems(DetailView(entry, service.Link(entry)), problems));
         } catch (error) {
             await Fail(interaction, error, sub);
         }
