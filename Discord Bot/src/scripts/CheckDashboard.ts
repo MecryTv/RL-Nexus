@@ -691,6 +691,55 @@ async function checkModuleState(): Promise<void> {
 }
 
 /**
+ * W-0055: Suche der Leiste. Treffer und Reihenfolge, Umlaute, und dass die
+ * rechte Umschalttaste nur allein und außerhalb von Feldern die Suche öffnet.
+ */
+async function checkNavSearch(): Promise<void> {
+    console.log("\n  — Leiste: Suche und rechte Umschalttaste —");
+
+    const { pathToFileURL } = await import("node:url");
+    const file = path.join(process.cwd(), "src", "dashboard", "client", "core", "NavSearch.ts");
+
+    if (!existsSync(file)) return check("NavSearch.ts ist da", false, file);
+
+    type Entry = { section: string; href: string; name: string; kind: "page" | "part" | "module" | "list" | "off"; icon: string; module?: string; area?: string; text?: string };
+    const { fold, searchNav, ShiftTap } = (await import(pathToFileURL(file).href)) as {
+        fold: (text: string) => string;
+        searchNav: (entries: readonly Entry[], query: string) => Entry[];
+        ShiftTap: new (limitMs?: number) => { down(code: string, at: number, editable: boolean): void; up(code: string, at: number): boolean };
+    };
+    const entry = (section: string, name: string, kind: Entry["kind"], extra: Partial<Entry> = {}): Entry => ({ section, href: `/x/${section}`, name, kind, icon: "#i-grid", ...extra });
+    const entries: Entry[] = [
+        entry("tickets", "Ticket System", "off", { area: "Support", text: "Rangfolge der Tickets" }),
+        entry("levels", "Level System", "module", { area: "Immer dabei", text: "Punkte, Belohnungen und Rangliste" }),
+        entry("rank-roles", "Rank Roles", "module", { area: "Rocket League", text: "Rollen nach Rang" }),
+        entry("sixmans-board", "Rangliste", "part", { module: "2, 4 & 6 Mans", area: "Rocket League" }),
+        entry("leaderboard", "Rangliste", "part", { module: "Level System", area: "Immer dabei" }),
+        entry("module", "Module", "page"),
+        entry("moderation", "Moderation", "module", { area: "Moderation" }),
+        entry("uebersicht", "Übersicht", "page"),
+    ];
+    const names = (query: string): string => searchNav(entries, query).map((hit) => hit.section).join(",");
+
+    check("fold: Umlaute zur Grundform", fold("Übersicht") === "ubersicht" && fold("Größe") === "grosse", `${fold("Übersicht")} ${fold("Größe")}`);
+    check("rang: erst Namen, dann Beschreibung, Aus zuletzt", names("rang") === "sixmans-board,leaderboard,levels,rank-roles,tickets", names("rang"));
+    check("Groß und klein egal", names("RANG") === names("rang"));
+    check("Ohne Umlaut gefunden", names("ubersicht") === "uebersicht", names("ubersicht"));
+    check("Leere Eingabe: keine Treffer", searchNav(entries, "  ").length === 0);
+    check("Nichts passt: keine Treffer", searchNav(entries, "xyz").length === 0);
+    check("Gleicher Rang: Seiten vor Modulen", names("mod") === "module,moderation", names("mod"));
+
+    const tap = (steps: (tap: InstanceType<typeof ShiftTap>) => boolean): boolean => steps(new ShiftTap());
+
+    check("Rechte Umschalttaste kurz: öffnet", tap((t) => (t.down("ShiftRight", 0, false), t.up("ShiftRight", 200))));
+    check("Gehalten: öffnet nicht", !tap((t) => (t.down("ShiftRight", 0, false), t.up("ShiftRight", 700))));
+    check("Linke Umschalttaste: öffnet nicht", !tap((t) => (t.down("ShiftLeft", 0, false), t.up("ShiftLeft", 100))));
+    check("Großbuchstabe getippt: öffnet nicht", !tap((t) => (t.down("ShiftRight", 0, false), t.down("KeyA", 50, false), t.up("ShiftRight", 100))));
+    check("Im Feld: öffnet nicht", !tap((t) => (t.down("ShiftRight", 0, true), t.up("ShiftRight", 100))));
+    check("Ohne Drücken nur Loslassen: öffnet nicht", !tap((t) => t.up("ShiftRight", 100)));
+}
+
+/**
  * W-0023: „Nächstes Backup“ zeigt Tag und Uhrzeit in Berlin - so plant der Bot.
  * Vorher kam der Tag aus der Zeitzone des Browsers und die Stunde aus Berlin.
  */
@@ -1753,6 +1802,7 @@ async function main(): Promise<void> {
     await checkLiveLists();
     await checkBackups();
     await checkModuleState();
+    await checkNavSearch();
     await checkBerlinAt();
     await checkHubTemplates();
 
