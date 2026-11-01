@@ -993,7 +993,7 @@ export function renderModeration(guildId: string): void {
                           open.append(image);
                       } else if (item.kind === "message" && item.message) {
                           open.title = `Nachricht von ${item.message.authorName} in #${item.message.channelName} · gesichert von ${item.byName}`;
-                          open.append(icon("#i-link"), el("span", "", `${item.message.authorName}: ${item.message.content || "Ohne Text"}`));
+                          open.append(icon("#i-message"), el("span", "", `${item.message.authorName}: ${item.message.content || "Ohne Text"}`));
                       } else {
                           open.append(icon("#i-link"), el("span", "", item.name ?? new URL(item.url).hostname));
                       }

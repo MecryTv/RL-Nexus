@@ -3404,8 +3404,9 @@ body.no-motion .hero__field .run{display:none}
 .mcevid__item{display:grid;place-items:center;height:96px;overflow:hidden;border:1px solid var(--line);background:var(--bg-panel);color:var(--text-2)}
 .mcevid__item:hover,.mcevid__item:focus-visible{border-color:var(--blue);outline:none}
 .mcevid__item img{width:100%;height:100%;object-fit:cover}
-.mcevid__item--link{align-content:center;gap:6px;padding:8px;font-size:11.5px;text-align:center;overflow-wrap:anywhere}
-.mcevid__item--link svg{width:18px;height:18px;color:var(--blue)}
+.mcevid__item--link,.mcevid__item--message{align-content:center;gap:6px;padding:8px;font-size:11.5px;text-align:center;overflow-wrap:anywhere}
+.mcevid__item--link svg,.mcevid__item--message svg{width:18px;height:18px;color:var(--blue)}
+.mcevid__item--message span{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .mcevid__x{position:absolute;top:4px;right:4px;width:28px;height:28px;background:rgba(5,6,8,.8)}
 .mcevid__add{display:flex;flex-wrap:wrap;gap:8px}
 .mcevid__add .btn{flex:none;height:40px;font-size:11.5px}
