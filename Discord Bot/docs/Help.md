@@ -11,7 +11,7 @@ Der Inhalt jeder Seite ist **gezeichnet** (Wunsch des Nutzers: Design der Entwü
 | Befehl | Was er macht, Beispiele, jedes Feld, was danach passiert, Tipp |
 | Gruppe | Befehle mit Unterbefehlen: nummerierte Kapitel in der Reihenfolge, in der man sie braucht |
 
-`/hilfe befehl:<name>` springt direkt zu einem Befehl, auch zu Unterbefehlen (`fall beweis`) und zum Rechtsklick „Hack melden“. Developer-Befehle sieht nur, wer in `DEV_USER_IDs` steht. Lange Seiten werden geteilt (◀ ▶), nicht gekürzt.
+`/hilfe befehl:<name>` springt direkt zu einem Befehl, auch zu Unterbefehlen (`fall beweis`) und zu den Rechtsklicks „Hack melden“ (auf eine Person) und „Als Beweis sichern“ (auf eine Nachricht). Die Seiten von `/warn`, `/timeout`, `/kick` und `/ban` haben das Kapitel „Beweise anhängen“ mit den drei Wegen (`IHelpText.evidence`). Developer-Befehle sieht nur, wer in `DEV_USER_IDs` steht. Lange Seiten werden geteilt (◀ ▶), nicht gekürzt.
 
 ## Dateien
 
