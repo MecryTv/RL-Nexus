@@ -45,9 +45,12 @@ export function bindNav(): INav {
     const rail = need<HTMLElement>("#setRail");
     const nav = need<HTMLElement>("#setNav");
     const head = need<HTMLElement>("#navHead");
+    const tabs = need<HTMLElement>("#modTabs");
+    const cards = need<HTMLElement>("#moduleCards");
     const buttons = new Map<string, HTMLButtonElement>();
     let chosen: string | null = null;
     let section = "";
+    let drawn = "";
 
     const group = (area: string): HTMLElement | null => nav.querySelector<HTMLElement>(`.setnav__group[data-area="${area}"]`);
     const count = (area: string): number =>
@@ -105,6 +108,57 @@ export function bindNav(): INav {
         if (owner && owner.id !== section) nav.querySelector<HTMLAnchorElement>(`a[data-section="${owner.id}"]:not(.is-sub)`)?.setAttribute("aria-current", "true");
     }
 
+    /**
+     * Reiter über der Seite: das Modul („Einstellungen“) und seine Teile, soweit
+     * ihr Link in der Leiste nicht versteckt ist. Unter zwei Reitern keine Zeile.
+     * Bleibt es dasselbe Modul, wandert nur die Markierung - der Fokus bleibt
+     * auf dem Reiter, den man gerade gedrückt hat.
+     */
+    function paintTabs(): void {
+        const owner = ownerOf(section);
+        const items = owner?.parts?.length ? [{ id: owner.id, name: "Einstellungen", icon: "#i-sliders" }, ...owner.parts] : [];
+        const open = items.flatMap((item) => {
+            const link = nav.querySelector<HTMLAnchorElement>(`a[data-section="${item.id}"]:not([data-liste])`);
+
+            return link && !link.hidden ? [{ item, href: link.href }] : [];
+        });
+        const key = open.length > 1 ? open.map(({ item }) => item.id).join(",") : "";
+
+        tabs.hidden = !key;
+        cards.classList.toggle("is-tabbed", Boolean(key));
+
+        if (key !== drawn) {
+            drawn = key;
+            tabs.replaceChildren();
+
+            if (owner && key) {
+                const title = document.createElement("h2");
+                const row = document.createElement("nav");
+
+                title.className = "modhead";
+                title.append(icon(owner.icon), owner.name);
+                row.className = "modtabs__row";
+                row.setAttribute("aria-label", `${owner.name}: Seiten`);
+
+                for (const { item, href } of open) {
+                    const tab = document.createElement("a");
+
+                    tab.href = href;
+                    tab.dataset.section = item.id;
+                    tab.append(icon(item.icon), item.name);
+                    row.append(tab);
+                }
+
+                tabs.append(title, row);
+            }
+        }
+
+        for (const tab of tabs.querySelectorAll<HTMLAnchorElement>("a[data-section]")) {
+            if (tab.dataset.section === section) tab.setAttribute("aria-current", "page");
+            else tab.removeAttribute("aria-current");
+        }
+    }
+
     /** Der erste Bereich in der Liste, der Module hat und den es noch gibt. */
     function pick(...wanted: (string | null | undefined)[]): string | null {
         return wanted.find((area): area is string => Boolean(area) && count(area!) > 0) ?? [...buttons.keys()].find((area) => count(area) > 0) ?? null;
@@ -120,6 +174,7 @@ export function bindNav(): INav {
 
         select(pick(chosen, ownerOf(section)?.category));
         mark();
+        paintTabs();
     }
 
     // Nach jedem Seitenwechsel steht der Bereich der offenen Seite. Auf Übersicht,
@@ -128,6 +183,7 @@ export function bindNav(): INav {
         section = (event as CustomEvent<string>).detail;
         select(pick(ownerOf(section)?.category, chosen));
         mark();
+        paintTabs();
     });
 
     return { refresh, area: () => chosen };

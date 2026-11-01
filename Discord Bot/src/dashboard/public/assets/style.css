@@ -1563,6 +1563,22 @@ body[data-page="guild"]{--shell:1440px}
 /* Kopf einer Modulkarte: Symbol und Name. */
 .modhead{display:flex;align-items:center;gap:10px;margin:16px 0 14px;font-size:20px;font-weight:700}
 .modhead svg{width:20px;height:20px;flex:none;color:var(--brand)}
+/* Teile eines Moduls als Reiter ueber seiner Seite (W-0055). Name und Symbol
+   des Moduls stehen dann hier, der Kopf der Karte darunter faellt weg. */
+.modtabs .modhead{margin-bottom:8px}
+.modtabs__row{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none;border-bottom:1px solid var(--line)}
+.modtabs__row a{
+  display:flex;align-items:center;gap:7px;padding:9px 12px;white-space:nowrap;
+  font-size:13.5px;color:var(--text-3);box-shadow:inset 0 -2px 0 transparent;
+  transition:color var(--t-fast) var(--ease),box-shadow var(--t-fast) var(--ease);
+}
+.modtabs__row a svg{width:14px;height:14px;flex:none}
+.modtabs__row a:hover{color:var(--text)}
+.modtabs__row a:focus-visible{outline:none;box-shadow:inset 0 0 0 2px var(--blue)}
+.modtabs__row a[aria-current="page"]{color:var(--text);box-shadow:inset 0 -2px 0 var(--brand)}
+.modtabs__row a[aria-current="page"] svg{color:var(--brand)}
+@media (pointer:coarse){.modtabs__row a{min-height:44px}}
+#moduleCards.is-tabbed > section > .modhead{display:none}
 /* Ein festes Modul: der Schalter steht da, laesst sich aber nicht bewegen. */
 .modlist .modalways{display:block;margin-top:4px;color:var(--text-2)}
 /* "Module": ein Raster aus Kacheln mit Schalter, ohne Kategorien. Die Kacheln
