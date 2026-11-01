@@ -55,6 +55,8 @@ export interface IStartInput {
 
 /** Den Server lesen und ein Laden beginnen dauert: Das Admin Dashboard fragt dabei selbst beim Bot nach. */
 const SLOW = 120_000;
+/** Dabei liest das Admin Dashboard den Server mit 120 s Zeitlimit (SNAPSHOT_TIMEOUT) - der Bot wartet länger, damit dessen Antwort ankommt (W-0041 M7). */
+const SNAPSHOTTING = 130_000;
 const QUICK = 10_000;
 /** Die Karte im Meldekanal wird höchstens so oft bearbeitet. */
 const CARD_EVERY_MS = 5_000;
@@ -314,7 +316,7 @@ export default class ServerBackupService {
                 path: `/${input.backupId}/server`,
                 body: { confirm: input.confirm, parts: input.parts, areas: other ? [] : input.areas, mode: input.mode, ...(other ? { targetGuildId: target.id } : {}) },
                 headers: other ? { "X-Target-Name": encodeURIComponent(target.name) } : undefined,
-                timeout: SLOW,
+                timeout: SNAPSHOTTING,
             });
 
             if (answer.status !== 200) return ErrorOf(answer);
@@ -556,18 +558,30 @@ export default class ServerBackupService {
         return answer.status === 200 ? null : `Bot-Daten nicht geladen: ${ErrorOf(answer)}`;
     }
 
-    /** Bilder, die im Auftrag fehlen: einmal das ganze Backup mit Bildern holen, dann nachsehen. */
+    /**
+     * Bilder, die im Auftrag fehlen: einmal das ganze Backup mit Bildern holen,
+     * dann nachsehen. Scheitert das Holen, versucht es das nächste Bild noch
+     * einmal - höchstens dreimal je Lauf (W-0041 M10).
+     */
     private Images(source: Guild, actor: Actor, backupId: number): (kind: ImageKind, id: string) => Promise<string | null> {
         let full: Promise<IServerSnapshot | null> | null = null;
+        let tries = 0;
 
         return async (kind, id) => {
-            full ??= this.AskBackups(source, actor, { method: "GET", path: `/${backupId}/server?images=1`, timeout: SLOW }).then((answer) =>
-                answer.status === 200 && Array.isArray((answer.body as IServerSnapshot | null)?.roles) ? (answer.body as IServerSnapshot) : null
-            );
+            if (!full && tries < 3) {
+                tries++;
+                full = this.AskBackups(source, actor, { method: "GET", path: `/${backupId}/server?images=1`, timeout: SLOW })
+                    .then((answer) => (answer.status === 200 && Array.isArray((answer.body as IServerSnapshot | null)?.roles) ? (answer.body as IServerSnapshot) : null))
+                    .catch(() => null);
+            }
 
             const server = await full;
 
-            if (!server) return null;
+            if (!server) {
+                full = null;
+
+                return null;
+            }
 
             switch (kind) {
                 case "role":
@@ -665,7 +679,7 @@ export default class ServerBackupService {
 
     private async CreateView(guild: Guild, actor: Actor, note: string | null, what: string): Promise<MessageCreateOptions> {
         const parts = what === "bot" ? ["bot"] : what === "server" ? ["server"] : ["bot", "server"];
-        const made = await this.AskBackups(guild, actor, { method: "POST", path: "", body: { note, parts }, timeout: SLOW });
+        const made = await this.AskBackups(guild, actor, { method: "POST", path: "", body: { note, parts }, timeout: SNAPSHOTTING });
 
         if (made.status !== 200) return Note(ErrorOf(made));
 

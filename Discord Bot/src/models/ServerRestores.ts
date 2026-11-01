@@ -93,6 +93,22 @@ export default class ServerRestores extends Model<IServerRestoreRow> {
     }
 
     async Save(id: number, patch: Partial<IRestoreJob>): Promise<void> {
+        // Ohne Teile des Stands (Schritte, Fehler, Bericht) nur die Spalten schreiben - nicht erst lesen (W-0041 M11).
+        if (!(["parts", "areas", "ops", "failed", "report"] as const).some((key) => key in patch)) {
+            const columns: Partial<IServerRestoreRow> = { updated_at: Date.now() };
+
+            if (patch.safetyId !== undefined) columns.safety_id = patch.safetyId;
+            if (patch.status !== undefined) columns.status = patch.status;
+            if (patch.phase !== undefined) columns.phase = patch.phase;
+            if (patch.done !== undefined) columns.done = patch.done;
+            if (patch.channelId !== undefined) columns.channel_id = patch.channelId;
+            if (patch.messageId !== undefined) columns.message_id = patch.messageId;
+
+            await this.Update([id], columns);
+
+            return;
+        }
+
         const current = await this.Get(id);
 
         if (!current) return;
@@ -112,5 +128,14 @@ export default class ServerRestores extends Model<IServerRestoreRow> {
                 updated_at: next.updatedAt,
             }
         );
+    }
+
+    /** Fertige, abgebrochene und gescheiterte Aufträge vor before löschen - laufende nie (W-0041 M11). */
+    async Prune(before: number): Promise<number> {
+        const result = await this.db.Write(`DELETE FROM \`${this.Table}\` WHERE status <> 'running' AND updated_at < ?`, [before]);
+
+        this.db.Bump(this.Table);
+
+        return result.affectedRows;
     }
 }

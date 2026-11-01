@@ -18,7 +18,10 @@ import { IBackupCall } from "../routes/DashboardApiBackups";
 import ServerBackupService from "../services/ServerBackupService";
 import BotClient from "../client/BotClient";
 import { AfterServerRestore, PanelsOf } from "../utils/guildpanels";
-import { AutoFailedCard, AutomaticReply, BackupReply, CompareReply, CreatedReply, DoneCard, ListReply, LoadConfirm, RunningCard, SafetyNotice, Strip } from "../builder/ServerBackupView";
+import { AutoFailedCard, AutomaticReply, BackupReply, CompareReply, CreatedReply, DoneCard, JobSummary, ListReply, LoadConfirm, RunningCard, SafetyNotice, Strip } from "../builder/ServerBackupView";
+import ServerRestores from "../models/ServerRestores";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { SERVER_PART_IDS } from "../constants/ServerBackup";
 import { FilterIdMap, MapSnapshot, ResolveChains } from "../services/serverbackup/IdMap";
 import { ReadSnapshot } from "../services/serverbackup/Snapshot";
@@ -534,14 +537,15 @@ async function checkRunner(): Promise<void> {
     const brokenDeps = Deps();
     const brokenJob = Job(ops);
     const brokenResult = await RunOps(broken.guild, brokenJob, brokenDeps.deps);
-    const last = brokenDeps.saved.at(-1)!;
+    // W-0041 M11: Fehler stehen im Schritt, in dem sie passieren; danach wird nur noch „done“ gespeichert.
+    const last = { ...brokenDeps.saved.filter((patch) => patch.failed).at(-1), done: brokenDeps.saved.at(-1)!.done };
     check("Recht fehlt mitten drin: Schritt in Geht nicht, Rest läuft weiter", brokenResult === "finished" && (last.failed ?? []).length >= 1 && last.done === ops.length && broken.calls.includes("ban:90071992547408301"), JSON.stringify(last.failed));
     check("Verweis auf nicht angelegte Rolle: Rechte ohne sie, Mitglied übersprungen", broken.calls.includes("overwrites:regeln") && broken.overwrites(brokenDeps.map.get(CHAN_B)!).length === 0 && !broken.calls.includes(`member.add:${USER}`));
 
     const full = LiveServer({ "emoji.create:gg": "Maximum number of emojis reached (50)" });
     const fullDeps = Deps();
     await RunOps(full.guild, Job([{ kind: "emoji.create", emoji: { id: "90071992547406010", name: "gg", animated: false, roles: [], image: "AAAA" } }, { kind: "ban", userId: "90071992547408302", reason: null }]), fullDeps.deps);
-    check("Emoji-Platz voll: einzeln gescheitert, Rest läuft", (fullDeps.saved.at(-1)?.failed ?? []).some((entry) => entry.reason.includes("Emoji")) && full.calls.includes("ban:90071992547408302"), JSON.stringify(fullDeps.saved.at(-1)));
+    check("Emoji-Platz voll: einzeln gescheitert, Rest läuft", (fullDeps.saved.filter((patch) => patch.failed).at(-1)?.failed ?? []).some((entry) => entry.reason.includes("Emoji")) && full.calls.includes("ban:90071992547408302"), JSON.stringify(fullDeps.saved.at(-1)));
 
     // Review M3: Leeres Thema und Slowmode 0 im Backup setzen zurück, was der Kanal jetzt hat.
     const reset = LiveServer();
@@ -1355,6 +1359,145 @@ async function checkResumeAtStart(): Promise<void> {
     check("Ein Fehler beim Fortsetzen beendet den Bot nicht", survived);
 }
 
+/* ----------------------------------------------------------
+   W-0041: die restlichen Kleinigkeiten aus dem Review von Plan 32
+   ---------------------------------------------------------- */
+async function checkLeftovers(): Promise<void> {
+    console.log("\n  — W-0041: Kleinigkeiten —");
+
+    const guildOf = (world: ReturnType<typeof ServiceWith>) => world.client.guilds.cache.get(GUILD)!;
+    const actor = { id: USER, name: "Sarah" };
+
+    /* M1: „Verschwindet“ zeigt Namen bis zur Grenze, dann „und N weitere“. */
+    {
+        const exact = PlanRestore({ backup: Before(), live: Now(), mode: "exact", parts: [...ALL_PARTS], protect, debris: [] });
+        const many = Array.from({ length: 400 }, (_, index) => `#ein-recht-langer-kanalname-${index}`);
+        const text = Contents(Tree(LoadConfirm({ ...exact, deletes: many }, "heute 00:00", "exact", 7)));
+        const rest = Number(/und (\d+) weitere/.exec(text.slice(text.indexOf("Verschwindet")))?.[1] ?? 0);
+
+        check("M1: Viele verschwindende Kanäle: Namen bis zur Grenze, dann „und N weitere“", text.includes("#ein-recht-langer-kanalname-0") && rest > 1 && rest < 400, `${rest} · ${text.slice(text.indexOf("Verschwindet")).slice(0, 4000).slice(-160).split(String.fromCharCode(10)).join(" | ")}`);
+    }
+
+    /* M2: Eine Kanal-Art, die es nicht mehr gibt, wird beim Planen übersprungen. */
+    {
+        const odd = Snap({ ...Before(), channels: [...Before().channels, snapChannel("90071992547406301", "alte-art", 99, null)] });
+        const plan = PlanRestore({ backup: odd, live: Now(), mode: "repair", parts: ["channels"], protect, debris: [] });
+
+        check(
+            "M2: Unbekannte Kanal-Art: nicht angelegt, steht unter „Geht nicht“",
+            !plan.ops.some((op) => op.kind === "channel.create" && op.channel.name === "alte-art") && plan.lines.some((line) => line.sign === "!" && line.text.includes("alte-art")),
+            JSON.stringify(plan.lines.filter((line) => line.sign === "!"))
+        );
+    }
+
+    /* M5: Nur die Bot-Daten laden geht nicht, solange der Server geladen wird. */
+    {
+        const { store, ask, calls } = ApiWorld();
+
+        store.set(50, { ...Job([]), id: 50 });
+        calls.length = 0;
+
+        const answer = await ask("POST", { action: "restore", backup: 7, areas: [], confirm: "Server" });
+
+        check("M5: Bot-Daten laden während eines Ladens: 409, nichts geladen", answer.statusCode === 409 && !calls.some((call) => call.startsWith("restore")), `${answer.statusCode} ${calls.join()}`);
+    }
+
+    /* M7: Beim Start wartet der Bot länger als das Admin Dashboard auf den Server (120 s). */
+    {
+        const world = ServiceWith(LiveServer(), []);
+        const fakes = world.service as unknown as { AskBackups: (guild: Guild, who: unknown, call: IBackupCall) => Promise<unknown> };
+
+        FakeAdmin(world.service);
+
+        const inner = fakes.AskBackups;
+        const waits: number[] = [];
+
+        fakes.AskBackups = async (guild, who, call) => {
+            if (call.method === "POST" && call.path.endsWith("/server")) waits.push(call.timeout ?? 0);
+
+            return inner(guild, who, call);
+        };
+        await world.service.Start({ guild: guildOf(world), target: guildOf(world), actor, backupId: 7, mode: "repair", parts: [...SERVER_PART_IDS], areas: [], confirm: "Server" });
+        check("M7: Start wartet 130 s statt 120 s", waits[0] === 130_000, waits.join());
+    }
+
+    /* M9: „Rückgängig“ nur auf dem Server, auf den geladen wurde. */
+    {
+        const cross: IRestoreJob = { ...Job([]), id: 70, targetGuildId: OTHER_GUILD, status: "done" };
+
+        check("M9: „Rückgängig“ nur beim Ziel, nicht bei der Quelle", JobSummary(cross, OTHER_GUILD).undo && !JobSummary(cross, GUILD).undo && !JobSummary({ ...cross, safetyId: null }, OTHER_GUILD).undo);
+    }
+
+    /* M10: Ein fehlgeschlagener Bild-Abruf bleibt nicht für den ganzen Lauf hängen. */
+    {
+        const world = ServiceWith(LiveServer(), []);
+        const fakes = world.service as unknown as { AskBackups: (guild: Guild, who: unknown, call: IBackupCall) => Promise<unknown>; Images: (source: Guild, who: unknown, backupId: number) => (kind: string, id: string) => Promise<string | null> };
+
+        FakeAdmin(world.service);
+
+        const inner = fakes.AskBackups;
+        let tries = 0;
+
+        fakes.AskBackups = async (guild, who, call) => {
+            if (!call.path.includes("images=1")) return inner(guild, who, call);
+
+            tries++;
+
+            return tries === 1 ? { status: 503, body: { error: "Admin Dashboard nicht erreichbar" } } : { status: 200, body: { ...Before(), roles: Before().roles.map((role) => ({ ...role, icon: "data:image/png;base64,AAAA" })) } };
+        };
+
+        const image = fakes.Images(guildOf(world), actor, 7);
+        const first = await image("role", R1);
+        const second = await image("role", R1);
+
+        check("M10: Nach einem Fehlschlag holt der nächste Bild-Abruf das Backup noch einmal", first === null && second === "data:image/png;base64,AAAA" && tries === 2, `${first} ${second} ${tries}`);
+    }
+
+    /* M11: Nach einem Schritt ohne Fehler nur „done“, und alte Aufträge werden aufgeräumt. */
+    {
+        const deps = Deps();
+
+        await RunOps(LiveServer().guild, Job([{ kind: "channel.create", channel: snapChannel("90071992547406311", "neu-eins", 0, null) }, { kind: "channel.create", channel: snapChannel("90071992547406312", "neu-zwei", 0, null) }]), deps.deps);
+        check("M11: Schritte ohne Fehler speichern nur „done“, nicht den ganzen Stand", deps.saved.length >= 2 && deps.saved.every((patch) => !("failed" in patch)), JSON.stringify(deps.saved));
+
+        const sql: string[] = [];
+        const model = new ServerRestores({
+            databaseService: {
+                Ready: true,
+                Write: async (query: string) => {
+                    sql.push(query);
+                    return { affectedRows: 3, insertId: 0 };
+                },
+                Bump: () => undefined,
+                Cached: async () => {
+                    throw new Error("gelesen");
+                },
+                One: async () => {
+                    throw new Error("gelesen");
+                },
+                Query: async () => {
+                    throw new Error("gelesen");
+                },
+            },
+        } as unknown as BotClient);
+
+        const saved = await model.Save(1, { done: 5 }).then(() => true, () => false);
+
+        check("M11: Speichern von „done“ liest den Auftrag nicht erst", saved && sql.length === 1 && /`done` = \?/.test(sql[0]) && !sql[0].includes("state"), sql.join(" | "));
+
+        const removed = await model.Prune(Date.now() - 30 * 86_400_000);
+
+        check("M11: Alte, fertige Aufträge werden gelöscht, laufende nie", removed === 3 && /DELETE/.test(sql[1] ?? "") && /running/.test(sql[1] ?? ""), sql[1] ?? "");
+    }
+
+    /* M13: Fortschritt und Bericht im Dashboard werden vorgelesen. */
+    {
+        const page = readFileSync(path.join(process.cwd(), "src", "dashboard", "client", "pages", "GuildBackups.ts"), "utf8");
+
+        check("M13: Der Bereich mit Fortschritt und Bericht ist aria-live", /aria-live", "polite"/.test(page), "");
+    }
+}
+
 async function main(): Promise<void> {
     console.log("\n💾  Backups für den Discord-Server\n");
 
@@ -1370,6 +1513,7 @@ async function main(): Promise<void> {
     await checkApi();
     await checkReviewFixes();
     await checkResumeAtStart();
+    await checkLeftovers();
 
     console.log(failures === 0 ? "\n✅ Alle Prüfungen bestanden.\n" : `\n❌ ${failures} Prüfung(en) fehlgeschlagen.\n`);
 

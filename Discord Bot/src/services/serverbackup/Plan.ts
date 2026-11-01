@@ -63,6 +63,9 @@ function DebrisRole(row: IDebrisRow): ISnapRole {
     };
 }
 
+/** Diese Kanal-Arten legt ein Bot an. */
+const CREATABLE = new Set<number>([ChannelType.GuildText, ChannelType.GuildVoice, ChannelType.GuildCategory, ChannelType.GuildAnnouncement, ChannelType.GuildStageVoice, ChannelType.GuildForum, ChannelType.GuildMedia]);
+
 export function PlanRestore(input: IPlanInput): IRestorePlan {
     const { backup, live, mode, protect } = input;
     const has = (part: ServerPart) => input.parts.includes(part);
@@ -190,6 +193,12 @@ export function PlanRestore(input: IPlanInput): IRestorePlan {
 
             const liveId = match.get(channel.id);
             const parentId = ref(channel.parentId);
+
+            // Eine Art aus einem alten Backup, die sich nicht mehr anlegen lässt: gleich hier, nicht erst von Discord abgelehnt (W-0041 M2).
+            if (!liveId && !CREATABLE.has(channel.type)) {
+                impossible.push(`Kanal „${channel.name}“: Diese Kanal-Art lässt sich nicht mehr anlegen. Er wird übersprungen.`);
+                continue;
+            }
 
             if (!liveId) {
                 // Mit den Rechten angelegt, damit ein privater Kanal keinen Augenblick öffentlich ist (Review I2).

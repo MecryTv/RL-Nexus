@@ -92,6 +92,8 @@ interface IJob {
     safetyId: number | null;
     startedAt: number;
     parts: ServerPart[];
+    /** W-0041 M9: nur beim Server, auf den geladen wurde. */
+    undo: boolean;
 }
 
 interface IPayload {
@@ -910,6 +912,8 @@ export function renderBackupList(guildId: string): void {
     /** Schritt 4: der Fortschritt eines Ladens, alle 2 Sekunden neu, bis es fertig ist. */
     function follow(panel: HTMLElement, jobId: number): void {
         following = jobId;
+        // Fortschritt und Bericht werden vorgelesen, sobald sie sich ändern (W-0041 M13).
+        panel.setAttribute("aria-live", "polite");
 
         const tick = async (): Promise<void> => {
             if (following !== jobId || !panel.isConnected) return;
@@ -976,7 +980,7 @@ export function renderBackupList(guildId: string): void {
             await load();
         });
 
-        if (job.safetyId !== null) {
+        if (job.undo) {
             const undo = button("btn btn--quiet", icon("#i-refresh"), "Rückgängig machen");
             const slot = el("div", "");
 

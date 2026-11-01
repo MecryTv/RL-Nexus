@@ -361,13 +361,17 @@ export async function RunOps(guild: Guild, job: IRestoreJob, deps: IRunDeps): Pr
 
         current = index;
 
+        let broke = false;
+
         try {
             await run(op);
         } catch (error) {
             failed.push({ op: index, reason: `${Label(op, names)}: ${error instanceof Skip ? error.message : Why(error)}` });
+            broke = true;
         }
 
-        await deps.save({ done: index + 1, failed: [...failed] });
+        // Nur bei einem neuen Fehler den ganzen Stand schreiben, sonst nur „done“ (W-0041 M11).
+        await deps.save(broke ? { done: index + 1, failed: [...failed] } : { done: index + 1 });
         deps.progress();
     }
 
