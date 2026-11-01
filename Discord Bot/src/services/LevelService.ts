@@ -205,7 +205,10 @@ export default class LevelService {
     async Save(guild: Guild, input: unknown): Promise<ILevelSettings> {
         const settings = this.Clean(guild, input, await this.Settings(guild.id));
 
-        if (settings.announce !== "off" && !settings.announceChannelId) throw new LevelError("Wähle einen Kanal für die Aufstiegs-Nachricht. Per DM schickt der Bot keine mehr.");
+        // W-0043: Nur wer den Aufstieg selbst speichert, muss den Kanal wählen - „öffentlich“ oder die Rangliste im Kanal speichern nur ihren Teil.
+        const touched = IsRecord(input) && (input.announce !== undefined || input.announceChannelId !== undefined);
+
+        if (touched && settings.announce !== "off" && !settings.announceChannelId) throw new LevelError("Wähle einen Kanal für die Aufstiegs-Nachricht. Per DM schickt der Bot keine mehr.");
         if (settings.top.week.on && !settings.top.week.channelId) throw new LevelError("Wähle einen Kanal für die Aktivsten der Woche.");
         if (settings.top.month.on && !settings.top.month.channelId) throw new LevelError("Wähle einen Kanal für die Aktivsten des Monats.");
         if (settings.boardPost.on && !settings.boardPost.channelId) throw new LevelError("Wähle einen Kanal für die Rangliste.");

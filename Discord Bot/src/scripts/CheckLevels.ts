@@ -715,6 +715,11 @@ async function checkAnnounce(): Promise<void> {
     check("Aufstieg an, aber kein Kanal: Speichern abgelehnt", noChannel instanceof LevelError, String(noChannel));
     check("Aufstieg aus: ohne Kanal gespeichert", !(quiet instanceof Error) && quiet.announce === "off", String(quiet));
 
+    // Andere Seiten speichern nur ihren Teil (öffentlich, Rangliste im Kanal) - das scheitert nicht am fehlenden Aufstiegs-Kanal.
+    const elsewhere = await World().service.Save(FakeGuild(), { public: true }).catch((error: Error) => error);
+
+    check("Nur „öffentlich“ gespeichert: geht auch ohne Aufstiegs-Kanal", !(elsewhere instanceof Error) && elsewhere.public === true, String(elsewhere));
+
     const base = World().settings;
     const clean = (value: unknown) => new LevelService({} as BotClient).Clean(FakeGuild(), { ...base, announceDelete: value }, base).announceDelete;
 
