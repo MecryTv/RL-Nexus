@@ -76,6 +76,7 @@ import LevelBoardPosts from "../models/LevelBoardPosts";
 import StaffGrants from "../models/StaffGrants";
 import StaffGrantLog from "../models/StaffGrantLog";
 import StaffGrantService from "../services/StaffGrantService";
+import StaffGrantDm from "../services/staffgrant/StaffGrantDm";
 import CustomMessages from "../models/CustomMessages";
 import AutoResponses from "../models/AutoResponses";
 import Polls from "../models/Polls";
@@ -293,6 +294,7 @@ export default class BotClient extends Client implements IBotClient {
         this.lookingForService = new LookingForService(this);
         this.pulseService = new PulseService(this);
         this.staffGrantService = new StaffGrantService(this);
+        this.staffGrantService.dm = new StaffGrantDm(this);
         this.presenceService = new PresenceService(this);
         this.rankIconService = new RankIconService(this);
         this.matchupService = new MatchupService(this);

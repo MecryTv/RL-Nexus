@@ -1,4 +1,4 @@
-import { Guild, GuildMember, PermissionFlagsBits } from "discord.js";
+import { Guild, GuildMember, Interaction, PermissionFlagsBits } from "discord.js";
 import BotClient from "../client/BotClient";
 import { COOLDOWN_MS, SEEN_DEDUPE_MS } from "../constants/StaffGrant";
 import { IStaffGrant, IStaffLogEntry, StaffAccessMode } from "../interfaces/services/staffgrant/IStaffGrant";
@@ -17,6 +17,8 @@ export interface IStaffDm {
     Send(grant: IStaffGrant, userId: string): Promise<{ channelId: string; messageId: string }>;
     Changed(grant: IStaffGrant): void;
     Logged(grant: IStaffGrant): void;
+    /** Knöpfe und Menüs der DM (events/staffgrant/StaffGrantButtons). */
+    OnInteraction?(interaction: Interaction): Promise<void>;
 }
 
 export interface IStaffRequest {

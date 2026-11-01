@@ -7,7 +7,9 @@
 process.env.CLIENT_SECRET ||= "check-secret";
 process.env.DEV_CLIENT_SECRET ||= "check-secret";
 
-import { Guild } from "discord.js";
+import { Guild, Interaction } from "discord.js";
+import { IStaffCardInput, StaffGrantCard } from "../builder/StaffGrantView";
+import StaffGrantDm from "../services/staffgrant/StaffGrantDm";
 import fastify, { FastifyReply, FastifyRequest } from "fastify";
 import RouteManager from "../handler/RouteManager";
 import Route from "../structures/Route";
@@ -572,6 +574,169 @@ async function checkPrivateGate(): Promise<void> {
     check("Ohne Staff-Freigabe: durch, nichts im Protokoll", (await app.call("GET", "/12")).statusCode === 200 && app.logged.length === 0);
 }
 
+/* ----------------------------------------------------------
+   Task 5: DM an den Gefragten
+   ---------------------------------------------------------- */
+
+interface ICardParts {
+    accents: number[];
+    texts: string[];
+    ids: string[];
+    defaults: string[];
+    descriptions: string[];
+    labels: string[];
+}
+
+/** Sammelt aus dem JSON der Container, was die Prüfungen brauchen. */
+function Parts(input: Partial<IStaffCardInput> & { grant: IStaffGrant }): ICardParts {
+    const payload = StaffGrantCard({
+        forUser: "1",
+        guildName: "Nova Esports",
+        staffAvatar: null,
+        log: [],
+        choice: { minutes: input.grant.minutes, private: false },
+        dashboardUrl: "https://dashboard.example/guild/100",
+        names: { "1": "Lukas", "2": "Mara" },
+        ...input,
+    });
+    const parts: ICardParts = { accents: [], texts: [], ids: [], defaults: [], descriptions: [], labels: [] };
+    const walk = (node: unknown): void => {
+        if (Array.isArray(node)) return node.forEach(walk);
+        if (!node || typeof node !== "object") return;
+
+        const entry = node as Record<string, unknown>;
+
+        if (typeof entry.accent_color === "number") parts.accents.push(entry.accent_color);
+        if (typeof entry.content === "string") parts.texts.push(entry.content);
+        if (typeof entry.custom_id === "string") parts.ids.push(entry.custom_id);
+        if (entry.default === true && typeof entry.value === "string") parts.defaults.push(entry.value);
+        if (typeof entry.description === "string") parts.descriptions.push(entry.description);
+        if (typeof entry.label === "string") parts.labels.push(entry.label);
+
+        Object.values(entry).forEach(walk);
+    };
+
+    walk(payload.components.map((container) => container.toJSON()));
+
+    return parts;
+}
+
+const has = (parts: ICardParts, text: string): boolean => parts.texts.some((entry) => entry.includes(text));
+
+function checkCard(): void {
+    console.log("\n💬 DM-Karte\n");
+
+    const ask = Parts({ grant: Grant() });
+    check("Anfrage: rot", ask.accents[0] === 0xff1e2d);
+    check("Anfrage: Titel", has(ask, "🔐 Freigabe für Nova Esports?"));
+    check("Anfrage: wer fragt", has(ask, "<@900> vom Team von RL Nexus (Developer) möchte deinen Server im Dashboard bearbeiten."));
+    check("Anfrage: Grund als Zitat", has(ask, "> Zeige dir die Rangliste"));
+    check("Anfrage: darf / darf nicht", has(ask, "**Darf** alles im Dashboard, auch Rollen, Kanäle, Moderation") && has(ask, "**Darf nicht** private Bereiche ohne dein Ja, Bot entfernen"));
+    check("Anfrage: Knöpfe", ["sg:dur:1", "sg:yes:1", "sg:no:1"].every((id) => ask.ids.includes(id)), ask.ids.join(","));
+    check("Anfrage: ohne private Bereiche keine zweite Auswahl", !ask.ids.includes("sg:priv:1"));
+    check("Anfrage: Vorschlag vorgewählt und beschrieben", ask.defaults.includes("60") && ask.descriptions.includes("Vorschlag von MecryTv | Joe"), ask.defaults.join(","));
+    check("Anfrage: Unterzeile", has(ask, "Anfrage verfällt <t:") && has(ask, "Jede Änderung steht im Protokoll · RL Nexus fragt nie nach Passwörtern"));
+
+    const pictured = JSON.stringify(StaffGrantCard({ grant: Grant(), forUser: "1", guildName: "Nova", staffAvatar: "https://cdn.example/joe.png", log: [], choice: { minutes: 60, private: false }, dashboardUrl: "https://x", names: {} }).components.map((container) => container.toJSON()));
+    check("Anfrage: Bild des Fragenden rechts", pictured.includes("https://cdn.example/joe.png") && pictured.includes("\"type\":11"));
+
+    const priv = Parts({ grant: Grant({ private: "asked" }) });
+    check("Mit privaten Bereichen: Hinweis und Auswahl, vorgewählt nein", has(priv, "🔏 **Extra angefragt:** Live Tickets, Transcripts, Bewerbungen, Fälle") && priv.ids.includes("sg:priv:1") && priv.defaults.includes("no"));
+
+    const custom = Parts({ grant: Grant({ private: "asked" }), choice: { minutes: 90, private: true } });
+    check("Eigene Zeit gemerkt: steht als Wahl da", custom.defaults.includes("custom") && custom.labels.includes("Eigene Zeit: 1 Std. 30 Min.") && custom.defaults.includes("yes"), custom.labels.join(","));
+
+    const log: IStaffLogEntry[] = [
+        { id: 1, grantId: 1, guildId: "100", at: T0, area: "Freigabe", text: "Erteilt von Lukas für 1 Std." },
+        { id: 2, grantId: 1, guildId: "100", at: T0, area: "Level System", text: "Level System › gespeichert" },
+    ];
+    const active = Parts({ grant: Running(), log });
+    check("Erlaubt: grün", active.accents[0] === 0x35e07f);
+    check("Erlaubt: Titel und bis wann", has(active, "✅ Freigabe läuft") && has(active, "<@900> darf Nova Esports bis <t:"));
+    check("Erlaubt: Bisher geändert ohne Freigabe-Einträge", has(active, "Level System › gespeichert") && !has(active, "Erteilt von"));
+    check("Erlaubt: Knöpfe", ["sg:end:1", "sg:more:1"].every((id) => active.ids.includes(id)));
+    check("Erlaubt ohne Änderungen: Noch nichts.", has(Parts({ grant: Running() }), "Noch nichts."));
+    check("Erlaubt mit privaten Bereichen: Satz", has(Parts({ grant: Running({ private: "on" }) }), "Dazu die privaten Bereiche."));
+
+    const late = Parts({ grant: Running({ private: "asked", privateReason: "Ticket #0142 hängt", privateAskedAt: T0 }) });
+    check("Späte private Anfrage: eigener gelber Block", late.accents.includes(0xf0b232) && has(late, "🔏 Auch private Bereiche?") && late.ids.includes("sg:pyes:1") && late.ids.includes("sg:pno:1"));
+
+    const other = Parts({ grant: Running(), forUser: "2" });
+    check("Andere Gefragte: Erlaubt von", other.accents[0] === 0x4e5058 && has(other, "Erlaubt von Lukas") && !other.ids.includes("sg:end:1"));
+
+    const ended = Parts({ grant: Running({ status: "ended", endedBy: "1", endedAt: T0 + 30 * MIN }), log });
+    check("Beendet: grau, Titel, von wem", ended.accents[0] === 0x4e5058 && has(ended, "🔒 Freigabe beendet") && has(ended, "MecryTv | Joe kann Nova Esports wieder nur ansehen.") && has(ended, "Von Lukas beendet um"));
+    check("Beendet durch Zeit", has(Parts({ grant: Running({ status: "ended", endedBy: null, endedAt: T0 + 60 * MIN }) }), "Zeit abgelaufen um"));
+    check("Abgelehnt", has(Parts({ grant: Grant({ status: "denied", denied: ["1", "2"], endedAt: T0 }) }), "Du hast die Anfrage abgelehnt. Staff sieht nur „abgelehnt“, keinen Grund."));
+    check("Verfallen", has(Parts({ grant: Grant({ status: "expired", endedAt: T0 }) }), "⌛ Anfrage verfallen"));
+    check("Zurückgezogen", has(Parts({ grant: Grant({ status: "withdrawn", endedAt: T0 }) }), "Der Staff hat die Anfrage zurückgezogen."));
+}
+
+function Click(kind: "button" | "select" | "modal", customId: string, userId: string, extra: { values?: string[]; text?: string } = {}) {
+    const calls: string[] = [];
+
+    return {
+        calls,
+        customId,
+        user: { id: userId },
+        values: extra.values ?? [],
+        fields: { getTextInputValue: () => extra.text ?? "" },
+        replied: false,
+        deferred: false,
+        isButton: () => kind === "button",
+        isStringSelectMenu: () => kind === "select",
+        isModalSubmit: () => kind === "modal",
+        isFromMessage: () => true,
+        reply: async (options: { content?: string }) => void calls.push(`reply:${options.content ?? ""}`),
+        followUp: async (options: { content?: string }) => void calls.push(`followUp:${options.content ?? ""}`),
+        update: async () => void calls.push("update"),
+        deferUpdate: async () => void calls.push("defer"),
+        showModal: async () => void calls.push("modal"),
+    };
+}
+
+async function checkDmButtons(): Promise<void> {
+    console.log("\n🔘 DM-Knöpfe\n");
+
+    const store = FakeStore();
+    const service = FakeService(store, { "100": ["1", "2"], "101": ["1"], "103": ["1"] });
+    const dm = new StaffGrantDm({ staffGrantService: service, guilds: { cache: new Map() }, users: { cache: new Map() }, server: { BaseURL: "https://x" } } as unknown as BotClient);
+    const run = (click: ReturnType<typeof Click>) => dm.OnInteraction(click as unknown as Interaction);
+
+    const first = await service.Request(RequestOf(GUILD));
+
+    let click = Click("select", `sg:dur:${first.id}`, "1", { values: ["custom"] });
+    await run(click);
+    check("„Eigene Zeit …“ öffnet das Fenster", click.calls.includes("modal"), click.calls.join(","));
+
+    click = Click("modal", `sg:time:${first.id}`, "1", { text: "5 Min." });
+    await run(click);
+    check("Fenster mit 5 Min.: Satz", click.calls.includes("reply:Bitte 10 Minuten bis 24 Stunden."), click.calls.join(","));
+
+    click = Click("modal", `sg:time:${first.id}`, "1", { text: "1:30" });
+    await run(click);
+    check("Fenster mit 1:30: Karte aktualisiert", click.calls.includes("update"), click.calls.join(","));
+
+    click = Click("button", `sg:yes:${first.id}`, "3");
+    await run(click);
+    check("Nicht gefragt: Satz", click.calls.includes("reply:Diese Anfrage ist nicht an dich."), click.calls.join(","));
+
+    await run(Click("button", `sg:yes:${first.id}`, "1"));
+    check("Erlauben nimmt die gemerkte Zeit (90)", service.Get(first.id)?.status === "active" && service.Get(first.id)?.minutes === 90);
+
+    const second = await service.Request({ ...RequestOf(OTHER), guild: { id: "101", name: "Zwei" } as unknown as Guild });
+    await run(Click("button", `sg:yes:${second.id}`, "1"));
+    check("Ohne Wahl: Vorschlag, keine privaten Bereiche", service.Get(second.id)?.minutes === 60 && service.Get(second.id)?.private === "none");
+
+    const third = await service.Request({ ...RequestOf(OTHER), guild: { id: "103", name: "Drei" } as unknown as Guild });
+    const restarted = FakeService(store, { "103": ["1"] });
+    await restarted.Load();
+    const dmAfter = new StaffGrantDm({ staffGrantService: restarted, guilds: { cache: new Map() }, users: { cache: new Map() }, server: { BaseURL: "https://x" } } as unknown as BotClient);
+    click = Click("button", `sg:no:${third.id}`, "1");
+    await dmAfter.OnInteraction(click as unknown as Interaction);
+    check("Knopf nach Neustart wirkt (Review 2)", store.grants.get(third.id)?.status === "denied", click.calls.join(","));
+}
+
 async function main(): Promise<void> {
     checkRules();
     checkAnswer();
@@ -584,6 +749,8 @@ async function main(): Promise<void> {
     checkOverlay();
     await checkGate();
     await checkPrivateGate();
+    checkCard();
+    await checkDmButtons();
 
     console.log(failures ? `\n❌ ${failures} Prüfung(en) fehlgeschlagen` : "\n✅ Alles in Ordnung");
     process.exit(failures ? 1 : 0);
