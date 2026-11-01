@@ -24,6 +24,8 @@ export type HelpBlock =
     | { kind: "chapter"; n: number; when?: string; display: string; who: string; text: string; code?: string; fields: string }
     /** Kopf einer Fall-Karte (Moderation): Titel, User als Pille, Zeile darunter, Bild rechts. */
     | { kind: "caseHead"; emoji: string; title: string; user?: string; sub: string; by?: string; avatar?: Buffer }
+    /** Einstellungen (/einstellungen) als nummerierte Kacheln, drei je Zeile, mit Abschnitt darüber. */
+    | { kind: "settings"; title?: string; items: { n: number; label: string; value: string; state?: "on" | "off"; hi?: boolean }[] }
     /** Beweise als Zeilen: Vorschau oder Emoji, Titel, wer und wann. */
     | { kind: "evidence"; items: { thumb?: Buffer; icon: string; title: string; sub: string; quote?: boolean }[] };
 
@@ -522,6 +524,57 @@ async function DrawBlock(ctx: SKRSContext2D, block: HelpBlock, y: number): Promi
             return Math.max(height, avatar ? size : 0);
         }
 
+        case "settings": {
+            const columns = 3;
+            const gap = 12;
+            const tile = 80;
+            const width = (INNER - gap * (columns - 1)) / columns;
+            let height = 0;
+
+            if (block.title) {
+                ctx.font = "700 22px Rajdhani";
+                ctx.fillStyle = C.muted;
+                ctx.fillText(block.title.toUpperCase(), x, y + 20);
+                height = 34;
+            }
+
+            for (const [index, item] of block.items.entries()) {
+                const left = x + (index % columns) * (width + gap);
+                const top = y + height + Math.floor(index / columns) * (tile + gap);
+
+                ctx.fillStyle = item.hi ? "rgba(240,178,50,0.14)" : C.tile;
+                ctx.beginPath();
+                ctx.roundRect(left, top, width, tile, 10);
+                ctx.fill();
+
+                if (item.hi) {
+                    ctx.strokeStyle = C.gold;
+                    ctx.lineWidth = 3;
+                    ctx.stroke();
+                }
+
+                ctx.fillStyle = C.gold;
+                ctx.beginPath();
+                ctx.arc(left + 26, top + 26, 15, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.font = "800 17px Oxanium";
+                ctx.fillStyle = "#1a1300";
+                ctx.textAlign = "center";
+                ctx.fillText(String(item.n), left + 26, top + 32);
+                ctx.textAlign = "left";
+                ctx.font = FONT.small;
+                ctx.fillStyle = C.muted;
+                ctx.fillText(Fit(ctx, item.label, width - 62), left + 50, top + 34);
+                ctx.font = "800 28px Oxanium";
+                ctx.fillStyle = item.state === "on" ? "#35e07f" : item.state === "off" ? C.muted : C.strong;
+                ctx.fillText(Fit(ctx, item.value, width - 28), left + 14, top + 68);
+            }
+
+            const rows = Math.ceil(block.items.length / columns);
+
+            return height + rows * tile + Math.max(0, rows - 1) * gap;
+        }
+
         case "evidence": {
             const row = 66;
             let height = 0;
@@ -686,6 +739,8 @@ export function HelpAlt(blocks: HelpBlock[]): string {
                 return `${block.title}. ${[block.user, block.sub].filter(Boolean).join(", ")}${block.by ? `. ${block.by}` : ""}`;
             case "evidence":
                 return block.items.map((item) => `${item.title} (${item.sub})`).join(". ");
+            case "settings":
+                return `${block.title ? `${block.title}: ` : ""}${block.items.map((item) => `${item.n}. ${item.label}: ${item.value}`).join(", ")}`;
         }
     });
     const text = lines.join(" ").replace(/\s+/g, " ").trim();

@@ -10,6 +10,8 @@ process.env.DEV_CLIENT_SECRET ||= "check-secret";
 
 import { ChannelType, Guild, GuildBasedChannel, Role } from "discord.js";
 import BotClient from "../client/BotClient";
+import { SetEmojiLoader } from "../builder/HelpImage";
+import { OverviewView, PanelBlocks, PanelView } from "../builder/SettingsView";
 import { DefaultApplySettings } from "../constants/Apply";
 import { DefaultLevelSettings } from "../constants/Levels";
 import { DefaultModConfig } from "../constants/Moderation";
@@ -147,7 +149,7 @@ function Other(field: IPanelField<unknown>, current: unknown): unknown {
     }
 }
 
-function checkRegisters(client: BotClient): void {
+function checkRegisters(client: BotClient): Record<PanelModuleId, unknown> {
     console.log("\n  — Register —");
 
     const guild = FakeGuild();
@@ -218,6 +220,79 @@ function checkRegisters(client: BotClient): void {
     const moderators = PANEL_MODULES.moderation.sections.flatMap((section) => section.fields).find((field) => field.key === "moderators");
 
     check("Moderatoren gehen über die Server-Einstellungen", JSON.stringify(moderators?.set([ROLE], start.moderation as never)) === JSON.stringify({ [MODERATORS]: [ROLE] }));
+
+    return start;
+}
+
+/** Wie viele Bausteine eine Nachricht hat - Discord erlaubt 40. */
+function Count(json: unknown): number {
+    if (Array.isArray(json)) return json.reduce((sum: number, item) => sum + Count(item), 0);
+    if (!json || typeof json !== "object") return 0;
+
+    return (typeof (json as { type?: unknown }).type === "number" ? 1 : 0) + Object.values(json as Record<string, unknown>).reduce((sum: number, value) => sum + Count(value), 0);
+}
+
+async function checkView(start: Record<PanelModuleId, unknown>): Promise<void> {
+    console.log("\n  — Panel als Bild —");
+
+    SetEmojiLoader(async () => null);
+
+    const guild = FakeGuild();
+    const link = "https://example.test/dashboard/guild/1/tickets";
+
+    for (const panel of Object.values(PANEL_MODULES)) {
+        const fields = panel.sections.flatMap((section) => section.fields) as IPanelField<unknown>[];
+        const state = { panel, settings: start[panel.id], on: true, guild, link };
+        const message = await PanelView(state);
+        const parts = message.components.map((part) => part.toJSON());
+        const json = JSON.stringify(parts);
+        const menu = (json.match(new RegExp(`"value":"[A-Za-z0-9-]+","description"`, "g")) ?? []).length;
+
+        check(`${panel.name}: höchstens 10 Bilder, 40 Bausteine`, message.files.length >= 1 && message.files.length <= 10 && Count(parts) <= 40, `${message.files.length} Bilder, ${Count(parts)} Bausteine`);
+        check(`${panel.name}: Menü mit allen ${fields.length} Feldern, nummeriert`, json.includes(`"custom_id":"set:w:${panel.id}"`) && menu === fields.length && json.includes(`"label":"1 · ${fields[0].label}"`), `${menu} Einträge`);
+        check(`${panel.name}: Knopf ins Dashboard`, json.includes(link));
+        check(`${panel.name}: ${panel.permanent ? "kein" : "ein"} Knopf zum Ausschalten`, json.includes(`set:x:${panel.id}`) !== panel.permanent);
+    }
+
+    const moderation = { panel: PANEL_MODULES.moderation, settings: start.moderation, on: true, guild, link };
+    const pick = async (key: string) => JSON.stringify((await PanelView(moderation, { selected: key })).components.map((part) => part.toJSON()));
+    const log = await pick("log");
+
+    check("Kanal: Kanal-Auswahl, „Keiner“ und Zurück", log.includes(`"custom_id":"set:c:moderation:log"`) && log.includes('"type":8') && log.includes("set:n:moderation:log") && log.includes("set:b:moderation"));
+    check("Kanal: das Menü „Was ändern?“ ist dann weg", !log.includes("set:w:moderation"));
+
+    const dm = await pick("dm");
+
+    check("An/Aus: zwei Knöpfe", dm.includes("set:t:moderation:dm:on") && dm.includes("set:t:moderation:dm:off"));
+
+    const ping = await pick("ping");
+
+    check("Rollen: Rollen-Auswahl mit mehreren", ping.includes(`"custom_id":"set:r:moderation:ping"`) && ping.includes('"type":6') && ping.includes('"max_values":5'));
+
+    const days = await pick("warnDays");
+
+    check("Auswahl: Menü mit den Möglichkeiten", days.includes(`"custom_id":"set:o:moderation:warnDays"`) && days.includes("für immer"));
+
+    for (const key of ["remind", "stages"]) check(`Fenster für ${key}: Knopf „Ändern“`, (await pick(key)).includes(`set:f:moderation:${key}`));
+
+    const blocks = JSON.stringify(PanelBlocks(moderation, { selected: "dm" }));
+
+    check("Das Bild markiert die gewählte Kachel", blocks.includes('"label":"DM an den User","value":"an","state":"on","hi":true'), blocks.slice(0, 200));
+
+    const done = JSON.stringify((await PanelView(moderation, { done: { key: "dm", before: "an", after: "aus" }, warning: "Mir fehlt etwas." })).components.map((part) => part.toJSON()));
+
+    check("Nach dem Speichern: Zeile und Rückgängig", done.includes("✅ **DM an den User**: an → aus") && done.includes("set:u:moderation:dm") && done.includes("Mir fehlt etwas."));
+
+    const off = JSON.stringify(PanelBlocks({ ...moderation, on: false }, {}));
+
+    check("Modul aus: Hinweis im Bild", off.includes("Das Modul ist aus"));
+    check("Modul aus: Knopf „Modul an“", JSON.stringify((await PanelView({ ...moderation, on: false })).components.map((part) => part.toJSON())).includes("Modul an"));
+
+    const overview = await OverviewView(guild, Object.values(PANEL_MODULES).map((panel, index) => ({ panel, on: index % 2 === 0 })), link);
+    const overviewJson = JSON.stringify(overview.components.map((part) => part.toJSON()));
+
+    check("Übersicht: Menü „Modul wählen“ mit fünf Modulen", overviewJson.includes(`"custom_id":"set:m"`) && (overviewJson.match(/"value":"(moderation|tickets|apply|levels|welcome)"/g) ?? []).length === 5);
+    check("Übersicht: ein Bild", overview.files.length >= 1);
 }
 
 async function main(): Promise<void> {
@@ -228,7 +303,7 @@ async function main(): Promise<void> {
     await client.configService.Initialize();
 
     checkModel();
-    checkRegisters(client);
+    await checkView(checkRegisters(client));
 
     console.log(failures === 0 ? "\n✅ Alle Prüfungen bestanden.\n" : `\n❌ ${failures} Prüfung(en) fehlgeschlagen.\n`);
 

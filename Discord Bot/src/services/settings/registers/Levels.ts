@@ -26,8 +26,8 @@ export const LevelsPanel: IPanelModule<S> = {
             title: "Punkte im Chat",
             fields: [
                 F<S>("toggle", "chat", "Chat-Punkte", "Punkte für Nachrichten.", (s) => s.chat.on, (value: boolean, s) => ({ chat: { ...s.chat, on: value } })),
-                F<S>("number", "chatMin", "Punkte je Nachricht ab", "Kleinste Zahl, zufällig bis zur größten.", (s) => s.chat.min, (value: number, s) => ({ chat: { ...s.chat, min: value } }), { min: 0, max: MAX_XP_PER_ACTION }),
-                F<S>("number", "chatMax", "Punkte je Nachricht bis", "Größte Zahl.", (s) => s.chat.max, (value: number, s) => ({ chat: { ...s.chat, max: value } }), { min: 0, max: MAX_XP_PER_ACTION }),
+                F<S>("number", "chatMin", "Punkte ab", "Kleinste Zahl, zufällig bis zur größten.", (s) => s.chat.min, (value: number, s) => ({ chat: { ...s.chat, min: value } }), { min: 0, max: MAX_XP_PER_ACTION }),
+                F<S>("number", "chatMax", "Punkte bis", "Größte Zahl.", (s) => s.chat.max, (value: number, s) => ({ chat: { ...s.chat, max: value } }), { min: 0, max: MAX_XP_PER_ACTION }),
                 F<S>("number", "cooldown", "Abklingzeit", "So lange nach einer Nachricht gibt es keine neuen Punkte.", (s) => s.chat.cooldown, (value: number, s) => ({ chat: { ...s.chat, cooldown: value } }), { min: 0, max: MAX_COOLDOWN, unit: "Sek." }),
             ],
         },
@@ -52,10 +52,10 @@ export const LevelsPanel: IPanelModule<S> = {
                     ],
                 }),
                 F<S>("channel", "announceChannel", "Aufstiegs-Kanal", "Der feste Kanal, und für Voice auch beim selben Kanal.", (s) => s.announceChannelId, (value: string | null) => ({ announceChannelId: value }), { channelTypes: TEXT }),
-                F<S>("choice", "announceDelete", "Aufstieg löschen nach", "Die Nachricht im Chat verschwindet wieder.", (s) => String(s.announceDelete ?? 0), (value: string) => ({ announceDelete: Number(value) }), {
+                F<S>("choice", "announceDelete", "Löschen nach", "Die Nachricht im Chat verschwindet wieder.", (s) => String(s.announceDelete ?? 0), (value: string) => ({ announceDelete: Number(value) }), {
                     choices: ANNOUNCE_DELETE.map((minutes): [string, string] => [String(minutes), minutes ? `${minutes} Min.` : "nie"]),
                 }),
-                F<S>("toggle", "stack", "Belohnungen stapeln", "An: alte Belohnungsrollen bleiben. Aus: die neue ersetzt sie.", (s) => s.stack, (value: boolean) => ({ stack: value })),
+                F<S>("toggle", "stack", "Rollen stapeln", "An: alte Belohnungsrollen bleiben. Aus: die neue ersetzt sie.", (s) => s.stack, (value: boolean) => ({ stack: value })),
                 F<S>("toggle", "public", "Rangliste öffentlich", "Die Rangliste ist ohne Anmeldung zu sehen.", (s) => s.public, (value: boolean) => ({ public: value })),
             ],
         },

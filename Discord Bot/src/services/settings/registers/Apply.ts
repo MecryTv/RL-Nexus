@@ -31,7 +31,7 @@ export const ApplyPanel: IPanelModule<S> = {
         {
             title: "Wohin die Bewerbung geht",
             fields: [
-                F<S>("channel", "channel", "Kanal für die Karten", "Gilt für Formulare ohne eigenen Kanal.", (s) => s.channelId, (value: string | null) => ({ channelId: value }), { channelTypes: TEXT }),
+                F<S>("channel", "channel", "Karten-Kanal", "Gilt für Formulare ohne eigenen Kanal.", (s) => s.channelId, (value: string | null) => ({ channelId: value }), { channelTypes: TEXT }),
                 F<S>("choice", "target", "Wohin", "Alle Karten in einen Kanal oder je Bewerbung ein eigener Kanal.", (s) => s.target, (value: string) => ({ target: value }), {
                     choices: [
                         ["shared", "Sammelkanal"],
@@ -40,7 +40,7 @@ export const ApplyPanel: IPanelModule<S> = {
                 }),
                 F<S>("channel", "category", "Kategorie", "Hier entstehen die eigenen Kanäle.", (s) => s.categoryId, (value: string | null) => ({ categoryId: value }), { channelTypes: [ChannelType.GuildCategory] }),
                 F<S>("text", "channelName", "Kanalname", "Name des eigenen Kanals, mit {user}, {nummer} und {formular}.", (s) => s.channelName, (value: string) => ({ channelName: value }), { max: 90 }),
-                F<S>("choice", "after", "Nach der Entscheidung", "Was mit dem eigenen Kanal passiert.", (s) => s.afterDecision, (value: string) => ({ afterDecision: value }), {
+                F<S>("choice", "after", "Nach Entscheidung", "Was mit dem eigenen Kanal passiert.", (s) => s.afterDecision, (value: string) => ({ afterDecision: value }), {
                     choices: [
                         ["delete", "Kanal löschen"],
                         ["close", "Kanal schließen"],

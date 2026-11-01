@@ -37,7 +37,7 @@ export const WelcomePanel: IPanelModule<S> = {
         {
             title: "Rollen",
             fields: [
-                F<S>("roles", "roles", "Rollen für neue Mitglieder", "Bekommt jeder, der beitritt.", (s) => s.roles, (value: string[]) => ({ roles: value }), { max: 25 }),
+                F<S>("roles", "roles", "Neue Mitglieder", "Bekommt jeder, der beitritt.", (s) => s.roles, (value: string[]) => ({ roles: value }), { max: 25 }),
                 F<S>("roles", "botRoles", "Rollen für Bots", "Bekommt jeder Bot, den jemand einlädt.", (s) => s.botRoles, (value: string[]) => ({ botRoles: value }), { max: 25 }),
             ],
         },

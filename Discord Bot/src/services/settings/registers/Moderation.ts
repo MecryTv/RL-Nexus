@@ -34,19 +34,19 @@ export const ModerationPanel: IPanelModule<S> = {
         {
             title: "Verwarnungen",
             fields: [
-                F<S>("choice", "warnDays", "Verwarnungen zählen", "Ältere Verwarnungen zählen für die Stufen nicht mehr mit.", (s) => String(s.warnDays), (value: string) => ({ warnDays: Number(value) }), { choices: DAYS }),
+                F<S>("choice", "warnDays", "Zählen", "Ältere Verwarnungen zählen für die Stufen nicht mehr mit.", (s) => String(s.warnDays), (value: string) => ({ warnDays: Number(value) }), { choices: DAYS }),
                 F<S>("stages", "stages", "Stufen", "Ab so vielen aktiven Verwarnungen folgt die Strafe von selbst. Eine Zeile je Stufe.", (s) => s.stages, (value: unknown) => ({ stages: value })),
             ],
         },
         {
             title: "Beweis-Pflicht",
             fields: [
-                F<S>("toggle", "proofBan", "Bann braucht Beweis", "Ohne Bild, Link oder gesicherte Nachricht lehnt der Bot einen Bann ab.", (s) => s.proof.ban, (value: boolean, s) => ({ proof: { ...s.proof, ban: value } })),
-                F<S>("toggle", "proofKick", "Kick braucht Beweis", "Ohne Beweis lehnt der Bot einen Kick ab.", (s) => s.proof.kick, (value: boolean, s) => ({ proof: { ...s.proof, kick: value } })),
-                F<S>("choice", "proofTimeout", "Timeout braucht Beweis", "Kurze Timeouts gehen ohne, ab dieser Länge nicht.", (s) => (s.proof.timeoutFrom === null ? "" : String(s.proof.timeoutFrom)), (value: string, s) => ({ proof: { ...s.proof, timeoutFrom: value ? Number(value) : null } }), {
+                F<S>("toggle", "proofBan", "Bann", "Ohne Bild, Link oder gesicherte Nachricht lehnt der Bot einen Bann ab.", (s) => s.proof.ban, (value: boolean, s) => ({ proof: { ...s.proof, ban: value } })),
+                F<S>("toggle", "proofKick", "Kick", "Ohne Beweis lehnt der Bot einen Kick ab.", (s) => s.proof.kick, (value: boolean, s) => ({ proof: { ...s.proof, kick: value } })),
+                F<S>("choice", "proofTimeout", "Timeout", "Kurze Timeouts gehen ohne, ab dieser Länge nicht.", (s) => (s.proof.timeoutFrom === null ? "" : String(s.proof.timeoutFrom)), (value: string, s) => ({ proof: { ...s.proof, timeoutFrom: value ? Number(value) : null } }), {
                     choices: PROOF_TIMEOUT_CHOICES.map(([seconds, label]): [string, string] => [seconds === null ? "" : String(seconds), label]),
                 }),
-                F<S>("toggle", "proofWarn", "Verwarnung braucht Beweis", "Ohne Beweis lehnt der Bot eine Verwarnung ab.", (s) => s.proof.warn, (value: boolean, s) => ({ proof: { ...s.proof, warn: value } })),
+                F<S>("toggle", "proofWarn", "Verwarnung", "Ohne Beweis lehnt der Bot eine Verwarnung ab.", (s) => s.proof.warn, (value: boolean, s) => ({ proof: { ...s.proof, warn: value } })),
             ],
         },
         {
