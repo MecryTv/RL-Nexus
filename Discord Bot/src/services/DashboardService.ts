@@ -907,6 +907,11 @@ export default class DashboardService implements IDashboardService {
         return Boolean(guild?.canManage);
     }
 
+    /** W-0011: die Karte dieser Sitzung für einen Server (Rolle, Rechte, laufende Freigabe). Wirft SessionExpired. */
+    async CardFor(session: IDashboardSession, guildId: string): Promise<IDashboardGuild | null> {
+        return (await this.GuildsOf(session)).find((entry) => entry.id === guildId) ?? null;
+    }
+
     /** W-0011: Staff mit Freigabe, aber ohne Ja zu den privaten Bereichen. Wirft SessionExpired. */
     async PrivateBlocked(session: IDashboardSession, guildId: string): Promise<boolean> {
         const guild = (await this.GuildsOf(session)).find((entry) => entry.id === guildId);

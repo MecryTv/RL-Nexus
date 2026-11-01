@@ -10,6 +10,8 @@ process.env.DEV_CLIENT_SECRET ||= "check-secret";
 import { Guild, Interaction } from "discord.js";
 import { IStaffCardInput, StaffGrantCard } from "../builder/StaffGrantView";
 import StaffGrantDm from "../services/staffgrant/StaffGrantDm";
+import DashboardApiStaff from "../routes/DashboardApiStaff";
+import DashboardApiMeStaff from "../routes/DashboardApiMeStaff";
 import fastify, { FastifyReply, FastifyRequest } from "fastify";
 import RouteManager from "../handler/RouteManager";
 import Route from "../structures/Route";
@@ -737,6 +739,125 @@ async function checkDmButtons(): Promise<void> {
     check("Knopf nach Neustart wirkt (Review 2)", store.grants.get(third.id)?.status === "denied", click.calls.join(","));
 }
 
+/* ----------------------------------------------------------
+   Task 6: Routen für Staff, Verwalter und Gefragte
+   ---------------------------------------------------------- */
+
+const API_GUILD = "223344556677889900";
+
+function ApiApp() {
+    const store = FakeStore();
+    const service = FakeService(store, { [API_GUILD]: ["1", "2"] });
+    const inner = service["client"] as unknown as Record<string, unknown>;
+    const sessions: Record<string, { userId: string; username: string }> = {
+        staff: { userId: "900", username: "Joe" },
+        staff2: { userId: "901", username: "Ana" },
+        owner: { userId: "1", username: "Lukas" },
+        other: { userId: "3", username: "Fremd" },
+    };
+    const cards: Record<string, Partial<IDashboardGuild>> = {
+        "900": { role: "Staff", canManage: false },
+        "901": { role: "Staff", canManage: false },
+        "1": { role: "Owner", canManage: true },
+    };
+    const guild = {
+        id: API_GUILD,
+        name: "Nova Esports",
+        ownerId: "1",
+        joinedAt: new Date(T0),
+        memberCount: 318,
+        iconURL: () => null,
+        members: { cache: new Map(), fetch: async () => null, me: { id: "bot" } },
+    };
+
+    (inner.guilds as { cache: Map<string, unknown> }).cache.set(API_GUILD, guild);
+
+    const client = {
+        ...inner,
+        staffGrantService: service,
+        users: { cache: new Map(), fetch: async () => null },
+        settings: { Of: async () => ({ modules: ["levels", "tickets"] }) },
+        server: { BaseURL: "https://x" },
+        dashboardService: {
+            Session: (cookie: string | undefined) => {
+                const found = cookie ? sessions[cookie] : undefined;
+
+                return found ? { id: cookie, ...found, avatar: null, accessToken: "x", mfa: true, expiresAt: Date.now() + 60_000 } : null;
+            },
+            CardFor: async (session: { userId: string }) => {
+                const card = cards[session.userId];
+
+                return card ? ({ id: API_GUILD, name: "Nova Esports", ...card } as IDashboardGuild) : null;
+            },
+            GroupOf: async () => "developer",
+            ShopEnds: async () => null,
+            Secure: false,
+        },
+    } as unknown as BotClient;
+    const instance = fastify({ logger: false });
+    const manager = new RouteManager(client);
+
+    manager.Register(new DashboardApiStaff(client));
+    manager.Register(new DashboardApiMeStaff(client));
+    manager.Apply(instance);
+
+    const send = (who: string, method: "GET" | "POST", url: string, payload?: unknown) =>
+        instance.inject({
+            method,
+            url: `${DASHBOARD_PATH}${url}`,
+            headers: { cookie: `${SESSION_COOKIE}=${who}`, ...(payload ? { "content-type": "application/json" } : {}) },
+            ...(payload ? { payload: JSON.stringify(payload) } : {}),
+        });
+    const guildApi = (who: string, method: "GET" | "POST", payload?: unknown) => send(who, method, `/api/guild/${API_GUILD}/staff`, payload);
+    const meApi = (who: string, method: "GET" | "POST", payload?: unknown) => send(who, method, "/api/me/staff", payload);
+
+    return { guildApi, meApi, service };
+}
+
+async function checkApi(): Promise<void> {
+    console.log("\n🛣️  Routen\n");
+
+    const { guildApi, meApi, service } = ApiApp();
+    const ask = (body: Record<string, unknown>) => guildApi("staff", "POST", { action: "request", reason: "Zeige dir die Rangliste", minutes: 60, private: false, ...body });
+
+    const info = await guildApi("staff", "GET");
+    const view = info.json() as { me?: string; info?: { owner?: { id: string }; server?: { members: number } }; askees?: { id: string }[]; grant?: unknown; blocked?: unknown };
+    check("Staff sieht Infokarte und Gefragte", info.statusCode === 200 && view.me === "staff" && view.info?.owner?.id === "1" && view.info.server?.members === 318 && view.askees?.length === 2 && view.grant === null && view.blocked === null, info.body.slice(0, 300));
+    check("Fremder: 403", (await guildApi("other", "GET")).statusCode === 403);
+
+    check("Grund leer: 400", (await ask({ reason: "  " })).statusCode === 400);
+    check("Grund 201 Zeichen: 400", (await ask({ reason: "x".repeat(201) })).statusCode === 400);
+    check("5 Minuten: 400", (await ask({ minutes: 5 })).statusCode === 400);
+
+    const made = await ask({});
+    const grant = (made.json() as { grant?: { id: number; status: string } }).grant;
+    check("Anfrage: 200, offen", made.statusCode === 200 && grant?.status === "open", made.body);
+
+    check("Zweite Anfrage: 409", (await guildApi("staff2", "POST", { action: "request", reason: "Auch", minutes: 30 })).statusCode === 409);
+    check("Owner kann nicht anfragen: 403", (await guildApi("owner", "POST", { action: "request", reason: "x", minutes: 30 })).statusCode === 403);
+
+    const mine = (await meApi("owner", "GET")).json() as { requests?: { id: number; reason: string; staff: { name: string } }[] };
+    check("Gefragter sieht die Anfrage", mine.requests?.length === 1 && mine.requests[0].reason === "Zeige dir die Rangliste" && mine.requests[0].staff.name === "Joe");
+    check("Nicht-Gefragter antwortet: 403", (await meApi("other", "POST", { grantId: grant!.id, kind: "grant", answer: "yes" })).statusCode === 403);
+
+    const yes = await meApi("owner", "POST", { grantId: grant!.id, kind: "grant", answer: "yes", minutes: 60 });
+    check("Gefragter erlaubt: 200", yes.statusCode === 200, yes.body);
+    check("Staff sieht: läuft", ((await guildApi("staff", "GET")).json() as { grant?: { status: string } }).grant?.status === "active");
+
+    const before = service.Get(grant!.id)!.endsAt!;
+    check("Verwalter verlängert", (await guildApi("owner", "POST", { action: "extend" })).statusCode === 200 && service.Get(grant!.id)!.endsAt === before + 30 * MIN);
+    check("Staff verlängert: 403", (await guildApi("staff", "POST", { action: "extend" })).statusCode === 403);
+
+    check("Staff fragt private Bereiche an", (await guildApi("staff", "POST", { action: "private", reason: "Ticket #0142 hängt" })).statusCode === 200 && service.Get(grant!.id)?.private === "asked");
+    check("Gefragter erlaubt sie", (await meApi("owner", "POST", { grantId: grant!.id, kind: "private", answer: "yes" })).statusCode === 200 && service.Get(grant!.id)?.private === "on");
+    check("Verwalter nimmt sie weg", (await guildApi("owner", "POST", { action: "private-off" })).statusCode === 200 && service.Get(grant!.id)?.private === "removed");
+
+    const manager = (await guildApi("owner", "GET")).json() as { me?: string; grant?: { id: number }; recent?: { grants: { id: number }[] } };
+    check("Verwalter sieht Freigabe und letzte 30 Tage", manager.me === "manager" && manager.grant?.id === grant!.id && Boolean(manager.recent?.grants.some((entry) => entry.id === grant!.id)));
+
+    check("Staff beendet selbst", (await guildApi("staff", "POST", { action: "end" })).statusCode === 200 && service.Get(grant!.id) === null);
+}
+
 async function main(): Promise<void> {
     checkRules();
     checkAnswer();
@@ -751,6 +872,7 @@ async function main(): Promise<void> {
     await checkPrivateGate();
     checkCard();
     await checkDmButtons();
+    await checkApi();
 
     console.log(failures ? `\n❌ ${failures} Prüfung(en) fehlgeschlagen` : "\n✅ Alles in Ordnung");
     process.exit(failures ? 1 : 0);
