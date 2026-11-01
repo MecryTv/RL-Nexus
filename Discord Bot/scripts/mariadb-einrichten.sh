@@ -8,7 +8,7 @@
 #   1. MariaDB aus Debian installieren. Sie lauscht auf allen Adressen, weil Bot
 #      und Admin Dashboard sie aus ihren Containern über host.docker.internal
 #      erreichen. Von außen sperrt ufw den Port, und der Nutzer darf sich nur von
-#      localhost und aus den Docker-Netzen (172.16.0.0/12) anmelden.
+#      localhost und aus dem Netz der Container (172.30.10.0/24, W-0044) anmelden.
 #   2. Gibt es noch den Container rlnexus-mariadb und ist der Umzug nicht fertig:
 #      Bot und Admin Dashboard stoppen, alle eigenen Datenbanken daraus sichern,
 #      hier einspielen und danach jede Tabelle in beiden zählen. Container und
@@ -27,8 +27,12 @@ set -euo pipefail
 ordner=$(cd "$(dirname "$0")/.." && pwd)
 env_datei="$ordner/.env"
 container=rlnexus-mariadb
-docker_netze=172.16.0.0/12
-docker_maske=172.16.0.0/255.240.0.0
+# W-0044: das feste Netz aus docker-compose.prod.yml - nicht alle Docker-Netze,
+# sonst kämen auch Mailcow und SnappyMail an Port 3306.
+docker_netze=172.30.10.0/24
+docker_maske=172.30.10.0/255.255.255.0
+alt_netze=172.16.0.0/12
+alt_maske=172.16.0.0/255.240.0.0
 # Das Admin Dashboard bekommt BACKUP_DATABASE_NAME nicht aus der Compose-Datei,
 # auf dem Server gilt immer sein Standard.
 backup_name=rlnexus_backups
@@ -89,6 +93,8 @@ if ! command -v ufw >/dev/null || ! ufw status | grep -q '^Status: active'; then
 fi
 ufw status verbose | grep -q 'deny (incoming)' || abbruch "ufw lässt eingehende Verbindungen zu (Default nicht deny)."
 ufw allow from "$docker_netze" to any port 3306 proto tcp comment 'MariaDB fuer Docker' >/dev/null
+# Die Regel von vor W-0044 galt für alle Docker-Netze.
+ufw status | grep -q "^3306/tcp .*ALLOW .*$alt_netze" && ufw delete allow from "$alt_netze" to any port 3306 proto tcp >/dev/null
 echo "Port 3306 nur aus $docker_netze (Docker), von außen zu."
 
 belegt=$(ss -Htlnp 'sport = :3306' || true)
@@ -225,6 +231,8 @@ GRANT ALL PRIVILEGES ON \`$db_name\`.* TO '$db_user'@'$host';
 GRANT ALL PRIVILEGES ON \`$backup_name\`.* TO '$db_user'@'$host';
 SQL
 done
+# Das Konto von vor W-0044 galt für alle Docker-Netze.
+mariadb -e "DROP USER IF EXISTS '$db_user'@'$alt_maske'"
 echo "$db_user darf auf $db_name und $backup_name, von localhost und aus $docker_netze."
 
 # Der Weg, den Bot und Admin Dashboard nehmen: aus einem Container über host.docker.internal.
@@ -237,7 +245,8 @@ if [ -n "$bild" ]; then
     netz=$(docker network ls --format '{{.Name}}' | grep -x rlnexus_default || true)
     if [ -z "$netz" ]; then
         netz=rlnexus-test
-        docker network create "$netz" >/dev/null
+        # Im selben Netz wie Bot und Admin Dashboard: Nur aus dem dürfen sie an die Datenbank.
+        docker network create --subnet "$docker_netze" "$netz" >/dev/null
     fi
     geheim=$(mktemp)
     trap 'rm -f "$geheim"; [ "$netz" = rlnexus-test ] && docker network rm rlnexus-test >/dev/null 2>&1' EXIT
