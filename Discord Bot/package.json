@@ -19,6 +19,7 @@
         "build:dashboard": "tsc -p src/dashboard/tsconfig.json --noEmit && tsx src/scripts/BuildDashboard.ts",
         "check:admin": "tsx src/scripts/CheckAdmin.ts",
         "check:apply": "tsx src/scripts/CheckApply.ts",
+        "check:help": "tsx src/scripts/CheckHelp.ts",
         "check:antivillain": "tsx src/scripts/CheckAntiVillain.ts",
         "check:automod": "tsx src/scripts/CheckAutoMod.ts",
         "check:card": "tsx src/scripts/CheckCard.ts",
