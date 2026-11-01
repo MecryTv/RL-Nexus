@@ -226,6 +226,17 @@ export default class ModCases extends Model<IModCaseRow> {
         return counts;
     }
 
+    /** Verwarnungen, Timeouts, Kicks und Banns eines Users in den 30 Tagen bis until - für „3. Fall in 30 Tagen“. */
+    async RecentPenalties(guildId: string, targetId: string, until: number): Promise<number> {
+        const rows = await this.db.Query<{ total: number }>(
+            `SELECT COUNT(*) AS total FROM \`${this.Table}\`
+             WHERE guild_id = ? AND target_id = ? AND action IN ('warn', 'timeout', 'kick', 'ban') AND created_at > ? AND created_at <= ?`,
+            [guildId, targetId, until - 30 * 86_400_000, until]
+        );
+
+        return Number(rows[0]?.total ?? 0);
+    }
+
     /** Die Fälle, die sich auf diesen beziehen - etwa der Kick, den ein Warn ausgelöst hat. */
     async RelatedTo(guildId: string, number: number): Promise<IModCase[]> {
         const rows = await this.db.Query<IModCaseRow>(

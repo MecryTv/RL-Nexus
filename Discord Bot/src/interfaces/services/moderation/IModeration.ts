@@ -43,6 +43,15 @@ export interface ISupportWait {
     remindedAt: number;
 }
 
+/** Welche Strafen ohne Beweis nicht gehen. Auto Mod und Stufen fragen nicht danach. */
+export interface IModProofRules {
+    ban: boolean;
+    kick: boolean;
+    /** Sekunden: ein Timeout ab dieser Länge braucht einen Beweis. null: keiner. */
+    timeoutFrom: number | null;
+    warn: boolean;
+}
+
 export interface IModConfig {
     /** Hierhin meldet der Bot jeden Fall - ein Textkanal oder ein Forum-Beitrag. null: nirgends. */
     logChannelId: string | null;
@@ -52,13 +61,26 @@ export interface IModConfig {
     warnDays: number;
     stages: IModStage[];
     support: IModSupport;
+    proof: IModProofRules;
+}
+
+/** Eine gesicherte Nachricht, wie sie beim Sichern war - sie bleibt, auch wenn das Original verschwindet. */
+export interface IModMessageProof {
+    authorId: string;
+    authorName: string;
+    channelId: string;
+    channelName: string;
+    /** Höchstens 2000 Zeichen. */
+    content: string;
+    sentAt: number;
 }
 
 export interface IModEvidence {
     id: number;
-    kind: "image" | "link";
-    /** image: der gespeicherte Dateiname (3.png), link: die https-Adresse. */
+    kind: "image" | "link" | "message";
+    /** image: der gespeicherte Dateiname (3.png), link: die https-Adresse, message: der Sprunglink. */
     value: string;
+    message?: IModMessageProof;
     /** Der ursprüngliche Dateiname oder ein Titel für den Link. */
     name: string | null;
     by: string;

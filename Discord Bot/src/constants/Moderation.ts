@@ -110,7 +110,52 @@ export function DefaultModConfig(): IModConfig {
             { warns: 5, action: "kick", duration: null },
         ],
         support: DefaultModSupport(),
+        proof: { ban: false, kick: false, timeoutFrom: null, warn: false },
     };
+}
+
+/* ----------------------------------------------------------
+   Beweise
+   ---------------------------------------------------------- */
+/** Ab welcher Länge ein Timeout einen Beweis braucht - die Auswahl im Dashboard. */
+export const PROOF_TIMEOUT_CHOICES: [number | null, string][] = [
+    [null, "aus"],
+    [3_600, "ab 1 Stunde"],
+    [86_400, "ab 1 Tag"],
+    [604_800, "ab 7 Tagen"],
+];
+
+/** Text einer Nachricht als Beweis. */
+export const MAX_PROOF_TEXT = 2_000;
+
+/** discord.com/channels/<server>/<kanal>/<nachricht>, auch ptb. und canary. */
+export const MESSAGE_LINK = /^https:\/\/(?:(?:ptb|canary)\.)?discord(?:app)?\.com\/channels\/(\d{17,20})\/(\d{17,20})\/(\d{17,20})\/?$/;
+
+/** Ein Nachrichtenlink dieses Servers - alles andere, auch eine DM, ist keiner. */
+export function ParseMessageLink(text: string, guildId: string): { channelId: string; messageId: string } | null {
+    const match = MESSAGE_LINK.exec(text.trim());
+
+    return match && match[1] === guildId ? { channelId: match[2], messageId: match[3] } : null;
+}
+
+/** Der Ablehnungstext, wenn diese Strafe hier einen Beweis braucht - sonst null. */
+export function ProofNeeded(config: IModConfig, request: { action: ModAction; duration?: number | null }): string | null {
+    const { proof } = config;
+    const from = proof.timeoutFrom;
+    // Nur eine Grenze aus der Auswahl zählt - so steht im Text immer „ab 1 Tag“ und nie „ab 86400 Sek.“.
+    const label = PROOF_TIMEOUT_CHOICES.find(([seconds]) => seconds !== null && seconds === from)?.[1];
+    const what =
+        request.action === "ban" && proof.ban
+            ? "ein Bann"
+            : request.action === "kick" && proof.kick
+              ? "ein Kick"
+              : request.action === "warn" && proof.warn
+                ? "eine Verwarnung"
+                : request.action === "timeout" && from !== null && label && (request.duration ?? 0) >= from
+                  ? `ein Timeout ${label}`
+                  : null;
+
+    return what ? `Auf diesem Server braucht ${what} einen Beweis. Häng ein Bild an, gib einen Link an oder sichere die Nachricht per Rechtsklick › Apps › „Als Beweis sichern“.` : null;
 }
 
 /* ----------------------------------------------------------

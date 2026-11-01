@@ -331,9 +331,22 @@
 
   <h2 id="befehle">Befehle</h2>
   <p>Alle Befehle des Bots auf einen Blick. Was sie im Einzelnen tun, steht beim jeweiligen Modul.</p>
+  <p>
+    In Discord erklärt <code>/hilfe</code> jeden Befehl ausführlich: was er macht, Beispiele, jedes Feld und was
+    danach passiert. Mit <code>/hilfe befehl:</code> springst du direkt zu einem Befehl, etwa <code>/hilfe befehl:fall beweis</code>.
+    Die Hilfe sieht nur, wer fragt.
+  </p>
+  <p>
+    Die einfachen Einstellungen von Moderation, Tickets, Apply, Level und Welcome gehen auch in Discord:
+    <code>/einstellungen</code> öffnet ein Panel nur für dich. Jede Einstellung hat eine Nummer, im Menü wählst du sie,
+    darunter erscheint das passende Feld, und nach dem Speichern kannst du die Änderung rückgängig machen. Formulare,
+    Nachrichten und Designs bleiben hier im Dashboard.
+  </p>
   <table class="doc__table">
     <thead><tr><th>Befehl</th><th>Wofür</th><th>Wer</th></tr></thead>
     <tbody>
+      <tr><td><code>/hilfe [befehl]</code></td><td>Alle Befehle erklärt</td><td>alle</td></tr>
+      <tr><td><code>/einstellungen [modul]</code></td><td>Einstellungen von Moderation, Tickets, Apply, Level und Welcome ändern, wie im Dashboard</td><td>Server verwalten</td></tr>
       <tr><td><code>/module an · aus · liste</code></td><td>Module schalten</td><td>Server verwalten</td></tr>
       <tr><td><code>/ticket setup · panel · entsperren</code></td><td>Ticket System einrichten, Panel senden, Sperre aufheben</td><td>Server verwalten</td></tr>
       <tr><td><code>/gallery</code></td><td>Bilder des Servers ansehen und verwalten</td><td>Administratoren</td></tr>
@@ -1233,6 +1246,7 @@ WTSI   = TS_2s × Rel_2s + TS_3s × Rel_3s</code></pre>
       <tr><td><code>/ban</code> <code>/unban</code></td><td>Dauerhaft oder befristet, auch gegen Leute, die nicht mehr auf dem Server sind. Auf Wunsch mit den Nachrichten der letzten Stunde bis sieben Tage.</td></tr>
       <tr><td><code>/purge</code></td><td>Löscht 1 bis 100 Nachrichten im Kanal, auf Wunsch nur die einer Person.</td></tr>
       <tr><td><code>/fall</code> <code>/verlauf</code></td><td>Einen Fall ansehen, eine Notiz oder einen Beweis anhängen, alle Fälle einer Person.</td></tr>
+      <tr><td>Rechtsklick › Apps › <b>Als Beweis sichern</b></td><td>Eine Nachricht als Beweis an einen Fall des Verfassers hängen oder gleich eine Verwarnung damit anlegen.</td></tr>
     </tbody>
   </table>
   <p class="hintline">
@@ -1250,10 +1264,24 @@ WTSI   = TS_2s × Rel_2s + TS_3s × Rel_3s</code></pre>
   <h3>Stufen, Fälle und Log</h3>
   <ul class="doc__bullets">
     <li><b>Stufen:</b> etwa „ab 3 Verwarnungen eine Stunde Timeout, ab 5 ein Kick“. Bis zu zehn Stufen. Gezählt werden die aktiven Verwarnungen, auf Wunsch nur die der letzten 30 bis 365 Tage.</li>
-    <li><b>Ein Fall</b> trägt Notizen fürs Team (bis 50) und Beweise: Bilder bis 8 MB und Links, bis 20 je Fall.</li>
-    <li><b>Log-Kanal:</b> jeder Fall als Karte, die sich nachzieht, wenn sich etwas ändert. Ein Textkanal oder ein Beitrag in einem Forum.</li>
+    <li><b>Ein Fall</b> trägt Notizen fürs Team (bis 50) und Beweise: Bilder bis 8 MB, Links und gesicherte Nachrichten, bis 20 je Fall.</li>
+    <li><b>Log-Kanal:</b> jeder Fall als gezeichnete Karte mit Bild des Users, Grund und den ersten drei Beweisen. Darunter die Knöpfe „Alle ansehen“, „Fall“ und „Notiz“, nur für das Team. Die Karte zieht sich nach, wenn sich etwas ändert. Ein Textkanal oder ein Beitrag in einem Forum.</li>
     <li><b>DM an die betroffene Person</b> mit Aktion, Grund und Dauer, ohne den Namen des Moderators. Ab Werk an.</li>
   </ul>
+
+  <h3 id="beweise">Beweise</h3>
+  <p>Beweise sieht nur das Moderations-Team. Es gibt drei Wege:</p>
+  <ul class="doc__bullets">
+    <li><b>Gleich beim Befehl:</b> <code>/warn</code>, <code>/timeout</code>, <code>/kick</code> und <code>/ban</code> haben die Felder <code>beweis</code> (ein Bild) und <code>beweislink</code>.</li>
+    <li><b>Später:</b> mit <code>/fall beweis</code> oder im Dashboard am Fall.</li>
+    <li><b>Rechtsklick auf die Nachricht</b> › Apps › „Als Beweis sichern“. Der Bot hält Text, Bilder, Verfasser, Kanal und Zeit fest. Die Nachricht bleibt am Fall, auch wenn sie später gelöscht wird.</li>
+  </ul>
+  <p>
+    Ein Nachrichtenlink aus diesem Server sichert die Nachricht genauso. Unter
+    <i>Moderation › Einstellungen › Beweise</i> legst du fest, welche Strafen ohne Beweis nicht gehen: Bann, Kick,
+    Verwarnung und Timeouts ab einer Länge. Klappt die Strafe, aber ein Beweis nicht, gilt die Strafe trotzdem und der
+    Bot sagt, welcher Beweis fehlt.
+  </p>
 
   <h3 id="support-warteraum">Support-Warteraum</h3>
   <p>

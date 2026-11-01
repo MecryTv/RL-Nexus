@@ -57,6 +57,10 @@ export interface IChannelSelectOptions {
     placeholder?: string;
     defaultChannel?: string | null;
     disabled?: boolean;
+    /** Mehrfachauswahl: so viele höchstens, vorausgewählt defaults. */
+    maxValues?: number;
+    minValues?: number;
+    defaults?: string[];
 }
 
 export interface IRoleSelectOptions {
@@ -64,6 +68,9 @@ export interface IRoleSelectOptions {
     placeholder?: string;
     defaultRole?: string | null;
     disabled?: boolean;
+    maxValues?: number;
+    minValues?: number;
+    defaults?: string[];
 }
 
 export interface IUserSelectOptions {

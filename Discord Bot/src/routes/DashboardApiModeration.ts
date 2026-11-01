@@ -5,9 +5,9 @@ import Route from "../structures/Route";
 import { PRIVATE_HINT } from "../constants/StaffGrant";
 import { DASHBOARD_PATH } from "../constants/Dashboard";
 import { SNOWFLAKE } from "../constants/Discord";
-import { DURATION_PRESETS, DELETE_CHOICES, MOD_ACTIONS } from "../constants/Moderation";
+import { DURATION_PRESETS, DELETE_CHOICES, MOD_ACTIONS, PROOF_TIMEOUT_CHOICES } from "../constants/Moderation";
 import { IModCase, ModAction } from "../interfaces/services/moderation/IModeration";
-import { IModActor, IModRequest, ModerationError } from "../services/ModerationService";
+import { IModActor, IModProof, IModRequest, ModerationError } from "../services/ModerationService";
 import { WantsJSON } from "../utils/admin";
 import { PersonOf, SearchMembers } from "../utils/dashboard";
 import logger from "../utils/logger";
@@ -49,6 +49,26 @@ const CASE_ACTIONS = new Set(["note", "note-remove", "link", "evidence-remove"])
  * heißt: Staff mit Freigabe ohne das extra Ja. Gibt den Hinweis zurück, wenn die
  * Anfrage an einen Fall geht, sonst null - Einstellungen und Aktionen gehen.
  */
+/** „Neue Aktion“: was passieren soll, und der Beweis-Link dazu (W-0014). Alles Unpassende wird null. */
+export function ActInput(raw: Record<string, unknown>): { request: IModRequest; proof: IModProof } {
+    const text = (value: unknown): string | null => (typeof value === "string" ? value : null);
+    const count = (value: unknown): number | null => (typeof value === "number" && Number.isFinite(value) ? value : null);
+
+    return {
+        request: {
+            action: raw.action as ModAction,
+            targetId: text(raw.targetId),
+            reason: text(raw.reason),
+            duration: count(raw.duration),
+            deleteSeconds: count(raw.deleteSeconds),
+            count: count(raw.count),
+            channelId: text(raw.channelId),
+            caseNumber: count(raw.caseNumber),
+        },
+        proof: { link: text(raw.proofLink)?.trim() || null },
+    };
+}
+
 export function ModerationLock(locked: boolean, writing: boolean, query: Record<string, string | undefined>, body: Record<string, unknown>): string | null {
     if (!locked) return null;
     if (!writing && query.case !== undefined) return PRIVATE_HINT;
@@ -148,7 +168,7 @@ export default class DashboardApiModeration extends Route {
 
             result.me = { id: access.actor.id, name: access.actor.name, manage, actions: await this.client.moderationService.AllowedActions(member) };
             result.config = config;
-            result.presets = { durations: DURATION_PRESETS, deletes: DELETE_CHOICES };
+            result.presets = { durations: DURATION_PRESETS, deletes: DELETE_CHOICES, proof: PROOF_TIMEOUT_CHOICES };
             // Für "Nachrichten löschen": wo der Bot und das Mitglied lesen können.
             result.channels = [...guild.channels.cache.values()]
                 .filter(
@@ -253,22 +273,10 @@ export default class DashboardApiModeration extends Route {
             case "act": {
                 if (!IsRecord(body.request)) throw new ModerationError("Es fehlt, was passieren soll.");
 
-                const raw = body.request;
-                const text = (value: unknown): string | null => (typeof value === "string" ? value : null);
-                const count = (value: unknown): number | null => (typeof value === "number" && Number.isFinite(value) ? value : null);
-                const wanted: IModRequest = {
-                    action: raw.action as ModAction,
-                    targetId: text(raw.targetId),
-                    reason: text(raw.reason),
-                    duration: count(raw.duration),
-                    deleteSeconds: count(raw.deleteSeconds),
-                    count: count(raw.count),
-                    channelId: text(raw.channelId),
-                    caseNumber: count(raw.caseNumber),
-                };
-                const entry = await service.Act(guild, member, wanted, "dashboard");
+                const { request: wanted, proof } = ActInput(body.request);
+                const { entry, problems } = await service.ActWithProof(guild, member, wanted, "dashboard", proof);
 
-                return { ok: true, case: this.Out(guild, entry) };
+                return { ok: true, case: this.Out(guild, entry), problems };
             }
 
             case "note":

@@ -31,7 +31,9 @@ export default class Ban extends Command {
                     .setName("loeschen")
                     .setDescription("Seine Nachrichten der letzten … mitlöschen")
                     .addChoices(...DELETE_CHOICES.map(([value, name]) => ({ name, value })))
-            );
+            )
+            .addAttachmentOption((option) => option.setName("beweis").setDescription("Ein Screenshot als Beweis: PNG, JPG, GIF oder WebP"))
+            .addStringOption((option) => option.setName("beweislink").setDescription("Ein https-Link oder Nachrichtenlink als Beweis").setMaxLength(500));
     }
 
     async AutoComplete(interaction: AutocompleteInteraction): Promise<void> {

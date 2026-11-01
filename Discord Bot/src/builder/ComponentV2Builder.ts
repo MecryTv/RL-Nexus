@@ -7,6 +7,7 @@ import {
     ContainerBuilder,
     FileBuilder,
     MediaGalleryBuilder,
+    MediaGalleryItemBuilder,
     MessageActionRowComponentBuilder,
     MessageFlags,
     resolveColor,
@@ -149,6 +150,19 @@ export default class ComponentV2Builder {
         return this;
     }
 
+    /** Ein einzelnes Bild über die volle Breite, mit Beschreibung für Screenreader. */
+    public image(url: string, description?: string): this {
+        this.spend(1);
+
+        const item = new MediaGalleryItemBuilder().setURL(url);
+
+        if (description) item.setDescription(description.slice(0, 1024));
+
+        this.container.addMediaGalleryComponents(new MediaGalleryBuilder().addItems(item));
+
+        return this;
+    }
+
     public file(name: string, spoiler = false): this {
         this.spend(1);
 
@@ -216,6 +230,9 @@ export default class ComponentV2Builder {
         if (options.channelTypes?.length) menu.addChannelTypes(...options.channelTypes);
         if (options.placeholder) menu.setPlaceholder(options.placeholder);
         if (options.defaultChannel) menu.setDefaultChannels(options.defaultChannel);
+        if (options.defaults?.length) menu.setDefaultChannels(...options.defaults);
+        if (options.minValues !== undefined) menu.setMinValues(options.minValues);
+        if (options.maxValues !== undefined) menu.setMaxValues(options.maxValues);
         if (options.disabled) menu.setDisabled(true);
 
         this.container.addActionRowComponents(
@@ -232,6 +249,9 @@ export default class ComponentV2Builder {
 
         if (options.placeholder) menu.setPlaceholder(options.placeholder);
         if (options.defaultRole) menu.setDefaultRoles(options.defaultRole);
+        if (options.defaults?.length) menu.setDefaultRoles(...options.defaults);
+        if (options.minValues !== undefined) menu.setMinValues(options.minValues);
+        if (options.maxValues !== undefined) menu.setMaxValues(options.maxValues);
         if (options.disabled) menu.setDisabled(true);
 
         this.container.addActionRowComponents(

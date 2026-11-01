@@ -88,7 +88,19 @@ function Facts(entry: IModCase, mentions: boolean): string[] {
     return lines;
 }
 
-function Footer(entry: IModCase): string {
+/** Was Log-Karte und Bild nicht im Kopf zeigen: mitgelöschte Nachrichten, Kanal, Stufe, Bezug. */
+export function ExtraFacts(entry: IModCase): string[] {
+    const shown = ["**User:**", "**Moderator:**", "**Grund:**", "**Dauer:**"];
+
+    return Facts(entry, true).filter((line) => !shown.some((start) => line.startsWith(start)));
+}
+
+/** Farbe der Karte: die der Aktion, grau, sobald der Fall beendet ist. */
+export function CaseAccent(entry: IModCase): `#${string}` {
+    return entry.active || !entry.details.ended ? ACTION_INFO[entry.action].color : "#6b7683";
+}
+
+export function CaseFooter(entry: IModCase): string {
     const parts = [StatusText(entry)];
 
     if (entry.notes.length) parts.push(`${entry.notes.length} ${entry.notes.length === 1 ? "Notiz" : "Notizen"}`);
@@ -101,12 +113,12 @@ function Footer(entry: IModCase): string {
 /** Die Karte im Log-Kanal - sie wird bei jeder Änderung am Fall nachgezogen. */
 export function CaseView(entry: IModCase, link: string | null): IModView {
     const info = ACTION_INFO[entry.action];
-    const builder = new ComponentV2Builder({ accentColor: entry.active || !entry.details.ended ? info.color : "#6b7683" })
+    const builder = new ComponentV2Builder({ accentColor: CaseAccent(entry) })
         .title(`${info.emoji} | ${info.label} · Fall ${CaseRef(entry.number)}`, `${SOURCE[entry.source]} · ${Stamp(entry.createdAt)}`)
         .separator()
         .text(Facts(entry, true).join("\n"));
 
-    const footer = Footer(entry);
+    const footer = CaseFooter(entry);
 
     if (footer) builder.subtext(footer);
     if (link) builder.buttons({ url: link, label: "Im Dashboard öffnen", emoji: "🛡️" });
@@ -143,18 +155,20 @@ export function DirectView(entry: IModCase, guildName: string): IModView {
 }
 
 /** Die Antwort auf einen Befehl - nur für den Moderator sichtbar. */
-export function DoneView(entry: IModCase, logged: boolean): IModView {
+/** problems: Beweise, die nicht ankamen - die Strafe gilt trotzdem. */
+export function DoneView(entry: IModCase, logged: boolean, problems: string[] = []): IModView {
     const info = ACTION_INFO[entry.action];
     const target = entry.targetId ? `**${Name(entry.targetName, entry.targetId)}**` : null;
     const headline =
         entry.action === "purge"
             ? `${info.emoji} ${entry.details.deleted ?? 0} Nachrichten in <#${entry.details.channelId}> gelöscht`
             : `${info.emoji} ${target ?? "Der User"} wurde ${info.past}`;
-    const extra = [Footer(entry), logged ? "im Log-Kanal vermerkt" : ""].filter(Boolean).join(" · ");
+    const extra = [CaseFooter(entry), logged ? "im Log-Kanal vermerkt" : ""].filter(Boolean).join(" · ");
     const builder = new ComponentV2Builder({ accentColor: info.color })
         .text(`### ${headline} – Fall ${CaseRef(entry.number)}`)
         .text(Facts(entry, false).filter((line) => !line.startsWith("**Moderator:**") && !line.startsWith("**User:**")).join("\n") || "Ohne Grund.");
 
+    if (problems.length) builder.text(`**Nicht gesichert:**\n${problems.map((problem) => `- ${problem}`).join("\n")}`);
     if (extra) builder.subtext(extra);
 
     return { components: [builder.build()] };
@@ -167,7 +181,7 @@ export function DetailView(entry: IModCase, link: string | null): IModView {
     const extra: string[] = [];
 
     for (const note of entry.notes.slice(-5)) extra.push(`📝 **${escapeMarkdown(note.byName)}** ${Stamp(note.at, "R")}: ${escapeMarkdown(note.text).slice(0, 300)}`);
-    for (const item of entry.evidence.slice(-5)) extra.push(`📎 ${item.kind === "link" ? item.value : escapeMarkdown(item.name ?? item.value)} · ${escapeMarkdown(item.byName)}`);
+    for (const item of entry.evidence.slice(-5)) extra.push(`📎 ${item.kind === "image" ? escapeMarkdown(item.name ?? item.value) : item.value} · ${escapeMarkdown(item.byName)}`);
 
     if (extra.length) {
         return {
@@ -211,6 +225,70 @@ export function HistoryView(name: string, cases: IModCase[], counts: Partial<Rec
 
 export function ModErrorView(text: string): IModView {
     return { components: [new ComponentV2Builder({ accentColor: "Red" }).text(`❌ ${text}`).build()] };
+}
+
+/** Hängt an eine Antwort, welche Beweise nicht ankamen. */
+export function WithProblems(view: IModView, problems: string[]): IModView {
+    return problems.length ? { components: [...view.components, ...ModErrorView(`Nicht gesichert:\n${problems.join("\n")}`).components] } : view;
+}
+
+/* ----------------------------------------------------------
+   Rechtsklick „Als Beweis sichern“
+   ---------------------------------------------------------- */
+export type EvidenceStep = "fall" | "warn" | "grund";
+
+/** mbw:<schritt>:<kanal>:<nachricht> - die Nachricht steckt in der ID, so gehen Menü und Knopf auch nach einem Neustart. */
+export function EvidenceId(step: EvidenceStep, channelId: string, messageId: string): string {
+    return `mbw:${step}:${channelId}:${messageId}`;
+}
+
+export function ReadEvidenceId(customId: string): { kind: EvidenceStep; channelId: string; messageId: string } | null {
+    const match = /^mbw:(fall|warn|grund):(\d{17,20}):(\d{17,20})$/.exec(customId);
+
+    return match ? { kind: match[1] as EvidenceStep, channelId: match[2], messageId: match[3] } : null;
+}
+
+/** Was das Menü von der Nachricht zeigt. */
+export interface IEvidencePreview {
+    channelId: string;
+    messageId: string;
+    authorName: string;
+    channelName: string;
+    content: string;
+    sentAt: number;
+}
+
+/** Das Menü nach dem Rechtsklick: die Nachricht, die Fälle des Verfassers (neueste zuerst) und „Neue Verwarnung damit“. */
+export function SaveEvidenceView(preview: IEvidencePreview, cases: IModCase[]): IModView {
+    const quote = preview.content.trim()
+        ? escapeMarkdown(preview.content.slice(0, 300))
+              .split("\n")
+              .map((line) => `> ${line}`)
+              .join("\n")
+        : "-# Ohne Text, nur Anhänge.";
+    const builder = new ComponentV2Builder({ accentColor: "#00afff" })
+        .text(`### 📎 Als Beweis sichern\n${quote}`)
+        .subtext(`von **${escapeMarkdown(preview.authorName)}** in #${escapeMarkdown(preview.channelName)} · ${Stamp(preview.sentAt, "R")}`);
+    const newest = [...cases].sort((a, b) => b.number - a.number).slice(0, 25);
+
+    if (newest.length) {
+        builder.select({
+            customId: EvidenceId("fall", preview.channelId, preview.messageId),
+            placeholder: "An welchen Fall?",
+            options: newest.map((entry) => ({
+                label: `${CaseRef(entry.number)} · ${ACTION_INFO[entry.action].label}`,
+                value: String(entry.number),
+                emoji: ACTION_INFO[entry.action].emoji,
+                description: (entry.reason ?? "Ohne Grund").slice(0, 100),
+            })),
+        });
+    } else {
+        builder.text(`**${escapeMarkdown(preview.authorName)}** hat hier noch keinen Fall.`);
+    }
+
+    builder.buttons({ customId: EvidenceId("warn", preview.channelId, preview.messageId), label: "Neue Verwarnung damit", emoji: "⚠️", tone: "danger" });
+
+    return { components: [builder.build()] };
 }
 
 /** Wie weit ein Wartender im Support-Warteraum ist. */

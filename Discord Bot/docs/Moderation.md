@@ -60,9 +60,29 @@ Unter *Moderation › Einstellungen*: „ab **3** Verwarnungen → **Timeout 1 S
 | Quelle | per Befehl, im Dashboard, automatisch (Stufe, Ablauf) |
 | Bezug | der zurückgenommene Warn, der auslösende Warn einer Stufe, der aufgehobene Bann |
 | Notizen | nur fürs Team, bis 50 je Fall. Entfernen darf der Autor oder wer den Server verwaltet |
-| Beweise | Bilder (PNG, JPG, GIF, WebP bis 8 MB — einmal durch den Canvas, heraus kommt WebP) und https-Links, bis 20 je Fall. Bilder liegen unter `evidence/<server>/<fall>/` (nicht im Repo, gehört ins Backup) |
+| Beweise | Bilder (PNG, JPG, GIF, WebP bis 8 MB — einmal durch den Canvas, heraus kommt WebP), https-Links und gesicherte Nachrichten, bis 20 je Fall. Bilder liegen unter `evidence/<server>/<fall>/` (nicht im Repo, gehört ins Backup) |
 
 Notizen und Beweise kommen auch später dazu: im Dashboard am Fall oder mit `/fall notiz` und `/fall beweis` (Anhang oder Link).
+
+---
+
+## Beweise (W-0014)
+
+Drei Wege, alle nur für das Moderations-Team (`ModerationService.CanView`):
+
+| Weg | Was passiert |
+|---|---|
+| **Gleich beim Befehl** | `/warn`, `/timeout`, `/kick`, `/ban` haben `beweis` (ein Bild) und `beweislink` (ein Link). Weitere Bilder später mit `/fall beweis` |
+| **Später** | `/fall beweis nummer:… bild:… link:…` oder im Dashboard am Fall |
+| **Rechtsklick** | Nachricht › Apps › **Als Beweis sichern**: Menü „An welchen Fall?“ mit den Fällen des Verfassers (höchstens 25, neueste zuerst) und „Neue Verwarnung damit“ (Fenster mit Grund) |
+
+**Nachrichtenlink:** Ein Link `discord.com/channels/<server>/<kanal>/<nachricht>` (auch `ptb.`/`canary.`) in `beweislink`, `/fall beweis link` oder im Dashboard sichert die Nachricht selbst. Nur von diesem Server und nur aus Kanälen, die Bot **und** Sichernder lesen dürfen — sonst eine Meldung, warum nicht. Jeder andere https-Link bleibt ein Link.
+
+**Gesicherte Nachricht** (Beweis-Art `message`): Verfasser, Kanal, Zeit, Text (bis 2000 Zeichen) und Sprunglink, festgehalten beim Sichern — sie bleibt, auch wenn das Original gelöscht wird. Ihre Bilder werden eigene Bild-Beweise. Im Dashboard steht sie wie ein Link mit Textanfang.
+
+**Beweis-Pflicht** (Dashboard › Moderation › Einstellungen › Beweise, `IModConfig.proof`): je Strafe Bann, Kick, Verwarnung an/aus, Timeout „aus · ab 1 Stunde · ab 1 Tag · ab 7 Tagen“. Fehlt der Beweis, lehnt der Bot ab, bevor etwas passiert: „Auf diesem Server braucht ein Bann einen Beweis. Häng ein Bild an, gib einen Link an oder sichere die Nachricht per Rechtsklick › Apps › „Als Beweis sichern“.“ Im Dashboard reicht dafür der Beweis-Link bei „Neue Aktion“. Auto Mod und Stufen fragen nicht danach.
+
+Gelingt die Strafe, aber ein Beweis nicht (Bild zu groß, Link kaputt), **bleibt die Strafe**, und die Antwort nennt unter „Nicht gesichert“, welcher fehlt. Die DM an den User bekommt keine Beweise.
 
 **Befristete Banns** hebt `ModerationExpiry` jede Minute auf (ein eigener Fall „Entbannt", automatisch). Abgelaufene **Timeouts** hebt Discord selbst auf, der Lauf trägt sie nur aus. Entbannt jemand in Discord von Hand, endet der offene Bann-Fall ebenfalls (`GuildBanRemove`, Intent `GuildModeration`).
 
@@ -70,7 +90,13 @@ Notizen und Beweise kommen auch später dazu: im Dashboard am Fall oder mit `/fa
 
 ## Log-Kanal und DM
 
-**Log-Kanal:** ein Textkanal oder ein **Beitrag in einem Forum** — dieselbe Auswahl wie beim Ticket-System (`utils/logtarget.ts`). Im Dashboard steht je Forum „+ Neuer Beitrag in #forum": der Bot legt ihn sofort an („Mod-Logs"). Jeder Fall ist eine Karte (Components V2) mit Knopf „Im Dashboard öffnen" (`…/moderation?fall=12`). Ändert sich am Fall etwas — Status, Notizen, Beweise —, zieht der Bot die Karte nach. Ein archivierter Beitrag wacht beim nächsten Fall von selbst auf.
+**Log-Kanal:** ein Textkanal oder ein **Beitrag in einem Forum** — dieselbe Auswahl wie beim Ticket-System (`utils/logtarget.ts`). Im Dashboard steht je Forum „+ Neuer Beitrag in #forum": der Bot legt ihn sofort an („Mod-Logs"). Ein archivierter Beitrag wacht beim nächsten Fall von selbst auf.
+
+**Die Karte** ist eine gezeichnete Akte (`builder/ModerationCard.ts`, derselbe Zeichner wie `/hilfe`): Bild des Users, „Fall #128 · Verwarnung“, „@name · 3. Fall in 30 Tagen“ (Verwarnungen, Timeouts, Kicks, Banns in den 30 Tagen bis zu diesem Fall), von wem, Grund, höchstens drei Beweise (Bild als Vorschau, Nachricht als Zitat). Darunter als Text, was das Bild nicht zeigt (Stufe, Bezug, mitgelöschte Nachrichten), Status und `<@User>` (ohne Ping, damit die Discord-Suche ihn findet). Knöpfe: **📎 Alle N ansehen** (nur mit Beweisen), **📁 Fall**, **📝 Notiz** (Fenster) und der Link ins Dashboard. Die IDs tragen die Fallnummer (`mf:ev:<nr>:<i>`, `mf:fall:<nr>`, `mf:notiz:<nr>`), sie gehen also auch nach einem Neustart; wer nicht im Team ist, bekommt „Das sieht nur das Moderations-Team.“
+
+**Beweis-Ansicht** (nur für den, der klickt): Kopf als Bild („Fall #128 · Beweis 2 von 4“, wer, wann, welche Art), darunter der Beweis groß, ein Menü mit allen, ◀ ▶ und „Original öffnen“.
+
+Ändert sich am Fall etwas — Status, Notizen, Beweise —, zeichnet der Bot die Karte neu, je Fall eins nach dem anderen und immer mit dem neuesten Stand. Klappt das Zeichnen nicht, geht die alte Text-Karte raus.
 
 **DM an den User** (Standard an): Aktion, Server, Grund, Dauer und Fallnummer — **ohne** den Namen des Moderators. Bei Bann und Kick geht sie **vor** der Aktion raus, danach teilt der User keinen Server mehr mit dem Bot. Ob sie ankam, steht am Fall. Beim Entbannen gibt es keine: ohne gemeinsamen Server kommt sie nicht an.
 
