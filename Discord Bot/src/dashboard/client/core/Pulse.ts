@@ -21,7 +21,11 @@ interface IStream {
     listeners: Map<string, Set<Handler>>;
 }
 
-const KINDS = ["moderation", "voice", "sixmans", "matchups", "lft", "clips", "guild", "levels"] as const;
+const KINDS = ["moderation", "voice", "sixmans", "matchups", "lft", "clips", "guild", "levels", "staff"] as const;
+
+/** Der persönliche Puls (W-0011): Anfragen vom Staff, ein frisch eingeladener Server. */
+const MY_KINDS = ["staff", "guilds"] as const;
+const ME = "@me";
 
 const streams = new Map<string, IStream>();
 
@@ -30,7 +34,16 @@ const streams = new Map<string, IStream>();
  * ein Abschnitt, der zugeht, gibt seinen Platz damit wieder frei.
  */
 export function onPulse(guildId: string, kinds: readonly string[], handler: Handler): () => void {
-    const stream = open(guildId);
+    return listen(guildId, `${BASE}/api/guild/${encodeURIComponent(guildId)}/pulse`, KINDS, kinds, handler);
+}
+
+/** Dasselbe für den persönlichen Puls: gilt auf jeder Seite, egal welcher Server. */
+export function onMyPulse(kinds: readonly string[], handler: Handler): () => void {
+    return listen(ME, `${BASE}/api/me/pulse`, MY_KINDS, kinds, handler);
+}
+
+function listen(key: string, address: string, known: readonly string[], kinds: readonly string[], handler: Handler): () => void {
+    const stream = open(key, address, known);
 
     for (const kind of kinds) {
         const set = stream.listeners.get(kind) ?? new Set<Handler>();
@@ -45,20 +58,20 @@ export function onPulse(guildId: string, kinds: readonly string[], handler: Hand
         // Hört niemand mehr zu, kann die Leitung weg.
         if ([...stream.listeners.values()].every((set) => set.size === 0)) {
             stream.source.close();
-            streams.delete(guildId);
+            streams.delete(key);
         }
     };
 }
 
-function open(guildId: string): IStream {
-    const found = streams.get(guildId);
+function open(key: string, address: string, known: readonly string[]): IStream {
+    const found = streams.get(key);
 
     if (found) return found;
 
-    const source = new EventSource(`${BASE}/api/guild/${encodeURIComponent(guildId)}/pulse`);
+    const source = new EventSource(address);
     const stream: IStream = { source, listeners: new Map() };
 
-    for (const kind of KINDS) {
+    for (const kind of known) {
         source.addEventListener(kind, (event) => {
             const set = stream.listeners.get(kind);
 
@@ -76,7 +89,7 @@ function open(guildId: string): IStream {
         });
     }
 
-    streams.set(guildId, stream);
+    streams.set(key, stream);
 
     return stream;
 }

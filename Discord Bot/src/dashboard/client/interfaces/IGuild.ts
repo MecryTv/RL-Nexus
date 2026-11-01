@@ -22,6 +22,8 @@ export interface IGuild {
     joined: string | null;
     teams: number;
     modules: string[];
+    /** Staff mit laufender Freigabe (W-0011): bis wann, private Bereiche offen, wer erlaubt hat (ID). */
+    staff?: { grantId: number; until: number; private: boolean; by: string } | null;
     c1: string;
     c2: string;
 }

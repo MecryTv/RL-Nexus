@@ -203,11 +203,16 @@ export function renderGuild(data: IPayload): void {
     // die Moderation (wenn sie auf der Liste stehen) und Bewerbungen (wenn sie
     // dort als Pruefer eingetragen sind).
     const supportOnly = !guild.canManage && guild.role === "Moderator";
+    // W-0011: Staff vor dem Ja sieht nur die Übersicht mit der Infokarte, danach alles außer den privaten Bereichen ohne extra Ja.
+    const staffView = guild.role === "Staff";
+    const lockedPrivate = staffView && Boolean(guild.staff) && !guild.staff?.private;
     const only = supportOnly
         ? new Set([...SUPPORT_SECTIONS, ...(guild.canModerate ? ["moderation"] : []), ...(guild.canReview ? ["applications"] : [])])
-        : null;
+        : staffView && !guild.staff
+          ? new Set(["uebersicht"])
+          : null;
 
-    if (!guild.canManage) {
+    if (!guild.canManage && !staffView) {
         const note = need<HTMLElement>("#readonly");
 
         note.hidden = false;
@@ -285,14 +290,24 @@ export function renderGuild(data: IPayload): void {
         whenShown(["reaction-roles"], () => void import("./GuildSelfRoles.js").then((module) => module.renderSelfRoles(guild.id)));
     }
 
-    whenShown(["transcriptions"], () => void import("./GuildTranscripts.js").then((module) => module.renderTranscripts(guild.id)));
+    if (lockedPrivate) {
+        // Staff mit Freigabe, aber ohne das extra Ja: statt der Seite die Sperrkarte mit „Private Bereiche anfragen“.
+        void import("./GuildStaff.js").then((module) => {
+            for (const id of module.PRIVATE_SECTIONS) whenShown([id], () => module.lockPrivate(need<HTMLElement>(`#${id}`), guild));
+        });
+    } else {
+        whenShown(["transcriptions"], () => void import("./GuildTranscripts.js").then((module) => module.renderTranscripts(guild.id)));
 
-    if (guild.canManage) whenShown(["apply"], () => void import("./GuildApply.js").then((module) => module.renderApply(guild.id)));
-    if (guild.canManage || guild.canReview) whenShown(["applications"], () => void import("./GuildApply.js").then((module) => module.renderApplications(guild.id)));
-    if (guild.canModerate) whenShown(["moderation"], () => void import("./GuildModeration.js").then((module) => module.renderModeration(guild.id)));
-    else maybe<HTMLElement>("#modNote")?.removeAttribute("hidden");
-    // Live Tickets meldet fertige Transcripts - der Stream läuft auch, wenn nur Transcriptions offen ist.
-    whenShown(["live-tickets", "transcriptions"], () => void import("./GuildLive.js").then((module) => module.renderLive(guild.id, user)));
+        if (guild.canManage) whenShown(["apply"], () => void import("./GuildApply.js").then((module) => module.renderApply(guild.id)));
+        if (guild.canManage || guild.canReview) whenShown(["applications"], () => void import("./GuildApply.js").then((module) => module.renderApplications(guild.id)));
+        if (guild.canModerate) whenShown(["moderation"], () => void import("./GuildModeration.js").then((module) => module.renderModeration(guild.id)));
+        else maybe<HTMLElement>("#modNote")?.removeAttribute("hidden");
+        // Live Tickets meldet fertige Transcripts - der Stream läuft auch, wenn nur Transcriptions offen ist.
+        whenShown(["live-tickets", "transcriptions"], () => void import("./GuildLive.js").then((module) => module.renderLive(guild.id, user)));
+    }
+
+    // W-0011: Leiste, Infokarte und Anfrage für Staff.
+    if (staffView) void import("./GuildStaff.js").then((module) => module.renderStaffView(guild));
 
     void waiting.detail.then((detail) => {
         paintDetails(detail);

@@ -136,6 +136,10 @@
         </div>
       </div>
 
+      <!-- W-0011: Staff-Freigabe. Lila „Nur lesen“, grün „Freigegeben“ (Staff), rot für Verwalter. GuildStaff.ts. -->
+      <div class="sgbar" id="staffBar" role="status" hidden></div>
+      <div class="sgbar sgbar--user" id="managerBar" role="status" hidden></div>
+
       <div class="notice" id="readonly" hidden>
         <svg><use href="#i-eye"/></svg>
         <span>Du siehst diesen Server über deine RL Nexus-Gruppe – er gehört dir nicht. Zum Bearbeiten brauchst du auf dem Server selbst „Server verwalten“ oder Administrator.</span>
@@ -593,6 +597,9 @@
         </section>
 
         <section id="uebersicht" class="overview">
+          <!-- W-0011: Infokarte und Anfrage für Staff. GuildStaff.ts. -->
+          <div id="staffCard" hidden></div>
+
           <div class="notice notice--info" id="ovNote" hidden>
             <svg><use href="#i-info"/></svg>
             <span></span>
