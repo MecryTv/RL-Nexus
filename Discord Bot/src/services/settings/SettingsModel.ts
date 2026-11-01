@@ -57,7 +57,8 @@ export interface IPanelModule<S> {
     /** Was nur im Dashboard geht - steht klein unter dem Bild. */
     dashOnly: string[];
     load(client: BotClient, guild: Guild): Promise<S>;
-    save(client: BotClient, guild: Guild, patch: Record<string, unknown>): Promise<unknown>;
+    /** Speichert über den Weg des Moduls. Gibt einen Hinweis zurück, wenn etwas so noch nicht greift. */
+    save(client: BotClient, guild: Guild, patch: Record<string, unknown>): Promise<string | null>;
 }
 
 /* ----------------------------------------------------------
