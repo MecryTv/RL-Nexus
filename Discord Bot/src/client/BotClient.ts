@@ -44,6 +44,7 @@ import SixMansService from "../services/SixMansService";
 import RankRoleService from "../services/RankRoleService";
 import ReportService from "../services/ReportService";
 import HelpService from "../services/help/HelpService";
+import SettingsService from "../services/settings/SettingsService";
 import SupportService from "../services/SupportService";
 import ClipService from "../services/ClipService";
 import GuildSettings from "../models/GuildSettings";
@@ -149,6 +150,8 @@ export default class BotClient extends Client implements IBotClient {
     sixMansService: SixMansService;
     reportService: ReportService;
     helpService: HelpService;
+    /** /einstellungen (W-0014 Teil 3) - nicht verwechseln mit settings, den Server-Einstellungen. */
+    settingsPanel: SettingsService;
     supportService: SupportService;
     clipService: ClipService;
 
@@ -304,6 +307,7 @@ export default class BotClient extends Client implements IBotClient {
         this.sixMansService = new SixMansService(this);
         this.reportService = new ReportService(this);
         this.helpService = new HelpService(this);
+        this.settingsPanel = new SettingsService(this);
         this.supportService = new SupportService(this);
         this.clipService = new ClipService(this);
 

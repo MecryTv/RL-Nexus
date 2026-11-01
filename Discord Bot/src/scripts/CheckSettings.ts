@@ -8,7 +8,8 @@
 process.env.CLIENT_SECRET ||= "check-secret";
 process.env.DEV_CLIENT_SECRET ||= "check-secret";
 
-import { ChannelType, Guild, GuildBasedChannel, Role } from "discord.js";
+import { ChannelType, Guild, GuildBasedChannel, GuildMember, Role } from "discord.js";
+import SettingsService from "../services/settings/SettingsService";
 import BotClient from "../client/BotClient";
 import { SetEmojiLoader } from "../builder/HelpImage";
 import { OverviewView, PanelBlocks, PanelView } from "../builder/SettingsView";
@@ -295,6 +296,57 @@ async function checkView(start: Record<PanelModuleId, unknown>): Promise<void> {
     check("Übersicht: ein Bild", overview.files.length >= 1);
 }
 
+async function Refused(run: () => Promise<unknown>): Promise<string> {
+    try {
+        await run();
+    } catch (error) {
+        return error instanceof PanelError ? error.message : `kein PanelError: ${String(error)}`;
+    }
+
+    return "";
+}
+
+async function checkService(client: BotClient): Promise<void> {
+    console.log("\n  — Ändern und Rückgängig (Datenbank) —");
+
+    const guild = FakeGuild();
+    const member = (manage: boolean, id = "90071992547409990") =>
+        ({ id, guild: { id: GUILD, ownerId: "1" }, permissions: { has: () => manage } }) as unknown as GuildMember;
+    const service = new SettingsService(client);
+    const admin = member(true);
+    const before = (await client.modSettings.Of(GUILD)).dm;
+    const changed = await service.Change(guild, admin, "moderation", "dm", !before);
+
+    check("Ändern speichert", (await client.modSettings.Of(GUILD)).dm === !before);
+    check("Die Antwort nennt alt und neu", changed.before === (before ? "an" : "aus") && changed.after === (before ? "aus" : "an"), JSON.stringify(changed));
+
+    await service.Undo(guild, admin, "moderation", "dm");
+
+    check("Rückgängig stellt zurück", (await client.modSettings.Of(GUILD)).dm === before);
+    check("Rückgängig ohne Merker: ein Satz", (await Refused(() => new SettingsService(client).Undo(guild, admin, "moderation", "dm"))).startsWith("Rückgängig geht nicht mehr"));
+    check("Ohne „Server verwalten“: abgelehnt", (await Refused(() => service.Change(guild, member(false), "moderation", "dm", true))) === "Einstellungen ändert nur, wer den Server verwaltet.");
+    check("Zahl außerhalb: ein Satz", (await Refused(() => service.Change(guild, admin, "moderation", "remind", "999"))).includes("0 bis 120"));
+    check("Und nichts gespeichert", (await client.modSettings.Of(GUILD)).support.remindAfter === 10);
+    check("Kaputte Stufen: Satz mit Zeile", (await Refused(() => service.Change(guild, admin, "moderation", "stages", "3 boom"))).startsWith("Zeile 1"));
+
+    await service.Change(guild, admin, "moderation", "stages", "2 timeout 30m\n4 kick");
+
+    check("Stufen aus dem Fenster", StagesText((await client.modSettings.Of(GUILD)).stages) === "2 timeout 30m\n4 kick");
+
+    await service.Change(guild, admin, "moderation", "proofTimeout", "86400");
+    await service.Change(guild, admin, "moderation", "proofTimeout", "-");
+
+    check("Auswahl „aus“ kommt als „-“ und wird wieder leer", (await client.modSettings.Of(GUILD)).proof.timeoutFrom === null);
+    check("Ein Fehler des Moduls wird ein Satz", (await Refused(() => service.Change(guild, admin, "moderation", "room", VOICE))).startsWith("Wähle auch den Kanal"));
+}
+
+async function cleanup(client: BotClient): Promise<void> {
+    await client.databaseService.Write("DELETE FROM mod_settings WHERE guild_id = ?", [GUILD]);
+    client.modSettings.Forget();
+
+    check("Aufgeräumt", (await client.modSettings.Of(GUILD)).stages.length === 2);
+}
+
 async function main(): Promise<void> {
     console.log("\n⚙️ Einstellungen\n");
 
@@ -304,6 +356,19 @@ async function main(): Promise<void> {
 
     checkModel();
     await checkView(checkRegisters(client));
+
+    if (await client.databaseService.Connect()) {
+        try {
+            await checkService(client);
+        } finally {
+            console.log("\n  — Aufräumen —");
+
+            await cleanup(client).catch((error) => check("Aufräumen lief durch", false, String(error)));
+            await client.databaseService.Close();
+        }
+    } else {
+        console.log("\n  — Datenbank —\n  übersprungen: keine Verbindung");
+    }
 
     console.log(failures === 0 ? "\n✅ Alle Prüfungen bestanden.\n" : `\n❌ ${failures} Prüfung(en) fehlgeschlagen.\n`);
 

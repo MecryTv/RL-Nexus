@@ -28,6 +28,8 @@ export interface IPanelView {
     done?: { key: string; before: string; after: string };
     warning?: string | null;
     error?: string | null;
+    /** Ein Satz ohne Änderung an einer Einstellung, etwa „Panel gesendet“. */
+    note?: string;
 }
 
 export interface IPanelMessage {
@@ -157,6 +159,7 @@ export async function PanelView(state: IPanelState, view: IPanelView = {}): Prom
     const done = view.done ? numbered.find((entry) => entry.field.key === view.done!.key) : null;
 
     if (done && view.done) builder.text(`✅ **${done.field.label}**: ${view.done.before} → ${view.done.after}`);
+    if (view.note) builder.text(view.note);
     if (view.warning) builder.text(`⚠️ ${view.warning}`);
     if (view.error) builder.text(`❌ ${view.error}`);
 
