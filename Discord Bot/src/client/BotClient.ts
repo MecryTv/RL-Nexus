@@ -43,6 +43,7 @@ import RoleListService from "../services/RoleListService";
 import SixMansService from "../services/SixMansService";
 import RankRoleService from "../services/RankRoleService";
 import ReportService from "../services/ReportService";
+import HelpService from "../services/help/HelpService";
 import SupportService from "../services/SupportService";
 import ClipService from "../services/ClipService";
 import GuildSettings from "../models/GuildSettings";
@@ -147,6 +148,7 @@ export default class BotClient extends Client implements IBotClient {
     roleListService: RoleListService;
     sixMansService: SixMansService;
     reportService: ReportService;
+    helpService: HelpService;
     supportService: SupportService;
     clipService: ClipService;
 
@@ -301,6 +303,7 @@ export default class BotClient extends Client implements IBotClient {
         this.roleListService = new RoleListService(this);
         this.sixMansService = new SixMansService(this);
         this.reportService = new ReportService(this);
+        this.helpService = new HelpService(this);
         this.supportService = new SupportService(this);
         this.clipService = new ClipService(this);
 

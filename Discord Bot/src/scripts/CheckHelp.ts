@@ -7,7 +7,9 @@
 process.env.CLIENT_SECRET ||= "check-secret";
 process.env.DEV_CLIENT_SECRET ||= "check-secret";
 
-import { ApplicationCommandType, ContextMenuCommandBuilder, SlashCommandBuilder } from "discord.js";
+import { ApplicationCommandType, Collection, ContextMenuCommandBuilder, Guild, SlashCommandBuilder } from "discord.js";
+import HelpService from "../services/help/HelpService";
+import HelpButtons from "../events/help/HelpButtons";
 import { glob } from "glob";
 import { loadImage } from "@napi-rs/canvas";
 import { RenderHelpBanner } from "../builder/HelpBanner";
@@ -225,6 +227,9 @@ function checkPages(): void {
     check("Bereich: Felder grau darunter", area.texts.includes("user*") && area.texts.includes("dauer"), area.texts);
     check("Bereich: Modul aus bei abgeschaltetem Modul", area.texts.includes("Modul aus") && area.texts.includes("/module an modul:anti-villain"), area.texts);
     check("Bereich: kein Modul aus bei eingeschaltetem", (area.texts.match(/Modul aus/g) ?? []).length === 1, String((area.texts.match(/Modul aus/g) ?? []).length));
+    const allOff = Flat(HelpAreaView("moderation", entries, { ...CONTEXT, enabled: new Set() }));
+
+    check("Bereich: Modul aus nur einmal je Modul", (allOff.texts.match(/Modul aus/g) ?? []).length === 2, String((allOff.texts.match(/Modul aus/g) ?? []).length));
     check("Bereich: Menü Befehl erklären", area.json.includes(`"custom_id":"${HELP_PREFIX}befehl"`));
     check("Bereich: zurück zur Übersicht", area.json.includes(`"custom_id":"${HELP_PREFIX}start"`));
     check("Bereich: Im Dashboard", area.json.includes(`"url":"${CONTEXT.dashboard}/guild/${CONTEXT.guildId}/moderation"`));
@@ -234,6 +239,7 @@ function checkPages(): void {
 
     check("Befehl: Abschnitte", ["Was er macht", "So nutzt du ihn", "Felder", "Was danach passiert"].every((part) => single.texts.includes(part)), single.texts);
     check("Befehl: Pflichtfeld mit Stern", single.texts.includes("user*"), single.texts);
+    check("Befehl: Hinweis zum Stern ohne Aufzählungszeichen", single.texts.includes("Felder mit Stern sind Pflicht") && !single.texts.includes("-# *"), single.texts);
     check("Befehl: Auswahl genannt", single.texts.includes("1h, 1d"), single.texts);
     check("Befehl: zurück zum Bereich", single.json.includes(`"custom_id":"${HELP_PREFIX}a:moderation"`));
     check("Befehl: Doku zum Bereich", single.json.includes(`"url":"${CONTEXT.docs}#docg-moderation"`));
@@ -278,11 +284,85 @@ async function checkBanner(): Promise<void> {
     check("Langer Name mit Emoji und Bild als Logo geht", long.length > 1000);
 }
 
+async function checkCommand(client: BotClient): Promise<void> {
+    console.log("\n  — Befehl —");
+
+    const loose = client as unknown as Record<string, unknown>;
+    const commands = await RealCommands(client);
+
+    loose.commands = new Collection(commands.map((command) => [command.name, command]));
+
+    const help = new HelpService(client);
+    const first = help.Suggest("timeout", false)[0];
+
+    check("Vorschlag: genauer Treffer zuerst", first?.value === "timeout", JSON.stringify(first));
+    check("Vorschlag: Treffer am Anfang vor Treffern mittendrin", help.Suggest("timeout", false).findIndex((entry) => entry.value === "untimeout") > 0);
+    check("Vorschlag: bei „ti“ nur, was mit ti beginnt, vorn", help.Suggest("ti", false).slice(0, 2).every((entry) => entry.value.startsWith("ti")), JSON.stringify(help.Suggest("ti", false).slice(0, 3)));
+    check("Vorschläge höchstens 25", help.Suggest("", false).length <= 25 && help.Suggest("", false).length > 0);
+    check("Vorschlag: Unterbefehle dabei", help.Suggest("fall b", false).some((entry) => entry.value === "fall beweis"));
+    check("Developer-Befehle nur für Developer", !help.Suggest("dev", false).some((entry) => entry.value === "devlogs") && help.Suggest("dev", true).some((entry) => entry.value === "devlogs"));
+    check("Vorschlag-Namen höchstens 100 Zeichen", help.Suggest("", false).every((entry) => entry.name.length <= 100));
+
+    const found = help.Find("fall beweis", false);
+
+    check("Finden: Unterbefehl", found?.entry.name === "fall" && found.key === "fall beweis");
+    check("Finden: mit / und Großbuchstaben", help.Find("/Timeout", false)?.entry.name === "timeout");
+    check("Finden: Gruppe ohne Unterbefehl", help.Find("fall", false)?.key === null);
+    check("Finden: Unsinn ergibt nichts", help.Find("xyz", false) === null);
+    check("Finden: Developer-Befehl ohne Developer ergibt nichts", help.Find("devlogs", false) === null && help.Find("devlogs", true) !== null);
+
+    const dashboard = client.dashboardService as unknown as Record<string, unknown>;
+    const guild = { id: "123456789012345678", ownerId: "111111111111111111", name: "Dev Server" } as unknown as Guild;
+
+    dashboard.Paywall = async () => false;
+    check("Zugang: Schranke aus heißt frei", (await help.Access(guild)).value === "Frei");
+
+    dashboard.Paywall = async () => true;
+    dashboard.ShopAccess = async () => ({ allowed: true, reason: "", viaShop: true });
+    dashboard.ShopEnds = async () => [{ name: "Pro", kind: "renews", endsAt: Date.UTC(2026, 11, 1, 10) }];
+
+    const paid = await help.Access(guild);
+
+    check("Zugang: bezahlt mit Datum", paid.value === "Paid" && paid.sub === "bis 01.12.", JSON.stringify(paid));
+
+    dashboard.ShopAccess = async () => {
+        throw new Error("Datenbank weg");
+    };
+    check("Zugang: Fehler heißt nicht prüfbar", (await help.Access(guild)).value === "–");
+
+    // Ein alter Knopf zu einem Befehl, den es nicht mehr gibt: zurück zur Startseite.
+    dashboard.Paywall = async () => false;
+    (client.settings as unknown as Record<string, unknown>).Of = async () => ({ modules: ["moderation"] });
+    loose.helpService = help;
+
+    let updated: { components?: unknown[]; files?: unknown[] } | null = null;
+    const interaction = {
+        customId: `${HELP_PREFIX}seite:weg:-:0`,
+        isButton: () => true,
+        isStringSelectMenu: () => false,
+        inCachedGuild: () => true,
+        guild,
+        user: { id: "222222222222222222", username: "joe" },
+        member: { displayName: "Joe" },
+        update: async (payload: { components?: unknown[]; files?: unknown[] }) => void (updated = payload),
+    };
+
+    await new HelpButtons(client).Execute(interaction as never);
+
+    const shown = updated as { components?: unknown[]; files?: unknown[] } | null;
+
+    check("Alter Knopf: zurück zur Startseite", JSON.stringify(shown?.components ?? []).includes("In drei Schritten startklar"), JSON.stringify(shown).slice(0, 200));
+    check("Startseite bringt das Banner mit", (shown?.files?.length ?? 0) === 1);
+}
+
 async function main(): Promise<void> {
     checkModel();
     checkPages();
     await checkBanner();
-    await checkCatalog(new BotClient());
+    const client = new BotClient();
+
+    await checkCatalog(client);
+    await checkCommand(client);
 
     console.log(failures === 0 ? "\n✅ Alle Prüfungen bestanden.\n" : `\n❌ ${failures} Prüfung(en) fehlgeschlagen.\n`);
     process.exit(failures > 0 ? 1 : 0);

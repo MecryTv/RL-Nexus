@@ -676,6 +676,20 @@ export const HELP_CATALOG: HelpCatalog = {
             },
         },
     },
+    hilfe: {
+        emoji: "❔",
+        area: "general",
+        module: null,
+        who: "alle",
+        whoText: "Alle",
+        what: "Erklärt alle Befehle des Bots: was sie machen, welche Felder sie haben und was danach passiert. Nur du siehst die Hilfe.",
+        examples: [
+            { code: "/hilfe", text: "Die Übersicht mit allen Bereichen" },
+            { code: "/hilfe befehl:fall beweis", text: "Springt direkt zu diesem Befehl" },
+        ],
+        fields: { befehl: "Springt direkt zu einem Befehl. Beim Tippen schlägt der Bot vor." },
+        after: ["Menüs und Knöpfe wechseln die Seite in derselben Nachricht"],
+    },
     fehler: {
         emoji: "🐞",
         area: "general",

@@ -183,8 +183,13 @@ export function HelpStartView(start: IHelpStart, entries: IHelpEntry[], context:
 export function HelpAreaView(area: HelpAreaId, entries: IHelpEntry[], context: IHelpContext, page = 0): IHelpPayload {
     const inArea = entries.filter((entry) => AreaOf(entry) === area);
     const commands = inArea.flatMap((entry) => entry.commands);
+    // Ist ein Modul aus, sagt das der erste seiner Befehle - nicht jeder einzelne.
+    const noted = new Set<string>();
     const blocks = commands.map((command) => {
-        const off = OffNote(command.text.module, context);
+        const module = command.text.module ?? "";
+        const off = noted.has(module) ? "" : OffNote(command.text.module, context);
+
+        if (off) noted.add(module);
 
         return [`**${command.display}** \`${WHO_LABELS[command.text.who]}\``, FirstSentence(command.text.what), ...(off ? [off] : []), `-# ${FieldLine(command)}`].join("\n");
     });
@@ -233,7 +238,7 @@ function CommandBlocks(command: IHelpCommand): string[] {
 
     const fields = command.fields.map((field) => `- \`${field.name}${field.required ? "*" : ""}\` ${field.text}${field.choices.length ? ` Auswahl: ${field.choices.join(", ")}.` : ""}`);
 
-    blocks.push(`### Felder\n${fields.length ? `${fields.join("\n")}${command.fields.some((field) => field.required) ? "\n-# * Pflichtfeld" : ""}` : "Keine, einfach abschicken."}`);
+    blocks.push(`### Felder\n${fields.length ? `${fields.join("\n")}${command.fields.some((field) => field.required) ? "\n-# Felder mit Stern sind Pflicht" : ""}` : "Keine, einfach abschicken."}`);
 
     if (text.after.length) blocks.push(`### Was danach passiert\n${text.after.map((line) => `- ${line}`).join("\n")}`);
     if (text.tip) blocks.push(`> **Tipp:** ${text.tip}`);
