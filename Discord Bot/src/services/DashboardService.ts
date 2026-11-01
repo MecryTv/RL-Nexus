@@ -367,6 +367,8 @@ export default class DashboardService implements IDashboardService {
     // Eine Seite fragt mehrere Routen auf einmal. Alle warten auf denselben Abruf der
     // Serverliste - jede für sich hätte Discord ab der zweiten mit 429 beantwortet.
     private guildsLoading = new Map<string, Promise<IDashboardGuild[]>>();
+    // W-0011: wem eine Sitzung gehört - damit Joined weiß, wem der Puls gilt.
+    private sessionUsers = new LRUCache<string, string>({ max: MAX_SESSIONS });
 
     // Läuft höchstens einmal gleichzeitig - sonst stößt jeder Seitenaufruf eine
     // weitere Mitglieder-Abfrage an.
@@ -907,6 +909,26 @@ export default class DashboardService implements IDashboardService {
         return Boolean(guild?.canManage);
     }
 
+    /**
+     * W-0011: Der Bot ist einem Server beigetreten. Jede Sitzung, deren Liste ihn
+     * kennt (Owner oder Admin, bisher ohne Bot), lädt ihre Liste neu; zurück
+     * kommen die Nutzer, denen der persönliche Puls Bescheid sagt.
+     */
+    Joined(guildId: string): string[] {
+        const sessions = [...this.guilds.entries()].filter(([, list]) => list.some((entry) => entry.id === guildId)).map(([sessionId]) => sessionId);
+        const users = new Set<string>();
+
+        for (const sessionId of sessions) {
+            this.guilds.delete(sessionId);
+
+            const userId = this.sessionUsers.get(sessionId);
+
+            if (userId) users.add(userId);
+        }
+
+        return [...users];
+    }
+
     /** W-0011: die Karte dieser Sitzung für einen Server (Rolle, Rechte, laufende Freigabe). Wirft SessionExpired. */
     async CardFor(session: IDashboardSession, guildId: string): Promise<IDashboardGuild | null> {
         return (await this.GuildsOf(session)).find((entry) => entry.id === guildId) ?? null;
@@ -1073,6 +1095,7 @@ export default class DashboardService implements IDashboardService {
         );
 
         this.guilds.set(session.id, list);
+        this.sessionUsers.set(session.id, session.userId);
 
         return list;
     }

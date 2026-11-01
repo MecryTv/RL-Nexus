@@ -17,7 +17,7 @@ import RouteManager from "../handler/RouteManager";
 import Route from "../structures/Route";
 import { DASHBOARD_PATH, SESSION_COOKIE } from "../constants/Dashboard";
 import IDashboardGuild from "../interfaces/services/dashboard/IDashboardGuild";
-import { StaffOverlay } from "../services/DashboardService";
+import DashboardService, { StaffOverlay } from "../services/DashboardService";
 import { ManageGate, PrivateGate, PrivateItem } from "../utils/managegate";
 import { SessionOf } from "../utils/dashboard";
 import BotClient from "../client/BotClient";
@@ -858,6 +858,27 @@ async function checkApi(): Promise<void> {
     check("Staff beendet selbst", (await guildApi("staff", "POST", { action: "end" })).statusCode === 200 && service.Get(grant!.id) === null);
 }
 
+/* ----------------------------------------------------------
+   Task 9: Live nach dem Einladen
+   ---------------------------------------------------------- */
+
+function checkJoined(): void {
+    console.log("\n📨 Live nach dem Einladen\n");
+
+    const dashboard = new DashboardService({} as BotClient);
+    const inner = dashboard as unknown as { guilds: Map<string, IDashboardGuild[]>; sessionUsers: Map<string, string> };
+
+    inner.guilds.set("s1", [Card("500", "Owner")]);
+    inner.guilds.set("s2", [Card("600", "Owner")]);
+    inner.sessionUsers.set("s1", "u1");
+    inner.sessionUsers.set("s2", "u2");
+
+    const users = dashboard.Joined("500");
+
+    check("Nur wer den Server in der Liste hat, bekommt den Puls", users.length === 1 && users[0] === "u1", users.join(","));
+    check("Seine Liste wird neu geladen, die andere bleibt", !inner.guilds.has("s1") && inner.guilds.has("s2"));
+}
+
 async function main(): Promise<void> {
     checkRules();
     checkAnswer();
@@ -873,6 +894,7 @@ async function main(): Promise<void> {
     checkCard();
     await checkDmButtons();
     await checkApi();
+    checkJoined();
 
     console.log(failures ? `\n❌ ${failures} Prüfung(en) fehlgeschlagen` : "\n✅ Alles in Ordnung");
     process.exit(failures ? 1 : 0);

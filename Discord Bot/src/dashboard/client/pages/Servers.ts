@@ -10,6 +10,7 @@ import { GROUPS, ROLE_ICONS, ROLE_LABELS, STAFF_GROUPS } from "../constants/Grou
 import { motionOff } from "../core/Prefs.js";
 import { clickSound, hoverSound } from "../core/Sound.js";
 import { toast } from "../core/Toast.js";
+import { onMyPulse } from "../core/Pulse.js";
 import { BASE, url } from "../core/Base.js";
 
 /* ----------------------------------------------------------
@@ -211,6 +212,52 @@ export function matches(guild: IGuild): boolean {
     return guild.name.toLowerCase().includes(state.query.toLowerCase());
 }
 
+const INVITE_KEY = "rlnexus.invite";
+let watching = false;
+
+function rememberInvite(guildId: string): void {
+    try {
+        sessionStorage.setItem(INVITE_KEY, guildId);
+    } catch {
+        // Ohne Speicher erscheint der Server nur in der Liste, ohne Sprung.
+    }
+}
+
+/**
+ * W-0011: Der Bot ist einem Server beigetreten (persönlicher Puls „guilds“).
+ * Hat dieser Tab ihn eingeladen, geht es direkt in dessen Dashboard, sonst
+ * lädt die Liste neu - der Server steht dann in jedem offenen Tab.
+ */
+function watchInvites(): void {
+    if (watching) return;
+
+    watching = true;
+    onMyPulse(["guilds"], (_kind, data) => {
+        const joined = typeof data.joined === "string" ? data.joined : null;
+        let wanted: string | null = null;
+
+        try {
+            wanted = sessionStorage.getItem(INVITE_KEY);
+        } catch {
+            wanted = null;
+        }
+
+        if (joined && (wanted === joined || wanted === "*")) {
+            try {
+                sessionStorage.removeItem(INVITE_KEY);
+            } catch {
+                // Nichts zu tun.
+            }
+
+            window.location.assign(url(`/guild/${encodeURIComponent(joined)}`));
+
+            return;
+        }
+
+        window.location.reload();
+    });
+}
+
 export function renderServers(data: IPayload): void {
     const grid = need<HTMLElement>("#grid");
     const empty = need<HTMLElement>("#empty");
@@ -222,6 +269,7 @@ export function renderServers(data: IPayload): void {
     const reset = need<HTMLButtonElement>("#emptyReset");
 
     inviteBase = data.inviteURL;
+    watchInvites();
 
     const active = data.guilds.filter((guild) => guild.active);
     const teams = active.reduce((sum, guild) => sum + guild.teams, 0);
@@ -507,6 +555,8 @@ export function bindCardEffects(grid: HTMLElement, data: IPayload): void {
         const guild = card ? data.guilds.find((entry) => entry.id === card.dataset.id) : undefined;
 
         if (trigger.classList.contains("btn--warm")) {
+            // W-0011: Kommt der Bot auf diesem Server an, öffnet diese Seite sein Dashboard von selbst.
+            rememberInvite(card?.dataset.id ?? "*");
             clickSound("warm");
             toast("invite", "Discord fragt gleich nach", "Bestätige dort, auf welchem Server RL Nexus landen soll.");
             return;
