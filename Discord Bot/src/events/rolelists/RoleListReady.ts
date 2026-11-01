@@ -1,6 +1,7 @@
 import { Events } from "discord.js";
 import BotClient from "../../client/BotClient";
 import Event from "../../structures/Event";
+import { WaitForDatabase } from "../../services/DatabaseService";
 import logger from "../../utils/logger";
 
 /**
@@ -18,7 +19,8 @@ export default class RoleListReady extends Event {
     }
 
     async Execute(): Promise<void> {
-        if (!this.client.databaseService.Ready) return;
+        // Beim ersten Start mit neuen Migrationen ist die Datenbank hier oft noch nicht fertig.
+        if (!(await WaitForDatabase(this.client.databaseService))) return;
 
         await this.client.roleListService.Startup().catch((error) => logger.warn(`📋 Rollen-Listen nach dem Start nicht geprüft: ${String(error)}`));
     }

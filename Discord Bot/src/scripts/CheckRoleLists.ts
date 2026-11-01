@@ -25,6 +25,7 @@ import { loadImage } from "@napi-rs/canvas";
 import { MOTIFS, IRoleListImage } from "../constants/RoleLists";
 import { IRoleListGroup, IRoleListMember, IRoleListRole } from "../interfaces/services/rolelists/IRoleLists";
 import { IRoleListSettings } from "../constants/RoleLists";
+import RoleListReady from "../events/rolelists/RoleListReady";
 
 const GUILD = "90071992547409971";
 const TEXT = "90071992547409972";
@@ -857,6 +858,26 @@ async function checkMinors(client: BotClient): Promise<void> {
     check("Bild-Vorschau: Fußzeile mit dem Kanal aus dem Entwurf", previewChannel === TEXT2, String(previewChannel));
 }
 
+/**
+ * Review W-0042: Beim Start verbindet sich die Datenbank parallel zum Login. Mit
+ * neuen Migrationen ist sie bei „bereit“ von Discord oft noch nicht fertig - dann
+ * sprang RoleListReady still ab, und die Listen wurden nicht nachgezogen.
+ */
+async function checkStartup(): Promise<void> {
+    console.log("\n  Nach dem Start");
+
+    let ready = false;
+    let started = 0;
+    const slow = {
+        databaseService: { get Ready() { return ready; } },
+        roleListService: { Startup: async () => { started++; } },
+    } as unknown as BotClient;
+
+    setTimeout(() => (ready = true), 50);
+    await new RoleListReady(slow).Execute();
+    check("Wartet auf die Datenbank und zieht die Listen danach nach", started === 1, `nachgezogen: ${started}`);
+}
+
 async function main(): Promise<void> {
     console.log("\n📋  Rollen-Listen\n");
 
@@ -871,6 +892,7 @@ async function main(): Promise<void> {
     await checkRoute(client);
     await checkReview(client);
     await checkMinors(client);
+    await checkStartup();
 
     console.log(failures === 0 ? "\n✅ Alle Prüfungen bestanden.\n" : `\n❌ ${failures} Prüfung(en) fehlgeschlagen.\n`);
 

@@ -9,15 +9,18 @@
 #      und Admin Dashboard sie aus ihren Containern über host.docker.internal
 #      erreichen. Von außen sperrt ufw den Port, und der Nutzer darf sich nur von
 #      localhost und aus den Docker-Netzen (172.16.0.0/12) anmelden.
-#   2. Gibt es noch den Container rlnexus-mariadb: Bot und Admin Dashboard
-#      stoppen, alle eigenen Datenbanken daraus sichern, hier einspielen und
-#      danach jede Tabelle in beiden zählen. Container und Volume bleiben stehen.
+#   2. Gibt es noch den Container rlnexus-mariadb und ist der Umzug nicht fertig:
+#      Bot und Admin Dashboard stoppen, alle eigenen Datenbanken daraus sichern,
+#      hier einspielen und danach jede Tabelle in beiden zählen. Container und
+#      Volume bleiben stehen. Erst wenn alles stimmt, vermerkt es den Umzug in
+#      /etc/mysql/rlnexus-umzug-fertig.
 #   3. Datenbank, Backup-Datenbank und Nutzer mit den Werten aus der .env.
 #   4. phpMyAdmin mit php-fpm. Die Seite db.nexus-emb.de kommt danach wie die
 #      anderen über nginx dazu (nginx/db.nexus-emb.de.conf).
 #
-# Ein zweiter Lauf schadet nicht: Hat eine Datenbank hier schon Tabellen, spielt
-# es nichts mehr ein.
+# Ein zweiter Lauf ändert an vorhandenen Daten nichts. Nach einem fertigen Umzug
+# fasst er den alten Container nicht mehr an, und MariaDB startet er nur neu, wenn
+# sich ihre Einstellungen geändert haben.
 
 set -euo pipefail
 
@@ -43,7 +46,21 @@ env_wert() {
 }
 
 # SQL im alten Container, als dessen root.
-im_container() { docker exec "$container" sh -c 'exec mariadb -uroot -p"$MARIADB_ROOT_PASSWORD" "$@"' sh "$@"; }
+# MYSQL_PWD statt -p: Die Umgebung eines Prozesses liest nur sein Besitzer, die Prozessliste jeder.
+im_container() { docker exec "$container" sh -c 'MYSQL_PWD="$MARIADB_ROOT_PASSWORD" exec mariadb -uroot "$@"' sh "$@"; }
+
+# Schreibt stdin nach $1, nur wenn sich etwas ändert. Gelingt (0), wenn die Datei neu ist.
+schreiben() {
+    local neu
+    neu=$(mktemp)
+    cat > "$neu"
+    if cmp -s "$neu" "$1"; then
+        rm -f "$neu"
+        return 1
+    fi
+    install -m 644 "$neu" "$1"
+    rm -f "$neu"
+}
 
 [ "$(id -u)" -eq 0 ] || abbruch "bitte mit sudo starten."
 [ -f "$env_datei" ] || abbruch "keine .env in $ordner."
@@ -54,6 +71,15 @@ db_pass=$(env_wert DATABASE_PASSWORD "")
 [[ $db_name =~ ^[A-Za-z0-9_]{1,64}$ && $db_user =~ ^[A-Za-z0-9_]{1,64}$ ]] \
     || abbruch "DATABASE_NAME und DATABASE_USER dürfen nur Buchstaben, Ziffern und _ enthalten."
 [ -n "$db_pass" ] || abbruch "DATABASE_PASSWORD fehlt in der .env."
+# root meldet sich unter Debian ohne Passwort über sudo mariadb an. Das Skript würde
+# das auf ein Passwort umstellen, und alle weiteren Schritte hier scheiterten.
+[ "$db_user" != root ] || abbruch "DATABASE_USER darf nicht root sein."
+# Compose liest die .env anders als env_wert: $NAME und \ in "…", # ohne Anführungszeichen.
+# MariaDB bekäme dann ein anderes Passwort als Bot und Admin Dashboard.
+for zeichen in '$' '\' '"' "'" '`' '#' ' ' $'\t'; do
+    [[ $db_pass != *"$zeichen"* ]] \
+        || abbruch "DATABASE_PASSWORD enthält \$, \\, Anführungszeichen, # oder Leerzeichen. Compose liest solche Zeichen anders als dieses Skript. Bitte ein Passwort nur aus Buchstaben, Ziffern und - _ . , ! ? + = @ nehmen."
+done
 # Für SQL in einfachen Anführungszeichen. sed statt ${…//…}: bash 5.2 schluckt dort Backslashes.
 pass_sql=$(printf '%s' "$db_pass" | sed -e 's/\\/\\\\/g' -e "s/'/''/g")
 
@@ -70,16 +96,25 @@ if [ -n "$belegt" ] && ! grep -q mariadbd <<<"$belegt"; then
     abbruch "Port 3306 belegt schon etwas anderes: $belegt"
 fi
 
-alt=false
+fertig=/etc/mysql/rlnexus-umzug-fertig
+umzug=false
 sortierung=""
 if command -v docker >/dev/null && docker inspect "$container" >/dev/null 2>&1; then
     schritt "Alter Container $container"
-    alt=true
-    [ "$(docker inspect -f '{{.State.Running}}' "$container")" = true ] || docker start "$container" >/dev/null
-    for _ in $(seq 30); do im_container -e 'SELECT 1' >/dev/null 2>&1 && break; sleep 2; done
-    im_container -e 'SELECT 1' >/dev/null || abbruch "der Container $container antwortet nicht."
-    sortierung=$(im_container -N -e 'SELECT @@collation_server')
-    echo "Läuft, Sortierung $sortierung. Er bleibt bis zum Ende unangetastet."
+    if [ -f "$fertig" ]; then
+        echo "Der Umzug ist schon fertig ($fertig), den Container fasse ich nicht an. Er wird nicht mehr gebraucht: docker rm -f $container"
+    else
+        umzug=true
+        [ "$(docker inspect -f '{{.State.Running}}' "$container")" = true ] || docker start "$container" >/dev/null
+        for _ in $(seq 30); do im_container -e 'SELECT 1' >/dev/null 2>&1 && break; sleep 2; done
+        im_container -e 'SELECT 1' >/dev/null || abbruch "der Container $container antwortet nicht."
+        sortierung=$(im_container -N -e 'SELECT @@collation_server')
+        echo "Läuft, Sortierung $sortierung. Er bleibt bis zum Ende unangetastet."
+    fi
+fi
+# Ohne Umzug bleibt die Sortierung, die die MariaDB hier schon hat.
+if [ -z "$sortierung" ] && systemctl is-active --quiet mariadb 2>/dev/null; then
+    sortierung=$(mariadb -N -e 'SELECT @@collation_server' 2>/dev/null || true)
 fi
 [[ $sortierung =~ ^utf8mb4_[a-z0-9_]+$ ]] || sortierung=utf8mb4_unicode_ci
 
@@ -88,7 +123,8 @@ export DEBIAN_FRONTEND=noninteractive
 apt-get update -q
 apt-get install -y -q mariadb-server
 
-cat > /etc/mysql/mariadb.conf.d/60-rlnexus.cnf <<EOF
+neustart=false
+schreiben /etc/mysql/mariadb.conf.d/60-rlnexus.cnf <<EOF && neustart=true
 # RL Nexus (scripts/mariadb-einrichten.sh). Bot und Admin Dashboard kommen aus
 # ihren Containern über host.docker.internal, deshalb alle Adressen. Von außen
 # sperrt ufw den Port, und der Nutzer darf nur von localhost und aus $docker_netze.
@@ -100,34 +136,37 @@ collation-server     = $sortierung
 EOF
 
 mkdir -p /etc/systemd/system/mariadb.service.d /etc/systemd/system/docker.service.d
-cat > /etc/systemd/system/mariadb.service.d/rlnexus.conf <<'EOF'
+systemd_neu=false
+schreiben /etc/systemd/system/mariadb.service.d/rlnexus.conf <<'EOF' && { neustart=true; systemd_neu=true; }
 # Dieselbe Zeitzone wie im alten Container (TZ in docker-compose.prod.yml). Der
 # Bot rechnet Zeiten mit der Zeitzone der Datenbank um, ohne das lägen
 # gespeicherte Zeiten nach dem Umzug ein, zwei Stunden daneben.
 [Service]
 Environment=TZ=Europe/Berlin
 EOF
-cat > /etc/systemd/system/docker.service.d/nach-mariadb.conf <<'EOF'
+schreiben /etc/systemd/system/docker.service.d/nach-mariadb.conf <<'EOF' && systemd_neu=true
 # Docker erst nach MariaDB: Findet der Bot beim Start keine Datenbank, läuft er
 # ohne sie weiter, bis man ihn neu startet. Startet MariaDB nicht, startet Docker trotzdem.
 [Unit]
 Wants=mariadb.service
 After=mariadb.service
 EOF
-systemctl daemon-reload
+if $systemd_neu; then systemctl daemon-reload; fi
 systemctl enable mariadb >/dev/null 2>&1
-systemctl restart mariadb
+if $neustart || ! systemctl is-active --quiet mariadb; then
+    systemctl restart mariadb
+    echo "MariaDB mit den Einstellungen neu gestartet."
+else
+    echo "Einstellungen unverändert, MariaDB läuft ohne Neustart weiter."
+fi
 # Bot und Admin Dashboard verbinden mit timezone "auto" und setzen dabei
 # time_zone = 'Europe/Berlin'. Ohne diese Tabellen scheitert jede Anmeldung
 # (ER_WRONG_IANA_TIMEZONE). Das Docker-Image lud sie von selbst, Debian nicht.
 mariadb-tzinfo-to-sql /usr/share/zoneinfo 2>/dev/null | mariadb mysql
 echo "$(mariadb -N -e 'SELECT VERSION()') läuft, Zeitzone $(mariadb -N -e 'SELECT @@system_time_zone'), $(mariadb -N -e 'SELECT COUNT(*) FROM mysql.time_zone_name') Zeitzonen geladen."
 
-if $alt; then
+if $umzug; then
     schritt "Stand aus dem Container sichern"
-    docker stop rlnexus-bot rlnexus-admin >/dev/null 2>&1 || true
-    echo "Bot und Admin Dashboard gestoppt, damit nichts mehr schreibt."
-
     mapfile -t datenbanken < <(im_container -N -e 'SHOW DATABASES' | grep -vxE 'information_schema|performance_schema|mysql|sys' || true)
     for name in "${datenbanken[@]}"; do
         [[ $name =~ ^[A-Za-z0-9_]{1,64}$ ]] || abbruch "unerwarteter Datenbankname im Container: $name"
@@ -135,22 +174,27 @@ if $alt; then
     [ ${#datenbanken[@]} -gt 0 ] || abbruch "im Container gibt es keine eigene Datenbank."
     liste=$(printf "'%s'," "${datenbanken[@]}")
     liste=${liste%,}
+    loeschen=$(printf 'DROP DATABASE `%s`; ' "${datenbanken[@]}")
+
+    # Tabellen hier, aber kein fertiger Umzug: Ein früherer Lauf ist beim Einspielen
+    # abgebrochen. Geprüft, bevor Bot und Admin Dashboard stoppen.
+    vorhanden=$(mariadb -N -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema IN ($liste)")
+    [ "$vorhanden" -eq 0 ] || abbruch "Hier gibt es schon $vorhanden Tabellen in ${datenbanken[*]}, aber keinen fertigen Umzug. Vermutlich ist ein früherer Lauf beim Einspielen abgebrochen. Bot und Admin Dashboard laufen weiter mit dem Container. Neu anfangen: sudo mariadb -e '$loeschen' und das Skript noch einmal. Läuft der Bot schon auf dieser Datenbank, ist der Umzug fertig: sudo touch $fertig"
+
+    docker stop rlnexus-bot rlnexus-admin >/dev/null 2>&1 || true
+    echo "Bot und Admin Dashboard gestoppt, damit nichts mehr schreibt."
 
     datei=/root/mariadb-umzug-$(date +%Y%m%d-%H%M).sql
-    (umask 077; docker exec "$container" sh -c 'exec mariadb-dump -uroot -p"$MARIADB_ROOT_PASSWORD" "$@"' sh \
+    (umask 077; docker exec "$container" sh -c 'MYSQL_PWD="$MARIADB_ROOT_PASSWORD" exec mariadb-dump -uroot "$@"' sh \
         --single-transaction --routines --events --triggers --default-character-set=utf8mb4 \
         --databases "${datenbanken[@]}" > "$datei")
     tail -n 1 "$datei" | grep -q 'Dump completed' || abbruch "die Sicherung $datei ist unvollständig."
     echo "Gesichert: ${datenbanken[*]} nach $datei ($(du -h "$datei" | cut -f1))."
 
     schritt "Einspielen"
-    vorhanden=$(mariadb -N -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema IN ($liste)")
-    if [ "$vorhanden" -gt 0 ]; then
-        echo "Hier gibt es schon $vorhanden Tabellen in ${datenbanken[*]}, eingespielt wird nichts."
-    else
-        mariadb < "$datei"
-        echo "Eingespielt."
-    fi
+    zurueck="Bot und Admin Dashboard sind gestoppt, der Container läuft: zurück mit docker start rlnexus-bot rlnexus-admin. Neu anfangen: sudo mariadb -e '$loeschen' und das Skript noch einmal."
+    mariadb < "$datei" || abbruch "das Einspielen ist abgebrochen. $zurueck"
+    echo "Eingespielt."
 
     # Jede Tabelle in beiden zählen, in einer Abfrage je Seite.
     abfrage=""
@@ -160,13 +204,12 @@ if $alt; then
         abfrage+="${abfrage:+ UNION ALL }SELECT '$tabelle', COUNT(*) FROM \`${tabelle%%.*}\`.\`${tabelle#*.}\`"
         anzahl=$((anzahl + 1))
     done < <(im_container -N -e "SELECT CONCAT(table_schema, '.', table_name) FROM information_schema.tables WHERE table_type = 'BASE TABLE' AND table_schema IN ($liste)")
-    if [ -z "$abfrage" ] || diff <(im_container -N -e "$abfrage" 2>&1 | sort) <(mariadb -N -e "$abfrage" 2>&1 | sort); then
-        echo "Alle $anzahl Tabellen haben hier dieselbe Zahl Zeilen wie im Container."
-    elif [ "$vorhanden" -eq 0 ]; then
-        abbruch "die Zeilen weichen ab (links Container, rechts hier). Bot und Admin Dashboard sind gestoppt, der Container läuft: zurück mit docker start rlnexus-bot rlnexus-admin."
-    else
-        echo "Achtung: Die Zeilen weichen ab (links Container, rechts hier). Kam hier seit dem ersten Lauf Neues dazu, ist das richtig so."
-    fi
+    [ "$anzahl" -gt 0 ] || abbruch "im Container sind keine Tabellen zu finden, so lässt sich nichts vergleichen. $zurueck"
+    # Bot und Admin Dashboard stehen, niemand schreibt: Jede Abweichung ist ein Fehler.
+    diff <(im_container -N -e "$abfrage" 2>&1 | sort) <(mariadb -N -e "$abfrage" 2>&1 | sort) \
+        || abbruch "die Zeilen weichen ab (links Container, rechts hier). $zurueck"
+    touch "$fertig"
+    echo "Alle $anzahl Tabellen haben hier dieselbe Zahl Zeilen wie im Container. Umzug vermerkt in $fertig."
 fi
 
 schritt "Datenbank und Nutzer"
@@ -207,6 +250,9 @@ if [ -n "$bild" ]; then
     else
         abbruch "aus dem Netz $netz kommt $db_user nicht an die Datenbank. ufw status und SELECT user, host FROM mysql.user prüfen."
     fi
+else
+    echo
+    echo "Test aus einem Container übersprungen: Auf dem Server liegt kein mariadb-Image. Nach dem Start von Bot und Admin Dashboard im Log auf „Datenbank verbunden“ achten."
 fi
 
 schritt "phpMyAdmin"

@@ -1,4 +1,5 @@
 import { readdir, readFile } from "node:fs/promises";
+import { setTimeout as sleep } from "node:timers/promises";
 import path from "path";
 import mariadb, { Pool, PoolConnection } from "mariadb";
 import { LRUCache } from "lru-cache";
@@ -22,6 +23,20 @@ export class DatabaseUnavailable extends Error {
         super("Keine Datenbankverbindung.");
         this.name = "DatabaseUnavailable";
     }
+}
+
+/** So lange warten Start-Ereignisse höchstens auf die Datenbank. */
+export const DATABASE_WAIT_MS = 120_000;
+
+/**
+ * Die Datenbank verbindet sich parallel zum Login (BotClient). Beim ersten Start
+ * mit neuen Migrationen ist sie bei „bereit“ von Discord oft noch nicht fertig.
+ * Wer dann schon etwas braucht, wartet hiermit. false: nach ms immer noch nicht.
+ */
+export async function WaitForDatabase(db: { readonly Ready: boolean }, ms = DATABASE_WAIT_MS, step = 1000): Promise<boolean> {
+    for (let waited = 0; !db.Ready && waited < ms; waited += step) await sleep(step);
+
+    return db.Ready;
 }
 
 export default class DatabaseService implements IDatabaseService {
