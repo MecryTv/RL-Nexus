@@ -8,8 +8,13 @@ process.env.CLIENT_SECRET ||= "check-secret";
 process.env.DEV_CLIENT_SECRET ||= "check-secret";
 
 import { ApplicationCommandType, ContextMenuCommandBuilder, SlashCommandBuilder } from "discord.js";
-import { HelpCatalog } from "../constants/Help";
-import { BuildHelp, CatalogProblems } from "../services/help/HelpModel";
+import { glob } from "glob";
+import path from "path";
+import { pathToFileURL } from "url";
+import BotClient from "../client/BotClient";
+import { HelpCatalog, IHelpText, IsGroupText } from "../constants/Help";
+import { HELP_CATALOG } from "../constants/HelpCatalog";
+import { BuildHelp, CatalogProblems, IHelpSource } from "../services/help/HelpModel";
 
 let failures = 0;
 
@@ -105,11 +110,53 @@ function checkModel(): void {
     check("Text ohne Befehl", problems(extra).includes("Hilfetext zu /weg, den Befehl gibt es nicht"), problems(extra));
 }
 
-function main(): void {
+/** Alle Befehle, geladen wie im ConstructionHandler, nur ohne Discord. */
+async function RealCommands(client: BotClient): Promise<IHelpSource[]> {
+    const files = await glob("**/*.{ts,js}", { cwd: path.join(__dirname, "../commands"), absolute: true });
+    const list: IHelpSource[] = [];
+
+    for (const file of files) {
+        const imported = await import(pathToFileURL(file).href);
+        const Class = imported.default?.default ?? imported.default;
+
+        list.push(new Class(client));
+    }
+
+    return list;
+}
+
+async function checkCatalog(client: BotClient): Promise<void> {
+    console.log("\n  — Echte Befehle —");
+
+    const commands = await RealCommands(client);
+    const problems = CatalogProblems(commands, HELP_CATALOG);
+
+    check(`Jeder der ${commands.length} Befehle hat stimmige Hilfetexte`, problems.length === 0, `${problems.length}: ${problems.slice(0, 8).join(" | ")}`);
+
+    const texts: [string, IHelpText][] = [];
+
+    for (const [name, text] of Object.entries(HELP_CATALOG)) {
+        if (IsGroupText(text)) for (const [sub, subText] of Object.entries(text.subs)) texts.push([`${name} ${sub}`, subText]);
+        else texts.push([name, text]);
+    }
+
+    const all = (text: IHelpText) => [text.whoText, text.what, text.tip ?? "", text.when ?? "", ...text.after, ...Object.values(text.fields), ...text.examples.flatMap((example) => [example.code, example.text])];
+    const dashes = texts.filter(([, text]) => all(text).some((line) => line.includes("—") || line.includes(" – ")));
+
+    check("Keine Gedankenstriche in den Texten", dashes.length === 0, dashes.map(([key]) => key).join(", "));
+
+    const wrong = texts.filter(([key, text]) => text.examples.some((example) => !example.code.startsWith(`/${key}`)));
+
+    check("Beispiele beginnen mit dem eigenen Befehl", wrong.length === 0, wrong.map(([key]) => key).join(", "));
+    check("Jeder Slash-Befehl hat ein Beispiel", texts.filter(([key, text]) => key !== "Hack melden" && text.examples.length === 0).length === 0, texts.filter(([key, text]) => key !== "Hack melden" && text.examples.length === 0).map(([key]) => key).join(", "));
+}
+
+async function main(): Promise<void> {
     checkModel();
+    await checkCatalog(new BotClient());
 
     console.log(failures === 0 ? "\n✅ Alle Prüfungen bestanden.\n" : `\n❌ ${failures} Prüfung(en) fehlgeschlagen.\n`);
     process.exit(failures > 0 ? 1 : 0);
 }
 
-main();
+void main();
