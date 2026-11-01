@@ -170,6 +170,26 @@ async function checkCatalog(client: BotClient): Promise<void> {
     }
 
     check(`Alle ${pages.length} echten Seiten passen in eine Nachricht`, tooBig.length === 0, tooBig.slice(0, 6).join(", "));
+
+    // Alle Seiten eines Befehls zusammen - das Kapitel darf auch auf Seite 2 stehen.
+    const blocksOf = (name: string) => {
+        const entry = real.find((candidate) => candidate.name === name);
+
+        return entry ? [0, 1, 2, 3].flatMap((index) => HelpCommandPage(entry, null, index, CONTEXT).blocks) : [];
+    };
+
+    for (const name of ["warn", "timeout", "kick", "ban"]) {
+        const steps = blocksOf(name).find((block) => block.kind === "steps" && block.title === "Beweise anhängen");
+        const items = steps?.kind === "steps" ? steps.items.join(" ") : "";
+
+        check(
+            `/${name}: Kapitel „Beweise anhängen“ mit drei Wegen`,
+            steps?.kind === "steps" && steps.items.length === 3 && items.includes("beweislink") && items.includes("/fall beweis") && items.includes("Als Beweis sichern"),
+            items
+        );
+    }
+
+    check("/unwarn hat kein solches Kapitel", !blocksOf("unwarn").some((block) => block.kind === "steps" && block.title === "Beweise anhängen"));
     check("Jeder Slash-Befehl hat ein Beispiel", texts.filter(([key, text]) => key !== "Hack melden" && text.examples.length === 0).length === 0, texts.filter(([key, text]) => key !== "Hack melden" && text.examples.length === 0).map(([key]) => key).join(", "));
 }
 

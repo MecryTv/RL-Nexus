@@ -143,7 +143,8 @@ export function DirectView(entry: IModCase, guildName: string): IModView {
 }
 
 /** Die Antwort auf einen Befehl - nur für den Moderator sichtbar. */
-export function DoneView(entry: IModCase, logged: boolean): IModView {
+/** problems: Beweise, die nicht ankamen - die Strafe gilt trotzdem. */
+export function DoneView(entry: IModCase, logged: boolean, problems: string[] = []): IModView {
     const info = ACTION_INFO[entry.action];
     const target = entry.targetId ? `**${Name(entry.targetName, entry.targetId)}**` : null;
     const headline =
@@ -155,6 +156,7 @@ export function DoneView(entry: IModCase, logged: boolean): IModView {
         .text(`### ${headline} – Fall ${CaseRef(entry.number)}`)
         .text(Facts(entry, false).filter((line) => !line.startsWith("**Moderator:**") && !line.startsWith("**User:**")).join("\n") || "Ohne Grund.");
 
+    if (problems.length) builder.text(`**Nicht gesichert:**\n${problems.map((problem) => `- ${problem}`).join("\n")}`);
     if (extra) builder.subtext(extra);
 
     return { components: [builder.build()] };
@@ -167,7 +169,7 @@ export function DetailView(entry: IModCase, link: string | null): IModView {
     const extra: string[] = [];
 
     for (const note of entry.notes.slice(-5)) extra.push(`📝 **${escapeMarkdown(note.byName)}** ${Stamp(note.at, "R")}: ${escapeMarkdown(note.text).slice(0, 300)}`);
-    for (const item of entry.evidence.slice(-5)) extra.push(`📎 ${item.kind === "link" ? item.value : escapeMarkdown(item.name ?? item.value)} · ${escapeMarkdown(item.byName)}`);
+    for (const item of entry.evidence.slice(-5)) extra.push(`📎 ${item.kind === "image" ? escapeMarkdown(item.name ?? item.value) : item.value} · ${escapeMarkdown(item.byName)}`);
 
     if (extra.length) {
         return {

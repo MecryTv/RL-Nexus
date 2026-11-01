@@ -249,6 +249,21 @@ function CommandGroups(command: IHelpCommand): HelpBlock[][] {
             : [{ kind: "heading", text: "Felder" }, { kind: "text", text: "Keine, einfach abschicken." }]
     );
 
+    if (text.evidence) {
+        groups.push([
+            {
+                kind: "steps",
+                title: "Beweise anhängen",
+                items: [
+                    "Gleich beim Befehl: ein Bild in **beweis**, ein Link in **beweislink**. Ein Nachrichtenlink sichert die Nachricht selbst.",
+                    "Später mit `/fall beweis`: Bild oder Link an die Fallnummer.",
+                    "Rechtsklick auf die Nachricht › Apps › „Als Beweis sichern“.",
+                ],
+            },
+            { kind: "text", text: "Verlangt der Server für diese Strafe einen Beweis, geht sie ohne nicht. Das stellst du im Dashboard unter Moderation ein." },
+        ]);
+    }
+
     if (text.after.length) groups.push([{ kind: "heading", text: "Was danach passiert" }, { kind: "list", items: text.after }]);
     if (text.tip) groups.push([{ kind: "tip", text: text.tip }]);
 

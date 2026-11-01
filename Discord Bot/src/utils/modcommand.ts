@@ -70,8 +70,8 @@ export function ActorOf(member: GuildMember): IModActor {
 
 /**
  * Eine Aktion aus einem Befehl. build liest die Optionen - wirft es, steht der
- * Satz als Antwort da. Die Antwort sieht nur der Moderator; öffentlich ist die
- * Karte im Log-Kanal.
+ * Satz als Antwort da. Beweise aus beweis und beweislink hängen gleich am Fall.
+ * Die Antwort sieht nur der Moderator; öffentlich ist die Karte im Log-Kanal.
  */
 export async function RunAction(client: BotClient, interaction: ChatInputCommandInteraction, build: () => IModRequest): Promise<void> {
     try {
@@ -80,9 +80,11 @@ export async function RunAction(client: BotClient, interaction: ChatInputCommand
 
         await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
-        const entry = await client.moderationService.Act(member.guild, member, request, "discord");
+        // Nur /warn, /timeout, /kick und /ban haben die Felder - sonst bleiben beide leer.
+        const proof = { image: interaction.options.getAttachment("beweis") ?? undefined, link: interaction.options.getString("beweislink") };
+        const { entry, problems } = await client.moderationService.ActWithProof(member.guild, member, request, "discord", proof);
 
-        await ModSay(interaction, DoneView(entry, entry.logMessage !== null));
+        await ModSay(interaction, DoneView(entry, entry.logMessage !== null, problems));
     } catch (error) {
         await Fail(interaction, error, "Aktion");
     }

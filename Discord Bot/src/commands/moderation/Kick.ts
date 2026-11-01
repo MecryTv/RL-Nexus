@@ -14,7 +14,9 @@ export default class Kick extends Command {
             .setDescription(this.description)
             .setContexts(InteractionContextType.Guild)
             .addUserOption((option) => option.setName("user").setDescription("Wen?").setRequired(true))
-            .addStringOption((option) => option.setName("grund").setDescription("Warum? Steht im Log und in der DM").setMaxLength(MAX_REASON));
+            .addStringOption((option) => option.setName("grund").setDescription("Warum? Steht im Log und in der DM").setMaxLength(MAX_REASON))
+            .addAttachmentOption((option) => option.setName("beweis").setDescription("Ein Screenshot als Beweis: PNG, JPG, GIF oder WebP"))
+            .addStringOption((option) => option.setName("beweislink").setDescription("Ein https-Link oder Nachrichtenlink als Beweis").setMaxLength(500));
     }
 
     async Execute(interaction: ChatInputCommandInteraction): Promise<void> {

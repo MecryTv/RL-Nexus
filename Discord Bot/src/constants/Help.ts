@@ -44,6 +44,8 @@ export interface IHelpText {
     tip?: string;
     /** Nur bei Unterbefehlen: die kleine Zeile über dem Kapitel (Gruppe K). */
     when?: string;
+    /** Strafen: die Seite bekommt das Kapitel „Beweise anhängen“. */
+    evidence?: true;
 }
 
 /** Ein Befehl mit Unterbefehlen (Gruppe K). Die Reihenfolge in subs ist die der Kapitel. */

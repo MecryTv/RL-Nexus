@@ -16,6 +16,12 @@ const PUNISH_AFTER = [
     "Der User bekommt eine DM mit Grund und Fallnummer, wenn das im Dashboard an ist (ohne deinen Namen)",
 ];
 
+/** Die Beweis-Felder der Strafen. */
+const PROOF_FIELDS = {
+    beweis: "Ein Screenshot als Beweis: PNG, JPG, GIF oder WebP, bis 8 MB.",
+    beweislink: "Ein https-Link als Beweis. Ein Nachrichtenlink von diesem Server sichert die Nachricht selbst.",
+};
+
 function Mod(text: Omit<IHelpText, "area" | "module" | "who" | "whoText"> & { whoText?: string }): IHelpText {
     return { area: "moderation", module: "moderation", who: "team", whoText: MOD, ...text };
 }
@@ -27,7 +33,8 @@ export const HELP_CATALOG: HelpCatalog = {
         whoText: "Moderations-Team: Moderatoren-Liste oder „Mitglieder im Timeout“",
         what: "Verwarnt einen User. Eine Verwarnung ist ein Eintrag mit Grund, sonst passiert erst einmal nichts. Erreicht der User eine Stufe, folgt die Strafe von selbst, etwa ab 3 Verwarnungen ein Timeout.",
         examples: [{ code: "/warn user:@nico grund:Spam im Allgemein-Chat", text: "Verwarnt nico, der Grund steht im Fall und in der DM" }],
-        fields: { user: "Wer verwarnt wird.", grund: "Pflicht. Steht im Fall, im Log und in der DM." },
+        fields: { user: "Wer verwarnt wird.", grund: "Pflicht. Steht im Fall, im Log und in der DM.", ...PROOF_FIELDS },
+        evidence: true,
         after: [...PUNISH_AFTER, "Greift eine Stufe aus dem Dashboard, kommt die Strafe als eigener Fall dazu"],
         tip: "Die Stufen stellst du im Dashboard unter Moderation ein. Zurücknehmen geht mit /unwarn.",
     }),
@@ -50,7 +57,8 @@ export const HELP_CATALOG: HelpCatalog = {
             { code: "/timeout user:@nico dauer:1h", text: "Eine Stunde stumm, ohne Grund" },
             { code: "/timeout user:@nico dauer:1d grund:Beleidigung", text: "Einen Tag, der Grund steht im Fall und in der DM" },
         ],
-        fields: { user: "Wer stumm wird.", dauer: "Etwa 10m, 2h, 1h30m oder 1d, höchstens 28 Tage. Beim Tippen rechnet der Bot vor.", grund: "Steht im Fall, im Log und in der DM." },
+        fields: { user: "Wer stumm wird.", dauer: "Etwa 10m, 2h, 1h30m oder 1d, höchstens 28 Tage. Beim Tippen rechnet der Bot vor.", grund: "Steht im Fall, im Log und in der DM.", ...PROOF_FIELDS },
+        evidence: true,
         after: PUNISH_AFTER,
         tip: "Früher aufheben mit /untimeout. Admins lassen sich nicht stummschalten.",
     }),
@@ -67,7 +75,8 @@ export const HELP_CATALOG: HelpCatalog = {
         whoText: "Moderations-Team: Moderatoren-Liste oder „Mitglieder kicken“",
         what: "Wirft einen User vom Server. Mit einer Einladung kann er zurückkommen.",
         examples: [{ code: "/kick user:@nico grund:Werbung trotz Verwarnung", text: "nico fliegt raus, die DM geht vorher raus" }],
-        fields: { user: "Wer rausfliegt.", grund: "Steht im Fall, im Log und in der DM." },
+        fields: { user: "Wer rausfliegt.", grund: "Steht im Fall, im Log und in der DM.", ...PROOF_FIELDS },
+        evidence: true,
         after: [...PUNISH_AFTER.slice(0, 2), "Die DM geht vor dem Kick raus, sonst käme sie nicht mehr an"],
     }),
     ban: Mod({
@@ -83,7 +92,9 @@ export const HELP_CATALOG: HelpCatalog = {
             grund: "Steht im Fall, im Log und in der DM.",
             dauer: "Befristet, etwa 3d oder 1w, höchstens ein Jahr. Leer bleibt der Bann dauerhaft.",
             loeschen: "Nachrichten der letzten Stunde bis sieben Tage mitlöschen.",
+            ...PROOF_FIELDS,
         },
+        evidence: true,
         after: [...PUNISH_AFTER.slice(0, 2), "Die DM geht vor dem Bann raus, wenn das im Dashboard an ist", "Ein befristeter Bann endet von selbst"],
         tip: "Aufheben mit /unban.",
     }),
@@ -126,9 +137,9 @@ export const HELP_CATALOG: HelpCatalog = {
                 emoji: "📎",
                 whoText: "Das Moderations-Team",
                 when: "Später mehr gefunden",
-                what: "Hängt ein Bild oder einen Link als Beweis an einen Fall, bis zu 20 je Fall. Nur das Team sieht Beweise.",
+                what: "Hängt ein Bild oder einen Link als Beweis an einen Fall, bis zu 20 je Fall. Ein Nachrichtenlink von diesem Server sichert die Nachricht selbst, mit Verfasser, Kanal und Zeit. Nur das Team sieht Beweise.",
                 examples: [{ code: "/fall beweis nummer:128 bild:dm.png", text: "Der Screenshot hängt an Fall 128" }],
-                fields: { nummer: "Welcher Fall.", bild: "Ein Screenshot: PNG, JPG, GIF oder WebP, bis 8 MB.", link: "Oder ein https-Link." },
+                fields: { nummer: "Welcher Fall.", bild: "Ein Screenshot: PNG, JPG, GIF oder WebP, bis 8 MB.", link: "Oder ein https-Link, auch ein Nachrichtenlink." },
                 after: ["Der Beweis steht am Fall", "Die Karte im Log-Kanal wird nachgezogen"],
             }),
             notiz: Mod({

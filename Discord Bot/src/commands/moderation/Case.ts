@@ -2,7 +2,7 @@ import { ChatInputCommandInteraction, InteractionContextType, MessageFlags, Slas
 import BotClient from "../../client/BotClient";
 import Command from "../../structures/Command";
 import Category from "../../enums/Category";
-import { DetailView } from "../../builder/ModerationView";
+import { DetailView, ModErrorView } from "../../builder/ModerationView";
 import { CaseRef, MAX_NOTE } from "../../constants/Moderation";
 import { ModerationError } from "../../services/ModerationService";
 import { ActorOf, Fail, MemberOf, ModSay } from "../../utils/modcommand";
@@ -53,6 +53,7 @@ export default class Case extends Command {
 
             const number = interaction.options.getInteger("nummer", true);
             let entry = await service.CaseOf(member.guild.id, number);
+            let problems: string[] = [];
 
             if (sub === "notiz") {
                 entry = await service.AddNote(member.guild.id, ActorOf(member), number, interaction.options.getString("text", true));
@@ -64,11 +65,18 @@ export default class Case extends Command {
 
                 if (!image && !link) throw new ModerationError(`Hänge ein Bild an oder gib einen Link an – dann landet er an Fall ${CaseRef(number)}.`);
 
-                if (image) entry = await service.AddAttachment(member.guild.id, ActorOf(member), number, image);
-                if (link) entry = await service.AddLink(member.guild.id, ActorOf(member), number, link);
+                const result = await service.AddProof(member.guild, ActorOf(member), number, { image: image ?? undefined, link });
+
+                // Kam gar nichts an, ist das ein Fehler wie früher.
+                if (result.entry.evidence.length === entry.evidence.length) throw new ModerationError(result.problems.join("\n"));
+
+                entry = result.entry;
+                problems = result.problems;
             }
 
-            await ModSay(interaction, DetailView(entry, service.Link(entry)));
+            const view = DetailView(entry, service.Link(entry));
+
+            await ModSay(interaction, problems.length ? { components: [...view.components, ...ModErrorView(`Nicht gesichert:\n${problems.join("\n")}`).components] } : view);
         } catch (error) {
             await Fail(interaction, error, sub);
         }

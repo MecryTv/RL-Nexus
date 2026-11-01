@@ -249,6 +249,11 @@ function checkViews(): void {
 
     check("Die DM nennt den Moderator nicht", !dm.includes("Helfer Hanna"));
     check("Die DM nennt die Zahl der Verwarnungen", dm.includes("3."));
+
+    const missing = JSON.stringify(DoneView(warn, true, ["Bild: Das Bild ist größer als 8 MB."]).components.map((part) => part.toJSON()));
+
+    check("Die Antwort nennt, welcher Beweis fehlt", missing.includes("Nicht gesichert") && missing.includes("Bild: Das Bild ist größer als 8 MB."), missing.slice(0, 300));
+    check("Ohne Problem kein Hinweis", !JSON.stringify(DoneView(warn, true).components.map((part) => part.toJSON())).includes("Nicht gesichert"));
 }
 
 function checkProof(client: BotClient): void {
