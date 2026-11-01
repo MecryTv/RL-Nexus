@@ -184,7 +184,7 @@ ${selected.field.hint}`);
     builder.buttons(
         ...(view.done ? [{ customId: PanelId("u", panel.id, view.done.key), label: "Rückgängig", emoji: "↩️" }] : []),
         ...(panel.id === "tickets" ? [{ customId: PanelId("p", panel.id), label: "Panel senden", emoji: "📨" }] : []),
-        ...(panel.permanent ? [] : [{ customId: PanelId("x", panel.id, undefined, state.on ? "off" : "on"), label: state.on ? "Modul aus" : "Modul an", emoji: "⏻" }]),
+        ...(panel.permanent ? [] : [{ customId: PanelId("x", panel.id, undefined, state.on ? "off" : "on"), label: state.on ? "Modul aus" : "Modul an", emoji: "🔌" }]),
         { customId: PanelId("s"), label: "◀ Alle Module" },
         { url: state.link, label: "Dashboard", emoji: "🖥️" }
     );

@@ -12,7 +12,7 @@ Spec: `Admin Dashboard/docs/superpowers/specs/2026-11-01-einstellungen-panel-des
 | `/einstellungen modul:Tickets` | Panel: Übersicht als Bild, jede Einstellung eine nummerierte Kachel mit ihrem Wert, gruppiert in Abschnitte, darunter „Nur im Dashboard“ |
 | Menü „Was willst du ändern?“ | Die Kachel leuchtet, darunter das passende Feld: Kanal- oder Rollen-Auswahl (mit „Keiner“), Knöpfe An/Aus, ein Menü mit den Möglichkeiten oder „Ändern“ für ein Fenster (Zahl, Text, Stufen) |
 | Nach dem Speichern | Bild neu, geänderte Kachel golden, „✅ Einstellung: alt → neu“ und „↩ Rückgängig“ |
-| Knöpfe | „⏻ Modul an/aus“ (nicht bei Level), „📨 Panel senden“ (Tickets), „◀ Alle Module“, „Dashboard“ |
+| Knöpfe | „🔌 Modul an/aus“ (nicht bei Level), „📨 Panel senden“ (Tickets), „◀ Alle Module“, „Dashboard“ |
 
 Wer darf: wer „Server verwalten“ hat (oder der Owner), wie bei den Einstellungen im Dashboard. Der Befehl ist für alle anderen in Discord ausgeblendet (`setDefaultMemberPermissions`), jeder Klick prüft es trotzdem.
 

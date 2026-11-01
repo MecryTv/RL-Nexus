@@ -252,6 +252,13 @@ async function checkView(start: Record<PanelModuleId, unknown>): Promise<void> {
         check(`${panel.name}: höchstens 10 Bilder, 40 Bausteine`, message.files.length >= 1 && message.files.length <= 10 && Count(parts) <= 40, `${message.files.length} Bilder, ${Count(parts)} Bausteine`);
         check(`${panel.name}: Menü mit allen ${fields.length} Feldern, nummeriert`, json.includes(`"custom_id":"set:w:${panel.id}"`) && menu === fields.length && json.includes(`"label":"1 · ${fields[0].label}"`), `${menu} Einträge`);
         check(`${panel.name}: Knopf ins Dashboard`, json.includes(link));
+
+        // Discord lehnt die ganze Nachricht ab, wenn ein Knopf ein Zeichen statt eines Emojis trägt (etwa ⏻).
+        for (const view of [message, await PanelView({ ...state, on: false }, { done: { key: fields[0].key, before: "a", after: "b" } })]) {
+            const emojis = [...JSON.stringify(view.components.map((part) => part.toJSON())).matchAll(/"emoji":\{"name":"([^"]+)"/g)].map((match) => match[1]);
+
+            check(`${panel.name}: nur echte Emojis an Knöpfen und Menüs`, emojis.every((emoji) => /\p{Extended_Pictographic}/u.test(emoji)), emojis.join(" "));
+        }
         check(`${panel.name}: ${panel.permanent ? "kein" : "ein"} Knopf zum Ausschalten`, json.includes(`set:x:${panel.id}`) !== panel.permanent);
     }
 

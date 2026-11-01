@@ -111,7 +111,7 @@ export default class SettingsButtons extends Event {
                         break;
                     case "x":
                         await service.SetModule(guild, member, module, target.extra === "on");
-                        view = { note: `⏻ ${PANEL_MODULES[module].name} ist jetzt ${target.extra === "on" ? "an" : "aus"}.` };
+                        view = { note: `🔌 ${PANEL_MODULES[module].name} ist jetzt ${target.extra === "on" ? "an" : "aus"}.` };
                         break;
                     case "p":
                         view = { note: `📨 Panel gesendet: ${await service.SendPanel(guild, member)}` };
