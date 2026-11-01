@@ -19,4 +19,13 @@ export default interface IDashboardUser {
     email: string | null;
     avatar: string | null;
     group: DashboardGroup;
+    /** W-0017: die laufenden Zugänge aus dem Shop. null ohne Datenbank, fehlt bei Sitzungen ohne Payload. */
+    access?: IAccessEnd[] | null;
+}
+
+/** W-0017: ein laufender Zugang und wie er endet. Gespiegelt in dashboard/client/constants/Access.ts. */
+export interface IAccessEnd {
+    name: string;
+    kind: "trial" | "renews" | "cancelled" | "until" | "unlimited" | "frozen";
+    endsAt: number | null;
 }

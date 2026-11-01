@@ -7,6 +7,7 @@ import { avatarOf } from "../layout/Profile.js";
 import { applyMotion, prefs, savePrefs } from "../core/Prefs.js";
 import { clickSound } from "../core/Sound.js";
 import { toast } from "../core/Toast.js";
+import { AccessText } from "../constants/Access.js";
 
 export function paintProfileCard(user: IUser): void {
     const group = GROUPS[user.group] ?? GROUPS.testphase;
@@ -19,6 +20,12 @@ export function paintProfileCard(user: IUser): void {
     need<HTMLElement>("#idUser").textContent = user.id;
 
     need<HTMLElement>("#idGroupText").textContent = group.grants;
+
+    // W-0017: bis wann der Zugang aus dem Shop läuft. Ohne Zugang aus dem Shop (Staff, Partner) oder ohne Datenbank bleibt die Zeile weg.
+    if (user.access?.length) {
+        need<HTMLElement>("#idAccess").replaceChildren(...user.access.map((entry) => Object.assign(document.createElement("div"), { textContent: AccessText(entry) })));
+        need<HTMLElement>("#idAccessField").hidden = false;
+    }
 
     const mail = need<HTMLElement>("#idMail");
 
