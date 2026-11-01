@@ -53,8 +53,9 @@ export function bindNav(): INav {
     let drawn = "";
 
     const group = (area: string): HTMLElement | null => nav.querySelector<HTMLElement>(`.setnav__group[data-area="${area}"]`);
+    // In der Spalte: die Module, und Teile, deren Modul man nicht sehen darf (is-alone).
     const count = (area: string): number =>
-        [...(group(area)?.querySelectorAll<HTMLAnchorElement>("a[data-section]:not(.is-sub)") ?? [])].filter((link) => !link.hidden).length;
+        [...(group(area)?.querySelectorAll<HTMLAnchorElement>("a[data-section]:not(.is-sub), a.is-alone") ?? [])].filter((link) => !link.hidden).length;
 
     for (const category of CATEGORIES) {
         const button = document.createElement("button");
@@ -165,6 +166,15 @@ export function bindNav(): INav {
     }
 
     function refresh(): void {
+        // Ein Moderator mit only sieht etwa Live Tickets, aber nicht das Ticket System:
+        // dann steht der Teil selbst in der Spalte, sonst käme er nirgends hin.
+        for (const sub of nav.querySelectorAll<HTMLAnchorElement>("a.is-sub:not([data-liste])")) {
+            const owner = ownerOf(sub.dataset.section ?? "");
+            const main = owner ? nav.querySelector<HTMLAnchorElement>(`a[data-section="${owner.id}"]:not(.is-sub)`) : null;
+
+            sub.classList.toggle("is-alone", !sub.hidden && main?.hidden === true);
+        }
+
         for (const [area, button] of buttons) {
             const n = count(area);
 
