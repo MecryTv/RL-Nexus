@@ -300,11 +300,13 @@ export function renderGuild(data: IPayload): void {
 
         if (guild.canManage) whenShown(["apply"], () => void import("./GuildApply.js").then((module) => module.renderApply(guild.id)));
         if (guild.canManage || guild.canReview) whenShown(["applications"], () => void import("./GuildApply.js").then((module) => module.renderApplications(guild.id)));
-        if (guild.canModerate) whenShown(["moderation"], () => void import("./GuildModeration.js").then((module) => module.renderModeration(guild.id)));
-        else maybe<HTMLElement>("#modNote")?.removeAttribute("hidden");
         // Live Tickets meldet fertige Transcripts - der Stream läuft auch, wenn nur Transcriptions offen ist.
         whenShown(["live-tickets", "transcriptions"], () => void import("./GuildLive.js").then((module) => module.renderLive(guild.id, user)));
     }
+
+    // Moderation: Staff mit Freigabe sieht Einstellungen und Aktionen, die Fälle nur mit dem extra Ja (die Route sperrt sie).
+    if (guild.canModerate || guild.staff) whenShown(["moderation"], () => void import("./GuildModeration.js").then((module) => module.renderModeration(guild.id)));
+    else maybe<HTMLElement>("#modNote")?.removeAttribute("hidden");
 
     // W-0011: Leiste, Infokarte und Anfrage für Staff.
     if (staffView) void import("./GuildStaff.js").then((module) => module.renderStaffView(guild));

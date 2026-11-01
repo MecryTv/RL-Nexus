@@ -20,6 +20,8 @@ import IDashboardGuild from "../interfaces/services/dashboard/IDashboardGuild";
 import DashboardService, { StaffOverlay } from "../services/DashboardService";
 import { ManageGate, PrivateGate, PrivateItem, StaffGrantOf } from "../utils/managegate";
 import LiveService from "../services/LiveService";
+import { ModGate } from "../utils/modgate";
+import { ModerationLock } from "../routes/DashboardApiModeration";
 import { SessionOf } from "../utils/dashboard";
 import BotClient from "../client/BotClient";
 import { PRIVATE_HINT, REQUEST_TTL_MS } from "../constants/StaffGrant";
@@ -980,6 +982,77 @@ async function checkReviewFixes(): Promise<void> {
     }
 }
 
+/* ----------------------------------------------------------
+   Nutzer-Entscheidung 01.11.: Moderation – nur die Fälle sind privat
+   ---------------------------------------------------------- */
+
+class ModProbe extends Route {
+    constructor(client: BotClient) {
+        super(client, {
+            method: ["GET", "POST"],
+            path: `${DASHBOARD_PATH}/api/guild/:id/modprobe`,
+            description: "Prüft ModGate",
+            prefixed: false,
+            requiresAuth: false,
+        });
+    }
+
+    async Handle(request: FastifyRequest, reply: FastifyReply): Promise<unknown> {
+        const whole = (request.query as { whole?: string }).whole === "1";
+        const access = await ModGate(this.client, request, reply, whole);
+
+        if (!access) return reply;
+
+        return reply.send({ locked: access.locked });
+    }
+}
+
+function ModApp(grant: IStaffGrant | null) {
+    const guild = { id: GATE_GUILD, members: { cache: new Map(), fetch: async () => null, me: { id: "bot", displayName: "RL Nexus" } } };
+    const client = {
+        dashboardService: {
+            Session: (cookie: string | undefined) =>
+                cookie === "gueltig" ? { id: "s", userId: "900", username: "Joe", avatar: null, accessToken: "x", mfa: true, expiresAt: Date.now() + 60_000 } : null,
+            CanModerate: async () => false,
+            IsStaff: async () => true,
+            Secure: false,
+        },
+        databaseService: { Ready: true },
+        guilds: { cache: new Map([[GATE_GUILD, guild]]) },
+        settings: { Of: async () => ({ modules: ["moderation"] }) },
+        moderationService: { CanManage: () => true },
+        staffGrantService: { Active: () => grant, Seen: () => undefined, Log: () => undefined },
+    } as unknown as BotClient;
+    const instance = fastify({ logger: false });
+    const manager = new RouteManager(client);
+
+    manager.Register(new ModProbe(client));
+    manager.Apply(instance);
+
+    return (whole: boolean) => instance.inject({ method: "GET", url: `${DASHBOARD_PATH}/api/guild/${GATE_GUILD}/modprobe${whole ? "?whole=1" : ""}`, headers: { cookie: `${SESSION_COOKIE}=gueltig` } });
+}
+
+async function checkModerationSplit(): Promise<void> {
+    console.log("\n🛡️ Moderation: nur die Fälle privat\n");
+
+    check("Fall ansehen: gesperrt", ModerationLock(true, false, { case: "3" }, {}) === PRIVATE_HINT);
+    check("Verlauf mit Einstellungen: erlaubt (Fälle bleiben leer)", ModerationLock(true, false, { meta: "1" }, {}) === null);
+    check("Notiz: gesperrt", ModerationLock(true, true, {}, { action: "note" }) === PRIVATE_HINT);
+    check("Beweis entfernen: gesperrt", ModerationLock(true, true, {}, { action: "evidence-remove" }) === PRIVATE_HINT);
+    check("Einstellungen speichern: erlaubt", ModerationLock(true, true, {}, { action: "save" }) === null);
+    check("Ohne Sperre: Fall erlaubt", ModerationLock(false, false, { case: "3" }, {}) === null);
+
+    const call = ModApp(Running({ endsAt: Date.now() + 60 * MIN }));
+    const settings = await call(false);
+    check("ModGate für die Moderation: Staff ohne privates Ja kommt durch, gesperrt", settings.statusCode === 200 && (settings.json() as { locked?: boolean }).locked === true, settings.body);
+
+    const evidence = await call(true);
+    check("ModGate für Beweise (ganz privat): 403", evidence.statusCode === 403, evidence.body);
+
+    const open = await ModApp(Running({ endsAt: Date.now() + 60 * MIN, private: "on" }))(false);
+    check("Mit privatem Ja: nicht gesperrt", open.statusCode === 200 && (open.json() as { locked?: boolean }).locked === false, open.body);
+}
+
 async function main(): Promise<void> {
     checkRules();
     checkAnswer();
@@ -997,6 +1070,7 @@ async function main(): Promise<void> {
     await checkApi();
     checkJoined();
     await checkReviewFixes();
+    await checkModerationSplit();
 
     console.log(failures ? `\n❌ ${failures} Prüfung(en) fehlgeschlagen` : "\n✅ Alles in Ordnung");
     process.exit(failures ? 1 : 0);

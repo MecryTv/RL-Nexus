@@ -807,7 +807,9 @@ export function renderAntiVillain(guildId: string): void {
             card(
                 "Protokoll",
                 "Alles, was Anti Villain getan hat, die letzten 30 Tage, neueste oben.",
-                list.length
+                data!.casesLocked
+                    ? el("p", "avempty", icon("#i-lock"), "Privater Bereich: Das Protokoll mit Namen und Gründen siehst du nur mit dem extra Ja.")
+                    : list.length
                     ? el("ol", "avlog", ...list.map((entry) => el("li", `is-${entry.kind}`, el("time", "", WHEN.format(new Date(entry.at))), el("b", "", entry.title), ...(entry.detail ? [el("span", "", entry.detail)] : []))))
                     : el("p", "hintline", "Noch nichts passiert.")
             ),

@@ -1136,8 +1136,9 @@ async function checkApiStaff(): Promise<void> {
     (world.client.dashboardService as unknown as Record<string, unknown>).IsStaff = async () => true;
 
     const shut = await ask("GET");
-    const body = (shut.statusCode === 200 ? shut.json() : {}) as { cases?: unknown[]; casesLocked?: boolean };
+    const body = (shut.statusCode === 200 ? shut.json() : {}) as { cases?: unknown[]; casesLocked?: boolean; protocol?: unknown[] };
     check("Staff ohne private Bereiche: keine Fälle, gesperrt", shut.statusCode === 200 && body.cases?.length === 0 && body.casesLocked === true, shut.body.slice(0, 200));
+    check("Staff ohne private Bereiche: kein Protokoll (Nutzer 01.11.)", Array.isArray(body.protocol) && body.protocol.length === 0, JSON.stringify(body.protocol));
 
     const release = await ask("POST", { action: "release", id: held.id });
     check("Staff ohne private Bereiche: Freigeben 403", release.statusCode === 403 && (release.json() as { hint?: string }).hint === PRIVATE_HINT, release.body);

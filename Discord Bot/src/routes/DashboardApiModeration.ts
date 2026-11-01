@@ -2,6 +2,7 @@ import { ChannelType, Guild } from "discord.js";
 import { FastifyReply, FastifyRequest } from "fastify";
 import BotClient from "../client/BotClient";
 import Route from "../structures/Route";
+import { PRIVATE_HINT } from "../constants/StaffGrant";
 import { DASHBOARD_PATH } from "../constants/Dashboard";
 import { SNOWFLAKE } from "../constants/Discord";
 import { DURATION_PRESETS, DELETE_CHOICES, MOD_ACTIONS } from "../constants/Moderation";
@@ -40,6 +41,22 @@ function IsRecord(value: unknown): value is Record<string, unknown> {
  * Notizen, Links, Einstellungen. Beweisbilder laufen über
  * DashboardApiModerationEvidence.
  */
+/** Aktionen an einzelnen Fällen - mit Staff-Freigabe nur mit dem extra Ja (W-0011). */
+const CASE_ACTIONS = new Set(["note", "note-remove", "link", "evidence-remove"]);
+
+/**
+ * W-0011 (Nutzer, 01.11.): Bei der Moderation sind nur die Fälle privat. Gesperrt
+ * heißt: Staff mit Freigabe ohne das extra Ja. Gibt den Hinweis zurück, wenn die
+ * Anfrage an einen Fall geht, sonst null - Einstellungen und Aktionen gehen.
+ */
+export function ModerationLock(locked: boolean, writing: boolean, query: Record<string, string | undefined>, body: Record<string, unknown>): string | null {
+    if (!locked) return null;
+    if (!writing && query.case !== undefined) return PRIVATE_HINT;
+    if (writing && CASE_ACTIONS.has(String(body.action))) return PRIVATE_HINT;
+
+    return null;
+}
+
 export default class DashboardApiModeration extends Route {
     constructor(client: BotClient) {
         super(client, {
@@ -57,11 +74,19 @@ export default class DashboardApiModeration extends Route {
 
         if (writing && !WantsJSON(request)) return reply.code(415).send({ error: "Nur application/json" });
 
-        const access = await ModGate(this.client, request, reply);
+        const access = await ModGate(this.client, request, reply, false);
 
         if (!access) return reply;
 
         reply.header("Cache-Control", "no-store");
+
+        // W-0011: Staff mit Freigabe sieht ohne das extra Ja keine Fälle, Notizen und Beweise (Nutzer, 01.11.).
+        const query = (request.query ?? {}) as Record<string, string | undefined>;
+        const blocked = ModerationLock(access.locked, writing, query, (request.body ?? {}) as Record<string, unknown>);
+
+        if (blocked) return reply.code(403).send({ error: "Forbidden", hint: blocked });
+
+        if (!writing && access.grant && !access.locked) this.client.staffGrantService.Seen(access.grant, "Fälle Moderation", query.case !== undefined ? `Fall #${query.case}` : "Liste");
 
         try {
             if (!writing) return reply.send(await this.Read(access, request.query as Record<string, string | undefined>));
@@ -79,6 +104,8 @@ export default class DashboardApiModeration extends Route {
        Lesen
        ---------------------------------------------------------- */
     private async Read(access: IModAccess, query: Record<string, string | undefined>): Promise<unknown> {
+        if (access.locked) return this.LockedRead(access, query);
+
         const { guild, member, manage } = access;
         const cases = this.client.modCases;
 
@@ -184,6 +211,14 @@ export default class DashboardApiModeration extends Route {
             joinedAt: member?.joinedTimestamp ?? null,
             counts,
         };
+    }
+
+    /** W-0011: Staff ohne das extra Ja - Einstellungen und Aktionen, aber keine Fälle. */
+    private async LockedRead(access: IModAccess, query: Record<string, string | undefined>): Promise<unknown> {
+        // Dieselbe Antwort wie sonst, nur vor Fall 0 gelesen (also keiner) und ohne Zahlen und Kopf des Verlaufs.
+        const full = (await this.Read({ ...access, locked: false }, { ...query, before: "0", user: undefined })) as Record<string, unknown>;
+
+        return { ...full, cases: [], more: false, stats: undefined, target: undefined, casesLocked: true };
     }
 
     /* ----------------------------------------------------------

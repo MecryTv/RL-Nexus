@@ -14,8 +14,8 @@ import { onMyPulse, onPulse } from "../core/Pulse.js";
 import { toast } from "../core/Toast.js";
 import { button, el, face, toggle } from "../core/Ui.js";
 
-/** Abschnitte, die nur mit dem extra Ja aufgehen. Anti Villain sperrt seine Fälle selbst. */
-export const PRIVATE_SECTIONS = ["live-tickets", "transcriptions", "applications", "apply", "moderation"];
+/** Abschnitte, die nur mit dem extra Ja aufgehen. Moderation und Anti Villain sperren nur ihre Fälle selbst. */
+export const PRIVATE_SECTIONS = ["live-tickets", "transcriptions", "applications", "apply"];
 
 const NOTICE_KEY = "rlnexus.staffNotice";
 const PRESETS = [30, 60, 180];

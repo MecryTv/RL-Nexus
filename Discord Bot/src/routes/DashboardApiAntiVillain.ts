@@ -145,7 +145,8 @@ export default class DashboardApiAntiVillain extends Route {
             },
             cases: locked ? [] : open.map((found) => this.CaseView(guild, found)),
             casesLocked: locked,
-            protocol: await this.client.avEvents.Recent(guild.id),
+            // Im Protokoll stehen Namen und Gründe - wie die Fälle nur mit dem extra Ja (Nutzer, 01.11.).
+            protocol: locked ? [] : await this.client.avEvents.Recent(guild.id),
             raid: service.RaidBanner(guild.id),
             readiness: Readiness(guild),
             // Ohne Server Members Intent kommen keine Beitritte an - dann kein Raid-Schutz.

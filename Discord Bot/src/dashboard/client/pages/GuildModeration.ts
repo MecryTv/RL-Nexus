@@ -133,6 +133,8 @@ interface IMeta {
 interface IList extends Partial<IMeta> {
     cases: ICase[];
     more: boolean;
+    /** W-0011: Staff mit Freigabe, aber ohne das extra Ja - die Fälle sind privat. */
+    casesLocked?: boolean;
     stats?: IStats;
     target?: ITarget;
 }
@@ -271,6 +273,7 @@ export function renderModeration(guildId: string): void {
     let stats: IStats | null = null;
     let target: ITarget | null = null;
     let tab: Tab = "history";
+    let casesLocked = false;
     let ticket = 0;
     let timer = 0;
 
@@ -553,6 +556,13 @@ export function renderModeration(guildId: string): void {
     }
 
     function paintList(): void {
+        if (casesLocked) {
+            listHost.replaceChildren(el("div", "tkempty tkempty--big", icon("#i-lock"), el("b", "", "Privater Bereich"), el("span", "", "Die Fälle samt Notizen und Beweisen siehst du nur mit dem extra Ja für die privaten Bereiche.")));
+            more.hidden = true;
+
+            return;
+        }
+
         listHost.replaceChildren(
             ...(entries.length
                 ? entries.map(row)
@@ -605,6 +615,7 @@ export function renderModeration(guildId: string): void {
             settingsDraft = structuredClone(data.config);
         }
 
+        casesLocked = data.casesLocked === true;
         entries = reset ? data.cases : [...entries, ...data.cases.filter((entry) => !entries.some((known) => known.number === entry.number))];
         hasMore = data.more && data.cases.length >= PAGE;
 
