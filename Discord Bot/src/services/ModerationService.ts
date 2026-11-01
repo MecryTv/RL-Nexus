@@ -1,6 +1,6 @@
 import path from "path";
 import { mkdir, rm, writeFile } from "node:fs/promises";
-import { ChannelType, DiscordAPIError, Guild, GuildMember, MessageFlags, PermissionFlagsBits, User } from "discord.js";
+import { ChannelType, DiscordAPIError, Guild, GuildMember, Message, MessageFlags, PermissionFlagsBits, User } from "discord.js";
 import BotClient from "../client/BotClient";
 import { CaseView, DirectView } from "../builder/ModerationView";
 import { DASHBOARD_PATH } from "../constants/Dashboard";
@@ -15,19 +15,24 @@ import {
     MAX_EVIDENCE_BYTES,
     MAX_NOTE,
     MAX_NOTES,
+    MAX_PROOF_TEXT,
     MAX_PURGE,
     MAX_REASON,
     MAX_STAGES,
     MAX_SUPPORT_REMIND,
     MAX_SUPPORT_ROLES,
     MAX_TIMEOUT,
+    MESSAGE_LINK,
     MIN_DURATION,
     MOD_ACTIONS,
+    ParseMessageLink,
     PERMISSION_LABEL,
+    PROOF_TIMEOUT_CHOICES,
+    ProofNeeded,
     StageFor,
     STORED_EVIDENCE,
 } from "../constants/Moderation";
-import { IModCase, IModConfig, IModDetails, IModEnded, IModStage, IModSupport, ModAction, ModSource } from "../interfaces/services/moderation/IModeration";
+import { IModCase, IModConfig, IModDetails, IModEnded, IModMessageProof, IModProofRules, IModStage, IModSupport, ModAction, ModSource } from "../interfaces/services/moderation/IModeration";
 import { NewModCase } from "../models/ModCases";
 import { Shrink } from "../utils/image";
 import logger from "../utils/logger";
@@ -56,6 +61,23 @@ export interface IModActor {
     id: string;
     name: string;
     member: GuildMember | null;
+}
+
+/** Beweise, die eine Strafe gleich mitbringt - jeder für sich, keiner muss klappen. */
+export interface IModProof {
+    /** Ein Anhang aus Discord. */
+    image?: { url: string; size: number; contentType: string | null; name: string };
+    /** https - oder ein Nachrichtenlink dieses Servers, dann wird die Nachricht gesichert. */
+    link?: string | null;
+    /** Die Nachricht vom Rechtsklick. */
+    message?: Message;
+}
+
+/** Ein Beweis, der nicht ankam: was es war, und warum. */
+function ProofProblem(what: string, error: unknown): string {
+    if (!(error instanceof ModerationError)) logger.warn(`🛡️ Moderation: ${what} als Beweis fehlgeschlagen - ${String(error)}`);
+
+    return `${what}: ${error instanceof ModerationError ? error.message : "Das ließ sich nicht sichern."}`;
 }
 
 const EVIDENCE_TYPES = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"]);
@@ -138,6 +160,22 @@ export default class ModerationService {
             warnDays: Number.isInteger(days) && days >= 0 && days <= 365 ? days : previous.warnDays,
             stages: Array.isArray(input.stages) ? this.CleanStages(input.stages) : previous.stages,
             support: this.CleanSupport(guild, input.support, previous.support),
+            proof: this.CleanProof(input.proof, previous.proof),
+        };
+    }
+
+    /** Die Beweis-Pflicht - eine Timeout-Grenze nur aus der Auswahl, alles andere heißt keine. */
+    CleanProof(input: unknown, previous: IModProofRules): IModProofRules {
+        if (!IsRecord(input)) return previous;
+
+        const flag = (value: unknown, fallback: boolean) => (typeof value === "boolean" ? value : fallback);
+        const from = input.timeoutFrom;
+
+        return {
+            ban: flag(input.ban, previous.ban),
+            kick: flag(input.kick, previous.kick),
+            timeoutFrom: from === undefined ? previous.timeoutFrom : (PROOF_TIMEOUT_CHOICES.find(([seconds]) => seconds !== null && seconds === from)?.[0] ?? null),
+            warn: flag(input.warn, previous.warn),
         };
     }
 
@@ -232,6 +270,29 @@ export default class ModerationService {
         }
 
         return this.Run(guild, { id: actor.id, name: actor.displayName, member: actor }, request, source, null);
+    }
+
+    /**
+     * Wie Act, mit Beweisen. Braucht die Strafe hier einen und fehlt er,
+     * passiert nichts. Sonst gilt die Strafe - ein Beweis, der danach nicht
+     * klappt, steht in problems, statt sie zu kippen.
+     */
+    async ActWithProof(
+        guild: Guild,
+        actor: GuildMember,
+        request: IModRequest,
+        source: Exclude<ModSource, "auto">,
+        proof?: IModProof
+    ): Promise<{ entry: IModCase; problems: string[] }> {
+        const given = Boolean(proof?.image || proof?.message || proof?.link?.trim());
+        const needed = given ? null : ProofNeeded(await this.client.modSettings.Of(guild.id), request);
+
+        // Wer die Aktion gar nicht darf, soll das hören - nicht, dass ein Beweis fehlt.
+        if (needed && (await this.Allowed(actor, request.action))) throw new ModerationError(needed);
+
+        const entry = await this.Act(guild, actor, request, source);
+
+        return given && proof ? this.AddProof(guild, { id: actor.id, name: actor.displayName, member: actor }, entry.number, proof) : { entry, problems: [] };
     }
 
     /**
@@ -738,6 +799,83 @@ export default class ModerationService {
         return this.AddEvidence(guildId, author, number, "image", file, name ? name.slice(0, 100) : null, id);
     }
 
+    /**
+     * Mehrere Beweise auf einmal, jeder für sich: was nicht klappt, steht mit
+     * Grund in problems, der Rest kommt trotzdem an den Fall.
+     */
+    async AddProof(guild: Guild, author: IModActor, number: number, proof: IModProof): Promise<{ entry: IModCase; problems: string[] }> {
+        const problems: string[] = [];
+        const attempt = (what: string, run: () => Promise<unknown>) => run().catch((error: unknown) => void problems.push(ProofProblem(what, error)));
+        const keep = (result: { problems: string[] }) => void problems.push(...result.problems);
+        const { image, message } = proof;
+        const link = proof.link?.trim();
+
+        if (image) await attempt("Bild", () => this.AddAttachment(guild.id, author, number, image));
+
+        if (link && MESSAGE_LINK.test(link)) {
+            await attempt("Nachricht", async () => keep(await this.AddMessage(guild, author, number, await this.LinkedMessage(guild, author, link))));
+        } else if (link) {
+            await attempt("Link", () => this.AddLink(guild.id, author, number, link));
+        }
+
+        if (message) await attempt("Nachricht", async () => keep(await this.AddMessage(guild, author, number, message)));
+
+        return { entry: await this.CaseOf(guild.id, number), problems };
+    }
+
+    /**
+     * Die Nachricht hinter einem Nachrichtenlink - nur von diesem Server, nur
+     * aus Kanälen, die der Bot und der Sichernde lesen dürfen. Sonst sähe das
+     * Team über den Fall, was es nicht sehen soll.
+     */
+    private async LinkedMessage(guild: Guild, author: IModActor, link: string): Promise<Message> {
+        const target = ParseMessageLink(link, guild.id);
+
+        if (!target) throw new ModerationError("Dieser Nachrichtenlink führt auf einen anderen Server. Gesichert wird nur, was hier steht.");
+
+        const channel = guild.channels.cache.get(target.channelId) ?? (await guild.channels.fetch(target.channelId).catch(() => null));
+        const me = guild.members.me ?? (await guild.members.fetchMe());
+        const read = PermissionFlagsBits.ViewChannel | PermissionFlagsBits.ReadMessageHistory;
+
+        if (!channel?.isTextBased() || !channel.permissionsFor(me).has(read)) throw new ModerationError("In diesen Kanal kann ich nicht hineinsehen.");
+        if (author.member && !channel.permissionsFor(author.member).has(read)) throw new ModerationError("Diesen Kanal kannst du selbst nicht lesen.");
+
+        const found = await channel.messages.fetch(target.messageId).catch(() => null);
+
+        if (!found) throw new ModerationError("Diese Nachricht gibt es nicht mehr.");
+
+        return found;
+    }
+
+    /**
+     * Eine Nachricht als Beweis, wie sie jetzt ist: Verfasser, Kanal, Zeit und
+     * Text bleiben am Fall, auch wenn sie später gelöscht wird. Ihre Bilder
+     * werden eigene Bild-Beweise; eins, das nicht klappt, steht in problems.
+     */
+    async AddMessage(guild: Guild, author: IModActor, number: number, message: Message): Promise<{ entry: IModCase; problems: string[] }> {
+        const snapshot: IModMessageProof = {
+            authorId: message.author.id,
+            authorName: message.member?.displayName ?? message.author.username,
+            channelId: message.channelId,
+            channelName: "name" in message.channel ? (message.channel.name ?? "") : "",
+            content: message.content.slice(0, MAX_PROOF_TEXT),
+            sentAt: message.createdTimestamp,
+        };
+        let entry = await this.AddEvidence(guild.id, author, number, "message", message.url, snapshot.content.slice(0, 100) || null, undefined, snapshot);
+        const problems: string[] = [];
+        const images = [...message.attachments.values()].filter((file) => (file.contentType ?? "").startsWith("image/"));
+
+        for (const [index, image] of images.entries()) {
+            try {
+                entry = await this.AddAttachment(guild.id, author, number, image);
+            } catch (error) {
+                problems.push(ProofProblem(`Bild ${index + 1} der Nachricht`, error));
+            }
+        }
+
+        return { entry, problems };
+    }
+
     /** Ein Anhang aus Discord (/fall beweis) - nur von Discords eigenem Speicher. */
     async AddAttachment(guildId: string, author: IModActor, number: number, attachment: { url: string; size: number; contentType: string | null; name: string }): Promise<IModCase> {
         const type = (attachment.contentType ?? "").split(";")[0];
@@ -760,10 +898,11 @@ export default class ModerationService {
         guildId: string,
         author: IModActor,
         number: number,
-        kind: "image" | "link",
+        kind: "image" | "link" | "message",
         value: string,
         name: string | null,
-        wanted?: number
+        wanted?: number,
+        message?: IModMessageProof
     ): Promise<IModCase> {
         const entry = await this.CaseOf(guildId, number);
         const updated = await this.client.modCases.Mutate(entry.id, (current) => {
@@ -771,7 +910,7 @@ export default class ModerationService {
 
             const id = wanted ?? Math.max(0, ...current.evidence.map((item) => item.id)) + 1;
 
-            return { evidence: [...current.evidence, { id, kind, value, name, by: author.id, byName: author.name, at: Date.now() }] };
+            return { evidence: [...current.evidence, { id, kind, value, name, ...(message ? { message } : {}), by: author.id, byName: author.name, at: Date.now() }] };
         });
 
         if (updated) void this.UpdateLog(updated);
