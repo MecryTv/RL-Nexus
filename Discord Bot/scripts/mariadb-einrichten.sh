@@ -304,7 +304,7 @@ grep -q 'conf.d' /etc/phpmyadmin/config.inc.php \
 echo "phpMyAdmin liegt unter /usr/share/phpmyadmin."
 
 schritt "Fertig"
-if $alt; then
+if $umzug; then
     echo "Bot und Admin Dashboard sind gestoppt. Weiter mit docs/MariaDB-Umzug.md, Schritt 4."
 else
     echo "Weiter mit docs/Hosting.md, Schritt 5."
