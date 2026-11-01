@@ -9,7 +9,7 @@ import IDashboardGuildDetail, {
     IDashboardServerFacts,
 } from "../interfaces/services/dashboard/IDashboardGuildDetail";
 import IDashboardSession from "../interfaces/services/dashboard/IDashboardSession";
-import IDashboardUser, { DashboardGroup } from "../interfaces/services/dashboard/IDashboardUser";
+import IDashboardUser, { DashboardGroup, IAccessEnd } from "../interfaces/services/dashboard/IDashboardUser";
 import {
     ADMINISTRATOR,
     AvatarURL,
@@ -198,21 +198,37 @@ export interface IShopStatusRow extends IShopGrantRow {
  * alten Ende, wie activeGrant im Admin-Server - nur ohne Datum, das sich noch verschiebt.
  */
 export function ShopStatusLines(rows: readonly IShopStatusRow[], now: Date): string[] {
+    return AccessEnds(rows, now).map((entry) => {
+        const name = `**${escapeMarkdown(entry.name)}**`;
+
+        if (entry.kind === "frozen") return `${name} ruht gerade, die Tage bleiben stehen.`;
+        if (entry.kind === "unlimited" || entry.endsAt === null) return `${name} läuft unbegrenzt.`;
+
+        const unix = Math.floor(entry.endsAt / 1000);
+        const when = `<t:${unix}:D> · <t:${unix}:R>`;
+
+        if (entry.kind === "trial") return `${name} endet ${when}.`;
+        if (entry.kind === "renews") return `${name} läuft bis ${when} und verlängert sich dann.`;
+        if (entry.kind === "cancelled") return `${name} ist gekündigt und endet ${when}.`;
+
+        return `${name} läuft bis ${when}.`;
+    });
+}
+
+/** W-0017: die laufenden Zugänge als Daten - für die DM oben und die Einstellungsseite des Dashboards. */
+export function AccessEnds(rows: readonly IShopStatusRow[], now: Date): IAccessEnd[] {
     return rows
         .filter((row) => (row.frozen_at ? row.ended_at === null : Running(row, now)))
-        .map((row) => {
-            const name = `**${row.source === "trial" ? "Test" : escapeMarkdown(row.title ?? "Zugang")}**`;
-            if (row.frozen_at) return `${name} ruht gerade, die Tage bleiben stehen.`;
-            if (row.ends_at === null) return `${name} läuft unbegrenzt.`;
+        .map((row): IAccessEnd => {
+            const name = row.source === "trial" ? "Test" : (row.title ?? "Zugang");
+            const endsAt = row.ends_at?.getTime() ?? null;
 
-            const unix = Math.floor(row.ends_at.getTime() / 1000);
-            const when = `<t:${unix}:D> · <t:${unix}:R>`;
+            if (row.frozen_at) return { name, kind: "frozen", endsAt: null };
+            if (endsAt === null) return { name, kind: "unlimited", endsAt: null };
+            if (row.source === "trial") return { name, kind: "trial", endsAt };
+            if (row.source === "subscription") return { name, kind: row.cancel_at_period_end === 0 ? "renews" : "cancelled", endsAt };
 
-            if (row.source === "trial") return `${name} endet ${when}.`;
-            if (row.source === "subscription" && row.cancel_at_period_end === 0) return `${name} läuft bis ${when} und verlängert sich dann.`;
-            if (row.source === "subscription") return `${name} ist gekündigt und endet ${when}.`;
-
-            return `${name} läuft bis ${when}.`;
+            return { name, kind: "until", endsAt };
         });
 }
 
@@ -577,6 +593,8 @@ export default class DashboardService implements IDashboardService {
 
         // Free, Zugang aus dem Shop, Guardian oder Testphase (siehe DisplayGroup).
         user.group = DisplayGroup(user.group, await this.ShopAccess(session.userId), guilds, await this.Paywall());
+        // W-0017: bis wann der Zugang läuft, für die Einstellungsseite. Scheitert das, fehlt nur die Zeile.
+        user.access = await this.ShopEnds(session.userId).catch(() => null);
 
         return { user, guilds, inviteURL: this.InviteURL() };
     }
@@ -729,15 +747,26 @@ export default class DashboardService implements IDashboardService {
     /** Für Routen, die nicht über GuildsOf gehen (Bewerbungen, Transcripts): eigener Zugang oder zahlender Owner. */
     /** Für den Knopf „Zugang anzeigen“ (ShopButtons): die Zeilen aus ShopStatusLines. null ohne Datenbank. */
     async ShopStatus(userId: string): Promise<string[] | null> {
+        const rows = await this.ShopRows(userId);
+
+        return rows && ShopStatusLines(rows, new Date());
+    }
+
+    /** W-0017: dasselbe als Daten für die Einstellungsseite. null ohne Datenbank. */
+    async ShopEnds(userId: string): Promise<IAccessEnd[] | null> {
+        const rows = await this.ShopRows(userId);
+
+        return rows && AccessEnds(rows, new Date());
+    }
+
+    private async ShopRows(userId: string): Promise<IShopStatusRow[] | null> {
         const db = this.client.databaseService;
         if (!db.Ready) return null;
 
-        const rows = await db.Query<IShopStatusRow>(
+        return db.Query<IShopStatusRow>(
             "SELECT g.source, g.starts_at, g.ends_at, g.ended_at, g.cancel_at_period_end, g.frozen_at, p.title FROM shop_grants g LEFT JOIN shop_products p ON p.id = g.product_id WHERE g.user_id = ?",
             [userId]
         );
-
-        return ShopStatusLines(rows, new Date());
     }
 
     async GuildAllowed(userId: string, guildId: string): Promise<boolean> {

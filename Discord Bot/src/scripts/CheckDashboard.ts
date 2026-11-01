@@ -23,7 +23,8 @@ import { MODULE_IDS, PERMANENT_MODULES } from "../constants/Modules";
 import { AdminStatus, AskAdmin, BackupCall } from "../routes/DashboardApiBackups";
 import { DASHBOARD_HOME, DASHBOARD_PATH, DISCORD_EPOCH, OAUTH_SCOPES, SESSION_COOKIE } from "../constants/Dashboard";
 import IDashboardSession from "../interfaces/services/dashboard/IDashboardSession";
-import DashboardService, { BETA_ERRORS, BetaErrorText, BetaGate, DisplayGroup, LockPlaceholders, MfaRequired, ShopDecision, ShopStatusLines, type IShopGrantRow, type IShopStatusRow } from "../services/DashboardService";
+import DashboardService, { AccessEnds, BETA_ERRORS, BetaErrorText, BetaGate, DisplayGroup, LockPlaceholders, MfaRequired, ShopDecision, ShopStatusLines, type IShopGrantRow, type IShopStatusRow } from "../services/DashboardService";
+import { AccessText } from "../dashboard/client/constants/Access";
 import { CodeFromForm, RedeemAtAdmin } from "../routes/DashboardBeta";
 import IDashboardGuild, { DashboardRole } from "../interfaces/services/dashboard/IDashboardGuild";
 import { DashboardGroup } from "../interfaces/services/dashboard/IDashboardUser";
@@ -353,6 +354,28 @@ function checkShopStatus(): void {
     // W-0024: Bei Free und Beta ruht der Zugang - kein Datum, das sich noch verschiebt, und auch nach dem alten Ende sichtbar.
     const resting = one({ frozen_at: new Date(now.getTime() - DAY), ends_at: new Date(now.getTime() - 2 * DAY) });
     check("Ruhender Zugang: ohne Datum, auch nach dem alten Ende", resting === "**Monat** ruht gerade, die Tage bleiben stehen.", resting);
+
+    // W-0017: dasselbe als Daten fürs Dashboard, und der Text dort.
+    const ends = AccessEnds([row({}), row({ cancel_at_period_end: 1, title: "Jahr" }), row({ source: "trial", title: null }), row({ source: "gift", ends_at: null, title: "Partner" }), row({ ends_at: new Date(now.getTime() - 2 * DAY) })], now);
+
+    check(
+        "Zugang fürs Dashboard: Art und Ende je laufendem Zugang",
+        JSON.stringify(ends) ===
+            JSON.stringify([
+                { name: "Monat", kind: "renews", endsAt: later.getTime() },
+                { name: "Jahr", kind: "cancelled", endsAt: later.getTime() },
+                { name: "Test", kind: "trial", endsAt: later.getTime() },
+                { name: "Partner", kind: "unlimited", endsAt: null },
+            ]),
+        JSON.stringify(ends)
+    );
+
+    const date = new Intl.DateTimeFormat("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" }).format(later);
+
+    check("Text im Dashboard: verlängert sich", AccessText(ends[0], now.getTime()) === `Monat läuft bis ${date} und verlängert sich dann.`, AccessText(ends[0], now.getTime()));
+    check("Text im Dashboard: gekündigt, mit „in 30 Tagen“", AccessText(ends[1], now.getTime()) === `Jahr ist gekündigt und endet am ${date} (in 30 Tagen).`, AccessText(ends[1], now.getTime()));
+    check("Text im Dashboard: Test endet morgen", AccessText({ ...ends[2], endsAt: now.getTime() + DAY }, now.getTime()).endsWith("(morgen)."), AccessText({ ...ends[2], endsAt: now.getTime() + DAY }, now.getTime()));
+    check("Text im Dashboard: unbegrenzt und ruhend", AccessText(ends[3], now.getTime()) === "Partner läuft unbegrenzt." && AccessText({ name: "Monat", kind: "frozen", endsAt: null }, now.getTime()) === "Monat ruht gerade, die Tage bleiben stehen.");
 }
 
 async function checkGroups(client: BotClient): Promise<void> {
