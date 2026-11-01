@@ -663,7 +663,13 @@ async function checkAnnounce(): Promise<void> {
     const mo = voice.member(OTHER);
 
     await voice.service.Credit(mo, XpForLevel(1, voice.settings.base), { voiceMinutes: 1 }, voice.settings, null);
-    check("Voice ohne festen Kanal: per DM", voice.sent.length === 1 && voice.sent[0].to === OTHER, JSON.stringify(voice.sent));
+    // W-0043: Aufstiege nie mehr per DM.
+    check("Voice ohne festen Kanal: keine Nachricht, keine DM", voice.sent.length === 0, JSON.stringify(voice.sent));
+
+    const gone = World({ announce: "channel", announceChannelId: "999" });
+
+    await gone.service.Credit(gone.member(OTHER), XpForLevel(1, gone.settings.base), { messages: 1 }, gone.settings, TEXT);
+    check("Fester Kanal gelöscht: keine DM", gone.sent.length === 0, JSON.stringify(gone.sent));
 
     const fixed = World({ announceChannelId: SPAM, announceDelete: 5 });
     const ben = fixed.member(OTHER);
@@ -674,13 +680,22 @@ async function checkAnnounce(): Promise<void> {
     check("Voice mit festem Kanal: dort", fixed.sent.length === 1 && fixed.sent[0].channelId === SPAM, JSON.stringify(fixed.sent));
     check("Löschen nach 5 Min.: geplant", later[0] === 5 * 60_000, JSON.stringify(later));
 
-    const dm = World({ announce: "dm", announceDelete: 5 });
+    // Gespeichert vor W-0043: „Als Direktnachricht“ läuft im festen Kanal weiter.
+    const dm = World({ announce: "dm" as unknown as ILevelSettings["announce"], announceChannelId: SPAM, announceDelete: 5 });
     const zoe = dm.member(OTHER);
-    const none: number[] = [];
+    const planned: number[] = [];
 
-    dm.service.Later = (ms) => void none.push(ms);
+    dm.service.Later = (ms) => void planned.push(ms);
     await dm.service.Credit(zoe, XpForLevel(1, dm.settings.base), { messages: 1 }, dm.settings, TEXT);
-    check("DM wird nie gelöscht", dm.sent[0]?.to === OTHER && none.length === 0, JSON.stringify(none));
+    check("Alte Wahl „DM“: Nachricht im festen Kanal, wird gelöscht", dm.sent.length === 1 && dm.sent[0].channelId === SPAM && planned[0] === 5 * 60_000, JSON.stringify({ sent: dm.sent.map((entry) => entry.channelId ?? entry.to), planned }));
+    check("Alte Wahl „DM“ wird beim Lesen zum festen Kanal", (await dm.service.Settings(GUILD)).announce === "channel");
+    check("Alte Wahl „DM“ wird beim Speichern zum festen Kanal", dm.service.Clean(dm.guild, { announce: "dm" }, dm.settings).announce === "channel");
+
+    const noChannel = await World().service.Save(FakeGuild(), { announce: "current", announceChannelId: null }).catch((error: Error) => error);
+    const quiet = await World().service.Save(FakeGuild(), { announce: "off", announceChannelId: null }).catch((error: Error) => error);
+
+    check("Aufstieg an, aber kein Kanal: Speichern abgelehnt", noChannel instanceof LevelError, String(noChannel));
+    check("Aufstieg aus: ohne Kanal gespeichert", !(quiet instanceof Error) && quiet.announce === "off", String(quiet));
 
     const base = World().settings;
     const clean = (value: unknown) => new LevelService({} as BotClient).Clean(FakeGuild(), { ...base, announceDelete: value }, base).announceDelete;
@@ -704,7 +719,8 @@ async function checkBackfill(): Promise<void> {
         { userId: OTHER, day: cutoff - 2, messages: 10, voice: 0 },
         { userId: ZEN2, day: cutoff - 1, messages: 30, voice: 0 },
     ];
-    const off = World({ noRoles: [ROLE] }, { modules: [], activity });
+    // W-0043: Aufstiege aus dem Nachtrag landen im festen Kanal, per DM nicht mehr.
+    const off = World({ noRoles: [ROLE], announceChannelId: TEXT }, { modules: [], activity });
     const waits: number[] = [];
 
     off.member(USER);
@@ -715,7 +731,7 @@ async function checkBackfill(): Promise<void> {
     const lifetime = (world: IWorld, userId: string) => world.entry(userId).xp;
 
     check("Modul aus: alles gutgeschrieben ohne Deckel", lifetime(off, USER) === 300 * 20 + 600 * 5 && off.entry(USER).messages === 300 && off.entry(USER).voiceMinutes === 600, JSON.stringify(off.entry(USER)));
-    check("Modul aus: eine Aufstiegsnachricht je Person, verteilt", off.sent.length === 2 && waits.length === 1 && waits.every((ms) => ms === 3_000), JSON.stringify({ sent: off.sent.map((entry) => entry.to), waits }));
+    check("Modul aus: eine Aufstiegsnachricht je Person, verteilt", off.sent.length === 2 && waits.length === 1 && waits.every((ms) => ms === 3_000), JSON.stringify({ sent: off.sent.map((entry) => entry.channelId ?? entry.to), waits }));
     check("Rolle ohne Punkte: nichts", lifetime(off, OTHER) === 0);
     check("Tag D0 selbst zählt nicht", off.day(USER, cutoff) === undefined && off.day(USER, cutoff - 2)?.xp === 200 * 20 + 400 * 5, JSON.stringify([...off.days.keys()]));
     check("Nachtrag gemerkt", first.length === 1 && first[0].mode === "backfill" && first[0].members === 2, JSON.stringify(first));
@@ -914,7 +930,7 @@ async function checkDashboard(): Promise<void> {
     const access = { guild: world.guild, member: { id: USER } };
     const payload = await route.Read(access, {});
     const board = (await route.Write(access, { action: "board", period: "7d", page: 1 })) as unknown as { period: string; entries: { trend: unknown }[] };
-    const saved = (await route.Write(access, { action: "save", settings: { ...world.settings, fair: { ...world.settings.fair, repeat: false }, announceDelete: 15 } })) as { settings?: ILevelSettings };
+    const saved = (await route.Write(access, { action: "save", settings: { ...world.settings, announceChannelId: TEXT, fair: { ...world.settings.fair, repeat: false }, announceDelete: 15 } })) as { settings?: ILevelSettings };
 
     check("GET liefert den Nachtrag", (payload.backfill as { mode?: string } | null)?.mode === "backfill", JSON.stringify(payload.backfill));
     check("board: Zeitraum und Trend", board.period === "7d" && board.entries[0]?.trend !== undefined, JSON.stringify(board));
@@ -1408,7 +1424,7 @@ async function checkDesignApi(): Promise<void> {
 
     check("Ranglisten-Stil: Vorschau und Speichern", Boolean(board.image?.startsWith("data:image/png;base64,")) && style.style?.podium === false && style.style.accent === "#22c55e" && style.style.image === null && world.settings.boardStyle.podium === false);
 
-    const kept = (await route.Write(access, { action: "save", settings: { ...world.settings, upMode: "text", upLine: "GG {user}" } })) as { settings?: ILevelSettings };
+    const kept = (await route.Write(access, { action: "save", settings: { ...world.settings, announceChannelId: TEXT, upMode: "text", upLine: "GG {user}" } })) as { settings?: ILevelSettings };
 
     check("Einstellungen speichern lässt Designs und Stil stehen", kept.settings?.upDesign?.template === "hud" && kept.settings.boardStyle.podium === false && kept.settings.upMode === "text" && kept.settings.upLine === "GG {user}");
 }

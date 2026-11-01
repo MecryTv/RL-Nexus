@@ -66,8 +66,9 @@ export interface ILevelSettings {
     /** Hier gibt es gar keine Punkte. */
     noChannels: string[];
     noRoles: string[];
-    /** Wo die Aufstiegs-Nachricht landet. */
-    announce: "current" | "channel" | "dm" | "off";
+    /** Wo die Aufstiegs-Nachricht landet. Per DM nicht mehr (W-0043): Gespeichertes „dm“ gilt als „channel“. */
+    announce: "current" | "channel" | "off";
+    /** Pflicht, solange die Nachricht an ist - bei „current“ für Voice und Nachtrag. */
     announceChannelId: string | null;
     /** Die Nachricht selbst - ohne eigene gilt die Vorlage. */
     message: IMessageDoc | null;

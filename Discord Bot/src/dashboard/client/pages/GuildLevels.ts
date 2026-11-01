@@ -64,7 +64,7 @@ interface ISettings {
     channelBonus: IBonus[];
     noChannels: string[];
     noRoles: string[];
-    announce: "current" | "channel" | "dm" | "off";
+    announce: "current" | "channel" | "off";
     announceChannelId: string | null;
     message: IMessageDoc | null;
     rewards: IReward[];
@@ -385,7 +385,6 @@ export function renderLevels(guildId: string, view: LevelView = "levels"): void 
             [
                 ["current", "Im Kanal, in dem es passiert"],
                 ["channel", "In einem festen Kanal"],
-                ["dm", "Als Direktnachricht"],
                 ["off", "Gar nicht"],
             ],
             settings.announce,
@@ -403,12 +402,13 @@ export function renderLevels(guildId: string, view: LevelView = "levels"): void 
             (value) => {
                 settings.announceChannelId = value || null;
                 touch();
+                paint();
             },
             "Kanal für die Aufstiegs-Nachricht"
         );
 
-        // Fester Kanal: für „In einem festen Kanal“ und für Aufstiege im Voice bei „Im Kanal, in dem es passiert“.
-        target.disabled = settings.announce === "dm" || settings.announce === "off";
+        // W-0043: Pflicht, solange die Nachricht an ist - per DM geht nichts mehr. Bei „Im Kanal, in dem es passiert“ landen hier Voice und Nachtrag.
+        target.disabled = settings.announce === "off";
 
         const remove = select(
             [
@@ -426,7 +426,7 @@ export function renderLevels(guildId: string, view: LevelView = "levels"): void 
             "Aufstiegs-Nachricht im Chat wieder löschen"
         );
 
-        remove.disabled = settings.announce === "dm" || settings.announce === "off";
+        remove.disabled = settings.announce === "off";
 
         // Plan 35: Bild oder Text. Ohne gespeicherte Wahl gilt, was der Bot sagt (eigene Nachricht: Text, sonst Bild).
         settings.upMode ??= data!.upMode;
@@ -465,9 +465,10 @@ export function renderLevels(guildId: string, view: LevelView = "levels"): void 
         return card(
             "Aufsteigen",
             "Was passiert, wenn jemand ein Level schafft.",
-            row("Nachricht", "Im Kanal, an einer festen Stelle oder per DM", where),
-            row("Fester Kanal", "Für „In einem festen Kanal“. Bei „Im Kanal, in dem es passiert“ landen Aufstiege im Voice hier, ohne festen Kanal per DM", target),
-            row("Wieder löschen", "Nur im Chat, Direktnachrichten bleiben", remove),
+            row("Nachricht", "Im Kanal, in dem es passiert, oder an einer festen Stelle. Per DM schickt der Bot keine", where),
+            row("Kanal", "Pflicht, solange die Nachricht an ist. Bei „Im Kanal, in dem es passiert“ landen hier die Aufstiege aus dem Voice", target),
+            ...(settings.announce !== "off" && !settings.announceChannelId ? [el("p", "hintline", "Noch kein Kanal gewählt. Ohne Kanal kommt keine Aufstiegs-Nachricht, und speichern geht erst mit Kanal.")] : []),
+            row("Wieder löschen", "Die Nachricht verschwindet nach dieser Zeit aus dem Kanal", remove),
             ...(settings.announce === "off" ? [] : [row("Als Bild oder Text", "Das Bild gestaltest du unter Level-Karte › Aufstieg", mode)]),
             ...(settings.announce === "off" || !asImage ? [] : [el("p", "hintline", "Das Bild und die Zeile darüber gestaltest du unter ", studioLink, ".")]),
             ...(settings.announce === "off" || asImage

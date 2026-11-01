@@ -39,6 +39,15 @@ Bleibt unverändert. Der Entwurf eines breiten Bilds ist verworfen.
 - **Eine Gestaltung für alle Boosts**, die Werte kommen je Boost.
 - **Pings:** Rollen in der Nachricht werden angepingt (`allowedMentions: { parse: ["roles"] }`), `@everyone` und `@here` nicht.
 
+### 5. Aufstieg nur im Kanal (nachgereicht am 01.11.)
+
+Wunsch des Nutzers: Aufstiege kommen nicht mehr per DM, dafür muss ein Kanal gesetzt sein.
+
+- Wahl unter Level System → Belohnungen → Aufsteigen: „Im Kanal, in dem es passiert“, „In einem festen Kanal“, „Gar nicht“. „Als Direktnachricht“ entfällt.
+- Der feste Kanal ist Pflicht, sobald die Nachricht an ist. Ohne ihn lässt sich nicht speichern. Bei „Im Kanal, in dem es passiert“ landen dort die Aufstiege aus dem Voice und aus dem Nachtrag (Entscheidung Claude: deshalb auch hier Pflicht).
+- Fehlt der Kanal trotzdem (gelöscht, alte Einstellung), schickt der Bot keine Nachricht, auch keine DM.
+- Wer heute „Als Direktnachricht“ gespeichert hat, bekommt die Aufstiege im festen Kanal; ist keiner gesetzt, keine Nachricht, bis jemand einen wählt.
+
 ## Nicht dabei
 
 - Keine Änderung an Punkten, Leveln, Aufstieg oder am Aussehen des Ranglisten-Bilds.

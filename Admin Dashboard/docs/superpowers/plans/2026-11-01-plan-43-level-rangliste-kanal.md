@@ -25,6 +25,7 @@
 3. **Zusatzzeile:** nur wenn der Betrachter Punkte hat und nicht auf der Seite steht; Podium auf Seite 1 bleibt; Höhe des Bilds stimmt.
 4. **Speichern im Dashboard** während die Nachricht steht: Nachricht-ID bleibt (Zustand in eigener Tabelle).
 5. **Boost-Ankündigung mit Rolle:** Rolle pingt, `@everyone` im Text pingt nicht; ohne Gestaltung unverändert.
+6. **Server ohne Kanal für den Aufstieg:** keine DM, Speichern im Dashboard nennt den fehlenden Kanal; gespeichertes „DM“ läuft im festen Kanal weiter.
 
 ---
 
@@ -56,5 +57,10 @@
 - Tests (rot zuerst): ohne Gestaltung exakt die heutigen Sätze; mit Gestaltung die Platzhalter gefüllt (`{boost.factor}` → `2`, `{boost.end}` → `<t:…:F>`); `allowedMentions` ist `{ parse: ["roles"] }`.
 - [ ] `check:levels`, `build:dashboard`, `tsc`.
 
-### Task 6: Doku und Gesamtprüfung
+### Task 6: Aufstieg nur im Kanal, keine DM (Wunsch des Nutzers vom 01.11., nachgereicht)
+**Files:** `interfaces/services/levels/ILevels.ts` (`announce` ohne `"dm"`), `services/LevelService.ts` (`Settings`: gespeichertes `"dm"` → `"channel"`; `Clean`: `"dm"` → `"channel"`; `Save`: Kanal Pflicht, sobald `announce !== "off"`; `Credit`: ohne Kanal keine Nachricht statt DM), `dashboard/client/pages/GuildLevels.ts` (Option „Als Direktnachricht“ weg, Kanal als Pflicht beschrieben), `scripts/CheckLevels.ts`.
+- Tests (rot zuerst): Voice ohne festen Kanal → keine Nachricht, keine DM; „In einem festen Kanal“ mit gelöschtem Kanal → keine DM; gespeichertes `"dm"` mit Kanal → Nachricht im festen Kanal; `Clean` macht aus `"dm"` `"channel"`; `Save` mit `"current"` ohne Kanal → `LevelError`, mit `"off"` ohne Kanal → gespeichert.
+- [ ] `check:levels`, `tsc`, `build:dashboard`.
+
+### Task 7: Doku und Gesamtprüfung
 - [ ] `docs/Levels.md`, `src/dashboard/public/docu.html`; alle `check:*`, `npm run build`; Test auf dem Dev-Server (Kategorie „Claude“, Bot „RL Nexus Development“); W-0043 Verlauf und Abnahme.

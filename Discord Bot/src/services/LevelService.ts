@@ -90,8 +90,11 @@ export default class LevelService {
     /* ----------------------------------------------------------
        Einstellungen
        ---------------------------------------------------------- */
-    Settings(guildId: string): Promise<ILevelSettings> {
-        return this.client.moduleSettings.Of<ILevelSettings>(guildId, LEVELS_MODULE, DefaultLevelSettings());
+    async Settings(guildId: string): Promise<ILevelSettings> {
+        const settings = await this.client.moduleSettings.Of<ILevelSettings>(guildId, LEVELS_MODULE, DefaultLevelSettings());
+
+        // W-0043: Aufstiege gibt es nicht mehr per DM - wer das gewählt hatte, bekommt sie im festen Kanal.
+        return (settings.announce as string) === "dm" ? { ...settings, announce: "channel" } : settings;
     }
 
     /** Was aus dem Dashboard kommt, wird zu gültigen Einstellungen. */
@@ -166,7 +169,7 @@ export default class LevelService {
             channelBonus: raw.channelBonus === undefined ? previous.channelBonus : bonus(raw.channelBonus, channel),
             noChannels: raw.noChannels === undefined ? previous.noChannels : Ids(raw.noChannels, channel, MAX_EXCLUDED),
             noRoles: raw.noRoles === undefined ? previous.noRoles : Ids(raw.noRoles, role, MAX_EXCLUDED),
-            announce: raw.announce === "channel" || raw.announce === "dm" || raw.announce === "off" ? raw.announce : raw.announce === "current" ? "current" : previous.announce,
+            announce: raw.announce === "channel" || raw.announce === "dm" ? "channel" : raw.announce === "off" || raw.announce === "current" ? raw.announce : previous.announce,
             announceChannelId: raw.announceChannelId === undefined ? previous.announceChannelId : (announceChannel?.isTextBased() ? announceChannel.id : null),
             message: doc && doc.blocks.length ? doc : null,
             rewards: raw.rewards === undefined ? previous.rewards : rewards,
@@ -192,7 +195,7 @@ export default class LevelService {
     async Save(guild: Guild, input: unknown): Promise<ILevelSettings> {
         const settings = this.Clean(guild, input, await this.Settings(guild.id));
 
-        if (settings.announce === "channel" && !settings.announceChannelId) throw new LevelError("Wähle einen Kanal für die Aufstiegs-Nachricht.");
+        if (settings.announce !== "off" && !settings.announceChannelId) throw new LevelError("Wähle einen Kanal für die Aufstiegs-Nachricht. Per DM schickt der Bot keine mehr.");
         if (settings.top.week.on && !settings.top.week.channelId) throw new LevelError("Wähle einen Kanal für die Aktivsten der Woche.");
         if (settings.top.month.on && !settings.top.month.channelId) throw new LevelError("Wähle einen Kanal für die Aktivsten des Monats.");
 
@@ -370,7 +373,7 @@ export default class LevelService {
     /**
      * Zählen und Punkte gutschreiben; wenn es reicht, aufsteigen lassen - eine
      * Nachricht je Sprung. channelId null: kein Chat, in dem es passiert (Voice,
-     * Nachtrag), dann fester Kanal oder DM.
+     * Nachtrag), dann der feste Kanal. Ohne Kanal keine Nachricht, nie eine DM.
      */
     async Credit(
         member: GuildMember,
@@ -495,11 +498,14 @@ export default class LevelService {
 
             return { ...(content ? { content } : {}), files: [new AttachmentBuilder(png, { name: "aufstieg.png" })], allowedMentions: { users: [member.id] } };
         };
-        // Im Chat: der feste Kanal oder der, in dem es passiert. Ohne den (Voice, Nachtrag) der feste Kanal, sonst DM.
-        const target = settings.announce === "dm" ? null : settings.announce === "channel" ? settings.announceChannelId : (channelId ?? settings.announceChannelId);
+        // Der Kanal, in dem es passiert, oder der feste. Ohne Kanal keine Nachricht - per DM nicht mehr (W-0043).
+        const target = settings.announce === "current" ? (channelId ?? settings.announceChannelId) : settings.announceChannelId;
         const found = target ? (member.guild.channels.cache.get(target) ?? (await member.guild.channels.fetch(target).catch(() => null))) : null;
         const channel = found?.isTextBased() && found.type !== ChannelType.GuildStageVoice ? found : null;
-        const send = (payload: MessageCreateOptions): Promise<Message | null> => (channel ? channel.send(payload) : member.send(payload)).catch(() => null);
+
+        if (!channel) return;
+
+        const send = (payload: MessageCreateOptions): Promise<Message | null> => channel.send(payload).catch(() => null);
         let sent: Message | null = null;
 
         if (UpMode(settings) === "image") {
@@ -514,8 +520,7 @@ export default class LevelService {
 
         sent ??= await send(await asText());
 
-        // Eine DM wird nie gelöscht.
-        if (sent && channel && settings.announceDelete > 0) this.Later(settings.announceDelete * 60_000, () => void sent.delete().catch(() => undefined));
+        if (sent && settings.announceDelete > 0) this.Later(settings.announceDelete * 60_000, () => void sent.delete().catch(() => undefined));
     }
 
     /**
