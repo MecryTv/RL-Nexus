@@ -9,6 +9,8 @@ process.env.DEV_CLIENT_SECRET ||= "check-secret";
 
 import { ApplicationCommandType, ContextMenuCommandBuilder, SlashCommandBuilder } from "discord.js";
 import { glob } from "glob";
+import { loadImage } from "@napi-rs/canvas";
+import { RenderHelpBanner } from "../builder/HelpBanner";
 import path from "path";
 import { pathToFileURL } from "url";
 import BotClient from "../client/BotClient";
@@ -262,9 +264,24 @@ function checkPages(): void {
     check("Viele Befehle: unter 4000 Zeichen und 40 Bausteinen", crowded.texts.length < 4000 && crowded.count <= 40, `${crowded.texts.length}/${crowded.count}`);
 }
 
+async function checkBanner(): Promise<void> {
+    console.log("\n  — Banner —");
+
+    const png = await RenderHelpBanner({ name: "MecryTv | Joe", avatar: null });
+    const image = await loadImage(png);
+
+    check("Banner ist ein PNG", png.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])));
+    check("Banner 1100 × 280", image.width === 1100 && image.height === 280, `${image.width} × ${image.height}`);
+
+    const long = await RenderHelpBanner({ name: `${"Sehr langer Name ".repeat(4)}🎮`, avatar: png });
+
+    check("Langer Name mit Emoji und Bild als Logo geht", long.length > 1000);
+}
+
 async function main(): Promise<void> {
     checkModel();
     checkPages();
+    await checkBanner();
     await checkCatalog(new BotClient());
 
     console.log(failures === 0 ? "\n✅ Alle Prüfungen bestanden.\n" : `\n❌ ${failures} Prüfung(en) fehlgeschlagen.\n`);
