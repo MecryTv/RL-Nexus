@@ -13,6 +13,7 @@ import HelpButtons from "../events/help/HelpButtons";
 import { glob } from "glob";
 import { loadImage } from "@napi-rs/canvas";
 import { RenderHelpBanner } from "../builder/HelpBanner";
+import { HelpAlt, HelpBlock, RenderHelpImages, SetEmojiLoader } from "../builder/HelpImage";
 import path from "path";
 import { pathToFileURL } from "url";
 import BotClient from "../client/BotClient";
@@ -355,10 +356,59 @@ async function checkCommand(client: BotClient): Promise<void> {
     check("Startseite bringt das Banner mit", (shown?.files?.length ?? 0) === 1);
 }
 
+async function checkImages(): Promise<void> {
+    console.log("\n  — Bilder —");
+
+    let asked = 0;
+
+    SetEmojiLoader(async () => {
+        asked++;
+        throw new Error("kein Netz");
+    });
+
+    const blocks: HelpBlock[] = [
+        { kind: "title", emoji: "⏱️", text: "/timeout", sub: "Moderation · Team mit „Mitglieder moderieren“" },
+        { kind: "heading", text: "Was er macht" },
+        { kind: "text", text: "Schaltet einen User **stumm**, mit `/timeout` ganz einfach." },
+        { kind: "code", code: "/timeout user:@nico dauer:1h", note: "Eine Stunde stumm" },
+        { kind: "fields", rows: [{ name: "user", required: true, text: "Wer stumm wird." }] },
+        { kind: "list", items: ["Ein Fall entsteht"] },
+        { kind: "tip", text: "Früher aufheben mit /untimeout." },
+        { kind: "tiles", items: [{ emoji: "📦", value: "9/24", label: "Module an" }] },
+        { kind: "steps", title: "In drei Schritten startklar", items: ["`/module` schaltet ein"] },
+        { kind: "areas", items: [{ emoji: "🛡️", name: "Moderation", count: "13 Befehle" }] },
+        { kind: "command", emoji: "⚠️", display: "/warn", who: "Team", text: "Verwarnt einen User.", fields: "user* · grund*", off: "Modul aus" },
+        { kind: "chapter", n: 1, when: "Später mehr gefunden", display: "/fall beweis", who: "Team", text: "Hängt ein Bild an.", code: "/fall beweis nummer:128", fields: "nummer* · bild · link" },
+    ];
+    const images = await RenderHelpImages(blocks);
+    const sizes = await Promise.all(images.map(async (png) => loadImage(png)));
+
+    check("Alle Blockarten zeichnen", images.length >= 1);
+    check("PNG, 1100 breit, höchstens 900 hoch", sizes.every((image) => image.width === 1100 && image.height <= 900), sizes.map((image) => `${image.width}×${image.height}`).join(", "));
+    check("Emoji ohne Netz bricht nichts", asked > 0);
+
+    const many: HelpBlock[] = Array.from({ length: 40 }, (_, index) => ({ kind: "text", text: `Absatz ${index}: ${"viel Text ".repeat(20)}` }));
+    const split = await RenderHelpImages(many);
+    const splitSizes = await Promise.all(split.map(async (png) => loadImage(png)));
+
+    check("Viel Inhalt: mehrere Bilder", split.length > 1, String(split.length));
+    check("Viel Inhalt: jedes höchstens 900 hoch", splitSizes.every((image) => image.height <= 900), splitSizes.map((image) => image.height).join(", "));
+
+    const giant = await RenderHelpImages([{ kind: "text", text: "Riesig ".repeat(2000) }]);
+
+    check("Ein Riesenblock wird trotzdem gezeichnet", giant.length >= 1 && (await loadImage(giant[0])).height <= 900);
+
+    const alt = HelpAlt(blocks);
+
+    check("Alt-Text ohne Markup", !alt.includes("**") && !alt.includes("`") && alt.includes("Schaltet einen User stumm"), alt.slice(0, 120));
+    check("Alt-Text höchstens 1024 Zeichen", HelpAlt(many).length <= 1024, String(HelpAlt(many).length));
+}
+
 async function main(): Promise<void> {
     checkModel();
     checkPages();
     await checkBanner();
+    await checkImages();
     const client = new BotClient();
 
     await checkCatalog(client);
