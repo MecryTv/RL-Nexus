@@ -1,4 +1,5 @@
 import { useMemo, useState, type JSX } from "react";
+import { useQueryParam } from "../nav/useQueryParam.ts";
 import type { IGuildList, IGuildRow } from "../../shared/api";
 import { useApi } from "../api/useApi";
 import { Field } from "../components/Field";
@@ -26,7 +27,7 @@ export function ServersPage(): JSX.Element {
     useTitle("Server");
 
     const { data, error, reload } = useApi<IGuildList>("/api/guilds");
-    const [query, setQuery] = useState("");
+    const [query, setQuery] = useQueryParam();
     const [sort, setSort] = useState<SortKey>("members");
 
     const guilds = useMemo(() => {

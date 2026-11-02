@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties, type FormEvent, type JSX } from "react";
+import { useQueryParam } from "../nav/useQueryParam.ts";
 import { Link } from "react-router-dom";
 import type { IGroupEntry, IGroupEvent, IGroupList, IUserRef } from "../../shared/api";
 import { GROUPS, GROUP_GRANTS, GROUP_LABELS, NOTE_MAX, SNOWFLAKE, type Group } from "../../shared/limits";
@@ -207,7 +208,7 @@ export function GroupsPage(): JSX.Element {
     const [saving, setSaving] = useState(false);
     const [replacing, setReplacing] = useState<IGroupEntry | null>(null);
     const [revoking, setRevoking] = useState<IGroupEntry | null>(null);
-    const [search, setSearch] = useState("");
+    const [search, setSearch] = useQueryParam();
     const [filter, setFilter] = useState<Filter>("alle");
     const [expanded, setExpanded] = useState<ReadonlySet<Card>>(new Set());
     const idInput = useRef<HTMLInputElement>(null);

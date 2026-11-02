@@ -1,4 +1,5 @@
 import { useState, type JSX } from "react";
+import { useQueryParam } from "../nav/useQueryParam.ts";
 import { CUSTOMER_FILTERS, customerMatches, formatPrice, type CustomerFilter, type ICustomerList, type IShopProductList } from "../../shared/shop";
 import { useLive } from "../api/live";
 import { useApi } from "../api/useApi";
@@ -37,7 +38,7 @@ export function CustomersPage(): JSX.Element {
     useLive("shop", list.reload);
 
     const [filter, setFilter] = useState<CustomerFilter>("all");
-    const [search, setSearch] = useState("");
+    const [search, setSearch] = useQueryParam();
     const [openId, setOpenId] = useState<string | null>(null);
     // Für Resttage und Monatsnamen reicht der Stand beim Öffnen der Seite.
     const [now] = useState(() => Date.now());
