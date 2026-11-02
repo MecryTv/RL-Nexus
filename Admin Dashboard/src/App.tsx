@@ -60,6 +60,7 @@ const router = createBrowserRouter(
                 <Route path="backups/:guildId" lazy={page(() => import("./backups/ServerBackupsPage"), "ServerBackupsPage")} />
                 <Route path="backups/:guildId/zurueckladen/:backupId" lazy={page(() => import("./backups/RestoreWizard"), "RestoreWizard")} />
                 <Route path="status" lazy={page(() => import("./pages/IncidentsPage"), "IncidentsPage")} />
+                <Route path="status/discord" lazy={page(() => import("./pages/IncidentsPage"), "IncidentsPage")} />
                 <Route path="meldungen" lazy={page(() => import("./pages/NotificationsPage"), "NotificationsPage")} />
                 <Route path="post" lazy={page(() => import("./pages/MailPage"), "MailPage")} />
                 <Route path="post/formular/:id?" lazy={page(() => import("./pages/MailPage"), "MailRedirect")} />

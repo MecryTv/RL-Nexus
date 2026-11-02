@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent, type JSX } from "react";
+import { useLocation } from "react-router-dom";
 import {
     INCIDENT_KIND_LABELS,
     INCIDENT_LIMITS,
@@ -22,12 +23,13 @@ import { Button, LinkButton } from "../components/Button";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { Field } from "../components/Field";
 import { PageHeader } from "../components/PageHeader";
+import { PageTabs } from "../components/PageTabs";
 import { Panel } from "../components/Panel";
 import { Segmented } from "../components/Segmented";
 import { Failure, Loading } from "../components/Status";
 import { formatDateTime, formatNumber, fromLocalInput, toLocalInput } from "../format";
 import { ago, countdown } from "../status/format";
-import { DiscordCard } from "../status/DiscordCard";
+import { DiscordTab } from "../status/DiscordTab";
 import { Leitstand } from "../status/Leitstand";
 import { useDiscordPost } from "../status/useDiscordPost";
 import { useToast } from "../toast/context";
@@ -281,6 +283,7 @@ export function IncidentsPage(): JSX.Element {
 
     // Knopf im Kopf und Karte „Discord-Meldung“ teilen sich einen Stand (W-0052).
     const discord = useDiscordPost();
+    const onDiscord = useLocation().pathname === "/status/discord";
     const noChannel = discord.state.data?.channels.length === 0;
     const discordWait = Math.max(0, Math.ceil((discord.waitUntil - now) / 1000));
 
@@ -339,6 +342,14 @@ export function IncidentsPage(): JSX.Element {
                 )}
             </PageHeader>
 
+            <PageTabs
+                label="Status"
+                tabs={[
+                    { to: "/status", label: "Leitstand", icon: "pulse", end: true },
+                    { to: "/status/discord", label: "Discord-Meldung", icon: "discord" },
+                ]}
+            />
+
             {creating !== null && (
                 <NewIncident
                     key={creating.join(",")}
@@ -350,63 +361,67 @@ export function IncidentsPage(): JSX.Element {
                 />
             )}
 
-            {detail.data ? (
-                <Leitstand detail={detail.data} now={now} range={range} onRange={setRange} onReport={setCreating} />
-            ) : detail.error ? (
-                <Failure message={detail.error.message} onRetry={detail.reload} />
-            ) : (
-                <Loading label="Leitstand wird geladen" />
-            )}
-
-            <DiscordCard post={discord} now={now} />
-
-            {list.error && !data ? (
-                <Failure message={list.error.message} onRetry={list.reload} />
-            ) : !data ? (
-                <Loading label="Meldungen werden geladen" />
+            {onDiscord ? (
+                <DiscordTab post={discord} now={now} />
             ) : (
                 <>
-                    <section className={styles.section} aria-labelledby="offen">
-                        <h2 id="offen" className={styles.heading}>
-                            Offen
-                        </h2>
-                        {data.open.length === 0 ? (
-                            <p className={styles.empty}>Keine offene Meldung. Die Statusseite zeigt nur, was die Prüfungen messen.</p>
-                        ) : (
-                            <div className={styles.cards}>
-                                {data.open.map((incident) => (
-                                    <IncidentCard key={incident.id} incident={incident} onChanged={list.reload} onDelete={setDeleting} />
-                                ))}
-                            </div>
-                        )}
-                    </section>
+                    {detail.data ? (
+                        <Leitstand detail={detail.data} now={now} range={range} onRange={setRange} onReport={setCreating} />
+                    ) : detail.error ? (
+                        <Failure message={detail.error.message} onRetry={detail.reload} />
+                    ) : (
+                        <Loading label="Leitstand wird geladen" />
+                    )}
 
-                    <section className={styles.section} aria-labelledby="vergangen">
-                        <h2 id="vergangen" className={styles.heading}>
-                            Vergangen
-                        </h2>
-                        {data.past.length === 0 ? (
-                            <p className={styles.empty}>Noch keine abgeschlossene Meldung.</p>
-                        ) : (
-                            <ul className={styles.past}>
-                                {data.past.map((incident) => (
-                                    <li key={incident.id}>
-                                        <span className={styles.pastTitle} id={`meldung-${incident.id}`}>
-                                            {incident.title}
-                                            <span className={styles.meta}>
-                                                {" "}
-                                                · {INCIDENT_KIND_LABELS[incident.kind]} · {servicesText(incident.services)}
-                                            </span>
-                                        </span>
-                                        <span className={styles.meta}>gelöst {incident.resolvedAt ? formatDateTime(incident.resolvedAt) : "–"}</span>
-                                        <Button size="sm" variant="ghost" icon="trash" onClick={() => setDeleting(incident)} aria-label={`${incident.title} löschen`}>
-                                            Löschen
-                                        </Button>
-                                    </li>
-                                ))}
-                            </ul>
-                        )}
-                    </section>
+                    {list.error && !data ? (
+                        <Failure message={list.error.message} onRetry={list.reload} />
+                    ) : !data ? (
+                        <Loading label="Meldungen werden geladen" />
+                    ) : (
+                        <>
+                            <section className={styles.section} aria-labelledby="offen">
+                                <h2 id="offen" className={styles.heading}>
+                                    Offen
+                                </h2>
+                                {data.open.length === 0 ? (
+                                    <p className={styles.empty}>Keine offene Meldung. Die Statusseite zeigt nur, was die Prüfungen messen.</p>
+                                ) : (
+                                    <div className={styles.cards}>
+                                        {data.open.map((incident) => (
+                                            <IncidentCard key={incident.id} incident={incident} onChanged={list.reload} onDelete={setDeleting} />
+                                        ))}
+                                    </div>
+                                )}
+                            </section>
+
+                            <section className={styles.section} aria-labelledby="vergangen">
+                                <h2 id="vergangen" className={styles.heading}>
+                                    Vergangen
+                                </h2>
+                                {data.past.length === 0 ? (
+                                    <p className={styles.empty}>Noch keine abgeschlossene Meldung.</p>
+                                ) : (
+                                    <ul className={styles.past}>
+                                        {data.past.map((incident) => (
+                                            <li key={incident.id}>
+                                                <span className={styles.pastTitle} id={`meldung-${incident.id}`}>
+                                                    {incident.title}
+                                                    <span className={styles.meta}>
+                                                        {" "}
+                                                        · {INCIDENT_KIND_LABELS[incident.kind]} · {servicesText(incident.services)}
+                                                    </span>
+                                                </span>
+                                                <span className={styles.meta}>gelöst {incident.resolvedAt ? formatDateTime(incident.resolvedAt) : "–"}</span>
+                                                <Button size="sm" variant="ghost" icon="trash" onClick={() => setDeleting(incident)} aria-label={`${incident.title} löschen`}>
+                                                    Löschen
+                                                </Button>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                )}
+                            </section>
+                        </>
+                    )}
                 </>
             )}
 

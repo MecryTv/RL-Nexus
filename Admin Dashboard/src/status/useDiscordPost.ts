@@ -10,6 +10,8 @@ export interface IDiscordPost {
     readonly busy: boolean;
     /** Bis wann der Knopf noch aus ist (Millisekunden), aus der Antwort des Servers. */
     readonly waitUntil: number;
+    /** Wann die nächste Runde von selbst kommt, nach der Uhr des Servers. null ohne Uhr. */
+    readonly nextUntil: number | null;
     readonly refresh: () => Promise<void>;
 }
 
@@ -23,6 +25,8 @@ export function useDiscordPost(): IDiscordPost {
     const notify = useToast();
     const [busy, setBusy] = useState(false);
     const waitUntil = state.data && state.updatedAt !== null ? state.updatedAt + state.data.waitSeconds * 1000 : 0;
+    // Aus Sekunden bis dahin, nicht aus einer Uhrzeit: Geht die Uhr des Rechners falsch, stimmt der Ring trotzdem.
+    const nextUntil = state.data?.nextSeconds != null && state.updatedAt !== null ? state.updatedAt + state.data.nextSeconds * 1000 : null;
 
     async function refresh(): Promise<void> {
         setBusy(true);
@@ -40,5 +44,5 @@ export function useDiscordPost(): IDiscordPost {
         }
     }
 
-    return { state, busy, waitUntil, refresh };
+    return { state, busy, waitUntil, nextUntil, refresh };
 }

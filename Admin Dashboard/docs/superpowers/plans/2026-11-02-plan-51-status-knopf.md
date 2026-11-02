@@ -62,3 +62,33 @@
 - [ ] Karte nach dem Leitstand: „#Kanal · zuletzt HH:MM:SS“ (bei mehreren „· N Kanäle“), Vorschau, „Jetzt aktualisieren“ und Ring „von selbst in M:SS“; ohne Kanal der Hinweis
 - [ ] Ergebnis als Toast: „Neu geschrieben in N Kanälen · 0,8 Sek.“ oder je Kanal der Fehler; 429 lädt den Stand neu, der Knopf bleibt bis dahin aus
 - [ ] Im Browser mit dem Dev-Bot und dem Statuskanal prüfen, Commit `feat(W-0052): Knopf und Vorschau auf der Status-Seite`
+
+---
+
+## Ergänzung vom 02.11. (Spec Teil 2, „Ergänzung vom 02.11.“)
+
+### Task 4: Reiter „Discord-Meldung“ (D1)
+
+**Files:** Modify `src/App.tsx` (Route `status/discord`), `src/pages/IncidentsPage.tsx` (Reiter Leitstand | Discord-Meldung); Rename `src/status/DiscordCard.*` → `src/status/DiscordTab.*`
+
+- [ ] Reiter über `PageTabs`; auf `/status/discord` statt Leitstand und Meldungen der Reiter: links Discord-Rahmen (Kanal, Bot mit APP, Uhrzeit, Bausteine), rechts Kästen Ring/Knopf, Statuskanal, Zuletzt von Hand
+- [ ] Vorschau als `role="region"` mit Namen und `tabIndex={0}`, Knöpfe in Abschnitten mit eigenem `aria-label`
+- [ ] Browser: beide Reiter, Zurück, Handy; Commit `feat(W-0052): Reiter Discord-Meldung`
+
+### Task 5: Statuskanal wählen (K2)
+
+**Files:** Modify `server/status-post.ts`, `server/routes/status.ts`, `shared/status.ts`, `server/checks/status.check.ts`; Create `src/status/ChannelDialog.tsx`
+
+**Interfaces (Produces):** `channelPermissions(input): { view, send, attach, manage, history }` (rein, Bits aus Rollen, @everyone und Überschreibungen, Administrator = alles), `GET /api/status/discord/channels` (Textkanäle von `config.guildId` mit Kategorie und fehlenden Rechten), `PUT /api/status/discord/channel` (`{ channelId }`; Kanal muss in der Liste stehen; alte Meldung löschen, speichern, sofort schreiben, Protokoll `status.channel`); wirksame Kanäle = gespeicherter Kanal, sonst `.env`
+
+- [ ] Prüfung `channelPermissions`: Administrator, Deny in Kanal, Allow für Rolle, Mitglied-Überschreibung; `PUT` mit fremdem Kanal → 400
+- [ ] Fenster mit Suche, Kategorien, „✓ alles da“ oder „fehlt: …“, Übernehmen; Commit `feat(W-0052): Statuskanal im Admin Dashboard wählen`
+
+### Task 6: Die Meldung als Bilder (Runde 2)
+
+**Files:** Create `server/status/image.ts`, `server/assets/fonts/*` (Oxanium, Rajdhani aus dem Bot); Modify `server/status-post.ts` (`payload`, `upload` mit mehreren Dateien, `complete`), `package.json` (`@napi-rs/canvas` wie im Bot), Prüfungen in `status.check.ts` und `check-db.ts`
+
+- [ ] `payload()`: Container mit Galerie Kopfbild und Zeile „Geprüft …“, Meldungen als Text, Galerie mit vier Karten, Wartungen als Text, Knopfzeile; Alt-Text je Bild
+- [ ] `renderHead`, `renderService` zeichnen PNG im Stil der Bot-Bilder; 24-Stunden-Leiste aus den stündlichen Punkten (schlechtester Zustand je Stunde)
+- [ ] Vorschau: `/api/status/discord/image/:name` liefert dieselben Bilder
+- [ ] Prüfungen anpassen (Bausteine, Anhänge, Größen), check:db grün bis auf die zwei bekannten; Commit `feat(W-0052): Statusmeldung als Bilder`

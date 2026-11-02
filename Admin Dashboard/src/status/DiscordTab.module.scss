@@ -1,0 +1,328 @@
+@use "mixins" as *;
+
+/* Reiter „Discord-Meldung“ (W-0052, Entwurf D1). Links die Nachricht in
+   Discords eigenen Farben, rechts die Kästen im Look des Admin Dashboards. */
+
+.tab {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 300px;
+    align-items: start;
+    gap: var(--s-4);
+
+    @include below(1099px) {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+/* --- Discord-Rahmen ----------------------------------------------------- */
+
+.frame {
+    max-width: 680px;
+    overflow: hidden;
+    border-radius: 8px;
+    background: #313338;
+    color: #dbdee1;
+    font-family: "gg sans", "Segoe UI", system-ui, sans-serif;
+    font-size: 0.875rem;
+    line-height: 1.375;
+
+    &:focus-visible {
+        @include focus-ring;
+    }
+}
+
+.channel {
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
+    padding: 10px 14px;
+    border-bottom: 1px solid #1f2023;
+    color: #f2f3f5;
+    font-weight: 600;
+
+    small {
+        margin-left: var(--s-2);
+        color: #b5bac1;
+        font-size: 0.75rem;
+        font-weight: 400;
+    }
+}
+
+.hash {
+    color: #80848e;
+    font-size: 1.25rem;
+    line-height: 1;
+}
+
+.empty {
+    padding: var(--s-4);
+    color: #b5bac1;
+}
+
+.message {
+    display: grid;
+    grid-template-columns: 40px minmax(0, 1fr);
+    padding: var(--s-3) var(--s-4) var(--s-4);
+    gap: var(--s-3);
+}
+
+.avatar {
+    border-radius: 50%;
+}
+
+.body {
+    display: grid;
+    min-width: 0;
+    gap: 6px;
+}
+
+.who {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+
+    b {
+        color: #f2f3f5;
+        font-weight: 600;
+    }
+
+    small {
+        color: #b5bac1;
+        font-size: 0.75rem;
+    }
+}
+
+.app {
+    padding: 0 4px;
+    border-radius: 3px;
+    background: #5865f2;
+    color: #fff;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    line-height: 15px;
+}
+
+.container {
+    display: grid;
+    padding: var(--s-3);
+    border-left: 4px solid var(--accent);
+    border-radius: 4px;
+    gap: var(--s-2);
+    background: #2b2d31;
+}
+
+.block {
+    display: grid;
+    gap: 2px;
+
+    strong {
+        color: #f2f3f5;
+        font-weight: 700;
+    }
+}
+
+.h1,
+.h2,
+.h3 {
+    color: #f2f3f5;
+    font-weight: 700;
+}
+
+.h1 {
+    font-size: 1.4rem;
+}
+
+.h2 {
+    font-size: 1.15rem;
+}
+
+.h3 {
+    font-size: 1rem;
+}
+
+.small {
+    color: #b5bac1;
+    font-size: 0.75rem;
+}
+
+.quote {
+    padding-left: var(--s-2);
+    border-left: 3px solid #4e5058;
+}
+
+.section {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-3);
+}
+
+.row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-2);
+}
+
+.button {
+    flex: none;
+    padding: 4px 14px;
+    border-radius: 3px;
+    background: #4e5058;
+    color: #fff;
+    font-size: 0.875rem;
+    font-weight: 500;
+
+    &:hover {
+        background: #6d6f78;
+    }
+
+    &:focus-visible {
+        @include focus-ring;
+    }
+}
+
+/* Wie Discord: ein Bild in voller Breite, mehrere als Raster mit zwei Spalten. */
+.gallery {
+    display: grid;
+    gap: 4px;
+
+    &:not([data-count="1"]) {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    img {
+        display: block;
+        width: 100%;
+        border-radius: 4px;
+    }
+}
+
+.unknown {
+    color: #b5bac1;
+    font-style: italic;
+}
+
+/* --- Rechts: Kästen ------------------------------------------------------ */
+
+.side {
+    position: sticky;
+    top: calc(var(--s-topbar) + var(--s-4));
+    display: grid;
+    gap: var(--s-3);
+
+    @include below(1099px) {
+        position: static;
+    }
+}
+
+.box {
+    display: grid;
+    justify-items: start;
+    padding: var(--s-4);
+    gap: var(--s-3);
+    border: 1px solid var(--c-line);
+    background: var(--c-panel-fill);
+
+    @include bevel-diagonal(10px);
+
+    > button:not(.link) {
+        justify-self: stretch;
+    }
+}
+
+.label {
+    color: var(--c-text-faint);
+
+    @include label(0.72rem, 0.14em);
+}
+
+.ring {
+    display: flex;
+    align-items: center;
+    gap: var(--s-3);
+}
+
+.ringTime {
+    display: block;
+    font-size: 1.5rem;
+    font-variant-numeric: tabular-nums;
+    font-weight: 800;
+}
+
+.ringNote,
+.note {
+    color: var(--c-text-faint);
+    font-size: 0.8125rem;
+}
+
+.track,
+.progress {
+    fill: none;
+    stroke-width: 6;
+}
+
+.track {
+    stroke: var(--c-line-strong);
+}
+
+.progress {
+    stroke: var(--c-win);
+    stroke-linecap: round;
+}
+
+.channelRow {
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
+    width: 100%;
+
+    small {
+        margin-left: auto;
+        color: var(--c-text-faint);
+        font-size: 0.8125rem;
+        font-variant-numeric: tabular-nums;
+    }
+}
+
+.dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--c-win);
+}
+
+.link {
+    color: var(--c-blue);
+    font-size: 0.875rem;
+    font-weight: 700;
+
+    @include touch-target;
+
+    &:hover {
+        color: var(--c-text);
+    }
+
+    &:focus-visible {
+        @include focus-ring;
+    }
+}
+
+.ok,
+.bad {
+    display: grid;
+    gap: 2px;
+    font-size: 0.875rem;
+
+    small {
+        color: var(--c-text-faint);
+        font-size: 0.8125rem;
+    }
+}
+
+.ok {
+    color: var(--c-text);
+}
+
+.bad {
+    color: var(--c-loss);
+}

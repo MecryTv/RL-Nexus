@@ -8,7 +8,7 @@ import { PublicError } from "../errors.ts";
 import { addUpdate, createIncident, deleteIncident, listIncidents, openKindOf, parseIncident, parseUpdate } from "../status/incidents.ts";
 import { loadDetail } from "../status/detail.ts";
 import { publicStatus } from "../status/snapshot.ts";
-import { BANNER, discordPostState, refreshNow, rememberManual, statusCycle } from "../status-post.ts";
+import { BANNER, BANNER_NAME, discordPostState, refreshNow, rememberManual, statusCycle } from "../status-post.ts";
 import { id } from "../validate.ts";
 
 function needDatabase(): void {
@@ -62,8 +62,13 @@ export async function statusRoutes(app: FastifyInstance, { config }: { config: I
         return result;
     });
 
-    /** Das Banner der Meldung für die Vorschau. In Discord steckt es als Anhang `attachment://…`. */
-    app.get("/api/status/discord/banner", async (_request, reply) => reply.type("image/webp").header("Cache-Control", "private, max-age=86400").send(BANNER));
+    /** Die Bilder der Meldung für die Vorschau. In Discord stecken sie als Anhang `attachment://<name>`. */
+    app.get("/api/status/discord/image/:name", async (request, reply) => {
+        const name = (request.params as { name?: string }).name;
+        if (name !== BANNER_NAME) throw new PublicError(404, "Dieses Bild gibt es nicht.");
+
+        return reply.type("image/webp").header("Cache-Control", "private, max-age=86400").send(BANNER);
+    });
 
     app.get("/api/status/incidents", async (): Promise<IIncidentList> => {
         needDatabase();
