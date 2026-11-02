@@ -117,7 +117,8 @@ async function findTeam(config: IConfig, text: string): Promise<ISearchHit[]> {
 
     return matched(
         (envelope.data as ITeam).members.map((member): ISearchHit => {
-            const context = `${member.role} · @${member.handle}`;
+            // Der Handle steht mal mit, mal ohne @ im Team.
+            const context = `${member.role} · @${member.handle.replace(/^@/, "")}`;
 
             return { kind: "personen", icon: "users", title: member.name, place: "Webseite · Team", context, href: "/webseite/team", at: null, rank: rankOf(member.name, context, wanted) ?? -1 };
         })

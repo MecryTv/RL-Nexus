@@ -62,7 +62,15 @@ Dann entweder den Dev-Bot einladen oder mit `npm run dev:server:live` gegen die 
 
 ## Leiste und Suche
 
-Links stehen die Bereiche (Start, Bot, Shop, Webseite, Developer nur für Developer), daneben die Seiten des gewählten Bereichs, wie im Bot-Dashboard. Ein Klick auf einen Bereich zeigt nur dessen Seiten, nach jedem Seitenwechsel ist der Bereich der offenen Seite gewählt. Die Suche öffnet sich mit kurz gedrückter rechter Umschalttaste, mit `/` oder `Strg K` und findet jede Seite, die man sieht. Bereiche, Seiten und der Satz unter jedem Titel stehen in `src/nav/areas.ts`, die Suchlogik in `src/nav/search.ts`; `npm run check` prüft beide. Unter 860 px stehen Bereiche und Seiten als Zeilen über der Seite.
+Links stehen die Bereiche (Start, Bot, Shop, Webseite, Developer nur für Developer), daneben die Seiten des gewählten Bereichs, wie im Bot-Dashboard. Ein Klick auf einen Bereich zeigt nur dessen Seiten, nach jedem Seitenwechsel ist der Bereich der offenen Seite gewählt. Bereiche, Seiten und der Satz unter jedem Titel stehen in `src/nav/areas.ts`. Unter 860 px stehen Bereiche und Seiten als Zeilen über der Seite.
+
+Die Suche öffnet sich mit kurz gedrückter rechter Umschalttaste, mit `/` oder `Strg K` und findet nicht nur Seiten (W-0059):
+
+- **Personen** aus Gruppen, Shop-Kunden und Beta, je Discord-ID eine Zeile mit allen Fundorten, dazu das Team der Webseite. Gruppen und Beta speichern nur die ID; die Namen holt der Server beim Start im Hintergrund (`warmNames`).
+- **Server**, auf denen der Bot ist; **Mails** im Posteingang aller Postfächer (IMAP-Suche wie im Postfach); **Inhalte**: Module, Banner, Shop-Produkte.
+- **Protokoll**: Meldungen ans Bot-Dashboard (einmal je Titel, Text und Minute), Störungen und Wartungen, Backups je Server. Das Protokoll des Admin Dashboards nur für Developer.
+
+Oben stehen die Filter mit der Zahl der Treffer, `Tab` und `Umschalt+Tab` wechseln sie. Kürzel am Anfang suchen nur dort: `@` Personen, `#` Server, `/` Seiten. Seiten sucht der Browser sofort, alles andere fragt er ab 2 Zeichen und 200 ms nach dem letzten Tastendruck mit einer Anfrage bei `GET /api/search`. Jede Quelle hat dort 2 Sekunden; was fehlt, nennt das Fenster. Höchstens 20 Treffer je Filter („20+“), 40 in „Alles“. Ein Treffer öffnet die Seite dazu, Server, Gruppen und Kunden schon gefiltert (`?q=`). Gemeinsame Regeln in `shared/search.ts`, die Quellen in `server/search/sources.ts`, das Fenster in `src/components/NavSearch.tsx`.
 
 ## Übersicht
 

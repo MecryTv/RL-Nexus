@@ -129,7 +129,8 @@ export function NavSearch({ entries, initial, onClose }: { readonly entries: rea
 
                 <div className={styles.filters} role="group" aria-label="Filter">
                     {FILTERS.map((entry) => {
-                        const count = text ? countLabel(entry, pages.length, result, loading) : null;
+                        // Mit Kürzel wird nur dort gesucht: Die anderen Filter hätten nichtssagende Zahlen.
+                        const count = text && (!prefixed || entry === prefixed) ? countLabel(entry, pages.length, result, loading) : null;
 
                         return (
                             <button
