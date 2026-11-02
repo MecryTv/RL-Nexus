@@ -50,6 +50,7 @@
         "check:teams": "tsx src/scripts/CheckTeams.ts",
         "icons:teams": "tsx src/scripts/RenderTeamIcons.ts",
         "check:tickets": "tsx src/scripts/CheckTickets.ts",
+        "check:userdata": "tsx src/scripts/CheckUserdata.ts",
         "check:voice": "tsx src/scripts/CheckVoice.ts",
         "check:welcome": "tsx src/scripts/CheckWelcome.ts",
         "dev": "npm run build:dashboard && tsx watch src/index.ts --dev",

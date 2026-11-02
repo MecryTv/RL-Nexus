@@ -221,6 +221,17 @@ export default class ActivityService {
      * währenddessen dazukommt, bleibt stehen, und ein Fehler verliert nichts -
      * der nächste Lauf versucht es mit allem erneut.
      */
+    /**
+     * Nach einer Löschung im Admin Dashboard (W-0051): Gepuffertes der Person
+     * verwerfen, sonst schriebe der nächste Flush ihre Aktivität zurück. Läuft
+     * sie gerade im Sprachkanal, zählt das ab jetzt nicht mehr.
+     */
+    ForgetUser(userId: string): void {
+        for (const map of [this.members, this.voice] as Map<string, unknown>[]) {
+            for (const key of [...map.keys()]) if (key.endsWith(`:${userId}`)) map.delete(key);
+        }
+    }
+
     async Flush(): Promise<void> {
         const now = Date.now();
 

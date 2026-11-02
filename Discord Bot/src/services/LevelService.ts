@@ -92,6 +92,11 @@ export default class LevelService {
     /* ----------------------------------------------------------
        Einstellungen
        ---------------------------------------------------------- */
+    /** Nach einer Löschung im Admin Dashboard (W-0051): Abklingzeiten der Person vergessen. */
+    ForgetUser(userId: string): void {
+        for (const key of [...this.cooldowns.keys()]) if (key.endsWith(`:${userId}`)) this.cooldowns.delete(key);
+    }
+
     async Settings(guildId: string): Promise<ILevelSettings> {
         const settings = await this.client.moduleSettings.Of<ILevelSettings>(guildId, LEVELS_MODULE, DefaultLevelSettings());
 

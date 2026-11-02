@@ -38,4 +38,9 @@ export default class MessageIndex {
     Forget(guildId: string, userId: string): void {
         this.people.delete(`${guildId}:${userId}`);
     }
+
+    /** Nach einer Löschung im Admin Dashboard (W-0051): auf allen Servern. */
+    ForgetUser(userId: string): void {
+        for (const key of [...this.people.keys()]) if (key.endsWith(`:${userId}`)) this.people.delete(key);
+    }
 }
