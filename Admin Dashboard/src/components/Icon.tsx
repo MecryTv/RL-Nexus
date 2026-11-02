@@ -8,6 +8,28 @@ import type { JSX, SVGProps } from "react";
  */
 const STROKE: Readonly<Record<string, JSX.Element>> = {
     dashboard: <path d="M3.5 3.5h7v7h-7zM13.5 3.5h7v4.5h-7zM13.5 11h7v9.5h-7zM3.5 13h7v7.5h-7z" />,
+    // Die Bereiche der Leiste (W-0053).
+    home: <path d="M3.5 11 12 4l8.5 7M5.5 9.5v10.5h4.5v-6h4v6h4.5V9.5" />,
+    bot: (
+        <>
+            <rect x="4" y="8" width="16" height="12" rx="3" />
+            <path d="M12 4v4M9 13.5v1.5M15 13.5v1.5M2 13v3M22 13v3" />
+        </>
+    ),
+    cart: (
+        <>
+            <path d="M3 4h2.2l2.3 11h11l2-8H6.3" />
+            <circle cx="9" cy="19.5" r="1.3" />
+            <circle cx="17" cy="19.5" r="1.3" />
+        </>
+    ),
+    globe: (
+        <>
+            <circle cx="12" cy="12" r="8.5" />
+            <path d="M3.5 12h17M12 3.5c2.6 2.4 3.6 5.2 3.6 8.5s-1 6.1-3.6 8.5c-2.6-2.4-3.6-5.2-3.6-8.5s1-6.1 3.6-8.5z" />
+        </>
+    ),
+    code: <path d="M8.5 7 3.5 12l5 5M15.5 7l5 5-5 5M13.5 4.5l-3 15" />,
     server: (
         <>
             <rect x="3.5" y="4" width="17" height="6.5" rx="1.5" />

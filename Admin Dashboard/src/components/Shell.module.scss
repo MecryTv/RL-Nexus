@@ -1,15 +1,14 @@
 @use "mixins" as *;
 
+/* Ab hier stehen Bereiche und Seiten als Zeilen über der Seite, wie im Bot-Dashboard. */
+$phone: 859px;
+
 .shell {
     display: grid;
-    grid-template-columns: var(--s-sidebar) minmax(0, 1fr);
+    grid-template-columns: auto minmax(0, 1fr);
     min-height: 100dvh;
 
-    @include below(1023px) {
-        grid-template-columns: var(--s-rail) minmax(0, 1fr);
-    }
-
-    @include below(767px) {
+    @include below($phone) {
         grid-template-columns: minmax(0, 1fr);
     }
 }
@@ -30,117 +29,207 @@
     }
 }
 
-.sidebar {
+.side {
     position: sticky;
+    z-index: 35;
     top: 0;
     display: flex;
-    flex-direction: column;
-    gap: var(--s-4);
     height: 100dvh;
-    overflow-y: auto;
-    padding: var(--s-4) var(--s-3);
-    border-right: 1px solid var(--c-line);
-    background: var(--c-panel);
 
-    @include between(768px, 1023px) {
-        padding-inline: var(--s-2);
-    }
-
-    @include below(767px) {
-        position: fixed;
-        z-index: 50;
-        inset: 0 auto 0 0;
-        width: min(300px, 86vw);
-        transform: translateX(-100%);
-        visibility: hidden;
-        transition:
-            transform var(--t-base),
-            visibility var(--t-base);
+    @include below($phone) {
+        position: static;
+        flex-direction: column;
+        height: auto;
+        border-bottom: 1px solid var(--c-line);
     }
 }
 
-.open {
-    @include below(767px) {
-        transform: none;
-        visibility: visible;
-    }
-}
+/* --- Bereichsleiste ---------------------------------------------------- */
 
-.brand {
+.rail {
     display: flex;
+    flex-direction: column;
     align-items: center;
-    gap: var(--s-3);
-    padding: var(--s-1) var(--s-2) var(--s-2);
+    gap: var(--s-1);
+    width: var(--s-rail);
+    padding: var(--s-3) 0;
+    overflow-y: auto;
+    border-right: 1px solid var(--c-line);
+    background: rgb(0 0 0 / 25%);
 
-    @include between(768px, 1023px) {
-        justify-content: center;
-        padding-inline: 0;
+    @include below($phone) {
+        flex-direction: row;
+        width: auto;
+        padding: var(--s-2);
+        overflow: auto hidden;
+        border-right: 0;
+        border-bottom: 1px solid var(--c-line);
     }
 }
 
-.wordmark {
-    font-family: var(--f-accent);
-    font-size: 0.9rem;
-    font-weight: 700;
-    letter-spacing: 0.05em;
-    white-space: nowrap;
-
-    em {
-        color: var(--c-red);
-        font-style: normal;
-    }
-
-    @include between(768px, 1023px) {
-        @include sr;
-    }
-}
-
-.close {
-    display: none;
-    width: 40px;
-    height: 40px;
-    margin-left: auto;
+.logo {
+    display: grid;
+    flex: none;
+    margin-bottom: var(--s-2);
     place-items: center;
-    color: var(--c-text-dim);
+
+    img {
+        border-radius: 8px;
+    }
+
+    @include below($phone) {
+        margin: 0 var(--s-2) 0 var(--s-1);
+    }
+}
+
+.area {
+    position: relative;
+    display: grid;
+    flex: none;
+    width: 64px;
+    padding: 7px 0 5px;
+    border-radius: 10px;
+    justify-items: center;
+    gap: 3px;
+    color: var(--c-text-faint);
+    transition:
+        color var(--t-fast),
+        background var(--t-fast);
+
+    &:hover {
+        background: var(--c-line);
+        color: var(--c-text);
+    }
 
     &:focus-visible {
         @include focus-inset;
     }
 
-    @include below(767px) {
-        display: grid;
+    &[aria-pressed="true"] {
+        background: rgb(255 30 45 / 18%);
+        color: #fff;
+
+        svg {
+            color: var(--c-red);
+        }
+
+        &::before {
+            position: absolute;
+            top: 10px;
+            bottom: 10px;
+            left: -5px;
+            width: 4px;
+            border-radius: 0 3px 3px 0;
+            background: #fff;
+            content: "";
+        }
+    }
+
+    @include below($phone) {
+        width: 58px;
+        min-height: 44px;
+        align-content: center;
+
+        &[aria-pressed="true"]::before {
+            display: none;
+        }
     }
 }
 
-.group + .group {
-    margin-top: var(--s-3);
+.areaName {
+    font-family: var(--f-display);
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.2;
 }
 
-.groupLabel {
-    padding: var(--s-2) var(--s-3) var(--s-1);
+/* Zahl der ungelesenen Post am Bereich Start. Dunkleres Rot, damit Weiß darauf lesbar ist. */
+.badge {
+    position: absolute;
+    top: 2px;
+    right: 7px;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    border-radius: 8px;
+    background: var(--c-red-deep);
+    color: #fff;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    line-height: 16px;
+    text-align: center;
+}
+
+.divider {
+    flex: none;
+    width: 40px;
+    height: 1px;
+    margin: 2px 0;
+    background: var(--c-line-strong);
+
+    @include below($phone) {
+        width: 1px;
+        height: 28px;
+        margin: 0 var(--s-1);
+    }
+}
+
+/* --- Seitenspalte ------------------------------------------------------ */
+
+.column {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    width: var(--s-sidebar);
+    padding: var(--s-3) 10px;
+    overflow-y: auto;
+    border-right: 1px solid var(--c-line);
+    background: var(--c-panel);
+
+    @include below($phone) {
+        width: auto;
+        padding: var(--s-2);
+        border-right: 0;
+    }
+}
+
+.columnHead {
+    margin: var(--s-1) 0;
+    padding: 0 var(--s-2);
     color: var(--c-text-faint);
 
-    @include label(0.72rem, 0.16em);
+    @include label(0.72rem, 0.14em);
 
-    @include between(768px, 1023px) {
+    @include below($phone) {
         @include sr;
     }
 }
 
-.item {
-    position: relative;
+.pages {
+    display: grid;
+    gap: 2px;
+
+    @include below($phone) {
+        display: flex;
+        gap: 6px;
+        overflow: auto hidden;
+    }
+}
+
+.page {
     display: flex;
     align-items: center;
-    gap: var(--s-3);
-    min-height: 40px;
-    padding: 0 var(--s-3);
+    gap: var(--s-2);
+    min-height: 38px;
+    padding: 0 var(--s-2);
+    border-radius: 6px;
     color: var(--c-text-dim);
     font-size: 0.9375rem;
     transition:
         color var(--t-fast),
         background var(--t-fast);
 
-    @include bevel-diagonal(8px);
     @include touch-target;
 
     &:hover {
@@ -152,34 +241,38 @@
         @include focus-inset;
     }
 
-    @include between(768px, 1023px) {
-        justify-content: center;
-        padding: 0;
+    &[aria-current="page"] {
+        background: rgb(255 30 45 / 9%);
+        box-shadow: inset 2px 0 0 var(--c-red);
+        color: var(--c-text);
+
+        svg {
+            color: var(--c-red);
+        }
+    }
+
+    @include below($phone) {
+        min-height: 44px;
+        padding: 0 var(--s-3);
+        border: 1px solid var(--c-line);
+        border-radius: 8px;
+        white-space: nowrap;
+
+        &[aria-current="page"] {
+            border-color: var(--c-red);
+            box-shadow: none;
+        }
     }
 }
 
-.active {
-    background: linear-gradient(90deg, rgb(255 30 45 / 18%), rgb(255 30 45 / 0%));
-    color: var(--c-text);
-
-    &::before {
-        position: absolute;
-        top: 8px;
-        bottom: 8px;
-        left: 0;
-        width: 3px;
-        background: var(--c-red);
-        content: "";
-    }
+.pageName {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
-.itemLabel {
-    @include between(768px, 1023px) {
-        @include sr;
-    }
-}
-
-/* Zahl der neuen Kontaktnachrichten. In der schmalen Leiste klein oben rechts am Symbol. */
+/* Zahl der ungelesenen Post am Postfach. */
 .count {
     min-width: 20px;
     height: 20px;
@@ -193,25 +286,9 @@
     font-weight: 700;
     line-height: 20px;
     text-align: center;
-
-    @include between(768px, 1023px) {
-        position: absolute;
-        top: 3px;
-        right: 6px;
-        min-width: 16px;
-        height: 16px;
-        padding: 0 4px;
-        font-size: 0.65rem;
-        line-height: 16px;
-    }
 }
 
-.backdrop {
-    position: fixed;
-    z-index: 40;
-    inset: 0;
-    background: rgb(0 0 0 / 60%);
-}
+/* --- Rechts: Kopfzeile und Seite ---------------------------------------- */
 
 .main {
     display: flex;
@@ -268,21 +345,9 @@
     padding: 0 clamp(var(--s-4), 3vw, var(--s-6));
     border-bottom: 1px solid var(--c-line);
     background: var(--c-base);
-}
 
-.menu {
-    display: none;
-    width: 40px;
-    height: 40px;
-    place-items: center;
-    color: var(--c-text);
-
-    &:focus-visible {
-        @include focus-inset;
-    }
-
-    @include below(767px) {
-        display: grid;
+    @include below($phone) {
+        position: static;
     }
 }
 
