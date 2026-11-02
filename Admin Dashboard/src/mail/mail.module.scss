@@ -5,14 +5,22 @@
    Lesebereich über der Liste, unter 768 px kommt eins nach dem anderen.
    1280 statt 1100, seit Leiste und Seitenspalte zusammen 284 px breit sind (W-0053). */
 $narrow: 1279px;
+// Das Schreibfenster ist bildschirmweit und hängt nicht an der Leiste, es bleibt bei 1100 px.
+$composeNarrow: 1099px;
 $phone: 767px;
 
 .mail {
     display: grid;
     grid-template-columns: 236px minmax(300px, 380px) minmax(0, 1fr);
-    height: max(560px, calc(100dvh - var(--s-topbar) - 150px));
+    /* Was über dem Raster steht: Kopfzeile, Seitenkopf mit Satz und Innenabstand. */
+    height: max(560px, calc(100dvh - var(--s-topbar) - 170px));
     border: 1px solid var(--c-line);
     background: var(--c-panel-fill);
+
+    /* Ab zwei Postfächern steht die Reiterzeile (PageTabs, ein <nav>) direkt darüber. */
+    nav + & {
+        height: max(560px, calc(100dvh - var(--s-topbar) - 220px));
+    }
 
     @include below($narrow) {
         grid-template-columns: 220px minmax(0, 1fr);
@@ -1027,7 +1035,7 @@ $phone: 767px;
         @include sr;
     }
 
-    @include below($narrow) {
+    @include below($composeNarrow) {
         display: block;
     }
 }
@@ -1039,7 +1047,7 @@ $phone: 767px;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     min-height: 0;
 
-    @include below($narrow) {
+    @include below($composeNarrow) {
         grid-template-columns: minmax(0, 1fr);
 
         &[data-pane="schreiben"] .preview,
@@ -1070,7 +1078,7 @@ $phone: 767px;
     border-left: 1px solid var(--c-line);
     background: #020304;
 
-    @include below($narrow) {
+    @include below($composeNarrow) {
         border-left: 0;
     }
 }

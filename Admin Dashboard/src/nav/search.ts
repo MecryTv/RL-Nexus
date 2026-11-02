@@ -65,7 +65,10 @@ export class ShiftTap {
         this.limitMs = limitMs;
     }
 
-    down(code: string, at: number, editable: boolean): void {
+    /** Gehalten wiederholt der Browser keydown (`repeat`) - das darf die Uhr nicht neu stellen. */
+    down(code: string, at: number, editable: boolean, repeat = false): void {
+        if (repeat) return;
+
         this.since = code === "ShiftRight" && !editable ? at : null;
     }
 

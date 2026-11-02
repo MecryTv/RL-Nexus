@@ -25,7 +25,7 @@ function useSearchKeys(open: () => void): void {
         const tap = new ShiftTap();
 
         const onDown = (event: KeyboardEvent): void => {
-            tap.down(event.code, performance.now(), busy());
+            tap.down(event.code, performance.now(), busy(), event.repeat);
 
             if (event.repeat || busy()) return;
 
@@ -95,7 +95,8 @@ export function Shell(): JSX.Element {
             </a>
 
             <aside className={styles.side} aria-label="Navigation">
-                <nav className={styles.rail} aria-label="Bereiche">
+                {/* Umschaltknöpfe, keine Links: deshalb eine Gruppe und kein <nav>. Die Links stehen in der Spalte daneben. */}
+                <div className={styles.rail} role="group" aria-label="Bereiche">
                     <span className={styles.logo}>
                         <img src={logo} alt="" width={30} height={30} />
                         <span className="u-sr">RL Nexus Admin</span>
@@ -119,30 +120,34 @@ export function Shell(): JSX.Element {
                             </button>
                         </Fragment>
                     ))}
-                </nav>
+                </div>
 
                 <div className={styles.column}>
                     <button type="button" className={styles.find} onClick={openSearch}>
                         <Icon name="search" size={16} />
                         Suchen …<kbd className={styles.kbd}>⇧ rechts</kbd>
                     </button>
-                    <p className={styles.columnHead}>{area.label}</p>
-                    <ul className={styles.pages}>
-                        {area.pages.map((page) => (
-                            <li key={page.to}>
-                                <Link to={page.to} className={styles.page} aria-current={page.to === open ? "page" : undefined}>
-                                    <Icon name={page.icon} size={18} />
-                                    <span className={styles.pageName}>{page.label}</span>
-                                    {page.unread && unread > 0 && (
-                                        <span className={styles.count}>
-                                            {unread}
-                                            <span className="u-sr"> neu</span>
-                                        </span>
-                                    )}
-                                </Link>
-                            </li>
-                        ))}
-                    </ul>
+                    <p className={styles.columnHead} id="leiste-bereich">
+                        {area.label}
+                    </p>
+                    <nav aria-labelledby="leiste-bereich">
+                        <ul className={styles.pages}>
+                            {area.pages.map((page) => (
+                                <li key={page.to}>
+                                    <Link to={page.to} className={styles.page} aria-current={page.to === open ? "page" : undefined}>
+                                        <Icon name={page.icon} size={18} />
+                                        <span className={styles.pageName}>{page.label}</span>
+                                        {page.unread && unread > 0 && (
+                                            <span className={styles.count}>
+                                                {unread}
+                                                <span className="u-sr"> neu</span>
+                                            </span>
+                                        )}
+                                    </Link>
+                                </li>
+                            ))}
+                        </ul>
+                    </nav>
                 </div>
             </aside>
 

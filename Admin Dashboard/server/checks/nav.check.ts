@@ -66,6 +66,15 @@ export async function checkNav(): Promise<void> {
         assert.equal(tap.up("ShiftRight", 100), false);
     });
 
+    await check("Gehaltene rechte Umschalttaste öffnet die Suche nicht, auch wenn Windows keydown wiederholt", () => {
+        const tap = new ShiftTap();
+
+        tap.down("ShiftRight", 0, false);
+        tap.down("ShiftRight", 500, false, true);
+        tap.down("ShiftRight", 1500, false, true);
+        assert.equal(tap.up("ShiftRight", 1600), false);
+    });
+
     await check("Tiefe Adressen gehören zu ihrer Seite und ihrem Bereich", () => {
         assert.equal(pageOf("/")?.page.to, "/");
         assert.equal(pageOf("/post/3/INBOX/12")?.page.to, "/post");

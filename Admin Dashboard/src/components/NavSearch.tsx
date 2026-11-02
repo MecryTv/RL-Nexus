@@ -26,6 +26,11 @@ export function NavSearch({ entries, initial, onClose }: { readonly entries: rea
         return () => before?.focus();
     }, []);
 
+    // Mit den Pfeiltasten bleibt die gewählte Zeile im Blick, auch unter dem Rand der Liste.
+    useEffect(() => {
+        document.getElementById(`${id}-${active}`)?.scrollIntoView({ block: "nearest" });
+    }, [id, active, query]);
+
     function open(entry: INavEntry | undefined): void {
         if (!entry) return;
 
