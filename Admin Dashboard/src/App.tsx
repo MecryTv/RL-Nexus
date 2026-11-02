@@ -73,6 +73,8 @@ const router = createBrowserRouter(
                 <Route path="webseite/module/:id" lazy={page(() => import("./pages/ModuleEditorPage"), "ModuleEditorPage")} />
                 {/* Eigene Adresse statt /module/neu: so kann keine Modul-ID damit kollidieren. */}
                 <Route path="webseite/neues-modul" lazy={page(() => import("./pages/ModuleEditorPage"), "ModuleEditorPage")} />
+                <Route path="datenschutz/regeln" lazy={page(() => import("./userdata/RulesPage"), "RulesPage")} />
+                <Route path="datenschutz/:id?" lazy={page(() => import("./userdata/UserdataPage"), "UserdataPage")} />
                 <Route path="shop/produkte" lazy={page(() => import("./shop/ProductsPage"), "ProductsPage")} />
                 <Route path="shop/kunden" lazy={page(() => import("./shop/CustomersPage"), "CustomersPage")} />
                 <Route path="shop/einstellungen" lazy={page(() => import("./shop/ShopSettingsPage"), "ShopSettingsPage")} />

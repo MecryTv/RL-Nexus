@@ -194,6 +194,12 @@ const STROKE: Readonly<Record<string, JSX.Element>> = {
             <path d="M7.1 6.6a7.5 7.5 0 1 0 9.8 0" />
         </>
     ),
+    lock: (
+        <>
+            <rect x="5" y="11" width="14" height="10" rx="2" />
+            <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+        </>
+    ),
     "shield-check": (
         <>
             <path d="M12 2.5 4.5 5.4V11c0 4.9 3.2 8.9 7.5 10.5 4.3-1.6 7.5-5.6 7.5-10.5V5.4z" />

@@ -48,12 +48,14 @@ export function Button({
 
 export interface ILinkButtonProps extends IShared {
     readonly href: string;
+    /** Lädt die Adresse als Datei, statt sie zu öffnen. */
+    readonly download?: boolean;
 }
 
 /** Sieht aus wie ein Knopf, ist aber ein echter Link, etwa zur Discord-Anmeldung. */
-export function LinkButton({ children, variant = "outline", size = "md", icon, href }: ILinkButtonProps): JSX.Element {
+export function LinkButton({ children, variant = "outline", size = "md", icon, href, download }: ILinkButtonProps): JSX.Element {
     return (
-        <a href={href} className={classes(variant, size)}>
+        <a href={href} className={classes(variant, size)} download={download || undefined}>
             {icon !== undefined && <Icon name={icon} size={16} />}
             <span className={styles.label}>{children}</span>
         </a>

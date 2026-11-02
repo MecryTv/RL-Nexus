@@ -21,7 +21,7 @@ export interface INavPage {
 }
 
 export interface INavArea {
-    readonly id: "start" | "bot" | "shop" | "webseite" | "dev";
+    readonly id: "start" | "bot" | "shop" | "webseite" | "datenschutz" | "dev";
     readonly label: string;
     /** Unter dem Symbol in der Leiste, 74 px breit. */
     readonly short: string;
@@ -77,6 +77,16 @@ export const AREAS: readonly INavArea[] = [
         ],
     },
     {
+        id: "datenschutz",
+        label: "Datenschutz",
+        short: "Daten",
+        icon: "lock",
+        pages: [
+            { to: "/datenschutz", label: "Nutzerdaten", icon: "users", description: "Wer bei RL Nexus Daten hat, was es ist, Auskunft als Datei." },
+            { to: "/datenschutz/regeln", label: "Was bleibt", icon: "lock", description: "Was bei einer Löschung bleibt und welcher Satz dazu in der DM steht." },
+        ],
+    },
+    {
         id: "dev",
         label: "Developer",
         short: "Dev",
@@ -96,14 +106,23 @@ function matches(path: string, pathname: string): boolean {
     return path === "/" ? pathname === "/" : pathname === path || pathname.startsWith(`${path}/`);
 }
 
+/** Die genaueste Seite: `/datenschutz/regeln` gehört zu „Was bleibt“, nicht zu `/datenschutz`. */
 export function pageOf(pathname: string): { readonly area: INavArea; readonly page: INavPage } | null {
+    let best: { readonly area: INavArea; readonly page: INavPage } | null = null;
+    let length = -1;
+
     for (const area of AREAS) {
         for (const page of area.pages) {
-            if ([page.to, ...(page.also ?? [])].some((path) => matches(path, pathname))) return { area, page };
+            for (const path of [page.to, ...(page.also ?? [])]) {
+                if (matches(path, pathname) && path.length > length) {
+                    best = { area, page };
+                    length = path.length;
+                }
+            }
         }
     }
 
-    return null;
+    return best;
 }
 
 export function areaOf(pathname: string): INavArea | null {
