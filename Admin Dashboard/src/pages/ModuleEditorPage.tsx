@@ -362,6 +362,20 @@ function DetailForm({ detail, meta, onChange }: { readonly detail: IModuleDetail
     );
 }
 
+/** Reiter der Module (W-0053). Auch während des Ladens da, damit die Seite nicht springt. */
+function ModuleTabs({ id, name }: { readonly id: string | null; readonly name: string }): JSX.Element | null {
+    return (
+        <PageTabs
+            label="Module"
+            tabs={[
+                { to: "/webseite/module", label: "Alle Module", icon: "puzzle", end: true },
+                { to: "/webseite/neues-modul", label: "Neues Modul", icon: "plus" },
+                ...(id === null ? [] : [{ to: `/webseite/module/${id}`, label: name, icon: "pencil" }]),
+            ]}
+        />
+    );
+}
+
 function ModuleEditor({ id }: { readonly id: string | null }): JSX.Element {
     const creating = id === null;
 
@@ -390,6 +404,7 @@ function ModuleEditor({ id }: { readonly id: string | null }): JSX.Element {
         return (
             <>
                 <PageHeader title={creating ? "Neues Modul" : "Modul"} />
+                <ModuleTabs id={id} name="Modul" />
                 {failure ? (
                     <Failure
                         message={failure}
@@ -486,14 +501,7 @@ function ModuleEditor({ id }: { readonly id: string | null }): JSX.Element {
                 )}
             </PageHeader>
 
-            <PageTabs
-                label="Module"
-                tabs={[
-                    { to: "/webseite/module", label: "Alle Module", icon: "puzzle", end: true },
-                    { to: "/webseite/neues-modul", label: "Neues Modul", icon: "plus" },
-                    ...(creating ? [] : [{ to: `/webseite/module/${id}`, label: module.name || "Modul ohne Namen", icon: "pencil" }]),
-                ]}
-            />
+            <ModuleTabs id={id} name={module.name || "Modul ohne Namen"} />
 
             <div className={styles.tabs} role="tablist" aria-label="Bereiche des Moduls" onKeyDown={onTabKey}>
                 {(["kachel", "detail"] as const).map((value) => {
