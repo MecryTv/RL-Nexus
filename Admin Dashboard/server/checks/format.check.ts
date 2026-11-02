@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { formatBytes, formatDuration, formatMonth, formatNumber, formatPercent } from "../../src/format.ts";
 import { sparkline } from "../../src/sparkline.ts";
+import { discordLines, discordTime } from "../../src/status/discord.ts";
 import { check, section } from "./harness.ts";
 
 /** src/format.ts hat keine DOM-Abhängigkeit, deshalb läuft ihr Check hier mit. */
@@ -37,5 +38,30 @@ export async function checkFormat(): Promise<void> {
         assert.equal(sparkline([null, 5, null]), "50,2 50,2");
         assert.equal(sparkline([null, null]), "");
         assert.equal(sparkline([0, 0]), "0,28 100,28");
+    });
+
+    // 2. November 2026, 15:40 in Berlin.
+    const now = Date.UTC(2026, 10, 2, 14, 40, 0);
+    const seconds = now / 1000;
+
+    await check("Discord-Zeitstempel in der Vorschau wie im Client, in Berliner Zeit", () => {
+        assert.equal(discordTime(seconds - 120, "R", now), "vor 2 Minuten");
+        assert.equal(discordTime(seconds + 3 * 3600, "R", now), "in 3 Stunden");
+        assert.equal(discordTime(seconds, "t", now), "15:40");
+        assert.match(discordTime(seconds, "f", now) ?? "", /^2\. November 2026.*15:40$/);
+    });
+
+    await check("Discord-Text der Vorschau: Überschriften, kleine Zeilen, Zitate und Fett", () => {
+        const [head, small, quote, plain] = discordLines(`### 🤖 Bot · **99 %**\n-# Geprüft <t:${seconds - 120}:R>\n> Wartung\nOhne <t:${seconds}:x> Stil`, now);
+
+        assert.equal(head.kind, "h3");
+        assert.deepEqual(head.segments, [
+            { text: "🤖 Bot · ", bold: false },
+            { text: "99 %", bold: true },
+        ]);
+        assert.deepEqual([small.kind, small.segments.map((part) => part.text).join("")], ["small", "Geprüft vor 2 Minuten"]);
+        assert.deepEqual([quote.kind, quote.segments[0].text], ["quote", "Wartung"]);
+        assert.deepEqual([plain.kind, plain.segments[0].text], ["text", `Ohne <t:${seconds}:x> Stil`]);
+        assert.equal(discordLines("## 🟢 Alles läuft", now)[0].kind, "h2");
     });
 }
