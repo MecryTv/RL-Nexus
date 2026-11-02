@@ -261,6 +261,12 @@ $phone: 859px;
         display: flex;
         gap: 6px;
         overflow: auto hidden;
+        scrollbar-width: thin;
+
+        /* Seitlich scrollen statt die Namen zu kürzen. */
+        > li {
+            flex: none;
+        }
     }
 }
 
