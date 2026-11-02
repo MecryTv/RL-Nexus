@@ -1,4 +1,4 @@
-# Admin Dashboard: neuer Look, Status-Knopf, Nutzerdaten, Sperre (W-0053, W-0052, W-0051, W-0057)
+# Admin Dashboard: neuer Look, Status-Knopf, Nutzerdaten, Sperre, Suche (W-0053, W-0052, W-0051, W-0057, W-0059)
 
 Besprochen am 01.11.2026 im Chat, Entwürfe mit Superpowers: `w0053-admin-design.html` (Look A1 bis A4, Status B1 bis B3, erste Nutzerdaten C1 bis C3), `w0051-nutzerdaten.html` (C4 bis C6, D1, D2, E1 bis E3) und `w0051-dm.html` (Frist frei wählbar, neue DM). Für die Sperre `w0057-sperre.html` und die Runden 2 bis 4 (`w0057-runde2.html` bis `w0057-runde4.html`). Alle hängen an den Aufgaben in `.works/`.
 
@@ -15,6 +15,8 @@ Wahl des Nutzers:
 2. **W-0052** danach: klein, eine Route und eine Karte auf der Status-Seite.
 3. **W-0051** danach: der größte Teil, mit Arbeit in Admin Dashboard und Bot.
 4. **W-0057** zuletzt: baut auf dem Profil und den Wegen zwischen Admin und Bot aus Teil 3 auf.
+
+Nachtrag 02.11.: **W-0059** (Teil 5, Suche) kommt auf Wunsch des Nutzers gleich nach W-0052, also vor W-0051.
 
 Jeder Teil bekommt einen eigenen Plan und einen eigenen Branch.
 
@@ -301,6 +303,55 @@ Eine Löschung nach Teil 3 lässt die Sperre samt Hashes stehen. Im Profil der N
 - Eine gesperrte Person bekommt auf einem gesperrten Baustein eine Antwort vom Bot, oder eine nicht gesperrte Person keine.
 - Moderation gegen die gesperrte Person hört auf zu wirken.
 
+## Teil 5: Suche findet alles (W-0059)
+
+### Worum es geht
+
+Wunsch vom 02.11.: „verbesser die Suche, sodass man quasi alles auf dem Admin Dashboard suchen kann“. Die Suche aus Teil 1 findet bisher nur Seiten. Künftig findet sie auch Personen, Server, Mails, Inhalte der Webseite und Einträge aus Protokoll und Meldungen. Entwurf `w0059-suche.html`, gewählt **SC „Filter oben, eine Liste“**.
+
+### Das Fenster (SC)
+
+- Gleiches Fenster und gleiche Tasten zum Öffnen wie in Teil 1 (rechte Umschalttaste, /, Strg K), Platzhalter „Suchen …“.
+- Unter dem Feld eine Filterleiste: **Alles, Seiten, Personen, Server, Mails, Inhalte, Protokoll**, jeweils mit der Zahl der Treffer. Solange eine Quelle noch lädt, steht dort ein Punkt statt der Zahl. Filter ohne Treffer bleiben sichtbar, aber blass.
+- **Tab** wechselt zum nächsten Filter, **Umschalt+Tab** zum vorigen. Ein Klick auf einen Filter tut dasselbe.
+- **Kürzel** am Anfang der Eingabe: `@` Personen, `#` Server, `/` Seiten. Das Kürzel stellt den Filter um und wird nicht mitgesucht. Die Zeile unter dem Feld nennt die Kürzel.
+- Eine Liste, in „Alles“ nach Relevanz gemischt. Jede Zeile: Symbol der Art, Titel mit markiertem Treffer, Ort rechts (etwa „Postfach info@“, „Shop · Kunde“), darunter eine Zeile Kontext (Absender und Datum, Gruppe und Kunde, Mitglieder des Servers).
+- Pfeiltasten wählen, **Enter** oder Klick öffnet, **Esc** schließt. Unten die Zeile „Tab Filter wechseln · Enter öffnen · Esc schließen“.
+- Leeres Feld: wie bisher die Seiten. Nur ein Kürzel: kurzer Hinweis, was sich dort suchen lässt.
+- Handy: volle Breite, Filterleiste waagerecht scrollbar, Zeile mit den Kürzeln weg.
+
+### Was gefunden wird
+
+| Filter | Quellen | Gesucht in | Ziel beim Öffnen |
+|---|---|---|---|
+| Seiten | Bereiche und Seiten (wie bisher, im Browser) | Name, Bereich, Beschreibung | die Seite |
+| Personen | Gruppen, Shop-Kunden, Beta-Tester, Team der Webseite | Name, Discord-ID, bei Kunden auch die volle Mail | Kunde, Gruppe oder Beta je nach Fundort, gefiltert; ab Teil 3 die Nutzeransicht |
+| Server | Serverliste des Bots | Name, ID | Serverliste, gefiltert |
+| Mails | Posteingang aller Postfächer | Betreff, Absender | die Mail |
+| Inhalte | Module, Banner, Shop-Produkte | Titel, Text, Kategorie | das Modul; Banner- oder Produktseite |
+| Protokoll | Meldungen, Störungen und Wartungen, Backups, Protokoll des Admin Dashboards | Titel, Text, Server, Person | die jeweilige Seite, gefiltert |
+
+- Eine Person mit mehreren Fundorten ist **eine Zeile**; der Kontext nennt alle Fundorte („Gruppe Admin · Kunde Pro · Beta“).
+- Mails zeigt die Suche wie im Postfach, Kunden-Mails im Kontext nur gekürzt (wie in der Kundenliste).
+- Das Protokoll des Admin Dashboards sehen nur Developer, wie die Seite selbst. Alles andere sehen Admin und Developer.
+
+### Regeln
+
+- Seiten sucht der Browser sofort beim Tippen. Alles andere kommt ab **2 Zeichen** über **eine** Anfrage `GET /api/search?q=…`; der Server fragt die Quellen gleichzeitig.
+- Die Anfrage geht 200 ms nach dem letzten Tastendruck raus; eine neue bricht die alte ab.
+- Jede Quelle hat **2 Sekunden**. Was später kommt oder fehlschlägt, fehlt in der Liste, und das Fenster sagt es in einer Zeile („Mails gerade nicht erreichbar“).
+- Höchstens **20 Treffer je Quelle**; wird die Grenze erreicht, steht am Filter „20+“. In „Alles“ höchstens 40 Zeilen.
+- Rangfolge wie bei den Seiten: Titel beginnt mit dem Begriff, dann Titel enthält ihn, dann Kontext. Bei Gleichstand die Reihenfolge der Filterleiste, bei Mails und Protokoll das Neueste zuerst.
+- Groß und klein, Umlaute und Akzente zählen nicht (`fold` aus Teil 1).
+- Seiten mit eigenem Suchfeld (Server, Gruppen, Kunden, Beta, Postfach) übernehmen den Begriff aus `?q=` in der Adresse.
+- Die Suche ändert nichts und schreibt nichts ins Protokoll.
+
+### Was auf keinen Fall passieren darf
+
+- Ein Admin sieht über die Suche Einträge aus dem Protokoll des Admin Dashboards.
+- Eine langsame Quelle hält die übrigen Treffer auf.
+- Eine volle Kunden-Mail steht in der Trefferliste.
+
 ---
 
 ## Nicht dabei
@@ -311,6 +362,8 @@ Eine Löschung nach Teil 3 lässt die Sperre samt Hashes stehen. Im Profil der N
 - Keine Sperre auf Zeit; eine Sperre gilt, bis das Team sie ändert oder aufhebt.
 - Keine Prüfung von IPs außerhalb der Anmeldung (etwa bei jedem Seitenaufruf).
 - Kein Einspruch der gesperrten Person über RL Nexus selbst.
+- Die Suche fragt Discord nicht nach Personen, die RL Nexus nicht kennt; das kommt mit der Nutzeransicht aus Teil 3.
+- Keine Suche in gesendeten Mails, Ordnern außer dem Posteingang oder Anhängen.
 
 ## Entscheidungen von Claude (zum Gegenlesen)
 
@@ -333,3 +386,10 @@ Eine Löschung nach Teil 3 lässt die Sperre samt Hashes stehen. Im Profil der N
 17. **Proxycheck nur im Admin Dashboard,** das Bot-Dashboard fragt dort an. Zeitlimit 3 Sekunden.
 18. **Belege:** Bilder bis 8 MB, Discord-Links werden vom Bot mit Inhalt gesichert.
 19. **Blockiert durch VPN** bekommt eine eigene Seite im Stil der Sperrseite; Entwurf dafür und für die Sperr-DM vor dem Bau.
+20. **Suche als Teil 5,** gebaut vor Teil 3 (Wunsch: gleich nach W-0052). Personen öffnen deshalb erst die Liste ihres Fundorts; mit Teil 3 wechselt das Ziel auf die Nutzeransicht.
+21. **Eine Anfrage, der Server fragt die Quellen** statt einer Anfrage je Quelle aus dem Browser: ein Zeitlimit, eine Rechteprüfung, weniger Anfragen beim Tippen.
+22. **2 Zeichen, 200 ms, 2 Sekunden je Quelle, 20 je Quelle, 40 in „Alles“.** Ein Zeichen fände bei Mails fast alles; mehr als 2 Sekunden fühlt sich beim Tippen kaputt an.
+23. **Mails nur im Posteingang,** wie die heutige Suche über alle Postfächer; gesendete Mails und Anhänge erst, wenn es gebraucht wird.
+24. **Personen zusammengeführt über die Discord-ID,** damit dieselbe Person nicht viermal untereinander steht.
+25. **Backups, Meldungen, Störungen unter „Protokoll“,** damit die Leiste bei sieben Filtern bleibt.
+26. **Markierung nur, wo der Begriff wörtlich im Titel steht;** findet die Suche ihn nur über Umlaute oder Akzente, bleibt der Titel ohne Markierung.
