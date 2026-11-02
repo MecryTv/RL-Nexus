@@ -17,6 +17,7 @@ import type { Transporter } from "nodemailer";
 import type { Options } from "nodemailer/lib/mailer/index.js";
 import type { IAuditPage, IDbRows, IDbTable, IGroupList, IMailAllPage, IMailOverview, IOverview, ITech } from "../shared/api.ts";
 import type { ISearchResult } from "../shared/search.ts";
+import { PERSON_COLUMN, USERDATA_IGNORED, sourcesOf } from "../shared/userdata.ts";
 import type { ICancelReceipt, ICheckoutStart, ICustomerDetail, ICustomerList, IShopProduct, IShopProductList, IShopSettingsView, IShopState, IUnlockProgress } from "../shared/shop.ts";
 import type { IIncidentList, IPublicStatus, IStatusDetail } from "../shared/status.ts";
 import { buildApp } from "./app.ts";
@@ -750,6 +751,47 @@ try {
         assert.equal(found.length, 1);
         assert.match(found[0].context, /^an 2 Personen · /);
         assert.equal(found[0].href, "/meldungen");
+    });
+
+    section("Nutzerdaten");
+
+    // Die echte Datenbank: Bot- und Admin-Tabellen liegen zusammen.
+    const schema = await query<{ t: string; c: string; type: string }[]>(
+        "SELECT TABLE_NAME AS t, COLUMN_NAME AS c, DATA_TYPE AS type FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE()"
+    );
+    const tables = new Set(schema.map((column) => column.t));
+
+    await check("Nutzerdaten: jede Spalte mit Personen-ID steht in der Liste oder ist begründet ausgenommen", () => {
+        const known = new Set(sourcesOf().map((source) => `${source.table}.${source.column}`));
+        const missing = schema
+            .filter((column) => ["varchar", "char", "bigint"].includes(column.type) && PERSON_COLUMN.test(column.c))
+            .map((column) => `${column.t}.${column.c}`)
+            .filter((key) => !known.has(key) && !(key in USERDATA_IGNORED));
+
+        assert.deepEqual(missing, [], "in shared/userdata.ts eintragen oder in USERDATA_IGNORED begründen");
+    });
+
+    await check("Nutzerdaten: jede Spalte der Liste gibt es (fehlende Tabellen sind erlaubt)", () => {
+        const all = new Set(schema.map((column) => `${column.t}.${column.c}`));
+
+        assert.deepEqual(
+            sourcesOf()
+                .filter((source) => tables.has(source.table) && !all.has(`${source.table}.${source.column}`))
+                .map((source) => `${source.table}.${source.column}`),
+            []
+        );
+    });
+
+    await check("Nutzerdaten: jede Quelle lässt sich abfragen", async () => {
+        const broken: string[] = [];
+
+        for (const source of sourcesOf().filter((entry) => tables.has(entry.table))) {
+            await query(`SELECT ${source.label} AS label, ${source.time ?? "NULL"} AS at, ${source.guild ?? "NULL"} AS guild, ${source.name ?? "NULL"} AS name FROM ${source.table} LIMIT 1`).catch((error: unknown) => {
+                broken.push(`${source.table}.${source.column}: ${(error instanceof Error ? error.message : String(error)).split(String.fromCharCode(10))[0]}`);
+            });
+        }
+
+        assert.deepEqual(broken, []);
     });
 
     section("Statusmeldung in Discord");
