@@ -194,6 +194,53 @@ $phone: 859px;
     }
 }
 
+.find {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: var(--s-2);
+    min-height: 36px;
+    margin-bottom: var(--s-2);
+    padding: 0 10px;
+    border: 1px solid var(--c-line);
+    border-radius: 6px;
+    color: var(--c-text-faint);
+    font-size: 0.875rem;
+    transition:
+        color var(--t-fast),
+        border-color var(--t-fast);
+
+    @include touch-target;
+
+    &:hover {
+        border-color: var(--c-line-strong);
+        color: var(--c-text);
+    }
+
+    &:focus-visible {
+        @include focus-inset;
+    }
+
+    @include below($phone) {
+        min-height: 44px;
+    }
+}
+
+.kbd {
+    margin-left: auto;
+    padding: 0 5px;
+    border: 1px solid var(--c-line-strong);
+    border-radius: 4px;
+    font-family: var(--f-label);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+
+    @include below($phone) {
+        display: none;
+    }
+}
+
 .columnHead {
     margin: var(--s-1) 0;
     padding: 0 var(--s-2);

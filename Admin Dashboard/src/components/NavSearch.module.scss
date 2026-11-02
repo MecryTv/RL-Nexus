@@ -1,0 +1,118 @@
+@use "mixins" as *;
+
+.dialog {
+    width: min(560px, calc(100vw - 2 * var(--s-4)));
+    max-width: none;
+    /* Oben statt mittig, damit die Liste beim Tippen nicht springt. */
+    margin: 12vh auto auto;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--c-text);
+
+    &::backdrop {
+        background: rgb(0 0 0 / 65%);
+    }
+}
+
+.panel {
+    --c-panel-fill: var(--c-panel-solid);
+
+    display: grid;
+    padding: var(--s-2);
+    gap: var(--s-2);
+}
+
+.field {
+    display: flex;
+    align-items: center;
+    gap: var(--s-3);
+    padding: 0 var(--s-3);
+    border-bottom: 1px solid var(--c-line);
+    color: var(--c-text-faint);
+}
+
+.input {
+    flex: 1;
+    min-width: 0;
+    min-height: 48px;
+    border: 0;
+    background: transparent;
+    color: var(--c-text);
+    font: inherit;
+    font-size: 1rem;
+
+    &:focus {
+        outline: none;
+    }
+}
+
+.list {
+    display: grid;
+    max-height: min(50vh, 420px);
+    gap: 2px;
+    overflow-y: auto;
+}
+
+.option {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 2px var(--s-3);
+    padding: var(--s-2) var(--s-3);
+    border-radius: 6px;
+    color: var(--c-text-dim);
+    cursor: pointer;
+
+    &[aria-selected="true"] {
+        background: rgb(255 30 45 / 9%);
+        box-shadow: inset 2px 0 0 var(--c-red);
+        color: var(--c-text);
+
+        svg {
+            color: var(--c-red);
+        }
+    }
+}
+
+.name {
+    color: var(--c-text);
+    font-weight: 700;
+}
+
+.area {
+    color: var(--c-text-faint);
+    font-size: 0.8125rem;
+}
+
+.text {
+    grid-column: 2 / 4;
+    overflow: hidden;
+    color: var(--c-text-faint);
+    font-size: 0.8125rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.empty {
+    padding: var(--s-3);
+    color: var(--c-text-dim);
+}
+
+.keys {
+    padding: var(--s-1) var(--s-3) var(--s-1);
+    border-top: 1px solid var(--c-line);
+    color: var(--c-text-faint);
+    font-size: 0.75rem;
+
+    kbd {
+        padding: 0 5px;
+        border: 1px solid var(--c-line-strong);
+        border-radius: 4px;
+        font-family: inherit;
+    }
+
+    @include below(859px) {
+        display: none;
+    }
+}

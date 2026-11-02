@@ -1,13 +1,56 @@
-import { Fragment, useState, type JSX } from "react";
+import { Fragment, useCallback, useEffect, useState, type JSX } from "react";
 import { Link, Outlet, useLocation, useNavigation } from "react-router-dom";
 import { unreadOf, useMailOverview } from "../api/mail";
 import logo from "../assets/logo.webp";
-import { areaOf, pageOf, visibleAreas, type INavArea } from "../nav/areas.ts";
+import { areaOf, navEntries, pageOf, visibleAreas, type INavArea } from "../nav/areas.ts";
+import { ShiftTap } from "../nav/search.ts";
 import { useMe, useSession } from "../session/context";
 import { Badge } from "./Badge";
 import { Button } from "./Button";
 import { Icon } from "./Icon";
+import { NavSearch } from "./NavSearch";
 import styles from "./Shell.module.scss";
+
+/** Tippt jemand gerade, oder ist ein Fenster offen? Dann öffnet keine Taste die Suche. */
+function busy(): boolean {
+    const focus = document.activeElement;
+    const typing = focus instanceof HTMLElement && (focus.matches("input, textarea, select") || focus.isContentEditable);
+
+    return typing || document.querySelector("dialog[open], [role=dialog]") !== null;
+}
+
+/** Rechte Umschalttaste kurz, `/` oder Strg K (⌘ K) öffnen die Suche. */
+function useSearchKeys(open: () => void): void {
+    useEffect(() => {
+        const tap = new ShiftTap();
+
+        const onDown = (event: KeyboardEvent): void => {
+            tap.down(event.code, performance.now(), busy());
+
+            if (event.repeat || busy()) return;
+
+            const slash = event.key === "/" && !event.ctrlKey && !event.metaKey && !event.altKey;
+            const k = event.key.toLowerCase() === "k" && (event.ctrlKey || event.metaKey);
+
+            if (slash || k) {
+                event.preventDefault();
+                open();
+            }
+        };
+
+        const onUp = (event: KeyboardEvent): void => {
+            if (tap.up(event.code, performance.now())) open();
+        };
+
+        document.addEventListener("keydown", onDown);
+        document.addEventListener("keyup", onUp);
+
+        return () => {
+            document.removeEventListener("keydown", onDown);
+            document.removeEventListener("keyup", onUp);
+        };
+    }, [open]);
+}
 
 /**
  * Die Hülle wie im Bot-Dashboard (W-0053): links die Bereiche, daneben die
@@ -38,6 +81,12 @@ export function Shell(): JSX.Element {
     }
 
     const area = areas.find((entry) => entry.id === chosen) ?? areas[0];
+    const entries = navEntries(me.role);
+
+    const [searching, setSearching] = useState(false);
+    const openSearch = useCallback(() => setSearching(true), []);
+
+    useSearchKeys(openSearch);
 
     return (
         <div className={styles.shell}>
@@ -73,6 +122,10 @@ export function Shell(): JSX.Element {
                 </nav>
 
                 <div className={styles.column}>
+                    <button type="button" className={styles.find} onClick={openSearch}>
+                        <Icon name="search" size={16} />
+                        Suchen …<kbd className={styles.kbd}>⇧ rechts</kbd>
+                    </button>
                     <p className={styles.columnHead}>{area.label}</p>
                     <ul className={styles.pages}>
                         {area.pages.map((page) => (
@@ -124,6 +177,8 @@ export function Shell(): JSX.Element {
                     <Outlet />
                 </main>
             </div>
+
+            {searching && <NavSearch entries={entries} initial={entries.filter((entry) => entry.area === area.label)} onClose={() => setSearching(false)} />}
         </div>
     );
 }
