@@ -31,7 +31,7 @@ import { cancelDeletion, deletionCounts, deletionOf, latestDeletionOf, listDelet
 import { renderDeletionImage, sendDeletionDm } from "../userdata/dm.ts";
 import { personExport, personIndex, personRows, userdataRules } from "../userdata/find.ts";
 import { announcementInput, followUp, plainInput } from "../userdata/flow.ts";
-import { deletionReceipt } from "../userdata/receipt.ts";
+import { deletionReceipt, receiptCode } from "../userdata/receipt.ts";
 import { oneOf, snowflake, text } from "../validate.ts";
 
 /** So viele Zeilen zeigt die Zeitleiste im Profil; die Auskunft enthält alle. */
@@ -252,7 +252,7 @@ export async function userdataRoutes(app: FastifyInstance, { config }: { config:
         const filter = params.filter === undefined ? "offen" : oneOf(params.filter, DELETION_FILTERS, "Der Filter");
         const [deletions, counts] = await Promise.all([listDeletions(filter, text(params.q, "Die Suche", { max: 100 })), deletionCounts()]);
 
-        return { deletions: deletions.map(publicDeletion), counts };
+        return { deletions: deletions.map((entry) => ({ ...publicDeletion(entry), code: entry.state === "geloescht" ? receiptCode(entry, config.jwtSecret) : null })), counts };
     });
 
     /** Für die gelbe Zahl in der Leiste. */
@@ -284,6 +284,6 @@ export async function userdataRoutes(app: FastifyInstance, { config }: { config:
         return reply
             .type("application/pdf")
             .header("Content-Disposition", `attachment; filename="rl-nexus-loeschung-${record.id}.pdf"`)
-            .send(await deletionReceipt(record));
+            .send(await deletionReceipt(record, config.jwtSecret));
     });
 }

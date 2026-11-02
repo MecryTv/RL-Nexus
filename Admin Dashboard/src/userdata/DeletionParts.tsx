@@ -37,7 +37,7 @@ function stepNote(deletion: IDeletion): string {
         const total = [...Object.values(deleted), ...Object.values(anonymized)].reduce((sum, rows) => sum + (rows ?? 0), 0);
         const stayed = kept.length > 0 ? ` · ${kept.map((entry) => entry.label).join(", ")} blieb` : "";
 
-        return `${formatNumber(total)} Einträge auf ${servers} ${servers === 1 ? "Server" : "Servern"}${stayed}`;
+        return `${formatNumber(total)} Einträge auf ${servers} ${servers === 1 ? "Server" : "Servern"}${stayed}${deletion.code ? ` · Prüfcode ${deletion.code}` : ""}`;
     }
 
     const dm = deletion.dmState === "zugestellt" ? "DM zugestellt" : deletion.dmState === "nicht_zustellbar" ? "DM nicht zustellbar" : "DM wird geschickt";

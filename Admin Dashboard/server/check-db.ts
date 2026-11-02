@@ -20,7 +20,7 @@ import type { IAuditPage, IDbRows, IDbTable, IGroupList, IMailAllPage, IMailOver
 import type { ISearchResult } from "../shared/search.ts";
 import { PERSON_COLUMN, USERDATA_IGNORED, sourcesOf, type IDeletion, type IUserdataList, type IUserdataProfile, type IUserdataRuleView } from "../shared/userdata.ts";
 import { forgetIndex, personIndex, rowsOf } from "./userdata/find.ts";
-import { cancelDeletion, claimDeletion, deletionCounts, deletionOf, dueDeletions, listDeletions, markCopy, openDeletionOf, planDeletion, stopDeletion } from "./userdata/deletions.ts";
+import { cancelDeletion, claimDeletion, deletionCounts, deletionOf, dueDeletions, forgetOldDeletions, listDeletions, markCopy, openDeletionOf, planDeletion, stopDeletion } from "./userdata/deletions.ts";
 import { executeDeletion } from "./userdata/erase.ts";
 import { signToken } from "./bot.ts";
 import { deletionRound } from "./userdata/clock.ts";
@@ -1308,14 +1308,18 @@ try {
             });
         });
 
-        await check("Uhr: eine fällige Löschung wird ausgeführt; der Beleg ist ein PDF, vorher 409", async () => {
+        await check("Uhr: eine fällige Löschung wird ausgeführt, die DM „Erledigt“ hat den Beleg als PDF; der Beleg ist vorher 409", async () => {
             const deletion = await openDeletionOf(P2);
             assert.ok(deletion);
             assert.equal((await get(`/api/userdata/loeschungen/${deletion.id}/beleg`)).statusCode, 409);
 
             await query("UPDATE userdata_deletions SET due_at = ? WHERE id = ?", [new Date(Date.now() - 1000), deletion.id]);
-            await withDms(false, async () => {
+            await withDms(false, async (sent) => {
                 await deletionRound(config);
+
+                const done = sent.find((message) => message.body.includes(`rl-nexus-loeschung-${deletion.id}.pdf`));
+                assert.ok(done, sent.map((message) => message.body.slice(0, 120)).join(" | "));
+                assert.match(done.body, /"type":13/);
             });
             assert.equal((await deletionOf(deletion.id))?.state, "geloescht");
 
@@ -1323,6 +1327,22 @@ try {
             assert.equal(receipt.statusCode, 200);
             assert.match(String(receipt.headers["content-type"]), /application\/pdf/);
             assert.equal(receipt.rawPayload.subarray(0, 4).toString("ascii"), "%PDF");
+        });
+
+        await check("Uhr: Nachweise älter als 3 Jahre verschwinden, jüngere bleiben", async () => {
+            const daysAgo = (days: number): Date => new Date(Date.now() - days * 86_400_000);
+
+            await query(
+                `INSERT INTO userdata_deletions (user_id, state, due_at, reason, planned_by, planned_name, done_at, cancelled_at, created_at) VALUES
+                 (?, 'geloescht', ?, 'check:db Nachweis', '0', 'check', ?, NULL, ?),
+                 (?, 'abgebrochen', ?, 'check:db Nachweis', '0', 'check', NULL, ?, ?),
+                 (?, 'geloescht', ?, 'check:db Nachweis', '0', 'check', ?, NULL, ?)`,
+                [P1, daysAgo(1100), daysAgo(1100), daysAgo(1101), P2, daysAgo(1100), daysAgo(1100), daysAgo(1101), P3, daysAgo(700), daysAgo(700), daysAgo(701)]
+            );
+            await forgetOldDeletions();
+
+            const left = await query<{ user_id: string }[]>("SELECT user_id FROM userdata_deletions WHERE reason = 'check:db Nachweis'");
+            assert.deepEqual(left.map((row) => row.user_id), [P3]);
         });
 
         await check("Liste der Löschungen: offene zuerst, mit Zahlen", async () => {

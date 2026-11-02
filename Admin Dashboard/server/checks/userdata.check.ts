@@ -7,6 +7,8 @@ import { postDirectMessage, removeButtons } from "../discord.ts";
 import { DM_KINDS, deletionMessage, renderDeletionImage, type IDmInput } from "../userdata/dm.ts";
 import { eraseSql, eraseValues } from "../userdata/erase.ts";
 import { matchSql, matchValue } from "../userdata/find.ts";
+import type { IDeletionRecord } from "../userdata/deletions.ts";
+import { deletionReceipt, receiptCode } from "../userdata/receipt.ts";
 import { USERS } from "./fakes.ts";
 import { SECRET, check, config, section } from "./harness.ts";
 
@@ -146,6 +148,52 @@ export async function checkUserdata(): Promise<void> {
 
         assert.ok(heightOf(wrapped.data) >= heightOf(short.data) + 50, `${heightOf(short.data)} → ${heightOf(wrapped.data)}`);
         assert.match(wrapped.alt, /um Ansprüche belegen zu können/);
+    });
+
+    const record: IDeletionRecord = {
+        id: 42,
+        userId: "9999999999999999904",
+        userName: null,
+        state: "geloescht",
+        dueAt: "2026-11-01T19:51:00.000Z",
+        reason: "Anfrage per Mail vom 30.10.",
+        plannedBy: "1059621019947634739",
+        plannedName: "MecryTv | Joe",
+        dmState: "zugestellt",
+        dmError: null,
+        copyAt: null,
+        stoppedAt: null,
+        cancelledAt: null,
+        doneAt: "2026-11-01T19:51:04.000Z",
+        result: {
+            deleted: { level: 12, tickets: 3 },
+            anonymized: { team: 1 },
+            kept: [{ area: "shop", label: "Shop", rows: 2, note: "Bezahlte Bestellungen bewahren wir drei Jahre auf.", basis: "ansprueche", law: null, years: 3 }],
+            servers: 2,
+        },
+        createdAt: "2026-10-31T19:51:00.000Z",
+        dmChannelId: null,
+        dmMessageId: null,
+        forgetPending: false,
+    };
+
+    await check("Beleg: Prüfcode gleich bei gleichem Inhalt, anders bei anderen Zahlen oder anderem Geheimnis", () => {
+        const code = receiptCode(record, "geheim");
+
+        assert.match(code, /^[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}$/);
+        assert.equal(receiptCode({ ...record }, "geheim"), code);
+        assert.notEqual(receiptCode({ ...record, result: { ...record.result!, deleted: { level: 13, tickets: 3 } } }, "geheim"), code);
+        assert.notEqual(receiptCode(record, "anders"), code);
+    });
+
+    await check("Beleg: zwei Seiten mit den Schriften von RL Nexus, auch mit Emoji im Grund", async () => {
+        const pdf = await deletionReceipt({ ...record, reason: "Anfrage 🙂 per Mail" }, "geheim");
+        const raw = pdf.toString("latin1");
+
+        assert.equal(pdf.subarray(0, 4).toString("ascii"), "%PDF");
+        assert.equal((raw.match(/\/Type \/Page\b/g) ?? []).length, 2);
+        assert.match(raw, /Oxanium/);
+        assert.match(raw, /Rajdhani/);
     });
 
     await check("DM-Nachricht: nur die Ankündigung hat die Knöpfe, mit der Nummer der Löschung", () => {

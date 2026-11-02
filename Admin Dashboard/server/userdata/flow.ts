@@ -1,6 +1,6 @@
 import { USERDATA_AREAS, type IDeletionResult } from "../../shared/userdata.ts";
 import type { IConfig } from "../config.ts";
-import { removeButtons } from "../discord.ts";
+import { removeButtons, type IDiscordFile } from "../discord.ts";
 import { lookupUser } from "../users.ts";
 import type { IDeletionRecord } from "./deletions.ts";
 import { sendDeletionDm, type DmKind, type IDmInput } from "./dm.ts";
@@ -59,8 +59,8 @@ export async function plainInput(config: IConfig, record: IDeletionRecord, now =
 const sum = (counts: IDeletionResult["deleted"]): number => Object.values(counts).reduce((total, value) => total + (value ?? 0), 0);
 
 /** Eine Folgenachricht schicken und die Knöpfe der Ankündigung entfernen. */
-export async function followUp(config: IConfig, record: IDeletionRecord, kind: Exclude<DmKind, "ankuendigung" | "kopie">, input: IDmInput): Promise<void> {
-    await sendDeletionDm(config, record, kind, input);
+export async function followUp(config: IConfig, record: IDeletionRecord, kind: Exclude<DmKind, "ankuendigung" | "kopie">, input: IDmInput, file?: IDiscordFile): Promise<void> {
+    await sendDeletionDm(config, record, kind, input, file);
 
     if (record.dmChannelId && record.dmMessageId) await removeButtons(config, record.dmChannelId, record.dmMessageId);
 }

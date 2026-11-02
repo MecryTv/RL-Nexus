@@ -3,6 +3,7 @@ import {
     COPY_GAP_MS,
     DELETION_MAX_MS,
     DELETION_MIN_MS,
+    USERDATA_PROOF_YEARS,
     type DeletionFilter,
     type DeletionState,
     type DmState,
@@ -218,4 +219,17 @@ export async function deletionCounts(now = Date.now()): Promise<IDeletionCounts>
     );
 
     return { running: Number(row?.running ?? 0), halted: Number(row?.halted ?? 0), deleted: Number(row?.deleted ?? 0), cancelled: Number(row?.cancelled ?? 0), nextDueAt: iso(row?.next ?? null) };
+}
+
+/** Nachweise enden nach USERDATA_PROOF_YEARS Jahren: erledigte ab dem Löschen, abgebrochene ab dem Abbruch. Offene bleiben immer. */
+export async function forgetOldDeletions(now = Date.now()): Promise<number> {
+    const before = new Date(now);
+    before.setFullYear(before.getFullYear() - USERDATA_PROOF_YEARS);
+
+    const removed = await query<{ affectedRows: number }>(
+        "DELETE FROM userdata_deletions WHERE (state = 'geloescht' AND done_at < ?) OR (state = 'abgebrochen' AND cancelled_at < ?)",
+        [before, before]
+    );
+
+    return Number(removed.affectedRows ?? 0);
 }

@@ -310,6 +310,10 @@ export const USERDATA_BASIS: Readonly<Record<UserdataBasis, { readonly label: st
 };
 export const USERDATA_LAW_MAX = 60;
 export const USERDATA_YEARS_MAX = 30;
+/** So lange bleibt der Nachweis einer Löschung (Entscheidung des Nutzers, 02.11.). */
+export const USERDATA_PROOF_YEARS = 3;
+/** Nach so vielen Tagen sind Sicherungen der Datenbank überschrieben (Angabe des Nutzers, 02.11.). */
+export const USERDATA_BACKUP_DAYS = 30;
 /** Steht noch in einem Satz, sieht die Person ihn so in der DM. */
 export const USERDATA_OPEN_NOTE = "zu klären";
 
@@ -492,6 +496,8 @@ export interface IDeletion {
     readonly doneAt: string | null;
     readonly result: IDeletionResult | null;
     readonly createdAt: string;
+    /** Prüfcode des Belegs, nur bei gelöschten in der Liste. */
+    readonly code?: string | null;
 }
 
 export interface IDeletionCounts {

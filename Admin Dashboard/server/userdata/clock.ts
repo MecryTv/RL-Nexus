@@ -1,8 +1,9 @@
 import type { IConfig } from "../config.ts";
 import { databaseReady } from "../db.ts";
 import { publish } from "../events.ts";
-import { deletionOf, dueDeletions } from "./deletions.ts";
+import { deletionOf, dueDeletions, forgetOldDeletions } from "./deletions.ts";
 import { executeDeletion, retryForget } from "./erase.ts";
+import { deletionReceipt } from "./receipt.ts";
 import { finishedInput, followUp, personBase } from "./flow.ts";
 
 /**
@@ -33,11 +34,16 @@ export async function deletionRound(config: IConfig, now = Date.now()): Promise<
             if (!result) continue;
 
             done++;
-            await followUp(config, (await deletionOf(record.id)) ?? record, "erledigt", finishedInput(base, record, result));
+            // Der Beleg kommt als PDF mit der DM „Erledigt“ (Runde 3).
+            const finished = (await deletionOf(record.id)) ?? record;
+            const receipt = { name: `rl-nexus-loeschung-${record.id}.pdf`, data: await deletionReceipt(finished, config.jwtSecret), type: "application/pdf" };
+
+            await followUp(config, finished, "erledigt", finishedInput(base, record, result), receipt);
             publish("userdata");
         }
 
         await retryForget(config);
+        await forgetOldDeletions(now);
 
         return done;
     } catch (error) {
