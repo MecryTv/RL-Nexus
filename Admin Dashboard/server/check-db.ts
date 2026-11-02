@@ -40,7 +40,7 @@ import { LATEST_END, isActive } from "./shop/grants.ts";
 import type { IAccessPreview } from "../shared/shop.ts";
 import { shopSessionCookie } from "./shop/session.ts";
 import { setStripeGateway } from "./shop/stripe.ts";
-import { STATE_KEYS, lastStatusPost, stateKey, stopStatusPost, updateStatusPost } from "./status-post.ts";
+import { STATE_KEYS, lastStatusPost, refreshNow, stateKey, stopStatusPost, updateStatusPost } from "./status-post.ts";
 import { publicStatus, refreshStatus } from "./status/snapshot.ts";
 
 const CHANNEL = "900000000000000009";
@@ -982,6 +982,26 @@ try {
                     ["DELETE", "/messages/900000000000000065"],
                 ]);
                 assert.equal(await stateOf(stateKey(CHANNEL)), "900000000000000005");
+            }
+        );
+    });
+
+    await check("Status-Knopf: zwei gleichzeitige Klicks ergeben eine Runde, ein Klick 5 Sekunden später bekommt 429", async () => {
+        await setState(stateKey(CHANNEL), "900000000000000005");
+        // Weit in der Zukunft, damit kein Klick aus einem anderen Check die Sperre hält.
+        const at = Date.now() + 3_600_000;
+
+        await withDiscord(
+            (call) => (call.method === "GET" ? json([]) : json({ id: "900000000000000005" })),
+            async (calls) => {
+                const [first, second] = await Promise.all([refreshNow(statusConfig, at), refreshNow(statusConfig, at)]);
+
+                assert.equal(first, second, "beide bekommen dasselbe Ergebnis");
+                assert.deepEqual(writes(calls).map((call) => call.method), ["PATCH"]);
+                assert.deepEqual(first.channels.map((channel) => [channel.id, channel.ok]), [[CHANNEL, true]]);
+
+                await assert.rejects(refreshNow(statusConfig, at + 5000), (error: unknown) => (error as { statusCode?: number }).statusCode === 429);
+                assert.equal(writes(calls).length, 1, "der abgewiesene Klick geht nicht zu Discord");
             }
         );
     });

@@ -85,15 +85,32 @@ function minutesBetween(start: string, end: string | null, now: number): number 
     return Math.max(1, Math.round(((end === null ? now : Date.parse(end)) - Date.parse(start)) / 60_000));
 }
 
+/**
+ * Höchstens so oft landet eine Messung im Verlauf. Die Runde von selbst alle
+ * zwei Minuten zählt immer; Klicks auf „In Discord aktualisieren“ dazwischen
+ * nicht (W-0052), sonst hinge die Verfügbarkeit davon ab, wie oft das Team
+ * nachschaut. Länger als fünf Minuten (GAP_AFTER) wird die Lücke dadurch nie.
+ */
+const RECORD_GAP = 90_000;
+let lastRecorded: number | null = null;
+
+export function shouldRecord(last: number | null, now: number): boolean {
+    return last === null || now - last >= RECORD_GAP;
+}
+
 /** Ein Durchlauf: messen, merken, Verlauf und Meldungen laden, Stand bauen. */
 export async function refreshStatus(config: IConfig): Promise<IStatusSnapshot> {
     const measured = await measure(config);
     const now = measured.at.getTime();
     const current = Object.fromEntries(measured.measurements.map((entry) => [entry.service, entry.state])) as Record<StatusService, CheckState>;
 
-    await recordChecks(measured.measurements, measured.at).catch((error: unknown) => {
-        console.error(`⚠️  Statusprüfung nicht gespeichert: ${error instanceof Error ? error.message : String(error)}`);
-    });
+    if (shouldRecord(lastRecorded, now)) {
+        lastRecorded = now;
+
+        await recordChecks(measured.measurements, measured.at).catch((error: unknown) => {
+            console.error(`⚠️  Statusprüfung nicht gespeichert: ${error instanceof Error ? error.message : String(error)}`);
+        });
+    }
 
     // Ohne Datenbank kein Verlauf und keine Meldungen. Die Messung allein gilt trotzdem.
     const [fresh, incidents, resolved] = await Promise.all([

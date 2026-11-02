@@ -564,10 +564,11 @@ export async function refreshNow(config: IConfig, now = Date.now()): Promise<IDi
     lastManual = now;
     if (timer !== null) startTimer(config);
 
+    // Seit der Prüfung auf `current` lief kein await: Kanäle gibt es, also kommt hier ein Ergebnis.
     const result = await updateStatusPost(config);
+    if (result === null) throw new PublicError(503, "Die Statusmeldung wird gerade schon geschrieben. Versuch es gleich noch einmal.");
 
-    // Zwischen den beiden Zeilen oben kann die Uhr einen Durchlauf begonnen haben. Dann zählt der.
-    return result ?? (current ?? Promise.resolve({ at: new Date().toISOString(), ms: 0, channels: [] }));
+    return result;
 }
 
 /** Den Namen eines Statuskanals aus Discord, einmal je Prozess. */

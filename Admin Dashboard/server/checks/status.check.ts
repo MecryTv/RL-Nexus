@@ -4,7 +4,7 @@ import { buildApp } from "../app.ts";
 import { SESSION_COOKIE, seal } from "../session.ts";
 import { manualWait, payload } from "../status-post.ts";
 import { parseIncident, parseUpdate } from "../status/incidents.ts";
-import { historyData, refreshStatus, setHistoryLoader } from "../status/snapshot.ts";
+import { historyData, refreshStatus, setHistoryLoader, shouldRecord } from "../status/snapshot.ts";
 import { USERS } from "./fakes.ts";
 import { chartGeometry } from "../../src/status/chart.ts";
 import { ago, canReport, countdown, uptimeRow } from "../../src/status/format.ts";
@@ -328,6 +328,15 @@ export async function checkStatusRoutes(): Promise<void> {
             assert.equal(manualWait(1000, 4000), 7);
             assert.equal(manualWait(1000, 10_999), 1);
             assert.equal(manualWait(1000, 11_000), 0);
+        });
+
+        await check("Klicks auf den Status-Knopf landen nicht als zusätzliche Messung im Verlauf", () => {
+            assert.equal(shouldRecord(null, 0), true);
+            assert.equal(shouldRecord(0, 10_000), false);
+            assert.equal(shouldRecord(0, 89_999), false);
+            assert.equal(shouldRecord(0, 90_000), true);
+            // Die Runde von selbst alle zwei Minuten zählt immer.
+            assert.equal(shouldRecord(0, 120_000), true);
         });
 
         await check("Status-Knopf ohne Statuskanal: 409, und der Stand sagt es", async () => {
