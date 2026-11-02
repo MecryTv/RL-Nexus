@@ -175,6 +175,11 @@ export async function markCopy(id: number, userId: string, now = Date.now()): Pr
     return (await deletionOf(id)) as IDeletionRecord;
 }
 
+/** Die Kopie kam nicht an: Sperre der 5 Minuten zurücknehmen. */
+export async function clearCopy(id: number): Promise<void> {
+    await query("UPDATE userdata_deletions SET copy_at = NULL WHERE id = ?", [id]);
+}
+
 export async function setDm(id: number, state: DmState, refs: { readonly channelId: string; readonly messageId: string } | null, error: string | null = null): Promise<void> {
     await query("UPDATE userdata_deletions SET dm_state = ?, dm_channel_id = ?, dm_message_id = ?, dm_error = ? WHERE id = ?", [state, refs?.channelId ?? null, refs?.messageId ?? null, error, id]);
 }

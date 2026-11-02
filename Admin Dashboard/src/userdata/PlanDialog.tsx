@@ -158,7 +158,7 @@ export function PlanDialog({
                         </p>
                     </div>
 
-                    <Field id="plan-grund" label="Grund (steht im Protokoll)" counter={{ value: reason.length, max: 200 }}>
+                    <Field id="plan-grund" label="Grund (steht im Protokoll und im Beleg an die Person)" counter={{ value: reason.length, max: 200 }}>
                         <input id="plan-grund" type="text" value={reason} maxLength={200} placeholder="etwa: Anfrage per Mail vom 01.11." onChange={(event) => setReason(event.target.value)} />
                     </Field>
 

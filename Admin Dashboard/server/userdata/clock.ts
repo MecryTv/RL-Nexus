@@ -1,3 +1,5 @@
+import type { IDeletionResult } from "../../shared/userdata.ts";
+import { audit } from "../audit.ts";
 import type { IConfig } from "../config.ts";
 import { databaseReady } from "../db.ts";
 import { publish } from "../events.ts";
@@ -14,6 +16,10 @@ import { finishedInput, followUp, personBase } from "./flow.ts";
  */
 
 const EVERY = 30_000;
+/** Im Protokoll: wie beim Ausführen selbst. */
+const CLOCK = { id: "0", name: "Löschung zur Frist" };
+
+const message = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 
 let timer: NodeJS.Timeout | null = null;
 let running = false;
@@ -28,18 +34,32 @@ export async function deletionRound(config: IConfig, now = Date.now()): Promise<
         let done = 0;
 
         for (const record of await dueDeletions(now)) {
+            // Jede für sich: Scheitert eine, steht das im Protokoll und die nächste läuft trotzdem.
+            let result: IDeletionResult | null = null;
             // Name und Bild vorher holen: Danach ist der Name in der Löschung leer.
             const base = await personBase(config, record.userId, record.userName);
-            const result = await executeDeletion(config, record.id);
+
+            try {
+                result = await executeDeletion(config, record.id);
+            } catch (error) {
+                await audit(CLOCK, "userdata.delete", record.userId, `fehlgeschlagen: ${message(error)}`.slice(0, 250)).catch(() => undefined);
+                continue;
+            }
+
             if (!result) continue;
 
             done++;
-            // Der Beleg kommt als PDF mit der DM „Erledigt“ (Runde 3).
-            const finished = (await deletionOf(record.id)) ?? record;
-            const receipt = { name: `rl-nexus-loeschung-${record.id}.pdf`, data: await deletionReceipt(finished, config.jwtSecret), type: "application/pdf" };
-
-            await followUp(config, finished, "erledigt", finishedInput(base, record, result), receipt);
             publish("userdata");
+
+            // Gelöscht ist gelöscht. Klappt danach der Beleg oder die DM nicht, steht das im Protokoll.
+            try {
+                const finished = (await deletionOf(record.id)) ?? record;
+                const receipt = { name: `rl-nexus-loeschung-${record.id}.pdf`, data: await deletionReceipt(finished, config.jwtSecret), type: "application/pdf" };
+
+                await followUp(config, finished, "erledigt", finishedInput(base, record, result), receipt);
+            } catch (error) {
+                await audit(CLOCK, "userdata.dm", record.userId, `„Erledigt“ mit Beleg nicht verschickt: ${message(error)}`.slice(0, 250)).catch(() => undefined);
+            }
         }
 
         await retryForget(config);
@@ -47,7 +67,7 @@ export async function deletionRound(config: IConfig, now = Date.now()): Promise<
 
         return done;
     } catch (error) {
-        console.error(`🗑️  Löschrunde fehlgeschlagen: ${error instanceof Error ? error.message : String(error)}`);
+        console.error(`🗑️  Löschrunde fehlgeschlagen: ${message(error)}`);
 
         return 0;
     } finally {

@@ -151,7 +151,8 @@ export const USERDATA_AREAS: readonly IUserdataAreaDef[] = [
         sources: [
             { table: "team_members", column: "user_id", role: "person", time: "joined_at", label: "CONCAT('Mitglied in Team ', team_id)" },
             { table: "club_members", column: "user_id", role: "person", time: "joined_at", label: "CONCAT('Mitglied in Club ', club_id)" },
-            { table: "clubs", column: "leader_id", role: "person", time: "created_at", label: "CONCAT('Leitet Club ', name)" },
+            // team, nicht person: Ein gelöschter Club nähme per ON DELETE CASCADE alle Mitglieder mit.
+            { table: "clubs", column: "leader_id", role: "team", time: "created_at", label: "CONCAT('Leitet Club ', name)" },
             { table: "sixmans_players", column: "user_id", role: "person", guild: G, time: ms("updated_at"), label: "CONCAT('6mans · ', wins, ' Siege')", name: "name" },
             { table: "teams", column: "players", role: "json", guild: G, time: "created_at", label: "CONCAT('Spieler in ', name)" },
             { table: "sixmans_rounds", column: "blue", role: "json", guild: G, label: "'6mans-Runde, Team Blau'" },

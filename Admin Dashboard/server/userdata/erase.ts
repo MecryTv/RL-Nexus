@@ -26,12 +26,19 @@ export function eraseSql(source: IUserdataSource, nullable: boolean): string {
         case "person":
             return `DELETE FROM ${table} WHERE ${column} = ?`;
         case "team":
-            return `UPDATE ${table} SET ${column} = ${nullable ? "NULL" : "'0'"}${source.name ? `, ${source.name} = '${GONE}'` : ""} WHERE ${column} = ?`;
+            // IGNORE: Kollidiert die '0' mit einem eindeutigen Schlüssel (dieselbe Zeile gibt es schon anonym), bleibt die Zeile
+            // stehen und fällt danach mit eraseLeftovers weg. Sonst hielte eine Kollision jede Löschung an.
+            return `UPDATE IGNORE ${table} SET ${column} = ${nullable ? "NULL" : "'0'"}${source.name ? `, ${source.name} = '${GONE}'` : ""} WHERE ${column} = ?`;
         case "json":
             return `UPDATE ${table} SET ${column} = REPLACE(${column}, ?, '"0"') WHERE ${column} LIKE ?`;
         case "list":
             return `UPDATE ${table} SET ${column} = TRIM(BOTH ',' FROM REPLACE(CONCAT(',', ${column}, ','), CONCAT(',', ?, ','), ',')) WHERE FIND_IN_SET(?, ${column}) > 0`;
     }
+}
+
+/** Nach dem Entfernen der ID aus Team-Spalten: was wegen eines Schlüssels nicht anonymisiert werden konnte, ist doppelt und fällt weg. */
+export function eraseLeftovers(source: IUserdataSource): string | null {
+    return source.role === "team" ? `DELETE FROM ${source.table} WHERE ${source.column} = ?` : null;
 }
 
 export function eraseValues(source: IUserdataSource, id: string): string[] {
@@ -95,7 +102,9 @@ export async function erasePerson(id: string, run: TransactionQuery, rules: read
             }
 
             const changed = await tolerant<{ affectedRows: number }>(run, eraseSql(source, columns.get(`${source.table}.${source.column}`) ?? false), eraseValues(source, id), { affectedRows: 0 });
-            const rows = Number(changed.affectedRows ?? 0);
+            const leftovers = eraseLeftovers(source);
+            const doubled = leftovers ? await tolerant<{ affectedRows: number }>(run, leftovers, [id], { affectedRows: 0 }) : { affectedRows: 0 };
+            const rows = Number(changed.affectedRows ?? 0) + Number(doubled.affectedRows ?? 0);
             if (rows === 0) continue;
 
             const bucket = source.role === "person" ? deleted : anonymized;
@@ -130,7 +139,9 @@ export async function executeDeletion(config: IConfig, id: number): Promise<IDel
 
         const done = await erasePerson(record.userId, run, rules, columns);
         // Der Name geht mit; die ID bleibt als Nachweis für den Beleg.
-        await run("UPDATE userdata_deletions SET result = ?, user_name = NULL WHERE id = ?", [JSON.stringify(done), id]);
+        await run("UPDATE userdata_deletions SET result = ? WHERE id = ?", [JSON.stringify(done), id]);
+        // Auch frühere, abgebrochene Löschungen und ersetzte („Neu planen“) behalten sonst den Namen.
+        await run("UPDATE userdata_deletions SET user_name = NULL WHERE user_id = ?", [record.userId]);
 
         return done;
     });

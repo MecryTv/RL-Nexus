@@ -402,7 +402,7 @@ server/          Fastify, läuft direkt mit node
   db.ts          Pool und eigene Migrationen
   errors.ts      Jeder Fehler wird ein deutscher Satz
   validate.ts    Prüfregeln für alles, was von außen kommt
-  cleanup.ts     Erledigtes nach 90, Protokoll nach 365 Tagen löschen
+  cleanup.ts     Erledigtes nach 90 Tagen, Protokoll nach 3 Jahren löschen
   notify.ts      Kontaktformular: Mail an support@, Hinweis nach Discord
   events.ts      Live-Meldungen an die Oberfläche
   status-post.ts Statusmeldung in Discord: Durchlauf, sofort aktualisieren, Kanalwahl

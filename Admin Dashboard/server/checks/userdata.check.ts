@@ -104,8 +104,8 @@ export async function checkUserdata(): Promise<void> {
         const list: IUserdataSource = { table: "level_top", column: "holders", role: "list", label: "'x'" };
 
         assert.equal(eraseSql(person, true), "DELETE FROM levels WHERE user_id = ?");
-        assert.equal(eraseSql(team, false), "UPDATE mod_cases SET moderator_id = '0', moderator_name = 'Gelöschte Person' WHERE moderator_id = ?");
-        assert.equal(eraseSql({ ...team, name: undefined }, true), "UPDATE mod_cases SET moderator_id = NULL WHERE moderator_id = ?");
+        assert.equal(eraseSql(team, false), "UPDATE IGNORE mod_cases SET moderator_id = '0', moderator_name = 'Gelöschte Person' WHERE moderator_id = ?");
+        assert.equal(eraseSql({ ...team, name: undefined }, true), "UPDATE IGNORE mod_cases SET moderator_id = NULL WHERE moderator_id = ?");
         assert.equal(eraseSql(json, false), `UPDATE tickets SET members = REPLACE(members, ?, '"0"') WHERE members LIKE ?`);
         assert.equal(eraseSql(list, false), "UPDATE level_top SET holders = TRIM(BOTH ',' FROM REPLACE(CONCAT(',', holders, ','), CONCAT(',', ?, ','), ',')) WHERE FIND_IN_SET(?, holders) > 0");
         assert.deepEqual(

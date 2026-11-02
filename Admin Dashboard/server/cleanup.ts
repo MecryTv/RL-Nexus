@@ -6,7 +6,7 @@ const DAY = 24 * 60 * 60_000;
 
 /**
  * Kontaktnachrichten aus der Zeit, als das Formular sie noch speicherte, 90
- * Tage nach dem Eingang. Protokoll nach 365 Tagen, Statusprüfungen nach 90.
+ * Tage nach dem Eingang. Protokoll nach 3 Jahren, Statusprüfungen nach 90.
  * Offene Bestellungen nach 30 Tagen, alte Discord-Tokens des Shops. Name und
  * Mail von Shop-Kunden ohne Bestellung und ohne laufenden Zugang 90 Tage nach
  * der letzten Anmeldung (die Zeile mit ID, Test und Sperre bleibt, sonst ginge
@@ -19,7 +19,8 @@ export async function cleanup(): Promise<void> {
         const contact = await query<{ affectedRows: number }>(
             "DELETE FROM contact_messages WHERE created_at < NOW() - INTERVAL 90 DAY"
         );
-        const audit = await query<{ affectedRows: number }>("DELETE FROM admin_audit WHERE created_at < NOW() - INTERVAL 365 DAY");
+        // Drei Jahre: Was das Team zu einer Person tat, ist Nachweis (W-0051, Entscheidung des Nutzers vom 02.11.).
+        const audit = await query<{ affectedRows: number }>("DELETE FROM admin_audit WHERE created_at < NOW() - INTERVAL 3 YEAR");
 
         // Ohne Meldung: Hier fallen jeden Tag rund 2900 Zeilen weg, das ist Alltag.
         await query(`DELETE FROM status_checks WHERE checked_at < NOW() - INTERVAL ${HISTORY_DAYS} DAY`);

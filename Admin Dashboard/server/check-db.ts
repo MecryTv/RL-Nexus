@@ -455,9 +455,9 @@ try {
         assert.deepEqual(rows.map((row) => row.subject), ["check:db jung"]);
     });
 
-    await check("Protokolleinträge verschwinden nach 365 Tagen", async () => {
+    await check("Protokolleinträge verschwinden nach 3 Jahren (Nachweis, Entscheidung des Nutzers)", async () => {
         await query(
-            "INSERT INTO admin_audit (user_id, user_name, action, created_at) VALUES (?, 'nutzer1', 'check.alt', NOW() - INTERVAL 366 DAY), (?, 'nutzer1', 'check.jung', NOW() - INTERVAL 364 DAY)",
+            "INSERT INTO admin_audit (user_id, user_name, action, created_at) VALUES (?, 'nutzer1', 'check.alt', NOW() - INTERVAL 3 YEAR - INTERVAL 1 DAY), (?, 'nutzer1', 'check.jung', NOW() - INTERVAL 2 YEAR)",
             [USERS.admin, USERS.admin]
         );
 
@@ -1130,9 +1130,13 @@ try {
     const BYSTANDER = "9999999999999999990";
     const ERASE_GUILD = "9999999999999999991";
     const [{ id: eraseAuditBefore }] = await query<{ id: number | null }[]>("SELECT COALESCE(MAX(id), 0) AS id FROM admin_audit");
+    const LEADER = "9999999999999999984";
+    const CLUBBER = "9999999999999999983";
     const eraseTidy = async (): Promise<void> => {
-        for (const table of ["levels", "mod_cases", "tickets", "level_top"]) await query(`DELETE FROM ${table} WHERE guild_id = ?`, [ERASE_GUILD]);
-        await query("DELETE FROM userdata_deletions WHERE user_id IN (?, ?)", [ERASED, TWICE]);
+        for (const table of ["levels", "mod_cases", "tickets", "level_top", "av_reports"]) await query(`DELETE FROM ${table} WHERE guild_id = ?`, [ERASE_GUILD]).catch(() => undefined);
+        await query("DELETE FROM club_members WHERE user_id IN (?, ?)", [CLUBBER, BYSTANDER]).catch(() => undefined);
+        await query("DELETE FROM clubs WHERE tag = 'CHKDB'").catch(() => undefined);
+        await query("DELETE FROM userdata_deletions WHERE user_id IN (?, ?, ?, ?)", [ERASED, TWICE, LEADER, CLUBBER]);
         await query("DELETE FROM admin_audit WHERE id > ? AND action LIKE 'userdata.%'", [Number(eraseAuditBefore)]);
         await restoreRules();
     };
@@ -1150,6 +1154,13 @@ try {
         );
         await query("INSERT INTO tickets (guild_id, number, option_id, opener_id, members, notes, anonymous) VALUES (?, 7, 'check', ?, ?, '[]', '[]')", [ERASE_GUILD, BYSTANDER, JSON.stringify([ERASED, BYSTANDER])]);
         await query("INSERT INTO level_top (guild_id, kind, period_key, holders, posted_at) VALUES (?, 'week', '2090-01-01', ?, ?)", [ERASE_GUILD, `${BYSTANDER},${ERASED}`, now]);
+
+        await check("Löschung ausführen: Name verschwindet auch aus früheren, abgebrochenen Löschungen der Person", async () => {
+            await query(
+                "INSERT INTO userdata_deletions (user_id, user_name, state, due_at, reason, planned_by, planned_name, cancelled_at) VALUES (?, 'check Früher', 'abgebrochen', NOW(), 'check:db', '0', 'check', NOW())",
+                [ERASED]
+            );
+        });
 
         await check("Löschung ausführen: eigene Zeilen weg, für andere nur die ID raus, „behalten“ bleibt mit Grundlage, Nachweis im Protokoll", async () => {
             await query("INSERT INTO userdata_rules (area, keep, note, basis, law, years) VALUES ('moderation', 1, 'check:db bleibt', 'ansprueche', NULL, 1) ON DUPLICATE KEY UPDATE keep = 1, note = VALUES(note), basis = VALUES(basis), law = NULL, years = 1");
@@ -1182,8 +1193,36 @@ try {
 
             const done = await deletionOf(planned.id);
             assert.deepEqual([done?.state, done?.userName, done?.forgetPending], ["geloescht", null, true], "Bot im Check nicht erreichbar: Vergessen steht aus");
+            const names = await query<{ user_name: string | null }[]>("SELECT user_name FROM userdata_deletions WHERE user_id = ?", [ERASED]);
+            assert.deepEqual(names.map((row) => row.user_name), [null, null], "auch die frühere, abgebrochene Löschung");
             const [audit] = await query<{ detail: string }[]>("SELECT detail FROM admin_audit WHERE id > ? AND action = 'userdata.delete' AND target = ?", [Number(eraseAuditBefore), ERASED]);
             assert.match(audit?.detail ?? "", /Bot nicht erreichbar/);
+        });
+
+        await check("Löschung ausführen: kollidiert das Entfernen der ID mit einem Schlüssel, fällt die doppelte Zeile weg statt die Löschung zu stoppen", async () => {
+            // av_reports: (Server, Ziel, Meldender) ist eindeutig. Eine früher gelöschte Person meldete dasselbe Ziel schon als '0'.
+            await query("INSERT INTO av_reports (guild_id, target_id, reporter_id, at) VALUES (?, ?, '0', ?), (?, ?, ?, ?)", [ERASE_GUILD, BYSTANDER, Date.now(), ERASE_GUILD, BYSTANDER, LEADER, Date.now()]);
+            await query("INSERT INTO levels (guild_id, user_id, xp, level, updated_at) VALUES (?, ?, 10, 1, ?)", [ERASE_GUILD, LEADER, Date.now()]);
+
+            const planned = await planDeletion({ userId: LEADER, userName: "check Leitung", dueAt: later(), reason: "check:db", by: { id: USERS.admin, name: "nutzer1" } });
+            const result = await executeDeletion(config, planned.id);
+
+            assert.ok(result, "ausgeführt");
+            const reports = await query<{ reporter_id: string }[]>("SELECT reporter_id FROM av_reports WHERE guild_id = ? AND target_id = ?", [ERASE_GUILD, BYSTANDER]);
+            assert.deepEqual(reports.map((row) => row.reporter_id), ["0"]);
+        });
+
+        await check("Löschung ausführen: Leitet die Person einen Club, bleibt der Club mit seinen Mitgliedern", async () => {
+            const club = await query<{ insertId: number }>("INSERT INTO clubs (name, tag, leader_id) VALUES ('check:db Club', 'CHKDB', ?)", [CLUBBER]);
+            await query("INSERT INTO club_members (club_id, user_id, role) VALUES (?, ?, 'leader'), (?, ?, 'member')", [Number(club.insertId), CLUBBER, Number(club.insertId), BYSTANDER]);
+
+            const planned = await planDeletion({ userId: CLUBBER, userName: "check Club", dueAt: later(), reason: "check:db", by: { id: USERS.admin, name: "nutzer1" } });
+            assert.ok(await executeDeletion(config, planned.id), "ausgeführt");
+
+            const [row] = await query<{ leader_id: string }[]>("SELECT leader_id FROM clubs WHERE tag = 'CHKDB'");
+            assert.equal(row?.leader_id, "0", "Club bleibt, die Leitung ist raus");
+            const members = await query<{ user_id: string }[]>("SELECT user_id FROM club_members WHERE club_id = ?", [Number(club.insertId)]);
+            assert.deepEqual(members.map((member) => member.user_id), [BYSTANDER]);
         });
 
         await check("Löschung ausführen: zwei Uhr-Runden zugleich löschen einmal; erreicht der Bot, ist nichts offen", async () => {
@@ -1314,6 +1353,17 @@ try {
                 assert.equal(sent.length, 1, "DM „angehalten“");
                 assert.equal((await internal(deletion.id, "copy", P1)).statusCode, 409);
             });
+        });
+
+        await check("Knöpfe: kommt die Kopie nicht an, sagt die Antwort das und der nächste Versuch geht sofort", async () => {
+            const deletion = await openDeletionOf(P3);
+            assert.ok(deletion);
+
+            await withDms(true, async () => {
+                const answer = await internal(deletion.id, "copy", P3);
+                assert.equal(answer.statusCode, 502, answer.body);
+            });
+            assert.equal((await deletionOf(deletion.id))?.copyAt, null);
         });
 
         await check("Knöpfe: Kopie als Datei, höchstens alle 5 Minuten", async () => {

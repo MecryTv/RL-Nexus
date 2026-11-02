@@ -5,7 +5,7 @@ import type { IConfig } from "../config.ts";
 import { DatabaseUnavailable, databaseReady } from "../db.ts";
 import { PublicError } from "../errors.ts";
 import { publish } from "../events.ts";
-import { markCopy, stopDeletion } from "../userdata/deletions.ts";
+import { clearCopy, markCopy, stopDeletion } from "../userdata/deletions.ts";
 import { deletionCopy, sendDeletionDm } from "../userdata/dm.ts";
 import { personRows } from "../userdata/find.ts";
 import { followUp, personBase, plainInput } from "../userdata/flow.ts";
@@ -55,7 +55,14 @@ export async function internalUserdataRoutes(app: FastifyInstance, { config }: {
             const record = await markCopy(id, userId);
             const [file, rows, base] = await Promise.all([deletionCopy(userId), personRows(userId), personBase(config, userId, record.userName)]);
 
-            await sendDeletionDm(config, record, "kopie", { ...base, sentAt: new Date(), dueAt: new Date(record.dueAt), areas: [], kept: [], total: rows.length, servers: 0, bytes: file.data.length }, file);
+            const sent = await sendDeletionDm(config, record, "kopie", { ...base, sentAt: new Date(), dueAt: new Date(record.dueAt), areas: [], kept: [], total: rows.length, servers: 0, bytes: file.data.length }, file);
+
+            if (!sent) {
+                // Nicht angekommen: Die 5 Minuten gelten nicht, der nächste Versuch geht sofort.
+                await clearCopy(id);
+                throw new PublicError(502, "Die Kopie ließ sich gerade nicht schicken. Versuch es gleich noch einmal; klappt es nicht, meldet sich das Team.");
+            }
+
             await audit(PERSON, "userdata.copy", userId, `${rows.length} Einträge`);
             publish("userdata");
 
