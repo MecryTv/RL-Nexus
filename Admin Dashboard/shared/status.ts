@@ -269,3 +269,32 @@ export interface IPublicStatus {
     readonly history: readonly IPastIssue[];
     readonly links: { readonly website: string; readonly discord: string | null };
 }
+
+/** Ein Statuskanal nach einem Durchlauf (W-0052). */
+export interface IDiscordPostChannel {
+    readonly id: string;
+    /** Name des Kanals aus Discord, null wenn Discord ihn nicht verrät. */
+    readonly name: string | null;
+    readonly ok: boolean;
+    readonly error: string | null;
+}
+
+/** POST /api/status/discord: was beim Neuschreiben herauskam. */
+export interface IDiscordPostResult {
+    readonly at: string;
+    readonly ms: number;
+    readonly channels: readonly IDiscordPostChannel[];
+}
+
+/** GET /api/status/discord: alles für die Karte „Discord-Meldung“. */
+export interface IDiscordPostState {
+    readonly channels: readonly { readonly id: string; readonly name: string | null }[];
+    readonly lastAt: string | null;
+    /** Wann die nächste Runde von selbst kommt. */
+    readonly nextAt: string | null;
+    readonly everySeconds: number;
+    /** So lange bleibt der Knopf noch aus. */
+    readonly waitSeconds: number;
+    /** Die Bausteine der Nachricht aus dem letzten Stand, null vor der ersten Prüfung. */
+    readonly components: readonly unknown[] | null;
+}

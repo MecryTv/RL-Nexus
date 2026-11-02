@@ -1,11 +1,22 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { BANNER_KIND_LABELS, bannerState, type IBanner } from "../shared/content.ts";
-import { INCIDENT_STATE_LABELS, STATUS_SERVICE_LABELS, type BlockState, type CheckState, type IIncident, type IOutage } from "../shared/status.ts";
+import {
+    INCIDENT_STATE_LABELS,
+    STATUS_SERVICE_LABELS,
+    type BlockState,
+    type CheckState,
+    type IDiscordPostChannel,
+    type IDiscordPostResult,
+    type IDiscordPostState,
+    type IIncident,
+    type IOutage,
+} from "../shared/status.ts";
 import type { IConfig } from "./config.ts";
 import { databaseReady, query } from "./db.ts";
 import { DISCORD_API } from "./discord.ts";
-import { maintenanceRunning, refreshStatus, type IServiceSnapshot, type IStatusSnapshot } from "./status/snapshot.ts";
+import { PublicError } from "./errors.ts";
+import { maintenanceRunning, refreshStatus, statusSnapshot, type IServiceSnapshot, type IStatusSnapshot } from "./status/snapshot.ts";
 
 /**
  * Eine Nachricht in Discord, die sagt, was läuft.
@@ -24,6 +35,9 @@ import { maintenanceRunning, refreshStatus, type IServiceSnapshot, type IStatusS
 
 /** Wie oft geprüft und die Nachricht nachgezogen wird. */
 const EVERY = 2 * 60_000;
+
+/** Höchstens so oft schreibt ein Klick auf „In Discord aktualisieren“ wirklich (W-0052). */
+export const MANUAL_GAP = 10_000;
 
 /**
  * Unter diesem Namen stand früher die ID der einen Nachricht. Heute merkt
@@ -74,14 +88,23 @@ const STATE_WORDS: Readonly<Record<CheckState, string>> = { ok: "", warn: "einge
  * einer Signatur, die nach rund einem Tag abläuft. Neu hochladen sind 50 KB
  * alle zwei Minuten, dafür bleibt es ein echter Anhang der Nachricht.
  */
-const BANNER_NAME = "status-banner.webp";
-const BANNER = readFileSync(path.join(import.meta.dirname, "assets", BANNER_NAME));
+export const BANNER_NAME = "status-banner.webp";
+export const BANNER = readFileSync(path.join(import.meta.dirname, "assets", BANNER_NAME));
 
 let timer: NodeJS.Timeout | null = null;
-/** Läuft gerade ein Durchlauf? Verhindert, dass sich zwei überholen. */
-let running = false;
+/** Wann die Uhr das nächste Mal von selbst nachzieht. Für den Ring auf der Status-Seite. */
+let nextAt: number | null = null;
+/**
+ * Der laufende Durchlauf. Verhindert, dass sich zwei überholen, und ein Klick
+ * währenddessen wartet auf genau dieses Ergebnis, statt einen zweiten zu starten.
+ */
+let current: Promise<IDiscordPostResult> | null = null;
 /** Wann zuletzt mindestens ein Kanal die Meldung bekam. Für die Übersicht, seit dem Start. */
 let lastPost: string | null = null;
+/** Wann zuletzt ein Klick wirklich geschrieben hat. */
+let lastManual: number | null = null;
+/** Namen der Statuskanäle aus Discord. Ändern sich praktisch nie, deshalb einmal je Prozess. */
+const channelNames = new Map<string, string | null>();
 
 export function lastStatusPost(): string | null {
     return lastPost;
@@ -463,12 +486,24 @@ async function postTo(config: IConfig, channel: string, body: Record<string, unk
 
 /**
  * Einmal nachziehen, in jedem Statuskanal. Ohne mitgegebenen Stand wird erst
- * geprüft. Scheitert ein Kanal, kommen die anderen trotzdem dran.
+ * geprüft. Scheitert ein Kanal, kommen die anderen trotzdem dran. Ohne
+ * Statuskanal oder während ein Durchlauf läuft: null.
  */
-export async function updateStatusPost(config: IConfig, given?: IStatusSnapshot): Promise<void> {
-    if (config.statusChannelIds.length === 0 || running) return;
+export async function updateStatusPost(config: IConfig, given?: IStatusSnapshot): Promise<IDiscordPostResult | null> {
+    if (config.statusChannelIds.length === 0 || current !== null) return null;
 
-    running = true;
+    current = post(config, given);
+
+    try {
+        return await current;
+    } finally {
+        current = null;
+    }
+}
+
+async function post(config: IConfig, given?: IStatusSnapshot): Promise<IDiscordPostResult> {
+    const started = Date.now();
+    const channels: IDiscordPostChannel[] = [];
 
     try {
         const body = payload(given ?? (await refreshStatus(config)), config);
@@ -479,8 +514,12 @@ export async function updateStatusPost(config: IConfig, given?: IStatusSnapshot)
             try {
                 kept = await postTo(config, channel, body);
                 lastPost = new Date().toISOString();
+                channels.push({ id: channel, name: channelNames.get(channel) ?? null, ok: true, error: null });
             } catch (error) {
-                console.error(`📊 Statusmeldung in Kanal ${channel} fehlgeschlagen: ${error instanceof Error ? error.message : String(error)}`);
+                const message = error instanceof Error ? error.message : String(error);
+
+                console.error(`📊 Statusmeldung in Kanal ${channel} fehlgeschlagen: ${message}`);
+                channels.push({ id: channel, name: channelNames.get(channel) ?? null, ok: false, error: message });
                 continue;
             }
 
@@ -492,10 +531,76 @@ export async function updateStatusPost(config: IConfig, given?: IStatusSnapshot)
             }
         }
     } catch (error) {
-        console.error(`📊 Statusmeldung fehlgeschlagen: ${error instanceof Error ? error.message : String(error)}`);
-    } finally {
-        running = false;
+        const message = error instanceof Error ? error.message : String(error);
+
+        console.error(`📊 Statusmeldung fehlgeschlagen: ${message}`);
+
+        for (const channel of config.statusChannelIds) {
+            if (!channels.some((entry) => entry.id === channel)) channels.push({ id: channel, name: channelNames.get(channel) ?? null, ok: false, error: message });
+        }
     }
+
+    return { at: new Date().toISOString(), ms: Date.now() - started, channels };
+}
+
+/** Wie viele Sekunden der Knopf noch warten muss. Aufgerundet, damit „wieder in 0 Sek.“ nie dasteht. */
+export function manualWait(last: number | null, now: number): number {
+    return last === null ? 0 : Math.max(0, Math.ceil((last + MANUAL_GAP - now) / 1000));
+}
+
+/**
+ * „In Discord aktualisieren“ (W-0052): sofort prüfen und in jedem
+ * Statuskanal neu schreiben. Läuft gerade ein Durchlauf, kommt dessen
+ * Ergebnis. Höchstens ein echter Aufruf alle zehn Sekunden, egal wie viele
+ * Leute klicken. Danach kommt die Uhr erst zwei Minuten später wieder.
+ */
+export async function refreshNow(config: IConfig, now = Date.now()): Promise<IDiscordPostResult> {
+    if (config.statusChannelIds.length === 0) throw new PublicError(409, "Kein Statuskanal eingestellt.");
+    if (current !== null) return current;
+
+    const wait = manualWait(lastManual, now);
+    if (wait > 0) throw new PublicError(429, `Gerade erst aktualisiert, wieder in ${wait} Sek.`);
+
+    lastManual = now;
+    if (timer !== null) startTimer(config);
+
+    const result = await updateStatusPost(config);
+
+    // Zwischen den beiden Zeilen oben kann die Uhr einen Durchlauf begonnen haben. Dann zählt der.
+    return result ?? (current ?? Promise.resolve({ at: new Date().toISOString(), ms: 0, channels: [] }));
+}
+
+/** Den Namen eines Statuskanals aus Discord, einmal je Prozess. */
+async function channelName(config: IConfig, channel: string): Promise<string | null> {
+    if (channelNames.has(channel)) return channelNames.get(channel) ?? null;
+
+    let name: string | null = null;
+
+    try {
+        const response = await fetch(`${DISCORD_API}/channels/${channel}`, { headers: { Authorization: `Bot ${config.botToken}` }, signal: AbortSignal.timeout(5000) });
+        if (response.ok) name = ((await response.json()) as { name?: unknown }).name?.toString() ?? null;
+    } catch {
+        // Ohne Namen steht in der Karte die ID. Beim nächsten Neustart wird es wieder versucht.
+    }
+
+    channelNames.set(channel, name);
+
+    return name;
+}
+
+/** Was die Karte „Discord-Meldung“ zeigt. Die Vorschau kommt aus dem Stand der letzten Prüfung. */
+export async function discordPostState(config: IConfig, now = Date.now()): Promise<IDiscordPostState> {
+    const snapshot = statusSnapshot();
+    const channels = await Promise.all(config.statusChannelIds.map(async (id) => ({ id, name: await channelName(config, id) })));
+
+    return {
+        channels,
+        lastAt: lastPost,
+        nextAt: nextAt === null ? null : new Date(nextAt).toISOString(),
+        everySeconds: EVERY / 1000,
+        waitSeconds: manualWait(lastManual, now),
+        components: snapshot === null ? null : ((payload(snapshot, config).components as readonly unknown[]) ?? null),
+    };
 }
 
 /** Prüfen, merken, Statusseite und Discord nachziehen. Auch nach jeder eigenen Meldung. */
@@ -519,7 +624,18 @@ export function scheduleStatusPost(config: IConfig): void {
     // Nicht sofort: Beim Start steht die Datenbank vielleicht noch nicht, und
     // der Bot braucht einen Moment, bis er sich als bereit meldet.
     setTimeout(() => void statusCycle(config), 10_000).unref();
-    timer = setInterval(() => void statusCycle(config), EVERY);
+    startTimer(config);
+}
+
+/** Die Uhr (neu) stellen: der nächste Durchlauf von selbst in zwei Minuten. */
+function startTimer(config: IConfig): void {
+    if (timer !== null) clearInterval(timer);
+
+    nextAt = Date.now() + EVERY;
+    timer = setInterval(() => {
+        nextAt = Date.now() + EVERY;
+        void statusCycle(config);
+    }, EVERY);
     timer.unref();
 }
 
@@ -527,4 +643,5 @@ export function scheduleStatusPost(config: IConfig): void {
 export function stopStatusPost(): void {
     if (timer !== null) clearInterval(timer);
     timer = null;
+    nextAt = null;
 }

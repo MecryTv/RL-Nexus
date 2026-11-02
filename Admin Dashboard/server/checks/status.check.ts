@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
-import type { IChartPoint, IIncident, IPublicStatus, ISpan, IStatusDetail, StatusService } from "../../shared/status.ts";
+import type { IChartPoint, IDiscordPostState, IIncident, IPublicStatus, ISpan, IStatusDetail, StatusService } from "../../shared/status.ts";
 import { buildApp } from "../app.ts";
 import { SESSION_COOKIE, seal } from "../session.ts";
-import { payload } from "../status-post.ts";
+import { manualWait, payload } from "../status-post.ts";
 import { parseIncident, parseUpdate } from "../status/incidents.ts";
 import { historyData, refreshStatus, setHistoryLoader } from "../status/snapshot.ts";
 import { USERS } from "./fakes.ts";
@@ -321,6 +321,25 @@ export async function checkStatusRoutes(): Promise<void> {
 
             assert.ok(countOf(sent.components) <= 40, `${countOf(sent.components)} Bausteine`);
             assert.ok(texts.join("").length <= 4000, `${texts.join("").length} Zeichen`);
+        });
+
+        await check("Status-Knopf: höchstens ein echter Aufruf alle 10 Sekunden, Wartezeit aufgerundet", () => {
+            assert.equal(manualWait(null, 0), 0);
+            assert.equal(manualWait(1000, 4000), 7);
+            assert.equal(manualWait(1000, 10_999), 1);
+            assert.equal(manualWait(1000, 11_000), 0);
+        });
+
+        await check("Status-Knopf ohne Statuskanal: 409, und der Stand sagt es", async () => {
+            const response = await post("/api/status/discord", {});
+            assert.equal(response.statusCode, 409);
+            assert.match(response.json().error, /Kein Statuskanal eingestellt/);
+
+            const state = (await app.inject({ method: "GET", url: "/api/status/discord", headers: { cookie } })).json() as IDiscordPostState;
+            assert.deepEqual(state.channels, []);
+            assert.equal(state.everySeconds, 120);
+            assert.equal(state.waitSeconds, 0);
+            assert.ok(Array.isArray(state.components), "Vorschau aus dem letzten Stand");
         });
     } finally {
         await app.close();

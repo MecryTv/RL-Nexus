@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { DETAIL_RANGES, type DetailRange, type IIncidentList, type IStatusDetail } from "../../shared/status.ts";
+import { DETAIL_RANGES, type DetailRange, type IDiscordPostResult, type IDiscordPostState, type IIncidentList, type IStatusDetail } from "../../shared/status.ts";
 import { accessOf } from "../access.ts";
 import { audit } from "../audit.ts";
 import type { IConfig } from "../config.ts";
@@ -8,7 +8,7 @@ import { PublicError } from "../errors.ts";
 import { addUpdate, createIncident, deleteIncident, listIncidents, openKindOf, parseIncident, parseUpdate } from "../status/incidents.ts";
 import { loadDetail } from "../status/detail.ts";
 import { publicStatus } from "../status/snapshot.ts";
-import { statusCycle } from "../status-post.ts";
+import { BANNER, discordPostState, refreshNow, statusCycle } from "../status-post.ts";
 import { id } from "../validate.ts";
 
 function needDatabase(): void {
@@ -40,6 +40,28 @@ export async function statusRoutes(app: FastifyInstance, { config }: { config: I
 
         return loadDetail(range as DetailRange);
     });
+
+    /** Die Karte „Discord-Meldung“: Kanäle, zuletzt, nächste Runde, Vorschau (W-0052). */
+    app.get("/api/status/discord", async (): Promise<IDiscordPostState> => discordPostState(config));
+
+    /** „In Discord aktualisieren“: sofort neu schreiben. Die Sperre von zehn Sekunden steckt in refreshNow. */
+    app.post("/api/status/discord", async (request): Promise<IDiscordPostResult> => {
+        const actor = accessOf(request);
+        const result = await refreshNow(config);
+        const failed = result.channels.filter((channel) => !channel.ok);
+
+        await audit(
+            actor,
+            "status.discord",
+            null,
+            `${result.channels.length - failed.length} von ${result.channels.length} Kanälen${failed.length > 0 ? ` · ${failed.map((channel) => `${channel.name ?? channel.id}: ${channel.error}`).join(" · ")}` : ""}`
+        );
+
+        return result;
+    });
+
+    /** Das Banner der Meldung für die Vorschau. In Discord steckt es als Anhang `attachment://…`. */
+    app.get("/api/status/discord/banner", async (_request, reply) => reply.type("image/webp").header("Cache-Control", "private, max-age=86400").send(BANNER));
 
     app.get("/api/status/incidents", async (): Promise<IIncidentList> => {
         needDatabase();
