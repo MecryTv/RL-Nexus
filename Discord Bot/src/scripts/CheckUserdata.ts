@@ -110,7 +110,9 @@ async function main(): Promise<void> {
     check("falsche ID 400", (await forget("abc", admin)).status === 400);
     check("mit Admin-Token 204", (await forget(GONE, admin)).status === 204);
 
-    await client.server.Stop?.();
+    await client.server.Stop();
+    // Unter Windows stürzt Node sonst beim Beenden ab, solange fetch seine Verbindungen noch schließt.
+    await new Promise((resolve) => setTimeout(resolve, 200));
 
     console.log(failures === 0 ? "\n  Alles in Ordnung.\n" : `\n  ${failures} Prüfung(en) fehlgeschlagen.\n`);
     process.exit(failures === 0 ? 0 : 1);
