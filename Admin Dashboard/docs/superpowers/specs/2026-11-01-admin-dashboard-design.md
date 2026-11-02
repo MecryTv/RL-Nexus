@@ -312,7 +312,7 @@ Wunsch vom 02.11.: „verbesser die Suche, sodass man quasi alles auf dem Admin 
 ### Das Fenster (SC)
 
 - Gleiches Fenster und gleiche Tasten zum Öffnen wie in Teil 1 (rechte Umschalttaste, /, Strg K), Platzhalter „Suchen …“.
-- Unter dem Feld eine Filterleiste: **Alles, Seiten, Personen, Server, Mails, Inhalte, Protokoll**, jeweils mit der Zahl der Treffer. Solange eine Quelle noch lädt, steht dort ein Punkt statt der Zahl. Filter ohne Treffer bleiben sichtbar, aber blass.
+- Unter dem Feld eine Filterleiste: **Alles, Seiten, Personen, Server, Mails, Inhalte, Protokoll**, jeweils mit der Zahl der Treffer. Solange die Antwort des Servers aussteht, steht an allen Filtern außer Seiten ein Punkt statt der Zahl. Filter ohne Treffer bleiben sichtbar, aber blass.
 - **Tab** wechselt zum nächsten Filter, **Umschalt+Tab** zum vorigen. Ein Klick auf einen Filter tut dasselbe.
 - **Kürzel** am Anfang der Eingabe: `@` Personen, `#` Server, `/` Seiten. Das Kürzel stellt den Filter um und wird nicht mitgesucht. Die Zeile unter dem Feld nennt die Kürzel.
 - Eine Liste, in „Alles“ nach Relevanz gemischt. Jede Zeile: Symbol der Art, Titel mit markiertem Treffer, Ort rechts (etwa „Postfach info@“, „Shop · Kunde“), darunter eine Zeile Kontext (Absender und Datum, Gruppe und Kunde, Mitglieder des Servers).
@@ -325,13 +325,17 @@ Wunsch vom 02.11.: „verbesser die Suche, sodass man quasi alles auf dem Admin 
 | Filter | Quellen | Gesucht in | Ziel beim Öffnen |
 |---|---|---|---|
 | Seiten | Bereiche und Seiten (wie bisher, im Browser) | Name, Bereich, Beschreibung | die Seite |
-| Personen | Gruppen, Shop-Kunden, Beta-Tester, Team der Webseite | Name, Discord-ID, bei Kunden auch die volle Mail | Kunde, Gruppe oder Beta je nach Fundort, gefiltert; ab Teil 3 die Nutzeransicht |
+| Personen | Gruppen, Shop-Kunden, Beta-Tester, Team der Webseite | Name, Discord-ID, bei Kunden auch die volle Mail; Team nach Name und Handle | Kunde, sonst Gruppe, sonst Beta, jeweils gefiltert; Team: die Team-Seite; ab Teil 3 die Nutzeransicht |
 | Server | Serverliste des Bots | Name, ID | Serverliste, gefiltert |
-| Mails | Posteingang aller Postfächer | Betreff, Absender | die Mail |
+| Mails | Posteingang aller Postfächer | wie die Suche im Postfach (IMAP: Betreff, Absender, Text) | die Mail |
 | Inhalte | Module, Banner, Shop-Produkte | Titel, Text, Kategorie | das Modul; Banner- oder Produktseite |
-| Protokoll | Meldungen, Störungen und Wartungen, Backups, Protokoll des Admin Dashboards | Titel, Text, Server, Person | die jeweilige Seite, gefiltert |
+| Protokoll | Meldungen, Störungen und Wartungen, Backups, Protokoll des Admin Dashboards | Titel, Text, Server, Person | Meldungen-Seite; Status-Seite an der Meldung (`#meldung-<id>`); Backups des Servers; Protokoll gefiltert nach Person oder Aktion |
 
-- Eine Person mit mehreren Fundorten ist **eine Zeile**; der Kontext nennt alle Fundorte („Gruppe Admin · Kunde Pro · Beta“).
+- Eine Person mit mehreren Fundorten ist **eine Zeile**; der Kontext nennt alle Fundorte („Gruppe Admin · Kunde Pro · Beta“). Das Team der Webseite hat keine Discord-ID und bleibt eine eigene Zeile.
+- Gruppen und Beta speichern nur die Discord-ID. Die Namen kommen aus dem Namensspeicher, den das Admin Dashboard schon hat (`server/users.ts`); beim Start füllt er sich für alle IDs aus Gruppen und Beta im Hintergrund. Ist ein Name noch nicht bekannt, findet die Suche die Person über die ID.
+- Meldungen stehen je Empfänger in `notifications`; die Suche fasst sie nach Titel, Text und Zeit zu einem Treffer zusammen. Aktionen, die schon als Meldung, Störung oder Wartung erscheinen, zeigt der Protokoll-Teil nicht ein zweites Mal.
+- Backups: ein Treffer je Server mit Sicherungen („Backups: <Server>“), gefunden über Name oder ID des Servers.
+- Ältere Einträge, die die Zielseite nicht mehr anzeigt (Meldungen, vergangene Störungen), öffnen trotzdem die Seite; was im Treffer steht, ist der Inhalt.
 - Mails zeigt die Suche wie im Postfach, Kunden-Mails im Kontext nur gekürzt (wie in der Kundenliste).
 - Das Protokoll des Admin Dashboards sehen nur Developer, wie die Seite selbst. Alles andere sehen Admin und Developer.
 
@@ -339,17 +343,17 @@ Wunsch vom 02.11.: „verbesser die Suche, sodass man quasi alles auf dem Admin 
 
 - Seiten sucht der Browser sofort beim Tippen. Alles andere kommt ab **2 Zeichen** über **eine** Anfrage `GET /api/search?q=…`; der Server fragt die Quellen gleichzeitig.
 - Die Anfrage geht 200 ms nach dem letzten Tastendruck raus; eine neue bricht die alte ab.
-- Jede Quelle hat **2 Sekunden**. Was später kommt oder fehlschlägt, fehlt in der Liste, und das Fenster sagt es in einer Zeile („Mails gerade nicht erreichbar“).
-- Höchstens **20 Treffer je Quelle**; wird die Grenze erreicht, steht am Filter „20+“. In „Alles“ höchstens 40 Zeilen.
+- Die Antwort kommt, sobald alle Quellen fertig sind, **spätestens nach 2 Sekunden**. Was bis dahin fehlt oder fehlschlägt, fehlt in der Liste, und das Fenster sagt es in einer Zeile („Mails gerade nicht erreichbar“). Eine langsame Quelle hält die übrigen also höchstens 2 Sekunden auf.
+- Höchstens **20 Treffer je Filter**, nach dem Mischen seiner Quellen; wird die Grenze erreicht, steht am Filter „20+“. In „Alles“ höchstens 40 Zeilen.
 - Rangfolge wie bei den Seiten: Titel beginnt mit dem Begriff, dann Titel enthält ihn, dann Kontext. Bei Gleichstand die Reihenfolge der Filterleiste, bei Mails und Protokoll das Neueste zuerst.
-- Groß und klein, Umlaute und Akzente zählen nicht (`fold` aus Teil 1).
-- Seiten mit eigenem Suchfeld (Server, Gruppen, Kunden, Beta, Postfach) übernehmen den Begriff aus `?q=` in der Adresse.
+- Groß und klein, Umlaute und Akzente zählen nicht (`fold` aus Teil 1). Ausnahme Mails: Dort sucht der Mailserver selbst, „grosse“ findet „Größe“ dann nicht.
+- Seiten mit eigenem Suchfeld (Server, Gruppen, Kunden, Postfach) übernehmen den Begriff aus `?q=` in der Adresse. Die Beta-Seite bekommt kein Suchfeld; ein Beta-Treffer öffnet sie ungefiltert.
 - Die Suche ändert nichts und schreibt nichts ins Protokoll.
 
 ### Was auf keinen Fall passieren darf
 
 - Ein Admin sieht über die Suche Einträge aus dem Protokoll des Admin Dashboards.
-- Eine langsame Quelle hält die übrigen Treffer auf.
+- Eine langsame Quelle hält die übrigen Treffer länger als 2 Sekunden auf.
 - Eine volle Kunden-Mail steht in der Trefferliste.
 
 ---
@@ -393,3 +397,8 @@ Wunsch vom 02.11.: „verbesser die Suche, sodass man quasi alles auf dem Admin 
 24. **Personen zusammengeführt über die Discord-ID,** damit dieselbe Person nicht viermal untereinander steht.
 25. **Backups, Meldungen, Störungen unter „Protokoll“,** damit die Leiste bei sieben Filtern bleibt.
 26. **Markierung nur, wo der Begriff wörtlich im Titel steht;** findet die Suche ihn nur über Umlaute oder Akzente, bleibt der Titel ohne Markierung.
+27. **Eine normale Antwort statt Stream,** spätestens nach 2 Sekunden. Ein Stream je Quelle wäre neu im Projekt; 2 Sekunden Warten auf Mails sind beim Tippen noch in Ordnung, und Seiten stehen sofort da.
+28. **Namen aus dem vorhandenen Namensspeicher,** beim Start vorgewärmt, keine neue Tabelle. Teil 3 braucht für die Nutzeransicht ohnehin Namen und kann sie dann dauerhaft speichern.
+29. **Mails über die Suche des Mailservers** (wie im Postfach, mit Text), ohne Falten der Umlaute: Die Umschläge selbst zu laden und zu falten hieße bei jedem Tastendruck alle Postfächer durchzugehen.
+30. **Ziel bei mehreren Fundorten: Kunde vor Gruppe vor Beta.** Beim Kunden steht am meisten über die Person.
+31. **Kein neues Suchfeld auf der Beta-Seite** und keine Hervorhebung auf den Zielseiten; der Treffer selbst zeigt den Inhalt.
