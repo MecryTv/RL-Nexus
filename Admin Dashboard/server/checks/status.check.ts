@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { channelLabel, type IChartPoint, type IDiscordPostState, type IIncident, type IPublicStatus, type ISpan, type IStatusDetail, type StatusService } from "../../shared/status.ts";
 import { buildApp } from "../app.ts";
 import { SESSION_COOKIE, seal } from "../session.ts";
-import { manualWait, payload, shortError } from "../status-post.ts";
+import { channelPermissions, manualWait, missingRights, payload, shortError } from "../status-post.ts";
 import { parseIncident, parseUpdate } from "../status/incidents.ts";
 import { historyData, refreshStatus, setHistoryLoader, shouldRecord } from "../status/snapshot.ts";
 import { USERS } from "./fakes.ts";
@@ -346,6 +346,39 @@ export async function checkStatusRoutes(): Promise<void> {
             assert.equal(shortError("x".repeat(400)).length, 200);
             assert.equal(channelLabel({ id: "123", name: "status" }), "#status");
             assert.equal(channelLabel({ id: "123", name: null }), "Kanal 123");
+        });
+
+        await check("Rechte des Bots im Statuskanal: Rollen, @everyone, Überschreibungen am Kanal", () => {
+            const VIEW = 1n << 10n;
+            const SEND = 1n << 11n;
+            const MANAGE = 1n << 13n;
+            const ATTACH = 1n << 15n;
+            const HISTORY = 1n << 16n;
+            const ALL = VIEW | SEND | MANAGE | ATTACH | HISTORY;
+            const base = { guildId: "1", memberId: "9", memberRoles: ["2"], roles: { "1": VIEW | SEND | HISTORY, "2": ATTACH }, overwrites: [] };
+
+            assert.deepEqual(missingRights(channelPermissions(base)), ["Nachrichten verwalten"]);
+            assert.deepEqual(missingRights(channelPermissions({ ...base, roles: { "1": 0n, "2": 1n << 3n } })), [], "Administrator darf alles");
+            assert.deepEqual(missingRights(channelPermissions({ ...base, roles: { "1": ALL, "2": 0n } })), []);
+
+            // @everyone darf im Kanal nicht schreiben, die Rolle des Bots schon.
+            const denied = { ...base, roles: { "1": ALL, "2": 0n }, overwrites: [{ id: "1", type: 0, allow: "0", deny: String(SEND) }] };
+            assert.deepEqual(missingRights(channelPermissions(denied)), ["Nachrichten senden"]);
+            assert.deepEqual(missingRights(channelPermissions({ ...denied, overwrites: [...denied.overwrites, { id: "2", type: 0, allow: String(SEND), deny: "0" }] })), []);
+
+            // Eine Überschreibung für den Bot selbst gilt zuletzt.
+            assert.deepEqual(missingRights(channelPermissions({ ...base, roles: { "1": ALL, "2": 0n }, overwrites: [{ id: "9", type: 1, allow: "0", deny: String(VIEW) }] })), ["Kanal sehen"]);
+        });
+
+        await check("Statuskanal wechseln geht nur mit Bestätigung, dass dort alles andere gelöscht wird", async () => {
+            const put = (body: unknown) =>
+                app.inject({ method: "PUT", url: "/api/status/discord/channel", headers: { cookie, origin: config.publicUrl, "content-type": "application/json" }, payload: JSON.stringify(body) });
+
+            const unconfirmed = await put({ channelId: "123456789012345678" });
+            assert.equal(unconfirmed.statusCode, 400);
+            assert.match(unconfirmed.json().error, /alle anderen Nachrichten/);
+
+            assert.equal((await put({ channelId: "kein-kanal", confirm: true })).statusCode, 400);
         });
 
         await check("Status-Knopf ohne Statuskanal: 409, und der Stand sagt es", async () => {

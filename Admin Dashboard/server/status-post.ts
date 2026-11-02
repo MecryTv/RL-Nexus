@@ -9,6 +9,7 @@ import {
     type IDiscordPostChannel,
     type IDiscordPostResult,
     type IDiscordPostState,
+    type IStatusChannelOption,
     type IIncident,
     type IOutage,
 } from "../shared/status.ts";
@@ -107,6 +108,24 @@ let lastManual: number | null = null;
 let manual: IDiscordPostState["manual"] = null;
 /** Namen der Statuskanäle aus Discord. Ändern sich praktisch nie, deshalb einmal je Prozess. */
 const channelNames = new Map<string, string | null>();
+/**
+ * Der im Admin Dashboard gewählte Statuskanal (W-0052, K2). undefined: noch
+ * nicht aus der Datenbank gelesen. null: keiner gewählt, dann gilt die .env.
+ */
+let chosen: string | null | undefined;
+
+/** Unter diesem Namen steht der gewählte Kanal in admin_state. */
+const CHOSEN_KEY = "status_channel";
+
+/** Einmal aus der Datenbank lesen. Danach hält der Speicher den Stand, `chooseChannel` schreibt beides. */
+async function loadChosen(): Promise<void> {
+    if (chosen === undefined) chosen = await remembered(CHOSEN_KEY).catch(() => null);
+}
+
+/** Die Kanäle, in die geschrieben wird: der gewählte, sonst die aus der .env. */
+export function statusChannels(config: IConfig): readonly string[] {
+    return chosen ? [chosen] : config.statusChannelIds;
+}
 
 export function lastStatusPost(): string | null {
     return lastPost;
@@ -492,7 +511,7 @@ async function postTo(config: IConfig, channel: string, body: Record<string, unk
  * Statuskanal oder während ein Durchlauf läuft: null.
  */
 export async function updateStatusPost(config: IConfig, given?: IStatusSnapshot): Promise<IDiscordPostResult | null> {
-    if (config.statusChannelIds.length === 0 || current !== null) return null;
+    if (statusChannels(config).length === 0 || current !== null) return null;
 
     current = post(config, given);
 
@@ -510,7 +529,7 @@ async function post(config: IConfig, given?: IStatusSnapshot): Promise<IDiscordP
     try {
         const body = payload(given ?? (await refreshStatus(config)), config);
 
-        for (const channel of config.statusChannelIds) {
+        for (const channel of statusChannels(config)) {
             let kept: string;
 
             try {
@@ -537,7 +556,7 @@ async function post(config: IConfig, given?: IStatusSnapshot): Promise<IDiscordP
 
         console.error(`📊 Statusmeldung fehlgeschlagen: ${message}`);
 
-        for (const channel of config.statusChannelIds) {
+        for (const channel of statusChannels(config)) {
             if (!channels.some((entry) => entry.id === channel)) channels.push({ id: channel, name: channelNames.get(channel) ?? null, ok: false, error: shortError(message) });
         }
     }
@@ -587,7 +606,10 @@ export function manualWait(last: number | null, now: number): number {
  * Leute klicken. Danach kommt die Uhr erst zwei Minuten später wieder.
  */
 export async function refreshNow(config: IConfig, now = Date.now()): Promise<IDiscordPostResult> {
-    if (config.statusChannelIds.length === 0) throw new PublicError(409, "Kein Statuskanal eingestellt.");
+    // Vor der Prüfung auf `current`: Danach darf bis zum Merken der Runde kein await mehr kommen.
+    await loadChosen();
+
+    if (statusChannels(config).length === 0) throw new PublicError(409, "Kein Statuskanal eingestellt.");
     if (current !== null) return current;
 
     const wait = manualWait(lastManual, now);
@@ -601,6 +623,157 @@ export async function refreshNow(config: IConfig, now = Date.now()): Promise<IDi
     if (result === null) throw new PublicError(503, "Die Statusmeldung wird gerade schon geschrieben. Versuch es gleich noch einmal.");
 
     return result;
+}
+
+/* --- Statuskanal wählen (W-0052, K2) --------------------------------------- */
+
+const PERMISSION = { administrator: 1n << 3n, view: 1n << 10n, send: 1n << 11n, manage: 1n << 13n, attach: 1n << 15n, history: 1n << 16n } as const;
+
+/** Was der Bot im Statuskanal braucht, in der Reihenfolge, in der es fehlen kann. */
+const NEEDED: readonly [keyof typeof PERMISSION, string][] = [
+    ["view", "Kanal sehen"],
+    ["send", "Nachrichten senden"],
+    ["attach", "Dateien anhängen"],
+    ["manage", "Nachrichten verwalten"],
+    ["history", "Nachrichtenverlauf lesen"],
+];
+
+export interface IPermissionInput {
+    readonly guildId: string;
+    readonly memberId: string;
+    readonly memberRoles: readonly string[];
+    /** Rechte je Rolle; die Rolle mit der ID des Servers ist @everyone. */
+    readonly roles: Readonly<Record<string, bigint>>;
+    /** Überschreibungen am Kanal, wie Discord sie schickt (type 0 Rolle, 1 Mitglied). */
+    readonly overwrites: readonly { readonly id: string; readonly type: number; readonly allow: string; readonly deny: string }[];
+}
+
+/**
+ * Die Rechte eines Mitglieds in einem Kanal, wie Discord sie rechnet: Rollen
+ * zusammen, Administrator heißt alles, dann die Überschreibungen am Kanal für
+ * @everyone, für die Rollen zusammen und zuletzt für das Mitglied selbst.
+ */
+export function channelPermissions(input: IPermissionInput): bigint {
+    let rights = input.roles[input.guildId] ?? 0n;
+
+    for (const role of input.memberRoles) rights |= input.roles[role] ?? 0n;
+    if ((rights & PERMISSION.administrator) !== 0n) return ~0n;
+
+    const apply = (allow: bigint, deny: bigint): void => {
+        rights = (rights & ~deny) | allow;
+    };
+
+    const everyone = input.overwrites.find((entry) => entry.id === input.guildId);
+    if (everyone) apply(BigInt(everyone.allow), BigInt(everyone.deny));
+
+    let allow = 0n;
+    let deny = 0n;
+
+    for (const entry of input.overwrites) {
+        if (entry.type === 0 && input.memberRoles.includes(entry.id)) {
+            allow |= BigInt(entry.allow);
+            deny |= BigInt(entry.deny);
+        }
+    }
+
+    apply(allow, deny);
+
+    const own = input.overwrites.find((entry) => entry.type === 1 && entry.id === input.memberId);
+    if (own) apply(BigInt(own.allow), BigInt(own.deny));
+
+    return rights;
+}
+
+/** Was dem Bot fehlt, als Wörter für das Fenster. Leer heißt: alles da. */
+export function missingRights(rights: bigint): string[] {
+    return NEEDED.filter(([key]) => (rights & PERMISSION[key]) === 0n).map(([, label]) => label);
+}
+
+async function discordGet<T>(config: IConfig, url: string): Promise<T> {
+    const response = await fetch(`${DISCORD_API}${url}`, { headers: { Authorization: `Bot ${config.botToken}` }, signal: AbortSignal.timeout(10_000) });
+    if (!response.ok) throw new PublicError(502, `Discord antwortet mit ${response.status} beim Lesen von ${url.split("/")[1]}.`);
+
+    return (await response.json()) as T;
+}
+
+interface IDiscordChannel {
+    readonly id: string;
+    readonly name: string;
+    readonly type: number;
+    readonly position: number;
+    readonly parent_id?: string | null;
+    readonly permission_overwrites?: IPermissionInput["overwrites"];
+}
+
+/** Text- und Ankündigungskanäle; Kategorien sind 4. */
+const TEXT_TYPES = new Set([0, 5]);
+
+/**
+ * Alle Textkanäle des einen Servers, der in Frage kommt (`ADMIN_GUILD_ID`:
+ * im Development-Modus der Dev Server, im Betrieb der Server des Teams),
+ * nach Kategorie sortiert und mit dem, was dem Bot dort fehlt.
+ */
+export async function statusChannelOptions(config: IConfig): Promise<IStatusChannelOption[]> {
+    const me = await discordGet<{ id: string }>(config, "/users/@me");
+    const [channels, roles, member] = await Promise.all([
+        discordGet<IDiscordChannel[]>(config, `/guilds/${config.guildId}/channels`),
+        discordGet<{ id: string; permissions: string }[]>(config, `/guilds/${config.guildId}/roles`),
+        discordGet<{ roles: string[] }>(config, `/guilds/${config.guildId}/members/${me.id}`),
+    ]);
+
+    const roleRights = Object.fromEntries(roles.map((role) => [role.id, BigInt(role.permissions)]));
+    const categories = new Map(channels.filter((channel) => channel.type === 4).map((channel) => [channel.id, channel]));
+    const order = (channel: IDiscordChannel): [number, number] => {
+        const parent = channel.parent_id ? categories.get(channel.parent_id) : undefined;
+
+        return [parent ? parent.position + 1 : 0, channel.position];
+    };
+
+    return channels
+        .filter((channel) => TEXT_TYPES.has(channel.type))
+        .sort((a, b) => order(a)[0] - order(b)[0] || order(a)[1] - order(b)[1])
+        .map((channel) => {
+            const rights = channelPermissions({ guildId: config.guildId, memberId: me.id, memberRoles: member.roles, roles: roleRights, overwrites: channel.permission_overwrites ?? [] });
+
+            channelNames.set(channel.id, channel.name);
+
+            return { id: channel.id, name: channel.name, category: (channel.parent_id && categories.get(channel.parent_id)?.name) || null, missing: missingRights(rights) };
+        });
+}
+
+/**
+ * Den Statuskanal wechseln: Der Kanal muss einer aus `statusChannelOptions`
+ * sein. Die alte Meldung im alten Kanal wird gelöscht, im neuen steht sofort
+ * eine neue. Gibt das Ergebnis dieser Runde zurück.
+ */
+export async function chooseChannel(config: IConfig, channelId: string): Promise<{ readonly from: string | null; readonly result: IDiscordPostResult | null }> {
+    const options = await statusChannelOptions(config);
+    if (!options.some((option) => option.id === channelId)) throw new PublicError(400, "Diesen Textkanal gibt es auf dem Server nicht.");
+
+    await loadChosen();
+
+    const before = statusChannels(config);
+    const from = before[0] ?? null;
+
+    if (before.length === 1 && from === channelId) return { from, result: null };
+
+    // Eine laufende Runde schreibt noch in den alten Kanal. Erst danach aufräumen.
+    if (current !== null) await current;
+
+    for (const old of before) {
+        const message = await remembered(stateKey(old));
+
+        if (message !== null) {
+            const gone = await remove(config, `/channels/${old}/messages/${message}`).catch(() => null);
+            if (gone && !gone.ok && gone.status !== 404) console.error(`📊 Alte Statusmeldung in Kanal ${old} nicht gelöscht: ${gone.status}`);
+            await remember(stateKey(old), null);
+        }
+    }
+
+    await remember(CHOSEN_KEY, channelId);
+    chosen = channelId;
+
+    return { from, result: await updateStatusPost(config) };
 }
 
 /** Den Namen eines Statuskanals aus Discord, einmal je Prozess. */
@@ -623,8 +796,10 @@ async function channelName(config: IConfig, channel: string): Promise<string | n
 
 /** Was die Karte „Discord-Meldung“ zeigt. Die Vorschau kommt aus dem Stand der letzten Prüfung. */
 export async function discordPostState(config: IConfig, now = Date.now()): Promise<IDiscordPostState> {
+    await loadChosen();
+
     const snapshot = statusSnapshot();
-    const channels = await Promise.all(config.statusChannelIds.map(async (id) => ({ id, name: await channelName(config, id) })));
+    const channels = await Promise.all(statusChannels(config).map(async (id) => ({ id, name: await channelName(config, id) })));
 
     return {
         channels,
@@ -640,6 +815,8 @@ export async function discordPostState(config: IConfig, now = Date.now()): Promi
 /** Prüfen, merken, Statusseite und Discord nachziehen. Auch nach jeder eigenen Meldung. */
 export async function statusCycle(config: IConfig): Promise<void> {
     try {
+        await loadChosen();
+
         const snapshot = await refreshStatus(config);
         await updateStatusPost(config, snapshot);
     } catch (error) {

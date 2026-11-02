@@ -1,0 +1,150 @@
+@use "mixins" as *;
+
+.dialog {
+    width: min(540px, calc(100vw - 2 * var(--s-4)));
+    max-width: none;
+    margin: 10vh auto auto;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--c-text);
+
+    &::backdrop {
+        background: rgb(0 0 0 / 65%);
+    }
+}
+
+.panel {
+    --c-panel-fill: var(--c-panel-solid);
+
+    display: grid;
+    padding: var(--s-5);
+    gap: var(--s-3);
+}
+
+.title {
+    font-size: 1.15rem;
+}
+
+.sub {
+    color: var(--c-text-dim);
+    font-size: 0.875rem;
+}
+
+.search {
+    width: 100%;
+}
+
+.list {
+    display: grid;
+    max-height: min(46vh, 420px);
+    margin: 0;
+    padding: 0;
+    overflow-y: auto;
+    border: 0;
+    gap: var(--s-2);
+}
+
+.group {
+    display: grid;
+    gap: 2px;
+}
+
+.groupName {
+    padding: var(--s-1) var(--s-1) 0;
+    color: var(--c-text-faint);
+
+    @include label(0.72rem, 0.12em);
+}
+
+.row {
+    display: grid;
+    grid-template-columns: 16px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--s-2);
+    min-height: 38px;
+    padding: 0 var(--s-2);
+    border-radius: 6px;
+    color: var(--c-text-dim);
+    cursor: pointer;
+
+    @include touch-target;
+
+    &:hover {
+        background: var(--c-line);
+        color: var(--c-text);
+    }
+
+    &:focus-within {
+        @include focus-inset;
+    }
+}
+
+.on {
+    background: rgb(255 30 45 / 10%);
+    box-shadow: inset 2px 0 0 var(--c-red);
+    color: var(--c-text);
+}
+
+.hash {
+    color: var(--c-text-faint);
+    font-size: 1.05rem;
+}
+
+.name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ok,
+.miss,
+.now {
+    font-size: 0.8125rem;
+    text-align: right;
+}
+
+.ok {
+    color: var(--c-win);
+}
+
+.miss {
+    color: #ffc53d;
+}
+
+.now {
+    color: var(--c-text-faint);
+}
+
+.foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--s-2);
+    padding-top: var(--s-3);
+    border-top: 1px solid var(--c-line);
+}
+
+.warn {
+    display: grid;
+    padding: var(--s-3);
+    gap: var(--s-2);
+    border: 1px solid rgb(255 197 61 / 45%);
+    background: rgb(255 197 61 / 8%);
+    font-size: 0.875rem;
+
+    strong {
+        color: #ffc53d;
+    }
+}
+
+.confirm {
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
+    font-weight: 600;
+    cursor: pointer;
+
+    @include touch-target;
+}

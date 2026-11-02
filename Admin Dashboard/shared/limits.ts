@@ -122,6 +122,7 @@ export const AUDIT_LABELS: Readonly<Record<string, string>> = {
     "status.update": "Statusmeldung ergänzt",
     "status.delete": "Statusmeldung gelöscht",
     "status.discord": "Statusmeldung in Discord aktualisiert",
+    "status.channel": "Statuskanal gewechselt",
     "mail.send": "Mail verschickt",
     "mail.delete": "Mail gelöscht",
     "mail.account.add": "Postfach hinzugefügt",

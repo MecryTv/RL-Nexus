@@ -286,6 +286,16 @@ export interface IDiscordPostResult {
     readonly channels: readonly IDiscordPostChannel[];
 }
 
+/** Ein Textkanal, der Statuskanal werden kann (W-0052, Fenster K2). */
+export interface IStatusChannelOption {
+    readonly id: string;
+    readonly name: string;
+    /** Name der Kategorie, null ohne. */
+    readonly category: string | null;
+    /** Rechte, die dem Bot dort fehlen, leer wenn alles da ist. */
+    readonly missing: readonly string[];
+}
+
 /** Wie ein Statuskanal überall heißt: „#status“, ohne Namen „Kanal 123…“. */
 export function channelLabel(channel: { readonly id: string; readonly name: string | null }): string {
     return channel.name ? `#${channel.name}` : `Kanal ${channel.id}`;

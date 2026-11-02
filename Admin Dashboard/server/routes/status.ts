@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { channelLabel, DETAIL_RANGES, type DetailRange, type IDiscordPostResult, type IDiscordPostState, type IIncidentList, type IStatusDetail } from "../../shared/status.ts";
+import { channelLabel, DETAIL_RANGES, type DetailRange, type IDiscordPostResult, type IDiscordPostState, type IStatusChannelOption, type IIncidentList, type IStatusDetail } from "../../shared/status.ts";
 import { accessOf } from "../access.ts";
 import { audit } from "../audit.ts";
 import type { IConfig } from "../config.ts";
@@ -8,7 +8,7 @@ import { PublicError } from "../errors.ts";
 import { addUpdate, createIncident, deleteIncident, listIncidents, openKindOf, parseIncident, parseUpdate } from "../status/incidents.ts";
 import { loadDetail } from "../status/detail.ts";
 import { publicStatus } from "../status/snapshot.ts";
-import { BANNER, BANNER_NAME, discordPostState, refreshNow, rememberManual, statusCycle } from "../status-post.ts";
+import { BANNER, BANNER_NAME, chooseChannel, discordPostState, refreshNow, rememberManual, statusChannelOptions, statusCycle } from "../status-post.ts";
 import { id } from "../validate.ts";
 
 function needDatabase(): void {
@@ -58,6 +58,28 @@ export async function statusRoutes(app: FastifyInstance, { config }: { config: I
             null,
             `${result.channels.length - failed.length} von ${result.channels.length} Kanälen${failed.length > 0 ? ` · ${failed.map((channel) => `${channelLabel(channel)}: ${channel.error}`).join(" · ")}` : ""}`
         );
+
+        return result;
+    });
+
+    /** Die Textkanäle des Servers für das Fenster „Statuskanal wählen“ (K2). */
+    app.get("/api/status/discord/channels", async (): Promise<IStatusChannelOption[]> => statusChannelOptions(config));
+
+    /** Statuskanal wechseln: alte Meldung weg, neue sofort im neuen Kanal. */
+    app.put("/api/status/discord/channel", async (request): Promise<IDiscordPostResult | null> => {
+        const actor = accessOf(request);
+        const body = request.body as { channelId?: unknown; confirm?: unknown } | null;
+        const channelId = body?.channelId;
+
+        // Der Bot räumt den Statuskanal auf. Wer wechselt, muss das ausdrücklich wissen.
+        if (body?.confirm !== true) throw new PublicError(400, "Bestätige, dass der Bot im neuen Kanal alle anderen Nachrichten löscht.");
+        if (typeof channelId !== "string" || !/^\d{17,20}$/.test(channelId)) throw new PublicError(400, "Wähl einen Kanal aus der Liste.");
+
+        const { from, result } = await chooseChannel(config, channelId);
+        const name = (id: string): string => channelLabel({ id, name: (result?.channels.find((channel) => channel.id === id)?.name ?? null) });
+
+        await audit(actor, "status.channel", channelId, `${from ? name(from) : "keiner"} → ${name(channelId)}`);
+        if (result) rememberManual(actor.name, result);
 
         return result;
     });

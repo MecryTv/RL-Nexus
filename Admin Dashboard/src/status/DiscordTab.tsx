@@ -1,9 +1,10 @@
-import type { CSSProperties, JSX } from "react";
+import { useState, type CSSProperties, type JSX } from "react";
 import { channelLabel } from "../../shared/status.ts";
 import logo from "../assets/logo.webp";
 import { Button } from "../components/Button";
 import { Failure, Loading } from "../components/Status";
 import { discordLines, postSummary } from "./discord.ts";
+import { ChannelDialog } from "./ChannelDialog";
 import styles from "./DiscordTab.module.scss";
 import type { IDiscordPost } from "./useDiscordPost";
 
@@ -107,8 +108,9 @@ function Ring({ remaining, total }: { readonly remaining: number; readonly total
  * Reiter „Discord-Meldung“ (W-0052, Entwurf D1): links die Nachricht, wie sie
  * im Kanal steht, rechts alles zum Handeln.
  */
-export function DiscordTab({ post, now, onChangeChannel }: { readonly post: IDiscordPost; readonly now: number; readonly onChangeChannel?: () => void }): JSX.Element {
+export function DiscordTab({ post, now }: { readonly post: IDiscordPost; readonly now: number }): JSX.Element {
     const { state, busy, waitUntil, nextUntil, refresh } = post;
+    const [choosing, setChoosing] = useState(false);
     const data = state.data;
 
     if (data === null) return state.error ? <Failure message={state.error.message} onRetry={state.reload} /> : <Loading label="Discord-Meldung wird geladen" />;
@@ -172,11 +174,9 @@ export function DiscordTab({ post, now, onChangeChannel }: { readonly post: IDis
                             </p>
                         ))
                     )}
-                    {onChangeChannel && (
-                        <button type="button" className={styles.link} onClick={onChangeChannel}>
-                            Kanal ändern
-                        </button>
-                    )}
+                    <button type="button" className={styles.link} onClick={() => setChoosing(true)}>
+                        {data.channels.length === 0 ? "Kanal wählen" : "Kanal ändern"}
+                    </button>
                 </div>
 
                 <div className={styles.box}>
@@ -193,6 +193,8 @@ export function DiscordTab({ post, now, onChangeChannel }: { readonly post: IDis
                     )}
                 </div>
             </aside>
+
+            {choosing && <ChannelDialog current={first?.id ?? null} onClose={() => setChoosing(false)} onChanged={state.reload} />}
         </div>
     );
 }
