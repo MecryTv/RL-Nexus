@@ -1,18 +1,20 @@
-# Admin Dashboard: neuer Look, Status-Knopf, Nutzerdaten (W-0053, W-0052, W-0051)
+# Admin Dashboard: neuer Look, Status-Knopf, Nutzerdaten, Sperre (W-0053, W-0052, W-0051, W-0057)
 
-Besprochen am 01.11.2026 im Chat, Entwürfe mit Superpowers: `w0053-admin-design.html` (Look A1 bis A4, Status B1 bis B3, erste Nutzerdaten C1 bis C3), `w0051-nutzerdaten.html` (C4 bis C6, D1, D2, E1 bis E3) und `w0051-dm.html` (Frist frei wählbar, neue DM). Alle drei hängen an den Aufgaben in `.works/`.
+Besprochen am 01.11.2026 im Chat, Entwürfe mit Superpowers: `w0053-admin-design.html` (Look A1 bis A4, Status B1 bis B3, erste Nutzerdaten C1 bis C3), `w0051-nutzerdaten.html` (C4 bis C6, D1, D2, E1 bis E3) und `w0051-dm.html` (Frist frei wählbar, neue DM). Für die Sperre `w0057-sperre.html` und die Runden 2 bis 4 (`w0057-runde2.html` bis `w0057-runde4.html`). Alle hängen an den Aufgaben in `.works/`.
 
 Wahl des Nutzers:
 
-- **W-0053:** A4, „Wie das Bot-Dashboard“.
+- **W-0053:** A4, „Wie das Bot-Dashboard“. Am 02.11. fürs Postfach (`w0053-postfach.html`, `w0053-postfach-v2.html`): „P2 nur verbessert bitte“, dann „Zustand 1 bitte“ und „Und reiter Alle weg bitte“.
 - **W-0052:** B1 und B2 zusammen, Knopf oben und Vorschau mit Ring.
 - **W-0051:** zuerst C1 bis C3 verworfen („Sollten alle User aufgelistet werden und wenn man dann darauf klickt bekommt man alle Infos“), dazu: „bevor die Löschung final ist, soll der User per Discord DM benachrichtigt werden, dass in x Minuten seine Daten gelöscht werden“. Dann **C4**, **D1 mit eigener Zeit**, **E3 mit verbesserter Nachricht**. Die neue Nachricht steht in `w0051-dm.html`.
+- **W-0057:** **A2** (eigener Bereich Sicherheit), **B1a in der Fassung V1 aus Runde 4** (Sperrfenster), **C2** (einmal eine DM, dann Stille), **C4c aus Runde 3** (Sperrseite mit Schild), **D3 mit Sperrprüfung**, **E2 mit Entscheidung je Server**, **F2** (Bausteine, „Nur Besitz“ = eigene Server, Bot-Dashboard, Shop). Die Entscheidungen stehen in `.works/tasks/W-0057-…/decisions.md` (E1 bis E7).
 
 ## Reihenfolge
 
-1. **W-0053** zuerst: Leiste, Suche und Seitenkopf sind die Hülle, in der die beiden anderen Seiten wohnen.
+1. **W-0053** zuerst: Leiste, Suche und Seitenkopf sind die Hülle, in der die anderen Seiten wohnen.
 2. **W-0052** danach: klein, eine Route und eine Karte auf der Status-Seite.
-3. **W-0051** zuletzt: der größte Teil, mit Arbeit in Admin Dashboard und Bot.
+3. **W-0051** danach: der größte Teil, mit Arbeit in Admin Dashboard und Bot.
+4. **W-0057** zuletzt: baut auf dem Profil und den Wegen zwischen Admin und Bot aus Teil 3 auf.
 
 Jeder Teil bekommt einen eigenen Plan und einen eigenen Branch.
 
@@ -26,7 +28,7 @@ Das Admin Dashboard soll aussehen und sich bedienen wie das Bot-Dashboard nach W
 
 ### Aufbau
 
-**Bereichsleiste (links, etwa 74 px).** Symbol mit kurzem Namen darunter, je Bereich:
+**Bereichsleiste (links, etwa 74 px).** Symbol mit kurzem Namen darunter, je Bereich. Namen und Zahlen in 11 px (im Bot-Dashboard 10 px), Zahlen auf `--c-red-deep` statt `--c-red`, damit Weiß darauf lesbar ist:
 
 | Bereich | Kurzname | Seiten in der Spalte |
 |---|---|---|
@@ -35,9 +37,10 @@ Das Admin Dashboard soll aussehen und sich bedienen wie das Bot-Dashboard nach W
 | Shop | Shop | Produkte, Kunden, Einstellungen |
 | Webseite | Web | Banner, Team, Module |
 | Datenschutz | Daten | Nutzerdaten, Löschungen (neu, Teil 3) |
+| Sicherheit | Sicherheit | Sperren, Verdacht, VPN-Prüfung (neu, Teil 4) |
 | Developer | Dev | Logs, Datenbank, Technik, Wartung, Protokoll (nur Developer, wie heute) |
 
-Der gewählte Bereich ist hervorgehoben wie im Bot-Dashboard. Ein Klick auf einen Bereich zeigt dessen Seiten, die offene Seite bleibt. Die ungelesene Post zeigt eine Zahl am Bereich Start, wie heute am Eintrag Postfach.
+Der gewählte Bereich ist hervorgehoben wie im Bot-Dashboard. Ein Klick auf einen Bereich zeigt dessen Seiten, die offene Seite bleibt. Die ungelesene Post zeigt eine Zahl am Bereich Start, wie heute am Eintrag Postfach. Ein Bereich ohne Seite, die die Person sieht, fehlt in der Leiste; Datenschutz und Sicherheit erscheinen also erst mit Teil 3 und Teil 4.
 
 **Seitenspalte (daneben, etwa 210 px).** Oben das Feld „Suchen …“ mit dem Hinweis `⇧ rechts`, darunter Name des Bereichs und seine Seiten, eine Zeile je Seite mit Symbol. Markierung der offenen Seite wie heute (`aria-current="page"`).
 
@@ -45,11 +48,20 @@ Der gewählte Bereich ist hervorgehoben wie im Bot-Dashboard. Ein Klick auf eine
 
 **Seitenkopf.** Jede Seite hat oben Titel, einen Satz darunter und, wo es Kennzahlen gibt, eine Reihe Kacheln mit der schrägen Ecke wie im Bot-Dashboard. Seiten mit Unterseiten bekommen Reiter wie dort. Heute sind das:
 
-- Postfach: die Konten und „Alle“ als Reiter (heute Pfade `post/alle`, `post/:account`).
+- Postfach: ein Reiter je Postfach (siehe unten).
 - Backups: Übersicht und ein Server als Reiter, solange ein Server offen ist.
 - Webseite › Module: Liste und „Neues Modul“.
 
-Die Inhalte der Seiten ändern sich nicht, nur Kopf und Hülle.
+Die Inhalte der Seiten ändern sich nicht, nur Kopf und Hülle. Ausnahme ist das Postfach.
+
+**Postfach (P2 überarbeitet, Zustand 1).** Vorlage `w0053-postfach-v2.html`, Zustand 1, gewählt am 02.11.:
+
+- **Reiter:** je Postfach einer mit Farbpunkt (`boxColor`), kurzem Namen und der Zahl ungelesener Mails im Posteingang. Die volle Adresse steht im Tooltip. Ist ein Postfach nicht erreichbar (`box.error`), steht ein gelbes Warnzeichen statt der Zahl, der Fehler im Tooltip. **Kein Reiter „Alle“** und keine Zusammenschau aller Posteingänge mehr („Und reiter Alle weg bitte“).
+- **Ordnerspalte:** oben Name und volle Adresse des offenen Postfachs, darunter seine Ordner: Posteingang, Gesendet, Entwürfe, ein Strich, Spam, Papierkorb, danach weitere Ordner wie heute. Ungelesene als Zahl, bei Entwürfen grau. Kein Auf- und Zuklappen mehr; der Merker dafür fällt weg. Ohne Postfach steht dort wie heute „Postfach hinzufügen“ (nur Developer).
+- **Liste und Leser** wie heute (Titel mit Anzahl, Suche, Filter Alle, Ungelesen, Mit Anhang). Im Leser stehen Antworten, Allen antworten und Weiterleiten oben rechts neben dem Betreff.
+- **Seitenkopf:** „Neue Mail“ als roter Knopf; im Reiter eines Postfachs ist es als Absender schon gewählt. „Postfächer verwalten“ daneben, nur für Developer wie heute.
+- **Adressen:** `/post` öffnet den Posteingang des ersten Postfachs mit ungelesener Post, sonst des ersten. Alte Adressen `post/alle/…` leiten um: mit Postfach und Mail auf diese Mail im Posteingang ihres Postfachs, sonst auf `/post`. Die Übersicht (`OverviewPage`) verlinkt Mails direkt in ihr Postfach, aus „Alle Posteingänge“ wird „Zum Postfach“.
+- **Handy:** Reiter scrollen seitlich, die Ordner sind eine Auswahl über der Liste, „Neu“ ist ein Knopf im Kopf, Ziele mindestens 44 px.
 
 **Handy (unter 860 px).** Wie im Bot-Dashboard: Bereiche als waagerechte Zeile, darunter Suche und die Seiten des Bereichs als Zeile, Reiter scrollen seitlich, Finger-Ziele mindestens 44 px.
 
@@ -58,7 +70,8 @@ Die Inhalte der Seiten ändern sich nicht, nur Kopf und Hülle.
 - Alle Adressen bleiben gleich.
 - Wer was sieht: Developer-Seiten nur für Developer, wie heute.
 - Farben, Schriften und Bausteine (`Panel`, `Metric`, `Button`, …) bleiben; Kacheln bekommen die schräge Ecke des Bot-Dashboards.
-- Abmelden und Nutzer oben rechts bleiben.
+- Abmelden und Nutzer oben rechts bleiben, in einer schmalen Kopfzeile über der Seite. Das Logo steht oben in der Bereichsleiste.
+- Der Ladebalken beim Seitenwechsel und „Zum Inhalt springen“ bleiben.
 
 ---
 
@@ -171,11 +184,118 @@ Ein Abschnitt beschreibt den Weg: Anfrage an das Team, DM mit Vorlauf, Kopie mö
 
 ---
 
+## Teil 4: Dauerhafte Sperre mit VPN-Erkennung (W-0057)
+
+### Worum es geht
+
+Wunsch des Nutzers: RL Nexus behält sich vor, Personen bei Missbrauch dauerhaft zu sperren. Wer voll gesperrt ist, kommt nie wieder an RL Nexus heran: kein Bot auf irgendeinem Server, kein Bot-Dashboard, keine Webseite mit Anmeldung, kein Shop. Das Team kann eine Sperre lockern, etwa auf eine Besitzsperre, und wieder verschärfen. Eine VPN-Erkennung über Proxycheck hilft, Umgehungen mit neuen Konten zu erkennen.
+
+Heute gibt es nur die Ticket-Sperre je Server (`Discord Bot/src/models/TicketBlacklist.ts`). Der Bot sieht keine IP-Adressen; IPs gibt es nur bei den Anmeldungen im Bot-Dashboard (`DashboardService.Exchange`, `routes/DashboardCallback.ts`) und bei der Anmeldung für Webseite und Shop (`/public/shop/login` und `/public/shop/callback` im Admin Dashboard, genutzt von `AccessPage` und `PricingPage`).
+
+### Umfang als Bausteine (F2)
+
+Eine Sperre besteht aus fünf Bausteinen, jeder an oder aus:
+
+| Baustein | Was gesperrt ist |
+|---|---|
+| Bot auf fremden Servern | Befehle, Knöpfe, Menüs und Fenster des Bots auf jedem Server, der der Person nicht gehört, und in DMs mit dem Bot |
+| Eigene Server | dasselbe auf Servern, deren Besitzer (`guild.ownerId`) die Person ist; im Bot-Dashboard tauchen diese Server für sie nicht auf |
+| Bot-Dashboard | Anmeldung ins Bot-Dashboard, statt dessen die Sperrseite |
+| Webseite | alles auf der Webseite, was eine Anmeldung mit Discord braucht (heute die Seite Zugang); öffentliche Seiten bleiben lesbar |
+| Shop | Kasse, Probezeit und Kundenbereich im Shop |
+
+**Voll** setzt alle fünf. **Nur Besitz** setzt Eigene Server, Bot-Dashboard und Shop; Bot auf fremden Servern und Webseite bleiben erlaubt (bestätigt am 01.11.). **Eigene Auswahl** ist jede andere Mischung. Mindestens ein Baustein muss an sein, sonst ist es keine Sperre.
+
+Was weiterläuft, auch bei Vollsperre: Moderation gegen die Person (Automod, Fälle, Logs, Befehle anderer gegen sie), Einträge anderer über sie. Gesperrt ist, was die Person selbst auslöst.
+
+### Bereich „Sicherheit“ (A2)
+
+Neuer Bereich in der Leiste aus Teil 1, für Admin und Developer.
+
+- **Sperren:** Kacheln „Gesperrt“, „Offener Verdacht“, „VPN heute“ (blockierte Anmeldungen seit Mitternacht). Knopf „Person sperren“: Suche nach Discord-ID oder Name (wie in Teil 3), dann das Sperrfenster. Darunter die Liste: Person, Umfang (Voll, Nur Besitz, Eigene), seit, von wem, Treffer (abgewiesene Anmeldungen danach). Filter: aktiv, aufgehoben. Klick öffnet das Profil der Sperre.
+- **Profil der Sperre:** Kopf mit Person, Umfang, seit und von wem, Knöpfe „Umfang ändern“ und „Aufheben“. Reiter **Server** (E2: Server, Mitglieder, Schalter „Bot verlässt“, seit), **Belege**, **Treffer** (abgewiesene Anmeldungen und Verdachtsfälle mit Bezug zu dieser Person), **Protokoll**.
+- **Verdacht:** offene Fälle aus der Prüfung bei der Anmeldung (D3): Konto, Hinweis („VPN, gleiches Netz wie Spammer123“, „gleiche IP wie Spammer123, ohne VPN“), Alter des Kontos, wann, wo (Bot-Dashboard, Webseite, Shop). Zwei Knöpfe: **Sperren** (öffnet das Sperrfenster, Grund „Sperre umgangen“ vorgewählt, das gesperrte Konto als Bezug) und **Passt** (schließt den Fall). Die Zahl offener Fälle steht am Bereich Sicherheit in der Leiste.
+- **VPN-Prüfung:** oben, ob ein Proxycheck-Key gesetzt ist und ob Proxycheck zuletzt geantwortet hat. Darunter die Prüfungen der letzten 30 Tage: Zeit, Konto, wo, Ergebnis (rein, rein mit Markierung, blockiert, ohne Prüfung), Grund. Filter nach Ergebnis.
+
+### Das Sperrfenster (B1a V1)
+
+Ein ruhiges Fenster mit Formularzeilen, links Bezeichnung und Hinweis, rechts das Feld (Vorlage `w0057-runde4.html`, V1):
+
+- **Kopf** als graue Zeile: Bild, Name, @Handle, ID, Kontoalter (gelb, wenn unter 30 Tage), Zahl der eigenen Server, Knopf „Vorgeschichte“ mit Zahl (Mod-Fälle, Ticket-Sperren, frühere Sperren).
+- **Grund** (nur fürs Team): Vorlagen Raid, Scam, Belästigung, Sperre umgangen, Sonstiges (mehrere möglich), dazu ein Textfeld. Pflicht: mindestens eine Vorlage oder Text.
+- **Belege:** Bilder hineinziehen oder mit Strg V einfügen (PNG, JPG, WebP, höchstens 8 MB je Bild), als Liste mit Dateiname und Größe. Discord-Nachrichtenlinks: Der Bot holt Text, Verfasser, Kanal, Zeit und Bilder der Nachricht und speichert sie; in der Liste steht dann „gespeichert“. Fehlt die Nachricht, steht der Fehler dort.
+- **Umfang:** Umschalter Voll, Nur Besitz, Eigene Auswahl und darunter die fünf Schalter. Rot ist nur, was gesperrt wird.
+- **Eigene Server:** je Server der Person Name, Alter, Mitgliederzahl rechtsbündig und ein Schalter „Bot verlässt“ (Standard aus: Bot bleibt, Besitzer ist raus). Hinweis „nur Besitzer hat Rechte“, wenn außer dem Besitzer niemand den Server verwalten darf.
+- **Verknüpfte Konten:** Konten aus der Prüfung bei der Anmeldung (gleiche IP oder gleiches Netz), je Zeile Grund und Alter, zum Anhaken. Angehakte Konten bekommen dieselbe Sperre mit Verweis auf dieses Konto.
+- **Unten** ein Satz, was passiert („2 Konten überall gesperrt, 2 DMs gehen raus · Bot verlässt 1 von 3 Servern“), das Feld „SPERREN eintippen“ und der Knopf „Endgültig sperren“, gedämpft, bis SPERREN dasteht.
+
+Dasselbe Fenster dient zum **Lockern, Verschärfen und Aufheben** im Profil, vorausgefüllt mit dem aktuellen Stand; Grund ist dann „Änderung“ mit Pflichttext, und das Wort zum Bestätigen heißt ÄNDERN oder AUFHEBEN.
+
+### Was die gesperrte Person sieht (C2, C4c)
+
+- **Eine DM als Bild im Stil I1** bei jeder Sperre und jeder Änderung, sonst nie. Inhalt: „Du bist bei RL Nexus gesperrt“, seit wann, dauerhaft, die Listen „Gesperrt“ und „Weiter nutzbar“ nach den Bausteinen. Bei einer Lockerung oder Verschärfung „Deine Sperre wurde geändert“ mit dem neuen Stand, beim Aufheben „Deine Sperre ist aufgehoben“. Kein Grund, kein Ansprechpartner, keine Knöpfe. Streifen rot bei Vollsperre, gelb bei Teilsperre, grün beim Aufheben. Alt-Text mit allem, was draufsteht. Ist die DM nicht zustellbar, steht das im Protokoll; die Sperre gilt trotzdem. Das genaue Bild wird vor dem Bau als Entwurf gezeigt.
+- **Danach keine Antwort mehr** auf gesperrten Bausteinen: Der Bot verwirft die Interaktion, ohne zu antworten.
+- **Sperrseite C4c** auf Bot-Dashboard, Webseite und Shop nach der Anmeldung mit Discord (Vorlage `w0057-runde3.html`): Kopfzeile mit RL Nexus und Abmelden, gezeichnetes Schild ohne Leuchten (rot bei Vollsperre, gelb bei Teilsperre), Name und „über Discord angemeldet“, Listen „Gesperrt“ und „Weiter nutzbar“, „seit TT.MM.JJJJ“ und gegebenenfalls „gelockert am …“. Handy-Fassung mit großem Abmelde-Knopf (mindestens 44 px). Kein Grund, kein Ansprechpartner.
+
+### Prüfung bei jeder Anmeldung (D3)
+
+Bei jeder Anmeldung im Bot-Dashboard und für Webseite und Shop, in dieser Reihenfolge:
+
+1. **Discord-ID gesperrt** (für den Baustein, um den es geht): Sperrseite.
+2. **Gleiche IP wie eine gesperrte Person, ohne VPN:** rein, aber ein Verdachtsfall fürs Team (kann Familie sein).
+3. **Proxycheck:** VPN oder Proxy und Konto unter 30 Tage, oder Netz einer gesperrten Person: blockiert, Verdachtsfall. VPN ohne diese Treffer: rein, markiert. Kein VPN: rein.
+
+Ohne Key oder ohne Antwort von Proxycheck (Zeitlimit 3 Sekunden): rein, nur protokolliert. Blockiert heißt: eine Seite im Stil von C4c mit gelbem Schild „Anmeldung nicht möglich“ und „Schalte VPN oder Proxy aus und melde dich neu an.“ (Entwurf vor dem Bau zeigen). Das Kontoalter kommt aus der Discord-ID.
+
+Der Bot prüft bei jeder Interaktion nur die Sperrliste nach Discord-ID, er sieht keine IPs.
+
+### Was gespeichert wird
+
+- **Nie die IP selbst**, weder in der Datenbank noch im Log. Gespeichert wird ein HMAC-SHA256 der IP und einer des Netzes (IPv4 /24, IPv6 /48) mit einem geheimen Schlüssel aus der `.env` (`IP_HASH_SECRET`), dazu die ASN von Proxycheck.
+- Je Anmeldung: Discord-ID, die beiden Hashes, wo, VPN ja oder nein, Ergebnis, Zeit. Diese Einträge werden nach **30 Tagen** gelöscht. Beim Sperren werden die Hashes der Person aus diesem Zeitraum in die Sperre übernommen und bleiben mit ihr. Hat sich die Person nie im Web angemeldet, gibt es keine Hashes; dann greift nur die Discord-ID.
+- Die Sperre selbst: Person, Bausteine, Grund, Belege, Server-Entscheidungen, verknüpfte Sperren, wer und wann, jede Änderung. Aufgehobene Sperren bleiben als Eintrag für die Vorgeschichte.
+- Der Proxycheck-Key steht nur in der `.env` (`PROXYCHECK_API_KEY`), den setzt der Nutzer selbst.
+
+### Server der gesperrten Person (E2)
+
+- Standard: **Bot bleibt, Besitzer ist raus.** Die Mitglieder nutzen RL Nexus weiter, wer dort „Server verwalten“ hat, stellt den Bot weiter im Bot-Dashboard ein.
+- Das Team kann je Server **„Bot verlässt“** wählen, beim Sperren und später im Profil. Der Bot verlässt den Server sofort. Wird er dort wieder eingeladen, verlässt er ihn gleich wieder, solange der Schalter an ist. Schalter wieder aus heißt: Der Server darf den Bot wieder einladen; der Bot tritt nicht von selbst bei.
+- Server, die die Person nach der Sperre neu einrichtet, bekommen den Standard und tauchen im Reiter Server auf.
+- Beim Aufheben fallen alle Schalter weg; jeder Wechsel steht im Protokoll.
+
+### Wer was tut
+
+- **Admin Dashboard** besitzt die Sperren: Tabellen (eigene Migrationen wie heute), alle Seiten, das Protokoll, die Prüfung D3 für Webseite und Shop und den Aufruf an Proxycheck. Nach jeder Änderung sagt es dem Bot Bescheid (`/dcapi/admin/…`).
+- **Bot** hält die Sperrliste im Speicher (beim Start geladen, nach jedem Bescheid und zur Sicherheit alle 5 Minuten neu). Er prüft jede Interaktion an einer Stelle vor allen Handlern (`handler/ContructionHandler.ts`, `LoadEvents`, für `interactionCreate`), schickt die DMs, holt Discord-Belege, verlässt Server mit „Bot verlässt“ und prüft beim Beitritt (`guildCreate`).
+- **Bot-Dashboard** (im Bot): Schritt 1 von D3 prüft es selbst aus der Sperrliste, Schritte 2 und 3 fragt es beim Admin Dashboard an (`/internal/…`, kurzlebiges Token, Scope `security`). Antwortet das Admin Dashboard nicht, gilt dasselbe wie ohne Proxycheck: rein, protokolliert.
+
+### Rechte und Protokoll
+
+- Den Bereich Sicherheit sehen Admin und Developer. **Sperren und Verschärfen** dürfen beide, **Lockern und Aufheben** nur Developer (so stand es im ersten Entwurf B1).
+- Mitglieder des Teams (Admin, Developer) lassen sich nicht sperren; das Fenster sagt das, statt zu sperren.
+- Ins Protokoll kommen: Sperre, jede Änderung mit altem und neuem Umfang, Aufheben, „Bot verlässt“ an und aus, DM zugestellt oder nicht, Verdacht geschlossen mit „Passt“, Beleg hinzugefügt.
+
+### Sperre und Löschung (W-0051)
+
+Eine Löschung nach Teil 3 lässt die Sperre samt Hashes stehen. Im Profil der Nutzerdaten steht der Bereich mit Schloss als „bleibt: Sperre“, in der DM unter „Bleibt“ der Satz, den das Team dafür einträgt. Bis W-0009 klärt, was rechtlich bleiben darf, steht dort „zu klären“. Die Anmelde-Hashes einer Person ohne Sperre werden mit gelöscht.
+
+### Was auf keinen Fall passieren darf
+
+- Jemand wird blockiert, weil Proxycheck fehlt oder nicht antwortet.
+- Eine IP steht im Klartext in Datenbank, Log oder Protokoll.
+- Eine gesperrte Person bekommt auf einem gesperrten Baustein eine Antwort vom Bot, oder eine nicht gesperrte Person keine.
+- Moderation gegen die gesperrte Person hört auf zu wirken.
+
+---
+
 ## Nicht dabei
 
 - Personen können die Löschung nicht selbst im Bot-Dashboard anstoßen; sie fragen das Team (offene Frage aus W-0051, erst mal so).
 - Keine automatische Löschung nach Zeit (Aufbewahrungsfristen) in diesem Schritt.
 - Kein neues Farbschema; das Admin Dashboard behält seine Farben.
+- Keine Sperre auf Zeit; eine Sperre gilt, bis das Team sie ändert oder aufhebt.
+- Keine Prüfung von IPs außerhalb der Anmeldung (etwa bei jedem Seitenaufruf).
+- Kein Einspruch der gesperrten Person über RL Nexus selbst.
 
 ## Entscheidungen von Claude (zum Gegenlesen)
 
@@ -188,3 +308,13 @@ Ein Abschnitt beschreibt den Weg: Anfrage an das Team, DM mit Vorlauf, Kopie mö
 7. **Admin und Developer** dürfen den Bereich Datenschutz nutzen, alles steht im Protokoll.
 8. **Status-Knopf darf, wer die Status-Seite sieht**, 10 Sekunden Abstand auf dem Server.
 9. **Uhrzeit im Bild in Berliner Zeit,** die Zeile darunter als Discord-Zeitstempel in der Zeitzone der Person und live; ein Bild kann nicht für jede Person anders rechnen.
+10. **Sperre als Teil 4, nach den Nutzerdaten,** obwohl W-0057 P2 ist: Sie nutzt die Personensuche, das Profil und die Wege zwischen Admin und Bot aus Teil 3.
+11. **Kurzname „Sicherheit“** in der Leiste, Bereich zwischen Datenschutz und Developer. Bereiche ohne Seiten fehlen, bis ihr Teil gebaut ist.
+12. **Lockern und Aufheben nur Developer,** sperren dürfen Admin und Developer. Team-Mitglieder lassen sich nicht sperren.
+13. **Gesperrt ist, was die Person selbst auslöst.** Moderation gegen sie läuft weiter; DMs mit dem Bot zählen zu „Bot auf fremden Servern“.
+14. **Webseite** sperrt nur, was eine Anmeldung braucht; öffentliche Seiten lassen sich nicht pro Person sperren.
+15. **IP nur als HMAC mit geheimem Schlüssel** (`IP_HASH_SECRET`), Netz als /24 bzw. /48. Ein einfacher Hash wäre bei IPv4 leicht zurückzurechnen.
+16. **Anmelde-Hashes 30 Tage,** dann gelöscht; bei einer Sperre bleiben die der gesperrten Person.
+17. **Proxycheck nur im Admin Dashboard,** das Bot-Dashboard fragt dort an. Zeitlimit 3 Sekunden.
+18. **Belege:** Bilder bis 8 MB, Discord-Links werden vom Bot mit Inhalt gesichert.
+19. **Blockiert durch VPN** bekommt eine eigene Seite im Stil der Sperrseite; Entwurf dafür und für die Sperr-DM vor dem Bau.
