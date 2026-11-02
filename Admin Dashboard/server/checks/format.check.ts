@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { formatBytes, formatDuration, formatMonth, formatNumber, formatPercent } from "../../src/format.ts";
 import { sparkline } from "../../src/sparkline.ts";
-import { discordLines, discordTime } from "../../src/status/discord.ts";
+import { discordLines, discordTime, postSummary } from "../../src/status/discord.ts";
 import { check, section } from "./harness.ts";
 
 /** src/format.ts hat keine DOM-Abhängigkeit, deshalb läuft ihr Check hier mit. */
@@ -63,5 +63,16 @@ export async function checkFormat(): Promise<void> {
         assert.deepEqual([quote.kind, quote.segments[0].text], ["quote", "Wartung"]);
         assert.deepEqual([plain.kind, plain.segments[0].text], ["text", `Ohne <t:${seconds}:x> Stil`]);
         assert.equal(discordLines("## 🟢 Alles läuft", now)[0].kind, "h2");
+    });
+
+    await check("Nach dem Klick ein Satz: wo neu geschrieben, wie lange, sonst je Kanal der Fehler", () => {
+        const ok = (id: string, name: string | null) => ({ id, name, ok: true, error: null });
+
+        assert.deepEqual(postSummary({ at: "", ms: 812, channels: [ok("1", "status"), ok("2", null)] }), { text: "Neu geschrieben in 2 Kanälen · 0,8 Sek.", ok: true });
+        assert.deepEqual(postSummary({ at: "", ms: 1500, channels: [ok("1", "status")] }), { text: "Neu geschrieben in #status · 1,5 Sek.", ok: true });
+        assert.deepEqual(postSummary({ at: "", ms: 900, channels: [ok("1", "status"), { id: "2", name: null, ok: false, error: "Missing Permissions" }] }), {
+            text: "Neu geschrieben in #status · Kanal 2: Missing Permissions",
+            ok: false,
+        });
     });
 }

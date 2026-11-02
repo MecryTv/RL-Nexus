@@ -27,7 +27,9 @@ import { Segmented } from "../components/Segmented";
 import { Failure, Loading } from "../components/Status";
 import { formatDateTime, formatNumber, fromLocalInput, toLocalInput } from "../format";
 import { ago, countdown } from "../status/format";
+import { DiscordCard } from "../status/DiscordCard";
 import { Leitstand } from "../status/Leitstand";
+import { useDiscordPost } from "../status/useDiscordPost";
 import { useToast } from "../toast/context";
 import { useTitle } from "../useTitle";
 import styles from "./IncidentsPage.module.scss";
@@ -277,9 +279,15 @@ export function IncidentsPage(): JSX.Element {
     const [deleting, setDeleting] = useState<IIncident | null>(null);
     const [busy, setBusy] = useState(false);
 
+    // Knopf im Kopf und Karte „Discord-Meldung“ teilen sich einen Stand (W-0052).
+    const discord = useDiscordPost();
+    const noChannel = discord.state.data?.channels.length === 0;
+    const discordWait = Math.max(0, Math.ceil((discord.waitUntil - now) / 1000));
+
     useLive("status", () => {
         list.reload();
         detail.reload();
+        discord.state.reload();
     });
 
     // Für „vor 38 Sek.“ und den Countdown bis zur nächsten Prüfung.
@@ -309,6 +317,16 @@ export function IncidentsPage(): JSX.Element {
     return (
         <>
             <PageHeader title="Status" meta={headline(detail.data, now)}>
+                <Button
+                    size="sm"
+                    icon="refresh"
+                    busy={discord.busy}
+                    disabled={discord.state.data === null || noChannel || discordWait > 0}
+                    title={noChannel ? "Kein Statuskanal eingestellt" : discordWait > 0 ? `Gerade erst aktualisiert, wieder in ${discordWait} Sek.` : undefined}
+                    onClick={() => void discord.refresh()}
+                >
+                    In Discord aktualisieren
+                </Button>
                 {data && (
                     <LinkButton href={data.statusUrl} size="sm" icon="arrow-right">
                         Statusseite
@@ -339,6 +357,8 @@ export function IncidentsPage(): JSX.Element {
             ) : (
                 <Loading label="Leitstand wird geladen" />
             )}
+
+            <DiscordCard post={discord} now={now} />
 
             {list.error && !data ? (
                 <Failure message={list.error.message} onRetry={list.reload} />

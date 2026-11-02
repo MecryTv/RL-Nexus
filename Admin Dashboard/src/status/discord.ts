@@ -4,6 +4,8 @@
  * npm run check es prüfen kann.
  */
 
+import type { IDiscordPostChannel, IDiscordPostResult } from "../../shared/status.ts";
+
 /** Die Vorschau zeigt, was jemand in Deutschland sieht. Feste Zone, damit Prüfung und Browser dasselbe rechnen. */
 const ZONE = "Europe/Berlin";
 
@@ -65,6 +67,20 @@ function segments(line: string, now: number): ISegment[] {
         .split("**")
         .map((text, index) => ({ text, bold: index % 2 === 1 }))
         .filter((part) => part.text !== "");
+}
+
+/** Der Hinweis nach „In Discord aktualisieren“: wo es geklappt hat, wie lange, sonst je Kanal der Fehler. */
+export function postSummary(result: IDiscordPostResult): { readonly text: string; readonly ok: boolean } {
+    const label = (channel: IDiscordPostChannel): string => (channel.name ? `#${channel.name}` : `Kanal ${channel.id}`);
+    const done = result.channels.filter((channel) => channel.ok);
+    const failed = result.channels.filter((channel) => !channel.ok);
+    const where = done.length === 1 ? label(done[0]) : `${done.length} Kanälen`;
+    const parts = [
+        ...(done.length > 0 ? [`Neu geschrieben in ${where}`] : []),
+        ...(failed.length === 0 ? [`${(result.ms / 1000).toLocaleString("de-DE", { maximumFractionDigits: 1, minimumFractionDigits: 1 })} Sek.`] : failed.map((channel) => `${label(channel)}: ${channel.error}`)),
+    ];
+
+    return { text: parts.join(" · "), ok: failed.length === 0 };
 }
 
 /** Text eines Discord-Bausteins, Zeile für Zeile. */

@@ -1,0 +1,191 @@
+@use "mixins" as *;
+
+/* Die Karte „Discord-Meldung“ (W-0052). Die Vorschau trägt Discords eigene
+   Farben, damit sie aussieht wie im Kanal, nicht wie das Admin Dashboard. */
+
+/* Links die Vorschau in Discord-Breite, rechts Knopf und Ring. Schmal untereinander. */
+.card {
+    display: grid;
+    grid-template-columns: minmax(0, 560px) minmax(0, 1fr);
+    align-items: start;
+    margin-top: var(--s-5);
+    padding: var(--s-4);
+    gap: var(--s-3) var(--s-5);
+
+    @include below(899px) {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+.head,
+.none {
+    grid-column: 1 / -1;
+}
+
+.head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--s-1) var(--s-3);
+}
+
+.title {
+    font-size: 1.05rem;
+}
+
+.meta {
+    color: var(--c-text-faint);
+    font-size: 0.875rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.none {
+    color: var(--c-text-dim);
+}
+
+.preview {
+    display: grid;
+    max-width: 560px;
+    max-height: 520px;
+    padding: var(--s-3);
+    overflow-y: auto;
+    border-radius: 8px;
+    gap: var(--s-2);
+    background: #313338;
+    color: #dbdee1;
+    font-family: "gg sans", "Segoe UI", system-ui, sans-serif;
+    font-size: 0.875rem;
+    line-height: 1.35;
+}
+
+.container {
+    display: grid;
+    padding: var(--s-3);
+    border-left: 4px solid var(--accent);
+    border-radius: 4px;
+    gap: var(--s-2);
+    background: #2b2d31;
+}
+
+.block {
+    display: grid;
+    gap: 2px;
+
+    strong {
+        color: #f2f3f5;
+        font-weight: 700;
+    }
+}
+
+.h1,
+.h2,
+.h3 {
+    color: #f2f3f5;
+    font-weight: 700;
+}
+
+.h1 {
+    font-size: 1.4rem;
+}
+
+.h2 {
+    font-size: 1.15rem;
+}
+
+.h3 {
+    font-size: 1rem;
+}
+
+.small {
+    color: #949ba4;
+    font-size: 0.75rem;
+}
+
+.quote {
+    padding-left: var(--s-2);
+    border-left: 3px solid #4e5058;
+}
+
+.section {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-3);
+}
+
+.row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-2);
+}
+
+.button {
+    flex: none;
+    padding: 4px 14px;
+    border-radius: 3px;
+    background: #4e5058;
+    color: #fff;
+    font-size: 0.875rem;
+    font-weight: 500;
+
+    &:hover {
+        background: #6d6f78;
+    }
+
+    &:focus-visible {
+        @include focus-ring;
+    }
+}
+
+.gallery img {
+    display: block;
+    width: 100%;
+    border-radius: 4px;
+}
+
+.unknown {
+    color: #949ba4;
+    font-style: italic;
+}
+
+.actions {
+    display: grid;
+    justify-items: start;
+    gap: var(--s-3);
+
+    @include below(899px) {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+    }
+}
+
+.hint {
+    max-width: 320px;
+    color: var(--c-text-faint);
+    font-size: 0.8125rem;
+}
+
+.ring {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-2);
+    color: var(--c-text-dim);
+    font-size: 0.875rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.track,
+.progress {
+    fill: none;
+    stroke-width: 3;
+}
+
+.track {
+    stroke: var(--c-line-strong);
+}
+
+.progress {
+    stroke: var(--c-win);
+    stroke-linecap: round;
+}
