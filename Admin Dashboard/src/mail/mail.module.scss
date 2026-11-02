@@ -1,10 +1,10 @@
 @use "mixins" as *;
 
 /* Das Postfach nach Entwurf A: Postfächer, Liste, Lesebereich.
-   Ab 1100 px nebeneinander, jede Spalte scrollt für sich. Darunter liegt der
-   Lesebereich über der Liste, unter 768 px kommt eins nach dem anderen. */
-$wide: 1100px;
-$narrow: 1099px;
+   Ab 1280 px nebeneinander, jede Spalte scrollt für sich. Darunter liegt der
+   Lesebereich über der Liste, unter 768 px kommt eins nach dem anderen.
+   1280 statt 1100, seit Leiste und Seitenspalte zusammen 284 px breit sind (W-0053). */
+$narrow: 1279px;
 $phone: 767px;
 
 .mail {
@@ -54,7 +54,7 @@ $phone: 767px;
     }
 }
 
-/* Unter 1100 px: Lesebereich statt Liste, sobald etwas offen ist. */
+/* Unter 1280 px: Lesebereich statt Liste, sobald etwas offen ist. */
 @include below($narrow) {
     .mail[data-view="read"] .listPane,
     .mail:not([data-view="read"]) .readPane {
@@ -62,11 +62,9 @@ $phone: 767px;
     }
 }
 
-/* Unter 768 px: nur die Spalte, um die es gerade geht. */
+/* Unter 768 px: keine Ordnerspalte, die Ordner sind eine Auswahl über der Liste (W-0053). */
 @include below($phone) {
-    .mail[data-view="nav"] .listPane,
-    .mail[data-view="nav"] .readPane,
-    .mail:not([data-view="nav"]) .boxes {
+    .mail .boxes {
         display: none;
     }
 }
@@ -95,12 +93,6 @@ $phone: 767px;
     }
 }
 
-.backPhone {
-    @include below($phone) {
-        display: flex;
-    }
-}
-
 /* --- Postfächer ---------------------------------------------------------- */
 .boxes {
     background: var(--c-panel-solid);
@@ -117,89 +109,41 @@ $phone: 767px;
     padding: var(--s-3) var(--s-2);
 }
 
-.compose {
+/* Kopf der Ordnerspalte: Name und Adresse des offenen Postfachs. */
+.boxHead {
     display: flex;
-    align-items: center;
-    justify-content: center;
+    align-items: baseline;
     gap: var(--s-2);
-    width: 100%;
-    min-height: 44px;
-    background: linear-gradient(135deg, var(--c-red), var(--c-red-deep));
-    color: #fff;
-    transition: filter var(--t-fast);
-
-    @include label(0.78rem, 0.14em);
-    @include bevel-diagonal(8px);
-
-    &:hover:not(:disabled) {
-        filter: brightness(1.12);
-    }
-
-    &:focus-visible {
-        @include focus-inset(#fff);
-    }
-
-    &:disabled {
-        opacity: 0.45;
-        cursor: not-allowed;
-    }
-}
-
-.box {
-    display: grid;
-    gap: 2px;
-}
-
-.boxToggle {
-    display: flex;
-    align-items: center;
-    gap: var(--s-2);
-    width: 100%;
-    min-width: 0;
-    min-height: 36px;
-    padding: 0 var(--s-2);
-    background: none;
-    color: var(--c-text);
-    font: inherit;
-    font-weight: 700;
-    text-align: left;
-    transition: background var(--t-fast);
-
-    &:hover {
-        background: rgb(255 255 255 / 4%);
-    }
-
-    &:focus-visible {
-        @include focus-inset;
-    }
-
-    svg {
-        flex-shrink: 0;
-        color: var(--c-text-faint);
-    }
+    padding: 0 var(--s-2) var(--s-3);
+    border-bottom: 1px solid var(--c-line);
 }
 
 .boxName {
-    flex: 1;
+    display: grid;
     min-width: 0;
+
+    strong {
+        font-size: 0.9375rem;
+    }
+}
+
+.boxAddress {
     overflow: hidden;
+    color: var(--c-text-faint);
+    font-size: 0.8125rem;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-.boxFolders {
+.folders {
     display: grid;
     gap: 2px;
-
-    &[hidden] {
-        display: none;
-    }
 }
 
-.allInboxes {
-    padding-left: var(--s-2);
-    color: var(--c-text);
-    font-weight: 600;
+.folderRule {
+    margin: var(--s-1) var(--s-2);
+    border: 0;
+    border-top: 1px solid var(--c-line);
 }
 
 .boxDot {
@@ -215,7 +159,7 @@ $phone: 767px;
     align-items: center;
     gap: var(--s-2);
     min-height: 36px;
-    padding: 0 var(--s-2) 0 var(--s-5);
+    padding: 0 var(--s-2);
     color: var(--c-text-dim);
     font-size: 0.9375rem;
     transition:
@@ -257,6 +201,21 @@ $phone: 767px;
     font-weight: 700;
 }
 
+.countDim {
+    color: var(--c-text-faint);
+}
+
+/* Nur auf dem Handy: die Ordner des Postfachs als Auswahl über der Liste. */
+.folderSelect {
+    display: none;
+    min-height: 44px;
+    margin: var(--s-2) var(--s-3) 0;
+
+    @include below($phone) {
+        display: block;
+    }
+}
+
 .boxError {
     padding: var(--s-1) var(--s-2) var(--s-1) var(--s-5);
     color: var(--c-loss);
@@ -272,12 +231,6 @@ $phone: 767px;
     color: var(--c-text-faint);
     font-size: 0.875rem;
     line-height: 1.5;
-}
-
-.manage {
-    margin-top: auto;
-    padding: var(--s-2);
-    border-top: 1px solid var(--c-line);
 }
 
 /* --- Liste --------------------------------------------------------------- */
@@ -513,6 +466,17 @@ $phone: 767px;
 
     @include below($phone) {
         padding: var(--s-3);
+    }
+}
+
+.readerHead {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: var(--s-2) var(--s-4);
+
+    .subject {
+        flex: 1 1 260px;
     }
 }
 

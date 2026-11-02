@@ -7,7 +7,8 @@ import { BANNER_STATE_LABELS, type BannerState } from "../../shared/content";
 import { AUDIT_LABELS } from "../../shared/limits";
 import { INCIDENT_KIND_LABELS, STATUS_SERVICE_LABELS, STATUS_SERVICES, type CheckState, type StatusService } from "../../shared/status";
 import { useLive } from "../api/live";
-import { allPath, boxColor, displayName, mailPath, useMailOverview } from "../api/mail";
+import { boxColor, displayName, mailPath, useMailOverview } from "../api/mail";
+import { inboxOf } from "../mail/route.ts";
 import { useApi } from "../api/useApi";
 import { Badge, type BadgeTone } from "../components/Badge";
 import { GuildTable } from "../components/GuildTable";
@@ -116,7 +117,7 @@ function Mailboxes(): JSX.Element {
 
                     return (
                         <li key={box.id}>
-                            <Link to={inbox ? mailPath(box.id, inbox.path) : allPath()} className={styles.box} title={box.error ?? box.address}>
+                            <Link to={mailPath(box.id, inboxOf(box))} className={styles.box} title={box.error ?? box.address}>
                                 <span className={styles.boxCount} style={{ color: box.error ? "var(--c-loss)" : inbox && inbox.unread > 0 ? boxColor(index) : undefined }}>
                                     {box.error ? "!" : formatNumber(inbox?.unread ?? 0)}
                                 </span>
@@ -149,7 +150,8 @@ function LatestMail(): JSX.Element {
             <ul className={styles.rows}>
                 {data.messages.slice(0, 5).map((entry) => (
                     <li key={`${entry.account}-${entry.uid}`}>
-                        <Link to={allPath(entry.account, entry.uid)} className={styles.row}>
+                        {/* Die Liste kommt aus allen Posteingängen, und der heißt bei IMAP immer INBOX. */}
+                        <Link to={mailPath(entry.account, "INBOX", entry.uid)} className={styles.row}>
                             <span className={styles.text} title={`${displayName(entry.from)} · ${entry.subject}`}>
                                 <strong>{displayName(entry.from)}</strong> · {entry.subject}
                             </span>
@@ -315,7 +317,7 @@ export function OverviewPage(): JSX.Element {
                     )}
                 </Section>
 
-                <Section id="postfaecher" title="Postfächer" action={<More to={allPath()}>Alle Posteingänge</More>}>
+                <Section id="postfaecher" title="Postfächer" action={<More to="/post">Zum Postfach</More>}>
                     <Panel cut="sm" className={styles.card}>
                         <Mailboxes />
                     </Panel>
@@ -327,7 +329,7 @@ export function OverviewPage(): JSX.Element {
                     <Panel cut="sm" className={styles.card}>{data ? <RecentActions entries={data.recent} /> : <Loading />}</Panel>
                 </Section>
 
-                <Section id="mail" title="Neueste Mails" action={<More to={allPath()}>Zum Postfach</More>}>
+                <Section id="mail" title="Neueste Mails" action={<More to="/post">Zum Postfach</More>}>
                     <Panel cut="sm" className={styles.card}>
                         <LatestMail />
                     </Panel>

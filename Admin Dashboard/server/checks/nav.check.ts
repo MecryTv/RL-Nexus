@@ -1,9 +1,25 @@
 import assert from "node:assert/strict";
+import type { IMailBox } from "../../shared/api.ts";
+import { legacyAllPath, mailPath, startPath } from "../../src/mail/route.ts";
 import { AREAS, areaOf, navEntries, pageOf, visibleAreas } from "../../src/nav/areas.ts";
 import { fold, searchNav, ShiftTap, type INavEntry } from "../../src/nav/search.ts";
 import { check, section } from "./harness.ts";
 
 const entry = (name: string, text: string): INavEntry => ({ href: `/${fold(name)}`, name, icon: "dashboard", area: "Bot", text });
+
+const server = { host: "mail.example.test", port: 993 };
+
+/** Ein Postfach mit Posteingang; ohne Posteingang ist es nicht erreichbar. */
+const box = (id: number, inbox: { path: string; unread: number } | null): IMailBox => ({
+    id,
+    address: `box${id}@example.test`,
+    label: `Box ${id}`,
+    position: id,
+    imap: server,
+    smtp: server,
+    folders: inbox && [{ path: inbox.path, name: "Posteingang", role: "inbox", unread: inbox.unread, total: 10 }],
+    error: inbox ? null : "nicht erreichbar",
+});
 
 /** Leiste und Suche (W-0053): reine Funktionen in src/nav, ohne DOM. */
 export async function checkNav(): Promise<void> {
@@ -78,6 +94,26 @@ export async function checkNav(): Promise<void> {
 
         assert.equal(entries.length, 14);
         assert.ok(entries.every((hit) => !hit.href.startsWith("/dev")));
+    });
+
+    await check("Das Postfach öffnet das erste Postfach mit ungelesener Post, ohne Postfach nichts", () => {
+        const a = box(1, { path: "INBOX", unread: 0 });
+        const b = box(2, { path: "Posteingang", unread: 3 });
+
+        assert.equal(startPath([a, b]), "/post/2/Posteingang");
+        assert.equal(startPath([a]), "/post/1/INBOX");
+        assert.equal(startPath([box(3, null)]), "/post/3/INBOX");
+        assert.equal(startPath([]), null);
+    });
+
+    await check("Alte Links auf „Alle Posteingänge“ landen im Posteingang ihres Postfachs", () => {
+        const boxes = [box(1, { path: "INBOX", unread: 0 }), box(2, { path: "Posteingang", unread: 3 })];
+
+        assert.equal(legacyAllPath(boxes, 2, 55), "/post/2/Posteingang/55");
+        assert.equal(legacyAllPath(boxes, 9, 55), "/post/2/Posteingang");
+        assert.equal(legacyAllPath(boxes, null, null), "/post/2/Posteingang");
+        assert.equal(legacyAllPath([], 2, 55), "/post");
+        assert.equal(mailPath(2, "Sent/Alt", 4), "/post/2/Sent%2FAlt/4");
     });
 
     await check("Jede Seite hat einen Satz für Seitenkopf und Suche", () => {

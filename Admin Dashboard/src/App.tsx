@@ -63,7 +63,7 @@ const router = createBrowserRouter(
                 <Route path="meldungen" lazy={page(() => import("./pages/NotificationsPage"), "NotificationsPage")} />
                 <Route path="post" lazy={page(() => import("./pages/MailPage"), "MailPage")} />
                 <Route path="post/formular/:id?" lazy={page(() => import("./pages/MailPage"), "MailRedirect")} />
-                <Route path="post/alle/:account?/:uid?" lazy={page(() => import("./pages/MailPage"), "MailPage")} />
+                <Route path="post/alle/:account?/:uid?" lazy={page(() => import("./pages/MailPage"), "MailAllRedirect")} />
                 <Route path="post/:account/:folder/:uid?" lazy={page(() => import("./pages/MailPage"), "MailPage")} />
                 <Route path="kontakt/:id?" lazy={page(() => import("./pages/MailPage"), "MailRedirect")} />
                 <Route path="webseite/banner" lazy={page(() => import("./pages/BannerPage"), "BannerPage")} />
