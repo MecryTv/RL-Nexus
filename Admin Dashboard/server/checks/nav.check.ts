@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import type { IMailBox } from "../../shared/api.ts";
 import { legacyAllPath, mailPath, startPath } from "../../src/mail/route.ts";
 import { AREAS, areaOf, navEntries, pageOf, visibleAreas } from "../../src/nav/areas.ts";
-import { fold, searchNav, ShiftTap, type INavEntry } from "../../src/nav/search.ts";
+import type { ISearchHit, ISearchResult, SearchKind } from "../../shared/search.ts";
+import { countLabel, fold, nextFilter, pageHits, shownHits, ShiftTap, type INavEntry } from "../../src/nav/search.ts";
 import { check, section } from "./harness.ts";
 
 const entry = (name: string, text: string): INavEntry => ({ href: `/${fold(name)}`, name, icon: "dashboard", area: "Bot", text });
@@ -34,16 +35,52 @@ export async function checkNav(): Promise<void> {
         const entries = [entry("Status", "Dienste, Störungen und Backups der Nacht"), entry("Beta Access", "Codes für die Beta"), entry("Backups", "Sicherungen je Server")];
 
         assert.deepEqual(
-            searchNav(entries, "back").map((hit) => hit.name),
+            pageHits(entries, "back").map((hit) => hit.title),
             ["Backups", "Status"]
         );
-        assert.deepEqual(searchNav(entries, "BACK"), searchNav(entries, "back"));
+        assert.deepEqual(pageHits(entries, "BACK"), pageHits(entries, "back"));
         assert.deepEqual(
-            searchNav(entries, "sicherung").map((hit) => hit.name),
+            pageHits(entries, "sicherung").map((hit) => hit.title),
             ["Backups"]
         );
-        assert.deepEqual(searchNav(entries, ""), []);
-        assert.deepEqual(searchNav(entries, "   "), []);
+        assert.deepEqual(pageHits(entries, ""), []);
+        assert.deepEqual(pageHits(entries, "   "), []);
+    });
+
+    await check("Seiten als Treffer: Art Seiten, Ort ist der Bereich, Ziel die Seite", () => {
+        const [post] = pageHits(navEntries("admin"), "post");
+
+        assert.deepEqual([post.kind, post.title, post.place, post.href], ["seiten", "Postfach", "Start", "/post"]);
+    });
+
+    const hits = (kind: SearchKind, count: number): ISearchHit[] => Array.from({ length: count }, (_, index) => ({ kind, icon: "", title: `${kind} ${index}`, place: "", context: "", href: "", at: null, rank: 0 }));
+    const result = (counts: ISearchResult["counts"], capped: SearchKind[] = []): ISearchResult => ({ hits: hits("mails", 30), counts, capped, failed: [] });
+
+    await check("Tab wechselt den Filter ringsum, Umschalt+Tab zurück", () => {
+        assert.equal(nextFilter("alles", 1), "seiten");
+        assert.equal(nextFilter("seiten", 1), "personen");
+        assert.equal(nextFilter("protokoll", 1), "alles");
+        assert.equal(nextFilter("alles", -1), "protokoll");
+    });
+
+    await check("Zahl am Filter: Punkt beim Laden, 20+ an der Grenze, Seiten sofort", () => {
+        assert.equal(countLabel("mails", 0, null, true), "·");
+        assert.equal(countLabel("seiten", 2, null, true), "2");
+        assert.equal(countLabel("mails", 0, result({ mails: 20 }, ["mails"]), false), "20+");
+        assert.equal(countLabel("server", 0, result({ mails: 20 }), false), "0");
+        assert.equal(countLabel("alles", 2, result({ mails: 3, personen: 1 }), false), "6");
+        assert.equal(countLabel("alles", 2, result({ mails: 20 }, ["mails"]), false), "22+");
+        assert.equal(countLabel("alles", 2, null, true), "·");
+    });
+
+    await check("Liste: in Alles höchstens 40 gemischt, sonst nur die Art und höchstens 20", () => {
+        const pages = hits("seiten", 30);
+
+        assert.equal(shownHits(pages, result({}), "alles").length, 40);
+        const mails = shownHits(pages, result({}), "mails");
+        assert.equal(mails.length, 20);
+        assert.ok(mails.every((hit) => hit.kind === "mails"));
+        assert.equal(shownHits(pages, null, "seiten").length, 20);
     });
 
     await check("Nur die rechte Umschalttaste allein, kurz und außerhalb von Feldern öffnet die Suche", () => {

@@ -1,22 +1,54 @@
 import { useEffect, useId, useRef, useState, type JSX } from "react";
 import { useNavigate } from "react-router-dom";
-import { searchNav, type INavEntry } from "../nav/search.ts";
+import { markOf, parseQuery, SEARCH_LABELS, type ISearchHit, type SearchKind } from "../../shared/search.ts";
+import { countLabel, entryHit, FILTERS, nextFilter, pageHits, shownHits, type INavEntry, type SearchFilter } from "../nav/search.ts";
+import { useSearch } from "../nav/useSearch.ts";
 import { Icon } from "./Icon";
 import { Panel } from "./Panel";
 import styles from "./NavSearch.module.scss";
 
+/** Was nach einem Kürzel allein dasteht. */
+const HINTS: Partial<Record<SearchKind, string>> = {
+    personen: "Name, Discord-ID oder Mail einer Person eingeben.",
+    server: "Name oder ID eines Servers eingeben.",
+    seiten: "Namen einer Seite eingeben.",
+};
+
+/** Der Titel mit markiertem Begriff, wenn er wörtlich drinsteht. */
+function Title({ title, text }: { readonly title: string; readonly text: string }): JSX.Element {
+    const mark = markOf(title, text);
+
+    return mark ? (
+        <>
+            {mark.before}
+            <mark>{mark.match}</mark>
+            {mark.after}
+        </>
+    ) : (
+        <>{title}</>
+    );
+}
+
 /**
- * Das Suchfenster der Leiste (W-0053). Steht nur im DOM, solange es offen
- * ist. Das native <dialog> bringt Fokusfalle und Escape mit; beim Schließen
- * kommt der Fokus dorthin zurück, wo er vorher war.
+ * Das Suchfenster der Leiste (W-0053, W-0059 Variante SC): oben die Filter
+ * mit Zahl, darunter eine Liste. Steht nur im DOM, solange es offen ist. Das
+ * native <dialog> bringt Fokusfalle und Escape mit; beim Schließen kommt der
+ * Fokus dorthin zurück, wo er vorher war.
  */
 export function NavSearch({ entries, initial, onClose }: { readonly entries: readonly INavEntry[]; readonly initial: readonly INavEntry[]; readonly onClose: () => void }): JSX.Element {
     const ref = useRef<HTMLDialogElement>(null);
     const navigate = useNavigate();
     const id = useId();
-    const [query, setQuery] = useState("");
+    const [input, setInput] = useState("");
+    const [chosen, setChosen] = useState<SearchFilter>("alles");
     const [active, setActive] = useState(0);
-    const hits = query.trim() ? searchNav(entries, query) : initial;
+    const { kind: prefixed, text } = parseQuery(input);
+    const filter = prefixed ?? chosen;
+    // Nur ein Kürzel grenzt schon die Anfrage ein; Tab filtert die fertige Antwort.
+    const { result, loading } = useSearch(text, prefixed);
+    const pages = pageHits(entries, text);
+    const hits: readonly ISearchHit[] = text ? shownHits(pages, result, filter) : prefixed ? [] : initial.map((entry) => entryHit(entry));
+    const current = Math.min(active, hits.length - 1);
 
     useEffect(() => {
         const before = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -28,21 +60,30 @@ export function NavSearch({ entries, initial, onClose }: { readonly entries: rea
 
     // Mit den Pfeiltasten bleibt die gewählte Zeile im Blick, auch unter dem Rand der Liste.
     useEffect(() => {
-        document.getElementById(`${id}-${active}`)?.scrollIntoView({ block: "nearest" });
-    }, [id, active, query]);
+        document.getElementById(`${id}-${current}`)?.scrollIntoView({ block: "nearest" });
+    }, [id, current, input, filter]);
 
-    function open(entry: INavEntry | undefined): void {
-        if (!entry) return;
+    function open(hit: ISearchHit | undefined): void {
+        if (!hit) return;
 
         onClose();
-        navigate(entry.href);
+        navigate(hit.href);
     }
+
+    /** Ein anderer Filter löst ein Kürzel ab: Der Begriff bleibt, das Kürzel geht. */
+    function choose(next: SearchFilter): void {
+        setChosen(next);
+        if (prefixed) setInput(text);
+        setActive(0);
+    }
+
+    const failed = result?.failed ?? [];
 
     return (
         <dialog
             ref={ref}
             className={styles.dialog}
-            aria-label="Seite suchen"
+            aria-label="Suchen"
             onCancel={(event) => {
                 event.preventDefault();
                 onClose();
@@ -61,51 +102,87 @@ export function NavSearch({ entries, initial, onClose }: { readonly entries: rea
                         role="combobox"
                         aria-expanded="true"
                         aria-controls={`${id}-liste`}
-                        aria-activedescendant={hits[active] ? `${id}-${active}` : undefined}
+                        aria-activedescendant={hits[current] ? `${id}-${current}` : undefined}
                         aria-autocomplete="list"
-                        placeholder="Seite suchen …"
+                        placeholder="Suchen …"
                         autoComplete="off"
                         spellCheck={false}
-                        value={query}
+                        value={input}
                         onChange={(event) => {
-                            setQuery(event.target.value);
+                            setInput(event.target.value);
                             setActive(0);
                         }}
                         onKeyDown={(event) => {
-                            if (event.key === "ArrowDown") setActive((index) => Math.min(index + 1, hits.length - 1));
-                            else if (event.key === "ArrowUp") setActive((index) => Math.max(index - 1, 0));
-                            else if (event.key === "Enter") open(hits[active]);
+                            if (event.key === "ArrowDown") setActive(Math.min(current + 1, hits.length - 1));
+                            else if (event.key === "ArrowUp") setActive(Math.max(current - 1, 0));
+                            else if (event.key === "Enter") open(hits[current]);
+                            else if (event.key === "Tab") choose(nextFilter(filter, event.shiftKey ? -1 : 1));
                             else return;
 
                             event.preventDefault();
                         }}
                     />
+                    <span className={styles.prefixes} aria-hidden="true">
+                        @ Personen · # Server · / Seiten
+                    </span>
                 </div>
 
-                <ul id={`${id}-liste`} role="listbox" aria-label="Seiten" className={styles.list}>
-                    {hits.map((entry, index) => (
+                <div className={styles.filters} role="group" aria-label="Filter">
+                    {FILTERS.map((entry) => {
+                        const count = text ? countLabel(entry, pages.length, result, loading) : null;
+
+                        return (
+                            <button
+                                key={entry}
+                                type="button"
+                                // Tab bleibt im Feld und wechselt dort den Filter; die Maus klickt direkt.
+                                tabIndex={-1}
+                                className={styles.filter}
+                                aria-pressed={entry === filter}
+                                data-none={count === "0" || undefined}
+                                onClick={() => choose(entry)}
+                            >
+                                {entry === "alles" ? "Alles" : SEARCH_LABELS[entry]}
+                                {count !== null && <small>{count}</small>}
+                            </button>
+                        );
+                    })}
+                </div>
+
+                <ul id={`${id}-liste`} role="listbox" aria-label="Treffer" className={styles.list}>
+                    {hits.map((hit, index) => (
                         // Die Tastatur bleibt im Feld (aria-activedescendant); die Maus wählt direkt.
                         <li
-                            key={entry.href}
+                            key={`${hit.kind}-${hit.href}-${hit.title}`}
                             id={`${id}-${index}`}
                             role="option"
-                            aria-selected={index === active}
+                            aria-selected={index === current}
                             className={styles.option}
                             onMouseMove={() => setActive(index)}
-                            onClick={() => open(entry)}
+                            onClick={() => open(hit)}
                         >
-                            <Icon name={entry.icon} size={18} />
-                            <span className={styles.name}>{entry.name}</span>
-                            <span className={styles.area}>{entry.area}</span>
-                            <span className={styles.text}>{entry.text}</span>
+                            <span className={styles.icon}>
+                                <Icon name={hit.icon} size={16} />
+                            </span>
+                            <span className={styles.name}>
+                                <Title title={hit.title} text={text} />
+                            </span>
+                            <span className={styles.area}>{hit.place}</span>
+                            <span className={styles.text}>{hit.context}</span>
                         </li>
                     ))}
                 </ul>
 
-                {hits.length === 0 && <p className={styles.empty}>Nichts gefunden zu „{query.trim()}“.</p>}
+                {prefixed && !text && <p className={styles.empty}>{HINTS[prefixed]}</p>}
+                {text && !loading && hits.length === 0 && <p className={styles.empty}>Nichts gefunden zu „{text}“.</p>}
+                {failed.length > 0 && <p className={styles.failed}>{failed.map((kind) => SEARCH_LABELS[kind]).join(", ")} gerade nicht erreichbar.</p>}
+
+                <p className={styles.sr} aria-live="polite">
+                    {text && !loading ? `${hits.length} Treffer` : ""}
+                </p>
 
                 <p className={styles.keys} aria-hidden="true">
-                    <kbd>↑</kbd>
+                    <kbd>Tab</kbd> Filter wechseln · <kbd>↑</kbd>
                     <kbd>↓</kbd> wählen · <kbd>Enter</kbd> öffnen · <kbd>Esc</kbd> schließen
                 </p>
             </Panel>
