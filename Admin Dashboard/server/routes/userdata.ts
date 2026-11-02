@@ -23,7 +23,7 @@ import { DatabaseUnavailable, databaseReady, query } from "../db.ts";
 import { publish } from "../events.ts";
 import { PublicError } from "../errors.ts";
 import { knownName, lookupUser, userRefs } from "../users.ts";
-import { cancelDeletion, deletionCounts, deletionOf, latestDeletionOf, listDeletions, planDeletion, publicDeletion } from "../userdata/deletions.ts";
+import { cancelDeletion, deletionCounts, deletionOf, latestDeletionOf, listDeletions, openDeletionOf, planDeletion, publicDeletion } from "../userdata/deletions.ts";
 import { renderDeletionImage, sendDeletionDm } from "../userdata/dm.ts";
 import { personExport, personIndex, personRows, userdataRules } from "../userdata/find.ts";
 import { announcementInput, followUp, plainInput } from "../userdata/flow.ts";
@@ -168,10 +168,13 @@ export async function userdataRoutes(app: FastifyInstance, { config }: { config:
             .send(JSON.stringify(copy, null, 2));
     });
 
-    /** Löschung planen (Teil 3b, Fenster D1): Bestätigung durch die ID, Frist, Grund; danach geht die Ankündigung raus. */
+    /**
+     * Löschung planen (Teil 3b, Fenster D1): Bestätigung durch die ID, Frist, Grund; danach geht die Ankündigung raus.
+     * replace: „Neu planen“ nach „Das war ich nicht“. Die angehaltene endet still, die Person bekommt nur die neue Ankündigung.
+     */
     app.post("/api/userdata/:id/loeschung", async (request): Promise<IDeletion> => {
         const id = snowflake((request.params as { id?: string }).id);
-        const body = (request.body ?? {}) as { dueAt?: unknown; reason?: unknown; confirm?: unknown };
+        const body = (request.body ?? {}) as { dueAt?: unknown; reason?: unknown; confirm?: unknown; replace?: unknown };
 
         if (body.confirm !== id) throw new PublicError(400, "Tipp zur Bestätigung die ID der Person ein.");
 
@@ -182,8 +185,17 @@ export async function userdataRoutes(app: FastifyInstance, { config }: { config:
         if ((await personRows(id)).length === 0) throw new PublicError(404, "Zu dieser ID gibt es bei RL Nexus keine Daten.");
 
         const actor = accessOf(request);
-        const input = await announcementInput(config, id, dueAt, (await personIndex()).get(id)?.name ?? null);
-        const record = await planDeletion({ userId: id, userName: input.name, dueAt, reason, by: actor });
+        const halted = body.replace === true ? await openDeletionOf(id) : null;
+
+        if (halted?.state === "angehalten") {
+            await cancelDeletion(halted.id, actor);
+            await audit(actor, "userdata.cancel", id, "neu geplant");
+        }
+
+        const stored = (await personIndex()).get(id)?.name ?? null;
+        const input = await announcementInput(config, id, dueAt, stored);
+        // input.name ist der Gruß der DM („du“, wenn niemand den Namen kennt); gespeichert wird nur ein echter Name.
+        const record = await planDeletion({ userId: id, userName: knownName(id) ?? stored ?? halted?.userName ?? null, dueAt, reason, by: actor });
 
         await sendDeletionDm(config, record, "ankuendigung", input);
         await audit(actor, "userdata.plan", id, `endgültig ${BERLIN.format(dueAt)} · ${reason}`);

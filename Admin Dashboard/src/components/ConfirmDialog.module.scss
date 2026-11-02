@@ -13,6 +13,12 @@
     }
 }
 
+.wide {
+    width: min(680px, calc(100vw - 2 * var(--s-4)));
+    max-height: calc(100dvh - 2 * var(--s-4));
+    overflow-y: auto;
+}
+
 .panel {
     /* Deckend: Durch die Glas-Füllung schiene sonst die Seite darunter durch den Text. */
     --c-panel-fill: var(--c-panel-solid);

@@ -391,3 +391,375 @@
         grid-column: 1 / -1;
     }
 }
+
+/* --- Löschung (Teil 3b): Fenster D1, Kasten im Profil, Seite Löschungen LA+ --- */
+
+.planForm {
+    display: grid;
+    gap: var(--s-4);
+    color: var(--c-text);
+}
+
+.planRow {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-3);
+    margin-top: var(--s-3);
+
+    > * {
+        flex: 1 1 160px;
+    }
+}
+
+.final {
+    margin-top: var(--s-2);
+    color: var(--c-text);
+    font-weight: 600;
+}
+
+.planLabel {
+    margin-bottom: var(--s-2);
+    color: var(--c-text-faint);
+
+    @include label(0.75rem, 0.14em);
+}
+
+.planAreas {
+    display: grid;
+    gap: 2px;
+
+    li {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto 120px;
+        align-items: center;
+        gap: var(--s-3);
+        padding: var(--s-1) var(--s-2);
+        background: rgb(255 255 255 / 3%);
+        font-size: 0.875rem;
+    }
+
+    b {
+        font-variant-numeric: tabular-nums;
+    }
+}
+
+.goes {
+    color: #ff6b76;
+}
+
+.stays {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-1);
+    color: var(--c-mod-engagement);
+}
+
+.goes,
+.stays {
+    justify-self: end;
+    font-size: 0.8125rem;
+}
+
+.preview {
+    display: block;
+    width: 100%;
+    height: auto;
+    border: 1px solid var(--c-line);
+}
+
+.error {
+    color: var(--c-loss);
+}
+
+.deletionBox {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-3);
+    padding: var(--s-3);
+    border: 1px solid var(--c-line);
+}
+
+.deletionBox.run {
+    box-shadow: inset 3px 0 0 var(--c-blue);
+}
+
+.deletionBox.halt {
+    border-color: rgb(255 197 61 / 50%);
+    background: rgb(255 197 61 / 6%);
+    box-shadow: inset 3px 0 0 var(--c-mod-engagement);
+}
+
+.steps {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s-2);
+    margin-top: var(--s-2);
+
+    em {
+        color: var(--c-text-faint);
+        font-size: 0.8125rem;
+        font-style: normal;
+    }
+}
+
+.dots {
+    display: inline-flex;
+    gap: 4px;
+
+    i {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--c-line-strong);
+    }
+
+    i[data-state="ok"] {
+        background: var(--c-win);
+    }
+
+    i[data-state="warn"] {
+        background: var(--c-mod-engagement);
+    }
+
+    i[data-state="bad"] {
+        background: var(--c-red);
+    }
+}
+
+.dim {
+    display: block;
+    color: var(--c-text-faint);
+    font-size: 0.8125rem;
+}
+
+.when {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-3);
+}
+
+.ring {
+    display: grid;
+    flex: none;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    place-items: center;
+
+    span {
+        width: 26px;
+        height: 26px;
+        border-radius: 50%;
+        background: var(--c-panel-solid);
+    }
+}
+
+.left {
+    display: block;
+    font-family: var(--f-display);
+    font-size: 0.95rem;
+    font-variant-numeric: tabular-nums;
+    font-weight: 800;
+}
+
+.actions {
+    display: inline-flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: var(--s-2);
+}
+
+.gold {
+    border-color: rgb(255 197 61 / 60%);
+    color: var(--c-mod-engagement);
+}
+
+.metrics {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--s-3);
+    margin-bottom: var(--s-4);
+
+    @include below(859px) {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+.metricSub {
+    display: block;
+    color: var(--c-text-faint);
+    font-size: 0.75rem;
+    font-weight: 400;
+}
+
+.goldText {
+    color: var(--c-mod-engagement);
+}
+
+.toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    justify-content: space-between;
+    gap: var(--s-3);
+
+    .chips {
+        margin-bottom: 0;
+    }
+}
+
+.toolbarSearch {
+    flex: 0 1 280px;
+}
+
+.sect {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: var(--s-4) 0 var(--s-2);
+
+    h2 {
+        color: var(--c-text-faint);
+
+        @include label(0.75rem, 0.14em);
+    }
+}
+
+.linkish {
+    color: var(--c-blue);
+    font-size: 0.8125rem;
+
+    @include touch-target;
+
+    &:focus-visible {
+        @include focus-ring;
+    }
+}
+
+.deletions {
+    width: 100%;
+    border-collapse: collapse;
+    /* Feste Spalten: „Offen“ und „Zuletzt erledigt“ stehen bündig untereinander. */
+    table-layout: fixed;
+    background: var(--c-panel-fill);
+
+    th {
+        padding: var(--s-2) var(--s-3);
+        border-bottom: 1px solid var(--c-line-strong);
+        color: var(--c-text-faint);
+        text-align: left;
+
+        @include label(0.7rem, 0.14em);
+    }
+
+    td {
+        padding: var(--s-3);
+        border-bottom: 1px solid var(--c-line);
+        vertical-align: middle;
+    }
+
+    .halt td {
+        background: rgb(255 197 61 / 6%);
+    }
+
+    .halt td:first-child {
+        box-shadow: inset 3px 0 0 var(--c-mod-engagement);
+    }
+
+    .run td:first-child {
+        box-shadow: inset 3px 0 0 var(--c-blue);
+    }
+
+    /* Auf dem Handy Karten statt Zeilen. */
+    @include below(859px) {
+        thead {
+            @include sr;
+        }
+
+        tr {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: var(--s-2) var(--s-3);
+            margin-bottom: var(--s-2);
+            padding: var(--s-3);
+            border: 1px solid var(--c-line);
+        }
+
+        td {
+            display: block;
+            padding: 0;
+            border: 0;
+        }
+
+        .halt {
+            border-color: rgb(255 197 61 / 50%);
+            box-shadow: inset 3px 0 0 var(--c-mod-engagement);
+        }
+
+        .run {
+            box-shadow: inset 3px 0 0 var(--c-blue);
+        }
+
+        .halt td,
+        .halt td:first-child,
+        .run td:first-child {
+            background: none;
+            box-shadow: none;
+        }
+
+        .cellWho,
+        .cellState,
+        .cellActions {
+            grid-column: 1 / -1;
+        }
+
+        .cellBy {
+            display: none;
+        }
+    }
+}
+
+.person {
+    display: flex;
+    align-items: center;
+    gap: var(--s-3);
+    min-width: 0;
+
+    a {
+        display: block;
+        overflow: hidden;
+        color: var(--c-text);
+        font-weight: 700;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+}
+
+.colWho {
+    width: 24%;
+}
+
+.colState {
+    width: 30%;
+}
+
+.colDue {
+    width: 15%;
+}
+
+.colActions {
+    width: 200px;
+}
+
+.cellBy {
+    overflow-wrap: anywhere;
+    color: var(--c-text-faint);
+    font-size: 0.8125rem;
+}
+
+.cellActions {
+    text-align: right;
+}

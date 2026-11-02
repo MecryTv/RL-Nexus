@@ -232,6 +232,7 @@ export function OverviewPage(): JSX.Element {
     // von selbst altert: Laufzeit, Ping, Antwortzeiten, ob der Bot noch antwortet.
     useLive("maintenance", reload);
     useLive("content", reload);
+    useLive("userdata", reload);
     const bot = data?.bot ?? null;
     const offline = data !== null && bot === null;
     const maintenance = data ? maintenanceText(data.maintenance) : null;
@@ -267,6 +268,16 @@ export function OverviewPage(): JSX.Element {
             ))}
 
             <BackupNotice />
+
+            {data && data.halted > 0 && (
+                <Panel className={[styles.notice, styles.alert].join(" ")}>
+                    <Badge tone="warn">Löschung angehalten</Badge>
+                    <p>
+                        {data.halted === 1 ? "Eine Person hat" : `${data.halted} Personen haben`} „Das war ich nicht“ gedrückt. Nichts wird gelöscht, bis das Team neu plant oder schließt.
+                    </p>
+                    <More to="/datenschutz/loeschungen">Löschungen</More>
+                </Panel>
+            )}
 
             <Section id="dienste" title="Dienste" action={<More to="/status">Statusmeldungen</More>}>
                 <div className={styles.tiles}>

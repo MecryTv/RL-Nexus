@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties, type FormEvent, type JSX } from "react";
+import { useState, type CSSProperties, type FormEvent, type JSX } from "react";
 import { BANNER_KINDS, BANNER_KIND_LABELS, CONTENT_LIMITS, bannerState, type BannerKind, type IBanner } from "../../shared/content";
 import { Badge, type BadgeTone } from "../components/Badge";
 import { Field } from "../components/Field";
@@ -11,6 +11,7 @@ import { EditorBar, ResetAction } from "../editor/EditorParts";
 import { UnsavedGuard } from "../editor/UnsavedGuard";
 import { useContentDoc } from "../editor/useContentDoc";
 import { formatDateTime, fromLocalInput, toLocalInput } from "../format";
+import { useNow } from "../useNow";
 import { useTitle } from "../useTitle";
 import styles from "./BannerPage.module.scss";
 
@@ -42,18 +43,6 @@ function countdownText(milliseconds: number): string {
 /** Morgen um dieselbe Zeit, auf die Minute: der Vorschlag für einen neuen Countdown. */
 function tomorrow(): string {
     return new Date(Math.ceil((Date.now() + 86_400_000) / 60_000) * 60_000).toISOString();
-}
-
-function useNow(interval: number): number {
-    const [now, setNow] = useState(() => Date.now());
-
-    useEffect(() => {
-        const timer = window.setInterval(() => setNow(Date.now()), interval);
-
-        return () => window.clearInterval(timer);
-    }, [interval]);
-
-    return now;
 }
 
 /** Was die Webseite mit diesem Stand zeigt, als ein Satz. */

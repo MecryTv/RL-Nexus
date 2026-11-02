@@ -4,6 +4,7 @@ import { legacyAllPath, mailPath, startPath } from "../../src/mail/route.ts";
 import { AREAS, areaOf, navEntries, pageOf, visibleAreas } from "../../src/nav/areas.ts";
 import type { ISearchHit, ISearchResult, SearchKind } from "../../shared/search.ts";
 import { countLabel, fold, nextFilter, pageHits, shownHits, ShiftTap, type INavEntry } from "../../src/nav/search.ts";
+import { deletionSteps, dueFrom, dueValid, elapsedShare, remaining } from "../../src/userdata/plan.ts";
 import { check, section } from "./harness.ts";
 
 const entry = (name: string, text: string): INavEntry => ({ href: `/${fold(name)}`, name, icon: "dashboard", area: "Bot", text });
@@ -141,7 +142,7 @@ export async function checkNav(): Promise<void> {
 
         const entries = navEntries("admin");
 
-        assert.equal(entries.length, 16);
+        assert.equal(entries.length, 17);
         assert.ok(entries.every((hit) => !hit.href.startsWith("/dev")));
     });
 
@@ -150,9 +151,11 @@ export async function checkNav(): Promise<void> {
             AREAS.find((area) => area.id === "datenschutz")?.pages.map((page) => [page.to, page.label]),
             [
                 ["/datenschutz", "Nutzerdaten"],
+                ["/datenschutz/loeschungen", "Löschungen"],
                 ["/datenschutz/regeln", "Was bleibt"],
             ]
         );
+        assert.equal(pageOf("/datenschutz/loeschungen")?.page.label, "Löschungen");
         assert.equal(pageOf("/datenschutz/123456789012345678")?.page.to, "/datenschutz");
         assert.equal(pageOf("/datenschutz/regeln")?.page.to, "/datenschutz/regeln");
     });
@@ -181,5 +184,40 @@ export async function checkNav(): Promise<void> {
         for (const page of AREAS.flatMap((area) => area.pages)) {
             assert.ok(page.description.length > 0 && page.description.length <= 90, page.to);
         }
+    });
+
+    await check("Löschen planen: Frist aus Schnellwahl, eigener Zahl oder Zeitpunkt, 5 Minuten bis 30 Tage", () => {
+        const now = Date.UTC(2026, 10, 2, 12, 0);
+
+        assert.equal(dueFrom({ kind: "schnell", minutes: 30 }, now)?.getTime(), now + 30 * 60_000);
+        assert.equal(dueFrom({ kind: "eigene", amount: 2, unit: "tage" }, now)?.getTime(), now + 2 * 86_400_000);
+        assert.equal(dueFrom({ kind: "eigene", amount: 3, unit: "stunden" }, now)?.getTime(), now + 3 * 3_600_000);
+        assert.equal(dueFrom({ kind: "zeitpunkt", value: "kaputt" }, now), null);
+        assert.equal(dueFrom({ kind: "eigene", amount: 0, unit: "minuten" }, now)?.getTime(), now);
+
+        assert.equal(dueValid(new Date(now + 4 * 60_000), now), false);
+        assert.equal(dueValid(new Date(now + 10 * 60_000), now), true);
+        assert.equal(dueValid(new Date(now + 31 * 86_400_000), now), false);
+        assert.equal(dueValid(null, now), false);
+    });
+
+    await check("Löschungen: Punkte für geplant, DM, Kopie, gelöscht", () => {
+        assert.deepEqual(deletionSteps({ state: "geplant", dmState: "zugestellt", copyAt: "2026-11-02T12:00:00.000Z" }), ["ok", "ok", "ok", "todo"]);
+        assert.deepEqual(deletionSteps({ state: "angehalten", dmState: "zugestellt", copyAt: null }), ["ok", "ok", "todo", "warn"]);
+        assert.deepEqual(deletionSteps({ state: "geplant", dmState: "nicht_zustellbar", copyAt: null }), ["ok", "bad", "todo", "todo"]);
+        assert.deepEqual(deletionSteps({ state: "geloescht", dmState: "zugestellt", copyAt: null }), ["ok", "ok", "todo", "ok"]);
+        assert.deepEqual(deletionSteps({ state: "abgebrochen", dmState: "zugestellt", copyAt: null }), ["ok", "ok", "todo", "bad"]);
+    });
+
+    await check("Löschungen: Restzeit am Ring", () => {
+        const now = Date.parse("2026-11-02T20:00:00.000Z");
+        const at = (ms: number): string => new Date(now + ms).toISOString();
+
+        assert.equal(remaining(at(27 * 60_000 + 14_000), now), "27:14");
+        assert.equal(remaining(at(23 * 3_600_000 + 5 * 60_000), now), "23 Std.");
+        assert.equal(remaining(at(3 * 86_400_000), now), "3 Tage");
+        assert.equal(remaining(at(-1000), now), "gleich");
+        assert.equal(elapsedShare(at(-30 * 60_000), at(30 * 60_000), now), 0.5);
+        assert.equal(elapsedShare(at(-60_000), at(-1000), now), 1);
     });
 }

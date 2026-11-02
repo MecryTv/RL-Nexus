@@ -11,6 +11,10 @@ export interface IConfirmDialogProps {
     /** danger für alles, was sich nicht zurücknehmen lässt. */
     readonly tone?: "primary" | "danger";
     readonly busy?: boolean;
+    /** Solange etwas fehlt, etwa die eingetippte ID. */
+    readonly confirmDisabled?: boolean;
+    /** Breiter, für Fenster mit Formular und Vorschau. */
+    readonly wide?: boolean;
     readonly onConfirm: () => void;
     readonly onCancel: () => void;
 }
@@ -21,7 +25,7 @@ export interface IConfirmDialogProps {
  * dem ersten Knopf, und das ist „Abbrechen“: wer nur Enter drückt, löscht
  * nichts.
  */
-export function ConfirmDialog({ open, title, children, confirmLabel, tone = "primary", busy = false, onConfirm, onCancel }: IConfirmDialogProps): JSX.Element {
+export function ConfirmDialog({ open, title, children, confirmLabel, tone = "primary", busy = false, confirmDisabled = false, wide = false, onConfirm, onCancel }: IConfirmDialogProps): JSX.Element {
     const ref = useRef<HTMLDialogElement>(null);
     const titleId = useId();
 
@@ -36,7 +40,7 @@ export function ConfirmDialog({ open, title, children, confirmLabel, tone = "pri
     return (
         <dialog
             ref={ref}
-            className={styles.dialog}
+            className={[styles.dialog, wide && styles.wide].filter(Boolean).join(" ")}
             aria-labelledby={titleId}
             onCancel={(event) => {
                 event.preventDefault();
@@ -58,7 +62,7 @@ export function ConfirmDialog({ open, title, children, confirmLabel, tone = "pri
                     <Button variant="ghost" onClick={onCancel} disabled={busy}>
                         Abbrechen
                     </Button>
-                    <Button variant={tone} onClick={onConfirm} busy={busy}>
+                    <Button variant={tone} onClick={onConfirm} busy={busy} disabled={confirmDisabled}>
                         {confirmLabel}
                     </Button>
                 </div>

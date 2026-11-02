@@ -326,6 +326,13 @@ $phone: 859px;
 }
 
 /* Zahl der ungelesenen Post am Postfach. */
+/* Angehaltene Löschungen: gelb wie „warn“, dunkle Schrift (11:1). */
+.badge.halted,
+.count.halted {
+    background: var(--c-mod-engagement);
+    color: var(--c-base);
+}
+
 .count {
     min-width: 20px;
     height: 20px;

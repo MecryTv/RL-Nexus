@@ -2,16 +2,21 @@ import { useEffect, useState, type JSX } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { AUDIT_LABELS } from "../../shared/limits.ts";
 import { SEARCH_DEBOUNCE_MS } from "../../shared/search.ts";
-import { USERDATA_AREAS, USERDATA_FILTERS, type IUserdataList, type IUserdataProfile, type UserdataFilter } from "../../shared/userdata.ts";
+import { USERDATA_AREAS, USERDATA_FILTERS, type IDeletion, type IUserdataList, type IUserdataProfile, type UserdataFilter } from "../../shared/userdata.ts";
+import { useLive } from "../api/live";
 import { useApi } from "../api/useApi";
-import { LinkButton } from "../components/Button";
+import { Button, LinkButton } from "../components/Button";
 import { Field } from "../components/Field";
 import { Icon } from "../components/Icon";
 import { PageHeader } from "../components/PageHeader";
 import { PageTabs } from "../components/PageTabs";
 import { Failure, Loading } from "../components/Status";
 import { formatDate, formatDateTime, formatNumber } from "../format";
+import { useNow } from "../useNow";
 import { useTitle } from "../useTitle";
+import { DeletionActions, Due, StateBadge, Steps } from "./DeletionParts";
+import { PlanDialog } from "./PlanDialog";
+import { isOpen } from "./plan.ts";
 import styles from "./userdata.module.scss";
 
 const FILTER_LABELS: Readonly<Record<UserdataFilter, string>> = { alle: "Alle", laeuft: "Löschung läuft", shop: "Shop-Kunden" };
@@ -27,10 +32,32 @@ function initialOf(name: string | null): string {
     return (name ?? "?").slice(0, 1).toUpperCase();
 }
 
-/** Profil rechts (C4): Kopf, Auskunft, vier Reiter. Der Reiter steht in der Adresse. */
+/** Die laufende oder angehaltene Löschung im Profil, nach dem Löschen der Beleg. Abgebrochene stehen nur im Protokoll. */
+function DeletionBox({ deletion, onChanged }: { readonly deletion: IDeletion; readonly onChanged: () => void }): JSX.Element | null {
+    const now = useNow(1000);
+
+    if (deletion.state === "abgebrochen") return null;
+
+    return (
+        <section className={[styles.deletionBox, deletion.state === "angehalten" ? styles.halt : deletion.state === "geplant" ? styles.run : ""].join(" ")} aria-label="Löschung">
+            <div className={styles.cellState}>
+                <StateBadge state={deletion.state} />
+                <Steps deletion={deletion} />
+            </div>
+            <Due deletion={deletion} now={now} />
+            <DeletionActions deletion={deletion} onChanged={onChanged} />
+        </section>
+    );
+}
+
+/** Profil rechts (C4): Kopf, Auskunft, Löschung, vier Reiter. Der Reiter steht in der Adresse. */
 function Profile({ id }: { readonly id: string }): JSX.Element {
     const profile = useApi<IUserdataProfile>(`/api/userdata/${id}`);
+    const [planning, setPlanning] = useState(false);
     const [params] = useSearchParams();
+
+    useLive("userdata", profile.reload);
+
     const tab = TABS.find((entry) => entry.id === params.get("reiter"))?.id ?? "bereiche";
     const data = profile.data;
 
@@ -59,7 +86,25 @@ function Profile({ id }: { readonly id: string }): JSX.Element {
                 <LinkButton href={`/api/userdata/${id}/auskunft`} icon="download" download>
                     Auskunft (JSON)
                 </LinkButton>
+                {!isOpen(data.deletion) && (
+                    <Button variant="danger" icon="trash" onClick={() => setPlanning(true)}>
+                        Löschen planen
+                    </Button>
+                )}
             </header>
+
+            {data.deletion && <DeletionBox deletion={data.deletion} onChanged={profile.reload} />}
+
+            {planning && (
+                <PlanDialog
+                    userId={id}
+                    onClose={() => setPlanning(false)}
+                    onPlanned={() => {
+                        setPlanning(false);
+                        profile.reload();
+                    }}
+                />
+            )}
 
             <PageTabs label="Profil" tabs={TABS.map((entry) => ({ to: `/datenschutz/${id}?reiter=${entry.id}`, label: entry.label, active: entry.id === tab }))} />
 
@@ -160,6 +205,9 @@ export function UserdataPage(): JSX.Element {
 
     const list = useApi<IUserdataList>(`/api/userdata?${new URLSearchParams({ seite: String(page), filter, ...(wanted ? { q: wanted } : {}) }).toString()}`);
     const data = list.data;
+
+    useLive("userdata", list.reload);
+
     const most = Math.max(1, ...(data?.people ?? []).map((person) => person.rows));
     const pages = data ? Math.max(1, Math.ceil(data.total / data.pageSize)) : 1;
 

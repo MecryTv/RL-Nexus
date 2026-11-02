@@ -1202,6 +1202,7 @@ try {
 
                 const deletion = answer.json() as IDeletion;
                 assert.deepEqual([deletion.state, deletion.dmState], ["geplant", "zugestellt"]);
+                assert.equal(deletion.userName, null, "ohne bekannten Namen bleibt er leer, nicht der Gruß „du“");
                 assert.equal(sent.length, 1);
                 assert.match(sent[0].body, new RegExp(`ud:copy:${deletion.id}`));
             });
@@ -1268,6 +1269,20 @@ try {
                 assert.equal(answer.statusCode, 200, answer.body);
                 assert.equal((answer.json() as IDeletion).state, "abgebrochen");
                 assert.equal(sent.length, 1);
+            });
+        });
+
+        await check("Neu planen: eine angehaltene Löschung wird nur mit replace ersetzt, ohne DM „abgebrochen“", async () => {
+            await withDms(false, async (sent) => {
+                const first = (await plan(P1)).json() as IDeletion;
+                assert.equal((await internal(first.id, "stop", P1)).statusCode, 200);
+                assert.equal((await plan(P1)).statusCode, 409);
+
+                const before = sent.length;
+                const again = await write("POST", `/api/userdata/${P1}/loeschung`, { dueAt: new Date(Date.now() + 20 * 60_000).toISOString(), reason: "check:db neu", confirm: P1, replace: true });
+                assert.equal(again.statusCode, 200, again.body);
+                assert.equal((await deletionOf(first.id))?.state, "abgebrochen");
+                assert.equal(sent.length - before, 1, "nur die neue Ankündigung");
             });
         });
 
