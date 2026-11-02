@@ -19,6 +19,7 @@ import type { Options } from "nodemailer/lib/mailer/index.js";
 import type { IAuditPage, IDbRows, IDbTable, IGroupList, IMailAllPage, IMailOverview, IOverview, ITech } from "../shared/api.ts";
 import type { ISearchResult } from "../shared/search.ts";
 import { PERSON_COLUMN, USERDATA_IGNORED, sourcesOf, type IUserdataList, type IUserdataProfile, type IUserdataRule } from "../shared/userdata.ts";
+import { forgetIndex, personIndex, rowsOf } from "./userdata/find.ts";
 import type { ICancelReceipt, ICheckoutStart, ICustomerDetail, ICustomerList, IShopProduct, IShopProductList, IShopSettingsView, IShopState, IUnlockProgress } from "../shared/shop.ts";
 import type { IIncidentList, IPublicStatus, IStatusDetail } from "../shared/status.ts";
 import { buildApp } from "./app.ts";
@@ -773,6 +774,27 @@ try {
         assert.deepEqual(missing, [], "in shared/userdata.ts eintragen oder in USERDATA_IGNORED begründen");
     });
 
+    await check("Nutzerdaten: jede JSON-, Text- und Blob-Spalte steht in der Liste oder ist begründet ausgenommen", () => {
+        const known = new Set(sourcesOf().flatMap((source) => [`${source.table}.${source.column}`, ...(source.packed ?? []).map((column) => `${source.table}.${column}`)]));
+        const missing = schema
+            .filter((column) => ["longtext", "mediumtext", "text", "json", "blob", "mediumblob", "longblob"].includes(column.type))
+            .map((column) => `${column.t}.${column.c}`)
+            .filter((key) => !known.has(key) && !(key in USERDATA_IGNORED) && !(`${key.split(".")[0]}.*` in USERDATA_IGNORED));
+
+        assert.deepEqual(missing, [], "in shared/userdata.ts eintragen oder in USERDATA_IGNORED begründen");
+    });
+
+    await check("Nutzerdaten: gleichzeitige Anfragen rechnen die Liste nur einmal", async () => {
+        forgetIndex();
+
+        const [first, second] = await Promise.all([personIndex(), personIndex()]);
+        assert.equal(first, second);
+    });
+
+    await check("Nutzerdaten: eine fehlende Spalte (ältere Datenbank) zählt 0 statt Fehler", async () => {
+        assert.deepEqual(await rowsOf("SELECT gibt_es_nicht FROM levels LIMIT 1"), []);
+    });
+
     await check("Nutzerdaten: jede Spalte der Liste gibt es (fehlende Tabellen sind erlaubt)", () => {
         const all = new Set(schema.map((column) => `${column.t}.${column.c}`));
 
@@ -796,15 +818,18 @@ try {
         assert.deepEqual(broken, []);
     });
 
-    // Eigene IDs: 18 Ziffern, damit eine 19-stellige ID sie als Teilstring enthalten kann.
-    const PERSON = "999999999999999993";
-    const DECOY = "9999999999999999931";
-    const TEST_GUILD = "999999999999999990";
+    // Eigene IDs in der Zukunft (um 2090): 19 Ziffern, damit eine 20-stellige ID sie als Teilstring enthalten kann.
+    const PERSON = "9999999999999999993";
+    const DECOY = "99999999999999999931";
+    const TEST_GUILD = "9999999999999999990";
+    const [{ id: auditBefore }] = await query<{ id: number | null }[]>("SELECT COALESCE(MAX(id), 0) AS id FROM admin_audit");
     const [savedLevelRule] = await query<{ keep: number; note: string | null }[]>("SELECT keep, note FROM userdata_rules WHERE area = 'level'").catch(() => []);
     const userdataTidy = async (): Promise<void> => {
         for (const table of ["levels", "member_activity", "tickets", "ticket_transcripts", "mod_cases"]) await query(`DELETE FROM ${table} WHERE guild_id = ?`, [TEST_GUILD]);
-        for (const table of ["shop_events", "shop_customers"]) await query(`DELETE FROM ${table} WHERE user_id = ?`, [PERSON]);
-        await query("DELETE FROM admin_audit WHERE action LIKE 'userdata.%' AND target IN (?, 'level')", [PERSON]);
+        for (const table of ["shop_events", "shop_customers"]) await query(`DELETE FROM ${table} WHERE user_id IN (?, ?)`, [PERSON, DECOY]);
+        await query("DELETE FROM mail_accounts WHERE address = 'check-db-userdata@example.test'");
+        // Nur was dieser Lauf ins Protokoll schrieb.
+        await query("DELETE FROM admin_audit WHERE id > ? AND action LIKE 'userdata.%'", [Number(auditBefore)]);
     };
     const profileOf = async (id: string): Promise<IUserdataProfile> => {
         const answer = await get(`/api/userdata/${id}`);
@@ -824,10 +849,12 @@ try {
         const ticket = await query<{ insertId: number }>("INSERT INTO tickets (guild_id, number, option_id, opener_id, members, notes, anonymous) VALUES (?, 1, 'check', ?, '[]', '[]', '[]')", [TEST_GUILD, PERSON]);
         await query("INSERT INTO tickets (guild_id, number, option_id, opener_id, members, notes, anonymous) VALUES (?, 2, 'check', ?, ?, '[]', '[]')", [TEST_GUILD, DECOY, JSON.stringify([DECOY])]);
         await query("INSERT INTO ticket_transcripts (ticket_id, guild_id, number, opener_id, opener_name, meta, data, closed_at) VALUES (?, ?, 1, ?, 'check Person', '{}', ?, ?)", [Number(ticket.insertId), TEST_GUILD, PERSON, transcript, now]);
-        await query("INSERT INTO mod_cases (guild_id, number, action, target_id, moderator_id, moderator_name, details, evidence, notes, created_at) VALUES (?, 1, 'warn', ?, ?, 'check Person', '{}', '[]', '[]', ?)", [TEST_GUILD, DECOY, PERSON, now]);
+        await query("INSERT INTO mod_cases (guild_id, number, action, target_id, target_name, moderator_id, moderator_name, details, evidence, notes, created_at) VALUES (?, 1, 'warn', ?, 'check Dritter', ?, 'check Person', '{}', '[]', '[]', ?)", [TEST_GUILD, DECOY, PERSON, now]);
         await records.upsertCustomer({ id: PERSON, name: "check Person", email: "check-person@example.test" });
 
         await check("Nutzerdaten: Liste und Profil zählen je Bereich", async () => {
+            // Die Liste ist 5 Minuten gemerkt; die Testdaten sind eben erst angelegt.
+            forgetIndex();
             const list = (await get(`/api/userdata?q=${PERSON}`)).json() as IUserdataList;
             const found = list.people.find((entry) => entry.id === PERSON);
 
@@ -841,6 +868,8 @@ try {
                 [1, 2, 1, 1, 0]
             );
             assert.ok(profile.servers.some((server) => server.id === TEST_GUILD));
+            assert.ok(profile.timeline.some((row) => row.label === "Ticket 1 · offen"), "Status auf Deutsch");
+            assert.ok(profile.timeline.some((row) => row.label === "Fall 1 bearbeitet · Verwarnung"), "Aktion auf Deutsch");
         });
 
         await check("Nutzerdaten: Einträge aus dem Protokoll stehen mit deutschem Namen da", async () => {
@@ -866,9 +895,23 @@ try {
             // Das OAuth-Token des Shop-Kunden ist geheim (dashboard_credentials gibt es nicht in jeder Datenbank).
             await query("UPDATE shop_customers SET oauth_sealed = 'check-oauth-geheim' WHERE user_id = ?", [PERSON]);
 
+            // Was die Person für andere tat: ein Postfach angelegt, einen Kunden gesperrt, einen Fall bearbeitet.
+            await query(
+                "INSERT INTO mail_accounts (address, label, secret, position, imap_host, imap_port, smtp_host, smtp_port, created_by) VALUES ('check-db-userdata@example.test', 'check', 'check-secret-geheim', 99, 'imap.example.test', 993, 'smtp.example.test', 465, ?)",
+                [PERSON]
+            );
+            await records.upsertCustomer({ id: DECOY, name: "check Dritter", email: "check-dritter@example.test" });
+            await query("UPDATE shop_customers SET oauth_sealed = 'check-oauth-dritter', banned_by = ? WHERE user_id = ?", [PERSON, DECOY]);
+
             const answer = await get(`/api/userdata/${PERSON}/auskunft`);
             assert.equal(answer.statusCode, 200, answer.body);
-            assert.match(String(answer.headers["content-disposition"]), /^attachment; filename="rl-nexus-999999999999999993-\d{4}-\d{2}-\d{2}\.json"$/);
+            for (const secret of ["check-secret-geheim", "check-oauth-dritter", "check Dritter", "check-dritter@example.test"]) {
+                assert.ok(!answer.body.includes(secret), `${secret} gehört nicht in die Auskunft`);
+            }
+
+            const team = (answer.json() as { bereiche: Record<string, Record<string, Record<string, unknown>[]>> }).bereiche.team;
+            assert.deepEqual(Object.keys(team["mod_cases.moderator_id"][0]).sort(), ["label", "server", "zeit"], "Team-Zeilen nur zusammengefasst");
+            assert.match(String(answer.headers["content-disposition"]), /^attachment; filename="rl-nexus-9999999999999999993-\d{4}-\d{2}-\d{2}\.json"$/);
             assert.ok(!answer.body.includes("check-oauth-geheim") && !answer.body.includes("oauth_sealed"), "kein OAuth-Token");
             assert.ok(answer.body.includes("check:db hallo"), "Transcript entpackt");
 
@@ -903,7 +946,7 @@ try {
             assert.equal((await write("PUT", "/api/userdata/regeln/level", { keep: true, note: "check:db bleibt" })).statusCode, 204);
             assert.equal((await profileOf(PERSON)).areas.find((area) => area.id === "level")?.keep, "check:db bleibt");
 
-            const [row] = await query<{ n: number }[]>("SELECT COUNT(*) AS n FROM admin_audit WHERE action = 'userdata.rules' AND target = 'level'");
+            const [row] = await query<{ n: number }[]>("SELECT COUNT(*) AS n FROM admin_audit WHERE id > ? AND action = 'userdata.rules' AND target = 'level'", [Number(auditBefore)]);
             assert.equal(Number(row.n), 1);
         });
 

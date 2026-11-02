@@ -1,6 +1,7 @@
-import { useState, type JSX } from "react";
+import { useEffect, useState, type JSX } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { AUDIT_LABELS } from "../../shared/limits.ts";
+import { SEARCH_DEBOUNCE_MS } from "../../shared/search.ts";
 import { USERDATA_AREAS, USERDATA_FILTERS, type IUserdataList, type IUserdataProfile, type UserdataFilter } from "../../shared/userdata.ts";
 import { useApi } from "../api/useApi";
 import { LinkButton } from "../components/Button";
@@ -39,7 +40,13 @@ function Profile({ id }: { readonly id: string }): JSX.Element {
     return (
         <article className={styles.profileBody} aria-labelledby="nutzer-name">
             <header className={styles.head}>
-                {data.avatar ? <img className={styles.avatar} src={data.avatar} alt="" /> : <span className={styles.avatar}>{initialOf(data.name)}</span>}
+                {data.avatar ? (
+                    <img className={styles.avatar} src={data.avatar} alt="" />
+                ) : (
+                    <span className={styles.avatar} aria-hidden="true">
+                        {initialOf(data.name)}
+                    </span>
+                )}
                 <div className={styles.who}>
                     <h2 id="nutzer-name">{data.name ?? "Unbekannt"}</h2>
                     <p className={styles.id}>{data.id}</p>
@@ -142,7 +149,15 @@ export function UserdataPage(): JSX.Element {
     const [search, setSearch] = useState("");
     const [filter, setFilter] = useState<UserdataFilter>("alle");
     const [page, setPage] = useState(1);
-    const wanted = search.trim();
+    const [wanted, setWanted] = useState("");
+
+    // Erst wenn das Tippen kurz ruht: Jede Anfrage rechnet sonst auf dem Server die Liste durch.
+    useEffect(() => {
+        const timer = setTimeout(() => setWanted(search.trim()), SEARCH_DEBOUNCE_MS);
+
+        return () => clearTimeout(timer);
+    }, [search]);
+
     const list = useApi<IUserdataList>(`/api/userdata?${new URLSearchParams({ seite: String(page), filter, ...(wanted ? { q: wanted } : {}) }).toString()}`);
     const data = list.data;
     const most = Math.max(1, ...(data?.people ?? []).map((person) => person.rows));
@@ -211,9 +226,10 @@ export function UserdataPage(): JSX.Element {
                                                     <b>{person.name ?? "Unbekannt"}</b>
                                                     <small>{person.id}</small>
                                                 </span>
-                                                <span className={styles.amount} title={`${formatNumber(person.rows)} Einträge`}>
+                                                <span className={styles.amount} title={`${formatNumber(person.rows)} Einträge`} aria-hidden="true">
                                                     <span className={styles.bar} style={{ width: `${Math.max(4, (person.rows / most) * 100)}%` }} />
                                                 </span>
+                                                <span className={styles.sr}>{formatNumber(person.rows)} Einträge</span>
                                             </Link>
                                         </li>
                                     ))}

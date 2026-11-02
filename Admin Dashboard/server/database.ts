@@ -23,7 +23,7 @@ export const DB_LIMITS = { page: PAGE_SIZE, search: { min: 1, max: 100 }, downlo
  * Passwörter nicht in einen Browser-Tab, einen Screenshot oder die Zwischenablage.
  * Dass die Spalte existiert und gefüllt ist, bleibt sichtbar.
  */
-const SECRET_COLUMN = /token|secret|passwor[dt]|_key$|^key$|credential|sealed/i;
+export const SECRET_COLUMN = /token|secret|passwor[dt]|_key$|^key$|credential|sealed/i;
 
 /** Backticks im Namen verdoppeln. Greift nur, wenn MariaDB je solche Namen zulässt. */
 function quote(name: string): string {

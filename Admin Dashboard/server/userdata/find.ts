@@ -3,6 +3,7 @@ import { AUDIT_LABELS } from "../../shared/limits.ts";
 import {
     USERDATA_AREAS,
     USERDATA_DEFAULT_KEEP,
+    germanLabel,
     sourcesOf,
     type IUserdataPerson,
     type IUserdataRow,
@@ -10,30 +11,38 @@ import {
     type IUserdataSource,
     type UserdataArea,
 } from "../../shared/userdata.ts";
+import { SECRET_COLUMN } from "../database.ts";
 import { query } from "../db.ts";
 
 /** Nutzerdaten (W-0051): Liste, Profil und Auskunft, gelesen über die Liste in shared/userdata.ts. */
 
 /** Die Liste aller Personen ist teuer (eine Abfrage je Quelle) und ändert sich langsam. */
 const INDEX_TTL = 5 * 60_000;
-/** MariaDB: Tabelle gibt es nicht. Ein Modul, das nie lief, hat keine Daten. */
-const NO_TABLE = 1146;
+/**
+ * MariaDB: Tabelle (1146) oder Spalte (1054) gibt es nicht. Ein Modul, das nie
+ * lief, oder eine ältere Datenbank hat dort keine Daten. Tippfehler in der
+ * Liste fängt check:db („jede Quelle lässt sich abfragen“).
+ */
+const MISSING = new Set([1146, 1054]);
 const SNOWFLAKE = /^\d{17,20}$/;
 
 /** In JSON steht die ID als String in Anführungszeichen: so trifft sie nie eine längere ID. */
 export function matchSql(source: IUserdataSource): string {
-    return source.role === "json" ? `${source.column} LIKE ?` : `${source.column} = ?`;
+    if (source.role === "json") return `${source.column} LIKE ?`;
+    if (source.role === "list") return `FIND_IN_SET(?, ${source.column}) > 0`;
+
+    return `${source.column} = ?`;
 }
 
 export function matchValue(source: IUserdataSource, id: string): string {
     return source.role === "json" ? `%"${id}"%` : id;
 }
 
-async function rowsOf<T>(sql: string, values: readonly unknown[] = []): Promise<T[]> {
+export async function rowsOf<T>(sql: string, values: readonly unknown[] = []): Promise<T[]> {
     try {
         return await query<T[]>(sql, values);
     } catch (error) {
-        if ((error as { errno?: number }).errno === NO_TABLE) return [];
+        if (MISSING.has((error as { errno?: number }).errno ?? 0)) return [];
 
         throw error;
     }
@@ -50,15 +59,25 @@ interface IIndexEntry {
 }
 
 let index: { readonly at: number; readonly people: Map<string, IUserdataPerson> } | null = null;
+/** Eine laufende Rechnung: Wer währenddessen fragt, wartet auf dieselbe statt eine zweite zu starten. */
+let pending: Promise<Map<string, IUserdataPerson>> | null = null;
 
 /**
- * Alle Personen mit Daten, je ID zusammengezählt. Quellen in JSON fehlen hier
- * (die IDs stecken in Listen); im Profil zählen sie mit.
+ * Alle Personen mit Daten, je ID zusammengezählt. Quellen in JSON und Listen
+ * fehlen hier (die IDs stecken in Listen); im Profil zählen sie mit.
  * ponytail: im Speicher und 5 Minuten alt; bei vielen Tausend Personen eine eigene Tabelle.
  */
-export async function personIndex(now = Date.now()): Promise<Map<string, IUserdataPerson>> {
-    if (index && now - index.at < INDEX_TTL) return index.people;
+export function personIndex(now = Date.now()): Promise<Map<string, IUserdataPerson>> {
+    if (index && now - index.at < INDEX_TTL) return Promise.resolve(index.people);
 
+    pending ??= buildIndex(now).finally(() => {
+        pending = null;
+    });
+
+    return pending;
+}
+
+async function buildIndex(now: number): Promise<Map<string, IUserdataPerson>> {
     const entries = new Map<string, IIndexEntry>();
     const entry = (id: string): IIndexEntry => {
         const found = entries.get(id) ?? { rows: 0, name: null, lastAt: null, shop: false, guilds: new Set<string>() };
@@ -68,7 +87,7 @@ export async function personIndex(now = Date.now()): Promise<Map<string, IUserda
         return found;
     };
 
-    for (const source of sourcesOf().filter((item) => item.role !== "json")) {
+    for (const source of sourcesOf().filter((item) => item.role === "person" || item.role === "team")) {
         const rows = await rowsOf<{ id: string; n: number; last: Date | string | null; name: string | null }>(
             `SELECT ${source.column} AS id, COUNT(*) AS n, ${source.time ? `MAX(${source.time})` : "NULL"} AS last, ${source.name ? `MAX(${source.name})` : "NULL"} AS name
              FROM ${source.table} WHERE ${source.column} IS NOT NULL GROUP BY ${source.column}`
@@ -107,21 +126,28 @@ export function forgetIndex(): void {
 
 const areaOf = new Map(USERDATA_AREAS.flatMap((area) => area.sources.map((source) => [source, area.id] as const)));
 
+/** Die Fundstellen einer Quelle als Anzeige, Server und Zeit. */
+async function shortRows(source: IUserdataSource, id: string): Promise<{ readonly label: string; readonly guild: string | null; readonly at: string | null }[]> {
+    const found = await rowsOf<{ label: string | null; guild: string | null; at: Date | string | null }>(
+        `SELECT ${source.label} AS label, ${source.guild ?? "NULL"} AS guild, ${source.time ?? "NULL"} AS at FROM ${source.table} WHERE ${matchSql(source)}`,
+        [matchValue(source, id)]
+    );
+
+    return found.map((row) => {
+        const label = String(row.label ?? source.table);
+
+        // Im Protokoll steht der technische Name der Aktion, in ENUM-Spalten ein englisches Wort; angezeigt wird Deutsch.
+        return { label: source.table === "admin_audit" ? (AUDIT_LABELS[label] ?? label) : source.words ? germanLabel(label) : label, guild: row.guild, at: iso(row.at) };
+    });
+}
+
 /** Alles zu einer Person, eine Zeile je Fundstelle. Servernamen setzt der Aufrufer. */
 export async function personRows(id: string): Promise<Omit<IUserdataRow, "guildName">[]> {
     const rows: Omit<IUserdataRow, "guildName">[] = [];
 
     for (const source of sourcesOf()) {
-        const found = await rowsOf<{ label: string | null; guild: string | null; at: Date | string | null }>(
-            `SELECT ${source.label} AS label, ${source.guild ?? "NULL"} AS guild, ${source.time ?? "NULL"} AS at FROM ${source.table} WHERE ${matchSql(source)}`,
-            [matchValue(source, id)]
-        );
-
-        for (const row of found) {
-            const label = String(row.label ?? source.table);
-
-            // Im Protokoll steht der technische Name der Aktion; angezeigt wird der deutsche.
-            rows.push({ area: areaOf.get(source) as UserdataArea, table: source.table, role: source.role, label: source.table === "admin_audit" ? (AUDIT_LABELS[label] ?? label) : label, guildId: row.guild, at: iso(row.at) });
+        for (const row of await shortRows(source, id)) {
+            rows.push({ area: areaOf.get(source) as UserdataArea, table: source.table, role: source.role, label: row.label, guildId: row.guild, at: row.at });
         }
     }
 
@@ -147,22 +173,35 @@ function exportValue(value: unknown, packed: boolean): unknown {
     return value;
 }
 
-/** Die Auskunft: alle Zeilen je Bereich und `tabelle.spalte`, ohne Geheimes. */
+/**
+ * Die Auskunft je Bereich und `tabelle.spalte`. Eigene Zeilen (`person`)
+ * vollständig, ohne Geheimes. Wo die Person nur vorkommt (`team`, `json`,
+ * `list`), gehört die Zeile anderen: dort nur, was die Person getan hat, wann
+ * und auf welchem Server (Art. 15 Abs. 4 DSGVO).
+ */
 export async function personExport(id: string): Promise<Partial<Record<UserdataArea, Record<string, Record<string, unknown>[]>>>> {
     const result: Partial<Record<UserdataArea, Record<string, Record<string, unknown>[]>>> = {};
 
     for (const area of USERDATA_AREAS) {
         for (const source of area.sources) {
+            const key = `${source.table}.${source.column}`;
+
+            if (source.role !== "person") {
+                const rows = await shortRows(source, id);
+                if (rows.length > 0) (result[area.id] ??= {})[key] = rows.map((row) => ({ label: row.label, zeit: row.at, server: row.guild }));
+                continue;
+            }
+
             const rows = await rowsOf<Record<string, unknown>>(`SELECT * FROM ${source.table} WHERE ${matchSql(source)}`, [matchValue(source, id)]);
             if (rows.length === 0) continue;
 
             const hidden = new Set(source.hidden ?? []);
             const packed = new Set(source.packed ?? []);
 
-            (result[area.id] ??= {})[`${source.table}.${source.column}`] = rows.map((row) =>
+            (result[area.id] ??= {})[key] = rows.map((row) =>
                 Object.fromEntries(
                     Object.entries(row)
-                        .filter(([column]) => !hidden.has(column))
+                        .filter(([column]) => !hidden.has(column) && !SECRET_COLUMN.test(column))
                         .map(([column, value]) => [column, exportValue(value, packed.has(column))])
                 )
             );

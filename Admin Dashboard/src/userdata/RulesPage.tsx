@@ -53,9 +53,22 @@ function RuleRow({ rule, onSaved }: { readonly rule: IUserdataRule; readonly onS
                     onChange={(event) => setNote(event.target.value)}
                 />
             )}
-            <Button className={styles.save} size="sm" variant={changed ? "primary" : "outline"} disabled={!changed || busy || (keep && !note.trim())} onClick={() => void save()}>
+            <Button
+                className={styles.save}
+                size="sm"
+                variant={changed ? "primary" : "outline"}
+                busy={busy}
+                disabled={!changed || (keep && !note.trim())}
+                aria-describedby={keep && !note.trim() ? `satz-${rule.area}` : undefined}
+                onClick={() => void save()}
+            >
                 Speichern
             </Button>
+            {keep && !note.trim() && (
+                <p id={`satz-${rule.area}`} className={styles.hint}>
+                    Zum Behalten gehört ein Satz: Er steht in der DM an die Person.
+                </p>
+            )}
         </li>
     );
 }

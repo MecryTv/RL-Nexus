@@ -369,6 +369,16 @@
     }
 }
 
+.sr {
+    @include sr;
+}
+
+.hint {
+    grid-column: 1 / -1;
+    color: var(--c-text-dim);
+    font-size: 0.8125rem;
+}
+
 /* Immer in der letzten Spalte, auch wenn kein Satzfeld davor steht. */
 .save {
     grid-column: -2 / -1;

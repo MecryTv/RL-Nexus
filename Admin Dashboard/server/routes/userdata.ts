@@ -8,7 +8,7 @@ import { botOverview } from "../bot.ts";
 import type { IConfig } from "../config.ts";
 import { DatabaseUnavailable, databaseReady, query } from "../db.ts";
 import { PublicError } from "../errors.ts";
-import { knownName, lookupUser } from "../users.ts";
+import { knownName, lookupUser, userRefs } from "../users.ts";
 import { personExport, personIndex, personRows, userdataRules } from "../userdata/find.ts";
 import { oneOf, snowflake, text } from "../validate.ts";
 
@@ -33,9 +33,13 @@ export async function userdataRoutes(app: FastifyInstance, { config }: { config:
             .filter((person) => !wanted || person.id.includes(wanted) || fold(person.name ?? "").includes(wanted))
             .sort((a, b) => b.rows - a.rows || a.id.localeCompare(b.id));
         const shown = filter === "shop" ? people.filter((person) => person.shop) : people;
+        const visible = shown.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+        // Nur für die sichtbare Seite und nur, wo kein Name bekannt ist: höchstens 50 Abfragen, eine Stunde gemerkt.
+        const unknown = visible.filter((person) => person.name === null).map((person) => person.id);
+        const refs = unknown.length > 0 ? await userRefs(config, unknown) : new Map<string, { readonly name: string | null }>();
 
         return {
-            people: shown.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+            people: visible.map((person) => ({ ...person, name: person.name ?? refs.get(person.id)?.name ?? null })),
             total: shown.length,
             counts: { alle: people.length, shop: people.filter((person) => person.shop).length },
             page,

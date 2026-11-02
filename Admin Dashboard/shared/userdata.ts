@@ -1,3 +1,5 @@
+import { GROUP_LABELS } from "./limits.ts";
+
 /**
  * Wo RL Nexus Daten zu einer Person hat (W-0051). Die einzige Stelle, die das
  * weiß: Liste, Profil, Auskunft und später die Löschung lesen nur hier.
@@ -12,8 +14,11 @@ export type UserdataArea = (typeof USERDATA_AREA_IDS)[number];
 export interface IUserdataSource {
     readonly table: string;
     readonly column: string;
-    /** person: die Zeile gehört der Person. team: sie hat etwas für andere getan. json: ihre ID steht in einer JSON-Spalte. */
-    readonly role: "person" | "team" | "json";
+    /**
+     * person: die Zeile gehört der Person. team: sie hat etwas für andere getan.
+     * json: ihre ID steht als String in einer JSON-Spalte. list: in einer Liste mit Kommas.
+     */
+    readonly role: "person" | "team" | "json" | "list";
     readonly guild?: string;
     readonly time?: string;
     readonly label: string;
@@ -23,6 +28,8 @@ export interface IUserdataSource {
     readonly hidden?: readonly string[];
     /** zlib-gepacktes JSON, in der Auskunft entpackt. */
     readonly packed?: readonly string[];
+    /** In der Anzeige stehen Werte aus einer ENUM-Spalte: auf Deutsch übersetzen (`germanLabel`). */
+    readonly words?: true;
 }
 
 export interface IUserdataAreaDef {
@@ -47,9 +54,9 @@ export const USERDATA_AREAS: readonly IUserdataAreaDef[] = [
         sources: [
             { table: "dashboard_credentials", column: "user_id", role: "person", time: "created_at", label: "'Anmeldung im Bot-Dashboard'", name: "username", hidden: ["password", "totp_secret"] },
             { table: "notifications", column: "user_id", role: "person", time: "created_at", label: "title" },
-            { table: "user_codes", column: "user_id", role: "person", time: "created_at", label: "'Code zum Verknüpfen'", hidden: ["code"] },
+            { table: "user_codes", column: "user_id", role: "person", time: "created_at", label: "CONCAT('Feste Ticket-ID ', code)" },
             { table: "voice_presets", column: "user_id", role: "person", time: ms("created_at"), label: "CONCAT('Voice-Vorlage ', name)" },
-            { table: "dashboard_groups", column: "user_id", role: "person", time: "granted_at", label: "CONCAT('Gruppe ', group_name)" },
+            { table: "dashboard_groups", column: "user_id", role: "person", time: "granted_at", label: "CONCAT('Gruppe ', group_name)", words: true },
         ],
     },
     {
@@ -70,14 +77,15 @@ export const USERDATA_AREAS: readonly IUserdataAreaDef[] = [
             { table: "levels", column: "user_id", role: "person", guild: G, time: ms("updated_at"), label: "CONCAT('Level ', level, ' · ', xp, ' XP')" },
             { table: "level_days", column: "user_id", role: "person", guild: G, time: days("day"), label: "CONCAT(xp, ' XP an einem Tag')" },
             { table: "member_activity", column: "user_id", role: "person", guild: G, time: days("day"), label: "CONCAT(messages, ' Nachrichten an einem Tag')" },
-            { table: "level_log", column: "user_id", role: "person", guild: G, time: ms("created_at"), label: "CONCAT('XP ', mode, ' ', amount)" },
+            { table: "level_log", column: "user_id", role: "person", guild: G, time: ms("created_at"), label: "CONCAT('XP ', mode, ' ', amount)", words: true },
+            { table: "level_top", column: "holders", role: "list", guild: G, time: ms("posted_at"), label: "'In der Bestenliste'" },
         ],
     },
     {
         id: "tickets",
         label: "Tickets",
         sources: [
-            { table: "tickets", column: "opener_id", role: "person", guild: G, time: "created_at", label: "CONCAT('Ticket ', number, ' · ', status)" },
+            { table: "tickets", column: "opener_id", role: "person", guild: G, time: "created_at", label: "CONCAT('Ticket ', number, ' · ', status)", words: true },
             { table: "tickets", column: "members", role: "json", guild: G, time: "created_at", label: "CONCAT('Im Ticket ', number)" },
             { table: "ticket_transcripts", column: "opener_id", role: "person", guild: G, time: "created_at", label: "CONCAT('Verlauf von Ticket ', number)", name: "opener_name", packed: ["data"] },
             { table: "ticket_blacklist", column: "user_id", role: "person", guild: G, time: "created_at", label: "'Für Tickets gesperrt'" },
@@ -88,19 +96,20 @@ export const USERDATA_AREAS: readonly IUserdataAreaDef[] = [
         id: "bewerbungen",
         label: "Bewerbungen und Teamsuche",
         sources: [
-            { table: "apply_submissions", column: "user_id", role: "person", guild: G, time: ms("created_at"), label: "CONCAT('Bewerbung · ', status)", name: "user_name" },
+            { table: "apply_submissions", column: "user_id", role: "person", guild: G, time: ms("created_at"), label: "CONCAT('Bewerbung · ', status)", name: "user_name", words: true },
             { table: "lft_requests", column: "user_id", role: "person", guild: G, time: ms("created_at"), label: "title", name: "user_name" },
-            { table: "staff_grants", column: "staff_id", role: "person", guild: G, time: ms("created_at"), label: `CONCAT('Staff-Freigabe · ', ${text("status")})` },
+            { table: "staff_grants", column: "staff_id", role: "person", guild: G, time: ms("created_at"), label: `CONCAT('Staff-Freigabe · ', ${text("status")})`, words: true },
         ],
     },
     {
         id: "moderation",
         label: "Moderation",
         sources: [
-            { table: "mod_cases", column: "target_id", role: "person", guild: G, time: ms("created_at"), label: "CONCAT('Fall ', number, ' · ', action)", name: "target_name" },
-            { table: "av_cases", column: "user_id", role: "person", guild: G, time: ms("created_at"), label: "CONCAT('Anti-Villain · ', status)" },
+            { table: "mod_cases", column: "target_id", role: "person", guild: G, time: ms("created_at"), label: "CONCAT('Fall ', number, ' · ', action)", name: "target_name", words: true },
+            { table: "av_cases", column: "user_id", role: "person", guild: G, time: ms("created_at"), label: "CONCAT('Anti-Villain · ', status)", words: true },
             { table: "av_reports", column: "target_id", role: "person", guild: G, time: ms("at"), label: "'Gemeldet'" },
             { table: "av_trust", column: "user_id", role: "person", guild: G, label: "'Vertrauen gesetzt'" },
+            { table: "av_debris", column: "members", role: "json", guild: G, label: "'Von Anti-Nuke gesichert'" },
         ],
     },
     {
@@ -112,6 +121,8 @@ export const USERDATA_AREAS: readonly IUserdataAreaDef[] = [
             { table: "clip_entries", column: "user_id", role: "person", guild: G, time: ms("created_at"), label: "'Clip eingereicht'", name: "user_name" },
             { table: "clip_votes", column: "user_id", role: "person", time: ms("voted_at"), label: "'Stimme für einen Clip'" },
             { table: "temp_voices", column: "owner_id", role: "person", guild: G, time: ms("created_at"), label: "'Eigener Sprachkanal'" },
+            { table: "giveaways", column: "results", role: "json", guild: G, time: ms("created_at"), label: "CONCAT('Gewinn bei Gewinnspiel ', number)" },
+            { table: "clip_rounds", column: "winners", role: "json", guild: G, time: ms("opened_at"), label: "'Gewinner einer Clip-Runde'" },
         ],
     },
     {
@@ -123,6 +134,8 @@ export const USERDATA_AREAS: readonly IUserdataAreaDef[] = [
             { table: "clubs", column: "leader_id", role: "person", time: "created_at", label: "CONCAT('Leitet Club ', name)" },
             { table: "sixmans_players", column: "user_id", role: "person", guild: G, time: ms("updated_at"), label: "CONCAT('6mans · ', wins, ' Siege')", name: "name" },
             { table: "teams", column: "players", role: "json", guild: G, time: "created_at", label: "CONCAT('Spieler in ', name)" },
+            { table: "sixmans_rounds", column: "blue", role: "json", guild: G, label: "'6mans-Runde, Team Blau'" },
+            { table: "sixmans_rounds", column: "orange", role: "json", guild: G, label: "'6mans-Runde, Team Orange'" },
         ],
     },
     {
@@ -130,8 +143,8 @@ export const USERDATA_AREAS: readonly IUserdataAreaDef[] = [
         label: "Shop",
         sources: [
             { table: "shop_customers", column: "user_id", role: "person", time: "created_at", label: "'Kundenkonto im Shop'", name: "name", hidden: ["oauth_sealed"] },
-            { table: "shop_orders", column: "user_id", role: "person", time: "created_at", label: "CONCAT('Bestellung ', order_no, ' · ', status)" },
-            { table: "shop_grants", column: "user_id", role: "person", time: "created_at", label: "CONCAT('Zugang · ', source)" },
+            { table: "shop_orders", column: "user_id", role: "person", time: "created_at", label: "CONCAT('Bestellung ', order_no, ' · ', status)", words: true },
+            { table: "shop_grants", column: "user_id", role: "person", time: "created_at", label: "CONCAT('Zugang · ', source)", words: true },
             { table: "shop_events", column: "user_id", role: "person", time: "created_at", label: `CONCAT('Shop · ', ${text("kind")})` },
         ],
     },
@@ -169,14 +182,14 @@ export const USERDATA_AREAS: readonly IUserdataAreaDef[] = [
             { table: "contact_messages", column: "handled_by", role: "team", time: "handled_at", label: "CONCAT('Kontakt bearbeitet: ', subject)" },
             { table: "contact_replies", column: "user_id", role: "team", time: "created_at", label: "'Auf eine Kontaktanfrage geantwortet'", name: "user_name" },
             { table: "custom_messages", column: "created_by", role: "team", guild: G, label: "CONCAT('Nachricht angelegt: ', name)" },
-            { table: "dashboard_groups", column: "granted_by", role: "team", time: "granted_at", label: "CONCAT('Gruppe vergeben: ', group_name)" },
+            { table: "dashboard_groups", column: "granted_by", role: "team", time: "granted_at", label: "CONCAT('Gruppe vergeben: ', group_name)", words: true },
             { table: "giveaways", column: "host_id", role: "team", guild: G, time: ms("created_at"), label: "CONCAT('Gewinnspiel ', number)" },
             { table: "guild_settings", column: "moderators", role: "json", guild: G, label: "'Als Moderator eingetragen'" },
-            { table: "level_log", column: "actor_id", role: "team", guild: G, time: ms("created_at"), label: "CONCAT('XP geändert: ', mode, ' ', amount)" },
+            { table: "level_log", column: "actor_id", role: "team", guild: G, time: ms("created_at"), label: "CONCAT('XP geändert: ', mode, ' ', amount)", words: true },
             { table: "lft_requests", column: "closed_by", role: "team", guild: G, time: ms("closed_at"), label: "CONCAT('Teamsuche geschlossen: ', title)" },
             { table: "mail_accounts", column: "created_by", role: "team", time: "created_at", label: "CONCAT('Postfach angelegt: ', address)" },
             { table: "matchups", column: "created_by", role: "team", guild: G, label: "CONCAT('Matchup angelegt: ', opponent)" },
-            { table: "mod_cases", column: "moderator_id", role: "team", guild: G, time: ms("created_at"), label: "CONCAT('Fall ', number, ' bearbeitet · ', action)", name: "moderator_name" },
+            { table: "mod_cases", column: "moderator_id", role: "team", guild: G, time: ms("created_at"), label: "CONCAT('Fall ', number, ' bearbeitet · ', action)", name: "moderator_name", words: true },
             { table: "polls", column: "created_by", role: "team", guild: G, time: ms("created_at"), label: "CONCAT('Umfrage ', number)" },
             { table: "self_role_panels", column: "created_by", role: "team", guild: G, label: "CONCAT('Rollen-Panel angelegt: ', name)" },
             { table: "server_restores", column: "actor_id", role: "team", guild: G, time: ms("started_at"), label: "'Backup zurückgeladen'", name: "actor_name" },
@@ -191,6 +204,11 @@ export const USERDATA_AREAS: readonly IUserdataAreaDef[] = [
             { table: "tickets", column: "claimed_by", role: "team", guild: G, time: "created_at", label: "CONCAT('Ticket ', number, ' übernommen')" },
             { table: "tickets", column: "closed_by", role: "team", guild: G, time: "closed_at", label: "CONCAT('Ticket ', number, ' geschlossen')" },
             { table: "voice_hubs", column: "created_by", role: "team", guild: G, label: "'Voice-Hub angelegt'" },
+            { table: "tickets", column: "notes", role: "json", guild: G, time: "created_at", label: "CONCAT('Notiz in Ticket ', number)" },
+            { table: "tickets", column: "anonymous", role: "json", guild: G, time: "created_at", label: "CONCAT('Ticket ', number, ' anonym beantwortet')" },
+            { table: "ticket_transcripts", column: "meta", role: "json", guild: G, time: "created_at", label: "CONCAT('Im Verlauf von Ticket ', number)" },
+            { table: "mod_cases", column: "notes", role: "json", guild: G, time: ms("created_at"), label: "CONCAT('Notiz zu Fall ', number)" },
+            { table: "staff_grants", column: "data", role: "json", guild: G, time: ms("created_at"), label: "'Bei einer Staff-Freigabe gefragt'" },
         ],
     },
 ];
@@ -204,6 +222,42 @@ export const USERDATA_IGNORED: Readonly<Record<string, string>> = {
     "level_backfill.last_user": "Arbeitsstand der Nachberechnung, keine Daten über die Person",
     "mail_accounts.imap_host": "Adresse des Mailservers",
     "mail_accounts.smtp_host": "Adresse des Mailservers",
+    // JSON-, Text- und Blob-Spalten. `tabelle.*` gilt nur für diese, nie für Spalten mit Personen-Namen.
+    "mail_accounts.secret": "Zugangsdaten eines Postfachs, nie in der Auskunft",
+    "shop_customers.oauth_sealed": "Geheimnis, nie in der Auskunft",
+    "mod_cases.details": "Inhalt des Falls, gehört zur Person aus target_id",
+    "mod_cases.evidence": "Belege des Falls, gehören zur Person aus target_id",
+    "av_debris.data": "gelöschte Kanäle und Rollen",
+    "apply_forms.*": "Formular und Einstellungen",
+    "auto_responses.*": "Inhalt und Einstellungen einer Auto-Antwort",
+    "custom_messages.*": "Inhalt und Einstellungen einer Nachricht",
+    "self_role_panels.*": "Text und Rollen eines Panels",
+    "role_lists.*": "Einstellungen einer Rollenliste",
+    "stream_notifiers.*": "Einstellungen einer Stream-Meldung",
+    "voice_hubs.*": "Einstellungen eines Voice-Hubs",
+    "module_settings.*": "Einstellungen eines Moduls",
+    "mod_settings.*": "Einstellungen der Moderation",
+    "ticket_settings.*": "Einstellungen der Tickets",
+    "guild_settings.*": "Einstellungen des Servers; Moderatoren stehen als Quelle moderators",
+    "polls.*": "Fragen, Einstellungen und Ergebnis als Zahlen; Stimmen stehen in poll_votes",
+    "giveaways.*": "Bedingungen und Einstellungen; Gewinner stehen als Quelle results",
+    "clip_rounds.*": "Preise der Runde; Gewinner stehen als Quelle winners",
+    "sixmans_rounds.*": "names, before_mmr und reports nennen dieselben Personen wie blue und orange; channels sind Kanäle",
+    "teams.*": "Einstellungen des Teams; Spieler stehen als Quelle players",
+    "matchups.*": "Notiz und Ergebnis eines Matchups",
+    "shop_products.*": "Produkt im Shop",
+    "server_restores.*": "Zustand eines Zurückladens",
+    "av_incidents.*": "Zustand eines Anti-Nuke-Vorfalls",
+    "av_cases.*": "Inhalt des Falls, gehört zur Person aus user_id",
+    "apply_submissions.*": "Antworten, gehören zur Person aus user_id",
+    "lft_requests.*": "Antworten, gehören zur Person aus user_id",
+    "epic_name_cases.*": "gehört zur Person aus user_id",
+    "player_profiles.*": "gehört zur Person aus user_id",
+    "voice_presets.*": "gehört zur Person aus user_id",
+    "temp_voices.*": "Einstellungen des Kanals, gehört zur Person aus owner_id",
+    "contact_messages.*": "Inhalt der Nachricht, gehört zur Zeile",
+    "contact_replies.*": "Inhalt der Antwort, gehört zur Zeile",
+    "status_incident_updates.*": "Text einer Statusmeldung",
 };
 
 /** Name einer Spalte, die eine Discord-ID einer Person hält (für VARCHAR, CHAR, BIGINT). */
@@ -211,6 +265,43 @@ export const PERSON_COLUMN = /(^|_)(user|target|moderator|owner|actor|opener|lea
 
 /** Bis W-0009 klärt, was rechtlich bleiben muss (Spec Teil 3, „Was bleibt“). */
 export const USERDATA_DEFAULT_KEEP: Readonly<Partial<Record<UserdataArea, string>>> = { shop: "zu klären", moderation: "zu klären", protokoll: "zu klären" };
+
+/** Werte aus ENUM-Spalten, die in Anzeigen stehen. Unbekanntes bleibt, wie es ist. */
+const WORDS: Readonly<Record<string, string>> = {
+    open: "offen",
+    closed: "geschlossen",
+    pending: "wartet",
+    paid: "bezahlt",
+    refunded: "erstattet",
+    failed: "fehlgeschlagen",
+    accepted: "angenommen",
+    declined: "abgelehnt",
+    released: "freigegeben",
+    trusted: "vertraut",
+    banned: "gebannt",
+    kicked: "gekickt",
+    frozen: "eingefroren",
+    ban: "Bann",
+    unban: "Entbannung",
+    kick: "Kick",
+    timeout: "Timeout",
+    untimeout: "Timeout aufgehoben",
+    warn: "Verwarnung",
+    unwarn: "Verwarnung zurückgenommen",
+    purge: "Nachrichten gelöscht",
+    add: "dazu",
+    set: "gesetzt",
+    reset: "zurückgesetzt",
+    trial: "Test",
+    one_time: "Einmalkauf",
+    subscription: "Abo",
+    gift: "Geschenk",
+    ...GROUP_LABELS,
+};
+
+export function germanLabel(label: string): string {
+    return label.replace(/\b[a-z_]+\b/g, (word) => WORDS[word] ?? word);
+}
 
 export function sourcesOf(area?: UserdataArea): IUserdataSource[] {
     return USERDATA_AREAS.filter((entry) => area === undefined || entry.id === area).flatMap((entry) => entry.sources);

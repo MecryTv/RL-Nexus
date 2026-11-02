@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { PERSON_COLUMN, USERDATA_AREA_IDS, USERDATA_AREAS, USERDATA_DEFAULT_KEEP, sourcesOf, type IUserdataSource } from "../../shared/userdata.ts";
+import { PERSON_COLUMN, USERDATA_AREA_IDS, USERDATA_AREAS, USERDATA_DEFAULT_KEEP, germanLabel, sourcesOf, type IUserdataSource } from "../../shared/userdata.ts";
 import { buildApp } from "../app.ts";
 import { SESSION_COOKIE, seal } from "../session.ts";
 import { matchSql, matchValue } from "../userdata/find.ts";
@@ -25,11 +25,11 @@ export async function checkUserdata(): Promise<void> {
 
     await check("Jede Spalte sieht aus wie eine Personen-ID, außer IDs in JSON", () => {
         const odd = sourcesOf()
-            .filter((source) => source.role !== "json" && !PERSON_COLUMN.test(source.column))
+            .filter((source) => (source.role === "person" || source.role === "team") && !PERSON_COLUMN.test(source.column))
             .map((source) => `${source.table}.${source.column}`);
 
         assert.deepEqual(odd, []);
-        assert.ok(sourcesOf("team").every((source) => source.role !== "person"), "im Bereich team nur Handelnde und JSON");
+        assert.ok(sourcesOf("team").every((source) => source.role !== "person"), "im Bereich team nur Handelnde und IDs in Listen");
     });
 
     await check("Geheimes kommt nie in die Auskunft", () => {
@@ -44,12 +44,24 @@ export async function checkUserdata(): Promise<void> {
         assert.deepEqual(USERDATA_DEFAULT_KEEP, { shop: "zu klären", moderation: "zu klären", protokoll: "zu klären" });
     });
 
+    await check("Anzeigen auf Deutsch: Zustände, Aktionen und Gruppen", () => {
+        assert.equal(germanLabel("Ticket 12 · closed"), "Ticket 12 · geschlossen");
+        assert.equal(germanLabel("Fall 3 · warn"), "Fall 3 · Verwarnung");
+        assert.equal(germanLabel("Gruppe administrator"), "Gruppe Administrator");
+        assert.equal(germanLabel("XP add 50"), "XP dazu 50");
+        assert.equal(germanLabel("Bewerbung · accepted"), "Bewerbung · angenommen");
+        assert.equal(germanLabel("Etwas ganz anderes"), "Etwas ganz anderes");
+    });
+
     await check("Treffer: in JSON nur die ganze ID in Anführungszeichen, sonst genau gleich", () => {
         const json: IUserdataSource = { table: "tickets", column: "members", role: "json", label: "'x'" };
         const plain: IUserdataSource = { table: "levels", column: "user_id", role: "person", label: "'x'" };
 
         assert.deepEqual([matchSql(json), matchValue(json, "123")], ["members LIKE ?", '%"123"%']);
         assert.deepEqual([matchSql(plain), matchValue(plain, "123")], ["user_id = ?", "123"]);
+
+        const list: IUserdataSource = { table: "level_top", column: "holders", role: "list", label: "'x'" };
+        assert.deepEqual([matchSql(list), matchValue(list, "123")], ["FIND_IN_SET(?, holders) > 0", "123"]);
     });
 
     const app = await buildApp(config);
