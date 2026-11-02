@@ -199,6 +199,15 @@ Je Bereich stellt das Team im Bereich Datenschutz ein: **löschen** oder **behal
 
 Ein Abschnitt beschreibt den Weg: Anfrage an das Team, DM mit Vorlauf, Kopie möglich, „Das war ich nicht“, Bestätigung. Text erst nach W-0009 endgültig.
 
+### Ergänzung vom 02.11.: Wer zählt und löscht, zwei Schritte
+
+Wahl des Nutzers vor dem Plan:
+
+- **Das Admin Dashboard zählt, gibt Auskunft und löscht**, per SQL über eine Liste aller Bereiche (`shared/userdata.ts`), so wie es für Backups die Bot-Tabellen schon direkt liest und schreibt. Es zeichnet auch die DM-Bilder (wie die Statusbilder aus W-0052). Der Bot beantwortet nur die Knöpfe der DMs und vergisst nach einer Löschung seine Zwischenspeicher zu der Person. Die Prüfung, dass keine Tabelle fehlt, läuft in `check:db` des Admin Dashboards gegen die echte Datenbank; ein `check:userdata` im Bot entfällt. Das ersetzt die Aufteilung unter „Wer was tut“.
+- **Zwei Schritte mit je eigenem Plan und Branch:** 3a „Finden und Auskunft“ (Bereich Datenschutz, Liste, Profil, Auskunft als JSON, Was bleibt, Prüfung), danach 3b „Löschung“ (Frist, Uhr, DMs, Knöpfe, Ausführen, Beleg, Seite Löschungen, Datenschutzerklärung).
+
+Entscheidungen von Claude dazu (Liste am Ende, 32 bis 36).
+
 ---
 
 ## Teil 4: Dauerhafte Sperre mit VPN-Erkennung (W-0057)
@@ -402,3 +411,8 @@ Wunsch vom 02.11.: „verbesser die Suche, sodass man quasi alles auf dem Admin 
 29. **Mails über die Suche des Mailservers** (wie im Postfach, mit Text), ohne Falten der Umlaute: Die Umschläge selbst zu laden und zu falten hieße bei jedem Tastendruck alle Postfächer durchzugehen.
 30. **Ziel bei mehreren Fundorten: Kunde vor Gruppe vor Beta.** Beim Kunden steht am meisten über die Person.
 31. **Kein neues Suchfeld auf der Beta-Seite** und keine Hervorhebung auf den Zielseiten; der Treffer selbst zeigt den Inhalt.
+32. **Wer etwas für andere getan hat** (Ersteller, Bearbeiter, Moderator, „vergeben von“), steht in einem eigenen Bereich „Als Team aktiv“. Beim Löschen (3b) werden diese Spalten geleert, die Zeilen bleiben: Sonst verschwänden Panels, Fälle oder Bewerbungen anderer Personen.
+33. **„Server“ im Profil heißt: Server mit Daten der Person.** Ob sie dort noch Mitglied ist, weiß das Admin Dashboard nicht ohne Mitgliederliste; die ist im Bot optional (GuildMembers ist privilegiert). Der Filter „Nicht mehr auf Servern“ kommt deshalb später, zusammen mit W-0057, das die Mitglieder auch braucht.
+34. **Eigene Seite „Was bleibt“** im Bereich Datenschutz für „löschen“ oder „behalten“ je Bereich, statt die Einstellung im Profil zu verstecken.
+35. **Die Liste aller Personen rechnet der Server** aus allen Bereichen und hält sie 5 Minuten. Bei vielen Tausend Personen wird daraus später eine eigene Tabelle.
+36. **Auskunft ohne Geheimnisse:** Passwort-Hashes, 2FA-Schlüssel und OAuth-Token stehen nicht im JSON; Transcripts kommen entpackt und lesbar.
