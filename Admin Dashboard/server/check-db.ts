@@ -9,6 +9,7 @@
  * deren Zeitstempel Jahrhunderte in der Zukunft läge (Discord kann sie nicht
  * vergeben haben), und Betreffe mit "check:db". Am Ende ist alles wieder weg.
  */
+import { deflateSync } from "node:zlib";
 import assert from "node:assert/strict";
 import { copyFile, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -17,7 +18,7 @@ import type { Transporter } from "nodemailer";
 import type { Options } from "nodemailer/lib/mailer/index.js";
 import type { IAuditPage, IDbRows, IDbTable, IGroupList, IMailAllPage, IMailOverview, IOverview, ITech } from "../shared/api.ts";
 import type { ISearchResult } from "../shared/search.ts";
-import { PERSON_COLUMN, USERDATA_IGNORED, sourcesOf } from "../shared/userdata.ts";
+import { PERSON_COLUMN, USERDATA_IGNORED, sourcesOf, type IUserdataList, type IUserdataProfile, type IUserdataRule } from "../shared/userdata.ts";
 import type { ICancelReceipt, ICheckoutStart, ICustomerDetail, ICustomerList, IShopProduct, IShopProductList, IShopSettingsView, IShopState, IUnlockProgress } from "../shared/shop.ts";
 import type { IIncidentList, IPublicStatus, IStatusDetail } from "../shared/status.ts";
 import { buildApp } from "./app.ts";
@@ -701,7 +702,7 @@ try {
         return answer.json() as ISearchResult;
     };
 
-    await check("Suche: Person in Gruppe, als Kunde und in Beta ist eine Zeile, Ziel ist der Kunde", async () => {
+    await check("Suche: Person in Gruppe, als Kunde und in Beta ist eine Zeile, Ziel ist die Nutzeransicht", async () => {
         const person = IDS[3];
 
         await query("INSERT INTO dashboard_groups (user_id, group_name, granted_by, note) VALUES (?, 'partner', ?, NULL)", [person, USERS.admin]);
@@ -715,7 +716,8 @@ try {
             assert.equal(hits.length, 1, JSON.stringify(result));
             assert.equal(hits[0].title, "check Suche");
             for (const place of ["Gruppe Partner", "Kunde", "Beta"]) assert.ok(hits[0].context.includes(place), hits[0].context);
-            assert.ok(hits[0].href.startsWith("/shop/kunden?q="), hits[0].href);
+            // Mit Teil 3 (W-0051) öffnet eine Person ihre Nutzeransicht.
+            assert.equal(hits[0].href, `/datenschutz/${person}`);
             assert.ok(!JSON.stringify(result).includes("check-suche@example.test"), "keine volle Mail");
         } finally {
             await query("DELETE FROM beta_members WHERE user_id = ?", [person]);
@@ -793,6 +795,117 @@ try {
 
         assert.deepEqual(broken, []);
     });
+
+    // Eigene IDs: 18 Ziffern, damit eine 19-stellige ID sie als Teilstring enthalten kann.
+    const PERSON = "999999999999999993";
+    const DECOY = "9999999999999999931";
+    const TEST_GUILD = "999999999999999990";
+    const [savedLevelRule] = await query<{ keep: number; note: string | null }[]>("SELECT keep, note FROM userdata_rules WHERE area = 'level'").catch(() => []);
+    const userdataTidy = async (): Promise<void> => {
+        for (const table of ["levels", "member_activity", "tickets", "ticket_transcripts", "mod_cases"]) await query(`DELETE FROM ${table} WHERE guild_id = ?`, [TEST_GUILD]);
+        for (const table of ["shop_events", "shop_customers"]) await query(`DELETE FROM ${table} WHERE user_id = ?`, [PERSON]);
+        await query("DELETE FROM admin_audit WHERE action LIKE 'userdata.%' AND target IN (?, 'level')", [PERSON]);
+    };
+    const profileOf = async (id: string): Promise<IUserdataProfile> => {
+        const answer = await get(`/api/userdata/${id}`);
+        assert.equal(answer.statusCode, 200, answer.body);
+
+        return answer.json() as IUserdataProfile;
+    };
+    const rowsIn = (profile: IUserdataProfile, area: string): number => profile.areas.find((entry) => entry.id === area)?.rows ?? 0;
+
+    await userdataTidy();
+
+    try {
+        const now = Date.now();
+        const transcript = deflateSync(Buffer.from(JSON.stringify({ messages: [{ content: "check:db hallo" }] })));
+
+        await query("INSERT INTO levels (guild_id, user_id, xp, level, updated_at) VALUES (?, ?, 1000, 5, ?), (?, ?, 50, 1, ?)", [TEST_GUILD, PERSON, now, TEST_GUILD, DECOY, now]);
+        const ticket = await query<{ insertId: number }>("INSERT INTO tickets (guild_id, number, option_id, opener_id, members, notes, anonymous) VALUES (?, 1, 'check', ?, '[]', '[]', '[]')", [TEST_GUILD, PERSON]);
+        await query("INSERT INTO tickets (guild_id, number, option_id, opener_id, members, notes, anonymous) VALUES (?, 2, 'check', ?, ?, '[]', '[]')", [TEST_GUILD, DECOY, JSON.stringify([DECOY])]);
+        await query("INSERT INTO ticket_transcripts (ticket_id, guild_id, number, opener_id, opener_name, meta, data, closed_at) VALUES (?, ?, 1, ?, 'check Person', '{}', ?, ?)", [Number(ticket.insertId), TEST_GUILD, PERSON, transcript, now]);
+        await query("INSERT INTO mod_cases (guild_id, number, action, target_id, moderator_id, moderator_name, details, evidence, notes, created_at) VALUES (?, 1, 'warn', ?, ?, 'check Person', '{}', '[]', '[]', ?)", [TEST_GUILD, DECOY, PERSON, now]);
+        await records.upsertCustomer({ id: PERSON, name: "check Person", email: "check-person@example.test" });
+
+        await check("Nutzerdaten: Liste und Profil zählen je Bereich", async () => {
+            const list = (await get(`/api/userdata?q=${PERSON}`)).json() as IUserdataList;
+            const found = list.people.find((entry) => entry.id === PERSON);
+
+            assert.ok(found, JSON.stringify(list));
+            assert.ok(found.rows >= 5, `${found.rows} Zeilen`);
+            assert.equal(found.shop, true);
+
+            const profile = await profileOf(PERSON);
+            assert.deepEqual(
+                ["level", "tickets", "team", "shop", "moderation"].map((area) => rowsIn(profile, area)),
+                [1, 2, 1, 1, 0]
+            );
+            assert.ok(profile.servers.some((server) => server.id === TEST_GUILD));
+        });
+
+        await check("Nutzerdaten: nur genaue Treffer, keine ID als Teilstring", async () => {
+            const profile = await profileOf(PERSON);
+
+            assert.equal(rowsIn(profile, "level"), 1);
+            assert.ok(profile.timeline.every((row) => !row.label.includes("Ticket 2")), "Ticket 2 gehört DECOY");
+        });
+
+        await check("Nutzerdaten: Auskunft ohne Geheimnisse, Transcript lesbar, steht im Protokoll", async () => {
+            // Das OAuth-Token des Shop-Kunden ist geheim (dashboard_credentials gibt es nicht in jeder Datenbank).
+            await query("UPDATE shop_customers SET oauth_sealed = 'check-oauth-geheim' WHERE user_id = ?", [PERSON]);
+
+            const answer = await get(`/api/userdata/${PERSON}/auskunft`);
+            assert.equal(answer.statusCode, 200, answer.body);
+            assert.match(String(answer.headers["content-disposition"]), /^attachment; filename="rl-nexus-999999999999999993-\d{4}-\d{2}-\d{2}\.json"$/);
+            assert.ok(!answer.body.includes("check-oauth-geheim") && !answer.body.includes("oauth_sealed"), "kein OAuth-Token");
+            assert.ok(answer.body.includes("check:db hallo"), "Transcript entpackt");
+
+            const [row] = await query<{ n: number }[]>("SELECT COUNT(*) AS n FROM admin_audit WHERE action = 'userdata.export' AND target = ?", [PERSON]);
+            assert.equal(Number(row.n), 1);
+        });
+
+        await check("Nutzerdaten: 500 Tage Aktivität, die Zeitleiste zeigt die neuesten 100", async () => {
+            const values = Array.from({ length: 500 }, (_, day) => [TEST_GUILD, PERSON, 20_000 + day]);
+            await query(`INSERT INTO member_activity (guild_id, user_id, day) VALUES ${values.map(() => "(?, ?, ?)").join(", ")}`, values.flat());
+
+            const profile = await profileOf(PERSON);
+            assert.equal(profile.timeline.length, 100);
+            assert.equal(rowsIn(profile, "level"), 501);
+
+            const copy = (await get(`/api/userdata/${PERSON}/auskunft`)).json() as { bereiche: Record<string, Record<string, unknown[]>> };
+            assert.equal(copy.bereiche.level["member_activity.user_id"].length, 500);
+        });
+
+        await check("Nutzerdaten: Was bleibt hat Vorgaben und lässt sich ändern", async () => {
+            const rules = (await get("/api/userdata/regeln")).json() as IUserdataRule[];
+            assert.deepEqual(
+                rules.filter((rule) => rule.keep).map((rule) => [rule.area, rule.note]),
+                [
+                    ["moderation", "zu klären"],
+                    ["shop", "zu klären"],
+                    ["protokoll", "zu klären"],
+                ]
+            );
+
+            assert.equal((await write("PUT", "/api/userdata/regeln/level", { keep: true, note: null })).statusCode, 400);
+            assert.equal((await write("PUT", "/api/userdata/regeln/level", { keep: true, note: "check:db bleibt" })).statusCode, 204);
+            assert.equal((await profileOf(PERSON)).areas.find((area) => area.id === "level")?.keep, "check:db bleibt");
+
+            const [row] = await query<{ n: number }[]>("SELECT COUNT(*) AS n FROM admin_audit WHERE action = 'userdata.rules' AND target = 'level'");
+            assert.equal(Number(row.n), 1);
+        });
+
+        await check("Suche: eine Person mit ID öffnet ihre Nutzeransicht", async () => {
+            const hit = (await searchAs(cookie, PERSON, "personen")).hits.find((entry) => entry.title === "check Person");
+
+            assert.equal(hit?.href, `/datenschutz/${PERSON}`);
+        });
+    } finally {
+        await userdataTidy();
+        if (savedLevelRule) await query("INSERT INTO userdata_rules (area, keep, note) VALUES ('level', ?, ?) ON DUPLICATE KEY UPDATE keep = VALUES(keep), note = VALUES(note)", [savedLevelRule.keep, savedLevelRule.note]);
+        else await query("DELETE FROM userdata_rules WHERE area = 'level'").catch(() => undefined);
+    }
+
 
     section("Statusmeldung in Discord");
 

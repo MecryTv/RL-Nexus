@@ -64,8 +64,6 @@ interface IPerson {
     name: string | null;
     email: string | null;
     readonly places: string[];
-    /** 1 Kunde, 2 Gruppe, 3 Beta: wohin Enter führt (Entscheidung 30). */
-    target: { readonly order: number; readonly path: string };
 }
 
 /** Gruppen, Kunden und Beta, je Discord-ID eine Zeile. */
@@ -74,24 +72,23 @@ async function findPersons(text: string): Promise<ISearchHit[]> {
 
     const [groups, customers, testers] = await Promise.all([query<{ user_id: string; group_name: string }[]>("SELECT user_id, group_name FROM dashboard_groups"), allCustomers(), listTesters()]);
     const people = new Map<string, IPerson>();
-    const person = (id: string, order: number, path: string): IPerson => {
-        const entry = people.get(id) ?? { id, name: null, email: null, places: [], target: { order, path } };
+    const person = (id: string): IPerson => {
+        const entry = people.get(id) ?? { id, name: null, email: null, places: [] };
 
-        if (order < entry.target.order) entry.target = { order, path };
         people.set(id, entry);
 
         return entry;
     };
 
     for (const { customer } of customers) {
-        const entry = person(customer.userId, 1, "/shop/kunden");
+        const entry = person(customer.userId);
 
         entry.name = customer.name;
         entry.email = customer.email;
         entry.places.push("Kunde");
     }
-    for (const row of groups) person(row.user_id, 2, "/gruppen").places.push(`Gruppe ${GROUP_LABELS[row.group_name as Group] ?? row.group_name}`);
-    for (const tester of testers) person(tester.userId, 3, "/beta").places.push("Beta");
+    for (const row of groups) person(row.user_id).places.push(`Gruppe ${GROUP_LABELS[row.group_name as Group] ?? row.group_name}`);
+    for (const tester of testers) person(tester.userId).places.push("Beta");
 
     const wanted = fold(text);
 
@@ -100,10 +97,8 @@ async function findPersons(text: string): Promise<ISearchHit[]> {
             const name = entry.name ?? knownName(entry.id);
             const title = name ?? entry.id;
             const context = [...entry.places, ...(entry.email ? [maskEmail(entry.email)] : [])].join(" · ");
-            // Die Beta-Seite hat kein Suchfeld (Entscheidung 31).
-            const href = entry.target.order === 3 ? entry.target.path : `${entry.target.path}?q=${encodeURIComponent(name ?? entry.id)}`;
-
-            return { kind: "personen", icon: "users", title, place: "Person", context, href, at: null, rank: rankOf(title, `${context} ${entry.id} ${entry.email ?? ""}`, wanted) ?? -1 };
+            // Mit Teil 3 (W-0051) zeigt jede Person auf ihre Nutzeransicht (Spec-Entscheidung 20).
+            return { kind: "personen", icon: "users", title, place: "Person", context, href: `/datenschutz/${entry.id}`, at: null, rank: rankOf(title, `${context} ${entry.id} ${entry.email ?? ""}`, wanted) ?? -1 };
         })
     );
 }

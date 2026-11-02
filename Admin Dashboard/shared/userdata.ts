@@ -215,3 +215,60 @@ export const USERDATA_DEFAULT_KEEP: Readonly<Partial<Record<UserdataArea, string
 export function sourcesOf(area?: UserdataArea): IUserdataSource[] {
     return USERDATA_AREAS.filter((entry) => area === undefined || entry.id === area).flatMap((entry) => entry.sources);
 }
+
+/* --- Was die Seiten bekommen ------------------------------------------- */
+
+export interface IUserdataPerson {
+    readonly id: string;
+    /** Aus Discord, sonst der zuletzt gespeicherte. */
+    readonly name: string | null;
+    readonly rows: number;
+    /** Server mit Daten der Person. */
+    readonly servers: number;
+    readonly lastAt: string | null;
+    readonly shop: boolean;
+}
+
+export const USERDATA_FILTERS = ["alle", "shop"] as const;
+export type UserdataFilter = (typeof USERDATA_FILTERS)[number];
+
+export interface IUserdataList {
+    readonly people: readonly IUserdataPerson[];
+    readonly total: number;
+    readonly counts: Readonly<Record<UserdataFilter, number>>;
+    readonly page: number;
+    readonly pageSize: number;
+}
+
+export interface IUserdataRow {
+    readonly area: UserdataArea;
+    readonly table: string;
+    readonly role: IUserdataSource["role"];
+    readonly label: string;
+    readonly guildId: string | null;
+    readonly guildName: string | null;
+    readonly at: string | null;
+}
+
+export interface IUserdataProfile {
+    readonly id: string;
+    readonly name: string | null;
+    readonly avatar: string | null;
+    readonly firstAt: string | null;
+    readonly lastAt: string | null;
+    readonly servers: readonly { readonly id: string; readonly name: string | null; readonly rows: number }[];
+    /** Je Bereich die Zahl, die ersten drei Einträge und der Satz, wenn er bleibt. */
+    readonly areas: readonly { readonly id: UserdataArea; readonly label: string; readonly rows: number; readonly first: readonly string[]; readonly keep: string | null }[];
+    /** Die neuesten 100. */
+    readonly timeline: readonly IUserdataRow[];
+    readonly audit: readonly { readonly action: string; readonly by: string; readonly at: string; readonly detail: string | null }[];
+}
+
+export interface IUserdataRule {
+    readonly area: UserdataArea;
+    readonly label: string;
+    readonly keep: boolean;
+    readonly note: string | null;
+}
+
+export const USERDATA_NOTE_MAX = 200;
