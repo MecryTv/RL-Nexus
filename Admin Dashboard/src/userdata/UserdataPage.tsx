@@ -14,7 +14,7 @@ import { formatDate, formatDateTime, formatNumber } from "../format";
 import { useTitle } from "../useTitle";
 import styles from "./userdata.module.scss";
 
-const FILTER_LABELS: Readonly<Record<UserdataFilter, string>> = { alle: "Alle", shop: "Shop-Kunden" };
+const FILTER_LABELS: Readonly<Record<UserdataFilter, string>> = { alle: "Alle", laeuft: "Löschung läuft", shop: "Shop-Kunden" };
 const TABS = [
     { id: "bereiche", label: "Bereiche" },
     { id: "zeitleiste", label: "Zeitleiste" },

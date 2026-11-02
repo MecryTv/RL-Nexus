@@ -117,6 +117,8 @@ export interface IOverview {
     readonly statusPost: { readonly channels: number; readonly at: string | null };
     /** Die letzten fünf Einträge im Protokoll. Leer ohne Datenbank. */
     readonly recent: readonly IRecentAction[];
+    /** Angehaltene Löschungen von Nutzerdaten (W-0051): „Das war ich nicht“, das Team muss sich kümmern. */
+    readonly halted: number;
 }
 
 /** Ein eingeschalteter Wartungsmodus. Beides null, wenn die Datei da, aber unlesbar ist: an ist er trotzdem. */

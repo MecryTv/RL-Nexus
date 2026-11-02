@@ -323,9 +323,11 @@ export interface IUserdataPerson {
     readonly servers: number;
     readonly lastAt: string | null;
     readonly shop: boolean;
+    /** Offene Löschung (Teil 3b): Stand und Frist, sonst null. */
+    readonly deletion?: { readonly state: DeletionState; readonly dueAt: string } | null;
 }
 
-export const USERDATA_FILTERS = ["alle", "shop"] as const;
+export const USERDATA_FILTERS = ["alle", "laeuft", "shop"] as const;
 export type UserdataFilter = (typeof USERDATA_FILTERS)[number];
 
 export interface IUserdataList {
@@ -358,6 +360,8 @@ export interface IUserdataProfile {
     /** Die neuesten 100. */
     readonly timeline: readonly IUserdataRow[];
     readonly audit: readonly { readonly action: string; readonly by: string; readonly at: string; readonly detail: string | null }[];
+    /** Die offene Löschung, sonst die zuletzt angelegte (Teil 3b). */
+    readonly deletion: IDeletion | null;
 }
 
 export interface IUserdataRule {

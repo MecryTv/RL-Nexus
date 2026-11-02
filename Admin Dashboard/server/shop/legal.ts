@@ -106,7 +106,7 @@ export function legalDay(version: string): string {
 }
 
 /** Die Standardschriften von PDF können nur WinAnsi. Was darin fehlt, wird ersetzt statt als Kästchen gedruckt. */
-function pdfSafe(text: string): string {
+export function pdfSafe(text: string): string {
     return text
         .replace(/[‐‑−]/g, "-")
         .replace(/[  ]/g, " ")

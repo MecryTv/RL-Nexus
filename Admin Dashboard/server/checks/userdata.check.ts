@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { PERSON_COLUMN, USERDATA_AREA_IDS, USERDATA_AREAS, USERDATA_DEFAULT_KEEP, germanLabel, sourcesOf, type IUserdataSource } from "../../shared/userdata.ts";
 import { buildApp } from "../app.ts";
+import { signToken } from "../bot.ts";
 import { SESSION_COOKIE, seal } from "../session.ts";
 import { postDirectMessage, removeButtons } from "../discord.ts";
 import { DM_KINDS, deletionMessage, renderDeletionImage, type IDmInput } from "../userdata/dm.ts";
@@ -186,6 +187,24 @@ export async function checkUserdata(): Promise<void> {
     const get = (url: string) => app.inject({ method: "GET", url, headers: { cookie } });
 
     try {
+        await check("Löschung planen: ohne Bestätigung oder mit zu kurzer Frist 400, vor der Datenbank", async () => {
+            const post = (body: unknown) =>
+                app.inject({ method: "POST", url: "/api/userdata/123456789012345678/loeschung", headers: { cookie, origin: config.publicUrl, "content-type": "application/json" }, payload: JSON.stringify(body) });
+            const soon = (minutes: number): string => new Date(Date.now() + minutes * 60_000).toISOString();
+
+            assert.equal((await post({ dueAt: soon(10), reason: "Anfrage" })).statusCode, 400);
+            assert.equal((await post({ dueAt: soon(10), reason: "Anfrage", confirm: "123" })).statusCode, 400);
+            assert.equal((await post({ dueAt: soon(4), reason: "Anfrage", confirm: "123456789012345678" })).statusCode, 400);
+            assert.equal((await post({ dueAt: soon(10), reason: "", confirm: "123456789012345678" })).statusCode, 400);
+        });
+
+        await check("Knöpfe des Bots: ohne Token oder mit fremdem Scope 401", async () => {
+            const knock = (authorization?: string) => app.inject({ method: "POST", url: "/internal/userdata/1/stop", headers: authorization ? { authorization } : {} });
+
+            assert.equal((await knock()).statusCode, 401);
+            assert.equal((await knock(`Bearer ${signToken(SECRET, "discord:123456789012345678", ["beta"])}`)).statusCode, 401);
+        });
+
         await check("Nutzerdaten ohne Datenbank: 503, eine falsche ID vorher 400", async () => {
             assert.equal((await get("/api/userdata/abc")).statusCode, 400);
             assert.equal((await get("/api/userdata")).statusCode, 503);

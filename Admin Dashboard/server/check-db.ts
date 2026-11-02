@@ -18,10 +18,12 @@ import type { Transporter } from "nodemailer";
 import type { Options } from "nodemailer/lib/mailer/index.js";
 import type { IAuditPage, IDbRows, IDbTable, IGroupList, IMailAllPage, IMailOverview, IOverview, ITech } from "../shared/api.ts";
 import type { ISearchResult } from "../shared/search.ts";
-import { PERSON_COLUMN, USERDATA_IGNORED, sourcesOf, type IUserdataList, type IUserdataProfile, type IUserdataRule } from "../shared/userdata.ts";
+import { PERSON_COLUMN, USERDATA_IGNORED, sourcesOf, type IDeletion, type IUserdataList, type IUserdataProfile, type IUserdataRule } from "../shared/userdata.ts";
 import { forgetIndex, personIndex, rowsOf } from "./userdata/find.ts";
 import { cancelDeletion, claimDeletion, deletionCounts, deletionOf, dueDeletions, listDeletions, markCopy, openDeletionOf, planDeletion, stopDeletion } from "./userdata/deletions.ts";
 import { executeDeletion } from "./userdata/erase.ts";
+import { signToken } from "./bot.ts";
+import { deletionRound } from "./userdata/clock.ts";
 import type { ICancelReceipt, ICheckoutStart, ICustomerDetail, ICustomerList, IShopProduct, IShopProductList, IShopSettingsView, IShopState, IUnlockProgress } from "../shared/shop.ts";
 import type { IIncidentList, IPublicStatus, IStatusDetail } from "../shared/status.ts";
 import { buildApp } from "./app.ts";
@@ -1141,6 +1143,159 @@ try {
         });
     } finally {
         await eraseTidy();
+    }
+
+    section("Nutzerdaten: Löschung über Routen, Knöpfe und Uhr");
+
+    const P1 = "9999999999999999989";
+    const P2 = "9999999999999999988";
+    const P3 = "9999999999999999987";
+    const ROUTE_GUILD = "9999999999999999986";
+    const [{ id: routeAuditBefore }] = await query<{ id: number | null }[]>("SELECT COALESCE(MAX(id), 0) AS id FROM admin_audit");
+    const routeTidy = async (): Promise<void> => {
+        await query("DELETE FROM levels WHERE guild_id = ?", [ROUTE_GUILD]);
+        await query("DELETE FROM userdata_deletions WHERE user_id IN (?, ?, ?)", [P1, P2, P3]);
+        await query("DELETE FROM admin_audit WHERE id > ? AND action LIKE 'userdata.%'", [Number(routeAuditBefore)]);
+    };
+    /** Discord nachgestellt: DM-Kanal, Nachricht, Ändern; Profile unbekannt. refuse: Die Person nimmt keine DMs an. */
+    const withDms = async (refuse: boolean, run: (sent: { url: string; body: string }[]) => Promise<void>): Promise<void> => {
+        const real = globalThis.fetch;
+        const sent: { url: string; body: string }[] = [];
+        const json = (body: unknown, status = 200): Response => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+
+        globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+            const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+            if (!url.startsWith("https://discord.com/api")) return real(input, init);
+
+            if (url.endsWith("/users/@me/channels")) return json({ id: "500000000000000011" });
+            if (/\/users\/\d+$/.test(url)) return json({ message: "Unknown User" }, 404);
+            if (url.endsWith("/channels/500000000000000011/messages") && init?.method === "POST") {
+                const payload = init.body instanceof FormData ? String(init.body.get("payload_json")) : String(init.body);
+                sent.push({ url, body: payload });
+
+                return refuse ? json({ code: 50007 }, 403) : json({ id: `5000000000000000${20 + sent.length}` });
+            }
+
+            return json({ flags: 1 << 15, components: [{ type: 12 }, { type: 1 }] });
+        }) as typeof fetch;
+
+        try {
+            await run(sent);
+        } finally {
+            globalThis.fetch = real;
+        }
+    };
+    const plan = (id: string) => write("POST", `/api/userdata/${id}/loeschung`, { dueAt: new Date(Date.now() + 10 * 60_000).toISOString(), reason: "check:db", confirm: id });
+    const internal = (deletion: number, action: string, as: string) =>
+        app.inject({ method: "POST", url: `/internal/userdata/${deletion}/${action}`, headers: { authorization: `Bearer ${signToken(SECRET, `discord:${as}`, ["userdata"])}` } });
+
+    await routeTidy();
+
+    try {
+        const now = Date.now();
+        await query("INSERT INTO levels (guild_id, user_id, xp, level, updated_at) VALUES (?, ?, 10, 1, ?), (?, ?, 10, 1, ?), (?, ?, 10, 1, ?)", [ROUTE_GUILD, P1, now, ROUTE_GUILD, P2, now, ROUTE_GUILD, P3, now]);
+
+        await check("Löschung planen per Route: Ankündigung als Bild mit Knöpfen, Stand „zugestellt“, Protokoll", async () => {
+            await withDms(false, async (sent) => {
+                const answer = await plan(P1);
+                assert.equal(answer.statusCode, 200, answer.body);
+
+                const deletion = answer.json() as IDeletion;
+                assert.deepEqual([deletion.state, deletion.dmState], ["geplant", "zugestellt"]);
+                assert.equal(sent.length, 1);
+                assert.match(sent[0].body, new RegExp(`ud:copy:${deletion.id}`));
+            });
+
+            const [row] = await query<{ n: number }[]>("SELECT COUNT(*) AS n FROM admin_audit WHERE id > ? AND action = 'userdata.plan' AND target = ?", [Number(routeAuditBefore), P1]);
+            assert.equal(Number(row.n), 1);
+        });
+
+        await check("Löschung planen: zwei Klicks gleichzeitig ergeben eine", async () => {
+            await withDms(false, async () => {
+                const both = await Promise.all([plan(P2), plan(P2)]);
+
+                assert.deepEqual(both.map((answer) => answer.statusCode).sort(), [200, 409], both.map((answer) => answer.body).join(" | "));
+            });
+        });
+
+        await check("Löschung planen: nimmt die Person keine DMs an, läuft sie trotzdem, Protokoll sagt es", async () => {
+            await withDms(true, async () => {
+                const deletion = (await plan(P3)).json() as IDeletion;
+
+                assert.deepEqual([deletion.state, deletion.dmState], ["geplant", "nicht_zustellbar"]);
+            });
+
+            const [row] = await query<{ n: number }[]>("SELECT COUNT(*) AS n FROM admin_audit WHERE id > ? AND action = 'userdata.dm' AND target = ?", [Number(routeAuditBefore), P3]);
+            assert.equal(Number(row.n), 1);
+        });
+
+        await check("Knöpfe: anhalten nur die Person selbst; danach keine Kopie mehr", async () => {
+            const deletion = await openDeletionOf(P1);
+            assert.ok(deletion);
+
+            await withDms(false, async (sent) => {
+                assert.equal((await internal(deletion.id, "stop", P2)).statusCode, 403);
+
+                const stopped = await internal(deletion.id, "stop", P1);
+                assert.equal(stopped.statusCode, 200, stopped.body);
+                assert.equal((await deletionOf(deletion.id))?.state, "angehalten");
+                assert.equal(sent.length, 1, "DM „angehalten“");
+                assert.equal((await internal(deletion.id, "copy", P1)).statusCode, 409);
+            });
+        });
+
+        await check("Knöpfe: Kopie als Datei, höchstens alle 5 Minuten", async () => {
+            const deletion = await openDeletionOf(P3);
+            assert.ok(deletion);
+
+            await withDms(false, async (sent) => {
+                assert.equal((await internal(deletion.id, "copy", P3)).statusCode, 200);
+                assert.match(sent[0]?.body ?? "", /"type":13/, "die Kopie hängt als Datei dran");
+                assert.equal((await internal(deletion.id, "copy", P3)).statusCode, 429);
+            });
+        });
+
+        await check("Übersicht zählt angehaltene Löschungen", async () => {
+            assert.ok(((await get("/api/overview")).json() as IOverview).halted >= 1);
+        });
+
+        await check("Abbrechen per Route: abgebrochen, DM dazu, Protokoll", async () => {
+            const deletion = await openDeletionOf(P1);
+            assert.ok(deletion);
+
+            await withDms(false, async (sent) => {
+                const answer = await write("POST", `/api/userdata/loeschungen/${deletion.id}/abbrechen`, {});
+                assert.equal(answer.statusCode, 200, answer.body);
+                assert.equal((answer.json() as IDeletion).state, "abgebrochen");
+                assert.equal(sent.length, 1);
+            });
+        });
+
+        await check("Uhr: eine fällige Löschung wird ausgeführt; der Beleg ist ein PDF, vorher 409", async () => {
+            const deletion = await openDeletionOf(P2);
+            assert.ok(deletion);
+            assert.equal((await get(`/api/userdata/loeschungen/${deletion.id}/beleg`)).statusCode, 409);
+
+            await query("UPDATE userdata_deletions SET due_at = ? WHERE id = ?", [new Date(Date.now() - 1000), deletion.id]);
+            await withDms(false, async () => {
+                await deletionRound(config);
+            });
+            assert.equal((await deletionOf(deletion.id))?.state, "geloescht");
+
+            const receipt = await get(`/api/userdata/loeschungen/${deletion.id}/beleg`);
+            assert.equal(receipt.statusCode, 200);
+            assert.match(String(receipt.headers["content-type"]), /application\/pdf/);
+            assert.equal(receipt.rawPayload.subarray(0, 4).toString("ascii"), "%PDF");
+        });
+
+        await check("Liste der Löschungen: offene zuerst, mit Zahlen", async () => {
+            const list = (await get("/api/userdata/loeschungen?filter=offen")).json() as { deletions: IDeletion[]; counts: { running: number } };
+
+            assert.ok(list.deletions.some((entry) => entry.userId === P3));
+            assert.ok(list.counts.running >= 1);
+        });
+    } finally {
+        await routeTidy();
     }
 
     section("Statusmeldung in Discord");

@@ -10,6 +10,7 @@ import { bannerOf } from "../content-rules.ts";
 import { readContent, websiteStatus } from "../content.ts";
 import { databaseReady, query } from "../db.ts";
 import { readMaintenance } from "../maintenance.ts";
+import { deletionCounts } from "../userdata/deletions.ts";
 import { lastStatusPost } from "../status-post.ts";
 import { statusSnapshot } from "../status/snapshot.ts";
 
@@ -111,6 +112,7 @@ export async function overviewRoutes(app: FastifyInstance, { config }: { config:
             commands,
             statusPost: { channels: config.statusChannelIds.length, at: lastStatusPost() },
             recent,
+            halted: databaseReady() ? (await deletionCounts().catch(() => null))?.halted ?? 0 : 0,
         };
     });
 
