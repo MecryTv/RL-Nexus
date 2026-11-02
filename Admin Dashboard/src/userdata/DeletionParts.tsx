@@ -63,7 +63,7 @@ export function Steps({ deletion }: { readonly deletion: IDeletion }): JSX.Eleme
 
 /** Restzeit als kleiner Ring mit Uhrzeit, wie beim Status-Knopf. Angehalten und Erledigtes nur mit Zeit. */
 export function Due({ deletion, now }: { readonly deletion: IDeletion; readonly now: number }): JSX.Element {
-    if (deletion.state === "angehalten") return <span className={styles.dim}>war {when(deletion.dueAt, now)} geplant</span>;
+    if (deletion.state === "angehalten") return <span className={styles.dim}>geplant für {when(deletion.dueAt, now)}</span>;
     if (deletion.state !== "geplant") return <span className={styles.dim}>{when(deletion.doneAt ?? deletion.cancelledAt ?? deletion.dueAt, now)}</span>;
 
     const share = Math.round(elapsedShare(deletion.createdAt, deletion.dueAt, now) * 100);

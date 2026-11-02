@@ -142,6 +142,18 @@ async function avatar(ctx: SKRSContext2D, input: IDmInput, x: number, y: number,
     ctx.restore();
 }
 
+/** Der Name einer Kachel: erst kleiner (15, 13, 12 px), erst dann gekürzt. Stellt die Schrift auf die gefundene Größe. */
+export function tileLabel(ctx: SKRSContext2D, label: string, width: number): { readonly size: number; readonly text: string } {
+    const text = label.toUpperCase();
+
+    for (const size of [15, 13, 12]) {
+        ctx.font = `700 ${size}px Rajdhani`;
+        if (ctx.measureText(text).width <= width) return { size, text };
+    }
+
+    return { size: 12, text: fit(ctx, text, width) };
+}
+
 function label(ctx: SKRSContext2D, text: string, x: number, y: number): void {
     ctx.font = "700 16px Rajdhani";
     ctx.fillStyle = DIM;
@@ -276,9 +288,9 @@ function announcement(input: IDmInput): (ctx: SKRSContext2D) => Promise<number> 
             ctx.beginPath();
             ctx.roundRect(x, y, width, 108, 8);
             ctx.fill();
-            ctx.font = "700 15px Rajdhani";
+            const name = tileLabel(ctx, area.label, width - 24);
             ctx.fillStyle = DIM;
-            ctx.fillText(fit(ctx, area.label.toUpperCase(), width - 24), x + 12, y + 26);
+            ctx.fillText(name.text, x + 12, y + 26);
             ctx.font = "800 36px Oxanium";
             ctx.fillStyle = TEXT;
             ctx.fillText(number(area.rows), x + 12, y + 70);

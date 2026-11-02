@@ -4,7 +4,9 @@ import { buildApp } from "../app.ts";
 import { signToken } from "../bot.ts";
 import { SESSION_COOKIE, seal } from "../session.ts";
 import { postDirectMessage, removeButtons } from "../discord.ts";
-import { DM_KINDS, deletionMessage, renderDeletionImage, type IDmInput } from "../userdata/dm.ts";
+import { createCanvas } from "@napi-rs/canvas";
+import { registerFonts } from "../status/image.ts";
+import { DM_KINDS, deletionMessage, renderDeletionImage, tileLabel, type IDmInput } from "../userdata/dm.ts";
 import { eraseSql, eraseValues } from "../userdata/erase.ts";
 import { scrubTables } from "../userdata/backups.ts";
 import { copyHtml } from "../userdata/copy.ts";
@@ -268,6 +270,17 @@ export async function checkUserdata(): Promise<void> {
         assert.equal((raw.match(/\/Type \/Page\b/g) ?? []).length, 2);
         assert.match(raw, /Oxanium/);
         assert.match(raw, /Rajdhani/);
+    });
+
+    await check("DM-Bilder: lange Namen in den Kacheln werden kleiner statt gekürzt", () => {
+        registerFonts();
+        const ctx = createCanvas(10, 10).getContext("2d");
+        const width = (800 - 2 * 36 - 3 * 12) / 4 - 24;
+
+        assert.equal(tileLabel(ctx, "Rocket-League-Konten", width).text, "ROCKET-LEAGUE-KONTEN");
+        assert.ok(tileLabel(ctx, "Rocket-League-Konten", width).size < 15, "kleiner als sonst");
+        assert.equal(tileLabel(ctx, "Level", width).size, 15);
+        assert.match(tileLabel(ctx, "Ein sehr, sehr langer Bereichsname, der nie passt", width).text, /…$/);
     });
 
     await check("DM-Nachricht: nur die Ankündigung hat die Knöpfe, mit der Nummer der Löschung", () => {

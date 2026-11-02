@@ -336,6 +336,15 @@ Rückmeldung des Nutzers nach Task 6: Beleg, Nutzerdaten und Was bleibt „kompl
 - **Was bleibt W3:** oben drei Zahlen (wird gelöscht, bleibt, noch offen). „Bleibt“ groß oben: je Bereich was drin ist, Personen und Einträge, Satz für DM und Beleg mit Vorschlägen, Rechtsgrundlage (Gesetzliche Pflicht, Art. 17 Abs. 3 lit. b · Rechtsansprüche, lit. e) mit optionaler Norm, Dauer; Warnung, solange „zu klären“ drinsteht. „Wird gelöscht“ als Karten mit Schalter, Inhalt und Personen. Rechts Vorschau für DM und Beleg. Ein Speichern unten mit Liste der Änderungen und „Verwerfen“, Nachfrage beim Verlassen.
 - **Vorgaben aus der Datenschutzerklärung:** Shop bleibt: „Bezahlte Bestellungen, Zustimmungen und Kündigungen bewahren wir drei Jahre nach Vertragsende auf, um Ansprüche belegen zu können. Rechnungen und Zahlungsdaten liegen bei Stripe.“ (Rechtsansprüche, 3 Jahre). Moderation: keine Frist genannt, wird auf Anfrage gelöscht. Protokoll: Entscheidung von Claude, siehe 44.
 
+### Ergänzung vom 02.11. (nach dem Abschluss-Review)
+
+Entscheidungen des Nutzers zu den Funden des Reviews:
+
+- **Kopie meiner Daten** kommt als zwei Dateien: HTML zum Lesen (Entwurf K1, in sich geschlossen, Bereiche, Tabellen, Verläufe als Chat, Rohdaten zum Aufklappen) und JSON für Programme (Art. 20). Im Profil zusätzlich „Auskunft (HTML)“.
+- **Backups einzelner Server:** Beim Löschen fallen die Zeilen der Person auch aus allen Server-Backups heraus. Was herausfiel, liegt getrennt in der Backup-Datenbank, lässt sich nicht zurückladen und ist nach 30 Tagen endgültig gelöscht. Zurückladen lässt gelöschte Personen immer weg.
+- **Protokoll des Teams** bleibt 3 Jahre (vorher 365 Tage), passend zu Entscheidung 44.
+- **Grund im Beleg** bleibt; das Feld im Planungsfenster sagt, dass er auch im Beleg an die Person steht.
+
 ## Teil 5: Suche findet alles (W-0059)
 
 ### Worum es geht
