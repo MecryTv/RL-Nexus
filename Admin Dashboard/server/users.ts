@@ -24,6 +24,11 @@ export async function lookupUser(config: IConfig, userId: string, now = Date.now
     return value;
 }
 
+/** Der Name aus dem Speicher, ohne Discord zu fragen. Für die Suche (W-0059), die nicht warten darf. */
+export function knownName(userId: string): string | null {
+    return known.get(userId)?.value?.name ?? null;
+}
+
 /**
  * Mehrere auf einmal, für Listen. Wer sich nicht nachschlagen lässt, steht mit
  * ID und ohne Namen da: eine Liste soll nicht an Discord scheitern.

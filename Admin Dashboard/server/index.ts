@@ -1,3 +1,4 @@
+import { warmNames } from "./search/sources.ts";
 import { buildApp } from "./app.ts";
 import { scheduleBackups } from "./backups/round.ts";
 import { ensureBackupDatabase } from "./backups/store.ts";
@@ -32,6 +33,8 @@ if (backupProblem && config.database) console.warn(`⚠️  Backups: ${backupPro
 scheduleBackups(config);
 scheduleCleanup();
 scheduleStatusPost(config);
+// Namen für die Suche (W-0059). Läuft nebenher, der Start wartet nicht darauf.
+void warmNames(config).catch((error: unknown) => console.error(`🔎 Namen für die Suche nicht geholt: ${error instanceof Error ? error.message : String(error)}`));
 scheduleCommandSync(config);
 scheduleShopExpiry(config);
 

@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import { fold, markOf, parseQuery, rankOf, sortHits, type ISearchHit, type SearchKind } from "../../shared/search.ts";
 import { buildApp } from "../app.ts";
+import { mailPath } from "../../src/mail/route.ts";
 import { runSearch, type ISearchSource } from "../search/run.ts";
+import { likeOf, mailHit } from "../search/sources.ts";
 import { SESSION_COOKIE, seal } from "../session.ts";
 import { USERS } from "./fakes.ts";
 import { SECRET, check, config, section } from "./harness.ts";
@@ -76,6 +78,33 @@ export async function checkSearch(): Promise<void> {
         assert.equal(asked, 0);
         assert.equal((await runSearch([audit], "ab", "developer")).hits.length, 1);
         assert.equal(asked, 1);
+    });
+
+    await check("SQL: Prozent, Unterstrich und das Fluchtzeichen werden wörtlich gesucht", () => {
+        assert.equal(likeOf("100%_!"), "%100!%!_!!%");
+        assert.equal(likeOf("mecry"), "%mecry%");
+    });
+
+    await check("Mail-Treffer: Ziel wie im Postfach, Ort ist das Postfach, ohne Betreff steht das da", () => {
+        const mail = {
+            uid: 42,
+            from: { name: "Max", address: "max@example.test" },
+            to: [],
+            subject: "Rechnung Oktober",
+            date: "2026-11-02T10:00:00.000Z",
+            preview: "Hallo",
+            seen: true,
+            flagged: false,
+            answered: false,
+            attachments: false,
+        };
+        const found = mailHit({ id: 3, address: "info@example.test", label: "Info" }, mail, "rech");
+
+        assert.equal(found.href, mailPath(3, "INBOX", 42));
+        assert.deepEqual([found.kind, found.title, found.place, found.at, found.rank], ["mails", "Rechnung Oktober", "Postfach Info", mail.date, 0]);
+        assert.match(found.context, /^Max · /);
+        assert.equal(mailHit({ id: 3, address: "info@example.test", label: null }, { ...mail, subject: "" }, "max").title, "(ohne Betreff)");
+        assert.equal(mailHit({ id: 3, address: "info@example.test", label: null }, mail, "x").place, "Postfach info@example.test");
     });
 
     const app = await buildApp(config);

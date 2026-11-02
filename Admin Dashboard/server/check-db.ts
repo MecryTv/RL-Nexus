@@ -16,6 +16,7 @@ import path from "node:path";
 import type { Transporter } from "nodemailer";
 import type { Options } from "nodemailer/lib/mailer/index.js";
 import type { IAuditPage, IDbRows, IDbTable, IGroupList, IMailAllPage, IMailOverview, IOverview, ITech } from "../shared/api.ts";
+import type { ISearchResult } from "../shared/search.ts";
 import type { ICancelReceipt, ICheckoutStart, ICustomerDetail, ICustomerList, IShopProduct, IShopProductList, IShopSettingsView, IShopState, IUnlockProgress } from "../shared/shop.ts";
 import type { IIncidentList, IPublicStatus, IStatusDetail } from "../shared/status.ts";
 import { buildApp } from "./app.ts";
@@ -687,6 +688,59 @@ try {
         } finally {
             await query("DROP TABLE IF EXISTS admin_check_secrets");
         }
+    });
+
+    section("Suche");
+
+    const developerCookie = `${SESSION_COOKIE}=${seal({ id: USERS.developer, name: "nutzer2", avatar: null, exp: Math.floor(Date.now() / 1000) + 600 }, SECRET)}`;
+    const searchAs = async (who: string, text: string, kind: string): Promise<ISearchResult> => {
+        const answer = await app.inject({ method: "GET", url: `/api/search?q=${encodeURIComponent(text)}&art=${kind}`, headers: { cookie: who } });
+        assert.equal(answer.statusCode, 200, answer.body);
+
+        return answer.json() as ISearchResult;
+    };
+
+    await check("Suche: Person in Gruppe, als Kunde und in Beta ist eine Zeile, Ziel ist der Kunde", async () => {
+        const person = IDS[3];
+
+        await query("INSERT INTO dashboard_groups (user_id, group_name, granted_by, note) VALUES (?, 'partner', ?, NULL)", [person, USERS.admin]);
+        await records.upsertCustomer({ id: person, name: "check Suche", email: "check-suche@example.test" });
+        await query("INSERT IGNORE INTO beta_members (user_id, code_id) VALUES (?, NULL)", [person]);
+
+        try {
+            const result = await searchAs(cookie, person, "personen");
+            const hits = result.hits.filter((hit) => hit.place !== "Webseite · Team");
+
+            assert.equal(hits.length, 1, JSON.stringify(result));
+            assert.equal(hits[0].title, "check Suche");
+            for (const place of ["Gruppe Partner", "Kunde", "Beta"]) assert.ok(hits[0].context.includes(place), hits[0].context);
+            assert.ok(hits[0].href.startsWith("/shop/kunden?q="), hits[0].href);
+            assert.ok(!JSON.stringify(result).includes("check-suche@example.test"), "keine volle Mail");
+        } finally {
+            await query("DELETE FROM beta_members WHERE user_id = ?", [person]);
+        }
+    });
+
+    await check("Suche: Admin sieht kein Protokoll, Developer schon", async () => {
+        await query("INSERT INTO admin_audit (user_id, user_name, action, target, detail) VALUES (?, 'nutzer2', 'group.grant', 'check:suche', NULL)", [USERS.developer]);
+
+        const audit = (result: ISearchResult) => result.hits.filter((hit) => hit.place === "Protokoll" && hit.title.includes("check:suche"));
+
+        assert.deepEqual(audit(await searchAs(cookie, "check:suche", "protokoll")), []);
+        const found = audit(await searchAs(developerCookie, "check:suche", "protokoll"));
+        assert.equal(found.length, 1);
+        assert.equal(found[0].title, "Gruppe vergeben · check:suche");
+        assert.equal(found[0].href, "/dev/protokoll?person=nutzer2");
+    });
+
+    await check("Suche: eine Meldung an viele Personen ist ein Treffer", async () => {
+        await query("INSERT INTO notifications (user_id, kind, title, body, link) VALUES (?, 'info', 'check:db Suche Meldung', 'Text', NULL), (?, 'info', 'check:db Suche Meldung', 'Text', NULL)", [IDS[0], IDS[1]]);
+
+        const found = (await searchAs(cookie, "check:db Suche Meldung", "protokoll")).hits.filter((hit) => hit.place === "Meldung");
+
+        assert.equal(found.length, 1);
+        assert.match(found[0].context, /^an 2 Personen · /);
+        assert.equal(found[0].href, "/meldungen");
     });
 
     section("Statusmeldung in Discord");
