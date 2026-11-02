@@ -24,6 +24,7 @@ import { publicShopRoutes } from "./routes/shop-public.ts";
 import { internalBackupRoutes } from "./routes/internal-backups.ts";
 import { backupRoutes } from "./routes/backups.ts";
 import { betaRoutes, internalBetaRoutes } from "./routes/beta.ts";
+import { searchRoutes } from "./routes/search.ts";
 import { publicStatusRoutes, statusRoutes } from "./routes/status.ts";
 import { userRoutes } from "./routes/users.ts";
 
@@ -83,6 +84,7 @@ export async function buildApp(config: IConfig): Promise<FastifyInstance> {
         await api.register(shopCustomerRoutes, { config });
         await api.register(backupRoutes, { config });
         await api.register(betaRoutes, { config });
+        await api.register(searchRoutes, { config });
 
         // Nur mit der Developer-Rolle. Der Hook läuft hinter requireSession.
         await api.register(async (dev) => {
