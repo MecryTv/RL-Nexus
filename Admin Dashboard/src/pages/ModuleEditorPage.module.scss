@@ -1,20 +1,5 @@
 @use "mixins" as *;
 
-.back {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--s-1);
-    min-height: 34px;
-    color: var(--c-blue);
-    font-size: 0.875rem;
-
-    &:hover {
-        color: var(--c-text);
-    }
-
-    @include touch-target;
-}
-
 .missing {
     color: var(--c-text-dim);
 

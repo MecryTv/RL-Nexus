@@ -1,0 +1,67 @@
+@use "mixins" as *;
+
+.tabs {
+    display: flex;
+    gap: 2px;
+    margin: calc(-1 * var(--s-2)) 0 var(--s-4);
+    overflow: auto hidden;
+    border-bottom: 1px solid var(--c-line);
+    white-space: nowrap;
+    scrollbar-width: thin;
+}
+
+.tab {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: var(--s-2);
+    min-height: 40px;
+    padding: 0 var(--s-3);
+    color: var(--c-text-faint);
+    font-weight: 700;
+    transition: color var(--t-fast);
+
+    @include touch-target;
+
+    &:hover {
+        color: var(--c-text);
+    }
+
+    &:focus-visible {
+        @include focus-inset;
+    }
+}
+
+.on {
+    box-shadow: inset 0 -2px 0 var(--c-red);
+    color: var(--c-text);
+}
+
+.dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--dot);
+}
+
+.count {
+    min-width: 18px;
+    padding: 0 5px;
+    border-radius: 9px;
+    background: rgb(255 255 255 / 12%);
+    color: var(--c-text);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    line-height: 18px;
+    text-align: center;
+
+    .on & {
+        background: var(--c-red-deep);
+        color: #fff;
+    }
+}
+
+.warn {
+    display: grid;
+    color: #ffc53d;
+}

@@ -79,9 +79,23 @@ export function Reader({
 
     return (
         <article className={styles.reader} aria-labelledby="mail-betreff">
-            <h2 id="mail-betreff" className={styles.subject}>
-                {data.subject}
-            </h2>
+            {/* Betreff und die drei Wege zu antworten in einer Zeile (W-0053), der Rest darunter. */}
+            <div className={styles.readerHead}>
+                <h2 id="mail-betreff" className={styles.subject}>
+                    {data.subject}
+                </h2>
+                <div className={styles.actions}>
+                    <Button variant="primary" size="sm" icon="reply" onClick={() => setReply("reply")}>
+                        Antworten
+                    </Button>
+                    <Button size="sm" icon="reply-all" onClick={() => setReply("all")}>
+                        Allen antworten
+                    </Button>
+                    <Button size="sm" icon="forward" onClick={() => setReply("forward")}>
+                        Weiterleiten
+                    </Button>
+                </div>
+            </div>
 
             <div className={styles.sender}>
                 <span className={styles.avatar} aria-hidden="true">
@@ -96,15 +110,6 @@ export function Reader({
             </div>
 
             <div className={styles.actions}>
-                <Button variant="primary" size="sm" icon="reply" onClick={() => setReply("reply")}>
-                    Antworten
-                </Button>
-                <Button size="sm" icon="reply-all" onClick={() => setReply("all")}>
-                    Allen
-                </Button>
-                <Button size="sm" icon="forward" onClick={() => setReply("forward")}>
-                    Weiterleiten
-                </Button>
                 <Button size="sm" variant="ghost" icon="mail" disabled={busy} onClick={() => void markUnread()}>
                     Ungelesen
                 </Button>

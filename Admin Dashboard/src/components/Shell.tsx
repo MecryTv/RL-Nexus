@@ -1,116 +1,92 @@
-import { useEffect, useRef, useState, type JSX } from "react";
-import { NavLink, Outlet, useLocation, useNavigation } from "react-router-dom";
+import { Fragment, useCallback, useEffect, useState, type JSX } from "react";
+import { Link, Outlet, useLocation, useNavigation } from "react-router-dom";
 import { unreadOf, useMailOverview } from "../api/mail";
 import logo from "../assets/logo.webp";
+import { areaOf, navEntries, pageOf, visibleAreas, type INavArea } from "../nav/areas.ts";
+import { ShiftTap } from "../nav/search.ts";
 import { useMe, useSession } from "../session/context";
 import { Badge } from "./Badge";
 import { Button } from "./Button";
 import { Icon } from "./Icon";
+import { NavSearch } from "./NavSearch";
 import styles from "./Shell.module.scss";
 
-interface INavItem {
-    readonly to: string;
-    readonly label: string;
-    readonly icon: string;
-    /** Nur für die Developer-Rolle. Der Server prüft das ohnehin selbst. */
-    readonly developer?: boolean;
-    /** Zeigt die Zahl ungelesener Mails und neuer Formulare an diesem Eintrag. */
-    readonly unread?: boolean;
+/** Tippt jemand gerade, oder ist ein Fenster offen? Dann öffnet keine Taste die Suche. */
+function busy(): boolean {
+    const focus = document.activeElement;
+    const typing = focus instanceof HTMLElement && (focus.matches("input, textarea, select") || focus.isContentEditable);
+
+    return typing || document.querySelector("dialog[open], [role=dialog]") !== null;
 }
 
-interface INavGroup {
-    readonly label: string | null;
-    readonly items: readonly INavItem[];
+/** Rechte Umschalttaste kurz, `/` oder Strg K (⌘ K) öffnen die Suche. */
+function useSearchKeys(open: () => void): void {
+    useEffect(() => {
+        const tap = new ShiftTap();
+
+        const onDown = (event: KeyboardEvent): void => {
+            tap.down(event.code, performance.now(), busy(), event.repeat);
+
+            if (event.repeat || busy()) return;
+
+            const slash = event.key === "/" && !event.ctrlKey && !event.metaKey && !event.altKey;
+            const k = event.key.toLowerCase() === "k" && (event.ctrlKey || event.metaKey);
+
+            if (slash || k) {
+                event.preventDefault();
+                open();
+            }
+        };
+
+        const onUp = (event: KeyboardEvent): void => {
+            if (tap.up(event.code, performance.now())) open();
+        };
+
+        document.addEventListener("keydown", onDown);
+        document.addEventListener("keyup", onUp);
+
+        return () => {
+            document.removeEventListener("keydown", onDown);
+            document.removeEventListener("keyup", onUp);
+        };
+    }, [open]);
 }
 
-/** Die Seitenleiste. Jeder Plan hängt hier seine Seiten an. */
-const NAV: readonly INavGroup[] = [
-    {
-        label: null,
-        items: [
-            { to: "/", label: "Übersicht", icon: "dashboard" },
-            { to: "/post", label: "Postfach", icon: "mail", unread: true },
-        ],
-    },
-    {
-        label: "Bot",
-        items: [
-            { to: "/server", label: "Server", icon: "server" },
-            { to: "/backups", label: "Backups", icon: "archive" },
-            { to: "/gruppen", label: "Gruppen", icon: "shield-check" },
-            { to: "/beta", label: "Beta Access", icon: "sparkle" },
-            { to: "/meldungen", label: "Meldungen", icon: "bell" },
-            { to: "/status", label: "Status", icon: "pulse" },
-        ],
-    },
-    {
-        label: "Shop",
-        items: [
-            { to: "/shop/produkte", label: "Produkte", icon: "tag" },
-            { to: "/shop/kunden", label: "Kunden", icon: "users" },
-            { to: "/shop/einstellungen", label: "Einstellungen", icon: "sliders" },
-        ],
-    },
-    {
-        label: "Webseite",
-        items: [
-            { to: "/webseite/banner", label: "Banner", icon: "megaphone" },
-            { to: "/webseite/team", label: "Team", icon: "users" },
-            { to: "/webseite/module", label: "Module", icon: "puzzle" },
-        ],
-    },
-    {
-        label: "Developer",
-        items: [
-            { to: "/dev/logs", label: "Logs", icon: "file-text", developer: true },
-            { to: "/dev/datenbank", label: "Datenbank", icon: "database", developer: true },
-            { to: "/dev/technik", label: "Technik", icon: "cpu", developer: true },
-            { to: "/dev/wartung", label: "Wartung", icon: "wrench", developer: true },
-            { to: "/dev/protokoll", label: "Protokoll", icon: "history", developer: true },
-        ],
-    },
-];
-
+/**
+ * Die Hülle wie im Bot-Dashboard (W-0053): links die Bereiche, daneben die
+ * Seiten des gewählten Bereichs, oben rechts wer angemeldet ist. Bereiche und
+ * Seiten stehen in nav/areas.ts.
+ */
 export function Shell(): JSX.Element {
     const me = useMe();
     const { signOut } = useSession();
     const location = useLocation();
-    const unread = unreadOf(useMailOverview().data);
+    const unread = unreadOf(useMailOverview().data) ?? 0;
     const loading = useNavigation().state === "loading";
+    const areas = visibleAreas(me.role);
+    const open = pageOf(location.pathname)?.page.to ?? null;
 
-    // Auf dem Handy: offen ist die Navigation nur auf der Seite, auf der sie
-    // geöffnet wurde. Jeder Seitenwechsel schließt sie damit von selbst, auch
-    // der Zurück-Knopf des Browsers.
-    const [openAt, setOpenAt] = useState<string | null>(null);
-    const menuOpen = openAt === location.pathname;
-    const menuButton = useRef<HTMLButtonElement>(null);
-    const closeMenu = (): void => setOpenAt(null);
+    // Ein Klick auf einen Bereich zeigt nur dessen Seiten. Nach jedem
+    // Seitenwechsel ist wieder der Bereich der offenen Seite gewählt; eine
+    // Seite ohne Bereich (Nicht gefunden) lässt die Wahl stehen.
+    const [chosen, setChosen] = useState<INavArea["id"] | null>(() => areaOf(location.pathname)?.id ?? null);
+    const [path, setPath] = useState(location.pathname);
 
-    useEffect(() => {
-        if (!menuOpen) return;
+    if (path !== location.pathname) {
+        setPath(location.pathname);
 
-        const button = menuButton.current;
+        const here = areaOf(location.pathname)?.id;
 
-        const onKey = (event: KeyboardEvent): void => {
-            if (event.key === "Escape") setOpenAt(null);
-        };
+        if (here) setChosen(here);
+    }
 
-        window.addEventListener("keydown", onKey);
+    const area = areas.find((entry) => entry.id === chosen) ?? areas[0];
+    const entries = navEntries(me.role);
 
-        // Beim Schließen zurück auf den Knopf, sonst bliebe der Fokus auf einem
-        // Link in der zugeschobenen Navigation. Erst im Aufräumen, weil der
-        // Knopf im Hauptbereich sitzt: Solange das Menü offen ist, ist der
-        // inert und nimmt keinen Fokus an.
-        return () => {
-            window.removeEventListener("keydown", onKey);
-            button?.focus();
-        };
-    }, [menuOpen]);
+    const [searching, setSearching] = useState(false);
+    const openSearch = useCallback(() => setSearching(true), []);
 
-    const groups = NAV.map((group) => ({
-        ...group,
-        items: group.items.filter((item) => !item.developer || me.role === "developer"),
-    })).filter((group) => group.items.length > 0);
+    useSearchKeys(openSearch);
 
     return (
         <div className={styles.shell}>
@@ -118,51 +94,64 @@ export function Shell(): JSX.Element {
                 Zum Inhalt springen
             </a>
 
-            <aside id="navigation" className={[styles.sidebar, menuOpen && styles.open].filter(Boolean).join(" ")} aria-label="Navigation">
-                <div className={styles.brand}>
-                    <img src={logo} alt="" width={30} height={30} />
-                    <span className={styles.wordmark}>
-                        RL Nexus <em>Admin</em>
+            <aside className={styles.side} aria-label="Navigation">
+                {/* Umschaltknöpfe, keine Links: deshalb eine Gruppe und kein <nav>. Die Links stehen in der Spalte daneben. */}
+                <div className={styles.rail} role="group" aria-label="Bereiche">
+                    <span className={styles.logo}>
+                        <img src={logo} alt="" width={30} height={30} />
+                        <span className="u-sr">RL Nexus Admin</span>
                     </span>
-                    <button type="button" className={styles.close} onClick={closeMenu}>
-                        <Icon name="close" />
-                        <span className="u-sr">Navigation schließen</span>
-                    </button>
+
+                    {areas.map((entry) => (
+                        <Fragment key={entry.id}>
+                            {entry.id === "dev" && <span className={styles.divider} aria-hidden="true" />}
+                            <button type="button" className={styles.area} aria-pressed={entry.id === area.id} title={entry.label} onClick={() => setChosen(entry.id)}>
+                                <Icon name={entry.icon} size={18} />
+                                <span className={styles.areaName} aria-hidden="true">
+                                    {entry.short}
+                                </span>
+                                <span className="u-sr">{entry.label}</span>
+                                {entry.id === "start" && unread > 0 && (
+                                    <span className={styles.badge}>
+                                        {unread}
+                                        <span className="u-sr"> neu</span>
+                                    </span>
+                                )}
+                            </button>
+                        </Fragment>
+                    ))}
                 </div>
 
-                <nav>
-                    {groups.map((group) => (
-                        <div key={group.label ?? "start"} className={styles.group}>
-                            {group.label && <p className={styles.groupLabel}>{group.label}</p>}
-                            <ul>
-                                {group.items.map((item) => (
-                                    <li key={item.to}>
-                                        <NavLink
-                                            to={item.to}
-                                            end={item.to === "/"}
-                                            title={item.label}
-                                            className={({ isActive }) => [styles.item, isActive && styles.active].filter(Boolean).join(" ")}
-                                        >
-                                            <Icon name={item.icon} size={18} />
-                                            <span className={styles.itemLabel}>{item.label}</span>
-                                            {item.unread && unread !== null && unread > 0 && (
-                                                <span className={styles.count}>
-                                                    {unread}
-                                                    <span className="u-sr"> neu</span>
-                                                </span>
-                                            )}
-                                        </NavLink>
-                                    </li>
-                                ))}
-                            </ul>
-                        </div>
-                    ))}
-                </nav>
+                <div className={styles.column}>
+                    <button type="button" className={styles.find} onClick={openSearch}>
+                        <Icon name="search" size={16} />
+                        Suchen …<kbd className={styles.kbd}>⇧ rechts</kbd>
+                    </button>
+                    <p className={styles.columnHead} id="leiste-bereich">
+                        {area.label}
+                    </p>
+                    <nav aria-labelledby="leiste-bereich">
+                        <ul className={styles.pages}>
+                            {area.pages.map((page) => (
+                                <li key={page.to}>
+                                    <Link to={page.to} className={styles.page} aria-current={page.to === open ? "page" : undefined}>
+                                        <Icon name={page.icon} size={18} />
+                                        <span className={styles.pageName}>{page.label}</span>
+                                        {page.unread && unread > 0 && (
+                                            <span className={styles.count}>
+                                                {unread}
+                                                <span className="u-sr"> neu</span>
+                                            </span>
+                                        )}
+                                    </Link>
+                                </li>
+                            ))}
+                        </ul>
+                    </nav>
+                </div>
             </aside>
 
-            {menuOpen && <div className={styles.backdrop} onClick={closeMenu} aria-hidden="true" />}
-
-            <div className={styles.main} inert={menuOpen}>
+            <div className={styles.main}>
                 {/*
                     Der Balken, solange der Router das Bündel der nächsten Seite
                     holt. Die alte Seite bleibt dabei stehen, sonst sähe man
@@ -172,18 +161,6 @@ export function Shell(): JSX.Element {
                 {loading && <div className={styles.progress} aria-hidden="true" />}
 
                 <header className={styles.topbar}>
-                    <button
-                        ref={menuButton}
-                        type="button"
-                        className={styles.menu}
-                        aria-expanded={menuOpen}
-                        aria-controls="navigation"
-                        onClick={() => setOpenAt(location.pathname)}
-                    >
-                        <Icon name="menu" />
-                        <span className="u-sr">Navigation öffnen</span>
-                    </button>
-
                     <div className={styles.user}>
                         {me.avatar ? (
                             <img src={me.avatar} alt="" width={32} height={32} className={styles.avatar} />
@@ -205,6 +182,8 @@ export function Shell(): JSX.Element {
                     <Outlet />
                 </main>
             </div>
+
+            {searching && <NavSearch entries={entries} initial={entries.filter((entry) => entry.area === area.label)} onClose={() => setSearching(false)} />}
         </div>
     );
 }

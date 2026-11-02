@@ -141,7 +141,7 @@ export async function checkContact(): Promise<void> {
 
                 const embed = (calls[0] as { embeds: { title: string; url: string; fields: { name: string; value: string }[] }[] }).embeds[0];
                 assert.equal(embed.title, "Hinweis");
-                assert.match(embed.url, /\/post\/alle$/);
+                assert.match(embed.url, /\/post$/);
                 assert.ok(embed.fields.some((field) => field.name === "Von" && field.value.includes("mecry@example.com")));
             } finally {
                 globalThis.fetch = real;

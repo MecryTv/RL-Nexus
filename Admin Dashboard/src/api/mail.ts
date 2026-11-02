@@ -7,15 +7,7 @@ import { useApi, type IApiState } from "./useApi";
  * Postfächern und Ordnern und die Zahl für die Seitenleiste.
  */
 
-/** Die Adresse eines Ordners oder einer Mail darin. Ordnernamen können Schrägstriche enthalten. */
-export function mailPath(account: number, folder: string, uid?: number): string {
-    return `/post/${account}/${encodeURIComponent(folder)}${uid === undefined ? "" : `/${uid}`}`;
-}
-
-/** „Alle Posteingänge“ oder eine Mail darin. */
-export function allPath(account?: number, uid?: number): string {
-    return account === undefined || uid === undefined ? "/post/alle" : `/post/alle/${account}/${uid}`;
-}
+export { mailPath } from "../mail/route.ts";
 
 const BOX_COLORS = ["var(--c-blue)", "var(--c-purple)", "var(--c-win)", "var(--c-red)"];
 

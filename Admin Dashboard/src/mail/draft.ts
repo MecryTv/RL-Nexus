@@ -2,12 +2,9 @@ import type { IMailAccount, IMailMessage } from "../../shared/api";
 import { displayName, formatAddress, prefixed } from "../api/mail";
 
 /**
- * Was die Teile des Postfachs teilen, ohne selbst Komponente zu sein:
- * Auswahl und der Anfang eines Entwurfs.
+ * Was die Teile des Postfachs teilen, ohne selbst Komponente zu sein: der
+ * Anfang eines Entwurfs.
  */
-
-/** Was gerade offen ist, damit die Seitenleiste es markiert. */
-export type MailSelection = { readonly kind: "all" } | { readonly kind: "folder"; readonly account: number; readonly folder: string } | null;
 
 export type ReplyKind = "reply" | "all" | "forward";
 

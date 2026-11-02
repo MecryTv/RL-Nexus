@@ -220,7 +220,7 @@ export function TeamPage(): JSX.Element {
 
     return (
         <>
-            <PageHeader title="Team" meta="Die Personen und offenen Stellen auf der Team-Seite der Webseite.">
+            <PageHeader title="Team">
                 <ResetAction doc={doc} what="Das Team" />
             </PageHeader>
 

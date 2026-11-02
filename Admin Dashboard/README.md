@@ -60,6 +60,10 @@ Die Rollen prüft in **beiden** Modi der RL-Nexus-Server: Admin und Developer gi
 
 Dann entweder den Dev-Bot einladen oder mit `npm run dev:server:live` gegen die Produktiv-Application starten. Im Developer Portal braucht dann sie den Redirect auf `localhost`.
 
+## Leiste und Suche
+
+Links stehen die Bereiche (Start, Bot, Shop, Webseite, Developer nur für Developer), daneben die Seiten des gewählten Bereichs, wie im Bot-Dashboard. Ein Klick auf einen Bereich zeigt nur dessen Seiten, nach jedem Seitenwechsel ist der Bereich der offenen Seite gewählt. Die Suche öffnet sich mit kurz gedrückter rechter Umschalttaste, mit `/` oder `Strg K` und findet jede Seite, die man sieht. Bereiche, Seiten und der Satz unter jedem Titel stehen in `src/nav/areas.ts`, die Suchlogik in `src/nav/search.ts`; `npm run check` prüft beide. Unter 860 px stehen Bereiche und Seiten als Zeilen über der Seite.
+
 ## Übersicht
 
 Die Startseite fragt alle 15 Sekunden `/api/overview` ab, Wartung und Inhalte kommen sofort über `/api/events`.
@@ -76,7 +80,7 @@ Die Startseite fragt alle 15 Sekunden `/api/overview` ab, Wartung und Inhalte ko
 
 Unter *Postfach* liest und schreibt das Admin Dashboard direkt in den Mailcow-Postfächern. Gespeichert wird nur, welche Postfächer es gibt, samt Servern und verschlüsseltem Passwort. Die Mails bleiben in Mailcow, das Handy und jedes Mailprogramm sehen also dasselbe.
 
-- **Lesen:** Ganz oben „Alle Posteingänge“, die Posteingänge aller Postfächer in einer Liste mit dem farbigen Punkt des Postfachs (`GET /api/mail/all`). Darunter die Postfächer zum Auf- und Zuklappen, der Browser merkt sich, welche zu sind. Ordner mit der Zahl der ungelesenen Mails, Suche über IMAP, Filter „Ungelesen“ und „Mit Anhang“, 50 Mails je Seite. Neue Mails meldet Mailcow über IDLE, sie erscheinen ohne Neuladen. HTML-Mails bereinigt der Server (`server/mail/render.ts`), der Browser zeigt sie in einem iframe ohne Skripte und mit eigener CSP. Externe Bilder kommen erst nach „Laden“, damit der Absender nicht sieht, wann jemand die Mail öffnet.
+- **Lesen:** Oben ein Reiter je Postfach mit Farbpunkt und der Zahl ungelesener Mails im Posteingang, ein gelbes Warnzeichen, wenn es nicht erreichbar ist. *Postfach* öffnet das erste mit ungelesener Post. Links Name und Adresse des offenen Postfachs und seine Ordner, auf dem Handy als Auswahl über der Liste. Alte Links auf `/post/alle/…` führen in den Posteingang des passenden Postfachs. Ordner mit der Zahl der ungelesenen Mails, Suche über IMAP, Filter „Ungelesen“ und „Mit Anhang“, 50 Mails je Seite. Neue Mails meldet Mailcow über IDLE, sie erscheinen ohne Neuladen. HTML-Mails bereinigt der Server (`server/mail/render.ts`), der Browser zeigt sie in einem iframe ohne Skripte und mit eigener CSP. Externe Bilder kommen erst nach „Laden“, damit der Absender nicht sieht, wann jemand die Mail öffnet.
 - **Schreiben:** In einem großen Fenster über dem Postfach, links der Editor, rechts die Vorschau. Die baut der Server mit derselben Vorlage wie beim Senden (`POST /api/mail/preview`), mit Umschalter für Handy-Breite. Editor mit Fett, Kursiv, Unterstrichen, Durchgestrichen, Überschriften, Listen, Zitat, Link, Knopf und Linie, dazu Anhänge (bis 10 Dateien, zusammen 20 MB). Jede Mail geht in der dunklen RL-Nexus-Vorlage hinaus, mit Logo, Name, Rang und Avatar aus Discord (`server/mail/compose.ts`). Der Rang kommt von der Team-Seite der Webseite, sonst steht dort Administrator oder Developer. „Vorlage weglassen“ schickt nur den Text. Absender ist genau der Name, der beim Postfach eingetragen ist. Die Kopie liegt danach in „Gesendet“, beantwortete Mails bekommen ihre Marke.
 - **Antworten und Weiterleiten:** Im selben Fenster, oben umschaltbar zwischen Antworten, Allen antworten und Weiterleiten, ohne dass der Text verloren geht. Die ursprüngliche Mail steht eingeklappt unter dem Editor und kommt als Zitat unter die Signatur. Beim Weiterleiten holt der Server die gewählten Anhänge aus Mailcow und hängt sie an.
 - **Verwalten:** Nur Developer tragen Postfächer ein, unter *Postfach → Postfach hinzufügen* (später *Postfächer verwalten*): Adresse, Name und Passwort. Die Server sind vorbelegt mit `mail.<Domain>`, IMAP 993 und SMTP 465, und lassen sich aufklappen und ändern. Vor dem Speichern meldet sich der Server einmal per IMAP und SMTP an und sagt, welcher Teil hakt. Das Passwort kommt danach nie wieder in den Browser.
@@ -102,7 +106,7 @@ Gespeichert wird nichts. Deshalb wartet das Formular auf die Mail: Geht sie nich
 | Weg | Was gesetzt sein muss |
 |---|---|
 | **E-Mail** an `CONTACT_MAIL` | Das Postfach mit dieser Adresse unter *Postfächer verwalten*. Gibt es das nicht, ersatzweise `SMTP_HOST`, `SMTP_USER`, `SMTP_PASSWORD` aus der `.env`. Ohne beides ist das Formular aus |
-| **Discord** in einen Kanal | `CONTACT_WEBHOOK_URL`, freiwillig. Läuft nebenher, der Link führt zu „Alle Posteingänge“. Mit `--dev` gilt nur `DEV_CONTACT_WEBHOOK_URL`, leer heißt dann: kein Hinweis |
+| **Discord** in einen Kanal | `CONTACT_WEBHOOK_URL`, freiwillig. Läuft nebenher, der Link führt ins Postfach. Mit `--dev` gilt nur `DEV_CONTACT_WEBHOOK_URL`, leer heißt dann: kein Hinweis |
 
 Was gerade eingerichtet ist, zeigt *Developer → Technik* unter „Kontakt-Hinweis“.
 
@@ -197,7 +201,7 @@ Darüber gehen nur Marken wie „im Postfach hat sich etwas geändert“, nie Da
 
 | Marke | Wird gesetzt bei | Zieht nach |
 |---|---|---|
-| `contact` | neue Nachricht, Status, Antwort, Löschen | Postfach, Zahl in der Seitenleiste, Übersicht |
+| `contact` | neue Nachricht, Status, Antwort, Löschen | Postfach, Zahl am Bereich Start, Übersicht |
 | `content` | Banner, Team, Module gespeichert oder zurückgesetzt | Übersicht |
 | `maintenance` | Wartung an oder aus | Übersicht |
 | `groups`, `notifications`, `bot` | die jeweiligen Aktionen | für später vorgesehen |
@@ -390,6 +394,7 @@ server/          Fastify, läuft direkt mit node
   check-db.ts    npm run check:db
 shared/          Typen und Grenzen für Server und Oberfläche
 src/             React-App
+  nav/           Leiste: Bereiche, Seiten, Suche
   mail/          Postfach: Spalten, Leser, Editor (TipTap), Verwaltung
   shop/          Shop: Produkte, Einstellungen
   backups/       Backups: Lagebild, Seite eines Servers, Assistent zum Zurückladen

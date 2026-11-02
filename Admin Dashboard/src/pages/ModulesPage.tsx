@@ -1,8 +1,8 @@
 import type { JSX } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import type { ICategories, IContentMeta, IModules } from "../../shared/content";
-import { Button } from "../components/Button";
 import { PageHeader } from "../components/PageHeader";
+import { PageTabs } from "../components/PageTabs";
 import { Failure, Loading } from "../components/Status";
 import { ResetAction } from "../editor/EditorParts";
 import { iconUrl } from "../editor/iconUrl";
@@ -81,7 +81,6 @@ function ModuleTable({ doc, meta }: { readonly doc: IContentDoc<IModules>; reado
 export function ModulesPage(): JSX.Element {
     useTitle("Module");
 
-    const navigate = useNavigate();
     const doc = useContentDoc<IModules>("/api/content/modules");
     const meta = useModuleMeta();
     const categories = useContentDoc<ICategories>("/api/content/categories");
@@ -94,10 +93,15 @@ export function ModulesPage(): JSX.Element {
                 meta={doc.saved === null ? undefined : `${doc.draft.modules.length} Module auf der Webseite. Ein geänderter Status gilt sofort.`}
             >
                 <ResetAction doc={doc} what="Die Modulliste samt aller Kacheln" />
-                <Button variant="primary" size="sm" icon="plus" onClick={() => navigate("/webseite/neues-modul")}>
-                    Neues Modul
-                </Button>
             </PageHeader>
+
+            <PageTabs
+                label="Module"
+                tabs={[
+                    { to: "/webseite/module", label: "Alle Module", icon: "puzzle", end: true },
+                    { to: "/webseite/neues-modul", label: "Neues Modul", icon: "plus" },
+                ]}
+            />
 
             {doc.problem && <Failure message={doc.problem} onRetry={doc.conflict ? doc.reload : undefined} />}
 
