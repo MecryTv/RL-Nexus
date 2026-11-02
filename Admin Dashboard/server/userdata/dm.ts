@@ -4,7 +4,6 @@ import type { IConfig } from "../config.ts";
 import { postDirectMessage, type IDiscordFile } from "../discord.ts";
 import { fit, registerFonts } from "../status/image.ts";
 import { setDm, type IDeletionRecord } from "./deletions.ts";
-import { personExport } from "./find.ts";
 
 /**
  * Die DMs zur Löschung als gezeichnetes Bild (W-0051, Entwurf I1 und J1 bis
@@ -389,7 +388,7 @@ export async function renderDeletionImage(kind: DmKind, input: IDmInput): Promis
  * bei der Ankündigung darunter die live zählende Zeile und die Knöpfe, bei
  * der Kopie die Datei.
  */
-export function deletionMessage(kind: DmKind, deletionId: number, image: { readonly name: string; readonly alt: string }, dueAt: Date, fileName?: string): { readonly flags: number; readonly components: readonly unknown[] } {
+export function deletionMessage(kind: DmKind, deletionId: number, image: { readonly name: string; readonly alt: string }, dueAt: Date, fileNames: readonly string[] = []): { readonly flags: number; readonly components: readonly unknown[] } {
     const parts: unknown[] = [{ type: 12, items: [{ media: { url: `attachment://${image.name}` }, description: image.alt.slice(0, 1024) }] }];
 
     if (kind === "ankuendigung") {
@@ -405,16 +404,9 @@ export function deletionMessage(kind: DmKind, deletionId: number, image: { reado
         );
     }
 
-    if (fileName) parts.push({ type: 13, file: { url: `attachment://${fileName}` } });
+    for (const name of fileNames) parts.push({ type: 13, file: { url: `attachment://${name}` } });
 
     return { flags: 1 << 15, components: parts };
-}
-
-/** Die Kopie wie die Auskunft: ohne Geheimes, fremde Zeilen nur zusammengefasst. */
-export async function deletionCopy(userId: string, now = new Date()): Promise<IDiscordFile> {
-    const data = Buffer.from(JSON.stringify({ person: userId, erstellt: now.toISOString(), von: "RL Nexus", bereiche: await personExport(userId) }, null, 2));
-
-    return { name: `rl-nexus-${userId}-${now.toISOString().slice(0, 10)}.json`, data, type: "application/json" };
 }
 
 /**
@@ -422,10 +414,10 @@ export async function deletionCopy(userId: string, now = new Date()): Promise<ID
  * ob sie ankam und wo sie liegt; kommt sie nicht an, steht das im Protokoll.
  * Die Löschung läuft in jedem Fall weiter.
  */
-export async function sendDeletionDm(config: IConfig, record: IDeletionRecord, kind: DmKind, input: IDmInput, file?: IDiscordFile): Promise<boolean> {
+export async function sendDeletionDm(config: IConfig, record: IDeletionRecord, kind: DmKind, input: IDmInput, files: readonly IDiscordFile[] = []): Promise<boolean> {
     const image = await renderDeletionImage(kind, input);
-    const message = deletionMessage(kind, record.id, image, input.dueAt, file?.name);
-    const sent = await postDirectMessage(config, record.userId, message, [{ name: image.name, data: image.data, type: "image/png" }, ...(file ? [file] : [])]);
+    const message = deletionMessage(kind, record.id, image, input.dueAt, files.map((file) => file.name));
+    const sent = await postDirectMessage(config, record.userId, message, [{ name: image.name, data: image.data, type: "image/png" }, ...files]);
 
     if (kind === "ankuendigung") {
         if ("error" in sent) {

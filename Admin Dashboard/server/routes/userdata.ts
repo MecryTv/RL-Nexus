@@ -36,6 +36,7 @@ import { cancelDeletion, deletionCounts, deletionOf, latestDeletionOf, listDelet
 import { renderDeletionImage, sendDeletionDm } from "../userdata/dm.ts";
 import { personExport, personIndex, personRows, userdataRules } from "../userdata/find.ts";
 import { announcementInput, followUp, plainInput } from "../userdata/flow.ts";
+import { personCopies } from "../userdata/copy.ts";
 import { deletionReceipt, receiptCode } from "../userdata/receipt.ts";
 import { oneOf, snowflake, text } from "../validate.ts";
 
@@ -206,10 +207,18 @@ export async function userdataRoutes(app: FastifyInstance, { config }: { config:
         };
     });
 
-    /** Die Auskunft als Datei. Steht im Protokoll, auch wenn sie leer ist. */
+    /** Die Auskunft als Datei, JSON oder mit ?format=html zum Lesen. Steht im Protokoll, auch wenn sie leer ist. */
     app.get("/api/userdata/:id/auskunft", async (request, reply) => {
         const id = snowflake((request.params as { id?: string }).id);
         requireDatabase();
+
+        if ((request.query as { format?: unknown }).format === "html") {
+            const { html } = await personCopies(id);
+
+            await audit(accessOf(request), "userdata.export", id, "als HTML");
+
+            return reply.type("text/html; charset=utf-8").header("Content-Disposition", `attachment; filename="${html.name}"`).send(html.data);
+        }
 
         const now = new Date();
         const copy = { person: id, erstellt: now.toISOString(), von: "RL Nexus", bereiche: await personExport(id) };

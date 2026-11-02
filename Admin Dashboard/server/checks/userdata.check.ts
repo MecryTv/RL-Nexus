@@ -7,6 +7,7 @@ import { postDirectMessage, removeButtons } from "../discord.ts";
 import { DM_KINDS, deletionMessage, renderDeletionImage, type IDmInput } from "../userdata/dm.ts";
 import { eraseSql, eraseValues } from "../userdata/erase.ts";
 import { scrubTables } from "../userdata/backups.ts";
+import { copyHtml } from "../userdata/copy.ts";
 import { matchSql, matchValue } from "../userdata/find.ts";
 import type { IDeletionRecord } from "../userdata/deletions.ts";
 import { deletionReceipt, receiptCode } from "../userdata/receipt.ts";
@@ -145,6 +146,33 @@ export async function checkUserdata(): Promise<void> {
         assert.equal(result.removed.mod_cases?.[0].moderator_id, A, "Original in der Ablage");
     });
 
+    await check("Kopie als HTML: eine Datei mit allem, Texte aus der Datenbank sind entschärft", () => {
+        const html = copyHtml({
+            id: "276088889339543553",
+            name: "Mi<script>alert(1)</script>",
+            at: new Date("2026-11-02T20:59:00.000Z"),
+            rows: [
+                { area: "level", table: "levels", role: "person", label: "Level 3 <b>fett</b>", guildId: "9", guildName: null, at: "2026-11-01T10:00:00.000Z" },
+                { area: "tickets", table: "ticket_transcripts", role: "person", label: "Verlauf von Ticket 118", guildId: "9", guildName: null, at: "2026-10-12T17:02:00.000Z" },
+            ],
+            exported: {
+                level: { "levels.user_id": [{ xp: 250 }] },
+                tickets: { "ticket_transcripts.opener_id": [{ number: 118, data: { messages: [{ author: { name: "MiqoRL" }, at: 1, content: "Hallo <img src=x>" }] } }] },
+            },
+            kept: { protokoll: "Bleibt drei Jahre als Nachweis." },
+        });
+
+        assert.match(html, /^<!doctype html>/i);
+        assert.ok(!/<script/i.test(html), "kein Skript, auch nicht aus Daten");
+        assert.ok(!html.includes("<img src=x>") && !html.includes("<b>fett</b>"), "HTML aus Daten wird Text");
+        assert.match(html, /Mi&lt;script&gt;/);
+        assert.match(html, /Level und Aktivität/);
+        assert.match(html, /Level 3 &lt;b&gt;fett&lt;\/b&gt;/);
+        assert.match(html, /&quot;xp&quot;: 250/);
+        assert.match(html, /Hallo &lt;img src=x&gt;/);
+        assert.match(html, /JSON-Datei/);
+    });
+
     section("Nutzerdaten: DMs zur Löschung");
 
     // 1. November 2026, 23:30 in Berlin; geschickt 45 Minuten vorher.
@@ -249,7 +277,7 @@ export async function checkUserdata(): Promise<void> {
         assert.deepEqual(ids(deletionMessage("ankuendigung", 7, image, due)), ["ud:copy:7", "ud:stop:7"]);
         assert.match(JSON.stringify(deletionMessage("ankuendigung", 7, image, due).components), new RegExp(`<t:${due.getTime() / 1000}:R>`));
         for (const kind of DM_KINDS.filter((entry) => entry !== "ankuendigung")) assert.deepEqual(ids(deletionMessage(kind, 7, image, due)), [], kind);
-        assert.equal(deletionMessage("kopie", 7, image, due, "rl-nexus-1.json").components.filter((part) => (part as { type: number }).type === 13).length, 1, "die Kopie hängt als Datei dran");
+        assert.equal(deletionMessage("kopie", 7, image, due, ["rl-nexus-1.html", "rl-nexus-1.json"]).components.filter((part) => (part as { type: number }).type === 13).length, 2, "die Kopie hängt als HTML und JSON dran");
     });
 
     await check("DM senden: Kanal und Nachricht kommen zurück, wer keine DMs annimmt, ergibt den Satz", async () => {

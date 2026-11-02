@@ -981,6 +981,13 @@ try {
 
             const [row] = await query<{ n: number }[]>("SELECT COUNT(*) AS n FROM admin_audit WHERE action = 'userdata.export' AND target = ?", [PERSON]);
             assert.equal(Number(row.n), 1);
+
+            const html = await get(`/api/userdata/${PERSON}/auskunft?format=html`);
+            assert.equal(html.statusCode, 200, html.body.slice(0, 200));
+            assert.match(String(html.headers["content-type"]), /text\/html/);
+            assert.match(String(html.headers["content-disposition"]), /^attachment; filename="rl-nexus-kopie-9999999999999999993-\d{4}-\d{2}-\d{2}\.html"$/);
+            assert.ok(html.body.includes("check:db hallo"), "Verlauf als Chat");
+            assert.ok(!html.body.includes("check-oauth-geheim") && !html.body.includes("check-secret-geheim"), "keine Geheimnisse");
         });
 
         await check("Nutzerdaten: 500 Tage Aktivität, die Zeitleiste zeigt die neuesten 100", async () => {
@@ -1413,6 +1420,8 @@ try {
             await withDms(false, async (sent) => {
                 assert.equal((await internal(deletion.id, "copy", P3)).statusCode, 200);
                 assert.match(sent[0]?.body ?? "", /"type":13/, "die Kopie hängt als Datei dran");
+                assert.match(sent[0]?.body ?? "", new RegExp(`rl-nexus-kopie-${P3}-[0-9-]+\\.html`), "zum Lesen");
+                assert.match(sent[0]?.body ?? "", new RegExp(`rl-nexus-kopie-${P3}-[0-9-]+\\.json`), "für Programme");
                 assert.equal((await internal(deletion.id, "copy", P3)).statusCode, 429);
             });
         });

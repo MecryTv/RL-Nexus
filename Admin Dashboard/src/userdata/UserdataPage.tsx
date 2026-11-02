@@ -104,8 +104,11 @@ function Hero({ data, onPlan }: { readonly data: IUserdataProfile; readonly onPl
                     </div>
                 </div>
                 <div className={styles.heroActions}>
+                    <LinkButton href={`/api/userdata/${data.id}/auskunft?format=html`} icon="download" download>
+                        Auskunft (HTML)
+                    </LinkButton>
                     <LinkButton href={`/api/userdata/${data.id}/auskunft`} icon="download" download>
-                        Auskunft (JSON)
+                        JSON
                     </LinkButton>
                     {!isOpen(data.deletion) && (
                         <Button variant="danger" icon="trash" onClick={onPlan}>

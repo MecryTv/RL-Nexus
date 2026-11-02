@@ -60,7 +60,7 @@ const sum = (counts: IDeletionResult["deleted"]): number => Object.values(counts
 
 /** Eine Folgenachricht schicken und die Knöpfe der Ankündigung entfernen. */
 export async function followUp(config: IConfig, record: IDeletionRecord, kind: Exclude<DmKind, "ankuendigung" | "kopie">, input: IDmInput, file?: IDiscordFile): Promise<void> {
-    await sendDeletionDm(config, record, kind, input, file);
+    await sendDeletionDm(config, record, kind, input, file ? [file] : []);
 
     if (record.dmChannelId && record.dmMessageId) await removeButtons(config, record.dmChannelId, record.dmMessageId);
 }

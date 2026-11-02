@@ -6,8 +6,8 @@ import { DatabaseUnavailable, databaseReady } from "../db.ts";
 import { PublicError } from "../errors.ts";
 import { publish } from "../events.ts";
 import { clearCopy, markCopy, stopDeletion } from "../userdata/deletions.ts";
-import { deletionCopy, sendDeletionDm } from "../userdata/dm.ts";
-import { personRows } from "../userdata/find.ts";
+import { personCopies } from "../userdata/copy.ts";
+import { sendDeletionDm } from "../userdata/dm.ts";
 import { followUp, personBase, plainInput } from "../userdata/flow.ts";
 
 /**
@@ -53,9 +53,10 @@ export async function internalUserdataRoutes(app: FastifyInstance, { config }: {
 
         if (params.action === "copy") {
             const record = await markCopy(id, userId);
-            const [file, rows, base] = await Promise.all([deletionCopy(userId), personRows(userId), personBase(config, userId, record.userName)]);
+            // Zwei Dateien: HTML zum Lesen, JSON für Programme (Wahl des Nutzers am 02.11.).
+            const [copies, base] = await Promise.all([personCopies(userId), personBase(config, userId, record.userName)]);
 
-            const sent = await sendDeletionDm(config, record, "kopie", { ...base, sentAt: new Date(), dueAt: new Date(record.dueAt), areas: [], kept: [], total: rows.length, servers: 0, bytes: file.data.length }, file);
+            const sent = await sendDeletionDm(config, record, "kopie", { ...base, sentAt: new Date(), dueAt: new Date(record.dueAt), areas: [], kept: [], total: copies.rows, servers: 0, bytes: copies.html.data.length + copies.json.data.length }, [copies.html, copies.json]);
 
             if (!sent) {
                 // Nicht angekommen: Die 5 Minuten gelten nicht, der nächste Versuch geht sofort.
@@ -63,7 +64,7 @@ export async function internalUserdataRoutes(app: FastifyInstance, { config }: {
                 throw new PublicError(502, "Die Kopie ließ sich gerade nicht schicken. Versuch es gleich noch einmal; klappt es nicht, meldet sich das Team.");
             }
 
-            await audit(PERSON, "userdata.copy", userId, `${rows.length} Einträge`);
+            await audit(PERSON, "userdata.copy", userId, `${copies.rows} Einträge`);
             publish("userdata");
 
             return { message: "Die Kopie ist unterwegs, schau in deine Direktnachrichten." };
