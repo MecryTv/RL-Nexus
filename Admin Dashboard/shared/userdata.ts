@@ -384,6 +384,26 @@ export function sourcesOf(area?: UserdataArea): IUserdataSource[] {
 
 /* --- Was die Seiten bekommen ------------------------------------------- */
 
+/** Wann das Discord-Konto angelegt wurde: steckt in der ID (Snowflake). */
+export function discordSince(id: string): string {
+    return new Date(Number((BigInt(id) >> 22n) + 1420070400000n)).toISOString();
+}
+
+/** Einträge je Woche der letzten 13 Wochen (90 Tage), die neueste zuletzt. */
+export function activityWeeks(times: readonly string[], now: number): number[] {
+    const weeks = Array.from({ length: 13 }, () => 0);
+
+    for (const time of times) {
+        const age = Math.floor((now - Date.parse(time)) / (7 * 86_400_000));
+        if (age >= 0 && age < weeks.length) weeks[weeks.length - 1 - age]++;
+    }
+
+    return weeks;
+}
+
+export const USERDATA_SORTS = ["eintraege", "zuletzt", "name"] as const;
+export type UserdataSort = (typeof USERDATA_SORTS)[number];
+
 export interface IUserdataPerson {
     readonly id: string;
     /** Aus Discord, sonst der zuletzt gespeicherte. */
@@ -395,6 +415,8 @@ export interface IUserdataPerson {
     readonly shop: boolean;
     /** Einträge je Bereich (ohne Listen und JSON). */
     readonly areas: Partial<Record<UserdataArea, number>>;
+    /** Profilbild aus Discord, nur auf der sichtbaren Seite der Liste. */
+    readonly avatar?: string | null;
     /** Offene Löschung (Teil 3b): Stand und Frist, sonst null. */
     readonly deletion?: { readonly state: DeletionState; readonly dueAt: string } | null;
 }
@@ -408,6 +430,8 @@ export interface IUserdataList {
     readonly counts: Readonly<Record<UserdataFilter, number>>;
     readonly page: number;
     readonly pageSize: number;
+    /** Für die Zahlen oben: alle Einträge und angehaltene Löschungen. */
+    readonly totals: { readonly rows: number; readonly halted: number };
 }
 
 export interface IUserdataRow {
@@ -424,9 +448,22 @@ export interface IUserdataProfile {
     readonly id: string;
     readonly name: string | null;
     readonly avatar: string | null;
+    /** @-Name bei Discord. */
+    readonly username: string | null;
+    /** Profilbanner bei Discord, sonst null. */
+    readonly banner: string | null;
+    /** Profilfarbe bei Discord als #rrggbb, sonst null. */
+    readonly accentColor: string | null;
+    /** Wann das Discord-Konto angelegt wurde. */
+    readonly discordSince: string;
+    readonly shop: boolean;
+    /** So viele Einträge blieben bei einer Löschung (Was bleibt). */
+    readonly keptRows: number;
+    /** Einträge je Woche der letzten 13 Wochen, die neueste zuletzt. */
+    readonly activity: readonly number[];
     readonly firstAt: string | null;
     readonly lastAt: string | null;
-    readonly servers: readonly { readonly id: string; readonly name: string | null; readonly rows: number }[];
+    readonly servers: readonly { readonly id: string; readonly name: string | null; readonly icon: string | null; readonly rows: number }[];
     /** Je Bereich die Zahl, die ersten drei Einträge und der Satz, wenn er bleibt. */
     readonly areas: readonly { readonly id: UserdataArea; readonly label: string; readonly rows: number; readonly first: readonly string[]; readonly keep: string | null }[];
     /** Die neuesten 100. */

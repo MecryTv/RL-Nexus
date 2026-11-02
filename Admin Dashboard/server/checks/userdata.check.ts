@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { PERSON_COLUMN, USERDATA_AREA_IDS, USERDATA_AREAS, USERDATA_DEFAULTS, basisText, germanLabel, sourcesOf, type IUserdataSource } from "../../shared/userdata.ts";
+import { PERSON_COLUMN, USERDATA_AREA_IDS, USERDATA_AREAS, USERDATA_DEFAULTS, activityWeeks, basisText, discordSince, germanLabel, sourcesOf, type IUserdataSource } from "../../shared/userdata.ts";
 import { buildApp } from "../app.ts";
 import { signToken } from "../bot.ts";
 import { SESSION_COOKIE, seal } from "../session.ts";
@@ -57,6 +57,20 @@ export async function checkUserdata(): Promise<void> {
         assert.equal(basisText({ basis: "ansprueche", law: null, years: 3 }), "Art. 17 Abs. 3 lit. e DSGVO · 3 Jahre");
         assert.equal(basisText({ basis: "pflicht", law: "Art. 5 Abs. 2 DSGVO", years: 1 }), "Art. 17 Abs. 3 lit. b DSGVO · Art. 5 Abs. 2 DSGVO · 1 Jahr");
         assert.equal(basisText({ basis: null, law: null, years: null }), "Rechtsgrundlage zu klären");
+    });
+
+    await check("discordSince: aus der ID, wann das Discord-Konto angelegt wurde", () => {
+        assert.equal(discordSince("175928847299117063"), "2016-04-30T11:18:25.796Z");
+    });
+
+    await check("activityWeeks: 13 Wochen, die neueste zuletzt, Älteres fällt raus", () => {
+        const now = Date.parse("2026-11-02T20:00:00.000Z");
+        const ago = (days: number): string => new Date(now - days * 86_400_000).toISOString();
+        const weeks = activityWeeks([ago(0.1), ago(0.2), ago(8), ago(100)], now);
+
+        assert.equal(weeks.length, 13);
+        assert.deepEqual(weeks.slice(-2), [1, 2]);
+        assert.equal(weeks.reduce((sum, count) => sum + count, 0), 3);
     });
 
     await check("Jeder Bereich sagt, was drin ist, und hat ein Symbol", () => {

@@ -10,6 +10,7 @@ export async function userRoutes(app: FastifyInstance, { config }: { config: ICo
         const user = await lookupUser(config, snowflake((request.params as { id?: string }).id));
         if (!user) throw new PublicError(404, "Discord kennt keine Person mit dieser ID.");
 
-        return user;
+        // Banner und Profilfarbe braucht nur das Profil unter Nutzerdaten.
+        return { id: user.id, name: user.name, avatar: user.avatar };
     });
 }

@@ -3,6 +3,7 @@ import { audit } from "../audit.ts";
 import { botForgetUser } from "../bot.ts";
 import type { IConfig } from "../config.ts";
 import { query, withTransaction, type TransactionQuery } from "../db.ts";
+import { forgetUser } from "../users.ts";
 import { claimDeletion, deletionOf } from "./deletions.ts";
 import { forgetIndex, matchSql, matchValue, userdataRules } from "./find.ts";
 
@@ -137,6 +138,7 @@ export async function executeDeletion(config: IConfig, id: number): Promise<IDel
     if (!result) return null;
 
     forgetIndex();
+    forgetUser(record.userId);
 
     const forgot = await botForgetUser(config, record.userId, record.plannedBy);
     if (!forgot) await query("UPDATE userdata_deletions SET forget_pending = 1 WHERE id = ?", [id]);

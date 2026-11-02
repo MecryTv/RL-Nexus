@@ -11,17 +11,22 @@ import {
     USERDATA_AREA_IDS,
     USERDATA_AREAS,
     USERDATA_FILTERS,
+    USERDATA_SORTS,
+    activityWeeks,
+    discordSince,
     USERDATA_NOTE_MAX,
     basisText,
     type IDeletion,
     type IDeletionCounts,
     type IUserdataList,
+    type IUserdataPerson,
     type IUserdataProfile,
     type IUserdataRuleView,
 } from "../../shared/userdata.ts";
 import { accessOf } from "../access.ts";
 import { audit } from "../audit.ts";
 import { botOverview } from "../bot.ts";
+import type { IUserRef } from "../../shared/api.ts";
 import type { IConfig } from "../config.ts";
 import { DatabaseUnavailable, databaseReady, query } from "../db.ts";
 import { publish } from "../events.ts";
@@ -65,26 +70,33 @@ export async function userdataRoutes(app: FastifyInstance, { config }: { config:
     app.get("/api/userdata", async (request): Promise<IUserdataList> => {
         requireDatabase();
 
-        const params = request.query as { seite?: string; q?: unknown; filter?: unknown };
+        const params = request.query as { seite?: string; q?: unknown; filter?: unknown; sort?: unknown };
         const page = Math.max(1, Number.parseInt(params.seite ?? "1", 10) || 1);
         const wanted = fold(text(params.q, "Die Suche", { max: 100 }));
         const filter = params.filter === undefined ? "alle" : oneOf(params.filter, USERDATA_FILTERS, "Der Filter");
+        const sort = params.sort === undefined ? "eintraege" : oneOf(params.sort, USERDATA_SORTS, "Die Sortierung");
+        const order = {
+            eintraege: (a: IUserdataPerson, b: IUserdataPerson) => b.rows - a.rows,
+            zuletzt: (a: IUserdataPerson, b: IUserdataPerson) => (b.lastAt ?? "").localeCompare(a.lastAt ?? ""),
+            // Ohne Namen ans Ende.
+            name: (a: IUserdataPerson, b: IUserdataPerson) => Number(a.name === null) - Number(b.name === null) || (a.name ?? "").localeCompare(b.name ?? "", "de"),
+        }[sort];
         const open = new Map((await listDeletions("offen", "")).map((entry) => [entry.userId, { state: entry.state, dueAt: entry.dueAt }]));
         const people = [...(await personIndex()).values()]
             .map((person) => ({ ...person, name: knownName(person.id) ?? person.name, deletion: open.get(person.id) ?? null }))
             .filter((person) => !wanted || person.id.includes(wanted) || fold(person.name ?? "").includes(wanted))
             // Laufende Löschungen stehen oben (Entwurf C4), die nächste Frist zuerst.
-            .sort((a, b) => Number(Boolean(b.deletion)) - Number(Boolean(a.deletion)) || (a.deletion?.dueAt ?? "").localeCompare(b.deletion?.dueAt ?? "") || b.rows - a.rows || a.id.localeCompare(b.id));
+            .sort((a, b) => Number(Boolean(b.deletion)) - Number(Boolean(a.deletion)) || (a.deletion?.dueAt ?? "").localeCompare(b.deletion?.dueAt ?? "") || order(a, b) || a.id.localeCompare(b.id));
         const shown = filter === "shop" ? people.filter((person) => person.shop) : filter === "laeuft" ? people.filter((person) => person.deletion) : people;
         const visible = shown.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-        // Nur für die sichtbare Seite und nur, wo kein Name bekannt ist: höchstens 50 Abfragen, eine Stunde gemerkt.
-        const unknown = visible.filter((person) => person.name === null).map((person) => person.id);
-        const refs = unknown.length > 0 ? await userRefs(config, unknown) : new Map<string, { readonly name: string | null }>();
+        // Name und Bild nur für die sichtbare Seite: höchstens 50 Abfragen, eine Stunde gemerkt.
+        const refs = visible.length > 0 ? await userRefs(config, visible.map((person) => person.id)) : new Map<string, IUserRef>();
 
         return {
-            people: visible.map((person) => ({ ...person, name: person.name ?? refs.get(person.id)?.name ?? null })),
+            people: visible.map((person) => ({ ...person, name: person.name ?? refs.get(person.id)?.name ?? null, avatar: refs.get(person.id)?.avatar ?? null })),
             total: shown.length,
             counts: { alle: people.length, laeuft: people.filter((person) => person.deletion).length, shop: people.filter((person) => person.shop).length },
+            totals: { rows: people.reduce((sum, person) => sum + person.rows, 0), halted: [...open.values()].filter((entry) => entry.state === "angehalten").length },
             page,
             pageSize: PAGE_SIZE,
         };
@@ -140,6 +152,8 @@ export async function userdataRoutes(app: FastifyInstance, { config }: { config:
 
     app.get("/api/userdata/:id", async (request): Promise<IUserdataProfile> => {
         const id = snowflake((request.params as { id?: string }).id);
+        const only = (request.query as { bereich?: unknown }).bereich;
+        const area = only === undefined || only === "" ? null : oneOf(only, USERDATA_AREA_IDS, "Der Bereich");
         requireDatabase();
 
         const rows = await personRows(id);
@@ -156,6 +170,8 @@ export async function userdataRoutes(app: FastifyInstance, { config }: { config:
             latestDeletionOf(id),
         ]);
         const guildNames = new Map((bot?.guilds ?? []).map((guild) => [guild.id, guild.name]));
+        const guildIcons = new Map((bot?.guilds ?? []).map((guild) => [guild.id, guild.icon]));
+        const indexed = (await personIndex()).get(id);
         const named = rows.map((row) => ({ ...row, guildName: row.guildId ? (guildNames.get(row.guildId) ?? null) : null }));
         const newest = [...named].sort((a, b) => (b.at ?? "").localeCompare(a.at ?? ""));
         const times = named.flatMap((row) => (row.at ? [row.at] : [])).sort();
@@ -165,18 +181,26 @@ export async function userdataRoutes(app: FastifyInstance, { config }: { config:
 
         return {
             id,
-            name: user?.name ?? (await personIndex()).get(id)?.name ?? null,
-            avatar: user?.avatar ?? null,
+            name: user?.name ?? indexed?.name ?? null,
+            // Größer als in Listen: Der Kopf zeigt das Bild mit 84 Pixeln.
+            avatar: user?.avatar?.replace("size=64", "size=256") ?? null,
+            username: user?.username ?? null,
+            banner: user?.banner ?? null,
+            accentColor: user?.accentColor ?? null,
+            discordSince: discordSince(id),
+            shop: indexed?.shop ?? false,
+            keptRows: named.filter((row) => rules.find((rule) => rule.area === row.area)?.keep).length,
+            activity: activityWeeks(times, Date.now()),
             firstAt: times[0] ?? null,
             lastAt: times.at(-1) ?? null,
-            servers: [...servers].map(([guild, count]) => ({ id: guild, name: guildNames.get(guild) ?? null, rows: count })).sort((a, b) => b.rows - a.rows),
+            servers: [...servers].map(([guild, count]) => ({ id: guild, name: guildNames.get(guild) ?? null, icon: guildIcons.get(guild) ?? null, rows: count })).sort((a, b) => b.rows - a.rows),
             areas: USERDATA_AREAS.map((area) => {
                 const inArea = newest.filter((row) => row.area === area.id);
                 const rule = rules.find((entry) => entry.area === area.id);
 
                 return { id: area.id, label: area.label, rows: inArea.length, first: inArea.slice(0, 3).map((row) => row.label), keep: rule?.keep ? rule.note : null };
             }),
-            timeline: newest.slice(0, TIMELINE),
+            timeline: (area ? newest.filter((row) => row.area === area) : newest).slice(0, TIMELINE),
             audit: auditRows.map((row) => ({ action: row.action, by: row.user_name, at: row.created_at.toISOString(), detail: row.detail })),
             deletion: deletion ? publicDeletion(deletion) : null,
         };

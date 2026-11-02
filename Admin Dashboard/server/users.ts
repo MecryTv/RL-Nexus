@@ -1,6 +1,6 @@
 import type { IUserRef } from "../shared/api.ts";
 import type { IConfig } from "./config.ts";
-import { avatarUrl, displayName, fetchUser } from "./discord.ts";
+import { avatarUrl, bannerUrl, displayName, fetchUser } from "./discord.ts";
 
 const TTL = 60 * 60_000;
 
@@ -17,11 +17,25 @@ export async function lookupUser(config: IConfig, userId: string, now = Date.now
     if (cached && now - cached.at < TTL) return cached.value;
 
     const user = await fetchUser(config, userId);
-    const value = user ? { id: user.id, name: displayName(user), avatar: avatarUrl(user.id, user.avatar) } : null;
+    const value = user
+        ? {
+              id: user.id,
+              name: displayName(user),
+              avatar: avatarUrl(user.id, user.avatar),
+              username: user.username,
+              banner: bannerUrl(user.id, user.banner),
+              accentColor: typeof user.accent_color === "number" ? `#${user.accent_color.toString(16).padStart(6, "0")}` : null,
+          }
+        : null;
 
     known.set(userId, { value, at: now });
 
     return value;
+}
+
+/** Nach einer Löschung und in Checks: Name, Bild und Banner aus dem Speicher werfen. */
+export function forgetUser(userId: string): void {
+    known.delete(userId);
 }
 
 /** Der Name aus dem Speicher, ohne Discord zu fragen. Für die Suche (W-0059), die nicht warten darf. */

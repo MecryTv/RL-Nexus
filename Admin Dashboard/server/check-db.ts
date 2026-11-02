@@ -18,11 +18,12 @@ import type { Transporter } from "nodemailer";
 import type { Options } from "nodemailer/lib/mailer/index.js";
 import type { IAuditPage, IDbRows, IDbTable, IGroupList, IMailAllPage, IMailOverview, IOverview, ITech } from "../shared/api.ts";
 import type { ISearchResult } from "../shared/search.ts";
-import { PERSON_COLUMN, USERDATA_IGNORED, sourcesOf, type IDeletion, type IUserdataList, type IUserdataProfile, type IUserdataRuleView } from "../shared/userdata.ts";
+import { PERSON_COLUMN, USERDATA_IGNORED, discordSince, sourcesOf, type IDeletion, type IUserdataList, type IUserdataProfile, type IUserdataRuleView } from "../shared/userdata.ts";
 import { forgetIndex, personIndex, rowsOf } from "./userdata/find.ts";
 import { cancelDeletion, claimDeletion, deletionCounts, deletionOf, dueDeletions, forgetOldDeletions, listDeletions, markCopy, openDeletionOf, planDeletion, stopDeletion } from "./userdata/deletions.ts";
 import { executeDeletion } from "./userdata/erase.ts";
 import { signToken } from "./bot.ts";
+import { forgetUser } from "./users.ts";
 import { deletionRound } from "./userdata/clock.ts";
 import type { ICancelReceipt, ICheckoutStart, ICustomerDetail, ICustomerList, IShopProduct, IShopProductList, IShopSettingsView, IShopState, IUnlockProgress } from "../shared/shop.ts";
 import type { IIncidentList, IPublicStatus, IStatusDetail } from "../shared/status.ts";
@@ -882,6 +883,54 @@ try {
             assert.ok(profile.servers.some((server) => server.id === TEST_GUILD));
             assert.ok(profile.timeline.some((row) => row.label === "Ticket 1 · offen"), "Status auf Deutsch");
             assert.ok(profile.timeline.some((row) => row.label === "Fall 1 bearbeitet · Verwarnung"), "Aktion auf Deutsch");
+        });
+
+        await check("Nutzerdaten: Liste sortiert nach Einträgen, zuletzt aktiv oder Name, mit Zahlen oben", async () => {
+            const page = async (sort: string): Promise<IUserdataList["people"]> => ((await get(`/api/userdata?sort=${sort}`)).json() as IUserdataList).people.filter((person) => !person.deletion);
+            const byRows = await page("eintraege");
+            const byLast = await page("zuletzt");
+            const names = (await page("name")).map((person) => person.name).filter((name): name is string => Boolean(name));
+
+            assert.ok(byRows.every((person, index) => index === 0 || byRows[index - 1].rows >= person.rows), "Einträge absteigend");
+            assert.ok(byLast.every((person, index) => index === 0 || (byLast[index - 1].lastAt ?? "") >= (person.lastAt ?? "")), "zuletzt aktiv zuerst");
+            assert.deepEqual(names, [...names].sort((a, b) => a.localeCompare(b, "de")), "Name A bis Z");
+            assert.equal((await get("/api/userdata?sort=falsch")).statusCode, 400);
+
+            const list = (await get(`/api/userdata?q=${PERSON}`)).json() as IUserdataList;
+            assert.ok(list.totals.rows >= list.people.reduce((sum, person) => sum + person.rows, 0));
+            assert.equal(typeof list.totals.halted, "number");
+            assert.equal(list.people.find((person) => person.id === PERSON)?.areas.level, 1);
+        });
+
+        await check("Nutzerdaten: Profil mit Banner und Profilfarbe aus Discord, Shop, Aktivität, Zeitleiste je Bereich", async () => {
+            const real = globalThis.fetch;
+
+            globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+                const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+                if (!url.endsWith(`/users/${PERSON}`)) return real(input, init);
+
+                return new Response(JSON.stringify({ id: PERSON, username: "checkperson", global_name: "check Person", avatar: "abc", banner: "a_def", accent_color: 0x1f6f8b }), { status: 200, headers: { "Content-Type": "application/json" } });
+            }) as typeof fetch;
+
+            try {
+                forgetUser(PERSON);
+                const profile = await profileOf(PERSON);
+
+                assert.equal(profile.banner, `https://cdn.discordapp.com/banners/${PERSON}/a_def.gif?size=600`);
+                assert.equal(profile.accentColor, "#1f6f8b");
+                assert.equal(profile.username, "checkperson");
+                assert.equal(profile.shop, true);
+                assert.equal(profile.discordSince, discordSince(PERSON));
+                assert.equal(profile.activity.length, 13);
+                assert.ok((profile.activity.at(-1) ?? 0) >= 1, "heute angelegt");
+
+                const tickets = await get(`/api/userdata/${PERSON}?bereich=tickets`);
+                const timeline = (tickets.json() as IUserdataProfile).timeline;
+                assert.ok(timeline.length > 0 && timeline.every((row) => row.area === "tickets"), JSON.stringify(timeline.map((row) => row.area)));
+            } finally {
+                globalThis.fetch = real;
+                forgetUser(PERSON);
+            }
         });
 
         await check("Nutzerdaten: Einträge aus dem Protokoll stehen mit deutschem Namen da", async () => {

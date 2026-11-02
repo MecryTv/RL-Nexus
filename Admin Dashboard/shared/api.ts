@@ -372,6 +372,10 @@ export interface IUserRef {
     readonly id: string;
     readonly name: string | null;
     readonly avatar: string | null;
+    /** Nur aus lookupUser: @-Name, Banner und Profilfarbe für das Profil unter Nutzerdaten. */
+    readonly username?: string | null;
+    readonly banner?: string | null;
+    readonly accentColor?: string | null;
 }
 
 export interface IGroupEntry {

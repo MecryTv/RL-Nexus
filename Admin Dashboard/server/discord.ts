@@ -18,6 +18,9 @@ export interface IDiscordUser {
     readonly username: string;
     readonly global_name?: string | null;
     readonly avatar: string | null;
+    /** Nur über /users/:id mit dem Bot-Token. */
+    readonly banner?: string | null;
+    readonly accent_color?: number | null;
     readonly mfa_enabled?: boolean;
     /** Nur mit Scope email. */
     readonly email?: string | null;
@@ -272,6 +275,11 @@ export async function setMemberRole(config: IConfig, userId: string, roleId: str
     throw new DiscordUnavailable(
         `Die Rolle ${roleId} ließ sich nicht ${on ? "vergeben" : "entfernen"} (${response.status}, Code ${code ?? "?"}). Steht die Rolle des Bots über der Shop-Rolle, und darf er „Rollen verwalten“?`
     );
+}
+
+/** Das Profilbanner; animierte (a_) als GIF. */
+export function bannerUrl(userId: string, hash: string | null | undefined): string | null {
+    return hash ? `https://cdn.discordapp.com/banners/${userId}/${hash}.${hash.startsWith("a_") ? "gif" : "png"}?size=600` : null;
 }
 
 export function avatarUrl(userId: string, hash: string | null | undefined): string | null {
