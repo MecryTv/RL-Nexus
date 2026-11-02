@@ -835,6 +835,20 @@ const PRIVACY: readonly ILegalSection[] = [
                     die richtigen Daten finden.
                 </p>
                 <p>
+                    <strong>Löschen:</strong> Bittest du uns, deine Daten zu löschen, schickt dir der Bot eine
+                    Nachricht mit der Uhrzeit, zu der gelöscht wird. Bis dahin kannst du dir über einen Knopf eine
+                    Kopie deiner Daten holen. Warst du es nicht, hältst du die Löschung mit „Das war ich nicht“ an;
+                    dann meldet sich das Team bei dir. Nach dem Löschen bekommst du eine Bestätigung mit einem Beleg
+                    als PDF. Was wir aufbewahren müssen und warum, steht in der Nachricht und im Beleg.
+                </p>
+                <p>
+                    Den Nachweis der Löschung (Discord-ID, Zeitpunkte und Zahlen, keine Inhalte) bewahren wir drei
+                    Jahre auf (Art. 6 Abs. 1 lit. c, Art. 5 Abs. 2 DSGVO). Ebenso lange steht im Protokoll unseres
+                    Teams, was es zu deiner Person erledigt hat, etwa eine Auskunft oder eine Löschung. In
+                    Sicherungskopien der Datenbank stehen gelöschte Daten noch, bis diese nach 30 Tagen
+                    überschrieben werden.
+                </p>
+                <p>
                     Außerdem kannst du dich bei einer Datenschutz-Aufsichtsbehörde beschweren (Art. 77 DSGVO). Für uns
                     zuständig ist das Unabhängige Landeszentrum für Datenschutz Schleswig-Holstein, Holstenstraße 98,
                     24103 Kiel.
