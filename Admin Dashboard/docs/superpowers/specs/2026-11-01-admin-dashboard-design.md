@@ -208,6 +208,19 @@ Wahl des Nutzers vor dem Plan:
 
 Entscheidungen von Claude dazu (Liste am Ende, 32 bis 36).
 
+### Ergänzung vom 02.11.: Seite „Löschungen“ (LA+) und Ablauf in 3b
+
+Entwurf `w0051-loeschungen.html` (LA Tabelle, LB Spalten), Wahl des Nutzers: „LA nur besser“, überarbeitet als `w0051-loeschungen-v2.html` (LA+), dann „Ja, so bauen“:
+
+- Oben vier Zahlen: Läuft (mit „nächste in …“), Angehalten (gelb), Gelöscht und Abgebrochen in 30 Tagen.
+- Filter **Offen** (Standard), Erledigt, Abgebrochen, Alle, dazu Suche nach Name oder ID.
+- Abschnitt „Offen“: angehaltene zuerst (gelb markiert), dann laufende (blau markiert). Je Zeile Person, Stand mit Punkten für die Schritte (geplant, DM, Kopie, gelöscht; gelb oder rot, wo etwas hakt), Restzeit als kleiner Ring mit Uhrzeit, „geplant von · Grund“. Knöpfe je Stand: angehalten „Neu planen“ und „Schließen“, laufend „Abbrechen“, gelöscht „Beleg (PDF)“.
+- Abschnitt „Zuletzt erledigt“ gekürzt, mit „alle zeigen“.
+- Auf dem Handy Karten statt Zeilen.
+- Angehalten fällt auf: gelbe Zahl an „Löschungen“ in der Leiste und am Bereich, Kachel auf der Übersicht.
+
+Entscheidungen von Claude zum Ablauf (Liste am Ende, 37 bis 43).
+
 ---
 
 ## Teil 4: Dauerhafte Sperre mit VPN-Erkennung (W-0057)
@@ -416,3 +429,10 @@ Wunsch vom 02.11.: „verbesser die Suche, sodass man quasi alles auf dem Admin 
 34. **Eigene Seite „Was bleibt“** im Bereich Datenschutz für „löschen“ oder „behalten“ je Bereich, statt die Einstellung im Profil zu verstecken.
 35. **Die Liste aller Personen rechnet der Server** aus allen Bereichen und hält sie 5 Minuten. Bei vielen Tausend Personen wird daraus später eine eigene Tabelle.
 36. **Auskunft ohne Geheimnisse:** Passwort-Hashes, 2FA-Schlüssel und OAuth-Token stehen nicht im JSON; Transcripts kommen entpackt und lesbar.
+37. **Die Uhr schaut alle 30 Sekunden** nach fälligen Löschungen; „endgültig um …“ kann also bis zu 30 Sekunden später ausgeführt werden. Der Stand liegt in der Datenbank, ein Neustart verliert nichts.
+38. **Löschen in einer Transaktion:** Zeilen der Person (`person`) werden gelöscht; wo sie für andere gehandelt hat (`team`), wird die Spalte geleert (NULL, wo erlaubt, sonst „0“) und ein Name dazu auf „Gelöschte Person“ gesetzt; IDs in JSON werden durch "0" ersetzt, aus Komma-Listen entfernt. Bereiche auf „behalten“ bleiben ganz.
+39. **Die Löschung selbst bleibt als Nachweis** (`userdata_deletions`, mit ID, Zeiten, Zahlen je Bereich). Der gespeicherte Name wird beim Ausführen geleert; die ID bleibt für den Beleg.
+40. **Knöpfe in der DM:** Der Bot nimmt den Klick an und fragt das Admin Dashboard (`/internal/userdata/…`, Scope `userdata`, Subjekt = Discord-ID der klickenden Person). Es zählt nur die Person, an die die DM ging, und nur solange die Löschung läuft.
+41. **Kopie wie die Auskunft** (ohne Geheimes, fremde Zeilen zusammengefasst), höchstens alle 5 Minuten.
+42. **„Schließen“** bei einer angehaltenen Löschung heißt abgebrochen; die Person bekommt die DM „abgebrochen“.
+43. **Datenschutzerklärung:** Der Abschnitt „Deine Rechte“ beschreibt den Weg; der Text gilt vorläufig, bis W-0009 die Rechtstexte prüft.
