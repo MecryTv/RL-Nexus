@@ -369,6 +369,11 @@
     }
 }
 
+/* Immer in der letzten Spalte, auch wenn kein Satzfeld davor steht. */
+.save {
+    grid-column: -2 / -1;
+}
+
 .note {
     min-width: 0;
 

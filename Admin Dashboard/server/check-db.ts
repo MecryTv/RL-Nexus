@@ -843,6 +843,18 @@ try {
             assert.ok(profile.servers.some((server) => server.id === TEST_GUILD));
         });
 
+        await check("Nutzerdaten: Einträge aus dem Protokoll stehen mit deutschem Namen da", async () => {
+            await query("INSERT INTO admin_audit (user_id, user_name, action, target, detail) VALUES (?, 'check Person', 'group.grant', ?, NULL)", [PERSON, DECOY]);
+
+            try {
+                const profile = await profileOf(PERSON);
+
+                assert.deepEqual(profile.areas.find((area) => area.id === "team")?.first.includes("Gruppe vergeben"), true, JSON.stringify(profile.areas));
+            } finally {
+                await query("DELETE FROM admin_audit WHERE user_id = ? AND target = ?", [PERSON, DECOY]);
+            }
+        });
+
         await check("Nutzerdaten: nur genaue Treffer, keine ID als Teilstring", async () => {
             const profile = await profileOf(PERSON);
 

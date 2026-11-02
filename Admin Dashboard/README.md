@@ -72,6 +72,16 @@ Die Suche öffnet sich mit kurz gedrückter rechter Umschalttaste, mit `/` oder 
 
 Oben stehen die Filter mit der Zahl der Treffer, `Tab` und `Umschalt+Tab` wechseln sie. Kürzel am Anfang suchen nur dort: `@` Personen, `#` Server, `/` Seiten. Seiten sucht der Browser sofort, alles andere fragt er ab 2 Zeichen und 200 ms nach dem letzten Tastendruck mit einer Anfrage bei `GET /api/search`. Jede Quelle hat dort 2 Sekunden; was fehlt, nennt das Fenster. Höchstens 20 Treffer je Filter („20+“), 40 in „Alles“. Ein Treffer öffnet die Seite dazu, Server, Gruppen und Kunden schon gefiltert (`?q=`). Gemeinsame Regeln in `shared/search.ts`, die Quellen in `server/search/sources.ts`, das Fenster in `src/components/NavSearch.tsx`.
 
+## Datenschutz
+
+Recht auf Auskunft (W-0051, Teil 3a; die Löschung folgt als Teil 3b). Admin und Developer sehen den Bereich.
+
+- **Wo Personendaten liegen**, steht an genau einer Stelle: `shared/userdata.ts`, je Bereich die Tabellen und Spalten mit Discord-IDs. `person` heißt, die Zeile gehört der Person; `team`, sie hat etwas für andere getan (Ersteller, Moderator, „vergeben von“); `json`, ihre ID steht in einer JSON-Liste. `check:db` vergleicht die Liste mit `INFORMATION_SCHEMA`: Jede Spalte, deren Name nach Personen-ID aussieht (`PERSON_COLUMN`), muss eingetragen oder in `USERDATA_IGNORED` begründet sein. Ein neues Modul mit `user_id` fällt also sofort auf.
+- **Nutzerdaten** (`/datenschutz`): links alle Personen mit Daten, nach Menge sortiert, Suche nach Name oder ID, Filter Shop-Kunden; der Server rechnet die Liste aus allen Bereichen und hält sie 5 Minuten. Rechts das Profil mit den Reitern Bereiche, Zeitleiste (die neuesten 100), Server und Protokoll. Unter 1100 px steht das Profil auf eigener Seite.
+- **Auskunft (JSON)** lädt alles zu einer Person als Datei, je Bereich und `tabelle.spalte`. Passwort-Hashes, 2FA-Schlüssel und OAuth-Token fehlen (`hidden`), Ticket-Verläufe kommen entpackt. Jede Auskunft steht im Protokoll.
+- **Was bleibt** (`/datenschutz/regeln`): je Bereich löschen oder behalten, beim Behalten ein Satz für die DM. Bis W-0009 bleiben Shop, Moderation und das Protokoll des Teams mit „zu klären“.
+- Personen-Treffer der Suche öffnen das Profil.
+
 ## Übersicht
 
 Die Startseite fragt alle 15 Sekunden `/api/overview` ab, Wartung und Inhalte kommen sofort über `/api/events`.

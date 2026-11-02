@@ -53,7 +53,7 @@ function RuleRow({ rule, onSaved }: { readonly rule: IUserdataRule; readonly onS
                     onChange={(event) => setNote(event.target.value)}
                 />
             )}
-            <Button size="sm" variant={changed ? "primary" : "outline"} disabled={!changed || busy || (keep && !note.trim())} onClick={() => void save()}>
+            <Button className={styles.save} size="sm" variant={changed ? "primary" : "outline"} disabled={!changed || busy || (keep && !note.trim())} onClick={() => void save()}>
                 Speichern
             </Button>
         </li>

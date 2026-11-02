@@ -1,4 +1,5 @@
 import { inflateSync } from "node:zlib";
+import { AUDIT_LABELS } from "../../shared/limits.ts";
 import {
     USERDATA_AREAS,
     USERDATA_DEFAULT_KEEP,
@@ -117,7 +118,10 @@ export async function personRows(id: string): Promise<Omit<IUserdataRow, "guildN
         );
 
         for (const row of found) {
-            rows.push({ area: areaOf.get(source) as UserdataArea, table: source.table, role: source.role, label: String(row.label ?? source.table), guildId: row.guild, at: iso(row.at) });
+            const label = String(row.label ?? source.table);
+
+            // Im Protokoll steht der technische Name der Aktion; angezeigt wird der deutsche.
+            rows.push({ area: areaOf.get(source) as UserdataArea, table: source.table, role: source.role, label: source.table === "admin_audit" ? (AUDIT_LABELS[label] ?? label) : label, guildId: row.guild, at: iso(row.at) });
         }
     }
 
