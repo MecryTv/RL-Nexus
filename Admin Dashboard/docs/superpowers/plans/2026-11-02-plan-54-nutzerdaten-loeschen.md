@@ -147,3 +147,27 @@ Zeilen 1 bis 3 und 5 haben Tests in Task 1, 2 und 4; Zeile 4 in Task 2 (Fälschu
 - [ ] **Step 2:** Im Browser (lokal, Dev-Bot läuft): Löschung für eine eigene Test-Person mit 5 Minuten planen, DM im Dev-Server ansehen, „Kopie“ und „Das war ich nicht“ drücken, neu planen, ablaufen lassen, Beleg öffnen; Seite Löschungen und die gelbe Zahl prüfen; 390 px. Nur mit Test-IDs oder dem eigenen Konto des Nutzers nach Rückfrage.
 - [ ] **Step 3:** Alle Prüfungen der drei Projekte grün (Admin: check, check:db bis auf die zwei bekannten, typecheck, lint, build; Bot: check:userdata, check:admin, tsc; Webseite: check, lint, build).
 - [ ] **Step 4:** Commit `docs(W-0051): Datenschutzerklärung und README`, Abschluss-Review durch einen frischen Reviewer, Befunde einarbeiten, Merge nur nach Zustimmung.
+
+---
+
+## Nachtrag vom 02.11. (Runde 3): Tasks 8 bis 10, vor Task 7
+
+Spec-Nachtrag „Runde 3: Beleg B1+, Nutzerdaten N2+, Was bleibt W3“ und Entscheidungen 44 bis 46. Reihenfolge: 6, 8, 9, 10, 7. Ausführung wie gehabt nativ.
+
+### Task 8: Was bleibt W3 mit Rechtsgrundlage und Dauer
+
+**Files:** Create `server/migrations/015_userdata_rules_basis.sql` (Spalten `basis` ENUM('pflicht','ansprueche') NULL, `law` VARCHAR(60) NULL, `years` TINYINT UNSIGNED NULL). Modify `shared/userdata.ts` (IUserdataRule + basis/law/years; `USERDATA_BASIS` mit Text „Art. 17 Abs. 3 lit. b DSGVO“ / „lit. e“; `USERDATA_DEFAULTS` statt `USERDATA_DEFAULT_KEEP`: shop = Satz aus der Datenschutzerklärung, ansprueche, 3 Jahre; protokoll = Nachweis, pflicht, „Art. 5 Abs. 2 DSGVO“, 3 Jahre; moderation nicht mehr; je Bereich `inside` und `icon`; `basisText(rule)`), `server/userdata/find.ts` (personIndex zählt je Bereich, userdataRules liest die neuen Spalten), `server/routes/userdata.ts` (GET /regeln mit Personen und Einträgen je Bereich; PUT /regeln als ein Speichern für alle geänderten Bereiche, Protokoll je Änderung; PUT /regeln/:area entfällt), `server/userdata/erase.ts` (kept mit basis/law/years), `src/userdata/RulesPage.tsx` (W3).
+- [ ] Tests zuerst: `userdata.check.ts` „basisText: Rechtsansprüche, 3 Jahre“, „Vorgaben aus der Datenschutzerklärung (Shop bleibt, Moderation nicht)“; `check-db.ts` „Was bleibt: ein Speichern für mehrere Bereiche mit Rechtsgrundlage“, „… 400 ohne Satz oder mit falscher Grundlage oder Dauer“, „… Personen je Bereich“, „Löschung: kept trägt Grundlage und Dauer“.
+- [ ] Commit `feat(W-0051): Was bleibt mit Rechtsgrundlage und Dauer`.
+
+### Task 9: Beleg B1+ per DM, Prüfcode, Nachweis 3 Jahre
+
+**Files:** Modify `server/userdata/receipt.ts` (B1+, zwei Seiten, dunkel; Schriften Oxanium 500 als WOFF aus @fontsource nach `server/assets/fonts/`, Oxanium Bold/ExtraBold und Rajdhani Bold TTF; Logo `server/assets/mail-logo.png`; nur Zeichen, die die Schriften haben), `receiptCode(record, secret)` (HMAC-SHA256, „XXXX-XXXX-XXXX“), `server/userdata/flow.ts` (followUp mit Datei), `server/userdata/clock.ts` (DM „Erledigt“ mit Beleg; alte Nachweise löschen), `server/userdata/deletions.ts` (`forgetOldDeletions(now)`: erledigt/abgebrochen älter als 3 Jahre), Route Liste (Prüfcode bei gelöschten), `src/userdata/DeletionParts.tsx` (Prüfcode in der Notiz).
+- [ ] Tests zuerst: `userdata.check.ts` „receiptCode: gleich bei gleichem Inhalt, anders bei anderen Zahlen“, „Beleg hat zwei Seiten“; `check-db.ts` „Uhr: DM Erledigt hat den Beleg als PDF“, „Uhr: Nachweise älter als 3 Jahre verschwinden, jüngere bleiben“.
+- [ ] Commit `feat(W-0051): Beleg B1+ per DM, Prüfcode, Nachweis 3 Jahre`.
+
+### Task 10: Nutzerdaten N2+
+
+**Files:** Modify `server/discord.ts` (IDiscordUser banner, accent_color), `server/users.ts` (lookupUser mit Banner-URL und Farbe), `shared/userdata.ts` (IUserdataPerson + avatar, areas; IUserdataList + totals; IUserdataProfile + banner, accentColor, username, shop, activity, keptRows, Server-Symbol; `discordSince(id)`, `activityWeeks(times, now)`), `server/routes/userdata.ts` (Sortierung `sort=eintraege|zuletzt|name`, Zahlen oben, Profil-Felder, Zeitleiste mit `bereich`), `src/userdata/UserdataPage.tsx` (N2+), Stile.
+- [ ] Tests zuerst: `userdata.check.ts` „discordSince aus der ID“, „activityWeeks: 13 Wochen, neueste zuletzt“; `check-db.ts` „Liste: sortiert nach Einträgen, zuletzt aktiv, Name; Zahlen oben“, „Profil: Banner und Farbe aus Discord, Shop, Aktivität“.
+- [ ] Commit `feat(W-0051): Nutzerdaten mit Profilbanner und Kennzahlen`.

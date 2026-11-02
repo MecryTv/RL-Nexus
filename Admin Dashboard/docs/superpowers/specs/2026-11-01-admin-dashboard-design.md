@@ -325,6 +325,17 @@ Eine Löschung nach Teil 3 lässt die Sperre samt Hashes stehen. Im Profil der N
 - Eine gesperrte Person bekommt auf einem gesperrten Baustein eine Antwort vom Bot, oder eine nicht gesperrte Person keine.
 - Moderation gegen die gesperrte Person hört auf zu wirken.
 
+### Ergänzung vom 02.11. (Runde 3): Beleg B1+, Nutzerdaten N2+, Was bleibt W3
+
+Rückmeldung des Nutzers nach Task 6: Beleg, Nutzerdaten und Was bleibt „komplett neu“, der Beleg geht per DM an die Person. Entwürfe `w0051-beleg-v2.html` (B1+), `w0051-nutzerdaten-v2.html` (N2+), `w0051-was-bleibt-v2.html` (W3), alle drei freigegeben („sehr gut“, „mega“). Fehlende Angaben aus der Datenschutzerklärung der Webseite.
+
+- **Beleg B1+:** dunkles A4-PDF in Oxanium und Rajdhani, zwei Seiten. Seite 1: Kopf mit Logo und „Löschbestätigung · Art. 17 DSGVO“, Beleg-Nr., Stempel „GELÖSCHT“ mit Zeit, betroffene Person (Discord-ID) und Verantwortlicher (Connor Olischer, Königsberger Straße 8, 25335 Elmshorn, support@nexus-emb.de), drei Zahlen (gelöscht, Server, aufbewahrt), Bereiche als Tabelle, Ablauf als Zeitstrahl (geplant, DM, Kopie, gelöscht), Anlass. Seite 2: „Was wir noch haben und warum“ je aufbewahrtem Bereich mit Satz, Rechtsgrundlage und Dauer; der Nachweis selbst (Discord-ID, Zeiten, Zahlen; Art. 6 Abs. 1 lit. c, Art. 5 Abs. 2 DSGVO; **3 Jahre**); Sicherungen (**30 Tage**, bis dahin nicht zurückgespielt); „Nicht bei uns“ (Nachrichten auf Discord-Servern); Rechte (support@nexus-emb.de, Support-Server, Beschwerde beim ULD Schleswig-Holstein, Holstenstraße 98, 24103 Kiel, Art. 77). Fuß: „Maschinell erstellt, gültig ohne Unterschrift“, Prüfcode (HMAC über Nr., ID, Zeit und Zahlen), Seite x/2. Kein QR-Code.
+- **Beleg per DM:** Die DM „Erledigt“ hat den Beleg als PDF-Datei angehängt.
+- **Nachweis 3 Jahre:** Die Uhr löscht erledigte und abgebrochene Löschungen 3 Jahre nach Ende (done_at bzw. cancelled_at).
+- **Nutzerdaten N2+:** Kennzahlen oben (Personen, Einträge, Löschung läuft mit Zahl angehaltener, Shop-Kunden). Liste mit echtem Profilbild, Symbolen der Bereiche, Einträgen, Stand der Löschung und Sortierung (Einträge, zuletzt aktiv, Name). Profil-Kopf mit dem Discord-Profilbanner als Hintergrund (abgedunkelt), sonst Profilfarbe, sonst roter Schein; großes Profilbild, Name, @Nutzername, ID mit „kopieren“, Auskunft und Löschen planen; Marken „Auf Discord seit“ (aus der ID), „Bei RL Nexus seit“, „Zuletzt“, „Shop-Kunde“, Server mit Symbol. Laufende oder angehaltene Löschung als Leiste unter dem Kopf. Kennzahlen Einträge, Bereiche, Server, Aktivität 90 Tage (Balken je Woche), „bleiben bei Löschung“. Bereichskarten mit Symbol, Anteil, ersten Einträgen und Sprung in die gefilterte Zeitleiste.
+- **Was bleibt W3:** oben drei Zahlen (wird gelöscht, bleibt, noch offen). „Bleibt“ groß oben: je Bereich was drin ist, Personen und Einträge, Satz für DM und Beleg mit Vorschlägen, Rechtsgrundlage (Gesetzliche Pflicht, Art. 17 Abs. 3 lit. b · Rechtsansprüche, lit. e) mit optionaler Norm, Dauer; Warnung, solange „zu klären“ drinsteht. „Wird gelöscht“ als Karten mit Schalter, Inhalt und Personen. Rechts Vorschau für DM und Beleg. Ein Speichern unten mit Liste der Änderungen und „Verwerfen“, Nachfrage beim Verlassen.
+- **Vorgaben aus der Datenschutzerklärung:** Shop bleibt: „Bezahlte Bestellungen, Zustimmungen und Kündigungen bewahren wir drei Jahre nach Vertragsende auf, um Ansprüche belegen zu können. Rechnungen und Zahlungsdaten liegen bei Stripe.“ (Rechtsansprüche, 3 Jahre). Moderation: keine Frist genannt, wird auf Anfrage gelöscht. Protokoll: Entscheidung von Claude, siehe 44.
+
 ## Teil 5: Suche findet alles (W-0059)
 
 ### Worum es geht
@@ -436,3 +447,6 @@ Wunsch vom 02.11.: „verbesser die Suche, sodass man quasi alles auf dem Admin 
 41. **Kopie wie die Auskunft** (ohne Geheimes, fremde Zeilen zusammengefasst), höchstens alle 5 Minuten.
 42. **„Schließen“** bei einer angehaltenen Löschung heißt abgebrochen; die Person bekommt die DM „abgebrochen“.
 43. **Datenschutzerklärung:** Der Abschnitt „Deine Rechte“ beschreibt den Weg; der Text gilt vorläufig, bis W-0009 die Rechtstexte prüft.
+44. **Protokoll des Teams bleibt 3 Jahre als Nachweis** (Gesetzliche Pflicht, Art. 5 Abs. 2 DSGVO), weil die Erklärung dazu nichts sagt und es dieselbe Frist wie der Löschnachweis ist; Task 7 trägt es in die Datenschutzerklärung ein.
+45. **Moderation wird bei einer Löschung gelöscht** (vorher „zu klären“), weil die Erklärung für Fälle keine Frist nennt und Löschung auf Anfrage zusagt. Gilt nur, solange kein Team-Mitglied auf „Was bleibt“ etwas anderes speichert.
+46. **Prüfcode** ist ein HMAC mit dem Server-Geheimnis über Beleg-Nr., Discord-ID, Ausführungszeit und Zahlen, 12 Zeichen in Dreiergruppen; die Seite Löschungen zeigt ihn zum Vergleich.
