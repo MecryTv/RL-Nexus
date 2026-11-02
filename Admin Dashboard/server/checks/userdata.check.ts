@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { PERSON_COLUMN, USERDATA_AREA_IDS, USERDATA_AREAS, USERDATA_DEFAULT_KEEP, germanLabel, sourcesOf, type IUserdataSource } from "../../shared/userdata.ts";
 import { buildApp } from "../app.ts";
 import { SESSION_COOKIE, seal } from "../session.ts";
+import { postDirectMessage, removeButtons } from "../discord.ts";
+import { DM_KINDS, deletionMessage, renderDeletionImage, type IDmInput } from "../userdata/dm.ts";
 import { eraseSql, eraseValues } from "../userdata/erase.ts";
 import { matchSql, matchValue } from "../userdata/find.ts";
 import { USERS } from "./fakes.ts";
@@ -80,6 +82,103 @@ export async function checkUserdata(): Promise<void> {
             [person, team, json, list].map((source) => eraseValues(source, "123")),
             [["123"], ["123"], ['"123"', '%"123"%'], ["123", "123"]]
         );
+    });
+
+    section("Nutzerdaten: DMs zur Löschung");
+
+    // 1. November 2026, 23:30 in Berlin; geschickt 45 Minuten vorher.
+    const due = new Date(Date.UTC(2026, 10, 1, 22, 30));
+    const dmInput: IDmInput = {
+        name: "MecryTv",
+        avatar: null,
+        sentAt: new Date(due.getTime() - 45 * 60_000),
+        dueAt: due,
+        areas: [
+            { label: "Level und Aktivität", rows: 412, servers: 3 },
+            { label: "Tickets", rows: 7, servers: 1 },
+            { label: "Bewerbungen und Teamsuche", rows: 2, servers: 1 },
+            { label: "Rocket-League-Konten", rows: 1, servers: 0 },
+            { label: "Community", rows: 5, servers: 2 },
+        ],
+        kept: [{ label: "Shop", rows: 3, note: "Rechnungen bewahren wir auf." }],
+        total: 427,
+        servers: 3,
+        bytes: 18_400,
+    };
+    const widthOf = (png: Buffer): number => png.readUInt32BE(16);
+
+    await check("DM-Bilder: jede Art ein PNG, 800 Pixel breit, Alt-Text mit allem, was draufsteht", async () => {
+        for (const kind of DM_KINDS) {
+            const image = await renderDeletionImage(kind, dmInput);
+
+            assert.equal(image.data.subarray(1, 4).toString("ascii"), "PNG", kind);
+            assert.equal(widthOf(image.data), 800, kind);
+            assert.ok(image.alt.length > 20, `${kind}: ${image.alt}`);
+        }
+
+        const announcement = await renderDeletionImage("ankuendigung", dmInput);
+        assert.match(announcement.alt, /23:30 Uhr/);
+        assert.match(announcement.alt, /Level und Aktivität 412/);
+        assert.match(announcement.alt, /Bleibt: Shop – Rechnungen bewahren wir auf\./);
+        assert.doesNotMatch((await renderDeletionImage("ankuendigung", { ...dmInput, kept: [] })).alt, /Bleibt/);
+        assert.match((await renderDeletionImage("erledigt", dmInput)).alt, /427 Einträge auf 3 Servern gelöscht/);
+    });
+
+    await check("DM-Nachricht: nur die Ankündigung hat die Knöpfe, mit der Nummer der Löschung", () => {
+        const ids = (message: { components: readonly unknown[] }): string[] => JSON.stringify(message.components).match(/ud:(copy|stop):\d+/g) ?? [];
+        const image = { name: "loeschung-7.png", alt: "Alt" };
+
+        assert.deepEqual(ids(deletionMessage("ankuendigung", 7, image, due)), ["ud:copy:7", "ud:stop:7"]);
+        assert.match(JSON.stringify(deletionMessage("ankuendigung", 7, image, due).components), new RegExp(`<t:${due.getTime() / 1000}:R>`));
+        for (const kind of DM_KINDS.filter((entry) => entry !== "ankuendigung")) assert.deepEqual(ids(deletionMessage(kind, 7, image, due)), [], kind);
+        assert.equal(deletionMessage("kopie", 7, image, due, "rl-nexus-1.json").components.filter((part) => (part as { type: number }).type === 13).length, 1, "die Kopie hängt als Datei dran");
+    });
+
+    await check("DM senden: Kanal und Nachricht kommen zurück, wer keine DMs annimmt, ergibt den Satz", async () => {
+        const real = globalThis.fetch;
+        let refuse = false;
+
+        globalThis.fetch = (async (input: string | URL | Request) => {
+            const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+
+            if (url.endsWith("/users/@me/channels")) return new Response(JSON.stringify({ id: "500000000000000001" }), { status: 200, headers: { "Content-Type": "application/json" } });
+            if (refuse) return new Response(JSON.stringify({ code: 50007 }), { status: 403, headers: { "Content-Type": "application/json" } });
+
+            return new Response(JSON.stringify({ id: "500000000000000002" }), { status: 200, headers: { "Content-Type": "application/json" } });
+        }) as typeof fetch;
+
+        try {
+            assert.deepEqual(await postDirectMessage(config, "123456789012345678", { content: "x" }), { channelId: "500000000000000001", messageId: "500000000000000002" });
+            refuse = true;
+            assert.deepEqual(await postDirectMessage(config, "123456789012345678", { content: "x" }), { error: "Die Person nimmt keine Direktnachrichten vom Bot an." });
+        } finally {
+            globalThis.fetch = real;
+        }
+    });
+
+    await check("DM ändern: die Knöpfe verschwinden, Bild und Text bleiben", async () => {
+        const real = globalThis.fetch;
+        let patched: { components: { type: number }[] } | null = null;
+
+        globalThis.fetch = (async (_input: string | URL | Request, init?: RequestInit) => {
+            if (init?.method === "PATCH") {
+                patched = JSON.parse(String(init.body)) as { components: { type: number }[] };
+
+                return new Response("{}", { status: 200 });
+            }
+
+            return new Response(JSON.stringify({ flags: 1 << 15, components: [{ type: 12 }, { type: 10 }, { type: 1 }] }), { status: 200, headers: { "Content-Type": "application/json" } });
+        }) as typeof fetch;
+
+        try {
+            assert.equal(await removeButtons(config, "500000000000000001", "500000000000000002"), true);
+            assert.deepEqual(
+                (patched as { components: { type: number }[] } | null)?.components.map((part) => part.type),
+                [12, 10]
+            );
+        } finally {
+            globalThis.fetch = real;
+        }
     });
 
     const app = await buildApp(config);

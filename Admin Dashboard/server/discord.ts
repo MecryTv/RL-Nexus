@@ -294,22 +294,22 @@ const CANNOT_DM = 50007;
 
 /**
  * Eine Direktnachricht vom Bot, Dateien als Anhang (im Inhalt als
- * attachment://name). null heißt angekommen, sonst der Grund. Wirft nie:
- * Die DM ist eine Zugabe und darf nichts davor aufhalten.
+ * attachment://name). Gibt zurück, wo sie liegt (um sie später zu ändern),
+ * sonst den Grund. Wirft nie: Die DM ist eine Zugabe und darf nichts davor aufhalten.
  */
-export async function sendDirectMessage(
+export async function postDirectMessage(
     config: IConfig,
     userId: string,
     message: Readonly<Record<string, unknown>>,
     files: readonly IDiscordFile[] = []
-): Promise<string | null> {
+): Promise<{ readonly channelId: string; readonly messageId: string } | { readonly error: string }> {
     try {
         const channel = await botCall(config, "/users/@me/channels", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ recipient_id: userId }),
         });
-        if (!channel.ok) return await refusal(channel);
+        if (!channel.ok) return { error: await refusal(channel) };
 
         const { id } = (await channel.json()) as { id: string };
         const form = new FormData();
@@ -318,10 +318,46 @@ export async function sendDirectMessage(
 
         // Kein Content-Type: fetch setzt ihn samt Grenze selbst. Das FormData lässt sich für den zweiten Versuch nach 429 wiederverwenden.
         const sent = await botCall(config, `/channels/${id}/messages`, { method: "POST", body: form });
+        if (!sent.ok) return { error: await refusal(sent) };
 
-        return sent.ok ? null : await refusal(sent);
+        return { channelId: id, messageId: ((await sent.json()) as { id: string }).id };
     } catch (error) {
-        return error instanceof Error ? error.message : String(error);
+        return { error: error instanceof Error ? error.message : String(error) };
+    }
+}
+
+/** Wie postDirectMessage, für die Shop-DMs: null heißt angekommen, sonst der Grund. */
+export async function sendDirectMessage(
+    config: IConfig,
+    userId: string,
+    message: Readonly<Record<string, unknown>>,
+    files: readonly IDiscordFile[] = []
+): Promise<string | null> {
+    const sent = await postDirectMessage(config, userId, message, files);
+
+    return "error" in sent ? sent.error : null;
+}
+
+/**
+ * Knopfzeilen aus einer Nachricht des Bots entfernen, Bild und Text bleiben
+ * (Löschung angehalten, abgebrochen oder erledigt). false: nicht geklappt,
+ * die Knöpfe beantwortet der Server dann mit einem Satz.
+ */
+export async function removeButtons(config: IConfig, channelId: string, messageId: string): Promise<boolean> {
+    try {
+        const current = await botCall(config, `/channels/${channelId}/messages/${messageId}`);
+        if (!current.ok) return false;
+
+        const message = (await current.json()) as { flags?: number; components?: { type: number }[] };
+        const changed = await botCall(config, `/channels/${channelId}/messages/${messageId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ flags: message.flags, components: (message.components ?? []).filter((part) => part.type !== 1) }),
+        });
+
+        return changed.ok;
+    } catch {
+        return false;
     }
 }
 

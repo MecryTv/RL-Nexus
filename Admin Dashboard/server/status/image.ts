@@ -37,7 +37,7 @@ const HEADS: Readonly<Record<CheckState, string>> = { ok: "Alles läuft", warn: 
 
 let fonts = false;
 
-function registerFonts(): void {
+export function registerFonts(): void {
     if (fonts) return;
 
     for (const [file, family] of [
@@ -127,13 +127,13 @@ export function serviceAlt(snapshot: IStatusSnapshot, id: StatusService): string
 const STATE_COLOR: Readonly<Record<BlockState | PointState, string>> = { ok: COLOR.ok, warn: COLOR.warn, down: COLOR.down, none: COLOR.gap, gap: COLOR.gap };
 const RANK: Readonly<Record<PointState, number>> = { gap: 0, ok: 1, warn: 2, down: 3 };
 
-function alpha(color: string, amount: number): string {
+export function alpha(color: string, amount: number): string {
     return `${color}${Math.round(amount * 255)
         .toString(16)
         .padStart(2, "0")}`;
 }
 
-function fit(ctx: SKRSContext2D, text: string, width: number): string {
+export function fit(ctx: SKRSContext2D, text: string, width: number): string {
     if (ctx.measureText(text).width <= width) return text;
 
     let cut = text;
