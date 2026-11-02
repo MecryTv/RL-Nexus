@@ -86,7 +86,7 @@ export function ShopSettingsPage(): JSX.Element {
 
     return (
         <form onSubmit={(event) => void submit(event)} noValidate>
-            <PageHeader title="Shop-Einstellungen" meta={`Gilt für alle Produkte. Zuletzt gespeichert ${formatDateTime(view.data.updatedAt)}.`}>
+            <PageHeader title="Shop-Einstellungen" meta={`Zuletzt gespeichert ${formatDateTime(view.data.updatedAt)}.`}>
                 <Button type="submit" variant="primary" icon="save" busy={busy} disabled={!dirty}>
                     Speichern
                 </Button>

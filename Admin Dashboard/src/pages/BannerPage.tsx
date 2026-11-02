@@ -140,7 +140,7 @@ export function BannerPage(): JSX.Element {
 
     return (
         <>
-            <PageHeader title="Banner" meta="Eine Leiste unten auf der Webseite. Besucher können sie für ihre Sitzung wegklicken, nach jeder Änderung erscheint sie wieder.">
+            <PageHeader title="Banner" meta="Besucher können sie für ihre Sitzung wegklicken, nach jeder Änderung erscheint sie wieder.">
                 <ResetAction doc={doc} what="Das Banner" />
             </PageHeader>
 

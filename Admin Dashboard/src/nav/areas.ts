@@ -61,7 +61,7 @@ export const AREAS: readonly INavArea[] = [
         icon: "cart",
         pages: [
             { to: "/shop/produkte", label: "Produkte", icon: "tag", description: "Was im Shop steht, mit Preis und Reihenfolge." },
-            { to: "/shop/kunden", label: "Kunden", icon: "users", description: "Käufe, Tests und Sperren je Kunde." },
+            { to: "/shop/kunden", label: "Kunden", icon: "users", description: "Wer kauft, testet oder gesperrt ist." },
             { to: "/shop/einstellungen", label: "Einstellungen", icon: "sliders", description: "Was für alle Produkte im Shop gilt." },
         ],
     },
@@ -72,7 +72,7 @@ export const AREAS: readonly INavArea[] = [
         icon: "globe",
         pages: [
             { to: "/webseite/banner", label: "Banner", icon: "megaphone", description: "Die Leiste unten auf der Webseite." },
-            { to: "/webseite/team", label: "Team", icon: "users", description: "Personen und offene Stellen auf der Team-Seite." },
+            { to: "/webseite/team", label: "Team", icon: "users", description: "Die Personen und offenen Stellen auf der Team-Seite der Webseite." },
             { to: "/webseite/module", label: "Module", icon: "puzzle", also: ["/webseite/neues-modul"], description: "Kacheln und Detailseiten der Module auf der Webseite." },
         ],
     },
@@ -83,7 +83,7 @@ export const AREAS: readonly INavArea[] = [
         icon: "code",
         pages: [
             { to: "/dev/logs", label: "Logs", icon: "file-text", developer: true, description: "Sessions und Logdateien des Bots." },
-            { to: "/dev/datenbank", label: "Datenbank", icon: "database", developer: true, description: "Tabellen der Datenbank ansehen, ändern geht hier nicht." },
+            { to: "/dev/datenbank", label: "Datenbank", icon: "database", developer: true, description: "Tabellen und Zeilen der Datenbank." },
             { to: "/dev/technik", label: "Technik", icon: "cpu", developer: true, description: "Bot und Datenbank: Ping, Speicher, Versionen, Migrationen." },
             { to: "/dev/wartung", label: "Wartung", icon: "wrench", developer: true, description: "Wartung planen, ankündigen und beenden." },
             { to: "/dev/protokoll", label: "Protokoll", icon: "history", developer: true, description: "Wer im Admin Dashboard was geändert hat." },

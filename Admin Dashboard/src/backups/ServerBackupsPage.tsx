@@ -10,6 +10,7 @@ import { ConfirmDialog } from "../components/ConfirmDialog";
 import { Field } from "../components/Field";
 import { Icon } from "../components/Icon";
 import { PageHeader } from "../components/PageHeader";
+import { PageTabs } from "../components/PageTabs";
 import { Panel } from "../components/Panel";
 import { Failure, Loading } from "../components/Status";
 import { formatBytes, formatDateTime, formatNumber } from "../format";
@@ -268,7 +269,6 @@ export function ServerBackupsPage(): JSX.Element {
 
     return (
         <>
-            {back}
             <div className={styles.head}>
                 <span className={[styles.avatar, styles.big].join(" ")} aria-hidden="true">
                     {initials(guild.name)}
@@ -281,6 +281,14 @@ export function ServerBackupsPage(): JSX.Element {
                     )}
                 </PageHeader>
             </div>
+
+            <PageTabs
+                label="Backups"
+                tabs={[
+                    { to: "/backups", label: "Übersicht", icon: "archive", end: true },
+                    { to: `/backups/${guildId}`, label: guild.name, icon: "server" },
+                ]}
+            />
 
             <p className={[styles.planLine, data.plan.lastError ? styles.meh : null].filter(Boolean).join(" ")}>{planSentence(data.plan)}</p>
 

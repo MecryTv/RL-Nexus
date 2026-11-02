@@ -140,7 +140,7 @@ export function NotificationsPage(): JSX.Element {
 
     return (
         <>
-            <PageHeader title="Meldungen" meta="Landen im Postfach des Bot-Dashboards. Das holt neue Meldungen jede Minute nach." />
+            <PageHeader title="Meldungen" meta="Das Bot-Dashboard holt neue Meldungen jede Minute nach." />
 
             <div className={styles.layout}>
                 <Panel className={styles.formPanel}>

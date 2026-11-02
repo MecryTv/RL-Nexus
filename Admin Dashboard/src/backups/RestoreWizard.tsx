@@ -7,6 +7,7 @@ import { Badge } from "../components/Badge";
 import { Button } from "../components/Button";
 import { Field } from "../components/Field";
 import { Icon } from "../components/Icon";
+import { PageTabs } from "../components/PageTabs";
 import { Panel } from "../components/Panel";
 import { Failure, Loading } from "../components/Status";
 import { Switch } from "../components/Switch";
@@ -202,6 +203,14 @@ function Wizard({ guildId, initial, carried }: { readonly guildId: string; reado
                     </Link>
                 )}
             </div>
+
+            <PageTabs
+                label="Backups"
+                tabs={[
+                    { to: "/backups", label: "Übersicht", icon: "archive", end: true },
+                    { to: `/backups/${guildId}`, label: data.guild.name, icon: "server" },
+                ]}
+            />
 
             {result ? (
                 <Result guildId={guildId} result={result} />

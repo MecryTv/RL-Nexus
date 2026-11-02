@@ -49,7 +49,7 @@ export function CustomersPage(): JSX.Element {
 
     return (
         <>
-            <PageHeader title="Kunden" meta="Wer kauft, testet oder gesperrt ist." />
+            <PageHeader title="Kunden" />
 
             {list.error && !list.data && <Failure message={list.error.message} onRetry={list.reload} />}
             {list.loading && <Loading label="Kunden werden geladen" />}

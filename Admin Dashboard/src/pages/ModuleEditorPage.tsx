@@ -17,8 +17,8 @@ import { api } from "../api/client";
 import { Button } from "../components/Button";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { Field } from "../components/Field";
-import { Icon } from "../components/Icon";
 import { PageHeader } from "../components/PageHeader";
+import { PageTabs } from "../components/PageTabs";
 import { Panel } from "../components/Panel";
 import { Failure, Loading } from "../components/Status";
 import { BotCommands } from "../editor/BotCommands";
@@ -478,9 +478,6 @@ function ModuleEditor({ id }: { readonly id: string | null }): JSX.Element {
     return (
         <>
             <PageHeader title={creating ? "Neues Modul" : module.name || "Modul ohne Namen"} meta={creating ? "Erst die Kachel speichern, danach gibt es eine Detailseite." : undefined}>
-                <Link to="/webseite/module" className={styles.back}>
-                    <Icon name="arrow-left" size={16} /> Alle Module
-                </Link>
                 {!creating && tab === "detail" && <ResetAction doc={detail} what="Der Detailtext" />}
                 {!creating && (
                     <Button variant="danger" size="sm" icon="trash" onClick={() => setDeleting(true)} disabled={modules.busy}>
@@ -488,6 +485,15 @@ function ModuleEditor({ id }: { readonly id: string | null }): JSX.Element {
                     </Button>
                 )}
             </PageHeader>
+
+            <PageTabs
+                label="Module"
+                tabs={[
+                    { to: "/webseite/module", label: "Alle Module", icon: "puzzle", end: true },
+                    { to: "/webseite/neues-modul", label: "Neues Modul", icon: "plus" },
+                    ...(creating ? [] : [{ to: `/webseite/module/${id}`, label: module.name || "Modul ohne Namen", icon: "pencil" }]),
+                ]}
+            />
 
             <div className={styles.tabs} role="tablist" aria-label="Bereiche des Moduls" onKeyDown={onTabKey}>
                 {(["kachel", "detail"] as const).map((value) => {
