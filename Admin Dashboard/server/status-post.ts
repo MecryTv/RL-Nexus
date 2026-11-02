@@ -103,6 +103,8 @@ let current: Promise<IDiscordPostResult> | null = null;
 let lastPost: string | null = null;
 /** Wann zuletzt ein Klick wirklich geschrieben hat. */
 let lastManual: number | null = null;
+/** Wer zuletzt geklickt hat und mit welchem Ergebnis. Für den Reiter „Discord-Meldung“, seit dem Start. */
+let manual: IDiscordPostState["manual"] = null;
 /** Namen der Statuskanäle aus Discord. Ändern sich praktisch nie, deshalb einmal je Prozess. */
 const channelNames = new Map<string, string | null>();
 
@@ -519,7 +521,7 @@ async function post(config: IConfig, given?: IStatusSnapshot): Promise<IDiscordP
                 const message = error instanceof Error ? error.message : String(error);
 
                 console.error(`📊 Statusmeldung in Kanal ${channel} fehlgeschlagen: ${message}`);
-                channels.push({ id: channel, name: channelNames.get(channel) ?? null, ok: false, error: message });
+                channels.push({ id: channel, name: channelNames.get(channel) ?? null, ok: false, error: shortError(message) });
                 continue;
             }
 
@@ -536,11 +538,41 @@ async function post(config: IConfig, given?: IStatusSnapshot): Promise<IDiscordP
         console.error(`📊 Statusmeldung fehlgeschlagen: ${message}`);
 
         for (const channel of config.statusChannelIds) {
-            if (!channels.some((entry) => entry.id === channel)) channels.push({ id: channel, name: channelNames.get(channel) ?? null, ok: false, error: message });
+            if (!channels.some((entry) => entry.id === channel)) channels.push({ id: channel, name: channelNames.get(channel) ?? null, ok: false, error: shortError(message) });
         }
     }
 
     return { at: new Date().toISOString(), ms: Date.now() - started, channels };
+}
+
+/**
+ * Ein Fehler für Hinweis und Protokoll: „Discord 403 beim Ändern: Missing
+ * Permissions“ statt der ganzen Antwort. Bei einer Störung schickt Discord
+ * auch mal eine HTML-Seite, die fällt weg.
+ */
+export function shortError(message: string): string {
+    const answer = /^Discord antwortet mit (\d+) beim (\S+): ([\s\S]*)$/.exec(message);
+
+    if (answer) {
+        const [, status, step, body] = answer;
+        let reason: string | null = null;
+
+        try {
+            const parsed: unknown = JSON.parse(body);
+            if (typeof parsed === "object" && parsed !== null && typeof (parsed as { message?: unknown }).message === "string") reason = (parsed as { message: string }).message;
+        } catch {
+            // Kein JSON, etwa HTML: nur Status und Schritt.
+        }
+
+        return `Discord ${status} beim ${step}${reason ? `: ${reason}` : ""}`.slice(0, 200);
+    }
+
+    return message.slice(0, 200);
+}
+
+/** Merkt sich den letzten Klick für den Reiter „Discord-Meldung“. */
+export function rememberManual(by: string, result: IDiscordPostResult): void {
+    manual = { by, result };
 }
 
 /** Wie viele Sekunden der Knopf noch warten muss. Aufgerundet, damit „wieder in 0 Sek.“ nie dasteht. */
@@ -597,10 +629,11 @@ export async function discordPostState(config: IConfig, now = Date.now()): Promi
     return {
         channels,
         lastAt: lastPost,
-        nextAt: nextAt === null ? null : new Date(nextAt).toISOString(),
+        nextSeconds: nextAt === null ? null : Math.max(0, Math.ceil((nextAt - now) / 1000)),
         everySeconds: EVERY / 1000,
         waitSeconds: manualWait(lastManual, now),
         components: snapshot === null ? null : ((payload(snapshot, config).components as readonly unknown[]) ?? null),
+        manual,
     };
 }
 

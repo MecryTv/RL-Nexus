@@ -4,7 +4,7 @@
  * npm run check es prüfen kann.
  */
 
-import type { IDiscordPostChannel, IDiscordPostResult } from "../../shared/status.ts";
+import { channelLabel, type IDiscordPostResult } from "../../shared/status.ts";
 
 /** Die Vorschau zeigt, was jemand in Deutschland sieht. Feste Zone, damit Prüfung und Browser dasselbe rechnen. */
 const ZONE = "Europe/Berlin";
@@ -71,7 +71,7 @@ function segments(line: string, now: number): ISegment[] {
 
 /** Der Hinweis nach „In Discord aktualisieren“: wo es geklappt hat, wie lange, sonst je Kanal der Fehler. */
 export function postSummary(result: IDiscordPostResult): { readonly text: string; readonly ok: boolean } {
-    const label = (channel: IDiscordPostChannel): string => (channel.name ? `#${channel.name}` : `Kanal ${channel.id}`);
+    const label = channelLabel;
     const done = result.channels.filter((channel) => channel.ok);
     const failed = result.channels.filter((channel) => !channel.ok);
     const where = done.length === 1 ? label(done[0]) : `${done.length} Kanälen`;

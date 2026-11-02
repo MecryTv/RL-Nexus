@@ -286,15 +286,22 @@ export interface IDiscordPostResult {
     readonly channels: readonly IDiscordPostChannel[];
 }
 
-/** GET /api/status/discord: alles für die Karte „Discord-Meldung“. */
+/** Wie ein Statuskanal überall heißt: „#status“, ohne Namen „Kanal 123…“. */
+export function channelLabel(channel: { readonly id: string; readonly name: string | null }): string {
+    return channel.name ? `#${channel.name}` : `Kanal ${channel.id}`;
+}
+
+/** GET /api/status/discord: alles für den Reiter „Discord-Meldung“. */
 export interface IDiscordPostState {
     readonly channels: readonly { readonly id: string; readonly name: string | null }[];
     readonly lastAt: string | null;
-    /** Wann die nächste Runde von selbst kommt. */
-    readonly nextAt: string | null;
+    /** In wie vielen Sekunden die nächste Runde von selbst kommt, gezählt auf dem Server. */
+    readonly nextSeconds: number | null;
     readonly everySeconds: number;
     /** So lange bleibt der Knopf noch aus. */
     readonly waitSeconds: number;
     /** Die Bausteine der Nachricht aus dem letzten Stand, null vor der ersten Prüfung. */
     readonly components: readonly unknown[] | null;
+    /** Der letzte Klick, seit dem Start: wer und was dabei herauskam. */
+    readonly manual: { readonly by: string; readonly result: IDiscordPostResult } | null;
 }

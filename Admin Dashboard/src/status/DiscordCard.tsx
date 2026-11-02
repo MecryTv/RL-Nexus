@@ -103,7 +103,7 @@ export function DiscordCard({ post, now }: { readonly post: IDiscordPost; readon
 
     const first = data.channels[0];
     const wait = Math.max(0, Math.ceil((waitUntil - now) / 1000));
-    const remaining = data.nextAt === null ? null : Math.max(0, Date.parse(data.nextAt) - now);
+    const remaining = data.nextSeconds === null || state.updatedAt === null ? null : Math.max(0, state.updatedAt + data.nextSeconds * 1000 - now);
 
     return (
         <Panel className={styles.card}>

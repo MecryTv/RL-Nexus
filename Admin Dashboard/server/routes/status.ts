@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { DETAIL_RANGES, type DetailRange, type IDiscordPostResult, type IDiscordPostState, type IIncidentList, type IStatusDetail } from "../../shared/status.ts";
+import { channelLabel, DETAIL_RANGES, type DetailRange, type IDiscordPostResult, type IDiscordPostState, type IIncidentList, type IStatusDetail } from "../../shared/status.ts";
 import { accessOf } from "../access.ts";
 import { audit } from "../audit.ts";
 import type { IConfig } from "../config.ts";
@@ -8,7 +8,7 @@ import { PublicError } from "../errors.ts";
 import { addUpdate, createIncident, deleteIncident, listIncidents, openKindOf, parseIncident, parseUpdate } from "../status/incidents.ts";
 import { loadDetail } from "../status/detail.ts";
 import { publicStatus } from "../status/snapshot.ts";
-import { BANNER, discordPostState, refreshNow, statusCycle } from "../status-post.ts";
+import { BANNER, discordPostState, refreshNow, rememberManual, statusCycle } from "../status-post.ts";
 import { id } from "../validate.ts";
 
 function needDatabase(): void {
@@ -50,11 +50,13 @@ export async function statusRoutes(app: FastifyInstance, { config }: { config: I
         const result = await refreshNow(config);
         const failed = result.channels.filter((channel) => !channel.ok);
 
+        rememberManual(actor.name, result);
+
         await audit(
             actor,
             "status.discord",
             null,
-            `${result.channels.length - failed.length} von ${result.channels.length} Kanälen${failed.length > 0 ? ` · ${failed.map((channel) => `${channel.name ?? channel.id}: ${channel.error}`).join(" · ")}` : ""}`
+            `${result.channels.length - failed.length} von ${result.channels.length} Kanälen${failed.length > 0 ? ` · ${failed.map((channel) => `${channelLabel(channel)}: ${channel.error}`).join(" · ")}` : ""}`
         );
 
         return result;

@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
-import type { IChartPoint, IDiscordPostState, IIncident, IPublicStatus, ISpan, IStatusDetail, StatusService } from "../../shared/status.ts";
+import { channelLabel, type IChartPoint, type IDiscordPostState, type IIncident, type IPublicStatus, type ISpan, type IStatusDetail, type StatusService } from "../../shared/status.ts";
 import { buildApp } from "../app.ts";
 import { SESSION_COOKIE, seal } from "../session.ts";
-import { manualWait, payload } from "../status-post.ts";
+import { manualWait, payload, shortError } from "../status-post.ts";
 import { parseIncident, parseUpdate } from "../status/incidents.ts";
 import { historyData, refreshStatus, setHistoryLoader, shouldRecord } from "../status/snapshot.ts";
 import { USERS } from "./fakes.ts";
@@ -337,6 +337,15 @@ export async function checkStatusRoutes(): Promise<void> {
             assert.equal(shouldRecord(0, 90_000), true);
             // Die Runde von selbst alle zwei Minuten zählt immer.
             assert.equal(shouldRecord(0, 120_000), true);
+        });
+
+        await check("Fehler von Discord kommen gekürzt an, ein Kanal ohne Namen heißt überall gleich", () => {
+            assert.equal(shortError('Discord antwortet mit 403 beim Ändern: {"message": "Missing Permissions", "code": 50013}'), "Discord 403 beim Ändern: Missing Permissions");
+            assert.equal(shortError("Discord antwortet mit 502 beim Schreiben: <html><body>Bad Gateway</body></html>"), "Discord 502 beim Schreiben");
+            assert.equal(shortError("fetch failed"), "fetch failed");
+            assert.equal(shortError("x".repeat(400)).length, 200);
+            assert.equal(channelLabel({ id: "123", name: "status" }), "#status");
+            assert.equal(channelLabel({ id: "123", name: null }), "Kanal 123");
         });
 
         await check("Status-Knopf ohne Statuskanal: 409, und der Stand sagt es", async () => {
