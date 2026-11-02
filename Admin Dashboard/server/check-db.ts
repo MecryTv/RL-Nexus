@@ -730,7 +730,16 @@ try {
         const found = audit(await searchAs(developerCookie, "check:suche", "protokoll"));
         assert.equal(found.length, 1);
         assert.equal(found[0].title, "Gruppe vergeben · check:suche");
-        assert.equal(found[0].href, "/dev/protokoll?person=nutzer2");
+        // Die Protokoll-Seite filtert nach Discord-ID, ein Name gäbe dort 400.
+        assert.equal(found[0].href, `/dev/protokoll?person=${USERS.developer}&aktion=group.grant`);
+        assert.equal((await app.inject({ method: "GET", url: `/api/audit?user=${USERS.developer}&action=group.grant`, headers: { cookie: developerCookie } })).statusCode, 200);
+    });
+
+    await check("Suche: Prozent und Unterstrich werden wörtlich gesucht", async () => {
+        const all = (await searchAs(developerCookie, "%%", "protokoll")).hits;
+
+        assert.deepEqual(all.filter((hit) => hit.title.includes("check:suche")), []);
+        assert.deepEqual(all.filter((hit) => hit.place === "Meldung"), []);
     });
 
     await check("Suche: eine Meldung an viele Personen ist ein Treffer", async () => {

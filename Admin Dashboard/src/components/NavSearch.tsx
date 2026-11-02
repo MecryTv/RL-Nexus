@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState, type JSX } from "react";
 import { useNavigate } from "react-router-dom";
-import { markOf, parseQuery, SEARCH_LABELS, type ISearchHit, type SearchKind } from "../../shared/search.ts";
+import { markOf, parseQuery, SEARCH_LABELS, SEARCH_MIN, type ISearchHit, type SearchKind } from "../../shared/search.ts";
 import { countLabel, entryHit, FILTERS, nextFilter, pageHits, shownHits, type INavEntry, type SearchFilter } from "../nav/search.ts";
 import { useSearch } from "../nav/useSearch.ts";
 import { Icon } from "./Icon";
@@ -113,7 +113,7 @@ export function NavSearch({ entries, initial, onClose }: { readonly entries: rea
                             setActive(0);
                         }}
                         onKeyDown={(event) => {
-                            if (event.key === "ArrowDown") setActive(Math.min(current + 1, hits.length - 1));
+                            if (event.key === "ArrowDown") setActive(Math.max(0, Math.min(current + 1, hits.length - 1)));
                             else if (event.key === "ArrowUp") setActive(Math.max(current - 1, 0));
                             else if (event.key === "Enter") open(hits[current]);
                             else if (event.key === "Tab") choose(nextFilter(filter, event.shiftKey ? -1 : 1));
@@ -153,8 +153,9 @@ export function NavSearch({ entries, initial, onClose }: { readonly entries: rea
                 <ul id={`${id}-liste`} role="listbox" aria-label="Treffer" className={styles.list}>
                     {hits.map((hit, index) => (
                         // Die Tastatur bleibt im Feld (aria-activedescendant); die Maus wählt direkt.
+                        // Gleiche Titel und Ziele kommen vor (Meldungen, Protokoll); die Zeilen haben keinen eigenen Zustand.
                         <li
-                            key={`${hit.kind}-${hit.href}-${hit.title}`}
+                            key={`${index}-${hit.href}`}
                             id={`${id}-${index}`}
                             role="option"
                             aria-selected={index === current}
@@ -175,11 +176,13 @@ export function NavSearch({ entries, initial, onClose }: { readonly entries: rea
                 </ul>
 
                 {prefixed && !text && <p className={styles.empty}>{HINTS[prefixed]}</p>}
-                {text && !loading && hits.length === 0 && <p className={styles.empty}>Nichts gefunden zu „{text}“.</p>}
+                {text && !loading && hits.length === 0 && (
+                    <p className={styles.empty}>{text.length < SEARCH_MIN && filter !== "seiten" ? `Ab ${SEARCH_MIN} Zeichen wird auch hier gesucht.` : `Nichts gefunden zu „${text}“.`}</p>
+                )}
                 {failed.length > 0 && <p className={styles.failed}>{failed.map((kind) => SEARCH_LABELS[kind]).join(", ")} gerade nicht erreichbar.</p>}
 
                 <p className={styles.sr} aria-live="polite">
-                    {text && !loading ? `${hits.length} Treffer` : ""}
+                    {text && !loading ? `${filter === "alles" ? "Alles" : SEARCH_LABELS[filter]}: ${hits.length} Treffer` : ""}
                 </p>
 
                 <p className={styles.keys} aria-hidden="true">

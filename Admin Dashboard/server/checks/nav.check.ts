@@ -71,6 +71,9 @@ export async function checkNav(): Promise<void> {
         assert.equal(countLabel("alles", 2, result({ mails: 3, personen: 1 }), false), "6");
         assert.equal(countLabel("alles", 2, result({ mails: 20 }, ["mails"]), false), "22+");
         assert.equal(countLabel("alles", 2, null, true), "·");
+        // Unter 2 Zeichen fragt niemand den Server: keine „0“, die nach „nichts da“ klingt.
+        assert.equal(countLabel("mails", 0, null, false), "");
+        assert.equal(countLabel("alles", 2, null, false), "2");
     });
 
     await check("Liste: in Alles höchstens 40 gemischt, sonst nur die Art und höchstens 20", () => {

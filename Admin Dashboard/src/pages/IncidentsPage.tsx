@@ -283,9 +283,15 @@ export function IncidentsPage(): JSX.Element {
 
     // Knopf im Kopf und Karte „Discord-Meldung“ teilen sich einen Stand (W-0052).
     const discord = useDiscordPost();
-    const onDiscord = useLocation().pathname === "/status/discord";
+    const location = useLocation();
+    const onDiscord = location.pathname === "/status/discord";
     const noChannel = discord.state.data?.channels.length === 0;
     const discordWait = Math.max(0, Math.ceil((discord.waitUntil - now) / 1000));
+
+    // Ein Treffer der Suche zeigt auf eine Meldung (#meldung-<id>, W-0059): dorthin, sobald die Liste da ist.
+    useEffect(() => {
+        if (location.hash && list.data) document.getElementById(location.hash.slice(1))?.scrollIntoView({ block: "center" });
+    }, [location.hash, list.data]);
 
     useLive("status", () => {
         list.reload();

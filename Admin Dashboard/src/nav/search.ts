@@ -60,6 +60,8 @@ export function nextFilter(current: SearchFilter, step: 1 | -1): SearchFilter {
 export function countLabel(filter: SearchFilter, pages: number, result: ISearchResult | null, loading: boolean): string {
     if (filter === "seiten") return String(pages);
     if (loading) return "·";
+    // Ohne Antwort (unter 2 Zeichen) keine „0“: Gefragt wurde der Server noch gar nicht.
+    if (result === null) return filter === "alles" ? String(pages) : "";
 
     const capped = result?.capped ?? [];
 

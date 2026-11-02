@@ -3,7 +3,7 @@ import { fold, markOf, parseQuery, rankOf, sortHits, type ISearchHit, type Searc
 import { buildApp } from "../app.ts";
 import { mailPath } from "../../src/mail/route.ts";
 import { runSearch, type ISearchSource } from "../search/run.ts";
-import { likeOf, mailHit } from "../search/sources.ts";
+import { likeOf, mailHit, matched } from "../search/sources.ts";
 import { SESSION_COOKIE, seal } from "../session.ts";
 import { USERS } from "./fakes.ts";
 import { SECRET, check, config, section } from "./harness.ts";
@@ -78,6 +78,14 @@ export async function checkSearch(): Promise<void> {
         assert.equal(asked, 0);
         assert.equal((await runSearch([audit], "ab", "developer")).hits.length, 1);
         assert.equal(asked, 1);
+    });
+
+    await check("Quelle im Speicher: erst sortieren, dann kürzen, ohne Rang raus", () => {
+        const found = matched([...Array.from({ length: 25 }, (_, index) => hit("personen", 2, null, `Kontext ${index}`)), hit("personen", -1, null, "weg"), hit("personen", 0, null, "Max")]);
+
+        assert.equal(found.length, 21);
+        assert.equal(found[0].title, "Max");
+        assert.ok(found.every((entry) => entry.rank >= 0));
     });
 
     await check("SQL: Prozent, Unterstrich und das Fluchtzeichen werden wörtlich gesucht", () => {

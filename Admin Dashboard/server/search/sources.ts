@@ -1,7 +1,7 @@
 import type { IMailSummary, IMe } from "../../shared/api.ts";
 import type { IModules, ITeam } from "../../shared/content.ts";
 import { AUDIT_LABELS, GROUP_LABELS, type Group } from "../../shared/limits.ts";
-import { fold, rankOf, type ISearchHit } from "../../shared/search.ts";
+import { fold, rankOf, sortHits, type ISearchHit } from "../../shared/search.ts";
 import { maskEmail } from "../../shared/shop.ts";
 import { backupGuilds, backupsReason } from "../backups/store.ts";
 import { listTesters } from "../beta/store.ts";
@@ -35,9 +35,9 @@ function day(at: Date | string): string {
     return DAY.format(new Date(at));
 }
 
-/** Im Speicher gefiltert: Rang -1 heißt kein Treffer. */
-function matched(hits: readonly ISearchHit[]): ISearchHit[] {
-    return hits.filter((hit) => hit.rank >= 0).slice(0, LIMIT);
+/** Im Speicher gefiltert: Rang -1 heißt kein Treffer. Erst sortieren, sonst fielen die besten hinter die Grenze. */
+export function matched(hits: readonly ISearchHit[]): ISearchHit[] {
+    return sortHits(hits.filter((hit) => hit.rank >= 0)).slice(0, LIMIT);
 }
 
 /** Schon von SQL oder IMAP gefunden: ohne Rang am Titel zählt es als Treffer im Kontext. */
@@ -287,8 +287,8 @@ async function findAudit(text: string): Promise<ISearchHit[]> {
     const named = Object.entries(AUDIT_LABELS)
         .filter(([, label]) => fold(label).includes(wanted))
         .map(([action]) => action);
-    const rows = await query<{ user_name: string; action: string; target: string | null; created_at: Date }[]>(
-        `SELECT user_name, action, target, created_at FROM admin_audit
+    const rows = await query<{ user_id: string; user_name: string; action: string; target: string | null; created_at: Date }[]>(
+        `SELECT user_id, user_name, action, target, created_at FROM admin_audit
          WHERE action NOT IN (?) AND (user_name LIKE ? ESCAPE '!' OR action LIKE ? ESCAPE '!' OR target LIKE ? ESCAPE '!' OR detail LIKE ? ESCAPE '!'${named.length > 0 ? " OR action IN (?)" : ""})
          ORDER BY id DESC LIMIT ${LIMIT}`,
         [SHOWN_ELSEWHERE, like, like, like, like, ...(named.length > 0 ? [named] : [])]
@@ -298,7 +298,7 @@ async function findAudit(text: string): Promise<ISearchHit[]> {
         const title = `${AUDIT_LABELS[row.action] ?? row.action}${row.target ? ` · ${row.target}` : ""}`;
         const context = `${row.user_name} · ${day(row.created_at)}`;
 
-        return { kind: "protokoll", icon: "history", title, place: "Protokoll", context, href: `/dev/protokoll?person=${encodeURIComponent(row.user_name)}`, at: row.created_at.toISOString(), rank: foundRank(title, context, wanted) };
+        return { kind: "protokoll", icon: "history", title, place: "Protokoll", context, href: `/dev/protokoll?person=${row.user_id}&aktion=${encodeURIComponent(row.action)}`, at: row.created_at.toISOString(), rank: foundRank(title, context, wanted) };
     });
 }
 
