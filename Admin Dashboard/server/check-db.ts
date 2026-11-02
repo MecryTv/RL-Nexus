@@ -20,6 +20,7 @@ import type { IAuditPage, IDbRows, IDbTable, IGroupList, IMailAllPage, IMailOver
 import type { ISearchResult } from "../shared/search.ts";
 import { PERSON_COLUMN, USERDATA_IGNORED, sourcesOf, type IUserdataList, type IUserdataProfile, type IUserdataRule } from "../shared/userdata.ts";
 import { forgetIndex, personIndex, rowsOf } from "./userdata/find.ts";
+import { cancelDeletion, claimDeletion, deletionCounts, dueDeletions, listDeletions, markCopy, openDeletionOf, planDeletion, stopDeletion } from "./userdata/deletions.ts";
 import type { ICancelReceipt, ICheckoutStart, ICustomerDetail, ICustomerList, IShopProduct, IShopProductList, IShopSettingsView, IShopState, IUnlockProgress } from "../shared/shop.ts";
 import type { IIncidentList, IPublicStatus, IStatusDetail } from "../shared/status.ts";
 import { buildApp } from "./app.ts";
@@ -961,6 +962,94 @@ try {
         else await query("DELETE FROM userdata_rules WHERE area = 'level'").catch(() => undefined);
     }
 
+
+    section("Nutzerdaten: Löschung");
+
+    // Eigene ID in der Zukunft, die Uhr des laufenden Servers fasst sie nicht an (Frist weit weg).
+    const DOOMED = "9999999999999999994";
+    const OTHER = "9999999999999999995";
+    const team = { id: USERS.admin, name: "nutzer1" };
+    const deletionTidy = async (): Promise<void> => {
+        await query("DELETE FROM userdata_deletions WHERE user_id IN (?, ?)", [DOOMED, OTHER]);
+    };
+    const inMinutes = (minutes: number, from = Date.now()): Date => new Date(from + minutes * 60_000);
+
+    await deletionTidy();
+
+    try {
+        await check("Löschung: planen legt „geplant“ an, eine zweite für dieselbe Person gibt 409", async () => {
+            const planned = await planDeletion({ userId: DOOMED, userName: "check Löschung", dueAt: inMinutes(60), reason: "check:db", by: team });
+
+            assert.deepEqual([planned.state, planned.dmState, planned.userId, planned.plannedName], ["geplant", "offen", DOOMED, "nutzer1"]);
+            assert.equal((await openDeletionOf(DOOMED))?.id, planned.id);
+            await assert.rejects(planDeletion({ userId: DOOMED, userName: null, dueAt: inMinutes(90), reason: "check:db", by: team }), (error: unknown) => (error as { statusCode?: number }).statusCode === 409);
+        });
+
+        await check("Löschung: zwei gleichzeitig für dieselbe Person ergeben genau eine", async () => {
+            const both = await Promise.allSettled([0, 1].map(() => planDeletion({ userId: OTHER, userName: null, dueAt: inMinutes(60), reason: "check:db", by: team })));
+
+            assert.deepEqual(both.map((entry) => entry.status).sort(), ["fulfilled", "rejected"]);
+        });
+
+        await check("Löschung: die Frist liegt zwischen 5 Minuten und 30 Tagen", async () => {
+            for (const minutes of [4, 30 * 24 * 60 + 1]) {
+                await assert.rejects(planDeletion({ userId: "9999999999999999996", userName: null, dueAt: inMinutes(minutes), reason: "check:db", by: team }), (error: unknown) => (error as { statusCode?: number }).statusCode === 400);
+            }
+        });
+
+        await check("Löschung: anhalten nur die Person selbst und nur, solange sie geplant ist", async () => {
+            const open = await openDeletionOf(DOOMED);
+            assert.ok(open);
+
+            await assert.rejects(stopDeletion(open.id, OTHER), (error: unknown) => (error as { statusCode?: number }).statusCode === 403);
+            assert.equal((await stopDeletion(open.id, DOOMED)).state, "angehalten");
+            await assert.rejects(stopDeletion(open.id, DOOMED), (error: unknown) => (error as { statusCode?: number }).statusCode === 409);
+        });
+
+        await check("Löschung: eine Kopie höchstens alle 5 Minuten, nur solange geplant", async () => {
+            const open = await openDeletionOf(OTHER);
+            assert.ok(open);
+            const now = Date.now();
+
+            await markCopy(open.id, OTHER, now);
+            await assert.rejects(markCopy(open.id, OTHER, now + 60_000), (error: unknown) => (error as { statusCode?: number }).statusCode === 429);
+            await markCopy(open.id, OTHER, now + 5 * 60_000 + 1);
+            await assert.rejects(markCopy(open.id, DOOMED, now + 20 * 60_000), (error: unknown) => (error as { statusCode?: number }).statusCode === 403);
+        });
+
+        await check("Löschung: abbrechen aus „angehalten“, danach geht wieder eine neue", async () => {
+            const halted = await openDeletionOf(DOOMED);
+            assert.equal(halted?.state, "angehalten");
+
+            assert.equal((await cancelDeletion(halted.id, team)).state, "abgebrochen");
+            await assert.rejects(cancelDeletion(halted.id, team), (error: unknown) => (error as { statusCode?: number }).statusCode === 409);
+            assert.equal((await planDeletion({ userId: DOOMED, userName: null, dueAt: inMinutes(60), reason: "check:db", by: team })).state, "geplant");
+        });
+
+        await check("Löschung: nur einer kann sie zum Ausführen übernehmen, fällig ist nur, was abgelaufen ist", async () => {
+            const open = await openDeletionOf(DOOMED);
+            assert.ok(open);
+
+            assert.ok(!(await dueDeletions(Date.now())).some((entry) => entry.id === open.id), "noch nicht fällig");
+            assert.ok((await dueDeletions(Date.now() + 2 * 3_600_000)).some((entry) => entry.id === open.id), "in zwei Stunden fällig");
+            assert.deepEqual(await Promise.all([claimDeletion(open.id), claimDeletion(open.id)]).then((claims) => claims.sort()), [false, true]);
+        });
+
+        await check("Löschung: Zahlen für Seite und Übersicht", async () => {
+            const counts = await deletionCounts(Date.now());
+
+            assert.ok(counts.running >= 1, JSON.stringify(counts));
+            assert.ok(counts.cancelled >= 1, JSON.stringify(counts));
+            assert.ok(counts.deleted >= 1, JSON.stringify(counts));
+            assert.ok(counts.nextDueAt !== null);
+
+            const offen = await listDeletions("offen", "");
+            assert.ok(offen.some((entry) => entry.userId === OTHER));
+            assert.ok(!offen.some((entry) => entry.userId === DOOMED), "die übernommene ist nicht mehr offen");
+        });
+    } finally {
+        await deletionTidy();
+    }
 
     section("Statusmeldung in Discord");
 

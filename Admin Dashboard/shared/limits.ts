@@ -142,6 +142,12 @@ export const AUDIT_LABELS: Readonly<Record<string, string>> = {
     "beta.redeem": "Beta-Code eingelöst",
     "userdata.export": "Auskunft geladen",
     "userdata.rules": "Was bleibt geändert",
+    "userdata.plan": "Löschung geplant",
+    "userdata.cancel": "Löschung abgebrochen",
+    "userdata.stop": "Löschung angehalten",
+    "userdata.copy": "Kopie geholt",
+    "userdata.delete": "Daten gelöscht",
+    "userdata.dm": "DM nicht zustellbar",
 };
 
 /* --- Postfach --- */

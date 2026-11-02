@@ -222,6 +222,10 @@ export const USERDATA_IGNORED: Readonly<Record<string, string>> = {
     "level_backfill.last_user": "Arbeitsstand der Nachberechnung, keine Daten über die Person",
     "mail_accounts.imap_host": "Adresse des Mailservers",
     "mail_accounts.smtp_host": "Adresse des Mailservers",
+    "userdata_deletions.user_id": "Nachweis der Löschung selbst, bleibt immer",
+    "userdata_deletions.open_user": "Nachweis der Löschung selbst, bleibt immer",
+    "userdata_deletions.planned_by": "Nachweis, wer die Löschung geplant hat",
+    "userdata_deletions.cancelled_by": "Nachweis, wer die Löschung abgebrochen hat",
     // JSON-, Text- und Blob-Spalten. `tabelle.*` gilt nur für diese, nie für Spalten mit Personen-Namen.
     "mail_accounts.secret": "Zugangsdaten eines Postfachs, nie in der Auskunft",
     "shop_customers.oauth_sealed": "Geheimnis, nie in der Auskunft",
@@ -258,6 +262,7 @@ export const USERDATA_IGNORED: Readonly<Record<string, string>> = {
     "contact_messages.*": "Inhalt der Nachricht, gehört zur Zeile",
     "contact_replies.*": "Inhalt der Antwort, gehört zur Zeile",
     "status_incident_updates.*": "Text einer Statusmeldung",
+    "userdata_deletions.*": "Zahlen der Löschung als Nachweis",
 };
 
 /** Name einer Spalte, die eine Discord-ID einer Person hält (für VARCHAR, CHAR, BIGINT). */
@@ -363,3 +368,55 @@ export interface IUserdataRule {
 }
 
 export const USERDATA_NOTE_MAX = 200;
+
+/* --- Löschungen (Teil 3b) ----------------------------------------------- */
+
+export const DELETION_STATES = ["geplant", "angehalten", "abgebrochen", "geloescht"] as const;
+export type DeletionState = (typeof DELETION_STATES)[number];
+export const DM_STATES = ["offen", "zugestellt", "nicht_zustellbar"] as const;
+export type DmState = (typeof DM_STATES)[number];
+export const DELETION_FILTERS = ["offen", "erledigt", "abgebrochen", "alle"] as const;
+export type DeletionFilter = (typeof DELETION_FILTERS)[number];
+
+/** Frist: lang genug, dass die Person die DM sehen kann, kurz genug für die Monatsfrist der DSGVO. */
+export const DELETION_MIN_MS = 5 * 60_000;
+export const DELETION_MAX_MS = 30 * 24 * 3_600_000;
+/** Höchstens so oft eine Kopie per Knopf. */
+export const COPY_GAP_MS = 5 * 60_000;
+
+export interface IDeletionResult {
+    readonly deleted: Partial<Record<UserdataArea, number>>;
+    /** Zeilen anderer, aus denen nur die Person entfernt wurde. */
+    readonly anonymized: Partial<Record<UserdataArea, number>>;
+    readonly kept: readonly { readonly area: UserdataArea; readonly label: string; readonly rows: number; readonly note: string }[];
+    readonly servers: number;
+}
+
+export interface IDeletion {
+    readonly id: number;
+    readonly userId: string;
+    /** Bis zum Ausführen; danach leer, die ID bleibt als Nachweis. */
+    readonly userName: string | null;
+    readonly state: DeletionState;
+    readonly dueAt: string;
+    readonly reason: string;
+    readonly plannedBy: string;
+    readonly plannedName: string;
+    readonly dmState: DmState;
+    readonly dmError: string | null;
+    readonly copyAt: string | null;
+    readonly stoppedAt: string | null;
+    readonly cancelledAt: string | null;
+    readonly doneAt: string | null;
+    readonly result: IDeletionResult | null;
+    readonly createdAt: string;
+}
+
+export interface IDeletionCounts {
+    readonly running: number;
+    readonly halted: number;
+    /** In den letzten 30 Tagen. */
+    readonly deleted: number;
+    readonly cancelled: number;
+    readonly nextDueAt: string | null;
+}
