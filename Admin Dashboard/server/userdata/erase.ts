@@ -83,7 +83,7 @@ export async function erasePerson(id: string, run: TransactionQuery, rules: read
                 rows += Number(counted?.n ?? 0);
             }
 
-            if (rows > 0) kept.push({ area: area.id, label: area.label, rows, note: rule.note ?? "" });
+            if (rows > 0) kept.push({ area: area.id, label: area.label, rows, note: rule.note ?? "", basis: rule.basis, law: rule.law, years: rule.years });
             continue;
         }
 

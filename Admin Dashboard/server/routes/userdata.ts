@@ -3,17 +3,21 @@ import { PAGE_SIZE } from "../../shared/limits.ts";
 import { fold } from "../../shared/search.ts";
 import {
     DELETION_FILTERS,
+    USERDATA_BASES,
+    USERDATA_LAW_MAX,
+    USERDATA_YEARS_MAX,
     DELETION_MAX_MS,
     DELETION_MIN_MS,
     USERDATA_AREA_IDS,
     USERDATA_AREAS,
     USERDATA_FILTERS,
     USERDATA_NOTE_MAX,
+    basisText,
     type IDeletion,
     type IDeletionCounts,
     type IUserdataList,
     type IUserdataProfile,
-    type IUserdataRule,
+    type IUserdataRuleView,
 } from "../../shared/userdata.ts";
 import { accessOf } from "../access.ts";
 import { audit } from "../audit.ts";
@@ -86,24 +90,50 @@ export async function userdataRoutes(app: FastifyInstance, { config }: { config:
         };
     });
 
-    app.get("/api/userdata/regeln", async (): Promise<IUserdataRule[]> => {
+    app.get("/api/userdata/regeln", async (): Promise<IUserdataRuleView[]> => {
         requireDatabase();
 
-        return userdataRules();
+        const [rules, people] = await Promise.all([userdataRules(), personIndex()]);
+
+        return rules.map((rule) => {
+            const counts = [...people.values()].map((person) => person.areas[rule.area] ?? 0).filter((rows) => rows > 0);
+
+            return { ...rule, people: counts.length, rows: counts.reduce((sum, rows) => sum + rows, 0) };
+        });
     });
 
-    app.put("/api/userdata/regeln/:area", async (request, reply) => {
+    /** Was bleibt (W3): ein Speichern für alle geänderten Bereiche. Erst alles prüfen, dann schreiben; ein Protokolleintrag je Bereich. */
+    app.put("/api/userdata/regeln", async (request, reply) => {
+        const list = ((request.body ?? {}) as { rules?: unknown }).rules;
+        if (!Array.isArray(list) || list.length === 0 || list.length > USERDATA_AREA_IDS.length) throw new PublicError(400, "Es fehlt, was gespeichert werden soll.");
+
+        const rules = list.map((entry) => {
+            const body = (entry ?? {}) as { area?: unknown; keep?: unknown; note?: unknown; basis?: unknown; law?: unknown; years?: unknown };
+            const area = oneOf(body.area, USERDATA_AREA_IDS, "Der Bereich");
+            if (typeof body.keep !== "boolean") throw new PublicError(400, "Sag, ob der Bereich bleibt oder gelöscht wird.");
+            if (!body.keep) return { area, keep: false, note: null, basis: null, law: null, years: null };
+
+            const note = text(body.note, "Der Satz", { max: USERDATA_NOTE_MAX }) || null;
+            if (note === null) throw new PublicError(400, "Schreib dazu, warum es bleibt. Der Satz steht in der DM und im Beleg.");
+
+            const basis = oneOf(body.basis, USERDATA_BASES, "Die Rechtsgrundlage");
+            const law = text(body.law, "Die Norm", { max: USERDATA_LAW_MAX }) || null;
+            const years = body.years === null || body.years === undefined ? null : Number(body.years);
+            if (years !== null && !(Number.isInteger(years) && years >= 1 && years <= USERDATA_YEARS_MAX)) throw new PublicError(400, `Die Dauer liegt zwischen 1 und ${USERDATA_YEARS_MAX} Jahren.`);
+
+            return { area, keep: true, note, basis, law, years };
+        });
         requireDatabase();
 
-        const area = oneOf((request.params as { area?: string }).area, USERDATA_AREA_IDS, "Der Bereich");
-        const body = (request.body ?? {}) as { keep?: unknown; note?: unknown };
-        if (typeof body.keep !== "boolean") throw new PublicError(400, "Sag, ob der Bereich bleibt oder gelöscht wird.");
+        const actor = accessOf(request);
 
-        const note = text(body.note, "Der Satz", { max: USERDATA_NOTE_MAX }) || null;
-        if (body.keep && note === null) throw new PublicError(400, "Schreib dazu, warum es bleibt. Der Satz steht in der DM an die Person.");
-
-        await query("INSERT INTO userdata_rules (area, keep, note) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE keep = VALUES(keep), note = VALUES(note)", [area, body.keep ? 1 : 0, note]);
-        await audit(accessOf(request), "userdata.rules", area, body.keep ? `behalten: ${note}` : "löschen");
+        for (const rule of rules) {
+            await query(
+                "INSERT INTO userdata_rules (area, keep, note, basis, law, years) VALUES (?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE keep = VALUES(keep), note = VALUES(note), basis = VALUES(basis), law = VALUES(law), years = VALUES(years)",
+                [rule.area, rule.keep ? 1 : 0, rule.note, rule.basis, rule.law, rule.years]
+            );
+            await audit(actor, "userdata.rules", rule.area, rule.keep ? `behalten: ${rule.note} · ${basisText(rule)}` : "löschen");
+        }
 
         return reply.code(204).send();
     });

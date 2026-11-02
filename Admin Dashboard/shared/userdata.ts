@@ -35,6 +35,10 @@ export interface IUserdataSource {
 export interface IUserdataAreaDef {
     readonly id: UserdataArea;
     readonly label: string;
+    /** Was drin ist, für „Was bleibt“: wenige Wörter je Teil. */
+    readonly inside: readonly string[];
+    /** Name im Icon-Satz des Admin Dashboards. */
+    readonly icon: string;
     readonly sources: readonly IUserdataSource[];
 }
 
@@ -51,6 +55,8 @@ export const USERDATA_AREAS: readonly IUserdataAreaDef[] = [
     {
         id: "konto",
         label: "Konto im Bot-Dashboard",
+        inside: ["Anmeldung", "Benachrichtigungen", "Ticket-IDs", "Voice-Vorlagen", "Gruppen"],
+        icon: "dashboard",
         sources: [
             { table: "dashboard_credentials", column: "user_id", role: "person", time: "created_at", label: "'Anmeldung im Bot-Dashboard'", name: "username", hidden: ["password", "totp_secret"] },
             { table: "notifications", column: "user_id", role: "person", time: "created_at", label: "title" },
@@ -62,6 +68,8 @@ export const USERDATA_AREAS: readonly IUserdataAreaDef[] = [
     {
         id: "spieler",
         label: "Rocket-League-Konten",
+        inside: ["Verknüpfte Konten", "Ränge", "Spielerprofil", "Epic-Namen"],
+        icon: "link",
         sources: [
             { table: "player_accounts", column: "user_id", role: "person", time: "linked_at", label: "CONCAT(platform, ' · ', COALESCE(display_name, account_id))" },
             { table: "player_profiles", column: "user_id", role: "person", time: "updated_at", label: "'Spielerprofil'" },
@@ -73,6 +81,8 @@ export const USERDATA_AREAS: readonly IUserdataAreaDef[] = [
     {
         id: "level",
         label: "Level und Aktivität",
+        inside: ["Level", "XP je Tag", "Nachrichten je Tag", "Bestenliste"],
+        icon: "trophy",
         sources: [
             { table: "levels", column: "user_id", role: "person", guild: G, time: ms("updated_at"), label: "CONCAT('Level ', level, ' · ', xp, ' XP')" },
             { table: "level_days", column: "user_id", role: "person", guild: G, time: days("day"), label: "CONCAT(xp, ' XP an einem Tag')" },
@@ -84,6 +94,8 @@ export const USERDATA_AREAS: readonly IUserdataAreaDef[] = [
     {
         id: "tickets",
         label: "Tickets",
+        inside: ["Tickets", "Verläufe", "Sperren", "Wartezeit im Support"],
+        icon: "inbox",
         sources: [
             { table: "tickets", column: "opener_id", role: "person", guild: G, time: "created_at", label: "CONCAT('Ticket ', number, ' · ', status)", words: true },
             { table: "tickets", column: "members", role: "json", guild: G, time: "created_at", label: "CONCAT('Im Ticket ', number)" },
@@ -95,6 +107,8 @@ export const USERDATA_AREAS: readonly IUserdataAreaDef[] = [
     {
         id: "bewerbungen",
         label: "Bewerbungen und Teamsuche",
+        inside: ["Bewerbungen", "Teamsuche", "Staff-Freigaben"],
+        icon: "file-text",
         sources: [
             { table: "apply_submissions", column: "user_id", role: "person", guild: G, time: ms("created_at"), label: "CONCAT('Bewerbung · ', status)", name: "user_name", words: true },
             { table: "lft_requests", column: "user_id", role: "person", guild: G, time: ms("created_at"), label: "title", name: "user_name" },
@@ -104,6 +118,8 @@ export const USERDATA_AREAS: readonly IUserdataAreaDef[] = [
     {
         id: "moderation",
         label: "Moderation",
+        inside: ["Fälle", "Anti-Villain", "Meldungen", "Vertrauen"],
+        icon: "shield-check",
         sources: [
             { table: "mod_cases", column: "target_id", role: "person", guild: G, time: ms("created_at"), label: "CONCAT('Fall ', number, ' · ', action)", name: "target_name", words: true },
             { table: "av_cases", column: "user_id", role: "person", guild: G, time: ms("created_at"), label: "CONCAT('Anti-Villain · ', status)", words: true },
@@ -115,6 +131,8 @@ export const USERDATA_AREAS: readonly IUserdataAreaDef[] = [
     {
         id: "community",
         label: "Community",
+        inside: ["Gewinnspiele", "Umfragen", "Clips", "Eigene Sprachkanäle"],
+        icon: "megaphone",
         sources: [
             { table: "giveaway_entries", column: "user_id", role: "person", time: ms("created_at"), label: "'Teilnahme an einem Gewinnspiel'" },
             { table: "poll_votes", column: "user_id", role: "person", time: ms("created_at"), label: "'Stimme in einer Umfrage'" },
@@ -128,6 +146,8 @@ export const USERDATA_AREAS: readonly IUserdataAreaDef[] = [
     {
         id: "teams",
         label: "Teams und Clubs",
+        inside: ["Teams", "Clubs", "6mans"],
+        icon: "users",
         sources: [
             { table: "team_members", column: "user_id", role: "person", time: "joined_at", label: "CONCAT('Mitglied in Team ', team_id)" },
             { table: "club_members", column: "user_id", role: "person", time: "joined_at", label: "CONCAT('Mitglied in Club ', club_id)" },
@@ -141,6 +161,8 @@ export const USERDATA_AREAS: readonly IUserdataAreaDef[] = [
     {
         id: "shop",
         label: "Shop",
+        inside: ["Kundenkonto", "Bestellungen", "Zugänge", "Verlauf"],
+        icon: "cart",
         sources: [
             { table: "shop_customers", column: "user_id", role: "person", time: "created_at", label: "'Kundenkonto im Shop'", name: "name", hidden: ["oauth_sealed"] },
             { table: "shop_orders", column: "user_id", role: "person", time: "created_at", label: "CONCAT('Bestellung ', order_no, ' · ', status)", words: true },
@@ -151,6 +173,8 @@ export const USERDATA_AREAS: readonly IUserdataAreaDef[] = [
     {
         id: "beta",
         label: "Beta Access",
+        inside: ["Beta Access"],
+        icon: "sparkle",
         sources: [
             { table: "beta_members", column: "user_id", role: "person", time: "redeemed_at", label: "'Beta Access'" },
             { table: "beta_removals", column: "user_id", role: "person", time: "removed_at", label: "'Beta Access entzogen'" },
@@ -159,18 +183,24 @@ export const USERDATA_AREAS: readonly IUserdataAreaDef[] = [
     {
         id: "kontakt",
         label: "Kontakt",
+        inside: ["Kontaktanfragen"],
+        icon: "mail",
         // Im Formular tippt die Person ihren Discord selbst ein: gefunden wird nur, wer dort die ID angab.
         sources: [{ table: "contact_messages", column: "discord", role: "person", time: "created_at", label: "subject", name: "name" }],
     },
     {
         id: "protokoll",
         label: "Im Protokoll des Teams",
+        inside: ["Was das Team zur Person getan hat"],
+        icon: "history",
         // Was das Team mit der Person getan hat (Gruppe vergeben, gesperrt, Auskunft geladen).
         sources: [{ table: "admin_audit", column: "target", role: "person", time: "created_at", label: "action" }],
     },
     {
         id: "team",
         label: "Als Team aktiv",
+        inside: ["Was die Person als Team getan hat"],
+        icon: "wrench",
         sources: [
             { table: "admin_audit", column: "user_id", role: "team", time: "created_at", label: "action", name: "user_name" },
             { table: "apply_forms", column: "created_by", role: "team", guild: G, label: "CONCAT('Formular angelegt: ', name)" },
@@ -268,8 +298,44 @@ export const USERDATA_IGNORED: Readonly<Record<string, string>> = {
 /** Name einer Spalte, die eine Discord-ID einer Person hält (für VARCHAR, CHAR, BIGINT). */
 export const PERSON_COLUMN = /(^|_)(user|target|moderator|owner|actor|opener|leader|author|creator|staff|reporter|host|captain|player|member)(_id)?$|_by$|^actor$|^discord$/;
 
-/** Bis W-0009 klärt, was rechtlich bleiben muss (Spec Teil 3, „Was bleibt“). */
-export const USERDATA_DEFAULT_KEEP: Readonly<Partial<Record<UserdataArea, string>>> = { shop: "zu klären", moderation: "zu klären", protokoll: "zu klären" };
+/* --- Was bleibt (Runde 3): Rechtsgrundlage und Dauer ------------------- */
+
+export const USERDATA_BASES = ["pflicht", "ansprueche"] as const;
+export type UserdataBasis = (typeof USERDATA_BASES)[number];
+
+/** Warum etwas trotz Löschung bleiben darf (Art. 17 Abs. 3 DSGVO). */
+export const USERDATA_BASIS: Readonly<Record<UserdataBasis, { readonly label: string; readonly article: string }>> = {
+    pflicht: { label: "Gesetzliche Pflicht", article: "Art. 17 Abs. 3 lit. b DSGVO" },
+    ansprueche: { label: "Rechtsansprüche", article: "Art. 17 Abs. 3 lit. e DSGVO" },
+};
+export const USERDATA_LAW_MAX = 60;
+export const USERDATA_YEARS_MAX = 30;
+/** Steht noch in einem Satz, sieht die Person ihn so in der DM. */
+export const USERDATA_OPEN_NOTE = "zu klären";
+
+/**
+ * Vorgaben, solange niemand auf „Was bleibt“ speichert. Aus der
+ * Datenschutzerklärung der Webseite (Abschnitt Shop); das Protokoll des Teams
+ * ist Entscheidung 44 der Spec. Moderation hat dort keine Frist: gelöscht.
+ */
+export const USERDATA_DEFAULTS: Readonly<Partial<Record<UserdataArea, { readonly note: string; readonly basis: UserdataBasis; readonly law: string | null; readonly years: number }>>> = {
+    shop: {
+        note: "Bezahlte Bestellungen, Zustimmungen und Kündigungen bewahren wir drei Jahre nach Vertragsende auf, um Ansprüche belegen zu können. Rechnungen und Zahlungsdaten liegen bei Stripe.",
+        basis: "ansprueche",
+        law: null,
+        years: 3,
+    },
+    protokoll: { note: "Was das Team zu dir getan hat, bleibt drei Jahre als Nachweis im Protokoll.", basis: "pflicht", law: "Art. 5 Abs. 2 DSGVO", years: 3 },
+};
+
+/** „Art. 17 Abs. 3 lit. e DSGVO · 3 Jahre“: für Vorschau und Beleg. */
+export function basisText(rule: { readonly basis: UserdataBasis | null; readonly law: string | null; readonly years: number | null }): string {
+    if (rule.basis === null) return "Rechtsgrundlage zu klären";
+
+    const years = rule.years === null ? null : `${rule.years} ${rule.years === 1 ? "Jahr" : "Jahre"}`;
+
+    return [USERDATA_BASIS[rule.basis].article, rule.law, years].filter(Boolean).join(" · ");
+}
 
 /** Werte aus ENUM-Spalten, die in Anzeigen stehen. Unbekanntes bleibt, wie es ist. */
 const WORDS: Readonly<Record<string, string>> = {
@@ -323,6 +389,8 @@ export interface IUserdataPerson {
     readonly servers: number;
     readonly lastAt: string | null;
     readonly shop: boolean;
+    /** Einträge je Bereich (ohne Listen und JSON). */
+    readonly areas: Partial<Record<UserdataArea, number>>;
     /** Offene Löschung (Teil 3b): Stand und Frist, sonst null. */
     readonly deletion?: { readonly state: DeletionState; readonly dueAt: string } | null;
 }
@@ -369,6 +437,15 @@ export interface IUserdataRule {
     readonly label: string;
     readonly keep: boolean;
     readonly note: string | null;
+    readonly basis: UserdataBasis | null;
+    readonly law: string | null;
+    readonly years: number | null;
+}
+
+/** Für die Seite: dazu wie viele Personen und Einträge der Bereich gerade hat (ohne Listen und JSON). */
+export interface IUserdataRuleView extends IUserdataRule {
+    readonly people: number;
+    readonly rows: number;
 }
 
 export const USERDATA_NOTE_MAX = 200;
@@ -392,7 +469,8 @@ export interface IDeletionResult {
     readonly deleted: Partial<Record<UserdataArea, number>>;
     /** Zeilen anderer, aus denen nur die Person entfernt wurde. */
     readonly anonymized: Partial<Record<UserdataArea, number>>;
-    readonly kept: readonly { readonly area: UserdataArea; readonly label: string; readonly rows: number; readonly note: string }[];
+    /** basis, law und years seit Runde 3; ältere Löschungen haben sie nicht. */
+    readonly kept: readonly { readonly area: UserdataArea; readonly label: string; readonly rows: number; readonly note: string; readonly basis?: UserdataBasis | null; readonly law?: string | null; readonly years?: number | null }[];
     readonly servers: number;
 }
 

@@ -321,54 +321,6 @@
 }
 
 /* Was bleibt */
-.rules {
-    display: grid;
-    gap: 2px;
-    max-width: 960px;
-}
-
-.rule {
-    display: grid;
-    grid-template-columns: minmax(160px, 220px) auto minmax(0, 1fr) auto;
-    align-items: center;
-    gap: var(--s-3);
-    padding: var(--s-3);
-    border: 1px solid var(--c-line);
-    background: var(--c-panel-fill);
-
-    @include below(859px) {
-        grid-template-columns: minmax(0, 1fr) auto;
-    }
-}
-
-.ruleName {
-    font-weight: 600;
-}
-
-.toggle {
-    display: inline-flex;
-    border: 1px solid var(--c-line-strong);
-
-    button {
-        min-height: 32px;
-        padding: 0 var(--s-3);
-        color: var(--c-text-dim);
-        font-size: 0.8125rem;
-
-        @include touch-target;
-
-        &:focus-visible {
-            @include focus-ring;
-        }
-
-        &[aria-pressed="true"] {
-            background: rgb(255 30 45 / 14%);
-            color: var(--c-text);
-            font-weight: 600;
-        }
-    }
-}
-
 .sr {
     @include sr;
 }
@@ -379,18 +331,7 @@
     font-size: 0.8125rem;
 }
 
-/* Immer in der letzten Spalte, auch wenn kein Satzfeld davor steht. */
-.save {
-    grid-column: -2 / -1;
-}
 
-.note {
-    min-width: 0;
-
-    @include below(859px) {
-        grid-column: 1 / -1;
-    }
-}
 
 /* --- Löschung (Teil 3b): Fenster D1, Kasten im Profil, Seite Löschungen LA+ --- */
 
@@ -762,4 +703,293 @@
 
 .cellActions {
     text-align: right;
+}
+
+/* --- Was bleibt (W3): Zahlen, Bleibt groß, Wird gelöscht als Karten, Vorschau rechts --- */
+
+.ruleSummary {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--s-3);
+    margin-bottom: var(--s-4);
+
+    > div {
+        display: grid;
+        padding: var(--s-3) var(--s-4);
+        border: 1px solid var(--c-line);
+        background: var(--c-panel-fill);
+    }
+
+    b {
+        font-family: var(--f-display);
+        font-size: 1.35rem;
+    }
+
+    small {
+        color: var(--c-text-faint);
+        font-size: 0.8125rem;
+    }
+
+    @include below(859px) {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+.summaryGoes b {
+    color: #ff6b76;
+}
+
+.summaryStays {
+    border-color: rgb(255 197 61 / 45%) !important;
+
+    b {
+        color: var(--c-mod-engagement);
+    }
+}
+
+.summaryOpen {
+    border-color: rgb(255 197 61 / 70%) !important;
+    background: rgb(255 197 61 / 6%) !important;
+
+    b {
+        color: var(--c-mod-engagement);
+    }
+}
+
+.rulesLayout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 340px;
+    align-items: start;
+    gap: var(--s-4);
+
+    .sect:first-child {
+        margin-top: 0;
+    }
+
+    @include below(1199px) {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+.cardHead {
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
+
+    h3 {
+        flex: 1;
+        min-width: 0;
+        font-size: 1rem;
+    }
+}
+
+.cardCounts {
+    color: var(--c-text-dim);
+    font-size: 0.8125rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.keepCard {
+    position: relative;
+    display: grid;
+    gap: var(--s-3);
+    margin-bottom: var(--s-3);
+    padding: var(--s-4);
+    border: 1px solid rgb(255 197 61 / 40%);
+    background: linear-gradient(180deg, rgb(255 197 61 / 5%), transparent 40%), var(--c-panel-fill);
+    box-shadow: inset 3px 0 0 var(--c-mod-engagement);
+
+    .cardHead > svg {
+        color: var(--c-mod-engagement);
+    }
+}
+
+.inside {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-1);
+
+    li {
+        padding: 0 var(--s-2);
+        border: 1px solid var(--c-line-strong);
+        color: var(--c-text-dim);
+        font-size: 0.75rem;
+    }
+}
+
+.keepFields {
+    display: grid;
+    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) 140px;
+    align-items: start;
+    gap: var(--s-3);
+
+    textarea {
+        resize: vertical;
+    }
+
+    @include below(859px) {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+.keepLaw {
+    display: grid;
+    gap: var(--s-2);
+}
+
+.suggestions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-1);
+    margin-top: var(--s-2);
+
+    button {
+        padding: 2px var(--s-2);
+        border: 1px dashed rgb(255 197 61 / 55%);
+        color: var(--c-mod-engagement);
+        font-size: 0.75rem;
+        text-align: left;
+
+        @include touch-target;
+
+        &:hover {
+            background: rgb(255 197 61 / 8%);
+        }
+
+        &:focus-visible {
+            @include focus-ring;
+        }
+    }
+}
+
+.keepAlert {
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
+    color: #ffd77a;
+    font-size: 0.875rem;
+}
+
+.deleteGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: var(--s-3);
+}
+
+.deleteCard {
+    display: grid;
+    gap: var(--s-1);
+    padding: var(--s-3);
+    border: 1px solid var(--c-line);
+    background: var(--c-panel-fill);
+    box-shadow: inset 3px 0 0 rgb(255 30 45 / 60%);
+
+    .cardHead > svg {
+        color: var(--c-text-dim);
+    }
+}
+
+.insideText {
+    color: var(--c-text-faint);
+    font-size: 0.8125rem;
+}
+
+.cardFoot {
+    display: flex;
+    justify-content: space-between;
+    color: var(--c-text-dim);
+    font-size: 0.8125rem;
+
+    .goes {
+        @include label(0.7rem, 0.12em);
+    }
+}
+
+.previews {
+    position: sticky;
+    top: calc(var(--s-topbar) + var(--s-3));
+    display: grid;
+    gap: var(--s-3);
+
+    @include below(1199px) {
+        position: static;
+    }
+}
+
+.previewBox {
+    padding: var(--s-3);
+    border: 1px solid var(--c-line);
+    background: var(--c-panel-fill);
+}
+
+/* Wie Discord: grauer Grund, Karte mit gelbem Streifen. */
+.dmPreview {
+    display: grid;
+    gap: var(--s-2);
+    padding: var(--s-3);
+    border-top: 3px solid var(--c-mod-engagement);
+    border-radius: 6px;
+    background: #1e1f22;
+    color: #dbdee1;
+    font-size: 0.8125rem;
+
+    > b {
+        color: #fff;
+        font-family: var(--f-display);
+    }
+}
+
+.dmKept {
+    display: grid;
+    gap: 2px;
+    padding: var(--s-2);
+    border-left: 3px solid var(--c-mod-engagement);
+    background: #2b2d31;
+
+    .planLabel {
+        display: flex;
+        align-items: center;
+        gap: var(--s-1);
+        margin-bottom: 0;
+    }
+}
+
+.pdfPreview {
+    display: grid;
+    gap: var(--s-3);
+    padding: var(--s-3);
+    border: 1px solid var(--c-line-strong);
+    background: var(--c-base);
+    font-size: 0.8125rem;
+}
+
+.law {
+    display: block;
+    width: fit-content;
+    margin-top: var(--s-1);
+    padding: 0 var(--s-2);
+    border: 1px solid var(--c-line-strong);
+    color: var(--c-text-dim);
+
+    @include label(0.68rem, 0.1em);
+}
+
+.saveBar {
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-3);
+    margin-top: var(--s-4);
+    padding: var(--s-3) var(--s-4);
+    border: 1px solid var(--c-line-strong);
+    background: var(--c-panel-solid);
+    box-shadow: 0 -8px 24px rgb(0 0 0 / 40%);
+}
+
+.saveProblem {
+    color: #ffd77a;
 }

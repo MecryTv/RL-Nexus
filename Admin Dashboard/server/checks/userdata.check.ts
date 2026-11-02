@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { PERSON_COLUMN, USERDATA_AREA_IDS, USERDATA_AREAS, USERDATA_DEFAULT_KEEP, germanLabel, sourcesOf, type IUserdataSource } from "../../shared/userdata.ts";
+import { PERSON_COLUMN, USERDATA_AREA_IDS, USERDATA_AREAS, USERDATA_DEFAULTS, basisText, germanLabel, sourcesOf, type IUserdataSource } from "../../shared/userdata.ts";
 import { buildApp } from "../app.ts";
 import { signToken } from "../bot.ts";
 import { SESSION_COOKIE, seal } from "../session.ts";
@@ -44,8 +44,21 @@ export async function checkUserdata(): Promise<void> {
         assert.deepEqual(sourcesOf().find((source) => source.table === "ticket_transcripts")?.packed, ["data"]);
     });
 
-    await check("Bis W-0009 bleiben Shop, Moderation und das Protokoll des Teams, „zu klären“", () => {
-        assert.deepEqual(USERDATA_DEFAULT_KEEP, { shop: "zu klären", moderation: "zu klären", protokoll: "zu klären" });
+    await check("Vorgaben aus der Datenschutzerklärung: Shop und Protokoll bleiben 3 Jahre, Moderation wird gelöscht", () => {
+        assert.deepEqual(Object.keys(USERDATA_DEFAULTS).sort(), ["protokoll", "shop"]);
+        assert.deepEqual([USERDATA_DEFAULTS.shop?.basis, USERDATA_DEFAULTS.shop?.years], ["ansprueche", 3]);
+        assert.match(USERDATA_DEFAULTS.shop?.note ?? "", /Stripe/);
+        assert.deepEqual([USERDATA_DEFAULTS.protokoll?.basis, USERDATA_DEFAULTS.protokoll?.law, USERDATA_DEFAULTS.protokoll?.years], ["pflicht", "Art. 5 Abs. 2 DSGVO", 3]);
+    });
+
+    await check("basisText: Grundlage, Norm und Dauer in einer Zeile", () => {
+        assert.equal(basisText({ basis: "ansprueche", law: null, years: 3 }), "Art. 17 Abs. 3 lit. e DSGVO · 3 Jahre");
+        assert.equal(basisText({ basis: "pflicht", law: "Art. 5 Abs. 2 DSGVO", years: 1 }), "Art. 17 Abs. 3 lit. b DSGVO · Art. 5 Abs. 2 DSGVO · 1 Jahr");
+        assert.equal(basisText({ basis: null, law: null, years: null }), "Rechtsgrundlage zu klären");
+    });
+
+    await check("Jeder Bereich sagt, was drin ist, und hat ein Symbol", () => {
+        for (const area of USERDATA_AREAS) assert.ok(area.inside.length > 0 && area.icon.length > 0, area.id);
     });
 
     await check("Anzeigen auf Deutsch: Zustände, Aktionen und Gruppen", () => {
@@ -123,6 +136,16 @@ export async function checkUserdata(): Promise<void> {
         assert.match(announcement.alt, /Bleibt: Shop – Rechnungen bewahren wir auf\./);
         assert.doesNotMatch((await renderDeletionImage("ankuendigung", { ...dmInput, kept: [] })).alt, /Bleibt/);
         assert.match((await renderDeletionImage("erledigt", dmInput)).alt, /427 Einträge auf 3 Servern gelöscht/);
+    });
+
+    await check("DM-Bilder: lange Sätze bei „Bleibt“ brechen um statt abgeschnitten, je Bereich eine Zeile", async () => {
+        const heightOf = (png: Buffer): number => png.readUInt32BE(20);
+        const long = "Bezahlte Bestellungen, Zustimmungen und Kündigungen bewahren wir drei Jahre nach Vertragsende auf, um Ansprüche belegen zu können.";
+        const short = await renderDeletionImage("ankuendigung", dmInput);
+        const wrapped = await renderDeletionImage("ankuendigung", { ...dmInput, kept: [{ label: "Shop", rows: 3, note: long }, { label: "Im Protokoll des Teams", rows: 2, note: "Bleibt drei Jahre als Nachweis." }] });
+
+        assert.ok(heightOf(wrapped.data) >= heightOf(short.data) + 50, `${heightOf(short.data)} → ${heightOf(wrapped.data)}`);
+        assert.match(wrapped.alt, /um Ansprüche belegen zu können/);
     });
 
     await check("DM-Nachricht: nur die Ankündigung hat die Knöpfe, mit der Nummer der Löschung", () => {

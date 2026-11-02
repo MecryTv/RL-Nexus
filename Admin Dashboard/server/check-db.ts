@@ -18,7 +18,7 @@ import type { Transporter } from "nodemailer";
 import type { Options } from "nodemailer/lib/mailer/index.js";
 import type { IAuditPage, IDbRows, IDbTable, IGroupList, IMailAllPage, IMailOverview, IOverview, ITech } from "../shared/api.ts";
 import type { ISearchResult } from "../shared/search.ts";
-import { PERSON_COLUMN, USERDATA_IGNORED, sourcesOf, type IDeletion, type IUserdataList, type IUserdataProfile, type IUserdataRule } from "../shared/userdata.ts";
+import { PERSON_COLUMN, USERDATA_IGNORED, sourcesOf, type IDeletion, type IUserdataList, type IUserdataProfile, type IUserdataRuleView } from "../shared/userdata.ts";
 import { forgetIndex, personIndex, rowsOf } from "./userdata/find.ts";
 import { cancelDeletion, claimDeletion, deletionCounts, deletionOf, dueDeletions, listDeletions, markCopy, openDeletionOf, planDeletion, stopDeletion } from "./userdata/deletions.ts";
 import { executeDeletion } from "./userdata/erase.ts";
@@ -827,7 +827,15 @@ try {
     const DECOY = "99999999999999999931";
     const TEST_GUILD = "9999999999999999990";
     const [{ id: auditBefore }] = await query<{ id: number | null }[]>("SELECT COALESCE(MAX(id), 0) AS id FROM admin_audit");
-    const [savedLevelRule] = await query<{ keep: number; note: string | null }[]>("SELECT keep, note FROM userdata_rules WHERE area = 'level'").catch(() => []);
+    // Was bleibt: Die Checks ändern Regeln, hinterher steht wieder genau das da, was vorher gespeichert war.
+    const savedRules = await query<Record<string, unknown>[]>("SELECT * FROM userdata_rules").catch(() => []);
+    const restoreRules = async (): Promise<void> => {
+        await query("DELETE FROM userdata_rules");
+        for (const row of savedRules) {
+            const columns = Object.keys(row);
+            await query(`INSERT INTO userdata_rules (${columns.join(", ")}) VALUES (${columns.map(() => "?").join(", ")})`, columns.map((column) => row[column]));
+        }
+    };
     const userdataTidy = async (): Promise<void> => {
         for (const table of ["levels", "member_activity", "tickets", "ticket_transcripts", "mod_cases"]) await query(`DELETE FROM ${table} WHERE guild_id = ?`, [TEST_GUILD]);
         for (const table of ["shop_events", "shop_customers"]) await query(`DELETE FROM ${table} WHERE user_id IN (?, ?)`, [PERSON, DECOY]);
@@ -935,23 +943,36 @@ try {
             assert.equal(copy.bereiche.level["member_activity.user_id"].length, 500);
         });
 
-        await check("Nutzerdaten: Was bleibt hat Vorgaben und lässt sich ändern", async () => {
-            const rules = (await get("/api/userdata/regeln")).json() as IUserdataRule[];
+        await check("Nutzerdaten: Was bleibt hat Vorgaben aus der Datenschutzerklärung und zählt Personen je Bereich", async () => {
+            await query("DELETE FROM userdata_rules");
+            const rules = (await get("/api/userdata/regeln")).json() as IUserdataRuleView[];
+
             assert.deepEqual(
-                rules.filter((rule) => rule.keep).map((rule) => [rule.area, rule.note]),
+                rules.filter((rule) => rule.keep).map((rule) => [rule.area, rule.basis, rule.years]),
                 [
-                    ["moderation", "zu klären"],
-                    ["shop", "zu klären"],
-                    ["protokoll", "zu klären"],
+                    ["shop", "ansprueche", 3],
+                    ["protokoll", "pflicht", 3],
                 ]
             );
+            assert.ok((rules.find((rule) => rule.area === "level")?.people ?? 0) >= 1, "Personen je Bereich");
+        });
 
-            assert.equal((await write("PUT", "/api/userdata/regeln/level", { keep: true, note: null })).statusCode, 400);
-            assert.equal((await write("PUT", "/api/userdata/regeln/level", { keep: true, note: "check:db bleibt" })).statusCode, 204);
+        await check("Nutzerdaten: Was bleibt speichert mehrere Bereiche auf einmal, mit Rechtsgrundlage und Dauer", async () => {
+            const rule = (change: Record<string, unknown>) => ({ area: "level", keep: true, note: "check:db bleibt", basis: "ansprueche", law: "§ 195 BGB", years: 2, ...change });
+            const save = (rules: unknown[]) => write("PUT", "/api/userdata/regeln", { rules });
+
+            for (const wrong of [{ note: null }, { basis: "falsch" }, { basis: null }, { years: 0 }, { years: 31 }, { area: "gibtsnicht" }]) {
+                assert.equal((await save([rule(wrong)])).statusCode, 400, JSON.stringify(wrong));
+            }
+
+            assert.equal((await save([rule({}), { area: "beta", keep: false, note: null, basis: null, law: null, years: null }])).statusCode, 204);
+
+            const level = ((await get("/api/userdata/regeln")).json() as IUserdataRuleView[]).find((entry) => entry.area === "level");
+            assert.deepEqual([level?.keep, level?.note, level?.basis, level?.law, level?.years], [true, "check:db bleibt", "ansprueche", "§ 195 BGB", 2]);
             assert.equal((await profileOf(PERSON)).areas.find((area) => area.id === "level")?.keep, "check:db bleibt");
 
-            const [row] = await query<{ n: number }[]>("SELECT COUNT(*) AS n FROM admin_audit WHERE id > ? AND action = 'userdata.rules' AND target = 'level'", [Number(auditBefore)]);
-            assert.equal(Number(row.n), 1);
+            const [row] = await query<{ n: number }[]>("SELECT COUNT(*) AS n FROM admin_audit WHERE id > ? AND action = 'userdata.rules' AND target IN ('level', 'beta')", [Number(auditBefore)]);
+            assert.equal(Number(row.n), 2, "ein Eintrag je Bereich");
         });
 
         await check("Suche: eine Person mit ID öffnet ihre Nutzeransicht", async () => {
@@ -961,8 +982,7 @@ try {
         });
     } finally {
         await userdataTidy();
-        if (savedLevelRule) await query("INSERT INTO userdata_rules (area, keep, note) VALUES ('level', ?, ?) ON DUPLICATE KEY UPDATE keep = VALUES(keep), note = VALUES(note)", [savedLevelRule.keep, savedLevelRule.note]);
-        else await query("DELETE FROM userdata_rules WHERE area = 'level'").catch(() => undefined);
+        await restoreRules().catch(() => undefined);
     }
 
 
@@ -1065,6 +1085,7 @@ try {
         for (const table of ["levels", "mod_cases", "tickets", "level_top"]) await query(`DELETE FROM ${table} WHERE guild_id = ?`, [ERASE_GUILD]);
         await query("DELETE FROM userdata_deletions WHERE user_id IN (?, ?)", [ERASED, TWICE]);
         await query("DELETE FROM admin_audit WHERE id > ? AND action LIKE 'userdata.%'", [Number(eraseAuditBefore)]);
+        await restoreRules();
     };
     const later = (): Date => new Date(Date.now() + 10 * 60_000);
 
@@ -1081,7 +1102,8 @@ try {
         await query("INSERT INTO tickets (guild_id, number, option_id, opener_id, members, notes, anonymous) VALUES (?, 7, 'check', ?, ?, '[]', '[]')", [ERASE_GUILD, BYSTANDER, JSON.stringify([ERASED, BYSTANDER])]);
         await query("INSERT INTO level_top (guild_id, kind, period_key, holders, posted_at) VALUES (?, 'week', '2090-01-01', ?, ?)", [ERASE_GUILD, `${BYSTANDER},${ERASED}`, now]);
 
-        await check("Löschung ausführen: eigene Zeilen weg, für andere nur die ID raus, „behalten“ bleibt, Nachweis im Protokoll", async () => {
+        await check("Löschung ausführen: eigene Zeilen weg, für andere nur die ID raus, „behalten“ bleibt mit Grundlage, Nachweis im Protokoll", async () => {
+            await query("INSERT INTO userdata_rules (area, keep, note, basis, law, years) VALUES ('moderation', 1, 'check:db bleibt', 'ansprueche', NULL, 1) ON DUPLICATE KEY UPDATE keep = 1, note = VALUES(note), basis = VALUES(basis), law = NULL, years = 1");
             const planned = await planDeletion({ userId: ERASED, userName: "check Weg", dueAt: later(), reason: "check:db", by: { id: USERS.admin, name: "nutzer1" } });
             const result = await executeDeletion(config, planned.id);
 
@@ -1089,8 +1111,8 @@ try {
             assert.equal(result.deleted.level, 1);
             assert.ok((result.anonymized.team ?? 0) >= 1 && (result.anonymized.tickets ?? 0) >= 1 && (result.anonymized.level ?? 0) >= 1, JSON.stringify(result));
             assert.deepEqual(
-                result.kept.filter((entry) => entry.area === "moderation").map((entry) => [entry.rows, entry.note]),
-                [[1, "zu klären"]]
+                result.kept.filter((entry) => entry.area === "moderation").map((entry) => [entry.rows, entry.note, entry.basis, entry.years]),
+                [[1, "check:db bleibt", "ansprueche", 1]]
             );
 
             const [levels] = await query<{ n: number }[]>("SELECT COUNT(*) AS n FROM levels WHERE user_id = ?", [ERASED]);

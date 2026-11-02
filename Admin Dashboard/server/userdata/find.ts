@@ -2,7 +2,7 @@ import { inflateSync } from "node:zlib";
 import { AUDIT_LABELS } from "../../shared/limits.ts";
 import {
     USERDATA_AREAS,
-    USERDATA_DEFAULT_KEEP,
+    USERDATA_DEFAULTS,
     germanLabel,
     sourcesOf,
     type IUserdataPerson,
@@ -10,6 +10,7 @@ import {
     type IUserdataRule,
     type IUserdataSource,
     type UserdataArea,
+    type UserdataBasis,
 } from "../../shared/userdata.ts";
 import { SECRET_COLUMN } from "../database.ts";
 import { query } from "../db.ts";
@@ -52,6 +53,7 @@ const iso = (value: Date | string | null): string | null => (value === null ? nu
 
 interface IIndexEntry {
     rows: number;
+    readonly areas: Partial<Record<UserdataArea, number>>;
     name: string | null;
     lastAt: string | null;
     shop: boolean;
@@ -80,14 +82,14 @@ export function personIndex(now = Date.now()): Promise<Map<string, IUserdataPers
 async function buildIndex(now: number): Promise<Map<string, IUserdataPerson>> {
     const entries = new Map<string, IIndexEntry>();
     const entry = (id: string): IIndexEntry => {
-        const found = entries.get(id) ?? { rows: 0, name: null, lastAt: null, shop: false, guilds: new Set<string>() };
+        const found = entries.get(id) ?? { rows: 0, areas: {}, name: null, lastAt: null, shop: false, guilds: new Set<string>() };
 
         entries.set(id, found);
 
         return found;
     };
 
-    for (const source of sourcesOf().filter((item) => item.role === "person" || item.role === "team")) {
+    for (const { area, source } of USERDATA_AREAS.flatMap((def) => def.sources.filter((item) => item.role === "person" || item.role === "team").map((item) => ({ area: def.id, source: item })))) {
         const rows = await rowsOf<{ id: string; n: number; last: Date | string | null; name: string | null }>(
             `SELECT ${source.column} AS id, COUNT(*) AS n, ${source.time ? `MAX(${source.time})` : "NULL"} AS last, ${source.name ? `MAX(${source.name})` : "NULL"} AS name
              FROM ${source.table} WHERE ${source.column} IS NOT NULL GROUP BY ${source.column}`
@@ -100,6 +102,7 @@ async function buildIndex(now: number): Promise<Map<string, IUserdataPerson>> {
             const last = iso(row.last);
 
             found.rows += Number(row.n);
+            found.areas[area] = (found.areas[area] ?? 0) + Number(row.n);
             found.name ??= row.name;
             if (last && (!found.lastAt || last > found.lastAt)) found.lastAt = last;
             if (source.table === "shop_customers" && source.role === "person") found.shop = true;
@@ -112,7 +115,7 @@ async function buildIndex(now: number): Promise<Map<string, IUserdataPerson>> {
         }
     }
 
-    const people = new Map([...entries].map(([id, found]) => [id, { id, name: found.name, rows: found.rows, servers: found.guilds.size, lastAt: found.lastAt, shop: found.shop }]));
+    const people = new Map([...entries].map(([id, found]) => [id, { id, name: found.name, rows: found.rows, areas: found.areas, servers: found.guilds.size, lastAt: found.lastAt, shop: found.shop }]));
 
     index = { at: now, people };
 
@@ -213,13 +216,16 @@ export async function personExport(id: string): Promise<Partial<Record<UserdataA
 
 /** Je Bereich löschen oder behalten. Ohne Zeile gilt die Vorgabe. */
 export async function userdataRules(): Promise<IUserdataRule[]> {
-    const rows = await query<{ area: string; keep: number; note: string | null }[]>("SELECT area, keep, note FROM userdata_rules");
+    const rows = await query<{ area: string; keep: number; note: string | null; basis: UserdataBasis | null; law: string | null; years: number | null }[]>("SELECT area, keep, note, basis, law, years FROM userdata_rules");
     const saved = new Map(rows.map((row) => [row.area, row]));
 
     return USERDATA_AREAS.map((area) => {
         const row = saved.get(area.id);
-        const fallback = USERDATA_DEFAULT_KEEP[area.id];
+        const fallback = USERDATA_DEFAULTS[area.id];
 
-        return row ? { area: area.id, label: area.label, keep: Boolean(row.keep), note: row.note } : { area: area.id, label: area.label, keep: fallback !== undefined, note: fallback ?? null };
+        if (row) return { area: area.id, label: area.label, keep: Boolean(row.keep), note: row.note, basis: row.basis, law: row.law, years: row.years === null ? null : Number(row.years) };
+        if (fallback) return { area: area.id, label: area.label, keep: true, ...fallback };
+
+        return { area: area.id, label: area.label, keep: false, note: null, basis: null, law: null, years: null };
     });
 }

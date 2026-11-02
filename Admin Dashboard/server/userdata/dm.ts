@@ -150,21 +150,61 @@ function label(ctx: SKRSContext2D, text: string, x: number, y: number): void {
     ctx.fillText(text.toUpperCase(), x, y);
 }
 
-/** Die Zeile „Bleibt“ bzw. „Geblieben“ mit Schloss. Gibt die neue Höhe zurück. */
+/** Text in Zeilen der Breite width, höchstens max; der Rest endet mit „…“. */
+function wrap(ctx: SKRSContext2D, text: string, width: number, max: number): string[] {
+    const lines: string[] = [];
+    let line = "";
+
+    for (const word of text.split(" ")) {
+        const next = line ? `${line} ${word}` : word;
+
+        if (ctx.measureText(next).width <= width || !line) {
+            line = next;
+            continue;
+        }
+
+        lines.push(line);
+        line = word;
+    }
+
+    if (line) lines.push(line);
+    if (lines.length <= max) return lines;
+
+    return [...lines.slice(0, max - 1), fit(ctx, `${lines.slice(max - 1).join(" ")}`, width)];
+}
+
+/** Der Block „Bleibt“ bzw. „Geblieben“ mit Schloss: je Bereich eine Zeile, lange Sätze brechen um (höchstens 3 Zeilen). Gibt die neue Höhe zurück. */
 function keptRow(ctx: SKRSContext2D, input: IDmInput, word: string, y: number): number {
     if (input.kept.length === 0) return y;
 
+    const LINE = 26;
+    const textWidth = W - 2 * PAD - 170;
+
+    ctx.font = "600 20px Rajdhani";
+    const blocks = input.kept.map((entry) => wrap(ctx, `${entry.label}: ${sentence(entry.note)}`, textWidth, 3));
+    const height = 26 + blocks.reduce((sum, lines) => sum + lines.length * LINE, 0) + (blocks.length - 1) * 8;
+
     ctx.fillStyle = TILE;
     ctx.beginPath();
-    ctx.roundRect(PAD, y, W - 2 * PAD, 52, 8);
+    ctx.roundRect(PAD, y, W - 2 * PAD, height, 8);
     ctx.fill();
     lock(ctx, PAD + 16, y + 15, DIM);
     label(ctx, word, PAD + 46, y + 32);
     ctx.font = "600 20px Rajdhani";
     ctx.fillStyle = TEXT;
-    ctx.fillText(fit(ctx, input.kept.map((entry) => `${entry.label}: ${sentence(entry.note)}`).join(" · "), W - 2 * PAD - 170), PAD + 150, y + 33);
 
-    return y + 52 + 24;
+    let line = y + 33;
+
+    for (const lines of blocks) {
+        for (const text of lines) {
+            ctx.fillText(text, PAD + 150, line);
+            line += LINE;
+        }
+
+        line += 8;
+    }
+
+    return y + height + 24;
 }
 
 /* --- Die fünf Bilder ----------------------------------------------------- */
