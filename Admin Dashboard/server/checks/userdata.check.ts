@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { PERSON_COLUMN, USERDATA_AREA_IDS, USERDATA_AREAS, USERDATA_DEFAULT_KEEP, germanLabel, sourcesOf, type IUserdataSource } from "../../shared/userdata.ts";
 import { buildApp } from "../app.ts";
 import { SESSION_COOKIE, seal } from "../session.ts";
+import { eraseSql, eraseValues } from "../userdata/erase.ts";
 import { matchSql, matchValue } from "../userdata/find.ts";
 import { USERS } from "./fakes.ts";
 import { SECRET, check, config, section } from "./harness.ts";
@@ -62,6 +63,23 @@ export async function checkUserdata(): Promise<void> {
 
         const list: IUserdataSource = { table: "level_top", column: "holders", role: "list", label: "'x'" };
         assert.deepEqual([matchSql(list), matchValue(list, "123")], ["FIND_IN_SET(?, holders) > 0", "123"]);
+    });
+
+    await check("Löschen: eigene Zeilen weg, für andere nur die ID raus, in JSON und Listen ersetzt", () => {
+        const person: IUserdataSource = { table: "levels", column: "user_id", role: "person", label: "'x'" };
+        const team: IUserdataSource = { table: "mod_cases", column: "moderator_id", role: "team", label: "'x'", name: "moderator_name" };
+        const json: IUserdataSource = { table: "tickets", column: "members", role: "json", label: "'x'" };
+        const list: IUserdataSource = { table: "level_top", column: "holders", role: "list", label: "'x'" };
+
+        assert.equal(eraseSql(person, true), "DELETE FROM levels WHERE user_id = ?");
+        assert.equal(eraseSql(team, false), "UPDATE mod_cases SET moderator_id = '0', moderator_name = 'Gelöschte Person' WHERE moderator_id = ?");
+        assert.equal(eraseSql({ ...team, name: undefined }, true), "UPDATE mod_cases SET moderator_id = NULL WHERE moderator_id = ?");
+        assert.equal(eraseSql(json, false), `UPDATE tickets SET members = REPLACE(members, ?, '"0"') WHERE members LIKE ?`);
+        assert.equal(eraseSql(list, false), "UPDATE level_top SET holders = TRIM(BOTH ',' FROM REPLACE(CONCAT(',', holders, ','), CONCAT(',', ?, ','), ',')) WHERE FIND_IN_SET(?, holders) > 0");
+        assert.deepEqual(
+            [person, team, json, list].map((source) => eraseValues(source, "123")),
+            [["123"], ["123"], ['"123"', '%"123"%'], ["123", "123"]]
+        );
     });
 
     const app = await buildApp(config);

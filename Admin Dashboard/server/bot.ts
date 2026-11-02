@@ -132,6 +132,19 @@ export async function botRestored(config: IConfig, guildId: string, tables: read
     }
 }
 
+/**
+ * Nach einer Löschung (W-0051): Der Bot vergisst die Person in seinen
+ * Zwischenspeichern, sonst schriebe er etwa gepufferte Aktivität zurück.
+ * byId: wer die Löschung geplant hat. false: nicht erreicht.
+ */
+export async function botForgetUser(config: IConfig, userId: string, byId: string): Promise<boolean> {
+    try {
+        return (await callBot(config, byId, `/admin/users/${userId}/forget`, "POST", { body: {} })).ok;
+    } catch {
+        return false;
+    }
+}
+
 /** Stößt den Neustart an. false heißt: Der Bot hat nicht angenommen oder antwortet nicht. */
 export async function restartBot(config: IConfig, userId: string): Promise<boolean> {
     try {

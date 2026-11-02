@@ -20,7 +20,8 @@ import type { IAuditPage, IDbRows, IDbTable, IGroupList, IMailAllPage, IMailOver
 import type { ISearchResult } from "../shared/search.ts";
 import { PERSON_COLUMN, USERDATA_IGNORED, sourcesOf, type IUserdataList, type IUserdataProfile, type IUserdataRule } from "../shared/userdata.ts";
 import { forgetIndex, personIndex, rowsOf } from "./userdata/find.ts";
-import { cancelDeletion, claimDeletion, deletionCounts, dueDeletions, listDeletions, markCopy, openDeletionOf, planDeletion, stopDeletion } from "./userdata/deletions.ts";
+import { cancelDeletion, claimDeletion, deletionCounts, deletionOf, dueDeletions, listDeletions, markCopy, openDeletionOf, planDeletion, stopDeletion } from "./userdata/deletions.ts";
+import { executeDeletion } from "./userdata/erase.ts";
 import type { ICancelReceipt, ICheckoutStart, ICustomerDetail, ICustomerList, IShopProduct, IShopProductList, IShopSettingsView, IShopState, IUnlockProgress } from "../shared/shop.ts";
 import type { IIncidentList, IPublicStatus, IStatusDetail } from "../shared/status.ts";
 import { buildApp } from "./app.ts";
@@ -1049,6 +1050,97 @@ try {
         });
     } finally {
         await deletionTidy();
+    }
+
+    section("Nutzerdaten: Löschung ausführen");
+
+    const ERASED = "9999999999999999997";
+    const TWICE = "9999999999999999998";
+    const BYSTANDER = "9999999999999999990";
+    const ERASE_GUILD = "9999999999999999991";
+    const [{ id: eraseAuditBefore }] = await query<{ id: number | null }[]>("SELECT COALESCE(MAX(id), 0) AS id FROM admin_audit");
+    const eraseTidy = async (): Promise<void> => {
+        for (const table of ["levels", "mod_cases", "tickets", "level_top"]) await query(`DELETE FROM ${table} WHERE guild_id = ?`, [ERASE_GUILD]);
+        await query("DELETE FROM userdata_deletions WHERE user_id IN (?, ?)", [ERASED, TWICE]);
+        await query("DELETE FROM admin_audit WHERE id > ? AND action LIKE 'userdata.%'", [Number(eraseAuditBefore)]);
+    };
+    const later = (): Date => new Date(Date.now() + 10 * 60_000);
+
+    await eraseTidy();
+
+    try {
+        const now = Date.now();
+
+        await query("INSERT INTO levels (guild_id, user_id, xp, level, updated_at) VALUES (?, ?, 100, 1, ?), (?, ?, 100, 1, ?)", [ERASE_GUILD, ERASED, now, ERASE_GUILD, TWICE, now]);
+        await query(
+            "INSERT INTO mod_cases (guild_id, number, action, target_id, target_name, moderator_id, moderator_name, details, evidence, notes, created_at) VALUES (?, 1, 'warn', ?, 'check Ziel', ?, 'check Mod', '{}', '[]', '[]', ?), (?, 2, 'warn', ?, 'check Dritter', ?, 'check Mod', '{}', '[]', '[]', ?)",
+            [ERASE_GUILD, ERASED, BYSTANDER, now, ERASE_GUILD, BYSTANDER, ERASED, now]
+        );
+        await query("INSERT INTO tickets (guild_id, number, option_id, opener_id, members, notes, anonymous) VALUES (?, 7, 'check', ?, ?, '[]', '[]')", [ERASE_GUILD, BYSTANDER, JSON.stringify([ERASED, BYSTANDER])]);
+        await query("INSERT INTO level_top (guild_id, kind, period_key, holders, posted_at) VALUES (?, 'week', '2090-01-01', ?, ?)", [ERASE_GUILD, `${BYSTANDER},${ERASED}`, now]);
+
+        await check("Löschung ausführen: eigene Zeilen weg, für andere nur die ID raus, „behalten“ bleibt, Nachweis im Protokoll", async () => {
+            const planned = await planDeletion({ userId: ERASED, userName: "check Weg", dueAt: later(), reason: "check:db", by: { id: USERS.admin, name: "nutzer1" } });
+            const result = await executeDeletion(config, planned.id);
+
+            assert.ok(result, "ausgeführt");
+            assert.equal(result.deleted.level, 1);
+            assert.ok((result.anonymized.team ?? 0) >= 1 && (result.anonymized.tickets ?? 0) >= 1 && (result.anonymized.level ?? 0) >= 1, JSON.stringify(result));
+            assert.deepEqual(
+                result.kept.filter((entry) => entry.area === "moderation").map((entry) => [entry.rows, entry.note]),
+                [[1, "zu klären"]]
+            );
+
+            const [levels] = await query<{ n: number }[]>("SELECT COUNT(*) AS n FROM levels WHERE user_id = ?", [ERASED]);
+            assert.equal(Number(levels.n), 0);
+            const cases = await query<{ number: number; target_id: string; moderator_id: string; moderator_name: string }[]>("SELECT number, target_id, moderator_id, moderator_name FROM mod_cases WHERE guild_id = ? ORDER BY number", [ERASE_GUILD]);
+            assert.deepEqual(
+                cases.map((row) => [Number(row.number), row.target_id, row.moderator_id, row.moderator_name]),
+                [
+                    [1, ERASED, BYSTANDER, "check Mod"],
+                    [2, BYSTANDER, "0", "Gelöschte Person"],
+                ]
+            );
+            // Der Treiber liefert JSON-Spalten schon als Wert.
+            const [ticket] = await query<{ members: unknown }[]>("SELECT members FROM tickets WHERE guild_id = ?", [ERASE_GUILD]);
+            assert.deepEqual(typeof ticket.members === "string" ? JSON.parse(ticket.members) : ticket.members, ["0", BYSTANDER]);
+            const [top] = await query<{ holders: string }[]>("SELECT holders FROM level_top WHERE guild_id = ?", [ERASE_GUILD]);
+            assert.equal(top.holders, BYSTANDER);
+
+            const done = await deletionOf(planned.id);
+            assert.deepEqual([done?.state, done?.userName, done?.forgetPending], ["geloescht", null, true], "Bot im Check nicht erreichbar: Vergessen steht aus");
+            const [audit] = await query<{ detail: string }[]>("SELECT detail FROM admin_audit WHERE id > ? AND action = 'userdata.delete' AND target = ?", [Number(eraseAuditBefore), ERASED]);
+            assert.match(audit?.detail ?? "", /Bot nicht erreichbar/);
+        });
+
+        await check("Löschung ausführen: zwei Uhr-Runden zugleich löschen einmal; erreicht der Bot, ist nichts offen", async () => {
+            const planned = await planDeletion({ userId: TWICE, userName: null, dueAt: later(), reason: "check:db", by: { id: USERS.admin, name: "nutzer1" } });
+            const real = globalThis.fetch;
+            const forgotten: string[] = [];
+
+            globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+                const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+                if (url.includes("/dcapi/admin/users/") && url.endsWith("/forget")) {
+                    forgotten.push(url);
+
+                    return new Response(null, { status: 204 });
+                }
+
+                return real(input, init);
+            }) as typeof fetch;
+
+            try {
+                const results = await Promise.all([executeDeletion(config, planned.id), executeDeletion(config, planned.id)]);
+
+                assert.equal(results.filter((entry) => entry !== null).length, 1);
+                assert.equal(forgotten.length, 1);
+                assert.equal((await deletionOf(planned.id))?.forgetPending, false);
+            } finally {
+                globalThis.fetch = real;
+            }
+        });
+    } finally {
+        await eraseTidy();
     }
 
     section("Statusmeldung in Discord");
