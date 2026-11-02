@@ -102,6 +102,21 @@ Beide Knöpfe machen dasselbe: sofort prüfen und in jedem Statuskanal neu schre
 
 Die Vorschau zeigt die Bausteine, die `payload()` heute verwendet: Container mit Farbe, Text (fett, Überschriften, `-#` klein, Discord-Zeitstempel `<t:…>` als Uhrzeit), Abschnitt mit Knopf daneben, Knopfzeile mit Link-Knöpfen, Bildergalerie. Nicht mehr. Kommt später ein neuer Baustein dazu, zeigt die Vorschau „(Baustein … nicht in der Vorschau)“ statt zu brechen.
 
+### Ergänzung vom 02.11.: Reiter, Bilder, Kanalwahl
+
+Nach dem ersten Bau kamen drei Wünsche dazu (Entwürfe `w0052-discord.html`, `w0052-statusbild-v2.html`, `w0052-kanalwahl.html`):
+
+- **D1, eigener Reiter.** Die Status-Seite bekommt die Reiter „Leitstand“ (`/status`, wie bisher mit Meldungen) und „Discord-Meldung“ (`/status/discord`). Im zweiten links die Vorschau im Discord-Rahmen (Kanalname, Bot mit APP-Abzeichen, Uhrzeit), rechts ein großer Ring bis zur nächsten Runde, „Jetzt aktualisieren“, der Kasten „Statuskanal“ und „Zuletzt von Hand“ (wer, wann, Ergebnis). Der Knopf B1 im Seitenkopf bleibt.
+- **Die Meldung als Bilder** (Runde 2, „Mischung aus S2 & S3, deutlich verbessert“, gewählt mit „Ja, so bauen“). Ein Kopfbild ersetzt das Banner: Name, Stand, Gesamtzustand groß mit Zeichen und Farbe, „N von 4 Diensten erreichbar“, 30-Tage-Wert, ein Punkt je Dienst, eine 24-Stunden-Leiste über alle Dienste (48 halbe Stunden) mit Zeitachse. Darunter genau eine Textzeile „Geprüft <t:R> · zieht alle 2 Minuten nach“. Laufende Meldungen als Text wie heute (gelb), dann vier Dienstkarten als Bilder in einer Galerie (Streifen, Rand und Wort nach Zustand: LÄUFT, EINGESCHRÄNKT, AUSFALL, WARTUNG; große Kennzahl, gestört stattdessen „N Min. weg“; Kurve der Antwortzeit über 24 Stunden; zwölf Kästchen; 24 h und 30 T; eine Zeile zum Dienst), dann geplante Wartungen als Text (blau), dann die Link-Knöpfe. Jedes Bild hat einen Alt-Text mit allen Werten. Uhrzeiten im Bild in Berliner Zeit.
+- **Statuskanal wählen (K2).** Im Kasten „Statuskanal“ öffnet „Kanal ändern“ ein Fenster mit Suche und den Textkanälen eines festen Servers, nach Kategorie: im Development-Modus der Dev Server, im Betrieb der Server `1547258700480253982` (beides `ADMIN_GUILD_ID`). Je Kanal steht, ob der Bot „Nachrichten senden“, „Dateien anhängen“ und „Nachrichten verwalten“ hat, sonst was fehlt. „Übernehmen“ speichert den Kanal, löscht die alte Meldung im alten Kanal und schreibt sofort im neuen. Jede Änderung steht im Protokoll.
+
+Entscheidungen von Claude dazu:
+
+1. **Gezeichnet wird im Admin Dashboard** mit `@napi-rs/canvas` (dieselbe Version wie im Bot) und den Schriften Oxanium und Rajdhani aus dem Bot. Würde der Bot zeichnen, könnte die Meldung einen Ausfall des Bots nicht mehr zeigen.
+2. **Keine Emojis in den Bildern:** Die Schriften haben keine, ein Emoji-Font wäre groß. Statt 🤖 steht ein gezeichnetes Zeichen in der Farbe des Zustands.
+3. **Genau ein Statuskanal je Modus**, gespeichert in `admin_state`. Steht nichts drin, gilt wie bisher der Kanal aus der `.env`.
+4. **Die Vorschau im Reiter zeigt dieselben Bilder**, der Server liefert sie unter `/api/status/discord/image/<name>`.
+
 ---
 
 ## Teil 3: Nutzerdaten finden und löschen (W-0051)
