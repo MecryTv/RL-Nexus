@@ -5,6 +5,10 @@
  * nur für Seiten. Ohne DOM, damit npm run check es prüfen kann.
  */
 
+import { fold, rankOf } from "../../shared/search.ts";
+
+export { fold };
+
 export interface INavEntry {
     readonly href: string;
     readonly name: string;
@@ -15,29 +19,6 @@ export interface INavEntry {
     readonly text: string;
 }
 
-/** Klein, ohne Umlaute und Akzente: „Größe“ wird „grosse“. */
-export function fold(text: string): string {
-    return text
-        .toLowerCase()
-        .replace(/ä/g, "a")
-        .replace(/ö/g, "o")
-        .replace(/ü/g, "u")
-        .replace(/ß/g, "ss")
-        .normalize("NFD")
-        .replace(/[̀-ͯ]/g, "");
-}
-
-/** 0 Name beginnt damit (oder ein Wort darin), 1 Name enthält es, 2 Bereich oder Beschreibung, null kein Treffer. */
-function rank(entry: INavEntry, query: string): number | null {
-    const name = fold(entry.name);
-
-    if (name.startsWith(query) || name.split(/[^a-z0-9]+/).some((word) => word.startsWith(query))) return 0;
-    if (name.includes(query)) return 1;
-    if (fold(`${entry.area} ${entry.text}`).includes(query)) return 2;
-
-    return null;
-}
-
 /** Leere Eingabe: keine Treffer - was dann zu sehen ist, entscheidet das Fenster. */
 export function searchNav(entries: readonly INavEntry[], query: string): INavEntry[] {
     const wanted = fold(query.trim());
@@ -45,7 +26,7 @@ export function searchNav(entries: readonly INavEntry[], query: string): INavEnt
     if (!wanted) return [];
 
     return entries
-        .map((entry) => ({ entry, rank: rank(entry, wanted) }))
+        .map((entry) => ({ entry, rank: rankOf(entry.name, `${entry.area} ${entry.text}`, wanted) }))
         .filter((hit): hit is { entry: INavEntry; rank: number } => hit.rank !== null)
         .sort((a, b) => a.rank - b.rank || a.entry.name.localeCompare(b.entry.name, "de"))
         .map((hit) => hit.entry);

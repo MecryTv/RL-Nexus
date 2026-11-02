@@ -27,6 +27,7 @@ import { checkNav } from "./checks/nav.check.ts";
 import { checkRoutes } from "./checks/routes.check.ts";
 import { checkSession } from "./checks/session.check.ts";
 import { checkShop } from "./checks/shop.check.ts";
+import { checkSearch } from "./checks/search.check.ts";
 import { checkStatus, checkStatusHistoryKept, checkStatusRoutes } from "./checks/status.check.ts";
 
 await checkConfig();
@@ -36,6 +37,7 @@ await checkAuth();
 await checkBot();
 await checkFormat();
 await checkNav();
+await checkSearch();
 await checkInput();
 await checkContact();
 await checkRoutes();
