@@ -149,7 +149,7 @@ async function sendDiscord(config: IConfig, input: IContactInput): Promise<void>
                     title: shorten(input.subject, 256),
                     // Die Farbe der Webseite, damit die Nachricht erkennbar ist.
                     color: 0xff_1e_2d,
-                    url: `${config.publicUrl}/post/alle`,
+                    url: `${config.publicUrl}/post`,
                     description: shorten(input.message, 2000),
                     fields: [
                         { name: "Thema", value: topicOf(input), inline: true },
