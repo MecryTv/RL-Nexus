@@ -846,7 +846,8 @@ const PRIVACY: readonly ILegalSection[] = [
                     Jahre auf (Art. 6 Abs. 1 lit. c, Art. 5 Abs. 2 DSGVO). Ebenso lange steht im Protokoll unseres
                     Teams, was es zu deiner Person erledigt hat, etwa eine Auskunft oder eine Löschung. In
                     Sicherungskopien der Datenbank stehen gelöschte Daten noch, bis diese nach 30 Tagen
-                    überschrieben werden.
+                    überschrieben werden. Aus den Backups einzelner Server nehmen wir sie beim Löschen heraus; sie
+                    liegen dann getrennt, lassen sich nicht zurückladen und sind nach 30 Tagen endgültig gelöscht.
                 </p>
                 <p>
                     Außerdem kannst du dich bei einer Datenschutz-Aufsichtsbehörde beschweren (Art. 77 DSGVO). Für uns

@@ -124,6 +124,8 @@ export const USERDATA_AREAS: readonly IUserdataAreaDef[] = [
             { table: "mod_cases", column: "target_id", role: "person", guild: G, time: ms("created_at"), label: "CONCAT('Fall ', number, ' · ', action)", name: "target_name", words: true },
             { table: "av_cases", column: "user_id", role: "person", guild: G, time: ms("created_at"), label: "CONCAT('Anti-Villain · ', status)", words: true },
             { table: "av_reports", column: "target_id", role: "person", guild: G, time: ms("at"), label: "'Gemeldet'" },
+            // Eigene Meldungen gehören der Person (nicht „Als Team aktiv“): Als team kollidierte die '0' mit dem Schlüssel (guild_id, target_id, reporter_id).
+            { table: "av_reports", column: "reporter_id", role: "person", guild: G, time: ms("at"), label: "'Jemanden gemeldet'" },
             { table: "av_trust", column: "user_id", role: "person", guild: G, label: "'Vertrauen gesetzt'" },
             { table: "av_debris", column: "members", role: "json", guild: G, label: "'Von Anti-Nuke gesichert'" },
         ],
@@ -208,7 +210,6 @@ export const USERDATA_AREAS: readonly IUserdataAreaDef[] = [
             { table: "apply_submissions", column: "decided_by", role: "team", guild: G, time: ms("decided_at"), label: "'Über eine Bewerbung entschieden'" },
             { table: "auto_responses", column: "created_by", role: "team", guild: G, label: "'Auto-Antwort angelegt'" },
             { table: "av_cases", column: "closed_by", role: "team", guild: G, time: ms("closed_at"), label: "'Anti-Villain-Fall geschlossen'" },
-            { table: "av_reports", column: "reporter_id", role: "team", guild: G, time: ms("at"), label: "'Jemanden gemeldet'" },
             { table: "beta_codes", column: "created_by", role: "team", time: "created_at", label: "'Beta-Code angelegt'" },
             { table: "contact_messages", column: "handled_by", role: "team", time: "handled_at", label: "CONCAT('Kontakt bearbeitet: ', subject)" },
             { table: "contact_replies", column: "user_id", role: "team", time: "created_at", label: "'Auf eine Kontaktanfrage geantwortet'", name: "user_name" },

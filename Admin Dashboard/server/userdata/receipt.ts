@@ -274,7 +274,7 @@ function remaining(pdf: Pdf, record: IDeletionRecord, code: string): void {
     }
 
     y = item(pdf, y, "Dieser Nachweis", "Discord-ID, Zeitpunkte und Zahlen dieser Löschung, keine Inhalte. Damit können wir belegen, dass wir gelöscht haben.", `Art. 6 Abs. 1 lit. c, Art. 5 Abs. 2 DSGVO · ${USERDATA_PROOF_YEARS} Jahre`);
-    y = item(pdf, y, "Sicherungen", `In Sicherungskopien der Datenbank stehen die Daten noch, bis diese nach ${USERDATA_BACKUP_DAYS} Tagen überschrieben werden. Bis dahin spielen wir sie nicht zurück.`, null);
+    y = item(pdf, y, "Sicherungen", `In Sicherungskopien der Datenbank stehen die Daten noch, bis diese nach ${USERDATA_BACKUP_DAYS} Tagen überschrieben werden; bis dahin spielen wir sie nicht zurück. Aus den Backups einzelner Server haben wir sie herausgenommen: Sie liegen getrennt, lassen sich nicht zurückladen und sind nach ${USERDATA_BACKUP_DAYS} Tagen endgültig gelöscht.`, null);
     y = item(pdf, y, "Nicht bei uns", "Nachrichten, die du auf Discord-Servern geschrieben hast, liegen bei Discord und den Servern. Die löscht RL Nexus nicht.", null);
 
     y = section(pdf, "Deine Rechte", y + 4);

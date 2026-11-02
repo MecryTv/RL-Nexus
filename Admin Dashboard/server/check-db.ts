@@ -22,6 +22,9 @@ import { PERSON_COLUMN, USERDATA_IGNORED, discordSince, sourcesOf, type IDeletio
 import { forgetIndex, personIndex, rowsOf } from "./userdata/find.ts";
 import { cancelDeletion, claimDeletion, deletionCounts, deletionOf, dueDeletions, forgetOldDeletions, listDeletions, markCopy, openDeletionOf, planDeletion, stopDeletion } from "./userdata/deletions.ts";
 import { executeDeletion } from "./userdata/erase.ts";
+import { purgeQuarantine, quarantineTable } from "./userdata/backups.ts";
+import { packBackup, unpackBackup } from "./backups/data.ts";
+import { backupDatabaseName, ensureBackupDatabase } from "./backups/store.ts";
 import { signToken } from "./bot.ts";
 import { forgetUser } from "./users.ts";
 import { deletionRound } from "./userdata/clock.ts";
@@ -1201,6 +1204,8 @@ try {
 
         await check("Löschung ausführen: kollidiert das Entfernen der ID mit einem Schlüssel, fällt die doppelte Zeile weg statt die Löschung zu stoppen", async () => {
             // av_reports: (Server, Ziel, Meldender) ist eindeutig. Eine früher gelöschte Person meldete dasselbe Ziel schon als '0'.
+            // Moderation (dort liegen die Meldungen) wird hier gelöscht, nicht behalten wie im Test davor.
+            await query("DELETE FROM userdata_rules WHERE area = 'moderation'");
             await query("INSERT INTO av_reports (guild_id, target_id, reporter_id, at) VALUES (?, ?, '0', ?), (?, ?, ?, ?)", [ERASE_GUILD, BYSTANDER, Date.now(), ERASE_GUILD, BYSTANDER, LEADER, Date.now()]);
             await query("INSERT INTO levels (guild_id, user_id, xp, level, updated_at) VALUES (?, ?, 10, 1, ?)", [ERASE_GUILD, LEADER, Date.now()]);
 
@@ -1223,6 +1228,41 @@ try {
             assert.equal(row?.leader_id, "0", "Club bleibt, die Leitung ist raus");
             const members = await query<{ user_id: string }[]>("SELECT user_id FROM club_members WHERE club_id = ?", [Number(club.insertId)]);
             assert.deepEqual(members.map((member) => member.user_id), [BYSTANDER]);
+        });
+
+        await check("Löschung ausführen: aus Server-Backups heraus, getrennt aufbewahrt, nach 30 Tagen endgültig weg", async () => {
+            const BACKUPPER = "9999999999999999982";
+            assert.equal(await ensureBackupDatabase(config), null, "Backup-Datenbank bereit");
+            const backups = `\`${backupDatabaseName()}\`.guild_backups`;
+            const data = packBackup({
+                levels: [
+                    { guild_id: ERASE_GUILD, user_id: BACKUPPER, xp: 5, level: 1, updated_at: 1 },
+                    { guild_id: ERASE_GUILD, user_id: BYSTANDER, xp: 6, level: 1, updated_at: 1 },
+                ],
+            });
+            const made = await query<{ insertId: number }>(`INSERT INTO ${backups} (guild_id, guild_name, kind, bytes, counts, data) VALUES (?, 'check:db', 'hand', ?, '{}', ?)`, [ERASE_GUILD, data.length, data]);
+            await query("INSERT INTO levels (guild_id, user_id, xp, level, updated_at) VALUES (?, ?, 10, 1, ?)", [ERASE_GUILD, BACKUPPER, Date.now()]);
+
+            try {
+                const planned = await planDeletion({ userId: BACKUPPER, userName: "check Backup", dueAt: later(), reason: "check:db", by: { id: USERS.admin, name: "nutzer1" } });
+                assert.ok(await executeDeletion(config, planned.id), "ausgeführt");
+
+                const [row] = await query<{ data: Buffer }[]>(`SELECT data FROM ${backups} WHERE id = ?`, [Number(made.insertId)]);
+                assert.deepEqual(unpackBackup(row.data).levels.map((level) => level.user_id), [BYSTANDER]);
+                assert.equal((await deletionOf(planned.id))?.backupPending, false);
+
+                const kept = await query<{ n: number }[]>(`SELECT COUNT(*) AS n FROM ${quarantineTable()} WHERE user_id = ?`, [BACKUPPER]);
+                assert.equal(Number(kept[0].n), 1, "getrennt aufbewahrt");
+
+                await purgeQuarantine(Date.now() + 29 * 86_400_000);
+                assert.equal(Number((await query<{ n: number }[]>(`SELECT COUNT(*) AS n FROM ${quarantineTable()} WHERE user_id = ?`, [BACKUPPER]))[0].n), 1, "nach 29 Tagen noch da");
+                await purgeQuarantine(Date.now() + 31 * 86_400_000);
+                assert.equal(Number((await query<{ n: number }[]>(`SELECT COUNT(*) AS n FROM ${quarantineTable()} WHERE user_id = ?`, [BACKUPPER]))[0].n), 0, "nach 31 Tagen weg");
+            } finally {
+                await query(`DELETE FROM ${backups} WHERE id = ?`, [Number(made.insertId)]);
+                await query(`DELETE FROM ${quarantineTable()} WHERE user_id = ?`, [BACKUPPER]).catch(() => undefined);
+                await query("DELETE FROM userdata_deletions WHERE user_id = ?", [BACKUPPER]);
+            }
         });
 
         await check("Löschung ausführen: zwei Uhr-Runden zugleich löschen einmal; erreicht der Bot, ist nichts offen", async () => {

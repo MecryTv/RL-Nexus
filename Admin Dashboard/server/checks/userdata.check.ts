@@ -6,6 +6,7 @@ import { SESSION_COOKIE, seal } from "../session.ts";
 import { postDirectMessage, removeButtons } from "../discord.ts";
 import { DM_KINDS, deletionMessage, renderDeletionImage, type IDmInput } from "../userdata/dm.ts";
 import { eraseSql, eraseValues } from "../userdata/erase.ts";
+import { scrubTables } from "../userdata/backups.ts";
 import { matchSql, matchValue } from "../userdata/find.ts";
 import type { IDeletionRecord } from "../userdata/deletions.ts";
 import { deletionReceipt, receiptCode } from "../userdata/receipt.ts";
@@ -114,6 +115,36 @@ export async function checkUserdata(): Promise<void> {
         );
     });
 
+    await check("Backups: Zeilen der Person fallen raus, Team-Spalten werden 0, JSON und Listen ohne ID; das Original kommt in die Ablage", () => {
+        const A = "111111111111111111";
+        const B = "222222222222222222";
+        const result = scrubTables(
+            {
+                levels: [
+                    { guild_id: "9", user_id: A, xp: 1 },
+                    { guild_id: "9", user_id: B, xp: 2 },
+                ],
+                mod_cases: [{ guild_id: "9", moderator_id: A, moderator_name: "Anna", target_id: B }],
+                tickets: [
+                    { guild_id: "9", members: JSON.stringify([A, B]) },
+                    { guild_id: "9", members: [A, B] },
+                ],
+                level_top: [{ guild_id: "9", holders: `${B},${A}` }],
+                roles: [{ guild_id: "9", name: A }],
+            },
+            new Set([A])
+        );
+
+        assert.deepEqual(result.tables.levels, [{ guild_id: "9", user_id: B, xp: 2 }]);
+        assert.deepEqual(result.tables.mod_cases, [{ guild_id: "9", moderator_id: "0", moderator_name: "Gelöschte Person", target_id: B }]);
+        assert.deepEqual(result.tables.tickets.map((row) => row.members), [JSON.stringify(["0", B]), ["0", B]]);
+        assert.deepEqual(result.tables.level_top, [{ guild_id: "9", holders: B }]);
+        assert.deepEqual(result.tables.roles, [{ guild_id: "9", name: A }], "Tabellen ohne Personendaten bleiben, wie sie sind");
+        assert.equal(result.count, 5);
+        assert.deepEqual(result.removed.levels, [{ guild_id: "9", user_id: A, xp: 1 }]);
+        assert.equal(result.removed.mod_cases?.[0].moderator_id, A, "Original in der Ablage");
+    });
+
     section("Nutzerdaten: DMs zur Löschung");
 
     // 1. November 2026, 23:30 in Berlin; geschickt 45 Minuten vorher.
@@ -189,6 +220,7 @@ export async function checkUserdata(): Promise<void> {
         dmChannelId: null,
         dmMessageId: null,
         forgetPending: false,
+        backupPending: false,
     };
 
     await check("Beleg: Prüfcode gleich bei gleichem Inhalt, anders bei anderen Zahlen oder anderem Geheimnis", () => {

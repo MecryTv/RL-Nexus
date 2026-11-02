@@ -4,6 +4,7 @@ import { botForgetUser } from "../bot.ts";
 import type { IConfig } from "../config.ts";
 import { query, withTransaction, type TransactionQuery } from "../db.ts";
 import { forgetUser } from "../users.ts";
+import { scrubBackups } from "./backups.ts";
 import { claimDeletion, deletionOf } from "./deletions.ts";
 import { forgetIndex, matchSql, matchValue, userdataRules } from "./find.ts";
 
@@ -154,9 +155,27 @@ export async function executeDeletion(config: IConfig, id: number): Promise<IDel
     const forgot = await botForgetUser(config, record.userId, record.plannedBy);
     if (!forgot) await query("UPDATE userdata_deletions SET forget_pending = 1 WHERE id = ?", [id]);
 
-    await audit(CLOCK, "userdata.delete", record.userId, `${summary(result)}${forgot ? "" : " · Bot nicht erreichbar, vergisst später"}`);
+    // Auch aus den Backups einzelner Server; ist die Backup-Datenbank nicht bereit, holt die Uhr das nach.
+    const scrubbed = await scrubBackups(config, id, record.userId).catch((error: unknown) => {
+        console.error(`🗑️  Backups für Löschung ${id} nicht bereinigt: ${error instanceof Error ? error.message : String(error)}`);
+
+        return null;
+    });
+    if (scrubbed === null) await query("UPDATE userdata_deletions SET backup_pending = 1 WHERE id = ?", [id]);
+
+    const notes = [forgot ? null : "Bot nicht erreichbar, vergisst später", scrubbed === null ? "Backups folgen" : scrubbed > 0 ? `${scrubbed} Zeilen aus Backups genommen` : null].filter(Boolean);
+    await audit(CLOCK, "userdata.delete", record.userId, `${summary(result)}${notes.map((note) => ` · ${note}`).join("")}`);
 
     return result;
+}
+
+/** Was beim Löschen nicht aus den Server-Backups kam, noch einmal versuchen. */
+export async function retryBackups(config: IConfig): Promise<void> {
+    const open = await query<{ id: number; user_id: string }[]>("SELECT id, user_id FROM userdata_deletions WHERE backup_pending = 1 LIMIT 5");
+
+    for (const row of open) {
+        if ((await scrubBackups(config, row.id, row.user_id)) !== null) await query("UPDATE userdata_deletions SET backup_pending = 0 WHERE id = ?", [row.id]);
+    }
 }
 
 /** Was der Bot beim Löschen nicht mitbekam, noch einmal schicken. */

@@ -4,7 +4,9 @@ import type { IConfig } from "../config.ts";
 import { databaseReady } from "../db.ts";
 import { publish } from "../events.ts";
 import { deletionOf, dueDeletions, forgetOldDeletions } from "./deletions.ts";
-import { executeDeletion, retryForget } from "./erase.ts";
+import { backupsReason } from "../backups/store.ts";
+import { purgeQuarantine } from "./backups.ts";
+import { executeDeletion, retryBackups, retryForget } from "./erase.ts";
 import { deletionReceipt } from "./receipt.ts";
 import { finishedInput, followUp, personBase } from "./flow.ts";
 
@@ -63,6 +65,8 @@ export async function deletionRound(config: IConfig, now = Date.now()): Promise<
         }
 
         await retryForget(config);
+        await retryBackups(config);
+        if (backupsReason() === null) await purgeQuarantine(now);
         await forgetOldDeletions(now);
 
         return done;

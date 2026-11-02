@@ -22,7 +22,7 @@ const DUPLICATE = 1062;
 const THIRTY_DAYS = 30 * 24 * 3_600_000;
 
 const COLUMNS =
-    "id, user_id, user_name, state, due_at, reason, planned_by, planned_name, dm_state, dm_error, dm_channel_id, dm_message_id, copy_at, stopped_at, cancelled_at, done_at, forget_pending, result, created_at";
+    "id, user_id, user_name, state, due_at, reason, planned_by, planned_name, dm_state, dm_error, dm_channel_id, dm_message_id, copy_at, stopped_at, cancelled_at, done_at, forget_pending, backup_pending, result, created_at";
 
 interface IDeletionRow {
     readonly id: number;
@@ -42,6 +42,7 @@ interface IDeletionRow {
     readonly cancelled_at: Date | null;
     readonly done_at: Date | null;
     readonly forget_pending: number;
+    readonly backup_pending: number;
     readonly result: string | IDeletionResult | null;
     readonly created_at: Date;
 }
@@ -51,6 +52,8 @@ export interface IDeletionRecord extends IDeletion {
     readonly dmChannelId: string | null;
     readonly dmMessageId: string | null;
     readonly forgetPending: boolean;
+    /** Aus den Server-Backups ist die Person noch nicht heraus (Backup-Datenbank war nicht bereit). */
+    readonly backupPending: boolean;
 }
 
 const iso = (value: Date | null): string | null => (value === null ? null : value.toISOString());
@@ -76,12 +79,13 @@ function toRecord(row: IDeletionRow): IDeletionRecord {
         dmChannelId: row.dm_channel_id,
         dmMessageId: row.dm_message_id,
         forgetPending: Boolean(row.forget_pending),
+        backupPending: Boolean(row.backup_pending),
     };
 }
 
 /** Für Seiten und Antworten: ohne die Angaben, die nur der Server braucht. */
 export function publicDeletion(record: IDeletionRecord): IDeletion {
-    const { dmChannelId: _channel, dmMessageId: _message, forgetPending: _forget, ...rest } = record;
+    const { dmChannelId: _channel, dmMessageId: _message, forgetPending: _forget, backupPending: _backup, ...rest } = record;
 
     return rest;
 }

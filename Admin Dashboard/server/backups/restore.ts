@@ -4,6 +4,7 @@ import type { IConfig } from "../config.ts";
 import { withTransaction, type TransactionQuery } from "../db.ts";
 import { PublicError } from "../errors.ts";
 import { publish } from "../events.ts";
+import { deletedPeople, scrubTables } from "../userdata/backups.ts";
 import { idMapOf, remapValue } from "./remap.ts";
 import { backupData, createBackup, existingColumns } from "./store.ts";
 
@@ -83,7 +84,10 @@ export async function restoreBackup(
     const inBackup = (table: string): boolean => Object.hasOwn(found.tables, table);
     // Plan 32: Wurde der Discord-Server seit dem Backup geladen, zeigen die Zeilen auf die neuen IDs.
     const map = await idMapOf(input.guildId);
-    const rowsOf = (table: string): Row[] => (map.size === 0 ? (found.tables[table] ?? []) : (found.tables[table] ?? []).map((row) => remapValue(row, map) as Row));
+    // W-0051: Wer gelöscht wurde, kommt mit keinem Backup zurück, auch nicht aus einem, das beim Löschen gerade entstand.
+    const gone = await deletedPeople();
+    const backup = gone.size > 0 ? scrubTables(found.tables, gone).tables : found.tables;
+    const rowsOf = (table: string): Row[] => (map.size === 0 ? (backup[table] ?? []) : (backup[table] ?? []).map((row) => remapValue(row, map) as Row));
     const before = await botGuildPanels(config, input.guildId, input.actor.id);
     const safety = input.safetyId
         ? { id: input.safetyId }
