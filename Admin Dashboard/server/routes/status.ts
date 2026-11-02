@@ -92,7 +92,7 @@ export async function statusRoutes(app: FastifyInstance, { config }: { config: I
         const image = snapshot === null ? undefined : (await renderStatusImages(snapshot)).find((entry) => entry.name === name);
         if (!image) throw new PublicError(404, "Dieses Bild gibt es nicht.");
 
-        // Die Bilder ändern sich mit jeder Prüfung, die Adresse nicht.
+        // Die Vorschau hängt den Stand an die Adresse (?v=), ein neuer Stand lädt also neu.
         return reply.type("image/png").header("Cache-Control", "no-cache").send(image.data);
     });
 

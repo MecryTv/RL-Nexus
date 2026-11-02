@@ -3,7 +3,7 @@ import { channelLabel } from "../../shared/status.ts";
 import logo from "../assets/logo.webp";
 import { Button } from "../components/Button";
 import { Failure, Loading } from "../components/Status";
-import { discordLines, postSummary } from "./discord.ts";
+import { discordLines, imageSrc, postSummary } from "./discord.ts";
 import { ChannelDialog } from "./ChannelDialog";
 import styles from "./DiscordTab.module.scss";
 import type { IDiscordPost } from "./useDiscordPost";
@@ -35,8 +35,8 @@ function Text({ content, now }: { readonly content: string; readonly now: number
 }
 
 /** Ein Baustein. Was `payload()` nicht kennt, steht als Hinweis da, statt die Vorschau zu brechen. */
-function Part({ part, now, context }: { readonly part: IPart; readonly now: number; readonly context?: string }): JSX.Element {
-    const children = (part.components ?? []).map((child, index) => <Part key={index} part={child} now={now} />);
+function Part({ part, now, at, context }: { readonly part: IPart; readonly now: number; readonly at: string | null; readonly context?: string }): JSX.Element {
+    const children = (part.components ?? []).map((child, index) => <Part key={index} part={child} now={now} at={at} />);
 
     switch (part.type) {
         case 17:
@@ -54,7 +54,7 @@ function Part({ part, now, context }: { readonly part: IPart; readonly now: numb
             return (
                 <div className={styles.section}>
                     <div>{children}</div>
-                    {part.accessory && <Part part={part.accessory} now={now} context={name} />}
+                    {part.accessory && <Part part={part.accessory} now={now} at={at} context={name} />}
                 </div>
             );
         }
@@ -70,10 +70,7 @@ function Part({ part, now, context }: { readonly part: IPart; readonly now: numb
             return (
                 <div className={styles.gallery} data-count={part.items?.length ?? 0}>
                     {(part.items ?? []).map((item, index) => {
-                        const url = item.media?.url ?? "";
-                        const src = url.startsWith("attachment://") ? `/api/status/discord/image/${encodeURIComponent(url.slice("attachment://".length))}` : url;
-
-                        return <img key={index} src={src} alt={item.description ?? ""} />;
+                        return <img key={index} src={imageSrc(item.media?.url ?? "", at)} alt={item.description ?? ""} />;
                     })}
                 </div>
             );
@@ -144,7 +141,7 @@ export function DiscordTab({ post, now }: { readonly post: IDiscordPost; readonl
                                 {data.lastAt && <small>Heute um {new Date(data.lastAt).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}</small>}
                             </div>
                             {data.components.map((part, index) => (
-                                <Part key={index} part={part as IPart} now={now} />
+                                <Part key={index} part={part as IPart} now={now} at={data.imagesAt} />
                             ))}
                         </div>
                     </div>

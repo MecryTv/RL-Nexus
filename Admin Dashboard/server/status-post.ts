@@ -93,13 +93,27 @@ let chosen: string | null | undefined;
 /** Unter diesem Namen steht der gewählte Kanal in admin_state. */
 const CHOSEN_KEY = "status_channel";
 
-/** Einmal aus der Datenbank lesen. Danach hält der Speicher den Stand, `chooseChannel` schreibt beides. */
-async function loadChosen(): Promise<void> {
-    if (chosen === undefined) chosen = await remembered(CHOSEN_KEY).catch(() => null);
+/**
+ * Einmal aus der Datenbank lesen. Danach hält der Speicher den Stand,
+ * `chooseChannel` schreibt beides. Ein Fehler wird nicht gemerkt: Beim
+ * nächsten Mal wird wieder gelesen.
+ */
+async function loadChosen(config: IConfig): Promise<void> {
+    if (chosen !== undefined || config.database === null) return;
+    if (!databaseReady()) throw new PublicError(503, "Die Datenbank antwortet nicht, deshalb ist unklar, welcher Statuskanal gilt.");
+
+    chosen = await remembered(CHOSEN_KEY);
 }
 
-/** Die Kanäle, in die geschrieben wird: der gewählte, sonst die aus der .env. */
+/**
+ * Die Kanäle, in die geschrieben wird: der gewählte, sonst die aus der .env.
+ * Mit Datenbank, aber noch ohne gelesene Wahl keiner: Der Bot räumt den
+ * Statuskanal leer, eine ausgelassene Runde ist besser als der falsche Kanal.
+ */
 export function statusChannels(config: IConfig): readonly string[] {
+    if (config.database === null) return config.statusChannelIds;
+    if (chosen === undefined) return [];
+
     return chosen ? [chosen] : config.statusChannelIds;
 }
 
@@ -387,6 +401,8 @@ async function postTo(config: IConfig, channel: string, body: Record<string, unk
  * Statuskanal oder während ein Durchlauf läuft: null.
  */
 export async function updateStatusPost(config: IConfig, given?: IStatusSnapshot): Promise<IDiscordPostResult | null> {
+    // Nur solange die Wahl fehlt. Ist sie gelesen, kommt bis zum Merken der Runde kein await.
+    if (chosen === undefined && config.database !== null) await loadChosen(config).catch(() => undefined);
     if (statusChannels(config).length === 0 || current !== null) return null;
 
     current = post(config, given);
@@ -485,7 +501,7 @@ export function manualWait(last: number | null, now: number): number {
  */
 export async function refreshNow(config: IConfig, now = Date.now()): Promise<IDiscordPostResult> {
     // Vor der Prüfung auf `current`: Danach darf bis zum Merken der Runde kein await mehr kommen.
-    await loadChosen();
+    await loadChosen(config);
 
     if (statusChannels(config).length === 0) throw new PublicError(409, "Kein Statuskanal eingestellt.");
     if (current !== null) return current;
@@ -619,39 +635,55 @@ export async function statusChannelOptions(config: IConfig): Promise<IStatusChan
         });
 }
 
+/** Läuft gerade ein Wechsel? Ein zweiter zur selben Zeit ließe eine Meldung im Kanal des ersten zurück. */
+let switching = false;
+
 /**
  * Den Statuskanal wechseln: Der Kanal muss einer aus `statusChannelOptions`
- * sein. Die alte Meldung im alten Kanal wird gelöscht, im neuen steht sofort
- * eine neue. Gibt das Ergebnis dieser Runde zurück.
+ * sein. Zuerst gilt die neue Wahl, damit keine Runde mehr in den alten Kanal
+ * schreibt. Dann wartet der Wechsel eine laufende Runde ab, schreibt im neuen
+ * Kanal und löscht erst danach die alten Meldungen: Klappt das Schreiben
+ * nicht, steht die alte Meldung noch. Gibt das Ergebnis dieser Runde zurück.
  */
 export async function chooseChannel(config: IConfig, channelId: string): Promise<{ readonly from: string | null; readonly result: IDiscordPostResult | null }> {
     const options = await statusChannelOptions(config);
     if (!options.some((option) => option.id === channelId)) throw new PublicError(400, "Diesen Textkanal gibt es auf dem Server nicht.");
+    // Ohne Datenbank wäre die Wahl nach dem nächsten Neustart still wieder die aus der .env.
+    if (config.database === null || !databaseReady()) throw new PublicError(503, "Ohne Datenbank lässt sich der Statuskanal nicht speichern.");
+    if (switching) throw new PublicError(409, "Der Statuskanal wird gerade schon gewechselt.");
 
-    await loadChosen();
+    switching = true;
 
-    const before = statusChannels(config);
-    const from = before[0] ?? null;
+    try {
+        await loadChosen(config);
 
-    if (before.length === 1 && from === channelId) return { from, result: null };
+        const before = statusChannels(config);
+        const from = before[0] ?? null;
 
-    // Eine laufende Runde schreibt noch in den alten Kanal. Erst danach aufräumen.
-    if (current !== null) await current;
+        if (before.length === 1 && from === channelId) return { from, result: null };
 
-    for (const old of before) {
-        const message = await remembered(stateKey(old));
+        await remember(CHOSEN_KEY, channelId);
+        chosen = channelId;
 
-        if (message !== null) {
+        // Eine Runde, die vor dem Wechsel losging, schreibt noch in den alten Kanal.
+        while (current !== null) await current;
+
+        // Seit dem Warten kein await: Die Runde gehört diesem Wechsel.
+        const result = await updateStatusPost(config);
+
+        for (const old of before) {
+            const message = old === channelId ? null : await remembered(stateKey(old));
+            if (message === null) continue;
+
             const gone = await remove(config, `/channels/${old}/messages/${message}`).catch(() => null);
             if (gone && !gone.ok && gone.status !== 404) console.error(`📊 Alte Statusmeldung in Kanal ${old} nicht gelöscht: ${gone.status}`);
             await remember(stateKey(old), null);
         }
+
+        return { from, result };
+    } finally {
+        switching = false;
     }
-
-    await remember(CHOSEN_KEY, channelId);
-    chosen = channelId;
-
-    return { from, result: await updateStatusPost(config) };
 }
 
 /** Den Namen eines Statuskanals aus Discord, einmal je Prozess. */
@@ -674,7 +706,7 @@ async function channelName(config: IConfig, channel: string): Promise<string | n
 
 /** Was die Karte „Discord-Meldung“ zeigt. Die Vorschau kommt aus dem Stand der letzten Prüfung. */
 export async function discordPostState(config: IConfig, now = Date.now()): Promise<IDiscordPostState> {
-    await loadChosen();
+    await loadChosen(config);
 
     const snapshot = statusSnapshot();
     const channels = await Promise.all(statusChannels(config).map(async (id) => ({ id, name: await channelName(config, id) })));
@@ -686,6 +718,7 @@ export async function discordPostState(config: IConfig, now = Date.now()): Promi
         everySeconds: EVERY / 1000,
         waitSeconds: manualWait(lastManual, now),
         components: snapshot === null ? null : ((payload(snapshot, config).components as readonly unknown[]) ?? null),
+        imagesAt: snapshot === null ? null : snapshot.measured.at.toISOString(),
         manual,
     };
 }
@@ -693,8 +726,7 @@ export async function discordPostState(config: IConfig, now = Date.now()): Promi
 /** Prüfen, merken, Statusseite und Discord nachziehen. Auch nach jeder eigenen Meldung. */
 export async function statusCycle(config: IConfig): Promise<void> {
     try {
-        await loadChosen();
-
+        // Die Statusseite braucht die Messung auch dann, wenn Discord diese Runde ausfällt.
         const snapshot = await refreshStatus(config);
         await updateStatusPost(config, snapshot);
     } catch (error) {

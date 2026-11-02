@@ -42,7 +42,7 @@ import { shopSessionCookie } from "./shop/session.ts";
 import { setStripeGateway } from "./shop/stripe.ts";
 import { STATE_KEYS, lastStatusPost, refreshNow, stateKey, stopStatusPost, updateStatusPost } from "./status-post.ts";
 import { STATUS_IMAGES } from "./status/image.ts";
-import { publicStatus, refreshStatus } from "./status/snapshot.ts";
+import { publicStatus, refreshStatus, statusSnapshot } from "./status/snapshot.ts";
 
 const CHANNEL = "900000000000000009";
 
@@ -1070,6 +1070,100 @@ try {
         } finally {
             await setState(STATE_KEYS.message, null);
         }
+    });
+
+    // Kanalwahl (K2): ein Server mit zwei Textkanälen, der Bot darf dort alles.
+    // Läuft zuletzt in diesem Abschnitt, weil danach ein Test-Kanal gewählt bleibt.
+    const OLD = "900000000000000030";
+    const NEW = "900000000000000031";
+    const withGuild = async (run: () => Promise<void>): Promise<void> => {
+        const real = globalThis.fetch;
+
+        globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+            const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+
+            if (url.endsWith("/users/@me")) return json({ id: "900000000000000070" });
+            if (url.endsWith(`/guilds/${config.guildId}/channels`)) return json([OLD, NEW].map((id, position) => ({ id, name: `check-${position}`, type: 0, position })));
+            if (url.endsWith(`/guilds/${config.guildId}/roles`)) return json([{ id: config.guildId, permissions: String(1 << 3) }]);
+            if (url.includes(`/guilds/${config.guildId}/members/`)) return json({ roles: [] });
+
+            return real(input, init);
+        }) as typeof fetch;
+
+        try {
+            await run();
+        } finally {
+            globalThis.fetch = real;
+        }
+    };
+    const choose = (channelId: string) => write("PUT", "/api/status/discord/channel", { channelId, confirm: true });
+    const answer = (call: IDiscordCall): Response =>
+        call.method === "GET" ? json([]) : call.method === "DELETE" ? new Response(null, { status: 204 }) : posted(call.url.includes(OLD) ? "900000000000000040" : "900000000000000041");
+
+    await check("Statuskanal: ein Kanal, der nicht auf dem Server liegt, gibt 400, und Discord bekommt nichts", async () => {
+        await withGuild(() =>
+            withDiscord(answer, async (calls) => {
+                const response = await choose("900000000000000099");
+
+                assert.deepEqual([response.statusCode, response.json().error], [400, "Diesen Textkanal gibt es auf dem Server nicht."]);
+                assert.deepEqual(writes(calls), []);
+                assert.equal(await stateOf("status_channel"), null);
+            })
+        );
+    });
+
+    await check("Statuskanal wechseln: neue Meldung im neuen Kanal, alte weg, Wahl gespeichert, Protokoll", async () => {
+        const snapshot = statusSnapshot();
+        assert.ok(snapshot, "aus den Checks davor gibt es einen Stand");
+
+        await withGuild(async () => {
+            assert.equal((await withDiscord(answer, async () => assert.equal((await choose(OLD)).statusCode, 200)), await stateOf("status_channel")), OLD);
+
+            // Genau während die alte Meldung gelöscht wird, startet eine Runde von selbst.
+            let racing: Promise<unknown> = Promise.resolve();
+
+            await withDiscord(
+                (call) => {
+                    if (call.method === "DELETE") racing = updateStatusPost(config, snapshot);
+
+                    return answer(call);
+                },
+                async (calls) => {
+                    const response = await choose(NEW);
+                    await racing;
+
+                    assert.equal(response.statusCode, 200, response.body);
+
+                    const removed = calls.findIndex((call) => call.method === "DELETE");
+                    assert.ok(removed >= 0, "die alte Meldung wird gelöscht");
+                    assert.ok(calls[removed].url.includes(`/channels/${OLD}/messages/900000000000000040`));
+                    assert.deepEqual(
+                        writes(calls.slice(removed + 1)).filter((call) => call.url.includes(OLD)),
+                        [],
+                        "nach dem Löschen schreibt niemand mehr in den alten Kanal"
+                    );
+                    assert.ok(writes(calls).some((call) => call.method === "POST" && call.url.includes(`/channels/${NEW}/messages`)));
+                }
+            );
+        });
+
+        assert.equal(await stateOf("status_channel"), NEW);
+        assert.equal(await stateOf(stateKey(OLD)), null);
+
+        const [row] = await query<{ detail: string }[]>("SELECT detail FROM admin_audit WHERE action = 'status.channel' AND target = ? ORDER BY id DESC LIMIT 1", [NEW]);
+        assert.match(row?.detail ?? "", / → #check-1$/);
+        await query("DELETE FROM admin_audit WHERE action = 'status.channel' AND target IN (?, ?)", [OLD, NEW]);
+    });
+
+    await check("Zwei gleichzeitige Wechsel: einer gewinnt, der andere bekommt 409", async () => {
+        await withGuild(() =>
+            withDiscord(answer, async () => {
+                const both = await Promise.all([choose(OLD), choose(OLD)]);
+
+                assert.deepEqual(both.map((response) => response.statusCode).sort(), [200, 409], both.map((response) => response.body).join(" | "));
+            })
+        );
+        await query("DELETE FROM admin_audit WHERE action = 'status.channel' AND target IN (?, ?)", [OLD, NEW]);
     });
 
     await check("Die echte Nachrichten-ID steht hinterher wieder da", async () => {

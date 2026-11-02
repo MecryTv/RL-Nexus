@@ -56,7 +56,8 @@ let logo: Promise<Image> | null = null;
 
 /* --- Werte in Worten, für Bild und Alt-Text ------------------------------ */
 
-const percent = (value: number | null): string => (value === null ? "–" : `${value.toLocaleString("de-DE", { maximumFractionDigits: 1 })} %`);
+/** Abgerundet wie auf der Statusseite: Nach einem Ausfall steht nie 100 %. */
+const percent = (value: number | null): string => (value === null ? "–" : `${(Math.floor(value * 10) / 10).toLocaleString("de-DE", { maximumFractionDigits: 1 })} %`);
 const berlin = (date: Date, options: Intl.DateTimeFormatOptions): string => new Intl.DateTimeFormat("de-DE", { ...options, timeZone: "Europe/Berlin" }).format(date);
 
 function serviceOf(snapshot: IStatusSnapshot, id: StatusService): IServiceSnapshot {

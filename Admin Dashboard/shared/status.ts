@@ -312,6 +312,8 @@ export interface IDiscordPostState {
     readonly waitSeconds: number;
     /** Die Bausteine der Nachricht aus dem letzten Stand, null vor der ersten Prüfung. */
     readonly components: readonly unknown[] | null;
+    /** Wann der Stand der Vorschau gemessen wurde. Hängt an den Bildadressen, damit der Browser neu lädt. */
+    readonly imagesAt: string | null;
     /** Der letzte Klick, seit dem Start: wer und was dabei herauskam. */
     readonly manual: { readonly by: string; readonly result: IDiscordPostResult } | null;
 }

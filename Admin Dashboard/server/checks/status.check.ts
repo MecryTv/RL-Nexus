@@ -2,8 +2,9 @@ import assert from "node:assert/strict";
 import { channelLabel, type IChartPoint, type IDiscordPostState, type IIncident, type IPublicStatus, type ISpan, type IStatusDetail, type StatusService } from "../../shared/status.ts";
 import { buildApp } from "../app.ts";
 import { SESSION_COOKIE, seal } from "../session.ts";
-import { channelPermissions, manualWait, missingRights, payload, shortError } from "../status-post.ts";
-import { STATUS_IMAGES, renderStatusImages } from "../status/image.ts";
+import { loadConfig } from "../config.ts";
+import { channelPermissions, manualWait, missingRights, payload, refreshNow, shortError, updateStatusPost } from "../status-post.ts";
+import { STATUS_IMAGES, headAlt, renderStatusImages } from "../status/image.ts";
 import { parseIncident, parseUpdate } from "../status/incidents.ts";
 import { historyData, refreshStatus, setHistoryLoader, shouldRecord } from "../status/snapshot.ts";
 import { USERS } from "./fakes.ts";
@@ -11,7 +12,7 @@ import { chartGeometry } from "../../src/status/chart.ts";
 import { ago, canReport, countdown, uptimeRow } from "../../src/status/format.ts";
 import { buildDetail, findGaps, incidentFor, loadDetail, mergeOutages, quantile, setDetailSource, unionMinutes, type IRawCheck } from "../status/detail.ts";
 import { hourPoints, outagesFrom, summarize, type IHour } from "../status/history.ts";
-import { SECRET, check, config, section } from "./harness.ts";
+import { ENV, SECRET, check, config, section } from "./harness.ts";
 
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
@@ -391,6 +392,34 @@ export async function checkStatusRoutes(): Promise<void> {
 
             // Eine Überschreibung für den Bot selbst gilt zuletzt.
             assert.deepEqual(missingRights(channelPermissions({ ...base, roles: { "1": ALL, "2": 0n }, overwrites: [{ id: "9", type: 1, allow: "0", deny: String(VIEW) }] })), ["Kanal sehen"]);
+        });
+
+        await check("Verfügbarkeit im Bild abgerundet: nach einem Ausfall nie 100 %", async () => {
+            const snapshot = await refreshStatus(config);
+
+            assert.match(headAlt({ ...snapshot, uptimeMonth: 99.97 }), /, 99,9 % verfügbar in 30 Tagen/);
+        });
+
+        await check("Datenbank eingetragen, aber nicht erreichbar: keine Meldung in den Kanal aus der .env", async () => {
+            // Dort steht vielleicht ein alter Statuskanal, den das Team inzwischen zum Reden nutzt.
+            const withDatabase = loadConfig({ ...ENV, DATABASE_HOST: "127.0.0.1", DATABASE_NAME: "nie", DATABASE_USER: "nie", STATUS_CHANNEL_ID: "123456789012345678" }, []);
+            const snapshot = await refreshStatus(config);
+            const real = globalThis.fetch;
+            const calls: string[] = [];
+
+            globalThis.fetch = (async (input: string | URL | Request) => {
+                calls.push(input instanceof Request ? input.url : String(input));
+
+                return new Response("{}", { status: 500 });
+            }) as typeof fetch;
+
+            try {
+                assert.equal(await updateStatusPost(withDatabase, snapshot), null);
+                await assert.rejects(refreshNow(withDatabase, Date.now() + 7_200_000), (error: unknown) => (error as { statusCode?: number }).statusCode === 503);
+                assert.deepEqual(calls.filter((url) => url.includes("/channels/")), []);
+            } finally {
+                globalThis.fetch = real;
+            }
         });
 
         await check("Statuskanal wechseln geht nur mit Bestätigung, dass dort alles andere gelöscht wird", async () => {

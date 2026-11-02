@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { formatBytes, formatDuration, formatMonth, formatNumber, formatPercent } from "../../src/format.ts";
 import { sparkline } from "../../src/sparkline.ts";
-import { discordLines, discordTime, postSummary } from "../../src/status/discord.ts";
+import { discordLines, discordTime, imageSrc, postSummary } from "../../src/status/discord.ts";
 import { check, section } from "./harness.ts";
 
 /** src/format.ts hat keine DOM-Abhängigkeit, deshalb läuft ihr Check hier mit. */
@@ -74,5 +74,14 @@ export async function checkFormat(): Promise<void> {
             text: "Neu geschrieben in #status · Kanal 2: Missing Permissions",
             ok: false,
         });
+    });
+
+    await check("Vorschau: Bildadresse mit dem Stand, damit der Browser nach jeder Prüfung neu lädt", () => {
+        const at = "2026-11-02T14:02:00.000Z";
+
+        assert.equal(imageSrc("attachment://status-kopf.png", at), `/api/status/discord/image/status-kopf.png?v=${Date.parse(at)}`);
+        assert.notEqual(imageSrc("attachment://status-kopf.png", at), imageSrc("attachment://status-kopf.png", "2026-11-02T14:04:00.000Z"));
+        assert.equal(imageSrc("attachment://status-bot.png", null), "/api/status/discord/image/status-bot.png");
+        assert.equal(imageSrc("https://example.test/x.png", at), "https://example.test/x.png");
     });
 }

@@ -83,6 +83,19 @@ export function postSummary(result: IDiscordPostResult): { readonly text: string
     return { text: parts.join(" · "), ok: failed.length === 0 };
 }
 
+/**
+ * Wo die Vorschau ein Bild der Meldung lädt. In Discord heißt es
+ * `attachment://<name>`; der Stand hängt an der Adresse, sonst zeigt der
+ * Browser nach der nächsten Prüfung weiter das alte Bild.
+ */
+export function imageSrc(url: string, at: string | null): string {
+    if (!url.startsWith("attachment://")) return url;
+
+    const path = `/api/status/discord/image/${encodeURIComponent(url.slice("attachment://".length))}`;
+
+    return at === null ? path : `${path}?v=${Date.parse(at)}`;
+}
+
 /** Text eines Discord-Bausteins, Zeile für Zeile. */
 export function discordLines(content: string, now: number): ILine[] {
     return content.split("\n").map((line) => {
