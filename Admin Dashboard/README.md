@@ -136,25 +136,27 @@ Die Seite zeigt den Gesamtzustand mit vier Kennzahlen, laufende Meldungen mit Ze
 
 ### Discord
 
-Steht `STATUS_CHANNEL_ID` in der `.env`, schreibt das Admin Dashboard in diesen Kanal eine Nachricht und ändert sie alle zwei Minuten. Mit `--dev` (also bei `npm run dev`) gehen die Meldungen stattdessen in die Kanäle aus `DEV_STATUS_CHANNEL_IDS`, ohne Eintrag nach `#moderator-only` (`1211378072549326860`) auf dem Dev Server. Jeder Kanal merkt sich seine eigene Nachricht (`admin_state`, Zeile `status_message_id:<Kanal>`). Gebaut mit **Components V2** (Flag `1 << 15`), ein **Container je Bereich** in der Farbe seines Zustands:
+Steht `STATUS_CHANNEL_ID` in der `.env`, schreibt das Admin Dashboard in diesen Kanal eine Nachricht und ändert sie alle zwei Minuten. Mit `--dev` (also bei `npm run dev`) gehen die Meldungen stattdessen in die Kanäle aus `DEV_STATUS_CHANNEL_IDS`, ohne Eintrag nach `#moderator-only` (`1211378072549326860`) auf dem Dev Server. **Im Admin Dashboard** lässt sich der Kanal unter *Bot → Status → Discord-Meldung → Kanal ändern* wählen, aus den Textkanälen des Servers aus `ADMIN_GUILD_ID` (lokal der Dev Server, im Betrieb der Server des Teams). Die Wahl steht in `admin_state` (`status_channel`) und gilt vor der `.env`. Das Fenster zeigt je Kanal, welche Rechte dem Bot fehlen, und verlangt eine Bestätigung, weil der Bot dort alle anderen Nachrichten löscht. Jeder Kanal merkt sich seine eigene Nachricht (`admin_state`, Zeile `status_message_id:<Kanal>`).
 
-| Container | Was drinsteht |
+Die Nachricht besteht aus **Bildern** (W-0052), gezeichnet von `server/status/image.ts` mit `@napi-rs/canvas` und den Schriften aus `server/assets/fonts`, und ist mit **Components V2** gebaut (Flag `1 << 15`):
+
+| Teil | Was drinsteht |
 |---|---|
-| Kopf | Banner, Gesamtzustand, Verfügbarkeit in 30 Tagen |
-| ⚠️ Meldung | Nur bei offener Störung: Titel, letztes Update, Stand, betroffene Dienste |
-| 🤖 Bot | Verfügbarkeit 24 h und 30 Tage, zwölf Kästchen, Laufzeit, Ping, Server, Mitglieder, letzter Ausfall, Version |
-| 🖥️ Bot-Dashboard | dazu Antwortzeit, Knopf „Öffnen“ (`DASHBOARD_URL`) |
-| 🌐 Webseite | dazu Antwortzeit, Build, Banner, Knopf „Öffnen“ (`WEBSITE_PUBLIC_URL`) |
-| 🗄️ Datenbank | Antwortzeit jetzt, Mittel und langsamste in 24 h, MariaDB-Version und Laufzeit, Tabellen, Größe, Zahl der Einträge |
-| 🛠️ Wartung | Nur bei geplanter oder laufender Wartung, mit Zeitpunkt und Countdown |
+| Kopfbild (1200 × 400) | Name, Stand, Gesamtzustand mit Zeichen und Farbe, „N von 4 Diensten erreichbar“, Verfügbarkeit in 30 Tagen, ein Punkt je Dienst, die letzten 24 Stunden über alle Dienste |
+| Zeile darunter | „Geprüft vor … · zieht alle 2 Minuten nach“, als Discord-Zeitstempel live |
+| ⚠️ Meldung | Text, nur bei offener Störung: Titel, letztes Update, Stand, betroffene Dienste |
+| Vier Karten (je 600 × 340) | Bot, Bot-Dashboard, Webseite, Datenbank: Zustand (Läuft, Eingeschränkt, Ausfall, Wartung), Antwortzeit oder wie lange schon weg, Kurve über 24 Stunden, zwölf Kästchen, 24 h und 30 Tage, eine Zeile zum Dienst |
+| 🛠️ Wartung | Text, nur bei geplanter oder laufender Wartung, mit Zeitpunkt und Countdown |
 
-Darunter Link-Knöpfe zu Statusseite (`STATUS_URL`), Webseite und Bot-Dashboard. Höchstens zwei Meldungen und zwei Wartungen stehen drin, der Rest auf der Statusseite. Offene Kontaktnachrichten stehen nicht mehr in der Nachricht.
+Darunter Link-Knöpfe zu Statusseite (`STATUS_URL`), Webseite und Bot-Dashboard. Höchstens zwei Meldungen und zwei Wartungen stehen drin, der Rest auf der Statusseite. Jedes Bild hat einen Alt-Text mit allen Werten.
 
-**Das Banner** liegt als `server/assets/status-banner.webp` im Code (1200 × 423, rund 50 KB). Es geht bei **jedem** Durchlauf als Datei mit, auch beim Ändern: `attachment://` findet beim Ändern ein schon vorhandenes Bild nicht, und eine direkte Bildadresse macht Discord zu einem fremden Bild mit ablaufender Signatur. Nach dem Schreiben prüft der Server, ob das Banner im ersten Container mit `attachment_id` angekommen ist, sonst löscht er die Nachricht gleich wieder.
+**Die Bilder** gehen bei **jedem** Durchlauf als Dateien mit (`files[0]` Kopfbild, dann die Karten), auch beim Ändern: `attachment://` findet beim Ändern ein schon vorhandenes Bild nicht, und eine direkte Bildadresse macht Discord zu einem fremden Bild mit ablaufender Signatur. Nach dem Schreiben prüft der Server, ob das Kopfbild im ersten Container mit `attachment_id` angekommen ist, sonst löscht er die Nachricht gleich wieder. Die Vorschau im Reiter *Discord-Meldung* zeigt dieselben Bilder (`/api/status/discord/image/<name>`).
+
+**Sofort aktualisieren:** Knopf „In Discord aktualisieren“ im Seitenkopf der Status-Seite oder „Jetzt aktualisieren“ im Reiter. Höchstens ein echter Durchlauf alle 10 Sekunden (auf dem Server geprüft), ein Klick während eines Durchlaufs bekommt dessen Ergebnis, danach kommt die Uhr erst zwei Minuten später. Klicks landen nicht als zusätzliche Messung im Verlauf (höchstens eine Messung je 90 Sekunden), damit die Verfügbarkeit nicht davon abhängt, wie oft jemand klickt. Jeder Klick steht im Protokoll.
 
 Es wird **dieselbe Nachricht geändert**. Ihre ID steht in `admin_state`. Löscht jemand sie, schreibt der nächste Durchlauf eine neue. Bei jedem anderen Fehler steht es im Log, der Kanal bekommt keine zweite Nachricht. Danach räumt der Server den Kanal auf: Alles außer der Statusmeldung wird gelöscht, auch Angepinntes. Nachrichten jünger als 14 Tage gehen gesammelt (`bulk-delete`), ältere einzeln, höchstens 20 je Durchlauf, der Rest zwei Minuten später. Dafür braucht der Bot im Kanal **Nachrichten verwalten**. Fehlt das Recht, steht „Aufräumen … fehlgeschlagen“ im Log, die Meldung selbst wird trotzdem geändert. Zeitpunkte stehen als Discord-Zeitstempel (`<t:…:R>`) darin und zählen im Client weiter.
 
-> **Beim Prüfen:** `npm run check:db` schreibt in dieselbe Zeile wie der Betrieb und merkt sich die echte ID vorher. Die Statusprüfungen, die der Lauf mit nachgestelltem Bot schreibt, löscht er am Ende wieder.
+> **Beim Prüfen:** `npm run check:db` schreibt in dieselbe Zeile wie der Betrieb und merkt sich die echte ID vorher, den im Admin Dashboard gewählten Statuskanal legt es für den Lauf beiseite. Die Statusprüfungen, die der Lauf mit nachgestelltem Bot schreibt, löscht er am Ende wieder.
 
 ## Backups
 
@@ -381,7 +383,7 @@ server/          Fastify, läuft direkt mit node
   cleanup.ts     Erledigtes nach 90, Protokoll nach 365 Tagen löschen
   notify.ts      Kontaktformular: Mail an support@, Hinweis nach Discord
   events.ts      Live-Meldungen an die Oberfläche
-  status-post.ts Statusmeldung in Discord
+  status-post.ts Statusmeldung in Discord: Durchlauf, sofort aktualisieren, Kanalwahl
   status/        Messen, Verlauf, eigene Meldungen, Stand für Statusseite und Discord
   mail/          Postfach: Postfächer, IMAP mit IDLE, Bereinigen, Vorlage, Senden
   shop/          Shop: Regeln, Stripe, Tabellen

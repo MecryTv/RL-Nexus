@@ -1,23 +1,18 @@
-import { readFileSync } from "node:fs";
-import path from "node:path";
-import { BANNER_KIND_LABELS, bannerState, type IBanner } from "../shared/content.ts";
 import {
     INCIDENT_STATE_LABELS,
     STATUS_SERVICE_LABELS,
-    type BlockState,
-    type CheckState,
     type IDiscordPostChannel,
     type IDiscordPostResult,
     type IDiscordPostState,
     type IStatusChannelOption,
     type IIncident,
-    type IOutage,
 } from "../shared/status.ts";
 import type { IConfig } from "./config.ts";
 import { databaseReady, query } from "./db.ts";
 import { DISCORD_API } from "./discord.ts";
 import { PublicError } from "./errors.ts";
-import { maintenanceRunning, refreshStatus, statusSnapshot, type IServiceSnapshot, type IStatusSnapshot } from "./status/snapshot.ts";
+import { STATUS_IMAGES, headAlt, imageName, renderStatusImages, serviceAlt, type IStatusImage } from "./status/image.ts";
+import { maintenanceRunning, refreshStatus, statusSnapshot, type IStatusSnapshot } from "./status/snapshot.ts";
 
 /**
  * Eine Nachricht in Discord, die sagt, was läuft.
@@ -63,7 +58,6 @@ const NOT_OURS = /"code":\s*50005\b/;
 /** Die Bausteine, die hier vorkommen. Die Zahlen sind Discords. */
 const ACTION_ROW = 1;
 const BUTTON = 2;
-const SECTION = 9;
 const TEXT = 10;
 const MEDIA_GALLERY = 12;
 const CONTAINER = 17;
@@ -73,24 +67,6 @@ const LINK_STYLE = 5;
 /** So viele Meldungen und Wartungen stehen höchstens drin, der Rest auf der Statusseite. */
 const SHOWN = 2;
 
-const BLOCKS: Readonly<Record<BlockState, string>> = { ok: "🟩", warn: "🟨", down: "🟥", none: "⬛" };
-const HEADS: Readonly<Record<CheckState, string>> = { ok: "🟢 Alles läuft", warn: "🟡 Eingeschränkt", down: "🔴 Es gibt ein Problem" };
-const STATE_WORDS: Readonly<Record<CheckState, string>> = { ok: "", warn: "eingeschränkt", down: "nicht erreichbar" };
-
-/**
- * Das Banner oben in der Meldung, aus der Vorlage auf 1200 Pixel Breite
- * gebracht (Discord zeigt es rund halb so breit, doppelt für scharfe
- * Bildschirme). Einmal beim Start gelesen, es ändert sich nur mit einem Update.
- *
- * Es geht bei jedem Durchlauf mit, auch beim Ändern. Ausprobiert am echten
- * Kanal: `attachment://` findet beim Ändern ein schon vorhandenes Bild nicht,
- * auch nicht mit dessen ID in `attachments`. Die Adresse des Bildes direkt
- * anzugeben nimmt Discord zwar an, macht daraus aber ein fremdes Bild hinter
- * einer Signatur, die nach rund einem Tag abläuft. Neu hochladen sind 50 KB
- * alle zwei Minuten, dafür bleibt es ein echter Anhang der Nachricht.
- */
-export const BANNER_NAME = "status-banner.webp";
-export const BANNER = readFileSync(path.join(import.meta.dirname, "assets", BANNER_NAME));
 
 let timer: NodeJS.Timeout | null = null;
 /** Wann die Uhr das nächste Mal von selbst nachzieht. Für den Ring auf der Status-Seite. */
@@ -166,22 +142,6 @@ function at(iso: string | null, style: "R" | "f" | "F" | "t"): string {
     return Number.isNaN(seconds) ? "–" : `<t:${seconds}:${style}>`;
 }
 
-function percent(value: number | null): string {
-    return value === null ? "–" : `${value.toLocaleString("de-DE", { maximumFractionDigits: 2 })} %`;
-}
-
-function ms(value: number | null): string {
-    return value === null ? "–" : `${value.toLocaleString("de-DE")} ms`;
-}
-
-function thousands(value: number): string {
-    return value.toLocaleString("de-DE");
-}
-
-function megabytes(bytes: number): string {
-    return `${Math.max(1, Math.round(bytes / 1024 / 1024))} MB`;
-}
-
 function duration(minutes: number): string {
     if (minutes < 60) return minutes === 1 ? "1 Minute" : `${minutes} Minuten`;
 
@@ -189,37 +149,6 @@ function duration(minutes: number): string {
     const rest = minutes % 60;
 
     return rest === 0 ? `${hours} Std.` : `${hours} Std. ${rest} Min.`;
-}
-
-function outageLine(outage: IOutage | null): string {
-    if (outage === null) return "Kein Ausfall in 90 Tagen";
-    if (outage.end === null) return `Ausfall seit ${at(outage.start, "R")}`;
-
-    return `Letzter Ausfall ${at(outage.start, "f")}, ${duration(outage.minutes)}`;
-}
-
-/** „Wartung · „Umzug“ · bis …“: was der Banner zeigt, in einer Zeile. */
-function bannerLine(banner: IBanner | null): string {
-    if (banner === null) return "unbekannt";
-
-    const state = bannerState(banner);
-    if (state === "aus") return "aus";
-
-    const name = banner.title || (banner.text.length > 40 ? `${banner.text.slice(0, 39)}…` : banner.text);
-    const what = `${BANNER_KIND_LABELS[banner.kind]} „${name}“`;
-
-    if (state === "geplant") return `${what} ab ${at(banner.showFrom ?? null, "f")}`;
-    if (state === "abgelaufen") return `${what}, abgelaufen`;
-
-    return what;
-}
-
-/** „### 🤖 Bot · 99,8 % in 24 h · 99,94 % in 30 Tagen“, darunter die zwölf Kästchen. */
-function head(icon: string, service: IServiceSnapshot): string {
-    const word = STATE_WORDS[service.state];
-    const label = `### ${icon} ${STATUS_SERVICE_LABELS[service.id]}${word ? ` · ${word}` : ""}`;
-
-    return `${label} · ${percent(service.uptime.day)} in 24 h · ${percent(service.uptime.month)} in 30 Tagen\n${service.blocks.map((block) => BLOCKS[block]).join("")}`;
 }
 
 function container(color: number, components: readonly unknown[]): Record<string, unknown> {
@@ -232,18 +161,6 @@ function text(content: string): Record<string, unknown> {
 
 function link(label: string, url: string): Record<string, unknown> {
     return { type: BUTTON, style: LINK_STYLE, label, url };
-}
-
-/** Text mit einem Knopf rechts daneben. Ohne Adresse nur der Text. */
-function withButton(content: string, url: string | null): Record<string, unknown> {
-    return url === null ? text(content) : { type: SECTION, components: [text(content)], accessory: link("Öffnen", url) };
-}
-
-function serviceOf(snapshot: IStatusSnapshot, id: IServiceSnapshot["id"]): IServiceSnapshot {
-    const service = snapshot.services.find((entry) => entry.id === id);
-    if (!service) throw new Error(`Dienst ${id} fehlt im Stand.`);
-
-    return service;
 }
 
 function incidentContainer(incident: IIncident): Record<string, unknown> {
@@ -278,75 +195,32 @@ function maintenanceContainer(incident: IIncident, now: number): Record<string, 
 }
 
 /**
- * Die Nachricht als Components V2: ein Container je Bereich, jeder in der
- * Farbe seines Zustands, darunter die Knöpfe.
+ * Die Nachricht als Components V2 (W-0052, Runde 2): oben ein Container mit
+ * dem Kopfbild und genau einer Zeile, darunter laufende Meldungen als Text,
+ * dann die vier Dienste als Karten in einer Galerie, geplante Wartungen als
+ * Text und unten die Knöpfe.
  *
- * Der erste Container trägt das Banner, `complete` prüft das. `content` und
- * `embeds` dürfen mit dem Flag nicht dabei sein. `attachments` sagt, welche
- * hochgeladene Datei das Banner ist: `id` 0 steht für `files[0]`.
+ * Die Bilder zeichnet status/image.ts. `attachments` sagt, welche
+ * hochgeladene Datei welches Bild ist: `id` n steht für `files[n]`.
+ * `content` und `embeds` dürfen mit dem Flag nicht dabei sein.
  */
 export function payload(snapshot: IStatusSnapshot, config: IConfig): Record<string, unknown> {
     const now = snapshot.measured.at.getTime();
-    const { bot, database, website, maintenance: paused, banner } = snapshot.measured;
-    const botService = serviceOf(snapshot, "bot");
-    const dashboard = serviceOf(snapshot, "dashboard");
-    const site = serviceOf(snapshot, "website");
-    const data = serviceOf(snapshot, "database");
 
     const components: unknown[] = [
         container(COLORS[snapshot.state], [
-            { type: MEDIA_GALLERY, items: [{ media: { url: `attachment://${BANNER_NAME}` }, description: "RL Nexus Status" }] },
-            text(`## ${HEADS[snapshot.state]}`),
-            text(`-# Geprüft ${at(snapshot.measured.at.toISOString(), "R")} · ${percent(snapshot.uptimeMonth)} verfügbar in 30 Tagen · ein Kästchen sind 2 Stunden`),
+            { type: MEDIA_GALLERY, items: [{ media: { url: `attachment://${STATUS_IMAGES[0]}` }, description: headAlt(snapshot) }] },
+            text(`-# Geprüft ${at(snapshot.measured.at.toISOString(), "R")} · zieht alle 2 Minuten nach`),
         ]),
     ];
 
     for (const incident of snapshot.incidents.slice(0, SHOWN)) components.push(incidentContainer(incident));
 
-    /* --- Bot ----------------------------------------------------------- */
-    const members = bot ? bot.guilds.reduce((sum, guild) => sum + guild.members, 0) : 0;
-    const botLine = bot
-        ? `${bot.ready ? "Läuft" : "Startet gerade"} seit ${at(bot.startedAt, "R")} · Ping **${ms(bot.ping)}** · **${thousands(bot.guilds.length)}** Server · **${thousands(members)}** Mitglieder`
-        : "Antwortet nicht";
+    components.push({
+        type: MEDIA_GALLERY,
+        items: snapshot.services.map((service) => ({ media: { url: `attachment://${imageName(service.id)}` }, description: serviceAlt(snapshot, service.id) })),
+    });
 
-    components.push(
-        container(COLORS[botService.state], [text(`${head("🤖", botService)}\n${botLine}\n-# ${outageLine(botService.lastOutage)}${bot ? ` · Version ${bot.versions.app}` : ""}`)])
-    );
-
-    /* --- Bot-Dashboard -------------------------------------------------- */
-    const dashboardLine =
-        paused.dashboard !== null
-            ? `In Wartung seit ${at(paused.dashboard.since, "R")}`
-            : dashboard.state === "down"
-              ? "Antwortet nicht"
-              : `Antwortet in **${ms(dashboard.latencyNow)}** · Ø 24 h ${ms(dashboard.latency.avg)}`;
-
-    components.push(container(COLORS[dashboard.state], [withButton(`${head("🖥️", dashboard)}\n${dashboardLine}\n-# ${outageLine(dashboard.lastOutage)}`, config.dashboardUrl)]));
-
-    /* --- Webseite ------------------------------------------------------- */
-    const siteLine =
-        paused.website !== null
-            ? `In Wartung seit ${at(paused.website.since, "R")}`
-            : site.state === "down"
-              ? "Antwortet nicht"
-              : `Antwortet in **${ms(site.latencyNow)}** · aktualisiert ${at(website.builtAt, "f")}`;
-
-    components.push(
-        container(COLORS[site.state], [withButton(`${head("🌐", site)}\n${siteLine}\n-# Banner: ${bannerLine(banner)} · ${outageLine(site.lastOutage)}`, config.websitePublicUrl)])
-    );
-
-    /* --- Datenbank ------------------------------------------------------ */
-    const dataLines = database.online
-        ? [
-              `**Antwortzeit** ${ms(data.latencyNow)} · Ø 24 h ${ms(data.latency.avg)} · langsamste ${ms(data.latency.max)}`,
-              `**Server** MariaDB ${database.version ?? "?"}${database.uptime === null ? "" : ` · läuft seit ${at(new Date(now - database.uptime * 1000).toISOString(), "R")}`}`,
-              `**Inhalt** ${thousands(database.tables)} Tabellen · ${megabytes(database.bytes)} · etwa ${thousands(database.rows)} Einträge`,
-          ]
-        : ["Nicht erreichbar"];
-
-    components.push(container(COLORS[data.state], [text(`${head("🗄️", data)}\n${dataLines.join("\n")}\n-# ${outageLine(data.lastOutage)}`)]));
-
-    /* --- Wartung und Knöpfe --------------------------------------------- */
     for (const incident of snapshot.maintenance.slice(0, SHOWN)) components.push(maintenanceContainer(incident, now));
 
     const more = snapshot.incidents.length + snapshot.maintenance.length - Math.min(SHOWN, snapshot.incidents.length) - Math.min(SHOWN, snapshot.maintenance.length);
@@ -361,23 +235,25 @@ export function payload(snapshot: IStatusSnapshot, config: IConfig): Record<stri
         ],
     });
 
-    return { flags: IS_COMPONENTS_V2, attachments: [{ id: 0, filename: BANNER_NAME }], components };
+    return { flags: IS_COMPONENTS_V2, attachments: STATUS_IMAGES.map((filename, id) => ({ id, filename })), components };
 }
 
 /**
- * Schreiben und Ändern, beides mit dem Bild: als multipart, das Bild in
- * `files[0]`, die Nachricht in `payload_json`. Den Content-Type samt Grenze
- * setzt fetch selbst.
+ * Schreiben und Ändern, beides mit den Bildern: als multipart, die Bilder in
+ * `files[0]` bis `files[4]`, die Nachricht in `payload_json`. Den
+ * Content-Type samt Grenze setzt fetch selbst. Discord findet beim Ändern ein
+ * schon vorhandenes Bild über `attachment://` nicht, deshalb gehen sie jedes
+ * Mal neu mit (zusammen rund 150 KB alle zwei Minuten).
  *
  * `payload_json` muss ein einfaches Textfeld sein. Als Blob angehängt, macht
  * FormData daraus eine Datei namens „blob“ - Discord legt die Nachricht dann
  * als Anhang ab und schickt eine leere Nachricht ohne jede Komponente.
  */
-async function upload(config: IConfig, url: string, method: "POST" | "PATCH", body: Record<string, unknown>): Promise<Response> {
+async function upload(config: IConfig, url: string, method: "POST" | "PATCH", body: Record<string, unknown>, images: readonly IStatusImage[]): Promise<Response> {
     const form = new FormData();
 
     form.append("payload_json", JSON.stringify(body));
-    form.append("files[0]", new Blob([BANNER], { type: "image/webp" }), BANNER_NAME);
+    images.forEach((image, index) => form.append(`files[${index}]`, new Blob([new Uint8Array(image.data)], { type: "image/png" }), image.name));
 
     return fetch(`${DISCORD_API}${url}`, {
         method,
@@ -465,13 +341,13 @@ function complete(message: ISentMessage): boolean {
  * Produktiv-Bots, wenn lokal die Dev-Application läuft). Alles andere ist ein
  * echter Fehler und soll auffallen, statt den Kanal mit neuen Nachrichten zu füllen.
  */
-async function postTo(config: IConfig, channel: string, body: Record<string, unknown>): Promise<string> {
+async function postTo(config: IConfig, channel: string, body: Record<string, unknown>, images: readonly IStatusImage[]): Promise<string> {
     const own = await remembered(stateKey(channel));
     // Vor dem Update gab es nur eine Zeile. Gehört die ID zu einem anderen Kanal, antwortet Discord mit 404.
     const known = own ?? (await remembered(STATE_KEYS.message));
 
     if (known !== null) {
-        const patched = await upload(config, `/channels/${channel}/messages/${known}`, "PATCH", body);
+        const patched = await upload(config, `/channels/${channel}/messages/${known}`, "PATCH", body, images);
 
         if (patched.ok) {
             if (own === null) await remember(stateKey(channel), known);
@@ -486,7 +362,7 @@ async function postTo(config: IConfig, channel: string, body: Record<string, unk
         // Gelöscht oder nicht von uns: unten eine eigene schreiben.
     }
 
-    const posted = await upload(config, `/channels/${channel}/messages`, "POST", body);
+    const posted = await upload(config, `/channels/${channel}/messages`, "POST", body, images);
     if (!posted.ok) throw new Error(`Discord antwortet mit ${posted.status} beim Schreiben: ${await posted.text()}`);
 
     const message = (await posted.json()) as ISentMessage;
@@ -527,13 +403,15 @@ async function post(config: IConfig, given?: IStatusSnapshot): Promise<IDiscordP
     const channels: IDiscordPostChannel[] = [];
 
     try {
-        const body = payload(given ?? (await refreshStatus(config)), config);
+        const snapshot = given ?? (await refreshStatus(config));
+        const body = payload(snapshot, config);
+        const images = await renderStatusImages(snapshot);
 
         for (const channel of statusChannels(config)) {
             let kept: string;
 
             try {
-                kept = await postTo(config, channel, body);
+                kept = await postTo(config, channel, body, images);
                 lastPost = new Date().toISOString();
                 channels.push({ id: channel, name: channelNames.get(channel) ?? null, ok: true, error: null });
             } catch (error) {

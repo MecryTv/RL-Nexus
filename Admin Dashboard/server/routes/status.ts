@@ -7,8 +7,9 @@ import { databaseReady } from "../db.ts";
 import { PublicError } from "../errors.ts";
 import { addUpdate, createIncident, deleteIncident, listIncidents, openKindOf, parseIncident, parseUpdate } from "../status/incidents.ts";
 import { loadDetail } from "../status/detail.ts";
-import { publicStatus } from "../status/snapshot.ts";
-import { BANNER, BANNER_NAME, chooseChannel, discordPostState, refreshNow, rememberManual, statusChannelOptions, statusCycle } from "../status-post.ts";
+import { renderStatusImages } from "../status/image.ts";
+import { publicStatus, statusSnapshot } from "../status/snapshot.ts";
+import { chooseChannel, discordPostState, refreshNow, rememberManual, statusChannelOptions, statusCycle } from "../status-post.ts";
 import { id } from "../validate.ts";
 
 function needDatabase(): void {
@@ -87,9 +88,12 @@ export async function statusRoutes(app: FastifyInstance, { config }: { config: I
     /** Die Bilder der Meldung für die Vorschau. In Discord stecken sie als Anhang `attachment://<name>`. */
     app.get("/api/status/discord/image/:name", async (request, reply) => {
         const name = (request.params as { name?: string }).name;
-        if (name !== BANNER_NAME) throw new PublicError(404, "Dieses Bild gibt es nicht.");
+        const snapshot = statusSnapshot();
+        const image = snapshot === null ? undefined : (await renderStatusImages(snapshot)).find((entry) => entry.name === name);
+        if (!image) throw new PublicError(404, "Dieses Bild gibt es nicht.");
 
-        return reply.type("image/webp").header("Cache-Control", "private, max-age=86400").send(BANNER);
+        // Die Bilder ändern sich mit jeder Prüfung, die Adresse nicht.
+        return reply.type("image/png").header("Cache-Control", "no-cache").send(image.data);
     });
 
     app.get("/api/status/incidents", async (): Promise<IIncidentList> => {

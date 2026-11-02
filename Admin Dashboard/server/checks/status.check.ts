@@ -3,6 +3,7 @@ import { channelLabel, type IChartPoint, type IDiscordPostState, type IIncident,
 import { buildApp } from "../app.ts";
 import { SESSION_COOKIE, seal } from "../session.ts";
 import { channelPermissions, manualWait, missingRights, payload, shortError } from "../status-post.ts";
+import { STATUS_IMAGES, renderStatusImages } from "../status/image.ts";
 import { parseIncident, parseUpdate } from "../status/incidents.ts";
 import { historyData, refreshStatus, setHistoryLoader, shouldRecord } from "../status/snapshot.ts";
 import { USERS } from "./fakes.ts";
@@ -204,6 +205,7 @@ interface IComponent {
     readonly label?: string;
     readonly components?: readonly IComponent[];
     readonly accessory?: IComponent;
+    readonly items?: readonly { readonly media: { readonly url: string }; readonly description?: string }[];
 }
 
 export async function checkStatusRoutes(): Promise<void> {
@@ -277,37 +279,39 @@ export async function checkStatusRoutes(): Promise<void> {
             assert.deepEqual([response.statusCode, response.json()], [503, { error: "Ohne Datenbank lassen sich keine Meldungen anlegen." }]);
         });
 
-        await check("Discord: ein Container je Bereich, Knöpfe darunter, kein Kontakt, Grenzen eingehalten", async () => {
+        await check("Discord als Bilder: Kopfbild mit einer Zeile, Karten je Dienst, Knöpfe darunter, Grenzen eingehalten", async () => {
             const snapshot = await refreshStatus(config);
-            const sent = payload(snapshot, { ...config, dashboardUrl: "https://dashboard.example.test" }) as { flags: number; components: IComponent[] };
+            const sent = payload(snapshot, { ...config, dashboardUrl: "https://dashboard.example.test" }) as {
+                flags: number;
+                attachments: { id: number; filename: string }[];
+                components: IComponent[];
+            };
 
             assert.equal(sent.flags, 1 << 15);
-
-            const containers = sent.components.filter((component) => component.type === 17);
-            assert.equal(containers.length, 5, "Kopf, Bot, Bot-Dashboard, Webseite, Datenbank");
-
-            // Der erste Container trägt das Banner, die Farbe zeigt den Gesamtzustand.
-            assert.equal(containers[0].components?.[0].type, 12);
-            assert.equal(containers[0].accent_color, 0xff_1e_2d);
-
-            // Jeder Dienst in seiner eigenen Farbe: drei grün, die Datenbank rot.
             assert.deepEqual(
-                containers.slice(1).map((container) => container.accent_color),
-                [0x22_c5_5e, 0x22_c5_5e, 0x22_c5_5e, 0xff_1e_2d]
+                sent.attachments.map((entry) => [entry.id, entry.filename]),
+                STATUS_IMAGES.map((name, index) => [index, name])
             );
+
+            // Oben das Kopfbild in der Farbe des Gesamtzustands, darunter genau eine Zeile.
+            const head = sent.components[0];
+            assert.equal(head.type, 17);
+            assert.equal(head.accent_color, 0xff_1e_2d);
+            assert.equal(head.components?.[0].type, 12);
+            assert.equal(head.components?.[0].items?.[0].media.url, "attachment://status-kopf.png");
+            assert.match(head.components?.[0].items?.[0].description ?? "", /Es gibt ein Problem/);
+            assert.match(textsOf([head])[0], /^-# Geprüft <t:\d+:R> · zieht alle 2 Minuten nach$/);
+
+            // Die vier Dienste als Karten in einer Galerie, jede mit Alt-Text.
+            const gallery = sent.components.find((component, index) => index > 0 && component.type === 12);
+            assert.deepEqual(
+                gallery?.items?.map((item) => item.media.url),
+                ["attachment://status-bot.png", "attachment://status-dashboard.png", "attachment://status-webseite.png", "attachment://status-datenbank.png"]
+            );
+            assert.match(gallery?.items?.[3].description ?? "", /^Datenbank: Ausfall/);
 
             const texts = textsOf(sent.components);
-            for (const heading of ["### 🤖 Bot", "### 🖥️ Bot-Dashboard", "### 🌐 Webseite", "### 🗄️ Datenbank"]) {
-                assert.ok(texts.some((text) => text.startsWith(heading)), heading);
-            }
             assert.ok(!texts.join("\n").includes("Kontakt"), "keine Kontaktnachrichten");
-
-            // Bot-Dashboard und Webseite mit „Öffnen“ rechts, unten drei Link-Knöpfe.
-            const sections = containers.flatMap((container) => container.components ?? []).filter((component) => component.type === 9);
-            assert.deepEqual(
-                sections.map((part) => part.accessory?.url),
-                ["https://dashboard.example.test", config.websitePublicUrl]
-            );
 
             const row = sent.components.at(-1);
             assert.deepEqual(
@@ -321,6 +325,25 @@ export async function checkStatusRoutes(): Promise<void> {
 
             assert.ok(countOf(sent.components) <= 40, `${countOf(sent.components)} Bausteine`);
             assert.ok(texts.join("").length <= 4000, `${texts.join("").length} Zeichen`);
+        });
+
+        await check("Die Bilder: fünf PNG, Kopf 1200 Pixel breit, Karten 600", async () => {
+            const images = await renderStatusImages(await refreshStatus(config));
+
+            assert.deepEqual(
+                images.map((image) => image.name),
+                STATUS_IMAGES
+            );
+
+            for (const image of images) {
+                assert.deepEqual([...image.data.subarray(0, 4)], [0x89, 0x50, 0x4e, 0x47], `${image.name} ist ein PNG`);
+                assert.ok(image.data.length < 400_000, `${image.name} hat ${image.data.length} Byte`);
+            }
+
+            assert.deepEqual(
+                images.map((image) => image.data.readUInt32BE(16)),
+                [1200, 600, 600, 600, 600]
+            );
         });
 
         await check("Status-Knopf: höchstens ein echter Aufruf alle 10 Sekunden, Wartezeit aufgerundet", () => {

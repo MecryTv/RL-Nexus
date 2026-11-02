@@ -41,6 +41,7 @@ import type { IAccessPreview } from "../shared/shop.ts";
 import { shopSessionCookie } from "./shop/session.ts";
 import { setStripeGateway } from "./shop/stripe.ts";
 import { STATE_KEYS, lastStatusPost, refreshNow, stateKey, stopStatusPost, updateStatusPost } from "./status-post.ts";
+import { STATUS_IMAGES } from "./status/image.ts";
 import { publicStatus, refreshStatus } from "./status/snapshot.ts";
 
 const CHANNEL = "900000000000000009";
@@ -100,6 +101,12 @@ try {
 }
 
 await tidy();
+
+// Der im Admin Dashboard gewählte Statuskanal (W-0052) gilt vor dem aus der
+// Konfiguration. Die Checks schreiben in ihre eigenen Test-Kanäle: die Wahl
+// des lokalen Dashboards beiseitelegen und am Ende zurückstellen.
+const [savedStatusChannel] = await query<{ value: string }[]>("SELECT value FROM admin_state WHERE name = 'status_channel'");
+await query("DELETE FROM admin_state WHERE name = 'status_channel'");
 
 // Ab hier geschriebene Statusprüfungen sind nachgestellt (Bot und Webseite sind Fälschungen)
 // und kommen am Ende wieder weg. Ein nebenher laufender Server verliert dabei diese eine Minute.
@@ -706,8 +713,8 @@ try {
         readonly method: string;
         readonly url: string;
         readonly body: Record<string, unknown> | null;
-        /** Was als files[0] mitging. */
-        readonly file: { readonly name: string; readonly type: string; readonly size: number } | null;
+        /** Was als files[0], files[1], … mitging. */
+        readonly files: readonly { readonly name: string; readonly type: string; readonly size: number }[];
     }
 
     /** Discord nachstellen: Jeder Aufruf an den Kanal wird mitgeschrieben und von `respond` beantwortet. */
@@ -724,15 +731,15 @@ try {
 
             if (init?.body instanceof FormData) {
                 const json = init.body.get("payload_json");
-                const file = init.body.get("files[0]") as File | null;
+                const files = [...init.body.entries()].filter(([key]) => key.startsWith("files[")).map(([, value]) => value as File);
 
                 // Als Blob wäre payload_json eine Datei namens „blob“, und Discord
                 // legte die Nachricht als Anhang statt als Inhalt ab.
                 assert.equal(typeof json, "string", "payload_json muss ein Textfeld sein, keine Datei");
 
-                call = { method: init.method ?? "GET", url, body: JSON.parse(json as string), file: file && { name: file.name, type: file.type, size: file.size } };
+                call = { method: init.method ?? "GET", url, body: JSON.parse(json as string), files: files.map((file) => ({ name: file.name, type: file.type, size: file.size })) };
             } else {
-                call = { method: init?.method ?? "GET", url, body: init?.body ? JSON.parse(String(init.body)) : null, file: null };
+                call = { method: init?.method ?? "GET", url, body: init?.body ? JSON.parse(String(init.body)) : null, files: [] };
             }
 
             calls.push(call);
@@ -775,29 +782,38 @@ try {
 
     /** Was in einem Aufruf an Discord stehen muss, egal ob geschrieben oder geändert. */
     const assertComplete = (call: IDiscordCall): void => {
-        // Das Bild geht jedes Mal mit, als files[0].
-        assert.deepEqual([call.file?.name, call.file?.type], ["status-banner.webp", "image/webp"]);
-        assert.ok((call.file?.size ?? 0) > 10_000, `Bild nur ${call.file?.size} Byte`);
+        // Die Bilder gehen jedes Mal mit, Kopfbild als files[0], dann die vier Karten.
+        assert.deepEqual(
+            call.files.map((file) => [file.name, file.type]),
+            STATUS_IMAGES.map((name) => [name, "image/png"])
+        );
+        assert.ok(call.files.every((file) => file.size > 5_000), `Bilder: ${call.files.map((file) => file.size).join(", ")} Byte`);
 
         // Components V2: ohne das Flag nimmt Discord `components` nicht an,
         // und `content`/`embeds` dürfen dann nicht mehr dabei sein.
         const sent = call.body as { flags: number; content?: unknown; embeds?: unknown; attachments: unknown; components: IPart[] };
         assert.equal(sent.flags, 1 << 15);
         assert.deepEqual([sent.content, sent.embeds], [undefined, undefined]);
-        assert.deepEqual(sent.attachments, [{ id: 0, filename: "status-banner.webp" }]);
+        assert.deepEqual(
+            sent.attachments,
+            STATUS_IMAGES.map((filename, id) => ({ id, filename }))
+        );
 
-        // Ein Container je Bereich, der erste trägt das Banner und zeigt auf die mitgeschickte Datei.
+        // Der erste Container trägt das Kopfbild und zeigt auf die mitgeschickte Datei, darunter eine Zeile.
         const containers = sent.components.filter((part) => part.type === 17);
-        assert.ok(containers.length >= 5, `${containers.length} Container`);
         assert.ok(containers.every((container) => (container.accent_color ?? 0) > 0));
         assert.equal(containers[0].components?.[0].type, 12);
-        assert.equal(containers[0].components?.[0].items?.[0].media.url, "attachment://status-banner.webp");
+        assert.equal(containers[0].components?.[0].items?.[0].media.url, `attachment://${STATUS_IMAGES[0]}`);
 
         const texts = textsOf(sent.components);
-        assert.match(texts[0], /^## (🟢|🟡|🔴) /);
-        for (const heading of ["### 🤖 Bot", "### 🖥️ Bot-Dashboard", "### 🌐 Webseite", "### 🗄️ Datenbank"]) {
-            assert.ok(texts.some((text) => text.startsWith(heading)), heading);
-        }
+        assert.match(texts[0], /^-# Geprüft <t:\d+:R>/);
+
+        // Die vier Karten als eigene Galerie.
+        const cards = sent.components.find((part, index) => index > 0 && part.type === 12);
+        assert.deepEqual(
+            cards?.items?.map((item) => item.media.url),
+            STATUS_IMAGES.slice(1).map((name) => `attachment://${name}`)
+        );
         assert.ok(!texts.join("\n").includes("Kontakt"), "keine Kontaktnachrichten");
 
         // Discords Grenzen: höchstens 40 Bausteine, 4000 Zeichen Text.
@@ -2707,6 +2723,7 @@ try {
     setShopMailer(null);
     await tidy();
     await query("DELETE FROM status_checks WHERE checked_at >= ?", [checkStart]);
+    if (savedStatusChannel) await query("INSERT INTO admin_state (name, value) VALUES ('status_channel', ?) ON DUPLICATE KEY UPDATE value = VALUES(value)", [savedStatusChannel.value]);
     await app.close();
     await closeDatabase();
 }
