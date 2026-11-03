@@ -31,7 +31,7 @@ export default class DashboardLogin extends Route {
 
         if (!service.IsConfigured) return Unconfigured(reply);
 
-        const query = request.query as { return?: string };
+        const query = request.query as { return?: string; join?: string };
 
         // Der Nonce liegt gleichzeitig im Cookie und im state-Parameter. Nur wenn
         // beim Rücksprung beide zusammenpassen, stammt der Code aus diesem Browser.
@@ -40,6 +40,7 @@ export default class DashboardLogin extends Route {
 
         return reply
             .header("Set-Cookie", SerializeCookie(STATE_COOKIE, `${nonce}|${back}`, STATE_LIFETIME, service.Secure))
-            .redirect(service.AuthorizeURL(nonce), 302);
+            // W-0064: ?join=1 fragt zusätzlich, ob der Bot die Person Servern hinzufügen darf.
+            .redirect(service.AuthorizeURL(nonce, query.join === "1"), 302);
     }
 }

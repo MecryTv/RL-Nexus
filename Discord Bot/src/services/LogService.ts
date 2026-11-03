@@ -233,6 +233,15 @@ export default class LogService {
     }
 
     /**
+     * W-0064: Karte vom Team oder von „ein Server pro Person“ unter einem
+     * vorhandenen Ereignis: integrations (Bot geht) oder memberJoin (Team tritt
+     * bei). Ist das Logging aus, erfährt der Server es eben nicht. Wirft nie.
+     */
+    async Notice(guild: Guild, key: "integrations" | "memberJoin", title: string, lines: string[]): Promise<void> {
+        await this.Post(guild, key, key === "memberJoin" ? "add" : "remove", title, lines).catch(() => undefined);
+    }
+
+    /**
      * Baut die Karte und schickt sie. Alles Weitere - Modul aus, Ereignis aus,
      * kein Ziel, kein Schreibrecht - endet hier still: ein Log-Eintrag über
      * einen fehlgeschlagenen Log-Eintrag hilft niemandem.

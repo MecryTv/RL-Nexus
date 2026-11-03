@@ -17,5 +17,8 @@ export default interface IDashboardSession {
     // fragen müsste. Es ist damit eine Momentaufnahme: wer den Schutz später
     // abschaltet, kommt bis zum Ablauf des Cookies weiter herein.
     mfa: true;
+    // W-0064: Der Token darf die Person Servern hinzufügen (guilds.join). Nur wer
+    // im Team-Kasten „Beitreten“ drückt, meldet sich dafür einmal neu an.
+    join?: true;
     expiresAt: number;
 }

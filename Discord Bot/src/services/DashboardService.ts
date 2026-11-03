@@ -413,12 +413,13 @@ export default class DashboardService implements IDashboardService {
         return Boolean(this.ClientId && this.ClientSecret);
     }
 
-    AuthorizeURL(state: string): string {
+    /** join: W-0064, zusätzlich guilds.join für „Selbst beitreten“ im Team-Kasten. */
+    AuthorizeURL(state: string, join = false): string {
         const query = new URLSearchParams({
             client_id: this.ClientId,
             redirect_uri: this.RedirectURI,
             response_type: "code",
-            scope: OAUTH_SCOPES.join(" "),
+            scope: [...OAUTH_SCOPES, ...(join ? ["guilds.join"] : [])].join(" "),
             state,
         });
 
@@ -525,7 +526,7 @@ export default class DashboardService implements IDashboardService {
             );
         }
 
-        const token = (await response.json()) as { access_token: string; expires_in: number };
+        const token = (await response.json()) as { access_token: string; expires_in: number; scope?: string };
         const user = await this.Fetch<IRawUser>("/users/@me", token.access_token);
 
         // Ohne Zwei-Faktor bei Discord kommt hier niemand herein. Die Anmeldung
@@ -551,6 +552,7 @@ export default class DashboardService implements IDashboardService {
             accessToken: token.access_token,
             mfa: true,
             expiresAt: Date.now() + token.expires_in * 1000,
+            ...((token.scope ?? "").split(" ").includes("guilds.join") ? { join: true as const } : {}),
         };
 
         logger.user(`🔐 Dashboard-Login: ${session.username} (${session.userId})`);
