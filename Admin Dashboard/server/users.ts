@@ -1,4 +1,6 @@
 import type { IUserRef } from "../shared/api.ts";
+import { CACHE_AREAS } from "./cache-areas.ts";
+import { cached, forget } from "./cache.ts";
 import type { IConfig } from "./config.ts";
 import { avatarUrl, bannerUrl, displayName, fetchUser } from "./discord.ts";
 
@@ -13,20 +15,25 @@ const known = new Map<string, { readonly value: IUserRef | null; readonly at: nu
 
 /** Name und Avatar zu einer ID, eine Stunde gemerkt. null: Discord kennt die ID nicht. Wirft DiscordUnavailable. */
 export async function lookupUser(config: IConfig, userId: string, now = Date.now()): Promise<IUserRef | null> {
-    const cached = known.get(userId);
-    if (cached && now - cached.at < TTL) return cached.value;
+    const local = known.get(userId);
+    if (local && now - local.at < TTL) return local.value;
 
-    const user = await fetchUser(config, userId);
-    const value = user
-        ? {
-              id: user.id,
-              name: displayName(user),
-              avatar: avatarUrl(user.id, user.avatar),
-              username: user.username,
-              banner: bannerUrl(user.id, user.banner),
-              accentColor: typeof user.accent_color === "number" ? `#${user.accent_color.toString(16).padStart(6, "0")}` : null,
-          }
-        : null;
+    // W-0066: zweite Stufe Redis, über Neustarts hinweg. Wirft fetchUser, wird nichts gemerkt.
+    // ponytail: Speicher im Prozess und Redis zusammen machen einen Namen bis zu zwei Stunden alt; für Namen reicht das.
+    const value = await cached<IUserRef | null>(CACHE_AREAS.discordUser.prefix + userId, CACHE_AREAS.discordUser.ttl, async () => {
+        const user = await fetchUser(config, userId);
+
+        return user
+            ? {
+                  id: user.id,
+                  name: displayName(user),
+                  avatar: avatarUrl(user.id, user.avatar),
+                  username: user.username,
+                  banner: bannerUrl(user.id, user.banner),
+                  accentColor: typeof user.accent_color === "number" ? `#${user.accent_color.toString(16).padStart(6, "0")}` : null,
+              }
+            : null;
+    });
 
     known.set(userId, { value, at: now });
 
@@ -36,6 +43,12 @@ export async function lookupUser(config: IConfig, userId: string, now = Date.now
 /** Nach einer Löschung und in Checks: Name, Bild und Banner aus dem Speicher werfen. */
 export function forgetUser(userId: string): void {
     known.delete(userId);
+    void forget(CACHE_AREAS.discordUser.prefix + userId);
+}
+
+/** Dev → Datenbank → Redis, Bereich leeren: auch der Speicher im Prozess, sonst träfe er noch bis zu einer Stunde. */
+export function forgetAllUsers(): void {
+    known.clear();
 }
 
 /** Der Name aus dem Speicher, ohne Discord zu fragen. Für die Suche (W-0059), die nicht warten darf. */

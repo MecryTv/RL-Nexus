@@ -90,6 +90,11 @@ export interface ICheckRound {
     readonly values: Readonly<Partial<Record<StatusService, { readonly state: CheckState; readonly latency: number | null }>>>;
 }
 
+/** Wie die Datenbank heißt: „MariaDB 11.8.6“, mit verbundenem Redis „MariaDB 11.8.6 + Redis Cache“ (W-0066). */
+export function databaseLabel(version: string | null, cache: boolean | undefined): string {
+    return `MariaDB${version ? ` ${version}` : ""}${cache ? " + Redis Cache" : ""}`;
+}
+
 export interface ITech {
     readonly bot: {
         readonly startedAt: string;
@@ -99,7 +104,8 @@ export interface ITech {
         readonly members: number;
         readonly versions: { readonly app: string; readonly node: string; readonly discordjs: string };
     } | null;
-    readonly database: { readonly version: string | null; readonly uptime: number | null; readonly tables: number; readonly bytes: number; readonly rows: number } | null;
+    /** cache: Redis war bei der Prüfung verbunden (W-0066). */
+    readonly database: { readonly version: string | null; readonly uptime: number | null; readonly tables: number; readonly bytes: number; readonly rows: number; readonly cache?: boolean } | null;
     readonly website: { readonly builtAt: string | null; readonly banner: boolean };
 }
 

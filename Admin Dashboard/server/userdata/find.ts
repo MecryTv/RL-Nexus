@@ -13,6 +13,8 @@ import {
     type UserdataBasis,
 } from "../../shared/userdata.ts";
 import { SECRET_COLUMN } from "../database.ts";
+import { CACHE_AREAS } from "../cache-areas.ts";
+import { cached, forget } from "../cache.ts";
 import { query } from "../db.ts";
 
 /** Nutzerdaten (W-0051): Liste, Profil und Auskunft, gelesen über die Liste in shared/userdata.ts. */
@@ -80,6 +82,16 @@ export function personIndex(now = Date.now()): Promise<Map<string, IUserdataPers
 }
 
 async function buildIndex(now: number): Promise<Map<string, IUserdataPerson>> {
+    // W-0066: Die Rechnung liegt fünf Minuten in Redis, auch über einen Neustart hinweg.
+    const list = await cached(CACHE_AREAS.userdataIndex.prefix, CACHE_AREAS.userdataIndex.ttl, computeIndex);
+    const people = new Map(list.map((person) => [person.id, person]));
+
+    index = { at: now, people };
+
+    return people;
+}
+
+async function computeIndex(): Promise<IUserdataPerson[]> {
     const entries = new Map<string, IIndexEntry>();
     const entry = (id: string): IIndexEntry => {
         const found = entries.get(id) ?? { rows: 0, areas: {}, name: null, lastAt: null, shop: false, guilds: new Set<string>() };
@@ -115,16 +127,13 @@ async function buildIndex(now: number): Promise<Map<string, IUserdataPerson>> {
         }
     }
 
-    const people = new Map([...entries].map(([id, found]) => [id, { id, name: found.name, rows: found.rows, areas: found.areas, servers: found.guilds.size, lastAt: found.lastAt, shop: found.shop }]));
-
-    index = { at: now, people };
-
-    return people;
+    return [...entries].map(([id, found]) => ({ id, name: found.name, rows: found.rows, areas: found.areas, servers: found.guilds.size, lastAt: found.lastAt, shop: found.shop }));
 }
 
 /** Nach einer Änderung (Löschung, Teil 3b) neu rechnen. */
 export function forgetIndex(): void {
     index = null;
+    void forget(CACHE_AREAS.userdataIndex.prefix);
 }
 
 const areaOf = new Map(USERDATA_AREAS.flatMap((area) => area.sources.map((source) => [source, area.id] as const)));

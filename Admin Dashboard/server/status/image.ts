@@ -1,6 +1,6 @@
 import path from "node:path";
 import { GlobalFonts, createCanvas, loadImage, type Image, type SKRSContext2D } from "@napi-rs/canvas";
-import { STATUS_SERVICE_LABELS, type BlockState, type CheckState, type PointState, type StatusService } from "../../shared/status.ts";
+import { STATUS_SERVICE_LABELS, databaseLabel, type BlockState, type CheckState, type PointState, type StatusService } from "../../shared/status.ts";
 import { maintenanceRunning, type IServiceSnapshot, type IStatusSnapshot } from "./snapshot.ts";
 
 /**
@@ -103,7 +103,7 @@ function extraOf(snapshot: IStatusSnapshot, service: IServiceSnapshot): string {
         case "website":
             return website.builtAt ? `Gebaut ${berlin(new Date(website.builtAt), { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}` : "Bauzeit unbekannt";
         case "database":
-            return database.online ? `MariaDB ${database.version ?? "?"} · ${Math.max(1, Math.round(database.bytes / 1024 / 1024))} MB` : "Nicht erreichbar";
+            return database.online ? `${databaseLabel(database.version, database.cache)} · ${Math.max(1, Math.round(database.bytes / 1024 / 1024))} MB` : "Nicht erreichbar";
     }
 }
 
