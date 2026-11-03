@@ -13,6 +13,7 @@ import {
     type UserdataBasis,
 } from "../../shared/userdata.ts";
 import { SECRET_COLUMN } from "../database.ts";
+import { CACHE_AREAS } from "../cache-areas.ts";
 import { cached, forget } from "../cache.ts";
 import { query } from "../db.ts";
 
@@ -82,7 +83,7 @@ export function personIndex(now = Date.now()): Promise<Map<string, IUserdataPers
 
 async function buildIndex(now: number): Promise<Map<string, IUserdataPerson>> {
     // W-0066: Die Rechnung liegt fünf Minuten in Redis, auch über einen Neustart hinweg.
-    const list = await cached("userdata:index:v1", INDEX_TTL / 1000, computeIndex);
+    const list = await cached(CACHE_AREAS.userdataIndex.prefix, CACHE_AREAS.userdataIndex.ttl, computeIndex);
     const people = new Map(list.map((person) => [person.id, person]));
 
     index = { at: now, people };
@@ -132,7 +133,7 @@ async function computeIndex(): Promise<IUserdataPerson[]> {
 /** Nach einer Änderung (Löschung, Teil 3b) neu rechnen. */
 export function forgetIndex(): void {
     index = null;
-    void forget("userdata:index:v1");
+    void forget(CACHE_AREAS.userdataIndex.prefix);
 }
 
 const areaOf = new Map(USERDATA_AREAS.flatMap((area) => area.sources.map((source) => [source, area.id] as const)));

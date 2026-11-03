@@ -1,4 +1,5 @@
 import { createClient } from "@redis/client";
+import { areaOfKey } from "./cache-areas.ts";
 import type { IConfig } from "./config.ts";
 
 /**
@@ -20,12 +21,47 @@ export const CACHE_WAIT = 250;
 /** So lange bleibt Redis nach einer Zeitüberschreitung außen vor. Sonst kostete jedes Lesen die volle Wartezeit. */
 const PAUSE = 30_000;
 
+/** Was die Seite Dev → Datenbank → Redis über einen Schlüssel zeigt. */
+export interface IKeyFacts {
+    readonly key: string;
+    /** Sekunden bis zum Ablauf, -1 ohne Ablauf, -2 schon weg. */
+    readonly ttl: number;
+    readonly bytes: number | null;
+    readonly type: string;
+    readonly encoding: string | null;
+}
+
 /** Das Wenige, was der Cache von einem Redis-Client braucht. In den Checks ersetzbar. */
 export interface ICacheClient {
     get(key: string): Promise<string | null>;
     set(key: string, value: string, options: { EX: number }): Promise<unknown>;
     del(keys: string | string[]): Promise<unknown>;
     scanKeys(pattern: string): Promise<string[]>;
+    /** Für die Seite Dev → Datenbank: Antwortzeit in ms, Version, Fakten je Schlüssel. */
+    ping(): Promise<number>;
+    version(): Promise<string | null>;
+    describe(keys: readonly string[]): Promise<IKeyFacts[]>;
+}
+
+/** Treffer seit dem Start, je Bereich (W-0066, Seite Dev → Datenbank). */
+interface IStats {
+    hits: number;
+    misses: number;
+    failures: number;
+}
+
+const stats = new Map<string, IStats>();
+
+function count(key: string, what: keyof IStats): void {
+    const id = areaOfKey(key)?.id ?? "sonstiges";
+    const entry = stats.get(id) ?? { hits: 0, misses: 0, failures: 0 };
+
+    entry[what]++;
+    stats.set(id, entry);
+}
+
+export function cacheStats(): ReadonlyMap<string, Readonly<IStats>> {
+    return stats;
 }
 
 let client: ICacheClient | null = null;
@@ -47,6 +83,7 @@ export function setCacheClient(next: ICacheClient | null): void {
     lastError = null;
     pausedUntil = 0;
     missed = false;
+    stats.clear();
 }
 
 /** Verbindung weg. Auch in den Checks, um einen Ausfall nachzustellen. */
@@ -122,6 +159,38 @@ export async function connectCache(config: IConfig): Promise<void> {
 
             return found;
         },
+        ping: async () => {
+            const started = performance.now();
+
+            await redis.ping();
+
+            return Math.round(performance.now() - started);
+        },
+        // INFO darf der Nutzer rlnexus nicht (@dangerous), HELLO nennt die Version auch.
+        version: async () => {
+            const reply = (await redis.sendCommand(["HELLO", "2"])) as unknown[];
+            const at = reply.findIndex((entry) => String(entry) === "version");
+
+            return at >= 0 ? String(reply[at + 1]) : null;
+        },
+        describe: async (keys) => {
+            const facts: IKeyFacts[] = [];
+
+            // In Gruppen: commandsQueueMaxLength lässt nicht beliebig viele auf einmal zu.
+            for (let start = 0; start < keys.length; start += 20) {
+                facts.push(
+                    ...(await Promise.all(
+                        keys.slice(start, start + 20).map(async (key) => {
+                            const [ttl, bytes, type, encoding] = await Promise.all([redis.ttl(key), redis.memoryUsage(key), redis.type(key), redis.objectEncoding(key).catch(() => null)]);
+
+                            return { key, ttl: Number(ttl), bytes: bytes === null ? null : Number(bytes), type: String(type), encoding: encoding === null ? null : String(encoding) };
+                        })
+                    ))
+                );
+            }
+
+            return facts;
+        },
     };
 
     // Höchstens eine Sekunde auf offene Befehle warten, dann hart trennen: Ein hängendes Redis hielte sonst das Beenden auf.
@@ -155,8 +224,18 @@ export async function cached<T>(key: string, seconds: number, load: () => Promis
     if (usable()) {
         try {
             const hit = await waited(client!.get(CACHE_PREFIX + key));
-            if (hit !== null) return JSON.parse(hit) as T;
+
+            if (hit !== null) {
+                const value = JSON.parse(hit) as T;
+
+                count(key, "hits");
+
+                return value;
+            }
+
+            count(key, "misses");
         } catch {
+            count(key, "failures");
             // Redis weg, zu langsam oder ein kaputter Wert: dann eben aus der Quelle.
         }
     }
@@ -173,6 +252,24 @@ export async function cached<T>(key: string, seconds: number, load: () => Promis
 
     return value;
 }
+
+/** Mit eigener, längerer Wartezeit und ohne Pause danach: nur für die Seite Dev → Datenbank. */
+function inspected<T>(work: Promise<T>): Promise<T> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    return Promise.race([work, new Promise<T>((_resolve, reject) => (timer = setTimeout(() => reject(new Error("Redis antwortet zu langsam")), 3_000)))]).finally(() => clearTimeout(timer));
+}
+
+/** Für die Seite Dev → Datenbank → Redis. null: Redis ist nicht eingerichtet oder gerade nicht verbunden. */
+export const cacheInspect = {
+    ping: (): Promise<number> | null => (client && ready ? inspected(client.ping()) : null),
+    version: (): Promise<string | null> | null => (client && ready ? inspected(client.version()) : null),
+    /** Alle Schlüssel mit diesem Anfang, ohne rln: zurück. */
+    keys: async (prefix: string): Promise<string[] | null> => (client && ready ? (await inspected(client.scanKeys(`${CACHE_PREFIX}${prefix}*`))).map((key) => key.slice(CACHE_PREFIX.length)) : null),
+    describe: async (keys: readonly string[]): Promise<IKeyFacts[] | null> =>
+        client && ready ? (await inspected(client.describe(keys.map((key) => CACHE_PREFIX + key)))).map((facts) => ({ ...facts, key: facts.key.slice(CACHE_PREFIX.length) })) : null,
+    read: (key: string): Promise<string | null> | null => (client && ready ? inspected(client.get(CACHE_PREFIX + key)) : null),
+};
 
 /** Einen Eintrag wegwerfen, nach jeder Änderung an seiner Quelle. Mit * am Ende alle mit diesem Anfang. */
 export async function forget(key: string): Promise<void> {

@@ -1,4 +1,5 @@
 import type { IUserRef } from "../shared/api.ts";
+import { CACHE_AREAS } from "./cache-areas.ts";
 import { cached, forget } from "./cache.ts";
 import type { IConfig } from "./config.ts";
 import { avatarUrl, bannerUrl, displayName, fetchUser } from "./discord.ts";
@@ -19,7 +20,7 @@ export async function lookupUser(config: IConfig, userId: string, now = Date.now
 
     // W-0066: zweite Stufe Redis, über Neustarts hinweg. Wirft fetchUser, wird nichts gemerkt.
     // ponytail: Speicher im Prozess und Redis zusammen machen einen Namen bis zu zwei Stunden alt; für Namen reicht das.
-    const value = await cached<IUserRef | null>(`discord:user:v1:${userId}`, TTL / 1000, async () => {
+    const value = await cached<IUserRef | null>(CACHE_AREAS.discordUser.prefix + userId, CACHE_AREAS.discordUser.ttl, async () => {
         const user = await fetchUser(config, userId);
 
         return user
@@ -42,7 +43,7 @@ export async function lookupUser(config: IConfig, userId: string, now = Date.now
 /** Nach einer Löschung und in Checks: Name, Bild und Banner aus dem Speicher werfen. */
 export function forgetUser(userId: string): void {
     known.delete(userId);
-    void forget(`discord:user:v1:${userId}`);
+    void forget(CACHE_AREAS.discordUser.prefix + userId);
 }
 
 /** Der Name aus dem Speicher, ohne Discord zu fragen. Für die Suche (W-0059), die nicht warten darf. */
