@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
+import { buildApp } from "../app.ts";
 import type { IConfig } from "../config.ts";
 import { query } from "../db.ts";
 import { hashSecret, ipHashes } from "../security/hash.ts";
 import { banPeople, changeBan, liftBan } from "../security/flow.ts";
 import { checkLogin } from "../security/login.ts";
+import { shopSessionCookie } from "../shop/session.ts";
 import { banProfile, overview, personPrefill, vpnView } from "../security/views.ts";
 import { check, section } from "./harness.ts";
 
@@ -188,6 +190,31 @@ export async function checkSecurityDb(base: IConfig): Promise<void> {
             const vpn = await vpnView(config);
             assert.equal(vpn.keySet, true);
             assert.ok(vpn.logins.some((row) => row.person.id === SHOPPER && row.result === "blocked"));
+        });
+
+        await check("Laufende Sitzung: Webseite gesperrt beendet sie, nur Shop gesperrt sperrt Test und Kasse", async () => {
+            const app = await buildApp(config);
+            const cookie = shopSessionCookie(config, { id: OLD, name: "Check", avatar: null, exp: Math.floor(Date.now() / 1000) + 600 }).split(";")[0]!;
+            const post = (url: string) => app.inject({ method: "POST", url, headers: { cookie, origin: new URL(config.shopSiteUrl).origin, "content-type": "application/json" }, payload: JSON.stringify({ productId: 1, consentTerms: true, consentImmediateStart: true, consentAdult: true }) });
+
+            try {
+                await query("INSERT INTO shop_customers (user_id, name, email) VALUES (?, 'Check', 'check@example.com') ON DUPLICATE KEY UPDATE email = VALUES(email)", [OLD]);
+
+                const state = await app.inject({ method: "GET", url: "/public/shop/state", headers: { cookie } });
+                assert.equal(state.json().me, null);
+                assert.match(String(state.headers["set-cookie"]), /Max-Age=0|Expires=Thu, 01 Jan 1970/i);
+
+                await query("UPDATE security_bans SET scope = 'own,dashboard,shop' WHERE user_id = ? AND state = 'active'", [OLD]);
+
+                const shopOnly = await app.inject({ method: "GET", url: "/public/shop/state", headers: { cookie } });
+                assert.equal(shopOnly.json().me?.status, "banned");
+                assert.equal((await post("/public/shop/trial")).statusCode, 403);
+                assert.equal((await post("/public/shop/checkout")).statusCode, 403);
+            } finally {
+                await query("UPDATE security_bans SET scope = 'others,own,dashboard,website,shop' WHERE user_id = ? AND state = 'active'", [OLD]);
+                await query("DELETE FROM shop_customers WHERE user_id = ?", [OLD]);
+                await app.close();
+            }
         });
     } finally {
         globalThis.fetch = real;

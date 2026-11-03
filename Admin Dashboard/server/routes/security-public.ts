@@ -7,7 +7,7 @@ import { open, seal } from "../session.ts";
 /**
  * Sperrseite und VPN-Seite der Webseite (W-0057, C4c und V-A+): Der
  * Shop-Callback schickt gesperrte oder blockierte Anmeldungen nach
- * /gesperrt?s=…, die Seite holt sich hier, was sie zeigt. Der Wert ist
+ * /gesperrt?s=…, die Seite holt sich hier (/api/shop/blocked), was sie zeigt. Der Wert ist
  * versiegelt und 15 Minuten gültig, eine Sitzung entsteht dabei nicht.
  */
 
@@ -18,7 +18,8 @@ export function blockedToken(config: IConfig, view: IBlockedView, now = Date.now
 }
 
 export async function publicSecurityRoutes(app: FastifyInstance, { config }: { config: IConfig }): Promise<void> {
-    app.get("/public/security/blocked", { config: { rateLimit: { max: 30, timeWindow: "1 minute" } } }, async (request): Promise<IBlockedView> => {
+    // Unter /public/shop/: Die Webseite erreicht das Admin Dashboard nur über /api/shop/ (nginx im Container).
+    app.get("/public/shop/blocked", { config: { rateLimit: { max: 30, timeWindow: "1 minute" } } }, async (request): Promise<IBlockedView> => {
         const token = String((request.query as { s?: string }).s ?? "");
         const value = token ? open<IBlockedView & { exp?: number }>(token, config.jwtSecret) : null;
 

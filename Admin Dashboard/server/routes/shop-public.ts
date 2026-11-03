@@ -55,6 +55,7 @@ import { handleStripeEvent } from "../shop/webhook.ts";
 import { body, id } from "../validate.ts";
 import { checkLogin } from "../security/login.ts";
 import { blockedToken } from "./security-public.ts";
+import { activeBanOf, scopeOfRow } from "../security/store.ts";
 
 /**
  * Der Shop für die Webseite. nginx reicht nexus-emb.de/api/shop/* hierher,
@@ -131,6 +132,22 @@ function sessionOf(request: FastifyRequest, config: IConfig): IShopSession {
     return session;
 }
 
+/** W-0057: Welche Bausteine einer dauerhaften Sperre für diese Person gelten. */
+async function bannedFor(userId: string): Promise<{ readonly website: boolean; readonly shop: boolean }> {
+    const ban = await activeBanOf(userId);
+    const scope = ban ? scopeOfRow(ban) : [];
+
+    return { website: scope.includes("website"), shop: scope.includes("shop") };
+}
+
+/** Für Test und Kasse: angemeldet und nicht für den Shop gesperrt. Kündigen und Portal bleiben offen (§ 312k BGB). */
+async function buyerOf(request: FastifyRequest, config: IConfig): Promise<IShopSession> {
+    const session = sessionOf(request, config);
+    if ((await bannedFor(session.id)).shop) throw new PublicError(403, "Dein Konto ist für den Shop gesperrt.");
+
+    return session;
+}
+
 function publicProduct(product: { readonly id: number; readonly title: string; readonly description: string; readonly bullets: readonly string[]; readonly kind: IShopPublicProduct["kind"]; readonly durationDays: number | null; readonly priceCents: number; readonly badge: string }): IShopPublicProduct {
     return {
         id: product.id,
@@ -153,11 +170,18 @@ export async function publicShopRoutes(app: FastifyInstance, { config }: { confi
         if (!fromWebsite(request, config)) return reply.code(403).send({ error: "Diese Anfrage kam nicht von der Webseite." });
     });
 
-    app.get("/public/shop/state", async (request): Promise<IShopState> => {
+    app.get("/public/shop/state", async (request, reply): Promise<IShopState> => {
         const settings = await readSettings();
         const products = (await listProducts()).filter((product) => product.visible).map(publicProduct);
-        const session = readShopSession(request, config);
+        let session = readShopSession(request, config);
         let me: IShopMe | null = null;
+        const ban = session ? await bannedFor(session.id) : null;
+
+        // W-0057: Für die Webseite gesperrt beendet die Sitzung; die nächste Anmeldung zeigt die Sperrseite.
+        if (session && ban?.website) {
+            reply.header("Set-Cookie", clearShopSession(config));
+            session = null;
+        }
 
         if (session) {
             const customer = await customerOf(session.id);
@@ -166,7 +190,7 @@ export async function publicShopRoutes(app: FastifyInstance, { config }: { confi
                 const now = new Date();
                 const grants = await grantsOf(session.id);
                 const access = accessOf(grants, now);
-                const banned = customer.bannedAt !== null;
+                const banned = customer.bannedAt !== null || ban?.shop === true;
                 const running = access.grant;
                 const title = running === null ? null : running.source === "trial" ? "Test" : ((await findProduct(running.productId ?? 0))?.title ?? null);
 
@@ -381,7 +405,7 @@ export async function publicShopRoutes(app: FastifyInstance, { config }: { confi
     app.post("/public/shop/logout", { config: LOGIN_LIMIT }, async (_request, reply) => reply.header("Set-Cookie", clearShopSession(config)).code(204).send());
 
     app.post("/public/shop/trial", { config: TRIAL_LIMIT }, async (request): Promise<IUnlockProgress> => {
-        const session = sessionOf(request, config);
+        const session = await buyerOf(request, config);
         const settings = await readSettings();
         const customer = await customerOf(session.id);
         if (!customer || !customer.email) throw new PublicError(401, "Melde dich zuerst mit Discord an.");
@@ -424,7 +448,7 @@ export async function publicShopRoutes(app: FastifyInstance, { config }: { confi
             throw new PublicError(400, "Bitte bestätige alle drei Punkte über dem Knopf.");
         }
 
-        const session = sessionOf(request, config);
+        const session = await buyerOf(request, config);
         const productId = id(String(input.productId ?? ""));
         const settings = await readSettings();
         if (!settings.shopOpen) throw new PublicError(409, "Gerade gibt es keinen Verkauf.");

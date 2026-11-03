@@ -1,0 +1,301 @@
+@use "mixins" as *;
+
+/* W-0057: Sperrseite C4c und VPN-Seite V-A+. Schild gezeichnet, ohne Leuchten. */
+
+.page {
+    display: flex;
+    justify-content: center;
+    padding-block: clamp(56px, 9vw, 110px);
+}
+
+.title {
+    margin: 2px 0 12px;
+    font-size: clamp(1.6rem, 1.2rem + 1.6vw, 2rem);
+    font-weight: 800;
+}
+
+.shield {
+    display: block;
+    width: 78px;
+    height: 86px;
+    flex: none;
+}
+
+.ban {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    max-width: 420px;
+    text-align: center;
+
+    .shield {
+        margin-bottom: 10px;
+    }
+}
+
+.state {
+    font: 700 0.78rem var(--f-label);
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: #ff8a93;
+
+    [data-tone="part"] & {
+        color: #f0b232;
+    }
+}
+
+.account {
+    display: inline-flex;
+    gap: 10px;
+    align-items: center;
+    padding: 3px 14px 3px 3px;
+    border: 1px solid var(--c-line);
+    border-radius: 999px;
+    background: rgb(255 255 255 / 4%);
+    font-size: 0.9rem;
+    text-align: left;
+
+    small {
+        display: block;
+        color: var(--c-text-dim);
+        font-size: 0.75rem;
+        line-height: 1.1;
+    }
+}
+
+.avatar {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 30px;
+    height: 30px;
+    overflow: hidden;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #b8358f, #7a28b8);
+    color: #fff;
+    font: 800 0.75rem var(--f-display);
+
+    img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+}
+
+.groups {
+    display: grid;
+    gap: 10px;
+    width: 100%;
+    margin-top: 18px;
+    text-align: left;
+}
+
+.label {
+    display: block;
+    margin-bottom: 4px;
+    font: 700 0.7rem var(--f-label);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--c-text-dim);
+}
+
+.chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+
+    li {
+        padding: 2px 9px;
+        border: 1px solid;
+        border-radius: 6px;
+        font: 700 0.75rem var(--f-label);
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+    }
+
+    [data-kind="no"] {
+        border-color: rgb(255 30 45 / 45%);
+        background: rgb(255 30 45 / 6%);
+        color: #ff9aa1;
+
+        &::before {
+            content: "✕ ";
+        }
+    }
+
+    [data-kind="yes"] {
+        border-color: rgb(53 224 127 / 40%);
+        background: rgb(53 224 127 / 5%);
+        color: #8ff0b8;
+
+        &::before {
+            content: "✓ ";
+        }
+    }
+}
+
+.since {
+    margin-top: 14px;
+    color: var(--c-text-dim);
+    font-size: 0.82rem;
+}
+
+.logout {
+    margin-top: 20px;
+
+    @include below(560px) {
+        width: 100%;
+    }
+}
+
+/* V-A+ */
+.vpn {
+    display: grid;
+    gap: 14px;
+    width: 100%;
+    max-width: 560px;
+
+    > .account {
+        justify-self: start;
+    }
+}
+
+.headline {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+
+    .shield {
+        width: 64px;
+        height: 72px;
+    }
+
+    .title {
+        margin: 0;
+    }
+
+    p {
+        margin: 2px 0 0;
+        color: var(--c-text-dim);
+    }
+
+    @include below(560px) {
+        flex-direction: column;
+        text-align: center;
+    }
+}
+
+.facts {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    margin: 0;
+
+    div {
+        padding: 9px 11px;
+        border: 1px solid var(--c-line);
+        background: var(--c-panel-solid);
+    }
+
+    dt {
+        font: 700 0.7rem var(--f-label);
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--c-text-dim);
+    }
+
+    dd {
+        margin: 0;
+        font: 700 0.9rem var(--f-display);
+    }
+
+    @include below(560px) {
+        grid-template-columns: 1fr;
+    }
+}
+
+.warn {
+    color: var(--c-mod-engagement);
+}
+
+.why {
+    padding: 10px 12px;
+    border-left: 3px solid var(--c-mod-engagement);
+    background: rgb(255 197 61 / 6%);
+    color: var(--c-text-dim);
+    font-size: 0.9rem;
+}
+
+.steps {
+    display: grid;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    counter-reset: step;
+
+    li {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        padding: 9px 12px;
+        border: 1px solid var(--c-line);
+        background: var(--c-panel-solid);
+        font-size: 0.9rem;
+        counter-increment: step;
+
+        &::before {
+            content: counter(step);
+            display: grid;
+            place-items: center;
+            flex: none;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: #1d2430;
+            font: 800 0.75rem var(--f-display);
+        }
+    }
+}
+
+.buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+
+    @include below(560px) {
+        flex-direction: column;
+    }
+}
+
+.help {
+    padding: 0 12px;
+    border: 1px solid var(--c-line);
+    background: var(--c-panel-solid);
+
+    summary {
+        padding: 10px 0;
+        font: 700 0.9rem var(--f-display);
+        cursor: pointer;
+    }
+
+    p {
+        margin: 0 0 10px;
+        color: var(--c-text-dim);
+        font-size: 0.9rem;
+    }
+}
+
+.expired {
+    display: grid;
+    gap: 12px;
+    justify-items: center;
+    text-align: center;
+
+    p {
+        color: var(--c-text-dim);
+    }
+}
