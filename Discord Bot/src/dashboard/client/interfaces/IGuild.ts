@@ -24,6 +24,10 @@ export interface IGuild {
     modules: string[];
     /** Staff mit laufender Freigabe (W-0011): bis wann, private Bereiche offen, wer erlaubt hat (ID). */
     staff?: { grantId: number; until: number; private: boolean; by: string } | null;
+    /** W-0064: Bei Karten „Staff“: ist die Person dort Mitglied? */
+    member?: boolean;
+    /** W-0064: Signatur einer Freigabe für einen weiteren Server, etwa „F-0007“. */
+    signature?: string | null;
     c1: string;
     c2: string;
 }

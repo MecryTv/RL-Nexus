@@ -1057,7 +1057,9 @@ export default class DashboardService implements IDashboardService {
         // Erst sammeln, welche Server überhaupt in die Liste gehören - danach
         // stehen die IDs fest und Teams und Module kommen in zwei Abfragen für
         // alle auf einmal statt in einer je Karte.
-        const picked = new Map<string, { raw: IRawGuild; role: DashboardRole; canManage: boolean; canModerate: boolean; canReview: boolean }>();
+        const picked = new Map<string, { raw: IRawGuild; role: DashboardRole; canManage: boolean; canModerate: boolean; canReview: boolean; member?: boolean }>();
+        // W-0064: Discords Liste enthält jeden Server, auf dem die Person Mitglied ist.
+        const memberOf = new Set(raw.map((guild) => guild.id));
 
         for (const guild of raw) {
             const permissions = this.Permissions(guild.permissions);
@@ -1085,14 +1087,20 @@ export default class DashboardService implements IDashboardService {
                     canManage: false,
                     canModerate: false,
                     canReview: false,
+                    member: memberOf.has(guild.id),
                 });
             }
         }
 
         const facts = await this.Facts([...picked.keys()]);
+        const signatures = await this.Signatures([...picked.keys()]);
 
         const list = [...picked.values()]
-            .map((entry) => this.Card(entry.raw, entry.role, entry.canManage, entry.canModerate, entry.canReview, facts))
+            .map((entry) => ({
+                ...this.Card(entry.raw, entry.role, entry.canManage, entry.canModerate, entry.canReview, facts),
+                ...(entry.member === undefined ? {} : { member: entry.member }),
+                signature: signatures.get(entry.raw.id) ?? null,
+            }))
             .sort(
             (a, b) => Number(b.active) - Number(a.active) || b.members - a.members || a.name.localeCompare(b.name)
         );
@@ -1101,6 +1109,25 @@ export default class DashboardService implements IDashboardService {
         this.sessionUsers.set(session.id, session.userId);
 
         return list;
+    }
+
+    /**
+     * W-0064: Signaturen freigegebener weiterer Server (F-0007). Die Tabelle
+     * gehört dem Admin Dashboard (Migration 017); fehlt sie, gibt es keine.
+     */
+    private async Signatures(guildIds: string[]): Promise<Map<string, string>> {
+        if (guildIds.length === 0 || !this.client.databaseService.Ready) return new Map();
+
+        try {
+            const rows = await this.client.databaseService.Query<{ guild_id: string; approval_id: number }>(
+                `SELECT guild_id, approval_id FROM server_invites WHERE state = 'active' AND approval_id IS NOT NULL AND guild_id IN (${guildIds.map(() => "?").join(", ")})`,
+                guildIds
+            );
+
+            return new Map(rows.map((row) => [row.guild_id, `F-${String(row.approval_id).padStart(4, "0")}`]));
+        } catch {
+            return new Map();
+        }
     }
 
     // Ohne Datenbank bleibt beides leer - die Karten zeigen dann 0 Teams und

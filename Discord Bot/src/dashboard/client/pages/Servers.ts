@@ -12,11 +12,15 @@ import { clickSound, hoverSound } from "../core/Sound.js";
 import { toast } from "../core/Toast.js";
 import { onMyPulse } from "../core/Pulse.js";
 import { BASE, url } from "../core/Base.js";
+import { teamMenu, teamRoleOf, type TeamRole } from "./GuildBotTeam.js";
 
 /* ----------------------------------------------------------
    Seite: Serverauswahl
    ---------------------------------------------------------- */
 export const state = { filter: "all", query: "", firstPaint: true };
+
+/** W-0064: Rolle im Team von RL Nexus, für das Menü an Karten „Staff“. */
+let teamRole: TeamRole | null = null;
 
 export function skeletons(count: number): void {
     const grid = need<HTMLElement>("#grid");
@@ -69,6 +73,26 @@ export function cardFor(guild: IGuild, position: number, animate: boolean): HTML
         card.style.setProperty("--accent", "var(--purple)");
         card.style.setProperty("--tint", "color-mix(in srgb,var(--purple) 14%,transparent)");
         pill?.classList.replace("pill--role", "pill--staff");
+
+        // W-0064: ob du dort Mitglied bist, und das Menü des Teams.
+        const meta = card.querySelector<HTMLElement>(".card__meta");
+        const membership = document.createElement("span");
+
+        membership.className = "pill pill--view";
+        membership.textContent = guild.member ? "Mitglied" : "nicht Mitglied";
+        meta?.append(membership);
+
+        if (teamRole && guild.active) card.querySelector<HTMLElement>(".card__head")?.append(teamMenu(guild, teamRole));
+    }
+
+    // W-0064: freigegebener weiterer Server mit Signatur.
+    if (guild.signature) {
+        const seal = document.createElement("span");
+
+        seal.className = "pill tseal";
+        seal.textContent = `✦ ${guild.signature}`;
+        seal.title = "Freigegeben vom Team von RL Nexus";
+        card.querySelector<HTMLElement>(".card__meta")?.append(seal);
     }
 
     // Moderator: gruen - der Server ist offen, nur nicht zum Einstellen.
@@ -259,6 +283,7 @@ function watchInvites(): void {
 }
 
 export function renderServers(data: IPayload): void {
+    teamRole = teamRoleOf(data.user.group);
     const grid = need<HTMLElement>("#grid");
     const empty = need<HTMLElement>("#empty");
     const resultline = need<HTMLElement>("#resultline");

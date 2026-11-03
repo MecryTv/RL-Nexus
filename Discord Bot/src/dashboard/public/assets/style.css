@@ -5325,3 +5325,57 @@ body.sg-locked{overflow:hidden}
 .sgmay .is-yes::before{content:"✓ ";color:var(--live);font-weight:800}
 .sgmay .is-no::before{content:"✕ ";color:var(--loss);font-weight:800}
 @media (max-width:520px){.sgmay{grid-template-columns:1fr}}
+
+/* W-0064: Team-Kasten, Fenster „Bot entfernen“ und Menü an der Karte (GuildBotTeam.ts). Developer lila, Administrator rot. */
+.tbadge{display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border:1px solid;font:700 11px var(--f-label);letter-spacing:.1em;vertical-align:middle}
+.tbadge svg{width:12px;height:12px}
+.tbadge--dev{color:#cdb4ff;border-color:color-mix(in srgb,var(--purple) 60%,transparent);background:color-mix(in srgb,var(--purple) 14%,transparent)}
+.tbadge--admin{color:#ff8a94;border-color:color-mix(in srgb,var(--brand) 60%,transparent);background:color-mix(in srgb,var(--brand) 12%,transparent)}
+.tbox{margin-bottom:16px;padding:16px 18px;border:1px solid var(--line);background:var(--panel-fill);box-shadow:inset 0 2px 0 var(--purple)}
+.tbox__head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px}
+.tbox__as{font-size:12px;color:var(--text-2)}
+.tbox__stats{grid-template-columns:repeat(4,minmax(0,1fr))}
+.tbox__team{margin-top:14px;padding:12px 14px;border:1px dashed color-mix(in srgb,var(--purple) 55%,transparent);background:color-mix(in srgb,var(--purple) 6%,transparent)}
+.tbox__lead{font-size:13px;color:var(--text-2);margin-bottom:10px}
+.trow{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 14px;padding:10px 12px;border:1px solid var(--line);background:var(--glass)}
+.trow+.trow{margin-top:8px}
+.trow--danger{border-color:color-mix(in srgb,var(--loss) 45%,transparent)}
+.trow__text{display:grid;gap:3px;flex:1 1 280px;min-width:0}
+.trow__text b{font-size:14px}
+.trow__text span{font-size:12.5px;color:var(--text-2)}
+.trow .btn{width:auto;flex:none}
+.tlinkbtn{background:none;border:0;padding:0;color:var(--blue-soft);font:inherit;text-decoration:underline;cursor:pointer}
+.tlinkbtn:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+.tseal{color:#cdb4ff;border-color:color-mix(in srgb,var(--purple) 60%,transparent);background:color-mix(in srgb,var(--purple) 14%,transparent)}
+.tmenu{position:relative;margin-left:auto;flex:none;align-self:flex-start}
+.tmenu__btn{width:36px;height:36px}
+.tmenu__list{position:absolute;right:0;top:40px;z-index:30;min-width:220px;padding:6px;border:1px solid var(--line-strong);background:var(--bg-panel);box-shadow:0 18px 40px rgba(0,0,0,.6)}
+.tmenu__item{display:flex;align-items:center;gap:8px;width:100%;min-height:40px;padding:0 10px;border:0;background:none;color:var(--text);font:600 13px var(--f-display);text-align:left;text-decoration:none;cursor:pointer}
+.tmenu__item svg{width:15px;height:15px;flex:none}
+.tmenu__item small{margin-left:auto;font-size:11px;color:var(--text-3)}
+.tmenu__item:hover,.tmenu__item:focus-visible{background:var(--glass);outline:none}
+.tmenu__item--danger{color:#ff8a94}
+.tmenu__head{padding:8px 10px 4px;font:700 11px var(--f-label);letter-spacing:.12em;text-transform:uppercase;color:#cdb4ff}
+.tmenu__rule{border:0;border-top:1px solid color-mix(in srgb,var(--loss) 45%,transparent);margin:6px 0}
+.tremove{width:min(560px,calc(100vw - 32px))}
+.tremove__body{display:grid;gap:10px;padding-top:14px}
+.tcrest{width:42px;height:42px;flex:none;display:grid;place-items:center;font:800 14px var(--f-display);background:linear-gradient(135deg,#1d2a3a,#0b1018);border:1px solid var(--line-strong)}
+.tlabel{font:700 12px var(--f-label);letter-spacing:.1em;text-transform:uppercase;color:var(--text-3)}
+.tstats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.tstat{display:grid;gap:2px;padding:9px 11px;border:1px solid var(--line);background:var(--glass);min-width:0}
+.tstat b{font:800 18px var(--f-display)}
+.tstat span{font-size:12px;color:var(--text-2);overflow-wrap:anywhere}
+.tchips{display:flex;flex-wrap:wrap;gap:6px}
+.tchip{min-height:36px;padding:0 12px;border:1px solid var(--line-strong);background:none;color:var(--text-2);font:600 13px var(--f-display);cursor:pointer}
+.tchip[aria-pressed="true"]{border-color:var(--loss);color:#fff;background:color-mix(in srgb,var(--loss) 22%,transparent)}
+.tchip:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+.tcheck{display:flex;gap:10px;align-items:flex-start;font-size:13px;cursor:pointer}
+.tcheck input{width:18px;height:18px;margin-top:2px;flex:none;accent-color:var(--loss)}
+.tcheck span{display:grid;gap:2px}
+.tcheck small{font-size:12px;color:var(--text-3)}
+.tpreview{margin:0 0 0 28px;padding:8px 10px;border-left:3px solid var(--line-strong);background:rgba(0,0,0,.25);font-size:12.5px;color:var(--text-2)}
+.tsummary{font-size:13px;color:var(--text-2)}
+.tconfirm{width:100%;min-height:40px;padding:8px 10px;border:1px solid var(--line-strong);background:rgba(0,0,0,.3);color:var(--text);font:600 14px var(--f-display)}
+.tactions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+.tactions .btn{width:auto}
+@media (max-width:640px){.tbox__stats{grid-template-columns:repeat(2,minmax(0,1fr))}.tstats{grid-template-columns:1fr}}

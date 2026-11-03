@@ -40,6 +40,10 @@ export default interface IDashboardGuild {
     modules: string[];
     // Nur bei Staff mit laufender Freigabe (W-0011, StaffOverlay).
     staff?: IStaffCard | null;
+    // W-0064: Bei Karten „Staff“, ob die Person dort Mitglied ist.
+    member?: boolean;
+    // W-0064: Signatur einer Freigabe für einen weiteren Server, etwa „F-0007“.
+    signature?: string | null;
     c1: string;
     c2: string;
 }
