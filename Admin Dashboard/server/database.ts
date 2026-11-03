@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { USERDATA_AREAS } from "../shared/userdata.ts";
 import type { IDbColumn, IDbOverview, IDbRows, IDbTable, IDbTableDetail, IDbTableInfo } from "../shared/api.ts";
 import { PAGE_SIZE } from "../shared/limits.ts";
-import { query } from "./db.ts";
+import { MIGRATIONS_TABLE, query } from "./db.ts";
 import { InvalidInput, PublicError } from "./errors.ts";
 
 /**
@@ -45,7 +45,8 @@ function adminTableNames(): Set<string> {
         .filter((file) => file.endsWith(".sql"))
         .flatMap((file) => [...readFileSync(path.join(folder, file), "utf8").matchAll(/CREATE TABLE(?: IF NOT EXISTS)?\s+`?([A-Za-z0-9_]+)`?/gi)].map((match) => match[1]!));
 
-    adminTables = new Set(names);
+    // Die Liste der Migrationen selbst legt db.ts an, keine .sql-Datei.
+    adminTables = new Set([...names, MIGRATIONS_TABLE]);
 
     return adminTables;
 }

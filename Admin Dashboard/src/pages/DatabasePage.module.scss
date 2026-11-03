@@ -208,3 +208,300 @@
     white-space: pre-wrap;
     overflow-wrap: anywhere;
 }
+
+/* --- W-0066, Entwurf D-A++: Reiter MariaDB und Redis ---------------------- */
+
+/* Spaltenköpfe ohne Sortierknopf sehen aus wie die mit. */
+.table th:not(:has(> button)) {
+    padding: var(--s-2) var(--s-3);
+    color: var(--c-text-faint);
+    white-space: nowrap;
+
+    @include label(0.72rem, 0.14em);
+}
+
+.right .sort {
+    justify-content: flex-end;
+}
+
+.tabsRow {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-2) var(--s-4);
+    margin-bottom: var(--s-4);
+}
+
+.live {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-2);
+    color: var(--c-text-dim);
+    font-size: 0.8rem;
+
+    i {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--c-win);
+        box-shadow: 0 0 0 3px rgb(53 224 127 / 15%);
+    }
+}
+
+.readonly {
+    padding: 0 8px;
+    border: 1px solid rgb(0 175 255 / 40%);
+    border-radius: 999px;
+    color: #7fd3ff;
+    font: 700 0.7rem var(--f-label);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.kpis {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    margin: 0 0 var(--s-4);
+    border: 1px solid var(--c-line);
+
+    > div {
+        min-width: 0;
+        padding: var(--s-3) var(--s-4);
+        border-right: 1px solid var(--c-line);
+
+        &:last-child {
+            border-right: 0;
+        }
+    }
+
+    dt {
+        color: var(--c-text-dim);
+        font: 700 0.7rem var(--f-label);
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+    }
+
+    dd {
+        margin: 0;
+        overflow: hidden;
+        font: 800 1.1rem var(--f-display);
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    small {
+        display: block;
+        overflow: hidden;
+        color: var(--c-text-dim);
+        font-size: 0.78rem;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    @include below(1199px) {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+
+        > div {
+            border-bottom: 1px solid var(--c-line);
+        }
+    }
+
+    @include below(599px) {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+.ok {
+    color: var(--c-win);
+}
+
+.warn {
+    color: var(--c-mod-engagement);
+}
+
+.bad {
+    color: var(--c-loss);
+}
+
+.faintText {
+    margin: 0;
+    color: var(--c-text-dim);
+    font-size: 0.85rem;
+}
+
+.sizeCell {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-2);
+}
+
+.sizeBar {
+    display: block;
+    width: 72px;
+    height: 6px;
+    border-radius: 3px;
+    background: rgb(255 255 255 / 8%);
+
+    b {
+        display: block;
+        height: 100%;
+        border-radius: 3px;
+        background: #5aa9d6;
+    }
+}
+
+.chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 0 0 var(--s-4);
+    padding: 0;
+    list-style: none;
+
+    li {
+        display: inline-flex;
+        align-items: center;
+        padding: 1px 10px;
+        border: 1px solid var(--c-line-strong);
+        border-radius: 999px;
+        color: var(--c-text-dim);
+        font-size: 0.8rem;
+    }
+}
+
+.actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-2);
+}
+
+.split {
+    display: grid;
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+    gap: var(--s-4);
+    align-items: start;
+
+    @include below(1099px) {
+        grid-template-columns: 1fr;
+    }
+}
+
+.panel {
+    min-width: 0;
+    border: 1px solid var(--c-line);
+    background: var(--c-panel-solid);
+}
+
+.panelHead {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-2);
+    padding: var(--s-2) var(--s-3);
+    border-bottom: 1px solid var(--c-line);
+
+    h2 {
+        min-width: 0;
+        overflow-wrap: anywhere;
+        font: 800 0.9rem var(--f-display);
+    }
+}
+
+.pickable {
+    cursor: pointer;
+
+    &:hover td {
+        background: rgb(255 255 255 / 3%);
+    }
+
+    &:focus-visible {
+        @include focus-inset;
+    }
+}
+
+.picked td {
+    background: rgb(255 30 45 / 7%);
+}
+
+.keyButton {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--c-blue);
+    cursor: pointer;
+    text-align: left;
+
+    &:focus-visible {
+        @include focus-ring;
+    }
+}
+
+.memory {
+    margin: calc(-1 * var(--s-2)) 0 var(--s-4);
+}
+
+.track {
+    display: flex;
+    height: 10px;
+    overflow: hidden;
+    border: 1px solid var(--c-line);
+    border-radius: 5px;
+    background: #141a22;
+
+    b {
+        display: block;
+        min-width: 3px;
+        height: 100%;
+    }
+}
+
+.legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-1) var(--s-4);
+    margin: var(--s-2) 0 0;
+    color: var(--c-text-dim);
+    font-size: 0.8rem;
+
+    i {
+        display: inline-block;
+        width: 9px;
+        height: 9px;
+        margin-right: 5px;
+        border-radius: 2px;
+        vertical-align: -1px;
+    }
+}
+
+.meta {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin: 0;
+    border-bottom: 1px solid var(--c-line);
+
+    > div {
+        min-width: 0;
+        padding: var(--s-2) var(--s-3);
+        border-right: 1px solid var(--c-line);
+        border-bottom: 1px solid var(--c-line);
+
+        &:nth-child(3n) {
+            border-right: 0;
+        }
+    }
+
+    dt {
+        color: var(--c-text-dim);
+        font: 700 0.68rem var(--f-label);
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+    }
+
+    dd {
+        margin: 0;
+        overflow-wrap: anywhere;
+        font-size: 0.85rem;
+    }
+}
