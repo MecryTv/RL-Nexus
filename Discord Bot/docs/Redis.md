@@ -35,43 +35,41 @@ REDIS_USER=rlnexus
 REDIS_PASSWORD=<der Wert von eben>
 ```
 
-**3. Den Hash des Passworts bilden**
+**3. Frühere Versuche entfernen**
 
-In der Konfiguration von Redis steht nur der Hash, nicht das Passwort. `read -rs` liest das Passwort, ohne es anzuzeigen, und es landet nicht im Verlauf der Shell:
+Hat schon einmal ein Block von RL Nexus am Ende von `/etc/redis/redis.conf` gestanden, kommt er hiermit weg. Auf einer frischen Installation ändert der Befehl nichts:
 
 ```bash
-read -rs PW && printf '%s' "$PW" | sha256sum && unset PW
+sudo sed -i -E '/^# RL Nexus/d; /^user (default|rlnexus) /d; /^bind 0\.0\.0\.0$/d; /^maxmemory 256mb$/d; /^maxmemory-policy allkeys-lru$/d; /^save ""$/d; /^appendonly no$/d' /etc/redis/redis.conf
 ```
-
-Das Passwort einfügen und Enter drücken. Ausgegeben wird eine lange Zeichenkette mit einem `-` dahinter; gebraucht wird nur die Zeichenkette.
 
 **4. Konfiguration ergänzen**
 
+In der Konfiguration von Redis steht nur der Hash des Passworts, nicht das Passwort selbst. Der Hash entsteht direkt aus der `.env`, angezeigt wird dabei nichts Geheimes:
+
 ```bash
-sudo nano /etc/redis/redis.conf
+PW=$(sed -n 's/^REDIS_PASSWORD=//p' /home/rlnexus/.env | tr -d "\"'\r\n")
+[ -n "$PW" ] && HASH=$(printf '%s' "$PW" | sha256sum | cut -d' ' -f1) && echo "Hash bereit (${#HASH} Zeichen)" || echo "REDIS_PASSWORD fehlt in der .env"
+unset PW
 ```
 
-Ganz ans Ende diesen Block setzen, `<HASH>` durch die Zeichenkette aus Schritt 3 ersetzen. Spätere Zeilen gelten vor früheren, die Debian-Vorgaben weiter oben bleiben stehen:
+Die Ausgabe muss `Hash bereit (64 Zeichen)` sein. Dann im selben Fenster den Block ans Ende der Konfiguration schreiben. Spätere Zeilen gelten vor früheren, die Debian-Vorgaben weiter oben bleiben stehen:
 
-```conf
-# RL Nexus (W-0066): Cache vor MariaDB, nur für die Container.
-# Auf allen Adressen wie MariaDB; von außen sperrt ufw den Port.
+```bash
+sudo tee -a /etc/redis/redis.conf > /dev/null <<EOF
+# RL Nexus (W-0066): Cache vor MariaDB, nur für die Container. Von außen sperrt ufw den Port.
 bind 0.0.0.0
-port 6379
-protected-mode yes
-# Der Standardnutzer ohne Passwort ist aus.
 user default off resetpass -@all
-# Der Nutzer von RL Nexus: nur Schlüssel mit rln:, nichts Gefährliches.
-user rlnexus on #<HASH> ~rln:* &* +@all -@dangerous
-# Ein Cache: Ist der Speicher voll, fliegt das am längsten Ungenutzte raus.
+user rlnexus on #$HASH ~rln:* &* +@all -@dangerous
 maxmemory 256mb
 maxmemory-policy allkeys-lru
-# Nichts auf die Platte schreiben, die Daten stehen ohnehin in MariaDB.
 save ""
 appendonly no
+EOF
+sudo tail -n 8 /etc/redis/redis.conf
 ```
 
-Speichern mit Strg O, Enter, Strg X.
+Die letzte Zeile zeigt den Block. In der Zeile `user rlnexus on #…` muss nach dem `#` eine lange Zeichenkette stehen, kein leerer Platz. Was die Zeilen tun: Der Standardnutzer ohne Passwort ist aus, der Nutzer `rlnexus` sieht nur Schlüssel mit `rln:` und darf nichts Gefährliches (etwa `FLUSHALL`, `CONFIG`). Ist der Speicher voll, fliegt das am längsten Ungenutzte raus, und auf die Platte schreibt Redis nichts, die Daten stehen ohnehin in MariaDB.
 
 **5. Firewall: nur die Container durchlassen**
 
@@ -88,6 +86,12 @@ Die zweite Zeile muss `6379/tcp  ALLOW  172.30.10.0/24` zeigen und nichts mit `A
 sudo systemctl restart redis-server
 sudo systemctl enable redis-server
 sudo systemctl status redis-server --no-pager
+```
+
+Startet Redis nicht, steht der Grund hier:
+
+```bash
+sudo journalctl -u redis-server -n 30 --no-pager
 ```
 
 **7. Prüfen**
@@ -115,7 +119,7 @@ Nach dem nächsten Update (oder sofort mit `docker compose -f docker-compose.pro
 | Technik zeigt „nicht eingerichtet“ | `REDIS_PASSWORD` fehlt in `/home/rlnexus/.env`, oder der Container wurde danach nicht neu gestartet |
 | Log sagt `Redis nicht erreichbar … ECONNREFUSED` | Läuft Redis? `sudo systemctl status redis-server`. Steht `bind 0.0.0.0` wirklich am Ende von `/etc/redis/redis.conf`? |
 | Log sagt `… ETIMEDOUT` | ufw lässt die Container nicht durch: Schritt 5 |
-| Log sagt `WRONGPASS` | Passwort in der `.env` und Hash in der Konfiguration passen nicht zusammen: Schritt 3 und 4 neu |
+| Log sagt `WRONGPASS` | Passwort in der `.env` und Hash in der Konfiguration passen nicht zusammen: Schritt 3 und 4 neu (Schritt 3 räumt den alten Block weg) |
 | Log sagt `NOPERM` | die Zeile `user rlnexus …` fehlt `~rln:*` oder `+@all` |
 
 Ohne Redis läuft das Admin Dashboard weiter, nur ohne Cache. Abschalten geht, indem `REDIS_PASSWORD` aus der `.env` fliegt.
