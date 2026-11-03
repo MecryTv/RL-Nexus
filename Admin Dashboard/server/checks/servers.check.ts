@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import { deadlineText, renderServerImage, serverMessage } from "../servers/dm.ts";
 import { choiceStep, decideJoin, keepAlone, signature } from "../servers/rules.ts";
-import { check, section } from "./harness.ts";
+import { buildApp } from "../app.ts";
+import { signToken } from "../bot.ts";
+import { SESSION_COOKIE, seal } from "../session.ts";
+import { USERS } from "./fakes.ts";
+import { SECRET, check, config, section } from "./harness.ts";
 
 const HOUR = 3_600_000;
 const base = { started: true, blocked: false, exempt: false, legacy: false, approved: false, others: 0 };
@@ -75,4 +79,33 @@ export async function checkServers(): Promise<void> {
         assert.match(choice, /sv:more/);
         assert.equal(deadlineText(new Date("2026-11-04T20:57:00Z")), "Mittwoch, 4. November · 21:57 Uhr");
     });
+
+    const app = await buildApp(config);
+    const cookie = `${SESSION_COOKIE}=${seal({ id: USERS.admin, name: "nutzer1", avatar: null, exp: Math.floor(Date.now() / 1000) + 600 }, SECRET)}`;
+
+    try {
+        await check("Interne Routen: ohne Token oder mit fremdem Scope 401, mit Scope ohne Datenbank 503", async () => {
+            const knock = (url: string, authorization?: string) =>
+                app.inject({ method: "POST", url, headers: { "content-type": "application/json", ...(authorization ? { authorization } : {}) }, payload: JSON.stringify({ guildId: "123456789012345678" }) });
+
+            for (const url of ["/internal/servers/joined", "/internal/servers/choose", "/internal/servers/removed"]) {
+                assert.equal((await knock(url)).statusCode, 401);
+                assert.equal((await knock(url, `Bearer ${signToken(SECRET, "discord:123456789012345678", ["userdata"])}`)).statusCode, 401);
+            }
+
+            assert.equal((await knock("/internal/servers/choose", `Bearer ${signToken(SECRET, "discord:123456789012345678", ["servers"])}`)).statusCode, 503);
+            // Ein Klick braucht eine Person als Subjekt, nicht den Bot.
+            assert.equal((await knock("/internal/servers/choose", `Bearer ${signToken(SECRET, "bot", ["servers"])}`)).statusCode, 503);
+        });
+
+        await check("Seiten: ohne Sitzung 401, ohne Datenbank 503, falsche ID 400", async () => {
+            assert.equal((await app.inject({ method: "GET", url: "/api/servers/freigaben" })).statusCode, 401);
+            assert.equal((await app.inject({ method: "GET", url: "/api/servers/freigaben", headers: { cookie } })).statusCode, 503);
+            assert.equal((await app.inject({ method: "GET", url: "/api/servers/person/abc", headers: { cookie } })).statusCode, 503);
+            assert.equal((await app.inject({ method: "GET", url: "/api/servers/abc/members", headers: { cookie } })).statusCode, 400);
+            assert.equal((await app.inject({ method: "GET", url: "/api/servers/123456789012345678/members?filter=quatsch", headers: { cookie } })).statusCode, 400);
+        });
+    } finally {
+        await app.close();
+    }
 }
