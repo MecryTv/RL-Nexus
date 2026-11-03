@@ -1,8 +1,7 @@
 import assert from "node:assert/strict";
-import { CACHE_WAIT, cached, forget, setCacheClient, type ICacheClient } from "../cache.ts";
+import { CACHE_WAIT, cached, forget, markCacheDown, markCacheUp, setCacheClient, type ICacheClient } from "../cache.ts";
 import { forgetUser, lookupUser } from "../users.ts";
-import { config } from "./harness.ts";
-import { check, section } from "./harness.ts";
+import { check, config, section } from "./harness.ts";
 
 /** W-0066: Redis als Cache vor MariaDB, mit einem Redis im Speicher. Ohne echtes Redis. */
 
@@ -72,6 +71,49 @@ export async function checkCache(): Promise<void> {
             clearTimeout(awake);
         });
 
+        await check("Nach einer Zeitüberschreitung lässt der Cache Redis eine Weile aus, auch das Merken", async () => {
+            let gets = 0;
+            let sets = 0;
+
+            setCacheClient({
+                ...fakeRedis(),
+                get: () => {
+                    gets++;
+
+                    return new Promise<string | null>(() => undefined);
+                },
+                set: async () => {
+                    sets++;
+                },
+            });
+            const awake = setTimeout(() => undefined, CACHE_WAIT * 4);
+
+            assert.equal(await cached("x", 60, async () => "a"), "a");
+            const started = Date.now();
+            assert.equal(await cached("x", 60, async () => "b"), "b");
+            clearTimeout(awake);
+
+            assert.equal(gets, 1, "zweites Lesen fragt Redis gar nicht erst");
+            assert.equal(sets, 0, "nach dem Hänger wird auch nichts gemerkt");
+            assert.ok(Date.now() - started < CACHE_WAIT);
+        });
+
+        await check("Ein verpasstes forget während eines Ausfalls: Nach dem Wiederverbinden ist der Cache leer", async () => {
+            const redis = fakeRedis();
+            setCacheClient(redis);
+
+            await cached("discord:user:v1:5", 60, async () => "alt");
+            await new Promise((resolve) => setImmediate(resolve));
+
+            markCacheDown();
+            await forget("discord:user:v1:5");
+            assert.equal(redis.store.size, 1, "während des Ausfalls kommt nichts an");
+
+            markCacheUp();
+            await new Promise((resolve) => setTimeout(resolve, 10));
+            assert.equal(redis.store.size, 0);
+        });
+
         await check("Fehler beim Laden werden nicht gemerkt; forget wirft einen oder alle mit gleichem Anfang weg", async () => {
             const redis = fakeRedis();
             setCacheClient(redis);
@@ -115,7 +157,7 @@ export async function checkCache(): Promise<void> {
 
                 forgetUser(id);
                 await new Promise((resolve) => setImmediate(resolve));
-                assert.equal(redis.store.has(`rln:discord:user:${id}`), false);
+                assert.equal(redis.store.has(`rln:discord:user:v1:${id}`), false);
             } finally {
                 globalThis.fetch = real;
                 forgetUser(id);

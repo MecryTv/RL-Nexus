@@ -1,4 +1,4 @@
-import { createClient } from "redis";
+import { createClient } from "@redis/client";
 import type { IConfig } from "./config.ts";
 
 /**
@@ -7,12 +7,18 @@ import type { IConfig } from "./config.ts";
  * sofort in MariaDB; wer etwas ändert, wirft den Eintrag mit forget() weg.
  * Ohne Redis, bei einem Fehler oder nach CACHE_WAIT ms läuft alles wie
  * vorher direkt gegen die Quelle: Der Cache darf nichts kaputt machen.
+ *
+ * Nur JSON-feste Werte cachen (kein Date, kein BigInt). Ändert sich die Form
+ * eines Werts, die Version im Schlüssel hochzählen (etwa discord:user:v1 → v2):
+ * Redis überlebt Deploys, alte Formen kämen sonst bis zu ihrer TTL zurück.
  */
 
 /** Alle Schlüssel von RL Nexus, damit Redis auch anderes tragen kann. */
-const PREFIX = "rln:";
+export const CACHE_PREFIX = "rln:";
 /** Länger wartet ein Lesen nicht auf Redis, dann fragt es die Quelle. */
 export const CACHE_WAIT = 250;
+/** So lange bleibt Redis nach einer Zeitüberschreitung außen vor. Sonst kostete jedes Lesen die volle Wartezeit. */
+const PAUSE = 30_000;
 
 /** Das Wenige, was der Cache von einem Redis-Client braucht. In den Checks ersetzbar. */
 export interface ICacheClient {
@@ -23,9 +29,12 @@ export interface ICacheClient {
 }
 
 let client: ICacheClient | null = null;
-let close: (() => Promise<unknown>) | null = null;
+let close: (() => Promise<void>) | null = null;
 let ready = false;
 let lastError: string | null = null;
+let pausedUntil = 0;
+/** Ein forget kam nicht an: Nach dem Wiederverbinden fliegt alles raus, was veraltet sein könnte. */
+let missed = false;
 
 export function cacheState(): { readonly configured: boolean; readonly ready: boolean; readonly error: string | null } {
     return { configured: client !== null, ready, error: ready ? null : lastError };
@@ -36,10 +45,41 @@ export function setCacheClient(next: ICacheClient | null): void {
     client = next;
     ready = next !== null;
     lastError = null;
+    pausedUntil = 0;
+    missed = false;
+}
+
+/** Verbindung weg. Auch in den Checks, um einen Ausfall nachzustellen. */
+export function markCacheDown(): void {
+    ready = false;
+}
+
+/** Verbindung da. War dazwischen ein forget verloren, alle Einträge wegwerfen. */
+export function markCacheUp(): void {
+    ready = true;
+    pausedUntil = 0;
+
+    if (missed) {
+        missed = false;
+        void forget("*");
+    }
+}
+
+function usable(): boolean {
+    return client !== null && ready && Date.now() >= pausedUntil;
 }
 
 function waited<T>(work: Promise<T>): Promise<T> {
-    return Promise.race([work, new Promise<T>((_resolve, reject) => setTimeout(() => reject(new Error("Redis antwortet zu langsam")), CACHE_WAIT).unref())]);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const late = new Promise<T>((_resolve, reject) => {
+        timer = setTimeout(() => {
+            pausedUntil = Date.now() + PAUSE;
+            reject(new Error("Redis antwortet zu langsam"));
+        }, CACHE_WAIT);
+        timer.unref();
+    });
+
+    return Promise.race([work, late]).finally(() => clearTimeout(timer));
 }
 
 /** Verbindet, falls REDIS_PASSWORD gesetzt ist. Wirft nie; ohne Redis läuft der Server wie vorher. */
@@ -50,23 +90,24 @@ export async function connectCache(config: IConfig): Promise<void> {
         return;
     }
 
+    const { host, port, user, password } = config.redis;
     const redis = createClient({
-        username: config.redis.user,
-        password: config.redis.password,
-        socket: { host: config.redis.host, port: config.redis.port, connectTimeout: 3_000, reconnectStrategy: (tries) => Math.min(tries * 500, 10_000) },
+        username: user,
+        password,
+        // Hängt Redis, staut sich nichts ohne Grenze an.
+        commandsQueueMaxLength: 100,
+        socket: { host, port, connectTimeout: 3_000, reconnectStrategy: (tries) => Math.min(tries * 500, 10_000) },
     });
 
     redis.on("ready", () => {
-        if (!ready) console.log(`🧊 Redis verbunden (${config.redis!.host}:${config.redis!.port})`);
-        ready = true;
+        if (!ready) console.log(`🧊 Redis verbunden (${host}:${port})`);
+        markCacheUp();
     });
-    redis.on("end", () => {
-        ready = false;
-    });
+    redis.on("end", markCacheDown);
     redis.on("error", (error: Error) => {
         // Nur beim Wechsel melden, sonst schreibt jeder neue Versuch eine Zeile.
         if (ready || lastError !== error.message) console.warn(`🧊 Redis nicht erreichbar, es geht ohne weiter: ${error.message}`);
-        ready = false;
+        markCacheDown();
         lastError = error.message;
     });
 
@@ -83,8 +124,16 @@ export async function connectCache(config: IConfig): Promise<void> {
         },
     };
 
-    // Ohne Verbindung hart trennen: close() wartete sonst auf eine, die nie kommt.
-    close = async () => (ready ? redis.close() : redis.destroy());
+    // Höchstens eine Sekunde auf offene Befehle warten, dann hart trennen: Ein hängendes Redis hielte sonst das Beenden auf.
+    close = async () => {
+        if (ready) await Promise.race([redis.close().catch(() => undefined), new Promise((resolve) => setTimeout(resolve, 1_000).unref())]);
+
+        try {
+            redis.destroy();
+        } catch {
+            // Schon zu.
+        }
+    };
 
     // Nicht warten: Ist Redis nicht erreichbar, versucht der Client es endlos, und der Start hinge.
     void redis.connect().catch((error: unknown) => {
@@ -92,7 +141,7 @@ export async function connectCache(config: IConfig): Promise<void> {
     });
 }
 
-/** Beim Beenden: offene Befehle abschließen, dann trennen. */
+/** Beim Beenden: offene Befehle kurz abschließen, dann trennen. */
 export async function closeCache(): Promise<void> {
     await close?.().catch(() => undefined);
 }
@@ -103,31 +152,43 @@ export async function closeCache(): Promise<void> {
  * nichts gemerkt und der Fehler geht weiter.
  */
 export async function cached<T>(key: string, seconds: number, load: () => Promise<T>): Promise<T> {
-    if (client && ready) {
+    if (usable()) {
         try {
-            const hit = await waited(client.get(PREFIX + key));
+            const hit = await waited(client!.get(CACHE_PREFIX + key));
             if (hit !== null) return JSON.parse(hit) as T;
         } catch {
-            // Redis weg oder zu langsam: dann eben aus der Quelle.
+            // Redis weg, zu langsam oder ein kaputter Wert: dann eben aus der Quelle.
         }
     }
 
     const value = await load();
 
-    if (client && ready && value !== undefined) void waited(client.set(PREFIX + key, JSON.stringify(value), { EX: seconds })).catch(() => undefined);
+    if (usable() && value !== undefined) {
+        try {
+            void waited(client!.set(CACHE_PREFIX + key, JSON.stringify(value), { EX: seconds })).catch(() => undefined);
+        } catch {
+            // Nicht als JSON darstellbar: dann eben nicht merken.
+        }
+    }
 
     return value;
 }
 
 /** Einen Eintrag wegwerfen, nach jeder Änderung an seiner Quelle. Mit * am Ende alle mit diesem Anfang. */
 export async function forget(key: string): Promise<void> {
-    if (!client || !ready) return;
+    if (!client) return;
+    if (!usable()) {
+        missed = true;
+
+        return;
+    }
 
     try {
-        const keys = key.endsWith("*") ? await waited(client.scanKeys(PREFIX + key)) : [PREFIX + key];
+        const keys = key.endsWith("*") ? await waited(client.scanKeys(CACHE_PREFIX + key)) : [CACHE_PREFIX + key];
 
         if (keys.length) await waited(client.del(keys));
     } catch {
-        // Läuft der Eintrag ab, stimmt er spätestens dann wieder.
+        // Nicht angekommen: beim nächsten Wiederverbinden fliegt alles raus.
+        missed = true;
     }
 }

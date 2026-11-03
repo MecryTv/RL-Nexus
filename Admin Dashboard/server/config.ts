@@ -226,10 +226,11 @@ export function loadConfig(env: Env = process.env, argv: readonly string[] = pro
               }
             : null;
 
-    const redisPort = Number(raw("REDIS_PORT") || 6379);
-    if (!Number.isInteger(redisPort) || redisPort < 1 || redisPort > 65535) throw new Error(`REDIS_PORT ist ungültig: ${raw("REDIS_PORT")}`);
-
-    const redis = raw("REDIS_PASSWORD") ? { host: raw("REDIS_HOST") || "127.0.0.1", port: redisPort, user: raw("REDIS_USER") || "rlnexus", password: raw("REDIS_PASSWORD") } : null;
+    // Nachsichtig wie DATABASE_PORT: Ein Tippfehler bei Redis darf den Start nicht verhindern.
+    const redisPort = Number(raw("REDIS_PORT"));
+    const redis = raw("REDIS_PASSWORD")
+        ? { host: raw("REDIS_HOST") || "127.0.0.1", port: Number.isInteger(redisPort) && redisPort > 0 && redisPort < 65536 ? redisPort : 6379, user: raw("REDIS_USER") || "rlnexus", password: raw("REDIS_PASSWORD") }
+        : null;
 
     const siteUrl = developerMode
         ? publicAddress(raw("DEV_WEBSITE_PUBLIC_URL"), "http://localhost:5173")
