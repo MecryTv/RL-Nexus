@@ -103,6 +103,10 @@ export async function securityRoutes(app: FastifyInstance, { config }: { config:
         const banId = id((request.params as { id?: string }).id);
         const input = body(request.body);
         const actor = actorOf(request);
+        const [ban] = await query<{ state: string }[]>("SELECT state FROM security_bans WHERE id = ?", [banId]);
+
+        if (!ban) throw new PublicError(404, "Diese Sperre gibt es nicht.");
+        if (ban.state !== "active") throw new PublicError(409, "Diese Sperre ist aufgehoben.");
 
         if (typeof input.link === "string") {
             const match = MESSAGE_LINK.exec(input.link.trim());
@@ -134,6 +138,20 @@ export async function securityRoutes(app: FastifyInstance, { config }: { config:
         if (!row?.data || !row.mime) throw new PublicError(404, "Diesen Beleg gibt es nicht.");
 
         return reply.header("Content-Type", row.mime).header("Cache-Control", "private, max-age=300").send(row.data);
+    });
+
+    // Ein Bild aus einer gesicherten Discord-Nachricht. Nur Rasterbilder: Ein SVG könnte hier Skript ausführen.
+    app.get("/api/security/evidence/:id/bild/:n", async (request, reply) => {
+        ready();
+
+        const params = request.params as { id?: string; n?: string };
+        const row = (await query<{ message: unknown }[]>("SELECT message FROM security_evidence WHERE id = ? AND kind = 'discord'", [id(params.id)]))[0];
+        const message = (typeof row?.message === "string" ? JSON.parse(row.message) : row?.message) as { images?: { url?: string }[] } | null | undefined;
+        const match = /^data:(image\/(?:png|jpeg|webp|gif));base64,([A-Za-z0-9+/=]+)$/.exec(message?.images?.[Number(params.n)]?.url ?? "");
+
+        if (!match) throw new PublicError(404, "Dieses Bild gibt es nicht.");
+
+        return reply.header("Content-Type", match[1]!).header("Cache-Control", "private, max-age=300").send(Buffer.from(match[2]!, "base64"));
     });
 
     app.get("/api/security/suspects", async (): Promise<ISuspectView[]> => {

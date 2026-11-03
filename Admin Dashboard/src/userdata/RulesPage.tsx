@@ -76,7 +76,8 @@ function KeepCard({ rule, onChange }: { readonly rule: IUserdataRuleView; readon
                 <span className={styles.cardCounts}>
                     {formatNumber(rule.people)} {rule.people === 1 ? "Person" : "Personen"} · {formatNumber(rule.rows)} Einträge
                 </span>
-                <Switch checked label="bleibt" onChange={(on) => !on && onChange({ keep: false })} />
+                {/* W-0057: Eine Sperre bleibt, damit sie wirkt. Der Server lehnt „löschen“ hier ohnehin ab. */}
+                <Switch checked label="bleibt" disabled={rule.area === "sicherheit"} hint={rule.area === "sicherheit" ? "immer, sonst wirkt keine Sperre" : undefined} onChange={(on) => !on && onChange({ keep: false })} />
             </div>
 
             <ul className={styles.inside} aria-label="Was drin ist">

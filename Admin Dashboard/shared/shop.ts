@@ -186,6 +186,8 @@ export interface IShopMe {
     readonly hasBilling: boolean;
     /** Produkt-ID → der Satz, mit dem der Server einen Kauf ablehnen würde. Die Karte bietet dann nichts an. */
     readonly blocked: Readonly<Record<string, string>>;
+    /** W-0057: dauerhaft gesperrt für Webseite oder Shop. url führt zur Sperrseite, website: Die Seite Zugang ist gesperrt. */
+    readonly gesperrt: { readonly url: string; readonly website: boolean } | null;
 }
 
 /** Alles, was die Preisseite beim Laden braucht, in einer Antwort. */

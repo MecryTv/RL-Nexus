@@ -1,4 +1,5 @@
 import { BLOCK_LABELS, normalScope, type Block } from "../../shared/security.ts";
+import { checkMember } from "../access.ts";
 import { audit } from "../audit.ts";
 import { botLeave, botSecurityReload } from "../bot.ts";
 import type { IConfig } from "../config.ts";
@@ -40,12 +41,19 @@ export interface IBanInput {
 const scopeText = (scope: readonly Block[]): string => scope.map((block) => BLOCK_LABELS[block]).join(", ") || "nichts";
 
 /** Team (Administrator, Developer) lässt sich nicht sperren. */
-export async function isTeam(config: IConfig, userId: string): Promise<boolean> {
+export async function isTeam(config: IConfig, userId: string, force = false): Promise<boolean> {
     if (config.devUserIds.includes(userId)) return true;
 
     const row = (await query<{ group_name: string }[]>("SELECT group_name FROM dashboard_groups WHERE user_id = ?", [userId]).catch(() => []))[0];
+    if (row?.group_name === "administrator") return true;
 
-    return row?.group_name === "administrator";
+    // Admin und Developer im Admin Dashboard sind Discord-Rollen (access.ts). Antwortet Discord nicht, wirft das: dann lieber nicht sperren.
+    return (await checkMember(config, userId, { name: userId, avatar: null }, { force })).role !== null;
+}
+
+/** Server, die der Person gehören. Nur dort darf „Bot verlässt“ greifen (E2). */
+async function ownedGuilds(userId: string): Promise<Set<string>> {
+    return new Set((await query<{ guild_id: string }[]>("SELECT guild_id FROM server_invites WHERE owner_id = ?", [userId])).map((row) => row.guild_id));
 }
 
 async function change(banId: number, action: "ban" | "change" | "lift" | "server" | "dm", before: string | null, after: string | null, note: string | null, actor: { readonly id: string; readonly name: string }): Promise<void> {
@@ -71,9 +79,11 @@ async function dm(config: IConfig, banId: number, userId: string, before: Block[
 
 /** „Bot verlässt“ an: Sperrliste, dann verlassen (Log-Kanal bekommt den Satz). */
 async function leaveServer(config: IConfig, banId: number, guildId: string, actor: ISecurityActor): Promise<void> {
-    await query("INSERT INTO server_blocks (guild_id, blocked_by, by_name, reason, origin, ban_id) VALUES (?, ?, ?, 'Besitzer gesperrt', 'ban', ?) ON DUPLICATE KEY UPDATE origin = 'ban', ban_id = VALUES(ban_id)", [guildId, actor.id, actor.name.slice(0, 100), banId]);
+    // IGNORE: Eine Sperre aus W-0064 (Entfernen) bleibt, wie sie ist, und fällt beim Aufheben nicht mit weg.
+    await query("INSERT IGNORE INTO server_blocks (guild_id, blocked_by, by_name, reason, origin, ban_id) VALUES (?, ?, ?, 'Besitzer gesperrt', 'ban', ?)", [guildId, actor.id, actor.name.slice(0, 100), banId]);
 
-    const left = await botLeave(config, guildId, "RL Nexus verlässt diesen Server: Das Team von RL Nexus hat den Besitzer gesperrt.", actor.id);
+    // Neutral (Nutzer, 03.11.): Alle Mitglieder lesen den Satz im Log-Kanal.
+    const left = await botLeave(config, guildId, "RL Nexus verlässt diesen Server. Das hat das Team von RL Nexus entschieden.", actor.id);
 
     if (left !== false) await markLeft(guildId, "blocked");
     await change(banId, "server", null, guildId, left === false ? "Bot verlässt, aber der Bot antwortet nicht (der Abgleich holt es nach)" : "Bot verlässt", actor);
@@ -93,7 +103,7 @@ export async function banPeople(config: IConfig, input: IBanInput, actor: ISecur
     if (input.reasons.length === 0 && !input.note.trim()) throw new PublicError(400, "Bitte einen Grund wählen oder dazuschreiben.");
 
     for (const userId of people) {
-        if (await isTeam(config, userId)) throw new PublicError(409, "Mitglieder des Teams lassen sich nicht sperren.");
+        if (await isTeam(config, userId, true)) throw new PublicError(409, "Mitglieder des Teams lassen sich nicht sperren.");
         if (await store.activeBanOf(userId)) throw new PublicError(409, `${userId} ist schon gesperrt. Ändere die Sperre im Profil.`);
     }
 
@@ -122,7 +132,12 @@ export async function banPeople(config: IConfig, input: IBanInput, actor: ISecur
         await audit(actor, "security.ban", userId, `${scopeText(scope)} als ${actor.role}${linkedTo ? `, verknüpft mit Sperre ${linkedTo}` : ""}`.slice(0, 500));
     }
 
-    for (const guildId of input.leave) await leaveServer(config, banIds[0]!, guildId, actor);
+    // Erst der Bot, dann die DM: Wer „antwortet dir nicht mehr“ liest, bekommt auch keine Antwort mehr.
+    await botSecurityReload(config, actor.id);
+
+    const owned = await ownedGuilds(input.userId);
+
+    for (const guildId of input.leave.filter((id) => owned.has(id))) await leaveServer(config, banIds[0]!, guildId, actor);
 
     let undelivered = 0;
 
@@ -130,7 +145,6 @@ export async function banPeople(config: IConfig, input: IBanInput, actor: ISecur
         if (await dm(config, banIds[index]!, userId, null, scope, actor)) undelivered++;
     }
 
-    await botSecurityReload(config, actor.id);
     publish("security");
 
     return { banIds, undelivered };
@@ -161,17 +175,22 @@ export async function changeBan(config: IConfig, banId: number, input: IChangeIn
     const changed = before.join(",") !== after.join(",");
 
     if (changed) {
-        await query("UPDATE security_bans SET scope = ?, changed_at = CURRENT_TIMESTAMP(3) WHERE id = ? AND state = 'active'", [after.join(","), banId]);
+        // Nur vom gelesenen Stand aus: Zwei gleichzeitige Änderungen schicken sonst zwei DMs.
+        const result = await query<{ affectedRows: number }>("UPDATE security_bans SET scope = ?, changed_at = CURRENT_TIMESTAMP(3) WHERE id = ? AND state = 'active' AND scope = ?", [after.join(","), banId, row.scope]);
+        if (result.affectedRows !== 1) throw new PublicError(409, "Diese Sperre hat sich inzwischen geändert. Lade das Profil neu.");
+
+        await botSecurityReload(config, actor.id);
         await change(banId, "change", before.join(","), after.join(","), input.note, actor);
         await audit(actor, "security.change", row.user_id, `${scopeText(before)} → ${scopeText(after)} als ${actor.role}: ${input.note}`.slice(0, 500));
     }
 
-    for (const guildId of input.leave) await leaveServer(config, banId, guildId, actor);
+    const owned = await ownedGuilds(row.user_id);
+
+    for (const guildId of input.leave.filter((id) => owned.has(id))) await leaveServer(config, banId, guildId, actor);
     for (const guildId of input.allow) await allowServer(banId, guildId, actor);
 
     if (changed) await dm(config, banId, row.user_id, before, after, actor);
 
-    await botSecurityReload(config, actor.id);
     publish("security");
 }
 
@@ -180,13 +199,16 @@ export async function liftBan(config: IConfig, banId: number, note: string, acto
 
     if (!note.trim()) throw new PublicError(400, "Bitte kurz dazuschreiben, warum die Sperre aufgehoben wird.");
 
-    await query("UPDATE security_bans SET state = 'lifted', lifted_at = CURRENT_TIMESTAMP(3) WHERE id = ? AND state = 'active'", [banId]);
-    // Beim Aufheben fallen alle Server-Schalter weg.
+    const result = await query<{ affectedRows: number }>("UPDATE security_bans SET state = 'lifted', lifted_at = CURRENT_TIMESTAMP(3) WHERE id = ? AND state = 'active'", [banId]);
+    if (result.affectedRows !== 1) throw new PublicError(404, "Diese Sperre gibt es nicht mehr.");
+
+    // Beim Aufheben fallen alle Server-Schalter weg, die Kürzel auch: Verglichen wird nur mit aktiven Sperren.
     await query("DELETE FROM server_blocks WHERE origin = 'ban' AND ban_id = ?", [banId]);
+    await query("DELETE FROM security_ban_hashes WHERE ban_id = ?", [banId]);
+    await botSecurityReload(config, actor.id);
     await change(banId, "lift", row.scope, null, note, actor);
     await audit(actor, "security.lift", row.user_id, `als ${actor.role}: ${note}`.slice(0, 500));
     await dm(config, banId, row.user_id, store.scopeOfRow(row), null, actor);
-    await botSecurityReload(config, actor.id);
     publish("security");
 }
 

@@ -1,5 +1,5 @@
 import { type JSX, useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { PageHeader } from "../components/layout/PageHeader";
 import { Section } from "../components/layout/Section";
 import { Badge } from "../components/ui/Badge";
@@ -43,6 +43,13 @@ export function AccessPage(): JSX.Element {
     const [portalError, setPortalError] = useState<string | null>(null);
     // Ein Doppelklick vor dem nächsten Rendern öffnet sonst zwei Sitzungen.
     const busy = useRef(false);
+    const navigate = useNavigate();
+    const locked = state?.me?.gesperrt;
+
+    // W-0057: Für die Webseite gesperrt: statt Zugang die Sperrseite.
+    useEffect(() => {
+        if (locked?.website) navigate(locked.url, { replace: true });
+    }, [locked, navigate]);
 
     useEffect(() => {
         let alive = true;
@@ -154,6 +161,10 @@ export function AccessPage(): JSX.Element {
                                         </div>
                                     ))}
                                 </dl>
+                            ) : me.status === "banned" && me.gesperrt ? (
+                                <p className={styles.text}>
+                                    Dein Konto ist für den Shop gesperrt. <Link to={me.gesperrt.url}>Was gesperrt ist</Link>
+                                </p>
                             ) : me.status === "banned" ? (
                                 <p className={styles.text}>
                                     Dein Konto ist für Käufe gesperrt. Wende dich bitte an <a href={`mailto:${siteConfig.contactMail}`}>{siteConfig.contactMail}</a>.

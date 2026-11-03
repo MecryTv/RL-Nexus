@@ -50,6 +50,9 @@ export async function checkLogin(config: IConfig, input: ILoginCheck, now = new 
             checkedAt: now.toISOString(),
         });
 
+        // Auch nach dem Sperrtag: neue Adressen der gesperrten Person kommen zur Sperre (gleiche IP, neues Konto).
+        if (ban && hashes) await store.keepHashes(ban.id, hashes);
+
         if (ban && blocks(scope, input.service)) {
             if (hashes) await store.recordLogin({ userId: input.userId, service: input.service, ipHash: hashes.ip, netHash: hashes.net, asn: null, vpn: null, result: "banned", reason: `Sperre ${ban.id}` });
 

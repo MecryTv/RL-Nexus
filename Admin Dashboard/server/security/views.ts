@@ -58,13 +58,14 @@ export async function overview(config: IConfig, state: "active" | "lifted"): Pro
 
 /** Server der Person (eingeladen oder Owner), mit Schalter „Bot verlässt“ dieser Sperre. */
 async function serversOf(userId: string, banId: number | null): Promise<IOwnServerView[]> {
-    const rows = await query<{ guild_id: string; guild_name: string; members: number; invited_at: Date; state: string; blocked: number | null }[]>(
-        `SELECT i.guild_id, i.guild_name, i.members, i.invited_at, i.state, (SELECT 1 FROM server_blocks b WHERE b.guild_id = i.guild_id AND b.origin = 'ban' AND b.ban_id <=> ?) AS blocked
+    const rows = await query<{ guild_id: string; guild_name: string; members: number; invited_at: Date; state: string; blocked: number | null; owner: number }[]>(
+        `SELECT i.guild_id, i.guild_name, i.members, i.invited_at, i.state, i.owner_id = ? AS owner,
+                (SELECT 1 FROM server_blocks b WHERE b.guild_id = i.guild_id AND b.origin = 'ban' AND b.ban_id <=> ?) AS blocked
          FROM server_invites i WHERE i.owner_id = ? OR i.user_id = ? ORDER BY i.members DESC`,
-        [banId, userId, userId]
+        [userId, banId, userId, userId]
     );
 
-    return rows.map((row) => ({ id: row.guild_id, name: row.guild_name, members: row.members, since: row.invited_at.toISOString(), leave: banId !== null && row.blocked === 1, active: row.state === "active" }));
+    return rows.map((row) => ({ id: row.guild_id, name: row.guild_name, members: row.members, since: row.invited_at.toISOString(), leave: banId !== null && row.blocked === 1, active: row.state === "active", owner: Boolean(row.owner) }));
 }
 
 async function suspectViews(config: IConfig, where: string, values: readonly unknown[]): Promise<ISuspectView[]> {
@@ -112,7 +113,7 @@ export async function banProfile(config: IConfig, banId: number): Promise<IBanPr
         liftedAt: ban.lifted_at?.toISOString() ?? null,
         linkedTo: ban.linked_to,
         changes: changes.map((row) => ({ action: row.action, before: row.before_val, after: row.after_val, note: row.note, by: row.by_name, at: row.created_at.toISOString() })),
-        evidence: evidence.map((row) => ({ id: row.id, kind: row.kind, name: row.name, size: row.size, mime: row.mime, message: typeof row.message === "string" ? (JSON.parse(row.message) as Record<string, unknown>) : (row.message as Record<string, unknown> | null), error: row.error, at: row.created_at.toISOString() })),
+        evidence: evidence.map((row) => ({ id: row.id, kind: row.kind, name: row.name, size: row.size, mime: row.mime, message: slimMessage(row.id, row.message), error: row.error, at: row.created_at.toISOString() })),
         servers,
         suspects,
     };
@@ -130,35 +131,46 @@ export async function openSuspectCount(): Promise<number> {
     return Number(row?.n ?? 0);
 }
 
+/** Bilder einer Discord-Nachricht kommen über /api/security/evidence/:id/bild/:n, nicht als data-URL im Profil. */
+function slimMessage(evidenceId: number, raw: unknown): Record<string, unknown> | null {
+    const message = (typeof raw === "string" ? JSON.parse(raw) : raw) as (Record<string, unknown> & { images?: { name: string }[] }) | null;
+    if (!message) return null;
+
+    return { ...message, images: (message.images ?? []).map((image, index) => ({ name: image.name, url: `/api/security/evidence/${evidenceId}/bild/${index}` })) };
+}
+
 /** Für das Sperrfenster: Kopf, Vorgeschichte, eigene Server, verknüpfte Konten aus den Anmeldespuren. */
 export async function personPrefill(config: IConfig, userId: string): Promise<IPersonPrefill> {
     const [user, team, active, history, modCases, ticketBlocks, servers, linked] = await Promise.all([
         lookupUser(config, userId).catch(() => null),
-        isTeam(config, userId),
+        isTeam(config, userId).catch(() => null),
         store.activeBanOf(userId),
         query<{ bans: number | bigint; suspects: number | bigint }[]>("SELECT (SELECT COUNT(*) FROM security_bans WHERE user_id = ? AND state = 'lifted') AS bans, (SELECT COUNT(*) FROM security_suspects WHERE user_id = ?) AS suspects", [userId, userId]),
         // Tabellen des Bots: Fehlen sie (etwa im Test), zählt die Vorgeschichte ohne sie.
         count("SELECT COUNT(*) AS n FROM mod_cases WHERE target_id = ?", userId),
         count("SELECT COUNT(*) AS n FROM ticket_blacklist WHERE user_id = ?", userId),
         serversOf(userId, null),
+        // Schon Gesperrte fehlen: Ein Haken darauf ließe die ganze Sperre scheitern.
         query<{ user_id: string; same_ip: number; vpn: number | null }[]>(
             `SELECT o.user_id, MAX(o.ip_hash = m.ip_hash) AS same_ip, MAX(o.vpn) AS vpn
              FROM security_logins m JOIN security_logins o ON o.net_hash = m.net_hash AND o.user_id <> m.user_id
-             WHERE m.user_id = ? GROUP BY o.user_id LIMIT 20`,
+             WHERE m.user_id = ? AND o.user_id NOT IN (SELECT user_id FROM security_bans WHERE state = 'active') GROUP BY o.user_id LIMIT 20`,
             [userId]
         ),
     ]);
-    const person = await refs(config, linked.map((row) => row.user_id));
+    // Das Team ebenso; ist das nicht prüfbar, fehlt das Konto lieber.
+    const candidates = (await Promise.all(linked.map(async (row) => ((await isTeam(config, row.user_id).catch(() => true)) ? null : row)))).filter((row) => row !== null);
+    const person = await refs(config, candidates.map((row) => row.user_id));
 
     return {
         person: { id: userId, name: user?.name ?? userId, avatar: user?.avatar ?? null },
         handle: user?.username ?? null,
         accountDays: days(userId),
-        team,
+        team: team === true,
         activeBan: active?.id ?? null,
         history: { bans: Number(history[0]?.bans ?? 0), suspects: Number(history[0]?.suspects ?? 0), modCases, ticketBlocks },
         servers: servers.filter((server) => server.active),
-        linked: linked.map((row) => ({ person: person(row.user_id), reason: row.same_ip ? "same_ip" : row.vpn ? "vpn" : "net", accountDays: days(row.user_id) })),
+        linked: candidates.map((row) => ({ person: person(row.user_id), reason: row.same_ip ? "same_ip" : row.vpn ? "vpn" : "net", accountDays: days(row.user_id) })),
     };
 }
 

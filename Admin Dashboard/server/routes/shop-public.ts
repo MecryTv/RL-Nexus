@@ -55,7 +55,7 @@ import { handleStripeEvent } from "../shop/webhook.ts";
 import { body, id } from "../validate.ts";
 import { checkLogin } from "../security/login.ts";
 import { blockedToken } from "./security-public.ts";
-import { activeBanOf, scopeOfRow } from "../security/store.ts";
+import { activeBanOf, scopeOfRow, type IBanRow } from "../security/store.ts";
 
 /**
  * Der Shop für die Webseite. nginx reicht nexus-emb.de/api/shop/* hierher,
@@ -133,17 +133,20 @@ function sessionOf(request: FastifyRequest, config: IConfig): IShopSession {
 }
 
 /** W-0057: Welche Bausteine einer dauerhaften Sperre für diese Person gelten. */
-async function bannedFor(userId: string): Promise<{ readonly website: boolean; readonly shop: boolean }> {
+async function bannedFor(userId: string): Promise<{ readonly website: boolean; readonly shop: boolean; readonly ban: IBanRow | null }> {
     const ban = await activeBanOf(userId);
     const scope = ban ? scopeOfRow(ban) : [];
 
-    return { website: scope.includes("website"), shop: scope.includes("shop") };
+    return { website: scope.includes("website"), shop: scope.includes("shop"), ban };
 }
+
+/** Der Satz bei einer dauerhaften Sperre für den Shop: ohne Ansprechpartner (Spec C4c). */
+const SHOP_BANNED = "Dein Konto ist für den Shop gesperrt.";
 
 /** Für Test und Kasse: angemeldet und nicht für den Shop gesperrt. Kündigen und Portal bleiben offen (§ 312k BGB). */
 async function buyerOf(request: FastifyRequest, config: IConfig): Promise<IShopSession> {
     const session = sessionOf(request, config);
-    if ((await bannedFor(session.id)).shop) throw new PublicError(403, "Dein Konto ist für den Shop gesperrt.");
+    if ((await bannedFor(session.id)).shop) throw new PublicError(403, SHOP_BANNED);
 
     return session;
 }
@@ -177,8 +180,9 @@ export async function publicShopRoutes(app: FastifyInstance, { config }: { confi
         let me: IShopMe | null = null;
         const ban = session ? await bannedFor(session.id) : null;
 
-        // W-0057: Für die Webseite gesperrt beendet die Sitzung; die nächste Anmeldung zeigt die Sperrseite.
-        if (session && ban?.website) {
+        // W-0057: Webseite und Shop gesperrt beendet die Sitzung; die nächste Anmeldung zeigt die Sperrseite.
+        // Nur die Webseite: Die Sitzung bleibt für den Shop, die Seite Zugang leitet zur Sperrseite.
+        if (session && ban?.website && ban.shop) {
             reply.header("Set-Cookie", clearShopSession(config));
             session = null;
         }
@@ -191,6 +195,7 @@ export async function publicShopRoutes(app: FastifyInstance, { config }: { confi
                 const grants = await grantsOf(session.id);
                 const access = accessOf(grants, now);
                 const banned = customer.bannedAt !== null || ban?.shop === true;
+                const lock = ban?.ban && (ban.website || ban.shop) ? ban.ban : null;
                 const running = access.grant;
                 const title = running === null ? null : running.source === "trial" ? "Test" : ((await findProduct(running.productId ?? 0))?.title ?? null);
 
@@ -210,10 +215,27 @@ export async function publicShopRoutes(app: FastifyInstance, { config }: { confi
                     // Dieselbe Regel wie beim Checkout: Die Seite sieht nur den längsten Zugang, der Server alle.
                     blocked: Object.fromEntries(
                         products.flatMap((product) => {
-                            const problem = purchaseProblem(grants, product, banned, now);
+                            const problem = ban?.shop ? SHOP_BANNED : purchaseProblem(grants, product, banned, now);
                             return problem === null ? [] : [[String(product.id), problem]];
                         })
                     ),
+                    gesperrt: lock
+                        ? {
+                              url: `/gesperrt?s=${encodeURIComponent(
+                                  blockedToken(config, {
+                                      kind: "ban",
+                                      service: ban?.website ? "website" : "shop",
+                                      name: session.name,
+                                      avatar: session.avatar,
+                                      scope: scopeOfRow(lock),
+                                      since: lock.created_at.toISOString(),
+                                      changedAt: lock.changed_at?.toISOString() ?? null,
+                                      checkedAt: now.toISOString(),
+                                  })
+                              )}`,
+                              website: ban?.website === true,
+                          }
+                        : null,
                 };
             }
         }

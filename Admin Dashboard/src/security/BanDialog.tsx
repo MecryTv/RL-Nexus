@@ -63,7 +63,8 @@ export function BanDialog({ mode, onClose, onDone }: { readonly mode: BanDialogM
     }, []);
 
     const data = prefill.data;
-    const servers = profile ? profile.servers.filter((server) => server.active || server.leave) : (data?.servers ?? []);
+    // Nur Server, die der Person gehören; eingeladene fremde Server zeigt das Profil, ohne Schalter.
+    const servers = (profile ? profile.servers.filter((server) => server.active || server.leave) : (data?.servers ?? [])).filter((server) => server.owner);
     const person = profile?.person ?? data?.person ?? null;
     const before = profile ? new Set(profile.servers.filter((server) => server.leave).map((server) => server.id)) : new Set<string>();
     const historyCount = data ? data.history.bans + data.history.modCases + data.history.ticketBlocks : 0;
@@ -156,7 +157,7 @@ export function BanDialog({ mode, onClose, onDone }: { readonly mode: BanDialogM
                                 {data.handle && <span>@{data.handle}</span>}
                                 <span>ID {userId}</span>
                                 <span className={data.accountDays < YOUNG ? styles.warnText : undefined}>Konto {ageText(data.accountDays)} alt</span>
-                                <span>besitzt {formatNumber(data.servers.length)} Server</span>
+                                <span>besitzt {formatNumber(data.servers.filter((server) => server.owner).length)} Server</span>
                             </p>
                         )}
                     </div>

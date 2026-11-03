@@ -206,10 +206,14 @@ export function BanProfilePage(): JSX.Element {
                                     <td className={styles.num}>{formatNumber(server.members)}</td>
                                     <td>{day(server.since)}</td>
                                     <td>
-                                        <label className={styles.leave}>
-                                            <span className="u-sr">Bot verlässt {server.name}</span>
-                                            <input type="checkbox" role="switch" checked={server.leave} disabled={!active} onChange={() => setDialog({ kind: "change", profile: data, flip: server.id })} />
-                                        </label>
+                                        {server.owner ? (
+                                            <label className={styles.leave}>
+                                                <span className="u-sr">Bot verlässt {server.name}</span>
+                                                <input type="checkbox" role="switch" checked={server.leave} disabled={!active} onChange={() => setDialog({ kind: "change", profile: data, flip: server.id })} />
+                                            </label>
+                                        ) : (
+                                            <span className={styles.dim}>nur eingeladen</span>
+                                        )}
                                     </td>
                                 </tr>
                             ))}

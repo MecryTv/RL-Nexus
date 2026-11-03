@@ -16,6 +16,9 @@ const OLD = "222222222222222201";
 const SIBLING = "222222222222222202";
 const SHOPPER = "222222222222222203";
 const IP = "203.0.113.77";
+const IP2 = "198.51.100.9";
+const TEAMER = "222222222222222204";
+const FOREIGN = "99999999999999990032";
 
 /** Eine Discord-ID von heute: Das Konto ist neu. */
 function youngId(): string {
@@ -47,6 +50,14 @@ export async function checkSecurityDb(base: IConfig): Promise<void> {
     globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
         const href = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
         const bot = href.startsWith(config.botApiUrl) ? new URL(href).pathname.replace(/^\/dcapi/, "") : null;
+        const member = /^https:\/\/discord\.com\/api\/v10\/guilds\/\d+\/members\/(\d+)$/.exec(href);
+
+        // Rollen im Admin Dashboard: nur TEAMER hat die Admin-Rolle, alle anderen sind keine Mitglieder.
+        if (member) {
+            return member[1] === TEAMER
+                ? new Response(JSON.stringify({ user: { id: TEAMER, username: "teamer", global_name: "Teamer", avatar: null }, nick: null, roles: [config.adminRoleId] }))
+                : new Response(JSON.stringify({ code: 10007, message: "Unknown Member" }), { status: 404 });
+        }
 
         if (bot === "/admin/security/reload") {
             reloads++;
@@ -72,7 +83,7 @@ export async function checkSecurityDb(base: IConfig): Promise<void> {
         return new Response(JSON.stringify({ status: "ok", [IP]: { proxy: vpn ? "yes" : "no", type: vpn ? "VPN" : undefined, asn: "AS64500" } }));
     }) as typeof fetch;
 
-    const login = (userId: string, service: "website" | "shop" | "dashboard", cfg = config) => checkLogin(cfg, { userId, name: "Check", avatar: null, ip: IP, service });
+    const login = (userId: string, service: "website" | "shop" | "dashboard", cfg = config, ip = IP) => checkLogin(cfg, { userId, name: "Check", avatar: null, ip, service });
 
     try {
         await tidy(users);
@@ -134,8 +145,12 @@ export async function checkSecurityDb(base: IConfig): Promise<void> {
         const actor = { id: "77777777777777777702", name: "check:db", role: "Developer" as const };
         const GUILD = "99999999999999990031";
 
-        await check("Sperren: Kürzel der Anmeldungen wandern in die Sperre, Verdacht geschlossen, Bot verlässt, eine DM, Bot lädt neu", async () => {
-            const { banIds } = await banPeople(config, { userId: SIBLING, scope: ["own", "dashboard", "shop"], reasons: ["Sperre umgangen"], note: "", leave: [GUILD], linked: [] }, actor);
+        await check("Sperren: Kürzel der Anmeldungen wandern in die Sperre, Verdacht geschlossen, Bot verlässt nur eigene Server, eine DM, Bot lädt neu", async () => {
+            await query(
+                "INSERT INTO server_invites (guild_id, guild_name, user_id, source, owner_id, invited_at) VALUES (?, 'check:db eigen', ?, 'owner', ?, NOW()), (?, 'check:db fremd', ?, 'audit', '222222222222222299', NOW())",
+                [GUILD, SIBLING, SIBLING, FOREIGN, SIBLING]
+            );
+            const { banIds } = await banPeople(config, { userId: SIBLING, scope: ["own", "dashboard", "shop"], reasons: ["Sperre umgangen"], note: "", leave: [GUILD, FOREIGN], linked: [] }, actor);
             const [hashCount] = await query<{ n: number | bigint }[]>("SELECT COUNT(*) AS n FROM security_ban_hashes WHERE ban_id = ?", [banIds[0]]);
             const [suspect] = await query<{ state: string }[]>("SELECT state FROM security_suspects WHERE user_id = ? ORDER BY id DESC LIMIT 1", [SIBLING]);
             const [block] = await query<{ origin: string; ban_id: number }[]>("SELECT origin, ban_id FROM server_blocks WHERE guild_id = ?", [GUILD]);
@@ -151,6 +166,8 @@ export async function checkSecurityDb(base: IConfig): Promise<void> {
 
         await check("Team lässt sich nicht sperren, leerer Umfang und fehlender Grund werden abgelehnt", async () => {
             await assert.rejects(banPeople({ ...config, devUserIds: [SHOPPER] } as IConfig, { userId: SHOPPER, scope: ["shop"], reasons: ["Raid"], note: "", leave: [], linked: [] }, actor), /Team/);
+            // Admin-Rolle bei Discord, ohne DEV_USER_IDs und ohne Gruppe im Bot-Dashboard.
+            await assert.rejects(banPeople(config, { userId: TEAMER, scope: ["shop"], reasons: ["Raid"], note: "", leave: [], linked: [] }, actor), /Team/);
             await assert.rejects(banPeople(config, { userId: SHOPPER, scope: [], reasons: ["Raid"], note: "", leave: [], linked: [] }, actor), /Baustein/);
             await assert.rejects(banPeople(config, { userId: SHOPPER, scope: ["shop"], reasons: [], note: " ", leave: [], linked: [] }, actor), /Grund/);
         });
@@ -166,6 +183,9 @@ export async function checkSecurityDb(base: IConfig): Promise<void> {
 
             await liftBan(config, ban!.id, "Einspruch geprüft", actor);
             const [lifted] = await query<{ state: string }[]>("SELECT state FROM security_bans WHERE id = ?", [ban!.id]);
+            const [hashesLeft] = await query<{ n: number | bigint }[]>("SELECT COUNT(*) AS n FROM security_ban_hashes WHERE ban_id = ?", [ban!.id]);
+
+            assert.equal(Number(hashesLeft?.n), 0, "Kürzel einer aufgehobenen Sperre sind weg");
             const blocks = await query<unknown[]>("SELECT 1 FROM server_blocks WHERE guild_id = ?", [GUILD]);
 
             assert.equal(lifted?.state, "lifted");
@@ -193,7 +213,25 @@ export async function checkSecurityDb(base: IConfig): Promise<void> {
             assert.ok(vpn.logins.some((row) => row.person.id === SHOPPER && row.result === "blocked"));
         });
 
-        await check("Laufende Sitzung: Webseite gesperrt beendet sie, nur Shop gesperrt sperrt Test und Kasse", async () => {
+        await check("Neue Adresse einer gesperrten Person kommt zur Sperre; „Passt“ öffnet für dasselbe Konto keinen neuen Verdacht", async () => {
+            const [ban] = await query<{ id: number }[]>("SELECT id FROM security_bans WHERE user_id = ? AND state = 'active'", [OLD]);
+            const hashes = ipHashes(hashSecret(config.ipHashSecret, config.jwtSecret), IP2)!;
+
+            await login(OLD, "website", config, IP2);
+            const [kept] = await query<{ n: number | bigint }[]>("SELECT COUNT(*) AS n FROM security_ban_hashes WHERE ban_id = ? AND ip_hash = ?", [ban!.id, hashes.ip]);
+            assert.equal(Number(kept?.n), 1);
+
+            await query("DELETE FROM security_suspects WHERE user_id = ?", [SHOPPER]);
+            await login(SHOPPER, "website", config, IP2);
+            const [open] = await query<{ id: number }[]>("SELECT id FROM security_suspects WHERE user_id = ? AND state = 'open'", [SHOPPER]);
+            assert.ok(open, "gleiche IP wie die neue Adresse des Gesperrten: Verdacht");
+
+            await query("UPDATE security_suspects SET state = 'ok' WHERE id = ?", [open!.id]);
+            await login(SHOPPER, "website", config, IP2);
+            assert.equal((await query<unknown[]>("SELECT 1 FROM security_suspects WHERE user_id = ? AND state = 'open'", [SHOPPER])).length, 0);
+        });
+
+        await check("Laufende Sitzung: Webseite und Shop gesperrt beendet sie, nur Webseite lässt den Shop offen, nur Shop sperrt Test und Kasse ohne Ansprechpartner", async () => {
             const app = await buildApp(config);
             const cookie = shopSessionCookie(config, { id: OLD, name: "Check", avatar: null, exp: Math.floor(Date.now() / 1000) + 600 }).split(";")[0]!;
             const post = (url: string) => app.inject({ method: "POST", url, headers: { cookie, origin: new URL(config.shopSiteUrl).origin, "content-type": "application/json" }, payload: JSON.stringify({ productId: 1, consentTerms: true, consentImmediateStart: true, consentAdult: true }) });
@@ -205,10 +243,20 @@ export async function checkSecurityDb(base: IConfig): Promise<void> {
                 assert.equal(state.json().me, null);
                 assert.match(String(state.headers["set-cookie"]), /Max-Age=0|Expires=Thu, 01 Jan 1970/i);
 
+                await query("UPDATE security_bans SET scope = 'others,own,dashboard,website' WHERE user_id = ? AND state = 'active'", [OLD]);
+
+                const siteOnly = await app.inject({ method: "GET", url: "/public/shop/state", headers: { cookie } });
+                assert.equal(siteOnly.headers["set-cookie"], undefined, "Sitzung bleibt für den Shop");
+                assert.equal(siteOnly.json().me?.gesperrt?.website, true);
+                assert.match(siteOnly.json().me?.gesperrt?.url ?? "", /^\/gesperrt\?s=/);
+                assert.notEqual(siteOnly.json().me?.status, "banned");
+
                 await query("UPDATE security_bans SET scope = 'own,dashboard,shop' WHERE user_id = ? AND state = 'active'", [OLD]);
 
                 const shopOnly = await app.inject({ method: "GET", url: "/public/shop/state", headers: { cookie } });
                 assert.equal(shopOnly.json().me?.status, "banned");
+                assert.equal(shopOnly.json().me?.gesperrt?.website, false);
+                assert.doesNotMatch(JSON.stringify(shopOnly.json().me?.blocked ?? {}), /Support|wende dich/i);
                 assert.equal((await post("/public/shop/trial")).statusCode, 403);
                 assert.equal((await post("/public/shop/checkout")).statusCode, 403);
             } finally {
@@ -246,10 +294,24 @@ export async function checkSecurityDb(base: IConfig): Promise<void> {
             assert.equal(Number(rest[0]?.n), 0);
             assert.ok((await query<unknown[]>("SELECT 1 FROM security_bans WHERE user_id = ? AND state = 'active'", [OLD])).length === 1);
         });
+
+        await check("Was bleibt: Sicherheit lässt sich mit „Berechtigtes Interesse“ speichern", async () => {
+            const [before] = await query<{ keep: number; note: string | null; basis: string | null; law: string | null; years: number | null }[]>("SELECT keep, note, basis, law, years FROM userdata_rules WHERE area = 'sicherheit'");
+
+            try {
+                await query("INSERT INTO userdata_rules (area, keep, note, basis, law, years) VALUES ('sicherheit', 1, 'check', 'interesse', NULL, NULL) ON DUPLICATE KEY UPDATE keep = 1, note = 'check', basis = 'interesse', law = NULL, years = NULL");
+                const [row] = await query<{ basis: string }[]>("SELECT basis FROM userdata_rules WHERE area = 'sicherheit'");
+                assert.equal(row?.basis, "interesse");
+            } finally {
+                if (before) await query("UPDATE userdata_rules SET keep = ?, note = ?, basis = ?, law = ?, years = ? WHERE area = 'sicherheit'", [before.keep, before.note, before.basis, before.law, before.years]);
+                else await query("DELETE FROM userdata_rules WHERE area = 'sicherheit'");
+            }
+        });
     } finally {
         globalThis.fetch = real;
         await tidy(users);
-        await query("DELETE FROM server_blocks WHERE guild_id = '99999999999999990031'");
+        await query("DELETE FROM server_blocks WHERE guild_id IN ('99999999999999990031', '99999999999999990032')");
+        await query("DELETE FROM server_invites WHERE guild_id IN ('99999999999999990031', '99999999999999990032')");
         await query("DELETE FROM security_ban_changes WHERE by_id = '77777777777777777702'");
         await query("DELETE FROM admin_audit WHERE action LIKE 'security.%' AND user_id = '77777777777777777702'");
     }

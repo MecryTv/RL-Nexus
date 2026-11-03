@@ -18,13 +18,14 @@ const TILE = "#232428";
 const TEXT = "#f2f3f5";
 const DIM = "#a9afb8";
 
-export type BanDmKind = "ban" | "partial" | "loosened" | "tightened" | "lifted";
+export type BanDmKind = "ban" | "partial" | "loosened" | "tightened" | "changed" | "lifted";
 
 const LOOK: Readonly<Record<BanDmKind, { readonly strip: string; readonly stamp: string; readonly title: string }>> = {
     ban: { strip: "#f23f43", stamp: "GESPERRT", title: "Du bist bei RL Nexus gesperrt" },
     partial: { strip: "#f0b232", stamp: "TEILWEISE", title: "Du bist bei RL Nexus teilweise gesperrt" },
     loosened: { strip: "#f0b232", stamp: "GEÄNDERT", title: "Deine Sperre wurde geändert" },
-    tightened: { strip: "#f23f43", stamp: "GEÄNDERT", title: "Deine Sperre wurde verschärft" },
+    tightened: { strip: "#f23f43", stamp: "GEÄNDERT", title: "Deine Sperre wurde geändert" },
+    changed: { strip: "#f0b232", stamp: "GEÄNDERT", title: "Deine Sperre wurde geändert" },
     lifted: { strip: "#23a55a", stamp: "AUFGEHOBEN", title: "Deine Sperre ist aufgehoben" },
 };
 
@@ -37,18 +38,28 @@ export interface IBanDmInput {
     readonly at: Date;
 }
 
-/** Welche DM: Sperre (voll oder teilweise), gelockert, verschärft, aufgehoben. */
+/** Welche DM: Sperre (voll oder teilweise), gelockert, verschärft, beides zugleich, aufgehoben. */
 export function banDmKind(before: readonly Block[] | null, after: readonly Block[] | null): BanDmKind {
     if (after === null) return "lifted";
     if (before === null) return after.length === 5 ? "ban" : "partial";
+    if (after.every((block) => before.includes(block))) return "loosened";
+    if (before.every((block) => after.includes(block))) return "tightened";
 
-    return after.length < before.length || after.some((block) => !before.includes(block)) ? (after.every((block) => before.includes(block)) ? "loosened" : "tightened") : "tightened";
+    return "changed";
+}
+
+/** Streifen und Stempel; bei einer Änderung die Farbe nach dem neuen Stand: rot bei Vollsperre, sonst gelb. */
+export function banDmLook(kind: BanDmKind, scope: readonly Block[]): { readonly strip: string; readonly stamp: string; readonly title: string } {
+    const look = LOOK[kind];
+
+    return kind === "loosened" || kind === "tightened" || kind === "changed" ? { ...look, strip: scope.length === 5 ? LOOK.ban.strip : LOOK.partial.strip } : look;
 }
 
 function sub(input: IBanDmInput): string {
     if (input.kind === "lifted") return `Seit ${day(input.at)} kannst du RL Nexus wieder nutzen, überall.`;
     if (input.kind === "loosened") return `Gelockert am ${day(input.at)} · dauerhaft`;
     if (input.kind === "tightened") return `Verschärft am ${day(input.at)} · dauerhaft`;
+    if (input.kind === "changed") return `Geändert am ${day(input.at)} · dauerhaft`;
 
     return `Seit ${day(input.at)} · dauerhaft`;
 }
@@ -96,7 +107,7 @@ function list(ctx: SKRSContext2D, label: string, items: readonly string[], mark:
 export async function renderBanDm(input: IBanDmInput): Promise<{ readonly name: string; readonly data: Buffer; readonly alt: string }> {
     registerFonts();
 
-    const look = LOOK[input.kind];
+    const look = banDmLook(input.kind, input.scope);
     const lists = input.kind === "lifted" ? { blocked: [], usable: [] } : dmLists(input.scope);
     const canvas = createCanvas(W, 700);
     const ctx = canvas.getContext("2d");

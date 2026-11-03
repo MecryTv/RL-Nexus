@@ -1,5 +1,5 @@
 import { normalScope, type Block, type Service } from "../../shared/security.ts";
-import { query } from "../db.ts";
+import { query, withTransaction } from "../db.ts";
 import type { LoginResult, SuspectKind } from "./check.ts";
 
 /** Die Tabellen von W-0057 (Migration 019). Nur SQL; Regeln in shared/security.ts und check.ts. */
@@ -65,11 +65,19 @@ export async function recordLogin(row: ILoginRow): Promise<void> {
 }
 
 /** Ein offener Verdacht je Konto und gesperrter Person (uniq_open). */
+/** Ein neuer Verdacht, außer derselbe ist schon offen oder das Team hat ihn schon mit „Passt“ geschlossen. */
 export async function addSuspect(userId: string, banId: number | null, kind: SuspectKind, service: Service): Promise<void> {
-    await query("INSERT IGNORE INTO security_suspects (user_id, ban_id, kind, service) VALUES (?, ?, ?, ?)", [userId, banId, kind, service]);
+    await query(
+        "INSERT IGNORE INTO security_suspects (user_id, ban_id, kind, service) SELECT ?, ?, ?, ? FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM security_suspects WHERE user_id = ? AND ban_id <=> ? AND state = 'ok')",
+        [userId, banId, kind, service, userId, banId]
+    );
 }
 
-/** Anmeldespuren nach 90 Tagen weg, außer die Person ist gesperrt oder hat einen offenen Verdacht. */
+/** Jede Anmeldung einer gesperrten Person bringt ihre Kürzel zur Sperre, auch nach dem Sperrtag. */
+export async function keepHashes(banId: number, hashes: { readonly ip: string; readonly net: string }): Promise<void> {
+    await query("INSERT IGNORE INTO security_ban_hashes (ban_id, ip_hash, net_hash) VALUES (?, ?, ?)", [banId, hashes.ip, hashes.net]);
+}
+
 /** Aufgehobene Sperren bleiben drei Jahre als Vorgeschichte (Nutzer, 03.11.), danach mit Kürzeln, Belegen und Verlauf weg. */
 export async function forgetOldBans(): Promise<number> {
     const rows = await query<{ id: number }[]>("SELECT id FROM security_bans WHERE state = 'lifted' AND lifted_at < NOW() - INTERVAL 3 YEAR");
@@ -77,15 +85,21 @@ export async function forgetOldBans(): Promise<number> {
 
     if (ids.length === 0) return 0;
 
-    await query("DELETE FROM security_ban_hashes WHERE ban_id IN (?)", [ids]);
-    await query("DELETE FROM security_evidence WHERE ban_id IN (?)", [ids]);
-    await query("DELETE FROM security_ban_changes WHERE ban_id IN (?)", [ids]);
-    await query("UPDATE security_suspects SET ban_id = NULL WHERE ban_id IN (?)", [ids]);
-    await query("UPDATE security_bans SET linked_to = NULL WHERE linked_to IN (?)", [ids]);
-    await query("DELETE FROM security_bans WHERE id IN (?)", [ids]);
+    // Alle oder keiner. Offene Verdachtsfälle zu diesen Sperren erst schließen, sonst stößt ban_id = NULL an uniq_open.
+    await withTransaction(async (tx) => {
+        await tx("DELETE FROM security_ban_hashes WHERE ban_id IN (?)", [ids]);
+        await tx("DELETE FROM security_evidence WHERE ban_id IN (?)", [ids]);
+        await tx("DELETE FROM security_ban_changes WHERE ban_id IN (?)", [ids]);
+        await tx("UPDATE security_suspects SET state = 'ok', closed_at = CURRENT_TIMESTAMP(3) WHERE ban_id IN (?) AND state = 'open'", [ids]);
+        await tx("UPDATE security_suspects SET ban_id = NULL WHERE ban_id IN (?)", [ids]);
+        await tx("UPDATE security_bans SET linked_to = NULL WHERE linked_to IN (?)", [ids]);
+        await tx("DELETE FROM security_bans WHERE id IN (?)", [ids]);
+    });
 
     return ids.length;
 }
+
+/** Anmeldespuren nach 90 Tagen weg, außer die Person ist gesperrt oder hat einen offenen Verdacht. */
 
 export async function forgetOldLogins(): Promise<number> {
     const result = await query<{ affectedRows: number }>(

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { BLOCKS, blocks, dmLists, presetOf, scopeOf } from "../../shared/security.ts";
 import { decideLogin } from "../security/check.ts";
+import { banDmKind, banDmLook } from "../security/dm.ts";
 import { ipHashes, networkOf } from "../security/hash.ts";
 import { proxycheck } from "../security/proxycheck.ts";
 import { buildApp } from "../app.ts";
@@ -89,6 +90,19 @@ export async function checkSecurity(): Promise<void> {
         // Ohne Proxycheck wird niemand blockiert.
         assert.deepEqual(decideLogin({ ...base, vpn: null, accountDays: 1, sameNet: 9 }), { result: "unchecked", suspect: null });
         assert.deepEqual(decideLogin({ ...base, vpn: null, sameIp: 7 }), { result: "unchecked", suspect: { kind: "same_ip", banId: 7 } });
+    });
+
+    await check("Sperr-DM: Lockern, Verschärfen und Gemischtes heißen „geändert“, Farbe nach dem neuen Stand", () => {
+        const full = [...BLOCKS];
+        const own = ["own", "dashboard", "shop"] as const;
+
+        assert.equal(banDmKind(full, [...own]), "loosened");
+        assert.equal(banDmKind([...own], full), "tightened");
+        assert.equal(banDmKind(["own", "shop"], ["own", "website"]), "changed");
+        assert.equal(banDmLook("tightened", ["own", "dashboard", "shop", "website"]).strip, "#f0b232");
+        assert.equal(banDmLook("tightened", full).strip, "#f23f43");
+        assert.equal(banDmLook("loosened", [...own]).strip, "#f0b232");
+        for (const kind of ["loosened", "tightened", "changed"] as const) assert.equal(banDmLook(kind, [...own]).title, "Deine Sperre wurde geändert");
     });
 
     const app = await buildApp(config);

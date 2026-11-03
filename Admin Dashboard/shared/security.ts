@@ -157,6 +157,8 @@ export interface IOwnServerView {
     /** „Bot verlässt“ steht für diesen Server. */
     readonly leave: boolean;
     readonly active: boolean;
+    /** Die Person ist Owner. Nur dann gibt es den Schalter „Bot verlässt“, sonst hat sie den Server nur eingeladen. */
+    readonly owner: boolean;
 }
 
 export interface IBanProfile extends IBanListItem {
