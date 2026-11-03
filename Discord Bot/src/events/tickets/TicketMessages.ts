@@ -3,6 +3,7 @@ import { LRUCache } from "lru-cache";
 import BotClient from "../../client/BotClient";
 import Event from "../../structures/Event";
 import { GuildPickerView, InfoView } from "../../builder/TicketPanel";
+import { BannedFor } from "../../utils/security";
 
 /**
  * Nachrichten, die das Ticket-System angehen: die DM eines Users bei ModMail,
@@ -26,6 +27,9 @@ export default class TicketMessages extends Event {
 
         try {
             if (!message.inGuild()) {
+                // W-0057: DMs zählen zu „Bot auf fremden Servern“. Gesperrte bekommen keine Antwort.
+                if (BannedFor(message.author.id, "others")) return;
+
                 await this.Direct(message);
 
                 return;

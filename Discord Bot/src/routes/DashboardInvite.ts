@@ -7,6 +7,7 @@ import { SNOWFLAKE } from "../constants/Discord";
 import { SessionOf, Unconfigured } from "../utils/dashboard";
 import { IssuePass } from "../utils/invitepass";
 import logger from "../utils/logger";
+import { BannedFor } from "../utils/security";
 
 /**
  * W-0064, Punkt 4 (Entwurf E-A): „Bot einladen“ läuft nur hierüber. Ohne
@@ -51,6 +52,8 @@ export default class DashboardInvite extends Route {
 
         // Einladen darf, wer den Server verwaltet (Owner oder Admin bei Discord). Staff-Karten zählen nicht.
         if (!card?.canManage || card.role === "Staff") return reply.redirect(DASHBOARD_HOME, 302);
+        // W-0057: kein Freigabe-Pass für Gesperrte (eigene Server).
+        if (BannedFor(session.userId, "own")) return reply.redirect(DASHBOARD_HOME, 302);
 
         if (!this.client.databaseService.Ready) {
             logger.warn(`🎟️  Freigabe-Pass für ${guildId} nicht angelegt: keine Datenbank`);

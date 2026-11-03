@@ -2,6 +2,7 @@ import { Events } from "discord.js";
 import BotClient from "../../client/BotClient";
 import Event from "../../structures/Event";
 import logger from "../../utils/logger";
+import { StartBans } from "../../utils/security";
 
 export default class Ready extends Event {
     constructor(client: BotClient) {
@@ -24,6 +25,9 @@ export default class Ready extends Event {
 
         // Staff-Freigaben (W-0011): offene und laufende gelten nach dem Neustart weiter.
         this.client.staffGrantService.Load().catch((error) => logger.warn(`🔐 Staff-Freigaben nicht geladen: ${String(error)}`));
+
+        // W-0057: die dauerhaften Sperren, danach alle 5 Minuten und auf Zuruf des Admin Dashboards neu.
+        StartBans(this.client);
 
         // Der Status unter dem Namen des Bots - fünf Ansagen im Wechsel.
         this.client.presenceService.Start();

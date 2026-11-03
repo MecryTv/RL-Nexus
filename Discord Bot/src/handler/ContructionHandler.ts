@@ -7,6 +7,7 @@ import Command from "../structures/Command";
 import { REST, Routes } from "discord.js";
 import logger from "../utils/logger";
 import Event from "../structures/Event";
+import { Admitted } from "../utils/security";
 
 export default class ConstructionHandler implements IConstructionHandler {
     client: BotClient;
@@ -39,7 +40,11 @@ export default class ConstructionHandler implements IConstructionHandler {
             continue;
         }
 
-        const execute = (...args: any[]) => event.Execute(...args);
+        // W-0057: Interaktionen gesperrter Personen enden hier, vor jedem Handler und ohne Antwort.
+        const execute =
+            event.name === "interactionCreate"
+                ? (...args: any[]) => void Admitted(this.client, args[0]).then((ok) => (ok ? event.Execute(...args) : undefined))
+                : (...args: any[]) => event.Execute(...args);
 
         const emitter = this.client as unknown as {
             on(name: string, listener: (...args: any[]) => void): void;

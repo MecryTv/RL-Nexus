@@ -6,6 +6,7 @@ import * as Machine from "./staffgrant/Machine";
 import { StaffGrantError } from "./staffgrant/Machine";
 import { AskList, DurationText } from "./staffgrant/Rules";
 import logger from "../utils/logger";
+import { BannedFor } from "../utils/security";
 
 export { StaffGrantError } from "./staffgrant/Machine";
 
@@ -70,7 +71,8 @@ export default class StaffGrantService {
         const dashboard = this.client.dashboardService;
         const mode: StaffAccessMode = (await dashboard.BetaMode()) ? "beta" : (await dashboard.Paywall()) ? "paid" : "free";
 
-        if (mode === "free") return { mode, users: [guild.ownerId] };
+        // W-0057: Wer für eigene Server gesperrt ist, zählt nie als Ansprechpartner.
+        if (mode === "free") return { mode, users: BannedFor(guild.ownerId, "own") ? [] : [guild.ownerId] };
 
         // Ohne Members-Intent hinge fetch() bis zum Timeout - dann reicht, wer im Speicher ist (Review I6).
         const members = this.client.config.GUILD_MEMBER_INTENT ? await guild.members.fetch().catch(() => guild.members.cache) : guild.members.cache;
@@ -80,6 +82,8 @@ export default class StaffGrantService {
         const ok = new Set<string>();
 
         for (const id of [guild.ownerId, ...managers]) {
+            if (BannedFor(id, "own")) continue;
+
             const fits = mode === "beta" ? await dashboard.BetaMember(id) : (await dashboard.ShopAccess(id)).allowed;
 
             if (fits) ok.add(id);

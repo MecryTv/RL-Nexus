@@ -1,5 +1,6 @@
 import { Guild, PermissionFlagsBits } from "discord.js";
 import BotClient from "../client/BotClient";
+import { BannedFor } from "./security";
 
 /**
  * W-0064, Punkt 4 und 5: Freigabe-Pass beim Einladen und die Sperre für
@@ -48,6 +49,9 @@ export async function AccessMode(client: BotClient): Promise<"free" | "paid" | "
 }
 
 export async function IssuePass(client: BotClient, guildId: string, userId: string, now = Date.now()): Promise<void> {
+    // W-0057: Wer für eigene Server gesperrt ist, bekommt keinen Pass.
+    if (BannedFor(userId, "own")) return;
+
     await client.databaseService.Write("INSERT INTO invite_passes (guild_id, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)", [guildId, userId, now, now + PASS_MINUTES * 60_000]);
 }
 
@@ -92,6 +96,9 @@ export async function PassUser(client: BotClient, guildId: string, since: number
  * (Review 1). null: nicht prüfbar.
  */
 export async function IsContact(client: BotClient, guild: Guild, userId: string): Promise<boolean | null> {
+    // W-0057: Gesperrt für eigene Server heißt nie Ansprechpartner.
+    if (BannedFor(userId, "own")) return false;
+
     try {
         const member = guild.members.cache.get(userId) ?? (await guild.members.fetch(userId).catch(() => null));
         if (!member) return false;

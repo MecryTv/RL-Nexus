@@ -28,6 +28,7 @@ import {
 } from "../constants/Dashboard";
 import { Open, Seal } from "../utils/seal";
 import logger from "../utils/logger";
+import { BannedFor } from "../utils/security";
 import { ModuleId } from "../constants/Modules";
 import IDashboardActivity from "../interfaces/services/dashboard/IDashboardActivity";
 
@@ -603,6 +604,9 @@ export default class DashboardService implements IDashboardService {
         // Anmelden, und genau dabei wird geprueft.
         if (session.mfa !== true) return null;
 
+        // W-0057: Eine Sperre fürs Bot-Dashboard beendet auch laufende Sitzungen; die neue Anmeldung zeigt die Sperrseite.
+        if (BannedFor(session.userId, "dashboard")) return null;
+
         return session;
     }
 
@@ -801,6 +805,8 @@ export default class DashboardService implements IDashboardService {
     }
 
     async GuildAllowed(userId: string, guildId: string): Promise<boolean> {
+        if (BannedFor(userId, "own") && this.OwnerOf(guildId) === userId) return false;
+
         const access = await this.ShopAccess(userId);
 
         if (access.allowed) return true;
@@ -831,7 +837,11 @@ export default class DashboardService implements IDashboardService {
         try {
             // Der Filter sitzt hier, damit er für jede Dashboard-API gilt, die über diese Liste prüft.
             // W-0011: Eine laufende Staff-Freigabe gilt sofort und endet sofort - nie aus dem Cache.
-            return StaffOverlay(await this.Paywalled(session.userId, await this.Guilds(session)), (guildId) => this.client.staffGrantService.Active(session.userId, guildId));
+            // W-0057: Gesperrt für eigene Server: Diese Server tauchen nicht auf.
+            const own = BannedFor(session.userId, "own");
+            const guilds = (await this.Guilds(session)).filter((guild) => !own || guild.role !== "Owner");
+
+            return StaffOverlay(await this.Paywalled(session.userId, guilds), (guildId) => this.client.staffGrantService.Active(session.userId, guildId));
         } catch (error) {
             if (error instanceof SessionExpired) this.Destroy(session);
 
