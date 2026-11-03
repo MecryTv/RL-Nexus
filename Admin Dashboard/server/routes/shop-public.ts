@@ -53,6 +53,8 @@ import { stripeGateway, stripeReady } from "../shop/stripe.ts";
 import { syncMember, type SyncStep } from "../shop/sync.ts";
 import { handleStripeEvent } from "../shop/webhook.ts";
 import { body, id } from "../validate.ts";
+import { checkLogin } from "../security/login.ts";
+import { blockedToken } from "./security-public.ts";
 
 /**
  * Der Shop für die Webseite. nginx reicht nexus-emb.de/api/shop/* hierher,
@@ -247,6 +249,10 @@ export async function publicShopRoutes(app: FastifyInstance, { config }: { confi
         try {
             const tokens = await exchangeShopCode(config, code);
             const user = await fetchMe(tokens.accessToken);
+
+            // W-0057, D3: Sperre und VPN vor allem anderen. Gesperrt oder blockiert: keine Sitzung, die Sperrseite.
+            const security = await checkLogin(config, { userId: user.id, name: displayName(user), avatar: avatarUrl(user.id, user.avatar), ip: request.ip, service: stored.target === "zugang" ? "website" : "shop" });
+            if (security.view) return go(`/gesperrt?s=${encodeURIComponent(blockedToken(config, security.view))}`);
 
             // Ohne bestätigte Mail kann keine Bestätigung ankommen.
             if (user.verified !== true || typeof user.email !== "string" || user.email === "") return go("/preise?anmeldung=mail");

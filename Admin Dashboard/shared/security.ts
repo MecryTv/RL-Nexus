@@ -87,3 +87,17 @@ export function dmLists(scope: readonly string[]): { readonly blocked: string[];
 
     return { blocked, usable };
 }
+
+/** Was Sperrseite und VPN-Seite über die Person zeigen (C4c, V-A+). */
+export interface IBlockedView {
+    readonly kind: "ban" | "vpn";
+    readonly service: Service;
+    readonly name: string;
+    readonly avatar: string | null;
+    /** Nur bei kind "ban": Bausteine, seit wann, wann zuletzt geändert. */
+    readonly scope: readonly Block[];
+    readonly since: string | null;
+    readonly changedAt: string | null;
+    /** Nur bei kind "vpn": wann geprüft. */
+    readonly checkedAt: string;
+}

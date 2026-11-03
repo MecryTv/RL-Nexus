@@ -29,6 +29,8 @@ import { userdataRoutes } from "./routes/userdata.ts";
 import { internalUserdataRoutes } from "./routes/internal-userdata.ts";
 import { internalServerRoutes } from "./routes/internal-servers.ts";
 import { serverRoutes } from "./routes/servers.ts";
+import { internalSecurityRoutes } from "./routes/internal-security.ts";
+import { publicSecurityRoutes } from "./routes/security-public.ts";
 import { publicStatusRoutes, statusRoutes } from "./routes/status.ts";
 import { userRoutes } from "./routes/users.ts";
 
@@ -67,6 +69,8 @@ export async function buildApp(config: IConfig): Promise<FastifyInstance> {
     await app.register(internalBetaRoutes, { config });
     await app.register(internalUserdataRoutes, { config });
     await app.register(internalServerRoutes, { config });
+    await app.register(internalSecurityRoutes, { config });
+    await app.register(publicSecurityRoutes, { config });
 
     // Alles hier drin braucht eine Sitzung, die Rolle wird bei jeder Anfrage geprüft.
     await app.register(async (api) => {
