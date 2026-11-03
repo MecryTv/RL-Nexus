@@ -118,13 +118,28 @@ export async function banProfile(config: IConfig, banId: number): Promise<IBanPr
     };
 }
 
+async function count(sql: string, userId: string): Promise<number> {
+    const rows = await query<{ n: number | bigint }[]>(sql, [userId]).catch(() => []);
+
+    return Number(rows[0]?.n ?? 0);
+}
+
+export async function openSuspectCount(): Promise<number> {
+    const [row] = await query<{ n: number | bigint }[]>("SELECT COUNT(*) AS n FROM security_suspects WHERE state = 'open'");
+
+    return Number(row?.n ?? 0);
+}
+
 /** Für das Sperrfenster: Kopf, Vorgeschichte, eigene Server, verknüpfte Konten aus den Anmeldespuren. */
 export async function personPrefill(config: IConfig, userId: string): Promise<IPersonPrefill> {
-    const [user, team, active, history, servers, linked] = await Promise.all([
+    const [user, team, active, history, modCases, ticketBlocks, servers, linked] = await Promise.all([
         lookupUser(config, userId).catch(() => null),
         isTeam(config, userId),
         store.activeBanOf(userId),
-        query<{ bans: number | bigint; suspects: number | bigint }[]>("SELECT (SELECT COUNT(*) FROM security_bans WHERE user_id = ?) AS bans, (SELECT COUNT(*) FROM security_suspects WHERE user_id = ?) AS suspects", [userId, userId]),
+        query<{ bans: number | bigint; suspects: number | bigint }[]>("SELECT (SELECT COUNT(*) FROM security_bans WHERE user_id = ? AND state = 'lifted') AS bans, (SELECT COUNT(*) FROM security_suspects WHERE user_id = ?) AS suspects", [userId, userId]),
+        // Tabellen des Bots: Fehlen sie (etwa im Test), zählt die Vorgeschichte ohne sie.
+        count("SELECT COUNT(*) AS n FROM mod_cases WHERE target_id = ?", userId),
+        count("SELECT COUNT(*) AS n FROM ticket_blacklist WHERE user_id = ?", userId),
         serversOf(userId, null),
         query<{ user_id: string; same_ip: number; vpn: number | null }[]>(
             `SELECT o.user_id, MAX(o.ip_hash = m.ip_hash) AS same_ip, MAX(o.vpn) AS vpn
@@ -141,7 +156,7 @@ export async function personPrefill(config: IConfig, userId: string): Promise<IP
         accountDays: days(userId),
         team,
         activeBan: active?.id ?? null,
-        history: { bans: Number(history[0]?.bans ?? 0), suspects: Number(history[0]?.suspects ?? 0) },
+        history: { bans: Number(history[0]?.bans ?? 0), suspects: Number(history[0]?.suspects ?? 0), modCases, ticketBlocks },
         servers: servers.filter((server) => server.active),
         linked: linked.map((row) => ({ person: person(row.user_id), reason: row.same_ip ? "same_ip" : row.vpn ? "vpn" : "net", accountDays: days(row.user_id) })),
     };

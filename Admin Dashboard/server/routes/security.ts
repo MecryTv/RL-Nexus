@@ -9,7 +9,7 @@ import { PublicError } from "../errors.ts";
 import { publish } from "../events.ts";
 import { banPeople, changeBan, clearSuspect, liftBan } from "../security/flow.ts";
 import { proxycheck } from "../security/proxycheck.ts";
-import { banProfile, openSuspects, overview, personPrefill, vpnView } from "../security/views.ts";
+import { banProfile, openSuspectCount, openSuspects, overview, personPrefill, vpnView } from "../security/views.ts";
 import { teamActor } from "../servers/views.ts";
 import { body, id, oneOf, snowflake, text } from "../validate.ts";
 
@@ -38,6 +38,9 @@ export async function securityRoutes(app: FastifyInstance, { config }: { config:
         return overview(config, (request.query as { stand?: string }).stand === "aufgehoben" ? "lifted" : "active");
     });
 
+    // Für die Zahl am Bereich in der Leiste; ohne Datenbank 0 statt Fehler.
+    app.get("/api/security/count", async (): Promise<{ suspects: number }> => ({ suspects: databaseReady() ? await openSuspectCount() : 0 }));
+
     app.get("/api/security/bans/:id", async (request): Promise<IBanProfile> => {
         ready();
 
@@ -63,6 +66,7 @@ export async function securityRoutes(app: FastifyInstance, { config }: { config:
                 note: typeof input.note === "string" ? input.note.slice(0, 2000) : "",
                 leave: ids(input.leave),
                 linked: ids(input.linked),
+                ref: input.ref === undefined || input.ref === null ? null : id(String(input.ref)),
             },
             actorOf(request)
         );
@@ -157,9 +161,10 @@ export async function securityRoutes(app: FastifyInstance, { config }: { config:
         if (!IPISH.test(ip)) throw new PublicError(400, "Das ist keine IP-Adresse.");
         if (!config.proxycheckKey) throw new PublicError(409, "Es ist kein Proxycheck-Key gesetzt.");
 
+        const started = Date.now();
         const result = await proxycheck(config.proxycheckKey, ip);
         if (!result) throw new PublicError(502, "Proxycheck antwortet gerade nicht.");
 
-        return result;
+        return { ...result, ms: Date.now() - started };
     });
 }

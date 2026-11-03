@@ -9,3 +9,12 @@ export function useHalted(): number {
 
     return data?.count ?? 0;
 }
+
+/** Offene Verdachtsfälle für die gelbe Zahl am Bereich Sicherheit (W-0057). */
+export function useSuspects(): number {
+    const { data, reload } = useApi<{ suspects: number }>("/api/security/count", 60_000);
+
+    useLive("security", reload);
+
+    return data?.suspects ?? 0;
+}

@@ -183,7 +183,8 @@ export interface IPersonPrefill {
     readonly accountDays: number;
     readonly team: boolean;
     readonly activeBan: number | null;
-    readonly history: { readonly bans: number; readonly suspects: number };
+    /** Für den Knopf „Vorgeschichte“: frühere Sperren, Verdachtsfälle, Mod-Fälle und Ticket-Sperren auf allen Servern. */
+    readonly history: { readonly bans: number; readonly suspects: number; readonly modCases: number; readonly ticketBlocks: number };
     readonly servers: readonly IOwnServerView[];
     readonly linked: readonly ILinkedCandidate[];
 }

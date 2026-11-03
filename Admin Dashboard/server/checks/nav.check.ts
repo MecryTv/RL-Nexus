@@ -132,7 +132,7 @@ export async function checkNav(): Promise<void> {
     await check("Ein Admin sieht keinen Bereich Developer, und die Suche findet keine Developer-Seite", () => {
         assert.deepEqual(
             visibleAreas("admin").map((area) => area.id),
-            ["start", "bot", "shop", "webseite", "datenschutz"]
+            ["start", "bot", "shop", "webseite", "datenschutz", "sicherheit"]
         );
 
         const developer = visibleAreas("developer");
@@ -142,8 +142,8 @@ export async function checkNav(): Promise<void> {
 
         const entries = navEntries("admin");
 
-        // W-0064: Server-Freigaben kam dazu.
-        assert.equal(entries.length, 18);
+        // W-0064: Server-Freigaben kam dazu, W-0057 der Bereich Sicherheit mit drei Seiten.
+        assert.equal(entries.length, 21);
         assert.ok(entries.every((hit) => !hit.href.startsWith("/dev")));
     });
 
@@ -159,6 +159,19 @@ export async function checkNav(): Promise<void> {
         assert.equal(pageOf("/datenschutz/loeschungen")?.page.label, "Löschungen");
         assert.equal(pageOf("/datenschutz/123456789012345678")?.page.to, "/datenschutz");
         assert.equal(pageOf("/datenschutz/regeln")?.page.to, "/datenschutz/regeln");
+    });
+
+    await check("Sicherheit (W-0057): Sperren, Verdacht, VPN-Prüfung, das Profil einer Sperre gehört zu Sperren", () => {
+        assert.deepEqual(
+            AREAS.find((area) => area.id === "sicherheit")?.pages.map((page) => [page.to, page.label]),
+            [
+                ["/sicherheit", "Sperren"],
+                ["/sicherheit/verdacht", "Verdacht"],
+                ["/sicherheit/vpn", "VPN-Prüfung"],
+            ]
+        );
+        assert.equal(pageOf("/sicherheit/sperre/12")?.page.to, "/sicherheit");
+        assert.equal(pageOf("/sicherheit/verdacht")?.page.label, "Verdacht");
     });
 
     await check("Das Postfach öffnet das erste Postfach mit ungelesener Post, ohne Postfach nichts", () => {

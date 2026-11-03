@@ -1,7 +1,7 @@
 import { Fragment, useCallback, useEffect, useState, type JSX } from "react";
 import { Link, Outlet, useLocation, useNavigation } from "react-router-dom";
 import { unreadOf, useMailOverview } from "../api/mail";
-import { useHalted } from "../api/userdata";
+import { useHalted, useSuspects } from "../api/userdata";
 import logo from "../assets/logo.webp";
 import { areaOf, navEntries, pageOf, visibleAreas, type INavArea } from "../nav/areas.ts";
 import { ShiftTap } from "../nav/search.ts";
@@ -64,6 +64,7 @@ export function Shell(): JSX.Element {
     const location = useLocation();
     const unread = unreadOf(useMailOverview().data) ?? 0;
     const halted = useHalted();
+    const suspects = useSuspects();
     const loading = useNavigation().state === "loading";
     const areas = visibleAreas(me.role);
     const open = pageOf(location.pathname)?.page.to ?? null;
@@ -125,6 +126,12 @@ export function Shell(): JSX.Element {
                                         <span className="u-sr"> angehalten</span>
                                     </span>
                                 )}
+                                {entry.id === "sicherheit" && suspects > 0 && (
+                                    <span className={[styles.badge, styles.halted].join(" ")}>
+                                        {suspects}
+                                        <span className="u-sr"> offener Verdacht</span>
+                                    </span>
+                                )}
                             </button>
                         </Fragment>
                     ))}
@@ -155,6 +162,12 @@ export function Shell(): JSX.Element {
                                             <span className={[styles.count, styles.halted].join(" ")}>
                                                 {halted}
                                                 <span className="u-sr"> angehalten</span>
+                                            </span>
+                                        )}
+                                        {page.suspects && suspects > 0 && (
+                                            <span className={[styles.count, styles.halted].join(" ")}>
+                                                {suspects}
+                                                <span className="u-sr"> offen</span>
                                             </span>
                                         )}
                                     </Link>

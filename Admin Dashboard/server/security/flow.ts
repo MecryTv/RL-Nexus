@@ -33,6 +33,8 @@ export interface IBanInput {
     readonly leave: readonly string[];
     /** Verdachtskonten mit derselben Sperre. */
     readonly linked: readonly string[];
+    /** Aus einem Verdachtsfall: die bestehende Sperre, auf die diese verweist. */
+    readonly ref?: number | null;
 }
 
 const scopeText = (scope: readonly Block[]): string => scope.map((block) => BLOCK_LABELS[block]).join(", ") || "nichts";
@@ -99,7 +101,7 @@ export async function banPeople(config: IConfig, input: IBanInput, actor: ISecur
 
     for (const userId of people) {
         const name = (await lookupUser(config, userId).catch(() => null))?.name ?? null;
-        const linkedTo = banIds[0] ?? null;
+        const linkedTo = banIds[0] ?? input.ref ?? null;
 
         const id = await withTransaction(async (tx) => {
             const result = await tx<{ insertId: number | bigint }>(
