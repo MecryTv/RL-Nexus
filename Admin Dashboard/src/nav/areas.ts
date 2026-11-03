@@ -51,6 +51,7 @@ export const AREAS: readonly INavArea[] = [
             { to: "/server", label: "Server", icon: "server", description: "Alle Server, auf denen der Bot ist." },
             { to: "/backups", label: "Backups", icon: "archive", description: "Sicherungen je Server, ansehen und zurückladen." },
             { to: "/gruppen", label: "Gruppen", icon: "shield-check", description: "Wer im Bot-Dashboard welche Gruppe hat." },
+            { to: "/freigaben", label: "Server-Freigaben", icon: "lock", description: "Ein Server pro Person: Anfragen, Freigaben mit Signatur und laufende Wahlen." },
             { to: "/beta", label: "Beta Access", icon: "sparkle", description: "Tester und Codes für den Zugang zur Beta." },
             { to: "/meldungen", label: "Meldungen", icon: "bell", description: "Nachrichten an das Postfach im Bot-Dashboard." },
             { to: "/status", label: "Status", icon: "pulse", description: "Zustand der Dienste, Störungen und Statusseite." },

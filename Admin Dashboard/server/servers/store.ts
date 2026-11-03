@@ -110,7 +110,7 @@ export async function blocked(guildId: string): Promise<boolean> {
 }
 
 export async function addBlock(guildId: string, byId: string, byName: string, reason: string): Promise<void> {
-    await query("INSERT IGNORE INTO server_blocks (guild_id, by_id, by_name, reason) VALUES (?, ?, ?, ?)", [guildId, byId, byName.slice(0, 100), reason.slice(0, 300)]);
+    await query("INSERT IGNORE INTO server_blocks (guild_id, blocked_by, by_name, reason) VALUES (?, ?, ?, ?)", [guildId, byId, byName.slice(0, 100), reason.slice(0, 300)]);
 }
 
 /* Anfragen */

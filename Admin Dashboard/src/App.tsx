@@ -57,6 +57,7 @@ const router = createBrowserRouter(
                 <Route path="gruppen" lazy={page(() => import("./pages/GroupsPage"), "GroupsPage")} />
                 <Route path="backups" lazy={page(() => import("./backups/BackupsPage"), "BackupsPage")} />
                 <Route path="beta" lazy={page(() => import("./beta/BetaPage"), "BetaPage")} />
+                <Route path="freigaben" lazy={page(() => import("./servers/FreigabenPage"), "FreigabenPage")} />
                 <Route path="backups/:guildId" lazy={page(() => import("./backups/ServerBackupsPage"), "ServerBackupsPage")} />
                 <Route path="backups/:guildId/zurueckladen/:backupId" lazy={page(() => import("./backups/RestoreWizard"), "RestoreWizard")} />
                 <Route path="status" lazy={page(() => import("./pages/IncidentsPage"), "IncidentsPage")} />

@@ -31,6 +31,7 @@ import { useTitle } from "../useTitle";
 import { DeletionActions, Due, StateBadge, Steps } from "./DeletionParts";
 import { PlanDialog } from "./PlanDialog";
 import { isOpen, remaining, when } from "./plan.ts";
+import { InvitedServers } from "../servers/InvitedServers";
 import styles from "./userdata.module.scss";
 
 const FILTER_LABELS: Readonly<Record<UserdataFilter, string>> = { alle: "Alle", laeuft: "Löschung läuft", shop: "Shop-Kunden" };
@@ -39,6 +40,7 @@ const TABS = [
     { id: "bereiche", label: "Bereiche" },
     { id: "zeitleiste", label: "Zeitleiste" },
     { id: "server", label: "Server" },
+    { id: "eingeladen", label: "Eingeladene Server" },
     { id: "protokoll", label: "Protokoll" },
 ] as const;
 const AREAS = new Map(USERDATA_AREAS.map((area) => [area.id, area]));
@@ -272,6 +274,8 @@ function Profile({ id }: { readonly id: string }): JSX.Element {
                         ))}
                     </ul>
                 ))}
+
+            {tab === "eingeladen" && <InvitedServers userId={id} />}
 
             {tab === "protokoll" &&
                 (data.audit.length === 0 ? (

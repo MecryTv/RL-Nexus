@@ -142,7 +142,8 @@ export async function checkNav(): Promise<void> {
 
         const entries = navEntries("admin");
 
-        assert.equal(entries.length, 17);
+        // W-0064: Server-Freigaben kam dazu.
+        assert.equal(entries.length, 18);
         assert.ok(entries.every((hit) => !hit.href.startsWith("/dev")));
     });
 

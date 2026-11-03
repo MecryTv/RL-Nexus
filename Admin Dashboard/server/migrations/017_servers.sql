@@ -62,7 +62,7 @@ CREATE TABLE IF NOT EXISTS server_choices (
 -- „Neues Einladen auf diesen Server sperren“ beim Entfernen. W-0057 übernimmt das später.
 CREATE TABLE IF NOT EXISTS server_blocks (
     guild_id   VARCHAR(20)  CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
-    by_id      VARCHAR(20)  CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+    blocked_by VARCHAR(20)  CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
     by_name    VARCHAR(100) NOT NULL,
     reason     VARCHAR(300) NOT NULL DEFAULT '',
     created_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),

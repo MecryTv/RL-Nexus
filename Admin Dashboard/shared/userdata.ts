@@ -55,7 +55,7 @@ export const USERDATA_AREAS: readonly IUserdataAreaDef[] = [
     {
         id: "konto",
         label: "Konto im Bot-Dashboard",
-        inside: ["Anmeldung", "Benachrichtigungen", "Ticket-IDs", "Voice-Vorlagen", "Gruppen"],
+        inside: ["Anmeldung", "Benachrichtigungen", "Ticket-IDs", "Voice-Vorlagen", "Gruppen", "Eingeladene Server"],
         icon: "dashboard",
         sources: [
             { table: "dashboard_credentials", column: "user_id", role: "person", time: "created_at", label: "'Anmeldung im Bot-Dashboard'", name: "username", hidden: ["password", "totp_secret"] },
@@ -63,6 +63,11 @@ export const USERDATA_AREAS: readonly IUserdataAreaDef[] = [
             { table: "user_codes", column: "user_id", role: "person", time: "created_at", label: "CONCAT('Feste Ticket-ID ', code)" },
             { table: "voice_presets", column: "user_id", role: "person", time: ms("created_at"), label: "CONCAT('Voice-Vorlage ', name)" },
             { table: "dashboard_groups", column: "user_id", role: "person", time: "granted_at", label: "CONCAT('Gruppe ', group_name)", words: true },
+            // W-0064: ein Server pro Person.
+            { table: "server_invites", column: "user_id", role: "person", guild: G, time: "invited_at", label: "CONCAT('Bot eingeladen auf ', guild_name)" },
+            { table: "server_invites", column: "owner_id", role: "person", guild: G, time: "invited_at", label: "CONCAT('Owner von ', guild_name)" },
+            { table: "server_requests", column: "user_id", role: "person", guild: G, time: "created_at", label: "CONCAT('Server-Anfrage · ', guild_name, ' · ', status)", words: true },
+            { table: "server_choices", column: "user_id", role: "person", time: "created_at", label: "CONCAT('Wahl ein Server pro Person · ', state)", words: true },
         ],
     },
     {
@@ -211,6 +216,8 @@ export const USERDATA_AREAS: readonly IUserdataAreaDef[] = [
             { table: "auto_responses", column: "created_by", role: "team", guild: G, label: "'Auto-Antwort angelegt'" },
             { table: "av_cases", column: "closed_by", role: "team", guild: G, time: ms("closed_at"), label: "'Anti-Villain-Fall geschlossen'" },
             { table: "beta_codes", column: "created_by", role: "team", time: "created_at", label: "'Beta-Code angelegt'" },
+            { table: "server_requests", column: "decided_by", role: "team", guild: G, time: "decided_at", label: "CONCAT('Über eine Server-Anfrage entschieden: ', guild_name)", name: "decided_name" },
+            { table: "server_blocks", column: "blocked_by", role: "team", guild: G, time: "created_at", label: "'Server für RL Nexus gesperrt'", name: "by_name" },
             { table: "contact_messages", column: "handled_by", role: "team", time: "handled_at", label: "CONCAT('Kontakt bearbeitet: ', subject)" },
             { table: "contact_replies", column: "user_id", role: "team", time: "created_at", label: "'Auf eine Kontaktanfrage geantwortet'", name: "user_name" },
             { table: "custom_messages", column: "created_by", role: "team", guild: G, label: "CONCAT('Nachricht angelegt: ', name)" },
@@ -353,6 +360,10 @@ const WORDS: Readonly<Record<string, string>> = {
     failed: "fehlgeschlagen",
     accepted: "angenommen",
     declined: "abgelehnt",
+    approved: "freigegeben",
+    revoked: "zurückgenommen",
+    chosen: "gewählt",
+    done: "erledigt",
     released: "freigegeben",
     trusted: "vertraut",
     banned: "gebannt",
