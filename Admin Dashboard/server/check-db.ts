@@ -1011,6 +1011,8 @@ try {
                 rules.filter((rule) => rule.keep).map((rule) => [rule.area, rule.basis, rule.years]),
                 [
                     ["shop", "ansprueche", 3],
+                    // W-0057: Sperren bleiben, ohne feste Dauer.
+                    ["sicherheit", "interesse", null],
                     ["protokoll", "pflicht", 3],
                 ]
             );

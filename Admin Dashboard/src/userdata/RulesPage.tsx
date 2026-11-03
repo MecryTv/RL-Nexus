@@ -34,6 +34,7 @@ const YEARS = [1, 2, 3, 4, 5, 6, 8, 10, 15, 20, 30];
 const GENERIC: Readonly<Record<UserdataBasis, string>> = {
     pflicht: "Das Gesetz verpflichtet uns, das aufzubewahren.",
     ansprueche: "Wir bewahren das auf, solange sich Ansprüche daraus ergeben können.",
+    interesse: "Eine Sperre bleibt, damit sie wirkt.",
 };
 
 function same(a: Draft, b: Draft): boolean {
