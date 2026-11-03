@@ -70,6 +70,23 @@ export async function addSuspect(userId: string, banId: number | null, kind: Sus
 }
 
 /** Anmeldespuren nach 90 Tagen weg, außer die Person ist gesperrt oder hat einen offenen Verdacht. */
+/** Aufgehobene Sperren bleiben drei Jahre als Vorgeschichte (Nutzer, 03.11.), danach mit Kürzeln, Belegen und Verlauf weg. */
+export async function forgetOldBans(): Promise<number> {
+    const rows = await query<{ id: number }[]>("SELECT id FROM security_bans WHERE state = 'lifted' AND lifted_at < NOW() - INTERVAL 3 YEAR");
+    const ids = rows.map((row) => row.id);
+
+    if (ids.length === 0) return 0;
+
+    await query("DELETE FROM security_ban_hashes WHERE ban_id IN (?)", [ids]);
+    await query("DELETE FROM security_evidence WHERE ban_id IN (?)", [ids]);
+    await query("DELETE FROM security_ban_changes WHERE ban_id IN (?)", [ids]);
+    await query("UPDATE security_suspects SET ban_id = NULL WHERE ban_id IN (?)", [ids]);
+    await query("UPDATE security_bans SET linked_to = NULL WHERE linked_to IN (?)", [ids]);
+    await query("DELETE FROM security_bans WHERE id IN (?)", [ids]);
+
+    return ids.length;
+}
+
 export async function forgetOldLogins(): Promise<number> {
     const result = await query<{ affectedRows: number }>(
         `DELETE FROM security_logins WHERE created_at < NOW() - INTERVAL 90 DAY

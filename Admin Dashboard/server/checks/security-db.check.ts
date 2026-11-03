@@ -5,6 +5,7 @@ import { query } from "../db.ts";
 import { hashSecret, ipHashes } from "../security/hash.ts";
 import { banPeople, changeBan, liftBan } from "../security/flow.ts";
 import { checkLogin } from "../security/login.ts";
+import { forgetOldBans } from "../security/store.ts";
 import { shopSessionCookie } from "../shop/session.ts";
 import { banProfile, overview, personPrefill, vpnView } from "../security/views.ts";
 import { check, section } from "./harness.ts";
@@ -215,6 +216,35 @@ export async function checkSecurityDb(base: IConfig): Promise<void> {
                 await query("DELETE FROM shop_customers WHERE user_id = ?", [OLD]);
                 await app.close();
             }
+        });
+
+        await check("Aufgehobene Sperren gehen nach drei Jahren mit Kürzeln, Belegen und Verlauf, jüngere und aktive bleiben", async () => {
+            const insert = async (userId: string, state: string, liftedDays: number | null): Promise<number> => {
+                const result = await query<{ insertId: number | bigint }>(
+                    "INSERT INTO security_bans (user_id, user_name, scope, state, lifted_at, created_by, created_name) VALUES (?, 'Alt', 'shop', ?, IF(? IS NULL, NULL, NOW() - INTERVAL ? DAY), '1', 'check:db')",
+                    [userId, state, liftedDays, liftedDays ?? 0]
+                );
+
+                return Number(result.insertId);
+            };
+            const old = await insert(SHOPPER, "lifted", 3 * 366);
+            const recent = await insert(young, "lifted", 30);
+
+            await query("INSERT INTO security_ban_hashes (ban_id, ip_hash, net_hash) VALUES (?, ?, ?)", [old, "a".repeat(64), "b".repeat(64)]);
+            await query("INSERT INTO security_evidence (ban_id, kind, name, by_id) VALUES (?, 'file', 'alt.png', '1')", [old]);
+            await query("INSERT INTO security_ban_changes (ban_id, action, by_id, by_name) VALUES (?, 'lift', '77777777777777777702', 'check:db')", [old]);
+
+            assert.ok((await forgetOldBans()) >= 1);
+
+            const left = await query<{ id: number }[]>("SELECT id FROM security_bans WHERE id IN (?)", [[old, recent]]);
+            const rest = await query<{ n: number | bigint }[]>(
+                "SELECT (SELECT COUNT(*) FROM security_ban_hashes WHERE ban_id = ?) + (SELECT COUNT(*) FROM security_evidence WHERE ban_id = ?) + (SELECT COUNT(*) FROM security_ban_changes WHERE ban_id = ?) AS n",
+                [old, old, old]
+            );
+
+            assert.deepEqual(left.map((row) => row.id), [recent]);
+            assert.equal(Number(rest[0]?.n), 0);
+            assert.ok((await query<unknown[]>("SELECT 1 FROM security_bans WHERE user_id = ? AND state = 'active'", [OLD])).length === 1);
         });
     } finally {
         globalThis.fetch = real;

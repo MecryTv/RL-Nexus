@@ -762,6 +762,41 @@ const PRIVACY: readonly ILegalSection[] = [
         ),
     },
     {
+        id: "sperren",
+        title: "Sperren und Schutz vor Missbrauch",
+        body: (
+            <>
+                <p>
+                    Bei Missbrauch, etwa Raids, Betrug oder Belästigung, kann das Team von RL Nexus ein Discord-Konto
+                    dauerhaft sperren, ganz oder für einzelne Teile: den Bot auf fremden oder eigenen Servern, das
+                    Dashboard, die Anmeldung auf dieser Website und den Shop. Die Person bekommt dazu einmal eine
+                    Nachricht vom Bot. Zur Sperre speichern wir Discord-ID und Name, was gesperrt ist, den Grund, Belege
+                    (etwa Bildschirmfotos oder gesicherte Discord-Nachrichten), wer gesperrt hat und jede Änderung.
+                </p>
+                <p>
+                    <strong>Prüfung bei der Anmeldung:</strong> Meldest du dich im Dashboard, auf der Website oder im
+                    Shop mit Discord an, prüfen wir, ob dein Konto gesperrt ist und ob die Verbindung über ein VPN oder
+                    einen Proxy läuft. Dafür geht deine IP-Adresse an proxycheck.io. Antwortet der Dienst nicht, kommst
+                    du trotzdem herein.
+                </p>
+                <p>
+                    Deine IP-Adresse selbst speichern wir nicht, nur zwei nicht umkehrbare Kürzel der Adresse und ihres
+                    Netzes (HMAC-SHA256 mit einem geheimen Schlüssel), dazu die Netzkennung (ASN), wo du dich angemeldet
+                    hast, ob ein VPN erkannt wurde, das Ergebnis und die Uhrzeit. Diese Anmeldespuren löschen wir nach 90
+                    Tagen. Wird ein Konto gesperrt, bleiben seine Kürzel bei der Sperre, damit sie sich nicht mit einem
+                    neuen Konto umgehen lässt. Fällt eine Anmeldung auf, etwa dieselbe Adresse wie ein gesperrtes Konto,
+                    sieht sich das Team den Fall an.
+                </p>
+                <p>
+                    Rechtsgrundlage ist unser berechtigtes Interesse, RL Nexus und seine Nutzer vor Missbrauch zu
+                    schützen und Sperren durchzusetzen (Art. 6 Abs. 1 lit. f DSGVO). Bittest du um Löschung, bleibt eine
+                    bestehende Sperre mit Discord-ID und Kürzeln stehen, weil sie sonst nicht wirkt (Art. 17 Abs. 1 lit.
+                    c, Art. 21 Abs. 1 DSGVO). Aufgehobene Sperren bewahren wir drei Jahre als Vorgeschichte auf.
+                </p>
+            </>
+        ),
+    },
+    {
         id: "empfaenger",
         title: "Wohin Daten gehen",
         body: (
@@ -795,6 +830,11 @@ const PRIVACY: readonly ILegalSection[] = [
                     <li>
                         <strong>Stripe:</strong> Zahlungen und Rechnungen im Shop, siehe{" "}
                         <a href="#shop">Zugang kaufen und testen</a>.
+                    </li>
+                    <li>
+                        <strong>Proxycheck:</strong> deine IP-Adresse bei der Anmeldung mit Discord, um VPN und Proxy zu
+                        erkennen, siehe <a href="#sperren">Sperren und Schutz vor Missbrauch</a>.{" "}
+                        <External href="https://proxycheck.io/privacy">Datenschutzerklärung von proxycheck.io</External>
                     </li>
                     <li>
                         <strong>Contabo:</strong> der Hoster, siehe <a href="#hosting">Hosting</a>.
