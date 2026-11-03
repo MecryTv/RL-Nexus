@@ -9,7 +9,7 @@
  */
 import { ParseServerId } from "../events/servers/ServerLimitButtons";
 import { JoinProblem, SameName } from "../routes/DashboardApiTeam";
-import { GateFresh, GATE_NO_TTL, GATE_OK_TTL, PassUsable, RefuseFor } from "../utils/invitepass";
+import { GateFresh, GateNow, GATE_NO_TTL, GATE_OK_TTL, PassUsable, RefuseFor } from "../utils/invitepass";
 import { NoAccessReply, PickInviter } from "../utils/servers";
 
 let failures = 0;
@@ -55,6 +55,12 @@ console.log("\nFreigabe-Pass und Ansprechpartner (Punkt 4 und 5)");
 check("Pass gilt 15 Minuten und nur einmal", PassUsable({ expires_at: 2_000, used_at: null }, 1_000) && !PassUsable({ expires_at: 2_000, used_at: 1_500 }, 1_000) && !PassUsable({ expires_at: 900, used_at: null }, 1_000));
 check("Ohne Pass geht der Bot, außer das Team hat eingeladen", RefuseFor({ pass: false, team: false, contacts: 3 }) === "pass" && RefuseFor({ pass: false, team: true, contacts: 0 }) === null);
 check("Ohne Ansprechpartner geht er, unbekannt heißt bleiben", RefuseFor({ pass: true, team: false, contacts: 0 }) === "contact" && RefuseFor({ pass: true, team: false, contacts: null }) === null);
+check(
+    "Review 5: Alter Eintrag gilt sofort und wird im Hintergrund erneuert, nur ohne Eintrag wird gewartet",
+    JSON.stringify(GateNow({ ok: false, at: 0 }, GATE_OK_TTL * 2)) === JSON.stringify({ ok: false, refresh: true }) &&
+        JSON.stringify(GateNow({ ok: true, at: 0 }, 1)) === JSON.stringify({ ok: true, refresh: false }) &&
+        JSON.stringify(GateNow(undefined, 0)) === JSON.stringify({ ok: null, refresh: true })
+);
 check("Mit Ansprechpartner gilt die Prüfung einen Tag, ohne fünf Minuten", GateFresh({ ok: true, at: 0 }, GATE_OK_TTL - 1) && !GateFresh({ ok: true, at: 0 }, GATE_OK_TTL) && !GateFresh({ ok: false, at: 0 }, GATE_NO_TTL) && !GateFresh(undefined, 0));
 
 void (async () => {

@@ -145,7 +145,7 @@ export function cardFor(guild: IGuild, position: number, animate: boolean): HTML
 
         foot.append(
             guild.canManage
-                ? link("btn btn--warm", "Bot einladen", inviteFor(guild.id))
+                ? link("btn btn--warm", "Bot einladen", inviteFor(guild.id), true)
                 : link("btn btn--quiet", "Keine Berechtigung", url("/")),
             ghost("#i-info", "Was RL Nexus auf einem Server macht")
         );

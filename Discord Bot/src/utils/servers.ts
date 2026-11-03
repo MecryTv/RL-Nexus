@@ -26,11 +26,13 @@ export function PickInviter(entries: readonly IAuditEntryLike[], botId: string, 
     return newest ? { userId: newest.executorId!, source: "audit" } : { userId: ownerId, source: "owner" };
 }
 
-/** Audit-Log lesen (braucht das Recht dazu, sonst Owner). Discord hält Einträge 45 Tage. */
-export async function InviterOf(guild: Guild): Promise<IInviter> {
+/** Audit-Log lesen (braucht das Recht dazu, sonst Owner). Discord hält Einträge 45 Tage. since: ältere Einträge zählen nicht. */
+export async function InviterOf(guild: Guild, since = 0): Promise<IInviter> {
     const logs = await guild.fetchAuditLogs({ type: AuditLogEvent.BotAdd, limit: 10 }).catch(() => null);
     const entries = logs
-        ? [...logs.entries.values()].map((entry) => ({ targetId: entry.targetId ?? (entry.target as { id?: string } | null)?.id ?? null, executorId: entry.executorId, createdTimestamp: entry.createdTimestamp }))
+        ? [...logs.entries.values()]
+              .filter((entry) => entry.createdTimestamp >= since)
+              .map((entry) => ({ targetId: entry.targetId ?? (entry.target as { id?: string } | null)?.id ?? null, executorId: entry.executorId, createdTimestamp: entry.createdTimestamp }))
         : [];
 
     return PickInviter(entries, guild.client.user.id, guild.ownerId);

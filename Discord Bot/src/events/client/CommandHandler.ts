@@ -74,8 +74,12 @@ export default class CommandHandler extends Event {
         }
 
         // W-0064, Punkt 5: Hat auf dem Server niemand Zugang, laufen keine Commands. Developer-Befehle bleiben.
-        if (interaction.inCachedGuild() && !command.developerOnly && !(await CommandsAllowed(this.client, interaction.guild))) {
-            await interaction.reply(await NoAccessReply(interaction.guild.name, interaction.memberPermissions.has("ManageGuild"), `${this.client.config.SITE_PUBLIC_URL.replace(/\/+$/, "")}/preise`));
+        if (interaction.inCachedGuild() && !command.developerOnly && !(await CommandsAllowed(this.client, interaction.guild, interaction.user.id))) {
+            const accessUrl = `${this.client.config.SITE_PUBLIC_URL.replace(/[/]+$/, "")}/preise`;
+
+            await interaction
+                .reply(await NoAccessReply(interaction.guild.name, interaction.memberPermissions.has("ManageGuild"), accessUrl))
+                .catch((error: unknown) => logger.warn(`[CommandHandler] Hinweis ohne Zugang zu /${command.name} nicht gesendet: ${String(error)}`));
 
             return;
         }

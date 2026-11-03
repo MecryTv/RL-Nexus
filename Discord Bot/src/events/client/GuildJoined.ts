@@ -2,7 +2,7 @@ import { Events, Guild } from "discord.js";
 import BotClient from "../../client/BotClient";
 import { DASHBOARD_PATH } from "../../constants/Dashboard";
 import Event from "../../structures/Event";
-import { ForgetGate, RefuseFor, TakePass } from "../../utils/invitepass";
+import { ForgetGate, IsContact, RefuseFor, RefuseReason, TakePass } from "../../utils/invitepass";
 import { AskServers, InviterOf } from "../../utils/servers";
 import logger from "../../utils/logger";
 
@@ -41,7 +41,7 @@ export default class GuildJoined extends Event {
         }
     }
 
-    /** true: Der Bot hat den Server wieder verlassen. Ohne Datenbank lässt er ihn lieber stehen. */
+    /** true: Der Bot hat den Server wieder verlassen. Ohne Datenbank oder bei einem Fehler lässt er ihn lieber stehen (Review 2). */
     private async Refused(guild: Guild): Promise<boolean> {
         if (!this.client.databaseService.Ready) {
             logger.warn(`🎟️  ${guild.name} (${guild.id}): Freigabe nicht prüfbar, keine Datenbank. Der Bot bleibt.`);
@@ -49,19 +49,15 @@ export default class GuildJoined extends Event {
             return false;
         }
 
-        const passUser = await TakePass(this.client, guild.id).catch(() => null);
-        let team = false;
+        let reason: RefuseReason | null;
 
-        // Ohne Pass: Hat das Team direkt eingeladen (Audit-Log), ist das in Ordnung.
-        if (!passUser) {
-            const inviter = await InviterOf(guild);
-            const group = inviter.source === "audit" ? await this.client.dashboardService.GroupOf(inviter.userId) : null;
+        try {
+            reason = await this.Reason(guild);
+        } catch (error) {
+            logger.warn(`🎟️  ${guild.name} (${guild.id}): Freigabe nicht prüfbar (${String(error)}). Der Bot bleibt.`);
 
-            team = group === "administrator" || group === "developer";
+            return false;
         }
-
-        const askees = passUser && !team ? await this.client.staffGrantService.Askees(guild).catch(() => null) : null;
-        const reason = RefuseFor({ pass: Boolean(passUser), team, contacts: askees ? askees.users.length : null });
 
         if (!reason) return false;
 
@@ -86,5 +82,25 @@ export default class GuildJoined extends Event {
         logger.info(`🎟️  ${guild.name} (${guild.id}) verlassen: ${reason === "pass" ? "ohne Freigabe eingeladen" : "kein Ansprechpartner mit Zugang"}`);
 
         return true;
+    }
+
+    /** Warum der Bot geht, null: Er bleibt. Wirft bei Datenbank- oder Discord-Fehlern. */
+    private async Reason(guild: Guild): Promise<RefuseReason | null> {
+        // Gültig ist, was beim Beitritt gültig war, nicht erst beim Verarbeiten (Review 3).
+        const passUser = await TakePass(this.client, guild.id, guild.joinedTimestamp);
+        // Ohne Pass: wer laut Audit-Log eingeladen hat, nur wenn der Eintrag zu diesem Beitritt passt.
+        const inviter = passUser ?? (await InviterOf(guild, guild.joinedTimestamp - 60_000));
+        const inviterId = typeof inviter === "string" ? inviter : inviter.source === "audit" ? inviter.userId : null;
+        // Das Team ist selbst Ansprechpartner, ob mit Pass oder direkt eingeladen (Review 4).
+        const team = inviterId ? await this.client.dashboardService.IsStaff(inviterId) : false;
+
+        if (team || !passUser) return RefuseFor({ pass: Boolean(passUser), team, contacts: null });
+
+        // Wer eingeladen hat, verwaltet den Server und hat Zugang (sonst kein Pass): erst ihn prüfen, ohne Members-Intent per REST (Review 1).
+        if ((await IsContact(this.client, guild, passUser)) !== false) return null;
+
+        const askees = await this.client.staffGrantService.Askees(guild).catch(() => null);
+
+        return RefuseFor({ pass: true, team: false, contacts: askees ? askees.users.length : null });
     }
 }

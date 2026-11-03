@@ -219,3 +219,34 @@ Bot-Dashboard: `GET/POST /api/guild/:id/team` (Fakten, `leave`, `join`, `leave-s
 6. „Befehle heute“ wird zu „Teams“, weil es keinen Befehlszähler gibt.
 7. Kann die Wahl-DM nicht zugestellt werden, läuft die Uhr trotzdem; die Seite zeigt
    „DM nicht zustellbar“, damit das Team eingreifen kann.
+
+## Teil 3 (Nachtrag 03.11.): Einladen nur mit Freigabe, Commands nur mit Zugang
+
+Entwurf `T3-einladen` (E-A, D1, D2, C-B mit überarbeitetem Text), vom Nutzer gewählt.
+
+- **Freigabe-Pass:** „Bot einladen“ im Bot-Dashboard läuft über `/einladen?guild=<id>`
+  (Anmeldung nötig, Recht „Server verwalten“ auf dem Server). Der Pass gilt 15 Minuten,
+  einmal, nur für diesen Server (Bot-Migration 048 `invite_passes`). Die Webseite verlinkt
+  schon auf das Bot-Dashboard. Links in den DMs des Admin Dashboards führen ebenfalls über
+  `/einladen`.
+- **Beim Beitritt:** Ohne Pass geht der Bot wieder, außer das Team (Administrator,
+  Developer) hat laut Audit-Log eingeladen. Mit Pass braucht es einen Ansprechpartner:
+  mindestens einen Admin des Servers (Owner oder „Server verwalten“) mit Zugang, wie bei
+  „Wird gefragt“ in der Staff-Freigabe (bei Free Access immer der Owner). Fehlt er, geht
+  der Bot. Vorher bekommt der Owner die DM D1 („RL Nexus ist wieder gegangen“, drei
+  Schritte, „Richtig einladen“) bzw. D2 („Es fehlt ein Ansprechpartner“, „Zugang holen“,
+  „Wieder einladen“) als Bild. Ohne Datenbank bleibt der Bot.
+- **Bestand:** Server, auf denen der Bot schon ist, gelten als freigegeben.
+- **Commands (Punkt 5):** Hat kein Admin des Servers Zugang, antworten Slash-Commands mit
+  einem Bild nur für die Person: Mitglieder lesen „Wende dich an den Owner oder einen Admin
+  des Servers“, Admins (Server verwalten) lesen, dass sie Zugang holen können, und sehen
+  den Knopf „Zugang holen“. Geprüft wird beim Beitritt und danach täglich (positives
+  Ergebnis 24 Std. gespeichert, negatives 5 Min., damit ein Kauf schnell wirkt). Der Bot
+  bleibt in diesem Fall auf dem Server. Developer-Befehle sind ausgenommen.
+
+Entscheidungen, die ich getroffen habe:
+
+8. Einladungen durch das Team ohne Pass bleiben erlaubt (das Team ist selbst Ansprechpartner).
+9. Der Hinweis „ein Server pro Person“ beim Einladen kommt über die DM 3a, nicht schon auf
+   der Einlade-Seite.
+10. Wartet die Command-Prüfung länger als 2 Sekunden, läuft der Command (im Zweifel offen).
