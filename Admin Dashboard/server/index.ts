@@ -1,5 +1,6 @@
 import { warmNames } from "./search/sources.ts";
 import { scheduleDeletions } from "./userdata/clock.ts";
+import { scheduleServers } from "./servers/clock.ts";
 import { buildApp } from "./app.ts";
 import { scheduleBackups } from "./backups/round.ts";
 import { ensureBackupDatabase } from "./backups/store.ts";
@@ -36,6 +37,8 @@ scheduleCleanup();
 scheduleStatusPost(config);
 // Fällige Löschungen von Nutzerdaten (W-0051), alle 30 Sekunden.
 scheduleDeletions(config);
+// Ein Server pro Person (W-0064): Wahl und Abgleich mit dem Bot.
+scheduleServers(config);
 // Namen für die Suche (W-0059). Läuft nebenher, der Start wartet nicht darauf.
 void warmNames(config).catch((error: unknown) => console.error(`🔎 Namen für die Suche nicht geholt: ${error instanceof Error ? error.message : String(error)}`));
 scheduleCommandSync(config);

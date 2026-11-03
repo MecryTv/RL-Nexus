@@ -117,7 +117,7 @@ function stamp(ctx: SKRSContext2D, text: string, color: string): void {
     ctx.restore();
 }
 
-async function avatar(ctx: SKRSContext2D, input: IDmInput, x: number, y: number, diameter: number): Promise<void> {
+export async function avatar(ctx: SKRSContext2D, input: { readonly name: string; readonly avatar: Buffer | null }, x: number, y: number, diameter: number): Promise<void> {
     ctx.save();
     ctx.beginPath();
     ctx.arc(x + diameter / 2, y + diameter / 2, diameter / 2, 0, Math.PI * 2);
@@ -162,7 +162,7 @@ function label(ctx: SKRSContext2D, text: string, x: number, y: number): void {
 }
 
 /** Text in Zeilen der Breite width, höchstens max; der Rest endet mit „…“. */
-function wrap(ctx: SKRSContext2D, text: string, width: number, max: number): string[] {
+export function wrap(ctx: SKRSContext2D, text: string, width: number, max: number): string[] {
     const lines: string[] = [];
     let line = "";
 

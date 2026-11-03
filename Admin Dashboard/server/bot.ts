@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import type { IBotCommand, IBotOverview, IBotStatus } from "../shared/api.ts";
 import type { IBotRestoreReport, IServerPartJson } from "../shared/backups.ts";
+import type { IBotMembers, IBotServer, IBotServerDetail, IBotServerFacts } from "../shared/servers.ts";
 import type { IConfig } from "./config.ts";
 
 /**
@@ -211,5 +212,62 @@ export async function botCommands(config: IConfig, userId: string): Promise<IBot
         return Array.isArray(body.commands) ? (body.commands as IBotCommand[]) : null;
     } catch {
         return null;
+    }
+}
+
+/* W-0064: ein Server pro Person. userId: wer fragt, im Token als Subjekt; die Uhr fragt als "servers". */
+
+async function botJson<T>(config: IConfig, userId: string, path: string, timeout = TIMEOUT): Promise<T | null> {
+    try {
+        const response = await callBot(config, userId, path, "GET", { timeout });
+        if (!response.ok) return null;
+
+        return (await response.json()) as T;
+    } catch {
+        return null;
+    }
+}
+
+/** Alle Server, auf denen der Bot gerade ist. null: Der Bot antwortet nicht. */
+export function botServers(config: IConfig, userId = "servers"): Promise<IBotServer[] | null> {
+    return botJson<IBotServer[]>(config, userId, "/admin/servers", 10_000);
+}
+
+/** Ein Server samt Einlader (Audit-Log, sonst Owner). Das Audit-Log braucht etwas: eigenes Zeitlimit. */
+export function botServer(config: IConfig, guildId: string, userId = "servers"): Promise<IBotServerDetail | null> {
+    return botJson<IBotServerDetail>(config, userId, `/admin/servers/${guildId}`, 10_000);
+}
+
+/** Module, offene Tickets, Owner und ob viewer Mitglied ist, je Server. */
+export function botServerFacts(config: IConfig, guildIds: readonly string[], viewer: string): Promise<Record<string, IBotServerFacts> | null> {
+    if (guildIds.length === 0) return Promise.resolve({});
+
+    return botJson<Record<string, IBotServerFacts>>(config, viewer, `/admin/servers/facts?ids=${guildIds.join(",")}&viewer=${viewer}`);
+}
+
+/** Die Mitglieder live aus dem Bot. Große Server brauchen einen Moment. */
+export function botMembers(config: IConfig, guildId: string, userId: string): Promise<IBotMembers | null> {
+    return botJson<IBotMembers>(config, userId, `/admin/servers/${guildId}/members`, 30_000);
+}
+
+/** Administrator, Developer oder Partner? null: Der Bot antwortet nicht. */
+export async function botExempt(config: IConfig, userId: string): Promise<boolean | null> {
+    const body = await botJson<{ exempt?: unknown }>(config, "servers", `/admin/users/${userId}/exempt`);
+
+    return typeof body?.exempt === "boolean" ? body.exempt : null;
+}
+
+/**
+ * Der Bot verlässt einen Server und schreibt vorher text in dessen Log-Kanal.
+ * "gone": war schon nicht mehr da. false: nicht erreicht oder abgelehnt.
+ */
+export async function botLeave(config: IConfig, guildId: string, text: string, userId = "servers"): Promise<true | false | "gone"> {
+    try {
+        const response = await callBot(config, userId, `/admin/servers/${guildId}/leave`, "POST", { body: { text }, timeout: 10_000 });
+        if (response.status === 404) return "gone";
+
+        return response.ok;
+    } catch {
+        return false;
     }
 }
