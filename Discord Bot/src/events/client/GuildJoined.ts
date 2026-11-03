@@ -2,7 +2,7 @@ import { Events, Guild } from "discord.js";
 import BotClient from "../../client/BotClient";
 import { DASHBOARD_PATH } from "../../constants/Dashboard";
 import Event from "../../structures/Event";
-import { ForgetGate, IsContact, RefuseFor, RefuseReason, TakePass } from "../../utils/invitepass";
+import { AccessMode, ForgetGate, IsContact, RefuseFor, RefuseReason, TakePass } from "../../utils/invitepass";
 import { AskServers, InviterOf } from "../../utils/servers";
 import logger from "../../utils/logger";
 
@@ -12,8 +12,8 @@ import logger from "../../utils/logger";
  * Serverliste neu - wer den Bot gerade eingeladen hat, landet im Server-Dashboard.
  * W-0064: Das Admin Dashboard prüft „ein Server pro Person“ und lässt den Bot
  * notfalls wieder gehen. Ist es nicht erreichbar, holt sein Abgleich das nach.
- * W-0064, Punkt 4: Vorher prüft der Bot selbst, ob er über das Bot-Dashboard
- * kam (Freigabe-Pass) und ob es einen Ansprechpartner gibt. Sonst bekommt der
+ * W-0064, Punkt 4: Vorher prüft der Bot bei Paid und Beta Access selbst, ob er
+ * über das Bot-Dashboard kam (Freigabe-Pass) und ob es einen Ansprechpartner gibt. Sonst bekommt der
  * Owner die DM D1 bzw. D2 (vom Admin Dashboard gezeichnet), und der Bot geht.
  */
 export default class GuildJoined extends Event {
@@ -88,6 +88,9 @@ export default class GuildJoined extends Event {
     private async Reason(guild: Guild): Promise<RefuseReason | null> {
         // Gültig ist, was beim Beitritt gültig war, nicht erst beim Verarbeiten (Review 3).
         const passUser = await TakePass(this.client, guild.id, guild.joinedTimestamp);
+
+        // Free Access: Jeder darf den Bot frei nutzen, auch direkt eingeladen. Der Pass merkt nur, wer eingeladen hat.
+        if ((await AccessMode(this.client)) === "free") return RefuseFor({ free: true, pass: Boolean(passUser), team: false, contacts: null });
         // Ohne Pass: wer laut Audit-Log eingeladen hat, nur wenn der Eintrag zu diesem Beitritt passt.
         const inviter = passUser ?? (await InviterOf(guild, guild.joinedTimestamp - 60_000));
         const inviterId = typeof inviter === "string" ? inviter : inviter.source === "audit" ? inviter.userId : null;

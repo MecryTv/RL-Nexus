@@ -21,8 +21,13 @@ export function PassUsable(row: { expires_at: number | string; used_at: number |
 
 export type RefuseReason = "pass" | "contact";
 
-/** Warum der Bot einen neuen Server gleich wieder verlässt. null: Er bleibt. contacts null heißt: unbekannt, dann bleibt er. */
-export function RefuseFor(input: { pass: boolean; team: boolean; contacts: number | null }): RefuseReason | null {
+/**
+ * Warum der Bot einen neuen Server gleich wieder verlässt. null: Er bleibt.
+ * contacts null heißt: unbekannt, dann bleibt er. Bei Free Access darf jeder
+ * den Bot frei nutzen: kein Pass, kein Ansprechpartner nötig (Nutzer, 03.11.).
+ */
+export function RefuseFor(input: { free?: boolean; pass: boolean; team: boolean; contacts: number | null }): RefuseReason | null {
+    if (input.free) return null;
     // Hat das Team eingeladen, ist es selbst der Ansprechpartner.
     if (input.team) return null;
     if (!input.pass) return "pass";
@@ -33,6 +38,13 @@ export function RefuseFor(input: { pass: boolean; team: boolean; contacts: numbe
 
 export function GateFresh(entry: { ok: boolean; at: number } | undefined, now: number): boolean {
     return entry !== undefined && now - entry.at < (entry.ok ? GATE_OK_TTL : GATE_NO_TTL);
+}
+
+/** Wie die Staff-Freigabe: Beta vor Paid, sonst Free Access. Pass und Sperre gelten nur bei Paid und Beta. */
+export async function AccessMode(client: BotClient): Promise<"free" | "paid" | "beta"> {
+    const dashboard = client.dashboardService;
+
+    return (await dashboard.BetaMode()) ? "beta" : (await dashboard.Paywall()) ? "paid" : "free";
 }
 
 export async function IssuePass(client: BotClient, guildId: string, userId: string, now = Date.now()): Promise<void> {
@@ -137,12 +149,15 @@ export function HasContact(client: BotClient, guild: Guild): Promise<boolean> {
 }
 
 /**
- * Punkt 5: Dürfen Commands auf diesem Server laufen? Wer den Command nutzt und
+ * Punkt 5: Dürfen Commands auf diesem Server laufen? Bei Free Access immer. Wer den Command nutzt und
  * selbst Ansprechpartner ist, darf immer. Ein gespeichertes Ergebnis gilt
  * sofort, auch ein altes (das wird im Hintergrund erneuert); nur ohne Ergebnis
  * wartet der Command, höchstens eine Sekunde (Review 5).
  */
 export async function CommandsAllowed(client: BotClient, guild: Guild, userId: string, now = Date.now()): Promise<boolean> {
+    // Free Access: Jeder darf, ohne Prüfung.
+    if ((await AccessMode(client).catch(() => "free" as const)) === "free") return true;
+
     const { ok, refresh } = GateNow(gate.get(guild.id), now);
 
     if (ok === true && !refresh) return true;

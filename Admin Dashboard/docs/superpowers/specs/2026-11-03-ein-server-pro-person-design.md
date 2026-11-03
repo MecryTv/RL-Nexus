@@ -223,6 +223,8 @@ Bot-Dashboard: `GET/POST /api/guild/:id/team` (Fakten, `leave`, `join`, `leave-s
 ## Teil 3 (Nachtrag 03.11.): Einladen nur mit Freigabe, Commands nur mit Zugang
 
 Entwurf `T3-einladen` (E-A, D1, D2, C-B mit überarbeitetem Text), vom Nutzer gewählt.
+Freigabe-Pass, Ansprechpartner und Command-Sperre gelten nur bei Paid und Beta Access.
+Bei Free Access darf jeder den Bot frei nutzen, auch direkt eingeladen (Nutzer, 03.11.).
 
 - **Freigabe-Pass:** „Bot einladen“ im Bot-Dashboard läuft über `/einladen?guild=<id>`
   (Anmeldung nötig, Recht „Server verwalten“ auf dem Server). Der Pass gilt 15 Minuten,

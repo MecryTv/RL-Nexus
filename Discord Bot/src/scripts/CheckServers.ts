@@ -53,6 +53,10 @@ check("Fehlendes Recht heißt: einmal zustimmen", JoinProblem(50025) === null);
 
 console.log("\nFreigabe-Pass und Ansprechpartner (Punkt 4 und 5)");
 check("Pass gilt 15 Minuten und nur einmal", PassUsable({ expires_at: 2_000, used_at: null }, 1_000) && !PassUsable({ expires_at: 2_000, used_at: 1_500 }, 1_000) && !PassUsable({ expires_at: 900, used_at: null }, 1_000));
+check(
+    "Bei Free Access bleibt der Bot immer, ohne Pass und ohne Ansprechpartner",
+    RefuseFor({ free: true, pass: false, team: false, contacts: 0 }) === null && RefuseFor({ free: false, pass: false, team: false, contacts: 0 }) === "pass"
+);
 check("Ohne Pass geht der Bot, außer das Team hat eingeladen", RefuseFor({ pass: false, team: false, contacts: 3 }) === "pass" && RefuseFor({ pass: false, team: true, contacts: 0 }) === null);
 check("Ohne Ansprechpartner geht er, unbekannt heißt bleiben", RefuseFor({ pass: true, team: false, contacts: 0 }) === "contact" && RefuseFor({ pass: true, team: false, contacts: null }) === null);
 check(
