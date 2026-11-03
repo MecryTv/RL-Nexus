@@ -332,6 +332,8 @@ export interface ITech {
         readonly guildCount: number;
         readonly env: Readonly<Record<string, boolean>>;
     } | null;
+    /** Redis als Cache (W-0066). configured false: kein REDIS_PASSWORD gesetzt. */
+    readonly redis: { readonly configured: boolean; readonly ready: boolean; readonly error: string | null };
     readonly database: {
         readonly online: boolean;
         readonly version: string | null;
@@ -591,6 +593,114 @@ export interface IDbRows {
     readonly sort: string | null;
     readonly dir: "asc" | "desc";
     readonly search: string;
+}
+
+/* --- Dev → Datenbank: MariaDB und Redis (W-0066, Entwurf D-A++) -------------- */
+
+export interface IDbTableInfo {
+    readonly name: string;
+    /** Aus welchen Migrationen die Tabelle kommt. */
+    readonly origin: "bot" | "admin";
+    /** Bereich im Datenschutz-Verzeichnis, null: keiner. */
+    readonly area: string | null;
+    readonly engine: string | null;
+    /** Bei InnoDB geschätzt. */
+    readonly rows: number | null;
+    readonly dataBytes: number | null;
+    readonly indexBytes: number | null;
+    readonly autoIncrement: number | null;
+    readonly createdAt: string | null;
+    readonly updatedAt: string | null;
+    readonly collation: string | null;
+    readonly comment: string;
+}
+
+export interface IDbOverview {
+    readonly server: {
+        readonly ping: number | null;
+        /** Wohin das Admin Dashboard sich verbindet, etwa host.docker.internal:3306. */
+        readonly host: string | null;
+        readonly version: string | null;
+        /** Sekunden. */
+        readonly uptime: number | null;
+        readonly database: string | null;
+        readonly collation: string | null;
+        readonly connections: number | null;
+        readonly maxConnections: number | null;
+        readonly migrations: { readonly bot: number; readonly admin: number };
+    };
+    readonly tables: readonly IDbTableInfo[];
+}
+
+export interface IDbIndex {
+    readonly name: string;
+    readonly columns: readonly string[];
+    readonly unique: boolean;
+    readonly type: string;
+}
+
+export interface IDbTableDetail {
+    readonly table: IDbTableInfo;
+    /** Gezählt, nicht geschätzt. */
+    readonly exactRows: number;
+    readonly columns: readonly (IDbColumn & { readonly default: string | null; readonly extra: string })[];
+    readonly indexes: readonly IDbIndex[];
+    readonly createSql: string;
+}
+
+export interface IRedisArea {
+    readonly id: string;
+    readonly label: string;
+    /** Mit rln: davor, wie in Redis. */
+    readonly pattern: string;
+    readonly ttl: number;
+    readonly source: string;
+    readonly cleared: string;
+    readonly keys: number;
+    readonly bytes: number;
+    readonly hits: number;
+    readonly misses: number;
+    readonly failures: number;
+}
+
+export interface IRedisOverview {
+    readonly configured: boolean;
+    readonly ready: boolean;
+    readonly error: string | null;
+    readonly host: string | null;
+    readonly user: string | null;
+    readonly ping: number | null;
+    readonly version: string | null;
+    readonly keys: number;
+    readonly bytes: number;
+    /** Die Grenze aus docs/Redis.md (maxmemory). Lesen darf der Nutzer rlnexus sie nicht. */
+    readonly maxBytes: number;
+    readonly areas: readonly IRedisArea[];
+}
+
+export interface IRedisKeyRow {
+    /** Ohne rln: davor. */
+    readonly key: string;
+    readonly ttl: number;
+    readonly bytes: number | null;
+}
+
+export interface IRedisKeyList {
+    readonly area: IRedisArea;
+    readonly keys: readonly IRedisKeyRow[];
+    readonly total: number;
+    readonly page: number;
+    readonly pages: number;
+    readonly search: string;
+}
+
+export interface IRedisKey extends IRedisKeyRow {
+    readonly area: IRedisArea | null;
+    readonly type: string;
+    readonly encoding: string | null;
+    /** Sekunden seit dem Merken, aus Laufzeit und Restlaufzeit. */
+    readonly age: number | null;
+    readonly value: unknown;
 }
 
 /* --- Commands vom Bot ------------------------------------------------------ */

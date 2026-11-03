@@ -11,6 +11,7 @@ import { publish } from "../events.ts";
 import { notifyStatus } from "../notify.ts";
 import { MAINTENANCE_FILES, endMaintenance, parseStart, readMaintenanceState, setMaintenanceUntil, startMaintenance, stepMaintenance, type MaintenanceArea } from "../maintenance.ts";
 import { body, oneOf } from "../validate.ts";
+import { cacheState } from "../cache.ts";
 
 /** Wartung, Neustart und Technik-Ansicht. Nur für Developer. */
 
@@ -61,6 +62,7 @@ export async function operationRoutes(app: FastifyInstance, { config }: { config
                 env: bot.env,
             },
             database,
+            redis: cacheState(),
             admin: {
                 node: process.version,
                 uptime: Math.floor(process.uptime()),

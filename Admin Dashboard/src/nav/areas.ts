@@ -110,7 +110,7 @@ export const AREAS: readonly INavArea[] = [
         icon: "code",
         pages: [
             { to: "/dev/logs", label: "Logs", icon: "file-text", developer: true, description: "Sessions und Logdateien des Bots." },
-            { to: "/dev/datenbank", label: "Datenbank", icon: "database", developer: true, description: "Tabellen und Zeilen der Datenbank." },
+            { to: "/dev/datenbank", label: "Datenbank", icon: "database", developer: true, also: ["/dev/redis"], description: "Tabellen von MariaDB und der Cache in Redis." },
             { to: "/dev/technik", label: "Technik", icon: "cpu", developer: true, description: "Bot und Datenbank: Ping, Speicher, Versionen, Migrationen." },
             { to: "/dev/wartung", label: "Wartung", icon: "wrench", developer: true, description: "Wartung planen, ankündigen und beenden." },
             { to: "/dev/protokoll", label: "Protokoll", icon: "history", developer: true, description: "Wer im Admin Dashboard was geändert hat." },

@@ -87,6 +87,7 @@ const router = createBrowserRouter(
                 <Route path="dev/logs" lazy={devPage(() => import("./pages/LogsPage"), "LogsPage")} />
                 <Route path="dev/logs/:n" lazy={devPage(() => import("./pages/LogViewPage"), "LogViewPage")} />
                 <Route path="dev/datenbank/:table?" lazy={devPage(() => import("./pages/DatabasePage"), "DatabasePage")} />
+                <Route path="dev/redis/:area?" lazy={devPage(() => import("./pages/RedisPage"), "RedisPage")} />
                 <Route path="dev/technik" lazy={devPage(() => import("./pages/TechPage"), "TechPage")} />
                 <Route path="dev/wartung" lazy={devPage(() => import("./pages/MaintenancePage"), "MaintenancePage")} />
                 <Route path="dev/protokoll" lazy={devPage(() => import("./pages/AuditPage"), "AuditPage")} />

@@ -30,6 +30,7 @@ import { checkShop } from "./checks/shop.check.ts";
 import { checkSearch } from "./checks/search.check.ts";
 import { checkServers } from "./checks/servers.check.ts";
 import { checkSecurity } from "./checks/security.check.ts";
+import { checkCache } from "./checks/cache.check.ts";
 import { checkUserdata } from "./checks/userdata.check.ts";
 import { checkStatus, checkStatusHistoryKept, checkStatusRoutes } from "./checks/status.check.ts";
 
@@ -44,6 +45,7 @@ await checkSearch();
 await checkUserdata();
 await checkServers();
 await checkSecurity();
+await checkCache();
 await checkInput();
 await checkContact();
 await checkRoutes();

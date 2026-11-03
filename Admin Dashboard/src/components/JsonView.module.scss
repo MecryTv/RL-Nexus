@@ -1,0 +1,59 @@
+@use "mixins" as *;
+
+/* JSON mit Zeilennummern und Aufklappen (W-0066). */
+
+.json {
+    padding: var(--s-2) 0;
+    overflow-x: auto;
+    font: 500 0.78rem/1.6 ui-monospace, Consolas, monospace;
+}
+
+.line {
+    display: grid;
+    grid-template-columns: 3.2em 1.4em 1fr;
+    align-items: start;
+    min-width: max-content;
+}
+
+.number {
+    padding-right: var(--s-2);
+    color: #6b7480;
+    text-align: right;
+    user-select: none;
+}
+
+.fold button {
+    width: 1.2em;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--c-text-faint);
+    cursor: pointer;
+
+    &:focus-visible {
+        @include focus-ring;
+    }
+}
+
+.text {
+    padding-right: var(--s-3);
+    color: #cfd6df;
+    white-space: pre;
+}
+
+.key {
+    color: #7fd3ff;
+}
+
+.string {
+    color: #8ff0b8;
+}
+
+.num,
+.word {
+    color: var(--c-mod-engagement);
+}
+
+.more {
+    color: var(--c-text-faint);
+}

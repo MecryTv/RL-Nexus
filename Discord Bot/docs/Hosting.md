@@ -30,6 +30,7 @@ rlnexus-bot, rlnexus-admin ──► host.docker.internal:3306  MariaDB auf dem 
 | Admin Dashboard | Container `rlnexus-admin`: API und die Oberfläche aus `/var/www/admin.nexus-emb.de/dist` (auf dem Server gebaut), Port nur auf `127.0.0.1:3001` |
 | Bot und Bot-Dashboard | Container `rlnexus-bot`, Port nur auf `127.0.0.1:3000` |
 | Datenbank | MariaDB 11.8 direkt auf dem Server, Daten unter `/var/lib/mysql`. Port 3306 lässt ufw nur aus den Docker-Netzen durch. Eingerichtet von `scripts/mariadb-einrichten.sh` |
+| Cache | Redis direkt auf dem Server, Nutzer `rlnexus` mit Passwort aus der `.env`. Port 6379 lässt ufw nur aus den Docker-Netzen durch. Einrichten: [Redis.md](Redis.md) |
 | phpMyAdmin | `https://db.nexus-emb.de`, aus Debian mit php-fpm, hinter Name und Passwort von nginx |
 | Zertifikate, Weiterleitungen | nginx auf dem Host, je Domain eine Datei unter `/etc/nginx/sites-available/` (Vorlagen: `nginx/` in diesem Repo), certbot |
 | Ersatzseite | `/var/www/ersatzseite` (Vorlage `nginx/ersatzseite/`). nginx zeigt sie bei unbekannten Adressen und wenn eine Nexus-Seite nicht antwortet |

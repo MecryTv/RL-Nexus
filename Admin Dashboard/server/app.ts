@@ -8,6 +8,7 @@ import type { IConfig } from "./config.ts";
 import { errorResponse } from "./errors.ts";
 import { auditRoutes } from "./routes/audit.ts";
 import { databaseRoutes } from "./routes/database.ts";
+import { redisRoutes } from "./routes/redis.ts";
 import { subscribe } from "./events.ts";
 import { authRoutes } from "./routes/auth.ts";
 import { publicContactRoutes } from "./routes/contact.ts";
@@ -106,7 +107,8 @@ export async function buildApp(config: IConfig): Promise<FastifyInstance> {
             await dev.register(logRoutes, { config });
             await dev.register(operationRoutes, { config });
             await dev.register(auditRoutes);
-            await dev.register(databaseRoutes);
+            await dev.register(databaseRoutes, { config });
+            await dev.register(redisRoutes, { config });
         });
     });
 

@@ -61,6 +61,17 @@ function TechView({ tech }: { readonly tech: ITech }): JSX.Element {
                 )}
             </section>
 
+            <section className={styles.section} aria-labelledby="technik-redis">
+                <h2 id="technik-redis" className={styles.heading}>
+                    Redis
+                </h2>
+                <div className={styles.metrics}>
+                    <Metric label="Status" value={tech.redis.configured ? <Online online={tech.redis.ready} /> : "nicht eingerichtet"} />
+                    <Metric label="Aufgabe" value="Cache vor MariaDB" />
+                    {tech.redis.error && <Metric label="Letzter Fehler" value={tech.redis.error} />}
+                </div>
+            </section>
+
             <section className={styles.section} aria-labelledby="technik-datenbank">
                 <h2 id="technik-datenbank" className={styles.heading}>
                     Datenbank

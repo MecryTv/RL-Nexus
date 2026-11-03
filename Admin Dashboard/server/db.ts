@@ -21,7 +21,7 @@ export class DatabaseUnavailable extends PublicError {
 }
 
 const MIGRATIONS = path.join(import.meta.dirname, "migrations");
-const MIGRATIONS_TABLE = "admin_migrations";
+export const MIGRATIONS_TABLE = "admin_migrations";
 const POOL_LIMIT = 3;
 
 let pool: Pool | null = null;

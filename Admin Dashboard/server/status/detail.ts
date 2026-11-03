@@ -157,7 +157,7 @@ function techOf(snapshot: IStatusSnapshot | null): ITech {
             members: bot.guilds.reduce((sum, guild) => sum + guild.members, 0),
             versions: { app: bot.versions.app, node: bot.versions.node, discordjs: bot.versions.discordjs },
         },
-        database: database?.online ? { version: database.version, uptime: database.uptime, tables: database.tables, bytes: database.bytes, rows: database.rows } : null,
+        database: database?.online ? { version: database.version, uptime: database.uptime, tables: database.tables, bytes: database.bytes, rows: database.rows, cache: database.cache === true } : null,
         website: { builtAt: measured?.website.builtAt ?? null, banner: (measured?.banner ?? null) !== null },
     };
 }

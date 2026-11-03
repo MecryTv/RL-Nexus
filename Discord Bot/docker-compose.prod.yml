@@ -45,6 +45,11 @@ services:
             DATABASE_NAME: ${DATABASE_NAME:-rlnexus}
             DATABASE_USER: ${DATABASE_USER:-rlnexus}
             DATABASE_PASSWORD: ${DATABASE_PASSWORD:?DATABASE_PASSWORD fehlt in der .env}
+            # Redis als Cache auf dem Host (docs/Redis.md). Ohne REDIS_PASSWORD bleibt er aus.
+            REDIS_HOST: host.docker.internal
+            REDIS_PORT: "6379"
+            REDIS_USER: ${REDIS_USER:-rlnexus}
+            REDIS_PASSWORD: ${REDIS_PASSWORD:-}
             DEV_USER_IDs: ${DEV_USER_IDs:-}
             ADMIN_GUILD_ID: ${ADMIN_GUILD_ID:-1547258700480253982}
             ADMIN_ROLE_ID: ${ADMIN_ROLE_ID:-1548701400031297619}
@@ -101,7 +106,7 @@ services:
         # Die Hauptseite geht über nginx auf dem Host, IMAP und SMTP zu Mailcow,
         # beides auf diesem Server. So landen Prüfung und Postfach über den Host
         # dort, auch wenn der Server seine eigene öffentliche Adresse von innen
-        # nicht erreicht. host.docker.internal ist MariaDB auf dem Host.
+        # nicht erreicht. host.docker.internal ist MariaDB (und Redis) auf dem Host.
         extra_hosts:
             - "${SITE_DOMAIN:-nexus-emb.de}:host-gateway"
             - "${MAIL_DOMAIN:-mail.nexus-emb.de}:host-gateway"

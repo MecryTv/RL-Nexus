@@ -7,6 +7,7 @@ import { readContent, websiteStatus } from "../content.ts";
 import { databaseReady, query } from "../db.ts";
 import { readMaintenance } from "../maintenance.ts";
 import type { IMeasurement } from "./history.ts";
+import { cacheState } from "../cache.ts";
 
 /**
  * Eine Runde Prüfungen: Bot, Bot-Dashboard, Webseite, Datenbank. Jede mit
@@ -27,6 +28,8 @@ export interface IDatabaseFacts {
     readonly bytes: number;
     /** Geschätzt aus information_schema, bei InnoDB nie ganz genau. */
     readonly rows: number;
+    /** Redis war verbunden (W-0066). In älteren Runden fehlt das. */
+    readonly cache?: boolean;
 }
 
 export interface IMeasured {
@@ -85,6 +88,7 @@ async function databaseFacts(): Promise<IDatabaseFacts> {
             tables: Number(size?.tables ?? 0),
             bytes: Number(size?.bytes ?? 0),
             rows: Number(size?.rows ?? 0),
+            cache: cacheState().ready,
         };
     } catch {
         return NO_DATABASE;

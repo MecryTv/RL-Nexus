@@ -1,10 +1,10 @@
-# MariaDB und phpMyAdmin für RL Nexus.
+# MariaDB, phpMyAdmin und Redis für RL Nexus.
 #
-#   docker compose up -d      startet beide
+#   docker compose up -d      startet alle drei
 #   docker compose down       stoppt sie, die Daten bleiben
 #   docker compose down -v    stoppt sie UND löscht die Daten
 #
-# phpMyAdmin liegt danach auf http://localhost:8080, die Datenbank auf 3306.
+# phpMyAdmin liegt danach auf http://localhost:8080, die Datenbank auf 3306, Redis auf 6379.
 # Die Zugangsdaten stehen in der .env - dieselben, die auch der Bot benutzt.
 
 # Fester Projektname wie in docker-compose.prod.yml: Das Volume heißt damit
@@ -48,6 +48,41 @@ services:
         depends_on:
             mariadb:
                 condition: service_healthy
+
+    # Redis als Cache vor MariaDB (W-0066), eingerichtet wie auf dem VPS
+    # (docs/Redis.md): Nutzer rlnexus mit Passwort, nur Schlüssel mit rln:,
+    # Standardnutzer aus, 256 MB, nichts auf die Platte. Das Passwort steht in
+    # der .env als REDIS_PASSWORD, dasselbe wie in der .env des Admin Dashboards.
+    redis:
+        image: redis:8.0-alpine
+        container_name: rlnexus-redis
+        restart: unless-stopped
+        command:
+            - redis-server
+            - --user
+            - default
+            - "off"
+            - resetpass
+            - -@all
+            - --user
+            - ${REDIS_USER:-rlnexus}
+            - "on"
+            - ">${REDIS_PASSWORD:?REDIS_PASSWORD fehlt in der .env}"
+            - ~rln:*
+            - resetchannels
+            - +@all
+            - -@dangerous
+            - --maxmemory
+            - 256mb
+            - --maxmemory-policy
+            - allkeys-lru
+            - --save
+            - ""
+            - --appendonly
+            - "no"
+        ports:
+            # Nur auf dem eigenen Rechner erreichbar, nicht im ganzen Netz.
+            - "127.0.0.1:6379:6379"
 
 volumes:
     mariadb-data:

@@ -7,6 +7,7 @@ import { ensureBackupDatabase } from "./backups/store.ts";
 import { scheduleCleanup } from "./cleanup.ts";
 import { scheduleCommandSync } from "./commands-sync.ts";
 import { loadConfig, type IConfig } from "./config.ts";
+import { closeCache, connectCache } from "./cache.ts";
 import { closeDatabase, connectDatabase } from "./db.ts";
 import { closeEvents } from "./events.ts";
 import { closeAllMail } from "./mail/pool.ts";
@@ -30,6 +31,8 @@ const config: IConfig = (() => {
 })();
 
 await connectDatabase(config);
+// W-0066: Redis als Cache, falls eingerichtet. Ohne Redis geht alles direkt an MariaDB.
+await connectCache(config);
 const backupProblem = await ensureBackupDatabase(config);
 if (backupProblem && config.database) console.warn(`⚠️  Backups: ${backupProblem}`);
 scheduleBackups(config);
@@ -60,6 +63,6 @@ for (const signal of ["SIGTERM", "SIGINT"] as const) {
         // Offene Ereignisströme zuerst: Sonst wartet app.close() auf Antworten,
         // die nie enden.
         closeEvents();
-        void Promise.all([app.close(), closeAllMail()]).then(closeDatabase).finally(() => process.exit(0));
+        void Promise.all([app.close(), closeAllMail()]).then(() => Promise.all([closeDatabase(), closeCache()])).finally(() => process.exit(0));
     });
 }
