@@ -16,6 +16,14 @@ function backupDatabaseName(value: string): string {
     return name;
 }
 
+/** Redis als Cache (W-0066). Ohne REDIS_PASSWORD bleibt er aus. */
+export interface IRedisConfig {
+    readonly host: string;
+    readonly port: number;
+    readonly user: string;
+    readonly password: string;
+}
+
 export interface IDatabaseConfig {
     readonly host: string;
     readonly port: number;
@@ -77,6 +85,7 @@ export interface IConfig {
     readonly jwtSecret: string;
     /** null heißt: ohne Datenbank. Was sie braucht, sagt dann, dass sie fehlt. */
     readonly database: IDatabaseConfig | null;
+    readonly redis: IRedisConfig | null;
     readonly devUserIds: readonly string[];
     readonly guildId: string;
     readonly adminRoleId: string;
@@ -217,6 +226,11 @@ export function loadConfig(env: Env = process.env, argv: readonly string[] = pro
               }
             : null;
 
+    const redisPort = Number(raw("REDIS_PORT") || 6379);
+    if (!Number.isInteger(redisPort) || redisPort < 1 || redisPort > 65535) throw new Error(`REDIS_PORT ist ungültig: ${raw("REDIS_PORT")}`);
+
+    const redis = raw("REDIS_PASSWORD") ? { host: raw("REDIS_HOST") || "127.0.0.1", port: redisPort, user: raw("REDIS_USER") || "rlnexus", password: raw("REDIS_PASSWORD") } : null;
+
     const siteUrl = developerMode
         ? publicAddress(raw("DEV_WEBSITE_PUBLIC_URL"), "http://localhost:5173")
         : publicAddress(raw("WEBSITE_PUBLIC_URL"), "https://nexus-emb.de");
@@ -228,6 +242,7 @@ export function loadConfig(env: Env = process.env, argv: readonly string[] = pro
         botToken: need(app("CLIENT_TOKEN")),
         jwtSecret,
         database,
+        redis,
         devUserIds: raw("DEV_USER_IDs")
             .split(",")
             .map((value) => value.trim())

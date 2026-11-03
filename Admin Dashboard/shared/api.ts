@@ -332,6 +332,8 @@ export interface ITech {
         readonly guildCount: number;
         readonly env: Readonly<Record<string, boolean>>;
     } | null;
+    /** Redis als Cache (W-0066). configured false: kein REDIS_PASSWORD gesetzt. */
+    readonly redis: { readonly configured: boolean; readonly ready: boolean; readonly error: string | null };
     readonly database: {
         readonly online: boolean;
         readonly version: string | null;
