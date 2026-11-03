@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { deadlineText, renderServerImage, serverMessage } from "../servers/dm.ts";
+import { deadlineText, inviteUrl, renderServerImage, serverMessage } from "../servers/dm.ts";
 import { choiceStep, decideJoin, keepAlone, signature } from "../servers/rules.ts";
 import { buildApp } from "../app.ts";
 import { signToken } from "../bot.ts";
@@ -82,6 +82,27 @@ export async function checkServers(): Promise<void> {
         assert.equal(deadlineText(new Date("2026-11-04T20:57:00Z")), "Mittwoch, 4. November · 21:57 Uhr");
     });
 
+    await check("Punkt 4: D1 mit Schritten, Links über die Einlade-Route statt direkt zu Discord", async () => {
+        const image = await renderServerImage({
+            strip: "#f23f43",
+            person: { name: "Lena", avatar: null },
+            title: "RL Nexus ist wieder gegangen",
+            sub: "Hallo Lena, jemand hat RL Nexus eingeladen, aber nicht über die Webseite.",
+            tilesLabel: "Dein Server",
+            tiles: [{ id: "2", name: "Chill Zone", members: 17, since: new Date(), tag: "nopass" }],
+            steps: { label: "So geht es richtig", items: ["Bot einladen drücken", "Chill Zone auswählen", "Bei Discord bestätigen"] },
+        });
+
+        assert.equal(image.data.subarray(1, 4).toString(), "PNG");
+        assert.match(image.alt, /Dein Server: Chill Zone \(17 Mitglieder, ohne freigabe\)/);
+        assert.match(image.alt, /2\. Chill Zone auswählen/);
+
+        const message = JSON.stringify(serverMessage(image, { kind: "links", text: "Gegangen", links: [{ label: "Richtig einladen", url: "https://dashboard.nexus-emb.de/einladen?guild=2" }] }));
+        assert.match(message, /Richtig einladen/);
+        assert.match(inviteUrl(config, "2"), /\/einladen\?guild=2$/);
+        assert.doesNotMatch(inviteUrl(config), /discord\.com/);
+    });
+
     const app = await buildApp(config);
     const cookie = `${SESSION_COOKIE}=${seal({ id: USERS.admin, name: "nutzer1", avatar: null, exp: Math.floor(Date.now() / 1000) + 600 }, SECRET)}`;
 
@@ -90,7 +111,7 @@ export async function checkServers(): Promise<void> {
             const knock = (url: string, authorization?: string) =>
                 app.inject({ method: "POST", url, headers: { "content-type": "application/json", ...(authorization ? { authorization } : {}) }, payload: JSON.stringify({ guildId: "123456789012345678" }) });
 
-            for (const url of ["/internal/servers/joined", "/internal/servers/choose", "/internal/servers/removed"]) {
+            for (const url of ["/internal/servers/joined", "/internal/servers/choose", "/internal/servers/removed", "/internal/servers/refused"]) {
                 assert.equal((await knock(url)).statusCode, 401);
                 assert.equal((await knock(url, `Bearer ${signToken(SECRET, "discord:123456789012345678", ["userdata"])}`)).statusCode, 401);
             }

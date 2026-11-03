@@ -2,6 +2,7 @@ import { FastifyReply, FastifyRequest } from "fastify";
 import BotClient from "../client/BotClient";
 import { HasAdminScope } from "../constants/Admin";
 import Route from "../structures/Route";
+import { PassUser } from "../utils/invitepass";
 import { InviterOf } from "../utils/servers";
 
 /** Gruppen, für die „ein Server pro Person“ nicht gilt (W-0064). */
@@ -27,7 +28,9 @@ export default class AdminServer extends Route {
         const guild = this.client.guilds.cache.get((request.params as { id?: string }).id ?? "");
         if (!guild) return reply.code(404).send({ error: "Der Bot ist nicht auf diesem Server." });
 
-        const inviter = await InviterOf(guild);
+        // W-0064, Punkt 4: Kam der Bot über das Bot-Dashboard, steht der Einlader im Pass.
+        const passUser = await PassUser(this.client, guild.id, guild.joinedTimestamp - 60_000);
+        const inviter = passUser ? { userId: passUser, source: "dashboard" as const } : await InviterOf(guild);
 
         return {
             id: guild.id,

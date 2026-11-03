@@ -9,7 +9,8 @@
  */
 import { ParseServerId } from "../events/servers/ServerLimitButtons";
 import { JoinProblem, SameName } from "../routes/DashboardApiTeam";
-import { PickInviter } from "../utils/servers";
+import { GateFresh, GATE_NO_TTL, GATE_OK_TTL, PassUsable, RefuseFor } from "../utils/invitepass";
+import { NoAccessReply, PickInviter } from "../utils/servers";
 
 let failures = 0;
 
@@ -50,5 +51,17 @@ check("Servername bestätigen: Leerzeichen am Rand und Groß/klein egal", SameNa
 check("Gebannt und voll ergeben denselben Satz ohne Code", JoinProblem(40007) === JoinProblem(30001) && !/\d/.test(JoinProblem(40007) ?? "1"));
 check("Fehlendes Recht heißt: einmal zustimmen", JoinProblem(50025) === null);
 
-console.log(failures ? `\n${failures} Prüfung(en) fehlgeschlagen.` : "\nAlles in Ordnung.");
-process.exit(failures ? 1 : 0);
+console.log("\nFreigabe-Pass und Ansprechpartner (Punkt 4 und 5)");
+check("Pass gilt 15 Minuten und nur einmal", PassUsable({ expires_at: 2_000, used_at: null }, 1_000) && !PassUsable({ expires_at: 2_000, used_at: 1_500 }, 1_000) && !PassUsable({ expires_at: 900, used_at: null }, 1_000));
+check("Ohne Pass geht der Bot, außer das Team hat eingeladen", RefuseFor({ pass: false, team: false, contacts: 3 }) === "pass" && RefuseFor({ pass: false, team: true, contacts: 0 }) === null);
+check("Ohne Ansprechpartner geht er, unbekannt heißt bleiben", RefuseFor({ pass: true, team: false, contacts: 0 }) === "contact" && RefuseFor({ pass: true, team: false, contacts: null }) === null);
+check("Mit Ansprechpartner gilt die Prüfung einen Tag, ohne fünf Minuten", GateFresh({ ok: true, at: 0 }, GATE_OK_TTL - 1) && !GateFresh({ ok: true, at: 0 }, GATE_OK_TTL) && !GateFresh({ ok: false, at: 0 }, GATE_NO_TTL) && !GateFresh(undefined, 0));
+
+void (async () => {
+    const reply = JSON.stringify(await NoAccessReply("Chill Zone", false, "https://nexus-emb.de/preise"));
+    const managerReply = JSON.stringify(await NoAccessReply("Chill Zone", true, "https://nexus-emb.de/preise"));
+    check("Antwort ohne Zugang: Mitglieder wenden sich an Owner oder Admin, nur Admins sehen „Zugang holen“", reply.includes("Kein Admin mit Zugang") && reply.includes("Wende dich an den Owner") && !reply.includes("Zugang holen") && managerReply.includes("Zugang holen") && managerReply.includes("Server verwalten"));
+
+    console.log(failures ? `\n${failures} Prüfung(en) fehlgeschlagen.` : "\nAlles in Ordnung.");
+    process.exit(failures ? 1 : 0);
+})();

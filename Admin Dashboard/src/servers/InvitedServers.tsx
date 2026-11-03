@@ -63,7 +63,7 @@ export function InvitedServers({ userId }: { readonly userId: string }): JSX.Ele
             </div>
 
             <p className={styles.note}>
-                Woher RL Nexus weiß, wer eingeladen hat: aus dem Audit-Log des Servers (Eintrag „Bot hinzugefügt“), auch bei Einladungen über das Bot-Dashboard. Steht dort niemand, gilt der Owner. Die Mitglieder kommen live vom Bot und werden nicht gespeichert.
+                Woher RL Nexus weiß, wer eingeladen hat: Seit dem Freigabe-Pass aus der Einladung über das Bot-Dashboard, bei älteren Servern aus dem Audit-Log (Eintrag „Bot hinzugefügt“). Steht dort niemand, gilt der Owner. Die Mitglieder kommen live vom Bot und werden nicht gespeichert.
             </p>
         </div>
     );
@@ -86,7 +86,7 @@ function ServerCard({ server, userId, others, open, onChanged }: { readonly serv
         onChanged();
     };
 
-    const origin = server.source === "audit" ? "laut Audit-Log" : "Owner angenommen";
+    const origin = server.source === "dashboard" ? "über das Bot-Dashboard" : server.source === "audit" ? "laut Audit-Log" : "Owner angenommen";
     const owner = server.ownerId === userId ? `${server.ownerName ?? "Owner"} (die Person selbst)` : (server.ownerName ?? server.ownerId);
 
     return (

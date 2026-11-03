@@ -133,7 +133,7 @@ export const AREAS: readonly IArea[] = [
 // des Nukers - zurückgeladen, löschte es dessen gemerkte Rollen. Also nie im Backup, nie überschrieben.
 // server_*: Zuordnung alter zu neuer IDs und laufende Ladevorgänge (Plan 32), ebenfalls Live-Zustand;
 // dazu die Einladungen, Anfragen und Sperren von „ein Server pro Person“ (W-0064), die das Team führt.
-export const EXCLUDED_TABLES = ["temp_voices", "support_waits", "av_cases", "av_trust", "av_reports", "av_incidents", "av_events", "av_debris", "server_id_map", "server_restores", "server_invites", "server_requests", "server_blocks"] as const;
+export const EXCLUDED_TABLES = ["temp_voices", "support_waits", "av_cases", "av_trust", "av_reports", "av_incidents", "av_events", "av_debris", "server_id_map", "server_restores", "server_invites", "server_requests", "server_blocks", "invite_passes"] as const;
 
 export interface IBackupMeta {
     readonly id: number;

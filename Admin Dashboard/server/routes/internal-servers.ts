@@ -3,7 +3,7 @@ import { verifyToken } from "../bot.ts";
 import type { IConfig } from "../config.ts";
 import { DatabaseUnavailable, databaseReady } from "../db.ts";
 import { PublicError } from "../errors.ts";
-import { checkGuild, chooseFromDm, choiceOptions, recordRemoved, requestFromDm, undoFromDm, type IReply } from "../servers/flow.ts";
+import { checkGuild, chooseFromDm, choiceOptions, recordRemoved, refusedDm, requestFromDm, undoFromDm, type IReply } from "../servers/flow.ts";
 import { body, oneOf, snowflake, text } from "../validate.ts";
 
 /**
@@ -44,6 +44,30 @@ export async function internalServerRoutes(app: FastifyInstance, { config }: { c
         void checkGuild(config, guildId).catch((error: unknown) => console.error(`🧭 Beitritt ${guildId} nicht geprüft: ${error instanceof Error ? error.message : String(error)}`));
 
         return reply.code(202).send({ ok: true });
+    });
+
+    // W-0064, Punkt 4: Der Bot geht gleich wieder (ohne Freigabe oder ohne Admin mit Zugang). Erst die DM an den Owner.
+    app.post("/internal/servers/refused", limit, async (request) => {
+        caller(config, request);
+        const input = body(request.body);
+        // Nur Adressen des Bots (lokal auch http), nie javascript: oder Ähnliches.
+        const url = (value: unknown, label: string): string => {
+            const checked = text(value, label, { min: 8, max: 300 });
+            if (!/^https?:\/\/[^\s]+$/.test(checked)) throw new PublicError(400, `${label} ist keine Adresse.`);
+
+            return checked;
+        };
+        const error = await refusedDm(config, {
+            guildId: snowflake(input.guildId, "Die Server-ID"),
+            guildName: text(input.guildName, "Der Servername", { min: 1, max: 100 }),
+            ownerId: snowflake(input.ownerId, "Die Owner-ID"),
+            members: Math.max(0, Number(input.members) || 0),
+            reason: oneOf(input.reason, ["pass", "contact"] as const, "Der Grund"),
+            inviteUrl: url(input.inviteUrl, "Der Einlade-Link"),
+            accessUrl: url(input.accessUrl, "Der Link zum Zugang"),
+        });
+
+        return { message: error ? "DM nicht zugestellt" : "DM zugestellt", dm: error === null };
     });
 
     app.post("/internal/servers/removed", limit, async (request) => {

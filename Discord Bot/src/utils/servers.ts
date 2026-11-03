@@ -1,5 +1,6 @@
-import { AuditLogEvent, Guild, GuildMember } from "discord.js";
+import { AuditLogEvent, Guild, GuildMember, InteractionReplyOptions, MessageFlags } from "discord.js";
 import { CreateToken } from "./jwt";
+import { NO_ACCESS_TITLE, NoAccessText, RenderNoAccess } from "../builder/NoAccessCard";
 
 /**
  * Ein Server pro Person (W-0064), Teil des Bots: wer den Bot eingeladen hat,
@@ -15,7 +16,7 @@ export interface IAuditEntryLike {
 
 export interface IInviter {
     readonly userId: string;
-    readonly source: "audit" | "owner";
+    readonly source: "audit" | "owner" | "dashboard";
 }
 
 /** Der neueste Eintrag „Bot hinzugefügt“ mit diesem Bot als Ziel. Fehlt er, gilt der Owner. */
@@ -93,4 +94,22 @@ export async function AskServers(baseUrl: string, secret: string, subject: strin
     } catch {
         return { reply: null, error: SERVERS_UNREACHABLE };
     }
+}
+
+/**
+ * W-0064, Punkt 5 (Entwurf C-B): Antwort auf Commands ohne Zugang, nur für die
+ * Person, als Bild. Admins (Server verwalten) sehen den Knopf „Zugang holen“,
+ * alle anderen den Hinweis, sich an den Owner oder einen Admin zu wenden.
+ */
+export async function NoAccessReply(guildName: string, manager: boolean, accessUrl: string): Promise<InteractionReplyOptions> {
+    const image = await RenderNoAccess(guildName, manager);
+
+    return {
+        flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral,
+        files: [{ attachment: image, name: "rl-nexus-ohne-zugang.png" }],
+        components: [
+            { type: 12, items: [{ media: { url: "attachment://rl-nexus-ohne-zugang.png" }, description: `${NO_ACCESS_TITLE}. ${NoAccessText(guildName, manager)}` }] },
+            ...(manager ? [{ type: 1, components: [{ type: 2, style: 5, label: "Zugang holen", url: accessUrl }] }] : []),
+        ],
+    } as InteractionReplyOptions;
 }

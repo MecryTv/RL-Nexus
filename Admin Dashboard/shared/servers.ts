@@ -6,7 +6,7 @@
 /** Gründe zum Anklicken beim Entfernen. Gleich im Bot-Dashboard (GuildBotTeam.ts). */
 export const REMOVE_REASONS = ["Missbrauch", "Wunsch des Owners", "Zweiter Server ohne Freigabe", "Testserver", "Sonstiges"] as const;
 
-export type InviteSource = "audit" | "owner";
+export type InviteSource = "audit" | "owner" | "dashboard";
 export type RequestKind = "extra" | "switch";
 export type RequestOrigin = "dm" | "wahl" | "team";
 export type RequestStatus = "open" | "approved" | "declined" | "revoked" | "done";

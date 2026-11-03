@@ -145,7 +145,7 @@ export function cardFor(guild: IGuild, position: number, animate: boolean): HTML
 
         foot.append(
             guild.canManage
-                ? link("btn btn--warm", "Bot einladen", inviteFor(guild.id), true)
+                ? link("btn btn--warm", "Bot einladen", inviteFor(guild.id))
                 : link("btn btn--quiet", "Keine Berechtigung", url("/")),
             ghost("#i-info", "Was RL Nexus auf einem Server macht")
         );
@@ -214,12 +214,9 @@ function paintModules(box: HTMLElement, guild: IGuild): void {
     }
 }
 
-export let inviteBase = "";
-
+/** W-0064, Punkt 4: über die Einlade-Route, die den Freigabe-Pass anlegt. Direkt zu Discord ginge der Bot gleich wieder. */
 export function inviteFor(guildId: string): string {
-    if (!inviteBase) return url("/");
-
-    return `${inviteBase}&guild_id=${encodeURIComponent(guildId)}&disable_guild_select=true`;
+    return url(`/einladen?guild=${encodeURIComponent(guildId)}`);
 }
 
 export function matches(guild: IGuild): boolean {
@@ -293,7 +290,6 @@ export function renderServers(data: IPayload): void {
     const glide = need<HTMLElement>("#glide");
     const reset = need<HTMLButtonElement>("#emptyReset");
 
-    inviteBase = data.inviteURL;
     watchInvites();
 
     const active = data.guilds.filter((guild) => guild.active);

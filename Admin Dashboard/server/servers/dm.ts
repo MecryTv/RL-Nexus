@@ -30,7 +30,7 @@ export function deadlineText(date: Date): string {
     return `${berlin(date, { weekday: "long", day: "numeric", month: "long" })} · ${berlin(date, { hour: "2-digit", minute: "2-digit" })} Uhr`;
 }
 
-export type TileTag = "main" | "gone" | "approved" | null;
+export type TileTag = "main" | "gone" | "approved" | "nopass" | "noaccess" | null;
 
 export interface IServerTile {
     readonly id: string;
@@ -48,13 +48,19 @@ export interface IServerImage {
     /** Große Zeile mit Label darüber, etwa die Frist. progress: Anteil der Leiste darunter. */
     readonly big?: { readonly label: string; readonly value: string; readonly progress: number };
     readonly tiles?: readonly IServerTile[];
+    /** Überschrift über den Kacheln, sonst „Deine Server“. */
+    readonly tilesLabel?: string;
     readonly note?: string;
+    /** Nummerierte Schritte unter den Kacheln (DM D1, „So geht es richtig“). */
+    readonly steps?: { readonly label: string; readonly items: readonly string[] };
 }
 
 const TAGS: Readonly<Record<Exclude<TileTag, null>, { readonly text: string; readonly color: string }>> = {
     main: { text: "HAUPTSERVER", color: "#23a55a" },
     gone: { text: "BOT IST GEGANGEN", color: "#f23f43" },
     approved: { text: "FREIGABE", color: "#a78bfa" },
+    nopass: { text: "OHNE FREIGABE", color: "#f23f43" },
+    noaccess: { text: "KEIN ZUGANG", color: "#f0b232" },
 };
 
 function initials(name: string): string {
@@ -150,7 +156,7 @@ async function paint(ctx: SKRSContext2D, input: IServerImage): Promise<number> {
     if (tiles.length > 0) {
         ctx.font = "700 16px Rajdhani";
         ctx.fillStyle = DIM;
-        ctx.fillText("DEINE SERVER", PAD, y + 4);
+        ctx.fillText((input.tilesLabel ?? "Deine Server").toUpperCase(), PAD, y + 4);
         y += 18;
 
         const perRow = Math.min(3, tiles.length);
@@ -158,6 +164,33 @@ async function paint(ctx: SKRSContext2D, input: IServerImage): Promise<number> {
 
         tiles.forEach((server, index) => tile(ctx, server, PAD + (index % perRow) * (width + 12), y + Math.floor(index / perRow) * 130, width));
         y += Math.ceil(tiles.length / perRow) * 130 + 6;
+    }
+
+    if (input.steps) {
+        ctx.font = "700 16px Rajdhani";
+        ctx.fillStyle = DIM;
+        ctx.fillText(input.steps.label.toUpperCase(), PAD, y + 4);
+        y += 16;
+
+        input.steps.items.forEach((item, index) => {
+            ctx.fillStyle = TILE;
+            ctx.beginPath();
+            ctx.roundRect(PAD, y, W - 2 * PAD, 40, 6);
+            ctx.fill();
+            ctx.fillStyle = "#3a3f4b";
+            ctx.beginPath();
+            ctx.arc(PAD + 22, y + 20, 12, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = TEXT;
+            ctx.font = "800 14px Oxanium";
+            ctx.textAlign = "center";
+            ctx.fillText(String(index + 1), PAD + 22, y + 25);
+            ctx.textAlign = "left";
+            ctx.font = "600 18px Rajdhani";
+            ctx.fillText(fit(ctx, item, W - 2 * PAD - 60), PAD + 46, y + 26);
+            y += 48;
+        });
+        y += 10;
     }
 
     if (input.note) {
@@ -183,7 +216,14 @@ async function paint(ctx: SKRSContext2D, input: IServerImage): Promise<number> {
 export function altText(input: IServerImage): string {
     const tiles = (input.tiles ?? []).map((server) => `${server.name} (${number(server.members)} Mitglieder${server.tag ? `, ${TAGS[server.tag].text.toLowerCase()}` : ""})`);
 
-    return [input.title, input.sub, input.big ? `${input.big.label}: ${input.big.value}` : null, tiles.length ? `Deine Server: ${tiles.join(", ")}` : null, input.note ?? null]
+    return [
+        input.title,
+        input.sub,
+        input.big ? `${input.big.label}: ${input.big.value}` : null,
+        tiles.length ? `${input.tilesLabel ?? "Deine Server"}: ${tiles.join(", ")}` : null,
+        input.steps ? `${input.steps.label}: ${input.steps.items.map((item, index) => `${index + 1}. ${item}`).join(" ")}` : null,
+        input.note ?? null,
+    ]
         .filter(Boolean)
         .join(". ")
         .slice(0, 1024);
@@ -207,16 +247,16 @@ export async function renderServerImage(input: IServerImage): Promise<{ readonly
     return { name: "rl-nexus-server.png", data: trimmed.toBuffer("image/png"), alt: altText(input) };
 }
 
-/** Link zum Einladen des Bots, mit Server vorausgewählt. */
+/** Wo das Bot-Dashboard steht, wenn DASHBOARD_URL fehlt. */
+const DASHBOARD = "https://dashboard.nexus-emb.de";
+
+/**
+ * Link zum Einladen des Bots, mit Server vorausgewählt. W-0064, Punkt 4: über
+ * die Einlade-Route des Bot-Dashboards, die den Freigabe-Pass anlegt. Direkt
+ * bei Discord eingeladen, ginge der Bot gleich wieder.
+ */
 export function inviteUrl(config: IConfig, guildId?: string): string {
-    const query = new URLSearchParams({ client_id: config.clientId, permissions: "8", scope: "bot applications.commands" });
-
-    if (guildId) {
-        query.set("guild_id", guildId);
-        query.set("disable_guild_select", "true");
-    }
-
-    return `https://discord.com/oauth2/authorize?${query}`;
+    return `${config.dashboardUrl ?? DASHBOARD}/einladen${guildId ? `?guild=${guildId}` : ""}`;
 }
 
 export type IServerOption = IServerOptionView;
@@ -227,6 +267,7 @@ export type ServerExtra =
     | { readonly kind: "choice"; readonly deadline: Date; readonly options: readonly IServerOption[] }
     | { readonly kind: "remind" }
     | { readonly kind: "link"; readonly label: string; readonly url: string }
+    | { readonly kind: "links"; readonly text: string; readonly links: readonly { readonly label: string; readonly url: string }[] }
     | { readonly kind: "none" };
 
 export function pickMenu(options: readonly IServerOption[]): unknown {
@@ -268,6 +309,8 @@ export function serverMessage(image: { readonly name: string; readonly alt: stri
         parts.push({ type: 1, components: [{ type: 2, style: 3, label: "Jetzt wählen", custom_id: "sv:remind" }] });
     } else if (extra.kind === "link") {
         parts.push({ type: 1, components: [{ type: 2, style: 5, label: extra.label, url: extra.url }] });
+    } else if (extra.kind === "links") {
+        parts.push({ type: 10, content: extra.text }, { type: 1, components: extra.links.map((link) => ({ type: 2, style: 5, label: link.label, url: link.url })) });
     }
 
     return { flags: 1 << 15, components: parts };

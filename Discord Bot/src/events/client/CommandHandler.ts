@@ -4,6 +4,8 @@ import Event from "../../structures/Event";
 import Command from "../../structures/Command";
 import ComponentV2Builder from "../../builder/ComponentV2Builder";
 import logger from "../../utils/logger";
+import { CommandsAllowed } from "../../utils/invitepass";
+import { NoAccessReply } from "../../utils/servers";
 
 export default class CommandHandler extends Event {
     constructor(client: BotClient) {
@@ -67,6 +69,13 @@ export default class CommandHandler extends Event {
                     .text("This command is only available to the bot developers.")
                     .toMessage({ ephemeral: true })
             );
+
+            return;
+        }
+
+        // W-0064, Punkt 5: Hat auf dem Server niemand Zugang, laufen keine Commands. Developer-Befehle bleiben.
+        if (interaction.inCachedGuild() && !command.developerOnly && !(await CommandsAllowed(this.client, interaction.guild))) {
+            await interaction.reply(await NoAccessReply(interaction.guild.name, interaction.memberPermissions.has("ManageGuild"), `${this.client.config.SITE_PUBLIC_URL.replace(/\/+$/, "")}/preise`));
 
             return;
         }

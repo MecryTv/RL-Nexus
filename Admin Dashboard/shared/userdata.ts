@@ -68,6 +68,7 @@ export const USERDATA_AREAS: readonly IUserdataAreaDef[] = [
             { table: "server_invites", column: "owner_id", role: "person", guild: G, time: "invited_at", label: "CONCAT('Owner von ', guild_name)" },
             { table: "server_requests", column: "user_id", role: "person", guild: G, time: "created_at", label: "CONCAT('Server-Anfrage · ', guild_name, ' · ', status)", words: true },
             { table: "server_choices", column: "user_id", role: "person", time: "created_at", label: "CONCAT('Wahl ein Server pro Person · ', state)", words: true },
+            { table: "invite_passes", column: "user_id", role: "person", guild: G, time: ms("created_at"), label: "'Freigabe zum Einladen des Bots'" },
         ],
     },
     {

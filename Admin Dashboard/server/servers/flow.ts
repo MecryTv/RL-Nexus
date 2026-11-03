@@ -634,6 +634,69 @@ export function removeFromProfile(config: IConfig, guildId: string, actor: ITeam
     });
 }
 
+export interface IRefusedInput {
+    readonly guildId: string;
+    readonly guildName: string;
+    readonly ownerId: string;
+    readonly members: number;
+    readonly reason: "pass" | "contact";
+    readonly inviteUrl: string;
+    readonly accessUrl: string;
+}
+
+/**
+ * W-0064, Punkt 4 (Entwürfe D1 und D2): Der Bot kam ohne Freigabe-Pass oder
+ * ohne Admin mit Zugang auf einen Server und geht gleich wieder. Vorher
+ * bekommt der Owner die DM als Bild. null: angekommen, sonst der Grund.
+ */
+export async function refusedDm(config: IConfig, input: IRefusedInput, now = new Date()): Promise<string | null> {
+    const owner = await personBase(config, input.ownerId, null);
+    const tile: IServerTile = { id: input.guildId, name: input.guildName, members: input.members, since: now, tag: input.reason === "pass" ? "nopass" : "noaccess" };
+    const site = new URL(input.accessUrl).host;
+    const error =
+        input.reason === "pass"
+            ? await sendServerDm(
+                  config,
+                  input.ownerId,
+                  {
+                      strip: "#f23f43",
+                      person: owner,
+                      title: "RL Nexus ist wieder gegangen",
+                      sub: `Hallo ${owner.name}, jemand hat RL Nexus auf deinen Server eingeladen, aber nicht über die Webseite. Ohne Freigabe läuft RL Nexus nicht.`,
+                      tilesLabel: "Dein Server",
+                      tiles: [tile],
+                      steps: { label: "So geht es richtig", items: [`Auf ${site} „Bot einladen“ drücken und mit Discord anmelden`, `${input.guildName} auswählen`, "Bei Discord bestätigen, fertig"] },
+                  },
+                  { kind: "links", text: `Gegangen <t:${Math.floor(now.getTime() / 1000)}:R> · Fragen: support@nexus-emb.de`, links: [{ label: "Richtig einladen", url: input.inviteUrl }] }
+              )
+            : await sendServerDm(
+                  config,
+                  input.ownerId,
+                  {
+                      strip: STRIPS.limit,
+                      person: owner,
+                      title: "Es fehlt ein Ansprechpartner",
+                      sub: `Hallo ${owner.name}, auf deinem Server hat kein Admin Zugang zu RL Nexus. Das Team braucht immer einen Admin mit Zugang, den es fragen kann.`,
+                      tilesLabel: "Dein Server",
+                      tiles: [tile],
+                      note: "Ansprechpartner kann nur ein Admin des Servers sein: der Owner oder jemand mit „Server verwalten“, und er braucht Zugang (Kauf im Shop, im Beta-Modus ein Beta-Code). Bei Free Access ist es immer der Owner.",
+                  },
+                  {
+                      kind: "links",
+                      text: `RL Nexus hat ${input.guildName} verlassen. Mit Zugang kannst du ihn gleich wieder einladen.`,
+                      links: [
+                          { label: "Zugang holen", url: input.accessUrl },
+                          { label: "Wieder einladen", url: input.inviteUrl },
+                      ],
+                  }
+              );
+
+    await audit(CLOCK, "servers.refused", input.guildId, `${input.guildName}: ${input.reason === "pass" ? "ohne Freigabe eingeladen" : "kein Admin mit Zugang"}${error ? `, DM an den Owner nicht zugestellt: ${error}` : ""}`.slice(0, 500));
+    publish("servers");
+
+    return error;
+}
+
 export interface IRemovedInput {
     readonly guildId: string;
     readonly guildName: string;
