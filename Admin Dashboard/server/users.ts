@@ -46,6 +46,11 @@ export function forgetUser(userId: string): void {
     void forget(CACHE_AREAS.discordUser.prefix + userId);
 }
 
+/** Dev → Datenbank → Redis, Bereich leeren: auch der Speicher im Prozess, sonst träfe er noch bis zu einer Stunde. */
+export function forgetAllUsers(): void {
+    known.clear();
+}
+
 /** Der Name aus dem Speicher, ohne Discord zu fragen. Für die Suche (W-0059), die nicht warten darf. */
 export function knownName(userId: string): string | null {
     return known.get(userId)?.value?.name ?? null;

@@ -41,7 +41,8 @@ const size = (table: IDbTableInfo): number => (table.dataBytes ?? 0) + (table.in
 export function DatabasePage(): JSX.Element {
     const { table } = useParams();
 
-    return table === undefined ? <TableList /> : <TableRows table={table} />;
+    // key: Eine andere Tabelle fängt mit leerer Auswahl und leerem Suchfeld an.
+    return table === undefined ? <TableList /> : <TableRows key={table} table={table} />;
 }
 
 function Origin({ origin }: { readonly origin: IDbTableInfo["origin"] }): JSX.Element {
@@ -77,7 +78,7 @@ function TableList(): JSX.Element {
                 <>
                     <Kpis
                         items={[
-                            { label: "Verbindung", value: `online · ${server.ping ?? "–"} ms`, tone: "ok", sub: "host.docker.internal:3306" },
+                            { label: "Verbindung", value: `online · ${server.ping ?? "–"} ms`, tone: "ok", sub: server.host ?? undefined },
                             { label: "Version", value: `MariaDB ${server.version ?? "?"}`, sub: server.uptime === null ? undefined : `läuft seit ${formatDuration(server.uptime)}` },
                             { label: "Datenbank", value: server.database ?? "–", sub: server.collation ?? undefined },
                             { label: "Größe", value: formatBytes(dataBytes + indexBytes), sub: `Daten ${formatBytes(dataBytes)} · Index ${formatBytes(indexBytes)}` },
@@ -182,6 +183,13 @@ function TableRows({ table }: { readonly table: string }): JSX.Element {
     const [draft, setDraft] = useState(search);
     const [open, setOpen] = useState<{ readonly column: string; readonly value: string } | null>(null);
     const [picked, setPicked] = useState<number | null>(null);
+    const [pickedFor, setPickedFor] = useState(params.toString());
+
+    // Zurück und Vor im Browser ändern die Adresse ohne go(): dann gilt die Auswahl der alten Seite nicht mehr.
+    if (pickedFor !== params.toString()) {
+        setPickedFor(params.toString());
+        setPicked(null);
+    }
 
     const query = new URLSearchParams({
         page: String(page),
@@ -422,6 +430,8 @@ function TableRows({ table }: { readonly table: string }): JSX.Element {
                                                     aria-selected={picked === index}
                                                     onClick={() => setPicked(picked === index ? null : index)}
                                                     onKeyDown={(event) => {
+                                                        // Enter auf dem Knopf einer langen Zelle öffnet die Zelle, nicht die Zeile.
+                                                        if (event.target !== event.currentTarget) return;
                                                         if (event.key === "Enter" || event.key === " ") {
                                                             event.preventDefault();
                                                             setPicked(picked === index ? null : index);

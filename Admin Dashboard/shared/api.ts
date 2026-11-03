@@ -618,6 +618,8 @@ export interface IDbTableInfo {
 export interface IDbOverview {
     readonly server: {
         readonly ping: number | null;
+        /** Wohin das Admin Dashboard sich verbindet, etwa host.docker.internal:3306. */
+        readonly host: string | null;
         readonly version: string | null;
         /** Sekunden. */
         readonly uptime: number | null;

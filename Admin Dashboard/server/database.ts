@@ -93,8 +93,12 @@ function tableInfo(row: IInfoRow): IDbTableInfo {
 }
 
 /** Für Dev → Datenbank (W-0066): Zahlen zum Server und je Tabelle mehr als nur die Größe. */
-export async function databaseOverview(): Promise<IDbOverview> {
+export async function databaseOverview(host: string | null = null): Promise<IDbOverview> {
     const started = performance.now();
+
+    await query("SELECT 1");
+
+    const ping = Math.round(performance.now() - started);
     const [[server], status, migrations, tables] = await Promise.all([
         query<{ version: string; database: string | null; collation: string | null; max_connections: number }[]>("SELECT VERSION() AS version, DATABASE() AS `database`, @@collation_database AS collation, @@max_connections AS max_connections"),
         query<{ Variable_name: string; Value: string }[]>("SHOW GLOBAL STATUS WHERE Variable_name IN ('Uptime', 'Threads_connected')"),
@@ -109,7 +113,8 @@ export async function databaseOverview(): Promise<IDbOverview> {
 
     return {
         server: {
-            ping: Math.round(performance.now() - started),
+            ping,
+            host,
             version: server?.version.split("-")[0] ?? null,
             uptime: value("Uptime"),
             database: server?.database ?? null,
@@ -162,7 +167,8 @@ export async function tableDetail(table: string): Promise<IDbTableDetail> {
             key: row.key,
             comment: row.comment ?? "",
             masked: SECRET_COLUMN.test(row.name),
-            default: row.fallback,
+            // Wie beim Inhalt: Bei einer Spalte, die nach einem Geheimnis aussieht, auch kein Standardwert.
+            default: SECRET_COLUMN.test(row.name) ? null : row.fallback,
             extra: row.extra,
         })),
         indexes: [...indexes.values()],

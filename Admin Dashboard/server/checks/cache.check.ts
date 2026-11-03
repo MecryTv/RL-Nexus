@@ -10,13 +10,15 @@ import { SECRET, check, config, section } from "./harness.ts";
 
 /** W-0066: Redis als Cache vor MariaDB, mit einem Redis im Speicher. Ohne echtes Redis. */
 
-function fakeRedis(): ICacheClient & { readonly store: Map<string, string>; readonly ttl: Map<string, number> } {
+function fakeRedis(): ICacheClient & { readonly store: Map<string, string>; readonly ttl: Map<string, number>; readonly detail: boolean[] } {
     const store = new Map<string, string>();
     const ttl = new Map<string, number>();
+    const detail: boolean[] = [];
 
     return {
         store,
         ttl,
+        detail,
         get: async (key) => store.get(key) ?? null,
         set: async (key, value, options) => {
             store.set(key, value);
@@ -28,7 +30,11 @@ function fakeRedis(): ICacheClient & { readonly store: Map<string, string>; read
         scanKeys: async (pattern) => [...store.keys()].filter((key) => key.startsWith(pattern.replace(/\*$/, ""))),
         ping: async () => 1,
         version: async () => "8.0.2",
-        describe: async (keys) => keys.map((key) => ({ key, ttl: ttl.get(key) ?? -2, bytes: (store.get(key) ?? "").length + 50, type: store.has(key) ? "string" : "none", encoding: "embstr" })),
+        describe: async (keys, full = false) => {
+            detail.push(full);
+
+            return keys.map((key) => ({ key, ttl: ttl.get(key) ?? -2, bytes: (store.get(key) ?? "").length + 50, type: full ? (store.has(key) ? "string" : "none") : null, encoding: full ? "embstr" : null }));
+        },
     };
 }
 
@@ -218,6 +224,58 @@ export async function checkCache(): Promise<void> {
 
                 assert.equal((await get("/api/redis/key?key=fremd:schluessel")).statusCode, 400);
                 assert.equal((await get("/api/redis/areas/gibts-nicht")).statusCode, 404);
+            });
+
+            await check("Redis-Ansicht: Übersicht und Liste fragen nur Größe und Ablauf, Typ und Kodierung nur das Detail", async () => {
+                const redis = fakeRedis();
+                setCacheClient(redis);
+
+                await cached("discord:user:v1:3", 60, async () => "c");
+                await new Promise((resolve) => setImmediate(resolve));
+
+                await get("/api/redis");
+                await get("/api/redis/areas/discord-namen");
+                assert.ok(redis.detail.length > 0 && redis.detail.every((full) => !full));
+
+                await get("/api/redis/key?key=discord:user:v1:3");
+                assert.equal(redis.detail.at(-1), true);
+            });
+
+            await check("Redis-Ansicht: Entfernen und Neu laden werfen auch den Speicher im Prozess weg, sonst bliebe der Name bis zu einer Stunde", async () => {
+                const redis = fakeRedis();
+                const real = globalThis.fetch;
+                const id = "222222222222222288";
+                let asked = 0;
+
+                setCacheClient(redis);
+                globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+                    const href = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+                    if (!href.endsWith(`/users/${id}`)) return real(input, init);
+
+                    asked++;
+
+                    return new Response(JSON.stringify({ id, username: "neu", global_name: `Name ${asked}`, avatar: null }));
+                }) as typeof fetch;
+
+                try {
+                    forgetUser(id);
+                    await lookupUser(config, id);
+                    await new Promise((resolve) => setImmediate(resolve));
+
+                    assert.equal((await post("/api/redis/key/forget", { key: `discord:user:v1:${id}` })).statusCode, 200);
+                    assert.equal((await lookupUser(config, id))?.name, "Name 2", "nach dem Entfernen frisch von Discord");
+
+                    await new Promise((resolve) => setImmediate(resolve));
+                    assert.equal((await post("/api/redis/areas/discord-namen/clear")).statusCode, 200);
+                    assert.equal((await lookupUser(config, id))?.name, "Name 3", "nach dem Leeren des Bereichs frisch von Discord");
+
+                    assert.equal((await post("/api/redis/key/reload", { key: `discord:user:v1:${id}` })).statusCode, 200);
+                    assert.equal(asked, 4);
+                    assert.equal((await post("/api/redis/key/forget", { key: "discord:user:v1:*" })).statusCode, 400, "keine Jokerzeichen");
+                } finally {
+                    globalThis.fetch = real;
+                    forgetUser(id);
+                }
             });
 
             await check("Redis-Ansicht: einen Schlüssel wegwerfen, den ganzen Cache leeren, beides im Protokoll", async () => {

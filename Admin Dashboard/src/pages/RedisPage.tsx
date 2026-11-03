@@ -82,7 +82,7 @@ function Overview(): JSX.Element {
                         items={[
                             { label: "Verbindung", value: data.ready ? `online · ${data.ping ?? "–"} ms` : "nicht verbunden", tone: data.ready ? "ok" : "bad", sub: data.error ?? data.host ?? undefined },
                             { label: "Version", value: data.version ? `Redis ${data.version}` : "–", sub: data.user ? `Nutzer ${data.user}` : undefined },
-                            { label: "Schlüssel", value: formatNumber(data.keys), sub: "alle mit rln:" },
+                            { label: "Schlüssel", value: formatNumber(data.keys), sub: "in den bekannten Bereichen" },
                             { label: "Belegt", value: formatBytes(data.bytes), sub: `von höchstens ${formatBytes(data.maxBytes)}` },
                             { label: "Treffer", value: percent(hits, asked), sub: `${formatNumber(hits)} von ${formatNumber(asked)} seit Start` },
                             { label: "Ausfälle", value: formatNumber(failures), tone: failures > 0 ? "warn" : undefined, sub: "zu langsam oder Fehler, seit Start" },

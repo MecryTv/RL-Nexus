@@ -54,9 +54,17 @@ function Token({ text }: { readonly text: string }): JSX.Element {
     );
 }
 
+/** Ab so vielen Zeilen starten die Einträge der obersten Ebene zugeklappt, sonst hinge der Tab. */
+const LARGE = 400;
+
+/** Die Zeilen, die eine Ebene unter der äußersten Klammer öffnen. */
+function topLevel(lines: readonly ILine[]): Set<number> {
+    return new Set(lines.flatMap((line, index) => (line.end !== null && /^ {2}\S/.test(line.text) ? [index] : [])));
+}
+
 export function JsonView({ value }: { readonly value: unknown }): JSX.Element {
     const lines = useMemo(() => linesOf(value), [value]);
-    const [folded, setFolded] = useState<ReadonlySet<number>>(new Set());
+    const [folded, setFolded] = useState<ReadonlySet<number>>(() => (lines.length > LARGE ? topLevel(lines) : new Set()));
     const shown: number[] = [];
 
     for (let index = 0; index < lines.length; index++) {

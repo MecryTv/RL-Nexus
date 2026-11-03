@@ -7,7 +7,7 @@ import { CACHE_PREFIX, cacheInspect, cacheState, cacheStats, forget, type IKeyFa
 import type { IConfig } from "../config.ts";
 import { PublicError } from "../errors.ts";
 import { forgetIndex, personIndex } from "../userdata/find.ts";
-import { forgetUser, lookupUser } from "../users.ts";
+import { forgetAllUsers, forgetUser, lookupUser } from "../users.ts";
 import { body } from "../validate.ts";
 
 /**
@@ -28,8 +28,10 @@ function areaById(id: string | undefined): ICacheArea {
 
 /** Nur Schlüssel aus einem bekannten Bereich: So lässt sich nichts anderes aus Redis lesen. */
 function keyOf(value: unknown): { readonly key: string; readonly area: ICacheArea } {
-    const key = typeof value === "string" ? value.replace(new RegExp(`^${CACHE_PREFIX}`), "") : "";
-    const area = key.length <= 200 ? areaOfKey(key) : null;
+    const raw = typeof value === "string" ? value : "";
+    const key = raw.startsWith(CACHE_PREFIX) ? raw.slice(CACHE_PREFIX.length) : raw;
+    // Keine Jokerzeichen: forget() läse * sonst als „alle mit diesem Anfang“.
+    const area = key.length <= 200 && !/[*?[\]\\]/.test(key) ? areaOfKey(key) : null;
 
     if (!area) throw new PublicError(400, "Diesen Schlüssel gibt es hier nicht.");
 
@@ -38,6 +40,24 @@ function keyOf(value: unknown): { readonly key: string; readonly area: ICacheAre
 
 function unavailable(): never {
     throw new PublicError(503, "Redis ist gerade nicht verbunden.");
+}
+
+/** Wegwerfen und Neuladen gehen nur, wenn Redis wirklich antwortet; in der Pause nach einem Hänger täten sie nichts. */
+function writable(): void {
+    const state = cacheState();
+
+    if (!state.ready) unavailable();
+    if (state.paused) throw new PublicError(503, "Redis hat eben zu langsam geantwortet. In einer halben Minute noch einmal.");
+}
+
+/** Den Speicher im Prozess zum Bereich mit wegwerfen. key: nur dieser Eintrag. */
+function forgetLocal(area: ICacheArea, key?: string): void {
+    if (area.id === CACHE_AREAS.discordUser.id) {
+        if (key === undefined) forgetAllUsers();
+        else forgetUser(key.slice(area.prefix.length));
+    } else {
+        forgetIndex();
+    }
 }
 
 function areaView(area: ICacheArea, facts: readonly IKeyFacts[]): IRedisArea {
@@ -64,6 +84,15 @@ async function factsOf(area: ICacheArea): Promise<IKeyFacts[]> {
     return (await cacheInspect.describe(keys)) ?? unavailable();
 }
 
+/** Bereich für Bereich, nicht alle auf einmal: Die Warteschlange teilt sich die Seite mit dem echten Cache. Ein Fehler trifft nur seinen Bereich. */
+async function factsOfAll(): Promise<IKeyFacts[][]> {
+    const all: IKeyFacts[][] = [];
+
+    for (const area of CACHE_AREA_LIST) all.push(await factsOf(area).catch(() => []));
+
+    return all;
+}
+
 export async function redisRoutes(app: FastifyInstance, { config }: { config: IConfig }): Promise<void> {
     app.get("/api/redis", async (): Promise<IRedisOverview> => {
         const state = cacheState();
@@ -71,7 +100,9 @@ export async function redisRoutes(app: FastifyInstance, { config }: { config: IC
 
         if (!state.ready) return { ...base, ping: null, version: null, keys: 0, bytes: 0, areas: CACHE_AREA_LIST.map((area) => areaView(area, [])) };
 
-        const [ping, version, perArea] = await Promise.all([cacheInspect.ping(), cacheInspect.version()?.catch(() => null), Promise.all(CACHE_AREA_LIST.map(factsOf))]);
+        const ping = await cacheInspect.ping()?.catch(() => null);
+        const version = await cacheInspect.version()?.catch(() => null);
+        const perArea = await factsOfAll();
         const areas = CACHE_AREA_LIST.map((area, index) => areaView(area, perArea[index] ?? []));
 
         return { ...base, ping: ping ?? null, version: version ?? null, keys: areas.reduce((sum, area) => sum + area.keys, 0), bytes: areas.reduce((sum, area) => sum + area.bytes, 0), areas };
@@ -98,7 +129,7 @@ export async function redisRoutes(app: FastifyInstance, { config }: { config: IC
 
     app.get("/api/redis/key", async (request): Promise<IRedisKey> => {
         const { key, area } = keyOf((request.query as { key?: string }).key);
-        const [facts] = (await cacheInspect.describe([key])) ?? unavailable();
+        const [facts] = (await cacheInspect.describe([key], true)) ?? unavailable();
         const raw = (await cacheInspect.read(key)) ?? null;
 
         if (!facts || facts.ttl === -2 || raw === null) throw new PublicError(404, "Diesen Schlüssel gibt es nicht mehr. Er ist wohl abgelaufen.");
@@ -111,12 +142,13 @@ export async function redisRoutes(app: FastifyInstance, { config }: { config: IC
             // Kein JSON: dann der Text, wie er dasteht.
         }
 
-        return { key, ttl: facts.ttl, bytes: facts.bytes, type: facts.type, encoding: facts.encoding, area: areaView(area, []), age: facts.ttl >= 0 ? Math.max(0, area.ttl - facts.ttl) : null, value };
+        return { key, ttl: facts.ttl, bytes: facts.bytes, type: facts.type ?? "unbekannt", encoding: facts.encoding, area: areaView(area, []), age: facts.ttl >= 0 ? Math.max(0, area.ttl - facts.ttl) : null, value };
     });
 
     app.post("/api/redis/clear", async (request) => {
-        if (!cacheState().ready) unavailable();
+        writable();
 
+        for (const area of CACHE_AREA_LIST) forgetLocal(area);
         await forget("*");
         await audit(accessOf(request), "redis.clear", null, "ganzer Cache");
 
@@ -125,8 +157,9 @@ export async function redisRoutes(app: FastifyInstance, { config }: { config: IC
 
     app.post("/api/redis/areas/:id/clear", async (request) => {
         const area = areaById((request.params as { id?: string }).id);
-        if (!cacheState().ready) unavailable();
+        writable();
 
+        forgetLocal(area);
         await forget(area.prefix.endsWith(":") ? `${area.prefix}*` : area.prefix);
         await audit(accessOf(request), "redis.clear", area.id, area.label);
 
@@ -134,9 +167,10 @@ export async function redisRoutes(app: FastifyInstance, { config }: { config: IC
     });
 
     app.post("/api/redis/key/forget", async (request) => {
-        const { key } = keyOf(body(request.body).key);
-        if (!cacheState().ready) unavailable();
+        const { key, area } = keyOf(body(request.body).key);
+        writable();
 
+        forgetLocal(area, key);
         await forget(key);
         await audit(accessOf(request), "redis.forget", key);
 
@@ -146,7 +180,7 @@ export async function redisRoutes(app: FastifyInstance, { config }: { config: IC
     // Aus der Quelle neu laden: wegwerfen und gleich wieder holen, wie beim nächsten Lesen.
     app.post("/api/redis/key/reload", async (request) => {
         const { key, area } = keyOf(body(request.body).key);
-        if (!cacheState().ready) unavailable();
+        writable();
 
         if (area.id === CACHE_AREAS.discordUser.id) {
             const userId = key.slice(area.prefix.length);

@@ -27,7 +27,8 @@ export interface IKeyFacts {
     /** Sekunden bis zum Ablauf, -1 ohne Ablauf, -2 schon weg. */
     readonly ttl: number;
     readonly bytes: number | null;
-    readonly type: string;
+    /** Nur mit full: Für Übersicht und Liste reichen Ablauf und Größe. */
+    readonly type: string | null;
     readonly encoding: string | null;
 }
 
@@ -40,7 +41,7 @@ export interface ICacheClient {
     /** Für die Seite Dev → Datenbank: Antwortzeit in ms, Version, Fakten je Schlüssel. */
     ping(): Promise<number>;
     version(): Promise<string | null>;
-    describe(keys: readonly string[]): Promise<IKeyFacts[]>;
+    describe(keys: readonly string[], full?: boolean): Promise<IKeyFacts[]>;
 }
 
 /** Treffer seit dem Start, je Bereich (W-0066, Seite Dev → Datenbank). */
@@ -72,8 +73,8 @@ let pausedUntil = 0;
 /** Ein forget kam nicht an: Nach dem Wiederverbinden fliegt alles raus, was veraltet sein könnte. */
 let missed = false;
 
-export function cacheState(): { readonly configured: boolean; readonly ready: boolean; readonly error: string | null } {
-    return { configured: client !== null, ready, error: ready ? null : lastError };
+export function cacheState(): { readonly configured: boolean; readonly ready: boolean; readonly paused: boolean; readonly error: string | null } {
+    return { configured: client !== null, ready, paused: Date.now() < pausedUntil, error: ready ? null : lastError };
 }
 
 /** Für die Checks: einen eigenen Client einsetzen (null: ohne Redis). */
@@ -167,23 +168,25 @@ export async function connectCache(config: IConfig): Promise<void> {
             return Math.round(performance.now() - started);
         },
         // INFO darf der Nutzer rlnexus nicht (@dangerous), HELLO nennt die Version auch.
+        // Ohne Protokollversion: HELLO 2 schaltete eine RESP3-Verbindung unter dem Client um.
         version: async () => {
-            const reply = (await redis.sendCommand(["HELLO", "2"])) as unknown[];
+            const reply = (await redis.sendCommand(["HELLO"])) as unknown[];
             const at = reply.findIndex((entry) => String(entry) === "version");
 
             return at >= 0 ? String(reply[at + 1]) : null;
         },
-        describe: async (keys) => {
+        describe: async (keys, full = false) => {
             const facts: IKeyFacts[] = [];
 
-            // In Gruppen: commandsQueueMaxLength lässt nicht beliebig viele auf einmal zu.
-            for (let start = 0; start < keys.length; start += 20) {
+            // In kleinen Gruppen, höchstens 20 Befehle auf einmal: commandsQueueMaxLength (100) teilt sich die Seite mit dem echten Cache.
+            for (let start = 0; start < keys.length; start += 10) {
                 facts.push(
                     ...(await Promise.all(
-                        keys.slice(start, start + 20).map(async (key) => {
-                            const [ttl, bytes, type, encoding] = await Promise.all([redis.ttl(key), redis.memoryUsage(key), redis.type(key), redis.objectEncoding(key).catch(() => null)]);
+                        keys.slice(start, start + 10).map(async (key) => {
+                            const [ttl, bytes] = await Promise.all([redis.ttl(key), redis.memoryUsage(key).catch(() => null)]);
+                            const [type, encoding] = full ? await Promise.all([redis.type(key).catch(() => null), redis.objectEncoding(key).catch(() => null)]) : [null, null];
 
-                            return { key, ttl: Number(ttl), bytes: bytes === null ? null : Number(bytes), type: String(type), encoding: encoding === null ? null : String(encoding) };
+                            return { key, ttl: Number(ttl), bytes: bytes === null ? null : Number(bytes), type: type === null ? null : String(type), encoding: encoding === null ? null : String(encoding) };
                         })
                     ))
                 );
@@ -266,8 +269,8 @@ export const cacheInspect = {
     version: (): Promise<string | null> | null => (client && ready ? inspected(client.version()) : null),
     /** Alle Schlüssel mit diesem Anfang, ohne rln: zurück. */
     keys: async (prefix: string): Promise<string[] | null> => (client && ready ? (await inspected(client.scanKeys(`${CACHE_PREFIX}${prefix}*`))).map((key) => key.slice(CACHE_PREFIX.length)) : null),
-    describe: async (keys: readonly string[]): Promise<IKeyFacts[] | null> =>
-        client && ready ? (await inspected(client.describe(keys.map((key) => CACHE_PREFIX + key)))).map((facts) => ({ ...facts, key: facts.key.slice(CACHE_PREFIX.length) })) : null,
+    describe: async (keys: readonly string[], full = false): Promise<IKeyFacts[] | null> =>
+        client && ready ? (await inspected(client.describe(keys.map((key) => CACHE_PREFIX + key), full))).map((facts) => ({ ...facts, key: facts.key.slice(CACHE_PREFIX.length) })) : null,
     read: (key: string): Promise<string | null> | null => (client && ready ? inspected(client.get(CACHE_PREFIX + key)) : null),
 };
 

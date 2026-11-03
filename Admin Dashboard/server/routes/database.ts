@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { accessOf } from "../access.ts";
 import { audit } from "../audit.ts";
 import { DB_LIMITS, databaseOverview, listTables, pageNumber, readRows, tableDetail, toCsv } from "../database.ts";
+import type { IConfig } from "../config.ts";
 import { DatabaseUnavailable, databaseReady } from "../db.ts";
 import { InvalidInput } from "../errors.ts";
 
@@ -30,7 +31,7 @@ function tableOf(request: { params: unknown }): string {
     return name;
 }
 
-export async function databaseRoutes(app: FastifyInstance): Promise<void> {
+export async function databaseRoutes(app: FastifyInstance, { config }: { config: IConfig }): Promise<void> {
     app.addHook("onRequest", async () => {
         if (!databaseReady()) throw new DatabaseUnavailable();
     });
@@ -38,7 +39,7 @@ export async function databaseRoutes(app: FastifyInstance): Promise<void> {
     app.get("/api/db/tables", async () => ({ tables: await listTables() }));
 
     // W-0066, Entwurf D-A++: Zahlen zum Server, je Tabelle Herkunft, Bereich, Engine; im Detail Spalten, Indizes, SQL.
-    app.get("/api/db/overview", async () => databaseOverview());
+    app.get("/api/db/overview", async () => databaseOverview(config.database ? `${config.database.host}:${config.database.port}` : null));
 
     app.get("/api/db/tables/:table/info", async (request) => tableDetail(tableOf(request)));
 

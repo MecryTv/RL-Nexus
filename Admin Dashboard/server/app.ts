@@ -101,7 +101,7 @@ export async function buildApp(config: IConfig): Promise<FastifyInstance> {
             await dev.register(logRoutes, { config });
             await dev.register(operationRoutes, { config });
             await dev.register(auditRoutes);
-            await dev.register(databaseRoutes);
+            await dev.register(databaseRoutes, { config });
             await dev.register(redisRoutes, { config });
         });
     });
