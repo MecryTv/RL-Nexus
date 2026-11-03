@@ -769,8 +769,8 @@ const PRIVACY: readonly ILegalSection[] = [
                 <p>
                     Bei Missbrauch, etwa Raids, Betrug oder Belästigung, kann das Team von RL Nexus ein Discord-Konto
                     dauerhaft sperren, ganz oder für einzelne Teile: den Bot auf fremden oder eigenen Servern, das
-                    Dashboard, die Anmeldung auf dieser Website und den Shop. Die Person bekommt dazu einmal eine
-                    Nachricht vom Bot. Zur Sperre speichern wir Discord-ID und Name, was gesperrt ist, den Grund, Belege
+                    Dashboard, die Anmeldung auf dieser Website und den Shop. Die Person bekommt bei der Sperre, bei
+                    jeder Änderung und beim Aufheben eine Nachricht vom Bot. Zur Sperre speichern wir Discord-ID und Name, was gesperrt ist, den Grund, Belege
                     (etwa Bildschirmfotos oder gesicherte Discord-Nachrichten), wer gesperrt hat und jede Änderung.
                 </p>
                 <p>
@@ -780,18 +780,20 @@ const PRIVACY: readonly ILegalSection[] = [
                     du trotzdem herein.
                 </p>
                 <p>
-                    Deine IP-Adresse selbst speichern wir nicht, nur zwei nicht umkehrbare Kürzel der Adresse und ihres
-                    Netzes (HMAC-SHA256 mit einem geheimen Schlüssel), dazu die Netzkennung (ASN), wo du dich angemeldet
-                    hast, ob ein VPN erkannt wurde, das Ergebnis und die Uhrzeit. Diese Anmeldespuren löschen wir nach 90
-                    Tagen. Wird ein Konto gesperrt, bleiben seine Kürzel bei der Sperre, damit sie sich nicht mit einem
-                    neuen Konto umgehen lässt. Fällt eine Anmeldung auf, etwa dieselbe Adresse wie ein gesperrtes Konto,
+                    Deine IP-Adresse selbst speichern wir nicht, nur zwei pseudonymisierte Kürzel der Adresse und ihres
+                    Netzes (HMAC-SHA256), die sich ohne unseren geheimen Schlüssel nicht zurückrechnen lassen, dazu die
+                    Netzkennung (ASN), wo du dich angemeldet hast, ob ein VPN erkannt wurde, das Ergebnis und die Uhrzeit.
+                    Diese Anmeldespuren löschen wir nach 90 Tagen, außer solange zu dem Konto ein Verdachtsfall offen ist
+                    oder es gesperrt ist. Wird ein Konto gesperrt, bleiben seine Kürzel bei der Sperre, damit sie sich
+                    nicht mit einem neuen Konto umgehen lässt. Fällt eine Anmeldung auf, etwa dieselbe Adresse wie ein gesperrtes Konto,
                     sieht sich das Team den Fall an.
                 </p>
                 <p>
                     Rechtsgrundlage ist unser berechtigtes Interesse, RL Nexus und seine Nutzer vor Missbrauch zu
                     schützen und Sperren durchzusetzen (Art. 6 Abs. 1 lit. f DSGVO). Bittest du um Löschung, bleibt eine
                     bestehende Sperre mit Discord-ID und Kürzeln stehen, weil sie sonst nicht wirkt (Art. 17 Abs. 1 lit.
-                    c, Art. 21 Abs. 1 DSGVO). Aufgehobene Sperren bewahren wir drei Jahre als Vorgeschichte auf.
+                    c, Art. 21 Abs. 1 DSGVO). Beim Aufheben einer Sperre löschen wir ihre Kürzel
+                    sofort, nur der Eintrag bleibt drei Jahre als Vorgeschichte.
                 </p>
             </>
         ),
