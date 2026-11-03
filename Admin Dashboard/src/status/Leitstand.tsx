@@ -1,5 +1,5 @@
 import { useState, type JSX } from "react";
-import { STATUS_SERVICE_LABELS, STATUS_SERVICES, type CheckState, type DetailRange, type IServiceDetail, type IStatusDetail, type StatusService } from "../../shared/status";
+import { STATUS_SERVICE_LABELS, STATUS_SERVICES, databaseLabel, type CheckState, type DetailRange, type IServiceDetail, type IStatusDetail, type StatusService } from "../../shared/status";
 import { Badge, type BadgeTone } from "../components/Badge";
 import { Button } from "../components/Button";
 import { Metric } from "../components/Metric";
@@ -79,7 +79,7 @@ function factsOf(service: IServiceDetail, detail: IStatusDetail): string {
 
     if (service.id === "database" && detail.tech.database) {
         const database = detail.tech.database;
-        facts.push(`${database.version ?? "MariaDB"} · ${formatNumber(database.tables)} Tabellen · ${formatBytes(database.bytes)}`);
+        facts.push(`${databaseLabel(database.version, database.cache)} · ${formatNumber(database.tables)} Tabellen · ${formatBytes(database.bytes)}`);
     }
 
     return facts.join(" · ");
@@ -347,7 +347,7 @@ export function Leitstand({
                                 <dd className={styles.bad}>antwortet nicht</dd>
                             </>
                         )}
-                        <dt>MariaDB</dt>
+                        <dt>{databaseLabel(null, database?.cache)}</dt>
                         <dd>{database ? `${database.version ?? "läuft"}${database.uptime === null ? "" : ` · läuft seit ${formatDuration(database.uptime)}`}` : "nicht erreichbar"}</dd>
                     </dl>
                 </Panel>

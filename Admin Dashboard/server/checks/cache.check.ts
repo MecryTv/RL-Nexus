@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { CACHE_WAIT, cached, forget, markCacheDown, markCacheUp, setCacheClient, type ICacheClient } from "../cache.ts";
+import { databaseLabel } from "../../shared/status.ts";
 import { forgetUser, lookupUser } from "../users.ts";
 import { check, config, section } from "./harness.ts";
 
@@ -28,6 +29,12 @@ export async function checkCache(): Promise<void> {
     section("Redis als Cache (W-0066)");
 
     try {
+        await check("Status: „MariaDB + Redis Cache“ nur, solange Redis verbunden ist", () => {
+            assert.equal(databaseLabel("11.8.6", true), "MariaDB 11.8.6 + Redis Cache");
+            assert.equal(databaseLabel("11.8.6", false), "MariaDB 11.8.6");
+            assert.equal(databaseLabel(null, undefined), "MariaDB");
+        });
+
         await check("Ohne Redis lädt jede Abfrage direkt aus der Quelle", async () => {
             setCacheClient(null);
             let loads = 0;
