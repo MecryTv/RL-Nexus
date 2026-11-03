@@ -101,3 +101,118 @@ export interface IBlockedView {
     /** Nur bei kind "vpn": wann geprüft. */
     readonly checkedAt: string;
 }
+
+/* Für die Oberfläche im Admin Dashboard (Bereich Sicherheit). */
+
+export interface IPersonRefView {
+    readonly id: string;
+    readonly name: string;
+    readonly avatar: string | null;
+}
+
+export interface IBanListItem {
+    readonly id: number;
+    readonly person: IPersonRefView;
+    readonly scope: readonly Block[];
+    readonly preset: Preset;
+    readonly state: "active" | "lifted";
+    readonly since: string;
+    readonly by: string;
+    /** Abgewiesene Anmeldungen und Verdachtsfälle mit Bezug zu dieser Sperre. */
+    readonly hits: number;
+}
+
+export interface ISecurityOverview {
+    readonly active: number;
+    readonly suspects: number;
+    readonly vpnToday: number;
+    readonly bans: readonly IBanListItem[];
+}
+
+export interface IBanChangeView {
+    readonly action: "ban" | "change" | "lift" | "server" | "evidence" | "dm";
+    readonly before: string | null;
+    readonly after: string | null;
+    readonly note: string | null;
+    readonly by: string;
+    readonly at: string;
+}
+
+export interface IEvidenceView {
+    readonly id: number;
+    readonly kind: "file" | "discord";
+    readonly name: string;
+    readonly size: number;
+    readonly mime: string | null;
+    readonly message: Readonly<Record<string, unknown>> | null;
+    readonly error: string | null;
+    readonly at: string;
+}
+
+export interface IOwnServerView {
+    readonly id: string;
+    readonly name: string;
+    readonly members: number;
+    readonly since: string;
+    /** „Bot verlässt“ steht für diesen Server. */
+    readonly leave: boolean;
+    readonly active: boolean;
+}
+
+export interface IBanProfile extends IBanListItem {
+    readonly reasons: readonly string[];
+    readonly note: string | null;
+    readonly changedAt: string | null;
+    readonly liftedAt: string | null;
+    readonly linkedTo: number | null;
+    readonly changes: readonly IBanChangeView[];
+    readonly evidence: readonly IEvidenceView[];
+    readonly servers: readonly IOwnServerView[];
+    readonly suspects: readonly ISuspectView[];
+}
+
+export interface ILinkedCandidate {
+    readonly person: IPersonRefView;
+    readonly reason: "same_ip" | "net" | "vpn";
+    readonly accountDays: number;
+}
+
+export interface IPersonPrefill {
+    readonly person: IPersonRefView;
+    readonly handle: string | null;
+    readonly accountDays: number;
+    readonly team: boolean;
+    readonly activeBan: number | null;
+    readonly history: { readonly bans: number; readonly suspects: number };
+    readonly servers: readonly IOwnServerView[];
+    readonly linked: readonly ILinkedCandidate[];
+}
+
+export interface ISuspectView {
+    readonly id: number;
+    readonly person: IPersonRefView;
+    readonly kind: "same_ip" | "vpn_young" | "net";
+    readonly service: Service;
+    readonly state: "open" | "ok" | "banned";
+    readonly banId: number | null;
+    readonly banned: IPersonRefView | null;
+    readonly accountDays: number;
+    readonly at: string;
+}
+
+export interface IVpnLoginView {
+    readonly person: IPersonRefView;
+    readonly service: Service;
+    readonly result: "in" | "marked" | "blocked" | "unchecked" | "banned";
+    readonly reason: string | null;
+    readonly at: string;
+}
+
+export interface IVpnView {
+    readonly keySet: boolean;
+    readonly lastAnswer: string | null;
+    readonly logins: readonly IVpnLoginView[];
+}
+
+export const EVIDENCE_TYPES = ["image/png", "image/jpeg", "image/webp"] as const;
+export const EVIDENCE_MAX = 8 * 1024 * 1024;

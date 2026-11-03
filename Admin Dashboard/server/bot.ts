@@ -271,3 +271,19 @@ export async function botLeave(config: IConfig, guildId: string, text: string, u
         return false;
     }
 }
+
+/* W-0057: dauerhafte Sperre. */
+
+/** Der Bot lädt seine Sperrliste neu. false: nicht erreicht, dann holt er sie spätestens nach 5 Minuten selbst. */
+export async function botSecurityReload(config: IConfig, userId = "security"): Promise<boolean> {
+    try {
+        return (await callBot(config, userId, "/admin/security/reload", "POST", { body: {} })).ok;
+    } catch {
+        return false;
+    }
+}
+
+/** Eine Discord-Nachricht als Beleg, über den Bot gelesen. null: nicht gefunden oder nicht erreicht. */
+export async function botMessage(config: IConfig, channelId: string, messageId: string, userId: string): Promise<Record<string, unknown> | null> {
+    return botJson<Record<string, unknown>>(config, userId, `/admin/security/message?channel=${channelId}&message=${messageId}`, 10_000);
+}

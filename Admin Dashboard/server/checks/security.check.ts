@@ -3,7 +3,10 @@ import { BLOCKS, blocks, dmLists, presetOf, scopeOf } from "../../shared/securit
 import { decideLogin } from "../security/check.ts";
 import { ipHashes, networkOf } from "../security/hash.ts";
 import { proxycheck } from "../security/proxycheck.ts";
-import { check, section } from "./harness.ts";
+import { buildApp } from "../app.ts";
+import { SESSION_COOKIE, seal } from "../session.ts";
+import { USERS } from "./fakes.ts";
+import { SECRET, check, config, section } from "./harness.ts";
 
 /** W-0057: dauerhafte Sperre. Nur die Regeln, ohne Datenbank und Discord. */
 export async function checkSecurity(): Promise<void> {
@@ -87,4 +90,23 @@ export async function checkSecurity(): Promise<void> {
         assert.deepEqual(decideLogin({ ...base, vpn: null, accountDays: 1, sameNet: 9 }), { result: "unchecked", suspect: null });
         assert.deepEqual(decideLogin({ ...base, vpn: null, sameIp: 7 }), { result: "unchecked", suspect: { kind: "same_ip", banId: 7 } });
     });
+
+    const app = await buildApp(config);
+    const cookie = `${SESSION_COOKIE}=${seal({ id: USERS.admin, name: "nutzer1", avatar: null, exp: Math.floor(Date.now() / 1000) + 600 }, SECRET)}`;
+
+    try {
+        await check("Bereich Sicherheit: ohne Sitzung 401, ohne Datenbank 503, Testabfrage nur mit IP und Key", async () => {
+            const post = (url: string, payload: unknown, withCookie = true) => app.inject({ method: "POST", url, headers: { "content-type": "application/json", origin: config.publicUrl, ...(withCookie ? { cookie } : {}) }, payload: JSON.stringify(payload) });
+
+            assert.equal((await app.inject({ method: "GET", url: "/api/security" })).statusCode, 401);
+            assert.equal((await post("/api/security/bans", { userId: "123456789012345678" }, false)).statusCode, 401);
+            assert.equal((await app.inject({ method: "GET", url: "/api/security", headers: { cookie } })).statusCode, 503);
+            assert.equal((await app.inject({ method: "GET", url: "/api/security/person/123456789012345678", headers: { cookie } })).statusCode, 503);
+            assert.equal((await post("/api/security/bans/1/lift", {})).statusCode, 503);
+            assert.equal((await post("/api/security/vpn/test", { ip: "<script>" })).statusCode, 400);
+            assert.equal((await post("/api/security/vpn/test", { ip: "203.0.113.77" })).statusCode, 409);
+        });
+    } finally {
+        await app.close();
+    }
 }
