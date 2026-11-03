@@ -54,6 +54,9 @@ services:
             ADMIN_GUILD_ID: ${ADMIN_GUILD_ID:-1547258700480253982}
             ADMIN_ROLE_ID: ${ADMIN_ROLE_ID:-1548701400031297619}
             DEVELOPER_ROLE_ID: ${DEVELOPER_ROLE_ID:-1548701516418912370}
+            # W-0057: VPN-Erkennung und Kürzel von IPs. Beide freiwillig: Ohne Key wird niemand blockiert.
+            PROXYCHECK_API_KEY: ${PROXYCHECK_API_KEY:-}
+            IP_HASH_SECRET: ${IP_HASH_SECRET:-}
             ADMIN_PUBLIC_URL: https://${ADMIN_DOMAIN:-admin.nexus-emb.de}
             BOT_API_URL: http://bot:3000
             # Ob die Webseite antwortet, prüft der Server wie ein Besucher, über

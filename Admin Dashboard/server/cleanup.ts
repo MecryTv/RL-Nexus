@@ -1,4 +1,5 @@
 import { databaseReady, query } from "./db.ts";
+import { forgetOldBans, forgetOldLogins } from "./security/store.ts";
 import { activeGrant } from "./shop/store.ts";
 import { HISTORY_DAYS } from "./status/history.ts";
 
@@ -21,6 +22,9 @@ export async function cleanup(): Promise<void> {
         );
         // Drei Jahre: Was das Team zu einer Person tat, ist Nachweis (W-0051, Entscheidung des Nutzers vom 02.11.).
         const audit = await query<{ affectedRows: number }>("DELETE FROM admin_audit WHERE created_at < NOW() - INTERVAL 3 YEAR");
+        // W-0057: Anmeldespuren 90 Tage, außer bei Sperre oder offenem Verdacht.
+        await forgetOldLogins().catch(() => 0);
+        await forgetOldBans().catch(() => 0);
 
         // Ohne Meldung: Hier fallen jeden Tag rund 2900 Zeilen weg, das ist Alltag.
         await query(`DELETE FROM status_checks WHERE checked_at < NOW() - INTERVAL ${HISTORY_DAYS} DAY`);

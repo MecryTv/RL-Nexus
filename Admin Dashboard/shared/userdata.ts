@@ -8,7 +8,7 @@ import { GROUP_LABELS } from "./limits.ts";
  * der Tabelle - Code, nie Eingabe.
  */
 
-export const USERDATA_AREA_IDS = ["konto", "spieler", "level", "tickets", "bewerbungen", "moderation", "community", "teams", "shop", "beta", "kontakt", "protokoll", "team"] as const;
+export const USERDATA_AREA_IDS = ["konto", "spieler", "level", "tickets", "bewerbungen", "moderation", "community", "teams", "shop", "beta", "kontakt", "sicherheit", "protokoll", "team"] as const;
 export type UserdataArea = (typeof USERDATA_AREA_IDS)[number];
 
 export interface IUserdataSource {
@@ -69,6 +69,8 @@ export const USERDATA_AREAS: readonly IUserdataAreaDef[] = [
             { table: "server_requests", column: "user_id", role: "person", guild: G, time: "created_at", label: "CONCAT('Server-Anfrage · ', guild_name, ' · ', status)", words: true },
             { table: "server_choices", column: "user_id", role: "person", time: "created_at", label: "CONCAT('Wahl ein Server pro Person · ', state)", words: true },
             { table: "invite_passes", column: "user_id", role: "person", guild: G, time: ms("created_at"), label: "'Freigabe zum Einladen des Bots'" },
+            // W-0057: Anmeldespuren (nur Hashes), nach 90 Tagen weg. Bei einer Sperre bleiben die Hashes in security_ban_hashes.
+            { table: "security_logins", column: "user_id", role: "person", time: "created_at", label: "CONCAT('Anmeldung · ', service, ' · ', result)", words: true },
         ],
     },
     {
@@ -198,6 +200,17 @@ export const USERDATA_AREAS: readonly IUserdataAreaDef[] = [
         sources: [{ table: "contact_messages", column: "discord", role: "person", time: "created_at", label: "subject", name: "name" }],
     },
     {
+        // W-0057: Sperren und Verdacht bleiben bei einer Löschung (Vorgabe), Anmeldespuren gehören zum Konto.
+        id: "sicherheit",
+        label: "Sicherheit",
+        inside: ["Sperren", "Verdacht"],
+        icon: "lock",
+        sources: [
+            { table: "security_bans", column: "user_id", role: "person", time: "created_at", label: "CONCAT('Sperre · ', state)", name: "user_name", words: true },
+            { table: "security_suspects", column: "user_id", role: "person", time: "created_at", label: "CONCAT('Verdacht · ', kind, ' · ', state)", words: true },
+        ],
+    },
+    {
         id: "protokoll",
         label: "Im Protokoll des Teams",
         inside: ["Was das Team zur Person getan hat"],
@@ -219,6 +232,8 @@ export const USERDATA_AREAS: readonly IUserdataAreaDef[] = [
             { table: "beta_codes", column: "created_by", role: "team", time: "created_at", label: "'Beta-Code angelegt'" },
             { table: "server_requests", column: "decided_by", role: "team", guild: G, time: "decided_at", label: "CONCAT('Über eine Server-Anfrage entschieden: ', guild_name)", name: "decided_name" },
             { table: "server_blocks", column: "blocked_by", role: "team", guild: G, time: "created_at", label: "'Server für RL Nexus gesperrt'", name: "by_name" },
+            { table: "security_bans", column: "created_by", role: "team", time: "created_at", label: "'Person gesperrt'", name: "created_name" },
+            { table: "security_suspects", column: "closed_by", role: "team", time: "closed_at", label: "'Verdacht entschieden'" },
             { table: "contact_messages", column: "handled_by", role: "team", time: "handled_at", label: "CONCAT('Kontakt bearbeitet: ', subject)" },
             { table: "contact_replies", column: "user_id", role: "team", time: "created_at", label: "'Auf eine Kontaktanfrage geantwortet'", name: "user_name" },
             { table: "custom_messages", column: "created_by", role: "team", guild: G, label: "CONCAT('Nachricht angelegt: ', name)" },
@@ -260,6 +275,11 @@ export const USERDATA_AREAS: readonly IUserdataAreaDef[] = [
  */
 export const USERDATA_IGNORED: Readonly<Record<string, string>> = {
     "level_backfill.last_user": "Arbeitsstand der Nachberechnung, keine Daten über die Person",
+    // W-0057: Teile der Sperre, die mit ihr im Bereich Sicherheit bleiben.
+    "security_bans.open_user": "Hilfsspalte für höchstens eine aktive Sperre je Person, derselbe Wert wie user_id",
+    "security_bans.note": "Begründung des Teams zur Sperre, bleibt mit der Sperre",
+    "security_evidence.data": "Beleg zur Sperre (Bild), bleibt mit der Sperre",
+    "security_evidence.message": "Beleg zur Sperre (gespeicherte Discord-Nachricht), bleibt mit der Sperre",
     "mail_accounts.imap_host": "Adresse des Mailservers",
     "mail_accounts.smtp_host": "Adresse des Mailservers",
     "userdata_deletions.user_id": "Nachweis der Löschung selbst, bleibt immer",
@@ -310,13 +330,15 @@ export const PERSON_COLUMN = /(^|_)(user|target|moderator|owner|actor|opener|lea
 
 /* --- Was bleibt (Runde 3): Rechtsgrundlage und Dauer ------------------- */
 
-export const USERDATA_BASES = ["pflicht", "ansprueche"] as const;
+export const USERDATA_BASES = ["pflicht", "ansprueche", "interesse"] as const;
 export type UserdataBasis = (typeof USERDATA_BASES)[number];
 
 /** Warum etwas trotz Löschung bleiben darf (Art. 17 Abs. 3 DSGVO). */
 export const USERDATA_BASIS: Readonly<Record<UserdataBasis, { readonly label: string; readonly article: string }>> = {
     pflicht: { label: "Gesetzliche Pflicht", article: "Art. 17 Abs. 3 lit. b DSGVO" },
     ansprueche: { label: "Rechtsansprüche", article: "Art. 17 Abs. 3 lit. e DSGVO" },
+    // W-0057: für Sperren (Entscheidung des Nutzers, 03.11.), geprüft in W-0009.
+    interesse: { label: "Berechtigtes Interesse", article: "Art. 17 Abs. 1 lit. c, Art. 21 Abs. 1 DSGVO" },
 };
 export const USERDATA_LAW_MAX = 60;
 export const USERDATA_YEARS_MAX = 30;
@@ -332,7 +354,7 @@ export const USERDATA_OPEN_NOTE = "zu klären";
  * Datenschutzerklärung der Webseite (Abschnitt Shop); das Protokoll des Teams
  * ist Entscheidung 44 der Spec. Moderation hat dort keine Frist: gelöscht.
  */
-export const USERDATA_DEFAULTS: Readonly<Partial<Record<UserdataArea, { readonly note: string; readonly basis: UserdataBasis; readonly law: string | null; readonly years: number }>>> = {
+export const USERDATA_DEFAULTS: Readonly<Partial<Record<UserdataArea, { readonly note: string; readonly basis: UserdataBasis; readonly law: string | null; readonly years: number | null }>>> = {
     shop: {
         note: "Bezahlte Bestellungen, Zustimmungen und Kündigungen bewahren wir drei Jahre nach Vertragsende auf, um Ansprüche belegen zu können. Rechnungen und Zahlungsdaten liegen bei Stripe.",
         basis: "ansprueche",
@@ -340,6 +362,8 @@ export const USERDATA_DEFAULTS: Readonly<Partial<Record<UserdataArea, { readonly
         years: 3,
     },
     protokoll: { note: "Was das Team zu dir getan hat, bleibt drei Jahre als Nachweis im Protokoll.", basis: "pflicht", law: "Art. 5 Abs. 2 DSGVO", years: 3 },
+    // W-0057: ohne feste Dauer, die Sperre ist dauerhaft.
+    sicherheit: { note: "Eine Sperre bleibt, damit sie wirkt.", basis: "interesse", law: null, years: null },
 };
 
 /** „Art. 17 Abs. 3 lit. e DSGVO · 3 Jahre“: für Vorschau und Beleg. */

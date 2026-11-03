@@ -46,6 +46,8 @@ export interface IShopMe {
     readonly hasBilling: boolean;
     /** Produkt-ID → der Satz, mit dem der Server einen Kauf ablehnen würde. */
     readonly blocked: Readonly<Record<string, string>>;
+    /** W-0057: dauerhaft gesperrt für Webseite oder Shop. url führt zur Sperrseite, website: Die Seite Zugang ist gesperrt. */
+    readonly gesperrt: { readonly url: string; readonly website: boolean } | null;
 }
 
 /* Kündigen ohne Anmeldung (§ 312k BGB) */
@@ -126,4 +128,19 @@ export interface IUnlockProgress {
     readonly email: string;
     /** Einladung zum Server, falls das Hinzufügen nicht geklappt hat. */
     readonly invite: string | null;
+}
+
+/** Bausteine einer dauerhaften Sperre (W-0057), wie `shared/security.ts` im Admin Dashboard. */
+export type Block = "others" | "own" | "dashboard" | "website" | "shop";
+
+/** Was Sperrseite (C4c) und VPN-Seite (V-A+) zeigen. Kommt versiegelt aus dem Callback, 15 Minuten gültig. */
+export interface IBlockedView {
+    readonly kind: "ban" | "vpn";
+    readonly service: "dashboard" | "website" | "shop";
+    readonly name: string;
+    readonly avatar: string | null;
+    readonly scope: readonly Block[];
+    readonly since: string | null;
+    readonly changedAt: string | null;
+    readonly checkedAt: string;
 }

@@ -56,6 +56,24 @@
         ],
         "createdAt": "2026-10-01T18:49:03.740Z",
         "reason": "Claude, static false positive: the stylesheet link __BASE__/assets/style.css is only resolved by the server, so the static scan reads every role as 16px. Live scan of the served page (computed h1 28px, h2 20px, body 14.5px) shows no flat hierarchy, checked 2026-10-01."
+      },
+      {
+        "rule": "kicker-above-heading",
+        "value": "*",
+        "files": [
+          "src/dashboard/public/gesperrt.html"
+        ],
+        "createdAt": "2026-11-03T18:12:16.455Z",
+        "reason": "Zeile Dauerhaft gesperrt über dem Titel ist Teil des vom Nutzer gewählten Entwurfs C4c"
+      },
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          "src/dashboard/public/vpn.html"
+        ],
+        "createdAt": "2026-11-03T18:12:16.841Z",
+        "reason": "Hinweisbalken Warum geprüft wird ist Teil des vom Nutzer gewählten Entwurfs V-A+"
       }
     ]
   }

@@ -51,7 +51,9 @@ export async function checkUserdata(): Promise<void> {
     });
 
     await check("Vorgaben aus der Datenschutzerklärung: Shop und Protokoll bleiben 3 Jahre, Moderation wird gelöscht", () => {
-        assert.deepEqual(Object.keys(USERDATA_DEFAULTS).sort(), ["protokoll", "shop"]);
+        assert.deepEqual(Object.keys(USERDATA_DEFAULTS).sort(), ["protokoll", "shop", "sicherheit"]);
+        // W-0057: Eine Sperre bleibt, damit sie wirkt (Berechtigtes Interesse, ohne feste Dauer).
+        assert.deepEqual([USERDATA_DEFAULTS.sicherheit?.basis, USERDATA_DEFAULTS.sicherheit?.years, USERDATA_DEFAULTS.sicherheit?.note], ["interesse", null, "Eine Sperre bleibt, damit sie wirkt."]);
         assert.deepEqual([USERDATA_DEFAULTS.shop?.basis, USERDATA_DEFAULTS.shop?.years], ["ansprueche", 3]);
         assert.match(USERDATA_DEFAULTS.shop?.note ?? "", /Stripe/);
         assert.deepEqual([USERDATA_DEFAULTS.protokoll?.basis, USERDATA_DEFAULTS.protokoll?.law, USERDATA_DEFAULTS.protokoll?.years], ["pflicht", "Art. 5 Abs. 2 DSGVO", 3]);

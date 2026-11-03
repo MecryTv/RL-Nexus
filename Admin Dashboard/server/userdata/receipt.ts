@@ -270,7 +270,7 @@ function remaining(pdf: Pdf, record: IDeletionRecord, code: string): void {
     let y = section(pdf, "Was wir noch haben und warum", 92);
 
     for (const entry of kept) {
-        y = item(pdf, y, `${entry.label} · ${number(entry.rows)} ${entry.rows === 1 ? "Eintrag" : "Einträge"}`, `${sentence(entry.note)} Wir nutzen das nur dafür und löschen es, sobald die Frist abläuft.`, basisText({ basis: entry.basis ?? null, law: entry.law ?? null, years: entry.years ?? null }), true);
+        y = item(pdf, y, `${entry.label} · ${number(entry.rows)} ${entry.rows === 1 ? "Eintrag" : "Einträge"}`, `${sentence(entry.note)} Wir nutzen das nur dafür${entry.years ? " und löschen es, sobald die Frist abläuft" : ""}.`, basisText({ basis: entry.basis ?? null, law: entry.law ?? null, years: entry.years ?? null }), true);
     }
 
     y = item(pdf, y, "Dieser Nachweis", "Discord-ID, Zeitpunkte und Zahlen dieser Löschung, keine Inhalte. Damit können wir belegen, dass wir gelöscht haben.", `Art. 6 Abs. 1 lit. c, Art. 5 Abs. 2 DSGVO · ${USERDATA_PROOF_YEARS} Jahre`);

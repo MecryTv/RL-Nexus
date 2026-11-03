@@ -221,11 +221,33 @@ Entwurf `w0051-loeschungen.html` (LA Tabelle, LB Spalten), Wahl des Nutzers: „
 
 Entscheidungen von Claude zum Ablauf (Liste am Ende, 37 bis 43).
 
+### Ergänzung vom 02.11. (Runde 3): Beleg B1+, Nutzerdaten N2+, Was bleibt W3
+
+Rückmeldung des Nutzers nach Task 6: Beleg, Nutzerdaten und Was bleibt „komplett neu“, der Beleg geht per DM an die Person. Entwürfe `w0051-beleg-v2.html` (B1+), `w0051-nutzerdaten-v2.html` (N2+), `w0051-was-bleibt-v2.html` (W3), alle drei freigegeben („sehr gut“, „mega“). Fehlende Angaben aus der Datenschutzerklärung der Webseite.
+
+- **Beleg B1+:** dunkles A4-PDF in Oxanium und Rajdhani, zwei Seiten. Seite 1: Kopf mit Logo und „Löschbestätigung · Art. 17 DSGVO“, Beleg-Nr., Stempel „GELÖSCHT“ mit Zeit, betroffene Person (Discord-ID) und Verantwortlicher (Connor Olischer, Königsberger Straße 8, 25335 Elmshorn, support@nexus-emb.de), drei Zahlen (gelöscht, Server, aufbewahrt), Bereiche als Tabelle, Ablauf als Zeitstrahl (geplant, DM, Kopie, gelöscht), Anlass. Seite 2: „Was wir noch haben und warum“ je aufbewahrtem Bereich mit Satz, Rechtsgrundlage und Dauer; der Nachweis selbst (Discord-ID, Zeiten, Zahlen; Art. 6 Abs. 1 lit. c, Art. 5 Abs. 2 DSGVO; **3 Jahre**); Sicherungen (**30 Tage**, bis dahin nicht zurückgespielt); „Nicht bei uns“ (Nachrichten auf Discord-Servern); Rechte (support@nexus-emb.de, Support-Server, Beschwerde beim ULD Schleswig-Holstein, Holstenstraße 98, 24103 Kiel, Art. 77). Fuß: „Maschinell erstellt, gültig ohne Unterschrift“, Prüfcode (HMAC über Nr., ID, Zeit und Zahlen), Seite x/2. Kein QR-Code.
+- **Beleg per DM:** Die DM „Erledigt“ hat den Beleg als PDF-Datei angehängt.
+- **Nachweis 3 Jahre:** Die Uhr löscht erledigte und abgebrochene Löschungen 3 Jahre nach Ende (done_at bzw. cancelled_at).
+- **Nutzerdaten N2+:** Kennzahlen oben (Personen, Einträge, Löschung läuft mit Zahl angehaltener, Shop-Kunden). Liste mit echtem Profilbild, Symbolen der Bereiche, Einträgen, Stand der Löschung und Sortierung (Einträge, zuletzt aktiv, Name). Profil-Kopf mit dem Discord-Profilbanner als Hintergrund (abgedunkelt), sonst Profilfarbe, sonst roter Schein; großes Profilbild, Name, @Nutzername, ID mit „kopieren“, Auskunft und Löschen planen; Marken „Auf Discord seit“ (aus der ID), „Bei RL Nexus seit“, „Zuletzt“, „Shop-Kunde“, Server mit Symbol. Laufende oder angehaltene Löschung als Leiste unter dem Kopf. Kennzahlen Einträge, Bereiche, Server, Aktivität 90 Tage (Balken je Woche), „bleiben bei Löschung“. Bereichskarten mit Symbol, Anteil, ersten Einträgen und Sprung in die gefilterte Zeitleiste.
+- **Was bleibt W3:** oben drei Zahlen (wird gelöscht, bleibt, noch offen). „Bleibt“ groß oben: je Bereich was drin ist, Personen und Einträge, Satz für DM und Beleg mit Vorschlägen, Rechtsgrundlage (Gesetzliche Pflicht, Art. 17 Abs. 3 lit. b · Rechtsansprüche, lit. e) mit optionaler Norm, Dauer; Warnung, solange „zu klären“ drinsteht. „Wird gelöscht“ als Karten mit Schalter, Inhalt und Personen. Rechts Vorschau für DM und Beleg. Ein Speichern unten mit Liste der Änderungen und „Verwerfen“, Nachfrage beim Verlassen.
+- **Vorgaben aus der Datenschutzerklärung:** Shop bleibt: „Bezahlte Bestellungen, Zustimmungen und Kündigungen bewahren wir drei Jahre nach Vertragsende auf, um Ansprüche belegen zu können. Rechnungen und Zahlungsdaten liegen bei Stripe.“ (Rechtsansprüche, 3 Jahre). Moderation: keine Frist genannt, wird auf Anfrage gelöscht. Protokoll: Entscheidung von Claude, siehe 44.
+
+### Ergänzung vom 02.11. (nach dem Abschluss-Review)
+
+Entscheidungen des Nutzers zu den Funden des Reviews:
+
+- **Kopie meiner Daten** kommt als zwei Dateien: HTML zum Lesen (Entwurf K1, in sich geschlossen, Bereiche, Tabellen, Verläufe als Chat, Rohdaten zum Aufklappen) und JSON für Programme (Art. 20). Im Profil zusätzlich „Auskunft (HTML)“.
+- **Backups einzelner Server:** Beim Löschen fallen die Zeilen der Person auch aus allen Server-Backups heraus. Was herausfiel, liegt getrennt in der Backup-Datenbank, lässt sich nicht zurückladen und ist nach 30 Tagen endgültig gelöscht. Zurückladen lässt gelöschte Personen immer weg.
+- **Protokoll des Teams** bleibt 3 Jahre (vorher 365 Tage), passend zu Entscheidung 44.
+- **Grund im Beleg** bleibt; das Feld im Planungsfenster sagt, dass er auch im Beleg an die Person steht.
+
 ---
 
 ## Teil 4: Dauerhafte Sperre mit VPN-Erkennung (W-0057)
 
 ### Worum es geht
+
+Design in vier Runden am 01.11. gewählt (A2, B1a V1, C2, C4c, D3, E2, F2), am 02.11. bestätigt („Passt so“). Entwürfe in `.works/tasks/W-0057-…/docs/` (`w0057-sperre`, `-runde2`, `-runde3`, `-runde4`).
 
 Wunsch des Nutzers: RL Nexus behält sich vor, Personen bei Missbrauch dauerhaft zu sperren. Wer voll gesperrt ist, kommt nie wieder an RL Nexus heran: kein Bot auf irgendeinem Server, kein Bot-Dashboard, keine Webseite mit Anmeldung, kein Shop. Das Team kann eine Sperre lockern, etwa auf eine Besitzsperre, und wieder verschärfen. Eine VPN-Erkennung über Proxycheck hilft, Umgehungen mit neuen Konten zu erkennen.
 
@@ -254,7 +276,7 @@ Neuer Bereich in der Leiste aus Teil 1, für Admin und Developer.
 - **Sperren:** Kacheln „Gesperrt“, „Offener Verdacht“, „VPN heute“ (blockierte Anmeldungen seit Mitternacht). Knopf „Person sperren“: Suche nach Discord-ID oder Name (wie in Teil 3), dann das Sperrfenster. Darunter die Liste: Person, Umfang (Voll, Nur Besitz, Eigene), seit, von wem, Treffer (abgewiesene Anmeldungen danach). Filter: aktiv, aufgehoben. Klick öffnet das Profil der Sperre.
 - **Profil der Sperre:** Kopf mit Person, Umfang, seit und von wem, Knöpfe „Umfang ändern“ und „Aufheben“. Reiter **Server** (E2: Server, Mitglieder, Schalter „Bot verlässt“, seit), **Belege**, **Treffer** (abgewiesene Anmeldungen und Verdachtsfälle mit Bezug zu dieser Person), **Protokoll**.
 - **Verdacht:** offene Fälle aus der Prüfung bei der Anmeldung (D3): Konto, Hinweis („VPN, gleiches Netz wie Spammer123“, „gleiche IP wie Spammer123, ohne VPN“), Alter des Kontos, wann, wo (Bot-Dashboard, Webseite, Shop). Zwei Knöpfe: **Sperren** (öffnet das Sperrfenster, Grund „Sperre umgangen“ vorgewählt, das gesperrte Konto als Bezug) und **Passt** (schließt den Fall). Die Zahl offener Fälle steht am Bereich Sicherheit in der Leiste.
-- **VPN-Prüfung:** oben, ob ein Proxycheck-Key gesetzt ist und ob Proxycheck zuletzt geantwortet hat. Darunter die Prüfungen der letzten 30 Tage: Zeit, Konto, wo, Ergebnis (rein, rein mit Markierung, blockiert, ohne Prüfung), Grund. Filter nach Ergebnis.
+- **VPN-Prüfung:** oben, ob ein Proxycheck-Key gesetzt ist, ob Proxycheck zuletzt geantwortet hat, Antwortzeit und Kontingent des Tages. Darunter die Prüfungen der letzten 30 Tage: Zeit, Konto, wo, Ergebnis (rein, rein mit Markierung, blockiert, ohne Prüfung), Grund. Filter nach Ergebnis. Eine Testabfrage für eine eingetippte IP, deren Ergebnis angezeigt, aber nicht gespeichert wird.
 
 ### Das Sperrfenster (B1a V1)
 
@@ -272,7 +294,7 @@ Dasselbe Fenster dient zum **Lockern, Verschärfen und Aufheben** im Profil, vor
 
 ### Was die gesperrte Person sieht (C2, C4c)
 
-- **Eine DM als Bild im Stil I1** bei jeder Sperre und jeder Änderung, sonst nie. Inhalt: „Du bist bei RL Nexus gesperrt“, seit wann, dauerhaft, die Listen „Gesperrt“ und „Weiter nutzbar“ nach den Bausteinen. Bei einer Lockerung oder Verschärfung „Deine Sperre wurde geändert“ mit dem neuen Stand, beim Aufheben „Deine Sperre ist aufgehoben“. Kein Grund, kein Ansprechpartner, keine Knöpfe. Streifen rot bei Vollsperre, gelb bei Teilsperre, grün beim Aufheben. Alt-Text mit allem, was draufsteht. Ist die DM nicht zustellbar, steht das im Protokoll; die Sperre gilt trotzdem. Das genaue Bild wird vor dem Bau als Entwurf gezeigt.
+- **Eine DM als Bild im Stil I1** bei jeder Sperre und jeder Änderung, sonst nie. Inhalt: „Du bist bei RL Nexus gesperrt“, seit wann, dauerhaft, die Listen „Gesperrt“ und „Weiter nutzbar“ nach den Bausteinen. Bei einer Lockerung oder Verschärfung „Deine Sperre wurde geändert“ mit dem neuen Stand, beim Aufheben „Deine Sperre ist aufgehoben“. Kein Grund, kein Ansprechpartner, keine Knöpfe. Streifen rot bei Vollsperre, gelb bei Teilsperre, grün beim Aufheben. Alt-Text mit allem, was draufsteht. Ist die DM nicht zustellbar, steht das im Protokoll; die Sperre gilt trotzdem. Gewählt am 03.11.: **S-B** (`w0057-dm-und-vpn.html`): schräger Stempel GESPERRT, TEILWEISE, GEÄNDERT oder AUFGEHOBEN wie bei der Lösch-DM, Profilbild, Titel, „Seit … · dauerhaft“, darunter die Listen untereinander; bei Vollsperre ohne Liste „Weiter nutzbar“; unten „RL Nexus antwortet dir ab jetzt nicht mehr.“
 - **Danach keine Antwort mehr** auf gesperrten Bausteinen: Der Bot verwirft die Interaktion, ohne zu antworten.
 - **Sperrseite C4c** auf Bot-Dashboard, Webseite und Shop nach der Anmeldung mit Discord (Vorlage `w0057-runde3.html`): Kopfzeile mit RL Nexus und Abmelden, gezeichnetes Schild ohne Leuchten (rot bei Vollsperre, gelb bei Teilsperre), Name und „über Discord angemeldet“, Listen „Gesperrt“ und „Weiter nutzbar“, „seit TT.MM.JJJJ“ und gegebenenfalls „gelockert am …“. Handy-Fassung mit großem Abmelde-Knopf (mindestens 44 px). Kein Grund, kein Ansprechpartner.
 
@@ -284,14 +306,14 @@ Bei jeder Anmeldung im Bot-Dashboard und für Webseite und Shop, in dieser Reihe
 2. **Gleiche IP wie eine gesperrte Person, ohne VPN:** rein, aber ein Verdachtsfall fürs Team (kann Familie sein).
 3. **Proxycheck:** VPN oder Proxy und Konto unter 30 Tage, oder Netz einer gesperrten Person: blockiert, Verdachtsfall. VPN ohne diese Treffer: rein, markiert. Kein VPN: rein.
 
-Ohne Key oder ohne Antwort von Proxycheck (Zeitlimit 3 Sekunden): rein, nur protokolliert. Blockiert heißt: eine Seite im Stil von C4c mit gelbem Schild „Anmeldung nicht möglich“ und „Schalte VPN oder Proxy aus und melde dich neu an.“ (Entwurf vor dem Bau zeigen). Das Kontoalter kommt aus der Discord-ID.
+Ohne Key oder ohne Antwort von Proxycheck (Zeitlimit 3 Sekunden): rein, nur protokolliert. Blockiert heißt: die Seite **V-A+** (`w0057-vpn-v2.html`, gewählt am 03.11.): Kopf mit RL Nexus und dem Dienst (Bot-Dashboard, Webseite, Shop), Schild mit durchgestrichenem Funk-Zeichen, „Anmeldung über VPN nicht möglich“, Kacheln Erkannt (VPN oder Proxy), Geprüft (Uhrzeit), Bei (Dienst), ein Satz, warum geprüft wird und dass die Adresse nicht gespeichert wird, drei Schritte, Knöpfe „Neu anmelden“ und „Abmelden“ (mindestens 44 px), aufklappbar „Ich nutze gar kein VPN“ mit dem Hinweis auf Firmen-, Schul- und Mobilfunknetze. Kein Hinweis auf Sperren. Das Kontoalter kommt aus der Discord-ID.
 
 Der Bot prüft bei jeder Interaktion nur die Sperrliste nach Discord-ID, er sieht keine IPs.
 
 ### Was gespeichert wird
 
 - **Nie die IP selbst**, weder in der Datenbank noch im Log. Gespeichert wird ein HMAC-SHA256 der IP und einer des Netzes (IPv4 /24, IPv6 /48) mit einem geheimen Schlüssel aus der `.env` (`IP_HASH_SECRET`), dazu die ASN von Proxycheck.
-- Je Anmeldung: Discord-ID, die beiden Hashes, wo, VPN ja oder nein, Ergebnis, Zeit. Diese Einträge werden nach **30 Tagen** gelöscht. Beim Sperren werden die Hashes der Person aus diesem Zeitraum in die Sperre übernommen und bleiben mit ihr. Hat sich die Person nie im Web angemeldet, gibt es keine Hashes; dann greift nur die Discord-ID.
+- Je Anmeldung: Discord-ID, die beiden Hashes, wo, VPN ja oder nein, Ergebnis, Zeit. Diese Einträge werden nach **90 Tagen** gelöscht (Nutzer, 03.11.). Beim Sperren werden die Hashes der Person aus diesem Zeitraum in die Sperre übernommen und bleiben mit ihr. Hat sich die Person nie im Web angemeldet, gibt es keine Hashes; dann greift nur die Discord-ID.
 - Die Sperre selbst: Person, Bausteine, Grund, Belege, Server-Entscheidungen, verknüpfte Sperren, wer und wann, jede Änderung. Aufgehobene Sperren bleiben als Eintrag für die Vorgeschichte.
 - Der Proxycheck-Key steht nur in der `.env` (`PROXYCHECK_API_KEY`), den setzt der Nutzer selbst.
 
@@ -310,13 +332,24 @@ Der Bot prüft bei jeder Interaktion nur die Sperrliste nach Discord-ID, er sieh
 
 ### Rechte und Protokoll
 
-- Den Bereich Sicherheit sehen Admin und Developer. **Sperren und Verschärfen** dürfen beide, **Lockern und Aufheben** nur Developer (so stand es im ersten Entwurf B1).
+- Den Bereich Sicherheit sehen Admin und Developer. **Sperren, Verschärfen, Lockern und Aufheben** dürfen beide (Nutzer, 03.11.); jeder Schritt steht im Protokoll.
 - Mitglieder des Teams (Admin, Developer) lassen sich nicht sperren; das Fenster sagt das, statt zu sperren.
 - Ins Protokoll kommen: Sperre, jede Änderung mit altem und neuem Umfang, Aufheben, „Bot verlässt“ an und aus, DM zugestellt oder nicht, Verdacht geschlossen mit „Passt“, Beleg hinzugefügt.
 
 ### Sperre und Löschung (W-0051)
 
-Eine Löschung nach Teil 3 lässt die Sperre samt Hashes stehen. Im Profil der Nutzerdaten steht der Bereich mit Schloss als „bleibt: Sperre“, in der DM unter „Bleibt“ der Satz, den das Team dafür einträgt. Bis W-0009 klärt, was rechtlich bleiben darf, steht dort „zu klären“. Die Anmelde-Hashes einer Person ohne Sperre werden mit gelöscht.
+Eine Löschung nach Teil 3 lässt die Sperre samt Hashes stehen. Im Profil der Nutzerdaten steht der Bereich mit Schloss als „bleibt: Sperre“. In „Was bleibt“ ist der Bereich Sicherheit vorbelegt mit „bleibt“, Grundlage **Berechtigtes Interesse** (Art. 17 Abs. 1 lit. c, Art. 21 Abs. 1 DSGVO) und dem Satz „Eine Sperre bleibt, damit sie wirkt.“ (Nutzer, 03.11.); W-0009 prüft das. Die Anmelde-Hashes einer Person ohne Sperre werden mit gelöscht.
+
+### Anschluss an W-0064 (ein Server pro Person, Freigabe-Pass)
+
+- **„Bot verlässt“** nutzt die Sperrliste `server_blocks` aus W-0064 (Spalte für die Herkunft: Entfernen oder Sperre). Der Abgleich und der Beitritt lassen den Bot dort schon heute sofort wieder gehen.
+- **Ansprechpartner:** Eine Person, deren Baustein „Eigene Server“ gesperrt ist, zählt nie als Ansprechpartner (Prüfung D2 und Command-Sperre aus W-0064) und bekommt beim Einladen keinen Freigabe-Pass.
+- **Eingeladene Server:** Im Profil der Sperre zeigt der Reiter Server dieselben Daten wie „Eingeladene Server“ (Mitglieder, Owner, Herkunft).
+- **Prüfstelle für Interaktionen:** Die Sperrliste wird im Bot vor allen Handlern geprüft, vor der Command-Sperre aus W-0064. Gesperrte bekommen keine Antwort, auch nicht das Bild „Kein Admin mit Zugang“.
+
+### Datenschutzerklärung
+
+Neuer Abschnitt auf der Webseite: dass RL Nexus Personen bei Missbrauch sperren kann, dass bei der Anmeldung mit Discord die IP an Proxycheck (proxycheck.io) geht, um VPN und Proxy zu erkennen, dass von IPs nur Hashes gespeichert werden, wie lange die Anmeldespuren bleiben und dass eine Sperre auch nach einer Löschanfrage bestehen bleibt. Der Text wird vor dem Einbau gezeigt; Rechtsbehauptungen nur, soweit W-0009 sie klärt.
 
 ### Was auf keinen Fall passieren darf
 
@@ -324,26 +357,12 @@ Eine Löschung nach Teil 3 lässt die Sperre samt Hashes stehen. Im Profil der N
 - Eine IP steht im Klartext in Datenbank, Log oder Protokoll.
 - Eine gesperrte Person bekommt auf einem gesperrten Baustein eine Antwort vom Bot, oder eine nicht gesperrte Person keine.
 - Moderation gegen die gesperrte Person hört auf zu wirken.
+- Eine Teilsperre sperrt mehr, als die Bausteine sagen.
+- Die gesperrte Person erfährt den Grund oder bekommt mehr als eine DM je Änderung.
 
-### Ergänzung vom 02.11. (Runde 3): Beleg B1+, Nutzerdaten N2+, Was bleibt W3
+### Nicht dabei
 
-Rückmeldung des Nutzers nach Task 6: Beleg, Nutzerdaten und Was bleibt „komplett neu“, der Beleg geht per DM an die Person. Entwürfe `w0051-beleg-v2.html` (B1+), `w0051-nutzerdaten-v2.html` (N2+), `w0051-was-bleibt-v2.html` (W3), alle drei freigegeben („sehr gut“, „mega“). Fehlende Angaben aus der Datenschutzerklärung der Webseite.
-
-- **Beleg B1+:** dunkles A4-PDF in Oxanium und Rajdhani, zwei Seiten. Seite 1: Kopf mit Logo und „Löschbestätigung · Art. 17 DSGVO“, Beleg-Nr., Stempel „GELÖSCHT“ mit Zeit, betroffene Person (Discord-ID) und Verantwortlicher (Connor Olischer, Königsberger Straße 8, 25335 Elmshorn, support@nexus-emb.de), drei Zahlen (gelöscht, Server, aufbewahrt), Bereiche als Tabelle, Ablauf als Zeitstrahl (geplant, DM, Kopie, gelöscht), Anlass. Seite 2: „Was wir noch haben und warum“ je aufbewahrtem Bereich mit Satz, Rechtsgrundlage und Dauer; der Nachweis selbst (Discord-ID, Zeiten, Zahlen; Art. 6 Abs. 1 lit. c, Art. 5 Abs. 2 DSGVO; **3 Jahre**); Sicherungen (**30 Tage**, bis dahin nicht zurückgespielt); „Nicht bei uns“ (Nachrichten auf Discord-Servern); Rechte (support@nexus-emb.de, Support-Server, Beschwerde beim ULD Schleswig-Holstein, Holstenstraße 98, 24103 Kiel, Art. 77). Fuß: „Maschinell erstellt, gültig ohne Unterschrift“, Prüfcode (HMAC über Nr., ID, Zeit und Zahlen), Seite x/2. Kein QR-Code.
-- **Beleg per DM:** Die DM „Erledigt“ hat den Beleg als PDF-Datei angehängt.
-- **Nachweis 3 Jahre:** Die Uhr löscht erledigte und abgebrochene Löschungen 3 Jahre nach Ende (done_at bzw. cancelled_at).
-- **Nutzerdaten N2+:** Kennzahlen oben (Personen, Einträge, Löschung läuft mit Zahl angehaltener, Shop-Kunden). Liste mit echtem Profilbild, Symbolen der Bereiche, Einträgen, Stand der Löschung und Sortierung (Einträge, zuletzt aktiv, Name). Profil-Kopf mit dem Discord-Profilbanner als Hintergrund (abgedunkelt), sonst Profilfarbe, sonst roter Schein; großes Profilbild, Name, @Nutzername, ID mit „kopieren“, Auskunft und Löschen planen; Marken „Auf Discord seit“ (aus der ID), „Bei RL Nexus seit“, „Zuletzt“, „Shop-Kunde“, Server mit Symbol. Laufende oder angehaltene Löschung als Leiste unter dem Kopf. Kennzahlen Einträge, Bereiche, Server, Aktivität 90 Tage (Balken je Woche), „bleiben bei Löschung“. Bereichskarten mit Symbol, Anteil, ersten Einträgen und Sprung in die gefilterte Zeitleiste.
-- **Was bleibt W3:** oben drei Zahlen (wird gelöscht, bleibt, noch offen). „Bleibt“ groß oben: je Bereich was drin ist, Personen und Einträge, Satz für DM und Beleg mit Vorschlägen, Rechtsgrundlage (Gesetzliche Pflicht, Art. 17 Abs. 3 lit. b · Rechtsansprüche, lit. e) mit optionaler Norm, Dauer; Warnung, solange „zu klären“ drinsteht. „Wird gelöscht“ als Karten mit Schalter, Inhalt und Personen. Rechts Vorschau für DM und Beleg. Ein Speichern unten mit Liste der Änderungen und „Verwerfen“, Nachfrage beim Verlassen.
-- **Vorgaben aus der Datenschutzerklärung:** Shop bleibt: „Bezahlte Bestellungen, Zustimmungen und Kündigungen bewahren wir drei Jahre nach Vertragsende auf, um Ansprüche belegen zu können. Rechnungen und Zahlungsdaten liegen bei Stripe.“ (Rechtsansprüche, 3 Jahre). Moderation: keine Frist genannt, wird auf Anfrage gelöscht. Protokoll: Entscheidung von Claude, siehe 44.
-
-### Ergänzung vom 02.11. (nach dem Abschluss-Review)
-
-Entscheidungen des Nutzers zu den Funden des Reviews:
-
-- **Kopie meiner Daten** kommt als zwei Dateien: HTML zum Lesen (Entwurf K1, in sich geschlossen, Bereiche, Tabellen, Verläufe als Chat, Rohdaten zum Aufklappen) und JSON für Programme (Art. 20). Im Profil zusätzlich „Auskunft (HTML)“.
-- **Backups einzelner Server:** Beim Löschen fallen die Zeilen der Person auch aus allen Server-Backups heraus. Was herausfiel, liegt getrennt in der Backup-Datenbank, lässt sich nicht zurückladen und ist nach 30 Tagen endgültig gelöscht. Zurückladen lässt gelöschte Personen immer weg.
-- **Protokoll des Teams** bleibt 3 Jahre (vorher 365 Tage), passend zu Entscheidung 44.
-- **Grund im Beleg** bleibt; das Feld im Planungsfenster sagt, dass er auch im Beleg an die Person steht.
+Einspruch durch die gesperrte Person, Sperren auf Zeit, automatische Sperren ohne Team, Sperren einzelner Server-Rollen.
 
 ## Teil 5: Suche findet alles (W-0059)
 
@@ -459,3 +478,9 @@ Wunsch vom 02.11.: „verbesser die Suche, sodass man quasi alles auf dem Admin 
 44. **Protokoll des Teams bleibt 3 Jahre als Nachweis** (Gesetzliche Pflicht, Art. 5 Abs. 2 DSGVO), weil die Erklärung dazu nichts sagt und es dieselbe Frist wie der Löschnachweis ist; Task 7 trägt es in die Datenschutzerklärung ein.
 45. **Moderation wird bei einer Löschung gelöscht** (vorher „zu klären“), weil die Erklärung für Fälle keine Frist nennt und Löschung auf Anfrage zusagt. Gilt nur, solange kein Team-Mitglied auf „Was bleibt“ etwas anderes speichert.
 46. **Prüfcode** ist ein HMAC mit dem Server-Geheimnis über Beleg-Nr., Discord-ID, Ausführungszeit und Zahlen, 12 Zeichen in Dreiergruppen; die Seite Löschungen zeigt ihn zum Vergleich.
+47. **Eine Prüfstelle für Proxycheck:** Nur das Admin Dashboard fragt Proxycheck; das Bot-Dashboard fragt bei Anmeldungen über `POST /internal/security/check` nach. Der Key steht nur in der `.env` des Admin Dashboards.
+48. **Sperrliste im Bot:** beim Start aus der gemeinsamen Datenbank geladen, nach jedem Bescheid des Admin Dashboards (`/dcapi/admin/security/reload`) und zur Sicherheit alle 5 Minuten neu.
+49. **Hashes:** HMAC-SHA256 mit `IP_HASH_SECRET`; fehlt der Wert, ein aus `SERVER_JWT_SECRET` abgeleiteter Schlüssel, damit es ohne zusätzliche Einrichtung läuft. Netz IPv4 /24, IPv6 /48.
+50. **Zeitlimit für Proxycheck 3 Sekunden**, danach gilt „ohne Prüfung“ (rein, protokolliert).
+51. **„Bot verlässt“ über `server_blocks`** aus W-0064 statt einer eigenen Tabelle.
+52. **Antworten des Nutzers vom 03.11.** zu den Widersprüchen zwischen älterem Teil 4 und dem Entwurf vom 02.11.: Anmeldespuren 90 Tage, Lockern und Aufheben dürfen Admin und Developer, Grundlage der bleibenden Sperre „Berechtigtes Interesse“. Teil 4 damit freigegeben.

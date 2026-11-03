@@ -53,6 +53,9 @@ import { stripeGateway, stripeReady } from "../shop/stripe.ts";
 import { syncMember, type SyncStep } from "../shop/sync.ts";
 import { handleStripeEvent } from "../shop/webhook.ts";
 import { body, id } from "../validate.ts";
+import { checkLogin } from "../security/login.ts";
+import { blockedToken } from "./security-public.ts";
+import { activeBanOf, scopeOfRow, type IBanRow } from "../security/store.ts";
 
 /**
  * Der Shop für die Webseite. nginx reicht nexus-emb.de/api/shop/* hierher,
@@ -129,6 +132,25 @@ function sessionOf(request: FastifyRequest, config: IConfig): IShopSession {
     return session;
 }
 
+/** W-0057: Welche Bausteine einer dauerhaften Sperre für diese Person gelten. */
+async function bannedFor(userId: string): Promise<{ readonly website: boolean; readonly shop: boolean; readonly ban: IBanRow | null }> {
+    const ban = await activeBanOf(userId);
+    const scope = ban ? scopeOfRow(ban) : [];
+
+    return { website: scope.includes("website"), shop: scope.includes("shop"), ban };
+}
+
+/** Der Satz bei einer dauerhaften Sperre für den Shop: ohne Ansprechpartner (Spec C4c). */
+const SHOP_BANNED = "Dein Konto ist für den Shop gesperrt.";
+
+/** Für Test und Kasse: angemeldet und nicht für den Shop gesperrt. Kündigen und Portal bleiben offen (§ 312k BGB). */
+async function buyerOf(request: FastifyRequest, config: IConfig): Promise<IShopSession> {
+    const session = sessionOf(request, config);
+    if ((await bannedFor(session.id)).shop) throw new PublicError(403, SHOP_BANNED);
+
+    return session;
+}
+
 function publicProduct(product: { readonly id: number; readonly title: string; readonly description: string; readonly bullets: readonly string[]; readonly kind: IShopPublicProduct["kind"]; readonly durationDays: number | null; readonly priceCents: number; readonly badge: string }): IShopPublicProduct {
     return {
         id: product.id,
@@ -151,11 +173,19 @@ export async function publicShopRoutes(app: FastifyInstance, { config }: { confi
         if (!fromWebsite(request, config)) return reply.code(403).send({ error: "Diese Anfrage kam nicht von der Webseite." });
     });
 
-    app.get("/public/shop/state", async (request): Promise<IShopState> => {
+    app.get("/public/shop/state", async (request, reply): Promise<IShopState> => {
         const settings = await readSettings();
         const products = (await listProducts()).filter((product) => product.visible).map(publicProduct);
-        const session = readShopSession(request, config);
+        let session = readShopSession(request, config);
         let me: IShopMe | null = null;
+        const ban = session ? await bannedFor(session.id) : null;
+
+        // W-0057: Webseite und Shop gesperrt beendet die Sitzung; die nächste Anmeldung zeigt die Sperrseite.
+        // Nur die Webseite: Die Sitzung bleibt für den Shop, die Seite Zugang leitet zur Sperrseite.
+        if (session && ban?.website && ban.shop) {
+            reply.header("Set-Cookie", clearShopSession(config));
+            session = null;
+        }
 
         if (session) {
             const customer = await customerOf(session.id);
@@ -164,7 +194,8 @@ export async function publicShopRoutes(app: FastifyInstance, { config }: { confi
                 const now = new Date();
                 const grants = await grantsOf(session.id);
                 const access = accessOf(grants, now);
-                const banned = customer.bannedAt !== null;
+                const banned = customer.bannedAt !== null || ban?.shop === true;
+                const lock = ban?.ban && (ban.website || ban.shop) ? ban.ban : null;
                 const running = access.grant;
                 const title = running === null ? null : running.source === "trial" ? "Test" : ((await findProduct(running.productId ?? 0))?.title ?? null);
 
@@ -184,10 +215,27 @@ export async function publicShopRoutes(app: FastifyInstance, { config }: { confi
                     // Dieselbe Regel wie beim Checkout: Die Seite sieht nur den längsten Zugang, der Server alle.
                     blocked: Object.fromEntries(
                         products.flatMap((product) => {
-                            const problem = purchaseProblem(grants, product, banned, now);
+                            const problem = ban?.shop ? SHOP_BANNED : purchaseProblem(grants, product, banned, now);
                             return problem === null ? [] : [[String(product.id), problem]];
                         })
                     ),
+                    gesperrt: lock
+                        ? {
+                              url: `/gesperrt?s=${encodeURIComponent(
+                                  blockedToken(config, {
+                                      kind: "ban",
+                                      service: ban?.website ? "website" : "shop",
+                                      name: session.name,
+                                      avatar: session.avatar,
+                                      scope: scopeOfRow(lock),
+                                      since: lock.created_at.toISOString(),
+                                      changedAt: lock.changed_at?.toISOString() ?? null,
+                                      checkedAt: now.toISOString(),
+                                  })
+                              )}`,
+                              website: ban?.website === true,
+                          }
+                        : null,
                 };
             }
         }
@@ -247,6 +295,10 @@ export async function publicShopRoutes(app: FastifyInstance, { config }: { confi
         try {
             const tokens = await exchangeShopCode(config, code);
             const user = await fetchMe(tokens.accessToken);
+
+            // W-0057, D3: Sperre und VPN vor allem anderen. Gesperrt oder blockiert: keine Sitzung, die Sperrseite.
+            const security = await checkLogin(config, { userId: user.id, name: displayName(user), avatar: avatarUrl(user.id, user.avatar), ip: request.ip, service: stored.target === "zugang" ? "website" : "shop" });
+            if (security.view) return go(`/gesperrt?s=${encodeURIComponent(blockedToken(config, security.view))}`);
 
             // Ohne bestätigte Mail kann keine Bestätigung ankommen.
             if (user.verified !== true || typeof user.email !== "string" || user.email === "") return go("/preise?anmeldung=mail");
@@ -375,7 +427,7 @@ export async function publicShopRoutes(app: FastifyInstance, { config }: { confi
     app.post("/public/shop/logout", { config: LOGIN_LIMIT }, async (_request, reply) => reply.header("Set-Cookie", clearShopSession(config)).code(204).send());
 
     app.post("/public/shop/trial", { config: TRIAL_LIMIT }, async (request): Promise<IUnlockProgress> => {
-        const session = sessionOf(request, config);
+        const session = await buyerOf(request, config);
         const settings = await readSettings();
         const customer = await customerOf(session.id);
         if (!customer || !customer.email) throw new PublicError(401, "Melde dich zuerst mit Discord an.");
@@ -418,7 +470,7 @@ export async function publicShopRoutes(app: FastifyInstance, { config }: { confi
             throw new PublicError(400, "Bitte bestätige alle drei Punkte über dem Knopf.");
         }
 
-        const session = sessionOf(request, config);
+        const session = await buyerOf(request, config);
         const productId = id(String(input.productId ?? ""));
         const settings = await readSettings();
         if (!settings.shopOpen) throw new PublicError(409, "Gerade gibt es keinen Verkauf.");

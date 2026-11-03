@@ -42,6 +42,7 @@ import { IBoardEntry, IBoardPage, ILevelBonus, ILevelEntry, ILevelLogEntry, ILev
 import { ILevelDaySum } from "../models/LevelDays";
 import { PeriodDays, PreviousWindow, RankOrder, Trend } from "./levels/Board";
 import logger from "../utils/logger";
+import { BlockedAt } from "../utils/security";
 
 export class LevelError extends Error {}
 
@@ -340,6 +341,8 @@ export default class LevelService {
                 const member = state.member;
 
                 if (!member || member.user.bot || !state.channel || state.channel.id === guild.afkChannelId) continue;
+                // W-0057: Gesperrte sammeln auch im Sprachkanal keine Punkte.
+                if (BlockedAt(member.id, guild.ownerId)) continue;
 
                 const xp = (await this.VoiceXp(state, member, settings, now)) * minutes;
 

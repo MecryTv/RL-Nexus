@@ -112,6 +112,10 @@ export interface IConfig {
     readonly smtp: ISmtpConfig | null;
     /** Mit --dev aus DEV_CONTACT_WEBHOOK_URL, damit Tests nicht im echten Kanal landen. */
     readonly contactWebhook: string | null;
+    /** W-0057: Key für proxycheck.io. Ohne ihn wird bei der Anmeldung niemand blockiert, nur protokolliert. */
+    readonly proxycheckKey: string | null;
+    /** W-0057: Schlüssel für die Kürzel von IPs, sonst aus jwtSecret abgeleitet (server/security/hash.ts). */
+    readonly ipHashSecret: string | null;
     /**
      * Wohin die Statusmeldung geht. Sonst der eine Kanal aus STATUS_CHANNEL_ID,
      * mit --dev die Test-Kanäle aus DEV_STATUS_CHANNEL_IDS (Standard: die
@@ -264,6 +268,8 @@ export function loadConfig(env: Env = process.env, argv: readonly string[] = pro
         smtp: smtpOf(raw),
         // Ein Discord-Webhook ist eine Vollmacht für den Kanal: nur https.
         contactWebhook: raw(app("CONTACT_WEBHOOK_URL")).startsWith("https://") ? raw(app("CONTACT_WEBHOOK_URL")) : null,
+        proxycheckKey: raw("PROXYCHECK_API_KEY") || null,
+        ipHashSecret: raw("IP_HASH_SECRET") || null,
         statusChannelIds: developerMode
             ? (raw("DEV_STATUS_CHANNEL_IDS") || DEV_STATUS_CHANNELS)
                   .split(",")

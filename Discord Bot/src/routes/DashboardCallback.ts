@@ -10,10 +10,13 @@ import {
     SerializeCookie,
     SESSION_COOKIE,
     SESSION_LIFETIME,
+    AvatarURL,
     STATE_COOKIE,
 } from "../constants/Dashboard";
 import { MfaRequired } from "../services/DashboardService";
 import { SendPage, Unconfigured } from "../utils/dashboard";
+import { BlockedPage } from "../builder/BlockedPage";
+import { LoginCheck } from "../utils/security";
 
 function Match(expected: string, received: string | undefined): boolean {
     if (!expected || !received) return false;
@@ -75,6 +78,19 @@ export default class DashboardCallback extends Route {
             reply.header("Set-Cookie", clear).code(403);
 
             return SendPage(this.client, reply, "mfa.html");
+        }
+
+        // W-0057, Prüfung D3: Sperre, gleiche IP, VPN. Gesperrt oder blockiert: keine Sitzung, die Seite C4c oder V-A+.
+        const blocked = await LoginCheck(this.client, { userId: session.userId, name: session.username, avatar: AvatarURL(session.userId, session.avatar), ip: request.ip });
+
+        if (blocked) {
+            await service.Revoke(session);
+
+            const { page, values } = BlockedPage(blocked);
+
+            reply.header("Set-Cookie", clear).code(403);
+
+            return SendPage(this.client, reply, page, values);
         }
 
         const cookies = [clear, SerializeCookie(SESSION_COOKIE, service.Sign(session), SESSION_LIFETIME, service.Secure)];

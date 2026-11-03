@@ -18,12 +18,14 @@ export interface INavPage {
     readonly unread?: boolean;
     /** Zeigt die Zahl angehaltener Löschungen an diesem Eintrag, gelb. */
     readonly halted?: boolean;
+    /** Zeigt die Zahl offener Verdachtsfälle an diesem Eintrag, gelb (W-0057). */
+    readonly suspects?: boolean;
     /** Weitere Adressen, die zu dieser Seite gehören. */
     readonly also?: readonly string[];
 }
 
 export interface INavArea {
-    readonly id: "start" | "bot" | "shop" | "webseite" | "datenschutz" | "dev";
+    readonly id: "start" | "bot" | "shop" | "webseite" | "datenschutz" | "sicherheit" | "dev";
     readonly label: string;
     /** Unter dem Symbol in der Leiste, 74 px breit. */
     readonly short: string;
@@ -88,6 +90,17 @@ export const AREAS: readonly INavArea[] = [
             { to: "/datenschutz", label: "Nutzerdaten", icon: "users", description: "Wer bei RL Nexus Daten hat, was es ist, Auskunft als Datei." },
             { to: "/datenschutz/loeschungen", label: "Löschungen", icon: "trash", halted: true, description: "Geplante und erledigte Löschungen von Nutzerdaten." },
             { to: "/datenschutz/regeln", label: "Was bleibt", icon: "lock", description: "Was bei einer Löschung bleibt und welcher Satz dazu in der DM steht." },
+        ],
+    },
+    {
+        id: "sicherheit",
+        label: "Sicherheit",
+        short: "Sperren",
+        icon: "ban",
+        pages: [
+            { to: "/sicherheit", label: "Sperren", icon: "ban", also: ["/sicherheit/sperre"], description: "Dauerhafte Sperren: wer gesperrt ist, wofür und seit wann." },
+            { to: "/sicherheit/verdacht", label: "Verdacht", icon: "alert", suspects: true, description: "Anmeldungen, die nach einer umgangenen Sperre aussehen." },
+            { to: "/sicherheit/vpn", label: "VPN-Prüfung", icon: "eye", description: "Proxycheck, Prüfungen der letzten 30 Tage und eine Testabfrage." },
         ],
     },
     {

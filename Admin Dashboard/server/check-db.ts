@@ -34,6 +34,7 @@ import { buildApp } from "./app.ts";
 import { checkBackupsDb } from "./checks/backups-db.check.ts";
 import { checkBetaDb } from "./checks/beta-db.check.ts";
 import { checkServersDb } from "./checks/servers-db.check.ts";
+import { checkSecurityDb } from "./checks/security-db.check.ts";
 import { checkDatabaseDb } from "./checks/database-db.check.ts";
 import { cleanup } from "./cleanup.ts";
 import { FakeMailStore, fakeImapFactory } from "./checks/fake-imap.ts";
@@ -1012,6 +1013,8 @@ try {
                 rules.filter((rule) => rule.keep).map((rule) => [rule.area, rule.basis, rule.years]),
                 [
                     ["shop", "ansprueche", 3],
+                    // W-0057: Sperren bleiben, ohne feste Dauer.
+                    ["sicherheit", "interesse", null],
                     ["protokoll", "pflicht", 3],
                 ]
             );
@@ -3629,6 +3632,7 @@ try {
     await checkBackupsDb(config, { get, write, raw });
     await checkBetaDb(config, { get, write, raw });
     await checkServersDb(config);
+    await checkSecurityDb(config);
     await checkDatabaseDb();
 } finally {
     stopStatusPost();

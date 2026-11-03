@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>RL Nexus · Zugang gesperrt</title>
+<meta name="color-scheme" content="dark">
+<meta name="robots" content="noindex">
+<link rel="icon" type="image/png" href="__BASE__/assets/images/rl-nexus-n-48.png">
+<!-- W-0057, Sperrseite C4c. Kein Grund, kein Ansprechpartner (so gewollt). -->
+<style>
+@font-face{font-family:"Oxanium";font-weight:500;font-display:swap;src:url("__BASE__/assets/fonts/oxanium-500.woff2") format("woff2")}
+@font-face{font-family:"Oxanium";font-weight:800;font-display:swap;src:url("__BASE__/assets/fonts/oxanium-800.woff2") format("woff2")}
+@font-face{font-family:"Rajdhani";font-weight:700;font-display:swap;src:url("__BASE__/assets/fonts/rajdhani-700.woff2") format("woff2")}
+:root{--line:rgba(255,255,255,.08);--line2:rgba(255,255,255,.14);--text:#f2f4f7;--text2:#b3bbc6;--text3:#8f99a6;--tone:#ff1e2d;--tone-soft:#ff8a93;--tone-fill:#1a0b0e;--tone-ring:rgba(255,30,45,.35)}
+.part{--tone:#f0b232;--tone-soft:#f0b232;--tone-fill:#1a1408;--tone-ring:rgba(240,178,50,.35)}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%}
+body{display:flex;flex-direction:column;min-height:100vh;color:var(--text);font:500 15px/1.5 "Oxanium","Segoe UI",sans-serif;background:linear-gradient(rgba(255,255,255,.022) 1px,transparent 1px) 0 0/24px 24px,linear-gradient(90deg,rgba(255,255,255,.022) 1px,transparent 1px) 0 0/24px 24px,radial-gradient(ellipse at 50% 30%,rgba(255,30,45,.10),transparent 55%),#050608;background-color:#050608}
+header{display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-bottom:1px solid var(--line)}
+.brand{display:flex;gap:8px;align-items:center;font:700 13px "Rajdhani";letter-spacing:.16em;text-transform:uppercase;color:var(--text2)}
+.brand i{width:24px;height:24px;border-radius:6px;background:#d81424;display:grid;place-items:center;font:800 13px "Oxanium";color:#fff;font-style:normal}
+.btn{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 16px;border-radius:5px;font:700 12px "Rajdhani";letter-spacing:.1em;text-transform:uppercase;border:1px solid var(--line2);color:#d6dbe2;background:rgba(255,255,255,.04);text-decoration:none}
+.btn:hover{border-color:rgba(255,255,255,.3)}
+.btn:focus-visible{outline:2px solid #fff;outline-offset:2px}
+main{flex:1;display:grid;place-items:center;padding:28px 16px;text-align:center}
+.shield{width:78px;height:86px;margin:0 auto 10px;display:block}
+.stt{font:700 12px "Rajdhani";letter-spacing:.16em;text-transform:uppercase;color:var(--tone-soft)}
+h1{margin:2px 0 12px;font:800 28px "Oxanium"}
+.acc{display:inline-flex;gap:10px;align-items:center;background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:999px;padding:3px 14px 3px 3px;font-size:14px;text-align:left}
+.acc small{display:block;color:var(--text3);font-size:12px;line-height:1.1}
+.ava{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font:800 12px "Oxanium";color:#fff;flex:none;background:linear-gradient(135deg,#b8358f,#7a28b8);overflow:hidden}
+.ava img{width:100%;height:100%;object-fit:cover}
+.groups{display:grid;gap:10px;margin:16px auto 0;max-width:360px;text-align:left}
+.k{display:block;margin-bottom:4px;font:700 11px "Rajdhani";letter-spacing:.12em;text-transform:uppercase;color:var(--text3)}
+.pls{display:flex;gap:6px;flex-wrap:wrap}
+.pl{border:1px solid;border-radius:6px;padding:2px 9px;font:700 12px "Rajdhani";letter-spacing:.08em;text-transform:uppercase}
+.pl.no{border-color:rgba(255,30,45,.45);color:#ff9aa1;background:rgba(255,30,45,.06)}.pl.no::before{content:"✕ "}
+.pl.yes{border-color:rgba(53,224,127,.4);color:#8ff0b8;background:rgba(53,224,127,.05)}.pl.yes::before{content:"✓ "}
+.since{margin-top:14px;font-size:13px;color:var(--text3)}
+.wide{display:none;width:100%;margin-top:18px}
+footer{padding:10px 18px;border-top:1px solid var(--line);font-size:12px;color:var(--text3);display:flex;justify-content:space-between}
+@media(max-width:560px){header .btn{display:none}.wide{display:flex}h1{font-size:23px}}
+</style>
+</head>
+<body class="__TONE__">
+<header><span class="brand"><i>N</i>RL Nexus</span><a class="btn" href="__SITE__">Abmelden</a></header>
+<main><div>
+  __SHIELD__
+  <div class="stt">__STATE__</div>
+  <h1>__TITLE__</h1>
+  <span class="acc"><span class="ava">__AVATAR__</span><span>__NAME__<small>über Discord angemeldet</small></span></span>
+  <div class="groups">__GROUPS__</div>
+  <div class="since">__SINCE__</div>
+  <a class="btn wide" href="__SITE__">Abmelden</a>
+</div></main>
+<footer><span>RL Nexus</span><span>nexus-emb.de</span></footer>
+</body>
+</html>

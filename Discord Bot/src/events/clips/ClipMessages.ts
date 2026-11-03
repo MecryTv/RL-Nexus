@@ -1,6 +1,7 @@
 import { Events, Message } from "discord.js";
 import BotClient from "../../client/BotClient";
 import Event from "../../structures/Event";
+import { BlockedAt } from "../../utils/security";
 
 /** Clips der Woche: was im Clip-Kanal gepostet wird, prüft und zählt der ClipService. */
 export default class ClipMessages extends Event {
@@ -13,6 +14,9 @@ export default class ClipMessages extends Event {
     }
 
     async Execute(message: Message): Promise<void> {
+        // W-0057: Gesperrte reichen keine Clips ein.
+        if (BlockedAt(message.author.id, message.guild?.ownerId ?? null)) return;
+
         await this.client.clipService.Message(message).catch(() => undefined);
     }
 }

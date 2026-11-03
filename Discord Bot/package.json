@@ -45,6 +45,7 @@
         "check:epicname": "tsx src/scripts/CheckEpicName.ts",
         "check:selfroles": "tsx src/scripts/CheckSelfRoles.ts",
         "check:servers": "tsx src/scripts/CheckServers.ts",
+        "check:security": "tsx src/scripts/CheckSecurity.ts",
         "check:settings": "tsx src/scripts/CheckSettings.ts",
         "check:sixmans": "tsx src/scripts/CheckSixMans.ts",
         "check:staffgrant": "tsx src/scripts/CheckStaffGrant.ts",

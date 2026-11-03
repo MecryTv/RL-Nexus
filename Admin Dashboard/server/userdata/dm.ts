@@ -99,7 +99,7 @@ function box(ctx: SKRSContext2D, x: number, y: number, color: string): void {
     ctx.restore();
 }
 
-function stamp(ctx: SKRSContext2D, text: string, color: string): void {
+export function stamp(ctx: SKRSContext2D, text: string, color: string): void {
     ctx.save();
     ctx.translate(W - PAD - 110, 70);
     ctx.rotate((-8 * Math.PI) / 180);

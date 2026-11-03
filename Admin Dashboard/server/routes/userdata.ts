@@ -28,7 +28,7 @@ import { audit } from "../audit.ts";
 import { botOverview } from "../bot.ts";
 import type { IUserRef } from "../../shared/api.ts";
 import type { IConfig } from "../config.ts";
-import { DatabaseUnavailable, databaseReady, query } from "../db.ts";
+import { DatabaseUnavailable, databaseReady, query, withTransaction } from "../db.ts";
 import { publish } from "../events.ts";
 import { PublicError } from "../errors.ts";
 import { knownName, lookupUser, userRefs } from "../users.ts";
@@ -124,6 +124,8 @@ export async function userdataRoutes(app: FastifyInstance, { config }: { config:
             const body = (entry ?? {}) as { area?: unknown; keep?: unknown; note?: unknown; basis?: unknown; law?: unknown; years?: unknown };
             const area = oneOf(body.area, USERDATA_AREA_IDS, "Der Bereich");
             if (typeof body.keep !== "boolean") throw new PublicError(400, "Sag, ob der Bereich bleibt oder gelöscht wird.");
+            // W-0057: Eine Sperre bleibt, damit sie wirkt. Sonst löschte die nächste Löschanfrage die Sperre still mit.
+            if (!body.keep && area === "sicherheit") throw new PublicError(400, "Der Bereich Sicherheit bleibt immer: Eine Sperre bleibt, damit sie wirkt.");
             if (!body.keep) return { area, keep: false, note: null, basis: null, law: null, years: null };
 
             const note = text(body.note, "Der Satz", { max: USERDATA_NOTE_MAX }) || null;
@@ -140,13 +142,17 @@ export async function userdataRoutes(app: FastifyInstance, { config }: { config:
 
         const actor = accessOf(request);
 
-        for (const rule of rules) {
-            await query(
-                "INSERT INTO userdata_rules (area, keep, note, basis, law, years) VALUES (?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE keep = VALUES(keep), note = VALUES(note), basis = VALUES(basis), law = VALUES(law), years = VALUES(years)",
-                [rule.area, rule.keep ? 1 : 0, rule.note, rule.basis, rule.law, rule.years]
-            );
-            await audit(actor, "userdata.rules", rule.area, rule.keep ? `behalten: ${rule.note} · ${basisText(rule)}` : "löschen");
-        }
+        // Alle oder keiner: Scheitert ein Bereich, bleibt auch keiner davor halb gespeichert.
+        await withTransaction(async (tx) => {
+            for (const rule of rules) {
+                await tx(
+                    "INSERT INTO userdata_rules (area, keep, note, basis, law, years) VALUES (?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE keep = VALUES(keep), note = VALUES(note), basis = VALUES(basis), law = VALUES(law), years = VALUES(years)",
+                    [rule.area, rule.keep ? 1 : 0, rule.note, rule.basis, rule.law, rule.years]
+                );
+            }
+        });
+
+        for (const rule of rules) await audit(actor, "userdata.rules", rule.area, rule.keep ? `behalten: ${rule.note} · ${basisText(rule)}` : "löschen");
 
         return reply.code(204).send();
     });
