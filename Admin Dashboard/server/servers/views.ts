@@ -50,7 +50,7 @@ async function requestViews(config: IConfig, rows: readonly IRequestRow[]): Prom
 }
 
 export async function freigaben(config: IConfig): Promise<IFreigaben> {
-    const [started, open, approved, choices] = await Promise.all([store.ruleStarted(), store.requestsWith("open"), store.requestsWith("approved"), store.runningChoices()]);
+    const [started, open, approved, choices, paid] = await Promise.all([store.ruleStarted(), store.requestsWith("open"), store.requestsWith("approved"), store.runningChoices(), store.limitedMode()]);
     const people = await userRefs(config, choices.map((choice) => choice.user_id));
     const choiceViews: IChoiceView[] = [];
 
@@ -70,6 +70,7 @@ export async function freigaben(config: IConfig): Promise<IFreigaben> {
 
     return {
         started: iso(started),
+        paid,
         preview: started === null ? await previewStart(config) : 0,
         open: await requestViews(config, open),
         approved: await requestViews(config, approved.filter((row) => row.kind === "extra")),

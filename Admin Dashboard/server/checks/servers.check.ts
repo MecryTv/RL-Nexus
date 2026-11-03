@@ -8,7 +8,7 @@ import { USERS } from "./fakes.ts";
 import { SECRET, check, config, section } from "./harness.ts";
 
 const HOUR = 3_600_000;
-const base = { started: true, blocked: false, exempt: false, legacy: false, approved: false, others: 0 };
+const base = { started: true, paid: true, blocked: false, exempt: false, legacy: false, approved: false, others: 0 };
 
 /** W-0064: ein Server pro Person. Nur die Regeln, ohne Datenbank und Discord. */
 export async function checkServers(): Promise<void> {
@@ -22,6 +22,12 @@ export async function checkServers(): Promise<void> {
         assert.equal(decideJoin({ ...base, started: false, others: 3 }), "free");
         assert.equal(decideJoin({ ...base, exempt: true, others: 3 }), "free");
         assert.equal(decideJoin({ ...base, legacy: true, others: 3 }), "free");
+    });
+
+    await check("Bei Free Access gilt ein Server pro Person nicht, nur bei Paid und Beta", () => {
+        assert.equal(decideJoin({ ...base, paid: false, others: 3 }), "free");
+        assert.equal(decideJoin({ ...base, paid: true, others: 3 }), "over");
+        assert.equal(decideJoin({ ...base, paid: false, blocked: true }), "blocked");
     });
 
     await check("Erster Server wird Hauptserver, zweiter ohne Freigabe ist zu viel, mit Freigabe bleibt er", () => {

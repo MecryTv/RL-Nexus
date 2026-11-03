@@ -104,8 +104,8 @@ async function checkNow(config: IConfig, guildId: string): Promise<JoinDecision 
 
     const row = (await store.inviteOf(guildId))!;
     const userId = row.user_id;
-    const [isBlocked, approval, others] = await Promise.all([store.blocked(guildId), store.approvalFor(userId, guildId), store.othersActive(userId, guildId)]);
-    const decision = decideJoin({ started: started !== null, blocked: isBlocked, exempt: detail.exempt, legacy, approved: approval !== null, others: others.length });
+    const [isBlocked, approval, others, paid] = await Promise.all([store.blocked(guildId), store.approvalFor(userId, guildId), store.othersActive(userId, guildId), store.limitedMode()]);
+    const decision = decideJoin({ started: started !== null, paid, blocked: isBlocked, exempt: detail.exempt, legacy, approved: approval !== null, others: others.length });
 
     if (decision === "blocked") {
         await leave(config, row, "blocked", "RL Nexus ist gegangen: Dieser Server ist für RL Nexus gesperrt.");
@@ -169,7 +169,8 @@ export async function reconcile(config: IConfig): Promise<void> {
  * Ohne neue DM, die gab es schon.
  */
 async function enforce(config: IConfig): Promise<void> {
-    if ((await store.ruleStarted()) === null) return;
+    // Bei Free Access ruht die Regel: niemand verlässt einen Server.
+    if ((await store.ruleStarted()) === null || !(await store.limitedMode())) return;
 
     const byUser = new Map<string, IInviteRow[]>();
 
@@ -237,7 +238,7 @@ async function multiServer(config: IConfig): Promise<{ readonly people: Map<stri
 }
 
 export async function previewStart(config: IConfig): Promise<number> {
-    return (await multiServer(config)).people.size;
+    return (await store.limitedMode()) ? (await multiServer(config)).people.size : 0;
 }
 
 function roleOn(row: IInviteRow, userId: string): string {
@@ -261,6 +262,8 @@ function choiceImage(name: string, rows: readonly IInviteRow[], deadline: Date, 
 
 /** „Regel starten“ auf der Seite Server-Freigaben. Gibt zurück, wie viele Personen die Wahl-DM bekommen haben. */
 export async function startRuleNow(config: IConfig, actor: ITeamActor, now = new Date()): Promise<number> {
+    if (!(await store.limitedMode())) throw new PublicError(409, "Bei Free Access gilt ein Server pro Person nicht. Starten lässt sich die Regel, sobald Paid oder Beta Access läuft.");
+
     // Erst abgleichen, solange die Regel noch nicht läuft: Was jetzt da ist, zählt als alt.
     await reconcile(config);
 
@@ -369,7 +372,8 @@ function clockOf(choice: store.IChoiceRow): IChoiceClock {
 
 /** Eine Runde der Uhr: Erinnerungen, abgelaufene Bedenkzeit, abgelaufene Frist. */
 export async function choiceRound(config: IConfig, now = Date.now()): Promise<void> {
-    if ((await store.ruleStarted()) === null) return;
+    // Bei Free Access ruhen laufende Wahlen.
+    if ((await store.ruleStarted()) === null || !(await store.limitedMode())) return;
 
     for (const choice of await store.runningChoices()) {
         const step = choiceStep(clockOf(choice), now);

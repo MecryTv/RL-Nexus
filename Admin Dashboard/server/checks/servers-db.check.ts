@@ -100,6 +100,7 @@ export async function checkServersDb(config: IConfig): Promise<void> {
 
     try {
         store.RULE.key = STARTED;
+        store.RULE.paid = true;
         await tidy();
 
         await check("Regel starten bricht ab, solange ein Server des Bots nicht eingetragen werden kann", async () => {
@@ -124,6 +125,21 @@ export async function checkServersDb(config: IConfig): Promise<void> {
             assert.ok(dms.includes(U(1)));
             assert.equal((await store.inviteOf(G(2)))?.left_reason, "limit");
             assert.equal((await store.inviteOf(G(1)))?.state, "active");
+        });
+
+        await check("Bei Free Access bleibt auch ein zweiter Server, der Start der Regel geht nicht", async () => {
+            store.RULE.paid = false;
+            join(G(15), U(8));
+            join(G(16), U(8));
+
+            try {
+                assert.equal(await checkGuild(config, G(15)), "free");
+                assert.equal(await checkGuild(config, G(16)), "free");
+                assert.ok(!left.includes(G(16)));
+                await assert.rejects(startRuleNow(config, ACTOR), /Free Access/);
+            } finally {
+                store.RULE.paid = true;
+            }
         });
 
         await check("Zwei Beitritte gleichzeitig: nur einer wird Hauptserver", async () => {
@@ -242,5 +258,6 @@ export async function checkServersDb(config: IConfig): Promise<void> {
         globalThis.fetch = real;
         await tidy();
         store.RULE.key = realKey;
+        store.RULE.paid = null;
     }
 }

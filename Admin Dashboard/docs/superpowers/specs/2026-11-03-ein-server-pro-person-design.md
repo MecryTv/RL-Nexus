@@ -27,6 +27,9 @@ Profil jeder Person alle Server, auf die sie den Bot eingeladen hat, samt Mitgli
   welcher Rolle gehandelt wird: Developer lila, Administrator rot.
 - **Ausgenommen von „ein Server“**: Administrator, Developer, Partner
   (`DashboardService.GroupOf`). Alle anderen Gruppen zählen.
+- **Nur bei Paid und Beta Access** (Nutzer, 03.11.): Bei Free Access gilt die Regel nicht.
+  Neue Server bleiben, laufende Wahlen und der Abgleich ruhen, die Regel lässt sich nicht
+  starten. Gelesen aus `shop_settings` wie im Bot (Beta, sonst Paid bei Bezahlschranke).
 
 ## Teil 1: Bot-Dashboard (Bot)
 

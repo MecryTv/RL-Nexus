@@ -143,6 +143,8 @@ export interface IChoiceView {
 
 export interface IFreigaben {
     readonly started: string | null;
+    /** Paid oder Beta Access läuft. Bei Free Access gilt die Regel nicht. */
+    readonly paid: boolean;
     /** Vor dem Start: Personen, die beim Start die Wahl-DM bekämen. */
     readonly preview: number;
     readonly open: readonly IRequestView[];

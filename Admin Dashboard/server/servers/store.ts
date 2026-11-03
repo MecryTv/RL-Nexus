@@ -45,8 +45,11 @@ export interface IChoiceRow {
     readonly dm_error: string | null;
 }
 
-/** Wo der Start der Regel steht. Der DB-Check biegt den Schlüssel um, damit er die echte Regel nie berührt (Review I5). */
-export const RULE = { key: "servers.rule_started" };
+/**
+ * Wo der Start der Regel steht. Der DB-Check biegt den Schlüssel um, damit er
+ * die echte Regel nie berührt (Review I5), und kann den Modus festlegen.
+ */
+export const RULE: { key: string; paid: boolean | null } = { key: "servers.rule_started", paid: null };
 
 /* Einladungen */
 
@@ -209,6 +212,23 @@ export async function endChoice(userId: string, from: "open" | "chosen", to: "do
 }
 
 /* Start der Regel */
+
+/**
+ * Läuft Paid oder Beta Access? Nur dann gilt „ein Server pro Person“. Gelesen
+ * wie im Bot (DashboardService.BetaMode und Paywall). Im Zweifel nein: lieber
+ * keine DM und kein Verlassen als eine falsche.
+ */
+export async function limitedMode(): Promise<boolean> {
+    if (RULE.paid !== null) return RULE.paid;
+
+    try {
+        const row = (await query<{ access_mode: string; paywall: number }[]>("SELECT access_mode, paywall FROM shop_settings WHERE id = 1"))[0];
+
+        return row?.access_mode === "beta" || row?.paywall === 1;
+    } catch {
+        return false;
+    }
+}
 
 export async function ruleStarted(): Promise<Date | null> {
     const row = (await query<{ value: string }[]>("SELECT value FROM admin_state WHERE name = ?", [RULE.key]))[0];

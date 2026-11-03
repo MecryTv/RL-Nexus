@@ -45,7 +45,15 @@ export function FreigabenPage(): JSX.Element {
         <section>
             <PageHeader title="Server-Freigaben" meta={data.started ? `Regel läuft seit ${stamp(data.started)}` : "Regel noch nicht gestartet"} />
 
-            {!data.started && (
+            {!data.paid && (
+                <div className={styles.start}>
+                    <p>
+                        <b>Free Access läuft: Ein Server pro Person gilt gerade nicht.</b> Jeder darf den Bot frei nutzen, neue Server bleiben, laufende Wahlen ruhen. Die Regel greift, sobald Paid oder Beta Access läuft.
+                    </p>
+                </div>
+            )}
+
+            {data.paid && !data.started && (
                 <div className={styles.start}>
                     <p>
                         <b>Ein Server pro Person ist noch aus.</b> Beim Start bekommen {formatNumber(data.preview)} {data.preview === 1 ? "Person" : "Personen"} mit zwei oder mehr Servern die Wahl-DM und haben 24 Stunden Zeit. Danach geht der Bot von jedem zweiten
@@ -108,7 +116,7 @@ export function FreigabenPage(): JSX.Element {
                 <div>
                     <dt>Ausgenommen</dt>
                     <dd>Team</dd>
-                    <small>Administrator, Developer, Partner</small>
+                    <small>Administrator, Developer, Partner{data.paid ? "" : ", bei Free Access alle"}</small>
                 </div>
             </dl>
 

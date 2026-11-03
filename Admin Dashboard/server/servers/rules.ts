@@ -14,6 +14,8 @@ export type JoinDecision = "blocked" | "free" | "approved" | "main" | "over";
 export interface IJoinInput {
     /** Hat das Team die Regel gestartet? */
     readonly started: boolean;
+    /** Paid oder Beta Access läuft. Bei Free Access darf jeder den Bot frei nutzen (Nutzer, 03.11.). */
+    readonly paid: boolean;
     /** Server steht auf der Sperrliste (Bot entfernen mit Sperre). */
     readonly blocked: boolean;
     /** Einlader ist Administrator, Developer oder Partner. */
@@ -31,7 +33,7 @@ export function decideJoin(input: IJoinInput): JoinDecision {
     if (input.blocked) return "blocked";
     // Vor legacy: Wird ein alter Server nach einem Neustart neu eingetragen, bleibt seine Freigabe (Review C1).
     if (input.approved) return "approved";
-    if (!input.started || input.exempt || input.legacy) return "free";
+    if (!input.started || !input.paid || input.exempt || input.legacy) return "free";
 
     return input.others === 0 ? "main" : "over";
 }
