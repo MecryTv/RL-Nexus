@@ -8,7 +8,7 @@ import { ConfirmDialog } from "../components/ConfirmDialog";
 import { Failure, Loading } from "../components/Status";
 import { formatNumber } from "../format";
 import { Seal } from "./parts";
-import { day, initials, since, useAct } from "./util.ts";
+import { day, dropText, initials, since, useAct } from "./util.ts";
 import { ServerMembers } from "./ServerMembers";
 import styles from "./servers.module.scss";
 
@@ -72,7 +72,7 @@ export function InvitedServers({ userId }: { readonly userId: string }): JSX.Ele
 function ServerCard({ server, userId, others, open, onChanged }: { readonly server: IInvitedServer; readonly userId: string; readonly others: readonly IInvitedServer[]; readonly open: boolean; readonly onChanged: () => void }): JSX.Element {
     const act = useAct();
     const [showMembers, setShowMembers] = useState(open);
-    const [dialog, setDialog] = useState<"remove" | "switch" | null>(null);
+    const [dialog, setDialog] = useState<"remove" | "switch" | "decline" | "revoke" | null>(null);
     const [target, setTarget] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
     const request = server.request;
@@ -98,7 +98,7 @@ function ServerCard({ server, userId, others, open, onChanged }: { readonly serv
                 <div className={styles.serverName}>
                     <b>{server.name}</b>
                     <span className={styles.sub}>
-                        eingeladen {day(server.invitedAt)} {origin} · Owner: {owner}
+                        eingeladen {day(server.invitedAt)} · {origin} · Owner: {owner}
                         {server.state === "left" && server.leftAt ? ` · verlassen am ${day(server.leftAt)}${server.leftReason ? ` (${LEFT_TEXT[server.leftReason]})` : ""}` : ""}
                         {server.state === "waiting" ? ` · ${request?.botThere ? "Bot ist noch da" : "Bot ist gegangen"} · Anfrage offen` : ""}
                     </span>
@@ -128,13 +128,13 @@ function ServerCard({ server, userId, others, open, onChanged }: { readonly serv
                             <Button size="sm" variant="primary" busy={busy} onClick={() => void run(`/api/servers/requests/${request.id}/approve`, "Freigegeben, die Person bekommt eine DM.")}>
                                 Freigeben
                             </Button>
-                            <Button size="sm" variant="outline" disabled={busy} onClick={() => void run(`/api/servers/requests/${request.id}/decline`, "Abgelehnt, die Person bekommt eine DM.")}>
+                            <Button size="sm" variant="outline" disabled={busy} onClick={() => setDialog("decline")}>
                                 Ablehnen
                             </Button>
                         </>
                     )}
                     {server.state === "approved" && request && (
-                        <Button size="sm" variant="outline" busy={busy} onClick={() => void run(`/api/servers/requests/${request.id}/revoke`, "Freigabe zurückgenommen.")}>
+                        <Button size="sm" variant="outline" busy={busy} onClick={() => setDialog("revoke")}>
                             Freigabe zurücknehmen
                         </Button>
                     )}
@@ -155,6 +155,22 @@ function ServerCard({ server, userId, others, open, onChanged }: { readonly serv
                 <div className={styles.members}>
                     <ServerMembers guildId={server.id} name={server.name} />
                 </div>
+            )}
+
+            {request && (
+                <ConfirmDialog
+                    open={dialog === "decline" || dialog === "revoke"}
+                    title={dialog === "revoke" ? `Freigabe ${request.signature ?? ""} zurücknehmen?` : `Anfrage für „${server.name}“ ablehnen?`}
+                    confirmLabel={dialog === "revoke" ? "Zurücknehmen" : "Ablehnen"}
+                    tone="danger"
+                    busy={busy}
+                    onCancel={() => setDialog(null)}
+                    onConfirm={() =>
+                        void run(`/api/servers/requests/${request.id}/${dialog === "revoke" ? "revoke" : "decline"}`, dialog === "revoke" ? "Freigabe zurückgenommen." : "Abgelehnt, die Person bekommt eine DM.")
+                    }
+                >
+                    <p>{dropText(request)}</p>
+                </ConfirmDialog>
             )}
 
             <ConfirmDialog

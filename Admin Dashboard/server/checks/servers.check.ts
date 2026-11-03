@@ -28,6 +28,8 @@ export async function checkServers(): Promise<void> {
         assert.equal(decideJoin(base), "main");
         assert.equal(decideJoin({ ...base, others: 1 }), "over");
         assert.equal(decideJoin({ ...base, others: 2, approved: true }), "approved");
+        // Review C1: Wird ein alter Server neu eingetragen (Bot-Neustart), bleibt seine Freigabe.
+        assert.equal(decideJoin({ ...base, legacy: true, approved: true }), "approved");
     });
 
     await check("Wahl: Erinnerung 2 Std. vorher, einmal; Ende nach Frist; nach Wahl 10 Min. Bedenkzeit", () => {

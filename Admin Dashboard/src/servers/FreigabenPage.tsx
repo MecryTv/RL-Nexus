@@ -10,7 +10,7 @@ import { Failure, Loading } from "../components/Status";
 import { formatNumber } from "../format";
 import { useTitle } from "../useTitle";
 import { PersonCell, Seal } from "./parts";
-import { day, since, stamp, useAct } from "./util.ts";
+import { day, dropText, since, stamp, useAct } from "./util.ts";
 import styles from "./servers.module.scss";
 
 /**
@@ -25,6 +25,7 @@ export function FreigabenPage(): JSX.Element {
     const act = useAct();
     const [starting, setStarting] = useState(false);
     const [busy, setBusy] = useState<number | null>(null);
+    const [confirm, setConfirm] = useState<{ readonly request: IRequestView; readonly action: "decline" | "revoke" } | null>(null);
     const data = state.data;
 
     useLive("servers", state.reload);
@@ -70,6 +71,22 @@ export function FreigabenPage(): JSX.Element {
                 <p>
                     {formatNumber(data.preview)} {data.preview === 1 ? "Person bekommt" : "Personen bekommen"} jetzt eine DM und müssen sich in 24 Stunden für einen Server entscheiden. Das lässt sich nicht zurücknehmen.
                 </p>
+            </ConfirmDialog>
+
+            <ConfirmDialog
+                open={confirm !== null}
+                title={confirm?.action === "revoke" ? `Freigabe ${confirm.request.signature ?? ""} zurücknehmen?` : `Anfrage von ${confirm?.request.person.name ?? ""} ablehnen?`}
+                confirmLabel={confirm?.action === "revoke" ? "Zurücknehmen" : "Ablehnen"}
+                tone="danger"
+                onCancel={() => setConfirm(null)}
+                onConfirm={() => {
+                    if (!confirm) return;
+
+                    setConfirm(null);
+                    void decide(confirm.request, confirm.action, confirm.action === "revoke" ? "Freigabe zurückgenommen." : "Abgelehnt, die Person bekommt eine DM.");
+                }}
+            >
+                {confirm && <p>{dropText(confirm.request)}</p>}
             </ConfirmDialog>
 
             <dl className={styles.kpis}>
@@ -137,7 +154,7 @@ export function FreigabenPage(): JSX.Element {
                                         <Button size="sm" variant="primary" busy={busy === request.id} onClick={() => void decide(request, "approve", request.kind === "switch" ? "Wechsel freigegeben." : "Freigegeben, die Person bekommt eine DM.")}>
                                             Freigeben
                                         </Button>
-                                        <Button size="sm" variant="outline" disabled={busy === request.id} onClick={() => void decide(request, "decline", "Abgelehnt, die Person bekommt eine DM.")}>
+                                        <Button size="sm" variant="outline" disabled={busy === request.id} onClick={() => setConfirm({ request, action: "decline" })}>
                                             Ablehnen
                                         </Button>
                                     </div>
@@ -174,7 +191,7 @@ export function FreigabenPage(): JSX.Element {
                                 </td>
                                 <td>
                                     <div className={styles.actions}>
-                                        <Button size="sm" variant="outline" busy={busy === request.id} onClick={() => void decide(request, "revoke", "Freigabe zurückgenommen.")}>
+                                        <Button size="sm" variant="outline" busy={busy === request.id} onClick={() => setConfirm({ request, action: "revoke" })}>
                                             Zurücknehmen
                                         </Button>
                                     </div>

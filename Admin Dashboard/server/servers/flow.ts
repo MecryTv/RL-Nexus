@@ -7,7 +7,7 @@ import { PublicError } from "../errors.ts";
 import { publish } from "../events.ts";
 import { personBase } from "../userdata/flow.ts";
 import { deadlineText, inviteUrl, sendServerDm, STRIPS, type IServerImage, type IServerTile, type ServerExtra, type TileTag } from "./dm.ts";
-import { CHOICE_HOURS, choiceStep, decideJoin, keepAlone, signature, THINK_TIME, type JoinDecision } from "./rules.ts";
+import { CHOICE_HOURS, choiceStep, decideJoin, keepAlone, signature, THINK_TIME, type IChoiceClock, type JoinDecision } from "./rules.ts";
 import * as store from "./store.ts";
 import type { IInviteRow, IRequestRow } from "./store.ts";
 
@@ -128,8 +128,8 @@ async function checkNow(config: IConfig, guildId: string): Promise<JoinDecision 
             },
             { kind: "limit", guildId }
         );
-        await leave(config, row, "limit", `RL Nexus ist gegangen: Pro Person läuft RL Nexus auf einem Server, und ${name} hat ihn schon auf einem anderen. Für einen weiteren braucht es eine Freigabe vom Team.`);
-        await audit(CLOCK, "servers.limit", userId, `${detail.name} (${guildId}) verlassen, schon auf ${names(others)}`.slice(0, 500));
+        const gone = await leave(config, row, "limit", `RL Nexus ist gegangen: Pro Person läuft RL Nexus auf einem Server, und ${name} hat ihn schon auf einem anderen. Für einen weiteren braucht es eine Freigabe vom Team.`);
+        await audit(CLOCK, "servers.limit", userId, `${detail.name} (${guildId}) ${gone ? "verlassen" : "nicht verlassen, der Bot antwortet nicht (der Abgleich holt es nach)"}, schon auf ${names(others)}`.slice(0, 500));
     }
 
     publish("servers");
@@ -141,6 +141,9 @@ async function checkNow(config: IConfig, guildId: string): Promise<JoinDecision 
 export async function reconcile(config: IConfig): Promise<void> {
     const list = await botServers(config);
     if (!list) return;
+
+    // Gleich nach einem Neustart kennt der Bot noch keine Server. Dann lieber nichts tun als alles als verlassen markieren (Review C1).
+    if (list.length === 0 && (await store.activeInvites()).length > 0) return;
 
     const present = new Set(list.map((server) => server.id));
 
@@ -154,12 +157,59 @@ export async function reconcile(config: IConfig): Promise<void> {
     for (const row of await store.activeInvites()) {
         if (!present.has(row.guild_id)) await serial(() => store.markLeft(row.guild_id, "gone"));
     }
+
+    await serial(() => enforce(config));
+}
+
+/**
+ * Was beim Verlassen gescheitert ist (Bot nicht erreichbar, 429), holt der
+ * Abgleich nach (Review I1): nach einer Wahl alle alten Server außer dem
+ * gewählten, ohne Wahl alle alten; neue Server nur, wenn die Person schon
+ * einen anderen hat. Angehaltene (offene Anfrage) und freigegebene bleiben.
+ * Ohne neue DM, die gab es schon.
+ */
+async function enforce(config: IConfig): Promise<void> {
+    if ((await store.ruleStarted()) === null) return;
+
+    const byUser = new Map<string, IInviteRow[]>();
+
+    for (const row of await store.activeInvites()) {
+        if (row.approval_id === null) byUser.set(row.user_id, [...(byUser.get(row.user_id) ?? []), row]);
+    }
+
+    for (const [userId, all] of byUser) {
+        if (all.length < 2) continue;
+
+        const paused = new Set((await store.requestsOf(userId)).filter((request) => request.status === "open").map((request) => request.guild_id));
+        const rows = all.filter((row) => !paused.has(row.guild_id)).sort((a, b) => a.invited_at.getTime() - b.invited_at.getTime());
+        const choice = await store.choiceOf(userId);
+        const running = choice?.state === "open" || choice?.state === "chosen";
+        const old = rows.filter((row) => row.legacy === 1);
+        const fresh = rows.filter((row) => row.legacy === 0);
+        const oldLeave = choice?.state === "done" ? old.filter((row) => row.guild_id !== choice.chosen_guild) : choice?.state === "timeout" ? old : [];
+        const anchored = choice?.state === "done" ? old.some((row) => row.guild_id === choice.chosen_guild) : choice?.state === "timeout" ? false : old.length > 0 || running;
+        const targets = [
+            ...oldLeave.map((row) => ({ row, reason: choice?.state === "timeout" ? ("timeout" as const) : ("choice" as const) })),
+            ...(anchored ? fresh : fresh.slice(1)).map((row) => ({ row, reason: "limit" as const })),
+        ];
+
+        if (targets.length === 0 || (await botExempt(config, userId)) !== false) continue;
+
+        const name = await personName(config, userId);
+
+        for (const { row, reason } of targets) {
+            if (await leave(config, row, reason, `RL Nexus verlässt diesen Server: Pro Person läuft RL Nexus auf einem Server, und ${name} hat ihn schon auf einem anderen (ein Server pro Person).`)) {
+                await audit(CLOCK, "servers.sweep", userId, `${row.guild_name} (${row.guild_id}) nachträglich verlassen`.slice(0, 500));
+                publish("servers");
+            }
+        }
+    }
 }
 
 /* --- Start der Regel und Wahl --------------------------------------------- */
 
 /** Personen mit zwei oder mehr aktiven Servern ohne Freigabe, die nicht ausgenommen sind. */
-async function multiServer(config: IConfig): Promise<Map<string, IInviteRow[]>> {
+async function multiServer(config: IConfig): Promise<{ readonly people: Map<string, IInviteRow[]>; readonly unknown: number }> {
     const byUser = new Map<string, IInviteRow[]>();
 
     for (const row of await store.activeInvites()) {
@@ -168,16 +218,26 @@ async function multiServer(config: IConfig): Promise<Map<string, IInviteRow[]>> 
         byUser.set(row.user_id, [...(byUser.get(row.user_id) ?? []), row]);
     }
 
+    let unknown = 0;
+
     for (const [userId, rows] of byUser) {
-        // Weiß der Bot es nicht, lieber keine DM als eine falsche.
-        if (rows.length < 2 || (await botExempt(config, userId)) !== false) byUser.delete(userId);
+        if (rows.length < 2) {
+            byUser.delete(userId);
+            continue;
+        }
+
+        const exempt = await botExempt(config, userId);
+
+        // Weiß der Bot es nicht, lieber keine DM als eine falsche. Der Start bricht dann ab (Review I4).
+        if (exempt === null) unknown++;
+        if (exempt !== false) byUser.delete(userId);
     }
 
-    return byUser;
+    return { people: byUser, unknown };
 }
 
 export async function previewStart(config: IConfig): Promise<number> {
-    return (await multiServer(config)).size;
+    return (await multiServer(config)).people.size;
 }
 
 function roleOn(row: IInviteRow, userId: string): string {
@@ -204,10 +264,19 @@ export async function startRuleNow(config: IConfig, actor: ITeamActor, now = new
     // Erst abgleichen, solange die Regel noch nicht läuft: Was jetzt da ist, zählt als alt.
     await reconcile(config);
 
+    // Erst starten, wenn alle Server des Bots eingetragen sind und der Bot zu jeder Person weiß, ob sie ausgenommen ist (Review I4).
+    const list = await botServers(config);
+    if (!list) throw new PublicError(502, "Der Bot antwortet nicht. Die Regel ist noch nicht gestartet.");
+
+    const active = new Set((await store.activeInvites()).map((row) => row.guild_id));
+    const missing = list.filter((server) => !active.has(server.id)).length;
+    if (missing > 0) throw new PublicError(409, `${missing} Server sind noch nicht eingetragen. Die Regel ist noch nicht gestartet, versuch es in ein paar Minuten noch einmal.`);
+
+    const { people, unknown } = await multiServer(config);
+    if (unknown > 0) throw new PublicError(502, `Bei ${unknown} Personen weiß der Bot gerade nicht, ob sie ausgenommen sind. Die Regel ist noch nicht gestartet.`);
     if (!(await store.startRule(now))) throw new PublicError(409, "Die Regel läuft schon.");
 
     const deadline = new Date(now.getTime() + CHOICE_HOURS * HOUR);
-    const people = await multiServer(config);
 
     for (const [userId, rows] of people) {
         await store.addChoice(userId, deadline);
@@ -233,32 +302,36 @@ async function leavable(userId: string, keep: string | null): Promise<IInviteRow
 }
 
 async function finishChoice(config: IConfig, choice: store.IChoiceRow): Promise<void> {
-    if (!choice.chosen_guild || !(await store.endChoice(choice.user_id, "chosen", "done"))) return;
+    if (!choice.chosen_guild || !(await store.endChoice(choice.user_id, "chosen", "done", choice.chosen_at))) return;
 
     const name = await personName(config, choice.user_id);
     const kept = await store.inviteOf(choice.chosen_guild);
+    const targets = await leavable(choice.user_id, choice.chosen_guild);
     const gone: IInviteRow[] = [];
 
-    for (const row of await leavable(choice.user_id, choice.chosen_guild)) {
+    // Scheitert ein Verlassen, holt es der nächste Abgleich nach (enforce).
+    for (const row of targets) {
         if (await leave(config, row, "choice", `RL Nexus verlässt diesen Server: ${name} hat RL Nexus auf mehreren Servern eingeladen und sich für einen anderen entschieden (ein Server pro Person).`)) gone.push(row);
     }
 
     await dm(config, choice.user_id, {
         strip: STRIPS.ok,
         title: `Erledigt: ${kept?.guild_name ?? "dein Server"} bleibt`,
-        sub: gone.length ? `Der Bot hat ${names(gone)} verlassen. Deren Owner haben Bescheid im Log-Kanal bekommen.` : "Alle anderen Server hatte der Bot schon verlassen.",
+        sub: targets.length ? `Der Bot verlässt ${names(targets)}. Deren Owner bekommen Bescheid im Log-Kanal.` : "Weitere Server hatte der Bot schon verlassen.",
         tiles: kept ? tiles([kept], () => "main") : [],
     });
-    await audit(CLOCK, "servers.choice", choice.user_id, `${kept?.guild_name ?? choice.chosen_guild} bleibt, verlassen: ${names(gone) || "keine"}`.slice(0, 500));
+    await audit(CLOCK, "servers.choice", choice.user_id, `${kept?.guild_name ?? choice.chosen_guild} bleibt, verlassen: ${names(gone) || "keine"}${gone.length < targets.length ? `, noch offen: ${names(targets.filter((row) => !gone.includes(row)))}` : ""}`.slice(0, 500));
 }
 
 async function timeoutChoice(config: IConfig, choice: store.IChoiceRow): Promise<void> {
-    if (!(await store.endChoice(choice.user_id, "open", "timeout"))) return;
+    if (!(await store.endChoice(choice.user_id, "open", "timeout", choice.chosen_at))) return;
 
     const name = await personName(config, choice.user_id);
+    const targets = await leavable(choice.user_id, null);
     const gone: IInviteRow[] = [];
 
-    for (const row of await leavable(choice.user_id, null)) {
+    // Scheitert ein Verlassen, holt es der nächste Abgleich nach (enforce).
+    for (const row of targets) {
         if (await leave(config, row, "timeout", `RL Nexus verlässt diesen Server: ${name} hat sich in 24 Stunden für keinen Server entschieden (ein Server pro Person).`)) gone.push(row);
     }
 
@@ -268,12 +341,12 @@ async function timeoutChoice(config: IConfig, choice: store.IChoiceRow): Promise
         {
             strip: STRIPS.grey,
             title: "RL Nexus hat deine Server verlassen",
-            sub: `Du hast keinen Server gewählt. Der Bot ist von ${names(gone) || "deinen Servern"} gegangen.`,
+            sub: `Du hast keinen Server gewählt. Der Bot verlässt ${names(targets) || "deine Server"}.`,
             note: "Einladen kannst du ihn jederzeit wieder, dann für einen Server.",
         },
         { kind: "link", label: "Wieder einladen", url: inviteUrl(config) }
     );
-    await audit(CLOCK, "servers.timeout", choice.user_id, `keine Wahl, verlassen: ${names(gone) || "keine"}`.slice(0, 500));
+    await audit(CLOCK, "servers.timeout", choice.user_id, `keine Wahl, verlassen: ${names(gone) || "keine"}${gone.length < targets.length ? `, noch offen: ${names(targets.filter((row) => !gone.includes(row)))}` : ""}`.slice(0, 500));
 }
 
 async function remind(config: IConfig, choice: store.IChoiceRow): Promise<void> {
@@ -290,16 +363,25 @@ async function remind(config: IConfig, choice: store.IChoiceRow): Promise<void> 
     );
 }
 
+function clockOf(choice: store.IChoiceRow): IChoiceClock {
+    return { state: choice.state, deadline: choice.deadline.getTime(), reminded: choice.reminded === 1, chosenAt: choice.chosen_at?.getTime() ?? null };
+}
+
 /** Eine Runde der Uhr: Erinnerungen, abgelaufene Bedenkzeit, abgelaufene Frist. */
 export async function choiceRound(config: IConfig, now = Date.now()): Promise<void> {
     if ((await store.ruleStarted()) === null) return;
 
     for (const choice of await store.runningChoices()) {
-        const step = choiceStep({ state: choice.state, deadline: choice.deadline.getTime(), reminded: choice.reminded === 1, chosenAt: choice.chosen_at?.getTime() ?? null }, now);
+        const step = choiceStep(clockOf(choice), now);
 
         if (step === "remind") await remind(config, choice);
-        else if (step === "finish") await serial(() => finishChoice(config, choice));
-        else if (step === "timeout") await serial(() => timeoutChoice(config, choice));
+        // Im Lock frisch lesen: Wer in der Zwischenzeit neu gewählt hat, bekommt seine neuen 10 Minuten (Review I2).
+        else if (step) await serial(async () => {
+            const fresh = await store.choiceOf(choice.user_id);
+            if (!fresh || choiceStep(clockOf(fresh), now) !== step) return;
+
+            await (step === "finish" ? finishChoice(config, fresh) : timeoutChoice(config, fresh));
+        });
 
         if (step) publish("servers");
     }
@@ -392,15 +474,27 @@ async function openRequest(id: number): Promise<IRequestRow> {
     return request;
 }
 
-/** Wechsel: Der Bot verlässt die bisherigen Server ohne Freigabe, target wird Hauptserver. */
-async function applySwitch(config: IConfig, userId: string, guildId: string, guildName: string): Promise<void> {
+const UNREACHABLE = "Der Bot antwortet gerade nicht. Nichts ist entschieden, versuch es gleich noch einmal.";
+
+/**
+ * Wechsel, Teil 1: Der Bot verlässt die bisherigen Server ohne Freigabe.
+ * Scheitert einer, wirft es, und die Anfrage bleibt offen (Review I1).
+ */
+async function switchLeaves(config: IConfig, userId: string, guildId: string): Promise<IInviteRow[]> {
     const name = await personName(config, userId);
     const gone: IInviteRow[] = [];
 
     for (const row of await store.othersActive(userId, guildId)) {
-        if (await leave(config, row, "switch", `RL Nexus verlässt diesen Server: Das Team hat für ${name} einen anderen Hauptserver eingetragen (ein Server pro Person).`)) gone.push(row);
+        if (!(await leave(config, row, "switch", `RL Nexus verlässt diesen Server: Das Team hat für ${name} einen anderen Hauptserver eingetragen (ein Server pro Person).`))) throw new PublicError(502, UNREACHABLE);
+
+        gone.push(row);
     }
 
+    return gone;
+}
+
+/** Wechsel, Teil 2: target wird Hauptserver, die Person bekommt die DM. */
+async function applySwitch(config: IConfig, userId: string, guildId: string, guildName: string, gone: readonly IInviteRow[]): Promise<void> {
     const target = await store.inviteOf(guildId);
     const there = target?.state === "active" && target.user_id === userId;
 
@@ -422,10 +516,12 @@ async function applySwitch(config: IConfig, userId: string, guildId: string, gui
 export function approve(config: IConfig, id: number, actor: ITeamActor): Promise<void> {
     return serial(async () => {
         const request = await openRequest(id);
+        const gone = request.kind === "switch" ? await switchLeaves(config, request.user_id, request.guild_id) : [];
+
         if (!(await store.decideRequest(id, "open", "approved", actor))) throw new PublicError(409, "Diese Anfrage ist schon entschieden.");
 
         if (request.kind === "switch") {
-            await applySwitch(config, request.user_id, request.guild_id, request.guild_name);
+            await applySwitch(config, request.user_id, request.guild_id, request.guild_name, gone);
         } else {
             const row = await store.inviteOf(request.guild_id);
             const there = row?.state === "active" && row.user_id === request.user_id;
@@ -449,25 +545,34 @@ export function approve(config: IConfig, id: number, actor: ITeamActor): Promise
     });
 }
 
-/** Ablehnen oder zurücknehmen: Steht der Bot noch dort und hat die Person einen anderen Server, geht er. */
+/**
+ * Ablehnen oder zurücknehmen: Steht der Bot noch dort und hat die Person
+ * einen anderen Server, geht er; sonst bleibt der Server ihr Hauptserver.
+ * Antwortet der Bot nicht, wirft es, bevor etwas entschieden ist (Review I1).
+ */
 async function dropServer(config: IConfig, userId: string, guildId: string, reason: "declined" | "revoked"): Promise<boolean> {
     const row = await store.inviteOf(guildId);
     if (row?.state !== "active" || row.user_id !== userId) return false;
 
-    await store.setApproval(guildId, null);
-    if (keepAlone((await store.othersActive(userId, guildId)).length)) return false;
+    if (keepAlone((await store.othersActive(userId, guildId)).length)) {
+        await store.setApproval(guildId, null);
+
+        return false;
+    }
 
     const name = await personName(config, userId);
 
-    return leave(config, row, reason, `RL Nexus verlässt diesen Server: Für ${name} gibt es hier keine Freigabe für einen weiteren Server (ein Server pro Person).`);
+    if (!(await leave(config, row, reason, `RL Nexus verlässt diesen Server: Für ${name} gibt es hier keine Freigabe für einen weiteren Server (ein Server pro Person).`))) throw new PublicError(502, UNREACHABLE);
+
+    return true;
 }
 
 export function decline(config: IConfig, id: number, actor: ITeamActor): Promise<void> {
     return serial(async () => {
         const request = await openRequest(id);
-        if (!(await store.decideRequest(id, "open", "declined", actor))) throw new PublicError(409, "Diese Anfrage ist schon entschieden.");
-
         const left = request.kind === "extra" ? await dropServer(config, request.user_id, request.guild_id, "declined") : false;
+
+        if (!(await store.decideRequest(id, "open", "declined", actor))) throw new PublicError(409, "Diese Anfrage ist schon entschieden.");
         const main = await mainOf(request.user_id, request.guild_id);
 
         await dm(config, request.user_id, {
@@ -486,9 +591,11 @@ export function decline(config: IConfig, id: number, actor: ITeamActor): Promise
 export function revoke(config: IConfig, id: number, actor: ITeamActor): Promise<void> {
     return serial(async () => {
         const request = await store.requestOf(id);
-        if (!request || request.kind !== "extra" || !(await store.decideRequest(id, "approved", "revoked", actor))) throw new PublicError(409, "Diese Freigabe gibt es nicht mehr.");
+        if (!request || request.kind !== "extra" || request.status !== "approved") throw new PublicError(409, "Diese Freigabe gibt es nicht mehr.");
 
         const left = await dropServer(config, request.user_id, request.guild_id, "revoked");
+
+        if (!(await store.decideRequest(id, "approved", "revoked", actor))) throw new PublicError(409, "Diese Freigabe gibt es nicht mehr.");
 
         await dm(config, request.user_id, {
             strip: STRIPS.grey,
@@ -506,9 +613,10 @@ export function switchMain(config: IConfig, userId: string, guildId: string, act
         const row = await store.inviteOf(guildId);
         if (!row || row.user_id !== userId) throw new PublicError(404, "Diesen Server hat die Person nicht eingeladen.");
 
+        const gone = await switchLeaves(config, userId, guildId);
         const id = await store.addDecided(userId, guildId, row.guild_name, "switch", "Vom Team gewechselt", actor);
 
-        await applySwitch(config, userId, guildId, row.guild_name);
+        await applySwitch(config, userId, guildId, row.guild_name, gone);
         await audit(actor, "servers.switch", userId, `Hauptserver jetzt ${row.guild_name} (${guildId}), Anfrage ${id}, als ${actor.role}`.slice(0, 500));
         publish("servers");
     });

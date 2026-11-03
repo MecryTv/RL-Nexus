@@ -101,7 +101,7 @@ export function ServerMembers({ guildId, name }: { readonly guildId: string; rea
                                             </div>
                                         </td>
                                         <td>
-                                            <span className={styles.id}>{member.id}</span> <CopyText value={member.id} />
+                                            <CopyText value={member.id} />
                                         </td>
                                         <td>{member.joinedAt ? day(member.joinedAt) : "–"}</td>
                                         <td>

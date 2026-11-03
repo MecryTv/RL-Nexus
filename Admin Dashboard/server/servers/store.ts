@@ -45,7 +45,8 @@ export interface IChoiceRow {
     readonly dm_error: string | null;
 }
 
-const STARTED = "servers.rule_started";
+/** Wo der Start der Regel steht. Der DB-Check biegt den Schlüssel um, damit er die echte Regel nie berührt (Review I5). */
+export const RULE = { key: "servers.rule_started" };
 
 /* Einladungen */
 
@@ -200,8 +201,9 @@ export async function choose(userId: string, guildId: string | null, now = new D
     return result.affectedRows === 1;
 }
 
-export async function endChoice(userId: string, from: "open" | "chosen", to: "done" | "timeout"): Promise<boolean> {
-    const result = await query<{ affectedRows: number }>("UPDATE server_choices SET state = ? WHERE user_id = ? AND state = ?", [to, userId, from]);
+/** Beendet eine Wahl, nur im erwarteten Stand und mit derselben Wahl (chosenAt), die gelesen wurde (Review I2). */
+export async function endChoice(userId: string, from: "open" | "chosen", to: "done" | "timeout", chosenAt: Date | null): Promise<boolean> {
+    const result = await query<{ affectedRows: number }>("UPDATE server_choices SET state = ? WHERE user_id = ? AND state = ? AND chosen_at <=> ?", [to, userId, from, chosenAt]);
 
     return result.affectedRows === 1;
 }
@@ -209,7 +211,7 @@ export async function endChoice(userId: string, from: "open" | "chosen", to: "do
 /* Start der Regel */
 
 export async function ruleStarted(): Promise<Date | null> {
-    const row = (await query<{ value: string }[]>("SELECT value FROM admin_state WHERE name = ?", [STARTED]))[0];
+    const row = (await query<{ value: string }[]>("SELECT value FROM admin_state WHERE name = ?", [RULE.key]))[0];
     const at = row ? Number(row.value) : NaN;
 
     return Number.isFinite(at) ? new Date(at) : null;
@@ -217,7 +219,7 @@ export async function ruleStarted(): Promise<Date | null> {
 
 /** false: lief schon. */
 export async function startRule(now = new Date()): Promise<boolean> {
-    const result = await query<{ affectedRows: number }>("INSERT IGNORE INTO admin_state (name, value) VALUES (?, ?)", [STARTED, String(now.getTime())]);
+    const result = await query<{ affectedRows: number }>("INSERT IGNORE INTO admin_state (name, value) VALUES (?, ?)", [RULE.key, String(now.getTime())]);
 
     return result.affectedRows === 1;
 }

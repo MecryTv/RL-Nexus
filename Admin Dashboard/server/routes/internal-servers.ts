@@ -34,7 +34,7 @@ function person(config: IConfig, request: FastifyRequest): string {
 }
 
 export async function internalServerRoutes(app: FastifyInstance, { config }: { config: IConfig }): Promise<void> {
-    const limit = { config: { rateLimit: { max: 60, timeWindow: "1 minute" } } };
+    const limit = { config: { rateLimit: { max: 300, timeWindow: "1 minute" } } };
 
     // Beitritt: antwortet sofort, geprüft wird daneben (Audit-Log und DM brauchen einen Moment).
     app.post("/internal/servers/joined", limit, async (request, reply) => {

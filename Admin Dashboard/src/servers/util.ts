@@ -1,4 +1,4 @@
-import type { RequestOrigin } from "../../shared/servers.ts";
+import type { IRequestView, RequestOrigin } from "../../shared/servers.ts";
 import { api } from "../api/client";
 import { useToast } from "../toast/context";
 
@@ -44,4 +44,13 @@ export function useAct(): (path: string, done: string, body?: Readonly<Record<st
             return false;
         }
     };
+}
+
+/** Was Ablehnen oder Zurücknehmen auslöst, als Satz im Bestätigungsfenster. */
+export function dropText(request: IRequestView): string {
+    const name = request.person.name;
+
+    if (request.kind === "switch") return `${name} bekommt eine DM, RL Nexus bleibt auf dem bisherigen Hauptserver.`;
+
+    return `${name} bekommt eine DM.${request.botThere ? ` Hat ${name} noch einen anderen Server ohne Freigabe, verlässt der Bot „${request.guildName}“ sofort. Sonst bleibt er dort als Hauptserver.` : ""}`;
 }

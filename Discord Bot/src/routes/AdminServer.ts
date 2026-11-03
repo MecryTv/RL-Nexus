@@ -14,12 +14,15 @@ export default class AdminServer extends Route {
             method: "GET",
             path: "/admin/servers/:id",
             description: "Ein Server mit Einlader für „ein Server pro Person“",
-            rateLimit: { max: 120, timeWindow: "1 minute" },
+            rateLimit: { max: 600, timeWindow: "1 minute" },
         });
     }
 
     async Handle(request: FastifyRequest, reply: FastifyReply): Promise<unknown> {
         if (!HasAdminScope(request)) return reply.code(403).send({ error: "Forbidden" });
+        if (!this.client.isReady()) return reply.code(503).send({ error: "Der Bot startet noch." });
+        // Ohne Datenbank wäre jede Gruppe „testphase“ und niemand ausgenommen (Review I3).
+        if (!this.client.databaseService.Ready) return reply.code(503).send({ error: "Die Datenbank des Bots ist nicht bereit." });
 
         const guild = this.client.guilds.cache.get((request.params as { id?: string }).id ?? "");
         if (!guild) return reply.code(404).send({ error: "Der Bot ist nicht auf diesem Server." });

@@ -16,6 +16,7 @@ export default class AdminServers extends Route {
 
     async Handle(request: FastifyRequest, reply: FastifyReply): Promise<unknown> {
         if (!HasAdminScope(request)) return reply.code(403).send({ error: "Forbidden" });
+        if (!this.client.isReady()) return reply.code(503).send({ error: "Der Bot startet noch." });
 
         return [...this.client.guilds.cache.values()].map((guild) => ({
             id: guild.id,

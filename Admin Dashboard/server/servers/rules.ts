@@ -29,8 +29,9 @@ export interface IJoinInput {
 /** Was mit einem Server passiert, auf den der Bot gerade gekommen ist. */
 export function decideJoin(input: IJoinInput): JoinDecision {
     if (input.blocked) return "blocked";
-    if (!input.started || input.exempt || input.legacy) return "free";
+    // Vor legacy: Wird ein alter Server nach einem Neustart neu eingetragen, bleibt seine Freigabe (Review C1).
     if (input.approved) return "approved";
+    if (!input.started || input.exempt || input.legacy) return "free";
 
     return input.others === 0 ? "main" : "over";
 }

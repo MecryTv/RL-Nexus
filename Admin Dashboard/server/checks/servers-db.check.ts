@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import type { IConfig } from "../config.ts";
 import { query } from "../db.ts";
-import { approve, checkGuild, chooseFromDm, choiceRound, decline, requestFromDm, undoFromDm } from "../servers/flow.ts";
+import { approve, checkGuild, chooseFromDm, choiceRound, decline, reconcile, requestFromDm, startRuleNow, undoFromDm } from "../servers/flow.ts";
 import * as store from "../servers/store.ts";
 import { check, section } from "./harness.ts";
 
@@ -15,7 +15,8 @@ import { check, section } from "./harness.ts";
 const G = (n: number): string => `99999999999999${String(n).padStart(4, "0")}`;
 const U = (n: number): string => `88888888888888${String(n).padStart(4, "0")}`;
 const ACTOR = { id: "77777777777777777701", name: "check:db", role: "Developer" as const };
-const STARTED = "servers.rule_started";
+// Review I5: eigener Schlüssel, damit der Check die echte Regel nie umschaltet.
+const STARTED = "servers.rule_started.check";
 
 interface IFakeGuild {
     readonly id: string;
@@ -32,6 +33,7 @@ async function tidy(): Promise<void> {
     await query("DELETE FROM server_choices WHERE user_id IN (?)", [users]);
     await query("DELETE FROM server_blocks WHERE guild_id IN (?)", [guilds]);
     await query("DELETE FROM admin_audit WHERE action LIKE 'servers.%' AND (target IN (?) OR target IN (?) OR user_id = ?)", [users, guilds, ACTOR.id]);
+    await query("DELETE FROM admin_state WHERE name = ?", [STARTED]);
 }
 
 export async function checkServersDb(config: IConfig): Promise<void> {
@@ -41,6 +43,11 @@ export async function checkServersDb(config: IConfig): Promise<void> {
     const left: string[] = [];
     const dms: string[] = [];
     const exempt = new Set<string>();
+    // Server, deren Verlassen der Bot gerade ablehnt (nicht erreichbar, 429).
+    const stuck = new Set<string>();
+    // Server, deren Einlader der Bot gerade nicht liefern kann.
+    const unknown = new Set<string>();
+    let listEmpty = false;
     const real = globalThis.fetch;
     const json = (value: unknown, status = 200): Response => new Response(JSON.stringify(value), { status, headers: { "content-type": "application/json" } });
 
@@ -54,19 +61,21 @@ export async function checkServersDb(config: IConfig): Promise<void> {
             const person = /^\/admin\/users\/(\d+)\/exempt$/.exec(bot);
 
             if (leave) {
+                if (stuck.has(leave[1])) return json({ error: "Too Many Requests" }, 429);
                 if (!guilds.delete(leave[1])) return json({ error: "weg" }, 404);
                 left.push(leave[1]);
 
                 return new Response(null, { status: 204 });
             }
             if (one) {
-                const guild = guilds.get(one[1]);
+                const guild = unknown.has(one[1]) ? undefined : guilds.get(one[1]);
 
                 return guild
                     ? json({ id: guild.id, name: `Check ${guild.id.slice(-2)}`, icon: null, ownerId: guild.inviter, members: 10, joinedAt: guild.joinedAt, inviter: { userId: guild.inviter, source: "audit" }, exempt: exempt.has(guild.inviter) })
                     : json({ error: "weg" }, 404);
             }
             if (person) return json({ exempt: exempt.has(person[1]) });
+            if (bot === "/admin/servers" && listEmpty) return json([]);
             if (bot === "/admin/servers") return json([...guilds.values()].map((guild) => ({ id: guild.id, name: `Check ${guild.id.slice(-2)}`, icon: null, ownerId: guild.inviter, members: 10, joinedAt: guild.joinedAt })));
         }
 
@@ -81,7 +90,7 @@ export async function checkServersDb(config: IConfig): Promise<void> {
         return real(input, init);
     }) as typeof fetch;
 
-    const saved = (await query<{ value: string }[]>("SELECT value FROM admin_state WHERE name = ?", [STARTED]))[0] ?? null;
+    const realKey = store.RULE.key;
     const join = (id: string, inviter: string, at = new Date()): IFakeGuild => {
         const guild = { id, inviter, joinedAt: at.toISOString() };
         guilds.set(id, guild);
@@ -90,7 +99,19 @@ export async function checkServersDb(config: IConfig): Promise<void> {
     };
 
     try {
+        store.RULE.key = STARTED;
         await tidy();
+
+        await check("Regel starten bricht ab, solange ein Server des Bots nicht eingetragen werden kann", async () => {
+            join(G(14), U(7));
+            unknown.add(G(14));
+            await assert.rejects(startRuleNow(config, ACTOR), /noch nicht/);
+            assert.equal(await store.ruleStarted(), null);
+            unknown.delete(G(14));
+            guilds.delete(G(14));
+            await query("DELETE FROM server_invites WHERE guild_id = ?", [G(14)]);
+        });
+
         await query("INSERT INTO admin_state (name, value) VALUES (?, ?) ON DUPLICATE KEY UPDATE value = VALUES(value)", [STARTED, String(Date.now() - 3_600_000)]);
 
         await check("Erster Server bleibt, der zweite derselben Person wird nach der DM verlassen", async () => {
@@ -171,11 +192,55 @@ export async function checkServersDb(config: IConfig): Promise<void> {
             assert.equal((await store.choiceOf(U(5)))?.state, "done");
             assert.equal((await store.inviteOf(G(9)))?.left_reason, "choice");
         });
+
+        await check("Leere Serverliste nach einem Bot-Neustart markiert nichts als verlassen", async () => {
+            listEmpty = true;
+            await reconcile(config);
+            listEmpty = false;
+            assert.equal((await store.inviteOf(G(1)))?.state, "active");
+        });
+
+        await check("Verlassen scheitert (429): Zeile bleibt aktiv, der nächste Abgleich holt es nach", async () => {
+            join(G(11), U(1));
+            stuck.add(G(11));
+            assert.equal(await checkGuild(config, G(11)), "over");
+            assert.equal((await store.inviteOf(G(11)))?.state, "active");
+
+            stuck.delete(G(11));
+            await reconcile(config);
+            assert.equal((await store.inviteOf(G(11)))?.state, "left");
+            assert.equal((await store.inviteOf(G(1)))?.state, "active");
+        });
+
+        await check("Wahl-Ende mit gescheitertem Verlassen: erledigt, der Rest geht beim nächsten Abgleich", async () => {
+            const before = new Date(Date.now() - 7_200_000);
+
+            for (const id of [G(12), G(13)]) {
+                join(id, U(6), before);
+                await store.putInvite({ guildId: id, name: `Check ${id.slice(-2)}`, icon: null, userId: U(6), source: "audit", ownerId: U(6), invitedAt: before, members: 10, legacy: true });
+            }
+
+            await store.addChoice(U(6), new Date(Date.now() + 23 * 3_600_000));
+            await chooseFromDm(U(6), G(12));
+            stuck.add(G(13));
+            await choiceRound(config, Date.now() + 11 * 60_000);
+            assert.equal((await store.choiceOf(U(6)))?.state, "done");
+            assert.equal((await store.inviteOf(G(13)))?.state, "active");
+
+            stuck.delete(G(13));
+            await reconcile(config);
+            assert.equal((await store.inviteOf(G(13)))?.state, "left");
+            assert.equal((await store.inviteOf(G(12)))?.state, "active");
+        });
+
+        await check("Wahl-Ende mit veraltetem Stand greift nicht (neu gewählt)", async () => {
+            const choice = (await store.choiceOf(U(6)))!;
+            assert.equal(await store.endChoice(U(6), "chosen", "done", new Date(0)), false);
+            assert.equal(choice.state, "done");
+        });
     } finally {
         globalThis.fetch = real;
         await tidy();
-
-        if (saved) await query("UPDATE admin_state SET value = ? WHERE name = ?", [saved.value, STARTED]);
-        else await query("DELETE FROM admin_state WHERE name = ?", [STARTED]);
+        store.RULE.key = realKey;
     }
 }

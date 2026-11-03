@@ -15,12 +15,13 @@ export default class AdminServerLeave extends Route {
             method: "POST",
             path: "/admin/servers/:id/leave",
             description: "Der Bot verlässt einen Server",
-            rateLimit: { max: 60, timeWindow: "1 minute" },
+            rateLimit: { max: 600, timeWindow: "1 minute" },
         });
     }
 
     async Handle(request: FastifyRequest, reply: FastifyReply): Promise<unknown> {
         if (!HasAdminScope(request)) return reply.code(403).send({ error: "Forbidden" });
+        if (!this.client.isReady()) return reply.code(503).send({ error: "Der Bot startet noch." });
 
         const guild = this.client.guilds.cache.get((request.params as { id?: string }).id ?? "");
         if (!guild) return reply.code(404).send({ error: "Der Bot ist nicht auf diesem Server." });
