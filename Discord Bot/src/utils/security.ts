@@ -1,4 +1,5 @@
 import { Interaction } from "discord.js";
+import { setTimeout as sleep } from "node:timers/promises";
 import BotClient from "../client/BotClient";
 import { WaitForDatabase } from "../services/DatabaseService";
 import { CreateToken } from "./jwt";
@@ -77,6 +78,11 @@ export function BlockOf(userId: string, ownerId: string | null): Block {
     return ownerId === userId ? "own" : "others";
 }
 
+/** Ob der Bot für diese Person an diesem Ort schweigt. ownerId null heißt DM. */
+export function BlockedAt(userId: string, ownerId: string | null): boolean {
+    return BannedFor(userId, BlockOf(userId, ownerId));
+}
+
 /**
  * Die Prüfstelle vor allen Handlern für Interaktionen (ConstructionHandler):
  * false heißt verwerfen, ohne Antwort. Nach dem Start wartet die erste
@@ -84,13 +90,12 @@ export function BlockOf(userId: string, ownerId: string | null): Block {
  */
 export async function Admitted(client: BotClient, interaction: Interaction): Promise<boolean> {
     if (!loaded) {
-        first ??= WaitForDatabase(client.databaseService, FIRST_WAIT, 100)
-            .then(() => LoadBans(client))
-            .then(() => undefined);
+        // Hängt die Datenbank, geht es nach FIRST_WAIT ohne Liste weiter; sie kommt dann später.
+        first ??= Promise.race([WaitForDatabase(client.databaseService, FIRST_WAIT, 100).then(() => LoadBans(client)), sleep(FIRST_WAIT)]).then(() => undefined);
         await first;
     }
 
-    return !BannedFor(interaction.user.id, BlockOf(interaction.user.id, interaction.guild?.ownerId ?? null));
+    return !BlockedAt(interaction.user.id, interaction.guild?.ownerId ?? null);
 }
 
 /** Was die Sperrseite (C4c) und die VPN-Seite (V-A+) zeigen, wie IBlockedView im Admin Dashboard. */
@@ -116,9 +121,17 @@ export async function LoginCheck(
     const ban = BanOf(person.userId);
 
     if (ban?.scope.includes("dashboard")) {
+        // Ohne zu warten: Das Admin Dashboard merkt sich den Versuch und neue Kürzel der Adresse.
+        void AskAdmin(client, person);
+
         return { kind: "ban", name: person.name, avatar: person.avatar, scope: ban.scope, since: ban.since.toISOString(), changedAt: ban.changedAt?.toISOString() ?? null, checkedAt: new Date().toISOString() };
     }
 
+    return AskAdmin(client, person);
+}
+
+/** Schritte 2 und 3 beim Admin Dashboard. Wirft nie, ohne Antwort heißt es null. */
+async function AskAdmin(client: BotClient, person: { userId: string; name: string; avatar: string | null; ip: string }): Promise<IBlockedView | null> {
     const base = client.config.ADMIN_INTERNAL_URL;
     if (!base) return null;
 

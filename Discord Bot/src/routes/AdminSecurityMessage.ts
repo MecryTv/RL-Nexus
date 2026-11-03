@@ -8,6 +8,8 @@ import logger from "../utils/logger";
 /** Bilder einer Nachricht, die als Beleg mitgesichert werden. */
 const IMAGES = 3;
 const IMAGE_MAX = 2 * 1024 * 1024;
+/** Nur Rasterbilder: ein SVG kann Skript enthalten und landet später als data-URL im Admin Dashboard. */
+const RASTER = ["image/png", "image/jpeg", "image/webp", "image/gif"];
 
 /**
  * W-0057, Belege: Das Admin Dashboard schickt einen Link zu einer
@@ -40,13 +42,15 @@ export default class AdminSecurityMessage extends Route {
         const images: { name: string; url: string }[] = [];
 
         for (const file of message.attachments.values()) {
-            if (images.length >= IMAGES || !file.contentType?.startsWith("image/") || file.size > IMAGE_MAX) continue;
+            const type = file.contentType?.split(";")[0].trim().toLowerCase() ?? "";
+
+            if (images.length >= IMAGES || !RASTER.includes(type) || file.size > IMAGE_MAX) continue;
 
             try {
                 const response = await fetch(file.url, { signal: AbortSignal.timeout(5_000) });
                 if (!response.ok) continue;
 
-                images.push({ name: file.name, url: `data:${file.contentType};base64,${Buffer.from(await response.arrayBuffer()).toString("base64")}` });
+                images.push({ name: file.name, url: `data:${type};base64,${Buffer.from(await response.arrayBuffer()).toString("base64")}` });
             } catch (error) {
                 logger.warn(`🚫 Bild ${file.name} aus einem Beleg nicht geladen: ${String(error)}`);
             }

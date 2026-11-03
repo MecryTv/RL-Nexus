@@ -10,6 +10,14 @@
 import type { Interaction } from "discord.js";
 import type BotClient from "../client/BotClient";
 import { BlockedPage, Chips } from "../builder/BlockedPage";
+import { ADMIN_SCOPE } from "../constants/Admin";
+import AdminSecurityMessage from "../routes/AdminSecurityMessage";
+import ClipMessages from "../events/clips/ClipMessages";
+import ClipReactions from "../events/clips/ClipReactions";
+import LevelMessages from "../events/levels/LevelMessages";
+import AutoResponder from "../events/messages/AutoResponder";
+import LevelService, { LEVELS_MODULE } from "../services/LevelService";
+import VoiceService, { VOICE_MODULE } from "../services/VoiceService";
 import { IsContact, IssuePass } from "../utils/invitepass";
 import { Admitted, BannedFor, BlockOf, LoginCheck, ScopeOf, SetBans } from "../utils/security";
 
@@ -44,7 +52,23 @@ const interaction = (userId: string, ownerId: string | null): Interaction => ({ 
 void (async () => {
     console.log("\nSperrliste und Prüfstelle");
 
-    check("Die erste Interaktion nach dem Start wartet auf die Liste", !(await Admitted(client, interaction(FULL, OWNER))));
+    // Die Datenbank antwortet erst nach 2,5 s: die erste Interaktion wartet, aber höchstens 2 s.
+    const query = client.databaseService.Query.bind(client.databaseService);
+    let loaded!: () => void;
+    const late = new Promise<void>((resolve) => (loaded = resolve));
+    (client.databaseService as { Query: unknown }).Query = async () => {
+        await new Promise((resolve) => setTimeout(resolve, 2_500));
+        setImmediate(loaded);
+
+        return query("");
+    };
+    const started = Date.now();
+    const waited = await Admitted(client, interaction(FULL, OWNER));
+    const took = Date.now() - started;
+    check("Die erste Interaktion wartet auf die Liste, aber höchstens 2 s", waited && took >= 1_900 && took < 2_400, `${took} ms`);
+    await late;
+    check("Kommt die Liste danach, gilt sie", !(await Admitted(client, interaction(FULL, OWNER))));
+    (client.databaseService as { Query: unknown }).Query = query;
 
     SetBans([
         [FULL, { scope: ScopeOf("others,own,dashboard,website,shop"), since, changedAt: null }],
@@ -62,6 +86,53 @@ void (async () => {
         !(await Admitted(client, interaction(OWNER, OWNER))) && (await Admitted(client, interaction(OWNER, FREE))) && (await Admitted(client, interaction(OWNER, null)))
     );
     check("Ohne Sperre läuft alles", (await Admitted(client, interaction(FREE, FREE))) && !BannedFor(FREE, "own"));
+
+    console.log("\nNachrichten, Voice, Level und Clips");
+
+    const calls: string[] = [];
+    const record = (name: string) => async () => void calls.push(name);
+    const events = {
+        ...client,
+        messageService: { Incoming: record("antwort") },
+        levelService: { Message: record("punkte") },
+        clipService: { Message: record("clip"), ReactionAdd: record("stimme") },
+        settings: { Of: async () => ({ modules: [VOICE_MODULE, LEVELS_MODULE] }) },
+        voiceHubs: { ByChannel: async () => ({ id: 1 }) },
+    } as unknown as BotClient;
+    const voice = new VoiceService(events) as unknown as { Voice: VoiceService["Voice"]; Create: () => Promise<void>; Cleanup: () => Promise<void> };
+    voice.Create = record("kanal");
+    voice.Cleanup = record("aufräumen");
+
+    const at = async (userId: string, ownerId: string): Promise<string> => {
+        const message = { author: { id: userId }, guild: { ownerId } } as never;
+        const guild = { id: "1", ownerId };
+        const member = { id: userId, guild };
+
+        calls.length = 0;
+        await new AutoResponder(events).Execute(message);
+        await new LevelMessages(events).Execute(message);
+        await new ClipMessages(events).Execute(message);
+        await new ClipReactions(events).Execute({ message: { guild } } as never, { id: userId } as never);
+        await voice.Voice({ guild, channelId: null, member } as never, { guild, channelId: "2", member } as never);
+        await voice.Voice({ guild, channelId: "2", member } as never, { guild, channelId: null, member } as never);
+
+        return calls.join(",");
+    };
+
+    check("Vollsperre: keine Antwort, keine Punkte, keine Clips und Stimmen, kein eigener Kanal", (await at(FULL, FREE)) === "aufräumen", await at(FULL, FREE));
+    check("Nur Besitz: auf dem eigenen Server dasselbe", (await at(OWNER, OWNER)) === "aufräumen", await at(OWNER, OWNER));
+    check("Nur Besitz: auf fremden Servern läuft alles", (await at(OWNER, FREE)) === "antwort,punkte,clip,stimme,kanal,aufräumen", await at(OWNER, FREE));
+
+    const levels = new LevelService({
+        ...events,
+        guilds: { cache: new Map([["1", { id: "1", ownerId: FREE, afkChannelId: null, voiceStates: { cache: new Map([FULL, FREE].map((id) => [id, { channel: { id: "2" }, member: { id, user: { bot: false } } }])) } }]]) },
+    } as unknown as BotClient) as unknown as { Voice: LevelService["Voice"]; Settings: () => Promise<object>; VoiceXp: () => Promise<number>; Credit: (member: { id: string }) => Promise<void> };
+    const credited: string[] = [];
+    levels.Settings = async () => ({});
+    levels.VoiceXp = async () => 5;
+    levels.Credit = async (member) => void credited.push(member.id);
+    await levels.Voice(Date.now());
+    check("Voice-Punkte nur für Nicht-Gesperrte", credited.join(",") === FREE, credited.join(","));
 
     console.log("\nAnsprechpartner und Freigabe-Pass (W-0064)");
 
@@ -93,6 +164,9 @@ void (async () => {
         answer = async () => new Response(JSON.stringify({ result: "blocked", view: { kind: "vpn", service: "dashboard", name: "Check", avatar: null, scope: [], since: null, changedAt: null, checkedAt: "2026-11-03T17:42:00Z" } }));
         check("VPN laut Admin Dashboard: VPN-Seite", (await LoginCheck(client, person(FREE)))?.kind === "vpn" && asked === 1);
 
+        answer = async () => new Response(JSON.stringify({ result: "in", view: null }));
+        check("Gesperrt fürs Dashboard: Sperrseite, das Admin Dashboard erfährt trotzdem davon", (await LoginCheck(client, person(FULL)))?.kind === "ban" && asked === 2, `${asked} Anfragen`);
+
         answer = async () => {
             throw new Error("weg");
         };
@@ -100,6 +174,17 @@ void (async () => {
 
         answer = async () => new Response("{}", { status: 500 });
         check("Fehler beim Admin Dashboard: herein", (await LoginCheck(client, person(FREE))) === null);
+
+        console.log("\nBelege aus Discord-Nachrichten");
+
+        answer = async () => new Response(new Uint8Array([1, 2, 3]));
+        const file = (name: string, contentType: string) => [name, { name, contentType, size: 3, url: `https://cdn.discordapp.com/${name}` }] as const;
+        const attachments = new Map([file("a.png", "image/png"), file("b.svg", "image/svg+xml"), file("c.webp", "image/webp"), file("d.html", "text/html")]);
+        const message = { author: { id: FREE, globalName: null, username: "check" }, guild: null, channel: {}, content: "", createdAt: since, attachments };
+        const bot = { isReady: () => true, channels: { fetch: async () => ({ isTextBased: () => true, messages: { fetch: async () => message } }) } } as unknown as BotClient;
+        const request = { token: { scope: [ADMIN_SCOPE] }, query: { channel: FREE, message: FREE } } as never;
+        const evidence = (await new AdminSecurityMessage(bot).Handle(request, {} as never)) as { images: { name: string }[] };
+        check("Nur Rasterbilder kommen als Beleg mit, kein SVG", evidence.images.map((image) => image.name).join(",") === "a.png,c.webp", evidence.images.map((image) => image.name).join(","));
     } finally {
         globalThis.fetch = real;
     }

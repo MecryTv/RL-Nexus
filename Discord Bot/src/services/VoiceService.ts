@@ -28,6 +28,7 @@ import {
 } from "../constants/Voice";
 import { IHubConfig, ITempVoice, IVoiceHub, IVoiceModuleSettings, IVoiceSettings, VoiceAction } from "../interfaces/services/voice/IVoice";
 import logger from "../utils/logger";
+import { BlockedAt } from "../utils/security";
 
 export class VoiceError extends Error {}
 
@@ -194,7 +195,8 @@ export default class VoiceService {
 
         if (!(await this.client.settings.Of(guild.id)).modules.includes(VOICE_MODULE)) return;
 
-        if (after.channelId && after.channelId !== before.channelId && after.member) {
+        // W-0057: Gesperrte bekommen keinen eigenen Kanal, aufgeräumt wird trotzdem.
+        if (after.channelId && after.channelId !== before.channelId && after.member && !BlockedAt(after.member.id, guild.ownerId)) {
             const hub = await this.client.voiceHubs.ByChannel(after.channelId);
 
             if (hub) await this.Create(hub, after.member).catch((error) => logger.warn(`🔊 Kanal für ${after.member?.id} - ${String(error)}`));
