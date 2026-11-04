@@ -910,14 +910,30 @@ try {
         });
 
         await check("Nutzerdaten: Liste wartet nicht auf Discord, fehlende Namen kommen im Hintergrund nach (W-0065)", async () => {
-            forgetAllUsers();
-            const first = (await get(`/api/userdata?q=${PERSON}`)).json() as IUserdataList;
-            assert.ok(first.namesPending >= 1, `${first.namesPending} ausstehend`);
+            const real = globalThis.fetch;
 
-            await namesFilled();
-            const second = (await get(`/api/userdata?q=${PERSON}`)).json() as IUserdataList;
-            assert.equal(second.namesPending, 0);
-            assert.ok(second.people.find((person) => person.id === PERSON)?.avatar !== undefined);
+            globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+                const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+                if (!url.endsWith(`/users/${PERSON}`)) return real(input, init);
+
+                return new Response(JSON.stringify({ id: PERSON, username: "checkperson", global_name: "check Person", avatar: "abc" }), { status: 200, headers: { "Content-Type": "application/json" } });
+            }) as typeof fetch;
+
+            try {
+                // Nachfragen aus den Fällen davor erst fertig werden lassen, dann alles vergessen.
+                await namesFilled();
+                forgetAllUsers();
+                const first = (await get(`/api/userdata?q=${PERSON}`)).json() as IUserdataList;
+                assert.ok(first.namesPending >= 1, `${first.namesPending} ausstehend`);
+                assert.equal(first.people.find((person) => person.id === PERSON)?.avatar, null);
+
+                await namesFilled();
+                const second = (await get(`/api/userdata?q=${PERSON}`)).json() as IUserdataList;
+                assert.equal(second.namesPending, 0);
+                assert.match(second.people.find((person) => person.id === PERSON)?.avatar ?? "", new RegExp(`/avatars/${PERSON}/abc\\.`));
+            } finally {
+                globalThis.fetch = real;
+            }
         });
 
         await check("Nutzerdaten: Profil mit Banner und Profilfarbe aus Discord, Shop, Aktivität, Zeitleiste je Bereich", async () => {

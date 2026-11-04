@@ -6,7 +6,7 @@ Im Cache liegen heute:
 
 | Schlüssel | Was | Wie lange |
 |---|---|---|
-| `rln:discord:user:v1:<ID>` | Name, Profilbild und Banner einer Person von Discord | 1 Stunde |
+| `rln:discord:user:v1:<ID>` | Name, Profilbild und Banner einer Person von Discord | 24 Stunden |
 | `rln:userdata:index:v1` | die Liste der Personen mit Daten (Datenschutz → Nutzerdaten) | 5 Minuten |
 
 Die Zahl im Schlüssel (`v1`) zählt hoch, wenn sich die Form eines Werts ändert. So kommen nach einem Update keine Einträge in alter Form zurück.

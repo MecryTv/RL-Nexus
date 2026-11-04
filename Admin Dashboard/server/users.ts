@@ -13,13 +13,13 @@ const BATCH = 10;
 // Kontaktnachrichten und dem, was Admins eintippen.
 const known = new Map<string, { readonly value: IUserRef | null; readonly at: number }>();
 
-/** Name und Avatar zu einer ID, eine Stunde gemerkt. null: Discord kennt die ID nicht. Wirft DiscordUnavailable. */
+/** Name und Avatar zu einer ID, im Prozess eine Stunde, in Redis einen Tag gemerkt. null: Discord kennt die ID nicht. Wirft DiscordUnavailable. */
 export async function lookupUser(config: IConfig, userId: string, now = Date.now()): Promise<IUserRef | null> {
     const local = known.get(userId);
     if (local && now - local.at < TTL) return local.value;
 
     // W-0066: zweite Stufe Redis, über Neustarts hinweg. Wirft fetchUser, wird nichts gemerkt.
-    // ponytail: Speicher im Prozess und Redis zusammen machen einen Namen bis zu zwei Stunden alt; für Namen reicht das.
+    // ponytail: Speicher im Prozess und Redis zusammen machen einen Namen bis zu 25 Stunden alt; für Namen und Bilder reicht das.
     const value = await cached<IUserRef | null>(CACHE_AREAS.discordUser.prefix + userId, CACHE_AREAS.discordUser.ttl, async () => {
         const user = await fetchUser(config, userId);
 
@@ -43,6 +43,9 @@ export async function lookupUser(config: IConfig, userId: string, now = Date.now
 /** Nach einer Löschung und in Checks: Name, Bild und Banner aus dem Speicher werfen. */
 export function forgetUser(userId: string): void {
     known.delete(userId);
+    // Sonst schriebe eine noch wartende Nachfrage Name und Bild gleich wieder hinein.
+    waiting.delete(userId);
+    failed.delete(userId);
     void forget(CACHE_AREAS.discordUser.prefix + userId);
 }
 
@@ -69,19 +72,23 @@ let filling: Promise<void> | null = null;
 /** Was ohne Discord bekannt ist: Speicher im Prozess, sonst Redis. Unbekannte IDs fehlen in der Map. */
 export async function knownRefs(ids: readonly string[], now = Date.now()): Promise<Map<string, IUserRef | null>> {
     const found = new Map<string, IUserRef | null>();
+    const unique = [...new Set(ids)];
 
-    await Promise.all(
-        [...new Set(ids)].map(async (id) => {
-            const local = known.get(id);
-            if (local && now - local.at < TTL) return void found.set(id, local.value);
+    // In Gruppen: Der Client von Redis nimmt höchstens 100 Befehle in die Warteschlange.
+    for (let start = 0; start < unique.length; start += BATCH) {
+        await Promise.all(
+            unique.slice(start, start + BATCH).map(async (id) => {
+                const local = known.get(id);
+                if (local && now - local.at < TTL) return void found.set(id, local.value);
 
-            const stored = await peek<IUserRef | null>(CACHE_AREAS.discordUser.prefix + id);
-            if (stored === undefined) return;
+                const stored = await peek<IUserRef | null>(CACHE_AREAS.discordUser.prefix + id);
+                if (stored === undefined) return;
 
-            known.set(id, { value: stored, at: now });
-            found.set(id, stored);
-        })
-    );
+                known.set(id, { value: stored, at: now });
+                found.set(id, stored);
+            })
+        );
+    }
 
     return found;
 }
@@ -94,26 +101,36 @@ export function fillNames(config: IConfig, ids: readonly string[], now = Date.no
         return at === undefined || now - at >= FAILED_TTL;
     });
 
-    for (const id of wanted) waiting.add(id);
-    if (waiting.size > 0) filling ??= drain(config).finally(() => (filling = null));
+    // Neueste zuerst: Wer gerade auf eine Seite schaut, wartet nicht hinter Seiten, die keiner mehr sieht.
+    for (const id of wanted) {
+        waiting.delete(id);
+        waiting.add(id);
+    }
+    if (waiting.size > 0) filling ??= drain(config);
 
     return wanted.length;
 }
 
 async function drain(config: IConfig): Promise<void> {
-    while (waiting.size > 0) {
-        await Promise.all(
-            [...waiting].slice(0, FILL_PARALLEL).map(async (id) => {
-                try {
-                    await lookupUser(config, id);
-                    failed.delete(id);
-                } catch {
-                    failed.set(id, Date.now());
-                } finally {
-                    waiting.delete(id);
-                }
-            })
-        );
+    try {
+        while (waiting.size > 0) {
+            await Promise.all(
+                [...waiting].slice(-FILL_PARALLEL).map(async (id) => {
+                    try {
+                        await lookupUser(config, id);
+                        failed.delete(id);
+                    } catch {
+                        failed.set(id, Date.now());
+                    } finally {
+                        waiting.delete(id);
+                    }
+                })
+            );
+        }
+    } finally {
+        // Im selben Schritt wie das Ende der Schleife. Mit .finally() dahinter bliebe eine ID,
+        // die genau dazwischen kommt, ohne Durchgang liegen.
+        filling = null;
     }
 }
 

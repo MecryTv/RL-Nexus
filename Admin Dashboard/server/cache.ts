@@ -218,21 +218,18 @@ export async function closeCache(): Promise<void> {
     await close?.().catch(() => undefined);
 }
 
-/**
- * Aus Redis, sonst load() und für seconds Sekunden merken. undefined wird nie
- * gemerkt, null schon (etwa „Discord kennt die ID nicht“). Wirft load(), wird
- * nichts gemerkt und der Fehler geht weiter.
- */
 /** Nur nachsehen, ohne Quelle (W-0065): undefined, wenn nichts da ist oder Redis fehlt. */
 export async function peek<T>(key: string): Promise<T | undefined> {
     if (!usable()) return undefined;
 
     try {
         const hit = await waited(client!.get(CACHE_PREFIX + key));
+        if (hit === null) return undefined;
 
-        count(key, hit === null ? "misses" : "hits");
+        // Nur Treffer: Fehltreffer zählt erst cached(), wenn wirklich aus der Quelle geladen wird.
+        count(key, "hits");
 
-        return hit === null ? undefined : (JSON.parse(hit) as T);
+        return JSON.parse(hit) as T;
     } catch {
         count(key, "failures");
 
@@ -240,6 +237,11 @@ export async function peek<T>(key: string): Promise<T | undefined> {
     }
 }
 
+/**
+ * Aus Redis, sonst load() und für seconds Sekunden merken. undefined wird nie
+ * gemerkt, null schon (etwa „Discord kennt die ID nicht“). Wirft load(), wird
+ * nichts gemerkt und der Fehler geht weiter.
+ */
 export async function cached<T>(key: string, seconds: number, load: () => Promise<T>): Promise<T> {
     if (usable()) {
         try {

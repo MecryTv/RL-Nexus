@@ -17,6 +17,7 @@ import { useTitle } from "../useTitle";
 import { BanDialog } from "./BanDialog";
 import { PersonLine } from "./parts";
 import { PRESET_TONE } from "./util.ts";
+import { useNameRefill } from "../userdata/useNameRefill.ts";
 import kpi from "../servers/servers.module.scss";
 import styles from "./security.module.scss";
 
@@ -29,6 +30,8 @@ const STATES = [
 /** Treffer zur Suche; eine ID geht auch ohne gespeicherte Daten. */
 function Hits({ wanted, onPick }: { readonly wanted: string; readonly onPick: (userId: string) => void }): JSX.Element {
     const list = useApi<IUserdataList>(`/api/userdata?${new URLSearchParams({ seite: "1", filter: "alle", sort: "eintraege", q: wanted }).toString()}`);
+    // W-0065: Treffer nur über die ID bekommen ihren Namen kurz danach.
+    useNameRefill(list.data?.namesPending ?? 0, list.reload, wanted, list.data);
     const people = list.data?.people.slice(0, 8) ?? [];
     const direct = SNOWFLAKE.test(wanted) && !people.some((person) => person.id === wanted);
 

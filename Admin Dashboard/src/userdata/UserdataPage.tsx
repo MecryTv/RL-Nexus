@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties, type JSX } from "react";
+import { useEffect, useState, type CSSProperties, type JSX } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { AUDIT_LABELS } from "../../shared/limits.ts";
 import { SEARCH_DEBOUNCE_MS } from "../../shared/search.ts";
@@ -32,11 +32,8 @@ import { DeletionActions, Due, StateBadge, Steps } from "./DeletionParts";
 import { PlanDialog } from "./PlanDialog";
 import { isOpen, remaining, when } from "./plan.ts";
 import { InvitedServers } from "../servers/InvitedServers";
+import { useNameRefill } from "./useNameRefill.ts";
 import styles from "./userdata.module.scss";
-
-/** W-0065: So oft und so schnell fragt die Liste nach, solange der Server noch Namen bei Discord holt. */
-const NAME_REFILLS = 15;
-const NAME_REFILL_MS = 2_000;
 
 const FILTER_LABELS: Readonly<Record<UserdataFilter, string>> = { alle: "Alle", laeuft: "Löschung läuft", shop: "Shop-Kunden" };
 const SORT_LABELS: Readonly<Record<UserdataSort, string>> = { eintraege: "Einträgen", zuletzt: "zuletzt aktiv", name: "Name" };
@@ -367,25 +364,7 @@ export function UserdataPage(): JSX.Element {
 
     useLive("userdata", list.reload);
 
-    // W-0065: Fehlende Namen holt der Server im Hintergrund. Kurz danach noch einmal fragen, höchstens 15 Mal hintereinander.
-    const refills = useRef(0);
-    const pending = data?.namesPending ?? 0;
-    const reload = list.reload;
-    useEffect(() => {
-        if (pending === 0) {
-            refills.current = 0;
-
-            return;
-        }
-        if (refills.current >= NAME_REFILLS) return;
-
-        const timer = setTimeout(() => {
-            refills.current += 1;
-            reload();
-        }, NAME_REFILL_MS);
-
-        return () => clearTimeout(timer);
-    }, [data, pending, reload]);
+    useNameRefill(data?.namesPending ?? 0, list.reload, `${page}|${filter}|${sort}|${wanted}`, data);
 
     const pages = data ? Math.max(1, Math.ceil(data.total / data.pageSize)) : 1;
 

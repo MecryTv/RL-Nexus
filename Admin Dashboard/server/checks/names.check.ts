@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
-import { markCacheUp, setCacheClient, type ICacheClient } from "../cache.ts";
+import { cacheStats, markCacheUp, setCacheClient, type ICacheClient } from "../cache.ts";
 import { CACHE_AREAS } from "../cache-areas.ts";
-import { fillNames, forgetAllUsers, knownRefs, namesFilled } from "../users.ts";
+import { fillNames, forgetAllUsers, forgetUser, knownRefs, namesFilled } from "../users.ts";
 import { fake } from "./fakes.ts";
 import { check, config, section } from "./harness.ts";
 
@@ -13,11 +13,18 @@ import { check, config, section } from "./harness.ts";
 
 const IDS = ["300000000000000001", "300000000000000002", "300000000000000003", "300000000000000004", "300000000000000005"];
 
-function redisWith(entries: Record<string, string>): ICacheClient {
+function redisWith(entries: Record<string, string>, open = { now: 0, most: 0 }): ICacheClient {
     const store = new Map(Object.entries(entries));
 
     return {
-        get: async (key) => store.get(key) ?? null,
+        get: async (key) => {
+            open.now++;
+            open.most = Math.max(open.most, open.now);
+            await new Promise((resolve) => setTimeout(resolve, 2));
+            open.now--;
+
+            return store.get(key) ?? null;
+        },
         set: async (key, value) => void store.set(key, value),
         del: async () => undefined,
         scanKeys: async () => [],
@@ -28,8 +35,9 @@ function redisWith(entries: Record<string, string>): ICacheClient {
 }
 
 /** Zählt Anfragen an /users/:id und wie viele gleichzeitig offen sind. */
-function watchLookups(delay = 20): { readonly calls: () => number; readonly most: () => number; readonly restore: () => void } {
+function watchLookups(delay = 20): { readonly calls: () => number; readonly most: () => number; readonly order: string[]; readonly restore: () => void } {
     const real = globalThis.fetch;
+    const order: string[] = [];
     let calls = 0;
     let open = 0;
     let most = 0;
@@ -39,6 +47,7 @@ function watchLookups(delay = 20): { readonly calls: () => number; readonly most
         if (!/\/users\/\d+$/.test(url)) return real(input, init);
 
         calls++;
+        order.push(url.slice(url.lastIndexOf("/") + 1));
         open++;
         most = Math.max(most, open);
         try {
@@ -50,7 +59,7 @@ function watchLookups(delay = 20): { readonly calls: () => number; readonly most
         }
     }) as typeof fetch;
 
-    return { calls: () => calls, most: () => most, restore: () => void (globalThis.fetch = real) };
+    return { calls: () => calls, most: () => most, order, restore: () => void (globalThis.fetch = real) };
 }
 
 export async function checkNames(): Promise<void> {
@@ -92,15 +101,63 @@ export async function checkNames(): Promise<void> {
         try {
             fillNames(config, [IDS[0]]);
             await namesFilled();
-            const first = watch.calls();
+            assert.equal(watch.calls(), 1);
             assert.equal(fillNames(config, [IDS[0]]), 0);
             await namesFilled();
-            assert.equal(watch.calls(), first);
+            assert.equal(watch.calls(), 1);
             assert.equal(fillNames(config, [IDS[0]], Date.now() + 11 * 60_000), 1);
             await namesFilled();
+            assert.equal(watch.calls(), 2);
         } finally {
             fake.discordDown = false;
             watch.restore();
+        }
+    });
+
+    await check("Während eines laufenden Durchgangs: nichts doppelt, die neuesten zuerst", async () => {
+        forgetAllUsers();
+        const watch = watchLookups();
+        try {
+            fillNames(config, IDS.slice(0, 4));
+            fillNames(config, [IDS[4], IDS[0]]);
+            await namesFilled();
+            assert.equal(watch.calls(), 5, watch.order.join(" "));
+            assert.equal(new Set(watch.order).size, 5);
+            // Die zuletzt gewünschten (eine neue Seite) vor den älteren, die noch warten.
+            assert.ok(watch.order.indexOf(IDS[4]) < watch.order.indexOf(IDS[1]), watch.order.join(" "));
+        } finally {
+            watch.restore();
+        }
+    });
+
+    await check("forgetUser nimmt eine wartende ID aus dem Hintergrund", async () => {
+        forgetAllUsers();
+        const watch = watchLookups();
+        try {
+            fillNames(config, IDS.slice(0, 4));
+            forgetUser(IDS[0]);
+            await namesFilled();
+            assert.equal(watch.calls(), 3);
+            assert.equal((await knownRefs([IDS[0]])).has(IDS[0]), false);
+        } finally {
+            watch.restore();
+            forgetAllUsers();
+        }
+    });
+
+    await check("Redis: höchstens 10 Abfragen gleichzeitig, Nachsehen zählt keine Fehltreffer", async () => {
+        forgetAllUsers();
+        const open = { now: 0, most: 0 };
+        setCacheClient(redisWith({}, open));
+        markCacheUp();
+        const misses = cacheStats().get("discord-namen")?.misses ?? 0;
+        try {
+            const many = Array.from({ length: 50 }, (_, index) => `31000000000000${String(index).padStart(4, "0")}`);
+            assert.equal((await knownRefs(many)).size, 0);
+            assert.ok(open.most <= 10, `${open.most} gleichzeitig`);
+            assert.equal(cacheStats().get("discord-namen")?.misses ?? 0, misses);
+        } finally {
+            setCacheClient(null);
         }
     });
 
