@@ -38,7 +38,7 @@ const STATE_WORDS: Readonly<Record<CheckState, string>> = { ok: "Erreichbar", wa
 /** W-0067: was die Übersicht zur nächtlichen Sicherung sagt, wenn etwas nicht stimmt. */
 const DUMP_SENTENCES: Readonly<Record<Exclude<IDumpSummary["state"], "ok">, string>> = {
     never: "Die Datenbank wurde noch nie automatisch gesichert. Ist die Sicherung auf dem Server eingerichtet?",
-    unknown: "Der Zustand der Sicherung ist unbekannt: Ihre Statusdatei fehlt oder ist nicht lesbar.",
+    unknown: "Der Zustand der Sicherung ist unbekannt: Ordner oder Statusdatei lassen sich nicht lesen.",
     failed: "Die letzte Sicherung der Datenbank ist fehlgeschlagen.",
     stale: "Seit mehr als 26 Stunden gibt es keine gute Sicherung der Datenbank.",
     "probe-failed": "Die letzte Probe hat sich nicht vollständig einspielen lassen.",

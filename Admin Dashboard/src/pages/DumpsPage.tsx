@@ -30,6 +30,8 @@ const day = (iso: string): string => DAY.format(new Date(iso));
 
 const dayKey = (date: Date): string => `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
 const ago = (iso: string, now: number): string => duration(Math.max(0, Math.round((now - Date.parse(iso)) / 1000)));
+/** Ein nächster Lauf, der schon vorbei ist, sagt nichts: dann keiner. */
+const upcoming = (next: string | null, now: number): string | null => (next && Date.parse(next) > now ? next : null);
 const rowId = (name: string): string => `sicherung-${name.replace(/[^a-z0-9]/gi, "-")}`;
 
 /** Je Nacht der letzten 30 Tage, älteste zuerst: was der Lauf der Nacht ergab. */
@@ -86,6 +88,7 @@ function Content({ data, onDownload }: { readonly data: IDumpsOverview; readonly
     const probe = data.probe;
     const found = probe ? Object.values(probe.tables).reduce((sum, [, count]) => sum + count, 0) : 0;
     const nights = nightsOf(data.runs, probe, now);
+    const next = upcoming(data.next, now);
 
     return (
         <>
@@ -99,7 +102,7 @@ function Content({ data, onDownload }: { readonly data: IDumpsOverview; readonly
                         tone: last ? (last.ok ? "ok" : "bad") : undefined,
                         sub: last ? `${last.ok ? "ok" : "fehlgeschlagen"}${last.seconds === null ? "" : ` · ${duration(last.seconds)}`} · vor ${ago(last.at, now)}` : undefined,
                     },
-                    { label: "Nächste", value: data.next ? short(data.next) : "–", sub: data.next ? `in ${duration(Math.max(0, Math.round((Date.parse(data.next) - now) / 1000)))}` : "Timer unbekannt" },
+                    { label: "Nächste", value: next ? short(next) : "–", sub: next ? `in ${duration(Math.round((Date.parse(next) - now) / 1000))}` : "Timer unbekannt" },
                     { label: "Größe", value: lastOk?.bytes ? formatBytes(lastOk.bytes) : "–", sub: "gepackt" },
                     { label: "Aufbewahrt", value: `${formatNumber(data.files.length)} ${data.files.length === 1 ? "Datei" : "Dateien"}`, sub: `${formatBytes(data.totalBytes)}${oldest ? ` · älteste ${day(oldest.at)}` : ""}` },
                     {
@@ -145,6 +148,10 @@ function Content({ data, onDownload }: { readonly data: IDumpsOverview; readonly
                         <i className={styles.bad} />
                         fehlgeschlagen
                     </span>
+                    <span>
+                        <i className={styles.none} />
+                        keine Sicherung
+                    </span>
                     <span className={db.faintText}>Ein Klick auf eine Nacht springt zur Datei.</span>
                 </p>
             </div>
@@ -153,7 +160,7 @@ function Content({ data, onDownload }: { readonly data: IDumpsOverview; readonly
             <div className={styles.stack}>
                 <div className={db.frame}>
                     {data.files.length === 0 ? (
-                        <p className={styles.none}>Im Ordner liegt noch keine Sicherung.</p>
+                        <p className={styles.emptyText}>Im Ordner liegt noch keine Sicherung.</p>
                     ) : (
                         <table className={db.table}>
                             <thead>
@@ -208,7 +215,7 @@ function Content({ data, onDownload }: { readonly data: IDumpsOverview; readonly
                             </span>
                         )}
                     </header>
-                    {probe ? <ProbeSteps probe={probe} /> : <p className={styles.none}>Noch keine Probe. Sie läuft am 1. jedes Monats und gleich bei der Einrichtung.</p>}
+                    {probe ? <ProbeSteps probe={probe} /> : <p className={styles.emptyText}>Noch keine Probe. Sie läuft am 1. jedes Monats und gleich bei der Einrichtung.</p>}
                 </section>
             </div>
         </>
@@ -252,14 +259,14 @@ function StateNote({ data, now }: { readonly data: IDumpsOverview; readonly now:
                     <b>Letzte Sicherung fehlgeschlagen: {formatDateTime(last.at)}</b>
                     {last.error && <code>{last.error}</code>}
                     <p>
-                        {goodSince} {data.next ? `Nächster Versuch: ${formatDateTime(data.next)}.` : ""}
+                        {goodSince} {upcoming(data.next, now) ? `Nächster Versuch: ${formatDateTime(upcoming(data.next, now) ?? "")}.` : ""}
                     </p>
                 </div>
             );
         case "stale":
             return (
                 <div className={[styles.note, styles.caution].join(" ")} role="status">
-                    <b>{lastOk ? `Seit ${ago(lastOk.at, now)} keine gute Sicherung` : "Keine gute Sicherung"}</b>
+                    <b>{lastOk ? `Keine gute Sicherung seit ${formatDateTime(lastOk.at)}` : "Keine gute Sicherung"}</b>
                     <p>Läuft der Timer? Auf dem Server: systemctl list-timers rlnexus-sicherung.timer</p>
                 </div>
             );
@@ -282,7 +289,7 @@ function StateNote({ data, now }: { readonly data: IDumpsOverview; readonly now:
             return (
                 <div className={[styles.note, styles.caution].join(" ")} role="status">
                     <b>Zustand unbekannt</b>
-                    <p>status.json fehlt oder lässt sich nicht lesen. Die Dateien stehen unten.</p>
+                    <p>Der Ordner oder status.json lässt sich nicht lesen. Wurde der Container nach der Einrichtung neu angelegt (docker compose -f docker-compose.prod.yml up -d admin)?</p>
                 </div>
             );
         default:
@@ -306,7 +313,7 @@ function DownloadDialog({ file, onClose }: { readonly file: IDumpFile | null; re
 
         setBusy(true);
         try {
-            const response = await fetch(`/api/db/dumps/${encodeURIComponent(file.name)}/download`, { credentials: "same-origin" });
+            const response = await fetch(`/api/db/dumps/${encodeURIComponent(file.name)}/download`, { credentials: "same-origin", headers: { "x-rlnexus-download": "1" } });
             if (!response.ok) {
                 const payload = (await response.json().catch(() => null)) as { error?: string } | null;
                 throw new Error(payload?.error ?? "Die Sicherung ließ sich nicht herunterladen.");

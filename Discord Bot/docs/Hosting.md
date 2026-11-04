@@ -515,9 +515,11 @@ Das Skript legt Gruppe, Ordner und Timer an, holt alte Sicherungen aus `/root/cl
 ```bash
 cd /home/rlnexus && docker compose -f docker-compose.prod.yml stop bot admin
 sudo rlnexus-sicherung --vor-deploy                # der Stand von jetzt, falls man zurück will
-gunzip -c /home/backups/database/<datei>.sql.gz | sudo mariadb
+sudo sh -c 'gunzip -c /home/backups/database/<datei>.sql.gz | mariadb'
 docker compose -f docker-compose.prod.yml start bot admin
 ```
+
+Beides in `sudo sh -c`: Den Ordner darf nur root lesen. Tabellen, die es in der Sicherung noch nicht gab (etwa aus einer neuen Migration), bleiben stehen. Soll der Stand genau der Sicherung entsprechen, vor dem Einspielen `sudo mariadb -e 'DROP DATABASE rlnexus; DROP DATABASE rlnexus_backups'`. Das löscht alles, deshalb vorher die Zeile mit `--vor-deploy`.
 
 ### Dateien
 
@@ -563,5 +565,5 @@ Verläufe, Beweisbilder, Clips, Logs, die Inhalte der Hauptseite und die Wartung
 | Log sagt `pool failed to retrieve a connection from pool`, und `mariadb` auf dem Server meldet `SELECT COUNT(*) FROM mysql.time_zone_name` = 0 | Die Zeitzonen fehlen. `sudo sh -c 'mariadb-tzinfo-to-sql /usr/share/zoneinfo 2>/dev/null \| mariadb mysql'`, danach `docker compose -f docker-compose.prod.yml restart bot admin` |
 | Log sagt `Datenbank nicht erreichbar (host.docker.internal:3306/…)` | Läuft MariaDB? `sudo systemctl status mariadb`. Lässt ufw die Container durch? `sudo ufw status \| grep 3306` muss `172.30.10.0/24` zeigen. Fehlt etwas davon: `scripts/mariadb-einrichten.sh` noch einmal laufen lassen. An vorhandenen Daten ändert es nichts, und MariaDB startet es nur neu, wenn sich ihre Einstellungen geändert haben. Danach `docker compose -f docker-compose.prod.yml restart bot admin` |
 | Nach einem Neustart des Servers läuft der Bot ohne Datenbank | Docker war schneller als MariaDB. `systemctl cat docker` muss `After=mariadb.service` zeigen (`/etc/systemd/system/docker.service.d/nach-mariadb.conf`, legt das Skript an). Bis dahin: `docker compose -f docker-compose.prod.yml restart bot admin` |
-| Übersicht im Admin Dashboard meldet „Sicherung nicht gelaufen“ oder „Probe nicht bestanden“ | `journalctl -u rlnexus-sicherung -n 50` zeigt den Grund, `systemctl list-timers rlnexus-sicherung.timer` ob der Timer läuft. Von Hand: `sudo rlnexus-sicherung`. Sieht der Reiter *Sicherungen* den Ordner nicht: `docker compose -f docker-compose.prod.yml up -d admin` (Ordner und Gruppe kommen nur beim Neuanlegen des Containers dazu) |
+| Übersicht im Admin Dashboard zeigt die Marke „Sicherung“ (fehlgeschlagen, seit 26 Stunden keine gute, Probe nicht bestanden) | `journalctl -u rlnexus-sicherung -n 50` zeigt den Grund, `systemctl list-timers rlnexus-sicherung.timer` ob der Timer läuft. Von Hand: `sudo rlnexus-sicherung`. Sieht der Reiter *Sicherungen* den Ordner nicht: `docker compose -f docker-compose.prod.yml up -d admin` (Ordner und Gruppe kommen nur beim Neuanlegen des Containers dazu) |
 | `db.nexus-emb.de` zeigt 403, 500 oder 502 | 403 nach der Eingabe von Name und Passwort: `/etc/nginx/db.nexus-emb.de.htpasswd` fehlt (Schritt 6). 500: nginx darf die Datei nicht lesen, oder `/etc/phpmyadmin/rlnexus-ohne-hinweise.php` fehlt, dann `scripts/mariadb-einrichten.sh` noch einmal laufen lassen. 502: php-fpm läuft nicht oder der Socket heißt anders, `ls /run/php/` und `fastcgi_pass` in `/etc/nginx/sites-available/db.nexus-emb.de` |

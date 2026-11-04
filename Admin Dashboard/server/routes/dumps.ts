@@ -17,6 +17,8 @@ export async function dumpRoutes(app: FastifyInstance, { config }: { config: ICo
 
     app.get("/api/db/dumps/:file/download", async (request, reply) => {
         if (config.dumpsDir === null) throw new PublicError(404, "Auf diesem Server ist die Sicherung nicht eingerichtet.");
+        // Nur über die Seite mit Bestätigung: Einen eigenen Header kann ein Link von woanders nicht setzen.
+        if (request.headers["x-rlnexus-download"] !== "1") throw new PublicError(403, "Sicherungen lassen sich nur über Dev → Datenbank → Sicherungen herunterladen.");
 
         const name = (request.params as { file?: string }).file ?? "";
         const dump = await openDump(config.dumpsDir, name);
@@ -27,6 +29,8 @@ export async function dumpRoutes(app: FastifyInstance, { config }: { config: ICo
             .header("Content-Type", "application/gzip")
             .header("Content-Length", String(dump.bytes))
             .header("Content-Disposition", `attachment; filename="${name}"`)
+            // Die ganze Datenbank gehört in keinen Cache des Browsers.
+            .header("Cache-Control", "no-store")
             .send(createReadStream(dump.path));
     });
 }

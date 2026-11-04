@@ -80,6 +80,13 @@ export async function checkDumps(): Promise<void> {
             assert.deepEqual(missing.files, []);
         });
 
+        await check("Ordner da, aber nicht lesbar: unknown statt „noch nie gesichert“", async () => {
+            const notDir = path.join(dir, "keine-ordner.txt");
+            await writeFile(notDir, "x");
+            assert.equal((await readDumps(notDir)).state, "unknown");
+            await rm(notDir);
+        });
+
         await put("rlnexus_2026-11-04_033007.sql.gz", "neu-neu");
         await put("rlnexus_2026-11-03_214600_vor-deploy.sql.gz", "deploy", "nein");
         await put("rlnexus_2026-10-06_033007.sql.gz", "alt");
@@ -183,7 +190,8 @@ export async function checkDumps(): Promise<void> {
         const cookieOf = (id: string, name: string): string => `${SESSION_COOKIE}=${seal({ id, name, avatar: null, exp: Math.floor(Date.now() / 1000) + 600 }, SECRET)}`;
         const developer = cookieOf(USERS.developer, "nutzer2");
         const admin = cookieOf(USERS.admin, "nutzer1");
-        const get = (url: string, cookie = developer, on = app) => on.inject({ method: "GET", url, headers: { cookie } });
+        // Wie die Seite: Der Download kommt nur mit dem eigenen Header durch, den ein fremder Link nicht setzen kann.
+        const get = (url: string, cookie = developer, on = app) => on.inject({ method: "GET", url, headers: { cookie, "x-rlnexus-download": "1" } });
 
         try {
             await check("Nur Developer: Admin bekommt 403 auf /api/db/dumps und den Download", async () => {
@@ -206,6 +214,13 @@ export async function checkDumps(): Promise<void> {
                 assert.equal(response.body, "neu-neu");
                 assert.match(response.headers["content-type"] as string, /application\/gzip/);
                 assert.equal(response.headers["content-disposition"], 'attachment; filename="rlnexus_2026-11-04_033007.sql.gz"');
+                assert.equal(response.headers["cache-control"], "no-store");
+            });
+
+            await check("Download nur von der eigenen Seite: ohne den Header 403, ein fremder Link lädt nichts", async () => {
+                const response = await app.inject({ method: "GET", url: "/api/db/dumps/rlnexus_2026-11-04_033007.sql.gz/download", headers: { cookie: developer } });
+                assert.equal(response.statusCode, 403);
+                assert.notEqual(response.body, "neu-neu");
             });
 
             await check("Download: ../ und %2F im Namen → 400, falsche Prüfsumme → 409", async () => {

@@ -84,8 +84,9 @@ export async function readDumps(dir: string | null, now = new Date()): Promise<I
     let names: string[];
     try {
         names = await readdir(dir);
-    } catch {
-        return { ...empty, state: "never" };
+    } catch (error) {
+        // Fehlt der Ordner, lief noch keine Sicherung. Ist er da, aber nicht lesbar (Gruppe fehlt, Container alt), ist der Zustand unbekannt.
+        return { ...empty, state: (error as NodeJS.ErrnoException).code === "ENOENT" ? "never" : "unknown" };
     }
 
     const found = await Promise.all(

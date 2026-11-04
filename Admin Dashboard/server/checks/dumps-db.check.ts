@@ -24,7 +24,7 @@ export async function checkDumpsDb(base: IConfig): Promise<void> {
 
         await check("Download einer Sicherung steht im Protokoll", async () => {
             const cookie = `${SESSION_COOKIE}=${seal({ id: USERS.developer, name: "nutzer2", avatar: null, exp: Math.floor(Date.now() / 1000) + 600 }, SECRET)}`;
-            assert.equal((await app.inject({ method: "GET", url: `/api/db/dumps/${name}/download`, headers: { cookie } })).statusCode, 200);
+            assert.equal((await app.inject({ method: "GET", url: `/api/db/dumps/${name}/download`, headers: { cookie, "x-rlnexus-download": "1" } })).statusCode, 200);
 
             const rows = await query<{ action: string }[]>("SELECT action FROM admin_audit WHERE user_id = ? AND target = ?", [USERS.developer, name]);
             assert.deepEqual(rows.map((row) => row.action), ["db.dump.download"]);
