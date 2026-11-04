@@ -7,6 +7,7 @@
 #   rlnexus-sicherung                       Sicherung der Nacht
 #   rlnexus-sicherung --vor-deploy          Sicherung vor einem Update
 #   rlnexus-sicherung --uebernehmen <datei> einen alten Dump in den Ordner holen
+#   rlnexus-sicherung --probe <name>        eine Sicherung aus dem Ordner von Hand proben
 #
 # Was ein Lauf tut:
 #   1. Wartet, falls schon ein Lauf arbeitet (höchstens 10 Minuten).
@@ -29,6 +30,10 @@ ordner=${SICHERUNG_ORDNER:-/home/backups/database}
 gruppe=${SICHERUNG_GRUPPE:-rlnexus-sicherung}
 sperre=${SICHERUNG_SPERRE:-/run/lock/rlnexus-sicherung.lock}
 min_frei_mb=${SICHERUNG_MIN_FREI_MB:-1024}
+# Nicht /tmp: Das kann im Arbeitsspeicher liegen.
+probe_ordner=${SICHERUNG_PROBE_ORDNER:-/var/tmp}
+probe_max_s=${SICHERUNG_PROBE_MAX_S:-600}
+probe_tage=31
 read -r -a dbs <<< "${SICHERUNG_DBS:-rlnexus rlnexus_backups}"
 tage=30
 laeufe="$ordner/.laeufe"
@@ -43,7 +48,8 @@ case "${1:-}" in
     "") ;;
     --vor-deploy) art=vor-deploy ;;
     --uebernehmen) art=uebernehmen; quelle=${2:?Welche Datei soll übernommen werden?} ;;
-    *) echo "Unbekannt: $1 (erlaubt: --vor-deploy, --uebernehmen <datei>)" >&2; exit 2 ;;
+    --probe) art=probe; quelle=${2:?Welche Sicherung soll geprobt werden?} ;;
+    *) echo "Unbekannt: $1 (erlaubt: --vor-deploy, --uebernehmen <datei>, --probe <name>)" >&2; exit 2 ;;
 esac
 
 log() { printf '%s\n' "$*"; }
@@ -141,7 +147,33 @@ status_schreiben() {
 }
 
 teil=
+fehlertext=
+probe_pid=
+probe_dir=
 aufgeschrieben=0
+
+# Die zweite MariaDB der Probe beenden und ihren Ordner löschen, auch nach einem Abbruch.
+probe_aufraeumen() {
+    if [ -n "$probe_pid" ]; then
+        # Mitten im Start nimmt sie kein shutdown an: dann TERM, nach 30 s KILL.
+        timeout 10 mariadb-admin --no-defaults --socket="$probe_dir/s.sock" shutdown >/dev/null 2>&1 || kill "$probe_pid" 2>/dev/null || true
+        for _ in $(seq 1 60); do
+            kill -0 "$probe_pid" 2>/dev/null || break
+            sleep 0.5
+        done
+        kill -9 "$probe_pid" 2>/dev/null || true
+        wait "$probe_pid" 2>/dev/null || true
+        probe_pid=
+    fi
+    [ -z "$probe_dir" ] || rm -rf "$probe_dir"
+    probe_dir=
+}
+
+zum_schluss() {
+    [ -z "$teil" ] || rm -f "$teil"
+    [ -z "$fehlertext" ] || rm -f "$fehlertext"
+    probe_aufraeumen
+}
 
 # Ein Fehler beendet den Lauf: Eintrag, status.json, Exit 1.
 fehlschlag() {
@@ -157,7 +189,7 @@ fehlschlag() {
 }
 
 trap 'fehlschlag "Unerwarteter Fehler in Zeile $LINENO."' ERR
-trap '[ -z "$teil" ] || rm -f "$teil"' EXIT
+trap zum_schluss EXIT
 
 mkdir -p "$ordner"
 chgrp "$gruppe" "$ordner"
@@ -224,6 +256,95 @@ ablegen() {
     mv -f "$von" "$ordner/$name"
 }
 
+# Wie viele Tabellen es beim Sichern gab, aus .laeufe, etwa "rlnexus=3,rlnexus_backups=1".
+erwartet_fuer() {
+    [ -f "$laeufe" ] || return 0
+    awk -F "$sep" -v datei="$1" '$4 == datei && $3 == 1 { t = $7 } END { print t }' "$laeufe"
+}
+
+# Die Probe: Die Sicherung in eine zweite, kurzlebige MariaDB aus denselben
+# Programmen einspielen, mit eigenem Ordner, eigenem Socket und ohne Netz, und
+# die Tabellen zählen. Die echte Datenbank sieht davon nichts. --no-defaults
+# überall, damit nichts aus der Konfiguration der echten mitkommt. Läuft ohne
+# set -e (Aufruf in einer Bedingung), jeder Schritt prüft selbst. Exit 0: bestanden.
+probe() {
+    local name=$1 beginn=$SECONDS frist=$((SECONDS + probe_max_s))
+    local datei="$ordner/$1" sock erwartet gefunden= fehlt= zeilen= fehler= ok=1 db soll ist liste=
+    local zu_lang="Die Probe dauerte länger als $probe_max_s s."
+
+    erwartet=$(erwartet_fuer "$name")
+    log "Probe mit $name"
+    probe_dir=$(mktemp -d "$probe_ordner/rlnexus-probe-XXXXXX")
+    sock="$probe_dir/s.sock"
+    chown mysql: "$probe_dir"
+
+    if ! mariadb-install-db --no-defaults --user=mysql --datadir="$probe_dir/daten" --auth-root-authentication-method=socket --skip-test-db >"$probe_dir/anlegen.log" 2>&1; then
+        fehler="mariadb-install-db: $(tail -n 1 "$probe_dir/anlegen.log")"
+    fi
+    if [ -z "$fehler" ]; then
+        mariadbd --no-defaults --user=mysql --datadir="$probe_dir/daten" --socket="$sock" --pid-file="$probe_dir/pid" \
+            --skip-networking --innodb-buffer-pool-size=64M --log-error="$probe_dir/fehler.log" &
+        probe_pid=$!
+        until timeout 5 mariadb-admin --no-defaults --connect-timeout=2 --socket="$sock" ping >/dev/null 2>&1; do
+            if ! kill -0 "$probe_pid" 2>/dev/null; then fehler="Die Probe-Datenbank startet nicht: $(tail -n 1 "$probe_dir/fehler.log")"; break; fi
+            if [ "$SECONDS" -ge "$frist" ]; then fehler=$zu_lang; break; fi
+            sleep 0.5
+        done
+    fi
+    if [ -z "$fehler" ] && [ "$SECONDS" -ge "$frist" ]; then fehler=$zu_lang; fi
+    if [ -z "$fehler" ] && ! timeout "$((frist - SECONDS))" bash -c 'gunzip -c "$1" | mariadb --no-defaults --socket="$2"' _ "$datei" "$sock" 2>"$probe_dir/einspielen.log"; then
+        # Der Client setzt vor die Meldung den Befehl zwischen Strichen: die Zeile mit ERROR zählt.
+        if [ "$SECONDS" -ge "$frist" ]; then fehler=$zu_lang; else
+            fehler="Einspielen: $(grep -m 1 '^ERROR' "$probe_dir/einspielen.log" || grep -v -E '^-*$' "$probe_dir/einspielen.log" | head -n 1)"
+        fi
+    fi
+
+    if [ -n "$probe_pid" ]; then
+        for db in "${dbs[@]}"; do
+            soll=$(printf ',%s,' "$erwartet" | sed -n "s/.*,$db=\([0-9]*\),.*/\1/p")
+            ist=$(mariadb --no-defaults --socket="$sock" -N -B -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = '${db//\'/\'\'}'" 2>/dev/null || echo 0)
+            # Ohne Zählung beim Sichern (alte übernommene Dumps) muss es wenigstens Tabellen geben.
+            if [ -z "$soll" ]; then soll=$ist; [ "$ist" -gt 0 ] || fehlt="${fehlt:+$fehlt, }$db leer"; fi
+            [ "$soll" = "$ist" ] || fehlt="${fehlt:+$fehlt, }$db $soll erwartet, $ist gefunden"
+            gefunden="${gefunden:+$gefunden,}$db=$soll/$ist"
+            liste="${liste:+$liste, }'${db//\'/\'\'}'"
+        done
+        zeilen=$(mariadb --no-defaults --socket="$sock" -N -B -e "SELECT CONCAT('SELECT COUNT(*) FROM \`', table_schema, '\`.\`', table_name, '\`;') FROM information_schema.tables WHERE table_type = 'BASE TABLE' AND table_schema IN ($liste)" 2>/dev/null \
+            | mariadb --no-defaults --socket="$sock" -N -B 2>/dev/null | awk '{ s += $1 } END { print s + 0 }')
+    fi
+    probe_aufraeumen
+
+    [ -z "$fehlt" ] || fehler=${fehler:-"Tabellen fehlen: $fehlt"}
+    [ -z "$fehler" ] || ok=0
+    printf "%s$sep%s$sep%s$sep%s$sep%s$sep%s$sep%s\n" "$start" "$ok" "$name" "$((SECONDS - beginn))" "$gefunden" "$zeilen" "$(einzeilig "$fehler")" > "$probe_datei.teil"
+    rechte "$probe_datei.teil"
+    mv -f "$probe_datei.teil" "$probe_datei"
+    if [ "$ok" = 1 ]; then log "Probe bestanden: $gefunden, $zeilen Zeilen"; else log "Probe nicht bestanden: $fehler"; fi
+    [ "$ok" = 1 ]
+}
+
+# Probe am 1. des Monats und immer dann, wenn die letzte bestandene älter als 31 Tage ist.
+probe_noetig() {
+    local at ok
+    [ "$(date -d "@$start" +%d)" = 01 ] && return 0
+    [ -s "$probe_datei" ] || return 0
+    IFS=$sep read -r at ok _ < "$probe_datei"
+    [ "$ok" = 1 ] || return 0
+    [ $((start - at)) -ge $((probe_tage * 86400)) ]
+}
+
+if [ "$art" = probe ]; then
+    if ! [[ $quelle =~ $muster ]] || [ ! -f "$ordner/$quelle" ]; then
+        log "Keine Sicherung im Ordner: $quelle"
+        exit 2
+    fi
+    aufgeschrieben=1
+    ende=0
+    probe "$quelle" || ende=1
+    status_schreiben
+    exit "$ende"
+fi
+
 if [ "$art" = uebernehmen ]; then
     [ -f "$quelle" ] || fehlschlag "Datei fehlt: $quelle"
     gzip -t "$quelle" 2>/dev/null || { log "Nicht übernommen, kein gültiges gzip: $quelle"; exit 3; }
@@ -270,7 +391,6 @@ frei_mb=$(($(df -Pk "$ordner" | awk 'NR == 2 { print $4 }') / 1024))
 [ "$frei_mb" -ge "$min_frei_mb" ] || fehlschlag "Zu wenig Platz: nur $frei_mb MB frei, nötig sind $min_frei_mb MB."
 
 fehlertext=$(mktemp)
-trap '[ -z "$teil" ] || rm -f "$teil"; rm -f "$fehlertext"' EXIT
 
 # Je Datenbank die Zahl der Tabellen, damit die Probe vergleichen kann.
 tabellen=
@@ -299,4 +419,6 @@ log "Fertig: $name, $bytes Bytes, $dauer s"
 
 aufgeschrieben=1
 lauf_merken "$start" "$art" 1 "$name" "$bytes" "$dauer" "$tabellen" ""
+# Eine Probe, die nicht besteht, macht die Sicherung nicht schlecht: Exit bleibt 0.
+if [ "$art" = nacht ] && probe_noetig; then probe "$name" || true; fi
 status_schreiben

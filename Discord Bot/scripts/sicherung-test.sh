@@ -76,6 +76,11 @@ tr -d '\r' < "$hier/sicherung.sh" | im sh -c 'cat > /opt/sicherung.sh'
 echo
 echo "  Sicherung"
 
+# Wann die echte Tabelle angelegt wurde: Spielte die Probe in die echte Datenbank, wäre sie neu.
+angelegt() { im mariadb -N -B -e "SELECT CREATE_TIME FROM information_schema.tables WHERE table_schema = 'rlnexus' AND table_name = 'a'"; }
+echt_vorher=$(angelegt)
+sleep 1
+
 skript SICHERUNG_JETZT="2026-11-04 03:30:07" || true
 datei="$ordner/rlnexus_2026-11-04_033007.sql.gz"
 pruefe "Nacht: Datei mit Zeit im Namen" im test -f "$datei"
@@ -83,7 +88,14 @@ pruefe "Nacht: Prüfsumme stimmt" im sh -c "cd $ordner && sha256sum -c rlnexus_2
 pruefe "Nacht: Datei 640, Gruppe mysql, Ordner 750" bash -c "[ \"\$(docker exec $name stat -c '%a %G' $datei)\" = '640 mysql' ] && [ \"\$(docker exec $name stat -c %a $ordner)\" = 750 ]"
 pruefe "Datei enthält beide Datenbanken" gleich "$(im sh -c "zgrep -c '^CREATE DATABASE' $datei")" 2
 pruefe "status.json: Lauf ok, Tabellen 3 und 1" gleich "$(json 's.runs[0].ok + "/" + s.runs[0].tables.rlnexus + "/" + s.runs[0].tables.rlnexus_backups + "/" + s.runs[0].file')" "true/3/1/rlnexus_2026-11-04_033007.sql.gz"
-pruefe "status.json: ohne Probe und ohne Timer null" gleich "$(json 's.probe + "/" + s.next')" "null/null"
+pruefe "status.json: ohne Timer ist next null" gleich "$(json 's.next')" "null"
+
+echo
+echo "  Probe"
+
+pruefe "Erste Sicherung: Probe läuft gleich mit und besteht, 3/3 und 1/1 Tabellen, 5 Zeilen" gleich "$(json 's.probe.ok + "/" + s.probe.tables.rlnexus.join("/") + "/" + s.probe.tables.rlnexus_backups.join("/") + "/" + s.probe.rows + "/" + s.probe.file')" "true/3/3/1/1/5/rlnexus_2026-11-04_033007.sql.gz"
+pruefe "Probe räumt auf: kein Ordner in /var/tmp, nur ein mariadbd" bash -c "! docker exec $name sh -c 'ls /var/tmp | grep -q rlnexus-probe' && [ \"\$(docker exec $name pgrep -c mariadbd)\" = 1 ]"
+pruefe "Echte Datenbank unberührt" gleich "$(angelegt)" "$echt_vorher"
 
 vorher=$(zeilen)
 skript SICHERUNG_JETZT="2026-11-04 04:30:00" || true
@@ -148,6 +160,36 @@ skript SICHERUNG_JETZT="2026-11-05 07:00:00" --uebernehmen /tmp/vor-halb.sql.gz 
 ende=$?
 set -e
 pruefe "Dump ohne beide Datenbanken: Exit 3, Datei bleibt liegen" bash -c "[ $ende = 3 ] && docker exec $name test -f /tmp/vor-halb.sql.gz"
+
+echo
+echo "  Probe im Monat"
+
+skript SICHERUNG_JETZT="2026-12-01 03:30:00" >/dev/null 2>&1 || true
+pruefe "Am 1. des Monats: neue Probe der neuen Datei" gleich "$(json 's.probe.ok + "/" + s.probe.file')" "true/rlnexus_2026-12-01_033000.sql.gz"
+skript SICHERUNG_JETZT="2026-12-02 03:30:00" >/dev/null 2>&1 || true
+pruefe "Am 2. mit frischer Probe: keine neue" gleich "$(json 's.probe.file + "/" + s.runs[0].file')" "rlnexus_2026-12-01_033000.sql.gz/rlnexus_2026-12-02_033000.sql.gz"
+
+# Eine Datei, der eine Datenbank fehlt, und eine mit kaputtem SQL; beide mit gültiger Prüfsumme und Eintrag.
+unterlegen() {
+    im sh -c "cd $ordner && gzip > $1 && sha256sum $1 > $1.sha256 && printf '%s\037vor-deploy\0371\037%s\037100\0371\037rlnexus=3,rlnexus_backups=1\037\n' \$(date +%s) $1 >> .laeufe"
+}
+im sh -c "gunzip -c $ordner/rlnexus_2026-12-02_033000.sql.gz | sed '/^CREATE DATABASE .*rlnexus_backups/,\$d'" | unterlegen rlnexus_2026-12-02_100000_vor-deploy.sql.gz
+set +e
+skript SICHERUNG_JETZT="2026-12-02 10:01:00" --probe rlnexus_2026-12-02_100000_vor-deploy.sql.gz >/dev/null 2>&1
+ende=$?
+set -e
+pruefe "Probe mit fehlender Datenbank: nicht bestanden, 1/0, Exit 1" bash -c "[ $ende = 1 ] && [ \"\$(docker exec $name cat $ordner/status.json | node -e \"const p=JSON.parse(require('fs').readFileSync(0,'utf8')).probe; process.stdout.write(p.ok + '/' + p.tables.rlnexus_backups.join('/'))\")\" = false/1/0 ]"
+
+{ im sh -c "gunzip -c $ordner/rlnexus_2026-12-02_033000.sql.gz"; echo "DAS IST KEIN SQL;"; } | unterlegen rlnexus_2026-12-02_110000_vor-deploy.sql.gz
+skript SICHERUNG_JETZT="2026-12-02 11:01:00" --probe rlnexus_2026-12-02_110000_vor-deploy.sql.gz >/dev/null 2>&1 || true
+pruefe "Probe mit kaputtem SQL: nicht bestanden, Fehler steht drin" gleich "$(json 's.probe.ok + "/" + /syntax/i.test(s.probe.error)')" "false/true"
+
+skript SICHERUNG_JETZT="2026-12-02 12:00:00" SICHERUNG_PROBE_MAX_S=1 --probe rlnexus_2026-12-02_033000.sql.gz >/dev/null 2>&1 || true
+pruefe "Probe über der Höchstdauer: nicht bestanden" gleich "$(json 's.probe.ok + "/" + /länger als 1 s/.test(s.probe.error)')" "false/true"
+pruefe "Nach allen Proben: kein Ordner in /var/tmp, nur ein mariadbd" bash -c "! docker exec $name sh -c 'ls /var/tmp | grep -q rlnexus-probe' && [ \"\$(docker exec $name pgrep -c mariadbd)\" = 1 ]"
+
+skript SICHERUNG_JETZT="2026-12-03 03:30:00" >/dev/null 2>&1 || true
+pruefe "Nach nicht bestandener Probe: nächste Nacht probt wieder" gleich "$(json 's.probe.ok + "/" + s.probe.file')" "true/rlnexus_2026-12-03_033000.sql.gz"
 
 echo
 if [ "$fehler" -eq 0 ]; then
