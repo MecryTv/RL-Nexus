@@ -1,5 +1,6 @@
 import { warmNames } from "./search/sources.ts";
 import { scheduleDeletions } from "./userdata/clock.ts";
+import { scheduleMessages } from "./messages/clock.ts";
 import { scheduleServers } from "./servers/clock.ts";
 import { buildApp } from "./app.ts";
 import { scheduleBackups } from "./backups/round.ts";
@@ -40,6 +41,8 @@ scheduleCleanup();
 scheduleStatusPost(config);
 // Fällige Löschungen von Nutzerdaten (W-0051), alle 30 Sekunden.
 scheduleDeletions(config);
+// Nachrichten über den Bot an alle (W-0058): eine DM alle 2 Sekunden. Vorher werden Zeilen von einem Absturz mitten im Senden vermerkt.
+await scheduleMessages(config);
 // Ein Server pro Person (W-0064): Wahl und Abgleich mit dem Bot.
 scheduleServers(config);
 // Namen für die Suche (W-0059). Läuft nebenher, der Start wartet nicht darauf.

@@ -1,4 +1,4 @@
-import type { IMessageContent, IMessageTemplate, MessageAudienceKind } from "../../shared/messages.ts";
+import type { IMessageContent, IMessageRun, IMessageTemplate, MessageAudienceKind, MessageState } from "../../shared/messages.ts";
 import type { IActor } from "../audit.ts";
 import { query } from "../db.ts";
 import { PublicError } from "../errors.ts";
@@ -77,4 +77,77 @@ export async function forgetOldMessages(): Promise<void> {
           WHERE m.audience = 'all' AND m.finished_at IS NOT NULL AND m.finished_at < NOW() - INTERVAL ${RECIPIENT_DAYS} DAY`
     );
     await query(`DELETE FROM bot_messages WHERE audience = 'all' AND finished_at IS NOT NULL AND finished_at < NOW() - INTERVAL ${ALL_YEARS} YEAR`);
+}
+
+/* --- Versand (Task 4) ------------------------------------------------------ */
+
+/** Löschung beantragt: Was danach noch liegt, ist Nachweis und nicht für Nachrichten da. Abgebrochen zählt nicht. */
+export const DELETION_STATES = ["geplant", "angehalten", "geloescht"] as const;
+
+export async function deletionRequested(userId: string): Promise<boolean> {
+    const [row] = await query<{ n: number }[]>("SELECT COUNT(*) AS n FROM userdata_deletions WHERE user_id = ? AND state IN (?)", [userId, DELETION_STATES]);
+
+    return Number(row?.n ?? 0) > 0;
+}
+
+/**
+ * Zahlen aus den Empfängerzeilen neu zählen. Ist die Nachricht zu, ist total
+ * die Summe: Eine mitten im Lauf gelöschte Zeile (W-0051) lässt die Zahlen
+ * sonst schief.
+ */
+export async function recount(id: number): Promise<void> {
+    const count = (state: string): string => `(SELECT COUNT(*) FROM bot_message_recipients r WHERE r.message_id = m.id AND r.state = '${state}')`;
+
+    await query(`UPDATE bot_messages m SET sent = ${count("sent")}, failed = ${count("failed")}, skipped = ${count("skipped")} WHERE m.id = ?`, [id]);
+    await query("UPDATE bot_messages SET total = sent + failed + skipped WHERE id = ? AND state IN ('done', 'cancelled')", [id]);
+}
+
+/** Keine Zeile mehr offen oder unterwegs: fertig. true, wenn es diese Runde war. */
+export async function finishIfDone(id: number): Promise<boolean> {
+    const changed = await query<{ affectedRows: number }>(
+        `UPDATE bot_messages SET state = 'done', pause_reason = NULL, finished_at = CURRENT_TIMESTAMP(3)
+          WHERE id = ? AND state = 'running' AND NOT EXISTS (SELECT 1 FROM bot_message_recipients r WHERE r.message_id = ? AND r.state IN ('open', 'sending'))`,
+        [id, id]
+    );
+    if (changed.affectedRows === 0) return false;
+
+    await recount(id);
+
+    return true;
+}
+
+interface IRunRow {
+    readonly id: number;
+    readonly state: MessageState;
+    readonly template_name: string;
+    readonly content: unknown;
+    readonly total: number;
+    readonly sent: number;
+    readonly failed: number;
+    readonly skipped: number;
+    readonly pause_reason: string | null;
+    readonly open: number;
+}
+
+/** Die Nachricht an alle, die gerade läuft oder angehalten ist. */
+export async function currentRun(): Promise<IMessageRun | null> {
+    const [row] = await query<IRunRow[]>(
+        `SELECT m.id, m.state, m.template_name, m.content, m.total, m.sent, m.failed, m.skipped, m.pause_reason,
+                (SELECT COUNT(*) FROM bot_message_recipients r WHERE r.message_id = m.id AND r.state IN ('open', 'sending')) AS open
+           FROM bot_messages m WHERE m.audience = 'all' AND m.state IN ('running', 'paused') ORDER BY m.id LIMIT 1`
+    );
+    if (!row) return null;
+
+    return {
+        id: Number(row.id),
+        state: row.state,
+        title: contentOf(row.content).title,
+        templateName: row.template_name,
+        total: Number(row.total),
+        sent: Number(row.sent),
+        failed: Number(row.failed),
+        skipped: Number(row.skipped),
+        open: Number(row.open),
+        pauseReason: row.pause_reason,
+    };
 }
