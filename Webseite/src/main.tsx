@@ -22,6 +22,27 @@ import "@fontsource/rajdhani/latin-700.css";
 import "@fontsource/orbitron/latin-700.css";
 import "./styles/main.scss";
 
+/**
+ * Nach einem Deploy fehlen einem offenen Tab die alten Dateien (neue Prüfsumme
+ * im Namen). Lädt ein Teil nicht, holt sich die Seite einmal neu, statt
+ * stehen zu bleiben. Höchstens einmal je Minute, sonst liefe ein echter Fehler im Kreis.
+ */
+window.addEventListener("vite:preloadError", (event) => {
+    const key = "rln:neu-geladen";
+    let last = 0;
+
+    try {
+        last = Number(sessionStorage.getItem(key) ?? 0);
+        sessionStorage.setItem(key, String(Date.now()));
+    } catch {
+        // Ohne Speicher (privates Fenster): trotzdem einmal neu laden.
+    }
+    if (Date.now() - last < 60_000) return;
+
+    event.preventDefault();
+    window.location.reload();
+});
+
 // Die Kategorie prüft hier niemand: categories.json lädt gleichzeitig, und Unbekanntes bekommt eine neutrale Farbe.
 const MODULE_VALUES: IModuleValues = { statuses: Object.values(ModuleStatus) };
 

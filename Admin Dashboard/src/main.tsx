@@ -11,6 +11,28 @@ import "@fontsource/rajdhani/latin-600.css";
 import "@fontsource/orbitron/latin-700.css";
 import "./styles/main.scss";
 
+/**
+ * Nach einem Deploy fehlen einem offenen Tab die alten Dateien (neue Prüfsumme
+ * im Namen). Lädt ein Teil nicht, holt sich die Seite einmal neu, statt mit
+ * „Unable to preload CSS“ stehen zu bleiben. Höchstens einmal je Minute, sonst
+ * liefe ein echter Fehler im Kreis.
+ */
+window.addEventListener("vite:preloadError", (event) => {
+    const key = "rln:neu-geladen";
+    let last = 0;
+
+    try {
+        last = Number(sessionStorage.getItem(key) ?? 0);
+        sessionStorage.setItem(key, String(Date.now()));
+    } catch {
+        // Ohne Speicher (privates Fenster): trotzdem einmal neu laden.
+    }
+    if (Date.now() - last < 60_000) return;
+
+    event.preventDefault();
+    window.location.reload();
+});
+
 const container = document.getElementById("root");
 
 // Ohne das Wurzelelement gibt es nichts zu tun.
