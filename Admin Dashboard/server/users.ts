@@ -53,6 +53,7 @@ export function forgetUser(userId: string): void {
 export function forgetAllUsers(): void {
     known.clear();
     failed.clear();
+    warmedAt = 0;
 }
 
 /*
@@ -93,8 +94,11 @@ export async function knownRefs(ids: readonly string[], now = Date.now()): Promi
     return found;
 }
 
-/** Fehlende Namen im Hintergrund nachschlagen. Gibt zurück, wie viele davon noch ausstehen. */
-export function fillNames(config: IConfig, ids: readonly string[], now = Date.now()): number {
+/**
+ * Fehlende Namen im Hintergrund nachschlagen. Gibt zurück, wie viele davon
+ * noch ausstehen. later: hinten anstellen, hinter allem, was schon wartet.
+ */
+export function fillNames(config: IConfig, ids: readonly string[], now = Date.now(), later = false): number {
     const wanted = ids.filter((id) => {
         const at = failed.get(id);
 
@@ -102,7 +106,10 @@ export function fillNames(config: IConfig, ids: readonly string[], now = Date.no
     });
 
     // Neueste zuerst: Wer gerade auf eine Seite schaut, wartet nicht hinter Seiten, die keiner mehr sieht.
-    for (const id of wanted) {
+    // Was später dran ist (Vorladen), kommt vor alles Wartende, also als Letztes an die Reihe.
+    const ahead = later ? [...waiting] : [];
+    if (later) waiting.clear();
+    for (const id of [...wanted, ...ahead]) {
         waiting.delete(id);
         waiting.add(id);
     }
@@ -132,6 +139,24 @@ async function drain(config: IConfig): Promise<void> {
         // die genau dazwischen kommt, ohne Durchgang liegen.
         filling = null;
     }
+}
+
+/** Höchstens so oft werden alle Namen vorgeladen. Danach liegen sie einen Tag in Redis. */
+const WARM_EVERY = 60 * 60_000;
+let warmedAt = 0;
+
+/**
+ * Einmal je Stunde alle Namen der Liste vorladen, damit auch der erste Blick
+ * auf jede Seite Namen zeigt. Hinter allem, was gerade jemand ansieht.
+ * null: in dieser Stunde schon geschehen.
+ */
+export function warmNames(config: IConfig, ids: readonly string[], now = Date.now()): Promise<void> | null {
+    if (now - warmedAt < WARM_EVERY) return null;
+    warmedAt = now;
+
+    return knownRefs(ids, now)
+        .then((refs) => void fillNames(config, ids.filter((id) => !refs.has(id)), now, true))
+        .catch(() => undefined);
 }
 
 /** Für die Checks: warten, bis der Hintergrund fertig ist. */
