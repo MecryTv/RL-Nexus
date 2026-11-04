@@ -1,4 +1,5 @@
 import { databaseReady, query } from "./db.ts";
+import { forgetOldMessages } from "./messages/store.ts";
 import { forgetOldBans, forgetOldLogins } from "./security/store.ts";
 import { activeGrant } from "./shop/store.ts";
 import { HISTORY_DAYS } from "./status/history.ts";
@@ -25,6 +26,8 @@ export async function cleanup(): Promise<void> {
         // W-0057: Anmeldespuren 90 Tage, außer bei Sperre oder offenem Verdacht.
         await forgetOldLogins().catch(() => 0);
         await forgetOldBans().catch(() => 0);
+        // W-0058: Nachrichten an eine Person 90 Tage, Empfänger 90 Tage, Nachrichten an alle 3 Jahre.
+        await forgetOldMessages().catch(() => undefined);
 
         // Ohne Meldung: Hier fallen jeden Tag rund 2900 Zeilen weg, das ist Alltag.
         await query(`DELETE FROM status_checks WHERE checked_at < NOW() - INTERVAL ${HISTORY_DAYS} DAY`);
