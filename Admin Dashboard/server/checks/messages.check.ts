@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { MESSAGE_LIMITS, berlinDay, checkMessage, fillContent, minutesFor, type IMessageContent } from "../../shared/messages.ts";
+import { failureKind, messagePayload, renderMessageDm, sendMessageDm } from "../messages/dm.ts";
 import { check, config, section } from "./harness.ts";
 
 const GUILD = config.guildId;
@@ -25,6 +26,46 @@ function problemOf(change: Partial<Record<keyof IMessageContent, unknown>>): str
 
     return "problem" in result ? result.problem : null;
 }
+
+/** Breite und Höhe aus dem Kopf einer PNG-Datei. */
+function pngSize(data: Buffer): { readonly width: number; readonly height: number } {
+    assert.deepEqual([...data.subarray(0, 8)], [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a], "PNG-Signatur");
+
+    return { width: data.readUInt32BE(16), height: data.readUInt32BE(20) };
+}
+
+const PERSON = { name: "Mira", avatar: null };
+const AT = new Date("2026-11-04T12:00:00Z");
+
+/** Discord nachgestellt: Kanal öffnen klappt, die Nachricht beantwortet answer. Merkt sich, was ankam. */
+function fakeDiscord(answer: () => Response | Promise<Response>): { readonly bodies: FormData[]; readonly recipients: string[]; restore(): void } {
+    const real = globalThis.fetch;
+    const bodies: FormData[] = [];
+    const recipients: string[] = [];
+
+    globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+        const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+
+        if (url.endsWith("/users/@me/channels")) {
+            recipients.push((JSON.parse(String(init?.body)) as { recipient_id: string }).recipient_id);
+
+            return new Response(JSON.stringify({ id: "500000000000000001" }), { status: 200, headers: { "Content-Type": "application/json" } });
+        }
+
+        if (url.includes("/channels/500000000000000001/messages")) {
+            bodies.push(init?.body as FormData);
+
+            return answer();
+        }
+
+        // Profil und Bild der Person: Discord kennt sie nicht, dann steht „du“ bzw. der gespeicherte Name da.
+        return new Response(JSON.stringify({ code: 10013 }), { status: 404, headers: { "Content-Type": "application/json" } });
+    }) as typeof fetch;
+
+    return { bodies, recipients, restore: () => (globalThis.fetch = real) };
+}
+
+const json = (status: number, body: unknown): Response => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 
 function contentOf(value: unknown): IMessageContent {
     const result = checkMessage(value, GUILD);
@@ -172,5 +213,109 @@ export async function checkMessages(): Promise<void> {
         assert.equal(minutesFor(169), 6);
         assert.equal(minutesFor(30), 1);
         assert.equal(minutesFor(0), 0);
+    });
+
+    await check("Fehlerarten: DMs zu oder Konto weg betrifft nur die Person, Spam-Signal, Störung", () => {
+        assert.equal(failureKind(403, 50007), "person");
+        assert.equal(failureKind(404, 10013), "person");
+        assert.equal(failureKind(400, 50033), "person");
+        assert.equal(failureKind(403, 40003), "spam");
+        assert.equal(failureKind(403, 20026), "spam");
+        assert.equal(failureKind(null, null), "trouble");
+        assert.equal(failureKind(429, null), "trouble");
+        assert.equal(failureKind(502, null), "trouble");
+        // Ungültiges Bot-Token trifft alle, nicht nur diese Person.
+        assert.equal(failureKind(401, 0), "trouble");
+    });
+
+    await check("Bild: PNG, 800 breit, wächst mit dem Text; Alt-Text mit allem, was draufsteht", async () => {
+        const short = await renderMessageDm({ ...BASE, boxes: [{ label: "Kurz", text: "Eine Zeile." }] }, { person: PERSON, at: AT, sender: "Joe" });
+        const paragraph = `${"Wort ".repeat(40).trim()}\n\n${"Noch mehr Text ".repeat(20).trim()}\n`;
+        const text = (paragraph + "x".repeat(600)).slice(0, 600);
+        const long = await renderMessageDm(
+            { ...BASE, big: { text: "Sa., 8. Nov. · 02:00–03:00 Uhr", note: "Bot, Dashboard und Webseite sind bis zu einer Stunde nicht erreichbar." }, boxes: [1, 2, 3].map((n) => ({ label: `Kachel ${n}`, text })) },
+            { person: PERSON, at: AT, sender: "Joe" }
+        );
+
+        assert.equal(short.name, "rl-nexus-nachricht.png");
+        assert.equal(pngSize(short.data).width, 800);
+        assert.equal(pngSize(long.data).width, 800);
+        assert.ok(pngSize(long.data).height > pngSize(short.data).height + 600, `${pngSize(long.data).height} gegen ${pngSize(short.data).height}`);
+
+        for (const part of [BASE.title, BASE.intro, "Kurz: Eine Zeile.", "Nachricht vom Team von RL Nexus · 4. November 2026"]) {
+            assert.ok(short.alt.includes(part), `Alt-Text ohne „${part}“: ${short.alt}`);
+        }
+
+        assert.ok(long.alt.length <= 1024, `Alt-Text ${long.alt.length} Zeichen`);
+        assert.ok(long.alt.includes(BASE.title) && long.alt.includes("Sa., 8. Nov. · 02:00–03:00 Uhr") && long.alt.includes("Kachel 1: Wort"));
+        assert.ok(long.alt.endsWith("Nachricht vom Team von RL Nexus · 4. November 2026"), "die Fußzeile bleibt, auch wenn der Text gekürzt wird");
+        assert.ok(!long.alt.includes("\n"));
+    });
+
+    await check("Unterschrieben: Fußzeile mit dem Namen des Absenders", async () => {
+        const signed = await renderMessageDm({ ...BASE, signed: true }, { person: PERSON, at: AT, sender: "Joe" });
+
+        assert.ok(signed.alt.includes("Joe vom Team von RL Nexus · 4. November 2026"), signed.alt);
+        assert.ok(!signed.alt.includes("Nachricht vom Team"));
+    });
+
+    await check("Ein langer Stempel und ein langer Titel passen ins Bild", async () => {
+        const wide = await renderMessageDm({ ...BASE, stamp: "WWWWWWWWWWWWWW", title: "W".repeat(80), intro: "Lang ".repeat(32).trim() }, { person: { name: "", avatar: Buffer.from("kein Bild") }, at: AT, sender: "Joe" });
+
+        assert.equal(pngSize(wide.data).width, 800);
+    });
+
+    await check("Nachricht: oben das Bild, Link-Knöpfe nur, wenn es welche gibt", () => {
+        const image = { name: "rl-nexus-nachricht.png", alt: "Alt" };
+        const bare = messagePayload(image, []);
+
+        assert.equal(bare.flags, 1 << 15);
+        assert.deepEqual(bare.components, [{ type: 12, items: [{ media: { url: "attachment://rl-nexus-nachricht.png" }, description: "Alt" }] }]);
+
+        const withButtons = messagePayload(image, [
+            { label: "Status", url: "https://status.nexus-emb.de" },
+            { label: "Kontakt", url: "https://nexus-emb.de/kontakt" },
+        ]);
+
+        assert.equal(withButtons.flags, 1 << 15);
+        assert.equal(withButtons.components.length, 2);
+        assert.deepEqual(withButtons.components[1], {
+            type: 1,
+            components: [
+                { type: 2, style: 5, label: "Status", url: "https://status.nexus-emb.de" },
+                { type: 2, style: 5, label: "Kontakt", url: "https://nexus-emb.de/kontakt" },
+            ],
+        });
+    });
+
+    await check("Senden: angekommen null, sonst Grund und Art; Platzhalter mit dem gespeicherten Namen", async () => {
+        let answer: () => Response | Promise<Response> = () => json(200, { id: "500000000000000002" });
+        const discord = fakeDiscord(() => answer());
+
+        try {
+            assert.equal(await sendMessageDm(config, "333333333333333301", BASE, "Joe", AT, "Mira"), null);
+            assert.deepEqual(discord.recipients, ["333333333333333301"]);
+
+            const payload = JSON.parse(String(discord.bodies[0]?.get("payload_json"))) as { components: { type: number; items?: { description: string }[]; components?: { url: string }[] }[]; attachments: { filename: string }[] };
+
+            assert.ok(payload.components[0]?.items?.[0]?.description.includes("Hallo Mira, das ändert sich"), "Platzhalter eingesetzt");
+            assert.equal(payload.components[1]?.components?.[0]?.url, "https://nexus-emb.de/module");
+            assert.deepEqual(payload.attachments, [{ id: 0, filename: "rl-nexus-nachricht.png" }]);
+            assert.ok(discord.bodies[0]?.get("files[0]") instanceof Blob);
+
+            answer = () => json(403, { code: 50007 });
+            assert.deepEqual(await sendMessageDm(config, "333333333333333301", BASE, "Joe", AT), { reason: "Die Person nimmt keine Direktnachrichten vom Bot an.", kind: "person" });
+
+            answer = () => json(403, { code: 40003 });
+            assert.equal((await sendMessageDm(config, "333333333333333301", BASE, "Joe", AT))?.kind, "spam");
+
+            answer = () => json(500, {});
+            assert.equal((await sendMessageDm(config, "333333333333333301", BASE, "Joe", AT))?.kind, "trouble");
+
+            answer = () => Promise.reject(new Error("Netz weg"));
+            assert.equal((await sendMessageDm(config, "333333333333333301", BASE, "Joe", AT))?.kind, "trouble");
+        } finally {
+            discord.restore();
+        }
     });
 }

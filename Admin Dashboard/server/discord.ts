@@ -301,6 +301,17 @@ export interface IDiscordFile {
 const CANNOT_DM = 50007;
 
 /**
+ * Warum eine DM nicht ankam: der Satz, dazu HTTP-Status und Discords
+ * Fehlercode (W-0058 unterscheidet danach, ob nur die Person betroffen ist).
+ * Ohne Antwort (Netz, Zeitüberschreitung) beide null.
+ */
+export interface IDirectMessageError {
+    readonly error: string;
+    readonly status: number | null;
+    readonly code: number | null;
+}
+
+/**
  * Eine Direktnachricht vom Bot, Dateien als Anhang (im Inhalt als
  * attachment://name). Gibt zurück, wo sie liegt (um sie später zu ändern),
  * sonst den Grund. Wirft nie: Die DM ist eine Zugabe und darf nichts davor aufhalten.
@@ -310,14 +321,14 @@ export async function postDirectMessage(
     userId: string,
     message: Readonly<Record<string, unknown>>,
     files: readonly IDiscordFile[] = []
-): Promise<{ readonly channelId: string; readonly messageId: string } | { readonly error: string }> {
+): Promise<{ readonly channelId: string; readonly messageId: string } | IDirectMessageError> {
     try {
         const channel = await botCall(config, "/users/@me/channels", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ recipient_id: userId }),
         });
-        if (!channel.ok) return { error: await refusal(channel) };
+        if (!channel.ok) return refusal(channel);
 
         const { id } = (await channel.json()) as { id: string };
         const form = new FormData();
@@ -326,11 +337,11 @@ export async function postDirectMessage(
 
         // Kein Content-Type: fetch setzt ihn samt Grenze selbst. Das FormData lässt sich für den zweiten Versuch nach 429 wiederverwenden.
         const sent = await botCall(config, `/channels/${id}/messages`, { method: "POST", body: form });
-        if (!sent.ok) return { error: await refusal(sent) };
+        if (!sent.ok) return refusal(sent);
 
         return { channelId: id, messageId: ((await sent.json()) as { id: string }).id };
     } catch (error) {
-        return { error: error instanceof Error ? error.message : String(error) };
+        return { error: error instanceof Error ? error.message : String(error), status: null, code: null };
     }
 }
 
@@ -369,10 +380,11 @@ export async function removeButtons(config: IConfig, channelId: string, messageI
     }
 }
 
-async function refusal(response: Response): Promise<string> {
+async function refusal(response: Response): Promise<IDirectMessageError> {
     const code = (await response.json().catch(() => ({})) as { code?: number }).code;
+    const error = code === CANNOT_DM ? "Die Person nimmt keine Direktnachrichten vom Bot an." : `Discord antwortet mit ${response.status} (Code ${code ?? "?"}).`;
 
-    return code === CANNOT_DM ? "Die Person nimmt keine Direktnachrichten vom Bot an." : `Discord antwortet mit ${response.status} (Code ${code ?? "?"}).`;
+    return { error, status: response.status, code: typeof code === "number" ? code : null };
 }
 
 async function call(url: string, init: RequestInit): Promise<Response> {
