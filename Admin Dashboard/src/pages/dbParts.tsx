@@ -4,9 +4,18 @@ import { useNow } from "../useNow";
 import { LIVE_EVERY } from "./dbUtil.ts";
 import styles from "./DatabasePage.module.scss";
 
-/** Bausteine für Dev → Datenbank, Reiter MariaDB und Redis (W-0066, Entwurf D-A++). */
+/** Bausteine für Dev → Datenbank, Reiter MariaDB und Redis (W-0066, Entwurf D-A++) und Sicherungen (W-0067, S-A). */
 
-export function DbTabs({ tables, keys, redisOnline, updatedAt }: { readonly tables?: number; readonly keys?: number; readonly redisOnline?: boolean; readonly updatedAt: number | null }): JSX.Element {
+interface IDbTabsProps {
+    readonly tables?: number;
+    readonly keys?: number;
+    readonly redisOnline?: boolean;
+    readonly dumps?: number;
+    readonly dumpsOk?: boolean;
+    readonly updatedAt: number | null;
+}
+
+export function DbTabs({ tables, keys, redisOnline, dumps, dumpsOk, updatedAt }: IDbTabsProps): JSX.Element {
     const now = useNow(1_000);
     const ago = updatedAt === null ? null : Math.max(0, Math.round((now - updatedAt) / 1000));
 
@@ -17,6 +26,7 @@ export function DbTabs({ tables, keys, redisOnline, updatedAt }: { readonly tabl
                 tabs={[
                     { to: "/dev/datenbank", label: "MariaDB", icon: "database", ...(tables === undefined ? {} : { count: tables }) },
                     { to: "/dev/redis", label: "Redis", icon: "pulse", ...(keys === undefined ? {} : { count: keys }), ...(redisOnline === undefined ? {} : { dot: redisOnline ? "var(--c-win)" : "var(--c-loss)" }) },
+                    { to: "/dev/sicherungen", label: "Sicherungen", icon: "archive", ...(dumps === undefined ? {} : { count: dumps }), ...(dumpsOk === undefined ? {} : { dot: dumpsOk ? "var(--c-win)" : "var(--c-loss)" }) },
                 ]}
             />
             <span className={styles.live} aria-live="off">

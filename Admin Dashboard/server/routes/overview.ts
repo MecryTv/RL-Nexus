@@ -13,6 +13,7 @@ import { readMaintenance } from "../maintenance.ts";
 import { deletionCounts } from "../userdata/deletions.ts";
 import { lastStatusPost } from "../status-post.ts";
 import { statusSnapshot } from "../status/snapshot.ts";
+import { dumpSummary, readDumps } from "../dumps.ts";
 
 const TOP_GUILDS = 5;
 const RECENT = 5;
@@ -95,12 +96,13 @@ async function recentActions(): Promise<IRecentAction[]> {
  */
 export async function overviewRoutes(app: FastifyInstance, { config }: { config: IConfig }): Promise<void> {
     app.get("/api/overview", async (request): Promise<IOverview> => {
-        const [bot, website, maintenance, commands, recent] = await Promise.all([
+        const [bot, website, maintenance, commands, recent, dumps] = await Promise.all([
             botOverview(config, accessOf(request).id),
             websiteSummary(config),
             readMaintenance(config),
             commandCount(config),
             recentActions(),
+            readDumps(config.dumpsDir),
         ]);
 
         return {
@@ -113,6 +115,7 @@ export async function overviewRoutes(app: FastifyInstance, { config }: { config:
             statusPost: { channels: config.statusChannelIds.length, at: lastStatusPost() },
             recent,
             halted: databaseReady() ? (await deletionCounts().catch(() => null))?.halted ?? 0 : 0,
+            dump: dumpSummary(dumps),
         };
     });
 

@@ -2,6 +2,7 @@ import type { JSX, ReactNode } from "react";
 import { Link } from "react-router-dom";
 import type { IMailAllPage, IMaintenance, IMaintenanceFlag, IOverview, IOverviewService } from "../../shared/api";
 import type { IBackupsOverview } from "../../shared/backups";
+import type { IDumpSummary } from "../../shared/dumps";
 import { roundSentence } from "../backups/format";
 import { BANNER_STATE_LABELS, type BannerState } from "../../shared/content";
 import { AUDIT_LABELS } from "../../shared/limits";
@@ -33,6 +34,30 @@ const STATE_TONES: Readonly<Record<CheckState, BadgeTone>> = { ok: "ok", warn: "
 
 /** Gelb heißt bei der Prüfung: langsam, in Wartung oder der Bot ist noch nicht bereit. */
 const STATE_WORDS: Readonly<Record<CheckState, string>> = { ok: "Erreichbar", warn: "Eingeschränkt", down: "Ausfall" };
+
+/** W-0067: was die Übersicht zur nächtlichen Sicherung sagt, wenn etwas nicht stimmt. */
+const DUMP_SENTENCES: Readonly<Record<Exclude<IDumpSummary["state"], "ok">, string>> = {
+    never: "Die Datenbank wurde noch nie automatisch gesichert. Ist die Sicherung auf dem Server eingerichtet?",
+    unknown: "Der Zustand der Sicherung ist unbekannt: Ordner oder Statusdatei lassen sich nicht lesen.",
+    failed: "Die letzte Sicherung der Datenbank ist fehlgeschlagen.",
+    stale: "Seit mehr als 26 Stunden gibt es keine gute Sicherung der Datenbank.",
+    "probe-failed": "Die letzte Probe hat sich nicht vollständig einspielen lassen.",
+};
+
+function DumpNotice({ dump, developer }: { readonly dump: IDumpSummary; readonly developer: boolean }): JSX.Element | null {
+    if (dump.state === "ok") return null;
+
+    return (
+        <Panel className={[styles.notice, styles.alert].join(" ")}>
+            <Badge tone={dump.state === "failed" ? "danger" : "warn"}>Sicherung</Badge>
+            <p>
+                {DUMP_SENTENCES[dump.state]}
+                {dump.lastOkAt ? ` Die letzte gute ist von ${formatDateTime(dump.lastOkAt)}.` : ""}
+            </p>
+            {developer && <More to="/dev/sicherungen">Sicherungen</More>}
+        </Panel>
+    );
+}
 
 function sinceText(flag: IMaintenanceFlag): string {
     const parts = [flag.since ? `seit ${formatDateTime(flag.since)}` : null, flag.by ? `von ${flag.by}` : null].filter(Boolean);
@@ -278,6 +303,8 @@ export function OverviewPage(): JSX.Element {
                     <More to="/datenschutz/loeschungen">Löschungen</More>
                 </Panel>
             )}
+
+            {data?.dump && <DumpNotice dump={data.dump} developer={me.role === "developer"} />}
 
             <Section id="dienste" title="Dienste" action={<More to="/status">Statusmeldungen</More>}>
                 <div className={styles.tiles}>

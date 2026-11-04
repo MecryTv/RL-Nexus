@@ -36,6 +36,7 @@ import { checkBetaDb } from "./checks/beta-db.check.ts";
 import { checkServersDb } from "./checks/servers-db.check.ts";
 import { checkSecurityDb } from "./checks/security-db.check.ts";
 import { checkDatabaseDb } from "./checks/database-db.check.ts";
+import { checkDumpsDb } from "./checks/dumps-db.check.ts";
 import { cleanup } from "./cleanup.ts";
 import { FakeMailStore, fakeImapFactory } from "./checks/fake-imap.ts";
 import { FakeStripe } from "./checks/fake-stripe.ts";
@@ -3634,6 +3635,7 @@ try {
     await checkServersDb(config);
     await checkSecurityDb(config);
     await checkDatabaseDb();
+    await checkDumpsDb(config);
 } finally {
     stopStatusPost();
     setShopMailer(null);
