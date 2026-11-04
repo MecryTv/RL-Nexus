@@ -142,23 +142,26 @@ export async function checkNav(): Promise<void> {
 
         const entries = navEntries("admin");
 
-        // W-0064: Server-Freigaben kam dazu, W-0057 der Bereich Sicherheit mit drei Seiten.
-        assert.equal(entries.length, 21);
+        // W-0064: Server-Freigaben kam dazu, W-0057 der Bereich Sicherheit mit drei Seiten, W-0058 Nachrichten.
+        assert.equal(entries.length, 22);
         assert.ok(entries.every((hit) => !hit.href.startsWith("/dev")));
     });
 
-    await check("Datenschutz (W-0051): Nutzerdaten und Was bleibt, ein Profil gehört zu Nutzerdaten", () => {
+    await check("Datenschutz (W-0051, W-0058): Nutzerdaten, Was bleibt, Nachrichten; ein Profil gehört zu Nutzerdaten", () => {
         assert.deepEqual(
             AREAS.find((area) => area.id === "datenschutz")?.pages.map((page) => [page.to, page.label]),
             [
                 ["/datenschutz", "Nutzerdaten"],
                 ["/datenschutz/loeschungen", "Löschungen"],
                 ["/datenschutz/regeln", "Was bleibt"],
+                ["/datenschutz/nachrichten", "Nachrichten"],
             ]
         );
         assert.equal(pageOf("/datenschutz/loeschungen")?.page.label, "Löschungen");
         assert.equal(pageOf("/datenschutz/123456789012345678")?.page.to, "/datenschutz");
         assert.equal(pageOf("/datenschutz/regeln")?.page.to, "/datenschutz/regeln");
+        assert.equal(pageOf("/datenschutz/nachrichten")?.page.label, "Nachrichten");
+        assert.equal(AREAS.find((area) => area.id === "datenschutz")?.pages.find((page) => page.to === "/datenschutz/nachrichten")?.developer, undefined, "auch für Admins, an alle nur Developer");
     });
 
     await check("Sicherheit (W-0057): Sperren, Verdacht, VPN-Prüfung, das Profil einer Sperre gehört zu Sperren", () => {

@@ -64,4 +64,10 @@
     input:focus-visible + span {
         @include focus-ring;
     }
+
+    input:disabled + span {
+        border-style: dashed;
+        color: var(--c-text-faint);
+        cursor: not-allowed;
+    }
 }

@@ -76,6 +76,7 @@ const router = createBrowserRouter(
                 <Route path="webseite/neues-modul" lazy={page(() => import("./pages/ModuleEditorPage"), "ModuleEditorPage")} />
                 <Route path="datenschutz/loeschungen" lazy={page(() => import("./userdata/DeletionsPage"), "DeletionsPage")} />
                 <Route path="datenschutz/regeln" lazy={page(() => import("./userdata/RulesPage"), "RulesPage")} />
+                <Route path="datenschutz/nachrichten" lazy={page(() => import("./messages/MessagesPage"), "MessagesPage")} />
                 <Route path="datenschutz/:id?" lazy={page(() => import("./userdata/UserdataPage"), "UserdataPage")} />
                 <Route path="sicherheit" lazy={page(() => import("./security/BansPage"), "BansPage")} />
                 <Route path="sicherheit/sperre/:id" lazy={page(() => import("./security/BanProfilePage"), "BanProfilePage")} />

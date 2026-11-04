@@ -4,6 +4,9 @@ import styles from "./Segmented.module.scss";
 export interface ISegmentedOption<T extends string> {
     readonly value: T;
     readonly label: string;
+    /** Nicht wählbar, der Grund steht in `title`. */
+    readonly disabled?: boolean;
+    readonly title?: string;
 }
 
 /** Eine Auswahl aus wenigen Möglichkeiten nebeneinander. Echte Radio-Knöpfe, also Pfeiltasten und Vorleser inklusive. */
@@ -25,8 +28,8 @@ export function Segmented<T extends string>({
             <legend className={styles.legend}>{legend}</legend>
             <div className={styles.options}>
                 {options.map((option) => (
-                    <label key={option.value} className={styles.option}>
-                        <input type="radio" name={name} value={option.value} checked={value === option.value} onChange={() => onChange(option.value)} />
+                    <label key={option.value} className={styles.option} title={option.title}>
+                        <input type="radio" name={name} value={option.value} checked={value === option.value} disabled={option.disabled} onChange={() => onChange(option.value)} />
                         <span>{option.label}</span>
                     </label>
                 ))}

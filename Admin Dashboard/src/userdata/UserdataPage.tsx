@@ -1,5 +1,5 @@
 import { useEffect, useState, type CSSProperties, type JSX } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { AUDIT_LABELS } from "../../shared/limits.ts";
 import { SEARCH_DEBOUNCE_MS } from "../../shared/search.ts";
 import {
@@ -85,6 +85,7 @@ function Activity({ weeks }: { readonly weeks: readonly number[] }): JSX.Element
 
 /** Kopf des Profils (N2+): Banner aus Discord, sonst Profilfarbe, sonst der rote Schein von RL Nexus. */
 function Hero({ data, onPlan }: { readonly data: IUserdataProfile; readonly onPlan: () => void }): JSX.Element {
+    const navigate = useNavigate();
     const kind = data.banner ? "banner" : data.accentColor ? "accent" : "plain";
     const look = data.accentColor ? ({ "--accent": data.accentColor } as CSSProperties) : undefined;
 
@@ -113,6 +114,10 @@ function Hero({ data, onPlan }: { readonly data: IUserdataProfile; readonly onPl
                     <LinkButton href={`/api/userdata/${data.id}/auskunft`} icon="download" download>
                         JSON
                     </LinkButton>
+                    {/* W-0058: Nachricht über den Bot, die Person ist schon eingetragen. */}
+                    <Button icon="send" onClick={() => navigate(`/datenschutz/nachrichten?an=${data.id}`)}>
+                        Nachricht schicken
+                    </Button>
                     {!isOpen(data.deletion) && (
                         <Button variant="danger" icon="trash" onClick={onPlan}>
                             Löschen planen
