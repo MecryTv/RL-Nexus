@@ -22,6 +22,12 @@ type Night = "probe" | "ok" | "bad" | "none";
 
 const NIGHT_LABELS: Readonly<Record<Night, string>> = { probe: "gesichert, mit Probe", ok: "gesichert", bad: "fehlgeschlagen", none: "keine Sicherung" };
 
+// Ohne Jahr: Alles hier ist höchstens 30 Tage alt, und die Kennzahlen bleiben auch am Handy lesbar.
+const SHORT = new Intl.DateTimeFormat("de-DE", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+const DAY = new Intl.DateTimeFormat("de-DE", { day: "numeric", month: "short" });
+const short = (iso: string): string => SHORT.format(new Date(iso));
+const day = (iso: string): string => DAY.format(new Date(iso));
+
 const dayKey = (date: Date): string => `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
 const ago = (iso: string, now: number): string => duration(Math.max(0, Math.round((now - Date.parse(iso)) / 1000)));
 const rowId = (name: string): string => `sicherung-${name.replace(/[^a-z0-9]/gi, "-")}`;
@@ -89,18 +95,18 @@ function Content({ data, onDownload }: { readonly data: IDumpsOverview; readonly
                 items={[
                     {
                         label: "Letzte Sicherung",
-                        value: last ? formatDateTime(last.at) : "noch keine",
+                        value: last ? short(last.at) : "noch keine",
                         tone: last ? (last.ok ? "ok" : "bad") : undefined,
                         sub: last ? `${last.ok ? "ok" : "fehlgeschlagen"}${last.seconds === null ? "" : ` · ${duration(last.seconds)}`} · vor ${ago(last.at, now)}` : undefined,
                     },
-                    { label: "Nächste", value: data.next ? formatDateTime(data.next) : "–", sub: data.next ? `in ${duration(Math.max(0, Math.round((Date.parse(data.next) - now) / 1000)))}` : "Timer unbekannt" },
-                    { label: "Größe", value: lastOk?.bytes ? formatBytes(lastOk.bytes) : "–", sub: "der letzten guten, gepackt" },
-                    { label: "Aufbewahrt", value: `${formatNumber(data.files.length)} ${data.files.length === 1 ? "Datei" : "Dateien"}`, sub: `${formatBytes(data.totalBytes)}${oldest ? ` · älteste ${formatDate(oldest.at)}` : ""}` },
+                    { label: "Nächste", value: data.next ? short(data.next) : "–", sub: data.next ? `in ${duration(Math.max(0, Math.round((Date.parse(data.next) - now) / 1000)))}` : "Timer unbekannt" },
+                    { label: "Größe", value: lastOk?.bytes ? formatBytes(lastOk.bytes) : "–", sub: "gepackt" },
+                    { label: "Aufbewahrt", value: `${formatNumber(data.files.length)} ${data.files.length === 1 ? "Datei" : "Dateien"}`, sub: `${formatBytes(data.totalBytes)}${oldest ? ` · älteste ${day(oldest.at)}` : ""}` },
                     {
                         label: "Letzte Probe",
                         value: probe ? (probe.ok ? "bestanden" : "nicht bestanden") : "noch keine",
                         tone: probe ? (probe.ok ? "ok" : "bad") : undefined,
-                        sub: probe ? `${formatDate(probe.at)} · ${formatNumber(found)} Tabellen${probe.seconds === null ? "" : ` · ${duration(probe.seconds)}`}` : "am 1. jedes Monats",
+                        sub: probe ? `${day(probe.at)} · ${formatNumber(found)} Tabellen${probe.seconds === null ? "" : ` · ${duration(probe.seconds)}`}` : "am 1. jedes Monats",
                     },
                     { label: "Freier Platz", value: data.free ? formatBytes(data.free.bytes) : "–", sub: data.free ? `von ${formatBytes(data.free.total)}` : undefined },
                 ]}
@@ -143,7 +149,8 @@ function Content({ data, onDownload }: { readonly data: IDumpsOverview; readonly
                 </p>
             </div>
 
-            <div className={db.split}>
+            {/* Untereinander statt nebeneinander: Neben dem Kasten der Probe wäre kein Platz für den Knopf zum Herunterladen. */}
+            <div className={styles.stack}>
                 <div className={db.frame}>
                     {data.files.length === 0 ? (
                         <p className={styles.none}>Im Ordner liegt noch keine Sicherung.</p>
@@ -322,7 +329,7 @@ function DownloadDialog({ file, onClose }: { readonly file: IDumpFile | null; re
     return (
         <ConfirmDialog open={file !== null} title="Sicherung herunterladen" confirmLabel="Herunterladen" busy={busy} confirmDisabled={!agreed} onCancel={close} onConfirm={() => void download()}>
             {file && (
-                <>
+                <div className={styles.dialogText}>
                     <p className={styles.file}>
                         <code>{file.name}</code>
                         <span>{formatBytes(file.bytes)}</span>
@@ -335,7 +342,7 @@ function DownloadDialog({ file, onClose }: { readonly file: IDumpFile | null; re
                         <input type="checkbox" checked={agreed} onChange={(event) => setAgreed(event.target.checked)} />
                         Ich lösche die Datei spätestens am {until}.
                     </label>
-                </>
+                </div>
             )}
         </ConfirmDialog>
     );

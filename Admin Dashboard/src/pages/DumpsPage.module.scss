@@ -54,6 +54,11 @@ a.night:hover {
     font-size: 0.75rem;
 }
 
+.stack {
+    display: grid;
+    gap: var(--s-4);
+}
+
 .none {
     margin: 0;
     padding: var(--s-3);
@@ -123,6 +128,15 @@ a.night:hover {
 
     b {
         color: var(--c-mod-engagement);
+    }
+}
+
+.dialogText {
+    display: grid;
+    gap: var(--s-2);
+
+    p {
+        margin: 0;
     }
 }
 
