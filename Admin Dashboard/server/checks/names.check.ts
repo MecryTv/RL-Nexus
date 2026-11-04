@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { cacheStats, markCacheUp, setCacheClient, type ICacheClient } from "../cache.ts";
 import { CACHE_AREAS } from "../cache-areas.ts";
-import { fillNames, forgetAllUsers, forgetUser, knownRefs, namesFilled } from "../users.ts";
+import { fillNames, forgetAllUsers, forgetUser, knownRefs, namesFilled, warmNames } from "../users.ts";
 import { fake } from "./fakes.ts";
 import { check, config, section } from "./harness.ts";
 
@@ -127,6 +127,42 @@ export async function checkNames(): Promise<void> {
             assert.ok(watch.order.indexOf(IDS[4]) < watch.order.indexOf(IDS[1]), watch.order.join(" "));
         } finally {
             watch.restore();
+        }
+    });
+
+    await check("Vorladen geht hinter die Seite, die gerade jemand ansieht", async () => {
+        forgetAllUsers();
+        const watch = watchLookups();
+        const [a, b, c, d, e] = IDS;
+        try {
+            fillNames(config, [a, b, c, e], Date.now(), true);
+            fillNames(config, [d]);
+            await namesFilled();
+            assert.equal(watch.calls(), 5);
+            assert.ok(watch.order.indexOf(d) < watch.order.indexOf(a), watch.order.join(" "));
+        } finally {
+            watch.restore();
+        }
+    });
+
+    await check("Vorladen: höchstens einmal in der Stunde, nur was noch unbekannt ist", async () => {
+        forgetAllUsers();
+        const watch = watchLookups(0);
+        try {
+            fillNames(config, [IDS[0]]);
+            await namesFilled();
+            const started = warmNames(config, IDS);
+            assert.ok(started, "erster Aufruf lädt vor");
+            await started;
+            await namesFilled();
+            assert.equal(watch.calls(), IDS.length, "der schon bekannte Name wird nicht noch einmal geholt");
+            assert.equal(warmNames(config, IDS), null);
+            const again = warmNames(config, IDS, Date.now() + 61 * 60_000);
+            assert.ok(again, "nach einer Stunde wieder");
+            await again;
+        } finally {
+            watch.restore();
+            await namesFilled();
         }
     });
 

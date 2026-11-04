@@ -30,7 +30,7 @@ import type { IConfig } from "../config.ts";
 import { DatabaseUnavailable, databaseReady, query, withTransaction } from "../db.ts";
 import { publish } from "../events.ts";
 import { PublicError } from "../errors.ts";
-import { fillNames, knownName, knownRefs, lookupUser } from "../users.ts";
+import { fillNames, knownName, knownRefs, lookupUser, warmNames } from "../users.ts";
 import { cancelDeletion, deletionCounts, deletionOf, latestDeletionOf, listDeletions, openDeletionOf, planDeletion, publicDeletion } from "../userdata/deletions.ts";
 import { renderDeletionImage, sendDeletionDm } from "../userdata/dm.ts";
 import { personExport, personIndex, personRows, userdataRules } from "../userdata/find.ts";
@@ -82,7 +82,8 @@ export async function userdataRoutes(app: FastifyInstance, { config }: { config:
             name: (a: IUserdataPerson, b: IUserdataPerson) => Number(a.name === null) - Number(b.name === null) || (a.name ?? "").localeCompare(b.name ?? "", "de"),
         }[sort];
         const open = new Map((await listDeletions("offen", "")).map((entry) => [entry.userId, { state: entry.state, dueAt: entry.dueAt }]));
-        const people = [...(await personIndex()).values()]
+        const index = await personIndex();
+        const people = [...index.values()]
             .map((person) => ({ ...person, name: knownName(person.id) ?? person.name, deletion: open.get(person.id) ?? null }))
             .filter((person) => !wanted || person.id.includes(wanted) || fold(person.name ?? "").includes(wanted))
             // Laufende Löschungen stehen oben (Entwurf C4), die nächste Frist zuerst.
@@ -93,6 +94,8 @@ export async function userdataRoutes(app: FastifyInstance, { config }: { config:
         const ids = visible.map((person) => person.id);
         const refs = await knownRefs(ids);
         const namesPending = fillNames(config, ids.filter((id) => !refs.has(id)));
+        // Danach, also hinter dieser Seite: einmal je Stunde alle übrigen Namen vorladen.
+        void warmNames(config, [...index.keys()]);
 
         return {
             people: visible.map((person) => ({ ...person, name: person.name ?? refs.get(person.id)?.name ?? null, avatar: refs.get(person.id)?.avatar ?? null })),
