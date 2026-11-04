@@ -28,7 +28,8 @@ export TZ=Europe/Berlin
 
 ordner=${SICHERUNG_ORDNER:-/home/backups/database}
 gruppe=${SICHERUNG_GRUPPE:-rlnexus-sicherung}
-sperre=${SICHERUNG_SPERRE:-/run/lock/rlnexus-sicherung.lock}
+# Nicht /run/lock: Dort darf jeder Dateien anlegen und so die Sicherung blockieren.
+sperre=${SICHERUNG_SPERRE:-/run/rlnexus-sicherung.lock}
 min_frei_mb=${SICHERUNG_MIN_FREI_MB:-1024}
 # Nicht /tmp: Das kann im Arbeitsspeicher liegen.
 probe_ordner=${SICHERUNG_PROBE_ORDNER:-/var/tmp}
@@ -90,10 +91,32 @@ json_tabellen() {
     printf '}'
 }
 
-# Zeit aus einem Dateinamen in Sekunden, leer bei fremden Namen.
-zeit_aus_name() {
+# Datum und Uhrzeit aus dem Namen als Text, etwa "2026-11-04_033007", leer bei
+# fremden Namen. Ohne date: Ein unmögliches Datum im Namen darf keinen Lauf abbrechen.
+stempel_aus_name() {
     [[ $1 =~ $muster ]] || return 0
-    date -d "${BASH_REMATCH[1]} ${BASH_REMATCH[2]}:${BASH_REMATCH[3]}:${BASH_REMATCH[4]}" +%s
+    printf '%s_%s%s%s' "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}" "${BASH_REMATCH[3]}" "${BASH_REMATCH[4]}"
+}
+
+# Der nächste Lauf des Timers: um 04:30, solange die Nacht noch keine gute
+# Sicherung hat, sonst morgen um 03:30. systemctl hilft hier nicht: Während
+# der Timer läuft, nennt er die Zeit, die gerade dran ist.
+naechster_lauf() {
+    local heute uhr gut=0 at kind ok
+    heute=$(date -d "@$start" +%Y-%m-%d)
+    uhr=$(date -d "@$start" +%H%M)
+    if [ -f "$laeufe" ]; then
+        while IFS=$sep read -r at kind ok _; do
+            if [ "$kind" = nacht ] && [ "$ok" = 1 ] && [ "$(date -d "@$at" +%Y-%m-%d)" = "$heute" ]; then gut=1; fi
+        done < "$laeufe"
+    fi
+    if [ "$uhr" -lt 330 ]; then
+        date -d "$heute 03:30:00" +%s
+    elif [ "$gut" = 1 ] || [ "$uhr" -ge 430 ]; then
+        date -d "$(date -d "$heute +1 day" +%Y-%m-%d) 03:30:00" +%s
+    else
+        date -d "$heute 04:30:00" +%s
+    fi
 }
 
 rechte() { chgrp "$gruppe" "$@" && chmod 640 "$@"; }
@@ -106,17 +129,11 @@ lauf_merken() {
 
 # Baut status.json aus .laeufe (letzte 30 Tage, neueste zuerst) und .probe.
 status_schreiben() {
-    local teil="$ordner/status.json.teil" grenze=$((start - tage * 86400)) erst=1 naechste=null
+    # Eigener Name je Lauf: Zwei Läufe schreiben nie in dieselbe halbe Datei.
+    local teil="$ordner/status.json.$$.teil" grenze=$((start - tage * 86400)) erst=1 naechste
     local at kind ok file bytes seconds tables error
 
-    if command -v systemctl >/dev/null 2>&1; then
-        local wert
-        wert=$(systemctl show rlnexus-sicherung.timer -p NextElapseUSecRealtime --value 2>/dev/null || true)
-        if [ -n "$wert" ] && [ "$wert" != "n/a" ]; then
-            wert=$(date -d "$wert" +%s 2>/dev/null || true)
-            [ -z "$wert" ] || naechste="\"$(iso "$wert")\""
-        fi
-    fi
+    naechste="\"$(iso "$(naechster_lauf)")\""
 
     {
         printf '{\n  "version": 1,\n  "writtenAt": "%s",\n  "next": %s,\n  "runs": [' "$(iso "$start")" "$naechste"
@@ -156,7 +173,7 @@ aufgeschrieben=0
 probe_aufraeumen() {
     if [ -n "$probe_pid" ]; then
         # Mitten im Start nimmt sie kein shutdown an: dann TERM, nach 30 s KILL.
-        timeout 10 mariadb-admin --no-defaults --socket="$probe_dir/s.sock" shutdown >/dev/null 2>&1 || kill "$probe_pid" 2>/dev/null || true
+        timeout 10 mariadb-admin --no-defaults --host=localhost --socket="$probe_dir/s.sock" shutdown >/dev/null 2>&1 || kill "$probe_pid" 2>/dev/null || true
         for _ in $(seq 1 60); do
             kill -0 "$probe_pid" 2>/dev/null || break
             sleep 0.5
@@ -165,14 +182,32 @@ probe_aufraeumen() {
         wait "$probe_pid" 2>/dev/null || true
         probe_pid=
     fi
-    [ -z "$probe_dir" ] || rm -rf "$probe_dir"
+    if [ -n "$probe_dir" ]; then
+        # mariadb-install-db startet selbst ein mariadbd. Bricht timeout es ab, bleibt das sonst übrig.
+        pkill -KILL -f -- "--datadir=$probe_dir/daten" 2>/dev/null || true
+        rm -rf "$probe_dir"
+    fi
     probe_dir=
 }
 
+# Nur Sicherungen sind Läufe. Übernehmen und Probe kommen nicht in die Liste.
+ist_sicherung() { [ "$art" = nacht ] || [ "$art" = vor-deploy ]; }
+
 zum_schluss() {
+    local rc=$?
     [ -z "$teil" ] || rm -f "$teil"
     [ -z "$fehlertext" ] || rm -f "$fehlertext"
     probe_aufraeumen
+    # set -e beendet die Shell in einer Funktion, ohne den ERR-Trap. Auch dann
+    # soll der Lauf in status.json stehen, sonst merkt es erst nach 26 Stunden jemand.
+    if [ "$rc" != 0 ] && [ "$aufgeschrieben" = 0 ]; then
+        aufgeschrieben=1
+        log "Fehler: unerwartet beendet (Exit $rc)"
+        if ist_sicherung; then
+            lauf_merken "$start" "$art" 0 "" "" "" "" "Unerwarteter Fehler (Exit $rc)." || true
+            status_schreiben || true
+        fi
+    fi
 }
 
 # Ein Fehler beendet den Lauf: Eintrag, status.json, Exit 1.
@@ -182,12 +217,15 @@ fehlschlag() {
     [ -z "$teil" ] || rm -f "$teil"
     if [ "$aufgeschrieben" = 0 ]; then
         aufgeschrieben=1
-        lauf_merken "$start" "$art" 0 "" "" "" "" "$1"
-        status_schreiben
+        if ist_sicherung; then
+            lauf_merken "$start" "$art" 0 "" "" "" "" "$1"
+            status_schreiben
+        fi
     fi
     exit 1
 }
 
+start=$(jetzt_s)
 trap 'fehlschlag "Unerwarteter Fehler in Zeile $LINENO."' ERR
 trap zum_schluss EXIT
 
@@ -196,31 +234,30 @@ chgrp "$gruppe" "$ordner"
 chmod 750 "$ordner"
 
 exec 9>"$sperre"
-start=$(jetzt_s)
-if ! flock -w 600 9; then
-    [ "$art" = uebernehmen ] && art=vor-deploy
-    fehlschlag "Ein anderer Lauf hält die Sperre seit 10 Minuten."
-fi
+flock -w 600 9 || fehlschlag "Ein anderer Lauf hält die Sperre seit 10 Minuten."
 # Erst nach dem Warten: Die Zeit im Namen ist die der Sicherung.
 start=$(jetzt_s)
 
 # Die neueste Sicherung mit Prüfsumme. Die bleibt beim Aufräumen immer.
 neueste_gute() {
-    local datei name zeit beste= beste_zeit=0
+    local datei name stempel beste= bester=
     for datei in "$ordner"/rlnexus_*.sql.gz; do
         [ -f "$datei" ] && [ -f "$datei.sha256" ] || continue
         name=${datei##*/}
-        zeit=$(zeit_aus_name "$name")
-        [ -n "$zeit" ] && [ "$zeit" -gt "$beste_zeit" ] || continue
+        stempel=$(stempel_aus_name "$name")
+        [ -n "$stempel" ] && [[ $stempel > $bester ]] || continue
         beste=$name
-        beste_zeit=$zeit
+        bester=$stempel
     done
     printf '%s' "$beste"
 }
 
 aufraeumen() {
-    local datei name zeit behalten
+    local datei name stempel behalten grenze_tag
     behalten=$(neueste_gute)
+    # Weg ist alles vom 30. Tag zurück, nach Kalendertag: So stimmt „wird gelöscht am“
+    # im Admin Dashboard, egal um welche Uhrzeit und über jede Zeitumstellung.
+    grenze_tag=$(date -d "$(date -d "@$start" +%Y-%m-%d) -$tage days" +%Y-%m-%d)
     for datei in "$ordner"/rlnexus_*; do
         [ -e "$datei" ] || continue
         name=${datei##*/}
@@ -228,9 +265,9 @@ aufraeumen() {
             *.teil) rm -f "$datei"; log "Rest entfernt: $name"; continue ;;
             *.sql.gz.sha256) [ -f "${datei%.sha256}" ] || { rm -f "$datei"; log "Prüfsumme ohne Datei entfernt: $name"; }; continue ;;
         esac
-        zeit=$(zeit_aus_name "$name")
-        [ -n "$zeit" ] || continue
-        [ $((start - zeit)) -ge $((tage * 86400)) ] || continue
+        stempel=$(stempel_aus_name "$name")
+        [ -n "$stempel" ] || continue
+        [[ ${stempel%%_*} > $grenze_tag ]] && continue
         if [ "$name" = "$behalten" ]; then
             log "Bleibt, obwohl älter als $tage Tage: $name ist die neueste gute Sicherung."
             continue
@@ -238,7 +275,7 @@ aufraeumen() {
         rm -f "$datei" "$datei.sha256"
         log "Gelöscht (älter als $tage Tage): $name"
     done
-    rm -f "$ordner"/status.json.teil
+    rm -f "$ordner"/status.json*.teil
     # Die Liste der Läufe auf 30 Tage kürzen.
     if [ -f "$laeufe" ]; then
         awk -F "$sep" -v grenze=$((start - tage * 86400)) '$1 >= grenze' "$laeufe" > "$laeufe.neu"
@@ -272,27 +309,33 @@ probe() {
     local datei="$ordner/$1" sock erwartet gefunden= fehlt= zeilen= fehler= ok=1 db soll ist liste=
     local zu_lang="Die Probe dauerte länger als $probe_max_s s."
 
+    # Der Client nähme sonst MYSQL_HOST und Co. aus der Umgebung und landete per
+    # TCP bei der echten Datenbank. Dazu --host=localhost: dann gilt der Socket.
+    unset MYSQL_HOST MYSQL_TCP_PORT MYSQL_UNIX_PORT MYSQL_PWD
+    rest() { local r=$((frist - SECONDS)); if [ "$r" -gt 0 ]; then echo "$r"; else echo 1; fi; }
+
     erwartet=$(erwartet_fuer "$name")
     log "Probe mit $name"
-    probe_dir=$(mktemp -d "$probe_ordner/rlnexus-probe-XXXXXX")
+    probe_dir=$(mktemp -d "$probe_ordner/rlnexus-probe-XXXXXX") || probe_dir=
     sock="$probe_dir/s.sock"
-    chown mysql: "$probe_dir"
 
-    if ! mariadb-install-db --no-defaults --user=mysql --datadir="$probe_dir/daten" --auth-root-authentication-method=socket --skip-test-db >"$probe_dir/anlegen.log" 2>&1; then
-        fehler="mariadb-install-db: $(tail -n 1 "$probe_dir/anlegen.log")"
+    if [ -z "$probe_dir" ]; then
+        fehler="Kein Ordner für die Probe in $probe_ordner."
+    elif ! chown mysql: "$probe_dir" || ! timeout "$(rest)" mariadb-install-db --no-defaults --user=mysql --datadir="$probe_dir/daten" --auth-root-authentication-method=socket --skip-test-db >"$probe_dir/anlegen.log" 2>&1; then
+        if [ "$SECONDS" -ge "$frist" ]; then fehler=$zu_lang; else fehler="mariadb-install-db: $(tail -n 1 "$probe_dir/anlegen.log" 2>/dev/null)"; fi
     fi
     if [ -z "$fehler" ]; then
         mariadbd --no-defaults --user=mysql --datadir="$probe_dir/daten" --socket="$sock" --pid-file="$probe_dir/pid" \
             --skip-networking --innodb-buffer-pool-size=64M --log-error="$probe_dir/fehler.log" &
         probe_pid=$!
-        until timeout 5 mariadb-admin --no-defaults --connect-timeout=2 --socket="$sock" ping >/dev/null 2>&1; do
+        until timeout 5 mariadb-admin --no-defaults --host=localhost --connect-timeout=2 --socket="$sock" ping >/dev/null 2>&1; do
             if ! kill -0 "$probe_pid" 2>/dev/null; then fehler="Die Probe-Datenbank startet nicht: $(tail -n 1 "$probe_dir/fehler.log")"; break; fi
             if [ "$SECONDS" -ge "$frist" ]; then fehler=$zu_lang; break; fi
             sleep 0.5
         done
     fi
     if [ -z "$fehler" ] && [ "$SECONDS" -ge "$frist" ]; then fehler=$zu_lang; fi
-    if [ -z "$fehler" ] && ! timeout "$((frist - SECONDS))" bash -c 'gunzip -c "$1" | mariadb --no-defaults --socket="$2"' _ "$datei" "$sock" 2>"$probe_dir/einspielen.log"; then
+    if [ -z "$fehler" ] && ! timeout "$((frist - SECONDS))" bash -c 'gunzip -c "$1" | mariadb --no-defaults --host=localhost --socket="$2"' _ "$datei" "$sock" 2>"$probe_dir/einspielen.log"; then
         # Der Client setzt vor die Meldung den Befehl zwischen Strichen: die Zeile mit ERROR zählt.
         if [ "$SECONDS" -ge "$frist" ]; then fehler=$zu_lang; else
             fehler="Einspielen: $(grep -m 1 '^ERROR' "$probe_dir/einspielen.log" || grep -v -E '^-*$' "$probe_dir/einspielen.log" | head -n 1)"
@@ -302,15 +345,15 @@ probe() {
     if [ -n "$probe_pid" ]; then
         for db in "${dbs[@]}"; do
             soll=$(printf ',%s,' "$erwartet" | sed -n "s/.*,$db=\([0-9]*\),.*/\1/p")
-            ist=$(mariadb --no-defaults --socket="$sock" -N -B -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = '${db//\'/\'\'}'" 2>/dev/null || echo 0)
+            ist=$(timeout "$(rest)" mariadb --no-defaults --host=localhost --socket="$sock" -N -B -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = '${db//\'/\'\'}'" 2>/dev/null || echo 0)
             # Ohne Zählung beim Sichern (alte übernommene Dumps) muss es wenigstens Tabellen geben.
             if [ -z "$soll" ]; then soll=$ist; [ "$ist" -gt 0 ] || fehlt="${fehlt:+$fehlt, }$db leer"; fi
             [ "$soll" = "$ist" ] || fehlt="${fehlt:+$fehlt, }$db $soll erwartet, $ist gefunden"
             gefunden="${gefunden:+$gefunden,}$db=$soll/$ist"
             liste="${liste:+$liste, }'${db//\'/\'\'}'"
         done
-        zeilen=$(mariadb --no-defaults --socket="$sock" -N -B -e "SELECT CONCAT('SELECT COUNT(*) FROM \`', table_schema, '\`.\`', table_name, '\`;') FROM information_schema.tables WHERE table_type = 'BASE TABLE' AND table_schema IN ($liste)" 2>/dev/null \
-            | mariadb --no-defaults --socket="$sock" -N -B 2>/dev/null | awk '{ s += $1 } END { print s + 0 }')
+        zeilen=$(timeout "$(rest)" mariadb --no-defaults --host=localhost --socket="$sock" -N -B -e "SELECT CONCAT('SELECT COUNT(*) FROM \`', table_schema, '\`.\`', table_name, '\`;') FROM information_schema.tables WHERE table_type = 'BASE TABLE' AND table_schema IN ($liste)" 2>/dev/null \
+            | timeout "$(rest)" mariadb --no-defaults --host=localhost --socket="$sock" -N -B 2>/dev/null | awk '{ s += $1 } END { print s + 0 }')
     fi
     probe_aufraeumen
 
@@ -334,11 +377,11 @@ probe_noetig() {
 }
 
 if [ "$art" = probe ]; then
+    aufgeschrieben=1
     if ! [[ $quelle =~ $muster ]] || [ ! -f "$ordner/$quelle" ]; then
         log "Keine Sicherung im Ordner: $quelle"
         exit 2
     fi
-    aufgeschrieben=1
     ende=0
     probe "$quelle" || ende=1
     status_schreiben
@@ -347,12 +390,15 @@ fi
 
 if [ "$art" = uebernehmen ]; then
     [ -f "$quelle" ] || fehlschlag "Datei fehlt: $quelle"
+    # Exit 3 heißt „passt nicht“, kein Absturz: nichts aufschreiben.
+    aufgeschrieben=1
     gzip -t "$quelle" 2>/dev/null || { log "Nicht übernommen, kein gültiges gzip: $quelle"; exit 3; }
     for db in "${dbs[@]}"; do
         zgrep -q "^CREATE DATABASE .*\`$db\`" "$quelle" || { log "Nicht übernommen, $db fehlt darin: $quelle"; exit 3; }
     done
     zeit=$(stat -c %Y "$quelle")
-    if [ $((start - zeit)) -ge $((tage * 86400)) ]; then
+    grenze_tag=$(date -d "$(date -d "@$start" +%Y-%m-%d) -$tage days" +%Y-%m-%d)
+    if [[ ! $(date -d "@$zeit" +%Y-%m-%d) > $grenze_tag ]]; then
         rm -f "$quelle"
         log "Älter als $tage Tage, gelöscht statt übernommen: $quelle"
         exit 0

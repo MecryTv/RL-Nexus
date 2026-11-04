@@ -45,6 +45,8 @@ db_an() { im rm -f /root/.my.cnf; }
 # Ein Wert aus status.json, ausgewertet mit node auf diesem Rechner: json 's.runs[0].ok'
 json() { im cat "$ordner/status.json" | node -e "const s = JSON.parse(require('fs').readFileSync(0, 'utf8')); process.stdout.write(String($1))"; }
 gleich() { [ "$1" = "$2" ]; }
+# Ohne Zombies: Im Container ist mariadbd PID 1 und räumt tote Kinder nicht ab, auf dem Server tut das systemd.
+lebende_mariadbd() { docker exec "$name" sh -c "ps -eo stat=,comm= | awk '\$2 == \"mariadbd\" && \$1 !~ /^Z/' | wc -l"; }
 zeilen() { im sh -c "wc -l < $ordner/.laeufe"; }
 dateien() { im sh -c "ls $ordner | grep -c '\.sql\.gz\$' || true"; }
 
@@ -88,13 +90,13 @@ pruefe "Nacht: Prüfsumme stimmt" im sh -c "cd $ordner && sha256sum -c rlnexus_2
 pruefe "Nacht: Datei 640, Gruppe mysql, Ordner 750" bash -c "[ \"\$(docker exec $name stat -c '%a %G' $datei)\" = '640 mysql' ] && [ \"\$(docker exec $name stat -c %a $ordner)\" = 750 ]"
 pruefe "Datei enthält beide Datenbanken" gleich "$(im sh -c "zgrep -c '^CREATE DATABASE' $datei")" 2
 pruefe "status.json: Lauf ok, Tabellen 3 und 1" gleich "$(json 's.runs[0].ok + "/" + s.runs[0].tables.rlnexus + "/" + s.runs[0].tables.rlnexus_backups + "/" + s.runs[0].file')" "true/3/1/rlnexus_2026-11-04_033007.sql.gz"
-pruefe "status.json: ohne Timer ist next null" gleich "$(json 's.next')" "null"
+pruefe "status.json: nach guter Nacht ist die nächste morgen 03:30" gleich "$(json 's.next')" "2026-11-05T03:30:00+01:00"
 
 echo
 echo "  Probe"
 
 pruefe "Erste Sicherung: Probe läuft gleich mit und besteht, 3/3 und 1/1 Tabellen, 5 Zeilen" gleich "$(json 's.probe.ok + "/" + s.probe.tables.rlnexus.join("/") + "/" + s.probe.tables.rlnexus_backups.join("/") + "/" + s.probe.rows + "/" + s.probe.file')" "true/3/3/1/1/5/rlnexus_2026-11-04_033007.sql.gz"
-pruefe "Probe räumt auf: kein Ordner in /var/tmp, nur ein mariadbd" bash -c "! docker exec $name sh -c 'ls /var/tmp | grep -q rlnexus-probe' && [ \"\$(docker exec $name pgrep -c mariadbd)\" = 1 ]"
+pruefe "Probe räumt auf: kein Ordner in /var/tmp, nur ein mariadbd" bash -c "! docker exec $name sh -c 'ls /var/tmp | grep -q rlnexus-probe' && [ $(lebende_mariadbd) = 1 ]"
 pruefe "Echte Datenbank unberührt" gleich "$(angelegt)" "$echt_vorher"
 
 vorher=$(zeilen)
@@ -133,6 +135,7 @@ db_an
 pruefe "Datenbank aus: Exit 1" gleich "$ende" 1
 pruefe "Datenbank aus: keine neue Datei, kein .teil" bash -c "[ $(dateien) = 1 ] && ! docker exec $name sh -c 'ls $ordner | grep -q teil'"
 pruefe "Datenbank aus: Fehler in status.json" bash -c "[ \"\$(docker exec $name cat $ordner/status.json | node -e \"const r=JSON.parse(require('fs').readFileSync(0,'utf8')).runs[0]; process.stdout.write(String(r.ok === false && r.file === null && /connect|socket/i.test(r.error)))\")\" = true ]"
+pruefe "Nach fehlgeschlagener Nacht um 03:30: nächster Versuch um 04:30" gleich "$(json 's.next')" "2026-11-05T04:30:00+01:00"
 
 set +e
 skript SICHERUNG_JETZT="2026-11-05 04:30:00" SICHERUNG_MIN_FREI_MB=99999999 >/dev/null 2>&1
@@ -140,8 +143,12 @@ ende=$?
 set -e
 pruefe "Zu wenig Platz: Exit 1 und Fehler „zu wenig Platz“" bash -c "[ $ende = 1 ] && [ \"\$(docker exec $name cat $ordner/status.json | node -e \"process.stdout.write(String(/zu wenig Platz/i.test(JSON.parse(require('fs').readFileSync(0,'utf8')).runs[0].error)))\")\" = true ]"
 
-skript SICHERUNG_JETZT="2026-11-05 05:00:00" SICHERUNG_DBS='rlnexus x"y\z' >/dev/null 2>&1 || true
+set +e
+skript SICHERUNG_JETZT="2026-11-05 05:00:00" SICHERUNG_DBS='rlnexus x"y\z' >/dev/null 2>&1
+ende=$?
+set -e
 pruefe "Fehlertext mit Anführungszeichen bleibt gültiges JSON" bash -c "docker exec $name cat $ordner/status.json | node -e \"const r=JSON.parse(require('fs').readFileSync(0,'utf8')).runs[0]; process.exit(r.ok === false && r.error.includes('x\\\"y') ? 0 : 1)\""
+pruefe "Abbruch mitten im Dump: Exit 1, keine halbe Datei, kein .teil" bash -c "[ $ende = 1 ] && ! docker exec $name test -e $ordner/rlnexus_2026-11-05_050000.sql.gz && ! docker exec $name sh -c 'ls $ordner | grep -q teil'"
 
 skript SICHERUNG_JETZT="2026-11-05 06:00:01" --vor-deploy >/dev/null 2>&1 &
 skript SICHERUNG_JETZT="2026-11-05 06:00:02" --vor-deploy >/dev/null 2>&1 &
@@ -186,10 +193,38 @@ pruefe "Probe mit kaputtem SQL: nicht bestanden, Fehler steht drin" gleich "$(js
 
 skript SICHERUNG_JETZT="2026-12-02 12:00:00" SICHERUNG_PROBE_MAX_S=1 --probe rlnexus_2026-12-02_033000.sql.gz >/dev/null 2>&1 || true
 pruefe "Probe über der Höchstdauer: nicht bestanden" gleich "$(json 's.probe.ok + "/" + /länger als 1 s/.test(s.probe.error)')" "false/true"
-pruefe "Nach allen Proben: kein Ordner in /var/tmp, nur ein mariadbd" bash -c "! docker exec $name sh -c 'ls /var/tmp | grep -q rlnexus-probe' && [ \"\$(docker exec $name pgrep -c mariadbd)\" = 1 ]"
+pruefe "Nach allen Proben: kein Ordner in /var/tmp, nur ein mariadbd" bash -c "! docker exec $name sh -c 'ls /var/tmp | grep -q rlnexus-probe' && [ $(lebende_mariadbd) = 1 ]"
 
 skript SICHERUNG_JETZT="2026-12-03 03:30:00" >/dev/null 2>&1 || true
 pruefe "Nach nicht bestandener Probe: nächste Nacht probt wieder" gleich "$(json 's.probe.ok + "/" + s.probe.file')" "true/rlnexus_2026-12-03_033000.sql.gz"
+
+echo
+echo "  Frist, Namen und Ausnahmen"
+
+for alt in 2026-03-05_033007 2026-03-06_033007; do
+    im sh -c "echo alt | gzip > $ordner/rlnexus_$alt.sql.gz && echo x > $ordner/rlnexus_$alt.sql.gz.sha256"
+done
+skript SICHERUNG_JETZT="2026-04-04 03:30:00" --vor-deploy >/dev/null 2>&1 || true
+pruefe "Frist nach Kalendertag: am 30. Tag weg, auch über die Zeitumstellung im März" bash -c "! docker exec $name test -e $ordner/rlnexus_2026-03-05_033007.sql.gz && docker exec $name test -f $ordner/rlnexus_2026-03-06_033007.sql.gz"
+
+im sh -c "echo alt | gzip > $ordner/rlnexus_2026-02-30_033007.sql.gz && echo x > $ordner/rlnexus_2026-02-30_033007.sql.gz.sha256"
+set +e
+skript SICHERUNG_JETZT="2026-12-04 09:00:00" --vor-deploy >/dev/null 2>&1
+ende=$?
+set -e
+pruefe "Name mit unmöglichem Datum stört die Sicherung nicht" bash -c "[ $ende = 0 ] && docker exec $name test -f $ordner/rlnexus_2026-12-04_090000_vor-deploy.sql.gz"
+
+# Ein Ordner, wo eine Prüfsumme liegen müsste: Das Aufräumen scheitert in einer Funktion.
+im mkdir "$ordner/rlnexus_2026-12-04_095959.sql.gz.sha256"
+set +e
+skript SICHERUNG_JETZT="2026-12-04 10:00:00" --vor-deploy >/dev/null 2>&1
+ende=$?
+set -e
+im rmdir "$ordner/rlnexus_2026-12-04_095959.sql.gz.sha256"
+pruefe "Unerwarteter Fehler in einer Funktion: Exit 1 und Eintrag in status.json" bash -c "[ $ende = 1 ] && [ \"\$(docker exec $name cat $ordner/status.json | node -e \"const r=JSON.parse(require('fs').readFileSync(0,'utf8')).runs[0]; process.stdout.write(String(r.ok === false && /Unerwarteter Fehler/.test(r.error)))\")\" = true ]"
+
+skript SICHERUNG_JETZT="2026-12-04 11:00:00" MYSQL_HOST=127.0.0.1 --probe rlnexus_2026-12-03_033000.sql.gz >/dev/null 2>&1 || true
+pruefe "Probe mit MYSQL_HOST in der Umgebung bleibt in der eigenen Instanz" gleich "$(angelegt)/$(json 's.probe.ok')" "$echt_vorher/true"
 
 echo
 if [ "$fehler" -eq 0 ]; then
