@@ -151,3 +151,81 @@ export async function currentRun(): Promise<IMessageRun | null> {
         pauseReason: row.pause_reason,
     };
 }
+
+/* --- Verlauf (Task 5) ------------------------------------------------------ */
+
+export interface IMessageRecord {
+    readonly id: number;
+    readonly templateName: string;
+    readonly content: IMessageContent;
+    readonly audience: MessageAudienceKind;
+    readonly targetUserId: string | null;
+    readonly state: MessageState;
+    readonly pauseReason: string | null;
+    readonly total: number;
+    readonly sent: number;
+    readonly failed: number;
+    readonly skipped: number;
+    readonly createdName: string;
+    readonly createdAt: Date;
+    readonly finishedAt: Date | null;
+}
+
+interface IRecordRow {
+    readonly id: number;
+    readonly template_name: string;
+    readonly content: unknown;
+    readonly audience: MessageAudienceKind;
+    readonly target_user_id: string | null;
+    readonly state: MessageState;
+    readonly pause_reason: string | null;
+    readonly total: number;
+    readonly sent: number;
+    readonly failed: number;
+    readonly skipped: number;
+    readonly created_name: string;
+    readonly created_at: Date;
+    readonly finished_at: Date | null;
+}
+
+const RECORD = "SELECT id, template_name, content, audience, target_user_id, state, pause_reason, total, sent, failed, skipped, created_name, created_at, finished_at FROM bot_messages";
+
+function record(row: IRecordRow): IMessageRecord {
+    return {
+        id: Number(row.id),
+        templateName: row.template_name,
+        content: contentOf(row.content),
+        audience: row.audience,
+        targetUserId: row.target_user_id,
+        state: row.state,
+        pauseReason: row.pause_reason,
+        total: Number(row.total),
+        sent: Number(row.sent),
+        failed: Number(row.failed),
+        skipped: Number(row.skipped),
+        createdName: row.created_name,
+        createdAt: new Date(row.created_at),
+        finishedAt: row.finished_at === null ? null : new Date(row.finished_at),
+    };
+}
+
+/** Die neuesten Nachrichten, an alle und an eine Person. */
+export async function listMessages(limit = 50): Promise<IMessageRecord[]> {
+    return (await query<IRecordRow[]>(`${RECORD} ORDER BY id DESC LIMIT ?`, [limit])).map(record);
+}
+
+export async function messageOf(id: number): Promise<IMessageRecord | null> {
+    const [row] = await query<IRecordRow[]>(`${RECORD} WHERE id = ?`, [id]);
+
+    return row ? record(row) : null;
+}
+
+/** Wer die Nachricht nicht bekam, mit Grund. Höchstens limit Zeilen. */
+export async function missesOf(id: number, limit = 1000): Promise<{ readonly userId: string; readonly reason: string }[]> {
+    const rows = await query<{ user_id: string; state: string; reason: string | null }[]>(
+        "SELECT user_id, state, reason FROM bot_message_recipients WHERE message_id = ? AND state IN ('failed', 'skipped') ORDER BY done_at, user_id LIMIT ?",
+        [id, limit]
+    );
+
+    return rows.map((row) => ({ userId: row.user_id, reason: row.reason ?? (row.state === "skipped" ? "ausgelassen" : "nicht erreicht") }));
+}

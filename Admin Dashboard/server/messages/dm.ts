@@ -313,10 +313,10 @@ export async function sendMessageDm(config: IConfig, userId: string, content: IM
     }
 }
 
-/** Die Vorschau: genau das Bild, das ankommt, mit Name und Bild der ansehenden Person. */
-export async function previewMessage(config: IConfig, viewer: { readonly id: string; readonly name: string }, content: IMessageContent, at = new Date()): Promise<Buffer> {
+/** Die Vorschau: genau das Bild, das ankommt, mit Name und Bild der ansehenden Person. Im Verlauf mit Datum und Absender von damals. */
+export async function previewMessage(config: IConfig, viewer: { readonly id: string; readonly name: string }, content: IMessageContent, at = new Date(), sender = viewer.name): Promise<Buffer> {
     const person = await personBase(config, viewer.id, viewer.name);
-    const image = await renderMessageDm(fillContent(content, { name: person.name, date: at }), { person, at, sender: viewer.name });
+    const image = await renderMessageDm(fillContent(content, { name: person.name, date: at }), { person, at, sender });
 
     return image.data;
 }

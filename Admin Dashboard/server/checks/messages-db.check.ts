@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { checkMessage, fillContent, type IMessageContent } from "../../shared/messages.ts";
+import { checkMessage, fillContent, type IMessageAudience, type IMessageContent, type IMessageDetail, type IMessageEntry, type IMessagePerson, type IMessageTemplate } from "../../shared/messages.ts";
 import type { IConfig } from "../config.ts";
 import { query } from "../db.ts";
 import { messageRound, recoverSending, type Sender } from "../messages/clock.ts";
@@ -7,11 +7,12 @@ import { renderMessageDm, type FailureKind, type ISendFailure } from "../message
 import { audienceView, cancelMessage, messageAudience, pauseMessage, personState, resumeMessage, sendOne, startAll } from "../messages/flow.ts";
 import { deleteTemplate, forgetOldMessages, listTemplates, saveTemplate } from "../messages/store.ts";
 import { planDeletion } from "../userdata/deletions.ts";
+import { SESSION_COOKIE, seal } from "../session.ts";
 import { executeDeletion } from "../userdata/erase.ts";
 import { forgetIndex } from "../userdata/find.ts";
 import type { IHttp } from "./backups-db.check.ts";
 import { USERS, fake } from "./fakes.ts";
-import { check, section } from "./harness.ts";
+import { SECRET, check, section } from "./harness.ts";
 
 /**
  * Nachrichten über den Bot (W-0058) gegen die echte Datenbank, aus
@@ -116,7 +117,11 @@ const recipients = async (id: number): Promise<number> => Number((await query<{ 
 export async function checkMessagesDb(config: IConfig, http: IHttp): Promise<void> {
     section("Nachrichten über den Bot (Datenbank)");
 
-    void http;
+    const { get, write, raw } = http;
+    const developerCookie = `${SESSION_COOKIE}=${seal({ id: USERS.developer, name: "nutzer2", avatar: null, exp: Math.floor(Date.now() / 1000) + 600 }, SECRET)}`;
+    const dev = (method: "GET" | "POST" | "PUT" | "DELETE", url: string, payload?: unknown) => raw(method, url, { cookie: developerCookie, origin: config.publicUrl }, payload);
+    /** Kopf und Bytes der Antwort, für Bilder. */
+    const binary = (response: unknown) => response as { statusCode: number; headers: Record<string, string | undefined>; rawPayload: Buffer };
 
     try {
         await tidyMessages();
@@ -436,6 +441,116 @@ export async function checkMessagesDb(config: IConfig, http: IHttp): Promise<voi
 
             const [failed] = await query<{ state: string; failed: number }[]>("SELECT state, failed FROM bot_messages WHERE target_user_id = ? ORDER BY id DESC LIMIT 1", [P.cancelled]);
             assert.deepEqual([failed?.state, failed?.failed], ["done", 1]);
+        });
+
+        /* --- Routen (Task 5) ----------------------------------------------- */
+
+        let routed = 0;
+
+        await check("Routen: an alle, Anhalten, Weiter, Abbrechen nur für Developer, Admin bekommt 403; ohne SENDEN 400", async () => {
+            const payload = { template: "check:db Route", content: CONTENT, confirm: "SENDEN" };
+
+            for (const url of ["/api/messages/all", "/api/messages/1/pause", "/api/messages/1/resume", "/api/messages/1/cancel"]) {
+                assert.equal((await write("POST", url, payload)).statusCode, 403, url);
+            }
+            assert.equal((await audienceView(config)).running, null, "als Admin ist nichts gestartet");
+
+            assert.equal((await dev("POST", "/api/messages/all", { ...payload, confirm: "senden" })).statusCode, 400);
+            assert.equal((await dev("POST", "/api/messages/all", { ...payload, content: { ...CONTENT, title: "Hallo {nmae}" } })).statusCode, 400);
+
+            const started = await dev("POST", "/api/messages/all", payload);
+            assert.equal(started.statusCode, 200, started.body);
+            routed = (started.json() as { id: number }).id;
+
+            assert.equal((await dev("POST", "/api/messages/all", payload)).statusCode, 409);
+            assert.equal((await dev("POST", `/api/messages/${routed}/resume`)).statusCode, 409);
+            assert.equal((await dev("POST", `/api/messages/${routed}/pause`)).statusCode, 204);
+            assert.equal((await dev("POST", `/api/messages/${routed}/pause`)).statusCode, 409);
+            assert.equal((await dev("POST", `/api/messages/${routed}/resume`)).statusCode, 204);
+            assert.equal((await dev("POST", `/api/messages/${routed}/cancel`)).statusCode, 204);
+            assert.equal((await dev("POST", `/api/messages/${routed}/cancel`)).statusCode, 409);
+            assert.equal((await dev("POST", "/api/messages/999999999/cancel")).statusCode, 404);
+        });
+
+        await check("Vorschau: PNG ohne Zwischenspeicher, ein falscher Platzhalter gibt 400 mit dem Satz", async () => {
+            const preview = binary(await write("POST", "/api/messages/preview", { content: CONTENT }));
+
+            assert.equal(preview.statusCode, 200);
+            assert.match(preview.headers["content-type"] ?? "", /^image\/png/);
+            assert.equal(preview.headers["cache-control"], "no-store");
+            assert.equal(preview.rawPayload.subarray(1, 4).toString("ascii"), "PNG");
+
+            const bad = await write("POST", "/api/messages/preview", { content: { ...CONTENT, title: "Hallo {nmae}" } });
+            assert.deepEqual([bad.statusCode, (bad.json() as { error: string }).error], [400, "{nmae} gibt es nicht. Erlaubt: {name}, {datum}."]);
+        });
+
+        await check("Zahlen für „An alle“: dieselben wie messageAudience, Server-ID dabei", async () => {
+            const view = (await get("/api/messages/audience")).json() as IMessageAudience;
+            const now = await messageAudience();
+
+            assert.deepEqual([view.people, view.banned, view.recipients, view.running, view.guildId], [now.ids.length, now.banned.size, now.ids.length - now.banned.size, null, config.guildId]);
+        });
+
+        await check("Vorlagen über die Routen: anlegen, ändern, löschen, jedes Mal im Protokoll", async () => {
+            const created = await write("POST", "/api/messages/templates", { name: "check:db Route", audience: "one", content: CONTENT });
+            assert.equal(created.statusCode, 200, created.body);
+
+            const id = (created.json() as IMessageTemplate).id;
+            assert.equal((await write("POST", "/api/messages/templates", { name: "check:db Kaputt", audience: "one", content: { ...CONTENT, title: "Neu 🎉" } })).statusCode, 400);
+            assert.equal((await write("POST", "/api/messages/templates", { name: "Wartung", audience: "one", content: CONTENT })).statusCode, 409);
+            assert.equal((await write("PUT", `/api/messages/templates/${id}`, { name: "check:db Route 2", audience: "all", content: { ...CONTENT, color: "rot" } })).statusCode, 200);
+
+            const changed = ((await get("/api/messages/templates")).json() as IMessageTemplate[]).find((template) => template.id === id);
+            assert.deepEqual([changed?.name, changed?.audience, changed?.content.color], ["check:db Route 2", "all", "rot"]);
+
+            assert.equal((await write("DELETE", `/api/messages/templates/${id}`)).statusCode, 204);
+            assert.equal((await write("DELETE", `/api/messages/templates/${id}`)).statusCode, 404);
+            assert.equal(await audited("messages.template", "%check:db Route%"), 3);
+        });
+
+        await check("An eine Person über die Route; Person nachschlagen mit Name, Bild und Zustand", async () => {
+            const sent = await write("POST", "/api/messages/one", { userId: P.data, template: "check:db Route eine", content: CONTENT });
+            assert.deepEqual([sent.statusCode, sent.json()], [200, { sent: true, reason: null }]);
+
+            const refused = await write("POST", "/api/messages/one", { userId: P.banned, template: "", content: CONTENT });
+            assert.deepEqual([refused.statusCode, (refused.json() as { error: string }).error], [409, "Gesperrt. RL Nexus schickt dieser Person keine Nachrichten."]);
+            assert.equal((await write("POST", "/api/messages/one", { userId: "123", template: "", content: CONTENT })).statusCode, 400);
+
+            assert.deepEqual((await get(`/api/messages/person/${P.data}`)).json() as IMessagePerson, { id: P.data, name: "nutzer1", avatar: null, state: "ok" });
+            assert.equal(((await get(`/api/messages/person/${P.banned}`)).json() as IMessagePerson).state, "banned");
+            assert.equal(((await get(`/api/messages/person/${P.audit}`)).json() as IMessagePerson).state, "nodata");
+        });
+
+        await check("Verlauf: neueste 50 mit Zahlen, eine Nachricht mit den nicht Erreichten und Grund, ihr Bild", async () => {
+            const list = (await get("/api/messages")).json() as IMessageEntry[];
+            const entry = list.find((item) => item.id === routed);
+
+            assert.ok(list.length <= 50);
+            assert.deepEqual([entry?.templateName, entry?.title, entry?.audience, entry?.state, entry?.createdName, entry?.target], ["check:db Route", "check:db Titel", "all", "cancelled", "nutzer2", null]);
+            assert.equal(entry?.total, entry ? entry.sent + entry.failed + entry.skipped : -1);
+
+            const one = list.find((item) => item.templateName === "check:db Route eine");
+            assert.deepEqual([one?.audience, one?.target?.id, one?.sent, one?.state], ["one", P.data, 1, "done"]);
+
+            const detail = (await get(`/api/messages/${routed}`)).json() as IMessageDetail;
+            assert.ok(detail.misses.some((miss) => miss.id === P.banned && miss.reason === "gesperrt"), JSON.stringify(detail.misses.slice(0, 3)));
+            assert.ok(detail.misses.some((miss) => miss.reason === "abgebrochen"));
+            assert.equal(detail.misses.length, detail.failed + detail.skipped);
+
+            const image = binary(await get(`/api/messages/${routed}/bild`));
+            assert.deepEqual([image.statusCode, image.headers["cache-control"], image.rawPayload.subarray(1, 4).toString("ascii")], [200, "no-store", "PNG"]);
+            assert.equal((await get("/api/messages/999999999")).statusCode, 404);
+        });
+
+        await check("Test an mich: geht an die eigene ID, kein Eintrag im Verlauf, aber im Protokoll", async () => {
+            const before = fake.dms.length;
+            const [{ n: messages }] = await query<{ n: number }[]>("SELECT COUNT(*) AS n FROM bot_messages");
+            const test = await write("POST", "/api/messages/test", { content: CONTENT });
+
+            assert.deepEqual([test.statusCode, test.json()], [200, { sent: true, reason: null }]);
+            assert.deepEqual(fake.dms.slice(before).map((dm) => dm.userId), [USERS.admin]);
+            assert.equal(Number((await query<{ n: number }[]>("SELECT COUNT(*) AS n FROM bot_messages"))[0]?.n), Number(messages));
+            assert.equal(Number((await query<{ n: number }[]>("SELECT COUNT(*) AS n FROM admin_audit WHERE action = 'messages.test' AND target = ? AND detail LIKE '%check:db%'", [USERS.admin]))[0]?.n), 1);
         });
     } finally {
         await tidyMessages();
