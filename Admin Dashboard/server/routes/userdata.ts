@@ -26,12 +26,11 @@ import {
 import { accessOf } from "../access.ts";
 import { audit } from "../audit.ts";
 import { botOverview } from "../bot.ts";
-import type { IUserRef } from "../../shared/api.ts";
 import type { IConfig } from "../config.ts";
 import { DatabaseUnavailable, databaseReady, query, withTransaction } from "../db.ts";
 import { publish } from "../events.ts";
 import { PublicError } from "../errors.ts";
-import { knownName, lookupUser, userRefs } from "../users.ts";
+import { fillNames, knownName, knownRefs, lookupUser } from "../users.ts";
 import { cancelDeletion, deletionCounts, deletionOf, latestDeletionOf, listDeletions, openDeletionOf, planDeletion, publicDeletion } from "../userdata/deletions.ts";
 import { renderDeletionImage, sendDeletionDm } from "../userdata/dm.ts";
 import { personExport, personIndex, personRows, userdataRules } from "../userdata/find.ts";
@@ -90,8 +89,10 @@ export async function userdataRoutes(app: FastifyInstance, { config }: { config:
             .sort((a, b) => Number(Boolean(b.deletion)) - Number(Boolean(a.deletion)) || (a.deletion?.dueAt ?? "").localeCompare(b.deletion?.dueAt ?? "") || order(a, b) || a.id.localeCompare(b.id));
         const shown = filter === "shop" ? people.filter((person) => person.shop) : filter === "laeuft" ? people.filter((person) => person.deletion) : people;
         const visible = shown.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-        // Name und Bild nur für die sichtbare Seite: höchstens 50 Abfragen, eine Stunde gemerkt.
-        const refs = visible.length > 0 ? await userRefs(config, visible.map((person) => person.id)) : new Map<string, IUserRef>();
+        // Name und Bild nur für die sichtbare Seite. W-0065: ohne auf Discord zu warten; was fehlt, kommt im Hintergrund.
+        const ids = visible.map((person) => person.id);
+        const refs = await knownRefs(ids);
+        const namesPending = fillNames(config, ids.filter((id) => !refs.has(id)));
 
         return {
             people: visible.map((person) => ({ ...person, name: person.name ?? refs.get(person.id)?.name ?? null, avatar: refs.get(person.id)?.avatar ?? null })),
@@ -100,6 +101,7 @@ export async function userdataRoutes(app: FastifyInstance, { config }: { config:
             totals: { rows: people.reduce((sum, person) => sum + person.rows, 0), halted: [...open.values()].filter((entry) => entry.state === "angehalten").length },
             page,
             pageSize: PAGE_SIZE,
+            namesPending,
         };
     });
 

@@ -17,7 +17,7 @@ export interface ICacheArea {
 }
 
 export const CACHE_AREAS = {
-    discordUser: { id: "discord-namen", label: "Discord-Namen", prefix: "discord:user:v1:", ttl: 3_600, source: "Discord-API, /users/:id", cleared: "bei einer Löschung von Nutzerdaten" },
+    discordUser: { id: "discord-namen", label: "Discord-Namen", prefix: "discord:user:v1:", ttl: 86_400, source: "Discord-API, /users/:id", cleared: "bei einer Löschung von Nutzerdaten" },
     userdataIndex: { id: "nutzerliste", label: "Nutzerliste", prefix: "userdata:index:v1", ttl: 300, source: "MariaDB, alle Quellen der Nutzerdaten", cleared: "nach jeder Löschung" },
 } as const satisfies Readonly<Record<string, ICacheArea>>;
 

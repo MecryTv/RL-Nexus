@@ -32,6 +32,7 @@ import { DeletionActions, Due, StateBadge, Steps } from "./DeletionParts";
 import { PlanDialog } from "./PlanDialog";
 import { isOpen, remaining, when } from "./plan.ts";
 import { InvitedServers } from "../servers/InvitedServers";
+import { useNameRefill } from "./useNameRefill.ts";
 import styles from "./userdata.module.scss";
 
 const FILTER_LABELS: Readonly<Record<UserdataFilter, string>> = { alle: "Alle", laeuft: "Löschung läuft", shop: "Shop-Kunden" };
@@ -362,6 +363,8 @@ export function UserdataPage(): JSX.Element {
     const data = list.data;
 
     useLive("userdata", list.reload);
+
+    useNameRefill(data?.namesPending ?? 0, list.reload, `${page}|${filter}|${sort}|${wanted}`, data);
 
     const pages = data ? Math.max(1, Math.ceil(data.total / data.pageSize)) : 1;
 

@@ -218,6 +218,25 @@ export async function closeCache(): Promise<void> {
     await close?.().catch(() => undefined);
 }
 
+/** Nur nachsehen, ohne Quelle (W-0065): undefined, wenn nichts da ist oder Redis fehlt. */
+export async function peek<T>(key: string): Promise<T | undefined> {
+    if (!usable()) return undefined;
+
+    try {
+        const hit = await waited(client!.get(CACHE_PREFIX + key));
+        if (hit === null) return undefined;
+
+        // Nur Treffer: Fehltreffer zählt erst cached(), wenn wirklich aus der Quelle geladen wird.
+        count(key, "hits");
+
+        return JSON.parse(hit) as T;
+    } catch {
+        count(key, "failures");
+
+        return undefined;
+    }
+}
+
 /**
  * Aus Redis, sonst load() und für seconds Sekunden merken. undefined wird nie
  * gemerkt, null schon (etwa „Discord kennt die ID nicht“). Wirft load(), wird

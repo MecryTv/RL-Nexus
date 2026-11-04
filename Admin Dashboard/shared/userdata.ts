@@ -470,6 +470,8 @@ export interface IUserdataList {
     readonly pageSize: number;
     /** Für die Zahlen oben: alle Einträge und angehaltene Löschungen. */
     readonly totals: { readonly rows: number; readonly halted: number };
+    /** W-0065: So viele Namen der Seite holt der Server gerade im Hintergrund bei Discord. Größer 0: gleich noch einmal fragen. */
+    readonly namesPending: number;
 }
 
 export interface IUserdataRow {
