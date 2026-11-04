@@ -99,6 +99,8 @@ export interface IConfig {
     /** Der gebaute dist-Ordner der Webseite, eingehängt. Gesetzt: Standardinhalt kommt von dort statt per HTTP. */
     readonly websiteDist: string | null;
     readonly logsDir: string;
+    /** W-0067: Ordner der nächtlichen Sicherungen, nur lesen. null: auf diesem Server nicht eingerichtet. */
+    readonly dumpsDir: string | null;
     readonly siteDir: string;
     readonly flagsDir: string;
     readonly port: number;
@@ -261,6 +263,7 @@ export function loadConfig(env: Env = process.env, argv: readonly string[] = pro
         websiteUrl: address("WEBSITE_URL", "http://localhost:5173"),
         websiteDist: raw("WEBSITE_DIST") || null,
         logsDir: raw("LOGS_DIR") || "../Discord Bot/logs",
+        dumpsDir: raw("DB_DUMPS_DIR") || null,
         siteDir: raw("SITE_DIR") || "./data/site",
         flagsDir: raw("FLAGS_DIR") || "./data/flags",
         port,
