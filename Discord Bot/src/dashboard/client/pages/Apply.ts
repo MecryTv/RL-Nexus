@@ -328,7 +328,9 @@ export async function renderApplyPage(): Promise<void> {
             el("div", "apsheet__head", el("h2", "", `${form.emoji ? `${form.emoji} ` : ""}${form.name}`), ...(form.description ? [el("p", "", form.description)] : [])),
             ...(data.me ? [] : [el("div", "notice", icon("#i-warn"), el("span", "", "Zum Abschicken meldest du dich mit Discord an – der Server muss wissen, wer sich bewirbt."))]),
             ...(data.me && !data.me.member ? [el("div", "notice", icon("#i-warn"), el("span", "", "Du bist auf diesem Server noch kein Mitglied. Tritt ihm erst bei."))] : []),
-            box
+            box,
+            // W-0048: fest auf jeder öffentlichen Bewerbung, egal was der Server fragt.
+            el("p", "apsafe", "RL Nexus fragt nie nach deinem Passwort, einem Token, einem Zwei-Faktor-Code oder Zahlungsdaten. Wer danach fragt, will dich betrügen.")
         );
     }
 
