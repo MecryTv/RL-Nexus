@@ -204,6 +204,21 @@ function checkForm(client: BotClient): IApplyForm {
     refuses("Ohne Namen geht es nicht", () => service.CleanForm(guild, { name: "   ", questions: clean.questions }));
     refuses("Ohne Fragen auch nicht", () => service.CleanForm(guild, { name: "Cutter", questions: [] }));
 
+    // W-0048: Auf unserer Domain fragt kein Formular nach Zugangsdaten. Sonst stuft Google die Seite als Phishing ein.
+    const sensitive: [string, unknown][] = [
+        ["Passwort in einer Frage", { name: "Team", questions: [{ label: "Wie lautet dein Discord-Passwort?", kind: "short" }] }],
+        ["Token im Hinweis", { name: "Team", questions: [{ label: "Dein Name", hint: "Kopiere deinen Token hier hinein", kind: "short" }] }],
+        ["Zwei-Faktor-Code", { name: "Team", questions: [{ label: "Dein 2FA-Code", kind: "short" }] }],
+        ["Kreditkarte in der Beschreibung", { name: "Team", description: "Bitte gib deine Kreditkarte an", questions: clean.questions }],
+        ["Passwort im Namen", { name: "Passwort-Abfrage", questions: clean.questions }],
+        ["Password in einer Auswahl", { name: "Team", questions: [{ label: "Login", kind: "choice", choices: ["E-Mail und Password"] }] }],
+    ];
+    for (const [what, form] of sensitive) refuses(`Kein Formular fragt nach Zugangsdaten: ${what}`, () => service.CleanForm(guild, form));
+    check(
+        "Normale Fragen gehen weiter",
+        service.CleanForm(guild, { name: "Team", questions: [{ label: "Wie lange spielst du schon Rocket League?", kind: "short" }] }).questions.length === 1
+    );
+
     const many = service.CleanForm(guild, {
         name: "Viele",
         questions: Array.from({ length: MAX_QUESTIONS + 10 }, (_, index) => ({ id: `f${index}`, label: `Frage ${index}`, kind: "short" })),

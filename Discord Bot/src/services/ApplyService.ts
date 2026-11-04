@@ -89,6 +89,13 @@ function Text(value: unknown, max: number, fallback = ""): string {
 
 const DAY = 86_400_000;
 
+/**
+ * W-0048: Fragen nach Zugangs- oder Zahlungsdaten. Die Formulare stehen
+ * öffentlich auf unserer Domain (/bewerben/<server>). So etwas darauf stuft
+ * Google Safe Browsing als Phishing ein und warnt dann vor allen Seiten.
+ */
+const SENSITIVE = /pass(wort|word)|kennwort|\btoken\b|\b2fa\b|zwei-?faktor|two-?factor|authenticator|backup-?codes?|wiederherstellungs-?code|recovery-?code|kreditkarte|credit ?card|\biban\b|\bcv[cv]\b|seed ?phrase/i;
+
 /** Was Bewerber und Prüfer im eigenen Kanal dürfen - dieselben Rechte wie im Ticket (TicketService). */
 const MEMBER_ALLOW: PermissionsString[] = ["ViewChannel", "SendMessages", "ReadMessageHistory", "AttachFiles", "EmbedLinks"];
 const BOT_ALLOW: PermissionsString[] = [...MEMBER_ALLOW, "ManageChannels", "ManageMessages"];
@@ -250,9 +257,16 @@ export default class ApplyService {
 
         if (!questions.length) throw new ApplyError("Ohne Fragen gibt es nichts auszufüllen.");
 
+        const description = Text(raw.description, MAX_DESCRIPTION, base.description);
+        const texts = [name, description, ...questions.flatMap((question) => [question.label, question.hint, ...question.choices])];
+
+        if (texts.some((text) => SENSITIVE.test(text))) {
+            throw new ApplyError("Formulare dürfen nicht nach Passwort, Token, Zwei-Faktor-Code oder Zahlungsdaten fragen. Solche Seiten stuft Google als Phishing ein und warnt dann vor ganz RL Nexus.");
+        }
+
         return {
             name,
-            description: Text(raw.description, MAX_DESCRIPTION, base.description),
+            description,
             emoji: typeof raw.emoji === "string" && raw.emoji.trim() ? raw.emoji.trim().slice(0, 64) : raw.emoji === null ? null : base.emoji,
             open: typeof raw.open === "boolean" ? raw.open : base.open,
             questions,
