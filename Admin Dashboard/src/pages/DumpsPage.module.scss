@@ -1,0 +1,173 @@
+@use "mixins" as *;
+
+/* Dev → Datenbank, Reiter Sicherungen (W-0067, Entwurf S-A). Rahmen, Tabelle und Kennzahlen kommen aus DatabasePage.module.scss. */
+
+.nights {
+    margin: calc(-1 * var(--s-2)) 0 var(--s-4);
+}
+
+.row {
+    display: grid;
+    grid-template-columns: repeat(30, minmax(0, 1fr));
+    gap: 3px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.night {
+    display: block;
+    height: 22px;
+    border-radius: 3px;
+    background: var(--c-panel-fill);
+    box-shadow: inset 0 0 0 1px var(--c-line);
+
+    &:focus-visible {
+        @include focus-ring;
+    }
+}
+
+a.night:hover {
+    filter: brightness(1.25);
+}
+
+.ok {
+    background: color-mix(in srgb, var(--c-win) 55%, transparent);
+    box-shadow: none;
+}
+
+.probe {
+    background: var(--c-win);
+    box-shadow: inset 0 0 0 2px var(--c-panel-solid);
+}
+
+.bad {
+    background: var(--c-loss);
+    box-shadow: none;
+}
+
+.ends {
+    display: flex;
+    justify-content: space-between;
+    margin: 3px 0 0;
+    color: var(--c-text-faint);
+    font-size: 0.75rem;
+}
+
+.none {
+    margin: 0;
+    padding: var(--s-3);
+    color: var(--c-text-dim);
+}
+
+.steps {
+    margin: 0;
+    padding: var(--s-3) var(--s-3) var(--s-2) calc(var(--s-3) + 1.1rem);
+    color: var(--c-text-dim);
+    font-size: 0.875rem;
+
+    li + li {
+        margin-top: var(--s-1);
+    }
+
+    b {
+        color: var(--c-text);
+    }
+
+    code {
+        overflow-wrap: anywhere;
+    }
+}
+
+.footnote {
+    margin: 0;
+    padding: 0 var(--s-3) var(--s-3);
+    color: var(--c-text-faint);
+    font-size: 0.8rem;
+}
+
+.note {
+    display: grid;
+    gap: var(--s-1);
+    margin-bottom: var(--s-4);
+    padding: var(--s-3);
+    border: 1px solid var(--c-line);
+
+    b {
+        font: 800 0.95rem var(--f-display);
+    }
+
+    code {
+        overflow-wrap: anywhere;
+    }
+
+    p {
+        margin: 0;
+        color: var(--c-text-dim);
+        font-size: 0.875rem;
+    }
+}
+
+.alert {
+    border-color: color-mix(in srgb, var(--c-loss) 55%, transparent);
+    background: color-mix(in srgb, var(--c-loss) 8%, transparent);
+
+    b {
+        color: var(--c-loss);
+    }
+}
+
+.caution {
+    border-color: color-mix(in srgb, var(--c-mod-engagement) 50%, transparent);
+    background: color-mix(in srgb, var(--c-mod-engagement) 7%, transparent);
+
+    b {
+        color: var(--c-mod-engagement);
+    }
+}
+
+.file {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: var(--s-2);
+    padding: var(--s-2) var(--s-3);
+    border: 1px solid var(--c-line);
+    background: var(--c-panel-fill);
+
+    code {
+        overflow-wrap: anywhere;
+    }
+
+    span {
+        color: var(--c-text-dim);
+    }
+}
+
+.agree {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--s-2);
+    margin-top: var(--s-3);
+    cursor: pointer;
+
+    @include touch-target;
+
+    input {
+        width: 18px;
+        height: 18px;
+        margin-top: 2px;
+        flex-shrink: 0;
+        accent-color: var(--c-red);
+    }
+}
+
+@include below(599px) {
+    .row {
+        gap: 2px;
+    }
+
+    .night {
+        height: 18px;
+    }
+}
