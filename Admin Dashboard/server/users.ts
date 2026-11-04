@@ -1,6 +1,6 @@
 import type { IUserRef } from "../shared/api.ts";
 import { CACHE_AREAS } from "./cache-areas.ts";
-import { cached, forget } from "./cache.ts";
+import { cached, forget, peek } from "./cache.ts";
 import type { IConfig } from "./config.ts";
 import { avatarUrl, bannerUrl, displayName, fetchUser } from "./discord.ts";
 
@@ -49,6 +49,77 @@ export function forgetUser(userId: string): void {
 /** Dev → Datenbank → Redis, Bereich leeren: auch der Speicher im Prozess, sonst träfe er noch bis zu einer Stunde. */
 export function forgetAllUsers(): void {
     known.clear();
+    failed.clear();
+}
+
+/*
+ * W-0065: Die Liste der Nutzerdaten wartet nicht auf Discord. Für 50 Personen
+ * ohne Cache waren das bis zu 15 Sekunden, weil das Token sein Limit mit dem
+ * Bot teilt. Sie nimmt, was bekannt ist, und der Rest kommt im Hintergrund.
+ */
+
+/** Ein Fehler (Discord weg, zu viele Anfragen) wird so lange gemerkt, damit nicht jedes Laden neu fragt. */
+const FAILED_TTL = 10 * 60_000;
+/** Im Hintergrund höchstens so viele gleichzeitig. */
+const FILL_PARALLEL = 2;
+const failed = new Map<string, number>();
+const waiting = new Set<string>();
+let filling: Promise<void> | null = null;
+
+/** Was ohne Discord bekannt ist: Speicher im Prozess, sonst Redis. Unbekannte IDs fehlen in der Map. */
+export async function knownRefs(ids: readonly string[], now = Date.now()): Promise<Map<string, IUserRef | null>> {
+    const found = new Map<string, IUserRef | null>();
+
+    await Promise.all(
+        [...new Set(ids)].map(async (id) => {
+            const local = known.get(id);
+            if (local && now - local.at < TTL) return void found.set(id, local.value);
+
+            const stored = await peek<IUserRef | null>(CACHE_AREAS.discordUser.prefix + id);
+            if (stored === undefined) return;
+
+            known.set(id, { value: stored, at: now });
+            found.set(id, stored);
+        })
+    );
+
+    return found;
+}
+
+/** Fehlende Namen im Hintergrund nachschlagen. Gibt zurück, wie viele davon noch ausstehen. */
+export function fillNames(config: IConfig, ids: readonly string[], now = Date.now()): number {
+    const wanted = ids.filter((id) => {
+        const at = failed.get(id);
+
+        return at === undefined || now - at >= FAILED_TTL;
+    });
+
+    for (const id of wanted) waiting.add(id);
+    if (waiting.size > 0) filling ??= drain(config).finally(() => (filling = null));
+
+    return wanted.length;
+}
+
+async function drain(config: IConfig): Promise<void> {
+    while (waiting.size > 0) {
+        await Promise.all(
+            [...waiting].slice(0, FILL_PARALLEL).map(async (id) => {
+                try {
+                    await lookupUser(config, id);
+                    failed.delete(id);
+                } catch {
+                    failed.set(id, Date.now());
+                } finally {
+                    waiting.delete(id);
+                }
+            })
+        );
+    }
+}
+
+/** Für die Checks: warten, bis der Hintergrund fertig ist. */
+export function namesFilled(): Promise<void> {
+    return filling ?? Promise.resolve();
 }
 
 /** Der Name aus dem Speicher, ohne Discord zu fragen. Für die Suche (W-0059), die nicht warten darf. */

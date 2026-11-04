@@ -26,7 +26,7 @@ import { purgeQuarantine, quarantineTable } from "./userdata/backups.ts";
 import { packBackup, unpackBackup } from "./backups/data.ts";
 import { backupDatabaseName, ensureBackupDatabase } from "./backups/store.ts";
 import { signToken } from "./bot.ts";
-import { forgetUser } from "./users.ts";
+import { forgetAllUsers, forgetUser, namesFilled } from "./users.ts";
 import { deletionRound } from "./userdata/clock.ts";
 import type { ICancelReceipt, ICheckoutStart, ICustomerDetail, ICustomerList, IShopProduct, IShopProductList, IShopSettingsView, IShopState, IUnlockProgress } from "../shared/shop.ts";
 import type { IIncidentList, IPublicStatus, IStatusDetail } from "../shared/status.ts";
@@ -907,6 +907,17 @@ try {
             assert.ok(list.totals.rows >= list.people.reduce((sum, person) => sum + person.rows, 0));
             assert.equal(typeof list.totals.halted, "number");
             assert.equal(list.people.find((person) => person.id === PERSON)?.areas.level, 1);
+        });
+
+        await check("Nutzerdaten: Liste wartet nicht auf Discord, fehlende Namen kommen im Hintergrund nach (W-0065)", async () => {
+            forgetAllUsers();
+            const first = (await get(`/api/userdata?q=${PERSON}`)).json() as IUserdataList;
+            assert.ok(first.namesPending >= 1, `${first.namesPending} ausstehend`);
+
+            await namesFilled();
+            const second = (await get(`/api/userdata?q=${PERSON}`)).json() as IUserdataList;
+            assert.equal(second.namesPending, 0);
+            assert.ok(second.people.find((person) => person.id === PERSON)?.avatar !== undefined);
         });
 
         await check("Nutzerdaten: Profil mit Banner und Profilfarbe aus Discord, Shop, Aktivität, Zeitleiste je Bereich", async () => {

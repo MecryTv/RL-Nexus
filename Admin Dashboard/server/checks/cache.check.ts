@@ -206,9 +206,9 @@ export async function checkCache(): Promise<void> {
                 const redis = fakeRedis();
                 setCacheClient(redis);
 
-                await cached("discord:user:v1:222222222222222266", 3_600, async () => ({ id: "222222222222222266", name: "Redis" }));
+                await cached("discord:user:v1:222222222222222266", 86_400, async () => ({ id: "222222222222222266", name: "Redis" }));
                 await new Promise((resolve) => setImmediate(resolve));
-                await cached("discord:user:v1:222222222222222266", 3_600, async () => null);
+                await cached("discord:user:v1:222222222222222266", 86_400, async () => null);
 
                 const overview = (await get("/api/redis")).json() as IRedisOverview;
                 const names = overview.areas.find((area) => area.id === "discord-namen");
@@ -220,7 +220,7 @@ export async function checkCache(): Promise<void> {
                 assert.deepEqual(list.keys.map((row) => row.key), ["discord:user:v1:222222222222222266"]);
 
                 const key = (await get("/api/redis/key?key=rln:discord:user:v1:222222222222222266")).json() as IRedisKey;
-                assert.deepEqual([key.type, key.ttl, key.age, (key.value as { name: string }).name], ["string", 3_600, 0, "Redis"]);
+                assert.deepEqual([key.type, key.ttl, key.age, (key.value as { name: string }).name], ["string", 86_400, 0, "Redis"]);
 
                 assert.equal((await get("/api/redis/key?key=fremd:schluessel")).statusCode, 400);
                 assert.equal((await get("/api/redis/areas/gibts-nicht")).statusCode, 404);
