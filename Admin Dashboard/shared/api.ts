@@ -7,6 +7,7 @@
  */
 
 import type { BannerState } from "./content.ts";
+import type { IDumpSummary } from "./dumps.ts";
 import type { Group, LogLevelFilter, MailFolderRole, NotificationKind } from "./limits.ts";
 import type { CheckState, ILatency, IncidentKind, StatusService } from "./status.ts";
 
@@ -119,6 +120,8 @@ export interface IOverview {
     readonly recent: readonly IRecentAction[];
     /** Angehaltene Löschungen von Nutzerdaten (W-0051): „Das war ich nicht“, das Team muss sich kümmern. */
     readonly halted: number;
+    /** W-0067: Zustand der nächtlichen Sicherung, ohne Dateinamen. null: hier nicht eingerichtet. */
+    readonly dump: IDumpSummary | null;
 }
 
 /** Ein eingeschalteter Wartungsmodus. Beides null, wenn die Datei da, aber unlesbar ist: an ist er trotzdem. */

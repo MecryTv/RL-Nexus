@@ -3,11 +3,15 @@ import { createHash } from "node:crypto";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { dumpState, parseDumpName, type IDumpProbe, type IDumpRun } from "../../shared/dumps.ts";
+import type { IOverview } from "../../shared/api.ts";
+import { dumpState, parseDumpName, type IDumpProbe, type IDumpRun, type IDumpsOverview } from "../../shared/dumps.ts";
+import { buildApp } from "../app.ts";
+import { loadConfig } from "../config.ts";
 import { dumpSummary, openDump, readDumps } from "../dumps.ts";
 import { PublicError } from "../errors.ts";
-import { loadConfig } from "../config.ts";
-import { ENV, check, section } from "./harness.ts";
+import { SESSION_COOKIE, seal } from "../session.ts";
+import { USERS } from "./fakes.ts";
+import { ENV, SECRET, check, config, section } from "./harness.ts";
 
 /** W-0067: Das Admin Dashboard liest die nächtlichen Sicherungen, die scripts/sicherung.sh im Repo des Bots schreibt. */
 
@@ -173,6 +177,54 @@ export async function checkDumps(): Promise<void> {
             assert.ok(!JSON.stringify(summary).includes(".sql.gz") && !JSON.stringify(summary).includes("Got error"));
             assert.equal(dumpSummary(await readDumps(null)), null);
         });
+
+        const app = await buildApp({ ...config, dumpsDir: dir });
+        const plain = await buildApp(config);
+        const cookieOf = (id: string, name: string): string => `${SESSION_COOKIE}=${seal({ id, name, avatar: null, exp: Math.floor(Date.now() / 1000) + 600 }, SECRET)}`;
+        const developer = cookieOf(USERS.developer, "nutzer2");
+        const admin = cookieOf(USERS.admin, "nutzer1");
+        const get = (url: string, cookie = developer, on = app) => on.inject({ method: "GET", url, headers: { cookie } });
+
+        try {
+            await check("Nur Developer: Admin bekommt 403 auf /api/db/dumps und den Download", async () => {
+                assert.equal((await get("/api/db/dumps", admin)).statusCode, 403);
+                assert.equal((await get("/api/db/dumps/rlnexus_2026-11-04_033007.sql.gz/download", admin)).statusCode, 403);
+            });
+
+            await check("Übersicht der Sicherungen als Developer", async () => {
+                const response = await get("/api/db/dumps");
+                const overview = response.json() as IDumpsOverview;
+                assert.equal(response.statusCode, 200);
+                assert.equal(overview.state, "failed");
+                assert.equal(overview.files[0].name, "rlnexus_2026-11-04_033007.sql.gz");
+                assert.equal((await get("/api/db/dumps", developer, plain)).json().state, "off");
+            });
+
+            await check("Download: passende Datei kommt mit Dateinamen und gleichem Inhalt", async () => {
+                const response = await get("/api/db/dumps/rlnexus_2026-11-04_033007.sql.gz/download");
+                assert.equal(response.statusCode, 200);
+                assert.equal(response.body, "neu-neu");
+                assert.match(response.headers["content-type"] as string, /application\/gzip/);
+                assert.equal(response.headers["content-disposition"], 'attachment; filename="rlnexus_2026-11-04_033007.sql.gz"');
+            });
+
+            await check("Download: ../ und %2F im Namen → 400, falsche Prüfsumme → 409", async () => {
+                assert.equal((await get("/api/db/dumps/..%2Fstatus.json/download")).statusCode, 400);
+                assert.equal((await get("/api/db/dumps/..%2F..%2Fetc%2Fpasswd/download")).statusCode, 400);
+                assert.equal((await get("/api/db/dumps/rlnexus_2026-11-01_033000.sql.gz/download")).statusCode, 409);
+                assert.equal((await get("/api/db/dumps/rlnexus_2026-11-01_033000.sql.gz/download", developer, plain)).statusCode, 404);
+            });
+
+            await check("/api/overview hat dump ohne Dateinamen; ohne DB_DUMPS_DIR null", async () => {
+                const overview = (await get("/api/overview", admin)).json() as IOverview;
+                assert.equal(overview.dump?.state, "failed");
+                assert.ok(!JSON.stringify(overview.dump).includes(".sql.gz"));
+                assert.equal(((await get("/api/overview", admin, plain)).json() as IOverview).dump, null);
+            });
+        } finally {
+            await app.close();
+            await plain.close();
+        }
     } finally {
         await rm(dir, { recursive: true, force: true });
     }
