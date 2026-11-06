@@ -99,6 +99,42 @@ export async function checkAuth(): Promise<void> {
             assert.equal(response.headers.location, "/anmelden?grund=abgebrochen");
         });
 
+        await check("W-0069: Rückweg mit guild_id (Bot-Freigabe) wird ohne Tausch abgewiesen", async () => {
+            const ip = from();
+            const start = await app.inject({ method: "GET", url: "/api/auth/login", remoteAddress: ip });
+            const state = new URL(String(start.headers.location)).searchParams.get("state") ?? "";
+            const before = fake.tokenExchanges;
+            const response = await app.inject({
+                method: "GET",
+                url: `/api/auth/callback?code=${USERS.admin}&state=${state}&guild_id=123456789012345678&permissions=8`,
+                headers: { cookie: `${STATE_COOKIE}=${cookieFrom(start, STATE_COOKIE)}` },
+                remoteAddress: ip,
+            });
+
+            assert.equal(response.headers.location, "/anmelden?grund=fehler");
+            assert.equal(cookieFrom(response, SESSION_COOKIE), null);
+            assert.equal(fake.tokenExchanges, before, "der Code wurde trotzdem getauscht");
+        });
+
+        await check("W-0069: Alter Code einer Bot-Freigabe mit neuem state: keine Sitzung, der Bot geht wieder", async () => {
+            const ip = from();
+            const start = await app.inject({ method: "GET", url: "/api/auth/login", remoteAddress: ip });
+            const state = new URL(String(start.headers.location)).searchParams.get("state") ?? "";
+
+            fake.leftGuilds.length = 0;
+
+            const response = await app.inject({
+                method: "GET",
+                url: `/api/auth/callback?code=bot-${USERS.admin}&state=${state}`,
+                headers: { cookie: `${STATE_COOKIE}=${cookieFrom(start, STATE_COOKIE)}` },
+                remoteAddress: ip,
+            });
+
+            assert.equal(response.headers.location, "/anmelden?grund=fehler");
+            assert.equal(cookieFrom(response, SESSION_COOKIE), null);
+            assert.deepEqual(fake.leftGuilds, ["123456789012345678"]);
+        });
+
         await check("Ohne Zwei-Faktor kein Zugang, auch wenn das Feld fehlt", async () => {
             assert.equal((await login(USERS.noMfa)).headers.location, "/anmelden?grund=mfa");
             assert.equal((await login(USERS.mfaMissing)).headers.location, "/anmelden?grund=mfa");

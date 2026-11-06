@@ -162,8 +162,9 @@ export function ClearCookie(name: string, secure: boolean): string {
 // Geprüft wird gegen DASHBOARD_PATH + "/". An der Wurzel bleibt davon "/"
 // übrig: dann muss der Pfad wenigstens mit einem einzelnen Slash beginnen, und
 // "https://fremd.de" fällt genauso durch wie vorher.
-export function SafeReturnPath(value: string | undefined): string {
-    if (!value || !value.startsWith(`${DASHBOARD_PATH}/`)) return DASHBOARD_HOME;
+export function SafeReturnPath(value: unknown): string {
+    // ?return=a&return=b kommt als Liste an: kein Pfad (W-0069, Review 12).
+    if (typeof value !== "string" || !value.startsWith(`${DASHBOARD_PATH}/`)) return DASHBOARD_HOME;
     // Steuerzeichen streicht der Browser aus der Adresse: Aus "/\t/evil" würde "//evil".
     if (value.startsWith("//") || value.includes("\\") || /[\u0000-\u001f\u007f]/.test(value)) return DASHBOARD_HOME;
 

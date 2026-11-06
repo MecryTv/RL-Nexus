@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>RL Nexus · __TITLE__</title>
+<meta name="color-scheme" content="dark">
+<!-- Die Hauptseite. Wird beim Ausliefern eingesetzt. -->
+<meta name="rlnexus-site" content="__SITE__">
+<meta name="robots" content="noindex">
+<link rel="icon" type="image/png" href="__BASE__/assets/images/rl-nexus-n-48.png">
+<link rel="stylesheet" href="__BASE__/assets/style.css">
+</head>
+<!--
+  W-0069, Entwurf B+: Der Rückweg von Discord nach „Bot einladen“ passt nicht,
+  der Bot ist nicht beigetreten. Ohne app.js, jeder Knopf ist ein echter Link.
+
+  Titel, Text, Server, dritter Schritt, Angaben und Knöpfe setzt der Bot beim
+  Ausliefern ein (src/builder/InviteFailPage.ts).
+-->
+<body>
+
+<div class="ambient" aria-hidden="true"><i class="ambient__warm"></i><i class="ambient__cool"></i><i class="ambient__bands"></i><i class="ambient__grid"></i><i class="ambient__vignette"></i></div>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <symbol id="i-warn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 2 20h20z"/><path d="M12 10v4M12 17h.01"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13M13 6l6 6-6 6"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4 6v6c0 4.5 3.4 8.3 8 9 4.6-.7 8-4.5 8-9V6z"/><path d="m9 12 2 2 4-4"/></symbol>
+</svg>
+
+<main class="stage">
+  <div class="empty empty--error invfail" role="alert">
+    <div class="invfail__srv">
+      __SERVER__
+      <span class="invfail__state"><i></i>__STATE__</span>
+    </div>
+    <h2>__TITLE__</h2>
+    <p class="invfail__text">__TEXT__</p>
+    <ol class="invfail__steps" aria-label="Ablauf der Einladung">
+      <li class="is-done"><span class="invfail__dot"><svg aria-hidden="true"><use href="#i-check"/></svg></span>Bot einladen<span class="invfail__sr"> (erledigt)</span></li>
+      <li class="is-done"><span class="invfail__dot"><svg aria-hidden="true"><use href="#i-check"/></svg></span>Freigabe bei Discord<span class="invfail__sr"> (erledigt)</span></li>
+      <li class="is-fail"><span class="invfail__dot"><svg aria-hidden="true"><use href="#i-x"/></svg></span>__STEP__<span class="invfail__sr"> (hier hakt es)</span></li>
+    </ol>
+    __FACTS__
+    <p class="invfail__safe"><svg aria-hidden="true"><use href="#i-shield"/></svg><span>__SAFE__</span></p>
+    <div class="invfail__acts">
+      __ACTIONS__
+    </div>
+    <p class="invfail__help">Hilft das nicht? <a href="mailto:support@nexus-emb.de">support@nexus-emb.de</a> oder unser <a href="https://discord.gg/CjG2HFGw95" target="_blank" rel="noopener">Support-Discord</a></p>
+  </div>
+</main>
+
+</body>
+</html>

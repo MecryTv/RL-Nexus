@@ -3,7 +3,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { LEGAL_DOCS, maskEmail, type ICancelReceipt, type ICheckoutStart, type ILegalText, type LegalDoc, type IShopMe, type IShopPublicProduct, type IShopState, type IUnlockProgress, type StepState } from "../../shared/shop.ts";
 import type { IConfig } from "../config.ts";
 import { query } from "../db.ts";
-import { DiscordUnavailable, avatarUrl, displayName, exchangeShopCode, fetchMe, fetchRoles, shopAuthorizeUrl, userGuildIds } from "../discord.ts";
+import { BotAuthorization, DiscordUnavailable, avatarUrl, displayName, exchangeShopCode, fetchMe, fetchRoles, leaveGuild, shopAuthorizeUrl, userGuildIds } from "../discord.ts";
 import { InvalidInput, PublicError } from "../errors.ts";
 import { makeLimiter, matchCancellation, parseCancelInput, rateKey, type ICancelCandidate } from "../shop/cancel.ts";
 import { publish } from "../events.ts";
@@ -285,11 +285,17 @@ export async function publicShopRoutes(app: FastifyInstance, { config }: { confi
     });
 
     app.get("/public/shop/callback", { config: LOGIN_LIMIT }, async (request, reply) => {
-        const { code, state, error } = request.query as Record<string, string | undefined>;
+        const { code, state, error, guild_id: guildId } = request.query as Record<string, string | undefined>;
         const stored = readShopState(request, config);
         const go = (location: string, ...cookies: string[]) => reply.header("Set-Cookie", [clearShopState(config), ...cookies]).redirect(location);
 
         if (error) return go("/preise?anmeldung=abgebrochen");
+        // W-0069: guild_id kommt nur bei einer Bot-Freigabe. Der Shop nutzt die Application des Bots; ein Tausch hier lüde ihn ein.
+        if (guildId !== undefined) {
+            console.warn(`🛒 Shop-Anmeldung mit Bot-Freigabe abgewiesen (Server ${/^\d{17,20}$/.test(String(guildId)) ? guildId : "?"})`);
+
+            return go("/preise?anmeldung=fehler");
+        }
         if (!stored || !state || !code || !sameText(stored.state, state)) return go("/preise?anmeldung=fehler");
 
         try {
@@ -321,6 +327,14 @@ export async function publicShopRoutes(app: FastifyInstance, { config }: { confi
 
             return go(next, shopSessionCookie(config, session));
         } catch (failure) {
+            // W-0069: alter Code aus einer Bot-Freigabe mit neuem state. Der Bot ist schon beigetreten: sofort wieder gehen.
+            if (failure instanceof BotAuthorization) {
+                console.warn(`🛒 Shop-Anmeldung mit Bot-Freigabe abgewiesen, Bot verlässt Server ${failure.guildId ?? "?"}`);
+                if (failure.guildId) await leaveGuild(config, failure.guildId);
+
+                return go("/preise?anmeldung=fehler");
+            }
+
             if (!(failure instanceof DiscordUnavailable) && !(failure instanceof PublicError)) {
                 console.error(`🛒 Shop-Anmeldung gescheitert: ${failure instanceof Error ? failure.message : String(failure)}`);
             }

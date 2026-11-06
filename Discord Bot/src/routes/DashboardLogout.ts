@@ -1,7 +1,7 @@
 import { FastifyReply, FastifyRequest } from "fastify";
 import BotClient from "../client/BotClient";
 import Route from "../structures/Route";
-import { ClearCookie, DASHBOARD_PATH, SESSION_COOKIE } from "../constants/Dashboard";
+import { ClearCookie, DASHBOARD_PATH, SafeReturnPath, SESSION_COOKIE } from "../constants/Dashboard";
 import { SessionOf } from "../utils/dashboard";
 
 export default class DashboardLogout extends Route {
@@ -26,8 +26,14 @@ export default class DashboardLogout extends Route {
             await service.Revoke(session);
         }
 
+        // W-0069: „Neu anmelden und einladen“ meldet ab und schickt mit Rückweg zur
+        // Anmeldung. Nur eigene Pfade (SafeReturnPath), sonst einfach zum Login.
+        const wanted = (request.query as { return?: string }).return;
+        const back = SafeReturnPath(wanted);
+        const login = wanted && back === wanted ? `${DASHBOARD_PATH}/login?return=${encodeURIComponent(back)}` : `${DASHBOARD_PATH}/login`;
+
         return reply
             .header("Set-Cookie", ClearCookie(SESSION_COOKIE, service.Secure))
-            .redirect(`${DASHBOARD_PATH}/login`, 302);
+            .redirect(login, 302);
     }
 }

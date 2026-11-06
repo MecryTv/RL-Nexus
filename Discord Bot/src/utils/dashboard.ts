@@ -127,7 +127,10 @@ async function PageBody(client: BotClient, name: string): Promise<string | null>
 // tragen kann.
 export async function SendPage(client: BotClient, reply: FastifyReply, name: string, extra?: Record<string, string>): Promise<unknown> {
     const template = await PageBody(client, name);
-    const body = extra ? Object.entries(extra).reduce((text, [key, value]) => text.replaceAll(`__${key}__`, value), template ?? "") : template;
+    // Ein Durchlauf mit Funktion: Sonst deutete replaceAll „$&“, „$`“ und „$'“ in
+    // eingesetzten Namen, und ein Name mit „__TEXT__“ würde später selbst ersetzt
+    // (W-0069, Review 8).
+    const body = extra && template !== null ? template.replace(/__([A-Z][A-Z0-9_]*)__/g, (match, key: string) => (Object.hasOwn(extra, key) ? extra[key] : match)) : template;
 
     if (template === null || body === null) return reply.code(404).send({ error: "Not Found" });
 
