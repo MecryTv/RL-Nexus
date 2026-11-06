@@ -86,6 +86,35 @@ export class MfaRequired extends Error {
 
 // Discord hat den Zugriff verweigert - der Token ist zurückgezogen oder abgelaufen.
 // Wird oben in ein 401 übersetzt, damit der Browser sauber neu anmeldet.
+/**
+ * W-0069, Review 1: Der Login-Tausch hat eine Bot-Freigabe eingelöst (scope
+ * bot oder ein Server in der Antwort). Der Bot ist dem Server damit schon
+ * beigetreten; guildId sagt, welchem.
+ */
+export class BotAuthorization extends Error {
+    constructor(readonly guildId: string | null) {
+        super("Bot-Freigabe statt Anmeldung");
+        this.name = "BotAuthorization";
+    }
+}
+
+/** W-0069, Review 3: Der Einladungs-Code ließ sich nicht tauschen. rejected: Discord hat abgelehnt. unreachable: keine Antwort, ob der Bot beigetreten ist, ist offen. */
+export class InviteExchangeFailed extends Error {
+    constructor(readonly kind: "rejected" | "unreachable", detail: string) {
+        super(detail);
+        this.name = "InviteExchangeFailed";
+    }
+}
+
+/** Steht in der Token-Antwort eine Bot-Freigabe? Dann der Server (oder null, falls Discord keinen nennt), sonst undefined. */
+export function BotGrantOf(token: { scope?: unknown; guild?: unknown }): string | null | undefined {
+    const scopes = typeof token.scope === "string" ? token.scope.split(" ") : [];
+    const guild = token.guild as { id?: unknown } | undefined;
+    const id = typeof guild?.id === "string" && /^\d{17,20}$/.test(guild.id) ? guild.id : null;
+
+    return scopes.includes("bot") || guild ? id : undefined;
+}
+
 export class SessionExpired extends Error {
     constructor() {
         super("Discord hat den Zugriffstoken abgelehnt.");
@@ -427,19 +456,90 @@ export default class DashboardService implements IDashboardService {
         return `https://discord.com/oauth2/authorize?${query}`;
     }
 
-    InviteURL(guildId?: string): string {
+    /**
+     * W-0069: Rückweg nach „Bot einladen“. Muss wie RedirectURI Zeichen für
+     * Zeichen im Developer Portal stehen, in der Live- und in der Dev-Application.
+     */
+    get InviteRedirectURI(): string {
+        return `${this.client.server.BaseURL}${DASHBOARD_PATH}/einladen/callback`;
+    }
+
+    /**
+     * W-0069: Mit „Requires OAuth2 Code Grant“ tritt der Bot erst bei, wenn
+     * ExchangeInvite den Code eintauscht. Der Link fragt deshalb nach einem Code
+     * und trägt den einmaligen state aus /einladen. Der Server ist fest gewählt.
+     */
+    InviteURL(guildId: string, state: string): string {
         const query = new URLSearchParams({
             client_id: this.ClientId,
             permissions: INVITE_PERMISSIONS,
             scope: "bot applications.commands",
+            response_type: "code",
+            redirect_uri: this.InviteRedirectURI,
+            state,
+            guild_id: guildId,
+            disable_guild_select: "true",
         });
 
-        if (guildId) {
-            query.set("guild_id", guildId);
-            query.set("disable_guild_select", "true");
+        return `https://discord.com/oauth2/authorize?${query}`;
+    }
+
+    /**
+     * W-0069: Tauscht den Code aus der Einladung. Erst damit tritt der Bot dem
+     * Server bei. Das Token selbst braucht niemand, es wird nicht gespeichert.
+     * Gibt die ID des Servers zurück, den Discord in der Antwort nennt.
+     */
+    async ExchangeInvite(code: string): Promise<string | null> {
+        let response: Response;
+
+        try {
+            response = await fetch(`${DISCORD_API}/oauth2/token`, {
+                method: "POST",
+                headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                body: new URLSearchParams({
+                    client_id: this.ClientId,
+                    client_secret: this.ClientSecret,
+                    grant_type: "authorization_code",
+                    code,
+                    redirect_uri: this.InviteRedirectURI,
+                }),
+                signal: AbortSignal.timeout(10_000),
+            });
+        } catch (error) {
+            throw new InviteExchangeFailed("unreachable", `Discord nicht erreicht: ${String(error)}`);
         }
 
-        return `https://discord.com/oauth2/authorize?${query}`;
+        if (!response.ok) {
+            const body = (await response.text().catch(() => "")).slice(0, 300);
+
+            throw new InviteExchangeFailed("rejected", `Discord hat den Einladungs-Code abgelehnt (${response.status} ${body}). Pruefe die Redirect URI ${this.InviteRedirectURI} im Developer Portal.`);
+        }
+
+        const token = (await response.json().catch(() => ({}))) as { guild?: unknown; scope?: unknown };
+
+        return BotGrantOf(token) ?? null;
+    }
+
+    /** W-0069: Der Bot verlässt einen Server per REST, auch wenn guildCreate noch nicht da war. */
+    async LeaveGuild(guildId: string): Promise<boolean> {
+        const { developerMode, config } = this.client;
+        const token = this.client.token ?? (developerMode ? config.DEV_CLIENT_TOKEN : config.CLIENT_TOKEN);
+
+        try {
+            const response = await fetch(`${DISCORD_API}/users/@me/guilds/${guildId}`, {
+                method: "DELETE",
+                headers: { Authorization: `Bot ${token}` },
+                signal: AbortSignal.timeout(10_000),
+            });
+
+            if (response.ok || response.status === 404) return true;
+
+            logger.warn(`🚪 Server ${guildId} nicht verlassen: Discord antwortet ${response.status}`);
+        } catch (error) {
+            logger.warn(`🚪 Server ${guildId} nicht verlassen: ${String(error)}`);
+        }
+
+        return false;
     }
 
     /**
@@ -527,7 +627,12 @@ export default class DashboardService implements IDashboardService {
             );
         }
 
-        const token = (await response.json()) as { access_token: string; expires_in: number; scope?: string };
+        const token = (await response.json()) as { access_token: string; expires_in: number; scope?: string; guild?: unknown };
+        // W-0069, Review 1: Ein Code aus einer Bot-Freigabe taugt nicht als Anmeldung, auch ohne guild_id in der Adresse.
+        const grant = BotGrantOf(token);
+
+        if (grant !== undefined) throw new BotAuthorization(grant);
+
         const user = await this.Fetch<IRawUser>("/users/@me", token.access_token);
 
         // Ohne Zwei-Faktor bei Discord kommt hier niemand herein. Die Anmeldung
@@ -631,7 +736,8 @@ export default class DashboardService implements IDashboardService {
         // W-0017: bis wann der Zugang läuft, für die Einstellungsseite. Scheitert das, fehlt nur die Zeile.
         user.access = await this.ShopEnds(session.userId).catch(() => null);
 
-        return { user, guilds, inviteURL: this.InviteURL() };
+        // W-0069: Ein fertiger Discord-Link ginge ohne state nicht mehr; eingeladen wird über /einladen?guild=…
+        return { user, guilds, inviteURL: `${DASHBOARD_PATH}/einladen` };
     }
 
     /** Zugang laut Shop, mit Cache. Wirft nie: Kann der Bot die Tabellen nicht lesen, bleibt die Schranke offen, außer Beta könnte laufen. */

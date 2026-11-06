@@ -4,7 +4,7 @@ import type { DenyReason } from "../../shared/api.ts";
 import { checkMember, forgetMember, readSession, safeReturn } from "../access.ts";
 import { audit } from "../audit.ts";
 import type { IConfig } from "../config.ts";
-import { DiscordUnavailable, authorizeUrl, avatarUrl, displayName, exchangeCode, fetchMe } from "../discord.ts";
+import { BotAuthorization, DiscordUnavailable, authorizeUrl, avatarUrl, displayName, exchangeCode, fetchMe, leaveGuild } from "../discord.ts";
 import {
     SESSION_COOKIE,
     SESSION_TTL,
@@ -56,11 +56,19 @@ export async function authRoutes(app: FastifyInstance, { config }: { config: ICo
     });
 
     app.get("/api/auth/callback", { config: AUTH_LIMIT }, async (request, reply) => {
-        const { code, state, error } = request.query as Record<string, string | undefined>;
+        const { code, state, error, guild_id: guildId } = request.query as Record<string, string | undefined>;
         const stored = open<IState>(parseCookies(request.headers.cookie)[STATE_COOKIE] ?? "", config.jwtSecret);
         const go = (location: string, ...cookies: string[]) => reply.header("Set-Cookie", [clearState, ...cookies]).redirect(location);
 
         if (error) return go(deny("abgebrochen"));
+        // W-0069: guild_id schickt Discord nur bei einer Bot-Freigabe. Dieselbe
+        // Application wie der Bot: Mit angehängtem bot-Scope lüde der Tausch hier
+        // den Bot ein, an /einladen und seinem state vorbei. Also kein Tausch.
+        if (guildId !== undefined) {
+            console.warn(`🔒 Anmeldung mit Bot-Freigabe abgewiesen (Server ${/^\d{17,20}$/.test(String(guildId)) ? guildId : "?"})`);
+
+            return go(deny("fehler"));
+        }
         if (!stored || !state || !code || !sameText(stored.state, state)) return go(deny("fehler"));
 
         try {
@@ -87,6 +95,15 @@ export async function authRoutes(app: FastifyInstance, { config }: { config: ICo
 
             return go(stored.ret, setCookie(SESSION_COOKIE, seal(session, config.jwtSecret), { path: "/", maxAge: SESSION_TTL, secure: config.secureCookies }));
         } catch (failure) {
+            // W-0069: Ein alter Code aus einer Bot-Freigabe mit neuem state. Der Bot ist
+            // schon beigetreten: sofort wieder gehen, keine Sitzung.
+            if (failure instanceof BotAuthorization) {
+                console.warn(`🔒 Anmeldung mit Bot-Freigabe abgewiesen, Bot verlässt Server ${failure.guildId ?? "?"}`);
+                if (failure.guildId) await leaveGuild(config, failure.guildId);
+
+                return go(deny("fehler"));
+            }
+
             if (!(failure instanceof DiscordUnavailable)) throw failure;
 
             console.warn(`🔒 Anmeldung gescheitert: ${failure.message}`);

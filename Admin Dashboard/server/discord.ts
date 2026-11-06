@@ -13,6 +13,30 @@ export const DISCORD_API = "https://discord.com/api/v10";
 /** Discord hat nicht oder nicht wie erwartet geantwortet. */
 export class DiscordUnavailable extends Error {}
 
+/**
+ * W-0069: Der Tausch hat eine Bot-Freigabe eingelöst (scope bot oder ein
+ * Server in der Antwort). Admin Dashboard und Shop nutzen die Application des
+ * Bots; der Bot ist damit schon beigetreten, an /einladen vorbei.
+ */
+export class BotAuthorization extends Error {
+    readonly guildId: string | null;
+
+    constructor(guildId: string | null) {
+        super("Bot-Freigabe statt Anmeldung");
+        this.guildId = guildId;
+    }
+}
+
+/** Wirft BotAuthorization, wenn die Token-Antwort eine Bot-Freigabe ist. */
+function refuseBotGrant(token: { scope?: unknown; guild?: unknown }): void {
+    const scopes = typeof token.scope === "string" ? token.scope.split(" ") : [];
+    const guild = token.guild as { id?: unknown } | undefined;
+
+    if (!scopes.includes("bot") && !guild) return;
+
+    throw new BotAuthorization(typeof guild?.id === "string" && /^\d{17,20}$/.test(guild.id) ? guild.id : null);
+}
+
 export interface IDiscordUser {
     readonly id: string;
     readonly username: string;
@@ -76,10 +100,22 @@ export async function exchangeCode(config: IConfig, code: string): Promise<strin
 
     if (!response.ok) throw new DiscordUnavailable(`Discord hat den Code abgelehnt (${response.status}).`);
 
-    const token = (await response.json()) as { access_token?: unknown };
+    const token = (await response.json()) as { access_token?: unknown; scope?: unknown; guild?: unknown };
+    refuseBotGrant(token);
     if (typeof token.access_token !== "string") throw new DiscordUnavailable("Discord hat kein Token geschickt.");
 
     return token.access_token;
+}
+
+/** W-0069: Der Bot verlässt einen Server per REST. false: hat nicht geklappt. */
+export async function leaveGuild(config: IConfig, guildId: string): Promise<boolean> {
+    try {
+        const response = await botCall(config, `/users/@me/guilds/${guildId}`, { method: "DELETE" });
+
+        return response.ok || response.status === 404;
+    } catch {
+        return false;
+    }
 }
 
 export async function fetchMe(accessToken: string): Promise<IDiscordUser> {
@@ -212,7 +248,8 @@ async function tokenRequest(config: IConfig, params: Readonly<Record<string, str
 
     if (!response.ok) throw new DiscordUnavailable(`Discord hat den Code abgelehnt (${response.status}).`);
 
-    const token = (await response.json()) as { access_token?: unknown; refresh_token?: unknown; expires_in?: unknown };
+    const token = (await response.json()) as { access_token?: unknown; refresh_token?: unknown; expires_in?: unknown; scope?: unknown; guild?: unknown };
+    refuseBotGrant(token);
     if (typeof token.access_token !== "string" || typeof token.refresh_token !== "string") throw new DiscordUnavailable("Discord hat kein Token geschickt.");
 
     const seconds = typeof token.expires_in === "number" ? token.expires_in : 604_800;

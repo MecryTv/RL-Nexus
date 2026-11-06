@@ -4,6 +4,7 @@ import { DASHBOARD_PATH } from "../../constants/Dashboard";
 import Event from "../../structures/Event";
 import { AccessMode, ForgetGate, IsContact, RefuseFor, RefuseReason, TakePass } from "../../utils/invitepass";
 import { AskServers, InviterOf } from "../../utils/servers";
+import { JoinStarted } from "../../utils/joinoutcome";
 import logger from "../../utils/logger";
 
 /**
@@ -28,9 +29,19 @@ export default class GuildJoined extends Event {
     async Execute(guild: Guild): Promise<void> {
         ForgetGate(guild.id);
 
-        if (await this.Refused(guild)) return;
+        // W-0069: Der Einladungs-Callback wartet auf dieses Ergebnis, bevor er weiterleitet.
+        const report = JoinStarted(guild.id);
+        const refused = await this.Refused(guild);
+
+        if (refused) {
+            report(refused);
+
+            return;
+        }
 
         for (const userId of this.client.dashboardService.Joined(guild.id)) this.client.pulseService.EmitUser(userId, "guilds", { joined: guild.id });
+
+        report("ok");
 
         const base = this.client.config.ADMIN_INTERNAL_URL;
 
@@ -41,12 +52,12 @@ export default class GuildJoined extends Event {
         }
     }
 
-    /** true: Der Bot hat den Server wieder verlassen. Ohne Datenbank oder bei einem Fehler lässt er ihn lieber stehen (Review 2). */
-    private async Refused(guild: Guild): Promise<boolean> {
+    /** Der Grund, aus dem der Bot den Server wieder verlassen hat, sonst null. Ohne Datenbank oder bei einem Fehler lässt er ihn lieber stehen (Review 2). */
+    private async Refused(guild: Guild): Promise<RefuseReason | null> {
         if (!this.client.databaseService.Ready) {
             logger.warn(`🎟️  ${guild.name} (${guild.id}): Freigabe nicht prüfbar, keine Datenbank. Der Bot bleibt.`);
 
-            return false;
+            return null;
         }
 
         let reason: RefuseReason | null;
@@ -56,10 +67,10 @@ export default class GuildJoined extends Event {
         } catch (error) {
             logger.warn(`🎟️  ${guild.name} (${guild.id}): Freigabe nicht prüfbar (${String(error)}). Der Bot bleibt.`);
 
-            return false;
+            return null;
         }
 
-        if (!reason) return false;
+        if (!reason) return null;
 
         const base = this.client.config.ADMIN_INTERNAL_URL;
 
@@ -81,7 +92,7 @@ export default class GuildJoined extends Event {
         await guild.leave().catch((error: unknown) => logger.warn(`🎟️  ${guild.name} nicht verlassen: ${String(error)}`));
         logger.info(`🎟️  ${guild.name} (${guild.id}) verlassen: ${reason === "pass" ? "ohne Freigabe eingeladen" : "kein Ansprechpartner mit Zugang"}`);
 
-        return true;
+        return reason;
     }
 
     /** Warum der Bot geht, null: Er bleibt. Wirft bei Datenbank- oder Discord-Fehlern. */
