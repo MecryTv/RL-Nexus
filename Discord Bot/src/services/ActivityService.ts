@@ -214,14 +214,6 @@ export default class ActivityService {
        Schreiben
        ---------------------------------------------------------- */
     /**
-     * Schreibt das Gesammelte weg. Laufende Sprachsitzungen werden bis jetzt
-     * angerechnet, damit die Übersicht auch mitten in einer langen Runde stimmt.
-     *
-     * Abgezogen wird erst nach dem Schreiben und nur, was geschrieben wurde: was
-     * währenddessen dazukommt, bleibt stehen, und ein Fehler verliert nichts -
-     * der nächste Lauf versucht es mit allem erneut.
-     */
-    /**
      * Nach einer Löschung im Admin Dashboard (W-0051): Gepuffertes der Person
      * verwerfen, sonst schriebe der nächste Flush ihre Aktivität zurück. Läuft
      * sie gerade im Sprachkanal, zählt das ab jetzt nicht mehr.
@@ -232,6 +224,14 @@ export default class ActivityService {
         }
     }
 
+    /**
+     * Schreibt das Gesammelte weg. Laufende Sprachsitzungen werden bis jetzt
+     * angerechnet, damit die Übersicht auch mitten in einer langen Runde stimmt.
+     *
+     * Abgezogen wird erst nach dem Schreiben und nur, was geschrieben wurde: was
+     * währenddessen dazukommt, bleibt stehen, und ein Fehler verliert nichts -
+     * der nächste Lauf versucht es mit allem erneut.
+     */
     async Flush(): Promise<void> {
         const now = Date.now();
 
