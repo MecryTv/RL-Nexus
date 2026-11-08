@@ -183,6 +183,9 @@ export async function retryForget(config: IConfig): Promise<void> {
     const open = await query<{ id: number; user_id: string; planned_by: string }[]>("SELECT id, user_id, planned_by FROM userdata_deletions WHERE forget_pending = 1 LIMIT 20");
 
     for (const row of open) {
-        if (await botForgetUser(config, row.user_id, row.planned_by)) await query("UPDATE userdata_deletions SET forget_pending = 0 WHERE id = ?", [row.id]);
+        // Antwortet der Bot nicht, bei der nächsten Runde weiter, statt sie für jede Zeile bis zum Timeout aufzuhalten (Review W-0051, Punkt 16).
+        if (!(await botForgetUser(config, row.user_id, row.planned_by))) break;
+
+        await query("UPDATE userdata_deletions SET forget_pending = 0 WHERE id = ?", [row.id]);
     }
 }

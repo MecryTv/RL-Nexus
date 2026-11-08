@@ -427,9 +427,17 @@ export function deletionMessage(kind: DmKind, deletionId: number, image: { reado
  * Die Löschung läuft in jedem Fall weiter.
  */
 export async function sendDeletionDm(config: IConfig, record: IDeletionRecord, kind: DmKind, input: IDmInput, files: readonly IDiscordFile[] = []): Promise<boolean> {
-    const image = await renderDeletionImage(kind, input);
-    const message = deletionMessage(kind, record.id, image, input.dueAt, files.map((file) => file.name));
-    const sent = await postDirectMessage(config, record.userId, message, [{ name: image.name, data: image.data, type: "image/png" }, ...files]);
+    let sent: Awaited<ReturnType<typeof postDirectMessage>>;
+
+    // Wirft Bild oder Versand, gilt das wie eine nicht zugestellte DM: Das Team sieht es an der Löschung,
+    // statt dass sie nach einem Fehler ohne Ankündigung weiterläuft (Review W-0051, Punkt 9).
+    try {
+        const image = await renderDeletionImage(kind, input);
+        const message = deletionMessage(kind, record.id, image, input.dueAt, files.map((file) => file.name));
+        sent = await postDirectMessage(config, record.userId, message, [{ name: image.name, data: image.data, type: "image/png" }, ...files]);
+    } catch (error) {
+        sent = { error: `Nicht verschickt: ${error instanceof Error ? error.message : String(error)}` };
+    }
 
     if (kind === "ankuendigung") {
         if ("error" in sent) {

@@ -260,14 +260,14 @@ export async function userdataRoutes(app: FastifyInstance, { config }: { config:
 
         const actor = accessOf(request);
         const halted = body.replace === true ? await openDeletionOf(id) : null;
+        const stored = (await personIndex()).get(id)?.name ?? null;
+        const input = await announcementInput(config, id, dueAt, stored);
 
+        // Erst wenn die neue Ankündigung steht, endet die angehaltene (Review W-0051, Punkt 8).
         if (halted?.state === "angehalten") {
             await cancelDeletion(halted.id, actor);
             await audit(actor, "userdata.cancel", id, "neu geplant");
         }
-
-        const stored = (await personIndex()).get(id)?.name ?? null;
-        const input = await announcementInput(config, id, dueAt, stored);
         // input.name ist der Gruß der DM („du“, wenn niemand den Namen kennt); gespeichert wird nur ein echter Name.
         const record = await planDeletion({ userId: id, userName: knownName(id) ?? stored ?? halted?.userName ?? null, dueAt, reason, by: actor });
 
