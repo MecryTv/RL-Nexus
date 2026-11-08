@@ -211,8 +211,10 @@ export async function listDeletions(filter: DeletionFilter, q: string): Promise<
         abgebrochen: "state = 'abgebrochen' ORDER BY cancelled_at DESC",
         alle: "1 = 1 ORDER BY open_user IS NULL, id DESC",
     };
-    const rows = (await query<IDeletionRow[]>(`SELECT ${COLUMNS} FROM userdata_deletions WHERE ${where[filter]} LIMIT 200`)).map(toRecord);
     const wanted = fold(q.trim());
+    // Mit Suche über alle, sonst würde nur unter den neuesten 200 gesucht (Review W-0051, Punkt 13).
+    // ponytail: Suche im Speicher; bei vielen tausend Löschungen in SQL verlegen.
+    const rows = (await query<IDeletionRow[]>(`SELECT ${COLUMNS} FROM userdata_deletions WHERE ${where[filter]}${wanted ? "" : " LIMIT 200"}`)).map(toRecord);
 
     return wanted ? rows.filter((row) => row.userId.includes(wanted) || fold(row.userName ?? "").includes(wanted)) : rows;
 }

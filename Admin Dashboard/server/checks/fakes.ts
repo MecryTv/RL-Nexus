@@ -56,6 +56,10 @@ export const fake = {
     memberRoles: new Map<string, Set<string>>(),
     /** Was der Shop bei Discord geändert hat, als Zeilen. */
     discordCalls: [] as string[],
+    /** W-0069: So oft wurde ein Code bei Discord getauscht (Anmeldung, Shop, Erneuern). */
+    tokenExchanges: 0,
+    /** W-0069: Server, die der Bot per REST verlassen hat. */
+    leftGuilds: [] as string[],
     /** Diese Rollen kann der Bot nicht vergeben (fehlendes Recht). */
     roleFails: new Set<string>(),
     /** Diese Personen können nicht beitreten (schon auf 100 Servern). */
@@ -148,10 +152,25 @@ globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit): P
 
     if (url === `${DISCORD_API}/oauth2/token`) {
         const form = new URLSearchParams(String(init?.body ?? ""));
+
+        fake.tokenExchanges++;
+        // W-0069: Ein Code „bot-<id>“ stammt aus einer Bot-Freigabe. Discord nennt dann scope bot und den Server.
+        if (form.get("code")?.startsWith("bot-")) {
+            const id = (form.get("code") ?? "").replace("bot-", "");
+
+            return json({ access_token: `token-${id}`, refresh_token: `refresh-${id}`, expires_in: 604800, token_type: "Bearer", scope: "bot identify", guild: { id: "123456789012345678", name: "Fremd" } });
+        }
+
         // Beim Tausch ist der Code die ID, beim Erneuern steht sie im Refresh-Token.
         const id = form.get("code") ?? (form.get("refresh_token") ?? "").replace("refresh-", "");
 
         return json({ access_token: `token-${id}`, refresh_token: `refresh-${id}`, expires_in: 604800, token_type: "Bearer" });
+    }
+
+    if (url.startsWith(`${DISCORD_API}/users/@me/guilds/`) && init?.method === "DELETE") {
+        fake.leftGuilds.push(url.slice(`${DISCORD_API}/users/@me/guilds/`.length));
+
+        return new Response(null, { status: 204 });
     }
 
     if (url === `${DISCORD_API}/users/@me/guilds`) {

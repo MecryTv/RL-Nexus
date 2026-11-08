@@ -1,4 +1,4 @@
-import { useState, type JSX } from "react";
+import { useEffect, useRef, useState, type JSX } from "react";
 import {
     USERDATA_AREAS,
     USERDATA_BASES,
@@ -163,6 +163,16 @@ function RulesEditor({ rules, onSaved }: { readonly rules: readonly IUserdataRul
     const notify = useToast();
     const [drafts, setDrafts] = useState<Partial<Record<UserdataArea, Draft>>>({});
     const [busy, setBusy] = useState(false);
+    const saved = useRef(false);
+
+    // Nach dem Speichern: Entwürfe erst leeren, wenn die neuen Werte angekommen sind. Ein Neuladen
+    // ohne Speichern (etwa beim Zurückkehren in den Tab) lässt ungespeicherte Eingaben stehen.
+    useEffect(() => {
+        if (!saved.current) return;
+
+        saved.current = false;
+        setDrafts({});
+    }, [rules]);
 
     const current = rules.map((rule) => ({ ...rule, ...drafts[rule.area] }));
     const changed = current.filter((rule, index) => !same(rule, rules[index]));
@@ -195,7 +205,8 @@ function RulesEditor({ rules, onSaved }: { readonly rules: readonly IUserdataRul
                 body: { rules: changed.map((rule) => ({ area: rule.area, keep: rule.keep, note: rule.note?.trim() || null, basis: rule.basis, law: rule.law?.trim() || null, years: rule.years })) },
             });
             notify(changed.length === 1 ? `${changed[0].label} gespeichert.` : `${changed.length} Bereiche gespeichert.`);
-            setDrafts({});
+            // Die Entwürfe gehen erst, wenn die neuen Werte da sind (useEffect oben), sonst blitzen die alten auf (Review W-0051, Punkt 15).
+            saved.current = true;
             onSaved();
         } catch (error) {
             notify(error instanceof Error ? error.message : String(error), "danger");

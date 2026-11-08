@@ -5380,3 +5380,65 @@ body.sg-locked{overflow:hidden}
 .tactions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
 .tactions .btn{width:auto}
 @media (max-width:640px){.tbox__stats{grid-template-columns:repeat(2,minmax(0,1fr))}.tstats{grid-template-columns:1fr}}
+
+/* ============================================================
+   W-0069, Entwurf B+: „Einladung nicht abgeschlossen“ (einladen.html).
+   Oben der Server mit Warnzeichen, darunter Grund, Ablauf in drei
+   Schritten, konkrete Angaben, Entwarnung und ein Hauptknopf.
+   ============================================================ */
+.stage .empty.invfail{max-width:480px;gap:0;padding:36px 28px 28px;text-align:center}
+.invfail__srv{display:flex;flex-direction:column;align-items:center;gap:10px}
+.invfail__srvwrap{position:relative}
+.invfail__avatar{position:relative;width:64px;height:64px;display:grid;place-items:center;overflow:hidden;font:800 20px var(--f-display);color:#fff;
+  background:linear-gradient(135deg,#2a3b55,#16202e);border:1px solid var(--line-strong);
+  clip-path:polygon(var(--cut-sm) 0,100% 0,100% calc(100% - var(--cut-sm)),calc(100% - var(--cut-sm)) 100%,0 100%,0 var(--cut-sm))}
+.invfail__avatar img,.invfail__mini img{width:100%;height:100%;object-fit:cover;display:block}
+.invfail__badge{position:absolute;right:-9px;bottom:-9px;width:28px;height:28px;display:grid;place-items:center;
+  color:var(--warn);background:#1a1508;border:1px solid color-mix(in srgb,var(--warn) 45%,transparent)}
+.invfail__badge svg{width:15px;height:15px}
+.invfail__name{font-weight:700;font-size:15px;color:var(--text);overflow-wrap:anywhere}
+.invfail__state{display:inline-flex;align-items:center;gap:7px;height:24px;padding:0 10px;
+  font-family:var(--f-label);font-weight:700;font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--warn);border:1px solid color-mix(in srgb,var(--warn) 34%,transparent);background:color-mix(in srgb,var(--warn) 8%,transparent)}
+.invfail__state i{width:6px;height:6px;background:var(--warn)}
+.stage .empty.invfail h2{margin-top:22px;font-size:24px;font-weight:800;letter-spacing:-.02em}
+.stage .empty.invfail .invfail__text{margin-top:8px;color:var(--text-2);font-size:15px;max-width:40ch}
+.invfail__steps{list-style:none;margin:22px 0 0;padding:0;width:100%;display:grid;grid-template-columns:1fr 1fr 1fr;isolation:isolate}
+.invfail__steps li{position:relative;display:flex;flex-direction:column;align-items:center;gap:7px;
+  font-family:var(--f-label);font-weight:700;font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-3)}
+.invfail__steps li::before{content:"";position:absolute;top:13px;left:-50%;right:50%;height:2px;background:var(--line-strong);z-index:-1}
+.invfail__steps li:first-child::before{display:none}
+.invfail__steps li.is-done::before{background:color-mix(in srgb,var(--live) 55%,transparent)}
+.invfail__steps li.is-fail::before{background:linear-gradient(90deg,color-mix(in srgb,var(--live) 55%,transparent),color-mix(in srgb,var(--warn) 70%,transparent))}
+.invfail__dot{width:28px;height:28px;display:grid;place-items:center;border:1px solid var(--line-strong);background:var(--bg-panel)}
+.invfail__dot svg{width:14px;height:14px}
+.is-done .invfail__dot{color:var(--live);border-color:color-mix(in srgb,var(--live) 45%,transparent);background:color-mix(in srgb,var(--live) 10%,var(--bg-panel))}
+.is-fail .invfail__dot{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 55%,transparent);background:color-mix(in srgb,var(--warn) 12%,var(--bg-panel))}
+.invfail__steps li.is-done{color:var(--text-2)}
+.invfail__steps li.is-fail{color:var(--warn)}
+.invfail__sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.invfail__facts{margin:20px 0 0;width:100%;display:grid;border:1px solid var(--line);background:var(--glass);text-align:left}
+.invfail__facts div{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 14px;font-size:14px}
+.invfail__facts div + div{border-top:1px solid var(--line)}
+.invfail__facts dt{color:var(--text-3);white-space:nowrap}
+.invfail__facts dd{margin:0;display:inline-flex;align-items:center;gap:8px;text-align:right;font-weight:600;color:var(--text);overflow-wrap:anywhere}
+.invfail__facts dd.is-off{color:var(--warn)}
+.invfail__mini{flex:none;width:20px;height:20px;display:grid;place-items:center;overflow:hidden;font:800 9px var(--f-display);color:#fff;background:linear-gradient(135deg,#2a3b55,#16202e);border:1px solid var(--line-strong)}
+.invfail__mini--alt{background:linear-gradient(135deg,#4a2a55,#24162e)}
+.invfail__safe{margin-top:16px;width:100%;display:flex;gap:10px;align-items:flex-start;padding:11px 14px;text-align:left;
+  font-size:13.5px;color:var(--text-2);border:1px solid color-mix(in srgb,var(--live) 26%,transparent);background:color-mix(in srgb,var(--live) 6%,transparent)}
+.invfail__safe svg{flex:none;width:18px;height:18px;margin-top:1px;color:var(--live)}
+.invfail__acts{margin-top:22px;width:100%;display:grid;gap:8px}
+.stage .empty.invfail .invfail__go,.stage .empty.invfail .invfail__back{margin:0;width:100%;height:auto;min-height:46px;justify-content:center;gap:10px;font-size:14.5px;font-weight:700}
+.stage .empty.invfail .invfail__go{color:#fff;border-color:var(--brand);background:linear-gradient(135deg,var(--brand-bright),var(--brand) 60%,var(--brand-deep))}
+.stage .empty.invfail .invfail__back{color:var(--text-2)}
+.invfail__go svg,.invfail__back svg{width:16px;height:16px}
+.stage .empty.invfail .invfail__help{margin-top:16px;font-size:12.5px;color:var(--text-3)}
+/* Textlinks im Hinweis, auch auf der allgemeinen Fehlerseite (error.html): Die
+   Knopf-Regel .stage .empty a machte aus ihnen Kästen. */
+.stage .empty .errhint a,.stage .empty.invfail .invfail__help a{display:inline;height:auto;margin:0;padding:0;border:0;background:none;clip-path:none;color:var(--text-2);text-decoration:underline;text-underline-offset:2px}
+.stage .empty .errhint a:hover,.stage .empty.invfail .invfail__help a:hover{color:var(--blue);background:none}
+@media (max-width:420px){
+  .stage .empty.invfail{padding:28px 18px 22px}
+  .invfail__steps li{font-size:10.5px;letter-spacing:.06em}
+}

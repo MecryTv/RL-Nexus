@@ -54,9 +54,11 @@ Trag **jede** Adresse einzeln ein, unter der das Dashboard erreichbar ist. Disco
 ```
 http://localhost:3000/dashboard/callback
 https://dashboard.nexus-emb.de/callback
+http://localhost:3000/dashboard/einladen/callback
+https://dashboard.nexus-emb.de/einladen/callback
 ```
 
-Die zweite Zeile trägt **kein** `/dashboard`: im Betrieb liegt das Dashboard an der Wurzel seiner eigenen Subdomain.
+Die Zeilen für `dashboard.nexus-emb.de` tragen **kein** `/dashboard`: im Betrieb liegt das Dashboard an der Wurzel seiner eigenen Subdomain. Die beiden `einladen/callback`-Zeilen braucht „Bot einladen“ (W-0069, siehe Abschnitt 4); fehlen sie, bricht Discord schon vor der Freigabe mit „Invalid OAuth2 redirect_uri“ ab.
 
 > Im `--dev` Modus baut der Bot die Redirect-URI aus `http://localhost:<SERVER_PORT>`, sonst aus `SERVER_PUBLIC_URL`. **Ruf das Dashboard lokal über `localhost` auf, nicht über `127.0.0.1`** — für Discord sind das zwei verschiedene Redirects.
 
@@ -104,16 +106,25 @@ Jeder Scope kostet eine Zeile mehr im Zustimmungsdialog — wer `guilds.members.
 
 > **`email` kam später dazu.** Sitzungen, die davor ausgestellt wurden, tragen weder die Adresse noch den `@`-Namen. Sie bleiben gültig — das Dashboard schreibt dort „Nach dem nächsten Anmelden sichtbar“, statt den Nutzer auszusperren. `IDashboardSession.handle` und `.email` sind genau deshalb optional.
 
-### 4. Einladelink für den Bot
+### 4. Einladelink für den Bot (Requires OAuth2 Code Grant)
 
-Den baut der Bot ebenfalls selbst — die Karten im Dashboard hängen `guild_id` an, damit Discord direkt den richtigen Server vorschlägt:
+Unter **Bot** ist „Requires OAuth2 Code Grant“ an (W-0069). Der Bot tritt damit erst bei, wenn der Bot selbst den Code von Discord eintauscht. Ein fertiger Link aus dem URL-Generator geht nicht mehr. Eingeladen wird nur über `<base>/einladen?guild=<id>`: Die Route prüft Anmeldung, „Server verwalten“ und Sperren, legt den Freigabe-Pass an, dazu einen einmaligen `state` (im Speicher und im Cookie `rlnexus_invite_state`), und leitet hierhin:
 
 ```
 https://discord.com/oauth2/authorize
   ?client_id=<CLIENT_ID>
   &permissions=8
   &scope=bot%20applications.commands
+  &response_type=code
+  &redirect_uri=<SERVER_PUBLIC_URL>/einladen/callback
+  &state=<einmaliger Wert>
+  &guild_id=<Server>
+  &disable_guild_select=true
 ```
+
+`<base>/einladen/callback` tauscht den Code nur, wenn der `state` im Cookie dieses Browsers steht, höchstens 15 Minuten alt ist, dieselbe Person angemeldet ist und Discord denselben Server nennt. Danach wartet der Rückweg auf die Entscheidung von `GuildJoined` (Freigabe-Pass, Ansprechpartner) und leitet erst dann in die Übersicht des Servers. Passt etwas nicht, kommt die Seite „Einladung nicht abgeschlossen“ (`public/einladen.html`, Werte aus `src/builder/InviteFailPage.ts`), der Bot tritt nicht bei.
+
+**Install Link im Portal:** Unter **Installation** sollte kein „Discord Provided Link“ stehen, der führte mit Code Grant ins Leere. Entweder „None“ oder eine eigene Adresse auf `<base>/einladen`.
 
 `8` ist das Recht **Administrator**. So muss beim Einrichten niemand einzelne Rechte nachziehen, wenn ein Modul mehr braucht (Rollen vergeben, Kanäle anlegen, Nachrichten löschen). Discord zeigt beim Einladen die Rolle des Bots mit diesem einen Recht. Die Zahl steht als `INVITE_PERMISSIONS` in `src/constants/Dashboard.ts`. Server, auf denen der Bot schon mit den alten Rechten sitzt, behalten diese, bis jemand den Bot neu über den Link einlädt oder seiner Rolle das Recht von Hand gibt.
 
@@ -173,8 +184,10 @@ npm run dev
 |---|---|
 | `GET <base>/` | Die Serverauswahl. Ohne Sitzung `302` auf `<base>/login` |
 | `GET <base>/login` | `302` zu Discord, setzt das `state`-Cookie. `?return=<base>/...` merkt sich den Rückweg |
-| `GET <base>/callback` | Tauscht den Code gegen einen Token, legt die Sitzung an, `302` zurück. `403` samt Anleitung, wenn am Discord-Konto Zwei-Faktor fehlt |
-| `GET <base>/logout` | Verwirft Sitzung und Cookie, `302` auf den Login |
+| `GET <base>/callback` | Tauscht den Code gegen einen Token, legt die Sitzung an, `302` zurück. `403` samt Anleitung, wenn am Discord-Konto Zwei-Faktor fehlt. `400` ohne Sitzung bei einer Bot-Freigabe (`guild_id` in der Adresse oder `bot`/Server in der Token-Antwort), der Bot verlässt den Server dann sofort |
+| `GET <base>/einladen?guild=<id>` | „Bot einladen“: Pass, einmaliger `state`, `302` zu Discord (W-0069) |
+| `GET <base>/einladen/callback` | Rückweg nach der Bot-Freigabe: Prüfen, Code tauschen, auf `GuildJoined` warten, `302` in die Übersicht. Abbruch bei Discord: `302` zur Liste. Sonst `400` mit „Einladung nicht abgeschlossen“ |
+| `GET <base>/logout` | Verwirft Sitzung und Cookie, `302` auf den Login. `?return=<base>/...` reicht den Rückweg an den Login weiter |
 | `GET <base>/api/me` | JSON: Nutzer, Serverliste, Einladelink. Ohne Sitzung `401` |
 | `GET <base>/guild/:id/:section?` | Serverseite: Übersicht, Module und die Module selbst |
 | `GET <base>/g/:id` | Der alte Weg dorthin — leitet auf `/guild/:id/uebersicht` |
@@ -450,6 +463,8 @@ Was dieser Tausch kostet: **eine Sitzung lässt sich nicht serverseitig zurückz
 **CSRF beim Login:** `/dashboard/login` legt einen Zufallswert gleichzeitig ins Cookie und in den `state`-Parameter. Der Callback vergleicht beide mit `timingSafeEqual`; passt etwas nicht, gibt es `400` statt einer Sitzung.
 
 **Offene Redirects:** `?return=` akzeptiert nur Pfade, die mit `/dashboard` beginnen und weder mit `//` anfangen noch einen Backslash enthalten. Alles andere landet auf `/dashboard`.
+
+**Einladen nur über `/einladen` (W-0069):** Bot, Admin Dashboard und Shop nutzen dieselbe Application. Damit sich der Bot nicht über einen normalen Login mit angehängtem `bot`-Scope einladen lässt, weisen alle drei Login-Callbacks ab, wenn Discord `guild_id` mitschickt, ohne den Code zu tauschen. Wird ein solcher Code später mit neuem `state` und ohne `guild_id` eingereicht, verrät ihn die Token-Antwort (`scope` mit `bot` oder ein `guild`): keine Sitzung, und der Bot verlässt den Server sofort per REST. Freigabe-Pass und `GuildJoined` bleiben als zweite Absicherung.
 
 **Pfadschutz:** `/dashboard/assets/*` löst ausschließlich unter `public/assets` auf und liefert nur bekannte Dateitypen aus — dieselbe Absicherung wie bei der Galerie. Die HTML-Seiten liegen eine Ebene darüber und werden nur namentlich ausgeliefert.
 

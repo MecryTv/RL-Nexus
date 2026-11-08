@@ -13,10 +13,11 @@ import {
     AvatarURL,
     STATE_COOKIE,
 } from "../constants/Dashboard";
-import { MfaRequired } from "../services/DashboardService";
+import { BotAuthorization, MfaRequired } from "../services/DashboardService";
 import { SendPage, Unconfigured } from "../utils/dashboard";
 import { BlockedPage } from "../builder/BlockedPage";
 import { LoginCheck } from "../utils/security";
+import logger from "../utils/logger";
 
 function Match(expected: string, received: string | undefined): boolean {
     if (!expected || !received) return false;
@@ -44,7 +45,7 @@ export default class DashboardCallback extends Route {
 
         if (!service.IsConfigured) return Unconfigured(reply);
 
-        const query = request.query as { code?: string; state?: string; error?: string };
+        const query = request.query as { code?: string; state?: string; error?: string; guild_id?: string };
         const cookie = ParseCookies(request.headers.cookie)[STATE_COOKIE] ?? "";
         const separator = cookie.indexOf("|");
         const clear = ClearCookie(STATE_COOKIE, service.Secure);
@@ -52,6 +53,16 @@ export default class DashboardCallback extends Route {
         // Abgebrochen oder von Discord abgelehnt - kein Grund für einen 500er.
         if (query.error) {
             reply.header("Set-Cookie", clear).code(403);
+
+            return SendPage(this.client, reply, "denied.html");
+        }
+
+        // W-0069: guild_id schickt Discord nur bei einer Bot-Freigabe. Ein Login mit
+        // angehängtem bot-Scope würde sonst beim Tausch den Bot einladen, an
+        // /einladen und dem state dort vorbei. Also kein Tausch.
+        if (query.guild_id !== undefined) {
+            logger.warn(`🔒 Login mit Bot-Freigabe abgewiesen (Server ${/^\d{17,20}$/.test(String(query.guild_id)) ? query.guild_id : "?"})`);
+            reply.header("Set-Cookie", clear).code(400);
 
             return SendPage(this.client, reply, "denied.html");
         }
@@ -70,6 +81,17 @@ export default class DashboardCallback extends Route {
         try {
             session = await service.Exchange(query.code);
         } catch (error) {
+            // W-0069, Review 1: Der Code stammte aus einer Bot-Freigabe (alter Code
+            // mit neuem state, ohne guild_id in der Adresse). Der Bot ist damit schon
+            // beigetreten, an /einladen vorbei: sofort wieder gehen, keine Sitzung.
+            if (error instanceof BotAuthorization) {
+                logger.warn(`🔒 Login mit Bot-Freigabe abgewiesen, Bot verlässt Server ${error.guildId ?? "?"}`);
+                if (error.guildId) await service.LeaveGuild(error.guildId);
+                reply.header("Set-Cookie", clear).code(400);
+
+                return SendPage(this.client, reply, "denied.html");
+            }
+
             // Kein Zwei-Faktor am Discord-Konto. Das ist kein Ausfall, sondern
             // eine Absage mit einem Weg daraus - also eine Anleitung statt eines
             // 500ers. Alles andere fliegt weiter nach oben.

@@ -17,13 +17,16 @@ export default interface IDashboardService {
 
     readonly ClientId: string;
     readonly RedirectURI: string;
+    readonly InviteRedirectURI: string;
     readonly Secure: boolean;
     readonly IsConfigured: boolean;
 
     AuthorizeURL(state: string): string;
-    InviteURL(guildId?: string): string;
+    InviteURL(guildId: string, state: string): string;
 
     Exchange(code: string): Promise<IDashboardSession>;
+    ExchangeInvite(code: string): Promise<string | null>;
+    LeaveGuild(guildId: string): Promise<boolean>;
     Session(cookie: string | undefined): IDashboardSession | null;
     Sign(session: IDashboardSession): string;
     Destroy(session: IDashboardSession): void;

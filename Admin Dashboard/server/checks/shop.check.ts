@@ -1108,6 +1108,37 @@ section("Shop: Kündigen");
             assert.equal(cancelled.headers.location, "/preise?anmeldung=abgebrochen");
         });
 
+        await check("W-0069: Rücksprung mit guild_id (Bot-Freigabe) wird ohne Tausch abgewiesen", async () => {
+            const login = await app.inject({ method: "GET", url: "/public/shop/login" });
+            const state = new URL(String(login.headers.location)).searchParams.get("state") ?? "";
+            const before = fake.tokenExchanges;
+            const response = await app.inject({
+                method: "GET",
+                url: `/public/shop/callback?code=${USERS.buyer}&state=${state}&guild_id=123456789012345678&permissions=8`,
+                headers: { cookie: String(login.headers["set-cookie"]).split(";")[0] },
+            });
+
+            assert.deepEqual([response.statusCode, response.headers.location], [302, "/preise?anmeldung=fehler"]);
+            assert.equal(fake.tokenExchanges, before, "der Code wurde trotzdem getauscht");
+        });
+
+        await check("W-0069: Alter Code einer Bot-Freigabe im Shop: keine Sitzung, der Bot geht wieder", async () => {
+            const login = await app.inject({ method: "GET", url: "/public/shop/login" });
+            const state = new URL(String(login.headers.location)).searchParams.get("state") ?? "";
+
+            fake.leftGuilds.length = 0;
+
+            const response = await app.inject({
+                method: "GET",
+                url: `/public/shop/callback?code=bot-${USERS.buyer}&state=${state}`,
+                headers: { cookie: String(login.headers["set-cookie"]).split(";")[0] },
+            });
+
+            assert.deepEqual([response.statusCode, response.headers.location], [302, "/preise?anmeldung=fehler"]);
+            assert.doesNotMatch(String(response.headers["set-cookie"]), /rlnexus_shop=[^;]/);
+            assert.deepEqual(fake.leftGuilds, ["123456789012345678"]);
+        });
+
         await check("Abmelden löscht das Shop-Cookie", async () => {
             const response = await publicPost("/public/shop/logout", {});
             assert.equal(response.statusCode, 204);

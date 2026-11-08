@@ -29,6 +29,8 @@ import { CodeFromForm, RedeemAtAdmin } from "../routes/DashboardBeta";
 import IDashboardGuild, { DashboardRole } from "../interfaces/services/dashboard/IDashboardGuild";
 import { DashboardGroup } from "../interfaces/services/dashboard/IDashboardUser";
 import { Open, Seal } from "../utils/seal";
+import { CreateInviteState, DecideInvite, INVITE_COOKIE_LIFETIME, INVITE_LIFETIME, INVITE_STATE_COOKIE, NonceList, TakeInviteState } from "../utils/invitestate";
+import { JoinStarted } from "../utils/joinoutcome";
 
 const PORT = 3999;
 const BASE = `http://127.0.0.1:${PORT}`;
@@ -1187,6 +1189,207 @@ async function checkDevMaintenance(): Promise<void> {
     }
 }
 
+/**
+ * W-0069: Einladen mit „Requires OAuth2 Code Grant“. Der Link fragt nach einem
+ * Code, der Callback tauscht ihn nur bei gültigem state, passendem Server und
+ * passender Person. Die Login-Callbacks lassen sich nicht zum Einladen nutzen.
+ */
+async function checkInvite(client: BotClient): Promise<void> {
+    console.log("\n  — Einladen (W-0069) —");
+
+    const service = client.dashboardService;
+    const guildId = "123456789012345678";
+    const otherGuild = "223456789012345678";
+    const userId = "1059621019947634739";
+
+    const link = new URL(service.InviteURL(guildId, "staat-123"));
+
+    check("Einladung: response_type=code", link.searchParams.get("response_type") === "code", link.href);
+    check("  redirect_uri ist der Einladungs-Callback", link.searchParams.get("redirect_uri") === service.InviteRedirectURI && service.InviteRedirectURI.endsWith(`${P}/einladen/callback`), service.InviteRedirectURI);
+    check("  state, Server und feste Auswahl", link.searchParams.get("state") === "staat-123" && link.searchParams.get("guild_id") === guildId && link.searchParams.get("disable_guild_select") === "true");
+    check("  scope bot und applications.commands", link.searchParams.get("scope") === "bot applications.commands", String(link.searchParams.get("scope")));
+
+    const start = { guildId, guildName: "Testserver", guildIcon: null, userId, userName: "Check", userAvatar: null };
+    const nonce = CreateInviteState(start);
+
+    check("state ist lang und jedes Mal neu", nonce.length >= 32 && nonce !== CreateInviteState(start));
+    check("state gilt genau einmal", TakeInviteState(nonce)?.guildId === guildId && TakeInviteState(nonce) === null);
+    check("Leerer state findet nichts", TakeInviteState("") === null);
+
+    const known = { ...start, createdAt: 0 };
+    const ok = { code: "c", state: "s", guild_id: guildId };
+    const decide = (query: Record<string, string>, state: typeof known | null, sessionUserId: string | null, now = 1_000) => DecideInvite({ query, state, sessionUserId, now });
+
+    check("Abbruch bei Discord: zurück zur Serverliste", decide({ error: "access_denied" }, null, null).kind === "cancel");
+    check("  ein anderer Fehler von Discord ist kein Abbruch", JSON.stringify(decide({ error: "invalid_scope" }, null, null)).includes('"reason":"discord"'));
+    check("Das Cookie lebt länger als die Einladung (sonst nie „abgelaufen“)", INVITE_COOKIE_LIFETIME >= 60 * 60_000 && INVITE_COOKIE_LIFETIME > INVITE_LIFETIME);
+    check("Cookie mit mehreren Einladungen: neue hinten, höchstens fünf", NonceList(`a${"x".repeat(31)}.b${"y".repeat(31)}`, `c${"z".repeat(31)}`).split(".").length === 3 && NonceList(Array.from({ length: 9 }, (_, i) => `${i}${"q".repeat(31)}`).join("."), `n${"w".repeat(31)}`).split(".").length === 5);
+    check("Ohne passenden state: nicht gültig", JSON.stringify(decide(ok, null, userId)).includes('"reason":"unknown"'));
+    check("Nach 15 Minuten: abgelaufen", JSON.stringify(decide(ok, known, userId, INVITE_LIFETIME + 1)).includes('"reason":"expired"'));
+    check("  genau 15 Minuten gelten noch", decide(ok, known, userId, INVITE_LIFETIME).kind === "exchange");
+    check("Andere Person angemeldet: anderes Konto", JSON.stringify(decide(ok, known, "999999999999999999")).includes('"reason":"account"'));
+    check("  niemand angemeldet: anderes Konto", JSON.stringify(decide(ok, known, null)).includes('"reason":"account"'));
+    check("Anderer Server bei Discord: anderer Server", JSON.stringify(decide({ ...ok, guild_id: otherGuild }, known, userId)).includes('"reason":"guild"'));
+    check("  ohne guild_id: nicht gültig", JSON.stringify(decide({ code: "c", state: "s" }, known, userId)).includes('"reason":"unknown"'));
+    check("  ohne Code: nicht gültig", JSON.stringify(decide({ state: "s", guild_id: guildId }, known, userId)).includes('"reason":"unknown"'));
+    check("Alles passt: Code eintauschen", decide(ok, known, userId).kind === "exchange");
+
+    const session: IDashboardSession = { id: "sitzung-einladen", userId, username: "Check", avatar: null, accessToken: "token-einladen", mfa: true, expiresAt: Date.now() + 60_000 };
+    const sessionCookie = `${SESSION_COOKIE}=${service.Sign(session)}`;
+    const realFetch = globalThis.fetch;
+    const calls: { url: string; body: string; method: string }[] = [];
+    const exchanges = (): number => calls.filter((call) => call.url.endsWith("/oauth2/token")).length;
+    const left = (id: string): boolean => calls.some((call) => call.method === "DELETE" && call.url.endsWith(`/users/@me/guilds/${id}`));
+
+    // Was Discord beim Tausch antwortet, und was GuildJoined danach meldet. Je Fall umgestellt.
+    let tokenReply = (): Response => Response.json({ access_token: "bot-token", token_type: "Bearer", scope: "bot applications.commands", expires_in: 604800, guild: { id: guildId, name: "Testserver" } });
+    let joined: "ok" | "contact" | null = "ok";
+
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = input instanceof Request ? input.url : String(input);
+
+        if (!url.startsWith("https://discord.com/")) return realFetch(input, init);
+
+        calls.push({ url, body: String(init?.body ?? ""), method: init?.method ?? "GET" });
+
+        if (url.endsWith("/oauth2/token")) {
+            const reply = tokenReply();
+            const body = (await reply.clone().json().catch(() => ({}))) as { guild?: { id?: string } };
+            const target = body.guild?.id;
+
+            // Wie GuildJoined nach dem Beitritt: meldet kurz darauf sein Ergebnis.
+            if (reply.ok && target && joined) {
+                const outcome = joined;
+                setTimeout(() => JoinStarted(target)(outcome), 30);
+            }
+
+            return reply;
+        }
+        if (init?.method === "DELETE" && url.includes("/users/@me/guilds/")) return new Response(null, { status: 204 });
+        if (url.includes("/users/@me/guilds")) return Response.json([]);
+
+        return new Response(null, { status: 404 });
+    }) as typeof fetch;
+
+    const callback = (query: string, cookie: string) => realFetch(`${BASE}${P}/einladen/callback?${query}`, { headers: { cookie, Accept: "text/html" }, ...MANUAL });
+    const fresh = (overrides: Partial<typeof start> = {}, createdAt?: number) => CreateInviteState({ ...start, ...overrides }, createdAt);
+    const with_ = (...nonces: string[]): string => `${INVITE_STATE_COOKIE}=${nonces.join(".")}; ${sessionCookie}`;
+
+    try {
+        const cancelled = await callback("error=access_denied", "");
+        check("Callback: Abbruch leitet zur Serverliste", cancelled.status === 302 && cancelled.headers.get("location") === HOME, `${cancelled.status} ${cancelled.headers.get("location")}`);
+        check("  und löscht das state-Cookie", String(cancelled.headers.get("set-cookie")).includes(`${INVITE_STATE_COOKIE}=;`), String(cancelled.headers.get("set-cookie")));
+
+        const broken = await callback("error=invalid_scope", sessionCookie);
+        check("Callback: anderer Discord-Fehler zeigt die Seite statt still zur Liste", broken.status === 400 && (await broken.text()).includes("Discord hat die Einladung nicht bestätigt"), `${broken.status}`);
+
+        const forged = await callback(`code=x&state=gefaelscht&guild_id=${guildId}`, sessionCookie);
+        const forgedBody = await forged.text();
+        check("Callback: gefälschter state ist 400 mit Seite", forged.status === 400 && forgedBody.includes("Einladung nicht mehr gültig") && forgedBody.includes("Bot nicht beigetreten"), `${forged.status}`);
+
+        // Bindung an den Browser: der echte state in der Adresse, aber ohne passendes Cookie.
+        const bound = fresh();
+        const stranger = await callback(`code=x&state=${bound}&guild_id=${guildId}`, sessionCookie);
+        check("Callback: echter state ohne sein Cookie ist nicht gültig", stranger.status === 400 && (await stranger.text()).includes("Einladung nicht mehr gültig"));
+        const foreign = await callback(`code=x&state=${bound}&guild_id=${guildId}`, with_(fresh()));
+        check("  mit einem fremden Cookie ebenso", foreign.status === 400 && (await foreign.text()).includes("Einladung nicht mehr gültig"));
+        const owner = await callback(`code=x&state=${bound}&guild_id=${otherGuild}`, with_(bound));
+        check("  und der state bleibt dabei für den richtigen Browser gültig", owner.status === 400 && (await owner.text()).includes("Anderer Server gewählt"));
+
+        const otherUser = fresh({ userId: "999999999999999999", userName: "Jemand anderes" });
+        const otherUserPage = await callback(`code=x&state=${otherUser}&guild_id=${guildId}`, with_(otherUser));
+        const otherUserBody = await otherUserPage.text();
+        check("Callback: anderes Konto zeigt den Grund", otherUserPage.status === 400 && otherUserBody.includes("Anderes Konto angemeldet"), `${otherUserPage.status}`);
+        check("  Knopf meldet ab und lädt danach neu ein", otherUserBody.includes(`${P}/logout?return=${encodeURIComponent(`${P}/einladen?guild=${guildId}`)}`), otherUserBody.match(/invfail__go[^>]*/)?.[0] ?? "");
+
+        const late = fresh({ guildName: "<b>Laut</b>" }, Date.now() - 16 * 60_000);
+        const latePage = await callback(`code=x&state=${late}&guild_id=${guildId}`, with_(late));
+        const lateBody = await latePage.text();
+        check("Callback: nach 16 Minuten abgelaufen", latePage.status === 400 && lateBody.includes("Einladung abgelaufen") && lateBody.includes("16 Minuten"), `${latePage.status}`);
+        check("  Servername wird maskiert", lateBody.includes("&lt;b&gt;Laut&lt;/b&gt;") && !lateBody.includes("<b>Laut</b>"));
+
+        const reused = await callback(`code=x&state=${late}&guild_id=${guildId}`, with_(late));
+        check("  derselbe state ein zweites Mal: nicht gültig", reused.status === 400 && (await reused.text()).includes("Einladung nicht mehr gültig"));
+
+        const dollar = fresh({ guildName: "Cash $'n Carry $` __ACTIONS__" }, Date.now() - 20 * 60_000);
+        const dollarBody = await (await callback(`code=x&state=${dollar}&guild_id=${guildId}`, with_(dollar))).text();
+        check("Servernamen mit $ und Platzhaltern bleiben, wie sie sind", dollarBody.includes("Cash $&#39;n Carry $` __ACTIONS__") && dollarBody.length < 20_000, `${dollarBody.length} Zeichen`);
+
+        check("Bei keinem Fehlschlag wurde ein Code eingetauscht", exchanges() === 0, JSON.stringify(calls.map((call) => call.url)));
+
+        // Zwei Einladungen in zwei Tabs: Die erste läuft durch, die zweite bleibt gültig.
+        const tabA = fresh();
+        const tabB = fresh();
+        const success = await callback(`code=echter-code&state=${tabA}&guild_id=${guildId}&permissions=8`, with_(tabA, tabB));
+        const token = calls.find((call) => call.url.endsWith("/oauth2/token"));
+
+        check("Callback: Erfolg führt in die Übersicht des Servers", success.status === 302 && success.headers.get("location") === `${P}/guild/${guildId}/uebersicht`, `${success.status} ${success.headers.get("location")}`);
+        check("  der Code wird mit der Einladungs-redirect_uri getauscht", token !== undefined && token.body.includes("code=echter-code") && token.body.includes(`redirect_uri=${encodeURIComponent(service.InviteRedirectURI)}`), token?.body ?? "kein Tausch");
+        check("  das Cookie behält die zweite Einladung", String(success.headers.get("set-cookie")).includes(`${INVITE_STATE_COOKIE}=${tabB};`), String(success.headers.get("set-cookie")));
+
+        const second = await callback(`code=x&state=${tabB}&guild_id=${otherGuild}`, with_(tabB));
+        check("  die zweite Einladung ist danach noch gültig", second.status === 400 && (await second.text()).includes("Anderer Server gewählt"));
+
+        // GuildJoined lässt den Bot gleich wieder gehen (kein Ansprechpartner).
+        joined = "contact";
+        const refusedState = fresh();
+        const refused = await callback(`code=c2&state=${refusedState}&guild_id=${guildId}`, with_(refusedState));
+        const refusedBody = await refused.text();
+        check("Callback: GuildJoined lehnt ab, dann keine Übersicht, sondern der Grund", refused.status === 400 && refusedBody.includes("Bot wieder gegangen") && refusedBody.includes("Zugang"), `${refused.status}`);
+        joined = "ok";
+
+        // Discord nennt nach dem Tausch einen anderen Server: Der Bot geht dort sofort wieder.
+        tokenReply = () => Response.json({ access_token: "bot-token", token_type: "Bearer", scope: "bot applications.commands", expires_in: 604800, guild: { id: otherGuild, name: "Woanders" } });
+        const swapped = fresh();
+        const swappedPage = await callback(`code=c3&state=${swapped}&guild_id=${guildId}`, with_(swapped));
+        check("Callback: anderer Server in Discords Antwort, der Bot geht dort wieder", swappedPage.status === 400 && (await swappedPage.text()).includes("Anderer Server gewählt") && left(otherGuild), JSON.stringify(calls.filter((call) => call.method === "DELETE").map((call) => call.url)));
+
+        // Discord lehnt den Code ab (abgelaufen, schon benutzt): eigene Seite statt 500.
+        tokenReply = () => Response.json({ error: "invalid_grant" }, { status: 400 });
+        const rejected = fresh();
+        const rejectedPage = await callback(`code=alt&state=${rejected}&guild_id=${guildId}`, with_(rejected));
+        check("Callback: abgelehnter Tausch zeigt die Seite mit Grund", rejectedPage.status === 400 && (await rejectedPage.text()).includes("Discord hat die Einladung nicht bestätigt"), `${rejectedPage.status}`);
+
+        // Der Login darf nicht zum Einladen taugen.
+        calls.length = 0;
+
+        const loginStart = async (): Promise<{ state: string; cookie: string }> => {
+            const login = await realFetch(`${BASE}${P}/login`, MANUAL);
+
+            return {
+                state: new URL(login.headers.get("location") ?? "https://invalid.example").searchParams.get("state") ?? "",
+                cookie: (login.headers.get("set-cookie") ?? "").split(";")[0],
+            };
+        };
+
+        const first = await loginStart();
+        const sneaky = await realFetch(`${BASE}${P}/callback?code=x&state=${first.state}&guild_id=${guildId}&permissions=8`, { headers: { cookie: first.cookie }, ...MANUAL });
+        check("Login-Callback mit guild_id: abgewiesen ohne Tausch", sneaky.status === 400 && exchanges() === 0, `${sneaky.status} ${JSON.stringify(calls.map((call) => call.url))}`);
+
+        // Derselbe Code noch einmal, jetzt mit neuem state und ohne guild_id: Discord verrät die Bot-Freigabe in der Antwort.
+        tokenReply = () => Response.json({ access_token: "bot-token", token_type: "Bearer", scope: "bot identify", expires_in: 604800, guild: { id: guildId, name: "Testserver" } });
+        joined = null;
+
+        const second2 = await loginStart();
+        const replay = await realFetch(`${BASE}${P}/callback?code=x&state=${second2.state}`, { headers: { cookie: second2.cookie }, ...MANUAL });
+        check("Login mit alter Bot-Freigabe: keine Sitzung, der Bot geht wieder", replay.status === 400 && !String(replay.headers.get("set-cookie")).includes(`${SESSION_COOKIE}=`) && left(guildId), `${replay.status} ${replay.headers.get("set-cookie")}`);
+
+        const logout = await realFetch(`${BASE}${P}/logout?return=${encodeURIComponent(`${P}/einladen?guild=${guildId}`)}`, { headers: { cookie: sessionCookie }, ...MANUAL });
+        check("Abmelden mit Rückweg: weiter zur Anmeldung samt Ziel", logout.headers.get("location") === `${P}/login?return=${encodeURIComponent(`${P}/einladen?guild=${guildId}`)}`, String(logout.headers.get("location")));
+
+        const evil = await realFetch(`${BASE}${P}/logout?return=//evil.example`, MANUAL);
+        check("  fremder Rückweg wird verworfen", evil.headers.get("location") === `${P}/login`, String(evil.headers.get("location")));
+
+        const twice = await realFetch(`${BASE}${P}/logout?return=a&return=b`, MANUAL);
+        check("  doppeltes return ist kein 500", twice.status === 302 && twice.headers.get("location") === `${P}/login`, `${twice.status}`);
+
+        const twiceLogin = await realFetch(`${BASE}${P}/login?return=a&return=b`, MANUAL);
+        check("  auch beim Anmelden nicht", twiceLogin.status === 302, `${twiceLogin.status}`);
+    } finally {
+        globalThis.fetch = realFetch;
+    }
+}
+
 async function main(): Promise<void> {
     const client = new BotClient();
 
@@ -1196,7 +1399,7 @@ async function main(): Promise<void> {
     const service = client.dashboardService;
 
     console.log(`\nRedirect URI: ${service.RedirectURI}`);
-    console.log(`Invite URL:   ${service.InviteURL()}\n`);
+    console.log(`Einladung:    ${service.InviteRedirectURI}\n`);
 
     checkScopes();
     await checkGroups(client);
@@ -1207,6 +1410,7 @@ async function main(): Promise<void> {
     checkShopStatus();
     checkSessions(client);
     await checkLogout(client);
+    await checkInvite(client);
 
     // RL Tracker, Administration und die Epic-Verknuepfung gibt es nicht mehr.
     for (const gone of ["/admins", "/api/admin", "/user/1059621019947634739/tracking", "/api/tracking/1059621019947634739", "/link/epic"]) {

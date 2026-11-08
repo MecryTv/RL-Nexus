@@ -2,10 +2,11 @@ import { FastifyReply, FastifyRequest } from "fastify";
 import BotClient from "../client/BotClient";
 import Route from "../structures/Route";
 import { SessionExpired } from "../services/DashboardService";
-import { DASHBOARD_HOME, DASHBOARD_PATH } from "../constants/Dashboard";
+import { AvatarURL, DASHBOARD_HOME, DASHBOARD_PATH, ParseCookies, SerializeCookie } from "../constants/Dashboard";
 import { SNOWFLAKE } from "../constants/Discord";
 import { SessionOf, Unconfigured } from "../utils/dashboard";
 import { IssuePass } from "../utils/invitepass";
+import { CreateInviteState, INVITE_COOKIE_LIFETIME, INVITE_STATE_COOKIE, NonceList } from "../utils/invitestate";
 import logger from "../utils/logger";
 import { BannedFor } from "../utils/security";
 
@@ -63,6 +64,22 @@ export default class DashboardInvite extends Route {
 
         await IssuePass(this.client, guildId, session.userId);
 
-        return reply.header("Cache-Control", "no-store").redirect(service.InviteURL(guildId), 302);
+        // W-0069: einmaliger state für den Rückweg, im Speicher und als Cookie in diesem Browser.
+        const state = CreateInviteState({
+            guildId,
+            guildName: card.name,
+            guildIcon: card.icon,
+            userId: session.userId,
+            userName: session.username,
+            userAvatar: session.avatar ? AvatarURL(session.userId, session.avatar) : null,
+        });
+
+        // Bis zu fünf offene Einladungen im Cookie, damit zwei Tabs sich nicht gegenseitig verdrängen.
+        const cookie = NonceList(ParseCookies(request.headers.cookie)[INVITE_STATE_COOKIE], state);
+
+        return reply
+            .header("Cache-Control", "no-store")
+            .header("Set-Cookie", SerializeCookie(INVITE_STATE_COOKIE, cookie, INVITE_COOKIE_LIFETIME, service.Secure))
+            .redirect(service.InviteURL(guildId, state), 302);
     }
 }
