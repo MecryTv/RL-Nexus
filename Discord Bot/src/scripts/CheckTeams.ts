@@ -1639,7 +1639,42 @@ async function checkSending(client: BotClient): Promise<void> {
         const sameJson = JSON.stringify(same.components);
 
         check("Menü zurücksetzen: dieselben Teile, Menü dabei", sameJson.includes("teams:menu:1") && same.components.length === 1, sameJson.slice(0, 200));
-        check("Menü zurücksetzen: Bilder zeigen auf den Anhang, nicht auf den ablaufenden Link", !sameJson.includes("cdn.discordapp.com") && (sameJson.match(/attachment:\/\/kopf\.png/g) ?? []).length === 2 && same.attachments.length === 1, sameJson.slice(0, 300));
+        check(
+            "Menü zurücksetzen: Bilder zeigen auf den Anhang, nicht auf den ablaufenden Link",
+            !sameJson.includes("cdn.discordapp.com") && (sameJson.match(/attachment:\/\/kopf\.png/g) ?? []).length === 2 && JSON.stringify(same.attachments) === JSON.stringify([{ id: "555", filename: "kopf.png" }]),
+            `${sameJson.slice(0, 300)} | ${JSON.stringify(same.attachments)}`
+        );
+
+        // W-0075: Bei einer Menüwahl schickt Discord die Nachricht ohne Anhangliste mit. Das Bild hängt trotzdem als
+        // Anhang an ihr - ohne ihn in attachments löscht Discord ihn beim Setzen, und das Bild ist weg.
+        const icon = "https://cdn.discordapp.com/icons/1/abc.webp?size=256";
+        const bare = {
+            components: [
+                {
+                    toJSON: () => ({
+                        type: 17,
+                        components: [
+                            { type: 9, components: [{ type: 10, content: "Kopf" }], accessory: { type: 11, media: { url: icon, id: "m1" } } },
+                            { type: 12, items: [{ media: { url: "https://cdn.discordapp.com/attachments/1566/1569444859209588737/0-welcomecard.webp?ex=aa&is=bb&hm=cc&", id: "m2", loading_state: 2 } }] },
+                            { type: 1, components: [{ type: 3, custom_id: "teams:menu:1", options: [] }] },
+                        ],
+                    }),
+                },
+            ],
+            attachments: new Map<string, { id: string; name: string; url: string }>(),
+        };
+        const kept = SameMessage(bare);
+        const keptJson = JSON.stringify(kept.components);
+
+        check(
+            "Menü zurücksetzen ohne Anhangliste: das große Bild zeigt auf seinen Anhang und bleibt erhalten",
+            // Discord löst attachment://… nur über filename im behaltenen Anhang auf, sonst: UNFURLED_MEDIA_ITEM_REFERENCED_ATTACHMENT_NOT_FOUND.
+            keptJson.includes("attachment://0-welcomecard.webp") &&
+                !keptJson.includes("/attachments/") &&
+                JSON.stringify(kept.attachments) === JSON.stringify([{ id: "1569444859209588737", filename: "0-welcomecard.webp" }]),
+            `${keptJson.slice(0, 300)} | ${JSON.stringify(kept.attachments)}`
+        );
+        check("Menü zurücksetzen ohne Anhangliste: ein fremder Link (Server-Icon) bleibt, wie er ist", keptJson.includes(icon));
 
         await service.Handle({
             inCachedGuild: () => true,
