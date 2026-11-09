@@ -243,6 +243,7 @@ export const USERDATA_AREAS: readonly IUserdataAreaDef[] = [
             { table: "beta_codes", column: "created_by", role: "team", time: "created_at", label: "'Beta-Code angelegt'" },
             { table: "bot_messages", column: "created_by", role: "team", time: "created_at", label: "'Nachricht über den Bot verschickt'", name: "created_name" },
             { table: "bot_message_templates", column: "updated_by", role: "team", time: "updated_at", label: "'Vorlage für Nachrichten geändert'", name: "updated_name" },
+            { table: "changelog_versions", column: "created_by", role: "team", time: "created_at", label: "CONCAT('Changelog-Version angelegt: ', version)", name: "created_name" },
             { table: "server_requests", column: "decided_by", role: "team", guild: G, time: "decided_at", label: "CONCAT('Über eine Server-Anfrage entschieden: ', guild_name)", name: "decided_name" },
             { table: "server_blocks", column: "blocked_by", role: "team", guild: G, time: "created_at", label: "'Server für RL Nexus gesperrt'", name: "by_name" },
             { table: "security_bans", column: "created_by", role: "team", time: "created_at", label: "'Person gesperrt'", name: "created_name" },
