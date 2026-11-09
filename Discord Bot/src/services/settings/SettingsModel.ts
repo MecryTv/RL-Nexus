@@ -70,7 +70,12 @@ export type PanelStep = "s" | "m" | "w" | "c" | "r" | "t" | "o" | "f" | "n" | "b
 const STEPS = new Set<string>(["s", "m", "w", "c", "r", "t", "o", "f", "n", "b", "u", "p", "x"]);
 
 export function PanelId(step: PanelStep, module?: string, key?: string, extra?: string): string {
-    return ["set", step, module, key, extra].filter((part) => part !== undefined).join(":");
+    // Nur hinten kürzen: Eine Lücke in der Mitte bleibt leer stehen, sonst rutscht extra an die Stelle von key (W-0014, „Modul an“).
+    const parts = ["set", step, module, key, extra];
+
+    while (parts.at(-1) === undefined) parts.pop();
+
+    return parts.map((part) => part ?? "").join(":");
 }
 
 export function ReadPanelId(id: string): { step: PanelStep; module: string | null; key: string | null; extra: string | null } | null {
