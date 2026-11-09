@@ -811,6 +811,50 @@ async function checkSweepDm(client: BotClient): Promise<void> {
     check("Der Entwurf ist trotzdem weg", flow.Draft("S", now + DRAFT_TTL + 1) === null);
 }
 
+/** W-0074: Sind die DMs zu, kommt der Hinweis statt eines Fehlers - Discord meldet das als 50007 oder 50278. */
+async function checkDmClosed(client: BotClient, form: IApplyForm): Promise<void> {
+    console.log("\n  — DM: Direktnachrichten zu —");
+
+    const flow = client.applyService.flow;
+    const start = async (userId: string, code: number): Promise<{ edits: string[]; error: unknown }> => {
+        const edits: string[] = [];
+        const interaction = {
+            user: {
+                id: userId,
+                createDM: async () => ({
+                    id: `dm-${userId}`,
+                    send: async () => {
+                        throw Object.assign(new Error(`DiscordAPIError[${code}]`), { code });
+                    },
+                }),
+            },
+            deferReply: async () => undefined,
+            editReply: async (options: unknown) => void edits.push(JSON.stringify(options)),
+        } as unknown as ButtonInteraction;
+
+        try {
+            await flow.StartDm(interaction, FakeGuild(), form);
+
+            return { edits, error: null };
+        } catch (error) {
+            return { edits, error };
+        }
+    };
+
+    for (const code of [50007, 50278]) {
+        const { edits, error } = await start(`closed-${code}`, code);
+
+        check(`DMs zu (${code}): kein Fehler`, error === null, String(error));
+        check(`DMs zu (${code}): Hinweis mit Anleitung`, edits.some((entry) => entry.includes("Ich komme nicht in deine DMs")), edits.join(" | "));
+        check(`DMs zu (${code}): kein Entwurf bleibt liegen`, flow.Draft(`closed-${code}`) === null);
+    }
+
+    const other = await start("closed-other", 50013);
+
+    check("Anderer Fehler beim Senden: geht weiter ins Fehlerprotokoll", (other.error as { code?: unknown } | null)?.code === 50013);
+    check("Anderer Fehler beim Senden: kein Entwurf bleibt liegen", flow.Draft("closed-other") === null);
+}
+
 /** W-0020: Discord merkt sich die Wahl im Menü - das Panel wird danach neu gezeichnet. */
 async function checkResetPanel(client: BotClient, form: IApplyForm): Promise<void> {
     console.log("\n  — Panel-Menü zurücksetzen —");
@@ -1459,6 +1503,7 @@ async function main(): Promise<void> {
     checkRealign();
     await checkDmQueue(client, form);
     await checkSweepDm(client);
+    await checkDmClosed(client, form);
     await checkResetPanel(client, form);
     await checkRestorePanel(client);
 

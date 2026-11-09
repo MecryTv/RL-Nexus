@@ -55,6 +55,9 @@ type StartInteraction = ButtonInteraction | StringSelectMenuInteraction | ChatIn
 type FlowInteraction = ButtonInteraction | StringSelectMenuInteraction | ModalSubmitInteraction;
 
 export const EXPIRED = "Diese Bewerbung ist abgelaufen. Klick im Kanal noch einmal auf „Bewerben“.";
+
+/** So meldet Discord geschlossene DMs: 50007, inzwischen auch 50278 („no mutual guilds“, W-0074). */
+const DM_CLOSED: ReadonlySet<unknown> = new Set([50007, 50278]);
 const CHANGED = "Das Formular hat sich gerade geändert. Weiter geht es mit der Nachricht darunter.";
 
 /** Die Fragen in Fenster zu je höchstens 5 - mehr nimmt Discord nicht. */
@@ -471,7 +474,7 @@ export default class ApplyFlow {
         } catch (error) {
             this.End(draft.userId);
 
-            if ((error as { code?: unknown }).code !== 50007) throw error;
+            if (!DM_CLOSED.has((error as { code?: unknown }).code)) throw error;
 
             await this.Edit(
                 interaction,
