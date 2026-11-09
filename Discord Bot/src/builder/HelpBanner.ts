@@ -1,5 +1,6 @@
 import { SKRSContext2D, createCanvas, loadImage } from "@napi-rs/canvas";
 import { RegisterFonts } from "./RankCard";
+import { DrawText, Fit, LoadEmojis } from "./HelpImage";
 
 /**
  * Das Banner oben auf der Startseite von /hilfe (W-0014, Entwurf B): dunkler
@@ -27,19 +28,9 @@ function RoundRect(ctx: SKRSContext2D, x: number, y: number, size: number, radiu
     ctx.roundRect(x, y, size, size, radius);
 }
 
-/** Kürzt mit „…“, bis der Text in die Breite passt. */
-function Fit(ctx: SKRSContext2D, text: string, max: number): string {
-    if (ctx.measureText(text).width <= max) return text;
-
-    let cut = [...text];
-
-    while (cut.length > 1 && ctx.measureText(`${cut.join("")}…`).width > max) cut = cut.slice(0, -1);
-
-    return `${cut.join("").trimEnd()}…`;
-}
-
 export async function RenderHelpBanner(input: { name: string; avatar: Buffer | null }): Promise<Buffer> {
     await RegisterFonts();
+    await LoadEmojis([input.name]);
 
     const canvas = createCanvas(WIDTH, HEIGHT);
     const ctx = canvas.getContext("2d");
@@ -111,10 +102,10 @@ export async function RenderHelpBanner(input: { name: string; avatar: Buffer | n
     ctx.fillStyle = "#ff1e2d";
     ctx.fillText("NEXUS", TEXT_LEFT + rl, HEIGHT / 2 + 6);
 
-    // Willkommen, <Name>
+    // Willkommen, <Name> - Emojis im Namen als Twemoji wie in den Seiten darunter.
     ctx.font = "700 30px Rajdhani";
     ctx.fillStyle = "#e4e8ee";
-    ctx.fillText(Fit(ctx, `WILLKOMMEN, ${input.name.toUpperCase()}`, TEXT_MAX), TEXT_LEFT + 4, HEIGHT / 2 + 52);
+    DrawText(ctx, Fit(ctx, `WILLKOMMEN, ${input.name.toUpperCase()}`, TEXT_MAX), TEXT_LEFT + 4, HEIGHT / 2 + 52);
 
     return canvas.toBuffer("image/png");
 }

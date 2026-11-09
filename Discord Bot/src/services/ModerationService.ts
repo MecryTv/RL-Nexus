@@ -86,6 +86,44 @@ const PENALTIES: ReadonlySet<ModAction> = new Set<ModAction>(["warn", "timeout",
 
 const EVIDENCE_TYPES = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"]);
 
+const FOREIGN_LINK = "Dieser Nachrichtenlink führt auf einen anderen Server. Gesichert wird nur, was hier steht.";
+const HTTPS_ONLY = "Nur https-Links gehen als Beweis.";
+
+function IsHttps(value: string): boolean {
+    return value.length <= 500 && URL.canParse(value) && new URL(value).protocol === "https:";
+}
+
+/** Woran ein Anhang als Beweis scheitert - null, wenn er taugt. Gilt vor der Strafe wie beim Sichern. */
+export function AttachmentFault(attachment: { url: string; size: number; contentType: string | null }): string | null {
+    const host = URL.canParse(attachment.url) ? new URL(attachment.url).hostname : "";
+
+    if (!EVIDENCE_TYPES.has((attachment.contentType ?? "").split(";")[0])) return "Nur Bilder: PNG, JPG, GIF oder WebP.";
+    if (attachment.size > MAX_EVIDENCE_BYTES) return "Das Bild ist größer als 8 MB.";
+    if (host !== "cdn.discordapp.com" && host !== "media.discordapp.net") return "Dieser Anhang kommt nicht von Discord.";
+
+    return null;
+}
+
+/**
+ * Die Ablehnung, wenn die Pflicht greift (needed) und kein Beweis taugt - sonst
+ * null. Einer, der taugt, reicht. Geprüft wird nur, was ohne Netz geht: Art,
+ * Größe, Herkunft, Server. Scheitert danach das Sichern, meldet AddProof das.
+ */
+export function ProofRefusal(needed: string | null, proof: IModProof | undefined, guildId: string): string | null {
+    if (!needed) return null;
+
+    const link = proof?.link?.trim();
+    const faults: (string | null)[] = [];
+
+    if (proof?.message) faults.push(null);
+    if (proof?.image) faults.push(AttachmentFault(proof.image));
+    if (link) faults.push(MESSAGE_LINK.test(link) ? (ParseMessageLink(link, guildId) ? null : FOREIGN_LINK) : IsHttps(link) ? null : HTTPS_ONLY);
+
+    if (faults.includes(null)) return null;
+
+    return faults.length ? `${faults[0]} ${needed}` : needed;
+}
+
 function IsRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -286,9 +324,10 @@ export default class ModerationService {
     }
 
     /**
-     * Wie Act, mit Beweisen. Braucht die Strafe hier einen und fehlt er,
-     * passiert nichts. Sonst gilt die Strafe - ein Beweis, der danach nicht
-     * klappt, steht in problems, statt sie zu kippen.
+     * Wie Act, mit Beweisen. Braucht die Strafe hier einen und fehlt er - oder
+     * taugt keiner (falsche Art, zu groß, fremder Server) -, passiert nichts.
+     * Sonst gilt die Strafe - ein Beweis, der danach nicht klappt, steht in
+     * problems, statt sie zu kippen.
      */
     async ActWithProof(
         guild: Guild,
@@ -297,11 +336,14 @@ export default class ModerationService {
         source: Exclude<ModSource, "auto">,
         proof?: IModProof
     ): Promise<{ entry: IModCase; problems: string[] }> {
+        // Ohne Datenbank oder mit Modul aus soll das dastehen, nicht ein Fehler beim Lesen der Pflicht.
+        await this.Ready(guild);
+
         const given = Boolean(proof?.image || proof?.message || proof?.link?.trim());
-        const needed = given ? null : ProofNeeded(await this.client.modSettings.Of(guild.id), request);
+        const refused = ProofRefusal(ProofNeeded(await this.client.modSettings.Of(guild.id), request), proof, guild.id);
 
         // Wer die Aktion gar nicht darf, soll das hören - nicht, dass ein Beweis fehlt.
-        if (needed && (await this.Allowed(actor, request.action))) throw new ModerationError(needed);
+        if (refused && (await this.Allowed(actor, request.action))) throw new ModerationError(refused);
 
         const entry = await this.Act(guild, actor, request, source);
 
@@ -846,9 +888,7 @@ export default class ModerationService {
     async AddLink(guildId: string, author: IModActor, number: number, url: unknown, name?: unknown): Promise<IModCase> {
         const value = typeof url === "string" ? url.trim() : "";
 
-        if (value.length > 500 || !URL.canParse(value) || new URL(value).protocol !== "https:") {
-            throw new ModerationError("Nur https-Links gehen als Beweis.");
-        }
+        if (!IsHttps(value)) throw new ModerationError(HTTPS_ONLY);
 
         return this.AddEvidence(guildId, author, number, "link", value, typeof name === "string" ? name.trim().slice(0, 100) || null : null);
     }
@@ -862,14 +902,13 @@ export default class ModerationService {
         const image = await Shrink(buffer, type).catch(() => {
             throw new ModerationError("Das Bild ließ sich nicht lesen.");
         });
-        const id = Math.max(0, ...entry.evidence.map((item) => item.id)) + 1;
-        const file = `${id}${image.extension}`;
         const directory = path.join(EVIDENCE_ROOT, guildId, String(entry.id));
 
-        await mkdir(directory, { recursive: true });
-        await writeFile(path.join(directory, file), image.buffer);
-
-        return this.AddEvidence(guildId, author, number, "image", file, name ? name.slice(0, 100) : null, id);
+        // Erst die Nummer unter Sperre, dann die Datei: bei 20 Beweisen bleibt keine liegen, zwei zugleich überschreiben sich nicht.
+        return this.AddEvidence(guildId, author, number, "image", (id) => `${id}${image.extension}`, name ? name.slice(0, 100) : null, undefined, async (file) => {
+            await mkdir(directory, { recursive: true });
+            await writeFile(path.join(directory, file), image.buffer);
+        });
     }
 
     /**
@@ -904,7 +943,7 @@ export default class ModerationService {
     private async LinkedMessage(guild: Guild, author: IModActor, link: string): Promise<Message> {
         const target = ParseMessageLink(link, guild.id);
 
-        if (!target) throw new ModerationError("Dieser Nachrichtenlink führt auf einen anderen Server. Gesichert wird nur, was hier steht.");
+        if (!target) throw new ModerationError(FOREIGN_LINK);
 
         const channel = guild.channels.cache.get(target.channelId) ?? (await guild.channels.fetch(target.channelId).catch(() => null));
         const me = guild.members.me ?? (await guild.members.fetchMe());
@@ -934,7 +973,7 @@ export default class ModerationService {
             content: message.content.slice(0, MAX_PROOF_TEXT),
             sentAt: message.createdTimestamp,
         };
-        let entry = await this.AddEvidence(guild.id, author, number, "message", message.url, snapshot.content.slice(0, 100) || null, undefined, snapshot);
+        let entry = await this.AddEvidence(guild.id, author, number, "message", message.url, snapshot.content.slice(0, 100) || null, snapshot);
         const problems: string[] = [];
         const images = [...message.attachments.values()].filter((file) => (file.contentType ?? "").startsWith("image/"));
 
@@ -951,40 +990,56 @@ export default class ModerationService {
 
     /** Ein Anhang aus Discord (/fall beweis) - nur von Discords eigenem Speicher. */
     async AddAttachment(guildId: string, author: IModActor, number: number, attachment: { url: string; size: number; contentType: string | null; name: string }): Promise<IModCase> {
-        const type = (attachment.contentType ?? "").split(";")[0];
+        const fault = AttachmentFault(attachment);
 
-        if (!EVIDENCE_TYPES.has(type)) throw new ModerationError("Nur Bilder: PNG, JPG, GIF oder WebP.");
-        if (attachment.size > MAX_EVIDENCE_BYTES) throw new ModerationError("Das Bild ist größer als 8 MB.");
+        if (fault) throw new ModerationError(fault);
 
-        const host = URL.canParse(attachment.url) ? new URL(attachment.url).hostname : "";
+        // Ein hängender Download hielte die Antwort an den Moderator auf.
+        const response = await fetch(attachment.url, { signal: AbortSignal.timeout(15_000) }).catch(() => null);
+        const body = response?.ok ? await response.arrayBuffer().catch(() => null) : null;
 
-        if (host !== "cdn.discordapp.com" && host !== "media.discordapp.net") throw new ModerationError("Dieser Anhang kommt nicht von Discord.");
+        if (!body) throw new ModerationError("Der Anhang ließ sich nicht laden.");
 
-        const response = await fetch(attachment.url).catch(() => null);
-
-        if (!response?.ok) throw new ModerationError("Der Anhang ließ sich nicht laden.");
-
-        return this.AddImage(guildId, author, number, Buffer.from(await response.arrayBuffer()), type, attachment.name);
+        return this.AddImage(guildId, author, number, Buffer.from(body), (attachment.contentType ?? "").split(";")[0], attachment.name);
     }
 
+    /**
+     * Die Nummer vergibt Mutate unter Sperre - zwei Beweise zugleich bekommen
+     * nie dieselbe. Ein Bild heißt nach ihr: value baut den Dateinamen, store
+     * legt die Datei ab, bevor die Karte sie zeichnet. Klappt das nicht, geht
+     * der Beweis wieder weg.
+     */
     private async AddEvidence(
         guildId: string,
         author: IModActor,
         number: number,
         kind: "image" | "link" | "message",
-        value: string,
+        value: string | ((id: number) => string),
         name: string | null,
-        wanted?: number,
-        message?: IModMessageProof
+        message?: IModMessageProof,
+        store?: (value: string) => Promise<void>
     ): Promise<IModCase> {
         const entry = await this.CaseOf(guildId, number);
+        let added = 0;
+        let stored = "";
         const updated = await this.client.modCases.Mutate(entry.id, (current) => {
             if (current.evidence.length >= MAX_EVIDENCE) throw new ModerationError(`Mehr als ${MAX_EVIDENCE} Beweise gehen an einem Fall nicht.`);
 
-            const id = wanted ?? Math.max(0, ...current.evidence.map((item) => item.id)) + 1;
+            added = Math.max(0, ...current.evidence.map((item) => item.id)) + 1;
+            stored = typeof value === "string" ? value : value(added);
 
-            return { evidence: [...current.evidence, { id, kind, value, name, ...(message ? { message } : {}), by: author.id, byName: author.name, at: Date.now() }] };
+            return { evidence: [...current.evidence, { id: added, kind, value: stored, name, ...(message ? { message } : {}), by: author.id, byName: author.name, at: Date.now() }] };
         });
+
+        if (store && added) {
+            try {
+                await store(stored);
+            } catch (error) {
+                await this.client.modCases.Mutate(entry.id, (current) => ({ evidence: current.evidence.filter((item) => item.id !== added) })).catch(() => null);
+
+                throw error;
+            }
+        }
 
         if (updated) void this.UpdateLog(updated);
 

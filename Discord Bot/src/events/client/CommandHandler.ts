@@ -27,25 +27,8 @@ export default class CommandHandler extends Event {
             return;
         }
 
-        // Kontextmenü an einem Mitglied (Plan 31: „Hack melden“).
-        if (interaction.isUserContextMenuCommand()) {
-            const target = this.client.commands.get(interaction.commandName);
-
-            await target?.ExecuteUser(interaction).catch((error) => logger.warn(`[CommandHandler] Kontextmenü „${interaction.commandName}“ fehlgeschlagen: ${error}`));
-
-            return;
-        }
-
-        // Kontextmenü an einer Nachricht (W-0014: „Als Beweis sichern“).
-        if (interaction.isMessageContextMenuCommand()) {
-            const target = this.client.commands.get(interaction.commandName);
-
-            await target?.ExecuteMessage(interaction).catch((error) => logger.warn(`[CommandHandler] Kontextmenü „${interaction.commandName}“ fehlgeschlagen: ${error}`));
-
-            return;
-        }
-
-        if (!interaction.isChatInputCommand()) return;
+        // Kontextmenüs (Plan 31: „Hack melden“, W-0014: „Als Beweis sichern“) gehen durch dieselben Prüfungen wie Slash-Befehle.
+        if (!interaction.isChatInputCommand() && !interaction.isContextMenuCommand()) return;
 
         const command: Command | undefined = this.client.commands.get(interaction.commandName);
 
@@ -110,7 +93,9 @@ export default class CommandHandler extends Event {
         setTimeout(() => timestamps.delete(interaction.user.id), cooldownAmount);
 
         try {
-            await command.Execute(interaction);
+            if (interaction.isUserContextMenuCommand()) await command.ExecuteUser(interaction);
+            else if (interaction.isMessageContextMenuCommand()) await command.ExecuteMessage(interaction);
+            else await command.Execute(interaction);
         } catch (error) {
             const normalized = error instanceof Error ? error : new Error(String(error));
             await this.client.guardian.ReportError(normalized, interaction, `Command Error: /${command.name}`);

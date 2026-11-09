@@ -5,6 +5,7 @@ import { HelpBlock, RenderHelpImages } from "./HelpImage";
 import { CaseAccent, CaseFooter, ExtraFacts } from "./ModerationView";
 import { ACTION_INFO, CaseRef, FormatDuration } from "../constants/Moderation";
 import { IModCase, IModEvidence } from "../interfaces/services/moderation/IModeration";
+import { Cut } from "../utils/cut";
 
 /**
  * Die Log-Karte als Akte und die Beweis-Ansicht (W-0014, Entwürfe 1B und 2B):
@@ -41,10 +42,6 @@ const WHEN = new Intl.DateTimeFormat("de-DE", { timeZone: "Europe/Berlin", day: 
 /** 01.11. 14:20 - im Bild gibt es keine Discord-Zeitstempel. */
 function When(ms: number): string {
     return WHEN.format(ms).replace(", ", " ");
-}
-
-function Cut(text: string, max: number): string {
-    return text.length > max ? `${text.slice(0, max - 1)}…` : text;
 }
 
 const KIND: Record<IModEvidence["kind"], { icon: string; label: string }> = {
@@ -145,7 +142,7 @@ export async function EvidenceView(entry: IModCase, index: number, extra: { link
         builder.text("Das Bild ist nicht mehr da.");
     } else if (item.kind === "message" && item.message) {
         const quote = item.message.content.trim()
-            ? escapeMarkdown(item.message.content.slice(0, 1_500))
+            ? escapeMarkdown(Cut(item.message.content, 1_500))
                   .split("\n")
                   .map((line) => `> ${line}`)
                   .join("\n")

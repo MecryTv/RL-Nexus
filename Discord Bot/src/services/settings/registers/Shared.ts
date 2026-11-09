@@ -4,6 +4,10 @@ import { FieldKind, IPanelField } from "../SettingsModel";
 
 /** Kanäle für Nachrichten. */
 export const TEXT = [ChannelType.GuildText, ChannelType.GuildAnnouncement];
+/** Kanäle mit Text-Chat, auch Sprachkanäle - so viel nimmt das Speichern mancher Module an (isTextBased). */
+export const CHAT = [...TEXT, ChannelType.GuildVoice];
+/** Alles, was eine Ausnahme sein kann: jede Kanalart und Kategorien. Beiträge erben vom Kanal darüber. */
+export const ANY_CHANNEL = [...TEXT, ChannelType.GuildVoice, ChannelType.GuildStageVoice, ChannelType.GuildCategory, ChannelType.GuildForum, ChannelType.GuildMedia];
 /** Log-Ziele: ein Textkanal oder ein Beitrag (utils/logtarget.ts). */
 export const LOG = [...TEXT, ChannelType.PublicThread, ChannelType.PrivateThread, ChannelType.AnnouncementThread];
 

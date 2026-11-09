@@ -47,6 +47,9 @@ export default class SettingsButtons extends Event {
                 const value = field.kind === "stages" ? StagesText(current as IModStage[]) : String(current ?? "");
                 // Bei Zahlen ist max der höchste Wert, nicht die Länge - nur Stufen und lange Texte bekommen ein großes Feld.
                 const long = field.kind === "stages" || (field.kind === "text" && (field.max ?? 0) > 100);
+                const max = field.kind === "number" ? 10 : Math.min(field.max ?? 4000, 4000);
+                // Ein Startwert über maxLength lässt Discord das ganze Fenster ablehnen. Kein halbes Emoji am Ende.
+                const start = value.slice(0, max).replace(/[\uD800-\uDBFF]$/, "");
 
                 await interaction.showModal(
                     new ModalBuilder()
@@ -61,8 +64,8 @@ export default class SettingsButtons extends Event {
                                         .setCustomId("wert")
                                         .setStyle(long ? TextInputStyle.Paragraph : TextInputStyle.Short)
                                         .setRequired(field.kind !== "stages" && field.kind !== "text")
-                                        .setMaxLength(field.kind === "number" ? 10 : Math.min(field.max ?? 4000, 4000))
-                                        .setValue(value.slice(0, 4000))
+                                        .setMaxLength(max)
+                                        .setValue(start)
                                 )
                         )
                 );
@@ -110,10 +113,14 @@ export default class SettingsButtons extends Event {
                     case "u":
                         view = done(key, await service.Undo(guild, member, module, key));
                         break;
-                    case "x":
-                        await service.SetModule(guild, member, module, target.extra === "on");
-                        view = { note: `🔌 ${PANEL_MODULES[module].name} ist jetzt ${target.extra === "on" ? "an" : "aus"}.` };
+                    case "x": {
+                        // Panels von vor 937c2ed tragen set:x:<modul>:on - dort steht „on“ an der Stelle des Schlüssels.
+                        const on = (target.extra ?? target.key) === "on";
+
+                        await service.SetModule(guild, member, module, on);
+                        view = { note: `🔌 ${PANEL_MODULES[module].name} ist jetzt ${on ? "an" : "aus"}.` };
                         break;
+                    }
                     case "p":
                         view = { note: `📨 Panel gesendet: ${await service.SendPanel(guild, member)}` };
                         break;

@@ -36,6 +36,13 @@ COPY --from=build /app/src/assets/fonts ./src/assets/fonts
 COPY --from=build /app/src/config ./src/config
 COPY --from=build /app/src/images ./src/images
 
+# Ersatzschriften für Namen in den Bildern (W-0014): ┃, Kyrillisch, Griechisch, Pfeile,
+# ★ und Mathe-Buchstaben. Die Bilder hängen sie hinter Oxanium/Rajdhani (DrawText in
+# builder/HelpImage.ts). CJK (fonts-noto-cjk, gut 90 MB) erst, wenn solche Namen vorkommen.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends fonts-dejavu-core fonts-noto-core \
+ && rm -rf /var/lib/apt/lists/*
+
 # Der Bot schreibt Logs, Verlaeufe, Beweisbilder, Clips und Galerie-Uploads. Er
 # laeuft nicht als root, also gehoeren die Ordner dem Nutzer "node" (UID 1000).
 RUN mkdir -p logs transcripts evidence clips && chown -R node:node /app
