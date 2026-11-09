@@ -115,6 +115,7 @@ export const AREAS: readonly INavArea[] = [
             { to: "/dev/technik", label: "Technik", icon: "cpu", developer: true, description: "Bot und Datenbank: Ping, Speicher, Versionen, Migrationen." },
             { to: "/dev/wartung", label: "Wartung", icon: "wrench", developer: true, description: "Wartung planen, ankündigen und beenden." },
             { to: "/dev/protokoll", label: "Protokoll", icon: "history", developer: true, description: "Wer im Admin Dashboard was geändert hat." },
+            { to: "/dev/changelog", label: "Changelog", icon: "tag", developer: true, description: "Was sich bei RL Nexus geändert hat, je Version, und der Post in Discord." },
         ],
     },
 ];

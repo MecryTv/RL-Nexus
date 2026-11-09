@@ -3,6 +3,7 @@ import { COLOR_HEX, COLOR_LABELS, MESSAGE_COLORS, MESSAGE_LIMITS, type IMessageB
 import { Button } from "../components/Button";
 import { Field } from "../components/Field";
 import { Switch } from "../components/Switch";
+import { dataUrl } from "../dataUrl";
 import styles from "./messages.module.scss";
 
 /**
@@ -10,16 +11,6 @@ import styles from "./messages.module.scss";
  * daneben. Jedes Feld zeigt, wie viele Zeichen übrig sind; den Satz aus
  * checkMessage zeigt die Seite unter dem Formular und statt der Vorschau.
  */
-
-function dataUrl(blob: Blob): Promise<string> {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-
-        reader.onload = () => resolve(String(reader.result));
-        reader.onerror = () => reject(new Error("Die Vorschau ließ sich nicht laden."));
-        reader.readAsDataURL(blob);
-    });
-}
 
 const PLACEHOLDER_HINT ="Platzhalter: {name} für den Namen, {datum} für den Tag des Versands.";
 
