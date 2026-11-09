@@ -8,23 +8,28 @@
 
 import { CATEGORIES, MODULES } from "../constants/Modules.js";
 import { icon, need } from "../core/Dom.js";
-import { INavEntry, NavKind, searchNav, ShiftTap } from "../core/NavSearch.js";
+import { browseNav, INavEntry, NavKind, searchNav, ShiftTap } from "../core/NavSearch.js";
 import { INav, ownerOf } from "./GuildNav.js";
 
 const GROUP_NAMES: Record<NavKind, string> = { page: "Seiten", part: "Unterseiten", module: "Module", list: "Rollen-Listen", off: "Aus" };
 
 const areaName = (id: string | null | undefined): string | undefined => CATEGORIES.find((category) => category.id === id)?.name;
 
-/** In einem Feld schreibt die Taste, und über einem offenen Fenster öffnet sich kein zweites. */
+/** In einem Feld schreibt die Taste, und über einem offenen Fenster öffnet sich kein zweites - auch nicht über einem ohne <dialog> (StaffPrompt sperrt mit sg-locked). */
 function busy(): boolean {
     const active = document.activeElement;
 
-    return Boolean(active?.closest("input, textarea, select, [contenteditable]:not([contenteditable='false'])")) || document.querySelector("dialog[open]") !== null;
+    return (
+        Boolean(active?.closest("input, textarea, select, [contenteditable]:not([contenteditable='false'])")) ||
+        document.querySelector("dialog[open], [aria-modal='true']") !== null ||
+        document.body.classList.contains("sg-locked")
+    );
 }
 
 /** canOff: ausgeschaltete Module mit anzeigen (nur wer den Server verwaltet, ohne only). */
 export function bindNavSearch(canOff: boolean, nav: INav): { open(): void } {
     const side = need<HTMLElement>("#setSide");
+    const find = need<HTMLButtonElement>("#navFind");
     const dialog = document.createElement("dialog");
     const bar = document.createElement("div");
     const input = document.createElement("input");
@@ -87,6 +92,7 @@ export function bindNavSearch(canOff: boolean, nav: INav): { open(): void } {
                     module: kind === "part" || kind === "list" ? owner?.name : undefined,
                     area: areaName(owner?.category),
                     text: kind === "list" ? undefined : (part ?? owner)?.description,
+                    alone: link.classList.contains("is-alone"),
                 },
                 link
             );
@@ -135,24 +141,31 @@ export function bindNavSearch(canOff: boolean, nav: INav): { open(): void } {
 
     function render(): void {
         const query = input.value.trim();
-        // Ohne Eingabe: die Module des gewählten Bereichs.
+        // Ohne Eingabe: was in der Spalte des gewählten Bereichs steht.
         const area = areaName(nav.area());
 
-        hits = query ? searchNav(entries, query) : entries.filter((entry) => entry.kind === "module" && entry.area === area);
+        hits = query ? searchNav(entries, query) : browseNav(entries, area);
         active = 0;
         list.replaceChildren();
 
-        let group: NavKind | null = null;
+        // Ohne Eingabe eine Gruppe für den Bereich, sonst eine je Art.
+        let kind: NavKind | null = null;
+        let group: HTMLElement = list;
 
         for (const [index, hit] of hits.entries()) {
-            if (hit.kind !== group) {
+            if (group === list || (query && hit.kind !== kind)) {
                 const head = document.createElement("div");
 
-                group = hit.kind;
+                kind = hit.kind;
+                group = document.createElement("div");
+                group.setAttribute("role", "group");
+                group.setAttribute("aria-labelledby", `navfind-group-${index}`);
                 head.className = "navfind__group";
+                head.id = `navfind-group-${index}`;
                 head.setAttribute("role", "presentation");
                 head.textContent = query ? GROUP_NAMES[hit.kind] : (area ?? GROUP_NAMES.module);
-                list.append(head);
+                group.append(head);
+                list.append(group);
             }
 
             const option = document.createElement("div");
@@ -172,7 +185,7 @@ export function bindNavSearch(canOff: boolean, nav: INav): { open(): void } {
                 active = index;
                 paint();
             });
-            list.append(option);
+            group.append(option);
         }
 
         if (!hits.length) {
@@ -193,15 +206,18 @@ export function bindNavSearch(canOff: boolean, nav: INav): { open(): void } {
     }
 
     // Wie ein Klick in der Leiste: dieselbe Adresse, Eintrag im Verlauf, Rollen-Listen samt ?liste=.
+    // Danach steht der Fokus auf dem Link der neuen Seite, nicht wieder dort, wo man vorher war.
     function go(index: number): void {
         const target = hits[index] ? targets.get(hits[index]) : undefined;
 
+        if (target) before = target;
         close();
         target?.click();
     }
 
     function open(): void {
-        if (dialog.open) return;
+        // Ohne sichtbare Links gibt es nichts zu finden, der Knopf ist dann auch weg.
+        if (dialog.open || find.hidden) return;
 
         before = document.activeElement instanceof HTMLElement ? document.activeElement : null;
         collect();
@@ -230,7 +246,7 @@ export function bindNavSearch(canOff: boolean, nav: INav): { open(): void } {
         if (event.target === dialog) close();
     });
     dialog.addEventListener("close", () => before?.focus());
-    need<HTMLButtonElement>("#navFind").addEventListener("click", open);
+    find.addEventListener("click", open);
 
     const tap = new ShiftTap();
 
@@ -238,7 +254,7 @@ export function bindNavSearch(canOff: boolean, nav: INav): { open(): void } {
         // Gehalten wiederholt der Browser keydown - das darf die Uhr nicht neu stellen.
         if (event.repeat) return;
 
-        tap.down(event.code, event.timeStamp, busy());
+        tap.down(event.code, event.timeStamp, busy() || event.ctrlKey || event.altKey || event.metaKey);
 
         if (busy() || event.altKey) return;
 
@@ -253,6 +269,8 @@ export function bindNavSearch(canOff: boolean, nav: INav): { open(): void } {
     document.addEventListener("keyup", (event) => {
         if (tap.up(event.code, event.timeStamp)) open();
     });
+    // Umschalt-Klick markiert Text oder öffnet einen Link im neuen Fenster - das ist kein Tippen auf die Taste.
+    document.addEventListener("pointerdown", () => tap.cancel(), true);
 
     return { open };
 }

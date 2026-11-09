@@ -704,11 +704,13 @@ async function checkNavSearch(): Promise<void> {
 
     if (!existsSync(file)) return check("NavSearch.ts ist da", false, file);
 
-    type Entry = { section: string; href: string; name: string; kind: "page" | "part" | "module" | "list" | "off"; icon: string; module?: string; area?: string; text?: string };
-    const { fold, searchNav, ShiftTap } = (await import(pathToFileURL(file).href)) as {
+    type Entry = { section: string; href: string; name: string; kind: "page" | "part" | "module" | "list" | "off"; icon: string; module?: string; area?: string; text?: string; alone?: boolean };
+    const { fold, searchNav, browseNav, areaLine, ShiftTap } = (await import(pathToFileURL(file).href)) as {
         fold: (text: string) => string;
         searchNav: (entries: readonly Entry[], query: string) => Entry[];
-        ShiftTap: new (limitMs?: number) => { down(code: string, at: number, editable: boolean): void; up(code: string, at: number): boolean };
+        browseNav: (entries: readonly Entry[], area: string | undefined) => Entry[];
+        areaLine: (modules: number, alone: number) => string;
+        ShiftTap: new (limitMs?: number) => { down(code: string, at: number, blocked: boolean): void; up(code: string, at: number): boolean; cancel(): void };
     };
     const entry = (section: string, name: string, kind: Entry["kind"], extra: Partial<Entry> = {}): Entry => ({ section, href: `/x/${section}`, name, kind, icon: "#i-grid", ...extra });
     const entries: Entry[] = [
@@ -731,6 +733,43 @@ async function checkNavSearch(): Promise<void> {
     check("Nichts passt: keine Treffer", searchNav(entries, "xyz").length === 0);
     check("Gleicher Rang: Seiten vor Modulen", names("mod") === "module,moderation", names("mod"));
 
+    // W-0055 Review: Bindestrich und Leerzeichen gleich, „ue“ wie „ü“.
+    const dashed = [entry("auto-mod", "Auto-Mod", "module", { area: "Moderation" }), ...entries];
+
+    check("fold: Satzzeichen werden Leerzeichen", fold("Auto-Mod") === "auto mod" && fold(" 2, 4 & 6 Mans ") === "2 4 6 mans", `${fold("Auto-Mod")}|${fold(" 2, 4 & 6 Mans ")}`);
+    check("„auto mod“ findet „Auto-Mod“", searchNav(dashed, "auto mod")[0]?.section === "auto-mod", searchNav(dashed, "auto mod").map((hit) => hit.section).join(","));
+    check("„Uebersicht“ findet „Übersicht“", names("Uebersicht") === "uebersicht", names("Uebersicht"));
+
+    // Jede Art steht zusammen, sonst stünde ihr Kopf im Fenster zweimal da.
+    const mixed: Entry[] = [
+        entry("mod-log", "Mod-Log", "part", { module: "Logs", area: "Moderation" }),
+        entry("logs-part", "Ereignisse", "part", { module: "Moderation", area: "Moderation" }),
+        entry("moderation", "Moderation", "module", { area: "Moderation" }),
+        entry("welcome", "Willkommen", "module", { area: "Community", text: "Grüßt neue Mitglieder, meldet es den Moderatoren" }),
+        entry("module", "Module", "page"),
+    ];
+    const kinds = searchNav(mixed, "mod").map((hit) => hit.kind);
+    const runs = kinds.filter((kind, index) => kind !== kinds[index - 1]);
+
+    check("Treffer nach Art gruppiert, jede Art nur einmal", runs.join(",") === "page,part,module", kinds.join(","));
+    check("In der Art nach Rang: Name vor Beschreibung", searchNav(mixed, "mod").map((hit) => hit.section).join(",") === "module,mod-log,logs-part,moderation,welcome", searchNav(mixed, "mod").map((hit) => hit.section).join(","));
+
+    // Ohne Eingabe: was in der Spalte steht. Ein Moderator mit only sieht etwa Live Tickets ohne das Ticket System.
+    const column: Entry[] = [
+        entry("tickets-live", "Live Tickets", "part", { module: "Ticket System", area: "Support", alone: true }),
+        entry("tickets-log", "Ticket-Log", "part", { module: "Ticket System", area: "Support" }),
+        entry("apply", "Apply System", "module", { area: "Support" }),
+        entry("levels", "Level System", "module", { area: "Immer dabei" }),
+    ];
+
+    check("Leere Suche: Module des Bereichs und allein stehende Teile", browseNav(column, "Support").map((hit) => hit.section).join(",") === "tickets-live,apply", browseNav(column, "Support").map((hit) => hit.section).join(","));
+    check("Leere Suche als Moderator nur mit Teil: der Teil steht da", browseNav(column.slice(0, 2), "Support").map((hit) => hit.section).join(",") === "tickets-live");
+    check(
+        "Kopf des Bereichs zählt Module und Seiten getrennt",
+        areaLine(3, 0) === "3 Module an" && areaLine(1, 0) === "1 Modul an" && areaLine(0, 1) === "1 Seite" && areaLine(2, 2) === "2 Module an · 2 Seiten",
+        [areaLine(3, 0), areaLine(1, 0), areaLine(0, 1), areaLine(2, 2)].join(" | ")
+    );
+
     const tap = (steps: (tap: InstanceType<typeof ShiftTap>) => boolean): boolean => steps(new ShiftTap());
 
     check("Rechte Umschalttaste kurz: öffnet", tap((t) => (t.down("ShiftRight", 0, false), t.up("ShiftRight", 200))));
@@ -739,6 +778,8 @@ async function checkNavSearch(): Promise<void> {
     check("Großbuchstabe getippt: öffnet nicht", !tap((t) => (t.down("ShiftRight", 0, false), t.down("KeyA", 50, false), t.up("ShiftRight", 100))));
     check("Im Feld: öffnet nicht", !tap((t) => (t.down("ShiftRight", 0, true), t.up("ShiftRight", 100))));
     check("Ohne Drücken nur Loslassen: öffnet nicht", !tap((t) => t.up("ShiftRight", 100)));
+    check("Mit Strg, Alt oder Meta (blocked): öffnet nicht", !tap((t) => (t.down("ShiftRight", 0, true), t.up("ShiftRight", 100))));
+    check("Umschalt-Klick (cancel): öffnet nicht", !tap((t) => (t.down("ShiftRight", 0, false), t.cancel(), t.up("ShiftRight", 100))));
 }
 
 /**
