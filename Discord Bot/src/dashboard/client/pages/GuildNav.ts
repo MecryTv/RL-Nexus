@@ -8,6 +8,7 @@
 
 import { CATEGORIES, IModule, MODULES } from "../constants/Modules.js";
 import { icon, need } from "../core/Dom.js";
+import { areaLine } from "../core/NavSearch.js";
 import { clickSound } from "../core/Sound.js";
 
 /** Kurz genug für die schmale Bereichsleiste. Der volle Name steht im Tooltip. */
@@ -34,6 +35,17 @@ export function ownerOf(section: string): IModule | undefined {
     return MODULES.find((module) => module.id === section || module.parts?.some((part) => part.id === section));
 }
 
+/** Auf dem Handy scrollen Bereiche, Module und Reiter seitlich: den Eintrag in die Zeile holen. Nur die Zeile, nie die Seite. */
+function reveal(row: HTMLElement | null, item: Element | null | undefined): void {
+    if (!row || !item || !item.getClientRects().length || row.scrollWidth <= row.clientWidth) return;
+
+    const at = item.getBoundingClientRect();
+    const box = row.getBoundingClientRect();
+
+    if (at.left < box.left) row.scrollLeft -= box.left - at.left + 8;
+    else if (at.right > box.right) row.scrollLeft += at.right - box.right + 8;
+}
+
 export interface INav {
     /** Nach jeder Änderung an den Links: Zahlen neu, ein leer gewordener Bereich wird abgewählt. */
     refresh(): void;
@@ -53,26 +65,38 @@ export function bindNav(): INav {
     let drawn = "";
 
     const group = (area: string): HTMLElement | null => nav.querySelector<HTMLElement>(`.setnav__group[data-area="${area}"]`);
+    const visible = (area: string, selector: string): number => [...(group(area)?.querySelectorAll<HTMLAnchorElement>(selector) ?? [])].filter((link) => !link.hidden).length;
     // In der Spalte: die Module, und Teile, deren Modul man nicht sehen darf (is-alone).
-    const count = (area: string): number =>
-        [...(group(area)?.querySelectorAll<HTMLAnchorElement>("a[data-section]:not(.is-sub), a.is-alone") ?? [])].filter((link) => !link.hidden).length;
+    const modulesIn = (area: string): number => visible(area, "a[data-section]:not(.is-sub)");
+    const aloneIn = (area: string): number => visible(area, "a.is-alone");
+    const count = (area: string): number => modulesIn(area) + aloneIn(area);
+
+    // Die Leiste klappt nicht mehr zu (W-0055); den alten Schlüssel nicht ewig liegen lassen.
+    try {
+        localStorage.removeItem("rlnexus.nav.folded");
+    } catch {
+        // Ohne Speicher (privates Fenster) gibt es auch nichts aufzuräumen.
+    }
 
     for (const category of CATEGORIES) {
         const button = document.createElement("button");
         const label = document.createElement("span");
         const badge = document.createElement("span");
+        const spoken = document.createElement("span");
 
+        // Der Name kommt aus dem sichtbaren Text („RL“), der volle steht im Tooltip. Die Zahl liest der Screenreader als Satz.
         button.type = "button";
         button.className = "setrail__area";
         button.dataset.area = category.id;
         button.title = category.name;
         button.hidden = true;
-        button.setAttribute("aria-label", category.name);
         button.setAttribute("aria-pressed", "false");
+        button.setAttribute("aria-controls", "setNav");
         label.textContent = AREA_SHORT[category.id] ?? category.name;
         badge.className = "setrail__count";
         badge.setAttribute("aria-hidden", "true");
-        button.append(icon(AREA_ICON[category.id] ?? "#i-grid"), label, badge);
+        spoken.className = "sr";
+        button.append(icon(AREA_ICON[category.id] ?? "#i-grid"), label, badge, spoken);
         button.addEventListener("click", () => {
             select(category.id);
             clickSound("primary");
@@ -82,17 +106,16 @@ export function bindNav(): INav {
     }
 
     function select(area: string | null): void {
+        const changed = area !== chosen;
+
         chosen = area;
 
         for (const [id, button] of buttons) button.setAttribute("aria-pressed", String(id === area));
         for (const box of nav.querySelectorAll<HTMLElement>(".setnav__group")) box.hidden = box.dataset.area !== area;
 
-        // Auf dem Handy scrollt die Zeile der Bereiche seitlich - der gewählte soll zu sehen sein.
-        const pressed = area ? buttons.get(area) : undefined;
-
-        if (pressed && rail.scrollWidth > rail.clientWidth) {
-            rail.scrollLeft += pressed.getBoundingClientRect().left - rail.getBoundingClientRect().left - 8;
-        }
+        // Auf dem Handy scrollt die Zeile der Bereiche seitlich. Nur bei einem neuen Bereich nachziehen,
+        // sonst rutschen Übersicht und Module bei jedem Seitenwechsel aus dem Bild.
+        if (changed) reveal(rail, area ? buttons.get(area) : undefined);
 
         const category = CATEGORIES.find((entry) => entry.id === area);
 
@@ -100,20 +123,27 @@ export function bindNav(): INav {
 
         const name = document.createElement("b");
         const sub = document.createElement("small");
-        const n = count(area);
 
         name.textContent = category.name;
-        sub.textContent = `${n} ${n === 1 ? "Modul" : "Module"} an`;
+        sub.textContent = areaLine(modulesIn(area), aloneIn(area));
         head.replaceChildren(name, sub);
     }
 
     // Ein Teil ist offen: sein Modul steht markiert in der Spalte, damit man sieht, wo man ist.
+    // Der Bereich der offenen Seite bleibt in der Bereichsleiste markiert, auch wenn gerade ein anderer gewählt ist.
     function mark(): void {
         for (const link of nav.querySelectorAll<HTMLAnchorElement>('a[aria-current="true"]')) link.removeAttribute("aria-current");
 
         const owner = ownerOf(section);
 
         if (owner && owner.id !== section) nav.querySelector<HTMLAnchorElement>(`a[data-section="${owner.id}"]:not(.is-sub)`)?.setAttribute("aria-current", "true");
+
+        for (const [id, button] of buttons) {
+            if (id === owner?.category) button.setAttribute("aria-current", "true");
+            else button.removeAttribute("aria-current");
+        }
+
+        reveal(nav, nav.querySelector("a[aria-current]"));
     }
 
     /**
@@ -165,6 +195,8 @@ export function bindNav(): INav {
             if (tab.dataset.section === section) tab.setAttribute("aria-current", "page");
             else tab.removeAttribute("aria-current");
         }
+
+        reveal(tabs.querySelector<HTMLElement>(".modtabs__row"), tabs.querySelector('a[aria-current="page"]'));
     }
 
     /** Der erste Bereich in der Liste, der Module hat und den es noch gibt. */
@@ -187,7 +219,13 @@ export function bindNav(): INav {
 
             button.hidden = n === 0;
             button.querySelector(".setrail__count")!.textContent = String(n);
+            button.querySelector(".sr")!.textContent = `, ${areaLine(modulesIn(area), aloneIn(area))}`;
         }
+
+        // Ohne einen einzigen sichtbaren Link gibt es nichts zu suchen.
+        const find = document.querySelector<HTMLElement>("#navFind");
+
+        if (find) find.hidden = !document.querySelector("#setSide a[data-section]:not([hidden])");
 
         select(pick(chosen, ownerOf(section)?.category));
         mark();

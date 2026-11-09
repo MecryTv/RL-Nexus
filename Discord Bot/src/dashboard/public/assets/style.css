@@ -1530,6 +1530,8 @@ body[data-page="guild"]{--shell:1440px}
 .setrail > a[aria-current="page"],.setrail__area[aria-pressed="true"]{color:var(--text);background:color-mix(in srgb,var(--brand) 14%,transparent)}
 .setrail > a[aria-current="page"] svg,.setrail__area[aria-pressed="true"] svg{color:var(--brand)}
 .setrail__area[aria-pressed="true"]::before{content:"";position:absolute;left:-5px;top:10px;bottom:10px;width:3px;background:var(--brand)}
+/* Hier liegt die offene Seite, auch wenn gerade ein anderer Bereich gewählt ist. */
+.setrail__area[aria-current="true"]:not([aria-pressed="true"]) svg{color:var(--brand)}
 .setrail__count{
   position:absolute;top:3px;right:8px;min-width:15px;height:15px;padding:0 4px;
   background:var(--glass-2);color:var(--text-2);font-size:9.5px;font-weight:700;line-height:15px;
@@ -1562,7 +1564,7 @@ body[data-page="guild"]{--shell:1440px}
 .setnav--modules a.is-sub{display:none}
 /* Ausser der Teil ist alles, was man von seinem Modul sehen darf (Moderatoren). */
 .setnav--modules a.is-sub.is-alone{display:flex}
-@media (pointer:coarse){.setnav--modules a,.setrail > a,.setrail__area{min-height:44px}}
+@media (pointer:coarse){.setnav--modules a,.setrail > a,.setrail__area,.setfind{min-height:44px}}
 /* Kopf einer Modulkarte: Symbol und Name. */
 .modhead{display:flex;align-items:center;gap:10px;margin:16px 0 14px;font-size:20px;font-weight:700}
 .modhead svg{width:20px;height:20px;flex:none;color:var(--brand)}
