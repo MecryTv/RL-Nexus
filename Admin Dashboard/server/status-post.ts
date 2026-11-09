@@ -263,7 +263,7 @@ export function payload(snapshot: IStatusSnapshot, config: IConfig): Record<stri
  * FormData daraus eine Datei namens „blob“ - Discord legt die Nachricht dann
  * als Anhang ab und schickt eine leere Nachricht ohne jede Komponente.
  */
-async function upload(config: IConfig, url: string, method: "POST" | "PATCH", body: Record<string, unknown>, images: readonly IStatusImage[]): Promise<Response> {
+export async function upload(config: IConfig, url: string, method: "POST" | "PATCH", body: Record<string, unknown>, images: readonly IStatusImage[]): Promise<Response> {
     const form = new FormData();
 
     form.append("payload_json", JSON.stringify(body));
@@ -277,7 +277,7 @@ async function upload(config: IConfig, url: string, method: "POST" | "PATCH", bo
     });
 }
 
-async function remove(config: IConfig, url: string): Promise<Response> {
+export async function remove(config: IConfig, url: string): Promise<Response> {
     return fetch(`${DISCORD_API}${url}`, { method: "DELETE", headers: { Authorization: `Bot ${config.botToken}` }, signal: AbortSignal.timeout(10_000) });
 }
 
@@ -687,7 +687,7 @@ export async function chooseChannel(config: IConfig, channelId: string): Promise
 }
 
 /** Den Namen eines Statuskanals aus Discord, einmal je Prozess. */
-async function channelName(config: IConfig, channel: string): Promise<string | null> {
+export async function channelName(config: IConfig, channel: string): Promise<string | null> {
     if (channelNames.has(channel)) return channelNames.get(channel) ?? null;
 
     let name: string | null = null;
