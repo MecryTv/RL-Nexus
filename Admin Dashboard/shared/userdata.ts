@@ -302,6 +302,7 @@ export const USERDATA_IGNORED: Readonly<Record<string, string>> = {
     "userdata_deletions.cancelled_by": "Nachweis, wer die Löschung abgebrochen hat",
     // JSON-, Text- und Blob-Spalten. `tabelle.*` gilt nur für diese, nie für Spalten mit Personen-Namen.
     "mail_accounts.secret": "Zugangsdaten eines Postfachs, nie in der Auskunft",
+    "staff_grant_log.detail": "Einstellungen vorher und nachher bei einer Staff-Freigabe (W-0049), keine Angaben über eine Person",
     "shop_customers.oauth_sealed": "Geheimnis, nie in der Auskunft",
     "mod_cases.details": "Inhalt des Falls, gehört zur Person aus target_id",
     "mod_cases.evidence": "Belege des Falls, gehören zur Person aus target_id",
