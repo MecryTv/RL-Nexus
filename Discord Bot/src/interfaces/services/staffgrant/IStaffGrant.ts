@@ -33,6 +33,30 @@ export interface IStaffGrant {
     privateBy: string | null;
     /** Die DM je Gefragtem, null wenn sie nicht ankam. */
     dms: Record<string, { channelId: string; messageId: string } | null>;
+    /* W-0049, fürs Protokoll. Freigaben von davor haben sie nicht. */
+    /** Was Staff angefragt hat; minutes ist nach dem Ja die erteilte Dauer. */
+    requestedMinutes?: number;
+    extensions?: IStaffExtension[];
+    /** Wann die privaten Bereiche erlaubt wurden. */
+    privateAt?: number | null;
+    privateRemovedBy?: string | null;
+    privateRemovedAt?: number | null;
+}
+
+export interface IStaffExtension {
+    at: number;
+    by: string;
+    minutes: number;
+}
+
+/** change: Staff hat etwas geändert, view: eine Seite angesehen, private: in einen privaten Bereich geschaut, grant: die Freigabe selbst. */
+export type StaffLogKind = "change" | "view" | "private" | "grant";
+
+/** Eine Einstellung vorher und nachher, so wie das Panel sie zeigt (W-0049). */
+export interface IStaffChange {
+    label: string;
+    before: string;
+    after: string;
 }
 
 export interface IStaffLogEntry {
@@ -42,4 +66,8 @@ export interface IStaffLogEntry {
     at: number;
     area: string;
     text: string;
+    kind: StaffLogKind;
+    changes: IStaffChange[];
+    /** Private Tickets: wie lange es offen war, in Sekunden. */
+    seconds: number | null;
 }

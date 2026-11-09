@@ -60,6 +60,7 @@ export function Answer(g: IStaffGrant, userId: string, yes: boolean, minutes: nu
         endsAt: now + minutes * MIN,
         private: asked ? (allowPrivate ? "on" : "denied") : g.private,
         privateBy: asked && allowPrivate ? userId : g.privateBy,
+        privateAt: asked && allowPrivate ? now : (g.privateAt ?? null),
         privateDeniedAt: asked && !allowPrivate ? now : g.privateDeniedAt,
     };
 }
@@ -77,15 +78,17 @@ export function Tick(g: IStaffGrant, now: number): IStaffGrant | null {
     return null;
 }
 
-/** +30 Min., zusammen höchstens 24 Stunden. */
-export function Extend(g: IStaffGrant, _now: number): IStaffGrant {
+/** +30 Min., zusammen höchstens 24 Stunden. Fürs Protokoll mit Zeitpunkt, Person und den echten Minuten. */
+export function Extend(g: IStaffGrant, by: string, now: number): IStaffGrant {
     needActive(g);
 
     const cap = g.startsAt! + STAFF_MAX * MIN;
 
     if (g.endsAt! >= cap) fail("Mehr als 24 Stunden geht nicht.");
 
-    return { ...g, endsAt: Math.min(g.endsAt! + EXTEND_MIN * MIN, cap) };
+    const endsAt = Math.min(g.endsAt! + EXTEND_MIN * MIN, cap);
+
+    return { ...g, endsAt, extensions: [...(g.extensions ?? []), { at: now, by, minutes: Math.round((endsAt - g.endsAt!) / MIN) }] };
 }
 
 export function End(g: IStaffGrant, by: string, now: number): IStaffGrant {
@@ -119,7 +122,7 @@ export function AnswerPrivate(g: IStaffGrant, userId: string, yes: boolean, now:
     needAsked(g, userId);
 
     if (g.private !== "asked") fail("Schon beantwortet.");
-    if (yes) return { ...g, private: "on", privateBy: userId };
+    if (yes) return { ...g, private: "on", privateBy: userId, privateAt: now };
 
     const privateDenied = [...new Set([...g.privateDenied, userId])];
     const all = g.asked.every((id) => privateDenied.includes(id));
@@ -127,13 +130,13 @@ export function AnswerPrivate(g: IStaffGrant, userId: string, yes: boolean, now:
     return { ...g, privateDenied, ...(all ? { private: "denied" as const, privateDeniedAt: now } : {}) };
 }
 
-/** Nur die privaten Bereiche schließen, die Freigabe läuft weiter. */
-export function RemovePrivate(g: IStaffGrant, by: string): IStaffGrant {
+/** Nur die privaten Bereiche schließen, die Freigabe läuft weiter. privateBy bleibt: wer sie erlaubt hat. */
+export function RemovePrivate(g: IStaffGrant, by: string, now: number): IStaffGrant {
     needActive(g);
 
     if (g.private !== "on") fail("Die privaten Bereiche sind nicht offen.");
 
-    return { ...g, private: "removed", privateBy: by };
+    return { ...g, private: "removed", privateRemovedBy: by, privateRemovedAt: now };
 }
 
 /**

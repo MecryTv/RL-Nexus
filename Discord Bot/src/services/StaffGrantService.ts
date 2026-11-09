@@ -1,7 +1,7 @@
 import { Guild, GuildMember, Interaction, PermissionFlagsBits } from "discord.js";
 import BotClient from "../client/BotClient";
 import { COOLDOWN_MS, SEEN_DEDUPE_MS } from "../constants/StaffGrant";
-import { IStaffGrant, IStaffLogEntry, StaffAccessMode } from "../interfaces/services/staffgrant/IStaffGrant";
+import { IStaffChange, IStaffGrant, IStaffLogEntry, StaffAccessMode, StaffLogKind } from "../interfaces/services/staffgrant/IStaffGrant";
 import * as Machine from "./staffgrant/Machine";
 import { StaffGrantError } from "./staffgrant/Machine";
 import { AskList, DurationText } from "./staffgrant/Rules";
@@ -47,6 +47,8 @@ export default class StaffGrantService {
     private readonly client: BotClient;
     private readonly live = new Map<number, IStaffGrant>();
     private readonly seen = new Map<string, number>();
+    /** „<Bereich> angesehen“ steht je Freigabe einmal im Protokoll (W-0049). ponytail: nur im Speicher, nach einem Neustart höchstens einmal mehr. */
+    private readonly viewed = new Set<string>();
     /** Server, für die gerade eine Anfrage angelegt wird - gegen zwei gleichzeitige. */
     private readonly pending = new Set<string>();
     /** Load lief schon mit Datenbank (sonst holt Tick es nach, Review I5). */
@@ -156,6 +158,11 @@ export default class StaffGrantService {
                 privateDenied: [],
                 privateBy: null,
                 dms: {},
+                requestedMinutes: input.minutes,
+                extensions: [],
+                privateAt: null,
+                privateRemovedBy: null,
+                privateRemovedAt: null,
             };
 
             grant.id = await this.client.staffGrants.Save(grant);
@@ -195,7 +202,7 @@ export default class StaffGrantService {
     }
 
     Extend(id: number, by: string): Promise<IStaffGrant> {
-        return this.Apply(id, (grant) => Machine.Extend(grant, Date.now()), (grant) => `Verlängert von ${this.NameOf(grant.guildId, by)} bis ${CLOCK.format(grant.endsAt!)}`);
+        return this.Apply(id, (grant) => Machine.Extend(grant, by, Date.now()), (grant) => `Verlängert von ${this.NameOf(grant.guildId, by)} bis ${CLOCK.format(grant.endsAt!)}`);
     }
 
     AskPrivate(id: number, staffId: string, reason: string): Promise<IStaffGrant> {
@@ -211,7 +218,7 @@ export default class StaffGrantService {
     }
 
     RemovePrivate(id: number, by: string): Promise<IStaffGrant> {
-        return this.Apply(id, (grant) => Machine.RemovePrivate(grant, by), (grant) => `Private Bereiche weggenommen von ${this.NameOf(grant.guildId, by)}`);
+        return this.Apply(id, (grant) => Machine.RemovePrivate(grant, by, Date.now()), (grant) => `Private Bereiche weggenommen von ${this.NameOf(grant.guildId, by)}`);
     }
 
     Get(id: number): IStaffGrant | null {
@@ -249,11 +256,30 @@ export default class StaffGrantService {
         return this.Active(userId, guild.id) ? guild.members.me : null;
     }
 
-    /** Eine Änderung von Staff mit Freigabe. */
-    Log(grant: IStaffGrant, area: string, text: string, at = Date.now()): void {
-        this.Write(grant, area, text, at);
+    /** Eine Änderung von Staff mit Freigabe, bei Einstellungen mit vorher und nachher (W-0049). */
+    Log(grant: IStaffGrant, area: string, text: string, at = Date.now(), changes: IStaffChange[] = []): void {
+        this.Write(grant, area, text, at, "change", changes);
         this.client.pulseService.Emit(grant.guildId, "staff", { id: grant.id });
         this.dm?.Logged(grant);
+    }
+
+    /** Staff hat eine Seite geöffnet (W-0049). Je Freigabe und Bereich einmal. */
+    Viewed(grant: IStaffGrant, area: string, now = Date.now()): void {
+        const key = `${grant.id}:${area}`;
+
+        if (this.viewed.has(key)) return;
+
+        this.viewed.add(key);
+        this.Write(grant, area, `${area} angesehen`, now, "view");
+        this.client.pulseService.Emit(grant.guildId, "staff", { id: grant.id });
+    }
+
+    /** Wie lange ein privater Gegenstand offen war (W-0049): zählt zum letzten „geöffnet“ dazu. */
+    async Stayed(grant: IStaffGrant, area: string, item: string, seconds: number): Promise<void> {
+        if (!this.client.databaseService.Ready) return;
+
+        await this.client.staffGrantLog.AddSeconds(grant.id, `${area} › ${item} geöffnet`, seconds);
+        this.client.pulseService.Emit(grant.guildId, "staff", { id: grant.id });
     }
 
     /** Ein Blick in einen privaten Bereich. Derselbe Gegenstand zählt in 10 Minuten einmal. */
@@ -264,7 +290,9 @@ export default class StaffGrantService {
         if (last !== undefined && now - last < SEEN_DEDUPE_MS) return;
 
         this.seen.set(key, now);
-        this.Log(grant, area, `${area} › ${item} geöffnet`, now);
+        this.Write(grant, area, `${area} › ${item} geöffnet`, now, "private");
+        this.client.pulseService.Emit(grant.guildId, "staff", { id: grant.id });
+        this.dm?.Logged(grant);
     }
 
     /** Jede Minute (Runnable StaffGrants): Verfall, Ablauf, verfallene späte private Anfrage. */
@@ -282,6 +310,7 @@ export default class StaffGrantService {
         }
 
         for (const [key, at] of this.seen) if (now - at >= SEEN_DEDUPE_MS) this.seen.delete(key);
+        for (const key of this.viewed) if (!this.live.has(Number(key.split(":")[0]))) this.viewed.delete(key);
     }
 
     async Recent(guildId: string, days: number): Promise<{ grants: IStaffGrant[]; log: IStaffLogEntry[] }> {
@@ -332,7 +361,7 @@ export default class StaffGrantService {
     }
 
     private Event(grant: IStaffGrant, text: string | null, dm = true): void {
-        if (text) this.Write(grant, AREA, text, Date.now());
+        if (text) this.Write(grant, AREA, text, Date.now(), "grant");
 
         const pulse = this.client.pulseService;
 
@@ -344,11 +373,11 @@ export default class StaffGrantService {
         if (dm) this.dm?.Changed(grant);
     }
 
-    private Write(grant: IStaffGrant, area: string, text: string, at: number): void {
+    private Write(grant: IStaffGrant, area: string, text: string, at: number, kind: StaffLogKind, changes: IStaffChange[] = []): void {
         if (!this.client.databaseService.Ready) return;
 
         void this.client.staffGrantLog
-            .Add({ grantId: grant.id, guildId: grant.guildId, at, area: area.slice(0, 80), text: text.slice(0, 300) })
+            .Add({ grantId: grant.id, guildId: grant.guildId, at, area: area.slice(0, 80), text: text.slice(0, 300), kind, changes, seconds: null })
             .catch((error: unknown) => logger.warn(`🔐 Staff-Protokoll für ${grant.guildId} nicht geschrieben - ${String(error)}`));
     }
 }
