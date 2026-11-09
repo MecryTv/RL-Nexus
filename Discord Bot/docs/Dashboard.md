@@ -214,6 +214,8 @@ npm run dev
 | `GET <base>/api/me/pulse` | Der persönliche Puls (`staff`, `guilds`) — siehe unten |
 | `GET\|POST <base>/api/guild/:id/staff` | Staff-Freigabe eines Servers: Infokarte und Anfrage für Staff, Live-Stand und letzte 30 Tage für Verwalter |
 | `GET\|POST <base>/api/me/staff` | Offene Anfragen an mich und die Antwort darauf |
+| `GET <base>/api/guild/:id/staff/protokoll` | W-0049: jede Staff-Freigabe der letzten 180 Tage mit allen Einträgen, nur für Verwalter |
+| `POST <base>/api/guild/:id/staff/stayed` | W-0049: Live Tickets melden, wie lange Staff mit privatem Ja in einem Ticket war (`sendBeacon`) |
 | `GET <base>/api/guild/:id/resources` | Alle Kanäle, Rollen, Kategorien, Foren und Emojis, ungekürzt — für die Live-Listen, siehe unten |
 | `GET,POST <base>/api/guild/:id/streams/:platform` | Twitch- und YouTube-Notifier: Streamer, Nachrichten, Live-Rolle — siehe [Notifiers.md](Notifiers.md#dashboard) |
 | `GET,POST <base>/api/guild/:id/polls` | Umfragen anlegen, beenden, löschen und ihre Stimmen — siehe [Polls.md](Polls.md#dashboard) |
@@ -356,6 +358,18 @@ Höchstens zehn Personen. Das erste Ja gibt frei, abgelehnt ist die Anfrage erst
 **Rechte**: Mit Freigabe legt `StaffOverlay` die Freigabe über die Staff-Karte (`canManage: true`, Feld `staff`). Damit gehen alle Routen auf, die über `CanManage` prüfen. Wo eine Route ein Mitglied braucht, nimmt sie den Bot selbst (`MemberOrStandIn`); „von wem“ steht dann in `actor`. Ausgenommen sind die **privaten Bereiche**: Live Tickets, Transcripts, Bewerbungen (samt System), Fälle der Moderation und von Anti Villain. Die öffnet nur ein eigenes, zweites Ja (`PrivateGate`). Es gilt nur, solange die Freigabe läuft; Verwalter können es mit „Private wegnehmen“ wieder schließen.
 
 **Protokoll**: Jede erfolgreiche Änderung von Staff steht in `staff_grant_log` als „<Bereich> › <Aktion>“, in privaten Bereichen auch jedes Ansehen (derselbe Gegenstand höchstens einmal in 10 Minuten). Dazu kommen alle Schritte der Freigabe selbst. Verwalter sehen die letzten 30 Tage auf der Übersicht unter „Staff-Zugriffe“, im Admin Dashboard steht alles unter Developer › Datenbank, Tabelle `staff_grant_log`. `ActivityPrune` löscht Protokoll und beendete Freigaben nach 180 Tagen.
+
+**Seite „Protokoll“** (W-0049, Entwurf A+ `w0049-protokoll-a2.html`, `pages/GuildProtocol.ts`): ein eigener Punkt in der Leiste für alle, die den Server verwalten, nie für Staff selbst. Oben Freigaben, Staff-Zeit, Änderungen und private Bereiche, darunter Filter (Läuft, Mit privaten Bereichen, Abgelehnt, Person, Bereich, 180/30/7 Tage) und eine Suche über Grund, Bereich, Text und vorher/nachher. Je Freigabe eine Karte mit den Eckdaten (angefragt, wer gefragt wurde und wer Nein sagte, Antwort, Dauer mit Verlängerungen, private Bereiche, Ende), einer Zeitleiste, den Bereichen mit Zahl und den Einträgen mit Reitern Geändert, Angesehen, Privat und Freigabe. Laufende sind offen und haben die Knöpfe der Leiste, vergangene stehen in einer Zeile und klappen bei „Details“ auf.
+
+Dafür speichert der Bot seit W-0049 mehr:
+
+- `staff_grant_log.kind` (Migration 049): `change` geändert, `view` angesehen, `private` privater Bereich, `grant` die Freigabe selbst. Alte Einträge bekommen ihre Art aus Bereich und Text.
+- **vorher → nachher** (`staff_grant_log.detail`, JSON): `StaffWrite` liest vor und nach einer Änderung mit Modul den Stand aller Felder über die Register des Panels (`staffgrant/Changes.ts`, `ShowValue`) und speichert, was sich unterscheidet. Gilt für alle Module mit Register; Aktionen wie „Panel neu gesendet“ bleiben ein Satz.
+- **angesehen**: Lesen einer Seite mit Freigabe steht je Freigabe und Bereich einmal im Protokoll (`StaffGrantService.Viewed`).
+- **Dauer im privaten Ticket** (`staff_grant_log.seconds`): Live Tickets melden beim Wechsel, Verlassen der Seite oder Schließen des Tabs, wie lange das Ticket offen war; es zählt zum letzten „geöffnet“ dazu. Bricht der Browser hart ab, fehlt die Dauer.
+- In `staff_grants.data`: die angefragte Dauer (`requestedMinutes`), jede Verlängerung mit Zeitpunkt und Person (`extensions`), wann die privaten Bereiche erlaubt wurden (`privateAt`) und wer sie weggenommen hat (`privateRemovedBy`, `privateRemovedAt`; `privateBy` bleibt, wer sie erlaubt hat).
+
+Freigaben von davor haben diese Angaben nicht. Die Seite liest Verlängerungen und private Erlaubnis dann aus den Sätzen im Protokoll („Verlängert von …“, „Private Bereiche erlaubt von …“, „Erteilt von … · mit privaten Bereichen“, `staffgrant/Protocol.ts`); was nirgends steht, fehlt.
 
 ### Gruppen
 

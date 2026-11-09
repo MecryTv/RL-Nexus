@@ -638,8 +638,11 @@ export function renderManagerBar(guild: IGuild): void {
             recent.replaceChildren(
                 el("h2", "", "Staff-Zugriffe"),
                 el("p", "ovcard__sub", "Was der RL Nexus Staff hier in den letzten 30 Tagen geändert und angesehen hat."),
-                logList(data.recent.log.slice(0, 30), WHEN)
+                logList(data.recent.log.slice(0, 30), WHEN),
+                // W-0049: alles mit Details steht im Protokoll.
+                el("a", "sgrecent__all", "Alles im Protokoll →")
             );
+            recent.querySelector<HTMLAnchorElement>(".sgrecent__all")!.href = url(`/guild/${encodeURIComponent(guild.id)}/protokoll`);
         }
     };
 
