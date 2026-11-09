@@ -11,9 +11,11 @@ import { ApplicationCommandType, Collection, ContextMenuCommandBuilder, Guild, S
 import HelpService from "../services/help/HelpService";
 import HelpButtons from "../events/help/HelpButtons";
 import { glob } from "glob";
-import { loadImage } from "@napi-rs/canvas";
+import { createCanvas, loadImage } from "@napi-rs/canvas";
 import { RenderHelpBanner } from "../builder/HelpBanner";
-import { HelpAlt, HelpBlock, RenderHelpImages, SetEmojiLoader } from "../builder/HelpImage";
+import { DrawText, Fit, HelpAlt, HelpBlock, LoadEmojis, RenderHelpImages, Runs, SetEmojiLoader, TextWidth } from "../builder/HelpImage";
+import { ShowValue } from "../services/settings/SettingsModel";
+import { Cut } from "../utils/cut";
 import path from "path";
 import { pathToFileURL } from "url";
 import BotClient from "../client/BotClient";
@@ -302,8 +304,46 @@ function checkPages(): void {
     check("Viele Befehle: höchstens 40 Bausteine", crowded.count <= 40, String(crowded.count));
 }
 
+/** Attrappe für Twemoji: ein rein grünes Quadrat - so grün ist sonst nichts in den Bildern. */
+function GreenEmoji(): Buffer {
+    const canvas = createCanvas(72, 72);
+    const ctx = canvas.getContext("2d");
+
+    ctx.fillStyle = "#00ff00";
+    ctx.fillRect(0, 0, 72, 72);
+
+    return canvas.toBuffer("image/png");
+}
+
+const GREEN = GreenEmoji();
+
+/** Wie viele Pixel des Bilds (oder eines Ausschnitts) die Attrappe zeigen. */
+async function GreenPixels(png: Buffer, area?: { x: number; y: number; w: number; h: number }): Promise<number> {
+    const image = await loadImage(png);
+    const canvas = createCanvas(image.width, image.height);
+    const ctx = canvas.getContext("2d");
+    const { x, y, w, h } = area ?? { x: 0, y: 0, w: image.width, h: image.height };
+
+    ctx.drawImage(image, 0, 0);
+
+    const { data } = ctx.getImageData(x, y, w, h);
+    let count = 0;
+
+    for (let index = 0; index < data.length; index += 4) if (data[index + 1] > 200 && data[index] < 60 && data[index + 2] < 60) count++;
+
+    return count;
+}
+
 async function checkBanner(): Promise<void> {
     console.log("\n  — Banner —");
+
+    const asked: string[] = [];
+
+    SetEmojiLoader(async (emoji) => {
+        asked.push(emoji);
+
+        return GREEN;
+    });
 
     const png = await RenderHelpBanner({ name: "MecryTv | Joe", avatar: null });
     const image = await loadImage(png);
@@ -314,6 +354,93 @@ async function checkBanner(): Promise<void> {
     const long = await RenderHelpBanner({ name: `${"Sehr langer Name ".repeat(4)}🎮`, avatar: png });
 
     check("Langer Name mit Emoji und Bild als Logo geht", long.length > 1000);
+
+    const short = await RenderHelpBanner({ name: "Joe 🎮", avatar: null });
+    const green = await GreenPixels(short);
+
+    check("Banner: Emoji im Namen als Twemoji-Bild gezeichnet", asked.includes("🎮") && green > 300, `gefragt: ${asked.join(" ")}, grüne Pixel: ${green}`);
+}
+
+/** Ein halbes Emoji: ein Surrogat ohne Partner. */
+function Broken(text: string): boolean {
+    return /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/.test(text);
+}
+
+function checkCut(): void {
+    console.log("\n  — Kürzen —");
+
+    check("Cut: Kurzes bleibt, wie es ist", Cut("abc", 5) === "abc");
+    check("Cut: Emoji passt noch ganz hinein", Cut("ab📢def", 5) === "ab📢…", Cut("ab📢def", 5));
+    check("Cut: Emoji passt nicht mehr, fällt ganz weg", Cut("abc📢def", 5) === "abc…", Cut("abc📢def", 5));
+    check("Cut: Familie 👨‍👩‍👧 wird nicht zerteilt", Cut("ab👨‍👩‍👧xyz", 8) === "ab…", Cut("ab👨‍👩‍👧xyz", 8));
+
+    const menu = Cut("📢".repeat(80), 100);
+
+    check("Cut: Menügrenze 100 in UTF-16 gehalten, nichts halb", menu.length <= 100 && !Broken(menu), String(menu.length));
+
+    const alt = HelpAlt([{ kind: "text", text: `${"x".repeat(1022)}📢📢` }]);
+
+    check("Alt-Text: Emoji an der Grenze 1024 wird nicht halbiert", alt.length <= 1024 && !Broken(alt) && alt.endsWith("x…"), `${alt.length}, Ende ${JSON.stringify(alt.slice(-3))}`);
+
+    const shown = ShowValue({ kind: "text" }, `${"a".repeat(38)}📢📢`, {} as Guild);
+
+    check("Einstellung als Text: Emoji an der Grenze 40 bleibt heil", shown.length <= 40 && !Broken(shown), JSON.stringify(shown.slice(-3)));
+}
+
+async function checkEmojiText(): Promise<void> {
+    console.log("\n  — Text mit Emojis —");
+
+    const asked: string[] = [];
+
+    SetEmojiLoader(async (emoji) => {
+        asked.push(emoji);
+
+        return GREEN;
+    });
+
+    const runs = Runs("📢┃ankündigungen");
+
+    check("Läufe: „📢┃ankündigungen“ ist ein Emoji, dann Text", JSON.stringify(runs) === JSON.stringify([{ text: "📢", emoji: true }, { text: "┃ankündigungen", emoji: false }]), JSON.stringify(runs));
+
+    const whole = Runs("🇩🇪👨‍👩‍👧1️⃣");
+
+    check("Läufe: Flagge, Familie und Tastenkappe je ein ganzes Emoji", whole.map((run) => run.text).join("|") === "🇩🇪|👨‍👩‍👧|1️⃣" && whole.every((run) => run.emoji), JSON.stringify(whole));
+    check("Läufe: © und ™ bleiben Text (die Schriften haben sie)", Runs("RL Nexus™ ©").every((run) => !run.emoji));
+
+    // Gezeichnet: das Emoji als Bild an seiner Stelle, nur der Rest geht an fillText.
+    await LoadEmojis(["📢┃ankündigungen"]);
+
+    const canvas = createCanvas(500, 60);
+    const ctx = canvas.getContext("2d");
+    const texts: string[] = [];
+    const fill = ctx.fillText.bind(ctx);
+
+    ctx.fillText = (text: string, x: number, y: number) => {
+        texts.push(text);
+        fill(text, x, y);
+    };
+    ctx.font = "600 30px Rajdhani";
+    ctx.fillStyle = "#ffffff";
+    DrawText(ctx, "📢┃ankündigungen", 10, 40);
+
+    const png = canvas.toBuffer("image/png");
+    const atEmoji = await GreenPixels(png, { x: 10, y: 10, w: 30, h: 40 });
+    const elsewhere = await GreenPixels(png, { x: 45, y: 0, w: 455, h: 60 });
+
+    check("Zeichnen: 📢 als Twemoji-Bild vorn, der Rest als Text", asked.includes("📢") && atEmoji > 400 && elsewhere === 0 && texts.join("") === "┃ankündigungen", `gefragt: ${asked.join(" ")}, grün vorn ${atEmoji}, grün sonst ${elsewhere}, Text: ${texts.join("|")}`);
+
+    const fitted = Fit(ctx, "ab📢📢📢📢📢📢", TextWidth(ctx, "ab📢…") + 1);
+
+    check("Fit: kürzt zwischen ganzen Emojis", fitted === "ab📢…", fitted);
+
+    // Durch die ganze Kette: Kanalname im Panel, Name und Grund im Fall-Kopf.
+    const [panel] = await RenderHelpImages([{ kind: "settings", items: [{ n: 1, label: "Log-Kanal", value: "#📢┃ankündigungen" }] }]);
+    const panelGreen = await GreenPixels(panel.png);
+
+    check("Panel: Emoji im Kanalnamen als Bild gezeichnet", panelGreen > 400, `grüne Pixel: ${panelGreen}`);
+
+    await RenderHelpImages([{ kind: "caseHead", emoji: "📁", title: "Fall #1 · Verwarnung", user: "@Jo🎮", sub: "", by: "von Mod · Grund: Spam 🎉" }]);
+    check("Fall-Kopf: Emojis aus Name und Grund werden geladen", asked.includes("🎮") && asked.includes("🎉"), asked.join(" "));
 }
 
 async function checkCommand(client: BotClient): Promise<void> {
@@ -450,6 +577,8 @@ async function main(): Promise<void> {
     checkPages();
     await checkBanner();
     await checkImages();
+    checkCut();
+    await checkEmojiText();
     const client = new BotClient();
 
     await checkCatalog(client);

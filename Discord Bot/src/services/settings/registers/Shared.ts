@@ -4,8 +4,12 @@ import { FieldKind, IPanelField } from "../SettingsModel";
 
 /** Kanäle für Nachrichten. */
 export const TEXT = [ChannelType.GuildText, ChannelType.GuildAnnouncement];
-/** Log-Ziele: ein Textkanal oder ein Beitrag (utils/logtarget.ts). */
-export const LOG = [...TEXT, ChannelType.PublicThread, ChannelType.PrivateThread, ChannelType.AnnouncementThread];
+/** Kanäle mit Text-Chat, auch Sprachkanäle - so viel nimmt das Speichern mancher Module an (isTextBased). */
+export const CHAT = [...TEXT, ChannelType.GuildVoice];
+/** Alles, was eine Ausnahme sein kann: jede Kanalart und Kategorien. Beiträge erben vom Kanal darüber. */
+export const ANY_CHANNEL = [...TEXT, ChannelType.GuildVoice, ChannelType.GuildStageVoice, ChannelType.GuildCategory, ChannelType.GuildForum, ChannelType.GuildMedia];
+/** Log-Ziele: ein Textkanal oder ein Beitrag, genau was IsLogTarget annimmt (utils/logtarget.ts). Private Threads nicht, die würde das Speichern still leeren. */
+export const LOG = [...TEXT, ChannelType.PublicThread, ChannelType.AnnouncementThread];
 
 /** Ein Feld in einer Zeile - die Register bleiben so lesbar wie eine Tabelle. */
 export function F<S>(

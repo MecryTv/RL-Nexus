@@ -540,10 +540,16 @@ export default class StreamService {
         return this.client.moduleSettings.Of<IYouTubeSettings>(guildId, YOUTUBE_MODULE, { liveRoleId: null });
     }
 
-    async SaveTwitchSettings(guild: Guild, input: unknown): Promise<ITwitchSettings> {
+    /** Ohne zu speichern und ohne Blick auf die Rechte des Bots - auch für /einstellungen und check:settings. */
+    CleanTwitchSettings(guild: Guild, input: unknown): ITwitchSettings {
         const raw = IsRecord(input) ? input : {};
         const role = (value: unknown): string | null => (typeof value === "string" && guild.roles.cache.has(value) && value !== guild.id ? value : null);
-        const settings: ITwitchSettings = { liveRoleId: role(raw.liveRoleId), liveRoleFilter: role(raw.liveRoleFilter) };
+
+        return { liveRoleId: role(raw.liveRoleId), liveRoleFilter: role(raw.liveRoleFilter) };
+    }
+
+    async SaveTwitchSettings(guild: Guild, input: unknown): Promise<ITwitchSettings> {
+        const settings = this.CleanTwitchSettings(guild, input);
 
         this.CheckLiveRole(guild, settings.liveRoleId);
         await this.client.moduleSettings.Save(guild.id, TWITCH_MODULE, settings);
@@ -551,14 +557,19 @@ export default class StreamService {
         return settings;
     }
 
-    async SaveYouTubeSettings(guild: Guild, input: unknown): Promise<IYouTubeSettings> {
+    CleanYouTubeSettings(guild: Guild, input: unknown): IYouTubeSettings {
         const raw = IsRecord(input) ? input : {};
-        const id = typeof raw.liveRoleId === "string" && guild.roles.cache.has(raw.liveRoleId) && raw.liveRoleId !== guild.id ? raw.liveRoleId : null;
 
-        this.CheckLiveRole(guild, id);
-        await this.client.moduleSettings.Save(guild.id, YOUTUBE_MODULE, { liveRoleId: id });
+        return { liveRoleId: typeof raw.liveRoleId === "string" && guild.roles.cache.has(raw.liveRoleId) && raw.liveRoleId !== guild.id ? raw.liveRoleId : null };
+    }
 
-        return { liveRoleId: id };
+    async SaveYouTubeSettings(guild: Guild, input: unknown): Promise<IYouTubeSettings> {
+        const settings = this.CleanYouTubeSettings(guild, input);
+
+        this.CheckLiveRole(guild, settings.liveRoleId);
+        await this.client.moduleSettings.Save(guild.id, YOUTUBE_MODULE, settings);
+
+        return settings;
     }
 
     /** Kann der Bot diese Rolle überhaupt vergeben? Sonst sagt das Dashboard, woran es liegt. */

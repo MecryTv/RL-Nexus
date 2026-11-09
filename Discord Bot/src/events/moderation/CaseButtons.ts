@@ -33,8 +33,7 @@ export default class CaseButtons extends Event {
         const flags = MessageFlags.IsComponentsV2 as const;
 
         try {
-            await service.TeamGate(interaction.member);
-
+            // Das Fenster muss sofort kommen - geprüft wird beim Absenden, wie alles darunter.
             if (target.kind === "notiz" && interaction.isButton()) {
                 await interaction.showModal(
                     new ModalBuilder()
@@ -55,6 +54,9 @@ export default class CaseButtons extends Event {
 
             if (inPlace) await interaction.deferUpdate();
             else await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+            // Erst nach dem Bestätigen: die Prüfung fragt womöglich die Datenbank, Discord wartet nur drei Sekunden.
+            await service.TeamGate(interaction.member);
 
             let entry = await service.CaseOf(interaction.guildId, target.number);
 

@@ -32,9 +32,12 @@ export default class SaveEvidence extends Command {
     async Execute(_interaction: ChatInputCommandInteraction): Promise<void> {}
 
     async ExecuteMessage(interaction: MessageContextMenuCommandInteraction): Promise<void> {
-        const say = (view: IModView) => interaction.reply({ ...view, flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral, allowedMentions: { parse: [] } });
+        const say = (view: IModView) => interaction.editReply({ ...view, flags: MessageFlags.IsComponentsV2, allowedMentions: { parse: [] } });
 
         try {
+            // Erst bestätigen: Team-Prüfung und Fall-Liste fragen womöglich die Datenbank, Discord wartet nur drei Sekunden.
+            await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
             if (!interaction.inCachedGuild()) throw new ModerationError("Das geht nur auf einem Server.");
 
             await this.client.moderationService.TeamGate(interaction.member);

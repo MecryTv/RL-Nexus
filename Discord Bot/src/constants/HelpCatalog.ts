@@ -658,14 +658,14 @@ export const HELP_CATALOG: HelpCatalog = {
         module: null,
         who: "verwalter",
         whoText: MANAGE,
-        what: "Öffnet die Einstellungen eines Moduls als Panel, nur für dich: Moderation, Tickets, Apply, Level oder Welcome. Jede Einstellung hat eine Nummer, im Menü wählst du sie, darunter erscheint das passende Feld. Was du änderst, gilt sofort, wie im Dashboard.",
+        what: "Öffnet die Einstellungen eines Moduls als Panel, nur für dich. Jedes Modul ist dabei, außer der Gallery. Jede Einstellung hat eine Nummer, im Menü wählst du sie, darunter erscheint das passende Feld. Was du änderst, gilt sofort, wie im Dashboard.",
         examples: [
             { code: "/einstellungen modul:Tickets", text: "Die Einstellungen der Tickets, mit Panel senden" },
             { code: "/einstellungen", text: "Erst alle Module zur Auswahl" },
         ],
         fields: { modul: "Welches Modul. Leer: alle zur Auswahl." },
         after: ["Nach jeder Änderung zeichnet der Bot die Übersicht neu, die geänderte Kachel leuchtet", "Mit Rückgängig nimmst du die letzte Änderung zurück", "Formulare, Nachrichten und Designs bleiben im Dashboard"],
-        tip: "Ein Modul an- oder ausschalten geht im Panel mit einem Knopf, Level bleibt immer an.",
+        tip: "Ein Modul an- oder ausschalten geht im Panel mit einem Knopf, Level und Backups bleiben immer an. Self Roles, Rollen-Listen, Giveaways, Umfragen und Custom Message haben nur diesen Knopf, ihr Rest ist ein Baukasten im Dashboard.",
     },
     module: {
         emoji: "🧩",

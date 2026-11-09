@@ -12,14 +12,29 @@
 process.env.CLIENT_SECRET ||= "check-secret";
 process.env.DEV_CLIENT_SECRET ||= "check-secret";
 
+import path from "path";
+import { readdir, rm } from "node:fs/promises";
 import { ChannelType, Guild, GuildBasedChannel, GuildMember, Message, Role } from "discord.js";
 import { SetEmojiLoader } from "../builder/HelpImage";
 import { CaseBlocks, CaseCard, EvidenceView, ReadCaseId } from "../builder/ModerationCard";
 import BotClient from "../client/BotClient";
 import { CaseView, DirectView, DoneView, EvidenceId, HistoryView, ReadEvidenceId, SaveEvidenceView, StatusText, SupportCard } from "../builder/ModerationView";
-import { DefaultModConfig, FormatDuration, MAX_EVIDENCE, MAX_REASON, MAX_SUPPORT_REMIND, MAX_SUPPORT_ROLES, ParseDuration, ParseMessageLink, ProofNeeded, StageFor } from "../constants/Moderation";
+import {
+    DefaultModConfig,
+    EVIDENCE_ROOT,
+    FormatDuration,
+    MAX_EVIDENCE,
+    MAX_EVIDENCE_BYTES,
+    MAX_REASON,
+    MAX_SUPPORT_REMIND,
+    MAX_SUPPORT_ROLES,
+    ParseDuration,
+    ParseMessageLink,
+    ProofNeeded,
+    StageFor,
+} from "../constants/Moderation";
 import { IModCase, IModEvidence } from "../interfaces/services/moderation/IModeration";
-import { ModerationError } from "../services/ModerationService";
+import { AttachmentFault, ModerationError, ProofRefusal } from "../services/ModerationService";
 import { ActInput } from "../routes/DashboardApiModeration";
 import { IsLogTarget } from "../utils/logtarget";
 import { ReadDuration } from "../utils/modcommand";
@@ -40,6 +55,22 @@ function check(name: string, passed: boolean, detail = ""): void {
     if (!passed) failures++;
 
     console.log(`  ${passed ? "ok  " : "FAIL"} ${name}${passed || !detail ? "" : `  → ${detail}`}`);
+}
+
+/** Der Satz, mit dem run ablehnt - leer, wenn es durchgeht. */
+async function Refusal(run: () => Promise<unknown>): Promise<string> {
+    try {
+        await run();
+    } catch (error) {
+        return error instanceof ModerationError ? error.message : String(error);
+    }
+
+    return "";
+}
+
+/** Ein Anhang, wie Discord ihn liefert - patch macht ihn kaputt. */
+function Attachment(patch: Partial<{ url: string; size: number; contentType: string | null; name: string }> = {}) {
+    return { url: "https://cdn.discordapp.com/attachments/1/2/chat.png", size: 1_000, contentType: "image/png" as string | null, name: "chat.png", ...patch };
 }
 
 function FakeGuild(): Guild {
@@ -321,6 +352,41 @@ function checkProof(client: BotClient): void {
     check("Ohne Fälle: kein Menü, nur der Knopf", !none.includes(`mbw:fall:`) && none.includes(`mbw:warn:${TEXT}:${THREAD}`));
 }
 
+/** Greift die Pflicht, muss ein Beweis taugen, bevor die Strafe passiert - nicht erst beim Sichern. */
+async function checkProofGate(client: BotClient): Promise<void> {
+    console.log("\n  — Beweis-Pflicht: taugt der Beweis? —");
+
+    const needed = ProofNeeded({ ...DefaultModConfig(), proof: { ban: true, kick: false, timeoutFrom: null, warn: false } }, { action: "ban" });
+    const foreign = `https://discord.com/channels/12345678901234567/${TEXT}/${THREAD}`;
+
+    check("Pflicht aus: nichts wird abgelehnt", ProofRefusal(null, { link: "abc" }, GUILD) === null);
+    check("Ohne Beweis: der Satz der Pflicht", ProofRefusal(needed, undefined, GUILD) === needed && ProofRefusal(needed, { link: "  " }, GUILD) === needed);
+    check(
+        "Nachrichtenlink von woanders: abgelehnt, mit Grund und Pflicht",
+        ProofRefusal(needed, { link: foreign }, GUILD) === `Dieser Nachrichtenlink führt auf einen anderen Server. Gesichert wird nur, was hier steht. ${needed}`,
+        String(ProofRefusal(needed, { link: foreign }, GUILD))
+    );
+    check("Unsinn als Link: abgelehnt", ProofRefusal(needed, { link: "abc" }, GUILD)?.startsWith("Nur https-Links") === true);
+    check("http ohne s: abgelehnt", ProofRefusal(needed, { link: "http://clips.example.com/1" }, GUILD)?.startsWith("Nur https-Links") === true);
+    check("Eine Textdatei: abgelehnt", ProofRefusal(needed, { image: Attachment({ contentType: "text/plain", name: "a.txt" }) }, GUILD)?.startsWith("Nur Bilder") === true);
+    check("Über 8 MB: abgelehnt", ProofRefusal(needed, { image: Attachment({ size: MAX_EVIDENCE_BYTES + 1 }) }, GUILD)?.startsWith("Das Bild ist größer als 8 MB.") === true);
+    check("Bild von fremdem Host: abgelehnt", ProofRefusal(needed, { image: Attachment({ url: "https://example.com/chat.png" }) }, GUILD)?.startsWith("Dieser Anhang kommt nicht von Discord.") === true);
+    check("Gültig: Nachrichtenlink dieses Servers", ProofRefusal(needed, { link: `https://discord.com/channels/${GUILD}/${TEXT}/${THREAD}` }, GUILD) === null);
+    check("Gültig: https-Link", ProofRefusal(needed, { link: "https://clips.example.com/1" }, GUILD) === null);
+    check("Gültig: Bild von Discord, genau 8 MB, mit charset", ProofRefusal(needed, { image: Attachment({ size: MAX_EVIDENCE_BYTES, contentType: "image/png; charset=binary" }) }, GUILD) === null);
+    check("Gültig: die Nachricht vom Rechtsklick", ProofRefusal(needed, { message: FakeMessage("Du bist so schlecht") }, GUILD) === null);
+    check("Ein guter Beweis reicht, auch neben einem kaputten", ProofRefusal(needed, { image: Attachment(), link: "abc" }, GUILD) === null);
+    check("AttachmentFault: ein gutes Bild hat keinen", AttachmentFault(Attachment()) === null);
+
+    // Diese Prüfungen kommen vor Datenbank und Download - das geht ohne beides.
+    const service = client.moderationService;
+    const author = { id: MOD, name: "Hanna", member: null };
+
+    check("AddAttachment: falscher Typ abgelehnt", (await Refusal(() => service.AddAttachment(GUILD, author, 1, Attachment({ contentType: "text/plain" })))) === "Nur Bilder: PNG, JPG, GIF oder WebP.");
+    check("AddAttachment: über 8 MB abgelehnt", (await Refusal(() => service.AddAttachment(GUILD, author, 1, Attachment({ size: MAX_EVIDENCE_BYTES + 1 })))) === "Das Bild ist größer als 8 MB.");
+    check("AddAttachment: fremder Host abgelehnt", (await Refusal(() => service.AddAttachment(GUILD, author, 1, Attachment({ url: "https://example.com/chat.png" })))) === "Dieser Anhang kommt nicht von Discord.");
+}
+
 async function checkCard(): Promise<void> {
     console.log("\n  — Log-Karte und Beweis-Ansicht —");
 
@@ -501,9 +567,28 @@ async function checkEvidence(client: BotClient): Promise<void> {
     check("Ein Nachrichtenlink von woanders: ein Problem, kein Absturz", foreign.problems.length === 1 && foreign.problems[0].includes("anderen Server"), foreign.problems.join(" | "));
     check("Und kein Beweis dazu", foreign.entry.evidence.length === linked.entry.evidence.length);
 
+    await Promise.all([
+        service.AddImage(GUILD, author, entry.number, Buffer.from("GIF89a eins"), "image/gif", "eins.gif"),
+        service.AddImage(GUILD, author, entry.number, Buffer.from("GIF89a zwei"), "image/gif", "zwei.gif"),
+    ]);
+
+    const both = await service.CaseOf(GUILD, entry.number);
+    const images = both.evidence.filter((evidence) => evidence.kind === "image");
+    const contents = await Promise.all(images.map(async (image) => String(await service.EvidenceFile(both, image))));
+
+    check("Zwei Bilder zugleich: jede Nummer nur einmal", images.length === 2 && new Set(both.evidence.map((evidence) => evidence.id)).size === both.evidence.length, JSON.stringify(both.evidence.map((evidence) => evidence.id)));
+    check("Und zwei Dateien - keine überschreibt die andere", contents.sort().join(" | ") === "GIF89a eins | GIF89a zwei", contents.join(" | "));
+
     await client.modCases.Mutate(entry.id, (current) => ({
         evidence: Array.from({ length: MAX_EVIDENCE }, (_, index) => ({ ...current.evidence[0], id: index + 1 })),
     }));
+
+    const folder = path.join(EVIDENCE_ROOT, GUILD, String(entry.id));
+    const stored = (await readdir(folder).catch(() => [])).length;
+    const fullImage = await Refusal(() => service.AddImage(GUILD, author, entry.number, Buffer.from("GIF89a drei"), "image/gif", "drei.gif"));
+
+    check("Ein Bild bei 20 Beweisen: abgelehnt", fullImage.startsWith(`Mehr als ${MAX_EVIDENCE}`), fullImage);
+    check("Und es bleibt keine Datei liegen", (await readdir(folder).catch(() => [])).length === stored, String(stored));
 
     let full = "";
 
@@ -549,12 +634,43 @@ async function checkEvidence(client: BotClient): Promise<void> {
 
     check("Pflicht ohne Beweis: abgelehnt", refused.startsWith("Auf diesem Server braucht eine Verwarnung einen Beweis."), refused);
     check("Und es entsteht kein Fall", (await client.modCases.List(GUILD, {}, null, 50)).length === before);
+
+    const warn = { action: "warn" as const, targetId: USER, reason: "Test" };
+    const broken: [string, { link?: string; image?: ReturnType<typeof Attachment> }, string][] = [
+        ["Link auf fremden Server", { link: `https://discord.com/channels/12345678901234567/${TEXT}/${THREAD}` }, "Dieser Nachrichtenlink führt auf einen anderen Server."],
+        ["Unsinn-Link", { link: "abc" }, "Nur https-Links gehen als Beweis."],
+        ["Textdatei", { image: Attachment({ contentType: "text/plain", name: "a.txt" }) }, "Nur Bilder: PNG, JPG, GIF oder WebP."],
+        ["Bild über 8 MB", { image: Attachment({ size: MAX_EVIDENCE_BYTES + 1 }) }, "Das Bild ist größer als 8 MB."],
+    ];
+
+    for (const [name, proof, reason] of broken) {
+        const said = await Refusal(() => service.ActWithProof(guild, owner, warn, "discord", proof));
+
+        check(`Pflicht mit ${name}: vor der Strafe abgelehnt`, said.startsWith(reason) && said.includes("braucht eine Verwarnung einen Beweis"), said);
+    }
+
+    check("Und auch dabei entsteht kein Fall", (await client.modCases.List(GUILD, {}, null, 50)).length === before);
+
+    // Ein gültiger Beweis kommt durch bis zur Strafe - die selbst bräuchte Discord, hier hält der Bot dort an.
+    const reached = "bis zur Strafe gekommen";
+    const halt = {
+        ...guild,
+        members: {
+            me: null,
+            fetchMe: async () => {
+                throw new ModerationError(reached);
+            },
+        },
+    } as unknown as Guild;
+
+    check("Pflicht mit gültigem Beweis: geht durch", (await Refusal(() => service.ActWithProof(halt, owner, warn, "discord", { link: "https://clips.example.com/1" }))) === reached);
 }
 
 async function cleanup(client: BotClient): Promise<void> {
     await client.databaseService.Write("DELETE FROM mod_cases WHERE guild_id = ?", [GUILD]);
     await client.databaseService.Write("DELETE FROM mod_settings WHERE guild_id = ?", [GUILD]);
     await client.databaseService.Write(`DELETE FROM \`${client.settings.Table}\` WHERE guild_id = ?`, [GUILD]);
+    await rm(path.join(EVIDENCE_ROOT, GUILD), { recursive: true, force: true });
 
     client.modCases.Forget();
     client.modSettings.Forget();
@@ -575,6 +691,7 @@ async function main(): Promise<void> {
     checkConfig(client);
     checkViews();
     checkProof(client);
+    await checkProofGate(client);
     await checkCard();
 
     if (await client.databaseService.Connect()) {

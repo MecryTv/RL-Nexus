@@ -32,8 +32,7 @@ export default class EvidenceMenu extends Event {
         const show = (view: IModView) => ({ ...view, flags: MessageFlags.IsComponentsV2 as const, allowedMentions: { parse: [] } });
 
         try {
-            await service.TeamGate(interaction.member);
-
+            // Das Fenster muss sofort kommen - geprüft wird beim Absenden, wie alles darunter.
             if (target.kind === "warn" && interaction.isButton()) {
                 await interaction.showModal(
                     new ModalBuilder()
@@ -51,9 +50,13 @@ export default class EvidenceMenu extends Event {
                 return;
             }
 
-            if (target.kind === "fall" && interaction.isStringSelectMenu()) {
-                await interaction.deferUpdate();
+            // Aus dem Menü heraus ersetzt die Antwort das Menü. Erst bestätigen, dann die Team-Prüfung - sie fragt womöglich die Datenbank.
+            if (interaction.isModalSubmit() && !interaction.isFromMessage()) await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+            else await interaction.deferUpdate();
 
+            await service.TeamGate(interaction.member);
+
+            if (target.kind === "fall" && interaction.isStringSelectMenu()) {
                 const message = await this.Message(interaction.guild, target);
                 const { entry, problems } = await service.AddMessage(interaction.guild, ActorOf(interaction.member), Number(interaction.values[0]), message);
 
@@ -62,10 +65,6 @@ export default class EvidenceMenu extends Event {
             }
 
             if (target.kind === "grund" && interaction.isModalSubmit()) {
-                // Aus dem Menü heraus: die Antwort ersetzt das Menü.
-                if (interaction.isFromMessage()) await interaction.deferUpdate();
-                else await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-
                 const message = await this.Message(interaction.guild, target);
                 const request = { action: "warn" as const, targetId: message.author.id, reason: interaction.fields.getTextInputValue("grund") };
                 const { entry, problems } = await service.ActWithProof(interaction.guild, interaction.member, request, "discord", { message });

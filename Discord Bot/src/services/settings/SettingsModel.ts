@@ -3,6 +3,7 @@ import BotClient from "../../client/BotClient";
 import { ModuleId } from "../../constants/Modules";
 import { MAX_BAN, MAX_STAGES, MAX_TIMEOUT, MIN_DURATION, ParseDuration } from "../../constants/Moderation";
 import { IModStage } from "../../interfaces/services/moderation/IModeration";
+import { Cut } from "../../utils/cut";
 
 /**
  * Das Einstellungs-Panel (/einstellungen, W-0014 Teil 3): Je Modul ein Register
@@ -16,7 +17,34 @@ export class PanelError extends Error {}
 
 export type FieldKind = "toggle" | "channel" | "channels" | "role" | "roles" | "choice" | "number" | "text" | "stages";
 
-export type PanelModuleId = "moderation" | "tickets" | "apply" | "levels" | "welcome";
+/** Die Module im Panel - dieselben IDs wie in den Server-Einstellungen. Gallery fehlt: nichts einzustellen, ausschalten geht nicht. */
+export type PanelModuleId =
+    | "levels"
+    | "backups"
+    | "rl-6mans"
+    | "lft"
+    | "teams"
+    | "rank-roles"
+    | "clips"
+    | "matchups"
+    | "moderation"
+    | "automod"
+    | "anti-villain"
+    | "logging"
+    | "welcome"
+    | "apply"
+    | "voice-hub"
+    | "reaction-roles"
+    | "role-lists"
+    | "giveaways"
+    | "polls"
+    | "tickets"
+    | "twitch-notifier"
+    | "youtube-notifier"
+    | "custom-message";
+
+/** So viele Kacheln fasst ein Bild in einem Abschnitt (vier Zeilen zu drei) - mehr schneidet der Zeichner ab. */
+export const MAX_SECTION_FIELDS = 12;
 
 export interface IPanelField<S> {
     /** Eindeutig im Modul, ohne Doppelpunkt - er steckt in den IDs. */
@@ -56,6 +84,8 @@ export interface IPanelModule<S> {
     sections: IPanelSection<S>[];
     /** Was nur im Dashboard geht - steht klein unter dem Bild. */
     dashOnly: string[];
+    /** Module ohne eigene Einstellungen (A1): ein Satz, warum, statt der Kacheln. */
+    about?: string;
     load(client: BotClient, guild: Guild): Promise<S>;
     /** Speichert über den Weg des Moduls. Gibt einen Hinweis zurück, wenn etwas so noch nicht greift. */
     save(client: BotClient, guild: Guild, patch: Record<string, unknown>): Promise<string | null>;
@@ -174,7 +204,7 @@ export function ShowValue(field: Pick<IPanelField<unknown>, "kind" | "choices" |
         case "text": {
             const text = typeof value === "string" ? value.trim() : "";
 
-            return text ? (text.length > 40 ? `${text.slice(0, 39)}…` : text) : "–";
+            return text ? Cut(text, 40) : "–";
         }
         case "stages": {
             const stages = Array.isArray(value) ? (value as IModStage[]) : [];

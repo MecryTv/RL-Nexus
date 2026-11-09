@@ -1,4 +1,5 @@
 import { ChannelType } from "discord.js";
+import { MAX_CHANNEL_NAME } from "../../../constants/Apply";
 import { IApplySettings } from "../../../interfaces/services/apply/IApply";
 import { IPanelModule } from "../SettingsModel";
 import { F, TEXT } from "./Shared";
@@ -39,13 +40,18 @@ export const ApplyPanel: IPanelModule<S> = {
                     ],
                 }),
                 F<S>("channel", "category", "Kategorie", "Hier entstehen die eigenen Kanäle.", (s) => s.categoryId, (value: string | null) => ({ categoryId: value }), { channelTypes: [ChannelType.GuildCategory] }),
-                F<S>("text", "channelName", "Kanalname", "Name des eigenen Kanals, mit {user}, {nummer} und {formular}.", (s) => s.channelName, (value: string) => ({ channelName: value }), { max: 90 }),
+                F<S>("text", "channelName", "Kanalname", "Name des eigenen Kanals, mit {user}, {nummer} und {formular}.", (s) => s.channelName, (value: string) => ({ channelName: value }), { max: MAX_CHANNEL_NAME }),
+                // Dieselben Namen wie im Dashboard (GuildApply.ts, AFTERS).
                 F<S>("choice", "after", "Nach Entscheidung", "Was mit dem eigenen Kanal passiert.", (s) => s.afterDecision, (value: string) => ({ afterDecision: value }), {
                     choices: [
-                        ["delete", "Kanal löschen"],
-                        ["close", "Kanal schließen"],
-                        ["keep", "Kanal behalten"],
+                        ["close", "Für die Person schließen"],
+                        ["delete", "Löschen"],
+                        ["keep", "Offen lassen"],
                     ],
+                }),
+                // W-0047: so viele Kanalarten, wie das Speichern annimmt (IsLogTarget).
+                F<S>("channel", "transcript", "Transcript-Kanal", "Vor dem Löschen kommt der Kanal als Datei hierhin. Ohne Kanal kein Transcript.", (s) => s.transcriptChannelId, (value: string | null) => ({ transcriptChannelId: value }), {
+                    channelTypes: [...TEXT, ChannelType.PublicThread, ChannelType.AnnouncementThread],
                 }),
             ],
         },

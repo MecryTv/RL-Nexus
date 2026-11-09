@@ -1,6 +1,7 @@
 import { Canvas, Image, SKRSContext2D, createCanvas, loadImage } from "@napi-rs/canvas";
 import { RegisterFonts } from "./RankCard";
 import { TwemojiUrl } from "../services/RoleListService";
+import { Chars, Cut } from "../utils/cut";
 
 /**
  * Die Seiten von /hilfe als Bilder (W-0014, Nachtrag Plan 45): der Look der
@@ -25,7 +26,7 @@ export type HelpBlock =
     /** Kopf einer Fall-Karte (Moderation): Titel, User als Pille, Zeile darunter, Bild rechts. */
     | { kind: "caseHead"; emoji: string; title: string; user?: string; sub: string; by?: string; avatar?: Buffer }
     /** Einstellungen (/einstellungen) als nummerierte Kacheln, drei je Zeile, mit Abschnitt darüber. */
-    | { kind: "settings"; title?: string; items: { n: number; label: string; value: string; state?: "on" | "off"; hi?: boolean }[] }
+    | { kind: "settings"; title?: string; items: { n: number; label: string; value: string; state?: "on" | "off"; hi?: boolean; dim?: boolean }[] }
     /** Beweise als Zeilen: Vorschau oder Emoji, Titel, wer und wann. */
     | { kind: "evidence"; items: { thumb?: Buffer; icon: string; title: string; sub: string; quote?: boolean }[] };
 
@@ -87,11 +88,14 @@ async function FetchEmoji(emoji: string): Promise<Buffer | null> {
 
 let loader: (emoji: string) => Promise<Buffer | null> = FetchEmoji;
 const emojis = new Map<string, Promise<Image | null>>();
+/** Dieselben, sobald sie da sind - Text mit Emojis wird ohne Warten gezeichnet. */
+const loaded = new Map<string, Image | null>();
 
 /** Für die Prüfungen: Emojis ohne Netz. */
 export function SetEmojiLoader(load: (emoji: string) => Promise<Buffer | null>): void {
     loader = load;
     emojis.clear();
+    loaded.clear();
 }
 
 function Emoji(emoji: string): Promise<Image | null> {
@@ -100,7 +104,12 @@ function Emoji(emoji: string): Promise<Image | null> {
     if (!found) {
         found = loader(emoji)
             .then((buffer) => (buffer ? loadImage(buffer) : null))
-            .catch(() => null);
+            .catch(() => null)
+            .then((image) => {
+                loaded.set(emoji, image);
+
+                return image;
+            });
         emojis.set(emoji, found);
     }
 
@@ -113,6 +122,97 @@ async function DrawEmoji(ctx: SKRSContext2D, emoji: string, x: number, y: number
     if (image) ctx.drawImage(image, x, y, size, size);
 
     return image !== null;
+}
+
+/* ----------------------------------------------------------
+   Text mit Emojis: Oxanium und Rajdhani haben keine, im Abbild
+   gibt es keine Systemschrift - ohne das würden sie Kästchen.
+   ---------------------------------------------------------- */
+
+/** Bildzeichen, Flaggen und Tastenkappen. © ® ™ ohne Emoji-Variante haben die Schriften selbst. */
+const EMOJI = /\p{Extended_Pictographic}|\p{Regional_Indicator}|\u20E3/u;
+
+/** Text in Läufe: jedes Emoji für sich, der Rest am Stück. */
+export function Runs(text: string): { text: string; emoji: boolean }[] {
+    // Fast jeder Text hat keins - dann ohne Zerlegen, das kostet bei jedem Wort.
+    if (!EMOJI.test(text)) return [{ text, emoji: false }];
+
+    const runs: { text: string; emoji: boolean }[] = [];
+
+    for (const char of Chars(text)) {
+        const emoji = EMOJI.test(char) && !/^[©®™]$/.test(char);
+        const last = runs[runs.length - 1];
+
+        if (last && !last.emoji && !emoji) last.text += char;
+        else runs.push({ text: char, emoji });
+    }
+
+    return runs;
+}
+
+/** Lädt die Emojis in den Texten vorab - DrawText zeichnet danach, ohne zu warten. */
+export async function LoadEmojis(texts: string[]): Promise<void> {
+    await Promise.all(texts.flatMap((text) => Runs(text).filter((run) => run.emoji).map((run) => Emoji(run.text))));
+}
+
+/**
+ * Für Zeichen, die Oxanium und Rajdhani nicht haben (┃, Kyrillisch, ★, CJK). Skia
+ * sucht keine Systemschrift von selbst, es nimmt nur, was in ctx.font steht - und
+ * überspringt Namen, die es nicht gibt. Im Abbild sind diese Schriften erst mit den
+ * Debian-Paketen da (fonts-dejavu-core, fonts-noto-core, fonts-noto-cjk), bis
+ * dahin bleibt es dort beim Kästchen.
+ */
+const FALLBACK = `"Noto Sans", "DejaVu Sans", "Noto Sans Symbols 2", "Noto Sans Math", "Noto Sans CJK JP"`;
+
+function WithFallback<T>(ctx: SKRSContext2D, text: string, use: () => T): T {
+    // ASCII haben die Schriften selbst - und das Umstellen kostet bei jedem Wort.
+    if (/^[\x20-\x7E]*$/.test(text)) return use();
+
+    const font = ctx.font;
+
+    ctx.font = `${font}, ${FALLBACK}`;
+
+    try {
+        return use();
+    } finally {
+        ctx.font = font;
+    }
+}
+
+/** Ein Emoji ist so breit, wie die Schrift groß ist. */
+function EmSize(ctx: SKRSContext2D): number {
+    return Number(/([\d.]+)px/.exec(ctx.font)?.[1] ?? 30);
+}
+
+/** Ohne geladenes Bild steht das Emoji als Text da - dann zählt seine Breite als Text. */
+function RunWidth(ctx: SKRSContext2D, run: { text: string; emoji: boolean }): number {
+    return run.emoji && loaded.get(run.text) ? EmSize(ctx) : WithFallback(ctx, run.text, () => ctx.measureText(run.text).width);
+}
+
+/** Wie measureText().width, mit Emojis als Bild. */
+export function TextWidth(ctx: SKRSContext2D, text: string): number {
+    return Runs(text).reduce((sum, run) => sum + RunWidth(ctx, run), 0);
+}
+
+/** Wie fillText (links, auf der Grundlinie), Emojis als Twemoji-Bild, wenn es geladen ist. */
+export function DrawText(ctx: SKRSContext2D, text: string, x: number, y: number): void {
+    const runs = Runs(text);
+
+    // Ohne Emoji wie bisher: ein fillText, ohne nachzumessen.
+    if (runs.length === 1 && !runs[0].emoji) return WithFallback(ctx, text, () => ctx.fillText(text, x, y));
+
+    const em = EmSize(ctx);
+    let cursor = x;
+
+    for (const run of runs) {
+        const image = run.emoji ? loaded.get(run.text) : null;
+
+        // Etwas kleiner als die Schrift, mittig auf der Höhe der Großbuchstaben.
+        if (image) ctx.drawImage(image, cursor + em * 0.05, y - em * 0.8, em * 0.9, em * 0.9);
+        else WithFallback(ctx, run.text, () => ctx.fillText(run.text, cursor, y));
+
+        cursor += RunWidth(ctx, run);
+    }
 }
 
 /* ----------------------------------------------------------
@@ -159,7 +259,7 @@ function Paragraph(ctx: SKRSContext2D, markup: string, x: number, y: number, wid
     for (const word of Words(markup)) {
         ctx.font = Font(word.style, size);
 
-        const measured = ctx.measureText(word.text).width + (word.style === "code" ? 16 : 0);
+        const measured = TextWidth(ctx, word.text) + (word.style === "code" ? 16 : 0);
 
         if (used + measured > width && lines[lines.length - 1].length) {
             lines.push([]);
@@ -185,13 +285,13 @@ function Paragraph(ctx: SKRSContext2D, markup: string, x: number, y: number, wid
                 ctx.roundRect(cursor, base - lineHeight + 14, wordWidth, lineHeight - 6, 6);
                 ctx.fill();
                 ctx.fillStyle = C.cmd;
-                ctx.fillText(word.text, cursor + 8, base);
+                DrawText(ctx, word.text, cursor + 8, base);
                 cursor += wordWidth + 6;
                 continue;
             }
 
             ctx.fillStyle = word.style === "bold" ? C.strong : (options.color ?? C.text);
-            ctx.fillText(word.text, cursor, base);
+            DrawText(ctx, word.text, cursor, base);
             cursor += wordWidth;
         }
     });
@@ -199,15 +299,27 @@ function Paragraph(ctx: SKRSContext2D, markup: string, x: number, y: number, wid
     return lines.length * lineHeight;
 }
 
-/** Kürzt auf eine Zeile mit „…“ - für Namen und Gründe, die nie umbrechen sollen. */
-function Fit(ctx: SKRSContext2D, text: string, width: number): string {
-    if (ctx.measureText(text).width <= width) return text;
+/**
+ * Kürzt auf eine Zeile mit „…“ - für Namen und Gründe, die nie umbrechen sollen.
+ * Geschnitten wird zwischen ganzen Zeichen, ein Emoji bleibt ganz oder fällt weg.
+ */
+export function Fit(ctx: SKRSContext2D, text: string, width: number): string {
+    if (TextWidth(ctx, text) <= width) return text;
 
-    let cut = text;
+    const chars = Chars(text);
+    const cut = (count: number) => `${chars.slice(0, count).join("").trimEnd()}…`;
+    let low = 1;
+    let high = chars.length - 1;
 
-    while (cut.length > 1 && ctx.measureText(`${cut}…`).width > width) cut = cut.slice(0, -1);
+    // Die längste Kürzung, die passt - halbiert gesucht, eine Nachricht als Beweis kann lang sein.
+    while (low < high) {
+        const middle = Math.ceil((low + high) / 2);
 
-    return `${cut.trimEnd()}…`;
+        if (TextWidth(ctx, cut(middle)) <= width) low = middle;
+        else high = middle - 1;
+    }
+
+    return cut(low);
 }
 
 function Badge(ctx: SKRSContext2D, label: string, x: number, y: number): number {
@@ -230,14 +342,14 @@ function Badge(ctx: SKRSContext2D, label: string, x: number, y: number): number 
 function Pill(ctx: SKRSContext2D, text: string, x: number, y: number, font: string): number {
     ctx.font = font;
 
-    const width = ctx.measureText(text).width + 18;
+    const width = TextWidth(ctx, text) + 18;
 
     ctx.fillStyle = C.cmdBg;
     ctx.beginPath();
     ctx.roundRect(x, y, width, 44, 8);
     ctx.fill();
     ctx.fillStyle = C.cmd;
-    ctx.fillText(text, x + 9, y + 33);
+    DrawText(ctx, text, x + 9, y + 33);
 
     return width;
 }
@@ -251,7 +363,7 @@ function CodeBox(ctx: SKRSContext2D, code: string, x: number, y: number, width: 
     for (const part of code.split(/(?<= )/)) {
         const next = lines[lines.length - 1] + part;
 
-        if (ctx.measureText(next).width > width - 36 && lines[lines.length - 1]) lines.push(part);
+        if (TextWidth(ctx, next) > width - 36 && lines[lines.length - 1]) lines.push(part);
         else lines[lines.length - 1] = next;
     }
 
@@ -265,7 +377,7 @@ function CodeBox(ctx: SKRSContext2D, code: string, x: number, y: number, width: 
     ctx.lineWidth = 2;
     ctx.stroke();
     ctx.fillStyle = C.text;
-    lines.forEach((line, index) => ctx.fillText(line.trimEnd(), x + 18, y + 12 + 38 * index + 29));
+    lines.forEach((line, index) => DrawText(ctx, line.trimEnd(), x + 18, y + 12 + 38 * index + 29));
 
     return height;
 }
@@ -488,7 +600,7 @@ async function DrawBlock(ctx: SKRSContext2D, block: HelpBlock, y: number): Promi
 
             ctx.font = "800 44px Oxanium";
             ctx.fillStyle = C.strong;
-            ctx.fillText(Fit(ctx, block.title, width - (left - x)), left, y + 42);
+            DrawText(ctx, Fit(ctx, block.title, width - (left - x)), left, y + 42);
 
             let cursor = x;
 
@@ -499,12 +611,12 @@ async function DrawBlock(ctx: SKRSContext2D, block: HelpBlock, y: number): Promi
 
             ctx.font = FONT.small;
             ctx.fillStyle = C.muted;
-            ctx.fillText(Fit(ctx, block.sub, width - (cursor - x)), cursor, y + 87);
+            DrawText(ctx, Fit(ctx, block.sub, width - (cursor - x)), cursor, y + 87);
 
             let height = 104;
 
             if (block.by) {
-                ctx.fillText(Fit(ctx, block.by, width), x, y + height + 26);
+                DrawText(ctx, Fit(ctx, block.by, width), x, y + height + 26);
                 height += 34;
             }
 
@@ -542,6 +654,8 @@ async function DrawBlock(ctx: SKRSContext2D, block: HelpBlock, y: number): Promi
                 const left = x + (index % columns) * (width + gap);
                 const top = y + height + Math.floor(index / columns) * (tile + gap);
 
+                // Blass: in der Übersicht die Module ohne eigene Einstellungen (W-0014 Teil 4, A1).
+                ctx.globalAlpha = item.dim ? 0.5 : 1;
                 ctx.fillStyle = item.hi ? "rgba(240,178,50,0.14)" : C.tile;
                 ctx.beginPath();
                 ctx.roundRect(left, top, width, tile, 10);
@@ -564,10 +678,11 @@ async function DrawBlock(ctx: SKRSContext2D, block: HelpBlock, y: number): Promi
                 ctx.textAlign = "left";
                 ctx.font = FONT.small;
                 ctx.fillStyle = C.muted;
-                ctx.fillText(Fit(ctx, item.label, width - 62), left + 50, top + 34);
+                DrawText(ctx, Fit(ctx, item.label, width - 62), left + 50, top + 34);
                 ctx.font = "800 28px Oxanium";
                 ctx.fillStyle = item.state === "on" ? "#35e07f" : item.state === "off" ? C.muted : C.strong;
-                ctx.fillText(Fit(ctx, item.value, width - 28), left + 14, top + 68);
+                DrawText(ctx, Fit(ctx, item.value, width - 28), left + 14, top + 68);
+                ctx.globalAlpha = 1;
             }
 
             const rows = Math.ceil(block.items.length / columns);
@@ -614,10 +729,10 @@ async function DrawBlock(ctx: SKRSContext2D, block: HelpBlock, y: number): Promi
 
                 ctx.font = FONT.bold;
                 ctx.fillStyle = item.quote ? C.text : C.strong;
-                ctx.fillText(Fit(ctx, item.title, width), left, top + 29);
+                DrawText(ctx, Fit(ctx, item.title, width), left, top + 29);
                 ctx.font = FONT.small;
                 ctx.fillStyle = C.muted;
-                ctx.fillText(Fit(ctx, item.sub, width), left, top + 56);
+                DrawText(ctx, Fit(ctx, item.sub, width), left, top + 56);
 
                 height += row + 10;
             }
@@ -627,9 +742,19 @@ async function DrawBlock(ctx: SKRSContext2D, block: HelpBlock, y: number): Promi
     }
 }
 
+/** Alle Texte eines Blocks, Bilder ausgenommen - für das Vorladen der Emojis. */
+function Texts(value: unknown): string[] {
+    if (typeof value === "string") return [value];
+    if (!value || typeof value !== "object" || Buffer.isBuffer(value)) return [];
+
+    return Object.values(value).flatMap(Texts);
+}
+
 /** Ein Block auf eigener, genau passender Fläche. */
 async function BlockImage(scratch: Canvas, block: HelpBlock): Promise<Canvas> {
     const ctx = scratch.getContext("2d");
+
+    await LoadEmojis(Texts(block));
 
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, scratch.width, scratch.height);
@@ -745,5 +870,5 @@ export function HelpAlt(blocks: HelpBlock[]): string {
     });
     const text = lines.join(" ").replace(/\s+/g, " ").trim();
 
-    return text.length <= 1024 ? text : `${text.slice(0, 1023)}…`;
+    return Cut(text, 1024);
 }

@@ -2,7 +2,8 @@ import { Guild, GuildMember, PermissionFlagsBits } from "discord.js";
 import BotClient from "../../client/BotClient";
 import { IPanelState } from "../../builder/SettingsView";
 import { DASHBOARD_PATH } from "../../constants/Dashboard";
-import { LogTargetError } from "../../utils/logtarget";
+import logger from "../../utils/logger";
+import { LogTargetError, WarmLogTarget } from "../../utils/logtarget";
 import { ApplyError } from "../ApplyService";
 import { LevelError } from "../LevelService";
 import { ModerationError } from "../ModerationService";
@@ -28,8 +29,8 @@ export interface IChange {
  */
 export default class SettingsService {
     private readonly client: BotClient;
-    /** Je User und Modul der Wert vor der letzten Änderung - nur solange der Bot läuft. */
-    private readonly last = new Map<string, { key: string; value: unknown }>();
+    /** Je Server, User und Modul der Wert vor und nach der letzten Änderung - nur solange der Bot läuft. */
+    private readonly last = new Map<string, { key: string; value: unknown; after: unknown }>();
 
     constructor(client: BotClient) {
         this.client = client;
@@ -67,6 +68,14 @@ export default class SettingsService {
     async State(guild: Guild, id: string): Promise<IPanelState> {
         const panel = this.Panel(id);
         const [settings, server] = await Promise.all([panel.load(this.client, guild), this.client.settings.Of(guild.id)]);
+
+        // Ein archivierter Forum-Beitrag als Log-Ziel steht nicht im Cache - im Bild hieße er sonst „gelöscht“.
+        await Promise.all(
+            panel.sections
+                .flatMap((section) => section.fields)
+                .filter((field) => field.kind === "channel")
+                .map((field) => WarmLogTarget(guild, field.get(settings)))
+        );
 
         return { panel, settings, on: server.modules.includes(panel.module), guild, link: this.Link(guild, panel.id) };
     }
@@ -136,23 +145,34 @@ export default class SettingsService {
         }
 
         const after = field.get(await panel.load(this.client, guild));
+        const memo = `${guild.id}:${member.id}:${id}`;
+
+        logger.user(`⚙️ /einstellungen: ${panel.name} · ${field.label} auf ${guild.id} geändert (von ${member.id})`);
 
         // Den Panel-Kanal „zurück“ hieße, das Panel woanders nochmal zu schicken - das gibt es nicht.
-        if (!(PANEL in field.set(value, settings))) this.last.set(`${member.id}:${id}`, { key, value: previous });
-        else this.last.delete(`${member.id}:${id}`);
+        if (!(PANEL in field.set(value, settings))) this.last.set(memo, { key, value: previous, after });
+        else this.last.delete(memo);
 
         return { before: ShowValue(field, previous, guild), after: ShowValue(field, after, guild), warning };
     }
 
-    /** Die letzte Änderung dieses Users in diesem Modul zurück. */
+    /**
+     * Die letzte Änderung dieses Users in diesem Modul auf diesem Server zurück -
+     * nur solange niemand den Wert danach geändert hat, sonst überschriebe es
+     * die neuere Änderung still.
+     */
     async Undo(guild: Guild, member: GuildMember, id: PanelModuleId, key: string): Promise<IChange> {
         this.Gate(member);
 
-        const last = this.last.get(`${member.id}:${id}`);
+        const last = this.last.get(`${guild.id}:${member.id}:${id}`);
 
         if (!last || last.key !== key) throw new PanelError("Rückgängig geht nicht mehr, stell den Wert neu ein.");
 
         const field = this.Field(id, key);
+        const now = field.get(await this.Panel(id).load(this.client, guild));
+
+        if (JSON.stringify(now) !== JSON.stringify(last.after)) throw new PanelError("Der Wert wurde inzwischen geändert, Rückgängig geht nicht mehr. Stell ihn neu ein.");
+
         const raw = field.kind === "choice" && last.value === "" ? "-" : last.value;
 
         return this.Change(guild, member, id, key, raw);

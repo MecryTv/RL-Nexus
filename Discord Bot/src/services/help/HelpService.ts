@@ -8,6 +8,7 @@ import { DASHBOARD_PATH } from "../../constants/Dashboard";
 import { HELP_CATALOG } from "../../constants/HelpCatalog";
 import { MODULE_IDS } from "../../constants/Modules";
 import { BuildHelp, IHelpEntry } from "./HelpModel";
+import { Cut } from "../../utils/cut";
 import logger from "../../utils/logger";
 
 /**
@@ -74,7 +75,7 @@ export default class HelpService {
                 const sentence = option.text.split(/(?<=[.!?])\s/)[0];
                 const name = `${option.name} · ${sentence}`;
 
-                return { name: name.length <= 100 ? name : `${name.slice(0, 99)}…`, value: option.value };
+                return { name: Cut(name, 100), value: option.value };
             });
     }
 

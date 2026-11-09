@@ -5,6 +5,7 @@ import { ButtonOptions, ISelectMenuOptions } from "../interfaces/builder/ICompon
 import { HELP_ACCENT, HELP_AREAS, HELP_PREFIX, HelpAreaId, IHelpText, STATUS_URL, SUPPORT_URL, WHO_LABELS } from "../constants/Help";
 import { IsModule } from "../constants/Modules";
 import { IHelpCommand, IHelpEntry } from "../services/help/HelpModel";
+import { Cut } from "../utils/cut";
 
 /**
  * Die Seiten von /hilfe (W-0014, Plan 45): Start B, Bereich C, Befehl A und
@@ -74,10 +75,6 @@ function FirstSentence(text: string): string {
     const end = text.search(/[.!?](\s|$)/);
 
     return end === -1 ? text : text.slice(0, end + 1);
-}
-
-function Cut(text: string, max: number): string {
-    return text.length <= max ? text : `${text.slice(0, max - 1)}…`;
 }
 
 function Count(count: number): string {
