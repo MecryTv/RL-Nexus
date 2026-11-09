@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { checkVersionInput, filterVersions, parseWorksChangelog, stampKind, type IChangeItem, type IChangelogFilter, type IChangelogVersion, type IVersionInput } from "../../shared/changelog.ts";
+import { changelogAlt, layoutRows, renderChangelogImage } from "../changelog/image.ts";
 import { check, section } from "./harness.ts";
+import { pngSize } from "./messages.check.ts";
 
 /** Eine gültige Version, von der jede Prüfung eine Stelle ändert. */
 const BASE: IVersionInput = {
@@ -112,5 +114,40 @@ export async function checkChangelog(): Promise<void> {
         assert.equal(stampKind([item({ kind: "verbessert" }), item({ kind: "behoben" })]), "verbessert");
         assert.equal(stampKind([item({ kind: "behoben" }), item({ kind: "behoben" }), item()]), "behoben");
         assert.equal(stampKind([item({ kind: "intern" })]), null);
+    });
+
+    const FOOTER = { poster: "MecryTv", editedOn: null };
+    const SHORT: IVersionInput = {
+        ...BASE,
+        items: [item(), item({ kind: "verbessert", area: "admin", text: "Beweis-Pflicht prüft Link", task: null }), item({ kind: "behoben", area: "webseite", text: "Modul an schaltete aus" }), item({ kind: "intern", text: "Geheimer Umbau" })],
+    };
+    const LONG: IVersionInput = { ...BASE, items: Array.from({ length: 30 }, (_, index) => item({ kind: (["neu", "verbessert", "behoben"] as const)[index % 3]!, text: `${index} ${"x".repeat(197)}` })) };
+
+    await check("Bild: 1100 breit, höchstens 580 hoch, auch mit 30 langen Zeilen", async () => {
+        for (const input of [SHORT, LONG]) {
+            const image = await renderChangelogImage(input, FOOTER);
+
+            assert.equal(image.name, "changelog.png");
+            assert.equal(pngSize(image.data).width, 1100);
+            assert.ok(pngSize(image.data).height <= 580, `${pngSize(image.data).height} px hoch`);
+        }
+    });
+
+    await check("Bild: passen nicht alle Zeilen, bleibt der Rest als „+ N weitere“", () => {
+        assert.equal(layoutRows(SHORT).hidden, 0);
+
+        const long = layoutRows(LONG);
+        assert.ok(long.hidden > 0 && long.hidden < 30, `${long.hidden} versteckt`);
+        assert.equal(long.tiles.reduce((sum, tile) => sum + tile.items.length, 0) + long.hidden, 30);
+        assert.ok(long.tiles.every((tile) => tile.items.length > 0), "jede Art zeigt mindestens eine Zeile");
+    });
+
+    await check("Alt-Text: Version, Titel und jede Zeile außer Intern, höchstens 1024 Zeichen", () => {
+        const alt = changelogAlt(SHORT, FOOTER);
+
+        for (const part of ["1.4.0", "Einstellungen für alle Module", "/einstellungen für alle Module", "Beweis-Pflicht prüft Link", "Modul an schaltete aus"]) assert.ok(alt.includes(part), `${part} fehlt in: ${alt}`);
+        assert.ok(!alt.includes("Geheimer Umbau"), "Intern steht im Alt-Text");
+        assert.ok(!alt.includes("weitere"), alt);
+        assert.ok(changelogAlt(LONG, FOOTER).length <= 1024, `${changelogAlt(LONG, FOOTER).length} Zeichen`);
     });
 }
