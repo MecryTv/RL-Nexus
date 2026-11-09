@@ -2,7 +2,9 @@ import { AttachmentBuilder, ContainerBuilder, Guild } from "discord.js";
 import ComponentV2Builder from "./ComponentV2Builder";
 import { HelpBlock, RenderHelpImages } from "./HelpImage";
 import { ButtonOptions } from "../interfaces/builder/IComponentV2Builder";
+import { PANEL_AREAS } from "../services/settings/registers";
 import { IPanelField, IPanelModule, PanelId, ShowValue } from "../services/settings/SettingsModel";
+import { Cut } from "../utils/cut";
 
 /**
  * Das Einstellungs-Panel (W-0014 Teil 3, Entwürfe 3B, A2, B1, C1): oben die
@@ -38,10 +40,6 @@ export interface IPanelMessage {
 }
 
 const MAX_FILES = 10;
-
-function Cut(text: string, max: number): string {
-    return text.length > max ? `${text.slice(0, max - 1)}…` : text;
-}
 
 /** Felder mit ihrer Nummer, durchgezählt über alle Abschnitte. */
 function Numbered(panel: IPanelModule<unknown>): { n: number; field: IPanelField<unknown>; section: string }[] {
@@ -81,6 +79,8 @@ export function PanelBlocks(state: IPanelState, view: IPanelView): HelpBlock[] {
         });
     }
 
+    // A1: Module ohne eigene Einstellungen - ein Satz statt der Kacheln.
+    if (panel.about) blocks.push({ kind: "text", text: `${panel.about} Hier kannst du das Modul ein- und ausschalten.` });
     if (panel.dashOnly.length) blocks.push({ kind: "text", text: `**Nur im Dashboard:** ${panel.dashOnly.join(", ")}` });
 
     return blocks;
@@ -113,7 +113,12 @@ function Control(builder: ComponentV2Builder, state: IPanelState, field: IPanelF
                 customId: id("c"),
                 channelTypes: field.channelTypes,
                 placeholder: field.kind === "channel" ? "Kanal wählen …" : "Kanäle wählen …",
-                defaults: ids.filter((channel) => guild.channels.cache.has(channel)),
+                // Nur, was das Menü auch anbietet: eine Vorauswahl außerhalb der Kanalarten könnte Discord ablehnen.
+                defaults: ids.filter((channel) => {
+                    const found = guild.channels.cache.get(channel);
+
+                    return found !== undefined && (!field.channelTypes || field.channelTypes.includes(found.type));
+                }),
                 ...(field.kind === "channels" ? { minValues: 0, maxValues: limit } : {}),
             });
             builder.buttons(none, back);
@@ -171,16 +176,19 @@ ${selected.field.hint}`);
         return { components: [builder.build()], files };
     }
 
-    builder.select({
-        customId: PanelId("w", panel.id),
-        placeholder: "Was willst du ändern? …",
-        // Die Bezeichnung ist kurz (sie steht in einer Kachel) - der Abschnitt davor gibt den Zusammenhang.
-        options: numbered.map(({ n, field, section }) => ({
-            label: Cut(`${n} · ${field.label}`, 100),
-            value: field.key,
-            description: Cut(`${section} · ${ShowValue(field, field.get(state.settings), guild)}`, 100),
-        })),
-    });
+    // Ohne Felder (A1) kein Menü - Discord lehnt eins ohne Einträge ab.
+    if (numbered.length) {
+        builder.select({
+            customId: PanelId("w", panel.id),
+            placeholder: "Was willst du ändern? …",
+            // Die Bezeichnung ist kurz (sie steht in einer Kachel) - der Abschnitt davor gibt den Zusammenhang.
+            options: numbered.map(({ n, field, section }) => ({
+                label: Cut(`${n} · ${field.label}`, 100),
+                value: field.key,
+                description: Cut(`${section} · ${ShowValue(field, field.get(state.settings), guild)}`, 100),
+            })),
+        });
+    }
     builder.buttons(
         ...(view.done ? [{ customId: PanelId("u", panel.id, view.done.key), label: "Rückgängig", emoji: "↩️" }] : []),
         ...(panel.id === "tickets" ? [{ customId: PanelId("p", panel.id), label: "Panel senden", emoji: "📨" }] : []),
@@ -192,24 +200,46 @@ ${selected.field.hint}`);
     return { components: [builder.build()], files };
 }
 
-/** /einstellungen ohne Modul (A2): alle Module als Kacheln, darunter „Modul wählen“. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export async function OverviewView(guild: Guild, rows: { panel: IPanelModule<any>; on: boolean }[], link: string): Promise<IPanelMessage> {
-    const blocks: HelpBlock[] = [
-        { kind: "title", emoji: "⚙️", text: "Einstellungen", sub: `${guild.name ?? "Server"} · Wähle ein Modul. Was du änderst, gilt sofort, wie im Dashboard.` },
-        { kind: "settings", items: rows.map(({ panel, on }, index) => ({ n: index + 1, label: panel.name, value: on ? "an" : "aus", state: on ? "on" : "off" })) },
-    ];
-    const { builder, files } = await Compose(blocks, "#ff1e2d", "einstellungen");
+type OverviewRow = { panel: IPanelModule<any>; on: boolean };
+
+/**
+ * Die Übersicht als Kacheln, je Bereich der Dashboard-Leiste ein Abschnitt
+ * (W-0014 Teil 4). Die Nummern laufen durch; das Zeichnen verteilt die
+ * Abschnitte auf so viele Bilder wie nötig.
+ */
+export function OverviewBlocks(guild: Guild, rows: OverviewRow[]): HelpBlock[] {
+    const blocks: HelpBlock[] = [{ kind: "title", emoji: "⚙️", text: "Einstellungen", sub: `${guild.name ?? "Server"} · Wähle ein Modul. Was du änderst, gilt sofort, wie im Dashboard.` }];
+    let n = 0;
+
+    for (const area of PANEL_AREAS) {
+        const inArea = rows.filter((row) => area.ids.includes(row.panel.id));
+
+        if (!inArea.length) continue;
+
+        blocks.push({
+            kind: "settings",
+            title: area.name,
+            // Blass: Module ohne eigene Einstellungen (A1), sie lassen sich nur ein- und ausschalten.
+            items: inArea.map(({ panel, on }) => ({ n: ++n, label: panel.name, value: on ? "an" : "aus", state: on ? "on" : "off", ...(panel.about ? { dim: true } : {}) })),
+        });
+    }
+
+    return blocks;
+}
+
+/** /einstellungen ohne Modul (A2): alle Module als Kacheln nach Bereichen, darunter „Modul wählen“. */
+export async function OverviewView(guild: Guild, rows: OverviewRow[], link: string): Promise<IPanelMessage> {
+    const { builder, files } = await Compose(OverviewBlocks(guild, rows), "#ff1e2d", "einstellungen");
 
     builder.select({
         customId: PanelId("m"),
         placeholder: "Modul wählen …",
-        options: rows.map(({ panel, on }) => ({
-            label: panel.name,
-            value: panel.id,
-            emoji: panel.emoji,
-            description: `${panel.sections.reduce((sum, section) => sum + section.fields.length, 0)} Einstellungen · ${on ? "an" : "aus"}`,
-        })),
+        options: rows.map(({ panel, on }) => {
+            const count = panel.sections.reduce((sum, section) => sum + section.fields.length, 0);
+
+            return { label: panel.name, value: panel.id, emoji: panel.emoji, description: `${count ? `${count} Einstellungen` : "nur an/aus"} · ${on ? "an" : "aus"}` };
+        }),
     });
     builder.buttons({ url: link, label: "Dashboard", emoji: "🖥️" });
 

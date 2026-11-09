@@ -12,15 +12,22 @@ import { ChannelType, Guild, GuildBasedChannel, GuildMember, Role } from "discor
 import SettingsService from "../services/settings/SettingsService";
 import BotClient from "../client/BotClient";
 import { SetEmojiLoader } from "../builder/HelpImage";
-import { OverviewView, PanelBlocks, PanelView } from "../builder/SettingsView";
+import { OverviewBlocks, OverviewView, PanelBlocks, PanelView } from "../builder/SettingsView";
 import { DefaultApplySettings } from "../constants/Apply";
 import { DefaultLevelSettings } from "../constants/Levels";
 import { DefaultModConfig } from "../constants/Moderation";
 import { DefaultConfig } from "../constants/Tickets";
 import { DefaultWelcomeConfig } from "../constants/Welcome";
-import { PANEL_MODULES } from "../services/settings/registers";
+import { PANEL_AREAS, PANEL_MODULES } from "../services/settings/registers";
 import { MODERATORS, PANEL } from "../services/settings/registers/Shared";
-import { IPanelField, PanelError, PanelId, PanelModuleId, ParseStages, ReadPanelId, ShowValue, StagesText } from "../services/settings/SettingsModel";
+import { IPanelField, MAX_SECTION_FIELDS, PanelError, PanelId, PanelModuleId, ParseStages, ReadPanelId, ShowValue, StagesText } from "../services/settings/SettingsModel";
+
+// Teil 4 · Imports Gruppe Rocket League
+// Teil 4 · Imports Gruppe Rest
+// Teil 4 · Imports Gruppe Moderation
+
+/** Discord nimmt höchstens 10 Bilder in einer Nachricht. */
+const MAX_FILES_CHECK = 10;
 
 const GUILD = "90071992547409971";
 const TEXT = "90071992547409972";
@@ -152,7 +159,7 @@ function Other(field: IPanelField<unknown>, current: unknown): unknown {
     }
 }
 
-function checkRegisters(client: BotClient): Record<PanelModuleId, unknown> {
+async function checkRegisters(client: BotClient): Promise<Partial<Record<PanelModuleId, unknown>>> {
     console.log("\n  — Register —");
 
     const guild = FakeGuild();
@@ -161,7 +168,8 @@ function checkRegisters(client: BotClient): Record<PanelModuleId, unknown> {
     welcome.join = { ...welcome.join, channelId: TEXT };
     welcome.leave = { ...welcome.leave, channelId: TEXT };
 
-    const start: Record<PanelModuleId, unknown> = {
+    // Startwerte und das echte Clean je Modul mit Feldern. Module ohne Felder (A1) brauchen keine.
+    const start: Partial<Record<PanelModuleId, unknown>> = {
         // Ein Warteraum ohne Meldekanal wird zu Recht abgelehnt - der Start hat deshalb einen.
         moderation: (() => {
             const config = DefaultModConfig();
@@ -172,23 +180,41 @@ function checkRegisters(client: BotClient): Record<PanelModuleId, unknown> {
         apply: DefaultApplySettings(),
         levels: DefaultLevelSettings(),
         welcome,
+        // Teil 4 · Startwerte Gruppe Rocket League
+        // Teil 4 · Startwerte Gruppe Rest
+        // Teil 4 · Startwerte Gruppe Moderation
     };
-    const clean: Record<PanelModuleId, (patch: Record<string, unknown>, previous: never) => unknown> = {
+    const clean: Partial<Record<PanelModuleId, (patch: Record<string, unknown>, previous: never) => unknown>> = {
         moderation: (patch, previous) => client.moderationService.Clean(guild, patch, previous),
         tickets: (patch, previous) => client.ticketService.Clean(guild, patch, previous),
         apply: (patch, previous) => client.applyService.CleanSettings(guild, patch, previous),
         levels: (patch, previous) => client.levelService.Clean(guild, patch, previous),
         welcome: (patch, previous) => client.welcomeService.Clean(guild, patch, previous),
+        // Teil 4 · Clean Gruppe Rocket League
+        // Teil 4 · Clean Gruppe Rest
+        // Teil 4 · Clean Gruppe Moderation
     };
+    const order = PANEL_AREAS.flatMap((area) => area.ids).join(",");
 
-    check("Fünf Module", Object.keys(PANEL_MODULES).join(",") === "moderation,tickets,apply,levels,welcome", Object.keys(PANEL_MODULES).join(","));
+    check("23 Module in der Reihenfolge der Bereiche, ohne Gallery", Object.keys(PANEL_MODULES).join(",") === order && Object.keys(PANEL_MODULES).length === 23 && !("gallery" in PANEL_MODULES), Object.keys(PANEL_MODULES).join(","));
+    check("Höchstens 25 Module (Menü und Auswahl bei modul:)", Object.keys(PANEL_MODULES).length <= 25);
 
     for (const panel of Object.values(PANEL_MODULES)) {
         const fields = panel.sections.flatMap((section) => section.fields) as IPanelField<unknown>[];
         const keys = fields.map((field) => field.key);
         const previous = start[panel.id];
 
-        check(`${panel.name}: ${fields.length} Felder, höchstens 25`, fields.length > 0 && fields.length <= 25);
+        if (!fields.length) {
+            check(`${panel.name}: ohne Felder, dafür ein Satz (A1)`, Boolean(panel.about) && panel.sections.length === 0, panel.about ?? "kein Satz");
+            continue;
+        }
+
+        check(`${panel.name}: ${fields.length} Felder, höchstens 25`, fields.length <= 25);
+        check(`${panel.name}: kein Abschnitt über ${MAX_SECTION_FIELDS} Kacheln, sonst schneidet das Bild ab`, panel.sections.every((section) => section.fields.length <= MAX_SECTION_FIELDS), panel.sections.map((section) => section.fields.length).join(","));
+        check(`${panel.name}: Startwerte und Clean für die Prüfung da`, previous !== undefined && clean[panel.id] !== undefined);
+
+        if (previous === undefined || !clean[panel.id]) continue;
+
         check(`${panel.name}: Schlüssel eindeutig und ohne Doppelpunkt`, new Set(keys).size === keys.length && keys.every((key) => /^[A-Za-z0-9-]{1,24}$/.test(key)), keys.join(","));
         check(`${panel.name}: jedes Feld zeigt einen Wert`, fields.every((field) => ShowValue(field, field.get(previous), guild).length > 0));
 
@@ -203,7 +229,7 @@ function checkRegisters(client: BotClient): Record<PanelModuleId, unknown> {
             let after: unknown;
 
             try {
-                after = clean[panel.id](patch, previous as never);
+                after = await clean[panel.id]!(patch, previous as never);
             } catch (error) {
                 wrong.push(`${field.key}: ${String(error)}`);
                 continue;
@@ -224,6 +250,27 @@ function checkRegisters(client: BotClient): Record<PanelModuleId, unknown> {
 
     check("Moderatoren gehen über die Server-Einstellungen", JSON.stringify(moderators?.set([ROLE], start.moderation as never)) === JSON.stringify({ [MODERATORS]: [ROLE] }));
 
+    // W-0014 Review: Das Speichern tauscht „ab“ und „bis“ still - das Panel lehnt verkehrt herum mit einem Satz ab.
+    const levelField = (key: string) => PANEL_MODULES.levels.sections.flatMap((section) => section.fields).find((field) => field.key === key)!;
+    const range = (key: string, value: number): string => {
+        try {
+            levelField(key).set(value, start.levels as never);
+        } catch (error) {
+            return error instanceof PanelError ? error.message : `kein PanelError: ${String(error)}`;
+        }
+
+        return "";
+    };
+
+    check("Level: „Punkte ab“ über „Punkte bis“ wird abgelehnt", range("chatMin", 30).startsWith("„Punkte ab“ darf höchstens 25"), range("chatMin", 30));
+    check("Level: „Punkte bis“ unter „Punkte ab“ wird abgelehnt", range("chatMax", 10).startsWith("„Punkte bis“ muss mindestens 15"), range("chatMax", 10));
+    check("Level: gleich geht", range("chatMin", 25) === "" && range("chatMax", 15) === "");
+    // Das Dashboard schließt auch Kategorien und Sprachkanäle aus - das Menü muss sie zeigen, sonst gehen sie beim Speichern verloren.
+    check(
+        "Level: „Keine Punkte in“ bietet Kategorien und Sprachkanäle an",
+        [ChannelType.GuildCategory, ChannelType.GuildVoice, ChannelType.GuildStageVoice].every((type) => levelField("noChannels").channelTypes?.includes(type))
+    );
+
     return start;
 }
 
@@ -235,7 +282,7 @@ function Count(json: unknown): number {
     return (typeof (json as { type?: unknown }).type === "number" ? 1 : 0) + Object.values(json as Record<string, unknown>).reduce((sum: number, value) => sum + Count(value), 0);
 }
 
-async function checkView(start: Record<PanelModuleId, unknown>): Promise<void> {
+async function checkView(start: Partial<Record<PanelModuleId, unknown>>): Promise<void> {
     console.log("\n  — Panel als Bild —");
 
     SetEmojiLoader(async () => null);
@@ -245,15 +292,23 @@ async function checkView(start: Record<PanelModuleId, unknown>): Promise<void> {
 
     for (const panel of Object.values(PANEL_MODULES)) {
         const fields = panel.sections.flatMap((section) => section.fields) as IPanelField<unknown>[];
-        const state = { panel, settings: start[panel.id], on: true, guild, link };
+        const state = { panel, settings: start[panel.id] ?? {}, on: true, guild, link };
         const message = await PanelView(state);
         const parts = message.components.map((part) => part.toJSON());
         const json = JSON.stringify(parts);
         const menu = (json.match(new RegExp(`"value":"[A-Za-z0-9-]+","description"`, "g")) ?? []).length;
 
         check(`${panel.name}: höchstens 10 Bilder, 40 Bausteine`, message.files.length >= 1 && message.files.length <= 10 && Count(parts) <= 40, `${message.files.length} Bilder, ${Count(parts)} Bausteine`);
+        check(`${panel.name}: Knopf ins Dashboard und zu allen Modulen`, json.includes(link) && json.includes(`"custom_id":"set:s"`));
+
+        if (!fields.length) {
+            // Discord lehnt ein Menü ohne Einträge ab - ohne Felder gibt es keins, dafür den Satz im Bild.
+            check(`${panel.name}: kein Menü „Was willst du ändern?“, der Satz steht im Bild`, !json.includes(`set:w:${panel.id}`) && JSON.stringify(PanelBlocks(state, {})).includes(panel.about ?? "–"));
+            check(`${panel.name}: Knopf zum Ausschalten`, json.includes(`set:x:${panel.id}`) !== panel.permanent);
+            continue;
+        }
+
         check(`${panel.name}: Menü mit allen ${fields.length} Feldern, nummeriert`, json.includes(`"custom_id":"set:w:${panel.id}"`) && menu === fields.length && json.includes(`"label":"1 · ${fields[0].label}"`), `${menu} Einträge`);
-        check(`${panel.name}: Knopf ins Dashboard`, json.includes(link));
 
         // Discord lehnt die ganze Nachricht ab, wenn ein Knopf ein Zeichen statt eines Emojis trägt (etwa ⏻).
         for (const view of [message, await PanelView({ ...state, on: false }, { done: { key: fields[0].key, before: "a", after: "b" } })]) {
@@ -298,11 +353,23 @@ async function checkView(start: Record<PanelModuleId, unknown>): Promise<void> {
     check("Modul aus: Hinweis im Bild", off.includes("Das Modul ist aus"));
     check("Modul aus: Knopf „Modul an“", JSON.stringify((await PanelView({ ...moderation, on: false })).components.map((part) => part.toJSON())).includes("Modul an"));
 
-    const overview = await OverviewView(guild, Object.values(PANEL_MODULES).map((panel, index) => ({ panel, on: index % 2 === 0 })), link);
+    const rows = Object.values(PANEL_MODULES).map((panel, index) => ({ panel, on: index % 2 === 0 }));
+    const overview = await OverviewView(guild, rows, link);
     const overviewJson = JSON.stringify(overview.components.map((part) => part.toJSON()));
+    const overviewBlocks = OverviewBlocks(guild, rows);
+    const titles = overviewBlocks.flatMap((block) => (block.kind === "settings" && block.title ? [block.title] : []));
+    const numbers = overviewBlocks.flatMap((block) => (block.kind === "settings" ? block.items.map((item) => item.n) : []));
 
-    check("Übersicht: Menü „Modul wählen“ mit fünf Modulen", overviewJson.includes(`"custom_id":"set:m"`) && (overviewJson.match(/"value":"(moderation|tickets|apply|levels|welcome)"/g) ?? []).length === 5);
-    check("Übersicht: ein Bild", overview.files.length >= 1);
+    const missing = rows.filter((row) => !overviewJson.includes(`"value":"${row.panel.id}"`)).map((row) => row.panel.id);
+
+    check("Übersicht: Menü „Modul wählen“ mit allen 23 Modulen", overviewJson.includes(`"custom_id":"set:m"`) && rows.length === 23 && missing.length === 0, missing.join(","));
+    check("Übersicht: nach den Bereichen der Dashboard-Leiste", titles.join(",") === PANEL_AREAS.map((area) => area.name).join(","), titles.join(","));
+    check("Übersicht: Nummern 1 bis 23 durchgezählt", numbers.join(",") === Array.from({ length: 23 }, (_, index) => index + 1).join(","));
+
+    const dim = overviewBlocks.flatMap((block) => (block.kind === "settings" ? block.items.filter((item) => item.dim).map((item) => item.label) : []));
+
+    check("Übersicht: Module ohne eigene Einstellungen blass", dim.join(",") === "Self Roles,Rollen-Listen,Giveaways,Umfragen,Custom Message", dim.join(","));
+    check("Übersicht: auf mehrere Bilder verteilt, keins abgeschnitten", overview.files.length >= 2 && overview.files.length <= MAX_FILES_CHECK, `${overview.files.length} Bilder`);
 }
 
 async function Refused(run: () => Promise<unknown>): Promise<string> {
@@ -333,6 +400,19 @@ async function checkService(client: BotClient): Promise<void> {
 
     check("Rückgängig stellt zurück", (await client.modSettings.Of(GUILD)).dm === before);
     check("Rückgängig ohne Merker: ein Satz", (await Refused(() => new SettingsService(client).Undo(guild, admin, "moderation", "dm"))).startsWith("Rückgängig geht nicht mehr"));
+
+    // W-0014 Review: Der Merker gilt je Server - auf einem anderen Server derselben Person gibt es nichts zurückzunehmen.
+    await service.Change(guild, admin, "moderation", "dm", !before);
+
+    const elsewhere = { id: "33333333333333333398" } as unknown as Guild;
+
+    check("Rückgängig auf einem anderen Server: ein Satz, nichts geändert", (await Refused(() => service.Undo(elsewhere, admin, "moderation", "dm"))).startsWith("Rückgängig geht nicht mehr"));
+
+    // Hat jemand den Wert danach geändert (Dashboard, anderer Admin), überschreibt Rückgängig das nicht still.
+    await client.moderationService.SaveConfig(guild, { dm: before });
+
+    check("Rückgängig nach fremder Änderung: ein Satz", (await Refused(() => service.Undo(guild, admin, "moderation", "dm"))).startsWith("Der Wert wurde inzwischen geändert"));
+    check("Und der fremde Wert bleibt", (await client.modSettings.Of(GUILD)).dm === before);
     check("Ohne „Server verwalten“: abgelehnt", (await Refused(() => service.Change(guild, member(false), "moderation", "dm", true))) === "Einstellungen ändert nur, wer den Server verwaltet.");
     check("Zahl außerhalb: ein Satz", (await Refused(() => service.Change(guild, admin, "moderation", "remind", "999"))).includes("0 bis 120"));
     check("Und nichts gespeichert", (await client.modSettings.Of(GUILD)).support.remindAfter === 10);
@@ -364,7 +444,7 @@ async function main(): Promise<void> {
     await client.configService.Initialize();
 
     checkModel();
-    await checkView(checkRegisters(client));
+    await checkView(await checkRegisters(client));
 
     if (await client.databaseService.Connect()) {
         try {

@@ -58,3 +58,36 @@ Der Transcript-Kanal von Apply (W-0047) kommt dazu, sobald jener Branch gemergt 
 
 - Prüfungen nach Art der vorhandenen `src/scripts/Check*.ts`; Test in Discord nur im Bereich „Claude“ des Dev Servers, Einstellungen danach wie vorher.
 - Texte Deutsch, du-Form, ohne Gedankenstriche als Stilmittel.
+
+## Teil 2: die übrigen Module (W-0054, Stand 09.11.2026)
+
+Entwurf: `.works/tasks/W-0054-einstellungen-per-befehl-fuer-die/docs/w0014-module-rest.html`. Der Nutzer will am 09.11.: „Alle Module sollen per Discord auch einstellbar sein.“
+
+### Entscheidungen des Nutzers
+
+- **Umfang wie im Entwurf**, Tabelle unten. Auto Mod ohne Aktion je Filter (08.11.).
+- **A1:** Self Roles, Rollen-Listen, Giveaways, Umfragen und Custom Message haben keine eigenen Einstellungen. Sie stehen trotzdem in der Übersicht und bekommen ein Panel nur mit einem Satz dazu, „Modul an/aus“, „◀ Alle Module“ und dem Dashboard-Knopf.
+- **Gallery System** fehlt in `/einstellungen` (keine Einstellungen, ausschalten geht nicht).
+- **Übersicht nach den Bereichen der Dashboard-Leiste** (Immer dabei, Rocket League, Moderation, Community, Support, Inhalte & Meldungen), auf zwei Bilder verteilt, je etwa 12 Kacheln. Module ohne eigene Einstellungen blass. Menü „Modul wählen“ und die Auswahl bei `modul:` mit allen 23 Modulen in derselben Reihenfolge.
+
+| Modul | Im Panel |
+|---|---|
+| 2, 4 & 6 Mans (12) | Kanal · Kategorie für die Sprachkanäle · Modi 2er, 4er, 6er (je an/aus) · Sprachkanäle je Runde · DM beim Start · Ergebnis bestätigen lassen · Startwert · Höchste Änderung je Runde · Aus der Warteschlange nach (Min.) · Rangliste öffentlich |
+| Looking for (9) | Spieler-Suche an/aus · Forum der Spieler-Suche · Team-Suche an/aus · Forum der Team-Suche · Meldung ans Team: Kanal · Ping-Rollen · Fragen per DM oder Fenster · Suche schließen nach (Tage) · Rollen, die fremde Suchen beenden dürfen |
+| RL Team-Übersicht (14) | Kanal · Anzeige (Hub oder Karten) · MMR (WTSI oder eigene Formel) · Kader-Rollen vergeben · Ränge zeigen als · Aufgaben zeigen als · Teams je Kategorie im Hub · Rolle je Aufgabe: Captain, Co-Captain, Spieler, Ersatz, Probe, Manager, Coach |
+| Rank Roles (5) | 1v1, 2v2, 3v3 (je an/aus) · Alte Rang-Rolle abnehmen · Platzierung zählt nicht als Rang |
+| Clips der Woche (9) | Clip-Kanal · Ansage-Kanal · Clips je Person · Abstimm-Emoji · Termine automatisch · Clip-Seite öffentlich · Ansagen: Start, Abstimmung, Gewinner (je an/aus) |
+| Matchups (9) | Kanal · Ping-Rollen · Erinnern vor Anpfiff (Min.) · Link offen · Ergebnisse eintragen · Knopf „Ergebnis eintragen“ in Discord · Ans Ergebnis erinnern nach (Std.) · Rand nach Stand färben · Tage im Voraus |
+| Auto Mod (12) | Filter je an/aus: Wortliste, Einladungen, Links, Spam, Wiederholung, Erwähnungen, GROSSBUCHSTABEN, Emojis · Log-Kanal · Kanäle ausnehmen · Rollen ausnehmen · Moderatoren ausnehmen |
+| Anti Villain (22) | Schutzstufe · Wächter je an/aus (9) · Team-Accounts · Vertraute Rollen · Quarantäne: Rolle, Kanal, Rollen abnehmen, Aufräumen, DM, Freigabe · Raid-Schutz an/aus · Anti-Nuke an/aus · Log-Kanal · Ping-Rolle |
+| Logging System (8) | Ziel je Bereich: Messages, Members, Server, Voice, Moderation · Kanäle übergehen · Rollen übergehen · Bots übergehen |
+| Temp Voice (2) | Steuer-Panel im eigenen Kanal oder fest in einem Kanal · Panel-Kanal |
+| Twitch Notifier (2) | Live-Rolle · Nur für Mitglieder mit Rolle |
+| YouTube Notifier (1) | Live-Rolle |
+| Backups (1) | Log-Kanal |
+
+### Entscheidungen von Claude (zum Gegenlesen)
+
+- Je Modul ein Register in `services/settings/registers/`, gespeichert über den Weg des Dashboards. Ein Feld darf nur sich selbst ändern; `check:settings` prüft das für jedes Feld gegen das echte `Clean` des Moduls, mit Startwerten je Modul in eigenen Dateien unter `src/scripts/settings/`.
+- Felder, deren Wert im Dashboard aus einer größeren Auswahl kommt, bieten im Panel dieselben Kanalarten an wie das Speichern annimmt, damit eine Mehrfachauswahl beim Ändern nichts verliert (Lehre aus dem Review von W-0014).
+- Module ohne Felder haben keine Menü-Zeile „Was willst du ändern?“.
