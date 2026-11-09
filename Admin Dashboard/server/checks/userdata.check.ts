@@ -311,7 +311,7 @@ export async function checkUserdata(): Promise<void> {
         try {
             assert.deepEqual(await postDirectMessage(config, "123456789012345678", { content: "x" }), { channelId: "500000000000000001", messageId: "500000000000000002" });
             refuse = true;
-            assert.deepEqual(await postDirectMessage(config, "123456789012345678", { content: "x" }), { error: "Die Person nimmt keine Direktnachrichten vom Bot an." });
+            assert.deepEqual(await postDirectMessage(config, "123456789012345678", { content: "x" }), { error: "Die Person nimmt keine Direktnachrichten vom Bot an.", status: 403, code: 50007 });
         } finally {
             globalThis.fetch = real;
         }

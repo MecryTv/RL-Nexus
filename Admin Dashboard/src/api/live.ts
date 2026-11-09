@@ -14,7 +14,7 @@ import { useEffect, useRef, useState } from "react";
  */
 
 /** Dieselbe Liste wie TOPICS in server/events.ts. Wer hier fehlt, bekommt nie Bescheid. */
-const TOPICS = ["content", "maintenance", "groups", "notifications", "bot", "status", "mail", "shop", "backups", "beta", "userdata", "servers", "security"] as const;
+const TOPICS = ["content", "maintenance", "groups", "notifications", "bot", "status", "mail", "shop", "backups", "beta", "userdata", "servers", "security", "messages"] as const;
 export type Topic = (typeof TOPICS)[number];
 
 type Handler = () => void;

@@ -436,7 +436,7 @@ export async function sendDeletionDm(config: IConfig, record: IDeletionRecord, k
         const message = deletionMessage(kind, record.id, image, input.dueAt, files.map((file) => file.name));
         sent = await postDirectMessage(config, record.userId, message, [{ name: image.name, data: image.data, type: "image/png" }, ...files]);
     } catch (error) {
-        sent = { error: `Nicht verschickt: ${error instanceof Error ? error.message : String(error)}` };
+        sent = { error: `Nicht verschickt: ${error instanceof Error ? error.message : String(error)}`, status: null, code: null };
     }
 
     if (kind === "ankuendigung") {

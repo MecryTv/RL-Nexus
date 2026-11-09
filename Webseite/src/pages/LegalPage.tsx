@@ -24,7 +24,7 @@ interface IFact {
 }
 
 /** Stand der Datenschutzerklärung. Bei jeder inhaltlichen Änderung nachziehen. */
-const UPDATED = "31. Oktober 2026";
+const UPDATED = "9. November 2026";
 
 /**
  * Impressum und Datenschutzerklärung.
@@ -794,6 +794,27 @@ const PRIVACY: readonly ILegalSection[] = [
                     bestehende Sperre mit Discord-ID und Kürzeln stehen, weil sie sonst nicht wirkt (Art. 17 Abs. 1 lit.
                     c, Art. 21 Abs. 1 DSGVO). Beim Aufheben einer Sperre löschen wir ihre Kürzel
                     sofort, nur der Eintrag bleibt drei Jahre als Vorgeschichte.
+                </p>
+            </>
+        ),
+    },
+    {
+        id: "nachrichten",
+        title: "Nachrichten vom Team",
+        body: (
+            <>
+                <p>
+                    Das Team kann dir über den Bot Direktnachrichten schicken, etwa zu Änderungen an den Diensten,
+                    Wartung, Störungen, Datenschutz oder deinem Konto. Werbung schicken wir so nicht.
+                </p>
+                <p>
+                    Wir speichern deine Discord-ID, welche Nachricht du bekommen hast und ob sie ankam, 90 Tage lang;
+                    eine Nachricht nur an dich samt Text ebenfalls 90 Tage. Gesperrte Konten und wer um Löschung gebeten
+                    hat, bekommen keine solchen Nachrichten.
+                </p>
+                <p>
+                    Rechtsgrundlage ist unser berechtigtes Interesse, dich über den Betrieb von RL Nexus zu informieren
+                    (Art. 6 Abs. 1 lit. f DSGVO).
                 </p>
             </>
         ),

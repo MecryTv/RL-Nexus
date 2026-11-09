@@ -8,7 +8,7 @@ import { GROUP_LABELS } from "./limits.ts";
  * der Tabelle - Code, nie Eingabe.
  */
 
-export const USERDATA_AREA_IDS = ["konto", "spieler", "level", "tickets", "bewerbungen", "moderation", "community", "teams", "shop", "beta", "kontakt", "sicherheit", "protokoll", "team"] as const;
+export const USERDATA_AREA_IDS = ["konto", "spieler", "level", "tickets", "bewerbungen", "moderation", "community", "teams", "shop", "beta", "kontakt", "sicherheit", "nachrichten", "protokoll", "team"] as const;
 export type UserdataArea = (typeof USERDATA_AREA_IDS)[number];
 
 export interface IUserdataSource {
@@ -211,6 +211,17 @@ export const USERDATA_AREAS: readonly IUserdataAreaDef[] = [
         ],
     },
     {
+        // W-0058: DMs vom Team über den Bot. Eine Nachricht nur an diese Person geht bei einer Löschung samt Text mit.
+        id: "nachrichten",
+        label: "Nachrichten vom Team",
+        inside: ["DMs über den Bot"],
+        icon: "send",
+        sources: [
+            { table: "bot_message_recipients", column: "user_id", role: "person", time: "done_at", label: "state", words: true },
+            { table: "bot_messages", column: "target_user_id", role: "person", time: "created_at", label: "template_name" },
+        ],
+    },
+    {
         id: "protokoll",
         label: "Im Protokoll des Teams",
         inside: ["Was das Team zur Person getan hat"],
@@ -230,6 +241,8 @@ export const USERDATA_AREAS: readonly IUserdataAreaDef[] = [
             { table: "auto_responses", column: "created_by", role: "team", guild: G, label: "'Auto-Antwort angelegt'" },
             { table: "av_cases", column: "closed_by", role: "team", guild: G, time: ms("closed_at"), label: "'Anti-Villain-Fall geschlossen'" },
             { table: "beta_codes", column: "created_by", role: "team", time: "created_at", label: "'Beta-Code angelegt'" },
+            { table: "bot_messages", column: "created_by", role: "team", time: "created_at", label: "'Nachricht über den Bot verschickt'", name: "created_name" },
+            { table: "bot_message_templates", column: "updated_by", role: "team", time: "updated_at", label: "'Vorlage für Nachrichten geändert'", name: "updated_name" },
             { table: "server_requests", column: "decided_by", role: "team", guild: G, time: "decided_at", label: "CONCAT('Über eine Server-Anfrage entschieden: ', guild_name)", name: "decided_name" },
             { table: "server_blocks", column: "blocked_by", role: "team", guild: G, time: "created_at", label: "'Server für RL Nexus gesperrt'", name: "by_name" },
             { table: "security_bans", column: "created_by", role: "team", time: "created_at", label: "'Person gesperrt'", name: "created_name" },
@@ -323,6 +336,9 @@ export const USERDATA_IGNORED: Readonly<Record<string, string>> = {
     "contact_replies.*": "Inhalt der Antwort, gehört zur Zeile",
     "status_incident_updates.*": "Text einer Statusmeldung",
     "userdata_deletions.*": "Zahlen der Löschung als Nachweis",
+    // W-0058: Bei einer Nachricht nur an eine Person geht die ganze Zeile über target_user_id.
+    "bot_messages.content": "Text einer Nachricht über den Bot, ohne eingesetzten Namen",
+    "bot_message_templates.*": "Vorlage für Nachrichten, ohne Bezug zu einer Person",
 };
 
 /** Name einer Spalte, die eine Discord-ID einer Person hält (für VARCHAR, CHAR, BIGINT). */
@@ -378,6 +394,10 @@ export function basisText(rule: { readonly basis: UserdataBasis | null; readonly
 /** Werte aus ENUM-Spalten, die in Anzeigen stehen. Unbekanntes bleibt, wie es ist. */
 const WORDS: Readonly<Record<string, string>> = {
     open: "offen",
+    // W-0058: Empfänger einer Nachricht über den Bot. failed bleibt „fehlgeschlagen“ wie im Shop.
+    sending: "wird gesendet",
+    sent: "zugestellt",
+    skipped: "ausgelassen",
     closed: "geschlossen",
     pending: "wartet",
     paid: "bezahlt",

@@ -14,7 +14,7 @@ import type { FastifyReply } from "fastify";
  */
 
 /** Worüber Bescheid gesagt wird. Jede Marke gehört zu einer Ansicht. */
-export const TOPICS = ["content", "maintenance", "groups", "notifications", "bot", "status", "mail", "shop", "backups", "beta", "userdata", "servers", "security"] as const;
+export const TOPICS = ["content", "maintenance", "groups", "notifications", "bot", "status", "mail", "shop", "backups", "beta", "userdata", "servers", "security", "messages"] as const;
 export type Topic = (typeof TOPICS)[number];
 
 interface IListener {

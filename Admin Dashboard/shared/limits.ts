@@ -151,6 +151,14 @@ export const AUDIT_LABELS: Readonly<Record<string, string>> = {
     "userdata.copy": "Kopie geholt",
     "userdata.delete": "Daten gelöscht",
     "userdata.dm": "DM nicht zustellbar",
+    "messages.one": "Nachricht an eine Person",
+    "messages.all": "Nachricht an alle gestartet",
+    "messages.test": "Nachricht an sich selbst getestet",
+    "messages.pause": "Nachricht an alle angehalten",
+    "messages.resume": "Nachricht an alle fortgesetzt",
+    "messages.cancel": "Nachricht an alle abgebrochen",
+    "messages.done": "Nachricht an alle fertig",
+    "messages.template": "Vorlage für Nachrichten geändert",
 };
 
 /* --- Postfach --- */

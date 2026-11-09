@@ -90,6 +90,7 @@ export const AREAS: readonly INavArea[] = [
             { to: "/datenschutz", label: "Nutzerdaten", icon: "users", description: "Wer bei RL Nexus Daten hat, was es ist, Auskunft als Datei." },
             { to: "/datenschutz/loeschungen", label: "Löschungen", icon: "trash", halted: true, description: "Geplante und erledigte Löschungen von Nutzerdaten." },
             { to: "/datenschutz/regeln", label: "Was bleibt", icon: "lock", description: "Was bei einer Löschung bleibt und welcher Satz dazu in der DM steht." },
+            { to: "/datenschutz/nachrichten", label: "Nachrichten", icon: "send", description: "DMs über den Bot an eine Person oder an alle mit Daten: Vorlagen, Vorschau und Verlauf." },
         ],
     },
     {
