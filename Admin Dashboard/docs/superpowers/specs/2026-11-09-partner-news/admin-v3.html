@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>W-0062 · Admin: Partner/Sponsorings, Entwurf 3</title>
+<style>
+@font-face { font-family: "Oxanium"; font-weight: 400; src: url("oxanium-400.woff2") format("woff2"); }
+@font-face { font-family: "Oxanium"; font-weight: 600; src: url("oxanium-600.woff2") format("woff2"); }
+@font-face { font-family: "Oxanium"; font-weight: 800; src: url("oxanium-800.woff2") format("woff2"); }
+@font-face { font-family: "Rajdhani"; font-weight: 600; src: url("rajdhani-600.woff2") format("woff2"); }
+@font-face { font-family: "Orbitron"; font-weight: 700; src: url("orbitron-700.woff2") format("woff2"); }
+:root {
+  --base: #050608; --panel: #080d12; --line: rgb(255 255 255 / 8%); --line2: rgb(255 255 255 / 14%);
+  --red: #ff1e2d; --blue: #00afff; --purple: #8a4dff; --win: #35e07f; --gold: #ffc53d; --orange: #ff8a3d; --cyan: #38c8ff; --silver: #c9d1db; --discord: #5865f2;
+  --text: #f2f4f7; --dim: #a8b0bc; --faint: #9aa5b2;
+  --f-display: "Oxanium", "Segoe UI", system-ui, sans-serif; --f-label: "Rajdhani", "Segoe UI", sans-serif; --f-accent: "Orbitron", "Oxanium", sans-serif;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--base); color: var(--text); font: 14px/1.55 var(--f-display); padding: 28px 20px 90px; }
+.doc { max-width: 1320px; margin: 0 auto; }
+.doc > h1 { font-size: 28px; font-weight: 800; margin: 0 0 4px; }
+.doc > h1 small { color: var(--red); font: 600 14px var(--f-label); letter-spacing: .16em; margin-right: 10px; }
+.doc > p.lead { color: var(--dim); max-width: 960px; margin: 0 0 8px; font-size: 15px; }
+.variant { margin: 40px 0 14px; display: flex; gap: 14px; align-items: baseline; flex-wrap: wrap; }
+.variant b { font: 700 15px var(--f-accent); color: var(--red); letter-spacing: .08em; }
+.variant h2 { margin: 0; font-size: 22px; font-weight: 800; }
+.variant span { color: var(--dim); font-size: 14px; }
+.changes { background: var(--panel); border: 1px solid var(--line); padding: 14px 20px 8px; margin: 0 0 16px; }
+.changes h3 { margin: 0 0 8px; font: 600 13px var(--f-label); letter-spacing: .16em; color: var(--red); text-transform: uppercase; }
+.changes ol { margin: 0; padding-left: 22px; color: var(--dim); font-size: 14px; } .changes li { margin-bottom: 6px; } .changes b { color: var(--text); }
+.cut { clip-path: polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px); }
+.btn { display: inline-flex; align-items: center; gap: 8px; padding: 9px 15px; font: 600 12px var(--f-label); letter-spacing: .16em; text-transform: uppercase; background: var(--red); color: #fff; clip-path: polygon(9px 0, 100% 0, 100% calc(100% - 9px), calc(100% - 9px) 100%, 0 100%, 0 9px); white-space: nowrap; }
+.btn.ghost { background: rgb(255 255 255 / 5%); color: var(--text); box-shadow: inset 0 0 0 1px var(--line2); }
+.btn.sm { padding: 6px 10px; font-size: 12px; }
+.label { font: 600 12px var(--f-label); letter-spacing: .16em; color: var(--faint); text-transform: uppercase; margin: 0 0 6px; display: flex; justify-content: space-between; }
+.label i { font-style: normal; letter-spacing: .06em; }
+.req::after { content: " *"; color: var(--red); }
+.field { background: rgb(255 255 255 / 3%); box-shadow: inset 0 0 0 1px var(--line2); padding: 9px 12px; color: var(--text); min-height: 38px; }
+.field.dim { color: var(--faint); }
+.help { color: var(--faint); font-size: 13px; margin: 6px 0 0; }
+.tag { display: inline-block; padding: 2px 8px 1px; font: 600 12px var(--f-label); letter-spacing: .12em; text-transform: uppercase; color: var(--c); background: color-mix(in srgb, var(--c) 13%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 36%, transparent); white-space: nowrap; }
+.av { flex-shrink: 0; width: 32px; height: 32px; display: grid; place-items: center; font: 700 12px var(--f-accent); color: var(--c, var(--blue)); background: color-mix(in srgb, var(--c, var(--blue)) 14%, #0a0f15); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c, var(--blue)) 40%, transparent); clip-path: polygon(7px 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 0 100%, 0 7px); }
+.av.round { border-radius: 50%; clip-path: none; }
+.sw { width: 38px; height: 20px; border-radius: 10px; background: var(--red); position: relative; flex-shrink: 0; display: inline-block; vertical-align: middle; }
+.sw::after { content: ""; position: absolute; right: 3px; top: 3px; width: 14px; height: 14px; border-radius: 50%; background: #fff; }
+.sw.off { background: rgb(255 255 255 / 14%); } .sw.off::after { right: auto; left: 3px; }
+.radio { width: 16px; height: 16px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px var(--faint); flex-shrink: 0; display: inline-block; }
+.radio.on { box-shadow: inset 0 0 0 1.5px var(--c, var(--red)), inset 0 0 0 4px #0a0f15; background: var(--c, var(--red)); }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+.three { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 12px; }
+
+.app { display: grid; grid-template-columns: 210px 1fr; border: 1px solid var(--line2); background: #06090d; position: relative; overflow: hidden; }
+.side { border-right: 1px solid var(--line); padding: 16px 12px; font: 600 13px var(--f-label); letter-spacing: .04em; color: var(--faint); }
+.side .logo { display: flex; align-items: center; gap: 8px; color: var(--text); font: 800 15px var(--f-display); margin: 0 0 18px 4px; } .side .logo img { width: 24px; }
+.side h5 { margin: 16px 6px 6px; font: 600 11px var(--f-label); letter-spacing: .2em; color: #8b96a3; text-transform: uppercase; }
+.side a { display: flex; justify-content: space-between; padding: 6px 8px; } .side a.on { color: var(--text); background: rgb(255 30 45 / 12%); box-shadow: inset 2px 0 0 var(--red); }
+.side a i { font-style: normal; color: var(--faint); }
+.main { padding: 22px 26px 30px; min-width: 0; }
+.ptitle { display: flex; align-items: flex-end; gap: 14px; margin-bottom: 16px; flex-wrap: wrap; }
+.ptitle .t { margin-right: auto; } .ptitle h2 { margin: 0; font-size: 24px; font-weight: 800; } .ptitle p { margin: 2px 0 0; color: var(--dim); }
+.stats { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+.stat { padding: 10px 14px; background: var(--panel); box-shadow: inset 0 0 0 1px var(--line2); min-width: 116px; }
+.stat small { display: block; font: 600 12px var(--f-label); letter-spacing: .14em; color: var(--faint); text-transform: uppercase; }
+.stat strong { font: 800 22px var(--f-display); }
+.stat.warn { box-shadow: inset 0 0 0 1px rgb(255 197 61 / 45%); background: rgb(255 197 61 / 6%); }
+.toolbar { display: flex; gap: 10px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
+.tabs { display: flex; gap: 18px; font: 600 13px var(--f-label); letter-spacing: .12em; text-transform: uppercase; color: var(--faint); margin-right: auto; }
+.tabs span { padding: 0 0 8px; } .tabs span.on { color: var(--text); box-shadow: inset 0 -2px 0 var(--red); } .tabs i { font-style: normal; margin-left: 5px; }
+.table { width: 100%; border-collapse: collapse; background: var(--panel); box-shadow: inset 0 0 0 1px var(--line2); }
+.table td, .table th { padding: 10px 11px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: middle; }
+.table th { font: 600 12px var(--f-label); letter-spacing: .16em; color: var(--faint); text-transform: uppercase; background: rgb(255 255 255 / 2%); }
+.table tr:last-child td { border-bottom: 0; }
+.handle { color: #5d6875; font-size: 16px; letter-spacing: -2px; }
+.person { display: flex; align-items: center; gap: 10px; } .person b { display: block; font-weight: 600; } .person small { color: var(--faint); font-size: 13px; }
+.star { color: var(--gold); font-size: 16px; } .star.off { color: #4a535e; }
+.muted { color: var(--faint); }
+.acts { display: flex; gap: 6px; justify-content: flex-end; }
+.role { display: inline-flex; align-items: center; gap: 6px; font: 600 12px var(--f-label); letter-spacing: .08em; color: var(--c); white-space: nowrap; }
+.role::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--c); }
+
+.shade { position: absolute; inset: 0; background: rgb(2 3 5 / 74%); display: grid; place-items: center; padding: 24px; }
+.dialog { width: 920px; max-width: 100%; background: #0a0f15; box-shadow: inset 0 0 0 1px var(--line2), 0 30px 80px rgb(0 0 0 / 60%); padding: 22px 24px 20px; }
+.dialog h3 { margin: 0 0 2px; font-size: 20px; font-weight: 800; } .dialog .sub { color: var(--dim); margin: 0 0 14px; }
+.steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 0 0 18px; }
+.steps span { padding: 8px 10px; font: 600 12px var(--f-label); letter-spacing: .12em; text-transform: uppercase; color: var(--faint); box-shadow: inset 0 -2px 0 var(--line2); }
+.steps span.on { color: var(--text); box-shadow: inset 0 -2px 0 var(--red); } .steps b { font: 700 12px var(--f-accent); margin-right: 6px; }
+.kindsel { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+.kindsel div { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; box-shadow: inset 0 0 0 1px var(--line2); background: rgb(255 255 255 / 2%); }
+.kindsel div.on { box-shadow: inset 0 0 0 1.5px var(--c); background: color-mix(in srgb, var(--c) 9%, transparent); }
+.kindsel b { display: block; font-size: 15px; } .kindsel small { color: var(--dim); font-size: 13px; }
+.dgrid { display: grid; grid-template-columns: 1fr 340px; gap: 22px; }
+.results { box-shadow: inset 0 0 0 1px var(--line2); margin-top: -1px; }
+.results div { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-bottom: 1px solid var(--line); }
+.results div:last-child { border: 0; } .results div.sel { background: rgb(0 175 255 / 10%); box-shadow: inset 2px 0 0 var(--blue); }
+.results b { font-weight: 600; } .results small { color: var(--faint); margin-left: auto; font-size: 13px; }
+.choices { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+.choice { padding: 12px 12px 10px; box-shadow: inset 0 0 0 1px var(--line2); background: rgb(255 255 255 / 2%); }
+.choice.on { box-shadow: inset 0 0 0 1.5px var(--c); background: color-mix(in srgb, var(--c) 9%, transparent); }
+.choice .top { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; } .choice b { font-size: 14px; } .choice p { margin: 0; color: var(--dim); font-size: 13px; }
+.rolebox { padding: 14px; background: rgb(88 101 242 / 9%); box-shadow: inset 0 0 0 1px rgb(88 101 242 / 45%); }
+.rolebox h4 { margin: 0 0 8px; font: 600 12px var(--f-label); letter-spacing: .16em; color: #aab3ff; text-transform: uppercase; }
+.rolepill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 12px; font-weight: 600; font-size: 13px; color: #d7dcff; background: rgb(88 101 242 / 25%); }
+.rolepill::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--gold); }
+.checks { list-style: none; padding: 0; margin: 10px 0 0; font-size: 13px; color: var(--dim); }
+.checks li { display: flex; gap: 8px; padding: 3px 0; } .checks li::before { content: "✓"; color: var(--win); font-weight: 700; }
+.checks li.wait::before { content: "…"; color: var(--gold); } .checks li.no::before { content: "!"; color: #ff6b76; }
+.dactions { display: flex; gap: 10px; margin-top: 18px; align-items: center; } .dactions .sp { margin-right: auto; color: var(--faint); font-size: 13px; }
+.mini { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+.minipanel { padding: 18px; background: #0a0f15; box-shadow: inset 0 0 0 1px var(--line2); }
+.minipanel h4 { margin: 0 0 12px; font-size: 15px; }
+.sec { padding: 18px 20px; background: var(--panel); box-shadow: inset 0 0 0 1px var(--line2); margin-bottom: 16px; }
+.sec > h3 { margin: 0 0 14px; font-size: 16px; font-weight: 800; display: flex; gap: 10px; align-items: center; } .sec > h3 small { margin-left: auto; color: var(--faint); font: 600 12px var(--f-label); letter-spacing: .12em; text-transform: uppercase; }
+.rowx { display: grid; grid-template-columns: 1fr 2fr 28px; gap: 8px; margin-bottom: 8px; } .x { color: var(--faint); text-align: center; }
+.add { color: var(--blue); font: 600 13px var(--f-label); letter-spacing: .08em; }
+.log { list-style: none; padding: 0; margin: 0; font-size: 13px; color: var(--dim); }
+.log li { padding: 6px 0; border-bottom: 1px solid var(--line); } .log li:last-child { border: 0; } .log b { color: var(--text); font-weight: 600; } .log span { color: var(--faint); display: block; font-size: 12px; }
+.danger { color: #ff6b76; font: 600 13px var(--f-label); letter-spacing: .06em; }
+.seg { display: flex; box-shadow: inset 0 0 0 1px var(--line2); margin-bottom: 10px; }
+.seg span { flex: 1; text-align: center; padding: 6px 0; font: 600 12px var(--f-label); letter-spacing: .1em; text-transform: uppercase; color: var(--dim); }
+.seg span.on { background: rgb(53 224 127 / 12%); color: var(--win); box-shadow: inset 0 0 0 1px rgb(53 224 127 / 45%); }
+.tierline { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.tierline span { text-align: center; padding: 8px 4px; font: 600 12px var(--f-label); letter-spacing: .08em; text-transform: uppercase; color: var(--dim); box-shadow: inset 0 0 0 1px var(--line2); }
+.tierline span.on { color: var(--gold); background: rgb(255 197 61 / 10%); box-shadow: inset 0 0 0 1.5px var(--gold); }
+</style>
+</head>
+<body>
+<div class="doc">
+  <h1><small>W-0062</small>Admin Dashboard, Runde 3: Partner/Sponsorings und Partner-Rolle</h1>
+  <p class="lead">Der Bereich im Menü heißt <b>Partner/Sponsorings</b>. Beim Anlegen wählst du <b>Partner</b> oder <b>Sponsor</b>. Ist ein Discord-Konto verknüpft, bekommt die Person die Gruppe Partner, dazu <b>automatisch die Rolle @Partner (1552668178465685635) auf dem RL-Nexus-Server (1547258700480253982)</b>. Wird die Gruppe entfernt, nimmt der Bot die Rolle wieder weg. Das gilt auch, wenn jemand unter Bot › Gruppen direkt Partner bekommt.</p>
+
+  <!-- ===================================================== Schritt 1 -->
+  <div class="variant"><b>D3</b><h2>Anlegen, Schritt 1: Art, Konto, Zugang und Rolle</h2></div>
+  <div class="changes"><h3>Geändert gegenüber D2+</h3><ol>
+    <li>Oben die Wahl <b>Partner</b> (Organisation, Creator, Liga, Community) oder <b>Sponsor</b> (Firma). Bei Sponsor kommt die <b>Stufe</b> dazu: Hauptsponsor, Sponsor, Unterstützer.</li>
+    <li>Das Discord-Konto heißt jetzt <b>Ansprechpartner</b> und bleibt freiwillig; bei Firmen ist es die Kontaktperson.</li>
+    <li>Neuer Kasten <b>Rolle auf RL Nexus</b>: zeigt die Rolle @Partner und prüft vorab, ob die Person auf dem Server ist und ob der Bot die Rolle vergeben darf.</li>
+    <li>Ist die Person <b>noch nicht auf dem Server</b>, merkt sich der Bot das und gibt die Rolle beim Beitritt; mit „Einladung kopieren“ kannst du sie gleich einladen.</li>
+  </ol></div>
+  <div class="app" style="min-height:720px">
+    <aside class="side"><div class="logo"><img src="logo-n.webp" alt="">RL Nexus</div><h5>Bot</h5><a>Server</a><a>Gruppen</a><a>Changelog</a><h5>Webseite</h5><a>News <i>24</i></a><a class="on">Partner/Sponsorings <i>16</i></a></aside>
+    <div class="main">
+      <div class="shade">
+        <div class="dialog cut">
+          <h3>Partner/Sponsoring anlegen</h3>
+          <p class="sub">Für die Seite Partner/Sponsorings und, mit Discord-Konto, für Zugang und Rolle.</p>
+          <div class="steps"><span class="on"><b>1</b>Art, Konto, Zugang</span><span><b>2</b>Profil</span><span><b>3</b>Prüfen</span></div>
+          <div class="kindsel">
+            <div class="on" style="--c: var(--blue)"><span class="radio on" style="--c: var(--blue)"></span><span><b>Partner</b><small>Organisation, Creator, Liga, Community</small></span></div>
+            <div style="--c: var(--gold)"><span class="radio"></span><span><b>Sponsor</b><small>Firma, die uns unterstützt, mit Stufe und Angebot</small></span></div>
+          </div>
+          <div class="dgrid">
+            <div>
+              <span class="label">Ansprechpartner auf Discord <i>freiwillig</i></span>
+              <div class="field">apex</div>
+              <div class="results"><div class="sel"><span class="av round" style="--c: var(--blue)">AV</span><b>Apex Vortex</b><span class="muted">@apexvortex</span><small>2 Server mit RL Nexus</small></div><div><span class="av round" style="--c: var(--purple)">AX</span><b>Apex</b><span class="muted">@apex.rl</span><small>schon Premium</small></div></div>
+              <span class="label" style="margin-top:16px">Zugang zum Bot-Dashboard</span>
+              <div class="choices">
+                <div class="choice on" style="--c: var(--win)"><div class="top"><span class="radio on" style="--c: var(--win)"></span><b>Free Access</b></div><p>Ohne Kauf, solange Partner.</p></div>
+                <div class="choice" style="--c: var(--gold)"><div class="top"><span class="radio"></span><b>Paid Access</b></div><p>Braucht ein Abo wie alle.</p></div>
+              </div>
+              <span class="label">Notiz, nur intern</span>
+              <div class="field">Organisation, 3 Teams, Kontakt über Vortex</div>
+            </div>
+            <div class="rolebox cut">
+              <h4>Rolle auf RL Nexus</h4>
+              <span class="rolepill">@Partner</span>
+              <ul class="checks"><li>@apexvortex ist auf dem RL-Nexus-Server</li><li>Der Bot darf die Rolle vergeben</li><li>Wird beim Speichern vergeben, wird beim Entfernen der Gruppe wieder genommen</li></ul>
+              <p class="help" style="margin-top:10px">Server 1547258700480253982 · Rolle 1552668178465685635. Im Dev-Modus der Dev Server mit eigener Rolle.</p>
+            </div>
+          </div>
+          <div class="dactions"><span class="sp">Schritt 1 von 3</span><span class="btn ghost">Abbrechen</span><span class="btn">Weiter: Profil →</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================== Varianten Schritt 1 -->
+  <div class="variant"><b>D3</b><h2>Schritt 1, zwei andere Fälle</h2><span>Sponsor gewählt · Person noch nicht auf dem Server</span></div>
+  <div class="mini">
+    <div class="minipanel cut">
+      <h4>Sponsor: Stufe statt Organisationsart</h4>
+      <div class="kindsel" style="margin-bottom:12px"><div><span class="radio"></span><span><b>Partner</b></span></div><div class="on" style="--c: var(--gold)"><span class="radio on" style="--c: var(--gold)"></span><span><b>Sponsor</b></span></div></div>
+      <span class="label req">Stufe</span>
+      <div class="tierline" style="margin-bottom:12px"><span class="on">Hauptsponsor</span><span>Sponsor</span><span>Unterstützer</span></div>
+      <span class="label">Ansprechpartner auf Discord <i>freiwillig</i></span>
+      <div class="field dim">Niemand gewählt: nur auf der Webseite, keine Rolle, kein Zugang</div>
+      <p class="help">Ein Hauptsponsor ist höchstens einmal möglich; wer bisher Hauptsponsor war, wird Sponsor.</p>
+    </div>
+    <div class="minipanel cut">
+      <h4>Ansprechpartner ist noch nicht auf dem Server</h4>
+      <div class="rolebox cut">
+        <h4>Rolle auf RL Nexus</h4>
+        <span class="rolepill">@Partner</span>
+        <ul class="checks"><li class="wait">@kbmmiqo ist noch nicht auf dem RL-Nexus-Server</li><li>Der Bot darf die Rolle vergeben</li><li class="wait">Die Rolle kommt automatisch, sobald er beitritt</li></ul>
+        <div style="display:flex;gap:8px;margin-top:12px"><span class="btn ghost sm">Einladung kopieren</span><span class="btn ghost sm">Erneut prüfen</span></div>
+      </div>
+      <p class="help">Fehlt dem Bot das Recht oder steht seine Rolle unter @Partner, steht hier ein roter Hinweis mit dem Grund; gespeichert wird trotzdem.</p>
+    </div>
+  </div>
+
+  <!-- ===================================================== Liste -->
+  <div class="variant"><b>L3</b><h2>Webseite › Partner/Sponsorings</h2></div>
+  <div class="changes"><h3>Geändert gegenüber P-L</h3><ol>
+    <li>Reiter <b>Partner</b> und <b>Sponsoren</b>, die Spalte <b>Art</b> zeigt Partner-Art oder Sponsor-Stufe.</li>
+    <li>Neue Spalte <b>Rolle</b>: vergeben, wartet auf Beitritt, fehlt (mit Grund beim Drüberfahren) oder ohne Konto.</li>
+    <li>Oben eine gelbe Zahl <b>„Rolle fehlt“</b>, ein Klick filtert die Liste darauf.</li>
+  </ol></div>
+  <div class="app">
+    <aside class="side"><div class="logo"><img src="logo-n.webp" alt="">RL Nexus</div><h5>Bot</h5><a>Server</a><a>Gruppen</a><a>Changelog</a><h5>Webseite</h5><a>News <i>24</i></a><a class="on">Partner/Sponsorings <i>16</i></a></aside>
+    <div class="main">
+      <div class="ptitle"><div class="t"><h2>Partner/Sponsorings</h2><p>Was auf nexus-emb.de/partner steht, wer Zugang hat und wer die Rolle @Partner trägt.</p></div><span class="btn ghost">Seite ansehen ↗</span><span class="btn">+ Anlegen</span></div>
+      <div class="stats"><div class="stat"><small>Partner</small><strong>7</strong></div><div class="stat"><small>Sponsoren</small><strong>9</strong></div><div class="stat"><small>Free / Paid</small><strong><span style="color:var(--win)">5</span> / <span style="color:var(--gold)">2</span></strong></div><div class="stat"><small>Rolle vergeben</small><strong>6</strong></div><div class="stat warn"><small>Rolle fehlt</small><strong style="color:var(--gold)">1</strong></div></div>
+      <div class="toolbar"><div class="tabs"><span class="on">Alle<i>16</i></span><span>Partner<i>7</i></span><span>Sponsoren<i>9</i></span><span>Versteckt<i>1</i></span></div><div class="field dim" style="min-width:220px">⌕ Suchen</div></div>
+      <table class="table">
+        <tr><th></th><th>Name</th><th>Art</th><th>Ansprechpartner</th><th>Zugang</th><th>Rolle @Partner</th><th>Seite</th><th>Hervorh.</th><th></th></tr>
+        <tr><td class="handle">⋮⋮</td><td><div class="person"><span class="av" style="--c: var(--gold)">NH</span><b>NordHost GmbH</b></div></td><td><span class="tag" style="--c: var(--gold)">Hauptsponsor</span></td><td>@nordhost.lena</td><td><span class="tag" style="--c: var(--gold)">Paid</span></td><td><span class="role" style="--c: var(--win)">vergeben</span></td><td><span class="sw"></span></td><td><span class="star">★</span></td><td><div class="acts"><span class="btn ghost sm">Bearbeiten</span></div></td></tr>
+        <tr><td class="handle">⋮⋮</td><td><div class="person"><span class="av" style="--c: var(--blue)">AV</span><b>Apex Vortex Esports</b></div></td><td><span class="tag" style="--c: var(--blue)">Organisation</span></td><td>@apexvortex</td><td><span class="tag" style="--c: var(--win)">Free</span></td><td><span class="role" style="--c: var(--win)">vergeben</span></td><td><span class="sw"></span></td><td><span class="star">★</span></td><td><div class="acts"><span class="btn ghost sm">Bearbeiten</span></div></td></tr>
+        <tr><td class="handle">⋮⋮</td><td><div class="person"><span class="av" style="--c: var(--purple)">KM</span><b>KBM Miqo</b></div></td><td><span class="tag" style="--c: var(--purple)">Creator</span></td><td>@kbmmiqo</td><td><span class="tag" style="--c: var(--win)">Free</span></td><td><span class="role" style="--c: var(--gold)">wartet auf Beitritt</span></td><td><span class="sw"></span></td><td><span class="star off">☆</span></td><td><div class="acts"><span class="btn ghost sm">Bearbeiten</span></div></td></tr>
+        <tr><td class="handle">⋮⋮</td><td><div class="person"><span class="av" style="--c: var(--cyan)">KF</span><b>KeyForge</b></div></td><td><span class="tag" style="--c: var(--silver)">Sponsor</span></td><td class="muted">ohne Konto</td><td class="muted">–</td><td class="muted">–</td><td><span class="sw"></span></td><td><span class="star off">☆</span></td><td><div class="acts"><span class="btn ghost sm">Bearbeiten</span></div></td></tr>
+        <tr><td class="handle">⋮⋮</td><td><div class="person"><span class="av" style="--c: var(--win)">BB</span><b>Boost Brigade</b></div></td><td><span class="tag" style="--c: var(--win)">Community</span></td><td>@boostbrigade</td><td><span class="tag" style="--c: var(--gold)">Paid</span></td><td><span class="role" style="--c: #ff6b76">fehlt: Rolle des Bots zu tief</span></td><td><span class="sw"></span></td><td><span class="star off">☆</span></td><td><div class="acts"><span class="btn ghost sm">Bearbeiten</span></div></td></tr>
+        <tr><td class="handle">⋮⋮</td><td><div class="person"><span class="av" style="--c: var(--orange)">CB</span><b>Clipbase</b></div></td><td><span class="tag" style="--c: var(--faint)">Unterstützer</span></td><td class="muted">ohne Konto</td><td class="muted">–</td><td class="muted">–</td><td><span class="sw"></span></td><td><span class="star off">☆</span></td><td><div class="acts"><span class="btn ghost sm">Bearbeiten</span></div></td></tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- ===================================================== Bearbeiten -->
+  <div class="variant"><b>E3</b><h2>Bearbeiten: Konto und Rolle, Felder für Sponsoren</h2><span>Ausschnitte der Seite aus Runde 2</span></div>
+  <div class="changes"><h3>Geändert gegenüber P-E</h3><ol>
+    <li>Im Kasten <b>Konto, Zugang und Rolle</b> steht, ob @Partner vergeben ist und seit wann, dazu „Erneut prüfen“.</li>
+    <li><b>Partner-Gruppe entfernen</b> nimmt Zugang und Rolle weg; der Eintrag auf der Webseite bleibt, bis du ihn versteckst oder löschst.</li>
+    <li>Bei Sponsoren statt Teams und Erfolgen: <b>Stufe, Branche, Sitz, Webseite</b>, <b>Angebot für die Community</b> mit Rabattcode und Ablaufdatum und <b>Was wir zusammen machen</b> als Liste.</li>
+  </ol></div>
+  <div class="mini">
+    <div class="minipanel cut">
+      <h4>Konto, Zugang und Rolle</h4>
+      <div class="person" style="margin-bottom:12px"><span class="av round" style="--c: var(--blue)">AV</span><div><b>@apexvortex</b><small>Partner seit 06.11.2026 · 2 Server</small></div></div>
+      <div class="seg"><span class="on">Free</span><span>Paid</span></div>
+      <div class="rolebox cut" style="margin:10px 0 12px"><h4>Rolle auf RL Nexus</h4><span class="rolepill">@Partner</span><ul class="checks"><li>vergeben am 06.11.2026, 18:10</li></ul><div style="margin-top:10px"><span class="btn ghost sm">Erneut prüfen</span></div></div>
+      <span class="danger">Partner-Gruppe entfernen (nimmt Zugang und Rolle)</span>
+    </div>
+    <div class="minipanel cut">
+      <h4>Sponsor: NordHost GmbH</h4>
+      <span class="label">Stufe</span><div class="tierline" style="margin-bottom:12px"><span class="on">Hauptsponsor</span><span>Sponsor</span><span>Unterstützer</span></div>
+      <div class="two"><div><span class="label">Branche</span><div class="field">Hosting</div></div><div><span class="label">Sitz</span><div class="field">Hamburg</div></div></div>
+      <span class="label">Angebot für die Community</span>
+      <div class="two"><div class="field">NEXUS15</div><div class="field">gültig bis 31.12.2026</div></div>
+      <div class="field" style="margin-bottom:12px">15 % auf das erste Jahr bei allen Game-Servern.</div>
+      <span class="label">Was wir zusammen machen</span>
+      <div class="rowx"><div class="field">Server für RL Nexus</div><div class="field">Bot, Dashboard und Datenbank laufen in Hamburg.</div><div class="x">✕</div></div>
+      <div class="rowx"><div class="field">Preisgeld Nordliga S3</div><div class="field">500 € für beide Divisionen.</div><div class="x">✕</div></div>
+      <span class="add">+ Punkt hinzufügen</span>
+    </div>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>W-0062 · News, Entwurf 2</title>
+<style>
+@font-face { font-family: "Oxanium"; font-weight: 400; src: url("oxanium-400.woff2") format("woff2"); }
+@font-face { font-family: "Oxanium"; font-weight: 600; src: url("oxanium-600.woff2") format("woff2"); }
+@font-face { font-family: "Oxanium"; font-weight: 800; src: url("oxanium-800.woff2") format("woff2"); }
+@font-face { font-family: "Rajdhani"; font-weight: 600; src: url("rajdhani-600.woff2") format("woff2"); }
+@font-face { font-family: "Orbitron"; font-weight: 700; src: url("orbitron-700.woff2") format("woff2"); }
+:root {
+  --base: #050608; --panel: #080d12; --line: rgb(255 255 255 / 8%); --line2: rgb(255 255 255 / 14%);
+  --red: #ff1e2d; --blue: #00afff; --purple: #8a4dff; --win: #35e07f; --gold: #ffc53d; --orange: #ff8a3d; --cyan: #38c8ff;
+  --text: #f2f4f7; --dim: #a8b0bc; --faint: #9aa5b2;
+  --f-display: "Oxanium", "Segoe UI", system-ui, sans-serif; --f-label: "Rajdhani", "Segoe UI", sans-serif; --f-accent: "Orbitron", "Oxanium", sans-serif;
+  --cut: 14px;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--base); color: var(--text); font: 15px/1.6 var(--f-display); padding: 28px 20px 90px; }
+.doc { max-width: 1280px; margin: 0 auto; }
+.doc > h1 { font-size: 28px; font-weight: 800; margin: 0 0 4px; }
+.doc > h1 small { color: var(--red); font: 600 14px var(--f-label); letter-spacing: .16em; margin-right: 10px; }
+.doc > p.lead { color: var(--dim); max-width: 920px; margin: 0 0 8px; }
+.variant { margin: 40px 0 14px; display: flex; gap: 14px; align-items: baseline; flex-wrap: wrap; }
+.variant b { font: 700 15px var(--f-accent); color: var(--red); letter-spacing: .08em; }
+.variant h2 { margin: 0; font-size: 22px; font-weight: 800; }
+.variant span { color: var(--dim); font-size: 14px; }
+.changes { background: var(--panel); border: 1px solid var(--line); padding: 14px 20px 8px; margin: 0 0 16px; }
+.changes h3 { margin: 0 0 8px; font: 600 13px var(--f-label); letter-spacing: .16em; color: var(--red); text-transform: uppercase; }
+.changes ol { margin: 0; padding-left: 22px; color: var(--dim); font-size: 14px; } .changes li { margin-bottom: 6px; } .changes b { color: var(--text); }
+
+.screen { border: 1px solid var(--line2); background: radial-gradient(1200px 500px at 70% -10%, rgb(255 30 45 / 10%), transparent 60%), var(--base); overflow: hidden; }
+.bar { display: flex; align-items: center; gap: 26px; padding: 16px 34px; border-bottom: 1px solid var(--line); background: rgb(5 6 8 / 80%); }
+.brand { display: flex; align-items: center; gap: 10px; margin-right: auto; }
+.brand img { width: 30px; height: 30px; }
+.brand strong { font: 800 17px var(--f-display); } .brand strong i { color: var(--red); font-style: normal; }
+.brand small { display: block; font: 600 9px var(--f-label); letter-spacing: .26em; color: var(--dim); margin-top: -3px; }
+.bar nav { display: flex; gap: 22px; font: 600 12px var(--f-label); letter-spacing: .16em; color: var(--dim); text-transform: uppercase; }
+.bar nav a.on { color: var(--text); position: relative; } .bar nav a.on::after { content: ""; position: absolute; left: 0; right: 0; bottom: -8px; height: 2px; background: var(--red); }
+.btn { display: inline-flex; align-items: center; gap: 8px; padding: 9px 16px; font: 600 12px var(--f-label); letter-spacing: .16em; text-transform: uppercase; background: var(--red); color: #fff; clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px); white-space: nowrap; }
+.btn.ghost { background: rgb(255 255 255 / 5%); color: var(--text); box-shadow: inset 0 0 0 1px var(--line2); }
+.wrap { padding: 44px 34px 54px; }
+.eyebrow { font: 600 12px var(--f-label); letter-spacing: .2em; color: var(--red); text-transform: uppercase; display: flex; align-items: center; gap: 10px; }
+.eyebrow::before { content: ""; width: 26px; height: 2px; background: var(--red); }
+.cut { clip-path: polygon(var(--cut) 0, 100% 0, 100% calc(100% - var(--cut)), calc(100% - var(--cut)) 100%, 0 100%, 0 var(--cut)); }
+.panel { background: linear-gradient(180deg, rgb(255 255 255 / 3%), transparent 40%), var(--panel); box-shadow: inset 0 0 0 1px var(--line2); }
+.tag { display: inline-block; padding: 3px 9px 2px; font: 600 12px var(--f-label); letter-spacing: .14em; text-transform: uppercase; color: var(--c); background: color-mix(in srgb, var(--c) 13%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 36%, transparent); }
+.meta { font: 600 13px var(--f-label); letter-spacing: .08em; color: var(--faint); display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.meta .dot::before { content: "·"; margin-right: 12px; }
+.new { font: 600 12px var(--f-label); letter-spacing: .16em; color: #fff; background: var(--red); padding: 1px 7px; text-transform: uppercase; }
+.cover { position: relative; overflow: hidden; background: radial-gradient(circle at 75% 30%, color-mix(in srgb, var(--c) 45%, transparent), transparent 55%), linear-gradient(135deg, #0b1118, #05080b); }
+.cover::after { content: attr(data-art); position: absolute; right: 14px; bottom: 10px; font: 700 40px/1 var(--f-accent); color: color-mix(in srgb, var(--c) 40%, transparent); }
+.cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.top { display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; flex-wrap: wrap; margin-bottom: 24px; }
+.top h1 { font-size: 42px; line-height: 1.08; font-weight: 800; margin: 14px 0 10px; } .top h1 em { color: var(--red); font-style: normal; }
+.top p { color: var(--dim); margin: 0; max-width: 620px; font-size: 16px; }
+.follow { display: flex; gap: 10px; }
+.pinned { display: grid; grid-template-columns: 1.3fr 1fr; margin-bottom: 14px; }
+.pinned .cover { min-height: 290px; }
+.pinned .body { padding: 28px 30px; display: flex; flex-direction: column; gap: 12px; }
+.pinned h2 { margin: 0; font-size: 30px; line-height: 1.15; font-weight: 800; }
+.pinned p { margin: 0; color: var(--dim); }
+.pin { font: 600 12px var(--f-label); letter-spacing: .16em; color: var(--gold); text-transform: uppercase; }
+.more { margin-top: auto; color: var(--red); font: 600 13px var(--f-label); letter-spacing: .14em; text-transform: uppercase; }
+.pinned2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 36px; }
+.mini { display: grid; grid-template-columns: 96px 1fr; }
+.mini .cover { min-height: 100px; } .mini .cover::after { font-size: 24px; }
+.mini .body { padding: 14px 18px; display: flex; flex-direction: column; gap: 6px; justify-content: center; }
+.mini h3 { margin: 0; font-size: 16px; line-height: 1.3; font-weight: 800; }
+
+.chips { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 22px; }
+.chip { padding: 6px 12px; font: 600 12px var(--f-label); letter-spacing: .12em; text-transform: uppercase; color: var(--dim); background: rgb(255 255 255 / 4%); box-shadow: inset 0 0 0 1px var(--line); }
+.chip.on { color: #fff; background: rgb(255 30 45 / 16%); box-shadow: inset 0 0 0 1px rgb(255 30 45 / 55%); }
+.chip i { font-style: normal; color: var(--faint); margin-left: 5px; }
+.cols { display: grid; grid-template-columns: 1fr 320px; gap: 34px; align-items: start; }
+
+/* Zeitstrahl */
+.tl { position: relative; padding-left: 132px; }
+.tl::before { content: ""; position: absolute; left: 104px; top: 6px; bottom: 0; width: 2px; background: linear-gradient(180deg, var(--red), var(--line2) 18%, var(--line2)); }
+.month { position: relative; margin: 30px 0 16px -132px; display: flex; align-items: center; gap: 14px; }
+.month:first-child { margin-top: 4px; }
+.month b { width: 92px; text-align: right; font: 700 12px var(--f-accent); letter-spacing: .1em; color: var(--red); text-transform: uppercase; }
+.month span { padding: 4px 10px; font: 600 12px var(--f-label); letter-spacing: .14em; color: var(--dim); background: var(--base); box-shadow: inset 0 0 0 1px var(--line2); margin-left: 6px; text-transform: uppercase; }
+.entry { position: relative; margin-bottom: 16px; }
+.entry .when { position: absolute; left: -132px; top: 14px; width: 88px; text-align: right; line-height: 1; }
+.entry .when strong { display: block; font: 800 26px var(--f-display); }
+.entry .when small { font: 600 12px var(--f-label); letter-spacing: .14em; color: var(--faint); text-transform: uppercase; }
+.entry .node { position: absolute; left: -35px; top: 20px; width: 16px; height: 16px; background: var(--c); clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
+.entry.big .card { display: grid; grid-template-columns: 1fr 230px; }
+.entry .card .body { padding: 16px 20px 16px; display: flex; flex-direction: column; gap: 8px; }
+.entry h3 { margin: 0; font-size: 19px; line-height: 1.25; font-weight: 800; }
+.entry p { margin: 0; color: var(--dim); font-size: 14px; }
+.entry.big .cover { min-height: 150px; }
+.entry.short .card { padding: 12px 18px; display: flex; align-items: center; gap: 14px; }
+.entry.short h3 { font-size: 16px; }
+.entry.short .card .body { padding: 0; }
+.entry.event .card { display: grid; grid-template-columns: 1fr auto; align-items: center; }
+.datebox { margin: 14px 18px 14px 0; text-align: center; padding: 10px 14px; background: color-mix(in srgb, var(--c) 10%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 40%, transparent); }
+.datebox small { display: block; font: 600 12px var(--f-label); letter-spacing: .16em; color: var(--c); text-transform: uppercase; }
+.datebox strong { font: 800 20px var(--f-display); }
+.entry.log .card .body { gap: 6px; }
+.entry.log ul { margin: 2px 0 0; padding-left: 18px; color: var(--dim); font-size: 14px; } .entry.log li { margin-bottom: 2px; }
+.entry.log .ver { font: 700 14px var(--f-accent); color: var(--c); letter-spacing: .06em; }
+.entry .readmark { position: absolute; right: 14px; top: 12px; }
+.loadmore { display: flex; justify-content: center; margin-top: 10px; padding-left: 132px; }
+.side { position: sticky; top: 20px; display: flex; flex-direction: column; gap: 16px; }
+.search { display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: rgb(255 255 255 / 4%); box-shadow: inset 0 0 0 1px var(--line2); color: var(--faint); font-size: 14px; }
+.box { padding: 16px 18px 14px; }
+.box h4 { margin: 0 0 10px; font: 600 12px var(--f-label); letter-spacing: .18em; color: var(--faint); text-transform: uppercase; }
+.box ul { list-style: none; padding: 0; margin: 0; }
+.box li { display: flex; justify-content: space-between; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--line); font-size: 14px; color: var(--dim); }
+.box li:last-child { border: 0; } .box li b { color: var(--text); font-weight: 600; }
+.soon li { display: grid; grid-template-columns: 52px 1fr; align-items: center; }
+.soon .d { text-align: center; line-height: 1; padding: 6px 0; background: rgb(255 255 255 / 4%); }
+.soon .d strong { display: block; font: 800 18px var(--f-display); color: var(--text); }
+.soon .d small { font: 600 12px var(--f-label); letter-spacing: .14em; color: var(--faint); text-transform: uppercase; }
+.soon b { display: block; } .soon span { font-size: 13px; color: var(--faint); }
+.subscribe p { margin: 0 0 12px; color: var(--dim); font-size: 14px; }
+.subscribe .btns { display: flex; gap: 8px; flex-wrap: wrap; }
+.legend { display: flex; gap: 14px; flex-wrap: wrap; color: var(--faint); font: 600 12px var(--f-label); letter-spacing: .1em; text-transform: uppercase; margin: 0 0 16px 132px; }
+.legend span::before { content: ""; display: inline-block; width: 9px; height: 9px; margin-right: 6px; background: var(--c); clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
+
+/* Artikel */
+.article { max-width: 760px; margin: 0 auto; }
+.progress { height: 3px; background: var(--line); } .progress i { display: block; width: 38%; height: 100%; background: var(--red); }
+.article h1 { font-size: 40px; line-height: 1.12; font-weight: 800; margin: 14px 0 14px; }
+.back { font: 600 12px var(--f-label); letter-spacing: .16em; color: var(--dim); text-transform: uppercase; }
+.author { display: flex; align-items: center; gap: 12px; margin: 0 0 24px; }
+.avatar { width: 40px; height: 40px; display: grid; place-items: center; font: 700 14px var(--f-accent); color: var(--red); background: rgb(255 30 45 / 12%); box-shadow: inset 0 0 0 1.5px rgb(255 30 45 / 45%); clip-path: polygon(9px 0, 100% 0, 100% calc(100% - 9px), calc(100% - 9px) 100%, 0 100%, 0 9px); }
+.author b { display: block; } .author small { color: var(--faint); font: 600 13px var(--f-label); letter-spacing: .08em; }
+.article .cover { aspect-ratio: 16 / 7; margin-bottom: 26px; }
+.prose { font-size: 17px; line-height: 1.7; color: #dfe3e9; max-width: 68ch; }
+.prose h2 { font-size: 24px; margin: 28px 0 10px; color: var(--text); } .prose p { margin: 0 0 16px; }
+.linked { display: grid; grid-template-columns: 64px 1fr auto; gap: 14px; align-items: center; padding: 14px 16px; margin: 20px 0; --c: var(--blue); }
+.linked .lg { width: 64px; height: 64px; display: grid; place-items: center; font: 700 20px var(--f-accent); color: var(--c); background: color-mix(in srgb, var(--c) 14%, #0a0f15); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--c) 50%, transparent); clip-path: polygon(11px 0, 100% 0, 100% calc(100% - 11px), calc(100% - 11px) 100%, 0 100%, 0 11px); }
+.linked small { display: block; color: var(--faint); font: 600 12px var(--f-label); letter-spacing: .14em; text-transform: uppercase; }
+.linked b { font-size: 18px; }
+.navnext { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--line); }
+.navnext div { padding: 14px 16px; } .navnext small { color: var(--faint); font: 600 12px var(--f-label); letter-spacing: .14em; text-transform: uppercase; display: block; } .navnext b { font-size: 15px; }
+.navnext div:last-child { text-align: right; }
+</style>
+</head>
+<body>
+<div class="doc">
+  <h1><small>W-0062</small>News, Runde 2: Angeheftet und Zeitstrahl</h1>
+  <p class="lead">Oben bleibt das Angeheftete aus N1 groß stehen, darunter läuft der Zeitstrahl aus N2. Neu sind verschiedene Eintragsarten im Strahl, die Leiste „Demnächst“ und ein Hinweis auf alles, was seit deinem letzten Besuch neu ist.</p>
+
+  <div class="variant"><b>N3</b><h2>Übersicht /news</h2><span>Mischung aus N1 und N2</span></div>
+  <div class="changes"><h3>Was drin ist</h3><ol>
+    <li><b>Angeheftet</b> wie in N1: ein großer Beitrag, darunter bis zu zwei kleinere angeheftete nebeneinander.</li>
+    <li><b>Zeitstrahl</b> wie in N2: Monatsköpfe, Datum links, eine Linie mit Rauten in der Farbe der Art.</li>
+    <li><b>Vier Eintragsarten im Strahl</b>: groß mit Bild (Beitrag), kurz ohne Bild (Kurzmeldung, etwa Wartung), <b>Termin</b> mit Datumskasten (Turnier, Anmeldeschluss) und <b>Changelog</b>: neue Bot-Versionen aus dem Changelog (W-0061) erscheinen von selbst mit den ersten drei Änderungen.</li>
+    <li><b>„Neu“-Marke</b> an allem, was seit deinem letzten Besuch dazukam (merkt sich der Browser, kein Konto nötig).</li>
+    <li><b>Seitenleiste</b>: Suche, Arten mit Anzahl, <b>Demnächst</b> (kommende Termine aus den Beiträgen), Archiv und <b>Nichts verpassen</b> mit Discord-Ankündigungen und RSS.</li>
+    <li>Unten <b>„Ältere laden“</b>; die Monatsköpfe bleiben beim Scrollen oben stehen.</li>
+  </ol></div>
+  <div class="screen">
+    <div class="bar">
+      <div class="brand"><img src="logo-n.webp" alt=""><div><strong>RL <i>Nexus</i></strong><small>ESPORTS MANAGEMENT BOT</small></div></div>
+      <nav><a>Home</a><a>Module</a><a>Partner</a><a class="on">News</a><a>Team</a><a>Kontakt</a></nav>
+      <span class="btn">Dashboard ↗</span>
+    </div>
+    <div class="wrap">
+      <div class="top">
+        <div><div class="eyebrow">News</div><h1>Was bei <em>RL Nexus</em> passiert.</h1><p>Updates, Partner, Turniere und alles, was ihr wissen solltet. <b style="color:var(--text)">3 neu</b> seit deinem letzten Besuch.</p></div>
+        <div class="follow"><span class="btn ghost">Discord-Ankündigungen</span><span class="btn ghost">RSS</span></div>
+      </div>
+
+      <div class="pinned panel cut">
+        <div class="cover" style="--c: var(--blue)"><img src="banner.webp" alt=""></div>
+        <div class="body">
+          <div class="meta"><span class="tag" style="--c: var(--blue)">Update</span><span class="pin">Angeheftet</span><span class="new">Neu</span></div>
+          <h2>Team-Hub 2.0: Kategorien, gezeichnete Karten und ein neues Menü</h2>
+          <p>Eure Teams stehen jetzt nach Kategorien sortiert in einer Nachricht. Wer im Menü ein Team wählt, bekommt die Karte nur für sich.</p>
+          <div class="meta"><span>08.11.2026</span><span class="dot">MecryTv</span><span class="dot">4 Min. Lesezeit</span></div>
+          <span class="more">Weiterlesen →</span>
+        </div>
+      </div>
+      <div class="pinned2">
+        <div class="mini panel cut"><div class="cover" style="--c: var(--gold)" data-art="S3"></div><div class="body"><div class="meta"><span class="tag" style="--c: var(--gold)">Turnier</span><span class="pin">Angeheftet</span></div><h3>Nordliga Season 3: Anmeldung bis 20. November</h3></div></div>
+        <div class="mini panel cut"><div class="cover" style="--c: var(--red)" data-art="!"></div><div class="body"><div class="meta"><span class="tag" style="--c: var(--red)">Ankündigung</span><span class="pin">Angeheftet</span></div><h3>Wartung am 12. November, 2 bis 4 Uhr</h3></div></div>
+      </div>
+
+      <div class="chips"><span class="chip on">Alle<i>31</i></span><span class="chip">Updates<i>12</i></span><span class="chip">Partner<i>5</i></span><span class="chip">Turniere<i>4</i></span><span class="chip">Ankündigungen<i>3</i></span><span class="chip">Changelog<i>7</i></span></div>
+      <div class="cols">
+        <div>
+          <div class="legend"><span style="--c: var(--blue)">Update</span><span style="--c: var(--purple)">Partner</span><span style="--c: var(--gold)">Turnier</span><span style="--c: var(--red)">Ankündigung</span><span style="--c: var(--win)">Changelog</span></div>
+          <div class="tl">
+            <div class="month"><b>Nov 2026</b><span>4 Einträge</span></div>
+            <div class="entry big" style="--c: var(--purple)"><div class="when"><strong>06</strong><small>Nov</small></div><span class="node"></span>
+              <div class="card panel cut"><div class="body"><div class="meta"><span class="tag" style="--c: var(--purple)">Partner</span><span class="new">Neu</span></div><h3>Apex Vortex Esports ist neuer Partner</h3><p>Drei Teams, ein Server: warum Apex Vortex auf RL Nexus umgestiegen ist und was als Nächstes kommt.</p><div class="meta"><span>MecryTv</span><span class="dot">3 Min.</span></div></div><div class="cover" style="--c: var(--purple)" data-art="AV"></div></div></div>
+            <div class="entry log" style="--c: var(--win)"><div class="when"><strong>05</strong><small>Nov</small></div><span class="node"></span>
+              <div class="card panel cut"><div class="body"><div class="meta"><span class="tag" style="--c: var(--win)">Changelog</span><span class="ver">v2.4.0</span><span class="new">Neu</span></div><h3>Bot-Version 2.4.0: 12 Änderungen</h3><ul><li>Bewerbungen per DM mit Zurück und Überspringen</li><li>Protokoll der Staff-Freigaben im Server-Dashboard</li><li>Rang-Karte mit eigenen Hintergründen</li></ul><span class="more" style="font-size:12px">Alle Änderungen im Changelog →</span></div></div></div>
+            <div class="entry event" style="--c: var(--gold)"><div class="when"><strong>04</strong><small>Nov</small></div><span class="node"></span>
+              <div class="card panel cut"><div class="body"><div class="meta"><span class="tag" style="--c: var(--gold)">Turnier</span></div><h3>Nordliga Season 3: Anmeldung offen</h3><p>Zwei Divisionen, Ergebnisse direkt über Matchups.</p></div><div class="datebox"><small>Anmeldung bis</small><strong>20.11.</strong></div></div></div>
+            <div class="entry short" style="--c: var(--red)"><div class="when"><strong>02</strong><small>Nov</small></div><span class="node"></span>
+              <div class="card panel cut"><span class="tag" style="--c: var(--red)">Kurz</span><div class="body"><h3>Wartung am 12. November von 2 bis 4 Uhr, der Bot ist in der Zeit offline.</h3></div></div></div>
+            <div class="month"><b>Okt 2026</b><span>9 Einträge</span></div>
+            <div class="entry big" style="--c: var(--blue)"><div class="when"><strong>29</strong><small>Okt</small></div><span class="node"></span>
+              <div class="card panel cut"><div class="body"><div class="meta"><span class="tag" style="--c: var(--blue)">Update</span></div><h3>Rang-Karte: eigene Hintergründe</h3><p>Lade ein eigenes Bild hoch oder nimm eins aus der Galerie deines Servers.</p><div class="meta"><span>MecryTv</span><span class="dot">2 Min.</span></div></div><div class="cover" style="--c: var(--blue)"><img src="banner.webp" alt=""></div></div></div>
+            <div class="entry short" style="--c: var(--blue)"><div class="when"><strong>24</strong><small>Okt</small></div><span class="node"></span>
+              <div class="card panel cut"><span class="tag" style="--c: var(--blue)">Kurz</span><div class="body"><h3>Bewerbungen gehen jetzt auch per DM, mit Zusammenfassung vor dem Abschicken.</h3></div></div></div>
+          </div>
+          <div class="loadmore"><span class="btn ghost">Ältere laden</span></div>
+        </div>
+        <aside class="side">
+          <div class="search">⌕ News durchsuchen …</div>
+          <div class="box panel cut soon"><h4>Demnächst</h4><ul>
+            <li><div class="d"><strong>12</strong><small>Nov</small></div><div><b>Wartung</b><span>2 bis 4 Uhr</span></div></li>
+            <li><div class="d"><strong>20</strong><small>Nov</small></div><div><b>Nordliga: Anmeldeschluss</b><span>Season 3</span></div></li>
+            <li><div class="d"><strong>22</strong><small>Nov</small></div><div><b>Aerial Academy Cup</b><span>2v2, bis Champion</span></div></li>
+          </ul></div>
+          <div class="box panel cut"><h4>Archiv</h4><ul><li><b>November 2026</b><span>4</span></li><li><b>Oktober 2026</b><span>9</span></li><li><b>September 2026</b><span>11</span></li><li><b>August 2026</b><span>7</span></li></ul></div>
+          <div class="box panel cut subscribe"><h4>Nichts verpassen</h4><p>Neue Beiträge kommen auch in unseren Ankündigungskanal auf Discord.</p><div class="btns"><span class="btn">Discord</span><span class="btn ghost">RSS-Feed</span></div></div>
+        </aside>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================== Artikel -->
+  <div class="variant"><b>A2</b><h2>Beitragsseite</h2><span>/news/apex-vortex-ist-neuer-partner</span></div>
+  <div class="changes"><h3>Geändert gegenüber A</h3><ol>
+    <li><b>Lesebalken</b> oben unter der Kopfzeile zeigt, wie weit man ist.</li>
+    <li>Ist ein Beitrag mit einem <b>Partner verknüpft</b>, steht seine Karte im Text mit Link zur großen Ansicht.</li>
+    <li>Unten <b>vorheriger und nächster Beitrag</b> statt nur „Mehr Updates“.</li>
+  </ol></div>
+  <div class="screen">
+    <div class="bar">
+      <div class="brand"><img src="logo-n.webp" alt=""><div><strong>RL <i>Nexus</i></strong><small>ESPORTS MANAGEMENT BOT</small></div></div>
+      <nav><a>Home</a><a>Module</a><a>Partner</a><a class="on">News</a><a>Team</a><a>Kontakt</a></nav>
+      <span class="btn">Dashboard ↗</span>
+    </div>
+    <div class="progress"><i></i></div>
+    <div class="wrap">
+      <div class="article">
+        <div class="back">← Alle News</div>
+        <h1>Apex Vortex Esports ist neuer Partner</h1>
+        <div class="meta" style="margin-bottom:18px"><span class="tag" style="--c: var(--purple)">Partner</span><span>06.11.2026</span><span class="dot">3 Min. Lesezeit</span></div>
+        <div class="author"><div class="avatar">MT</div><div><b>MecryTv</b><small>Developer</small></div></div>
+        <div class="cover" style="--c: var(--purple)"><img src="banner.webp" alt=""></div>
+        <div class="prose">
+          <p>Apex Vortex spielt mit drei Teams von Diamant bis SSL und hat seinen Server in den letzten Wochen komplett auf RL Nexus umgestellt.</p>
+          <div class="linked panel cut"><div class="lg">AV</div><div><small>Partner</small><b>Apex Vortex Esports</b></div><span class="btn ghost">Ansehen →</span></div>
+          <h2>Was sich für die Spieler ändert</h2>
+          <p>Bewerbungen laufen jetzt per DM, Probetrainings werden als Matchups geplant und im Team-Hub sieht jeder sofort, welches Team wo steht.</p>
+        </div>
+        <div class="navnext"><div class="panel cut"><small>← Vorheriger</small><b>Bot-Version 2.4.0: 12 Änderungen</b></div><div class="panel cut"><small>Nächster →</small><b>Team-Hub 2.0: Kategorien und neues Menü</b></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>
