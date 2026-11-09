@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { checkVersionInput, filterVersions, parseWorksChangelog, stampKind, type IChangeItem, type IChangelogVersion, type IVersionInput } from "../../shared/changelog.ts";
+import { checkVersionInput, filterVersions, parseWorksChangelog, stampKind, type IChangeItem, type IChangelogFilter, type IChangelogVersion, type IVersionInput } from "../../shared/changelog.ts";
 import { check, section } from "./harness.ts";
 
 /** Eine gültige Version, von der jede Prüfung eine Stelle ändert. */
@@ -93,8 +93,8 @@ export async function checkChangelog(): Promise<void> {
             version(2, { version: "1.4.0", items: [item({ text: "Bot einladen mit Code Grant", task: "W-0069" }), item({ kind: "behoben", area: "admin", text: "Anmeldung", task: "W-0048" })] }),
             version(1, { version: "1.3.0", title: "DMs", items: [item({ kind: "verbessert", area: "dashboard", text: "Neue Leiste", task: "W-0055" })] }),
         ];
-        const all = { query: "", kinds: [], areas: [], task: null };
-        const rows = (filter: Partial<typeof all>) => filterVersions(versions, { ...all, ...filter }).map((hit) => `${hit.version.version}:${hit.items.map((entry) => entry.text).join("|")}`);
+        const all: IChangelogFilter = { query: "", kinds: [], areas: [], task: null };
+        const rows = (filter: Partial<IChangelogFilter>) => filterVersions(versions, { ...all, ...filter }).map((hit) => `${hit.version.version}:${hit.items.map((entry) => entry.text).join("|")}`);
 
         assert.deepEqual(rows({}), ["1.4.0:Bot einladen mit Code Grant|Anmeldung", "1.3.0:Neue Leiste"]);
         assert.deepEqual(rows({ query: "EINLADEN" }), ["1.4.0:Bot einladen mit Code Grant"]);
