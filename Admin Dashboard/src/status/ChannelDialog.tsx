@@ -1,23 +1,35 @@
-import { useEffect, useRef, useState, type JSX } from "react";
-import type { IDiscordPostResult, IStatusChannelOption } from "../../shared/status";
-import { api } from "../api/client";
+import { useEffect, useRef, useState, type JSX, type ReactNode } from "react";
+import type { IStatusChannelOption } from "../../shared/status";
 import { useApi } from "../api/useApi";
 import { Button } from "../components/Button";
 import { Panel } from "../components/Panel";
 import { Failure, Loading } from "../components/Status";
 import { useToast } from "../toast/context";
 import { fold } from "../nav/search.ts";
-import { postSummary } from "./discord.ts";
 import styles from "./ChannelDialog.module.scss";
 
+export interface IChannelDialogProps {
+    readonly current: string | null;
+    /** Liefert IStatusChannelOption[]. */
+    readonly optionsPath: string;
+    readonly title: string;
+    readonly intro: string;
+    /** Speichert die Wahl; der Satz kommt als Hinweis. */
+    readonly save: (channelId: string) => Promise<{ readonly text: string; readonly ok: boolean }>;
+    /** Warnung vor dem Wechsel mit Häkchen, das gesetzt sein muss. Ohne: kein Häkchen. */
+    readonly warning?: (picked: string | undefined, current: string | undefined) => { readonly text: ReactNode; readonly confirm: string };
+    readonly onClose: () => void;
+    readonly onChanged: () => void;
+}
+
 /**
- * „Statuskanal wählen“ (W-0052, Entwurf K2): Textkanäle des einen Servers,
- * nach Kategorie, mit dem, was dem Bot dort fehlt. Steht nur im DOM, solange
- * es offen ist.
+ * Kanal wählen (W-0052, Entwurf K2; seit W-0061 auch für den Changelog):
+ * Textkanäle des einen Servers, nach Kategorie, mit dem, was dem Bot dort
+ * fehlt. Steht nur im DOM, solange es offen ist.
  */
-export function ChannelDialog({ current, onClose, onChanged }: { readonly current: string | null; readonly onClose: () => void; readonly onChanged: () => void }): JSX.Element {
+export function ChannelDialog({ current, optionsPath, title, intro, save: store, warning, onClose, onChanged }: IChannelDialogProps): JSX.Element {
     const ref = useRef<HTMLDialogElement>(null);
-    const options = useApi<IStatusChannelOption[]>("/api/status/discord/channels");
+    const options = useApi<IStatusChannelOption[]>(optionsPath);
     const notify = useToast();
     const [query, setQuery] = useState("");
     const [picked, setPicked] = useState<string | null>(current);
@@ -35,6 +47,7 @@ export function ChannelDialog({ current, onClose, onChanged }: { readonly curren
     const currentName = options.data?.find((option) => option.id === current)?.name;
     const pickedName = options.data?.find((option) => option.id === picked)?.name;
     const changing = picked !== null && picked !== current;
+    const warned = changing && warning ? warning(pickedName, currentName) : null;
 
     async function save(): Promise<void> {
         if (picked === null || picked === current) return onClose();
@@ -42,8 +55,7 @@ export function ChannelDialog({ current, onClose, onChanged }: { readonly curren
         setBusy(true);
 
         try {
-            const result = await api<IDiscordPostResult | null>("/api/status/discord/channel", { method: "PUT", body: { channelId: picked, confirm: true } });
-            const summary = result ? postSummary(result) : { text: "Statuskanal gewechselt.", ok: true };
+            const summary = await store(picked);
 
             notify(summary.text, summary.ok ? "ok" : "danger");
             onChanged();
@@ -67,9 +79,9 @@ export function ChannelDialog({ current, onClose, onChanged }: { readonly curren
         >
             <Panel className={styles.panel}>
                 <h2 id="kanal-titel" className={styles.title}>
-                    Statuskanal wählen
+                    {title}
                 </h2>
-                <p className={styles.sub}>Textkanäle auf dem Server des Teams. Der Bot braucht dort „Nachrichten senden“, „Dateien anhängen“ und „Nachrichten verwalten“ (zum Aufräumen).</p>
+                <p className={styles.sub}>{intro}</p>
 
                 <input className={styles.search} type="search" placeholder="Kanal suchen …" aria-label="Kanal suchen" value={query} onChange={(event) => setQuery(event.target.value)} />
 
@@ -117,15 +129,12 @@ export function ChannelDialog({ current, onClose, onChanged }: { readonly curren
                     </fieldset>
                 )}
 
-                {changing && (
+                {warned && (
                     <div className={styles.warn} role="alert">
-                        <p>
-                            <strong>Achtung:</strong> Der Bot hält den Statuskanal sauber und löscht in #{pickedName} <strong>alle anderen Nachrichten</strong>, auch angepinnte. Nimm einen eigenen Kanal nur für die Statusmeldung.
-                            {currentName && ` Die Meldung in #${currentName} wird gelöscht.`}
-                        </p>
+                        <p>{warned.text}</p>
                         <label className={styles.confirm}>
                             <input type="checkbox" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} />
-                            Verstanden, in #{pickedName} darf alles andere weg
+                            {warned.confirm}
                         </label>
                     </div>
                 )}
@@ -134,7 +143,7 @@ export function ChannelDialog({ current, onClose, onChanged }: { readonly curren
                     <Button variant="ghost" onClick={onClose} disabled={busy}>
                         Abbrechen
                     </Button>
-                    <Button variant="primary" onClick={() => void save()} busy={busy} disabled={!changing || !confirmed}>
+                    <Button variant="primary" onClick={() => void save()} busy={busy} disabled={!changing || (warned !== null && !confirmed)}>
                         Übernehmen
                     </Button>
                 </div>

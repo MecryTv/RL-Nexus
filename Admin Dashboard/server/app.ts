@@ -35,6 +35,7 @@ import { internalSecurityRoutes } from "./routes/internal-security.ts";
 import { publicSecurityRoutes } from "./routes/security-public.ts";
 import { securityRoutes } from "./routes/security.ts";
 import { messageRoutes } from "./routes/messages.ts";
+import { changelogRoutes } from "./routes/changelog.ts";
 import { publicStatusRoutes, statusRoutes } from "./routes/status.ts";
 import { userRoutes } from "./routes/users.ts";
 
@@ -113,6 +114,7 @@ export async function buildApp(config: IConfig): Promise<FastifyInstance> {
             await dev.register(databaseRoutes, { config });
             await dev.register(redisRoutes, { config });
             await dev.register(dumpRoutes, { config });
+            await dev.register(changelogRoutes, { config });
         });
     });
 

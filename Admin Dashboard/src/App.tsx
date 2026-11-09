@@ -93,6 +93,7 @@ const router = createBrowserRouter(
                 <Route path="dev/technik" lazy={devPage(() => import("./pages/TechPage"), "TechPage")} />
                 <Route path="dev/wartung" lazy={devPage(() => import("./pages/MaintenancePage"), "MaintenancePage")} />
                 <Route path="dev/protokoll" lazy={devPage(() => import("./pages/AuditPage"), "AuditPage")} />
+                <Route path="dev/changelog" lazy={devPage(() => import("./changelog/ChangelogPage"), "ChangelogPage")} />
                 <Route path="*" lazy={page(() => import("./pages/NotFoundPage"), "NotFoundPage")} />
             </Route>
         </>

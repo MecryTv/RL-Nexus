@@ -31,7 +31,7 @@ function problemOf(change: Partial<Record<keyof IMessageContent, unknown>>): str
 }
 
 /** Breite und Höhe aus dem Kopf einer PNG-Datei. */
-function pngSize(data: Buffer): { readonly width: number; readonly height: number } {
+export function pngSize(data: Buffer): { readonly width: number; readonly height: number } {
     assert.deepEqual([...data.subarray(0, 8)], [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a], "PNG-Signatur");
 
     return { width: data.readUInt32BE(16), height: data.readUInt32BE(20) };

@@ -351,6 +351,20 @@ Alle Filter stehen in der Adresse (`?aus=TASKS&stufe=error&q=pool&zeile=458`). E
 
 Zerlegt wird in `server/log-parse.ts`, passend zum Format von `ChronicleLogger.ts` im Bot. Ändert sich dort das Format, gehört `server/checks/logparse.check.ts` mit angepasst. Jede Datei wird einmal zerlegt und bleibt im Speicher, bis sich Größe oder Änderungszeit ändern. Die erste Suche über alle Sessions und der erste Filter „Mit Fehlern“ lesen deshalb alles einmal, danach geht es schnell.
 
+## Changelog
+
+Unter **Developer → Changelog** (`/dev/changelog`, W-0061) stehen die Versionen von RL Nexus mit ihren Änderungen. Nur Developer sehen und ändern sie. Spec: `docs/superpowers/specs/2026-11-09-changelog-design.md`.
+
+- **Ansicht:** Zeitleiste (neueste Version offen, ältere zugeklappt mit Zahlen je Art) oder Liste; die Wahl merkt sich der Browser. Filter nach Art (Neu, Verbessert, Behoben, Intern) und Bereich (Bot, Bot-Dashboard, Admin, Webseite), ein Klick auf eine Aufgabe zeigt nur ihre Zeilen. Sobald im Suchfeld etwas steht (`/` springt hinein), kommen die Treffer als Liste mit markiertem Wort.
+- **Version schreiben:** Version in der Form `1.4.0` (eindeutig), Datum, Titel (höchstens 80 Zeichen), 1 bis 30 Änderungen mit Art, Bereich, Text (höchstens 200 Zeichen) und Aufgabe (`W-0014` oder leer). Gespeichert wird als Entwurf, im Protokoll als `changelog.create` und `changelog.update`.
+- **Aus works einfügen:** Das Feld im Editor nimmt die Ausgabe von `works changelog`. Erkannt werden `### Neu`, `### Verbessert`, `### Behoben`, `### Sonstiges` (wird Intern) und Zeilen `- Text (W-0014)`. Der Anfang des Textes setzt den Bereich: „Admin Dashboard:“ oder „Admin:“ → Admin, „Dashboard:“ oder „Bot-Dashboard:“ → Bot-Dashboard, „Webseite:“ → Webseite, sonst Bot; der Präfix fällt weg. Was nicht passt, bleibt im Feld stehen.
+- **Kanal:** „Kanal wählen“ im Seitenkopf zeigt die Textkanäle des Servers aus `ADMIN_GUILD_ID` (im Dev-Modus der Dev Server, im Betrieb der Server des Teams) mit den Rechten, die dem Bot fehlen. Er braucht „Nachrichten senden“ und „Dateien anhängen“. Die Wahl steht in `admin_state` unter `changelog_channel`, im Protokoll als `changelog.channel`.
+- **Posten:** „In #kanal posten“ zeigt vorher genau das Bild, das kommt (`GET /api/changelog/:id/bild`). Der Post ist ein Bild im Stil der DMs (900 logische Pixel, ausgegeben als 1100 × höchstens 580) mit Stempel, Kacheln je Art und „+ N weitere im Admin Dashboard“, wenn nicht alle Zeilen passen, darunter der Knopf „Alle Änderungen“ zu dieser Seite. Interne Zeilen kommen nie ins Bild und nicht in den Alt-Text; eine Version nur mit internen Zeilen lässt sich nicht posten.
+- **Ändern nach dem Posten:** Die Version zeigt „seit dem Posten geändert“, „Post aktualisieren“ ändert dieselbe Nachricht, im Fuß steht dann „bearbeitet am …“. Ist die Nachricht in Discord weg, kommt eine neue in den gewählten Kanal.
+- **Löschen:** „Post löschen“ entfernt die Nachricht, die Version wird wieder Entwurf. „Version löschen“ entfernt erst den Post, dann die Version; scheitert Discord, bleibt beides. Im Protokoll als `changelog.post`, `changelog.unpost` und `changelog.delete`. Fehlt dem Bot im Kanal ein Recht, sagt die Meldung das, gespeichert wird dann nichts.
+
+Tabellen: `changelog_versions` und `changelog_items` (Migration 022). Code: `server/changelog/` (Speicher, Bild, Posten), `server/routes/changelog.ts`, `shared/changelog.ts` (Regeln, works-Parser, Filter), `src/changelog/`.
+
 ## Prüfen
 
 ```bash

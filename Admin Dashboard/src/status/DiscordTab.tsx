@@ -1,5 +1,6 @@
 import { useState, type CSSProperties, type JSX } from "react";
-import { channelLabel } from "../../shared/status.ts";
+import { channelLabel, type IDiscordPostResult } from "../../shared/status.ts";
+import { api } from "../api/client";
 import logo from "../assets/logo.webp";
 import { Button } from "../components/Button";
 import { Failure, Loading } from "../components/Status";
@@ -191,7 +192,30 @@ export function DiscordTab({ post, now }: { readonly post: IDiscordPost; readonl
                 </div>
             </aside>
 
-            {choosing && <ChannelDialog current={first?.id ?? null} onClose={() => setChoosing(false)} onChanged={state.reload} />}
+            {choosing && (
+                <ChannelDialog
+                    current={first?.id ?? null}
+                    optionsPath="/api/status/discord/channels"
+                    title="Statuskanal wählen"
+                    intro="Textkanäle auf dem Server des Teams. Der Bot braucht dort „Nachrichten senden“, „Dateien anhängen“ und „Nachrichten verwalten“ (zum Aufräumen)."
+                    save={async (channelId) => {
+                        const result = await api<IDiscordPostResult | null>("/api/status/discord/channel", { method: "PUT", body: { channelId, confirm: true } });
+
+                        return result ? postSummary(result) : { text: "Statuskanal gewechselt.", ok: true };
+                    }}
+                    warning={(picked, current) => ({
+                        text: (
+                            <>
+                                <strong>Achtung:</strong> Der Bot hält den Statuskanal sauber und löscht in #{picked} <strong>alle anderen Nachrichten</strong>, auch angepinnte. Nimm einen eigenen Kanal nur für die Statusmeldung.
+                                {current && ` Die Meldung in #${current} wird gelöscht.`}
+                            </>
+                        ),
+                        confirm: `Verstanden, in #${picked} darf alles andere weg`,
+                    })}
+                    onClose={() => setChoosing(false)}
+                    onChanged={state.reload}
+                />
+            )}
         </div>
     );
 }
