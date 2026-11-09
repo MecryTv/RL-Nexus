@@ -365,7 +365,7 @@ Dafür speichert der Bot seit W-0049 mehr:
 
 - `staff_grant_log.kind` (Migration 049): `change` geändert, `view` angesehen, `private` privater Bereich, `grant` die Freigabe selbst. Alte Einträge bekommen ihre Art aus Bereich und Text.
 - **vorher → nachher** (`staff_grant_log.detail`, JSON): `StaffWrite` liest vor und nach einer Änderung mit Modul den Stand aller Felder über die Register des Panels (`staffgrant/Changes.ts`, `ShowValue`) und speichert, was sich unterscheidet. Gilt für alle Module mit Register; Aktionen wie „Panel neu gesendet“ bleiben ein Satz.
-- **angesehen**: Lesen einer Seite mit Freigabe steht je Freigabe und Bereich einmal im Protokoll (`StaffGrantService.Viewed`).
+- **angesehen**: Liest Staff mit Freigabe eine Modulseite (Routen hinter `ManageGate`, dazu Tickets, Moderation und Moderatoren), steht das je Freigabe und Bereich einmal im Protokoll (`StaffGrantService.Viewed`). Abfragen, die das Dashboard im Hintergrund stellt (Raid-Stand von Anti Villain, Namen der Rollen-Listen für die Leiste), zählen nicht (`ManageGate(…, { view: false })`). Seiten ohne diese Routen, etwa Galerie, Bestenliste oder Übersicht, werden nicht erfasst.
 - **Dauer im privaten Ticket** (`staff_grant_log.seconds`): Live Tickets melden beim Wechsel, Verlassen der Seite oder Schließen des Tabs, wie lange das Ticket offen war; es zählt zum letzten „geöffnet“ dazu. Bricht der Browser hart ab, fehlt die Dauer.
 - In `staff_grants.data`: die angefragte Dauer (`requestedMinutes`), jede Verlängerung mit Zeitpunkt und Person (`extensions`), wann die privaten Bereiche erlaubt wurden (`privateAt`) und wer sie weggenommen hat (`privateRemovedBy`, `privateRemovedAt`; `privateBy` bleibt, wer sie erlaubt hat).
 

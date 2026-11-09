@@ -32,7 +32,7 @@ import { IStaffGrant, IStaffLogEntry } from "../interfaces/services/staffgrant/I
 import PulseService from "../services/PulseService";
 import StaffGrantService, { StaffGrantBlocked } from "../services/StaffGrantService";
 import { ActionText, AskList, ParseDuration } from "../services/staffgrant/Rules";
-import { DiffSnapshots, SettingsSnapshot } from "../services/staffgrant/Changes";
+import { DiffSnapshots, SettingsSnapshot, Snapshot } from "../services/staffgrant/Changes";
 import { ProtocolGrant } from "../services/staffgrant/Protocol";
 import { DefaultLevelSettings } from "../constants/Levels";
 import { Answer, AnswerPrivate, AskPrivate, CanRequest, End, Extend, RemovePrivate, StaffGrantError, Tick, Withdraw } from "../services/staffgrant/Machine";
@@ -293,6 +293,30 @@ function checkDiff(): void {
         JSON.stringify(DiffSnapshots(before, after))
     );
     check("Nichts geändert: leer", DiffSnapshots(before, before).length === 0);
+}
+
+/** Review W-0049: Texte werden ganz verglichen, nicht nur die 40 Zeichen der Anzeige. */
+async function checkLongText(): Promise<void> {
+    console.log("\n↔️  Lange Texte (W-0049)\n");
+
+    const head = "Willkommen auf dem Server, schön dass du da bist! ";
+    const settings = { text: `${head}Lies die Regeln.` };
+    const panel = {
+        id: "welcome",
+        module: "welcome",
+        sections: [{ title: "", fields: [{ key: "text", label: "Text", hint: "", kind: "text", get: (value: { text: string }) => value.text, set: () => ({}) }] }],
+        load: async () => ({ ...settings }),
+    } as unknown as NonNullable<Parameters<typeof Snapshot>[3]>[number];
+    const guild = { channels: { cache: new Map() }, roles: { cache: new Map() } } as unknown as Guild;
+    const before = await Snapshot({} as BotClient, guild, "welcome", [panel]);
+
+    settings.text = `${head}Lies bitte die Regeln.`;
+
+    const after = await Snapshot({} as BotClient, guild, "welcome", [panel]);
+    const diff = before && after ? DiffSnapshots(before, after) : [];
+
+    check("Änderung hinter Zeichen 40 ergibt vorher/nachher", diff.length === 1, JSON.stringify(diff));
+    check("Der Text steht ganz da (bis 120 Zeichen)", diff[0]?.after === `${head}Lies bitte die Regeln.`, JSON.stringify(diff[0]));
 }
 
 /** W-0049: was das Protokoll zusätzlich braucht - angefragte Dauer, Verlängerungen, Zeitpunkt der privaten Erlaubnis, wer sie weggenommen hat. */
@@ -574,7 +598,8 @@ class GateProbe extends Route {
     }
 
     async Handle(request: FastifyRequest, reply: FastifyReply): Promise<unknown> {
-        const access = await ManageGate(this.client, request, reply, "levels");
+        // ?still=1: eine Abfrage im Hintergrund, kein „angesehen“ (Review W-0049).
+        const access = await ManageGate(this.client, request, reply, "levels", { view: (request.query as { still?: string }).still !== "1" });
 
         if (!access) return reply;
 
@@ -632,10 +657,10 @@ function GateApp(options: { grant: IStaffGrant | null; canManage: boolean; bot?:
     manager.Register(new GateProbe(client));
     manager.Apply(instance);
 
-    const call = (method: "GET" | "POST", action?: string) =>
+    const call = (method: "GET" | "POST", action?: string, query = "") =>
         instance.inject({
             method,
-            url: `${DASHBOARD_PATH}/api/guild/${GATE_GUILD}/probe`,
+            url: `${DASHBOARD_PATH}/api/guild/${GATE_GUILD}/probe${query}`,
             headers: { cookie: `${SESSION_COOKIE}=gueltig`, ...(method === "POST" ? { "content-type": "application/json" } : {}) },
             ...(method === "POST" ? { payload: JSON.stringify({ action }) } : {}),
         });
@@ -663,6 +688,9 @@ async function checkGate(): Promise<void> {
     check("Abgewiesen (400): kein Eintrag", (await app.call("POST", "bad")).statusCode === 400 && (await flush(), app.logged.length === 1));
     check("Lesen: kein Eintrag", (await app.call("GET")).statusCode === 200 && (await flush(), app.logged.length === 1));
     check("Lesen: als angesehen gemeldet (W-0049)", app.viewed.length > 0 && app.viewed.every((area) => area === "Level System"), app.viewed.join(","));
+
+    const quiet = GateApp({ grant: running, canManage: true });
+    check("Abfrage im Hintergrund (view: false): kein angesehen", (await quiet.call("GET", undefined, "?still=1")).statusCode === 200 && quiet.viewed.length === 0, quiet.viewed.join(","));
 
     const base = app.levels.base;
 
@@ -1293,6 +1321,7 @@ async function main(): Promise<void> {
     checkCanRequest();
     checkProtocolFields();
     checkDiff();
+    await checkLongText();
     checkProtocolView();
     checkPulse();
     await checkService();

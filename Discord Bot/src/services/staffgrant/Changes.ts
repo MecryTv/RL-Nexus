@@ -3,6 +3,7 @@ import BotClient from "../../client/BotClient";
 import { IStaffChange } from "../../interfaces/services/staffgrant/IStaffGrant";
 import { PANEL_MODULES } from "../settings/registers";
 import { IPanelModule, ShowValue } from "../settings/SettingsModel";
+import { Cut } from "../../utils/cut";
 
 /**
  * W-0049: vorher und nachher, wenn Staff mit Freigabe Einstellungen speichert.
@@ -11,8 +12,11 @@ import { IPanelModule, ShowValue } from "../settings/SettingsModel";
  * So bleibt jeder Dienst unverändert, egal, wo er speichert.
  */
 
-/** Feld → Name und angezeigter Wert. Der Schlüssel ist <Register>:<Feld>. */
-export type SettingsSnapshot = Map<string, { label: string; text: string }>;
+/** Feld → Name, angezeigter Wert und der Wert selbst. Der Schlüssel ist <Register>:<Feld>. */
+export type SettingsSnapshot = Map<string, { label: string; text: string; raw?: string }>;
+
+/** Texte im Protokoll länger als im Panel-Bild (dort 40 Zeichen). */
+const TEXT_SHOWN = 120;
 
 /** Höchstens so viele Zeilen je Eintrag - mehr liest niemand. */
 const MAX_CHANGES = 20;
@@ -29,7 +33,11 @@ export async function Snapshot(client: BotClient, guild: Guild, module: string, 
         const settings = await panel.load(client, guild);
 
         for (const field of panel.sections.flatMap((section) => section.fields)) {
-            shot.set(`${panel.id}:${field.key}`, { label: field.label, text: ShowValue(field, field.get(settings), guild) });
+            const value = field.get(settings);
+            const text = field.kind === "text" ? (typeof value === "string" && value.trim() ? Cut(value.trim(), TEXT_SHOWN) : "–") : ShowValue(field, value, guild);
+
+            // Verglichen wird der Wert selbst: Die Anzeige kürzt und fasst Listen zusammen.
+            shot.set(`${panel.id}:${field.key}`, { label: field.label, text, raw: JSON.stringify(value ?? null) });
         }
     }
 
@@ -43,7 +51,7 @@ export function DiffSnapshots(before: SettingsSnapshot, after: SettingsSnapshot)
     for (const [key, now] of after) {
         const old = before.get(key);
 
-        if (old && old.text !== now.text) changes.push({ label: now.label, before: old.text, after: now.text });
+        if (old && (old.raw ?? old.text) !== (now.raw ?? now.text)) changes.push({ label: now.label, before: old.text, after: now.text });
     }
 
     return changes.slice(0, MAX_CHANGES);

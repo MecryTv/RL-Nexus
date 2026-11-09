@@ -7,10 +7,10 @@
 
 import { url } from "../core/Base.js";
 import { need } from "../core/Dom.js";
-import { onPulse } from "../core/Pulse.js";
+import { debounce, onPulse } from "../core/Pulse.js";
 import { toast } from "../core/Toast.js";
 import { button, el, face } from "../core/Ui.js";
-import { durationText, staffApi, tick, timer } from "./GuildStaff.js";
+import { durationText, staffApi, timer } from "./GuildStaff.js";
 
 type Kind = "change" | "view" | "private" | "grant";
 type Status = "open" | "active" | "denied" | "expired" | "withdrawn" | "ended";
@@ -122,24 +122,53 @@ export function renderProtocol(guildId: string, me: string): void {
     const open = new Set<number>();
     const tabs = new Map<number, Tab>();
 
+    /** Nach „von“: „von dir“. */
     const who = (found: IPerson | null): string => (!found ? "jemand" : found.id === me ? "dir" : found.name);
+    /** Als Subjekt oder in Aufzählungen: „du, Lena“. */
+    const nom = (found: IPerson | null): string => (!found ? "jemand" : found.id === me ? "du" : found.name);
 
+    // Fest stehende Teile: Beim Nachladen tauschen nur Zahlen und Liste, die Filter bleiben, samt Fokus im Suchfeld.
+    const statsHost = el("div", "");
+    const filtersHost = el("div", "");
+    const note = el("p", "prnote");
+    let filterKey = "";
+    let asked = 0;
+    let stale = false;
+
+    const section = need<HTMLElement>("#protokoll");
+
+    /** Nur die neueste Antwort zählt. Ein Fehler ersetzt nichts, was schon da ist. Versteckt: erst beim Anzeigen. */
     const load = async (): Promise<void> => {
+        if (section.hidden) {
+            stale = true;
+
+            return;
+        }
+
+        const mine = ++asked;
+        let failed: string | null = null;
+
         try {
             const response = await fetch(url(`/api/guild/${encodeURIComponent(guildId)}/staff/protokoll`), { headers: { Accept: "application/json" } });
             const body = (await response.json().catch(() => null)) as (IProtocol & { hint?: string; error?: string }) | null;
 
-            if (!response.ok || !body) {
-                host.replaceChildren(el("p", "prempty", body?.hint ?? body?.error ?? "Das Protokoll ließ sich nicht laden."));
+            if (mine !== asked) return;
+
+            if (response.ok && body) {
+                data = body;
+                paint();
 
                 return;
             }
 
-            data = body;
-            paint();
+            failed = body?.hint ?? body?.error ?? "Das Protokoll ließ sich nicht laden.";
         } catch {
-            host.replaceChildren(el("p", "prempty", "Der Bot antwortet gerade nicht."));
+            if (mine !== asked) return;
+
+            failed = "Der Bot antwortet gerade nicht.";
         }
+
+        if (!data) host.replaceChildren(el("p", "prempty", failed));
     };
 
     const act = (action: string): void =>
@@ -206,10 +235,18 @@ export function renderProtocol(guildId: string, me: string): void {
         const chips = SHOWS.map(([value, label]) => {
             const chip = button(`prchip${show === value ? " is-on" : ""}`, label);
 
+            chip.dataset.show = value;
             chip.setAttribute("aria-pressed", String(show === value));
             chip.addEventListener("click", () => {
                 show = value;
-                paint();
+
+                // An Ort und Stelle umschalten: Der Fokus bleibt auf dem Chip.
+                for (const other of filtersHost.querySelectorAll<HTMLButtonElement>(".prchip")) {
+                    other.classList.toggle("is-on", other.dataset.show === value);
+                    other.setAttribute("aria-pressed", String(other.dataset.show === value));
+                }
+
+                paintCards();
             });
 
             return chip;
@@ -250,15 +287,16 @@ export function renderProtocol(guildId: string, me: string): void {
             ...chips,
             pick("Person", person, [["", "Alle Personen"], ...people], (next) => {
                 person = next;
-                paint();
+                paintCards();
             }),
             pick("Bereich", area, [["", "Alle Bereiche"], ...areas.map((name): [string, string] => [name, name])], (next) => {
                 area = next;
-                paint();
+                paintCards();
             }),
             pick("Zeitraum", String(days), [["180", "180 Tage"], ["30", "30 Tage"], ["7", "7 Tage"]], (next) => {
                 days = Number(next);
-                paint();
+                paintStats();
+                paintCards();
             }),
             search
         );
@@ -292,8 +330,9 @@ export function renderProtocol(guildId: string, me: string): void {
         const requested = grant.requestedMinutes ?? (grant.startsAt === null ? grant.minutes : null);
         const deniedIds = new Set(grant.denied.map((found) => found.id));
         const faces = el("span", "prfaces", ...grant.asked.map((found) => el("i", deniedIds.has(found.id) ? "is-no" : "", (found.name.trim()[0] ?? "?").toUpperCase())));
-        const askedNames = grant.asked.filter((found) => !deniedIds.has(found.id)).map(who);
-        const said = grant.denied.length ? `${grant.denied.map(who).join(", ")} ${grant.denied.length === 1 ? "hat" : "haben"} „Nein“ gesagt` : "";
+        const askedNames = grant.asked.filter((found) => !deniedIds.has(found.id)).map(nom);
+        const verb = grant.denied.length > 1 ? "haben" : grant.denied[0]?.id === me ? "hast" : "hat";
+        const said = grant.denied.length ? `${grant.denied.map(nom).join(", ")} ${verb} „Nein“ gesagt` : "";
         const ext = grant.extensions;
         const priv = grant.private;
         const asked = priv.askedAt !== null ? `gefragt ${CLOCK.format(priv.askedAt)}${priv.reason ? ` · „${priv.reason}“` : ""}` : "";
@@ -525,7 +564,7 @@ export function renderProtocol(guildId: string, me: string): void {
                 " · nichts geändert"
             );
         } else if (grant.status === "expired") {
-            parts.push(el("b", "", when(grant.createdAt)), " · niemand hat in 10 Min. geantwortet", ` · gefragt: ${grant.asked.map(who).join(", ")}`, " · nichts geändert");
+            parts.push(el("b", "", when(grant.createdAt)), " · niemand hat in 10 Min. geantwortet", ` · gefragt: ${grant.asked.map(nom).join(", ")}`, " · nichts geändert");
         } else {
             parts.push(el("b", "", when(grant.createdAt)), ` · zurückgezogen${grant.endedAt !== null ? ` nach ${span(grant.createdAt, grant.endedAt)}` : ""}`, " · nichts geändert");
         }
@@ -611,18 +650,41 @@ export function renderProtocol(guildId: string, me: string): void {
         );
     }
 
-    function paint(): void {
+    function paintStats(): void {
         if (!data) return;
 
         const now = Date.now();
-        const inTime = data.grants.filter((grant) => inRange(grant, now));
 
-        host.replaceChildren(stats(inTime, now), filters(data.grants), list, el("p", "prnote", `Ältere Einträge als ${data.keepDays} Tage löscht der Bot.`));
+        statsHost.replaceChildren(stats(data.grants.filter((grant) => inRange(grant, now)), now));
+    }
+
+    function paint(): void {
+        if (!data) return;
+
+        if (!host.contains(list)) host.replaceChildren(statsHost, filtersHost, list, note);
+
+        note.textContent = `Ältere Einträge als ${data.keepDays} Tage löscht der Bot.`;
+        paintStats();
+
+        // Die Filterleiste nur neu, wenn neue Personen oder Bereiche dazukommen - und nie unter dem Fokus weg.
+        const key = JSON.stringify([data.grants.map((grant) => grant.staff.id), data.grants.flatMap((grant) => grant.log.map((entry) => entry.area))].map((values) => [...new Set(values)].sort()));
+
+        if (key !== filterKey && !filtersHost.contains(document.activeElement)) {
+            filterKey = key;
+            filtersHost.replaceChildren(filters(data.grants));
+        }
+
         paintCards();
     }
 
     host.replaceChildren(el("p", "prempty", "Wird geladen …"));
-    tick(() => void load());
-    onPulse(guildId, ["staff"], () => void load());
+    // Die Zähler laufen über den Takt der Verwalter-Leiste (GuildStaff.tick), die immer vor dieser Seite startet.
+    onPulse(guildId, ["staff"], debounce(() => void load(), 500));
+    window.addEventListener("guild:shown", (event) => {
+        if ((event as CustomEvent<string>).detail !== "protokoll" || !stale) return;
+
+        stale = false;
+        void load();
+    });
     void load();
 }

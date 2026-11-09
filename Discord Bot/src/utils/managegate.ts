@@ -47,14 +47,14 @@ export function StaffActor(session: IDashboardSession): IActor {
  * die Register des Panels), und Lesen zählt einmal je Bereich als „angesehen“.
  * Vor dem Handler aufrufen und abwarten: Der erste Stand muss vor der Änderung liegen.
  */
-export async function StaffWrite(client: BotClient, request: FastifyRequest, reply: FastifyReply, guildId: string, area: string, module: string | null = null): Promise<void> {
+export async function StaffWrite(client: BotClient, request: FastifyRequest, reply: FastifyReply, guildId: string, area: string, module: string | null = null, view = true): Promise<void> {
     const session = SessionOf(client, request);
     const grant = session ? client.staffGrantService.Active(session.userId, guildId) : null;
 
     if (!grant) return;
 
     if (request.method === "GET" || request.method === "HEAD") {
-        client.staffGrantService.Viewed(grant, area);
+        if (view) client.staffGrantService.Viewed(grant, area);
 
         return;
     }
@@ -167,7 +167,8 @@ export async function MemberOrStandIn(
  * heißt: die Antwort ist schon raus. module null: ohne „Modul an“ - die Route
  * entscheidet selbst, was bei ausgeschaltetem Modul noch geht (Anti Villain).
  */
-export async function ManageGate(client: BotClient, request: FastifyRequest, reply: FastifyReply, module: string | null): Promise<IManageAccess | null> {
+/** view: false für Abfragen, die das Dashboard im Hintergrund stellt - sie sind kein „angesehen“ (W-0049). */
+export async function ManageGate(client: BotClient, request: FastifyRequest, reply: FastifyReply, module: string | null, options: { view?: boolean } = {}): Promise<IManageAccess | null> {
     const service = client.dashboardService;
     const session = SessionOf(client, request);
 
@@ -223,7 +224,7 @@ export async function ManageGate(client: BotClient, request: FastifyRequest, rep
 
     if (!stand) return null;
 
-    if (stand.grant) await StaffWrite(client, request, reply, guild.id, ModuleLabel(module), module ?? ANTI_VILLAIN_MODULE);
+    if (stand.grant) await StaffWrite(client, request, reply, guild.id, ModuleLabel(module), module ?? ANTI_VILLAIN_MODULE, options.view ?? true);
 
     return { guild, member: stand.member, actor: stand.actor };
 }
