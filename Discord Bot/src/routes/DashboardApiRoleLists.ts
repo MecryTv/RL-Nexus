@@ -101,7 +101,8 @@ export default class DashboardApiRoleLists extends Route {
 
         if (writing && !WantsJSON(request)) return reply.code(415).send({ error: "Nur application/json" });
 
-        const access = await ManageGate(this.client, request, reply, ROLE_LISTS_MODULE);
+        // ?nur=namen holt die Leiste im Hintergrund - für Staff kein „angesehen“ (W-0049).
+        const access = await ManageGate(this.client, request, reply, ROLE_LISTS_MODULE, { view: (request.query as { nur?: unknown } | undefined)?.nur !== "namen" });
 
         if (!access) return reply;
 

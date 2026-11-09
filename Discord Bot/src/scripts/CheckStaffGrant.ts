@@ -12,6 +12,9 @@ import { IStaffCardInput, StaffGrantCard } from "../builder/StaffGrantView";
 import StaffGrantDm from "../services/staffgrant/StaffGrantDm";
 import DashboardApiStaff from "../routes/DashboardApiStaff";
 import DashboardApiMeStaff from "../routes/DashboardApiMeStaff";
+import DashboardApiStaffProtocol from "../routes/DashboardApiStaffProtocol";
+import DashboardApiStaffStayed from "../routes/DashboardApiStaffStayed";
+import { IProtocolGrant } from "../services/staffgrant/Protocol";
 import fastify, { FastifyReply, FastifyRequest } from "fastify";
 import RouteManager from "../handler/RouteManager";
 import Route from "../structures/Route";
@@ -29,6 +32,9 @@ import { IStaffGrant, IStaffLogEntry } from "../interfaces/services/staffgrant/I
 import PulseService from "../services/PulseService";
 import StaffGrantService, { StaffGrantBlocked } from "../services/StaffGrantService";
 import { ActionText, AskList, ParseDuration } from "../services/staffgrant/Rules";
+import { DiffSnapshots, SettingsSnapshot, Snapshot } from "../services/staffgrant/Changes";
+import { ProtocolGrant } from "../services/staffgrant/Protocol";
+import { DefaultLevelSettings } from "../constants/Levels";
 import { Answer, AnswerPrivate, AskPrivate, CanRequest, End, Extend, RemovePrivate, StaffGrantError, Tick, Withdraw } from "../services/staffgrant/Machine";
 
 let failures = 0;
@@ -164,12 +170,12 @@ function checkExtendEnd(): void {
 
     let grant = Running();
 
-    for (let i = 0; i < 3; i++) grant = Extend(grant, T0 + MIN);
+    for (let i = 0; i < 3; i++) grant = Extend(grant, "1", T0 + MIN);
 
     check("Dreimal +30 Min.", grant.endsAt === T0 + 150 * MIN);
-    check("Bis an 24 Stunden heran", Extend(Running({ endsAt: T0 + 1430 * MIN }), T0).endsAt === T0 + 1440 * MIN);
-    check("Über 24 Stunden: abgewiesen", fails(() => Extend(Running({ endsAt: T0 + 1440 * MIN }), T0)) === "Mehr als 24 Stunden geht nicht.");
-    check("Offene Anfrage verlängern: abgewiesen", fails(() => Extend(Grant(), T0)) !== null);
+    check("Bis an 24 Stunden heran", Extend(Running({ endsAt: T0 + 1430 * MIN }), "1", T0).endsAt === T0 + 1440 * MIN);
+    check("Über 24 Stunden: abgewiesen", fails(() => Extend(Running({ endsAt: T0 + 1440 * MIN }), "1", T0)) === "Mehr als 24 Stunden geht nicht.");
+    check("Offene Anfrage verlängern: abgewiesen", fails(() => Extend(Grant(), "1", T0)) !== null);
 
     const end = End(Running(), "1", T0 + 5 * MIN);
     check("Beenden", end.status === "ended" && end.endedBy === "1" && end.endedAt === T0 + 5 * MIN);
@@ -201,8 +207,142 @@ function checkPrivate(): void {
     check("Nein von allen: abgelehnt", denied.private === "denied" && denied.privateDeniedAt === T0 + 3 * MIN);
     check("Nicht gefragt: abgewiesen", fails(() => AnswerPrivate(asked, "3", true, T0)) === "Diese Anfrage ist nicht an dich.");
 
-    check("Wegnehmen", RemovePrivate(on, "1").private === "removed");
-    check("Wegnehmen ohne offene: abgewiesen", fails(() => RemovePrivate(Running(), "1")) !== null);
+    check("Wegnehmen", RemovePrivate(on, "1", T0).private === "removed");
+    check("Wegnehmen ohne offene: abgewiesen", fails(() => RemovePrivate(Running(), "1", T0)) !== null);
+}
+
+/** W-0049: eine Freigabe, wie die Seite Protokoll sie bekommt - neue mit allen Angaben, alte mit dem, was im Protokoll steht. */
+function checkProtocolView(): void {
+    console.log("\n📜 Protokoll-Ansicht (W-0049)\n");
+
+    const names: Record<string, string> = { "1": "Lukas", "2": "Mia", "900": "Joe" };
+    const name = (id: string): string => names[id] ?? id;
+    const entry = (at: number, kind: IStaffLogEntry["kind"], area: string, text: string): IStaffLogEntry => ({ id: at, grantId: 1, guildId: "100", at, area, text, kind, changes: [], seconds: null });
+
+    const fresh = Running({
+        requestedMinutes: 60,
+        minutes: 40,
+        denied: ["2"],
+        extensions: [{ at: T0 + 10 * MIN, by: "1", minutes: 30 }],
+        private: "removed",
+        privateBy: "2",
+        privateAt: T0 + 20 * MIN,
+        privateRemovedBy: "1",
+        privateRemovedAt: T0 + 30 * MIN,
+    });
+    const view = ProtocolGrant(fresh, [entry(T0 + 5 * MIN, "change", "Tickets", "Tickets › gespeichert"), entry(T0 + 6 * MIN, "view", "Tickets", "Tickets angesehen")], name, () => null);
+
+    check("Angefragte und erteilte Dauer", view.requestedMinutes === 60 && view.minutes === 40);
+    check("Gefragt und Nein mit Namen", view.asked.map((person) => person.name).join(",") === "Lukas,Mia" && view.denied.map((person) => person.name).join(",") === "Mia");
+    check("Antwort von", view.answeredBy?.name === "Lukas" && view.answeredBy.id === "1");
+    check("Verlängerung mit Person", JSON.stringify(view.extensions) === JSON.stringify([{ at: T0 + 10 * MIN, by: { id: "1", name: "Lukas" }, minutes: 30 }]), JSON.stringify(view.extensions));
+    check(
+        "Private: erlaubt von Mia, weggenommen von Lukas",
+        view.private.by?.name === "Mia" && view.private.at === T0 + 20 * MIN && view.private.removedBy?.name === "Lukas" && view.private.removedAt === T0 + 30 * MIN,
+        JSON.stringify(view.private)
+    );
+    check("Einträge neueste zuerst", view.log.map((item) => item.kind).join(",") === "view,change");
+
+    const oldLog = [
+        entry(T0, "grant", "Freigabe", "Erteilt von Lukas für 1 Std."),
+        entry(T0 + 15 * MIN, "grant", "Freigabe", "Verlängert von Mia bis 11:45"),
+        entry(T0 + 18 * MIN, "grant", "Freigabe", "Private Bereiche angefragt"),
+        entry(T0 + 20 * MIN, "grant", "Freigabe", "Private Bereiche erlaubt von Mia"),
+        entry(T0 + 25 * MIN, "grant", "Freigabe", "Private Bereiche weggenommen von Lukas"),
+    ];
+    // Vor W-0049 hat Wegnehmen privateBy überschrieben.
+    const back = ProtocolGrant(Running({ private: "removed", privateBy: "1" }), oldLog, name, () => null);
+
+    check(
+        "Alt: Verlängerung aus dem Protokoll",
+        back.extensions.length === 1 && back.extensions[0]!.at === T0 + 15 * MIN && back.extensions[0]!.by?.name === "Mia" && back.extensions[0]!.minutes === 30,
+        JSON.stringify(back.extensions)
+    );
+    check("Alt: Zeitpunkt der privaten Erlaubnis und wer", back.private.at === T0 + 20 * MIN && back.private.by?.name === "Mia", JSON.stringify(back.private));
+    check("Alt: wer weggenommen hat", back.private.removedBy?.name === "Lukas" && back.private.removedAt === T0 + 25 * MIN);
+    check("Alt: angefragte Dauer fehlt", back.requestedMinutes === null);
+
+    const atAnswer = ProtocolGrant(Running({ private: "on", privateBy: "1" }), [entry(T0, "grant", "Freigabe", "Erteilt von Lukas für 1 Std. · mit privaten Bereichen")], name, () => null);
+    check("Alt: privat schon beim Ja erlaubt", atAnswer.private.at === T0 && atAnswer.private.by?.name === "Lukas", JSON.stringify(atAnswer.private));
+}
+
+/** W-0049: vorher/nachher aus zwei Ständen der Register - nur, was sich geändert hat. */
+function checkDiff(): void {
+    console.log("\n↔️  Vorher und nachher (W-0049)\n");
+
+    const shot = (entries: [string, string, string][]): SettingsSnapshot => new Map(entries.map(([key, label, text]) => [key, { label, text }]));
+    const before = shot([
+        ["tickets:role", "Support-Rolle", "@Support"],
+        ["tickets:category", "Kategorie", "Support"],
+        ["tickets:on", "Tickets", "an"],
+    ]);
+    const after = shot([
+        ["tickets:role", "Support-Rolle", "@Team"],
+        ["tickets:category", "Kategorie", "Tickets offen"],
+        ["tickets:on", "Tickets", "an"],
+        ["tickets:new", "Neu", "x"],
+    ]);
+
+    check(
+        "Nur Geändertes, in der Reihenfolge der Felder",
+        JSON.stringify(DiffSnapshots(before, after)) ===
+            JSON.stringify([
+                { label: "Support-Rolle", before: "@Support", after: "@Team" },
+                { label: "Kategorie", before: "Support", after: "Tickets offen" },
+            ]),
+        JSON.stringify(DiffSnapshots(before, after))
+    );
+    check("Nichts geändert: leer", DiffSnapshots(before, before).length === 0);
+}
+
+/** Review W-0049: Texte werden ganz verglichen, nicht nur die 40 Zeichen der Anzeige. */
+async function checkLongText(): Promise<void> {
+    console.log("\n↔️  Lange Texte (W-0049)\n");
+
+    const head = "Willkommen auf dem Server, schön dass du da bist! ";
+    const settings = { text: `${head}Lies die Regeln.` };
+    const panel = {
+        id: "welcome",
+        module: "welcome",
+        sections: [{ title: "", fields: [{ key: "text", label: "Text", hint: "", kind: "text", get: (value: { text: string }) => value.text, set: () => ({}) }] }],
+        load: async () => ({ ...settings }),
+    } as unknown as NonNullable<Parameters<typeof Snapshot>[3]>[number];
+    const guild = { channels: { cache: new Map() }, roles: { cache: new Map() } } as unknown as Guild;
+    const before = await Snapshot({} as BotClient, guild, "welcome", [panel]);
+
+    settings.text = `${head}Lies bitte die Regeln.`;
+
+    const after = await Snapshot({} as BotClient, guild, "welcome", [panel]);
+    const diff = before && after ? DiffSnapshots(before, after) : [];
+
+    check("Änderung hinter Zeichen 40 ergibt vorher/nachher", diff.length === 1, JSON.stringify(diff));
+    check("Der Text steht ganz da (bis 120 Zeichen)", diff[0]?.after === `${head}Lies bitte die Regeln.`, JSON.stringify(diff[0]));
+}
+
+/** W-0049: was das Protokoll zusätzlich braucht - angefragte Dauer, Verlängerungen, Zeitpunkt der privaten Erlaubnis, wer sie weggenommen hat. */
+function checkProtocolFields(): void {
+    console.log("\n🧾 Angaben fürs Protokoll (W-0049)\n");
+
+    const yes = Answer(Grant({ requestedMinutes: 60 }), "1", true, 40, false, T0 + 3 * MIN);
+    check("Ja mit kürzerer Dauer: die angefragte Dauer bleibt", yes.minutes === 40 && yes.requestedMinutes === 60, `${yes.minutes}/${String(yes.requestedMinutes)}`);
+
+    const twice = Extend(Extend(Running(), "1", T0 + 10 * MIN), "2", T0 + 20 * MIN);
+    check(
+        "Verlängern merkt Zeitpunkt, Person und Minuten",
+        JSON.stringify(twice.extensions) === JSON.stringify([{ at: T0 + 10 * MIN, by: "1", minutes: 30 }, { at: T0 + 20 * MIN, by: "2", minutes: 30 }]),
+        JSON.stringify(twice.extensions)
+    );
+    check("An der 24-Stunden-Grenze zählen nur die echten Minuten", Extend(Running({ endsAt: T0 + 1430 * MIN }), "1", T0).extensions?.[0]?.minutes === 10);
+
+    const allowed = Answer(Grant({ private: "asked", privateAskedAt: T0 }), "1", true, 60, true, T0 + 2 * MIN);
+    check("Ja mit privaten Bereichen: Zeitpunkt der Erlaubnis", allowed.privateAt === T0 + 2 * MIN && allowed.privateBy === "1");
+    check("Ja ohne private Bereiche: kein Zeitpunkt", (Answer(Grant({ private: "asked", privateAskedAt: T0 }), "1", true, 60, false, T0 + 2 * MIN).privateAt ?? null) === null);
+
+    const late = AnswerPrivate(AskPrivate(Running(), "Ticket", T0 + MIN), "2", true, T0 + 4 * MIN);
+    check("Spätes Ja: Zeitpunkt der Erlaubnis", late.privateAt === T0 + 4 * MIN && late.privateBy === "2");
+
+    const removed = RemovePrivate(late, "1", T0 + 9 * MIN);
+    check("Wegnehmen überschreibt nicht, wer erlaubt hat", removed.privateBy === "2" && removed.privateRemovedBy === "1" && removed.privateRemovedAt === T0 + 9 * MIN);
 }
 
 function checkCanRequest(): void {
@@ -251,6 +391,11 @@ function FakeStore() {
             },
             Of: async (grantId: number, limit: number) => log.filter((entry) => entry.grantId === grantId).slice(-limit).reverse(),
             OfGuild: async (guildId: string, since: number) => log.filter((entry) => entry.guildId === guildId && entry.at >= since).reverse(),
+            AddSeconds: async (grantId: number, text: string, seconds: number) => {
+                const entry = log.filter((found) => found.grantId === grantId && found.kind === "private" && found.text === text).at(-1);
+
+                if (entry) entry.seconds = (entry.seconds ?? 0) + seconds;
+            },
             Prune: async () => 0,
         },
     };
@@ -352,6 +497,50 @@ async function checkService(): Promise<void> {
     check("Text des Ansehens", seenStore.log.at(-1)?.text === "Live Tickets › Ticket #12 geöffnet" && seenStore.log.at(-1)?.area === "Live Tickets");
 }
 
+/** W-0049: Arten im Protokoll, vorher/nachher, „angesehen“ einmal je Bereich, Dauer im privaten Ticket. */
+async function checkProtocolService(): Promise<void> {
+    console.log("\n🧾 Protokoll-Einträge (W-0049)\n");
+
+    const store = FakeStore();
+    const service = FakeService(store);
+    const open = await service.Request({ ...RequestOf(GUILD), minutes: 60 });
+
+    check("Neue Anfrage merkt die angefragte Dauer", open.requestedMinutes === 60 && JSON.stringify(open.extensions) === "[]");
+
+    const running = await service.Answer(open.id, "1", true, 40, true);
+    await flush();
+
+    check("Freigabe-Einträge haben die Art grant", store.log.length > 0 && store.log.every((entry) => entry.kind === "grant"), store.log.map((entry) => entry.kind).join(","));
+
+    service.Log(running, "Tickets", "Tickets › gespeichert", T0, [{ label: "Support-Rolle", before: "@Support", after: "@Team" }]);
+    await flush();
+
+    const change = store.log.at(-1);
+    check("Änderung: Art change mit vorher/nachher", change?.kind === "change" && JSON.stringify(change.changes) === JSON.stringify([{ label: "Support-Rolle", before: "@Support", after: "@Team" }]), JSON.stringify(change));
+
+    const before = store.log.length;
+
+    service.Viewed(running, "Tickets");
+    service.Viewed(running, "Tickets");
+    service.Viewed(running, "Moderation");
+    await flush();
+
+    const views = store.log.slice(before);
+    check("Angesehen: einmal je Bereich und Freigabe", views.length === 2 && views.every((entry) => entry.kind === "view"), views.map((entry) => entry.text).join(" | "));
+    check("Text des Ansehens", views[0]?.text === "Tickets angesehen" && views[0]?.area === "Tickets");
+
+    service.Seen(running, "Live Tickets", "Ticket #12", T0);
+    await flush();
+    check("Privates Ansehen: Art private", store.log.at(-1)?.kind === "private");
+
+    await service.Stayed(running, "Live Tickets", "Ticket #12", 200);
+    await service.Stayed(running, "Live Tickets", "Ticket #12", 160);
+    check("Dauer im privaten Ticket wird zusammengezählt", store.log.at(-1)?.seconds === 360, String(store.log.at(-1)?.seconds));
+
+    await service.Stayed(running, "Live Tickets", "Ticket #99", 100);
+    check("Ticket ohne geöffnet-Eintrag: nichts geändert", store.log.every((entry) => entry.text !== "Live Tickets › Ticket #99 geöffnet" && entry.seconds !== 100));
+}
+
 function checkPulse(): void {
     console.log("\n📡 Persönlicher Puls\n");
 
@@ -409,10 +598,16 @@ class GateProbe extends Route {
     }
 
     async Handle(request: FastifyRequest, reply: FastifyReply): Promise<unknown> {
-        const access = await ManageGate(this.client, request, reply, "levels");
+        // ?still=1: eine Abfrage im Hintergrund, kein „angesehen“ (Review W-0049).
+        const access = await ManageGate(this.client, request, reply, "levels", { view: (request.query as { still?: string }).still !== "1" });
 
         if (!access) return reply;
-        if (request.method === "POST" && (request.body as { action?: string } | undefined)?.action === "bad") return reply.code(400).send({ error: "nein" });
+
+        const action = (request.body as { action?: string } | undefined)?.action;
+
+        if (request.method === "POST" && action === "bad") return reply.code(400).send({ error: "nein" });
+        // W-0049: eine echte Änderung an den Level-Einstellungen, für vorher/nachher.
+        if (request.method === "POST" && action === "steigung") (await this.client.levelService.Settings(access.guild.id)).base += 50;
 
         return reply.send({ actor: access.actor, member: access.member.id });
     }
@@ -420,8 +615,13 @@ class GateProbe extends Route {
 
 function GateApp(options: { grant: IStaffGrant | null; canManage: boolean; bot?: boolean; member?: boolean; staff?: boolean }) {
     const logged: string[] = [];
+    const viewed: string[] = [];
+    const changed: { label: string; before: string; after: string }[][] = [];
+    const levels = DefaultLevelSettings();
     const guild = {
         id: GATE_GUILD,
+        channels: { cache: new Map() },
+        roles: { cache: new Map() },
         members: {
             cache: new Map(options.member ? [["900", { id: "900", displayName: "Joe als Mitglied" }]] : []),
             fetch: async () => {
@@ -441,9 +641,14 @@ function GateApp(options: { grant: IStaffGrant | null; canManage: boolean; bot?:
         databaseService: { Ready: true },
         guilds: { cache: new Map([[GATE_GUILD, guild]]) },
         settings: { Of: async () => ({ modules: ["levels"] }) },
+        levelService: { Settings: async () => levels },
         staffGrantService: {
             Active: () => options.grant,
-            Log: (_grant: IStaffGrant, _area: string, text: string) => logged.push(text),
+            Log: (_grant: IStaffGrant, _area: string, text: string, _at?: number, changes: { label: string; before: string; after: string }[] = []) => {
+                logged.push(text);
+                changed.push(changes);
+            },
+            Viewed: (_grant: IStaffGrant, area: string) => viewed.push(area),
         },
     } as unknown as BotClient;
     const instance = fastify({ logger: false });
@@ -452,15 +657,15 @@ function GateApp(options: { grant: IStaffGrant | null; canManage: boolean; bot?:
     manager.Register(new GateProbe(client));
     manager.Apply(instance);
 
-    const call = (method: "GET" | "POST", action?: string) =>
+    const call = (method: "GET" | "POST", action?: string, query = "") =>
         instance.inject({
             method,
-            url: `${DASHBOARD_PATH}/api/guild/${GATE_GUILD}/probe`,
+            url: `${DASHBOARD_PATH}/api/guild/${GATE_GUILD}/probe${query}`,
             headers: { cookie: `${SESSION_COOKIE}=gueltig`, ...(method === "POST" ? { "content-type": "application/json" } : {}) },
             ...(method === "POST" ? { payload: JSON.stringify({ action }) } : {}),
         });
 
-    return { call, logged };
+    return { call, logged, viewed, changed, levels };
 }
 
 async function checkGate(): Promise<void> {
@@ -482,6 +687,21 @@ async function checkGate(): Promise<void> {
     check("Speichern schreibt „Level System › gespeichert“", app.logged.length === 1 && app.logged[0] === "Level System › gespeichert", app.logged.join(" | "));
     check("Abgewiesen (400): kein Eintrag", (await app.call("POST", "bad")).statusCode === 400 && (await flush(), app.logged.length === 1));
     check("Lesen: kein Eintrag", (await app.call("GET")).statusCode === 200 && (await flush(), app.logged.length === 1));
+    check("Lesen: als angesehen gemeldet (W-0049)", app.viewed.length > 0 && app.viewed.every((area) => area === "Level System"), app.viewed.join(","));
+
+    const quiet = GateApp({ grant: running, canManage: true });
+    check("Abfrage im Hintergrund (view: false): kein angesehen", (await quiet.call("GET", undefined, "?still=1")).statusCode === 200 && quiet.viewed.length === 0, quiet.viewed.join(","));
+
+    const base = app.levels.base;
+
+    check("Einstellung geändert: 200", (await app.call("POST", "steigung")).statusCode === 200);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    check(
+        "Einstellung geändert: vorher → nachher aus dem Register (W-0049)",
+        JSON.stringify(app.changed.at(-1)) === JSON.stringify([{ label: "Steigung", before: String(base), after: String(base + 50) }]),
+        JSON.stringify(app.changed.at(-1))
+    );
+    check("Speichern ohne Änderung: kein vorher/nachher", JSON.stringify(app.changed[0]) === "[]", JSON.stringify(app.changed[0]));
 
     app = GateApp({ grant: running, canManage: true, member: true });
     const both = (await app.call("GET")).json() as { actor: { staff: boolean }; member: string };
@@ -654,13 +874,14 @@ function checkCard(): void {
     check("Eigene Zeit gemerkt: steht als Wahl da", custom.defaults.includes("custom") && custom.labels.includes("Eigene Zeit: 1 Std. 30 Min.") && custom.defaults.includes("yes"), custom.labels.join(","));
 
     const log: IStaffLogEntry[] = [
-        { id: 1, grantId: 1, guildId: "100", at: T0, area: "Freigabe", text: "Erteilt von Lukas für 1 Std." },
-        { id: 2, grantId: 1, guildId: "100", at: T0, area: "Level System", text: "Level System › gespeichert" },
+        { id: 1, grantId: 1, guildId: "100", at: T0, area: "Freigabe", text: "Erteilt von Lukas für 1 Std.", kind: "grant", changes: [], seconds: null },
+        { id: 2, grantId: 1, guildId: "100", at: T0, area: "Level System", text: "Level System › gespeichert", kind: "change", changes: [], seconds: null },
+        { id: 3, grantId: 1, guildId: "100", at: T0, area: "Tickets", text: "Tickets angesehen", kind: "view", changes: [], seconds: null },
     ];
     const active = Parts({ grant: Running(), log });
     check("Erlaubt: grün", active.accents[0] === 0x35e07f);
     check("Erlaubt: Titel und bis wann", has(active, "✅ Freigabe läuft") && has(active, "<@900> darf Nova Esports bis <t:"));
-    check("Erlaubt: Bisher geändert ohne Freigabe-Einträge", has(active, "Level System › gespeichert") && !has(active, "Erteilt von"));
+    check("Erlaubt: Bisher geändert ohne Freigabe-Einträge und ohne Angesehen", has(active, "Level System › gespeichert") && !has(active, "Erteilt von") && !has(active, "Tickets angesehen"));
     check("Erlaubt: Knöpfe", ["sg:end:1", "sg:more:1"].every((id) => active.ids.includes(id)));
     check("Erlaubt ohne Änderungen: Noch nichts.", has(Parts({ grant: Running() }), "Noch nichts."));
     check("Erlaubt mit privaten Bereichen: Satz", has(Parts({ grant: Running({ private: "on" }) }), "Dazu die privaten Bereiche."));
@@ -796,6 +1017,7 @@ function ApiApp() {
             },
             GroupOf: async () => "developer",
             ShopEnds: async () => null,
+            IsStaff: async (userId: string) => userId === "900" || userId === "901",
             Secure: false,
         },
     } as unknown as BotClient;
@@ -804,6 +1026,8 @@ function ApiApp() {
 
     manager.Register(new DashboardApiStaff(client));
     manager.Register(new DashboardApiMeStaff(client));
+    manager.Register(new DashboardApiStaffProtocol(client));
+    manager.Register(new DashboardApiStaffStayed(client));
     manager.Apply(instance);
 
     const send = (who: string, method: "GET" | "POST", url: string, payload?: unknown) =>
@@ -815,8 +1039,43 @@ function ApiApp() {
         });
     const guildApi = (who: string, method: "GET" | "POST", payload?: unknown) => send(who, method, `/api/guild/${API_GUILD}/staff`, payload);
     const meApi = (who: string, method: "GET" | "POST", payload?: unknown) => send(who, method, "/api/me/staff", payload);
+    const protocolApi = (who: string) => send(who, "GET", `/api/guild/${API_GUILD}/staff/protokoll`);
+    const stayedApi = (who: string, payload: unknown) => send(who, "POST", `/api/guild/${API_GUILD}/staff/stayed`, payload);
 
-    return { guildApi, meApi, service };
+    return { guildApi, meApi, protocolApi, stayedApi, service };
+}
+
+/** W-0049: die Seite Protokoll (nur wer verwaltet) und die Dauer im privaten Ticket (nur Staff mit privatem Ja). */
+async function checkProtocolApi(): Promise<void> {
+    console.log("\n📜 Routen Protokoll (W-0049)\n");
+
+    const { guildApi, meApi, protocolApi, stayedApi, service } = ApiApp();
+
+    await guildApi("staff", "POST", { action: "request", reason: "Panel prüfen", minutes: 60, private: true });
+
+    const id = service.Current(API_GUILD)!.id;
+    const yes = await meApi("owner", "POST", { grantId: id, kind: "grant", answer: "yes", minutes: 40, private: true });
+    check("Vorbereitung: erlaubt mit privaten Bereichen", yes.statusCode === 200 && service.Get(id)?.private === "on", yes.body);
+
+    const read = await protocolApi("owner");
+    const body = read.json() as { grants?: IProtocolGrant[]; keepDays?: number };
+    const first = body.grants?.[0];
+    check("Verwalter: 200 mit der Freigabe und 180 Tagen", read.statusCode === 200 && first?.id === id && body.keepDays === 180, read.body.slice(0, 300));
+    check("Angefragt 1 Std., erteilt 40 Min., Antwort vom Owner", first?.requestedMinutes === 60 && first.minutes === 40 && first.answeredBy?.id === "1", JSON.stringify(first).slice(0, 300));
+    check("Staff: 403", (await protocolApi("staff")).statusCode === 403);
+    check("Fremder: 403", (await protocolApi("other")).statusCode === 403);
+
+    service.Seen(service.Get(id)!, "Live Tickets", "Ticket #12");
+    await flush();
+
+    const seconds = async (): Promise<number | null | undefined> =>
+        ((await protocolApi("owner")).json() as { grants: IProtocolGrant[] }).grants[0]?.log.find((entry) => entry.kind === "private")?.seconds;
+
+    check("Dauer melden: 204", (await stayedApi("staff", { ticket: "12", seconds: 125 })).statusCode === 204);
+    check("Die Dauer steht am Eintrag", (await seconds()) === 125, String(await seconds()));
+    check("Unsinnige Dauer: 400", (await stayedApi("staff", { ticket: "12", seconds: -5 })).statusCode === 400);
+    check("Ticket mit Leerzeichen: 400", (await stayedApi("staff", { ticket: "1 2", seconds: 5 })).statusCode === 400);
+    check("Ohne Freigabe: 204 ohne Wirkung", (await stayedApi("owner", { ticket: "12", seconds: 10 })).statusCode === 204 && (await seconds()) === 125);
 }
 
 async function checkApi(): Promise<void> {
@@ -1021,7 +1280,7 @@ function ModApp(grant: IStaffGrant | null) {
         guilds: { cache: new Map([[GATE_GUILD, guild]]) },
         settings: { Of: async () => ({ modules: ["moderation"] }) },
         moderationService: { CanManage: () => true },
-        staffGrantService: { Active: () => grant, Seen: () => undefined, Log: () => undefined },
+        staffGrantService: { Active: () => grant, Seen: () => undefined, Log: () => undefined, Viewed: () => undefined },
     } as unknown as BotClient;
     const instance = fastify({ logger: false });
     const manager = new RouteManager(client);
@@ -1060,14 +1319,20 @@ async function main(): Promise<void> {
     checkExtendEnd();
     checkPrivate();
     checkCanRequest();
+    checkProtocolFields();
+    checkDiff();
+    await checkLongText();
+    checkProtocolView();
     checkPulse();
     await checkService();
+    await checkProtocolService();
     checkOverlay();
     await checkGate();
     await checkPrivateGate();
     checkCard();
     await checkDmButtons();
     await checkApi();
+    await checkProtocolApi();
     checkJoined();
     await checkReviewFixes();
     await checkModerationSplit();

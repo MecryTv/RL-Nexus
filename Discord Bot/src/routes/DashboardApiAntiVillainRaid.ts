@@ -23,7 +23,8 @@ export default class DashboardApiAntiVillainRaid extends Route {
 
     async Handle(request: FastifyRequest, reply: FastifyReply): Promise<unknown> {
         // Ohne „Modul an“: Die Zahl der Festgehaltenen braucht das Dashboard auch, wenn es aus ist.
-        const access = await ManageGate(this.client, request, reply, null);
+        // Fragt jede Seite im Hintergrund ab - für Staff kein „angesehen“ (W-0049).
+        const access = await ManageGate(this.client, request, reply, null, { view: false });
 
         if (!access) return reply;
 

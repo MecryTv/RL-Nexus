@@ -84,7 +84,7 @@ export default class DashboardApiGalleryEdit extends Route {
             }
 
             // W-0011: Staff mit Freigabe - erfolgreiche Änderungen ins Protokoll.
-            StaffWrite(this.client, request, reply, id, "Galerie");
+            await StaffWrite(this.client, request, reply, id, "Galerie");
         } catch (error) {
             if (!(error instanceof SessionExpired)) throw error;
 

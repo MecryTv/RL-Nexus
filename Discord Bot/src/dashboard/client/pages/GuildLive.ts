@@ -216,7 +216,7 @@ function chime(): void {
     window.setTimeout(() => tone(1175, 0.18, 0.04, "sine"), 120);
 }
 
-export function renderLive(guildId: string, user: ILiveUser): void {
+export function renderLive(guildId: string, user: ILiveUser, staff = false): void {
     const section = need<HTMLElement>("#live-tickets");
     const host = need<HTMLElement>("#ltBody");
     const note = need<HTMLElement>("#ltNote");
@@ -228,6 +228,8 @@ export function renderLive(guildId: string, user: ILiveUser): void {
     const previews = new Map<number, string>();
     const drafts = new Map<number, string>();
     let current: number | null = null;
+    // W-0049: Seit wann Staff das offene Ticket sieht. Beim Verlassen geht die Dauer ans Protokoll.
+    let since: number | null = null;
     // Das Ticket, das gerade offen war, als es geschlossen wurde - für den Hinweis im Chat.
     let ended: ILiveTicket | null = null;
     let filter: Filter = "all";
@@ -1081,10 +1083,32 @@ export function renderLive(guildId: string, user: ILiveUser): void {
         scrollToBottom();
     }
 
+    /** W-0049: Staff mit Freigabe - wie lange das Ticket offen war. Der Bot zählt es nur mit privatem Ja. */
+    function stayed(): void {
+        if (!staff || current === null || since === null) return;
+
+        const seconds = Math.round((Date.now() - since) / 1000);
+
+        since = null;
+
+        if (seconds >= 1) {
+            navigator.sendBeacon(
+                `${BASE}/api/guild/${encodeURIComponent(guildId)}/staff/stayed`,
+                new Blob([JSON.stringify({ ticket: String(current), seconds })], { type: "application/json" })
+            );
+        }
+    }
+
+    function watching(): void {
+        if (staff && current !== null && !document.hidden && !section.hidden) since = Date.now();
+    }
+
     async function select(id: number): Promise<void> {
         if (current !== null) drafts.set(current, input.value);
 
+        stayed();
         current = id;
+        watching();
         ended = null;
         panel = null;
         files = [];
@@ -1308,6 +1332,7 @@ export function renderLive(guildId: string, user: ILiveUser): void {
     function onTicket(ticket: ILiveTicket & { closed?: boolean }): void {
         if (ticket.closed) {
             if (current === ticket.id) {
+                stayed();
                 ended = tickets.get(ticket.id) ?? null;
                 current = null;
                 panel = null;
@@ -1436,6 +1461,11 @@ export function renderLive(guildId: string, user: ILiveUser): void {
         // Die Zeiten in der Liste ("vor 3 Min.") altern mit.
         window.setInterval(paintList, 60_000);
     }
+
+    // W-0049: Tab im Hintergrund, andere Seite oder Fenster zu - die Zeit im Ticket endet.
+    document.addEventListener("visibilitychange", () => (document.hidden ? stayed() : watching()));
+    window.addEventListener("pagehide", stayed);
+    window.addEventListener("guild:shown", (event) => ((event as CustomEvent<string>).detail === "live-tickets" ? watching() : stayed()));
 
     document.addEventListener("visibilitychange", () => {
         if (document.hidden || current === null || !unread.has(current)) return;

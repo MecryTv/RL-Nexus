@@ -140,7 +140,7 @@ function Ask(input: IStaffCardInput): ContainerBuilder[] {
 
 function Active(input: IStaffCardInput): ContainerBuilder[] {
     const { grant } = input;
-    const changes = input.log.filter((entry) => entry.area !== "Freigabe").slice(0, 3);
+    const changes = input.log.filter((entry) => entry.kind !== "grant" && entry.kind !== "view").slice(0, 3);
     const containers = [
         Container(
             GREEN,
@@ -173,7 +173,7 @@ function End(input: IStaffCardInput, title: string, body: string, sub: string | 
 
 export function StaffGrantCard(input: IStaffCardInput): { components: ContainerBuilder[]; flags: MessageFlags.IsComponentsV2; allowedMentions: { parse: [] } } {
     const { grant } = input;
-    const changes = input.log.filter((entry) => entry.area !== "Freigabe").length;
+    const changes = input.log.filter((entry) => entry.kind !== "grant" && entry.kind !== "view").length;
     let components: ContainerBuilder[];
 
     switch (grant.status) {

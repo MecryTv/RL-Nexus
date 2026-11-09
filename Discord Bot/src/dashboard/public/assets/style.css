@@ -5445,3 +5445,89 @@ body.sg-locked{overflow:hidden}
   .stage .empty.invfail{padding:28px 18px 22px}
   .invfail__steps li{font-size:10.5px;letter-spacing:.06em}
 }
+
+/* W-0049: Protokoll der Staff-Freigaben (Entwurf A+, w0049-protokoll-a2.html). GuildProtocol.ts. */
+.sgrecent__all{display:inline-block;margin-top:10px;font-size:13px;color:var(--blue);text-decoration:none}
+.sgrecent__all:hover{text-decoration:underline}
+.prtiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:4px 0 14px}
+.prtile{padding:9px 11px;border:1px solid var(--line);background:var(--glass);min-width:0}
+.prtile__k,.prfact__k{font-family:var(--f-label);font-weight:700;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--text-3)}
+.prtile__v{font-family:var(--f-display);font-weight:800;font-size:20px;color:var(--text)}
+.prtile__s{font-size:12px;color:var(--text-3)}
+.prfilters{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-bottom:12px}
+.prchip{font-family:var(--f-label);font-weight:700;font-size:12px;letter-spacing:.08em;text-transform:uppercase;padding:5px 10px;border:1px solid var(--line-strong);background:transparent;color:var(--text-2);cursor:pointer}
+.prchip:hover{color:var(--text)}
+.prchip.is-on{border-color:var(--brand);color:#fff;background:color-mix(in srgb,var(--brand) 14%,transparent)}
+.prchip:focus-visible,.prtab:focus-visible,.prmore:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+.prpick{width:auto;min-width:0;max-width:180px}
+.prsearch{flex:1 1 200px;min-width:0;padding:6px 10px;border:1px solid var(--line-strong);background:rgba(0,0,0,.3);color:var(--text);font:inherit;font-size:13px}
+.prsearch:focus{outline:2px solid var(--blue);outline-offset:1px}
+.prcard{margin-bottom:10px;border:1px solid var(--line);background:var(--panel-fill)}
+.prcard.is-live{box-shadow:inset 3px 0 0 var(--live)}
+.prcard__top{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;padding:11px 12px}
+.prcard__face{width:34px;height:34px;font-size:13px}
+.prcard__who{flex:1 1 220px;min-width:0}
+.prcard__who b{font-size:14px}
+.prcard__who small{display:block;font-size:12.5px;color:var(--text-3);overflow-wrap:anywhere}
+.prcard__id{margin-left:6px;font-size:11px;color:var(--text-3)}
+.prpill{gap:5px}
+.prpill--ok{border-color:color-mix(in srgb,var(--live) 50%,transparent);color:var(--live)}
+.prpill--wait{border-color:color-mix(in srgb,var(--warn) 45%,transparent);color:var(--warn)}
+.prpill--end{color:var(--text-3)}
+.prpill--no{border-color:color-mix(in srgb,var(--brand) 50%,transparent);color:#ff8a93}
+.prpill--priv{border-color:color-mix(in srgb,var(--warn) 45%,transparent);color:var(--warn)}
+.prsum{padding:0 12px 11px 56px;font-size:12.5px;color:var(--text-3)}
+.prsum b{color:var(--text-2)}
+.prmore{padding:0;border:0;background:none;color:var(--blue);font:inherit;font-size:12.5px;cursor:pointer}
+.prfacts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;padding:0 12px 10px}
+.prfact{padding:7px 9px;border:1px solid var(--line);background:var(--glass);font-size:12.5px;min-width:0}
+.prfact__k{display:block}
+.prfact b{font-size:13px;overflow-wrap:anywhere}
+.prfact small{display:block;font-size:11.5px;color:var(--text-3);overflow-wrap:anywhere}
+.prfaces{display:inline-flex;gap:3px;vertical-align:middle;margin-left:6px}
+.prfaces i{width:18px;height:18px;border-radius:50%;display:inline-grid;place-items:center;background:linear-gradient(135deg,var(--blue),var(--live));font:800 9px var(--f-display);font-style:normal;color:#fff}
+.prfaces i.is-no{background:#5a2a30;outline:1px solid color-mix(in srgb,var(--brand) 60%,transparent)}
+.prlife{position:relative;height:42px;margin:2px 22px 12px 12px}
+.prlife i{position:absolute;display:block}
+.prlife__track{left:0;right:0;top:14px;height:4px;background:var(--line)}
+.prlife__run{top:14px;height:4px;background:var(--live)}
+.prlife__pv{top:19px;height:3px;background:var(--warn)}
+.prlife__mk{top:8px;width:2px;height:16px;margin-left:-1px;background:var(--text-2)}
+.prlife__mk--warn{background:var(--warn)}
+.prlife__now{top:4px;width:2px;height:24px;margin-left:-1px;background:#fff}
+.prlife__lb{position:absolute;top:26px;font-size:10.5px;color:var(--text-3);white-space:nowrap;transform:translateX(-50%)}
+.prlife__lb:first-of-type{transform:none}
+.prlife__lb--end{right:0;transform:none}
+.prlife__lb--now{color:#fff}
+.prareas{display:flex;flex-wrap:wrap;gap:6px;padding:0 12px 10px}
+.prareas span{padding:2px 8px;border:1px solid var(--line-strong);font-size:12px;color:var(--text-2)}
+.prareas b{margin-left:4px;color:var(--text)}
+.prtabs{display:flex;flex-wrap:wrap;gap:4px;padding:8px 12px 0;border-top:1px solid var(--line)}
+.prtab{padding:3px 8px;border:1px solid transparent;background:none;font-family:var(--f-label);font-weight:700;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-3);cursor:pointer}
+.prtab.is-on{color:var(--text);border-color:var(--line-strong);background:var(--glass)}
+.prlog{padding:6px 12px 10px}
+.prlog__e{display:grid;grid-template-columns:76px 22px 120px minmax(0,1fr);gap:6px;align-items:start;padding:5px 0;border-bottom:1px solid var(--line);font-size:13px}
+.prlog__e:last-child{border-bottom:0}
+.prlog__e time{color:var(--text-3);font-variant-numeric:tabular-nums}
+.prlog__t{text-align:center}
+.prlog__a{font-family:var(--f-label);font-weight:700;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-3);overflow-wrap:anywhere}
+.prlog__w{color:var(--text-2);overflow-wrap:anywhere}
+.prlog__w small{display:block;font-size:11.5px;color:var(--text-3)}
+.prlog__none{margin:0;padding:8px 12px 12px;font-size:13px;color:var(--text-3)}
+.prdiff{margin-top:3px;font-family:Consolas,monospace;font-size:12px}
+.prdiff__k{color:var(--text-3)}
+.prdiff__o{color:#ff8a93}
+.prdiff__n{color:var(--live)}
+.prcard__foot{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px;padding:0 12px 12px}
+.prcard__foot .btn{flex:none;width:auto}
+.prempty,.prnote{margin:8px 0;font-size:13px;color:var(--text-3)}
+@media (max-width:900px){.prtiles{grid-template-columns:repeat(2,minmax(0,1fr))}.prfacts{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:560px){
+  .prfacts{grid-template-columns:1fr}
+  .prsum{padding-left:12px}
+  .prlog__e{grid-template-columns:44px 22px minmax(0,1fr)}
+  .prlog__a{grid-column:3}
+  .prlog__w{grid-column:3}
+  .prpick{flex:1 1 140px;max-width:none}
+  .prlife__lb:not(:first-of-type):not(.prlife__lb--end){display:none}
+}

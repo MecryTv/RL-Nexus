@@ -224,6 +224,8 @@ export function renderGuild(data: IPayload): void {
         whenShown(["tickets"], () => void import("./GuildTickets.js").then((module) => module.renderTickets(guild.id, guild.canManage, user)));
 
         if (guild.canManage) whenShown(["team"], () => void import("./GuildTeam.js").then((module) => module.renderTeam(guild.id)));
+        // W-0049: Protokoll der Staff-Freigaben für alle, die verwalten - Staff selbst nie.
+        if (guild.canManage && !staffView) whenShown(["protokoll"], () => void import("./GuildProtocol.js").then((module) => module.renderProtocol(guild.id, user.id)));
 
         // RL 6Mans: Einstellungen und die Live-Ansicht.
         whenShown(["rl-6mans"], () => void import("./GuildSixMans.js").then((module) => module.renderSixMans(guild.id)));
@@ -280,7 +282,7 @@ export function renderGuild(data: IPayload): void {
         if (guild.canManage) whenShown(["apply"], () => void import("./GuildApply.js").then((module) => module.renderApply(guild.id)));
         if (guild.canManage || guild.canReview) whenShown(["applications"], () => void import("./GuildApply.js").then((module) => module.renderApplications(guild.id)));
         // Live Tickets meldet fertige Transcripts - der Stream läuft auch, wenn nur Transcriptions offen ist.
-        whenShown(["live-tickets", "transcriptions"], () => void import("./GuildLive.js").then((module) => module.renderLive(guild.id, user)));
+        whenShown(["live-tickets", "transcriptions"], () => void import("./GuildLive.js").then((module) => module.renderLive(guild.id, user, staffView)));
     }
 
     // Moderation: Staff mit Freigabe sieht Einstellungen und Aktionen, die Fälle nur mit dem extra Ja (die Route sperrt sie).
@@ -619,6 +621,8 @@ function bindModules(guild: IGuild, only: Set<string> | null, side: INav): (modu
 
     // Die Moderatoren stellt nur ein, wer den Server verwalten darf.
     rail.querySelector<HTMLElement>('a[data-section="team"]')!.hidden = !guild.canManage || only !== null;
+    // W-0049: das Protokoll der Staff-Freigaben - nicht für Staff selbst.
+    rail.querySelector<HTMLElement>('a[data-section="protokoll"]')!.hidden = !guild.canManage || only !== null || guild.role === "Staff";
 
     function paint(): void {
         for (const [id, entry] of entries) {
