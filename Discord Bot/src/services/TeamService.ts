@@ -560,25 +560,46 @@ interface ISameSource {
     attachments: ReadonlyMap<string, { id: string; name: string; url: string }>;
 }
 
+/** Ein Anhang in Discords CDN: /attachments/<Kanal>/<Anhang>/<Datei>. */
+const ATTACHMENT_PATH = /^\/attachments\/\d+\/(\d+)\/([^/]+)$/;
+const DISCORD_CDN = new Set(["cdn.discordapp.com", "media.discordapp.net"]);
+
 /**
  * Die Hub-Nachricht unverändert zum erneuten Setzen (W-0035). Erst dann setzt
  * Discord das Menü zurück - ein deferUpdate allein lässt die letzte Wahl stehen,
  * und dasselbe Team lässt sich nicht noch einmal wählen. Bilder zeigen dabei auf
  * ihre Anhänge (attachment://), nicht auf deren Links: die laufen nach einem Tag ab.
+ *
+ * W-0075: Bei einer Menüwahl schickt Discord die Nachricht ohne Anhangliste mit.
+ * Dann sagt der Link selbst, welcher Anhang es ist. Fehlte er in attachments,
+ * löschte Discord ihn beim Setzen, und das Bild wäre weg.
+ * ponytail: ein Discord-Anhang aus einer anderen Nachricht als Bild-Link gilt als eigener;
+ * Discord lehnt das Setzen dann ab, das Menü bleibt stehen, das Bild auch.
  */
-export function SameMessage<T extends ISameSource>(message: T): { components: unknown[]; attachments: T["attachments"] extends ReadonlyMap<string, infer A> ? A[] : never } {
-    const files = [...message.attachments.values()];
-    const path = (url: string): string | null => {
+export function SameMessage(message: ISameSource): { components: unknown[]; attachments: { id: string; filename: string }[] } {
+    const files: { id: string; name: string; url?: string }[] = [...message.attachments.values()];
+    const parse = (url: unknown): URL | null => {
         try {
-            return new URL(url).pathname;
+            return typeof url === "string" ? new URL(url) : null;
         } catch {
             return null;
         }
     };
     const own = (media: { url?: unknown; attachment_id?: unknown }): string | null => {
-        const file = files.find((entry) => entry.id === media.attachment_id || (typeof media.url === "string" && path(entry.url) === path(media.url)));
+        const url = parse(media.url);
+        const file = files.find((entry) => entry.id === media.attachment_id || (url !== null && parse(entry.url)?.pathname === url.pathname));
 
-        return file ? `attachment://${file.name}` : null;
+        if (file) return `attachment://${file.name}`;
+
+        const match = url && DISCORD_CDN.has(url.hostname) ? ATTACHMENT_PATH.exec(url.pathname) : null;
+
+        if (!match) return null;
+
+        const found = { id: match[1]!, name: decodeURIComponent(match[2]!), url: url!.href };
+
+        files.push(found);
+
+        return `attachment://${found.name}`;
     };
     const fix = (node: unknown): unknown => {
         if (Array.isArray(node)) return node.map(fix);
@@ -595,7 +616,10 @@ export function SameMessage<T extends ISameSource>(message: T): { components: un
         return record;
     };
 
-    return { components: message.components.map((component) => fix(component.toJSON())), attachments: files as never };
+    const components = message.components.map((component) => fix(component.toJSON()));
+
+    // Behaltene Anhänge so, wie Discord sie zurückhaben will: attachment://… findet er nur über filename.
+    return { components, attachments: files.map((file) => ({ id: file.id, filename: file.name })) };
 }
 
 /**
