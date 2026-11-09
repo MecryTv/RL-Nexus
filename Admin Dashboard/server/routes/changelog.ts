@@ -4,12 +4,12 @@ import { accessOf } from "../access.ts";
 import { audit, type IActor } from "../audit.ts";
 import type { IStatusChannelOption } from "../../shared/status.ts";
 import { renderChangelogImage } from "../changelog/image.ts";
-import { changelogChannel, chooseChangelogChannel, deletePost, deleteVersion, postVersion, previewFooter } from "../changelog/post.ts";
+import { changelogChannel, changelogChannelOptions, chooseChangelogChannel, deletePost, deleteVersion, postVersion, previewFooter } from "../changelog/post.ts";
 import { createVersion, listVersions, updateVersion, versionOf } from "../changelog/store.ts";
 import type { IConfig } from "../config.ts";
 import { DatabaseUnavailable, databaseReady } from "../db.ts";
 import { InvalidInput, PublicError } from "../errors.ts";
-import { channelName, statusChannelOptions } from "../status-post.ts";
+import { channelName } from "../status-post.ts";
 import { body, id, snowflake } from "../validate.ts";
 
 /**
@@ -49,7 +49,7 @@ export async function changelogRoutes(app: FastifyInstance, { config }: { config
         return { versions: await listVersions(), channel: channel ? { id: channel, name: await channelName(config, channel) } : null };
     });
 
-    app.get("/api/changelog/channels", async (): Promise<IStatusChannelOption[]> => statusChannelOptions(config));
+    app.get("/api/changelog/channels", async (): Promise<IStatusChannelOption[]> => changelogChannelOptions(config));
 
     app.put("/api/changelog/channel", async (request): Promise<IChangelogView["channel"]> => {
         ready();

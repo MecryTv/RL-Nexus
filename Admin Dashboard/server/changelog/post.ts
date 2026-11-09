@@ -3,7 +3,8 @@ import { audit, type IActor } from "../audit.ts";
 import type { IConfig } from "../config.ts";
 import { query } from "../db.ts";
 import { PublicError } from "../errors.ts";
-import { remove, shortError, statusChannelOptions, upload } from "../status-post.ts";
+import type { IStatusChannelOption } from "../../shared/status.ts";
+import { remove, shortError, statusChannelOptions, upload, type ChannelRight } from "../status-post.ts";
 import { renderChangelogImage, type IChangelogFooter } from "./image.ts";
 import { clearPosted, contentHash, deleteVersionRow, markPosted, versionOf } from "./store.ts";
 
@@ -15,6 +16,26 @@ import { clearPosted, contentHash, deleteVersionRow, markPosted, versionOf } fro
 
 const CHANNEL_KEY = "changelog_channel";
 const NO_RIGHT = /"code":\s*50013\b/;
+/** Eigene Nachrichten schreiben, ändern und löschen braucht nur diese drei. */
+const RIGHTS: readonly ChannelRight[] = ["view", "send", "attach"];
+/**
+ * Versionen, an denen gerade gepostet oder gelöscht wird. Zwei Klicks zur
+ * selben Zeit ergäben sonst zwei Nachrichten oder einen Post ohne Eintrag.
+ * ponytail: nur in diesem Prozess; mit mehreren Prozessen bräuchte es eine Sperre in der Datenbank.
+ */
+const working = new Set<number>();
+
+async function exclusive<T>(id: number, run: () => Promise<T>): Promise<T> {
+    if (working.has(id)) throw new PublicError(409, "An dieser Version läuft gerade schon etwas. Versuch es gleich noch einmal.");
+
+    working.add(id);
+
+    try {
+        return await run();
+    } finally {
+        working.delete(id);
+    }
+}
 
 type IPosted = NonNullable<IChangelogVersion["posted"]>;
 
@@ -28,9 +49,14 @@ export async function changelogChannel(): Promise<string | null> {
     return row?.value ?? null;
 }
 
-/** Der Kanal muss einer aus `statusChannelOptions` sein, also ein Textkanal auf dem Server des Teams. */
+/** Die Textkanäle auf dem Server des Teams, mit dem, was dem Bot für den Changelog fehlt. */
+export function changelogChannelOptions(config: IConfig): Promise<IStatusChannelOption[]> {
+    return statusChannelOptions(config, RIGHTS);
+}
+
+/** Der Kanal muss einer aus `changelogChannelOptions` sein. */
 export async function chooseChangelogChannel(config: IConfig, channelId: string): Promise<void> {
-    if (!(await statusChannelOptions(config)).some((option) => option.id === channelId)) throw new PublicError(400, "Diesen Textkanal gibt es auf dem Server nicht.");
+    if (!(await changelogChannelOptions(config)).some((option) => option.id === channelId)) throw new PublicError(400, "Diesen Textkanal gibt es auf dem Server nicht.");
 
     await query("INSERT INTO admin_state (name, value) VALUES (?, ?) ON DUPLICATE KEY UPDATE value = VALUES(value)", [CHANNEL_KEY, channelId]);
 }
@@ -76,7 +102,11 @@ async function send(config: IConfig, version: IChangelogVersion, url: string, me
  * Posten oder, schon gepostet, dieselbe Nachricht ändern. Ist sie in Discord
  * weg (404), kommt eine neue in den gewählten Kanal.
  */
-export async function postVersion(config: IConfig, actor: IActor, id: number): Promise<IChangelogVersion> {
+export function postVersion(config: IConfig, actor: IActor, id: number): Promise<IChangelogVersion> {
+    return exclusive(id, () => post(config, actor, id));
+}
+
+async function post(config: IConfig, actor: IActor, id: number): Promise<IChangelogVersion> {
     const version = await found(id);
     const channel = await changelogChannel();
 
@@ -113,25 +143,29 @@ async function unpost(config: IConfig, posted: IPosted): Promise<void> {
     if (!gone.ok && gone.status !== 404) await failed(gone, "Löschen");
 }
 
-export async function deletePost(config: IConfig, actor: IActor, id: number): Promise<IChangelogVersion> {
-    const version = await found(id);
-    if (!version.posted) return version;
+export function deletePost(config: IConfig, actor: IActor, id: number): Promise<IChangelogVersion> {
+    return exclusive(id, async () => {
+        const version = await found(id);
+        if (!version.posted) return version;
 
-    await unpost(config, version.posted);
-    await clearPosted(id);
-    await audit(actor, "changelog.unpost", null, what(version));
+        await unpost(config, version.posted);
+        await clearPosted(id);
+        await audit(actor, "changelog.unpost", null, what(version));
 
-    return found(id);
+        return found(id);
+    });
 }
 
 /** Erst der Post, dann die Version: Scheitert Discord, bleibt beides, statt einen Post ohne Eintrag zurückzulassen. */
-export async function deleteVersion(config: IConfig, actor: IActor, id: number): Promise<void> {
-    const version = await found(id);
+export function deleteVersion(config: IConfig, actor: IActor, id: number): Promise<void> {
+    return exclusive(id, async () => {
+        const version = await found(id);
 
-    if (version.posted) await unpost(config, version.posted);
-    if (!(await deleteVersionRow(id))) throw new PublicError(404, "Diese Version gibt es nicht mehr.");
+        if (version.posted) await unpost(config, version.posted);
+        if (!(await deleteVersionRow(id))) throw new PublicError(404, "Diese Version gibt es nicht mehr.");
 
-    await audit(actor, "changelog.delete", null, what(version));
+        await audit(actor, "changelog.delete", null, what(version));
+    });
 }
 
 /** Für die Vorschau: so, wie der nächste Klick auf „Posten“ es zeichnen würde. */

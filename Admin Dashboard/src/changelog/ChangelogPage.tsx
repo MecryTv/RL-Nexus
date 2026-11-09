@@ -117,7 +117,8 @@ export function ChangelogPage(): JSX.Element {
     };
     const [busy, setBusy] = useState(false);
 
-    // `/` springt ins Suchfeld. Läuft vor der Navigationssuche der Shell, die sonst auf `/` aufgeht.
+    // `/` springt ins Suchfeld. Läuft vor der Navigationssuche der Shell; die sieht danach ein fokussiertes Feld und bleibt zu.
+    // Kein stopPropagation: Die Shell muss die Taste sehen, sonst hält sie rechts Umschalt + 7 für einen Umschalt-Tipp.
     useEffect(() => {
         const onKey = (event: KeyboardEvent): void => {
             if (event.key !== "/" || event.ctrlKey || event.metaKey || event.altKey) return;
@@ -125,7 +126,6 @@ export function ChangelogPage(): JSX.Element {
             if (document.querySelector("dialog[open]")) return;
 
             event.preventDefault();
-            event.stopPropagation();
             search.current?.focus();
         };
 

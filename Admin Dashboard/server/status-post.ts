@@ -523,8 +523,10 @@ export async function refreshNow(config: IConfig, now = Date.now()): Promise<IDi
 
 const PERMISSION = { administrator: 1n << 3n, view: 1n << 10n, send: 1n << 11n, manage: 1n << 13n, attach: 1n << 15n, history: 1n << 16n } as const;
 
+export type ChannelRight = Exclude<keyof typeof PERMISSION, "administrator">;
+
 /** Was der Bot im Statuskanal braucht, in der Reihenfolge, in der es fehlen kann. */
-const NEEDED: readonly [keyof typeof PERMISSION, string][] = [
+const NEEDED: readonly [ChannelRight, string][] = [
     ["view", "Kanal sehen"],
     ["send", "Nachrichten senden"],
     ["attach", "Dateien anhängen"],
@@ -579,8 +581,9 @@ export function channelPermissions(input: IPermissionInput): bigint {
 }
 
 /** Was dem Bot fehlt, als Wörter für das Fenster. Leer heißt: alles da. */
-export function missingRights(rights: bigint): string[] {
-    return NEEDED.filter(([key]) => (rights & PERMISSION[key]) === 0n).map(([, label]) => label);
+/** Was fehlt, von dem, was gebraucht wird; ohne Angabe alles, was die Statusmeldung braucht. */
+export function missingRights(rights: bigint, wanted: readonly ChannelRight[] = NEEDED.map(([key]) => key)): string[] {
+    return NEEDED.filter(([key]) => wanted.includes(key) && (rights & PERMISSION[key]) === 0n).map(([, label]) => label);
 }
 
 async function discordGet<T>(config: IConfig, url: string): Promise<T> {
@@ -607,7 +610,7 @@ const TEXT_TYPES = new Set([0, 5]);
  * im Development-Modus der Dev Server, im Betrieb der Server des Teams),
  * nach Kategorie sortiert und mit dem, was dem Bot dort fehlt.
  */
-export async function statusChannelOptions(config: IConfig): Promise<IStatusChannelOption[]> {
+export async function statusChannelOptions(config: IConfig, wanted?: readonly ChannelRight[]): Promise<IStatusChannelOption[]> {
     const me = await discordGet<{ id: string }>(config, "/users/@me");
     const [channels, roles, member] = await Promise.all([
         discordGet<IDiscordChannel[]>(config, `/guilds/${config.guildId}/channels`),
@@ -631,7 +634,7 @@ export async function statusChannelOptions(config: IConfig): Promise<IStatusChan
 
             channelNames.set(channel.id, channel.name);
 
-            return { id: channel.id, name: channel.name, category: (channel.parent_id && categories.get(channel.parent_id)?.name) || null, missing: missingRights(rights) };
+            return { id: channel.id, name: channel.name, category: (channel.parent_id && categories.get(channel.parent_id)?.name) || null, missing: missingRights(rights, wanted) };
         });
 }
 

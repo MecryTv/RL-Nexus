@@ -46,8 +46,12 @@ interface IDiscordCall {
 
 const reply = (body: unknown, status = 200): Response => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 
-/** Discord nachstellen: der Server mit einem Textkanal, dazu jeder Aufruf an Test-Kanäle mitgeschrieben und von `respond` beantwortet. */
-async function withDiscord(config: IConfig, respond: (call: IDiscordCall) => Response, run: (calls: IDiscordCall[]) => Promise<void>): Promise<void> {
+/**
+ * Discord nachstellen: der Server mit einem Textkanal, dazu jeder Aufruf an
+ * Test-Kanäle mitgeschrieben und von `respond` beantwortet. `rights` sind die
+ * Rechte von @everyone, ab Werk Administrator.
+ */
+async function withDiscord(config: IConfig, respond: (call: IDiscordCall) => Response | Promise<Response>, run: (calls: IDiscordCall[]) => Promise<void>, rights = String(1 << 3)): Promise<void> {
     const calls: IDiscordCall[] = [];
     const real = globalThis.fetch;
 
@@ -56,7 +60,7 @@ async function withDiscord(config: IConfig, respond: (call: IDiscordCall) => Res
 
         if (url.endsWith("/users/@me")) return reply({ id: "900000000000000070" });
         if (url.endsWith(`/guilds/${config.guildId}/channels`)) return reply([{ id: CHANNEL, name: "check-changelog", type: 0, position: 0 }]);
-        if (url.endsWith(`/guilds/${config.guildId}/roles`)) return reply([{ id: config.guildId, permissions: String(1 << 3) }]);
+        if (url.endsWith(`/guilds/${config.guildId}/roles`)) return reply([{ id: config.guildId, permissions: rights }]);
         if (url.includes(`/guilds/${config.guildId}/members/`)) return reply({ roles: [] });
         if (!url.includes("/channels/9000000000000000")) return real(input, init);
 
@@ -177,6 +181,21 @@ export async function checkChangelogDb(config: IConfig, http: IHttp): Promise<vo
             assert.equal(await audited("changelog.channel", `%(${CHANNEL})`), 1);
         });
 
+        await check("Kanal: als fehlend gelten nur Rechte, die der Changelog braucht (sehen, senden, Dateien)", async () => {
+            const missing = async (rights: number): Promise<unknown> => {
+                let result: unknown = null;
+
+                await withDiscord(config, accepting(), async () => {
+                    result = ((await dev("GET", "/api/changelog/channels")).json() as { id: string; missing: string[] }[]).map((option) => [option.id, option.missing]);
+                }, String(rights));
+
+                return result;
+            };
+
+            assert.deepEqual(await missing((1 << 10) | (1 << 11) | (1 << 15)), [[CHANNEL, []]]);
+            assert.deepEqual(await missing((1 << 10) | (1 << 11)), [[CHANNEL, ["Dateien anhängen"]]]);
+        });
+
         const posting = await create({ ...INPUT, version: "9.3.0" });
         const post = (target = posting.id) => dev("POST", `/api/changelog/${target}/post`);
 
@@ -213,6 +232,41 @@ export async function checkChangelogDb(config: IConfig, http: IHttp): Promise<vo
                 assert.deepEqual([posted?.channelId, posted?.messageId, posted?.stale], [CHANNEL, "900000000000000051", false]);
             });
             assert.equal(await audited("changelog.post", "9.3.0%"), 1);
+        });
+
+        await check("Während ein Post unterwegs ist: zweiter Klick auf Posten und Version löschen bekommen 409, Discord sieht eine Nachricht", async () => {
+            const draft = await create({ ...INPUT, version: "9.5.0" });
+            const answer = accepting();
+            let arrived!: () => void;
+            let release!: () => void;
+            const inFlight = new Promise<void>((resolve) => (arrived = resolve));
+            const gate = new Promise<void>((resolve) => (release = resolve));
+
+            await withDiscord(
+                config,
+                async (call) => {
+                    arrived();
+                    await gate;
+
+                    return answer(call);
+                },
+                async (calls) => {
+                    const first = post(draft.id);
+                    await inFlight;
+
+                    const second = post(draft.id);
+                    const removing = dev("DELETE", `/api/changelog/${draft.id}`);
+                    // Ohne Sperre erreichen beide Discord oder löschen die Version; mit Sperre kommt sofort 409.
+                    await new Promise((resolve) => setTimeout(resolve, 300));
+                    release();
+
+                    const [done, again, removed] = await Promise.all([first, second, removing]);
+                    assert.equal(done.statusCode, 200, done.body);
+                    assert.deepEqual([again.statusCode, again.json().error, removed.statusCode], [409, "An dieser Version läuft gerade schon etwas. Versuch es gleich noch einmal.", 409]);
+                    assert.deepEqual(said(calls), [`POST /channels/${CHANNEL}/messages`]);
+                }
+            );
+            assert.ok((await current(draft.id))?.posted, "die Version steht noch und ist gepostet");
         });
 
         await check("Nach dem Posten geändert: veraltet; erneut posten ändert dieselbe Nachricht, Fuß „bearbeitet am“", async () => {
