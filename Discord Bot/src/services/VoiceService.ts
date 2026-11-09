@@ -89,8 +89,16 @@ export default class VoiceService {
     }
 
     async SaveSettings(guild: Guild, input: unknown): Promise<IVoiceModuleSettings> {
+        const settings = this.CleanModuleSettings(guild, input, await this.Settings(guild.id));
+
+        await this.client.moduleSettings.Save(guild.id, VOICE_MODULE, settings);
+
+        return settings;
+    }
+
+    /** Wohin das Panel geht - ohne zu speichern, auch für /einstellungen und check:settings. */
+    CleanModuleSettings(guild: Guild, input: unknown, current: IVoiceModuleSettings): IVoiceModuleSettings {
         const raw = IsRecord(input) ? input : {};
-        const current = await this.Settings(guild.id);
         const panel = raw.panel === "channel" ? "channel" : "voice";
         const channel = typeof raw.panelChannelId === "string" ? guild.channels.cache.get(raw.panelChannelId) : null;
         const settings: IVoiceModuleSettings = {
@@ -101,8 +109,6 @@ export default class VoiceService {
         };
 
         if (panel === "channel" && !settings.panelChannelId) throw new VoiceError("Wähle einen Textkanal für das Panel.");
-
-        await this.client.moduleSettings.Save(guild.id, VOICE_MODULE, settings);
 
         return settings;
     }

@@ -91,3 +91,10 @@ Entwurf: `.works/tasks/W-0054-einstellungen-per-befehl-fuer-die/docs/w0014-modul
 - Je Modul ein Register in `services/settings/registers/`, gespeichert über den Weg des Dashboards. Ein Feld darf nur sich selbst ändern; `check:settings` prüft das für jedes Feld gegen das echte `Clean` des Moduls, mit Startwerten je Modul in eigenen Dateien unter `src/scripts/settings/`.
 - Felder, deren Wert im Dashboard aus einer größeren Auswahl kommt, bieten im Panel dieselben Kanalarten an wie das Speichern annimmt, damit eine Mehrfachauswahl beim Ändern nichts verliert (Lehre aus dem Review von W-0014).
 - Module ohne Felder haben keine Menü-Zeile „Was willst du ändern?“.
+
+### Abweichungen beim Bau (09.11.)
+
+- **Temp Voice: ein Feld statt zwei.** „Wohin“ und „Panel-Kanal“ sind beim Speichern ein Wert (fester Ort nur mit Kanal, sonst wird der Kanal verworfen). Ein Kanal-Feld „Panel fest in“ bildet beides ab, leer heißt im Chat des eigenen Sprachkanals.
+- **Anti Villain: 21 statt 22.** Der Wächter „Köder“ (`guards.bait`) wird nirgends gelesen, auch das Dashboard blendet ihn aus; der Köder selbst läuft über Einrichten im Dashboard.
+- **RL Team-Übersicht:** Kader-Rollen heißen wie im Dashboard (Stamm, Trial). Den Wechsel auf den Hub lehnt das Panel mit einem Satz ab, solange `{teams}` im Kopf steht (das Dashboard tauscht dann den Kopf mit).
+- **Apply:** Transcript-Kanal (W-0047) dazu, „Nach Entscheidung“ wie im Dashboard benannt.

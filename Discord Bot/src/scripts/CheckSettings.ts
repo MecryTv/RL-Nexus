@@ -23,8 +23,18 @@ import { MODERATORS, PANEL } from "../services/settings/registers/Shared";
 import { IPanelField, MAX_SECTION_FIELDS, PanelError, PanelId, PanelModuleId, ParseStages, ReadPanelId, ShowValue, StagesText } from "../services/settings/SettingsModel";
 
 // Teil 4 · Imports Gruppe Rocket League
+import { DefaultLftSettings } from "../constants/Lft";
+import { DefaultRankRoleSettings } from "../constants/RankRoles";
+import { DefaultSixSettings } from "../constants/SixMans";
+import { DefaultTeamSettings } from "../constants/Teams";
 // Teil 4 · Imports Gruppe Rest
+import { DefaultClipSettings } from "../constants/Clips";
+import { DefaultMatchupSettings } from "../constants/Matchups";
+import { DefaultBackupSettings } from "../constants/ServerBackup";
 // Teil 4 · Imports Gruppe Moderation
+import { DefaultAntiVillainSettings } from "../constants/AntiVillain";
+import { DefaultAutoModSettings } from "../constants/AutoMod";
+import { DefaultLogSettings } from "../constants/Logging";
 
 /** Discord nimmt höchstens 10 Bilder in einer Nachricht. */
 const MAX_FILES_CHECK = 10;
@@ -153,7 +163,8 @@ function Other(field: IPanelField<unknown>, current: unknown): unknown {
             return value + 1 <= (field.max ?? Infinity) ? value + 1 : value - 1;
         }
         case "text":
-            return "test-{nummer}";
+            // Ein Emoji-Feld (Clips: Abstimm-Emoji) nimmt nur ein Emoji an.
+            return field.key === "emoji" ? (current === "🎬" ? "🔥" : "🎬") : "test-{nummer}";
         case "stages":
             return ParseStages("4 kick");
     }
@@ -181,8 +192,22 @@ async function checkRegisters(client: BotClient): Promise<Partial<Record<PanelMo
         levels: DefaultLevelSettings(),
         welcome,
         // Teil 4 · Startwerte Gruppe Rocket League
+        "rl-6mans": DefaultSixSettings(),
+        lft: DefaultLftSettings(),
+        teams: DefaultTeamSettings(),
+        "rank-roles": DefaultRankRoleSettings(),
         // Teil 4 · Startwerte Gruppe Rest
+        clips: DefaultClipSettings(),
+        matchups: DefaultMatchupSettings(),
+        // Die Vorgaben stehen in Settings() der Dienste, eine eigene Default-Funktion gibt es nicht.
+        "voice-hub": { panel: "voice", panelChannelId: null, panelMessageId: null },
+        "twitch-notifier": { liveRoleId: null, liveRoleFilter: null },
+        "youtube-notifier": { liveRoleId: null },
+        backups: DefaultBackupSettings(),
         // Teil 4 · Startwerte Gruppe Moderation
+        automod: DefaultAutoModSettings(),
+        "anti-villain": DefaultAntiVillainSettings(),
+        logging: DefaultLogSettings(),
     };
     const clean: Partial<Record<PanelModuleId, (patch: Record<string, unknown>, previous: never) => unknown>> = {
         moderation: (patch, previous) => client.moderationService.Clean(guild, patch, previous),
@@ -191,8 +216,21 @@ async function checkRegisters(client: BotClient): Promise<Partial<Record<PanelMo
         levels: (patch, previous) => client.levelService.Clean(guild, patch, previous),
         welcome: (patch, previous) => client.welcomeService.Clean(guild, patch, previous),
         // Teil 4 · Clean Gruppe Rocket League
+        "rl-6mans": (patch, previous) => client.sixMansService.CleanSettings(guild, patch, previous),
+        lft: (patch, previous) => client.lookingForService.CleanSettings(guild, patch, previous),
+        teams: (patch, previous) => client.teamService.CleanSettings(guild, patch, previous),
+        "rank-roles": (patch, previous) => client.rankRoleService.CleanSettings(guild, patch, previous),
         // Teil 4 · Clean Gruppe Rest
+        clips: (patch, previous) => client.clipService.CleanSettings(guild, patch, previous),
+        matchups: (patch, previous) => client.matchupService.CleanSettings(guild, patch, previous),
+        "voice-hub": (patch, previous) => client.voiceService.CleanModuleSettings(guild, patch, previous),
+        "twitch-notifier": (patch) => client.streamService.CleanTwitchSettings(guild, patch),
+        "youtube-notifier": (patch) => client.streamService.CleanYouTubeSettings(guild, patch),
+        backups: (patch) => client.serverBackupService.CleanSettings(guild, patch),
         // Teil 4 · Clean Gruppe Moderation
+        automod: (patch, previous) => client.autoModService.Clean(guild, patch, previous),
+        "anti-villain": (patch, previous) => client.antiVillainService.Clean(guild, patch, previous),
+        logging: (patch, previous) => client.logService.Clean(guild, patch, previous),
     };
     const order = PANEL_AREAS.flatMap((area) => area.ids).join(",");
 

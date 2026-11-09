@@ -880,9 +880,14 @@ export default class ServerBackupService {
     }
 
     /** Nur ein Kanal, in den der Bot Karten schreiben kann, sonst keiner. */
-    async SaveSettings(guild: Guild, input: unknown): Promise<IBackupSettings> {
+    CleanSettings(guild: Guild, input: unknown): IBackupSettings {
         const log = (input as { logChannelId?: unknown } | null)?.logChannelId;
-        const settings: IBackupSettings = { logChannelId: typeof log === "string" && IsLogTarget(guild.channels.cache.get(log)) ? log : null };
+
+        return { logChannelId: typeof log === "string" && IsLogTarget(guild.channels.cache.get(log)) ? log : null };
+    }
+
+    async SaveSettings(guild: Guild, input: unknown): Promise<IBackupSettings> {
+        const settings = this.CleanSettings(guild, input);
 
         await this.client.moduleSettings.Save(guild.id, BACKUPS_MODULE, settings);
 

@@ -1,15 +1,36 @@
-import { IPanelModule } from "../SettingsModel";
+import { IYouTubeSettings } from "../../../interfaces/services/community/ICommunity";
+import { StreamError } from "../../StreamService";
+import { IPanelModule, PanelError } from "../SettingsModel";
+import { F } from "./Shared";
 
-/** Platzhalter (W-0014 Teil 4): Die Felder kommen aus dem Entwurf w0014-module-rest.html. */
-export const YouTubePanel: IPanelModule<Record<string, never>> = {
+type S = IYouTubeSettings;
+
+export const YouTubePanel: IPanelModule<S> = {
     id: "youtube-notifier",
     module: "youtube-notifier",
     name: "YouTube Notifier",
     emoji: "🔴",
     color: "#f23f43",
     permanent: false,
-    dashOnly: [],
-    sections: [],
-    load: async () => ({}),
-    save: async () => null,
+    dashOnly: ["Kanäle", "Nachrichten"],
+    sections: [
+        {
+            title: "Live-Rolle",
+            fields: [F<S>("role", "liveRole", "Live-Rolle", "Bekommt der verknüpfte Discord-User, solange sein Livestream läuft.", (s) => s.liveRoleId, (value: string | null) => ({ liveRoleId: value }))],
+        },
+    ],
+    load(client, guild) {
+        return client.streamService.YouTubeSettings(guild.id);
+    },
+    async save(client, guild, patch) {
+        try {
+            await client.streamService.SaveYouTubeSettings(guild, patch);
+        } catch (error) {
+            if (error instanceof StreamError) throw new PanelError(error.message);
+
+            throw error;
+        }
+
+        return null;
+    },
 };
