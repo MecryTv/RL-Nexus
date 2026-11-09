@@ -79,6 +79,8 @@ function checkModel(): void {
     check("Eine ID wird gebaut", id === "set:c:moderation:logChannelId", id);
     check("Und gelesen", JSON.stringify(ReadPanelId(id)) === JSON.stringify({ step: "c", module: "moderation", key: "logChannelId", extra: null }));
     check("Mit Zusatz", ReadPanelId(PanelId("t", "levels", "chat.on", "on"))?.extra === "on");
+    // W-0014: „Modul an“ hat keinen Schlüssel. Fiel der leere Teil weg, las ReadPanelId „on“ als Schlüssel, und der Knopf schaltete aus.
+    check("Ohne Schlüssel, mit Zusatz: der Zusatz bleibt der Zusatz", JSON.stringify(ReadPanelId(PanelId("x", "welcome", undefined, "on"))) === JSON.stringify({ step: "x", module: "welcome", key: "", extra: "on" }), PanelId("x", "welcome", undefined, "on"));
     check("Die Übersicht ohne Modul", JSON.stringify(ReadPanelId(PanelId("s"))) === JSON.stringify({ step: "s", module: null, key: null, extra: null }));
     check("Fremde IDs nicht", ReadPanelId("hilfe:start") === null && ReadPanelId("set:zz:moderation") === null && ReadPanelId("mf:ev:1") === null);
     check("Höchstens 100 Zeichen", PanelId("t", "moderation", "support.notifyChannelId", "off").length <= 100);
