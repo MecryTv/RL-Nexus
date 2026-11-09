@@ -1784,7 +1784,8 @@ body[data-page="guild"]{--shell:1440px}
   .heat__cell{height:16px}
 }
 
-.setcards{display:grid;gap:14px;min-width:0}
+/* minmax(0,1fr): Sonst wächst die Spalte mit der Reiterzeile, und auf dem Handy scrollt die ganze Seite statt nur der Reiter. */
+.setcards{display:grid;grid-template-columns:minmax(0,1fr);gap:14px;min-width:0}
 
 /* Dieselbe Aufteilung fuer die Doku: Inhaltsverzeichnis links, Text rechts.
    Die Doku scrollt allerdings, statt umzuschalten - deshalb faellt hier kein
