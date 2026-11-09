@@ -174,11 +174,12 @@ export function ComposeTab({
     const name = person.data?.name ?? wanted;
     const canSend = !problem && (effectiveMode === "all" ? !allBlocked && audience.recipients > 0 : person.data?.state === "ok");
 
-    const send = (): void => {
+    // Was der offene Dialog bestätigt, nicht was der Umschalter inzwischen zeigt: Startet daneben jemand eine Nachricht an alle, wird aus „alle“ sonst still „eine Person“.
+    const send = (kind: Mode): void => {
         setBusy("send");
 
         const request =
-            effectiveMode === "all"
+            kind === "all"
                 ? api<{ id: number; total: number }>("/api/messages/all", { method: "POST", body: { template: templateName, content, confirm: typed } }).then(() =>
                       notify(`Läuft: ${people(audience.recipients)}, eine DM alle 2 Sekunden.`)
                   )
@@ -322,7 +323,7 @@ export function ComposeTab({
                 tone="danger"
                 busy={busy === "send"}
                 confirmDisabled={typed !== CONFIRM}
-                onConfirm={send}
+                onConfirm={() => send("all")}
                 onCancel={() => {
                     setAsking(null);
                     setTyped("");
@@ -352,7 +353,7 @@ export function ComposeTab({
                 </Field>
             </ConfirmDialog>
 
-            <ConfirmDialog open={asking === "one"} title={`An ${name} senden?`} confirmLabel="Senden" busy={busy === "send"} onConfirm={send} onCancel={() => setAsking(null)}>
+            <ConfirmDialog open={asking === "one"} title={`An ${name} senden?`} confirmLabel="Senden" busy={busy === "send"} onConfirm={() => send("one")} onCancel={() => setAsking(null)}>
                 <p>„{content.title}“ geht sofort als DM über den Bot hinaus und lässt sich nicht zurückholen.</p>
             </ConfirmDialog>
         </div>

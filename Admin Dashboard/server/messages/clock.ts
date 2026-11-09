@@ -22,19 +22,35 @@ export type RoundResult = "idle" | "sent" | "failed" | "skipped" | "done" | "pau
 
 /** So viele Störungen hintereinander halten eine Nachricht an. */
 const TROUBLE_LIMIT = 5;
+/** So viele nicht angekommene DMs hintereinander, gleich aus welchem Grund, halten sie auch an: Viele Fehlversuche sieht Discord als Spam. */
+const MISS_LIMIT = 25;
+/** Zwischenstände gehen höchstens so oft an die Oberfläche; Ende und Anhalten sofort. */
+const PUBLISH_EVERY_MS = 10_000;
 const CLOCK = { id: "0", name: "Nachrichten über den Bot" };
 const RESTART = "Neustart beim Senden, unklar ob angekommen";
+const STUCK = "beim Senden hängen geblieben, unklar ob angekommen";
 
-// ponytail: Zähler nur im Speicher; nach einem Neustart beginnt er bei 0. Ein
-// Spam-Signal hält ohnehin sofort an, fünf Störungen sind eine Schätzung.
+// ponytail: Zähler nur im Speicher; nach einem Neustart beginnen sie bei 0. Ein
+// Spam-Signal hält ohnehin sofort an, die Grenzen sind Schätzungen.
 const troubles = new Map<number, number>();
+const misses = new Map<number, number>();
 
 let timer: NodeJS.Timeout | null = null;
 let running = false;
+let published = 0;
 
-/** Nach Weiter oder Abbrechen zählen Störungen von vorn. */
+/** Nach Weiter oder Abbrechen zählen Störungen und Fehlschläge von vorn. */
 export function resetTrouble(id: number): void {
     troubles.delete(id);
+    misses.delete(id);
+}
+
+/** Zwischenstand melden, aber nicht jede Runde: Sonst lädt jede offene Seite alle 2 Sekunden neu. */
+function publishSometimes(): void {
+    if (Date.now() - published < PUBLISH_EVERY_MS) return;
+
+    published = Date.now();
+    publish("messages");
 }
 
 const message = (error: unknown): string => (error instanceof Error ? error.message : String(error));
@@ -45,7 +61,7 @@ const describe = (row: { readonly id: number; readonly template_name: string }, 
 async function pause(row: { readonly id: number; readonly template_name: string }, content: IMessageContent, reason: string): Promise<boolean> {
     const changed = await query<{ affectedRows: number }>("UPDATE bot_messages SET state = 'paused', pause_reason = ? WHERE id = ? AND state = 'running'", [`Discord lehnt ab: ${reason}`.slice(0, 200), row.id]);
 
-    troubles.delete(row.id);
+    resetTrouble(row.id);
     if (changed.affectedRows === 0) return false;
 
     await audit(CLOCK, "messages.pause", null, `${describe(row, content)} · Discord lehnt ab: ${reason}`);
@@ -75,9 +91,13 @@ export async function messageRound(config: IConfig, send?: Sender): Promise<Roun
         const [next] = await query<{ user_id: string }[]>("SELECT user_id FROM bot_message_recipients WHERE message_id = ? AND state = 'open' ORDER BY user_id LIMIT 1", [id]);
 
         if (!next) {
+            // Eine Zeile auf „sending“ ist hier verwaist: Runden laufen nie gleichzeitig, also schickt sie keiner mehr. Lieber nicht erreicht als doppelt.
+            const stuck = await query<{ affectedRows: number }>("UPDATE bot_message_recipients SET state = 'failed', reason = ?, done_at = CURRENT_TIMESTAMP(3) WHERE message_id = ? AND state = 'sending'", [STUCK, id]);
+
+            if (stuck.affectedRows > 0) await recount(id);
             if (!(await finishIfDone(id))) return "idle";
 
-            troubles.delete(id);
+            resetTrouble(id);
             await audit(CLOCK, "messages.done", null, describe(row, content));
             publish("messages");
 
@@ -91,7 +111,7 @@ export async function messageRound(config: IConfig, send?: Sender): Promise<Roun
         if (skip) {
             await query("UPDATE bot_message_recipients SET state = 'skipped', reason = ?, done_at = CURRENT_TIMESTAMP(3) WHERE message_id = ? AND user_id = ? AND state = 'open'", [skip, id, userId]);
             await recount(id);
-            publish("messages");
+            publishSometimes();
 
             return "skipped";
         }
@@ -113,17 +133,21 @@ export async function messageRound(config: IConfig, send?: Sender): Promise<Roun
         let paused = false;
 
         if (failure === null) {
-            troubles.delete(id);
+            resetTrouble(id);
         } else if (failure.kind === "spam") {
             paused = await pause(row, content, failure.reason);
-        } else if (failure.kind === "trouble") {
-            const count = (troubles.get(id) ?? 0) + 1;
+        } else {
+            const trouble = failure.kind === "trouble" ? (troubles.get(id) ?? 0) + 1 : 0;
+            const missed = (misses.get(id) ?? 0) + 1;
 
-            troubles.set(id, count);
-            if (count >= TROUBLE_LIMIT) paused = await pause(row, content, failure.reason);
+            troubles.set(id, trouble);
+            misses.set(id, missed);
+            if (trouble >= TROUBLE_LIMIT) paused = await pause(row, content, failure.reason);
+            else if (missed >= MISS_LIMIT) paused = await pause(row, content, `${MISS_LIMIT} DMs hintereinander nicht angekommen, zuletzt: ${failure.reason}`);
         }
 
-        publish("messages");
+        if (paused) publish("messages");
+        else publishSometimes();
 
         return paused ? "paused" : failure ? "failed" : "sent";
     } catch (error) {

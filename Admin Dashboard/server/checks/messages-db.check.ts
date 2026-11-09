@@ -43,7 +43,7 @@ const P = {
     banned: `${PREFIX}09`,
 } as const;
 /** Zusätzliche Empfängerzeilen für lange Läufe, ohne Daten. */
-const EXTRA = Array.from({ length: 20 }, (_, index) => `${PREFIX}${20 + index}`);
+const EXTRA = Array.from({ length: 40 }, (_, index) => `${PREFIX}${20 + index}`);
 const GUILD = "33333333333333333399";
 
 const SEEDED = ["Änderung bei RL Nexus", "Wartung", "Störung behoben", "Datenschutz-Hinweis", "Hinweis zu deinem Konto", "Persönliche Nachricht"];
@@ -307,7 +307,7 @@ export async function checkMessagesDb(config: IConfig, http: IHttp): Promise<voi
 
         let second = 0;
 
-        await check("Anhalten: Spam-Signal sofort, fünf Störungen hintereinander, Fehler einer Person nie", async () => {
+        await check("Anhalten: Spam-Signal sofort, fünf Störungen hintereinander, 25 Fehlschläge hintereinander", async () => {
             second = (await startAll(ACTOR, "check:db alle", CONTENT)).id;
             await query(`INSERT INTO bot_message_recipients (message_id, user_id) VALUES ${EXTRA.map(() => "(?, ?)").join(", ")}`, EXTRA.flatMap((user) => [second, user]));
 
@@ -342,7 +342,21 @@ export async function checkMessagesDb(config: IConfig, http: IHttp): Promise<voi
             assert.equal(await until(rec.calls.length + 10), "failed");
             assert.equal((await messageRow(second))?.state, "running", "zehn Fehler einzelner Personen laufen weiter");
             assert.equal((await messageRow(second))?.failed, 16);
-            assert.equal(new Set(rec.calls).size, rec.calls.length, "niemand doppelt");
+
+            // Fehler einzelner Personen halten erst an, wenn 25 hintereinander kommen: Viele Fehlversuche sieht Discord als Spam.
+            assert.equal(await until(rec.calls.length + 14), "failed");
+            assert.equal((await messageRow(second))?.state, "running", "24 hintereinander laufen weiter");
+            assert.equal(await until(rec.calls.length + 1), "paused");
+            assert.equal((await messageRow(second))?.pause_reason, "Discord lehnt ab: 25 DMs hintereinander nicht angekommen, zuletzt: Die Person nimmt keine Direktnachrichten vom Bot an.");
+
+            // Nach Weiter zählt es von vorn; eine angekommene DM setzt den Zähler auch zurück.
+            await resumeMessage(ACTOR, second);
+            assert.equal(await until(rec.calls.length + 24), "failed");
+            const ok = recorder(() => null);
+            assert.equal(await messageRound(config, ok.send), "sent");
+            assert.equal(await until(rec.calls.length + 1), "failed");
+            assert.equal((await messageRow(second))?.state, "running", "nach einer angekommenen DM beginnt die Zählung neu");
+            assert.equal(new Set([...rec.calls, ...ok.calls]).size, rec.calls.length + ok.calls.length, "niemand doppelt");
         });
 
         await check("Anhalten, Weiter, Abbrechen nur im passenden Zustand; Abbrechen lässt die offenen aus", async () => {
@@ -416,6 +430,26 @@ export async function checkMessagesDb(config: IConfig, http: IHttp): Promise<voi
             assert.equal(done?.failed, 1);
         });
 
+        await check("Hängt eine Zeile mitten im Lauf auf „sending“, wird sie am Ende „nicht erreicht“ und die Nachricht fertig", async () => {
+            const fifth = (await startAll(ACTOR, "check:db alle", CONTENT)).id;
+
+            // Etwa ein Datenbankfehler zwischen Senden und Eintragen: Die Zeile bleibt ohne Neustart auf sending.
+            await query("UPDATE bot_message_recipients SET state = 'sending' WHERE message_id = ? AND user_id = ?", [fifth, P.data]);
+
+            const rec = recorder(() => null);
+            let result = "idle";
+
+            for (let round = 0; round < 200 && result !== "done"; round++) result = await messageRound(config, rec.send);
+
+            assert.equal(result, "done");
+            assert.ok(!rec.calls.includes(P.data), "nicht neu geschickt");
+            assert.deepEqual(await rowOf(fifth, P.data), { state: "failed", reason: "beim Senden hängen geblieben, unklar ob angekommen" });
+
+            const done = await messageRow(fifth);
+            assert.equal(done?.failed, 1);
+            assert.equal(done?.total, done ? done.sent + done.failed + done.skipped : -1);
+        });
+
         await check("An eine Person: ohne Daten, mit Löschung oder gesperrt abgelehnt; sonst sofort geschickt und im Verlauf", async () => {
             await assert.rejects(sendOne(config, ACTOR, P.audit, "check:db eine", CONTENT), status(409, "Zu dieser ID hat RL Nexus keine Daten."));
             await assert.rejects(sendOne(config, ACTOR, P.planned, "check:db eine", CONTENT), status(409, "Diese Person hat ihre Daten löschen lassen."));
@@ -434,6 +468,10 @@ export async function checkMessagesDb(config: IConfig, http: IHttp): Promise<voi
             assert.deepEqual([message?.audience, message?.target_user_id, message?.state, message?.total, message?.sent, message?.template_name], ["one", P.data, "done", 1, 1, "check:db eine"]);
             assert.deepEqual(await rowOf(Number(message?.id), P.data), { state: "sent", reason: null });
             assert.equal(Number((await query<{ n: number }[]>("SELECT COUNT(*) AS n FROM admin_audit WHERE action = 'messages.one' AND target = ?", [P.data]))[0]?.n), 1);
+
+            // Im Protokoll Vorlage und Nummer, nicht der Titel: Er kann Persönliches enthalten.
+            const [logged] = await query<{ detail: string }[]>("SELECT detail FROM admin_audit WHERE action = 'messages.one' AND target = ?", [P.data]);
+            assert.equal(logged?.detail, `check:db eine · Nachricht ${message?.id}`);
 
             fake.dmFails.add(P.cancelled);
             assert.deepEqual(await sendOne(config, ACTOR, P.cancelled, "check:db eine", CONTENT), { sent: false, reason: "Die Person nimmt keine Direktnachrichten vom Bot an." });

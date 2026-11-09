@@ -18,7 +18,10 @@ const BASE: IMessageContent = {
 };
 
 const LINK_PROBLEM = "Knöpfe dürfen nur auf nexus-emb.de oder einen Kanal des RL-Nexus-Servers zeigen.";
-const ADDRESS_PROBLEM = "Im Text dürfen nur Adressen von nexus-emb.de oder discord.com stehen.";
+const ADDRESS_PROBLEM = "Im Text dürfen nur Adressen von nexus-emb.de oder discord.com stehen, bei discord.com nur Kanäle des RL-Nexus-Servers.";
+const EMOJI_PROBLEM = "Emojis und Flaggen gehen nicht, weder im Bild noch auf Knöpfen.";
+const INVISIBLE_PROBLEM = "Die Nachricht enthält unsichtbare Steuerzeichen.";
+const FOREIGN_PROBLEM = "Nur lateinische Buchstaben: Zeichen aus anderen Schriften sehen oft gleich aus und täuschen.";
 const SENSITIVE_PROBLEM = "Nachrichten dürfen nicht nach Passwort, Token, Zwei-Faktor-Code oder Zahlungsdaten fragen.";
 
 function problemOf(change: Partial<Record<keyof IMessageContent, unknown>>): string | null {
@@ -144,9 +147,29 @@ export async function checkMessages(): Promise<void> {
         assert.equal(problemOf({ intro: "Hallo {name}, alles im Plan :-{" }), null);
     });
 
-    await check("Emojis kann das Bild nicht zeigen", () => {
-        assert.equal(problemOf({ title: "Neu 🎉" }), "Emojis kann das Bild nicht zeigen.");
-        assert.equal(problemOf({ boxes: [{ label: "", text: "Danke ❤️" }] }), "Emojis kann das Bild nicht zeigen.");
+    await check("Keine Emojis und Flaggen, auch nicht auf Knöpfen; ©, ® und ™ gehen", () => {
+        assert.equal(problemOf({ title: "Neu 🎉" }), EMOJI_PROBLEM);
+        assert.equal(problemOf({ boxes: [{ label: "", text: "Danke ❤️" }] }), EMOJI_PROBLEM);
+        assert.equal(problemOf({ intro: "Grüße aus 🇩🇪" }), EMOJI_PROBLEM);
+        assert.equal(problemOf({ buttons: [{ label: "Los 🚀", url: "https://nexus-emb.de" }] }), EMOJI_PROBLEM);
+        assert.equal(problemOf({ title: "RL Nexus™ © 2026 ®" }), null);
+    });
+
+    await check("Unsichtbare Steuerzeichen und fremde Schriften fallen durch", () => {
+        assert.equal(problemOf({ intro: "Pass​wort" }), INVISIBLE_PROBLEM);
+        assert.equal(problemOf({ title: "Hallo ‮ed.bme-suxen" }), INVISIBLE_PROBLEM);
+        assert.equal(problemOf({ buttons: [{ label: "Los", url: "https://nexus-emb.de/​x" }] }), INVISIBLE_PROBLEM);
+        // Kyrillisches „а“ (U+0430) statt „a“, griechisches „ο“ statt „o“.
+        assert.equal(problemOf({ intro: "Dein Pаsswort" }), FOREIGN_PROBLEM);
+        assert.equal(problemOf({ title: "nexus-emb.de/lοgin" }), FOREIGN_PROBLEM);
+        assert.equal(problemOf({ intro: "Grüße, Straße, café, 5 € – „so“ · 50 %" }), null);
+    });
+
+    await check("Regeln gelten für die NFKC-Form: Vollbreite Zeichen rutschen nicht durch", () => {
+        assert.equal(problemOf({ intro: "Schick dein ｐａｓｓｗｏｒｔ" }), SENSITIVE_PROBLEM);
+        assert.equal(problemOf({ intro: "Geh auf evil｡com" }), ADDRESS_PROBLEM);
+        // Gespeichert bleibt der Text, wie er kam.
+        assert.equal(contentOf({ ...BASE, title: "Neu ＃1" }).title, "Neu ＃1");
     });
 
     await check("Knöpfe nur auf nexus-emb.de oder einen Kanal des RL-Nexus-Servers", () => {
@@ -176,8 +199,13 @@ export async function checkMessages(): Promise<void> {
         assert.equal(problemOf({ boxes: [{ label: "", text: "Hier: https://bit.ly/x" }] }), ADDRESS_PROBLEM);
         assert.equal(problemOf({ buttons: [{ label: "Auf evil.com", url: "https://nexus-emb.de" }] }), ADDRESS_PROBLEM);
 
-        for (const intro of ["siehe nexus-emb.de/datenschutz", "z. B. heute", "Version 2.0", "Mehr auf https://status.nexus-emb.de", "Frag auf discord.com nach"]) {
+        for (const intro of ["siehe nexus-emb.de/datenschutz", "z. B. heute", "Version 2.0", "Mehr auf https://status.nexus-emb.de", "Frag auf discord.com nach", `Kanal: discord.com/channels/${GUILD}/123.`, `https://discord.com/channels/${GUILD}`]) {
             assert.equal(problemOf({ intro }), null, intro);
+        }
+
+        // discord.com nur ohne Pfad oder mit einem Kanal des RL-Nexus-Servers.
+        for (const intro of ["Tritt bei: discord.com/invite/abc", "discord.com/oauth2/authorize?client_id=1", "discord.com/channels/1/2", `discord.com/channels/${GUILD}0/2`, "https://discord.com/login"]) {
+            assert.equal(problemOf({ intro }), ADDRESS_PROBLEM, intro);
         }
     });
 
@@ -203,6 +231,13 @@ export async function checkMessages(): Promise<void> {
         const tricky = fillContent(BASE, { name: "{datum} $& $1", date: at });
 
         assert.equal(tricky.intro, "Hallo {datum} $& $1, das ändert sich bei RL Nexus.");
+
+        // Discord nimmt höchstens 80 Zeichen als Beschriftung; ein Emoji im Namen wird nicht zerteilt.
+        const long = fillContent({ ...BASE, buttons: [{ label: "{name} {name} {name}", url: "https://nexus-emb.de" }] }, { name: `${"x".repeat(31)}🎮`, date: at });
+        const label = long.buttons[0]?.label ?? "";
+
+        assert.ok(label.length <= 80, `${label.length} Zeichen`);
+        assert.equal(label, `${"x".repeat(31)}🎮 ${"x".repeat(31)}🎮 ${"x".repeat(12)}`);
         // Der Inhalt selbst bleibt unverändert.
         assert.equal(BASE.intro, "Hallo {name}, das ändert sich bei RL Nexus.");
     });
@@ -226,6 +261,10 @@ export async function checkMessages(): Promise<void> {
         assert.equal(failureKind(502, null), "trouble");
         // Ungültiges Bot-Token trifft alle, nicht nur diese Person.
         assert.equal(failureKind(401, 0), "trouble");
+        // Unbekannte 4xx treffen meist alle: fehlende Rechte, kaputte Nachricht.
+        assert.equal(failureKind(403, 50001), "trouble");
+        assert.equal(failureKind(400, 50035), "trouble");
+        assert.equal(failureKind(403, null), "trouble");
     });
 
     await check("Bild: PNG, 800 breit, wächst mit dem Text; Alt-Text mit allem, was draufsteht", async () => {

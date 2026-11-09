@@ -24,7 +24,7 @@ interface IFact {
 }
 
 /** Stand der Datenschutzerklärung. Bei jeder inhaltlichen Änderung nachziehen. */
-const UPDATED = "4. November 2026";
+const UPDATED = "9. November 2026";
 
 /**
  * Impressum und Datenschutzerklärung.

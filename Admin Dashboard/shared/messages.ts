@@ -85,15 +85,24 @@ const SENSITIVE = /pass(wort|word)|kennwort|\btoken\b|\b2fa\b|zwei-?faktor|two-?
 
 const PLACEHOLDER = /\{([^{}]*)\}/g;
 const ALLOWED_PLACEHOLDERS = new Set(["name", "datum"]);
-const EMOJI = /\p{Extended_Pictographic}/u;
-/** Ein Wort, das wie eine Domain aussieht, mit oder ohne https://. */
-const DOMAIN = /(?:https?:\/\/)?((?:[a-z0-9-]+\.)+[a-z]{2,})(?![a-z0-9-])/gi;
+/** Emojis und Flaggen; ©, ® und ™ zählen nicht dazu. */
+const EMOJI = /(?![©®™])\p{Extended_Pictographic}|\p{Regional_Indicator}/u;
+/** Unsichtbare Zeichen wie Zero-Width-Space oder Schreibrichtungs-Umschalter. */
+const INVISIBLE = /\p{Cf}/u;
+/** Buchstaben anderer Schriften, etwa ein kyrillisches „а“ in „Pаsswort“. Ziffern, Satzzeichen und Akzente gehören zu Common und Inherited. */
+const FOREIGN = /[^\p{Script=Latin}\p{Script=Common}\p{Script=Inherited}]/u;
+/** Ein Wort, das wie eine Domain aussieht, mit oder ohne https://, dahinter ein Pfad. */
+const DOMAIN = /(?:https?:\/\/)?((?:[a-z0-9-]+\.)+[a-z]{2,})(?![a-z0-9-])(\/\S*)?/gi;
 
 const EMPTY_PROBLEM = "Die Nachricht ist leer: Sie braucht eine große Zeile oder mindestens eine Kachel.";
 const FORM_PROBLEM = "Die Nachricht hat nicht die erwartete Form.";
-const EMOJI_PROBLEM = "Emojis kann das Bild nicht zeigen.";
+const EMOJI_PROBLEM = "Emojis und Flaggen gehen nicht, weder im Bild noch auf Knöpfen.";
+const INVISIBLE_PROBLEM = "Die Nachricht enthält unsichtbare Steuerzeichen.";
+const FOREIGN_PROBLEM = "Nur lateinische Buchstaben: Zeichen aus anderen Schriften sehen oft gleich aus und täuschen.";
 const LINK_PROBLEM = "Knöpfe dürfen nur auf nexus-emb.de oder einen Kanal des RL-Nexus-Servers zeigen.";
-const ADDRESS_PROBLEM = "Im Text dürfen nur Adressen von nexus-emb.de oder discord.com stehen.";
+const ADDRESS_PROBLEM = "Im Text dürfen nur Adressen von nexus-emb.de oder discord.com stehen, bei discord.com nur Kanäle des RL-Nexus-Servers.";
+/** Discord nimmt höchstens 80 Zeichen als Beschriftung eines Knopfs. */
+const BUTTON_LABEL_MAX = 80;
 const SENSITIVE_PROBLEM = "Nachrichten dürfen nicht nach Passwort, Token, Zwei-Faktor-Code oder Zahlungsdaten fragen.";
 
 const ownHost = (host: string): boolean => host === "nexus-emb.de" || host.endsWith(".nexus-emb.de");
@@ -115,11 +124,16 @@ function linkAllowed(raw: string, guildId: string): boolean {
     return discordHost(url.hostname) && (url.pathname === `/channels/${guildId}` || url.pathname.startsWith(`/channels/${guildId}/`));
 }
 
-function addressesAllowed(text: string): boolean {
+/** nexus-emb.de mit allem dahinter; discord.com nur ohne Pfad oder mit einem Kanal des RL-Nexus-Servers. */
+function addressesAllowed(text: string, guildId: string): boolean {
     for (const match of text.matchAll(DOMAIN)) {
         const host = (match[1] ?? "").toLowerCase();
+        // Satzzeichen am Ende gehören zum Satz, nicht zur Adresse.
+        const path = (match[2] ?? "").replace(/[.,;:!?)\]"'“”»«]+$/, "");
 
-        if (!ownHost(host) && !discordHost(host)) return false;
+        if (ownHost(host)) continue;
+        if (!discordHost(host)) return false;
+        if (path !== "" && path !== "/" && path !== `/channels/${guildId}` && !path.startsWith(`/channels/${guildId}/`)) return false;
     }
 
     return true;
@@ -234,10 +248,16 @@ export function checkMessage(value: unknown, guildId: string): { readonly conten
         }
     }
 
-    if (imageTexts(content).some((text) => EMOJI.test(text))) return { problem: EMOJI_PROBLEM };
+    // Die Regeln prüfen die NFKC-Form: Vollbreite Buchstaben oder „｡“ statt Punkt sollen nicht durchrutschen. Gespeichert bleibt der Text, wie er kam.
+    // „。“ bleibt auch nach NFKC stehen, gilt in Domains aber als Punkt (IDNA).
+    const normal = texts.map((text) => text.normalize("NFKC").replace(/。/g, "."));
+
+    if (texts.some((text) => EMOJI.test(text))) return { problem: EMOJI_PROBLEM };
+    if ([...texts, ...content.buttons.map((button) => button.url)].some((text) => INVISIBLE.test(text))) return { problem: INVISIBLE_PROBLEM };
+    if (normal.some((text) => FOREIGN.test(text))) return { problem: FOREIGN_PROBLEM };
     if (content.buttons.some((button) => !linkAllowed(button.url, guildId))) return { problem: LINK_PROBLEM };
-    if (!texts.every(addressesAllowed)) return { problem: ADDRESS_PROBLEM };
-    if (texts.some((text) => SENSITIVE.test(text))) return { problem: SENSITIVE_PROBLEM };
+    if (!normal.every((text) => addressesAllowed(text, guildId))) return { problem: ADDRESS_PROBLEM };
+    if (normal.some((text) => SENSITIVE.test(text))) return { problem: SENSITIVE_PROBLEM };
 
     return { content };
 }
@@ -258,8 +278,21 @@ export function fillContent(content: IMessageContent, values: { readonly name: s
         intro: fill(content.intro),
         big: content.big ? { text: fill(content.big.text), note: fill(content.big.note) } : null,
         boxes: content.boxes.map((box) => ({ label: fill(box.label), text: fill(box.text) })),
-        buttons: content.buttons.map((button) => ({ label: fill(button.label), url: button.url })),
+        // Ein langer Name kann die Beschriftung über Discords Grenze schieben; dann lehnt Discord die ganze DM ab.
+        buttons: content.buttons.map((button) => ({ label: cut(fill(button.label), BUTTON_LABEL_MAX), url: button.url })),
     };
+}
+
+/** Höchstens max UTF-16-Einheiten, ohne ein Emoji im Namen zu zerteilen. */
+function cut(text: string, max: number): string {
+    let out = "";
+
+    for (const char of text) {
+        if (out.length + char.length > max) break;
+        out += char;
+    }
+
+    return out;
 }
 
 /* --- API ------------------------------------------------------------------- */

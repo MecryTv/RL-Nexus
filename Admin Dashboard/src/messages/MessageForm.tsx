@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties, type JSX } from "react";
+import { useEffect, useState, type CSSProperties, type JSX } from "react";
 import { COLOR_HEX, COLOR_LABELS, MESSAGE_COLORS, MESSAGE_LIMITS, type IMessageBox, type IMessageButton, type IMessageContent } from "../../shared/messages.ts";
 import { Button } from "../components/Button";
 import { Field } from "../components/Field";
@@ -11,7 +11,17 @@ import styles from "./messages.module.scss";
  * checkMessage zeigt die Seite unter dem Formular und statt der Vorschau.
  */
 
-const PLACEHOLDER_HINT = "Platzhalter: {name} für den Namen, {datum} für den Tag des Versands.";
+function dataUrl(blob: Blob): Promise<string> {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(new Error("Die Vorschau ließ sich nicht laden."));
+        reader.readAsDataURL(blob);
+    });
+}
+
+const PLACEHOLDER_HINT ="Platzhalter: {name} für den Namen, {datum} für den Tag des Versands.";
 
 export function MessageForm({ id, value, onChange }: { readonly id: string; readonly value: IMessageContent; readonly onChange: (value: IMessageContent) => void }): JSX.Element {
     const set = (patch: Partial<IMessageContent>): void => onChange({ ...value, ...patch });
@@ -134,7 +144,6 @@ export function MessagePreview({ content, problem }: { readonly content: IMessag
     const [url, setUrl] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
-    const latest = useRef<string | null>(null);
     const body = JSON.stringify({ content });
 
     useEffect(() => {
@@ -149,11 +158,9 @@ export function MessagePreview({ content, problem }: { readonly content: IMessag
 
                     return response.blob();
                 })
-                .then((blob) => {
-                    const next = URL.createObjectURL(blob);
-
-                    if (latest.current) URL.revokeObjectURL(latest.current);
-                    latest.current = next;
+                // Als data:-URL: Die CSP von admin.nexus-emb.de lässt blob: in img-src nicht zu.
+                .then((blob) => dataUrl(blob))
+                .then((next) => {
                     setUrl(next);
                     setError(null);
                 })
@@ -170,14 +177,6 @@ export function MessagePreview({ content, problem }: { readonly content: IMessag
             controller.abort();
         };
     }, [body, problem]);
-
-    // Beim Verlassen das letzte Bild freigeben.
-    useEffect(
-        () => () => {
-            if (latest.current) URL.revokeObjectURL(latest.current);
-        },
-        []
-    );
 
     const shown = problem ?? error;
 

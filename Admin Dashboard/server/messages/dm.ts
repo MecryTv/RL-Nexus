@@ -34,18 +34,20 @@ export interface ISendFailure {
 
 /** Discords Codes für „DMs zu schnell geöffnet“ und „Bot als Spam markiert“. */
 const SPAM_CODES = new Set([40003, 20026]);
+/** Nur diese Person: DMs zu (50007), Konto weg (10013), kein gültiger Empfänger (50033). */
+const PERSON_CODES = new Set([50007, 10013, 50033]);
 
 /**
- * Wen ein Fehler betrifft: nur diese Person (DMs zu, Konto weg, jede andere
- * 4xx), ein Spam-Signal von Discord oder eine Störung (keine Antwort, 429
- * auch nach dem Warten, 5xx). 401 heißt: Das Bot-Token gilt nicht, das trifft
- * alle und zählt deshalb als Störung.
+ * Wen ein Fehler betrifft: nur diese Person (die Codes oben), ein
+ * Spam-Signal von Discord oder eine Störung. Störung ist alles andere: keine
+ * Antwort, 401 (Bot-Token gilt nicht), 429 auch nach dem Warten, 5xx und
+ * jede unbekannte 4xx, denn die trifft meist alle.
  */
-export function failureKind(status: number | null, code: number | null): FailureKind {
+export function failureKind(_status: number | null, code: number | null): FailureKind {
     if (code !== null && SPAM_CODES.has(code)) return "spam";
-    if (status === null || status === 401 || status === 429 || status >= 500) return "trouble";
+    if (code !== null && PERSON_CODES.has(code)) return "person";
 
-    return "person";
+    return "trouble";
 }
 
 /** Sätze für die Codes, die beim Versand an viele vorkommen. Der Rest bleibt Discords Status und Code. */

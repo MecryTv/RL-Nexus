@@ -63,6 +63,11 @@ function Detail({ id }: { readonly id: number }): JSX.Element {
                     ))}
                 </ul>
             )}
+            {data.misses.length > 0 && data.misses.length < data.failed + data.skipped && (
+                <p className={styles.dim}>
+                    Gezeigt: die ersten {formatNumber(data.misses.length)} von {formatNumber(data.failed + data.skipped)}.
+                </p>
+            )}
         </div>
     );
 }

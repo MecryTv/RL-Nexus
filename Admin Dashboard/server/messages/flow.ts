@@ -103,7 +103,8 @@ export async function sendOne(config: IConfig, actor: IActor, userId: string, te
     ]);
     await recount(id);
     await finishIfDone(id);
-    await audit(actor, "messages.one", userId, `${what(templateName, content)}${failure ? ` · nicht angekommen: ${failure.reason}` : ""}`);
+    // Ohne Titel: Er kann Persönliches enthalten, und das Protokoll bleibt länger als die 90 Tage der Nachricht.
+    await audit(actor, "messages.one", userId, `${templateName || "Ohne Vorlage"} · Nachricht ${id}${failure ? ` · nicht angekommen: ${failure.reason}` : ""}`);
     publish("messages");
 
     return { sent: failure === null, reason: failure?.reason ?? null };

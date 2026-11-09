@@ -22,6 +22,8 @@ import { body, id, oneOf, snowflake, text } from "../validate.ts";
 /** Was „An alle“ zum Bestätigen eingetippt braucht. */
 const CONFIRM = "SENDEN";
 const AUDIENCES = ["all", "one"] as const;
+/** Einzelne DMs gehen sofort raus: höchstens 10 in der Minute, damit ein Klick-Fehler oder ein Skript den Bot nicht als Spam markieren lässt. */
+const SEND_LIMIT = { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } };
 
 const iso = (value: Date | null): string | null => (value === null ? null : value.toISOString());
 
@@ -83,9 +85,9 @@ export async function messageRoutes(app: FastifyInstance, { config }: { config: 
         return reply.type("image/png").header("Cache-Control", "no-store").send(image);
     });
 
-    app.post("/api/messages/test", async (request): Promise<ISendResult> => sendTest(config, actorOf(request), contentFrom(body(request.body).content)));
+    app.post("/api/messages/test", SEND_LIMIT, async (request): Promise<ISendResult> => sendTest(config, actorOf(request), contentFrom(body(request.body).content)));
 
-    app.post("/api/messages/one", async (request): Promise<ISendResult> => {
+    app.post("/api/messages/one", SEND_LIMIT, async (request): Promise<ISendResult> => {
         ready();
 
         const input = body(request.body);
