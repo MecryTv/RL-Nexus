@@ -1,6 +1,6 @@
 import { HUB_ROWS, LAYOUT_LABELS, MMR_LABELS, RANK_STYLES, ROLE_LABELS, ROLE_ORDER } from "../../../constants/Teams";
 import { ITeamSettings } from "../../../interfaces/services/teams/ITeams";
-import { TeamError } from "../../TeamService";
+import { RoleProblem, TeamError } from "../../TeamService";
 import { IPanelModule, PanelError } from "../SettingsModel";
 import { F, TEXT } from "./Shared";
 
@@ -67,7 +67,14 @@ export const TeamsPanel: IPanelModule<S> = {
             throw error;
         }
 
+        // Wie der Hinweis im Dashboard: Eine Rolle, die der Bot nicht vergeben kann, nimmt er zwar an, gibt sie aber niemandem.
+        if ("roles" in patch) {
+            const positions = (patch.roles as { positions?: Record<string, string | null> }).positions ?? {};
+
+            return Object.values(positions).map((id) => (id ? RoleProblem(guild, id) : null)).find((problem) => problem !== null) ?? null;
+        }
+
         // Das Dashboard sendet die Übersicht nach dem Speichern auch nicht neu, das macht dort ein eigener Knopf.
-        return "roles" in patch ? null : "Im Kanal zeigt sich das, sobald du die Übersicht im Dashboard neu sendest.";
+        return "Im Kanal zeigt sich das, sobald du die Übersicht im Dashboard neu sendest.";
     },
 };

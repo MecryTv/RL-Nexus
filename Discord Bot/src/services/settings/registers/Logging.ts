@@ -1,7 +1,7 @@
 import { LOG_CATEGORIES, MAX_IGNORE } from "../../../constants/Logging";
 import { ILogSettings, LogCategoryId } from "../../../interfaces/services/logging/ILogging";
 import { IPanelModule } from "../SettingsModel";
-import { ANY_CHANNEL, F, LOG } from "./Shared";
+import { F, LOG, TEXT } from "./Shared";
 
 type S = ILogSettings;
 
@@ -32,7 +32,8 @@ export const LoggingPanel: IPanelModule<S> = {
         {
             title: "Übergehen",
             fields: [
-                F<S>("channels", "noChannels", "Kanäle übergehen", "Was dort passiert, taucht in keinem Log auf. Eine Kategorie übergeht alle Kanäle darin.", (s) => s.ignoreChannels, (value: string[]) => ({ ignoreChannels: value }), { max: MAX_IGNORE, channelTypes: ANY_CHANNEL }),
+                // Dieselben Kanalarten wie die Auswahl im Dashboard: Andere zeigte es dort als „gelöschter Kanal“ (Review 09.11.).
+                F<S>("channels", "noChannels", "Kanäle übergehen", "Was dort passiert, taucht in keinem Log auf.", (s) => s.ignoreChannels, (value: string[]) => ({ ignoreChannels: value }), { max: MAX_IGNORE, channelTypes: TEXT }),
                 F<S>("roles", "noRoles", "Rollen übergehen", "Wer eine davon hat, wird nicht protokolliert.", (s) => s.ignoreRoles, (value: string[]) => ({ ignoreRoles: value }), { max: MAX_IGNORE }),
                 F<S>("toggle", "bots", "Bots übergehen", "Bots machen sonst den größten Teil der Einträge aus.", (s) => s.ignoreBots, (value: boolean) => ({ ignoreBots: value })),
             ],

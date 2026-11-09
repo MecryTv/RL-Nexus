@@ -3,7 +3,7 @@ import { ILevelSettings } from "../../../interfaces/services/levels/ILevels";
 import logger from "../../../utils/logger";
 import { PostBoard } from "../../levels/BoardPost";
 import { IPanelModule, PanelError } from "../SettingsModel";
-import { ANY_CHANNEL, CHAT, F } from "./Shared";
+import { CHAT, F, TEXT_OR_CATEGORY } from "./Shared";
 
 type S = ILevelSettings;
 
@@ -79,7 +79,7 @@ export const LevelsPanel: IPanelModule<S> = {
         {
             title: "Ausnahmen und Kanäle",
             fields: [
-                F<S>("channels", "noChannels", "Keine Punkte in", "In diesen Kanälen gibt es keine Punkte.", (s) => s.noChannels, (value: string[]) => ({ noChannels: value }), { max: MAX_EXCLUDED, channelTypes: ANY_CHANNEL }),
+                F<S>("channels", "noChannels", "Keine Punkte in", "In diesen Kanälen gibt es keine Punkte.", (s) => s.noChannels, (value: string[]) => ({ noChannels: value }), { max: MAX_EXCLUDED, channelTypes: TEXT_OR_CATEGORY }),
                 F<S>("roles", "noRoles", "Keine Punkte für", "Diese Rollen sammeln nichts.", (s) => s.noRoles, (value: string[]) => ({ noRoles: value }), { max: MAX_EXCLUDED }),
                 F<S>("channel", "boost", "Boost-Kanal", "Hier kündigt der Bot doppelte Punkte an.", (s) => s.boostChannelId, (value: string | null) => ({ boostChannelId: value }), { channelTypes: CHAT }),
                 F<S>("channel", "board", "Rangliste im Kanal", "Die Rangliste steht fest in diesem Kanal und zieht sich nach. Leer: aus.", (s) => (s.boardPost.on ? s.boardPost.channelId : null), (value: string | null, s) => ({ boardPost: { ...s.boardPost, on: value !== null, channelId: value } }), { channelTypes: CHAT }),

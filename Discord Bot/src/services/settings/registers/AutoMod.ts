@@ -1,7 +1,7 @@
 import { FILTERS, MAX_IGNORE } from "../../../constants/AutoMod";
 import { FilterId, IAutoModSettings } from "../../../interfaces/services/automod/IAutoMod";
 import { IPanelModule } from "../SettingsModel";
-import { ANY_CHANNEL, F, LOG } from "./Shared";
+import { F, LOG, TEXT } from "./Shared";
 
 type S = IAutoModSettings;
 
@@ -36,7 +36,8 @@ export const AutoModPanel: IPanelModule<S> = {
             title: "Log und Ausnahmen",
             fields: [
                 F<S>("channel", "log", "Log-Kanal", "Hierhin meldet der Bot jeden Treffer, ein Textkanal oder ein Forum-Beitrag.", (s) => s.logChannelId, (value: string | null) => ({ logChannelId: value }), { channelTypes: LOG }),
-                F<S>("channels", "noChannels", "Kanäle ausnehmen", "Hier greift der Bot nicht ein. Eine Kategorie nimmt alle Kanäle darin aus.", (s) => s.ignoreChannels, (value: string[]) => ({ ignoreChannels: value }), { max: MAX_IGNORE, channelTypes: ANY_CHANNEL }),
+                // Dieselben Kanalarten wie die Auswahl im Dashboard: Andere zeigte es dort als „gelöschter Kanal“ (Review 09.11.).
+                F<S>("channels", "noChannels", "Kanäle ausnehmen", "In diesen Kanälen greift der Bot nicht ein.", (s) => s.ignoreChannels, (value: string[]) => ({ ignoreChannels: value }), { max: MAX_IGNORE, channelTypes: TEXT }),
                 F<S>("roles", "noRoles", "Rollen ausnehmen", "Wer eine davon hat, wird nicht gefiltert.", (s) => s.ignoreRoles, (value: string[]) => ({ ignoreRoles: value }), { max: MAX_IGNORE }),
                 F<S>("toggle", "mods", "Moderatoren ausnehmen", "Wer „Nachrichten verwalten“ darf, bleibt außen vor.", (s) => s.ignoreMods, (value: boolean) => ({ ignoreMods: value })),
             ],

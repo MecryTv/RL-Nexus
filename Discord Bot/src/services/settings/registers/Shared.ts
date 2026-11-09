@@ -6,8 +6,8 @@ import { FieldKind, IPanelField } from "../SettingsModel";
 export const TEXT = [ChannelType.GuildText, ChannelType.GuildAnnouncement];
 /** Kanäle mit Text-Chat, auch Sprachkanäle - so viel nimmt das Speichern mancher Module an (isTextBased). */
 export const CHAT = [...TEXT, ChannelType.GuildVoice];
-/** Alles, was eine Ausnahme sein kann: jede Kanalart und Kategorien. Beiträge erben vom Kanal darüber. */
-export const ANY_CHANNEL = [...TEXT, ChannelType.GuildVoice, ChannelType.GuildStageVoice, ChannelType.GuildCategory, ChannelType.GuildForum, ChannelType.GuildMedia];
+/** Level „Keine Punkte in“: Kanäle und Kategorien, genau wie die Auswahl im Dashboard (GuildLevels.ts). */
+export const TEXT_OR_CATEGORY = [...TEXT, ChannelType.GuildCategory];
 /** Log-Ziele: ein Textkanal oder ein Beitrag, genau was IsLogTarget annimmt (utils/logtarget.ts). Private Threads nicht, die würde das Speichern still leeren. */
 export const LOG = [...TEXT, ChannelType.PublicThread, ChannelType.AnnouncementThread];
 

@@ -68,7 +68,7 @@ Jede Änderung über das Panel steht im Protokoll des Bots (`⚙️ /einstellung
 ## Ein Modul dazunehmen
 
 1. Ein Register in `services/settings/registers/` anlegen: höchstens 25 Felder (ein Menü in Discord hat nicht mehr), je Abschnitt höchstens 12 (`MAX_SECTION_FIELDS`, mehr schneidet das Bild ab). Gespeichert wird über den Weg der Dashboard-Route des Moduls; eigene Fehler des Moduls als `PanelError` weitergeben.
-2. Kanalarten (`channelTypes`) so weit, wie das `Clean` des Moduls annimmt. Bei Mehrfachauswahl ist das Pflicht, sonst gehen Einträge beim Speichern verloren.
+2. Kanalarten (`channelTypes`) genau wie die Auswahl im Dashboard. Weniger, und bei Mehrfachauswahl gehen Einträge beim Speichern verloren; mehr, und das Dashboard zeigt sie als „gelöschter Kanal“.
 3. In `registers/index.ts` eintragen (`ALL` und den Bereich in `PANEL_AREAS`). Ein Modul ohne eigene Einstellungen bekommt statt Feldern einen Satz (`about`, siehe `registers/Simple.ts`).
 4. In `scripts/CheckSettings.ts` Startwerte und das echte `Clean` des Moduls eintragen. `npm run check:settings` prüft dann, dass jedes Feld beim Speichern nur sich selbst ändert.
 

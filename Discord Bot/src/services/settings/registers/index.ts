@@ -21,7 +21,8 @@ import { YouTubePanel } from "./YouTube";
 
 /**
  * Die Bereiche der Übersicht, wie im Entwurf (W-0014 Teil 4): Namen der
- * Dashboard-Leiste, Module in derselben Reihenfolge wie dort. Gallery fehlt.
+ * Dashboard-Leiste, Reihenfolge der Bereiche und Module wie im Entwurf (die
+ * Leiste stellt Moderation hinter Support). Gallery fehlt.
  */
 export const PANEL_AREAS: readonly { name: string; ids: readonly PanelModuleId[] }[] = [
     { name: "Immer dabei", ids: ["levels", "backups"] },
