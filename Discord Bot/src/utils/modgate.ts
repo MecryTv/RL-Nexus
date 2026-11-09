@@ -48,7 +48,7 @@ export async function ModGate(client: BotClient, request: FastifyRequest, reply:
 
     const grant = await StaffGrantOf(client, session, id);
 
-    if (grant && !whole) StaffWrite(client, request, reply, id, "Moderation");
+    if (grant && !whole) await StaffWrite(client, request, reply, id, "Moderation", "moderation");
 
     try {
         if (!grant && !(await service.CanModerate(session, id))) {

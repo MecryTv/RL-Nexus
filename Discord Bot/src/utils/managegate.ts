@@ -3,6 +3,8 @@ import { MODULES } from "../dashboard/client/constants/Modules";
 import IDashboardSession from "../interfaces/services/dashboard/IDashboardSession";
 import { IStaffGrant } from "../interfaces/services/staffgrant/IStaffGrant";
 import { ActionText } from "../services/staffgrant/Rules";
+import { DiffSnapshots, Snapshot } from "../services/staffgrant/Changes";
+import { ANTI_VILLAIN_MODULE } from "../constants/AntiVillain";
 import { PRIVATE_HINT } from "../constants/StaffGrant";
 import { FastifyReply, FastifyRequest } from "fastify";
 import BotClient from "../client/BotClient";
@@ -41,20 +43,35 @@ export function StaffActor(session: IDashboardSession): IActor {
 /**
  * W-0011: Schreibt Staff mit Freigabe, kommt nach einer erfolgreichen Antwort
  * ein Eintrag ins Protokoll: „<Bereich> › <Aktion>“ aus body.action.
+ * W-0049: Mit module stehen die Einstellungen vorher und nachher dabei (über
+ * die Register des Panels), und Lesen zählt einmal je Bereich als „angesehen“.
+ * Vor dem Handler aufrufen und abwarten: Der erste Stand muss vor der Änderung liegen.
  */
-export function StaffWrite(client: BotClient, request: FastifyRequest, reply: FastifyReply, guildId: string, area: string): void {
-    if (request.method === "GET" || request.method === "HEAD") return;
-
+export async function StaffWrite(client: BotClient, request: FastifyRequest, reply: FastifyReply, guildId: string, area: string, module: string | null = null): Promise<void> {
     const session = SessionOf(client, request);
     const grant = session ? client.staffGrantService.Active(session.userId, guildId) : null;
 
     if (!grant) return;
 
+    if (request.method === "GET" || request.method === "HEAD") {
+        client.staffGrantService.Viewed(grant, area);
+
+        return;
+    }
+
     const body = request.body;
     const action = typeof body === "object" && body !== null && !Buffer.isBuffer(body) ? (body as { action?: unknown }).action : undefined;
+    const guild = module ? client.guilds.cache.get(guildId) : undefined;
+    const before = guild && module ? await Snapshot(client, guild, module).catch(() => null) : null;
 
     reply.raw.once("finish", () => {
-        if (reply.statusCode < 400) client.staffGrantService.Log(grant, area, ActionText(area, action));
+        if (reply.statusCode >= 400) return;
+
+        void (async () => {
+            const after = before && guild && module ? await Snapshot(client, guild, module).catch(() => null) : null;
+
+            client.staffGrantService.Log(grant, area, ActionText(area, action), Date.now(), before && after ? DiffSnapshots(before, after) : []);
+        })();
     });
 }
 
@@ -102,7 +119,7 @@ export async function PrivateGate(client: BotClient, session: IDashboardSession,
     const request = reply.request;
 
     if (request.method === "GET") client.staffGrantService.Seen(grant, area, item);
-    else StaffWrite(client, request, reply, guildId, area);
+    else await StaffWrite(client, request, reply, guildId, area);
 
     return true;
 }
@@ -206,7 +223,7 @@ export async function ManageGate(client: BotClient, request: FastifyRequest, rep
 
     if (!stand) return null;
 
-    if (stand.grant) StaffWrite(client, request, reply, guild.id, ModuleLabel(module));
+    if (stand.grant) await StaffWrite(client, request, reply, guild.id, ModuleLabel(module), module ?? ANTI_VILLAIN_MODULE);
 
     return { guild, member: stand.member, actor: stand.actor };
 }

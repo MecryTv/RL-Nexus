@@ -43,10 +43,10 @@ export default class StaffGrants extends Model<IStaffGrantRow> {
     }
 
     /** Was seit since angefragt oder beendet wurde, neueste zuerst. */
-    async OfGuild(guildId: string, since: number): Promise<IStaffGrant[]> {
+    async OfGuild(guildId: string, since: number, limit = 50): Promise<IStaffGrant[]> {
         const rows = await this.db.Query<IStaffGrantRow>(
-            `SELECT * FROM \`${this.Table}\` WHERE guild_id = ? AND (created_at >= ? OR ended_at >= ?) ORDER BY created_at DESC LIMIT 50`,
-            [guildId, since, since]
+            `SELECT * FROM \`${this.Table}\` WHERE guild_id = ? AND (created_at >= ? OR ended_at >= ?) ORDER BY created_at DESC LIMIT ?`,
+            [guildId, since, since, limit]
         );
 
         return rows.map((row) => this.Grant(row));

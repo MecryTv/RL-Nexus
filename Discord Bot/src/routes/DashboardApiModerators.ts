@@ -53,7 +53,7 @@ export default class DashboardApiModerators extends Route {
             }
 
             // W-0011: Staff mit Freigabe - erfolgreiche Änderungen ins Protokoll.
-            StaffWrite(this.client, request, reply, id, "Moderatoren");
+            await StaffWrite(this.client, request, reply, id, "Moderatoren");
         } catch (error) {
             if (!(error instanceof SessionExpired)) throw error;
 

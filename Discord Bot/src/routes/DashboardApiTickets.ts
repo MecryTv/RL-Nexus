@@ -87,7 +87,7 @@ export default class DashboardApiTickets extends Route {
             }
 
             // W-0011: Staff mit Freigabe - erfolgreiche Änderungen ins Protokoll.
-            StaffWrite(this.client, request, reply, id, "Tickets");
+            await StaffWrite(this.client, request, reply, id, "Tickets", "tickets");
         } catch (error) {
             if (!(error instanceof SessionExpired)) throw error;
 

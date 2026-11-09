@@ -1,10 +1,11 @@
 import { Guild, GuildMember, Interaction, PermissionFlagsBits } from "discord.js";
 import BotClient from "../client/BotClient";
-import { COOLDOWN_MS, SEEN_DEDUPE_MS } from "../constants/StaffGrant";
+import { COOLDOWN_MS, LOG_KEEP_DAYS, SEEN_DEDUPE_MS } from "../constants/StaffGrant";
 import { IStaffChange, IStaffGrant, IStaffLogEntry, StaffAccessMode, StaffLogKind } from "../interfaces/services/staffgrant/IStaffGrant";
 import * as Machine from "./staffgrant/Machine";
 import { StaffGrantError } from "./staffgrant/Machine";
 import { AskList, DurationText } from "./staffgrant/Rules";
+import { IProtocolGrant, ProtocolGrant } from "./staffgrant/Protocol";
 import logger from "../utils/logger";
 import { BannedFor } from "../utils/security";
 
@@ -317,6 +318,28 @@ export default class StaffGrantService {
         const since = Date.now() - days * 86_400_000;
 
         return { grants: await this.client.staffGrants.OfGuild(guildId, since), log: await this.client.staffGrantLog.OfGuild(guildId, since) };
+    }
+
+    /**
+     * W-0049: die Seite Protokoll - jede Freigabe der letzten Tage mit ihren
+     * Einträgen. Laufende kommen aus dem Speicher, der ist immer frischer.
+     * ponytail: höchstens 500 Freigaben und 5000 Einträge, das reicht für 180 Tage bei Weitem.
+     */
+    async Protocol(guildId: string, days = LOG_KEEP_DAYS): Promise<IProtocolGrant[]> {
+        const since = Date.now() - days * 86_400_000;
+        const [grants, log] = await Promise.all([this.client.staffGrants.OfGuild(guildId, since, 500), this.client.staffGrantLog.OfGuild(guildId, since, 5000)]);
+        const byGrant = new Map<number, IStaffLogEntry[]>();
+
+        for (const entry of log) byGrant.set(entry.grantId, [...(byGrant.get(entry.grantId) ?? []), entry]);
+
+        return grants.map((grant) =>
+            ProtocolGrant(
+                this.live.get(grant.id) ?? grant,
+                byGrant.get(grant.id) ?? [],
+                (userId) => this.NameOf(guildId, userId),
+                (userId) => this.client.users.cache.get(userId)?.displayAvatarURL({ size: 64 }) ?? null
+            )
+        );
     }
 
     LogOf(grantId: number, limit: number): Promise<IStaffLogEntry[]> {

@@ -77,8 +77,8 @@ export default class StaffGrantLog extends Model<IStaffGrantLogRow> {
         return rows.map(Entry);
     }
 
-    async OfGuild(guildId: string, since: number): Promise<IStaffLogEntry[]> {
-        const rows = await this.db.Query<IStaffGrantLogRow>(`SELECT * FROM \`${this.Table}\` WHERE guild_id = ? AND at >= ? ORDER BY at DESC, id DESC LIMIT 200`, [guildId, since]);
+    async OfGuild(guildId: string, since: number, limit = 200): Promise<IStaffLogEntry[]> {
+        const rows = await this.db.Query<IStaffGrantLogRow>(`SELECT * FROM \`${this.Table}\` WHERE guild_id = ? AND at >= ? ORDER BY at DESC, id DESC LIMIT ?`, [guildId, since, limit]);
 
         return rows.map(Entry);
     }
