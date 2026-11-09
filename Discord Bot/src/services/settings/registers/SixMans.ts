@@ -20,7 +20,7 @@ export const SixMansPanel: IPanelModule<S> = {
             title: "Warteschlangen",
             fields: [
                 ...MODES.map((mode) =>
-                    F<S>("toggle", `mode${mode}`, MODE_LABELS[mode], `${MODE_LABELS[mode]} (${MODE_HINTS[mode]}) steht im Panel zur Wahl.`, (s) => s.modes[mode], (value: boolean, s) => ({ modes: { ...s.modes, [mode]: value } }))
+                    F<S>("toggle", `mode${mode}`, MODE_LABELS[mode], `${MODE_LABELS[mode]} (${MODE_HINTS[mode]}) steht als Warteschlange im 6-Mans-Kanal. Aus leert sie.`, (s) => s.modes[mode], (value: boolean, s) => ({ modes: { ...s.modes, [mode]: value } }))
                 ),
                 F<S>("number", "idle", "Rauswurf nach", "So lange ohne Runde, dann fliegt man aus der Warteschlange. 0 heißt nie.", (s) => s.idleMinutes, (value: number) => ({ idleMinutes: value }), { min: 0, max: MAX_IDLE, unit: "Min." }),
             ],

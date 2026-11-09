@@ -24,7 +24,7 @@ import { IPanelField, MAX_SECTION_FIELDS, PanelError, PanelId, PanelModuleId, Pa
 
 // Teil 4 · Imports Gruppe Rocket League
 import { DefaultLftSettings } from "../constants/Lft";
-import { DefaultRankRoleSettings } from "../constants/RankRoles";
+import { DefaultRankRoleSettings, Steps } from "../constants/RankRoles";
 import { DefaultSixSettings } from "../constants/SixMans";
 import { DefaultTeamSettings } from "../constants/Teams";
 // Teil 4 · Imports Gruppe Rest
@@ -284,6 +284,96 @@ async function checkRegisters(client: BotClient): Promise<Partial<Record<PanelMo
         check(`${panel.name}: jedes Feld ändert nur sich selbst`, wrong.length === 0, wrong.slice(0, 5).join(" | "));
     }
 
+    // Review 09.11. (W2): Mit leeren Vorgaben fiele ein Verlust nicht auf. Gefüllt - Rollen je Rang, Rollen je Aufgabe, Log-Ziele,
+    // Wortliste, Köder - darf ein Feld hin und zurück nichts am ganzen Objekt ändern, auch nicht an Daten ohne eigenes Feld.
+    const filled: Partial<Record<PanelModuleId, unknown>> = (() => {
+        const steps = Steps().map((step) => step.key);
+        const rankRoles = DefaultRankRoleSettings();
+
+        for (const playlist of Object.keys(rankRoles.playlists) as (keyof typeof rankRoles.playlists)[]) {
+            rankRoles.playlists[playlist] = { ...rankRoles.playlists[playlist], roles: { [steps[0]]: ROLE, [steps[1]]: ROLE2 } };
+        }
+
+        const teams = DefaultTeamSettings();
+        const lft = DefaultLftSettings();
+        const villain = DefaultAntiVillainSettings();
+        const automod = DefaultAutoModSettings();
+        const logging = DefaultLogSettings();
+
+        teams.channelId = TEXT;
+        teams.roles = { sync: true, positions: { ...teams.roles.positions, captain: ROLE, sub: ROLE2 } };
+        lft.notice = { ...lft.notice, channelId: TEXT, roles: [ROLE] };
+        lft.manageRoles = [ROLE2];
+        lft.player = { ...lft.player, forumId: FORUM };
+        villain.quarantine = { ...villain.quarantine, roleId: ROLE, channelId: TEXT };
+        villain.trustedRoles = [ROLE2];
+        villain.logChannelId = THREAD;
+        villain.bait = { ...villain.bait, channel: true, channelId: TEXT2, role: true, roleId: ROLE2 };
+        villain.nuke = { ...villain.nuke, trustedBots: ["123456789012345678"] };
+        automod.filters = { ...automod.filters, words: { ...automod.filters.words, words: ["foo", "bar"], action: "warn" } };
+        automod.ignoreChannels = [TEXT];
+        automod.ignoreRoles = [ROLE];
+        automod.logChannelId = THREAD;
+        logging.categories = Object.fromEntries(Object.keys(logging.categories).map((key, index) => [key, [TEXT, THREAD, TEXT2][index % 3]])) as typeof logging.categories;
+        logging.ignoreChannels = [TEXT];
+        logging.ignoreRoles = [ROLE];
+
+        return {
+            "rank-roles": rankRoles,
+            teams,
+            lft,
+            "anti-villain": villain,
+            automod,
+            logging,
+            "rl-6mans": { ...DefaultSixSettings(), channelId: TEXT, categoryId: CATEGORY },
+            clips: { ...DefaultClipSettings(), channelId: TEXT, announceChannelId: TEXT2 },
+            matchups: { ...DefaultMatchupSettings(), channelId: TEXT, pingRoles: [ROLE] },
+            "twitch-notifier": { liveRoleId: ROLE, liveRoleFilter: ROLE2 },
+            "voice-hub": { panel: "channel", panelChannelId: TEXT, panelMessageId: null },
+        };
+    })();
+
+    for (const [id, value] of Object.entries(filled) as [PanelModuleId, unknown][]) {
+        const panel = PANEL_MODULES[id];
+        const run = clean[id]!;
+        const fields = panel.sections.flatMap((section) => section.fields) as IPanelField<unknown>[];
+        const baseline = JSON.stringify(await run({}, value as never));
+        const problems: string[] = [];
+
+        for (const field of fields) {
+            try {
+                const after = await run(field.set(Other(field, field.get(value)), value), value as never);
+                const back = JSON.stringify(await run(field.set(field.get(value), after), after as never));
+
+                if (back !== baseline && back !== JSON.stringify(value)) problems.push(`${field.key}: ${back.slice(0, 120)}`);
+            } catch (error) {
+                problems.push(`${field.key}: ${String(error)}`);
+            }
+        }
+
+        check(`${panel.name}: gefüllt, jedes Feld hin und zurück ändert nichts am Rest`, problems.length === 0, problems.slice(0, 3).join(" | "));
+    }
+
+    // Was das Register selbst ablehnt, ohne Datenbank: Hub mit {teams} im Kopf.
+    const layout = PANEL_MODULES.teams.sections.flatMap((section) => section.fields).find((field) => field.key === "layout")!;
+    const withTeams = { ...DefaultTeamSettings(), layout: "cards" } as ReturnType<typeof DefaultTeamSettings>;
+
+    // Das Register sucht {teams} im ganzen Kopf - der genaue Aufbau des Dokuments ist dafür egal.
+    withTeams.board = { ...withTeams.board, doc: { blocks: [{ type: "text", text: "Unsere Teams: {teams}" }] } } as unknown as typeof withTeams.board;
+
+    check(
+        "Teams: Wechsel auf den Hub mit {teams} im Kopf wird mit Satz abgelehnt",
+        (() => {
+            try {
+                layout.set("hub", withTeams);
+            } catch (error) {
+                return error instanceof PanelError && error.message.includes("{teams}");
+            }
+
+            return false;
+        })()
+    );
+
     const moderators = PANEL_MODULES.moderation.sections.flatMap((section) => section.fields).find((field) => field.key === "moderators");
 
     check("Moderatoren gehen über die Server-Einstellungen", JSON.stringify(moderators?.set([ROLE], start.moderation as never)) === JSON.stringify({ [MODERATORS]: [ROLE] }));
@@ -305,8 +395,8 @@ async function checkRegisters(client: BotClient): Promise<Partial<Record<PanelMo
     check("Level: gleich geht", range("chatMin", 25) === "" && range("chatMax", 15) === "");
     // Das Dashboard schließt auch Kategorien und Sprachkanäle aus - das Menü muss sie zeigen, sonst gehen sie beim Speichern verloren.
     check(
-        "Level: „Keine Punkte in“ bietet Kategorien und Sprachkanäle an",
-        [ChannelType.GuildCategory, ChannelType.GuildVoice, ChannelType.GuildStageVoice].every((type) => levelField("noChannels").channelTypes?.includes(type))
+        "Level: „Keine Punkte in“ bietet Kanäle und Kategorien an, wie das Dashboard",
+        JSON.stringify(levelField("noChannels").channelTypes) === JSON.stringify([ChannelType.GuildText, ChannelType.GuildAnnouncement, ChannelType.GuildCategory])
     );
 
     return start;

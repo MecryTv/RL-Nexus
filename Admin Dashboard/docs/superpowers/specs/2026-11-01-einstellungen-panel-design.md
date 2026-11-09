@@ -88,7 +88,7 @@ Entwurf: `.works/tasks/W-0054-einstellungen-per-befehl-fuer-die/docs/w0014-modul
 
 ### Entscheidungen von Claude (zum Gegenlesen)
 
-- Je Modul ein Register in `services/settings/registers/`, gespeichert über den Weg des Dashboards. Ein Feld darf nur sich selbst ändern; `check:settings` prüft das für jedes Feld gegen das echte `Clean` des Moduls, mit Startwerten je Modul in eigenen Dateien unter `src/scripts/settings/`.
+- Je Modul ein Register in `services/settings/registers/`, gespeichert über den Weg des Dashboards. Ein Feld darf nur sich selbst ändern; `check:settings` prüft das für jedes Feld gegen das echte `Clean` des Moduls, mit Startwerten je Modul direkt im Skript, dazu gefüllte Werte (Rollen je Rang, Rollen je Aufgabe, Log-Ziele, Wortliste, Köder), bei denen jedes Feld hin und zurück nichts am ganzen Objekt ändern darf.
 - Felder, deren Wert im Dashboard aus einer größeren Auswahl kommt, bieten im Panel dieselben Kanalarten an wie das Speichern annimmt, damit eine Mehrfachauswahl beim Ändern nichts verliert (Lehre aus dem Review von W-0014).
 - Module ohne Felder haben keine Menü-Zeile „Was willst du ändern?“.
 
@@ -98,3 +98,5 @@ Entwurf: `.works/tasks/W-0054-einstellungen-per-befehl-fuer-die/docs/w0014-modul
 - **Anti Villain: 21 statt 22.** Der Wächter „Köder“ (`guards.bait`) wird nirgends gelesen, auch das Dashboard blendet ihn aus; der Köder selbst läuft über Einrichten im Dashboard.
 - **RL Team-Übersicht:** Kader-Rollen heißen wie im Dashboard (Stamm, Trial). Den Wechsel auf den Hub lehnt das Panel mit einem Satz ab, solange `{teams}` im Kopf steht (das Dashboard tauscht dann den Kopf mit).
 - **Apply:** Transcript-Kanal (W-0047) dazu, „Nach Entscheidung“ wie im Dashboard benannt.
+- **Ausnahmen bei Auto Mod, Logging und Level:** dieselben Kanalarten wie die Auswahl im Dashboard (Auto Mod und Logging: Text- und Ankündigungskanäle; Level: dazu Kategorien). Mehr Arten zeigte das Dashboard als „gelöschter Kanal“ (Review vom 09.11.).
+- **Bewusst so gelassen (Review vom 09.11.):** Anti Villain speichert im Panel auch, wenn das Modul aus ist (das Dashboard antwortet dort mit 409); das Bild sagt „Das Modul ist aus“, wie bei Welcome, Auto Mod und Logging. Temp Voice: Ein Kanalwechsel vergisst die Panel-Nachricht, Rückgängig holt sie nicht zurück; im Dashboard ist es bei Hin und Zurück genauso.

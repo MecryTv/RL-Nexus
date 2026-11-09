@@ -34,7 +34,7 @@ export const ClipsPanel: IPanelModule<S> = {
             fields: [
                 F<S>("number", "perUser", "Clips je Person", "So viele Clips darf jede Person je Runde einreichen.", (s) => s.maxPerUser, (value: number) => ({ maxPerUser: value }), { min: 1, max: MAX_PER_USER }),
                 // Ein Server-Emoji als <a:name:id> hat höchstens 57 Zeichen (CleanEmoji).
-                F<S>("text", "emoji", "Abstimm-Emoji", "Steht unter jedem Clip zum Abstimmen, ein normales Emoji oder eines von diesem Server.", (s) => s.emoji, (value: string) => ({ emoji: value }), { max: 57 }),
+                F<S>("text", "emoji", "Abstimm-Emoji", "Steht unter jedem Clip zum Abstimmen. Ein normales Emoji oder eins von diesem Server im Format <:name:id>.", (s) => s.emoji, (value: string) => ({ emoji: value }), { max: 57 }),
             ],
         },
         {
