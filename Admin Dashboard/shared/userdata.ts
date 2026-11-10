@@ -352,7 +352,7 @@ export const USERDATA_IGNORED: Readonly<Record<string, string>> = {
 };
 
 /** Name einer Spalte, die eine Discord-ID einer Person hält (für VARCHAR, CHAR, BIGINT). */
-export const PERSON_COLUMN = /(^|_)(user|target|moderator|owner|actor|opener|leader|author|creator|staff|reporter|host|captain|player|member)(_id)?$|_by$|^actor$|^discord$/;
+export const PERSON_COLUMN = /(^|_)(user|target|moderator|owner|actor|opener|leader|author|creator|staff|reporter|host|captain|player|member|contact)(_id)?$|_by$|^actor$|^discord$/;
 
 /* --- Was bleibt (Runde 3): Rechtsgrundlage und Dauer ------------------- */
 
