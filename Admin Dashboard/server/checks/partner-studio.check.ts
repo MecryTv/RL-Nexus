@@ -3,7 +3,7 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { checkEntryInput, SECTIONS_FOR, type IEntry, type IEntryInput, type ISection } from "../../shared/partners.ts";
-import { addSection, newEntry, roleNotice, sectionAction, switchKind, templateSections } from "../../src/partners/draft.ts";
+import { addSection, inputOf, newEntry, roleNotice, sectionAction, switchKind, templateSections } from "../../src/partners/draft.ts";
 import { partnerMessage, type IPartnerContext } from "../../src/partners/preview.ts";
 import { check, section } from "./harness.ts";
 
@@ -92,6 +92,14 @@ export async function checkPartnerStudio(): Promise<void> {
         assert.equal(addSection(addSection(sections, "partner", "gallery"), "partner", "gallery").filter((item) => item.type === "gallery").length, 2);
         assert.deepEqual(addSection(sections, "partner", "teams"), sections);
         assert.deepEqual(addSection(sections, "supporter", "gallery"), sections);
+    });
+
+    await check("Entwurf: ein gespeicherter Eintrag wird wieder zum Entwurf, ohne Felder des Servers", () => {
+        const input = newEntry("sponsor", "NordHost", { tier: "main" });
+        const back = inputOf(saved(input));
+
+        assert.deepEqual(back, input);
+        assert.ok(!("slug" in back) && !("role" in back));
     });
 
     await check("Entwurf: Folgen für Gruppe und @Partner werden vorher genannt", () => {

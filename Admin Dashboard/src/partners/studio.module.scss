@@ -1,0 +1,255 @@
+@use "mixins" as *;
+
+/* W-0062 Teil 2: Teile im Partner-Studio und auf der Seite eines Eintrags. */
+
+.muted {
+    margin: 0;
+    color: var(--c-text-faint);
+    font-size: 0.8125rem;
+    line-height: 1.5;
+}
+
+.back {
+    color: var(--c-text-dim);
+
+    @include label(0.75rem, 0.12em);
+
+    &:hover {
+        color: var(--c-text);
+    }
+}
+
+.pageTabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-4);
+    margin-bottom: var(--s-3);
+    border-bottom: 1px solid var(--c-line);
+}
+
+.pageTab {
+    padding: 0 0 9px;
+    background: transparent;
+    color: var(--c-text-dim);
+    cursor: pointer;
+
+    @include label(0.8rem, 0.12em);
+    @include touch-target;
+
+    &[aria-selected="true"] {
+        box-shadow: inset 0 -2px 0 var(--c-red);
+        color: var(--c-text);
+    }
+
+    &:focus-visible {
+        @include focus-ring;
+    }
+}
+
+/* --- Leiste --------------------------------------------------------------- */
+.state {
+    color: var(--c-text-faint);
+    font-size: 0.8125rem;
+    white-space: nowrap;
+}
+
+.problem {
+    max-width: 320px;
+    color: var(--c-mod-engagement);
+    font-size: 0.8125rem;
+    line-height: 1.4;
+}
+
+/* --- Fächer --------------------------------------------------------------- */
+.stack {
+    display: grid;
+    gap: var(--s-4);
+}
+
+.templates {
+    display: grid;
+    gap: 6px;
+}
+
+.template {
+    padding: 10px 12px;
+    background: rgb(255 255 255 / 4%);
+    box-shadow: inset 0 0 0 1px var(--c-line);
+    color: var(--c-text);
+    cursor: pointer;
+    text-align: left;
+
+    &:hover {
+        background: rgb(255 255 255 / 8%);
+    }
+
+    &:focus-visible {
+        @include focus-ring;
+    }
+}
+
+.swatches {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.swatch {
+    --c: var(--c-blue);
+
+    width: 32px;
+    height: 32px;
+    background: var(--c);
+    box-shadow: inset 0 0 0 1px rgb(255 255 255 / 20%);
+    cursor: pointer;
+
+    @include bevel-diagonal(6px);
+
+    &[aria-checked="true"] {
+        box-shadow:
+            inset 0 0 0 2px #fff,
+            inset 0 0 0 4px var(--c);
+    }
+
+    &:focus-visible {
+        @include focus-ring;
+    }
+
+    &[data-color="red"] {
+        --c: var(--c-red);
+    }
+
+    &[data-color="purple"] {
+        --c: var(--c-purple);
+    }
+
+    &[data-color="gold"] {
+        --c: var(--c-mod-engagement);
+    }
+
+    &[data-color="green"] {
+        --c: var(--c-win);
+    }
+
+    &[data-color="orange"] {
+        --c: var(--c-mod-utility);
+    }
+
+    &[data-color="cyan"] {
+        --c: var(--c-mod-community);
+    }
+
+    &[data-color="silver"] {
+        --c: var(--c-text-dim);
+    }
+}
+
+/* --- Inspektor ------------------------------------------------------------- */
+.address {
+    margin: 0;
+    font-family: ui-monospace, monospace;
+    font-size: 0.8125rem;
+    overflow-wrap: anywhere;
+}
+
+.fieldset {
+    display: grid;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+
+    legend {
+        margin-bottom: 6px;
+        color: var(--c-text-dim);
+        font-size: 0.8125rem;
+        font-weight: 600;
+    }
+}
+
+.check {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.875rem;
+}
+
+/* --- Fach Abschnitte (Task 11) ------------------------------------------- */
+.sections {
+    display: grid;
+    gap: 4px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.sectionRow {
+    display: grid;
+    align-items: center;
+    gap: 6px;
+    grid-template-columns: 24px minmax(0, 1fr) auto;
+    padding: 6px 8px;
+    background: rgb(255 255 255 / 3%);
+    box-shadow: inset 0 0 0 1px var(--c-line);
+
+    &[aria-current="true"] {
+        box-shadow: inset 0 0 0 1px var(--c-blue);
+    }
+
+    &[data-hidden="true"] {
+        opacity: 0.55;
+    }
+}
+
+.sectionName {
+    min-width: 0;
+    padding: 4px 0;
+    background: transparent;
+    color: var(--c-text);
+    cursor: pointer;
+    font-size: 0.875rem;
+    text-align: left;
+    overflow-wrap: anywhere;
+
+    &:focus-visible {
+        @include focus-ring;
+    }
+}
+
+.fixed {
+    color: var(--c-text-faint);
+    font-size: 0.75rem;
+}
+
+.iconButton {
+    display: grid;
+    width: 28px;
+    height: 28px;
+    background: transparent;
+    color: var(--c-text-dim);
+    cursor: pointer;
+    place-items: center;
+
+    &:hover {
+        color: var(--c-text);
+    }
+
+    &:focus-visible {
+        @include focus-ring;
+    }
+}
+
+.extras {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: var(--s-3);
+}
+
+.itemRow {
+    display: grid;
+    gap: 6px;
+    padding: var(--s-2);
+    background: rgb(255 255 255 / 3%);
+    box-shadow: inset 0 0 0 1px var(--c-line);
+}

@@ -211,3 +211,32 @@ export function roleNotice(before: IEntry | null, after: IEntryInput | "loeschen
 
     return `Der bisherige Ansprechpartner ${loses}, ${OTHER}. Der neue bekommt @Partner und, wenn er noch keine Gruppe hat, die Gruppe Partner.`;
 }
+
+/** Der gespeicherte Eintrag als Entwurf: nur, was der Server beim Speichern annimmt. */
+export function inputOf(entry: IEntry): IEntryInput {
+    return {
+        kind: entry.kind,
+        name: entry.name,
+        partnerType: entry.partnerType,
+        tier: entry.tier,
+        supporterType: entry.supporterType,
+        subtitle: entry.subtitle,
+        shortText: entry.shortText,
+        stripText: entry.stripText,
+        color: entry.color,
+        logo: entry.logo,
+        banner: entry.banner,
+        since: entry.since,
+        endsOn: entry.endsOn,
+        hideAfterEnd: entry.hideAfterEnd,
+        links: entry.links,
+        sections: entry.sections,
+        contactId: entry.contactId,
+        access: entry.access,
+        guildId: entry.guildId,
+        showTeams: entry.showTeams,
+        visible: entry.visible,
+        onHome: entry.onHome,
+        tournamentIds: entry.tournamentIds,
+    };
+}

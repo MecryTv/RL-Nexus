@@ -1,5 +1,5 @@
 import type { Group } from "../../shared/limits.ts";
-import { PARTNER_TYPE_LABELS, SUPPORTER_TYPE_LABELS, TIER_LABELS, type IEntryInput, type IRoleState } from "../../shared/partners.ts";
+import { PARTNER_TYPE_LABELS, SUPPORTER_TYPE_LABELS, TIER_LABELS, type EntryColor, type IEntryInput, type IRoleState } from "../../shared/partners.ts";
 
 /** W-0062 Teil 2: Wörter für Liste, Dialoge und Studio. */
 
@@ -30,3 +30,15 @@ export function groupHint(name: string, group: Group | null): string | null {
 
 /** Icon eines Discord-Servers als Adresse, für „Von Discord“. */
 export const guildIconUrl = (guildId: string, icon: string | null): string | null => (icon ? `https://cdn.discordapp.com/icons/${guildId}/${icon}.png?size=512` : null);
+
+export const COLOR_LABELS: Readonly<Record<EntryColor, string>> = {
+    red: "Rot",
+    blue: "Blau",
+    purple: "Lila",
+    gold: "Gold",
+    green: "Grün",
+    orange: "Orange",
+    cyan: "Türkis",
+    silver: "Silber",
+};
+
