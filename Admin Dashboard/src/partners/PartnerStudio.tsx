@@ -1,4 +1,4 @@
-import { type JSX, type ReactNode, useId, useMemo, useState } from "react";
+import { type JSX, useId, useMemo, useState } from "react";
 import type { IPost } from "../../shared/news";
 import { KIND_LABELS, type EntryKind, type IEntry, type IEntryInput } from "../../shared/partners";
 import { Button } from "../components/Button";
@@ -16,6 +16,8 @@ import { ColorSwatches, EntrySettings } from "./EntrySettings";
 import { guildIconUrl } from "./labels.ts";
 import { partnerMessage } from "./preview.ts";
 import { useShowcase } from "./hooks";
+import { SectionInspector } from "./SectionInspector";
+import { SectionsTray } from "./SectionsTray";
 import styles from "./studio.module.scss";
 
 type View = "gross" | "karte" | "leiste" | "handy";
@@ -47,8 +49,6 @@ export interface IPartnerStudioProps {
     readonly onSave: () => void;
     readonly onDelete: () => void;
     readonly onKind: (kind: EntryKind) => void;
-    /** Fach „Abschnitte“ und Inspektor eines Abschnitts (Task 11). */
-    readonly sections?: (selected: number | null, select: (index: number | null) => void) => { readonly tray: ReactNode; readonly inspector: ReactNode | null };
 }
 
 const timeOf = (iso: string): string => new Intl.DateTimeFormat("de-DE", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Berlin" }).format(new Date(iso));
@@ -58,7 +58,7 @@ const timeOf = (iso: string): string => new Intl.DateTimeFormat("de-DE", { hour:
  * (S3, S5). Mitte die echte Webseite, rechts der gewählte Abschnitt oder die
  * Einstellungen des Eintrags.
  */
-export function PartnerStudio({ doc, entry, entries, posts, contact, siteOrigin, saving, problem, onSave, onDelete, onKind, sections }: IPartnerStudioProps): JSX.Element {
+export function PartnerStudio({ doc, entry, entries, posts, contact, siteOrigin, saving, problem, onSave, onDelete, onKind }: IPartnerStudioProps): JSX.Element {
     const id = useId();
     const value = doc.value;
     const supporter = value.kind === "supporter";
@@ -100,7 +100,11 @@ export function PartnerStudio({ doc, entry, entries, posts, contact, siteOrigin,
         }
     };
 
-    const part = sections?.(sectionIndex, (index) => setSelected(index === null ? null : `abschnitt:${index}`));
+    const select = (index: number | null): void => setSelected(index === null ? null : `abschnitt:${index}`);
+    const part = {
+        tray: <SectionsTray value={value} set={doc.set} selected={sectionIndex} onSelect={select} />,
+        inspector: sectionIndex !== null && value.sections[sectionIndex] ? <SectionInspector value={value} set={doc.set} index={sectionIndex} posts={posts} /> : null,
+    };
     const trays: IStudioTray[] = [
         {
             id: "vorlagen",
@@ -117,7 +121,7 @@ export function PartnerStudio({ doc, entry, entries, posts, contact, siteOrigin,
                 </div>
             ),
         },
-        ...(part ? [{ id: "abschnitte", label: "Abschnitte", icon: "list", content: part.tray }] : []),
+        { id: "abschnitte", label: "Abschnitte", icon: "list", content: part.tray },
         {
             id: "bilder",
             label: "Bilder",
@@ -176,7 +180,7 @@ export function PartnerStudio({ doc, entry, entries, posts, contact, siteOrigin,
                 openTray={trays.some((item) => item.id === tray) ? tray : null}
                 onTray={setTray}
                 stage={<PreviewStage message={message} device={view === "handy" ? "handy" : "desktop"} onPick={(picked) => setSelected(picked === "kopf" ? null : picked)} onAction={act} />}
-                inspector={part?.inspector ?? <EntrySettings value={value} set={doc.set} entry={entry} entries={entries} posts={posts} contact={contact} onDelete={onDelete} />}
+                inspector={part.inspector ?? <EntrySettings value={value} set={doc.set} entry={entry} entries={entries} posts={posts} contact={contact} onDelete={onDelete} />}
             />
 
             <ConfirmDialog
