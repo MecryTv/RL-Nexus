@@ -16,9 +16,14 @@
     overflow-wrap: anywhere;
 }
 
+/* Feste Breite: Wird der Stand länger („· ungespeichert“), rutscht nichts in der Leiste. */
 .state {
+    overflow: hidden;
+    width: 15rem;
     color: var(--c-text-faint);
     font-size: 0.8125rem;
+    text-align: right;
+    text-overflow: ellipsis;
     white-space: nowrap;
 }
 

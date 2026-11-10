@@ -201,7 +201,7 @@ export function NewsStudio({ doc, saved, entries, channel, saving, problem, onSa
                 value={device}
                 onChange={setDevice}
             />
-            <span className={styles.state} role="status">
+            <span className={styles.state} role="status" title={stateLabel(saved, doc.dirty)}>
                 {stateLabel(saved, doc.dirty)}
             </span>
             <Button variant="ghost" size="sm" onClick={() => void openPreviewTab(message)}>
