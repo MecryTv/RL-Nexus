@@ -64,6 +64,14 @@ async function changelogSite(config: IConfig): Promise<ISiteChangelog> {
 
 async function writeChangelog(config: IConfig, site: ISiteChangelog): Promise<void> {
     await writeGenerated(config, "changelog.json", site, BY);
+
+    // Bilder nicht mehr geposteter Versionen weg; hochgeladene Bilder (Hash-Namen) bleiben.
+    const posted = new Set(site.versions.map((version) => `changelog-${version.version}.png`));
+
+    for (const name of await listRaw(config, "media")) {
+        if (/^changelog-.+\.png$/.test(name) && !posted.has(name)) await removeRaw(config, `media/${name}`);
+    }
+
     await writeFolder(
         config,
         "og/changelog",

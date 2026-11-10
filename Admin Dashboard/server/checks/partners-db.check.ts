@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import type { IPostInput } from "../../shared/news.ts";
@@ -207,7 +207,12 @@ export async function checkPartnersDb(config: IConfig): Promise<void> {
             try {
                 const post = await createPost({ ...POST, title: "Check DB Site" }, ACTOR);
 
-                await publishSite(site, ["news", "partners"]);
+                await mkdir(path.join(siteDir, "media"), { recursive: true });
+                await writeFile(path.join(siteDir, "media", "changelog-9.9.9.png"), "alt");
+                await writeFile(path.join(siteDir, "media", "abcdef0123456789.webp"), "hochgeladen");
+                await publishSite(site, ["news", "partners", "changelog"]);
+                assert.equal(existsSync(path.join(siteDir, "media", "changelog-9.9.9.png")), false, "verwaistes Changelog-Bild bleibt liegen");
+                assert.ok(existsSync(path.join(siteDir, "media", "abcdef0123456789.webp")), "hochgeladene Bilder bleiben");
                 assert.ok(existsSync(path.join(siteDir, "news", "check-db-site.json")));
                 assert.ok(existsSync(path.join(siteDir, "og", "news", "check-db-site.html")));
                 assert.ok(existsSync(path.join(siteDir, "partners.json")));
