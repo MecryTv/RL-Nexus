@@ -27,26 +27,30 @@ export interface IBlockInspectorProps {
     /** Ändert den Baustein; `key` fasst Tippen zu einem Schritt zusammen. */
     readonly onChange: (block: IBlock, key?: string) => void;
     readonly onAction: (action: "hoch" | "runter" | "kopie" | "weg") => void;
-    /** Steigt bei jeder Wahl auf der Bühne: dann bekommt der Inspektor den Fokus. */
-    readonly focus: number;
+    /** true direkt nach einer Wahl auf der Bühne: dann bekommt der Inspektor einmal den Fokus. */
+    readonly focus: boolean;
+    readonly onFocused: () => void;
 }
 
 /** W-0062 Teil 2: Inspektor des gewählten Bausteins (S1). */
-export function BlockInspector({ block, index, count, entries, onChange, onAction, focus }: IBlockInspectorProps): JSX.Element {
+export function BlockInspector({ block, index, count, entries, onChange, onAction, focus, onFocused }: IBlockInspectorProps): JSX.Element {
     const id = useId();
     const root = useRef<HTMLDivElement>(null);
     const area = useRef<HTMLTextAreaElement>(null);
 
     // Nach einem Klick auf der Bühne: bei Text die Schreibmarke ans Ende, sonst der Inspektor,
     // damit Entf, Strg+D und Alt+Pfeile gleich wirken (sie gehen nicht durch die Bühne).
+    // Nur einmal je Wahl auf der Bühne; beim Sortieren im Fach Aufbau bleibt der Fokus, wo er ist.
     useEffect(() => {
-        if (focus === 0) return;
+        if (!focus) return;
 
         if (area.current) {
             area.current.focus();
             area.current.setSelectionRange(area.current.value.length, area.current.value.length);
         } else root.current?.focus();
-    }, [focus]);
+
+        onFocused();
+    }, [focus, onFocused]);
 
     const mark = (which: TextMark): void => {
         if (block.type !== "text" || !area.current) return;

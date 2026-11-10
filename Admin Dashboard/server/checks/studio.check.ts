@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { History } from "../../src/studio/history.ts";
+import { afterSave, History } from "../../src/studio/history.ts";
 import { partShortcut, studioShortcut } from "../../src/studio/shortcut.ts";
 import { partIndex, readStageMessage } from "../../src/studio/stage.ts";
 import { berlinToIso, isoToBerlin, todayBerlin } from "../../src/studio/time.ts";
@@ -16,6 +16,11 @@ export async function checkStudio(): Promise<void> {
         shiftKey: more.shiftKey ?? false,
         altKey: more.altKey ?? false,
         target: { tagName: more.tagName ?? "BODY" },
+    });
+
+    await check("Studio: was während des Speicherns getippt wurde, bleibt und gilt als ungespeichert (Review)", () => {
+        assert.deepEqual(afterSave({ text: "ab" }, { text: "a" }, { text: "a", id: 1 }), { text: "ab" });
+        assert.deepEqual(afterSave({ text: "a" }, { text: "a" }, { text: "a", id: 1 }), { text: "a", id: 1 });
     });
 
     await check("Studio: 50 Schritte, Tippen im selben Feld ist ein Schritt", () => {
@@ -49,6 +54,10 @@ export async function checkStudio(): Promise<void> {
         assert.equal(partShortcut(key("ArrowUp", { altKey: true })), "hoch");
         assert.equal(partShortcut(key("ArrowDown", { altKey: true })), "runter");
         assert.equal(partShortcut(key("Delete", { tagName: "INPUT" })), null);
+        // Rück korrigiert Buchstaben; nur Entf löscht einen Teil (Review).
+        assert.equal(partShortcut(key("Backspace")), null);
+        // Hinter einem offenen Dialog löscht Entf nichts auf der Bühne (Review).
+        assert.equal(partShortcut({ ...key("Delete"), target: { tagName: "BUTTON", closest: (selector: string) => (selector === "dialog" ? {} : null) } }), null);
         assert.equal(partShortcut(key("a")), null);
     });
 

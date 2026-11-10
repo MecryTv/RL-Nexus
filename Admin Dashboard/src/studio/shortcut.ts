@@ -24,6 +24,13 @@ function typing(target: unknown): boolean {
     return (tag === "INPUT" && TYPED.has(type)) || tag === "TEXTAREA" || tag === "SELECT" || element.isContentEditable === true;
 }
 
+/** Liegt der Fokus in einem offenen Dialog? Dann gelten seine Tasten, nicht die der Bühne. */
+function inDialog(target: unknown): boolean {
+    const element = target as { closest?: unknown } | null;
+
+    return typeof element?.closest === "function" && (element.closest as (selector: string) => unknown)("dialog") !== null;
+}
+
 /** Strg+Z, Strg+Y und Strg+Umschalt+Z für das ganze Studio. */
 export function studioShortcut(event: IKeyLike): "undo" | "redo" | null {
     if ((!event.ctrlKey && !event.metaKey) || typing(event.target)) return null;
@@ -37,9 +44,10 @@ export function studioShortcut(event: IKeyLike): "undo" | "redo" | null {
 
 /** Tasten für den gewählten Teil: Entf löscht, Strg+D dupliziert, Alt+↑/↓ verschiebt. */
 export function partShortcut(event: IKeyLike): "weg" | "kopie" | "hoch" | "runter" | null {
-    if (typing(event.target)) return null;
+    if (typing(event.target) || inDialog(event.target)) return null;
 
-    if (event.key === "Delete" || event.key === "Backspace") return "weg";
+    // Nur Entf: Rück korrigiert Buchstaben und soll nie einen Baustein löschen.
+    if (event.key === "Delete") return "weg";
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "d") return "kopie";
     if (event.altKey && event.key === "ArrowUp") return "hoch";
     if (event.altKey && event.key === "ArrowDown") return "runter";

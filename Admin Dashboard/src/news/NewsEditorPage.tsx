@@ -39,6 +39,8 @@ function NewsEditor({ post, entries, channel, editorKey, onSaved }: IEditorProps
     const problem = postProblem(doc.value);
 
     const write = async (input: IPostInput): Promise<void> => {
+        const sent = doc.value;
+
         setSaving(true);
 
         try {
@@ -46,7 +48,7 @@ function NewsEditor({ post, entries, channel, editorKey, onSaved }: IEditorProps
             const fresh = result.post.status === "published" && saved?.status !== "published";
 
             setSaved(result.post);
-            doc.markSaved(postInput(result.post));
+            doc.markSaved(postInput(result.post), sent);
             notify(fresh ? "Veröffentlicht." : result.post.status === "scheduled" ? "Gespeichert und geplant." : "Gespeichert.");
             if (result.warning) notify(result.warning, "danger");
             if (!saved) setCreated(result.post.id);

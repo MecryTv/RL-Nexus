@@ -7,6 +7,14 @@
  * hintereinander (Tippen im selben Feld) ist ein Schritt. Jede neue Änderung
  * leert das Wiederholen.
  */
+/**
+ * Nach dem Speichern: Ist der Entwurf noch der, der geschickt wurde, gilt der
+ * Stand des Servers. Hat jemand währenddessen weitergetippt, bleibt das Getippte.
+ */
+export function afterSave<T>(current: T, sent: T, saved: T): T {
+    return JSON.stringify(current) === JSON.stringify(sent) ? saved : current;
+}
+
 export class History<T> {
     private past: T[] = [];
     private future: T[] = [];

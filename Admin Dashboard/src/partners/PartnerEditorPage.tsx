@@ -52,12 +52,14 @@ function PartnerEditor({ entry, entries, posts, siteOrigin, onSaved }: IEditorPr
     const save = async (): Promise<void> => {
         if (!("input" in checked)) return;
 
+        const sent = doc.value;
+
         setSaving(true);
 
         try {
             const saved = await api<IEntry>(`/api/partners/${entry.id}`, { method: "PUT", body: checked.input });
 
-            doc.markSaved(inputOf(saved));
+            doc.markSaved(inputOf(saved), sent);
             setAcknowledged(null);
             notify("Gespeichert.");
             onSaved();

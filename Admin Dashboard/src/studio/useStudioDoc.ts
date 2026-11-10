@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { History } from "./history.ts";
+import { afterSave, History } from "./history.ts";
 import { studioShortcut } from "./shortcut.ts";
 
 export interface IStudioDoc<T> {
@@ -13,7 +13,8 @@ export interface IStudioDoc<T> {
     /** Anders als der zuletzt gespeicherte Stand. */
     readonly dirty: boolean;
     /** Nach dem Speichern: der Stand des Servers gilt als gespeichert und wird übernommen. */
-    readonly markSaved: (saved: T) => void;
+    /** `sent`: der Entwurf, der geschickt wurde. Wer seitdem weitergetippt hat, behält das Getippte. */
+    readonly markSaved: (saved: T, sent?: T) => void;
     /** Ein anderer Eintrag ist geladen: Stand ersetzen, Rückgängig leeren. */
     readonly reset: (next: T) => void;
 }
@@ -72,9 +73,11 @@ export function useStudioDoc<T>(initial: T): IStudioDoc<T> {
         sync();
     }, [sync]);
 
-    const markSaved = useCallback((next: T): void => {
-        current.current = next;
-        setValue(next);
+    const markSaved = useCallback((next: T, sent?: T): void => {
+        const value = sent === undefined ? next : afterSave(current.current, sent, next);
+
+        current.current = value;
+        setValue(value);
         setSaved(JSON.stringify(next));
     }, []);
 

@@ -1,4 +1,4 @@
-import { type JSX, useEffect, useId, useMemo, useState } from "react";
+import { type JSX, useCallback, useEffect, useId, useMemo, useState } from "react";
 import { NEWS_KIND_LABELS, NEWS_KINDS, type BlockType, type IPost, type IPostInput, type PostState } from "../../shared/news";
 import type { IEntry } from "../../shared/partners";
 import { Button } from "../components/Button";
@@ -60,8 +60,9 @@ export function NewsStudio({ doc, saved, entries, channel, saving, problem, onSa
     const [tray, setTray] = useState<string | null>("bausteine");
     const [selected, setSelected] = useState<string | null>(null);
     const [template, setTemplate] = useState<NewsTemplate | null>(null);
-    // Steigt bei jeder Wahl auf der Bühne; der Inspektor holt sich dann den Fokus.
-    const [picked, setPicked] = useState(0);
+    // Nach einer Wahl auf der Bühne holt sich der Inspektor einmal den Fokus (Tasten im iframe erreichen das Studio nicht).
+    const [focusPick, setFocusPick] = useState(false);
+    const focused = useCallback(() => setFocusPick(false), []);
     const [device, setDevice] = useState<"desktop" | "handy">("desktop");
     // Ein Entwurf ohne Zeitpunkt zeigt „jetzt“; ein Zeitpunkt je geöffnetem Studio reicht.
     const [now] = useState(() => new Date());
@@ -158,7 +159,8 @@ export function NewsStudio({ doc, saved, entries, channel, saving, problem, onSa
                 index={blockIndex}
                 count={value.blocks.length}
                 entries={entries}
-                focus={picked}
+                focus={focusPick}
+                onFocused={focused}
                 onChange={(next, key) => doc.set({ ...value, blocks: value.blocks.map((item, at) => (at === blockIndex ? next : item)) }, key ? `b${blockIndex}-${key}` : undefined)}
                 onAction={(action) => act(blockIndex, action)}
             />
@@ -227,7 +229,7 @@ export function NewsStudio({ doc, saved, entries, channel, saving, problem, onSa
                         problem={problem}
                         onPick={(part) => {
                             setSelected(part === "kopf" ? null : part);
-                            setPicked((count) => count + 1);
+                            setFocusPick(true);
                         }}
                         onAction={(part, action) => {
                             const index = partIndex(part, "block");
