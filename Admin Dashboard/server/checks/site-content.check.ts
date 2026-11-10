@@ -3,6 +3,7 @@ import type { IChangelogVersion } from "../../shared/changelog.ts";
 import type { IPost } from "../../shared/news.ts";
 import type { IEntry } from "../../shared/partners.ts";
 import { buildChangelog, buildNews, buildOgPage, buildPartners, buildPost, buildRss } from "../../shared/site-content.ts";
+import { buildLive } from "../partners/live.ts";
 import { check, section } from "./harness.ts";
 
 const AT = "2026-11-05T12:00:00.000Z";
@@ -151,6 +152,20 @@ export async function checkSiteContent(): Promise<void> {
         assert.ok(rss.includes("Tom &amp; Jerry &lt;3"));
         assert.ok(rss.includes("https://nexus-emb.de/news/beitrag-3"));
         assert.ok(rss.includes("https://nexus-emb.de/changelog/2.4.0"));
+    });
+
+    await check("Webseite: Live-Daten nur mit Server, Teams nur mit Schalter, ohne Antwort des Bots fehlt der Server", () => {
+        const showcase = { members: 1240, online: 312, modules: ["teams", "apply"], teams: [{ name: "Apex A", group: null, mmr: 1500, rank: "GC 1", players: 3 }] };
+        const live = buildLive(
+            [entry(1, { guildId: "300000000000000001", showTeams: false }), entry(2, { guildId: "300000000000000002", showTeams: true }), entry(3, { guildId: "300000000000000003" }), entry(4, {})],
+            new Map([["300000000000000001", showcase], ["300000000000000002", showcase], ["300000000000000003", null]]),
+            new Date(AT)
+        );
+
+        assert.deepEqual(Object.keys(live.servers), ["eintrag-1", "eintrag-2"]);
+        assert.deepEqual(live.servers["eintrag-1"]!.teams, []);
+        assert.equal(live.servers["eintrag-2"]!.teams.length, 1);
+        assert.equal(live.servers["eintrag-1"]!.online, 312);
     });
 
     await check("Webseite: OG-Seite escaped den Titel", () => {

@@ -1,7 +1,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import type { IBotCommand, IBotOverview, IBotStatus } from "../shared/api.ts";
 import type { IBotRestoreReport, IServerPartJson } from "../shared/backups.ts";
-import type { IBotMembers, IBotServer, IBotServerDetail, IBotServerFacts } from "../shared/servers.ts";
+import type { IBotMembers, IBotServer, IBotServerDetail, IBotServerFacts, IBotShowcase } from "../shared/servers.ts";
 import type { IConfig } from "./config.ts";
 
 /**
@@ -226,6 +226,11 @@ async function botJson<T>(config: IConfig, userId: string, path: string, timeout
     } catch {
         return null;
     }
+}
+
+/** W-0062: Live-Daten eines Partner-Servers für die Webseite. null: Der Bot antwortet nicht oder ist nicht dort. */
+export function botShowcase(config: IConfig, guildId: string): Promise<IBotShowcase | null> {
+    return botJson<IBotShowcase>(config, "partner-live", `/admin/servers/${guildId}/showcase`, 10_000);
 }
 
 /** Alle Server, auf denen der Bot gerade ist. null: Der Bot antwortet nicht. */

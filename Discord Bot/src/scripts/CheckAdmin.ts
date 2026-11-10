@@ -92,6 +92,13 @@ async function main(): Promise<void> {
         process.exit = realExit;
     }
 
+    console.log("\n  — Partner-Server für die Webseite (W-0062) —");
+
+    const showcaseUrl = `${BASE}/dcapi/admin/servers/300000000000000001/showcase`;
+    check("Showcase ohne Token 401", (await fetch(showcaseUrl)).status === 401);
+    check("Showcase ohne Scope admin 403", (await fetch(showcaseUrl, { headers: bearer(plugin) })).status === 403);
+    check("Showcase: Bot nicht auf dem Server 404", (await fetch(showcaseUrl, { headers: bearer(admin) })).status === 404);
+
     console.log("\n  — Backups: Panels eines Servers —");
 
     const ref = (messageId: string, label: string) => ({ kind: "selfrole" as const, key: messageId, channelId: "1", messageId, label });

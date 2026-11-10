@@ -6,6 +6,7 @@ import type { IConfig } from "../config.ts";
 import { listRaw, removeRaw, writeGenerated, writeRaw } from "../content.ts";
 import { query } from "../db.ts";
 import { listPosts } from "../news/store.ts";
+import { refreshLive } from "../partners/live.ts";
 import { listEntries } from "../partners/store.ts";
 
 /**
@@ -98,6 +99,8 @@ export async function publishSite(config: IConfig, parts: readonly SitePart[]): 
 
             await writeRaw(config, "news.xml", buildRss(news, changelog, config.websitePublicUrl));
         }
+
+        if (want.has("live")) await refreshLive(config);
     } catch (error) {
         console.warn("[site] Inhalte der Webseite nicht geschrieben:", (error as Error).message);
     }

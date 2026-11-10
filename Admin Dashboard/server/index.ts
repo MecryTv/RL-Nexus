@@ -15,6 +15,7 @@ import { closeAllMail } from "./mail/pool.ts";
 import { scheduleShopExpiry } from "./shop/expiry.ts";
 import { schedulePartnerRoles } from "./partners/role.ts";
 import { scheduleNews } from "./news/clock.ts";
+import { schedulePartnerLive } from "./partners/live.ts";
 import { scheduleStatusPost } from "./status-post.ts";
 
 /**
@@ -53,6 +54,7 @@ scheduleCommandSync(config);
 scheduleShopExpiry(config);
 schedulePartnerRoles(config);
 scheduleNews(config);
+schedulePartnerLive(config);
 
 const app = await buildApp(config);
 await app.listen({ port: config.port, host: "0.0.0.0" });
