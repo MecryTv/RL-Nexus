@@ -5,6 +5,8 @@ import { query } from "../db.ts";
 import { PublicError } from "../errors.ts";
 import type { IStatusChannelOption } from "../../shared/status.ts";
 import { remove, shortError, statusChannelOptions, upload, type ChannelRight } from "../status-post.ts";
+import { removeRaw, writeRaw } from "../content.ts";
+import { publishSite } from "../site/publish.ts";
 import { renderChangelogImage, type IChangelogFooter } from "./image.ts";
 import { clearPosted, contentHash, deleteVersionRow, markPosted, versionOf } from "./store.ts";
 
@@ -84,18 +86,21 @@ async function failed(response: Response, step: string): Promise<never> {
     throw new PublicError(502, shortError(`Discord antwortet mit ${response.status} beim ${step}: ${answer}`));
 }
 
-async function send(config: IConfig, version: IChangelogVersion, url: string, method: "POST" | "PATCH", footer: IChangelogFooter): Promise<Response> {
+/** W-0062: das Bild des Posts auf der öffentlichen Seite der Version. */
+const imageFile = (version: IChangelogVersion): string => `media/changelog-${version.version}.png`;
+
+async function send(config: IConfig, version: IChangelogVersion, url: string, method: "POST" | "PATCH", footer: IChangelogFooter): Promise<{ readonly response: Response; readonly image: Buffer }> {
     const image = await renderChangelogImage(version, footer);
     const body = {
         flags: 1 << 15,
         components: [
             { type: 12, items: [{ media: { url: `attachment://${image.name}` }, description: image.alt }] },
-            { type: 1, components: [{ type: 2, style: 5, label: "Alle Änderungen", url: `${config.publicUrl}/dev/changelog` }] },
+            { type: 1, components: [{ type: 2, style: 5, label: "Alle Änderungen", url: `${config.websitePublicUrl}/changelog/${version.version}` }] },
         ],
         attachments: [{ id: 0, filename: image.name }],
     };
 
-    return reach(() => upload(config, url, method, body, [image]));
+    return { response: await reach(() => upload(config, url, method, body, [image])), image: image.data };
 }
 
 /**
@@ -114,24 +119,31 @@ async function post(config: IConfig, actor: IActor, id: number): Promise<IChange
     if (postableItems(version.items).length === 0) throw new PublicError(409, "Nur interne Änderungen, im Post stünde nichts.");
 
     let target: { readonly channelId: string; readonly messageId: string } | null = null;
+    let image: Buffer | null = null;
 
     if (version.posted) {
         const { channelId, messageId } = version.posted;
         const patched = await send(config, version, `/channels/${channelId}/messages/${messageId}`, "PATCH", { poster: actor.name, editedOn: today() });
 
-        if (patched.ok) target = { channelId, messageId };
-        else if (patched.status !== 404) await failed(patched, "Ändern");
+        if (patched.response.ok) {
+            target = { channelId, messageId };
+            image = patched.image;
+        } else if (patched.response.status !== 404) await failed(patched.response, "Ändern");
     }
 
     if (!target) {
         const sent = await send(config, version, `/channels/${channel}/messages`, "POST", { poster: actor.name, editedOn: null });
-        if (!sent.ok) await failed(sent, "Schreiben");
+        if (!sent.response.ok) await failed(sent.response, "Schreiben");
 
-        target = { channelId: channel, messageId: String(((await sent.json()) as { id: unknown }).id) };
+        target = { channelId: channel, messageId: String(((await sent.response.json()) as { id: unknown }).id) };
+        image = sent.image;
     }
 
-    await markPosted(id, target.channelId, target.messageId, contentHash(version));
+    await markPosted(id, target.channelId, target.messageId, contentHash(version), actor.name);
     await audit(actor, "changelog.post", null, what(version));
+    // W-0062: Bild und Version öffentlich auf der Webseite.
+    if (image) await writeRaw(config, imageFile(version), image).catch((error: Error) => console.warn("[changelog] Bild für die Webseite:", error.message));
+    await publishSite(config, ["changelog", "news"]);
 
     return found(id);
 }
@@ -151,6 +163,8 @@ export function deletePost(config: IConfig, actor: IActor, id: number): Promise<
         await unpost(config, version.posted);
         await clearPosted(id);
         await audit(actor, "changelog.unpost", null, what(version));
+        await removeRaw(config, imageFile(version)).catch(() => undefined);
+        await publishSite(config, ["changelog", "news"]);
 
         return found(id);
     });
@@ -165,6 +179,8 @@ export function deleteVersion(config: IConfig, actor: IActor, id: number): Promi
         if (!(await deleteVersionRow(id))) throw new PublicError(404, "Diese Version gibt es nicht mehr.");
 
         await audit(actor, "changelog.delete", null, what(version));
+        await removeRaw(config, imageFile(version)).catch(() => undefined);
+        if (version.posted) await publishSite(config, ["changelog", "news"]);
     });
 }
 
