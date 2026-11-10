@@ -19,7 +19,7 @@ const INPUT: IVersionInput = {
 };
 
 /** Test-Kanäle fangen mit 9000000000000000 an, echte nie. */
-const CHANNEL = "900000000000000050";
+export const CHANNEL = "900000000000000050";
 const FOREIGN = "900000000000000099";
 const CHANNEL_KEY = "changelog_channel";
 
@@ -36,7 +36,7 @@ async function setState(value: string | null): Promise<void> {
     else await query("INSERT INTO admin_state (name, value) VALUES (?, ?) ON DUPLICATE KEY UPDATE value = VALUES(value)", [CHANNEL_KEY, value]);
 }
 
-interface IDiscordCall {
+export interface IDiscordCall {
     readonly method: string;
     /** Ohne https://discord.com/api/v10 */
     readonly path: string;
@@ -51,7 +51,7 @@ const reply = (body: unknown, status = 200): Response => new Response(JSON.strin
  * Test-Kanäle mitgeschrieben und von `respond` beantwortet. `rights` sind die
  * Rechte von @everyone, ab Werk Administrator.
  */
-async function withDiscord(config: IConfig, respond: (call: IDiscordCall) => Response | Promise<Response>, run: (calls: IDiscordCall[]) => Promise<void>, rights = String(1 << 3)): Promise<void> {
+export async function withDiscord(config: IConfig, respond: (call: IDiscordCall) => Response | Promise<Response>, run: (calls: IDiscordCall[]) => Promise<void>, rights = String(1 << 3)): Promise<void> {
     const calls: IDiscordCall[] = [];
     const real = globalThis.fetch;
 
@@ -85,7 +85,7 @@ async function withDiscord(config: IConfig, respond: (call: IDiscordCall) => Res
 }
 
 /** Discord nimmt alles an: neue Nachrichten bekommen die nächste ID. */
-function accepting(): (call: IDiscordCall) => Response {
+export function accepting(): (call: IDiscordCall) => Response {
     let next = 51;
 
     return (call) => {

@@ -38,6 +38,7 @@ import { checkSecurityDb } from "./checks/security-db.check.ts";
 import { checkChangelogDb } from "./checks/changelog-db.check.ts";
 import { checkPartnerRoutesDb, checkPartnersDb } from "./checks/partners-db.check.ts";
 import { checkPartnerRoleDb } from "./checks/partner-role.check.ts";
+import { checkNewsDb } from "./checks/news-db.check.ts";
 import { checkMessagesDb } from "./checks/messages-db.check.ts";
 import { checkDatabaseDb } from "./checks/database-db.check.ts";
 import { checkDumpsDb } from "./checks/dumps-db.check.ts";
@@ -3672,6 +3673,7 @@ try {
     await checkPartnersDb();
     await checkPartnerRoleDb(config);
     await checkPartnerRoutesDb(config, { get, write, raw });
+    await checkNewsDb(config, { get, write, raw });
     await checkDatabaseDb();
     await checkDumpsDb(config);
 } finally {

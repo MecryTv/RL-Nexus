@@ -14,6 +14,7 @@ import { closeEvents } from "./events.ts";
 import { closeAllMail } from "./mail/pool.ts";
 import { scheduleShopExpiry } from "./shop/expiry.ts";
 import { schedulePartnerRoles } from "./partners/role.ts";
+import { scheduleNews } from "./news/clock.ts";
 import { scheduleStatusPost } from "./status-post.ts";
 
 /**
@@ -51,6 +52,7 @@ void warmNames(config).catch((error: unknown) => console.error(`🔎 Namen für 
 scheduleCommandSync(config);
 scheduleShopExpiry(config);
 schedulePartnerRoles(config);
+scheduleNews(config);
 
 const app = await buildApp(config);
 await app.listen({ port: config.port, host: "0.0.0.0" });
