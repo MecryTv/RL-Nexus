@@ -13,6 +13,7 @@ import { useStudioDoc } from "../studio/useStudioDoc";
 import { useToast } from "../toast/context";
 import { inputOf, roleNotice, switchKind } from "./draft.ts";
 import { useContact } from "./hooks";
+import { AccountTab, ProtocolTab } from "./AccountTab";
 import { PartnerStudio } from "./PartnerStudio";
 import styles from "./studio.module.scss";
 
@@ -148,8 +149,8 @@ function PartnerEditor({ entry, entries, posts, siteOrigin, onSaved }: IEditorPr
                     onKind={changeKind}
                 />
             )}
-            {shown === "konto" && <p className={styles.muted}>Konto, Zugang und Rolle folgen.</p>}
-            {shown === "protokoll" && <p className={styles.muted}>Das Protokoll folgt.</p>}
+            {shown === "konto" && <AccountTab value={doc.value} set={doc.set} entry={entry} dirty={doc.dirty} saving={saving} problem={problem} onSave={requestSave} onChanged={onSaved} />}
+            {shown === "protokoll" && <ProtocolTab entry={entry} />}
 
             <ConfirmDialog
                 open={pending !== null}

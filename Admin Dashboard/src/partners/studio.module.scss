@@ -260,3 +260,69 @@
     font-size: 0.8125rem;
     line-height: 1.5;
 }
+
+/* --- Konto, Zugang und Rolle, Protokoll (Task 12) ------------------------- */
+.account {
+    display: grid;
+    gap: var(--s-4);
+    max-width: 760px;
+}
+
+.panelTitle {
+    margin: 0 0 var(--s-3);
+    font-size: 1rem;
+    font-weight: 700;
+}
+
+.accountSave {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--s-2);
+    margin-top: var(--s-3);
+}
+
+.roleName {
+    color: var(--c-blue);
+}
+
+.roleActions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-2);
+    margin: var(--s-2) 0;
+}
+
+.protocol {
+    display: grid;
+    gap: 0;
+    max-width: 760px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+
+    li {
+        display: grid;
+        gap: 2px 12px;
+        grid-template-columns: 170px 1fr;
+        padding: 10px 0;
+        border-bottom: 1px solid var(--c-line);
+        font-size: 0.875rem;
+    }
+
+    time {
+        color: var(--c-text-faint);
+        grid-row: span 2;
+    }
+
+    span {
+        color: var(--c-text-dim);
+    }
+
+    @include below(600px) {
+        li {
+            grid-template-columns: 1fr;
+        }
+    }
+}
