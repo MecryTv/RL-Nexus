@@ -10,10 +10,26 @@ import type { IConfig } from "../config.ts";
 import { query } from "../db.ts";
 import type { IHttp } from "./backups-db.check.ts";
 import { USERS, fake } from "./fakes.ts";
-import { createPost, deletePost, duePosts, getPost, updatePost } from "../news/store.ts";
+import { createPost, deletePost, duePosts, getPost, markPublished, updatePost } from "../news/store.ts";
 import { createEntry, deleteEntry, getEntry, listEntries, updateEntry } from "../partners/store.ts";
 import { publishSite } from "../site/publish.ts";
-import { check, section } from "./harness.ts";
+import { SESSION_COOKIE, seal } from "../session.ts";
+import { SECRET, check, section } from "./harness.ts";
+
+/**
+ * Anfragen als Admin von einer eigenen Adresse: Das Rate-Limit zählt je IP, und
+ * der Lauf davor hat 127.0.0.1 schon fast ausgeschöpft (wie im Changelog-Check).
+ */
+export function ownAddress(config: IConfig, http: IHttp, ip: string): IHttp {
+    const cookie = `${SESSION_COOKIE}=${seal({ id: USERS.admin, name: "nutzer1", avatar: null, exp: Math.floor(Date.now() / 1000) + 600 }, SECRET)}`;
+    const headers = { cookie, origin: config.publicUrl, "x-forwarded-for": ip };
+
+    return {
+        get: (url) => http.raw("GET", url, headers),
+        write: (method, url, payload) => http.raw(method === "PATCH" ? "PUT" : method, url, headers, payload),
+        raw: (method, url, extra, payload) => http.raw(method, url, { "x-forwarded-for": ip, ...extra }, payload),
+    };
+}
 
 /** Prüf-Einträge heißen „Check DB …“, ihre Adressen beginnen mit check-db-. */
 const ACTOR: IActor = { id: "90000000000000000001", name: "check:db" };
@@ -68,10 +84,13 @@ export async function tidyPartners(): Promise<void> {
 }
 
 /** W-0062: Routen für Partner, Sponsoren und Unterstützer. Datenbank echt, Discord nachgestellt. */
-export async function checkPartnerRoutesDb(config: IConfig, http: IHttp): Promise<void> {
+export async function checkPartnerRoutesDb(config: IConfig, shared: IHttp): Promise<void> {
     section("Routen für Partner/Sponsorings (W-0062)");
 
+    const http = ownAddress(config, shared, "10.62.0.1");
+
     const contact = "99999999999999999931";
+    const hand = "99999999999999999932";
     const role = config.partnerRoleId!;
     const buyerJoined = fake.joined.delete(USERS.buyer);
 
@@ -112,6 +131,40 @@ export async function checkPartnerRoutesDb(config: IConfig, http: IHttp): Promis
             assert.ok(fake.discordCalls.includes(`rolle- ${contact} ${role}`));
         });
 
+        await check("Gruppenwechsel ohne Partner nimmt keine von Hand vergebene Rolle", async () => {
+            fake.memberRoles.set(hand, new Set([role]));
+
+            assert.equal((await http.write("PUT", `/api/groups/${hand}`, { group: "premium" })).statusCode, 204);
+            assert.equal((await http.write("DELETE", `/api/groups/${hand}`)).statusCode, 204);
+            assert.ok(!fake.discordCalls.includes(`rolle- ${hand} ${role}`));
+        });
+
+        await check("Versteckter Partner verschwindet auch aus den News-Dateien", async () => {
+            const created = (await http.write("POST", "/api/partners", { ...ENTRY, name: "Check DB Karte" })).json() as { id: number };
+            const news = (
+                await http.write("POST", "/api/news", {
+                    kind: "beitrag",
+                    category: "partner",
+                    title: "Check DB Mit Karte",
+                    summary: "Mit Partner-Karte.",
+                    cover: null,
+                    blocks: [{ type: "partner", entryId: created.id }],
+                    entryId: created.id,
+                    event: null,
+                    status: "published",
+                    publishAt: null,
+                    pinned: "none",
+                    announce: false,
+                })
+            ).json().post as { slug: string };
+            const read = async (file: string): Promise<any> => (JSON.parse(await readFile(path.join(config.siteDir, file), "utf8")) as { data: unknown }).data;
+
+            assert.ok((await read(`news/${news.slug}.json`)).partners[String(created.id)]);
+            assert.equal((await http.write("PUT", `/api/partners/${created.id}`, { ...ENTRY, name: "Check DB Karte", visible: false })).statusCode, 200);
+            assert.deepEqual((await read(`news/${news.slug}.json`)).partners, {});
+            assert.equal((await read("news.json")).posts.find((item: { slug: string }) => item.slug === news.slug)?.entry, null);
+        });
+
         await check("Partner: Vorab-Prüfung für jemanden, der nicht auf dem Server ist", async () => {
             const response = await http.get(`/api/partners/contact/${USERS.buyer}`);
 
@@ -121,8 +174,9 @@ export async function checkPartnerRoutesDb(config: IConfig, http: IHttp): Promis
         });
     } finally {
         await tidyPartners();
-        await query("DELETE FROM dashboard_groups WHERE user_id = ?", [contact]);
-        await query("DELETE FROM partner_roles WHERE user_id = ?", [contact]);
+        await query("DELETE FROM dashboard_groups WHERE user_id IN (?, ?)", [contact, hand]);
+        await query("DELETE FROM partner_roles WHERE user_id IN (?, ?)", [contact, hand]);
+        fake.memberRoles.delete(hand);
         await query("DELETE FROM admin_audit WHERE target LIKE 'partner:%' AND detail LIKE 'Check DB%'");
         fake.memberRoles.delete(contact);
         if (buyerJoined) fake.joined.add(USERS.buyer);
@@ -229,6 +283,35 @@ export async function checkPartnersDb(config: IConfig): Promise<void> {
             } finally {
                 await rm(siteDir, { recursive: true, force: true });
             }
+        });
+
+        await check("Webseite: gleichzeitige Läufe enden mit dem neuesten Stand", async () => {
+            const siteDir = await mkdtemp(path.join(tmpdir(), "rlnexus-site-"));
+            const site = { ...config, siteDir };
+
+            try {
+                const post = await createPost({ ...POST, title: "Check DB Parallel" }, ACTOR);
+                const first = publishSite(site, ["news"]);
+
+                await updatePost(post.id, { ...POST, title: "Check DB Parallel", status: "draft" }, ACTOR);
+
+                const second = publishSite(site, ["news"]);
+
+                await Promise.all([first, second]);
+                assert.equal(existsSync(path.join(siteDir, "news", "check-db-parallel.json")), false);
+            } finally {
+                await rm(siteDir, { recursive: true, force: true });
+            }
+        });
+
+        await check("News: Anheften wirkt erst beim Veröffentlichen", async () => {
+            const live = await createPost({ ...POST, title: "Check DB Angeheftet", pinned: "big" }, ACTOR);
+            const planned = await createPost({ ...POST, title: "Check DB Morgen", status: "scheduled", publishAt: "2026-01-01T10:00:00.000Z", pinned: "big" }, ACTOR);
+
+            assert.equal((await getPost(live.id))?.pinned, "big");
+            await markPublished(planned.id, new Date("2026-06-01T00:00:00.000Z"));
+            assert.equal((await getPost(live.id))?.pinned, "none");
+            assert.equal((await getPost(planned.id))?.pinned, "big");
         });
 
         await check("News: fällig sind nur geplante, deren Zeit gekommen ist", async () => {

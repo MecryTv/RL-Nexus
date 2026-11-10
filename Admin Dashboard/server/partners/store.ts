@@ -24,7 +24,7 @@ interface IEntryRow {
 
 interface IRoleRow {
     readonly user_id: string;
-    readonly state: "given" | "pending" | "missing";
+    readonly state: "given" | "pending" | "missing" | "removing";
     readonly note: string | null;
     readonly updated_at: Date;
 }
@@ -189,7 +189,13 @@ export async function setGroupGranted(id: number, granted: boolean): Promise<voi
     await query("UPDATE partner_entries SET group_granted = ? WHERE id = ?", [granted ? 1 : 0, id]);
 }
 
-export async function setRoleState(userId: string, state: "given" | "pending" | "missing" | null, note: string | null): Promise<void> {
+export async function roleStateOf(userId: string): Promise<"given" | "pending" | "missing" | "removing" | null> {
+    const [row] = await query<{ state: "given" | "pending" | "missing" | "removing" }[]>("SELECT state FROM partner_roles WHERE user_id = ?", [userId]);
+
+    return row?.state ?? null;
+}
+
+export async function setRoleState(userId: string, state: "given" | "pending" | "missing" | "removing" | null, note: string | null): Promise<void> {
     if (state === null) {
         await query("DELETE FROM partner_roles WHERE user_id = ?", [userId]);
 

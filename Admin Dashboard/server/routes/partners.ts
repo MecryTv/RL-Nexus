@@ -40,7 +40,8 @@ const target = (entry: Pick<IEntry, "id">): string => `partner:${entry.id}`;
 export async function partnerRoutes(app: FastifyInstance, { config }: { config: IConfig }): Promise<void> {
     const changed = async (): Promise<void> => {
         publish("partners");
-        await publishSite(config, ["partners"]);
+        // Auch die News: Sie nennen Name, Logo und Adresse verknüpfter Einträge (Review-Fund 3).
+        await publishSite(config, ["partners", "news"]);
     };
     const entryOf = async (request: FastifyRequest): Promise<IEntry> => {
         const entry = await getEntry(id((request.params as { id?: string }).id));

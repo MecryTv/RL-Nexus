@@ -4,7 +4,7 @@ import type { IConfig } from "../config.ts";
 import { databaseReady, query } from "../db.ts";
 import { DiscordUnavailable, fetchMember, fetchRoles, setMemberRole } from "../discord.ts";
 import { grantGroupIfNone, groupOf, revokeGroupIf } from "../groups.ts";
-import { entriesOfContact, setGroupGranted, setRoleState } from "./store.ts";
+import { entriesOfContact, roleStateOf, setGroupGranted, setRoleState } from "./store.ts";
 
 /**
  * Rolle @Partner und Gruppe Partner (W-0062, Spec Teil 7). Die Rolle bekommt,
@@ -21,7 +21,7 @@ export function wantsPartnerRole(input: { readonly group: string | null; readonl
 
 const none: IRoleState = { state: "none", note: null, since: null };
 
-async function remember(userId: string, state: "given" | "pending" | "missing" | null, note: string | null = null): Promise<IRoleState> {
+async function remember(userId: string, state: "given" | "pending" | "missing" | "removing" | null, note: string | null = null): Promise<IRoleState> {
     await setRoleState(userId, state, note);
 
     return state === null ? none : { state, note, since: new Date().toISOString() };
@@ -31,6 +31,8 @@ async function remember(userId: string, state: "given" | "pending" | "missing" |
 export async function syncPartnerRole(config: IConfig, userId: string, options: { readonly mayRemove: boolean; readonly actor?: IActor }): Promise<IRoleState> {
     const roleId = config.partnerRoleId;
     const want = wantsPartnerRole({ group: await groupOf(userId), contactOf: await entriesOfContact(userId) });
+    // Ein Wegnehmen, das nach einer Aktion scheiterte, holt auch der Zeitgeber nach (Review-Fund 5).
+    const mayRemove = options.mayRemove || (await roleStateOf(userId)) === "removing";
 
     if (!roleId) return want ? remember(userId, "missing", "Keine Test-Rolle eingestellt (DEV_PARTNER_ROLE_ID).") : remember(userId, null);
 
@@ -41,7 +43,9 @@ export async function syncPartnerRole(config: IConfig, userId: string, options: 
     } catch (error) {
         if (!(error instanceof DiscordUnavailable)) throw error;
 
-        return want ? remember(userId, "missing", "Discord ist gerade nicht erreichbar.") : remember(userId, null);
+        if (want) return remember(userId, "missing", "Discord ist gerade nicht erreichbar.");
+
+        return mayRemove ? remember(userId, "removing", "Discord war nicht erreichbar, die Rolle wird später entfernt.") : remember(userId, null);
     }
 
     if (roles === null) return want ? remember(userId, "pending") : remember(userId, null);
@@ -54,14 +58,14 @@ export async function syncPartnerRole(config: IConfig, userId: string, options: 
             await audit(options.actor ?? SYSTEM, "partner.role.give", userId);
         }
 
-        if (!want && has && options.mayRemove) {
+        if (!want && has && mayRemove) {
             await setMemberRole(config, userId, roleId, false, REASON);
             await audit(options.actor ?? SYSTEM, "partner.role.take", userId);
         }
     } catch (error) {
         if (!(error instanceof DiscordUnavailable)) throw error;
 
-        return remember(userId, "missing", error.message);
+        return remember(userId, want ? "missing" : "removing", error.message);
     }
 
     return want ? remember(userId, "given") : remember(userId, null);
@@ -79,13 +83,16 @@ export async function applyContact(config: IConfig, next: IEntry | null, previou
     const wantsGroup = next !== null && newId !== null && next.access === "free";
     const keeps = Boolean(previous?.groupGranted) && wantsGroup && oldId === newId;
 
-    if (next && wantsGroup && !keeps && newId && (await grantGroupIfNone(actor, newId, "partner", `Partner/Sponsoring: ${next.name}`))) {
+    const granted = Boolean(next && wantsGroup && !keeps && newId && (await grantGroupIfNone(actor, newId, "partner", `Partner/Sponsoring: ${next.name}`)));
+
+    if (next && newId && granted) {
         await setGroupGranted(next.id, true);
         await audit(actor, "group.grant", newId, `partner: ${next.name}`);
     }
 
     if (previous?.groupGranted && oldId && !keeps) {
-        if (next) await setGroupGranted(next.id, false);
+        // Hat dieser Aufruf dem neuen Ansprechpartner die Gruppe gegeben, bleibt die Markierung (Review-Fund 1).
+        if (next && !granted) await setGroupGranted(next.id, false);
 
         const others = (await entriesOfContact(oldId)).filter((entry) => entry.id !== previous.id && entry.kind !== "supporter" && entry.access === "free");
 
@@ -132,7 +139,7 @@ async function wantedPeople(): Promise<string[]> {
 }
 
 async function pendingPeople(): Promise<string[]> {
-    return (await query<{ user_id: string }[]>("SELECT user_id FROM partner_roles WHERE state IN ('pending', 'missing')")).map((row) => row.user_id);
+    return (await query<{ user_id: string }[]>("SELECT user_id FROM partner_roles WHERE state IN ('pending', 'missing', 'removing')")).map((row) => row.user_id);
 }
 
 async function round(config: IConfig, people: () => Promise<string[]>): Promise<void> {

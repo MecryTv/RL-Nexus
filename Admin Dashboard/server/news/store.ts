@@ -120,7 +120,8 @@ export async function createPost(input: IPostInput, actor: IActor, now = new Dat
         );
         const created = Number(inserted.insertId);
 
-        await pinRules(run, created, input.pinned);
+        // Anheften wirkt erst, wenn der Beitrag veröffentlicht ist (Review-Fund, Minor 6).
+        if (input.status === "published") await pinRules(run, created, input.pinned);
 
         return created;
     });
@@ -152,7 +153,7 @@ export async function updatePost(id: number, input: IPostInput, _actor: IActor, 
                 id,
             ]
         );
-        await pinRules(run, id, input.pinned);
+        if (input.status === "published") await pinRules(run, id, input.pinned);
     });
 
     return (await getPost(id))!;
@@ -170,8 +171,33 @@ export async function duePosts(now: Date): Promise<IPost[]> {
     return (await query<IPostRow[]>(`SELECT ${COLUMNS} FROM news_posts WHERE status = 'scheduled' AND publish_at <= ? ORDER BY publish_at, id`, [now])).map(record);
 }
 
-export async function markPublished(id: number, at: Date): Promise<void> {
-    await query("UPDATE news_posts SET status = 'published', published_at = ?, publish_at = NULL, updated_at = CURRENT_TIMESTAMP(3) WHERE id = ? AND status = 'scheduled'", [at, id]);
+/** true, wenn der Beitrag jetzt veröffentlicht wurde (war noch geplant). */
+export async function markPublished(id: number, at: Date): Promise<boolean> {
+    return withTransaction(async (run) => {
+        const changed = await run<{ affectedRows: number }>(
+            "UPDATE news_posts SET status = 'published', published_at = ?, publish_at = NULL, updated_at = CURRENT_TIMESTAMP(3) WHERE id = ? AND status = 'scheduled'",
+            [at, id]
+        );
+
+        if (changed.affectedRows !== 1) return false;
+
+        const [row] = await run<{ pinned: PinState }[]>("SELECT pinned FROM news_posts WHERE id = ?", [id]);
+
+        await pinRules(run, id, row?.pinned ?? "none");
+
+        return true;
+    });
+}
+
+/** Vor dem Posten: nur wer das bekommt, darf ankündigen. Zwei Klicks oder Route und Zeitgeber posten so nur einmal (Review-Fund 6). */
+export async function claimAnnouncement(id: number): Promise<boolean> {
+    const result = await query<{ affectedRows: number }>("UPDATE news_posts SET announced_at = CURRENT_TIMESTAMP(3) WHERE id = ? AND announced_at IS NULL AND status = 'published'", [id]);
+
+    return result.affectedRows === 1;
+}
+
+export async function releaseAnnouncement(id: number): Promise<void> {
+    await query("UPDATE news_posts SET announced_at = NULL WHERE id = ? AND announced_message_id IS NULL", [id]);
 }
 
 export async function markAnnounced(id: number, messageId: string, at: Date): Promise<void> {

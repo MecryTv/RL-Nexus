@@ -14,6 +14,9 @@ const ACTOR: IActor = { id: "90000000000000000001", name: "check:db" };
 const MEMBER = "99999999999999999921";
 const ADMIN = "99999999999999999922";
 const TWICE = "99999999999999999923";
+const FROM = "99999999999999999924";
+const TO = "99999999999999999925";
+const LATER = "99999999999999999926";
 
 const ENTRY: IEntryInput = {
     kind: "partner",
@@ -45,9 +48,9 @@ const calls = (prefix: "rolle+" | "rolle-", userId: string, role: string): numbe
 
 async function tidy(): Promise<void> {
     await query("DELETE FROM partner_entries WHERE slug LIKE 'check-db-%'");
-    await query("DELETE FROM dashboard_groups WHERE user_id IN (?, ?, ?)", [MEMBER, ADMIN, TWICE]);
+    await query("DELETE FROM dashboard_groups WHERE user_id IN (?, ?, ?, ?, ?, ?)", [MEMBER, ADMIN, TWICE, FROM, TO, LATER]);
     await query("DELETE FROM partner_roles WHERE user_id LIKE '999999999999999999%'");
-    for (const id of [MEMBER, ADMIN, TWICE]) fake.memberRoles.delete(id);
+    for (const id of [MEMBER, ADMIN, TWICE, FROM, TO, LATER]) fake.memberRoles.delete(id);
 }
 
 /** W-0062: Rolle @Partner und Gruppe. Datenbank echt, Discord nachgestellt. */
@@ -138,6 +141,50 @@ export async function checkPartnerRoleDb(config: IConfig): Promise<void> {
 
             await applyContact(config, entry, null, ACTOR);
             assert.equal((await syncPartnerRole(config, USERS.buyer, { mayRemove: false })).state, "pending");
+        });
+
+        await check("Ansprechpartner-Wechsel: die neue Person verliert Gruppe und Rolle beim Löschen", async () => {
+            const entry = await createEntry({ ...ENTRY, name: "Check DB Wechsel", contactId: FROM }, ACTOR);
+
+            await applyContact(config, entry, null, ACTOR);
+
+            const before = (await getEntry(entry.id))!;
+            const after = await updateEntry(entry.id, { ...ENTRY, name: "Check DB Wechsel", contactId: TO }, ACTOR);
+
+            await applyContact(config, after, before, ACTOR);
+            assert.equal(await groupOf(FROM), null);
+            assert.equal(await groupOf(TO), "partner");
+            assert.equal((await getEntry(entry.id))?.groupGranted, true);
+
+            const last = (await getEntry(entry.id))!;
+
+            await deleteEntry(entry.id);
+            await applyContact(config, null, last, ACTOR);
+            assert.equal(await groupOf(TO), null);
+            assert.equal(calls("rolle-", TO, role), 1);
+        });
+
+        await check("Wegnehmen scheitert: der Stand merkt es sich, der Zeitgeber holt es nach", async () => {
+            const entry = await createEntry({ ...ENTRY, name: "Check DB Später", contactId: LATER, access: "paid" }, ACTOR);
+
+            await applyContact(config, entry, null, ACTOR);
+
+            const last = (await getEntry(entry.id))!;
+
+            await deleteEntry(entry.id);
+            fake.discordDown = true;
+
+            try {
+                await applyContact(config, null, last, ACTOR);
+            } finally {
+                fake.discordDown = false;
+            }
+
+            const [row] = await query<{ state: string }[]>("SELECT state FROM partner_roles WHERE user_id = ?", [LATER]);
+
+            assert.equal(row?.state, "removing");
+            await syncPartnerRole(config, LATER, { mayRemove: false });
+            assert.equal(calls("rolle-", LATER, role), 1);
         });
 
         await check("Zeitgeber nimmt nie weg", async () => {

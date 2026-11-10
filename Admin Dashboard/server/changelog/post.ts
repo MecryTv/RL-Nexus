@@ -6,7 +6,7 @@ import { PublicError } from "../errors.ts";
 import type { IStatusChannelOption } from "../../shared/status.ts";
 import { remove, shortError, statusChannelOptions, upload, type ChannelRight } from "../status-post.ts";
 import { removeRaw, writeRaw } from "../content.ts";
-import { publishSite } from "../site/publish.ts";
+import { publishSite, withSite } from "../site/publish.ts";
 import { renderChangelogImage, type IChangelogFooter } from "./image.ts";
 import { clearPosted, contentHash, deleteVersionRow, markPosted, versionOf } from "./store.ts";
 
@@ -142,7 +142,7 @@ async function post(config: IConfig, actor: IActor, id: number): Promise<IChange
     await markPosted(id, target.channelId, target.messageId, contentHash(version), actor.name);
     await audit(actor, "changelog.post", null, what(version));
     // W-0062: Bild und Version öffentlich auf der Webseite.
-    if (image) await writeRaw(config, imageFile(version), image).catch((error: Error) => console.warn("[changelog] Bild für die Webseite:", error.message));
+    if (image) await withSite(() => writeRaw(config, imageFile(version), image)).catch((error: Error) => console.warn("[changelog] Bild für die Webseite:", error.message));
     await publishSite(config, ["changelog", "news"]);
 
     return found(id);
@@ -163,7 +163,7 @@ export function deletePost(config: IConfig, actor: IActor, id: number): Promise<
         await unpost(config, version.posted);
         await clearPosted(id);
         await audit(actor, "changelog.unpost", null, what(version));
-        await removeRaw(config, imageFile(version)).catch(() => undefined);
+        await withSite(() => removeRaw(config, imageFile(version))).catch(() => undefined);
         await publishSite(config, ["changelog", "news"]);
 
         return found(id);
@@ -179,7 +179,7 @@ export function deleteVersion(config: IConfig, actor: IActor, id: number): Promi
         if (!(await deleteVersionRow(id))) throw new PublicError(404, "Diese Version gibt es nicht mehr.");
 
         await audit(actor, "changelog.delete", null, what(version));
-        await removeRaw(config, imageFile(version)).catch(() => undefined);
+        await withSite(() => removeRaw(config, imageFile(version))).catch(() => undefined);
         if (version.posted) await publishSite(config, ["changelog", "news"]);
     });
 }

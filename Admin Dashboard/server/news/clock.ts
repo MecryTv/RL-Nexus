@@ -15,7 +15,7 @@ export async function runDue(config: IConfig, now = new Date()): Promise<number>
     const due = await duePosts(now);
 
     for (const post of due) {
-        await markPublished(post.id, now);
+        if (!(await markPublished(post.id, now))) continue;
 
         const fresh = await getPost(post.id);
         const warning = fresh?.announce && !fresh.announcedAt ? await announcePost(config, fresh, SYSTEM) : null;

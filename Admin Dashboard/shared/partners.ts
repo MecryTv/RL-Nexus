@@ -125,8 +125,8 @@ export interface IEntryInput {
 }
 
 export interface IRoleState {
-    /** given: vergeben · pending: wartet auf Beitritt · missing: fehlt (note sagt warum) · none: ohne Konto */
-    readonly state: "given" | "pending" | "missing" | "none";
+    /** given: vergeben · pending: wartet auf Beitritt · missing: fehlt (note sagt warum) · removing: soll weg, Wegnehmen steht noch aus · none: ohne Konto */
+    readonly state: "given" | "pending" | "missing" | "removing" | "none";
     readonly note: string | null;
     readonly since: string | null;
 }

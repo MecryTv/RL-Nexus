@@ -80,7 +80,27 @@ async function writeChangelog(config: IConfig, site: ISiteChangelog): Promise<vo
     );
 }
 
-export async function publishSite(config: IConfig, parts: readonly SitePart[]): Promise<void> {
+/**
+ * Alles, was unter SITE_DIR liest und schreibt, läuft nacheinander: Lesen aus der
+ * Datenbank und Schreiben gehören zusammen, sonst überschreibt ein älterer Lauf
+ * einen neueren (Review-Fund 4).
+ * ponytail: eine Kette in diesem Prozess; mit mehreren Prozessen bräuchte es eine Sperre in der Datenbank.
+ */
+let chain: Promise<unknown> = Promise.resolve();
+
+export function withSite<T>(task: () => Promise<T>): Promise<T> {
+    const run = chain.then(task, task);
+
+    chain = run.catch(() => undefined);
+
+    return run;
+}
+
+export function publishSite(config: IConfig, parts: readonly SitePart[]): Promise<void> {
+    return withSite(() => build(config, parts));
+}
+
+async function build(config: IConfig, parts: readonly SitePart[]): Promise<void> {
     const want = new Set(parts);
 
     try {

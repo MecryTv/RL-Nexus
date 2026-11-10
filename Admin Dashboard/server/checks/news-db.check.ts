@@ -7,6 +7,7 @@ import { getPost } from "../news/store.ts";
 import { publishSite } from "../site/publish.ts";
 import type { IHttp } from "./backups-db.check.ts";
 import { CHANNEL, accepting, withDiscord } from "./changelog-db.check.ts";
+import { ownAddress } from "./partners-db.check.ts";
 import { check, section } from "./harness.ts";
 
 const KEY = "news_channel";
@@ -31,8 +32,10 @@ async function tidy(): Promise<void> {
 }
 
 /** W-0062: News speichern, planen und in Discord ankündigen. Datenbank echt, Discord nachgestellt. */
-export async function checkNewsDb(config: IConfig, http: IHttp): Promise<void> {
+export async function checkNewsDb(config: IConfig, shared: IHttp): Promise<void> {
     section("News (W-0062)");
+
+    const http = ownAddress(config, shared, "10.62.0.2");
 
     const [saved] = await query<{ value: string }[]>("SELECT value FROM admin_state WHERE name = ?", [KEY]);
     const setChannel = async (value: string | null): Promise<void> => {
@@ -66,11 +69,22 @@ export async function checkNewsDb(config: IConfig, http: IHttp): Promise<void> {
 
                 assert.equal(posts.length, 1);
                 assert.ok(JSON.stringify(posts[0]!.body).includes("/news/check-db-sofort"));
+                assert.deepEqual(posts[0]!.body.allowed_mentions, { parse: [] });
 
                 const { post } = response.json() as { post: { id: number } };
 
                 assert.equal((await http.write("PUT", `/api/news/${post.id}`, { ...POST, title: "Check DB Sofort", status: "published", announce: true, summary: "Geändert." })).statusCode, 200);
                 assert.equal(calls.filter((call) => call.method === "POST").length, 1);
+            });
+
+            await check("News: Doppelklick kündigt einmal an", async () => {
+                const draft = (await http.write("POST", "/api/news", { ...POST, title: "Check DB Doppelt", announce: true })).json().post as { id: number };
+                const before = calls.filter((call) => call.method === "POST").length;
+                const body = { ...POST, title: "Check DB Doppelt", status: "published", announce: true };
+                const [a, b] = await Promise.all([http.write("PUT", `/api/news/${draft.id}`, body), http.write("PUT", `/api/news/${draft.id}`, body)]);
+
+                assert.deepEqual([a.statusCode, b.statusCode], [200, 200]);
+                assert.equal(calls.filter((call) => call.method === "POST").length - before, 1);
             });
 
             await check("News: ohne Kanal speichern mit Hinweis", async () => {

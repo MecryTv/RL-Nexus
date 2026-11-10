@@ -7,7 +7,7 @@ import type { IConfig } from "../config.ts";
 import { query } from "../db.ts";
 import { PublicError } from "../errors.ts";
 import { shortError, statusChannelOptions, upload, type ChannelRight } from "../status-post.ts";
-import { markAnnounced } from "./store.ts";
+import { claimAnnouncement, markAnnounced, releaseAnnouncement } from "./store.ts";
 
 /**
  * News in Discord ankündigen (W-0062): einmal je Beitrag, mit Titelbild, Titel,
@@ -49,11 +49,14 @@ export async function announcePost(config: IConfig, post: IPost, actor: IActor):
     const channel = await newsChannel();
 
     if (!channel) return "Kein News-Kanal eingestellt, nicht angekündigt.";
+    if (!(await claimAnnouncement(post.id))) return null;
 
     const cover = await coverOf(config, post.cover);
     const link = `${config.websitePublicUrl}/news/${post.slug}`;
     const body = {
         flags: 1 << 15,
+        // Kein @everyone, keine Rolle und niemand wird gepingt, auch wenn es im Titel steht.
+        allowed_mentions: { parse: [] },
         components: [
             {
                 type: 17,
@@ -72,10 +75,16 @@ export async function announcePost(config: IConfig, post: IPost, actor: IActor):
     try {
         response = await upload(config, `/channels/${channel}/messages`, "POST", body, cover ? [cover] : []);
     } catch {
+        await releaseAnnouncement(post.id);
+
         return "Discord ist gerade nicht erreichbar, nicht angekündigt.";
     }
 
-    if (!response.ok) return shortError(`Nicht angekündigt, Discord antwortet mit ${response.status}: ${await response.text()}`);
+    if (!response.ok) {
+        await releaseAnnouncement(post.id);
+
+        return shortError(`Nicht angekündigt, Discord antwortet mit ${response.status}: ${await response.text()}`);
+    }
 
     await markAnnounced(post.id, String(((await response.json()) as { id: unknown }).id), new Date());
     await audit(actor, "news.announce", `news:${post.id}`, post.title);
