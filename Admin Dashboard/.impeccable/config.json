@@ -119,6 +119,15 @@
         ],
         "createdAt": "2026-10-12T13:14:52.609Z",
         "reason": "Claude: Brainstorming-Entwurf; Großbuchstaben nur in kurzen Navigationspunkten wie auf der echten Webseite"
+      },
+      {
+        "rule": "broken-image",
+        "value": "*",
+        "files": [
+          "server/checks/studio.check.ts"
+        ],
+        "createdAt": "2026-11-10T21:03:44.204Z",
+        "reason": "Agent: Prüfdatei ohne UI; der String block:<img> ist absichtlich kaputte Bühnen-Nachricht im Test (Review-Fokus 4), kein ausgeliefertes img"
       }
     ]
   }
