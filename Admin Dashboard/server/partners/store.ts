@@ -72,6 +72,7 @@ function record(row: IEntryRow, tournaments: readonly number[], roles: ReadonlyM
         createdAt: new Date(row.created_at).toISOString(),
         updatedAt: new Date(row.updated_at).toISOString(),
         role: roleOf(row.contact_id, roles),
+        groupGranted: Boolean(row.group_granted),
     };
 }
 

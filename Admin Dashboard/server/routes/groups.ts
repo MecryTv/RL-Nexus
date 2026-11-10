@@ -8,6 +8,7 @@ import type { IConfig } from "../config.ts";
 import { query } from "../db.ts";
 import { PublicError } from "../errors.ts";
 import { userRefs } from "../users.ts";
+import { syncPartnerRole } from "../partners/role.ts";
 import { body, oneOf, snowflake, text } from "../validate.ts";
 
 /**
@@ -91,6 +92,8 @@ export async function groupRoutes(app: FastifyInstance, { config }: { config: IC
         );
 
         await audit(actor, "group.grant", userId, note ? `${group}: ${note}` : group);
+        // W-0062: Gruppe Partner bringt die Rolle @Partner mit, ein Wechsel weg davon nimmt sie (außer ein Eintrag trägt sie).
+        await syncPartnerRole(config, userId, { mayRemove: true, actor }).catch((error: Error) => console.warn("[partner] Rolle nach Gruppenwechsel:", error.message));
 
         publish("groups");
 
@@ -105,6 +108,7 @@ export async function groupRoutes(app: FastifyInstance, { config }: { config: IC
         if (result.affectedRows === 0) throw new PublicError(404, "Diese Person hat keine Gruppe.");
 
         await audit(actor, "group.revoke", userId);
+        await syncPartnerRole(config, userId, { mayRemove: true, actor }).catch((error: Error) => console.warn("[partner] Rolle nach Gruppenwechsel:", error.message));
 
         publish("groups");
 

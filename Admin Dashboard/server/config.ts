@@ -90,6 +90,8 @@ export interface IConfig {
     readonly guildId: string;
     readonly adminRoleId: string;
     readonly developerRoleId: string;
+    /** W-0062: Rolle @Partner auf guildId. Im Dev-Modus nur mit DEV_PARTNER_ROLE_ID, sonst null. */
+    readonly partnerRoleId: string | null;
     /** Ohne Schrägstrich am Ende, etwa https://admin.nexus-emb.de. */
     readonly publicUrl: string;
     readonly secureCookies: boolean;
@@ -167,6 +169,8 @@ const DEV_SERVER = {
     DEVELOPER_ROLE_ID: "1286386691925344390",
 } as const;
 const DEV_STATUS_CHANNELS = "1211378072549326860";
+/** W-0062: Rolle @Partner auf dem RL-Nexus-Server. Im Dev-Modus gibt es keinen Standard, dort braucht es DEV_PARTNER_ROLE_ID. */
+const PARTNER_ROLE = "1552668178465685635";
 
 /** Dieselbe Untergrenze wie MIN_SECRET_LENGTH im Bot. */
 const MIN_SECRET_LENGTH = 32;
@@ -257,6 +261,14 @@ export function loadConfig(env: Env = process.env, argv: readonly string[] = pro
         guildId: serverId("ADMIN_GUILD_ID"),
         adminRoleId: serverId("ADMIN_ROLE_ID"),
         developerRoleId: serverId("DEVELOPER_ROLE_ID"),
+        partnerRoleId: (() => {
+            const value = developerMode ? raw("DEV_PARTNER_ROLE_ID") : raw("PARTNER_ROLE_ID") || PARTNER_ROLE;
+
+            if (!value) return null;
+            if (!SNOWFLAKE.test(value)) throw new Error(`${developerMode ? "DEV_" : ""}PARTNER_ROLE_ID ist keine Discord-ID (17 bis 20 Ziffern).`);
+
+            return value;
+        })(),
         publicUrl,
         secureCookies: publicUrl.startsWith("https://"),
         botApiUrl: address("BOT_API_URL", "http://localhost:3000"),

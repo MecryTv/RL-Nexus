@@ -298,10 +298,10 @@ export async function addGuildMember(config: IConfig, userId: string, accessToke
 }
 
 /** Gibt oder nimmt eine Rolle. Nehmen bei jemandem, der nicht mehr da ist, ist kein Fehler. */
-export async function setMemberRole(config: IConfig, userId: string, roleId: string, on: boolean): Promise<void> {
+export async function setMemberRole(config: IConfig, userId: string, roleId: string, on: boolean, reason = "RL Nexus Shop"): Promise<void> {
     const response = await botCall(config, `/guilds/${config.guildId}/members/${userId}/roles/${roleId}`, {
         method: on ? "PUT" : "DELETE",
-        headers: { "X-Audit-Log-Reason": SHOP_REASON },
+        headers: { "X-Audit-Log-Reason": reason === "RL Nexus Shop" ? SHOP_REASON : encodeURIComponent(reason) },
     });
 
     if (response.status === 204) return;

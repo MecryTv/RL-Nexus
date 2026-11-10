@@ -139,6 +139,8 @@ export interface IEntry extends IEntryInput {
     readonly createdAt: string;
     readonly updatedAt: string;
     readonly role: IRoleState | null;
+    /** Dieser Eintrag hat dem Ansprechpartner die Gruppe Partner gegeben (dann nimmt er sie beim Entfernen wieder). */
+    readonly groupGranted: boolean;
 }
 
 /* --- Regeln, auch für news.ts --------------------------------------------- */
