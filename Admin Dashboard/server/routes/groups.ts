@@ -8,6 +8,8 @@ import type { IConfig } from "../config.ts";
 import { query } from "../db.ts";
 import { PublicError } from "../errors.ts";
 import { userRefs } from "../users.ts";
+import { groupOf } from "../groups.ts";
+import { syncPartnerRole } from "../partners/role.ts";
 import { body, oneOf, snowflake, text } from "../validate.ts";
 
 /**
@@ -81,6 +83,7 @@ export async function groupRoutes(app: FastifyInstance, { config }: { config: IC
         const input = body(request.body);
         const group = oneOf(input.group, GROUPS, "Die Gruppe");
         const note = text(input.note, "Die Notiz", { max: NOTE_MAX }) || null;
+        const before = await groupOf(userId);
 
         // Ein Nutzer hat höchstens einen Eintrag: vergeben und ändern ist dieselbe Anweisung.
         await query(
@@ -91,6 +94,9 @@ export async function groupRoutes(app: FastifyInstance, { config }: { config: IC
         );
 
         await audit(actor, "group.grant", userId, note ? `${group}: ${note}` : group);
+        // W-0062: Gruppe Partner bringt die Rolle @Partner mit. Nur ein Wechsel weg von Partner nimmt sie (außer ein Eintrag trägt sie);
+        // jemand, der die Rolle von Hand hat, behält sie bei anderen Wechseln (Review-Fund 2).
+        await syncPartnerRole(config, userId, { mayRemove: before === "partner" && group !== "partner", actor }).catch((error: Error) => console.warn("[partner] Rolle nach Gruppenwechsel:", error.message));
 
         publish("groups");
 
@@ -100,11 +106,13 @@ export async function groupRoutes(app: FastifyInstance, { config }: { config: IC
     app.delete("/api/groups/:userId", async (request, reply) => {
         const actor = accessOf(request);
         const userId = snowflake((request.params as { userId?: string }).userId);
+        const before = await groupOf(userId);
         const result = await query<{ affectedRows: number }>("DELETE FROM dashboard_groups WHERE user_id = ?", [userId]);
 
         if (result.affectedRows === 0) throw new PublicError(404, "Diese Person hat keine Gruppe.");
 
         await audit(actor, "group.revoke", userId);
+        await syncPartnerRole(config, userId, { mayRemove: before === "partner", actor }).catch((error: Error) => console.warn("[partner] Rolle nach Gruppenwechsel:", error.message));
 
         publish("groups");
 

@@ -63,6 +63,9 @@ export const USERDATA_AREAS: readonly IUserdataAreaDef[] = [
             { table: "user_codes", column: "user_id", role: "person", time: "created_at", label: "CONCAT('Feste Ticket-ID ', code)" },
             { table: "voice_presets", column: "user_id", role: "person", time: ms("created_at"), label: "CONCAT('Voice-Vorlage ', name)" },
             { table: "dashboard_groups", column: "user_id", role: "person", time: "granted_at", label: "CONCAT('Gruppe ', group_name)", words: true },
+            // W-0062: Ansprechpartner eines Partners oder Sponsors. Beim Löschen fällt nur die Verknüpfung weg, der Eintrag bleibt.
+            { table: "partner_entries", column: "contact_id", role: "team", time: "created_at", label: "CONCAT('Ansprechpartner für ', name)" },
+            { table: "partner_roles", column: "user_id", role: "person", time: "updated_at", label: "CONCAT('Rolle @Partner: ', state)", words: true },
             // W-0064: ein Server pro Person.
             { table: "server_invites", column: "user_id", role: "person", guild: G, time: "invited_at", label: "CONCAT('Bot eingeladen auf ', guild_name)" },
             { table: "server_invites", column: "owner_id", role: "person", guild: G, time: "invited_at", label: "CONCAT('Owner von ', guild_name)" },
@@ -244,6 +247,8 @@ export const USERDATA_AREAS: readonly IUserdataAreaDef[] = [
             { table: "bot_messages", column: "created_by", role: "team", time: "created_at", label: "'Nachricht über den Bot verschickt'", name: "created_name" },
             { table: "bot_message_templates", column: "updated_by", role: "team", time: "updated_at", label: "'Vorlage für Nachrichten geändert'", name: "updated_name" },
             { table: "changelog_versions", column: "created_by", role: "team", time: "created_at", label: "CONCAT('Changelog-Version angelegt: ', version)", name: "created_name" },
+            { table: "partner_entries", column: "created_by", role: "team", time: "created_at", label: "CONCAT('Partner/Sponsoring angelegt: ', name)", name: "created_name" },
+            { table: "news_posts", column: "author_id", role: "team", time: "created_at", label: "CONCAT('News geschrieben: ', title)", name: "author_name" },
             { table: "server_requests", column: "decided_by", role: "team", guild: G, time: "decided_at", label: "CONCAT('Über eine Server-Anfrage entschieden: ', guild_name)", name: "decided_name" },
             { table: "server_blocks", column: "blocked_by", role: "team", guild: G, time: "created_at", label: "'Server für RL Nexus gesperrt'", name: "by_name" },
             { table: "security_bans", column: "created_by", role: "team", time: "created_at", label: "'Person gesperrt'", name: "created_name" },
@@ -289,6 +294,9 @@ export const USERDATA_AREAS: readonly IUserdataAreaDef[] = [
  */
 export const USERDATA_IGNORED: Readonly<Record<string, string>> = {
     "level_backfill.last_user": "Arbeitsstand der Nachberechnung, keine Daten über die Person",
+    // W-0062: öffentliche Inhalte, der Ansprechpartner steht in partner_entries.contact_id.
+    "partner_entries.details": "Texte, Links und Bilder der Partner-Seite auf der Webseite, keine Daten über eine Person",
+    "news_posts.details": "Inhalt eines News-Beitrags auf der Webseite",
     // W-0057: Teile der Sperre, die mit ihr im Bereich Sicherheit bleiben.
     "security_bans.open_user": "Hilfsspalte für höchstens eine aktive Sperre je Person, derselbe Wert wie user_id",
     "security_bans.note": "Begründung des Teams zur Sperre, bleibt mit der Sperre",
@@ -344,7 +352,7 @@ export const USERDATA_IGNORED: Readonly<Record<string, string>> = {
 };
 
 /** Name einer Spalte, die eine Discord-ID einer Person hält (für VARCHAR, CHAR, BIGINT). */
-export const PERSON_COLUMN = /(^|_)(user|target|moderator|owner|actor|opener|leader|author|creator|staff|reporter|host|captain|player|member)(_id)?$|_by$|^actor$|^discord$/;
+export const PERSON_COLUMN = /(^|_)(user|target|moderator|owner|actor|opener|leader|author|creator|staff|reporter|host|captain|player|member|contact)(_id)?$|_by$|^actor$|^discord$/;
 
 /* --- Was bleibt (Runde 3): Rechtsgrundlage und Dauer ------------------- */
 

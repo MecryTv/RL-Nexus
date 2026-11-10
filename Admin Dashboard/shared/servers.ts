@@ -124,6 +124,14 @@ export interface IInvitedServer {
     readonly facts: IBotServerFacts | null;
 }
 
+/** W-0062: Live-Daten eines Partner-Servers (Bot-Route /admin/servers/:id/showcase). */
+export interface IBotShowcase {
+    readonly members: number;
+    readonly online: number;
+    readonly modules: readonly string[];
+    readonly teams: readonly { readonly name: string; readonly group: string | null; readonly mmr: number | null; readonly rank: string | null; readonly players: number }[];
+}
+
 export interface IPersonServers {
     readonly started: boolean;
     readonly exempt: boolean;

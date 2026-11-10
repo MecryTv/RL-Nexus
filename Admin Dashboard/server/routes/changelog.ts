@@ -10,6 +10,7 @@ import type { IConfig } from "../config.ts";
 import { DatabaseUnavailable, databaseReady } from "../db.ts";
 import { InvalidInput, PublicError } from "../errors.ts";
 import { channelName } from "../status-post.ts";
+import { publishSite } from "../site/publish.ts";
 import { body, id, snowflake } from "../validate.ts";
 
 /**
@@ -115,6 +116,11 @@ export async function changelogRoutes(app: FastifyInstance, { config }: { config
         await updateVersion(target, input);
         await audit(actorOf(request), "changelog.update", null, what(input));
 
-        return found(target);
+        const version = await found(target);
+
+        // W-0062: Die öffentliche Seite zeigt den aktuellen Text einer geposteten Version.
+        if (version.posted) await publishSite(config, ["changelog", "news"]);
+
+        return version;
     });
 }

@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>W-0062 · Partner-Seite, Entwurf 2</title>
+<style>
+@font-face { font-family: "Oxanium"; font-weight: 400; src: url("oxanium-400.woff2") format("woff2"); }
+@font-face { font-family: "Oxanium"; font-weight: 600; src: url("oxanium-600.woff2") format("woff2"); }
+@font-face { font-family: "Oxanium"; font-weight: 800; src: url("oxanium-800.woff2") format("woff2"); }
+@font-face { font-family: "Rajdhani"; font-weight: 600; src: url("rajdhani-600.woff2") format("woff2"); }
+@font-face { font-family: "Orbitron"; font-weight: 700; src: url("orbitron-700.woff2") format("woff2"); }
+:root {
+  --base: #050608; --panel: #080d12; --line: rgb(255 255 255 / 8%); --line2: rgb(255 255 255 / 14%);
+  --red: #ff1e2d; --blue: #00afff; --purple: #8a4dff; --win: #35e07f; --gold: #ffc53d; --orange: #ff8a3d; --cyan: #38c8ff;
+  --text: #f2f4f7; --dim: #a8b0bc; --faint: #9aa5b2;
+  --f-display: "Oxanium", "Segoe UI", system-ui, sans-serif; --f-label: "Rajdhani", "Segoe UI", sans-serif; --f-accent: "Orbitron", "Oxanium", sans-serif;
+  --cut: 14px;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--base); color: var(--text); font: 15px/1.6 var(--f-display); padding: 28px 20px 90px; }
+.doc { max-width: 1280px; margin: 0 auto; }
+.doc > h1 { font-size: 28px; font-weight: 800; margin: 0 0 4px; }
+.doc > h1 small { color: var(--red); font: 600 14px var(--f-label); letter-spacing: .16em; margin-right: 10px; }
+.doc > p.lead { color: var(--dim); max-width: 920px; margin: 0 0 8px; }
+.variant { margin: 40px 0 14px; display: flex; gap: 14px; align-items: baseline; flex-wrap: wrap; }
+.variant b { font: 700 15px var(--f-accent); color: var(--red); letter-spacing: .08em; }
+.variant h2 { margin: 0; font-size: 22px; font-weight: 800; }
+.variant span { color: var(--dim); font-size: 14px; }
+.changes { background: var(--panel); border: 1px solid var(--line); padding: 14px 20px 8px; margin: 0 0 16px; }
+.changes h3 { margin: 0 0 8px; font: 600 13px var(--f-label); letter-spacing: .16em; color: var(--red); text-transform: uppercase; }
+.changes ol { margin: 0; padding-left: 22px; color: var(--dim); font-size: 14px; } .changes li { margin-bottom: 6px; } .changes b { color: var(--text); }
+
+.screen { border: 1px solid var(--line2); background: radial-gradient(1200px 500px at 70% -10%, rgb(255 30 45 / 10%), transparent 60%), var(--base); overflow: hidden; }
+.bar { display: flex; align-items: center; gap: 26px; padding: 16px 34px; border-bottom: 1px solid var(--line); background: rgb(5 6 8 / 80%); }
+.brand { display: flex; align-items: center; gap: 10px; margin-right: auto; }
+.brand img { width: 30px; height: 30px; }
+.brand strong { font: 800 17px var(--f-display); } .brand strong i { color: var(--red); font-style: normal; }
+.brand small { display: block; font: 600 9px var(--f-label); letter-spacing: .26em; color: var(--dim); margin-top: -3px; }
+.bar nav { display: flex; gap: 22px; font: 600 12px var(--f-label); letter-spacing: .16em; color: var(--dim); text-transform: uppercase; }
+.bar nav a.on { color: var(--text); position: relative; } .bar nav a.on::after { content: ""; position: absolute; left: 0; right: 0; bottom: -8px; height: 2px; background: var(--red); }
+.btn { display: inline-flex; align-items: center; gap: 8px; padding: 9px 16px; font: 600 12px var(--f-label); letter-spacing: .16em; text-transform: uppercase; background: var(--red); color: #fff; clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px); white-space: nowrap; }
+.btn.ghost { background: rgb(255 255 255 / 5%); color: var(--text); box-shadow: inset 0 0 0 1px var(--line2); }
+.btn.big { padding: 12px 20px; font-size: 13px; }
+.wrap { padding: 44px 34px 54px; }
+.eyebrow { font: 600 12px var(--f-label); letter-spacing: .2em; color: var(--red); text-transform: uppercase; display: flex; align-items: center; gap: 10px; }
+.eyebrow::before { content: ""; width: 26px; height: 2px; background: var(--red); }
+.hero h1 { font-size: 46px; line-height: 1.08; font-weight: 800; margin: 14px 0 14px; }
+.hero h1 em { color: var(--red); font-style: normal; }
+.hero p { color: var(--dim); max-width: 640px; margin: 0 0 22px; font-size: 16px; }
+.cut { clip-path: polygon(var(--cut) 0, 100% 0, 100% calc(100% - var(--cut)), calc(100% - var(--cut)) 100%, 0 100%, 0 var(--cut)); }
+.panel { background: linear-gradient(180deg, rgb(255 255 255 / 3%), transparent 40%), var(--panel); box-shadow: inset 0 0 0 1px var(--line2); }
+.tag { display: inline-block; padding: 3px 9px 2px; font: 600 12px var(--f-label); letter-spacing: .14em; text-transform: uppercase; color: var(--c); background: color-mix(in srgb, var(--c) 13%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 36%, transparent); }
+.logo { flex-shrink: 0; display: grid; place-items: center; font: 700 18px var(--f-accent); color: var(--c); background: color-mix(in srgb, var(--c) 14%, #0a0f15); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--c) 50%, transparent); clip-path: polygon(11px 0, 100% 0, 100% calc(100% - 11px), calc(100% - 11px) 100%, 0 100%, 0 11px); }
+.links { display: flex; gap: 8px; flex-wrap: wrap; }
+.links a { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; font: 600 12px var(--f-label); letter-spacing: .08em; color: var(--dim); background: rgb(255 255 255 / 4%); box-shadow: inset 0 0 0 1px var(--line); }
+.facts { display: flex; gap: 26px; flex-wrap: wrap; }
+.facts div { font: 600 12px var(--f-label); letter-spacing: .14em; color: var(--faint); text-transform: uppercase; }
+.facts strong { display: block; font: 800 18px var(--f-display); color: var(--text); letter-spacing: 0; text-transform: none; }
+
+/* --- Übersicht ---------------------------------------------------------- */
+.feature { position: relative; margin: 36px 0 34px; overflow: hidden; --c: var(--blue); }
+.feature .bg { position: absolute; inset: 0; background: url("banner.webp") center / cover; opacity: .35; }
+.feature .bg::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, #080d12 30%, rgb(8 13 18 / 55%) 70%, rgb(8 13 18 / 20%)); }
+.feature .in { position: relative; display: grid; grid-template-columns: 150px 1fr auto; gap: 28px; align-items: center; padding: 30px; }
+.feature .logo { width: 150px; height: 150px; font-size: 46px; }
+.feature h3 { font-size: 30px; margin: 8px 0 8px; font-weight: 800; }
+.feature p { color: var(--dim); margin: 0 0 16px; max-width: 600px; }
+.feature .go { align-self: end; }
+.sectionhead { display: flex; justify-content: space-between; align-items: center; margin: 0 0 16px; gap: 16px; flex-wrap: wrap; }
+.sectionhead h2 { margin: 0; font-size: 22px; font-weight: 800; }
+.chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.chip { padding: 6px 12px; font: 600 12px var(--f-label); letter-spacing: .12em; text-transform: uppercase; color: var(--dim); background: rgb(255 255 255 / 4%); box-shadow: inset 0 0 0 1px var(--line); }
+.chip.on { color: #fff; background: rgb(255 30 45 / 16%); box-shadow: inset 0 0 0 1px rgb(255 30 45 / 55%); }
+.grid { display: grid; gap: 22px; grid-template-columns: repeat(3, 1fr); }
+.card { display: flex; flex-direction: column; position: relative; transition: transform .2s; }
+.card .strip { height: 84px; background: radial-gradient(circle at 80% 20%, color-mix(in srgb, var(--c) 45%, transparent), transparent 60%), linear-gradient(135deg, #0d141c, #06090d); }
+.card .strip.img { background: url("banner.webp") center / cover; }
+.card .head { display: flex; gap: 14px; align-items: flex-end; padding: 0 20px; margin-top: -30px; }
+.card .logo { width: 62px; height: 62px; font-size: 20px; background: color-mix(in srgb, var(--c) 18%, #0a0f15); }
+.card .head > div:last-child { padding-top: 36px; }
+.card h4 { margin: 0 0 2px; font-size: 18px; font-weight: 800; line-height: 1.2; }
+.card .body { padding: 14px 20px 18px; display: flex; flex-direction: column; gap: 12px; flex: 1; }
+.card p { margin: 0; color: var(--dim); font-size: 14px; }
+.card .foot { display: flex; align-items: center; justify-content: space-between; margin-top: auto; }
+.card .more { font: 600 12px var(--f-label); letter-spacing: .14em; color: var(--faint); text-transform: uppercase; }
+.card.hover { transform: translateY(-4px); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--c) 70%, transparent); }
+.card.hover .more { color: var(--c); }
+.hovernote { position: absolute; top: -26px; right: 0; font: 600 12px var(--f-label); letter-spacing: .14em; color: var(--gold); text-transform: uppercase; }
+.cta { margin-top: 34px; display: flex; align-items: center; gap: 24px; padding: 26px 30px; background: linear-gradient(100deg, rgb(255 30 45 / 16%), rgb(255 30 45 / 3%) 60%), var(--panel); box-shadow: inset 0 0 0 1px rgb(255 30 45 / 30%); }
+.cta h3 { margin: 0 0 4px; font-size: 21px; font-weight: 800; } .cta p { margin: 0; color: var(--dim); }
+.cta .btn { margin-left: auto; }
+
+/* --- Große Ansicht ----------------------------------------------------- */
+.dbanner { position: relative; height: 300px; background: url("banner.webp") center 40% / cover; }
+.dbanner::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgb(5 6 8 / 10%) 30%, var(--base)); }
+.dbanner .back { position: absolute; left: 34px; top: 22px; z-index: 1; font: 600 12px var(--f-label); letter-spacing: .16em; color: var(--text); text-transform: uppercase; padding: 7px 12px; background: rgb(5 6 8 / 70%); box-shadow: inset 0 0 0 1px var(--line2); }
+.dhead { position: relative; display: grid; grid-template-columns: 170px 1fr auto; gap: 28px; align-items: end; padding: 0 34px; margin-top: -96px; z-index: 1; --c: var(--blue); }
+.dhead .logo { width: 170px; height: 170px; font-size: 54px; background: color-mix(in srgb, var(--c) 20%, #0a0f15); box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--c) 60%, transparent); }
+.dhead h1 { font-size: 44px; line-height: 1.05; font-weight: 800; margin: 10px 0 10px; }
+.dhead .sub { color: var(--dim); }
+.dhead .acts { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; padding-bottom: 6px; }
+.icons { display: flex; gap: 8px; }
+.icons span { width: 38px; height: 38px; display: grid; place-items: center; font: 700 12px var(--f-label); color: var(--dim); background: rgb(255 255 255 / 5%); box-shadow: inset 0 0 0 1px var(--line2); clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px); }
+.dstats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; margin: 30px 34px 0; }
+.dstats div { padding: 16px 20px; box-shadow: inset -1px 0 0 var(--line); font: 600 12px var(--f-label); letter-spacing: .16em; color: var(--faint); text-transform: uppercase; }
+.dstats div:last-child { box-shadow: none; }
+.dstats strong { display: block; font: 800 24px var(--f-display); color: var(--text); letter-spacing: 0; text-transform: none; margin-top: 2px; }
+.dbody { display: grid; grid-template-columns: 1fr 340px; gap: 30px; padding: 30px 34px 50px; }
+.dbody h2 { font-size: 22px; margin: 0 0 12px; font-weight: 800; }
+.about { font-size: 16px; line-height: 1.7; color: #dfe3e9; max-width: 66ch; margin: 0 0 30px; }
+.about p { margin: 0 0 14px; }
+.timeline { list-style: none; padding: 0; margin: 0 0 30px; border-left: 2px solid var(--line2); }
+.timeline li { position: relative; padding: 0 0 18px 22px; }
+.timeline li::before { content: ""; position: absolute; left: -7px; top: 6px; width: 12px; height: 12px; background: var(--c, var(--gold)); clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
+.timeline b { display: block; } .timeline span { color: var(--faint); font: 600 13px var(--f-label); letter-spacing: .08em; }
+.teams { display: grid; gap: 10px; margin-bottom: 30px; }
+.team { display: grid; grid-template-columns: 44px 1fr auto auto; gap: 14px; align-items: center; padding: 12px 16px; }
+.rank { width: 44px; height: 44px; display: grid; place-items: center; font: 700 12px var(--f-accent); color: var(--c); background: color-mix(in srgb, var(--c) 14%, transparent); clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%); }
+.team b { font-size: 16px; } .team small { display: block; color: var(--faint); font-size: 13px; }
+.team .mmr { font: 800 18px var(--f-display); } .team .mmr small { display: inline; margin-left: 4px; }
+.box { padding: 18px 18px 16px; margin-bottom: 16px; }
+.box h4 { margin: 0 0 12px; font: 600 12px var(--f-label); letter-spacing: .18em; color: var(--faint); text-transform: uppercase; }
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; font-size: 14px; } .kv span { color: var(--faint); } .kv b { font-weight: 600; text-align: right; }
+.mods { display: flex; gap: 6px; flex-wrap: wrap; }
+.newslist { display: flex; flex-direction: column; gap: 12px; }
+.newsitem { display: grid; grid-template-columns: 64px 1fr; gap: 12px; align-items: center; }
+.newsitem .th { height: 48px; background: url("banner.webp") center / cover; }
+.newsitem .th.alt { background: radial-gradient(circle at 70% 30%, rgb(138 77 255 / 55%), transparent 60%), #0b1118; }
+.newsitem b { font-size: 14px; line-height: 1.3; display: block; } .newsitem small { color: var(--faint); font: 600 12px var(--f-label); letter-spacing: .08em; }
+.joinbox { background: linear-gradient(160deg, rgb(88 101 242 / 20%), transparent 70%), var(--panel); box-shadow: inset 0 0 0 1px rgb(88 101 242 / 40%); }
+.joinbox p { margin: 0 0 12px; color: var(--dim); font-size: 14px; }
+.joinbox .row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.joinbox .row b { font-size: 15px; } .joinbox .row small { color: var(--win); font: 600 12px var(--f-label); letter-spacing: .08em; display: block; }
+.more3 { padding: 0 34px 44px; }
+.more3 .grid .card .strip { height: 60px; }
+.mobile { width: 390px; border: 1px solid var(--line2); background: var(--base); overflow: hidden; }
+.mobile .dbanner { height: 170px; } .mobile .dbanner .back { left: 16px; top: 14px; }
+.mobile .dhead { grid-template-columns: 1fr; padding: 0 18px; margin-top: -64px; gap: 10px; }
+.mobile .dhead .logo { width: 96px; height: 96px; font-size: 30px; }
+.mobile .dhead h1 { font-size: 28px; margin: 4px 0 4px; }
+.mobile .dhead .acts { justify-content: flex-start; }
+.mobile .dstats { grid-template-columns: 1fr 1fr; margin: 18px 18px 0; }
+.mobile .dstats div:nth-child(2) { box-shadow: none; }
+.mobile .dstats div:nth-child(-n+2) { box-shadow: inset -1px -1px 0 var(--line); } .mobile .dstats div:nth-child(2) { box-shadow: inset 0 -1px 0 var(--line); }
+.mobile .about { padding: 18px; margin: 0; font-size: 15px; }
+.pair { display: grid; grid-template-columns: 390px 1fr; gap: 30px; align-items: start; }
+.pair .explain { color: var(--dim); font-size: 14px; } .pair .explain b { color: var(--text); }
+.pair .explain li { margin-bottom: 8px; }
+</style>
+</head>
+<body>
+<div class="doc">
+  <h1><small>W-0062</small>Partner-Seite, Runde 2: P1 mit großer Ansicht</h1>
+  <p class="lead">Grundlage ist P1. Ein Klick auf einen Partner öffnet seine eigene Seite <b>/partner/&lt;name&gt;</b> mit Banner, großem Logo, Links, Kennzahlen, Teams, Erfolgen und News. Die Adresse lässt sich teilen, und Discord zeigt beim Teilen Banner und Kurztext als Vorschau.</p>
+
+  <!-- ===================================================== Übersicht -->
+  <div class="variant"><b>P1+</b><h2>Übersicht</h2><span>/partner</span></div>
+  <div class="changes"><h3>Geändert gegenüber P1</h3><ol>
+    <li><b>Banner</b>: Jeder Partner kann ein Banner hochladen. Es liegt im hervorgehobenen Block als Hintergrund und oben auf jeder Karte; ohne Banner zeichnet die Karte einen Verlauf in seiner Farbe.</li>
+    <li><b>Ganze Karte klickbar</b>, mit Hover: Karte hebt sich, Rand in Partnerfarbe, „Ansehen →“ leuchtet auf (hier bei Orbit Gaming gezeigt).</li>
+    <li><b>Filter nach Art</b> über dem Raster (aus P2 übernommen), damit es auch mit vielen Partnern übersichtlich bleibt.</li>
+    <li>Der hervorgehobene Partner bekommt einen klaren Knopf <b>„Partner ansehen“</b> statt nur der Links.</li>
+  </ol></div>
+  <div class="screen">
+    <div class="bar">
+      <div class="brand"><img src="logo-n.webp" alt=""><div><strong>RL <i>Nexus</i></strong><small>ESPORTS MANAGEMENT BOT</small></div></div>
+      <nav><a>Home</a><a>Module</a><a class="on">Partner</a><a>News</a><a>Team</a><a>Kontakt</a></nav>
+      <span class="btn">Dashboard ↗</span>
+    </div>
+    <div class="wrap">
+      <div class="hero">
+        <div class="eyebrow">Partner</div>
+        <h1>Gemeinsam für die <em>Szene</em>.</h1>
+        <p>Organisationen, Creator und Ligen, mit denen wir eng zusammenarbeiten. Sie testen neue Module als Erste und sagen uns, was im Alltag fehlt.</p>
+        <span class="btn">Partner werden →</span> &nbsp; <span class="btn ghost">Support-Server</span>
+      </div>
+
+      <div class="feature panel cut">
+        <div class="bg"></div>
+        <div class="in">
+          <div class="logo">AV</div>
+          <div>
+            <span class="tag" style="--c: var(--blue)">Organisation</span> <span class="tag" style="--c: var(--gold)">Hervorgehoben</span>
+            <h3>Apex Vortex Esports</h3>
+            <p>Deutsche RL-Organisation mit drei Teams von Diamant bis SSL. Nutzt Team-Hub, Matchups und das Apply System für Probetrainings.</p>
+            <div class="facts"><div>Partner seit<strong>März 2026</strong></div><div>Teams<strong>3</strong></div><div>Mitglieder<strong>1.240</strong></div></div>
+          </div>
+          <span class="btn big go">Partner ansehen →</span>
+        </div>
+      </div>
+
+      <div class="sectionhead"><h2>Alle Partner</h2><div class="chips"><span class="chip on">Alle 6</span><span class="chip">Organisationen 2</span><span class="chip">Creator 1</span><span class="chip">Ligen &amp; Turniere 2</span><span class="chip">Communities 1</span></div></div>
+      <div class="grid">
+        <div class="card panel cut" style="--c: var(--purple)"><div class="strip"></div><div class="head"><div class="logo">KM</div><div><h4>KBM Miqo</h4><span class="tag">Creator</span></div></div><div class="body"><p>Streamt Rocket League auf Twitch, Ranked und Coaching. Testet bei uns die Rang-Karte.</p><div class="foot"><div class="links"><a>Twitch</a><a>Discord</a></div><span class="more">Ansehen →</span></div></div></div>
+        <div class="card panel cut" style="--c: var(--gold)"><div class="strip img"></div><div class="head"><div class="logo">NL</div><div><h4>Nordliga RL</h4><span class="tag">Liga</span></div></div><div class="body"><p>Wöchentliche 3v3-Liga im Norden, zwei Divisionen. Ergebnisse laufen über Matchups.</p><div class="foot"><div class="links"><a>Webseite</a><a>Discord</a></div><span class="more">Ansehen →</span></div></div></div>
+        <div class="card panel cut" style="--c: var(--win)"><div class="strip"></div><div class="head"><div class="logo">BB</div><div><h4>Boost Brigade</h4><span class="tag">Community</span></div></div><div class="body"><p>Offene Community mit 6Mans und Clips der Woche, rund 3.000 Mitglieder.</p><div class="foot"><div class="links"><a>Discord</a><a>X</a></div><span class="more">Ansehen →</span></div></div></div>
+        <div class="card panel cut hover" style="--c: var(--blue)"><div class="strip"></div><div class="head"><div class="logo">OG</div><div><h4>Orbit Gaming</h4><span class="tag">Organisation</span></div></div><div class="body"><p>Academy-Organisation, sucht Spieler über Looking For und das Apply System.</p><div class="foot"><div class="links"><a>Webseite</a><a>Discord</a></div><span class="more">Ansehen →</span></div></div></div>
+        <div class="card panel cut" style="--c: var(--orange)"><div class="strip"></div><div class="head"><div class="logo">AA</div><div><h4>Aerial Academy Cup</h4><span class="tag">Turnier</span></div></div><div class="body"><p>Monatlicher 2v2-Cup für Spieler bis Champion. Anmeldung im Discord.</p><div class="foot"><div class="links"><a>Discord</a><a>YouTube</a></div><span class="more">Ansehen →</span></div></div></div>
+      </div>
+      <div class="cta cut"><div><h3>Ihr wollt Partner werden?</h3><p>Schreibt uns, was ihr macht und wofür ihr RL Nexus nutzt. Wir melden uns innerhalb weniger Tage.</p></div><span class="btn">Kontakt aufnehmen →</span></div>
+    </div>
+  </div>
+
+  <!-- ===================================================== Große Ansicht -->
+  <div class="variant"><b>P1+</b><h2>Große Ansicht eines Partners</h2><span>/partner/apex-vortex</span></div>
+  <div class="changes"><h3>Was auf der Seite steht</h3><ol>
+    <li><b>Banner</b> über die ganze Breite, darauf das große Logo, Name, Art, Region und „Partner seit“.</li>
+    <li><b>Knöpfe</b>: „Discord beitreten“ groß, daneben Webseite und kleine Symbole für X, Twitch, YouTube, TikTok. Nur was eingetragen ist, steht da.</li>
+    <li><b>Kennzahlen</b> in einer Leiste (frei wählbar im Admin, bis zu vier).</li>
+    <li><b>Über uns</b> als längerer Text, <b>Erfolge</b> als kleine Zeitleiste.</li>
+    <li><b>Teams aus RL Nexus</b>: Nutzt der Partner den Team-Hub, kann er seine Teams mit Rang und MMR zeigen lassen. Schalter im Admin, ab Werk aus.</li>
+    <li>Rechts: <b>Discord-Einladung</b> als Kasten mit Mitgliederzahl, <b>Steckbrief</b>, welche <b>Module</b> er nutzt, und <b>News</b>, die mit ihm verknüpft sind.</li>
+    <li>Unten <b>weitere Partner</b>. Auf dem Handy rutscht die rechte Spalte unter den Text.</li>
+  </ol></div>
+  <div class="screen">
+    <div class="bar">
+      <div class="brand"><img src="logo-n.webp" alt=""><div><strong>RL <i>Nexus</i></strong><small>ESPORTS MANAGEMENT BOT</small></div></div>
+      <nav><a>Home</a><a>Module</a><a class="on">Partner</a><a>News</a><a>Team</a><a>Kontakt</a></nav>
+      <span class="btn">Dashboard ↗</span>
+    </div>
+    <div class="dbanner"><span class="back">← Alle Partner</span></div>
+    <div class="dhead">
+      <div class="logo">AV</div>
+      <div>
+        <span class="tag" style="--c: var(--blue)">Organisation</span> <span class="tag" style="--c: var(--gold)">Hervorgehoben</span>
+        <h1>Apex Vortex Esports</h1>
+        <div class="sub">Deutschland · Partner seit März 2026</div>
+      </div>
+      <div class="acts"><span class="btn big">Discord beitreten</span><span class="btn ghost big">Webseite ↗</span><div class="icons"><span>X</span><span>YT</span><span>TT</span></div></div>
+    </div>
+    <div class="dstats panel cut"><div>Teams<strong>3</strong></div><div>Mitglieder<strong>1.240</strong></div><div>Gegründet<strong>2023</strong></div><div>Bester Rang<strong>SSL</strong></div></div>
+    <div class="dbody">
+      <div>
+        <h2>Über uns</h2>
+        <div class="about"><p>Apex Vortex ist 2023 als kleines Trio gestartet und heute eine der aktivsten deutschen RL-Organisationen. Drei Teams spielen in Ligen von Diamant bis SSL, dazu kommen offene Trainings für die Community.</p><p>Mit RL Nexus laufen bei uns Team-Übersicht, Matchups und Bewerbungen an einem Ort. Neue Spieler bewerben sich per DM, Probetrainings planen wir über Matchups.</p></div>
+        <h2>Teams</h2>
+        <div class="teams">
+          <div class="team panel cut" style="--c: var(--purple)"><div class="rank">SSL</div><div><b>Apex Main</b><small>Captain: Vortex · 4 Spieler</small></div><span class="tag" style="--c: var(--purple)">Main</span><div class="mmr">1.905<small>MMR</small></div></div>
+          <div class="team panel cut" style="--c: var(--red)"><div class="rank">GC2</div><div><b>Apex Academy</b><small>Captain: Kirito · 3 Spieler</small></div><span class="tag" style="--c: var(--blue)">Academy</span><div class="mmr">1.612<small>MMR</small></div></div>
+          <div class="team panel cut" style="--c: var(--cyan)"><div class="rank">C3</div><div><b>Apex Rising</b><small>Captain: Nova · 3 Spieler</small></div><span class="tag" style="--c: var(--win)">Rising</span><div class="mmr">1.304<small>MMR</small></div></div>
+        </div>
+        <h2>Erfolge</h2>
+        <ul class="timeline"><li style="--c: var(--gold)"><b>1. Platz, Nordliga Season 2</b><span>August 2026</span></li><li style="--c: var(--blue)"><b>Top 8, RLCS Open EU Qualifier</b><span>Mai 2026</span></li><li style="--c: var(--win)"><b>Gründung von Apex Academy</b><span>Januar 2026</span></li></ul>
+      </div>
+      <aside>
+        <div class="box joinbox cut"><h4>Discord</h4><div class="row"><div class="logo" style="--c: var(--blue); width:44px; height:44px; font-size:14px">AV</div><div><b>Apex Vortex Esports</b><small>● 312 online · 1.240 Mitglieder</small></div></div><p>Offene Trainings jeden Mittwoch, Bewerbungen laufen über den Bot.</p><span class="btn">Beitreten</span></div>
+        <div class="box panel cut"><h4>Steckbrief</h4><div class="kv"><span>Art</span><b>Organisation</b><span>Region</span><b>EU · Deutschland</b><span>Spielmodi</span><b>3v3, 2v2</b><span>Partner seit</span><b>März 2026</b></div></div>
+        <div class="box panel cut"><h4>Nutzt RL Nexus für</h4><div class="mods"><span class="tag" style="--c: var(--orange)">Team-Hub</span><span class="tag" style="--c: var(--red)">Matchups</span><span class="tag" style="--c: var(--blue)">Apply System</span><span class="tag" style="--c: var(--purple)">Tickets</span></div></div>
+        <div class="box panel cut"><h4>News mit Apex Vortex</h4><div class="newslist"><div class="newsitem"><div class="th"></div><div><b>Apex Vortex Esports ist neuer Partner</b><small>06.11.2026 · Partner</small></div></div><div class="newsitem"><div class="th alt"></div><div><b>Nordliga Season 2: Apex holt den Titel</b><small>28.08.2026 · Turnier</small></div></div></div></div>
+      </aside>
+    </div>
+    <div class="more3">
+      <div class="sectionhead"><h2>Weitere Partner</h2><span class="chip">Alle Partner →</span></div>
+      <div class="grid">
+        <div class="card panel cut" style="--c: var(--purple)"><div class="strip"></div><div class="head"><div class="logo">KM</div><div><h4>KBM Miqo</h4><span class="tag">Creator</span></div></div><div class="body"><span class="more">Ansehen →</span></div></div>
+        <div class="card panel cut" style="--c: var(--gold)"><div class="strip img"></div><div class="head"><div class="logo">NL</div><div><h4>Nordliga RL</h4><span class="tag">Liga</span></div></div><div class="body"><span class="more">Ansehen →</span></div></div>
+        <div class="card panel cut" style="--c: var(--win)"><div class="strip"></div><div class="head"><div class="logo">BB</div><div><h4>Boost Brigade</h4><span class="tag">Community</span></div></div><div class="body"><span class="more">Ansehen →</span></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================== Handy -->
+  <div class="variant"><b>P1+</b><h2>Große Ansicht auf dem Handy</h2><span>390 px breit</span></div>
+  <div class="pair">
+    <div class="mobile">
+      <div class="dbanner"><span class="back">← Partner</span></div>
+      <div class="dhead">
+        <div class="logo">AV</div>
+        <div><span class="tag" style="--c: var(--blue)">Organisation</span><h1>Apex Vortex Esports</h1><div class="sub">Deutschland · seit März 2026</div></div>
+        <div class="acts"><span class="btn big">Discord beitreten</span><span class="btn ghost big">Webseite</span></div>
+      </div>
+      <div class="dstats panel"><div>Teams<strong>3</strong></div><div>Mitglieder<strong>1.240</strong></div><div>Gegründet<strong>2023</strong></div><div>Bester Rang<strong>SSL</strong></div></div>
+      <div class="about"><p>Apex Vortex ist 2023 als kleines Trio gestartet und heute eine der aktivsten deutschen RL-Organisationen …</p></div>
+    </div>
+    <ul class="explain">
+      <li><b>Logo</b> rutscht unter den Banner, Knöpfe in voller Breite, gut mit dem Daumen erreichbar.</li>
+      <li><b>Kennzahlen</b> zwei mal zwei statt in einer Reihe.</li>
+      <li>Danach Über uns, Teams, Erfolge, dann Discord-Kasten, Steckbrief, Module und News untereinander.</li>
+      <li>Beim Teilen der Adresse in Discord erscheinen <b>Banner, Name und Kurztext</b> als Vorschau (Open Graph).</li>
+    </ul>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>W-0062 · Startseite mit News, Changelog, Partnern und Sponsoren</title>
+<style>
+@font-face { font-family: "Oxanium"; font-weight: 400; src: url("oxanium-400.woff2") format("woff2"); }
+@font-face { font-family: "Oxanium"; font-weight: 600; src: url("oxanium-600.woff2") format("woff2"); }
+@font-face { font-family: "Oxanium"; font-weight: 800; src: url("oxanium-800.woff2") format("woff2"); }
+@font-face { font-family: "Rajdhani"; font-weight: 600; src: url("rajdhani-600.woff2") format("woff2"); }
+@font-face { font-family: "Orbitron"; font-weight: 700; src: url("orbitron-700.woff2") format("woff2"); }
+:root {
+  --base: #050608; --panel: #080d12; --line: rgb(255 255 255 / 8%); --line2: rgb(255 255 255 / 14%);
+  --red: #ff1e2d; --blue: #00afff; --purple: #8a4dff; --purple-t: #a884ff; --win: #35e07f; --gold: #ffc53d; --orange: #ff8a3d; --cyan: #38c8ff; --silver: #c9d1db;
+  --text: #f2f4f7; --dim: #a8b0bc; --faint: #9aa5b2;
+  --f-display: "Oxanium", "Segoe UI", system-ui, sans-serif; --f-label: "Rajdhani", "Segoe UI", sans-serif; --f-accent: "Orbitron", "Oxanium", sans-serif;
+  --cut: 14px;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--base); color: var(--text); font: 15px/1.6 var(--f-display); padding: 28px 16px 90px; }
+a { color: inherit; text-decoration: none; }
+svg.sym { position: absolute; width: 0; height: 0; overflow: hidden; }
+.i { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+.i.fill { fill: currentColor; stroke: none; }
+.i.s { width: 13px; height: 13px; }
+.doc { max-width: 1280px; margin: 0 auto; }
+.doc > h1 { font-size: 28px; font-weight: 800; margin: 0 0 4px; }
+.doc > h1 small { color: var(--red); font: 600 14px var(--f-label); letter-spacing: .16em; margin-right: 10px; }
+.doc > p.lead { color: var(--dim); max-width: 920px; margin: 0 0 8px; }
+.variant { margin: 48px 0 14px; display: flex; gap: 14px; align-items: baseline; flex-wrap: wrap; }
+.variant b { font: 700 15px var(--f-accent); color: var(--red); letter-spacing: .08em; }
+.variant h2 { margin: 0; font-size: 22px; font-weight: 800; }
+.variant span { color: var(--dim); font-size: 14px; }
+.changes { background: var(--panel); border: 1px solid var(--line); padding: 14px 20px 8px; margin: 0 0 16px; }
+.changes h3 { margin: 0 0 8px; font: 600 13px var(--f-label); letter-spacing: .16em; color: var(--red); text-transform: uppercase; }
+.changes ol, .changes ul { margin: 0; padding-left: 22px; color: var(--dim); font-size: 14px; } .changes li { margin-bottom: 6px; } .changes b { color: var(--text); }
+
+/* ---------- Bildschirm: Kopfzeile und Fußzeile wie die Webseite ---------- */
+.screen { container-type: inline-size; container-name: screen; border: 1px solid var(--line2); background: radial-gradient(1200px 500px at 70% -10%, rgb(255 30 45 / 9%), transparent 60%), var(--base); overflow: hidden; }
+.bar { display: flex; align-items: center; gap: 22px; height: 76px; padding: 0 34px; border-bottom: 1px solid var(--line); background: rgb(5 6 8 / 82%); }
+.brand { display: flex; align-items: center; gap: 12px; margin-right: auto; }
+.brand img { width: 40px; height: 40px; filter: drop-shadow(0 0 10px rgb(255 30 45 / 35%)); }
+.brand strong { display: block; font: 700 16px/1 var(--f-accent); letter-spacing: .06em; } .brand strong i { color: var(--red); font-style: normal; }
+.brand small { display: block; font: 600 12px var(--f-label); letter-spacing: .14em; color: var(--faint); margin-top: 3px; white-space: nowrap; text-transform: uppercase; }
+.bar nav { display: flex; align-items: center; gap: 2px; }
+.bar nav a { position: relative; padding: 9px 13px; font: 600 12.5px var(--f-label); letter-spacing: .1em; text-transform: uppercase; color: var(--dim); white-space: nowrap; }
+.bar nav a.on { color: var(--text); }
+.bar nav a.on::after { content: ""; position: absolute; left: 50%; bottom: 0; width: 22px; height: 2px; transform: translateX(-50%); background: var(--red); box-shadow: 0 0 10px var(--red); }
+.bar nav a.fresh::before { content: ""; position: absolute; right: 4px; top: 7px; width: 6px; height: 6px; background: var(--red); clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
+.bar .acts { display: flex; align-items: center; gap: 12px; }
+.ico { display: grid; place-items: center; width: 40px; height: 40px; color: var(--dim); clip-path: polygon(9px 0, 100% 0, 100% calc(100% - 9px), calc(100% - 9px) 100%, 0 100%, 0 9px); }
+.ico .i { width: 20px; height: 20px; }
+.bar .menu { display: none; width: 42px; height: 42px; place-items: center; color: var(--text); }
+.bar .menu .i { width: 22px; height: 22px; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 44px; padding: 0 18px; font: 600 12.5px var(--f-label); letter-spacing: .12em; text-transform: uppercase; color: #fff; background: linear-gradient(135deg, #ff3344, #ff1e2d 55%, #d81424); clip-path: polygon(11px 0, 100% 0, 100% calc(100% - 11px), calc(100% - 11px) 100%, 0 100%, 0 11px); white-space: nowrap; }
+.btn.ghost { background: rgb(255 255 255 / 5%); color: var(--text); box-shadow: inset 0 0 0 1px var(--line2); }
+.btn.lg { height: 52px; padding: 0 24px; font-size: 13.5px; }
+.btn.sm { height: 38px; padding: 0 14px; font-size: 12px; }
+.shell { max-width: 1240px; margin: 0 auto; padding: 0 34px; }
+.cut { clip-path: polygon(var(--cut) 0, 100% 0, 100% calc(100% - var(--cut)), calc(100% - var(--cut)) 100%, 0 100%, 0 var(--cut)); }
+.panel { background: linear-gradient(180deg, rgb(255 255 255 / 3%), transparent 40%), var(--panel); box-shadow: inset 0 0 0 1px var(--line2); }
+.eyebrow { font: 600 12px var(--f-label); letter-spacing: .22em; color: var(--c, var(--red)); text-transform: uppercase; display: flex; align-items: center; gap: 12px; }
+.eyebrow::before { content: ""; width: 26px; height: 2px; background: currentColor; box-shadow: 0 0 10px currentColor; }
+.meta { font: 600 13px var(--f-label); letter-spacing: .06em; color: var(--faint); display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.meta .dot::before { content: "·"; margin-right: 12px; }
+.tag { display: inline-flex; align-items: center; padding: 5px 10px 4px; font: 600 12px/1 var(--f-label); letter-spacing: .14em; text-transform: uppercase; color: var(--c); background: color-mix(in srgb, var(--c) 13%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 36%, transparent); white-space: nowrap; }
+.new { display: inline-flex; align-items: center; padding: 5px 10px 4px; font: 600 12px/1 var(--f-label); letter-spacing: .16em; text-transform: uppercase; color: var(--red); background: rgb(255 30 45 / 12%); box-shadow: inset 0 0 0 1px rgb(255 30 45 / 45%); }
+.more { display: inline-flex; align-items: center; gap: 7px; color: var(--red); font: 600 12.5px var(--f-label); letter-spacing: .14em; text-transform: uppercase; }
+.logo { flex-shrink: 0; display: grid; place-items: center; font: 700 18px var(--f-accent); color: var(--c); background: color-mix(in srgb, var(--c) 14%, #0a0f15); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--c) 50%, transparent); clip-path: polygon(11px 0, 100% 0, 100% calc(100% - 11px), calc(100% - 11px) 100%, 0 100%, 0 11px); }
+.cover { position: relative; overflow: hidden; background: radial-gradient(circle at 75% 30%, color-mix(in srgb, var(--c) 45%, transparent), transparent 55%), linear-gradient(135deg, #0b1118, #05080b); }
+.cover::after { content: attr(data-art); position: absolute; right: 14px; bottom: 10px; font: 700 34px/1 var(--f-accent); color: color-mix(in srgb, var(--c) 40%, transparent); }
+.cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.foot { border-top: 1px solid var(--line); margin-top: 60px; padding: 44px 34px 26px; background: linear-gradient(180deg, rgb(8 13 18 / 0%), rgb(8 13 18 / 80%)); }
+.foot .cols { display: grid; grid-template-columns: 1.15fr 1fr 1fr 1fr; gap: 36px; max-width: 1240px; margin: 0 auto 30px; }
+.foot .fb img { width: 56px; height: 56px; border-radius: 50%; margin-bottom: 12px; }
+.foot .fb p { margin: 0 0 14px; color: var(--dim); font-size: 14px; max-width: 38ch; }
+.foot .socials { display: flex; gap: 8px; } .foot .socials span { display: grid; place-items: center; width: 40px; height: 40px; box-shadow: inset 0 0 0 1px var(--line); color: var(--dim); clip-path: polygon(9px 0, 100% 0, 100% calc(100% - 9px), calc(100% - 9px) 100%, 0 100%, 0 9px); }
+.foot h4 { margin: 0 0 14px; font: 600 12px var(--f-label); letter-spacing: .18em; color: var(--text); text-transform: uppercase; }
+.foot ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 9px; font-size: 14px; color: var(--dim); }
+.foot ul li.on { color: var(--text); font-weight: 600; }
+.foot .bottom { border-top: 1px solid var(--line); padding-top: 20px; display: flex; justify-content: space-between; gap: 8px 24px; flex-wrap: wrap; color: var(--faint); font-size: 13px; max-width: 1240px; margin: 0 auto; }
+
+/* ---------- Das Bild aus dem Discord-Post (D2), als Nachbau ---------- */
+.post { container-type: inline-size; container-name: post; aspect-ratio: 1100 / 580; position: relative; overflow: hidden; display: flex; flex-direction: column; background: radial-gradient(70% 45% at 90% 0%, rgb(255 30 45 / 14%), transparent 70%), linear-gradient(160deg, #0d1219, #05080b 60%); box-shadow: inset 0 0 0 1px var(--line2); color: var(--text); }
+/* cqw am Bild selbst zählt gegen den äußeren Container, bei den Kindern gegen das Bild. Deshalb liegen alle Abstände auf den Kindern. */
+.post > * { margin: 0 5cqw; } .post > :first-child { margin-top: 2.6cqw; } .post > :last-child { margin-bottom: 2cqw; } .post > * + * { margin-top: .8cqw; }
+.post::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 1cqw; background: var(--red); }
+.post .ph { display: flex; align-items: center; gap: 1.4cqw; }
+.post .ph img { width: max(14px, 3.8cqw); height: max(14px, 3.8cqw); }
+.post .ph b { font: 800 max(13px, 2.2cqw)/1 var(--f-display); } .post .ph b i { color: var(--red); font-style: normal; }
+.post .ph small { font: 600 max(12px, 1.6cqw)/1 var(--f-label); letter-spacing: .14em; text-transform: uppercase; color: var(--dim); margin-left: .6cqw; }
+.post .stamp { margin-left: auto; transform: rotate(-6deg); padding: max(3px, .7cqw) max(6px, 1.4cqw) max(2px, .5cqw); font: 700 max(12px, 1.9cqw)/1 var(--f-accent); letter-spacing: .16em; text-transform: uppercase; color: var(--c); box-shadow: inset 0 0 0 max(2px, .3cqw) var(--c); background: color-mix(in srgb, var(--c) 8%, transparent); }
+.post .pv { font: 700 max(22px, 6.4cqw)/1 var(--f-accent); color: var(--red); letter-spacing: .04em; margin-top: 1.2cqw; }
+.post .pt { font: 800 max(13px, 2.5cqw)/1.15 var(--f-display); margin-top: .5cqw; }
+.post .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 1cqw; margin-top: auto; }
+.post .tile { padding: max(4px, .7cqw) max(6px, 1.4cqw); background: color-mix(in srgb, var(--c) 9%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 42%, transparent); clip-path: polygon(1.2cqw 0, 100% 0, 100% calc(100% - 1.2cqw), calc(100% - 1.2cqw) 100%, 0 100%, 0 1.2cqw); }
+.post .tile.full { grid-column: 1 / -1; }
+.post .tile h5 { margin: 0; display: flex; justify-content: space-between; align-items: baseline; gap: 6px; font: 600 max(12px, 1.6cqw)/1 var(--f-label); letter-spacing: .16em; text-transform: uppercase; color: var(--c); }
+.post .tile h5 b { font: 800 max(13px, 2.2cqw)/1 var(--f-display); color: var(--text); letter-spacing: 0; }
+/* Unter 260 px nur Streifen, Logo, Nummer und Stempel. */
+@container post (max-width: 260px) {
+  .post > .ph { margin-top: auto; } .post > .pv { margin-bottom: auto; }
+  .post > * + * { margin-top: max(4px, 1.6cqw); }
+  .post .tiles, .post .pt, .post .ph small { display: none; }
+}
+
+/* ---------- Heutige Startseite, gekürzt ---------- */
+.hero { padding: 72px 0 80px; }
+.hero .in { display: grid; grid-template-columns: 1.02fr 1fr; gap: 60px; align-items: center; }
+.pill { display: inline-flex; align-items: center; gap: 9px; padding: 7px 14px 6px; border: 1px solid rgb(255 30 45 / 32%); background: rgb(255 30 45 / 9%); color: #ff3344; font: 600 12px var(--f-label); letter-spacing: .15em; text-transform: uppercase; clip-path: polygon(7px 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 0 100%, 0 7px); }
+.hero h1 { font-size: 56px; line-height: 1.02; font-weight: 800; letter-spacing: -.03em; margin: 22px 0 20px; } .hero h1 em { color: var(--red); font-style: normal; }
+.hero .lead { color: var(--dim); font-size: 17px; line-height: 1.68; margin: 0 0 24px; max-width: 40rem; }
+.hero .acts { display: flex; gap: 14px; flex-wrap: wrap; }
+.hero .stats { display: flex; gap: 12px 40px; flex-wrap: wrap; margin-top: 30px; padding-top: 26px; border-top: 1px solid var(--line); }
+.hero .stats div { display: flex; flex-direction: column; gap: 4px; }
+.hero .stats b { font: 700 27px/1 var(--f-accent); letter-spacing: -.02em; }
+.hero .stats span { font: 600 12px var(--f-label); letter-spacing: .16em; text-transform: uppercase; color: var(--faint); }
+.heute { display: grid; place-items: center; min-height: 120px; padding: 24px; text-align: center; color: var(--faint); font: 600 13px var(--f-label); letter-spacing: .12em; text-transform: uppercase; background: repeating-linear-gradient(135deg, rgb(255 255 255 / 2.5%) 0 10px, transparent 10px 20px); box-shadow: inset 0 0 0 1px var(--line2); }
+.heute.card { min-height: 330px; }
+.sec { padding: 64px 0 0; }
+.sec.today { padding-top: 56px; }
+.shead { display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; flex-wrap: wrap; margin-bottom: 26px; }
+.shead h2 { font-size: 34px; line-height: 1.1; font-weight: 800; margin: 12px 0 10px; letter-spacing: -.01em; }
+.shead p { color: var(--dim); margin: 0; max-width: 60ch; font-size: 16px; }
+.shead .links { display: flex; gap: 18px; flex-wrap: wrap; }
+.shead .links .more { color: var(--text); } .shead .links .more:first-child { color: var(--red); }
+.cta { margin-top: 72px; padding: 56px 34px; text-align: center; background: radial-gradient(600px 240px at 50% 0%, rgb(255 30 45 / 12%), transparent 70%); border-top: 1px solid var(--line); }
+.cta img { width: 80px; height: 80px; margin-bottom: 14px; }
+.cta h2 { font-size: 32px; font-weight: 800; margin: 0 0 10px; }
+.cta p { color: var(--dim); max-width: 56ch; margin: 0 auto 22px; }
+.cta .acts { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+
+/* ---------- Gemeinsame Bausteine der neuen Abschnitte ---------- */
+.newsbig { display: grid; grid-template-rows: 220px 1fr; transition: transform .2s, box-shadow .2s; }
+.newsbig:hover, .nrow:hover, .clcard:hover, .pcard:hover, .scard:hover, .mainsp:hover, .ucard:hover, .ncard:hover { transform: translateY(-2px); box-shadow: inset 0 0 0 1px rgb(255 30 45 / 45%); }
+.newsbig .body { padding: 22px 26px 24px; display: flex; flex-direction: column; gap: 10px; }
+.newsbig h3 { margin: 0; font-size: 24px; line-height: 1.18; font-weight: 800; }
+.newsbig p { margin: 0; color: var(--dim); }
+.newsbig .more { margin-top: auto; padding-top: 6px; }
+.stack { display: flex; flex-direction: column; gap: 14px; }
+.clcard { display: grid; grid-template-columns: 168px 1fr; gap: 16px; align-items: center; padding: 12px 18px 12px 12px; transition: transform .2s, box-shadow .2s; }
+.clcard .post { box-shadow: inset 0 0 0 1px var(--line2); }
+.clcard .cv { display: flex; align-items: baseline; gap: 10px; font: 700 17px/1 var(--f-accent); color: var(--red); letter-spacing: .06em; margin-bottom: 4px; }
+.clcard .cv span { font: 600 12.5px var(--f-label); letter-spacing: .08em; color: var(--faint); }
+.clcard b { display: block; font-size: 16px; line-height: 1.3; margin-bottom: 6px; }
+.clcard .counts { font: 600 13px var(--f-label); letter-spacing: .04em; color: var(--faint); }
+.counts .n { color: var(--win); } .counts .v { color: var(--purple-t); } .counts .b { color: var(--blue); }
+.nrow { display: grid; grid-template-columns: 1fr auto; gap: 14px; align-items: center; padding: 14px 18px; transition: transform .2s, box-shadow .2s; }
+.nrow .meta { margin-bottom: 5px; }
+.nrow b { display: block; font-size: 15.5px; line-height: 1.3; }
+.datebox { text-align: center; padding: 8px 12px; background: color-mix(in srgb, var(--c) 10%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 40%, transparent); line-height: 1.1; }
+.datebox small { display: block; font: 600 12px var(--f-label); letter-spacing: .14em; color: var(--c); text-transform: uppercase; margin-bottom: 2px; }
+.datebox strong { font: 800 18px var(--f-display); }
+.pcard { display: flex; flex-direction: column; transition: transform .2s, box-shadow .2s; }
+.pcard .bn { height: 72px; background: radial-gradient(circle at 80% 20%, color-mix(in srgb, var(--c) 45%, transparent), transparent 60%), linear-gradient(135deg, #0d141c, #06090d); }
+.pcard .bn.img { background: url("banner.webp") center / cover; }
+.pcard .head { display: flex; gap: 12px; align-items: flex-end; padding: 0 18px; margin-top: -26px; }
+.pcard .head > div { padding-top: 30px; min-width: 0; }
+.pcard .logo { width: 56px; height: 56px; font-size: 18px; background: color-mix(in srgb, var(--c) 18%, #0a0f15); }
+.pcard h4 { margin: 0 0 4px; font-size: 17px; font-weight: 800; line-height: 1.2; }
+.pcard .body { padding: 12px 18px 16px; display: flex; flex-direction: column; gap: 10px; flex: 1; }
+.pcard p { margin: 0; color: var(--dim); font-size: 14px; }
+.pcard .pfoot { display: flex; align-items: center; justify-content: space-between; margin-top: auto; color: var(--faint); font: 600 12px var(--f-label); letter-spacing: .14em; text-transform: uppercase; }
+.mainsp { display: grid; grid-template-columns: 1fr 1.2fr; --c: var(--gold); transition: transform .2s, box-shadow .2s; }
+.mainsp .art { min-height: 220px; background: url("banner.webp") center / cover; position: relative; }
+.mainsp .art::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, transparent 40%, #080d12); }
+.mainsp .art .logo { position: absolute; left: 24px; bottom: 22px; width: 96px; height: 96px; font-size: 30px; z-index: 1; background: #0a0f15; }
+.mainsp .body { padding: 24px 26px; display: flex; flex-direction: column; gap: 10px; }
+.mainsp h3 { margin: 0; font-size: 26px; font-weight: 800; }
+.mainsp p { margin: 0; color: var(--dim); }
+.code { display: inline-flex; align-items: center; gap: 12px; padding: 8px 14px; background: color-mix(in srgb, var(--c) 10%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 45%, transparent); }
+.code b { font: 700 15px var(--f-accent); letter-spacing: .1em; color: var(--c); }
+.code small { color: var(--dim); font-size: 13px; }
+.scard { display: grid; grid-template-columns: 56px 1fr; gap: 14px; padding: 14px 16px; align-items: center; transition: transform .2s, box-shadow .2s; }
+.scard .logo { width: 56px; height: 56px; font-size: 17px; }
+.scard h4 { margin: 0 0 3px; font-size: 16px; font-weight: 800; }
+.scard p { margin: 3px 0 0; color: var(--dim); font-size: 13.5px; }
+.tier { font: 600 12px var(--f-label); letter-spacing: .18em; color: var(--c); text-transform: uppercase; margin: 0 0 10px; display: flex; align-items: center; gap: 10px; }
+.tier::after { content: ""; flex: 1; height: 1px; background: color-mix(in srgb, var(--c) 30%, transparent); }
+.ustrip { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+.ucard { display: flex; align-items: center; gap: 10px; padding: 12px 14px; background: rgb(255 255 255 / 3%); box-shadow: inset 0 0 0 1px var(--line); transition: transform .2s, box-shadow .2s; }
+.ucard .logo { width: 38px; height: 38px; font-size: 12px; }
+.ucard b { font-size: 13.5px; line-height: 1.25; }
+.ucard small { display: block; color: var(--faint); font-size: 12px; line-height: 1.3; }
+
+/* ---------- H1: zwei Bänder ---------- */
+.band { display: grid; grid-template-columns: 1.15fr 1fr; gap: 20px; align-items: stretch; }
+.who { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; margin-bottom: 20px; }
+.who .splist { display: flex; flex-direction: column; gap: 12px; }
+.who .splist .tier { margin-bottom: 0; }
+.pgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 20px; }
+.ustrip.h1 { grid-template-columns: auto repeat(5, 1fr); align-items: center; }
+.ustrip.h1 .tier { margin: 0; padding-right: 10px; } .ustrip.h1 .tier::after { content: none; }
+
+/* ---------- H2: getrennte Abschnitte ---------- */
+.news3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+.ncard { display: grid; grid-template-rows: 150px 1fr; transition: transform .2s, box-shadow .2s; }
+.ncard.ev { grid-template-rows: 1fr; }
+.ncard .body { padding: 18px 20px 20px; display: flex; flex-direction: column; gap: 8px; }
+.ncard h3 { margin: 0; font-size: 18px; line-height: 1.25; font-weight: 800; }
+.ncard p { margin: 0; color: var(--dim); font-size: 14px; }
+.ncard .more { margin-top: auto; padding-top: 6px; }
+.ncard.ev .body { padding-top: 22px; } .ncard.ev .datebox { align-self: flex-start; margin-bottom: 4px; }
+.clband { display: grid; grid-template-columns: 440px 1fr; gap: 34px; align-items: center; padding: 26px 30px 26px 26px; background: linear-gradient(100deg, rgb(53 224 127 / 9%), rgb(53 224 127 / 1%) 55%), var(--panel); box-shadow: inset 0 0 0 1px rgb(53 224 127 / 30%); }
+.clband .post { box-shadow: inset 0 0 0 1px var(--line2); }
+.clband .cv { display: flex; align-items: baseline; gap: 14px; font: 700 30px/1 var(--f-accent); color: var(--red); letter-spacing: .04em; margin: 10px 0 8px; }
+.clband .cv span { font: 600 13px var(--f-label); letter-spacing: .08em; color: var(--faint); }
+.clband h3 { margin: 0 0 10px; font-size: 24px; line-height: 1.2; font-weight: 800; }
+.clband .peek { margin: 0 0 16px; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; font-size: 15px; }
+.clband .peek li { display: flex; gap: 10px; align-items: baseline; }
+.clband .peek li::before { content: ""; width: 8px; height: 8px; flex-shrink: 0; background: var(--win); clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); transform: translateY(-1px); }
+.clband .peek li.v::before { background: var(--purple-t); }
+.clband .acts { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
+.clband .acts .more:last-child { color: var(--dim); }
+.sgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 16px; }
+.quiet { margin-top: 56px; padding-top: 28px; border-top: 1px solid var(--line); display: grid; grid-template-columns: auto 1fr auto; gap: 24px; align-items: center; }
+.quiet .tier { margin: 0; } .quiet .tier::after { content: none; }
+.quiet .ustrip { grid-template-columns: repeat(5, 1fr); }
+.quiet .ucard { background: transparent; box-shadow: none; padding: 6px 4px; }
+
+/* ---------- Handy ---------- */
+@container screen (max-width: 700px) {
+  .bar { height: 64px; padding: 0 16px; gap: 12px; } .bar nav, .bar .acts { display: none; } .bar .menu { display: grid; }
+  .brand img { width: 34px; height: 34px; } .brand strong { font-size: 14px; } .brand small { font-size: 12px; letter-spacing: .08em; }
+  .shell { padding: 0 16px; }
+  .hero { padding: 40px 0 44px; } .hero .in { grid-template-columns: 1fr; gap: 30px; }
+  .hero h1 { font-size: 38px; } .hero .lead { font-size: 15.5px; } .heute.card { min-height: 200px; }
+  .hero .acts .btn { width: 100%; }
+  .sec { padding-top: 44px; } .sec.today { padding-top: 40px; }
+  .shead h2 { font-size: 26px; } .shead p { font-size: 15px; }
+  .band, .who, .pgrid, .news3, .sgrid { grid-template-columns: 1fr; }
+  .newsbig { grid-template-rows: 170px 1fr; } .newsbig h3 { font-size: 20px; }
+  .clcard { grid-template-columns: 120px 1fr; gap: 12px; }
+  .clcard b { font-size: 15px; }
+  .mainsp { grid-template-columns: 1fr; } .mainsp .art { min-height: 150px; } .mainsp .art .logo { width: 72px; height: 72px; font-size: 22px; left: 18px; bottom: 16px; }
+  .mainsp h3 { font-size: 22px; } .mainsp .body { padding: 18px 18px 20px; }
+  .ustrip, .ustrip.h1, .quiet .ustrip { grid-template-columns: 1fr 1fr; }
+  .ustrip.h1 .tier { grid-column: 1 / -1; }
+  .ncard { grid-template-rows: 140px 1fr; }
+  .clband { grid-template-columns: 1fr; gap: 18px; padding: 16px; }
+  .clband .cv { font-size: 24px; } .clband h3 { font-size: 20px; }
+  .quiet { grid-template-columns: 1fr; gap: 14px; margin-top: 40px; }
+  .cta { margin-top: 48px; padding: 40px 16px; } .cta h2 { font-size: 26px; } .cta .acts .btn { width: 100%; }
+  .foot { padding: 28px 16px 20px; margin-top: 0; } .foot .cols { grid-template-columns: 1fr 1fr; gap: 24px; } .foot .fb { grid-column: 1 / -1; } .foot .bottom { flex-direction: column; }
+}
+
+/* ---------- Handyrahmen ---------- */
+.phones { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 390px)); gap: 28px; justify-content: start; align-items: start; }
+.phone { max-width: 100%; border: 8px solid #1a1f26; border-radius: 34px; overflow: hidden; background: var(--base); box-shadow: 0 0 0 1px #2b323b, 0 24px 50px rgb(0 0 0 / 50%); }
+.phone .status { display: flex; justify-content: space-between; padding: 10px 24px 2px; font: 600 12px var(--f-label); color: var(--dim); letter-spacing: .08em; }
+.phone .screen { border: 0; }
+.phone-label { font: 600 12px var(--f-label); letter-spacing: .16em; text-transform: uppercase; color: var(--faint); margin: 0 0 8px 8px; }
+.assume { margin-top: 48px; }
+.assume h2 { font-size: 22px; font-weight: 800; margin: 0 0 10px; }
+.assume ol, .assume ul { color: var(--dim); font-size: 14px; padding-left: 22px; max-width: 920px; } .assume li { margin-bottom: 8px; } .assume b { color: var(--text); }
+@media (max-width: 760px) { body { padding: 20px 12px 60px; } }
+</style>
+</head>
+<body>
+<svg class="sym" xmlns="http://www.w3.org/2000/svg">
+  <symbol id="i-right" viewBox="0 0 24 24"><path d="M4 12h15M13 6l6 6-6 6"/></symbol>
+  <symbol id="i-ext" viewBox="0 0 24 24"><path d="M7 17 17 7M8.5 7H17v8.5"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 24 24"><path d="M3.5 7h17M3.5 12h17M3.5 17h17"/></symbol>
+  <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></symbol>
+  <symbol id="i-dash" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="7" height="7"/><rect x="13.5" y="3.5" width="7" height="7"/><rect x="3.5" y="13.5" width="7" height="7"/><rect x="13.5" y="13.5" width="7" height="7"/></symbol>
+  <symbol id="i-discord" viewBox="0 0 24 24"><path d="M20.3 4.9A19.8 19.8 0 0 0 15.4 3.4a13.9 13.9 0 0 0-.6 1.3 18.3 18.3 0 0 0-5.5 0 13.6 13.6 0 0 0-.7-1.3A19.7 19.7 0 0 0 3.7 4.9C.6 9.5-.3 14 .2 18.4a19.9 19.9 0 0 0 6 3 14.6 14.6 0 0 0 1.3-2.1 12.9 12.9 0 0 1-2-1c.2-.1.3-.2.5-.4a14.2 14.2 0 0 0 12.1 0l.5.4a12.9 12.9 0 0 1-2 1 14.4 14.4 0 0 0 1.3 2.1 19.8 19.8 0 0 0 6-3c.6-5.1-1-9.6-3.6-13.5zM8 15.7c-1.2 0-2.1-1.1-2.1-2.4S6.8 10.9 8 10.9s2.2 1.1 2.2 2.4-1 2.4-2.2 2.4zm8 0c-1.2 0-2.1-1.1-2.1-2.4s.9-2.4 2.1-2.4 2.2 1.1 2.2 2.4-1 2.4-2.2 2.4z"/></symbol>
+</svg>
+
+<div class="doc">
+  <h1><small>W-0062</small>Startseite: News, Changelog, Partner, Sponsorings und Unterstützer</h1>
+  <p class="lead">Die heutige Startseite läuft Hero, Module, Einrichtung, Warum RL Nexus, Aufforderung. Die bestehenden Abschnitte sind hier auf ihren Kopf gekürzt (gestreifte Flächen stehen für den Inhalt von heute), damit man sieht, wo die neuen Abschnitte sitzen. Zwei Varianten: H1 fasst alles Neue in zwei Bändern zusammen, H2 gibt jedem Thema einen eigenen Abschnitt. Jeder Eintrag führt zu seiner Seite: Beitrag, Version, große Ansicht des Partners oder Sponsors, Fenster des Unterstützers.</p>
+
+  <div class="changes"><h3>Neu</h3><ol>
+    <li><b>Kopfzeile</b> mit den Menüpunkten News, Changelog und Partner/Sponsorings; Home ist aktiv.</li>
+    <li><b>Neue News</b> auf der Startseite: der neueste Beitrag groß, dazu die nächsten zwei Einträge (Partner-Beitrag, Termin).</li>
+    <li><b>Neuester Changelog</b>: die zuletzt gepostete Version mit dem Bild aus dem Post, Nummer, Titel und den Zahlen je Art. Führt auf <code>/changelog/2.4.0</code>.</li>
+    <li><b>Hauptsponsor</b> groß, <b>Sponsoren</b> als Zeilen, <b>Partner</b> als Karten, <b>Unterstützer</b> als Leiste. Dieselben Namen wie in <code>partner-v3.html</code>.</li>
+    <li>Jeder Abschnitt hat einen Weg zu seiner Seite („Alle News“, „Alle Versionen“, „Alle Partner und Sponsoren“).</li>
+  </ol></div>
+
+  <!-- ===================================================== H1 -->
+  <div class="variant"><b>H1</b><h2>Zwei Bänder</h2><span>„Neu bei RL Nexus“ direkt nach dem Hero, „Wer dabei ist“ vor der Aufforderung</span></div>
+  <div class="changes"><h3>Was du siehst</h3><ol>
+    <li><b>Hero</b> wie heute. Direkt darunter das Band <b>„Neu bei RL Nexus“</b>: links der neueste Beitrag mit Bild, rechts die neueste Bot-Version mit dem Bild aus dem Post, darunter zwei kurze Zeilen (Partner-Beitrag, Termin mit Datumskasten). Oben rechts „Alle News“ und „Changelog“. Die Zahl „3 neu seit deinem letzten Besuch“ nutzt dieselbe Browser-Marke wie die News-Seite.</li>
+    <li>Dann <b>Module, Einrichtung, Warum RL Nexus</b> wie heute (gekürzt dargestellt).</li>
+    <li>Vor der Aufforderung das Band <b>„Wer dabei ist“</b>: Hauptsponsor NordHost breit mit Banner, Logo, Satz und Rabattcode; daneben die drei Sponsoren als Zeilen; darunter drei Partner-Karten; zum Schluss die Unterstützer-Leiste mit fünf Logos. Oben rechts „Alle Partner und Sponsoren“.</li>
+    <li>Die Reihenfolge folgt der Logik der Seite: erst, was es ist und was gerade passiert, dann, was es kann, dann, wer dahintersteht, dann die Einladung.</li>
+    <li>Ganze Karten und Zeilen sind klickbar; Hover hebt sie um 2 px und färbt den Rand rot, wie die Modulkarten.</li>
+  </ol></div>
+  <div class="screen">
+    <div class="bar">
+      <div class="brand"><img src="logo-n.webp" alt=""><div><strong>RL <i>NEXUS</i></strong><small>Esports Management Bot</small></div></div>
+      <nav><a class="on">Home</a><a>Module</a><a class="fresh">News</a><a class="fresh">Changelog</a><a>Partner/Sponsorings</a><a>Team</a><a>Kontakt</a></nav>
+      <div class="acts"><span class="ico"><svg class="i fill"><use href="#i-discord"/></svg></span><span class="btn">Dashboard<svg class="i s"><use href="#i-ext"/></svg></span></div>
+      <span class="menu"><svg class="i"><use href="#i-menu"/></svg></span>
+    </div>
+
+    <section class="hero"><div class="shell in">
+      <div>
+        <span class="pill"><svg class="i s"><use href="#i-bolt"/></svg>Discord-Bot für Rocket-League-Organisationen</span>
+        <h1>Deine Org läuft auf <em>einem</em> Bot.</h1>
+        <p class="lead">Ränge, Teams, Bewerbungen, Tickets, Logging, Level, Stream-Meldungen. RL Nexus bringt alles mit, was eine Rocket-League-Organisation in Discord braucht, und du schaltest nur das ein, was du davon willst.</p>
+        <div class="acts"><span class="btn lg">Bot einladen<svg class="i s"><use href="#i-ext"/></svg></span><span class="btn ghost lg">Module ansehen<svg class="i s"><use href="#i-right"/></svg></span></div>
+        <div class="stats"><div><b>23</b><span>Module</span></div><div><b>60+</b><span>Commands</span></div><div><b>1</b><span>Bot statt fünf</span></div></div>
+      </div>
+      <div class="heute card cut">Rang-Karte wie heute</div>
+    </div></section>
+
+    <section class="sec"><div class="shell">
+      <div class="shead">
+        <div><div class="eyebrow">Aktuell</div><h2>Neu bei RL Nexus</h2><p>Beiträge, Versionen und Termine. <b style="color:var(--text)">3 neu</b> seit deinem letzten Besuch.</p></div>
+        <div class="links"><a class="more" href="/news">Alle News <svg class="i s"><use href="#i-right"/></svg></a><a class="more" href="/changelog">Changelog <svg class="i s"><use href="#i-right"/></svg></a></div>
+      </div>
+      <div class="band">
+        <a class="newsbig panel cut" href="/news/team-hub-2-0">
+          <div class="cover" style="--c: var(--blue)"><img src="banner.webp" alt=""></div>
+          <div class="body">
+            <div class="meta"><span class="tag" style="--c: var(--blue)">Update</span><span class="new">Neu</span><span>8. November 2026</span></div>
+            <h3>Team-Hub 2.0: Kategorien, gezeichnete Karten und ein neues Menü</h3>
+            <p>Eure Teams stehen jetzt nach Kategorien sortiert in einer Nachricht. Wer im Menü ein Team wählt, bekommt die Karte nur für sich.</p>
+            <span class="more">Weiterlesen <svg class="i s"><use href="#i-right"/></svg></span>
+          </div>
+        </a>
+        <div class="stack">
+          <a class="clcard panel cut" href="/changelog/2.4.0">
+            <div class="post" style="--c: var(--win)"><div class="ph"><img src="logo-n.webp" alt=""><b>RL <i>Nexus</i></b><small>Changelog</small><span class="stamp">Neu</span></div><div class="pv">2.4.0</div><div class="pt">Bewerbungen per DM, Protokoll der Freigaben und eigene Rang-Karten</div><div class="tiles"><div class="tile full" style="--c: var(--win)"><h5>Neu <b>5</b></h5></div><div class="tile" style="--c: var(--purple-t)"><h5>Verbessert <b>4</b></h5></div><div class="tile" style="--c: var(--blue)"><h5>Behoben <b>3</b></h5></div></div></div>
+            <div><div class="meta" style="margin-bottom:6px"><span class="tag" style="--c: var(--win)">Changelog</span><span class="new">Neu</span></div><div class="cv">2.4.0 <span>5. November</span></div><b>Bewerbungen per DM, Protokoll der Freigaben und eigene Rang-Karten</b><span class="counts"><span class="n">5 neu</span> · <span class="v">4 verbessert</span> · <span class="b">3 behoben</span></span></div>
+          </a>
+          <a class="nrow panel cut" href="/news/apex-vortex-ist-neuer-partner" style="--c: var(--purple)">
+            <div><div class="meta"><span class="tag" style="--c: var(--purple-t)">Partner/Sponsoring</span><span class="new">Neu</span><span>6. November</span></div><b>Apex Vortex Esports ist neuer Partner</b></div>
+            <svg class="i" style="color:var(--faint)"><use href="#i-right"/></svg>
+          </a>
+          <a class="nrow panel cut" href="/news/nordliga-season-3-anmeldung" style="--c: var(--gold)">
+            <div><div class="meta"><span class="tag" style="--c: var(--gold)">Termin</span><span>4. November</span></div><b>Nordliga Season 3: Anmeldung offen</b></div>
+            <div class="datebox"><small>Bis</small><strong>20.11.</strong></div>
+          </a>
+        </div>
+      </div>
+    </div></section>
+
+    <section class="sec today"><div class="shell">
+      <div class="shead"><div><div class="eyebrow">Module</div><h2>Nimm, was du brauchst.<br>Lass weg, was du nicht brauchst.</h2></div><span class="btn ghost">Alle 23 Module<svg class="i s"><use href="#i-right"/></svg></span></div>
+      <div class="heute cut">Sechs Modulkarten und die Kategorien-Zeile wie heute</div>
+    </div></section>
+    <section class="sec today"><div class="shell">
+      <div class="shead" style="justify-content:center;text-align:center"><div><div class="eyebrow" style="--c: var(--blue);justify-content:center">In drei Schritten</div><h2>In zehn Minuten eingerichtet</h2></div></div>
+      <div class="heute cut">Die drei Schritte wie heute</div>
+    </div></section>
+    <section class="sec today"><div class="shell">
+      <div class="shead"><div><div class="eyebrow">Warum RL Nexus</div><h2>Gebaut für Orgs, nicht für irgendeinen Server</h2></div></div>
+      <div class="heute cut">Die fünf Argumente wie heute</div>
+    </div></section>
+
+    <section class="sec"><div class="shell">
+      <div class="shead">
+        <div><div class="eyebrow">Partner/Sponsorings</div><h2>Wer dabei ist</h2><p>Firmen, die RL Nexus möglich machen, und Organisationen, Creator und Ligen, mit denen wir arbeiten.</p></div>
+        <div class="links"><a class="more" href="/partner">Alle Partner und Sponsoren <svg class="i s"><use href="#i-right"/></svg></a></div>
+      </div>
+      <div class="who">
+        <div>
+          <div class="tier" style="--c: var(--gold)">Hauptsponsor</div>
+          <a class="mainsp panel cut" href="/partner/nordhost">
+            <div class="art"><div class="logo" style="--c: var(--gold)">NH</div></div>
+            <div class="body">
+              <div class="meta"><span class="tag" style="--c: var(--gold)">Hauptsponsor</span><span class="tag" style="--c: var(--silver)">Hosting</span></div>
+              <h3>NordHost GmbH</h3>
+              <p>Stellt die Server, auf denen RL Nexus läuft, und das Preisgeld der Nordliga Season 3.</p>
+              <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-top:4px"><span class="code"><small>Für die Community</small><b>NEXUS15</b></span><span class="more">Mehr erfahren <svg class="i s"><use href="#i-right"/></svg></span></div>
+            </div>
+          </a>
+        </div>
+        <div class="splist">
+          <div class="tier" style="--c: var(--silver)">Sponsoren</div>
+          <a class="scard panel cut" href="/partner/keyforge"><div class="logo" style="--c: var(--cyan)">KF</div><div><h4>KeyForge</h4><p>Tastaturen und Mäuse; stattet die Nordliga-Sieger aus.</p></div></a>
+          <a class="scard panel cut" href="/partner/enerfuel"><div class="logo" style="--c: var(--win)">EF</div><div><h4>EnerFuel</h4><p>Unterstützt den Aerial Academy Cup jeden Monat.</p></div></a>
+          <a class="scard panel cut" href="/partner/pixeldock"><div class="logo" style="--c: var(--purple-t)">PD</div><div><h4>Pixeldock</h4><p>Hat die Rang-Karten und Banner mitgestaltet.</p></div></a>
+        </div>
+      </div>
+      <div class="tier" style="--c: var(--red)">Partner</div>
+      <div class="pgrid">
+        <a class="pcard panel cut" href="/partner/apex-vortex" style="--c: var(--blue)"><div class="bn img"></div><div class="head"><div class="logo">AV</div><div><h4>Apex Vortex Esports</h4><span class="tag">Organisation</span></div></div><div class="body"><p>Drei Teams von Diamant bis SSL, nutzt Team-Hub und Matchups.</p><div class="pfoot"><span>Seit Juni 2026</span><span class="more">Ansehen <svg class="i s"><use href="#i-right"/></svg></span></div></div></a>
+        <a class="pcard panel cut" href="/partner/kbm-miqo" style="--c: var(--purple-t)"><div class="bn"></div><div class="head"><div class="logo">KM</div><div><h4>KBM Miqo</h4><span class="tag">Creator</span></div></div><div class="body"><p>Streamt Ranked und Coaching, testet die Rang-Karte.</p><div class="pfoot"><span>Seit Juli 2026</span><span class="more">Ansehen <svg class="i s"><use href="#i-right"/></svg></span></div></div></a>
+        <a class="pcard panel cut" href="/partner/nordliga" style="--c: var(--gold)"><div class="bn"></div><div class="head"><div class="logo">NL</div><div><h4>Nordliga RL</h4><span class="tag">Liga</span></div></div><div class="body"><p>3v3-Liga, zwei Divisionen, Ergebnisse über Matchups.</p><div class="pfoot"><span>Seit August 2026</span><span class="more">Ansehen <svg class="i s"><use href="#i-right"/></svg></span></div></div></a>
+      </div>
+      <div class="ustrip h1">
+        <div class="tier" style="--c: var(--faint)">Unterstützer</div>
+        <a class="ucard" href="/partner?unterstuetzer=clipbase"><span class="logo" style="--c: var(--orange)">CB</span><div><b>Clipbase</b><small>Clips der Cup-Finals</small></div></a>
+        <a class="ucard" href="/partner?unterstuetzer=streammate"><span class="logo" style="--c: var(--blue)">SM</span><div><b>StreamMate</b><small>Stream-Overlays</small></div></a>
+        <a class="ucard" href="/partner?unterstuetzer=ranktool"><span class="logo" style="--c: var(--red)">RT</span><div><b>Ranktool</b><small>Rang-Daten</small></div></a>
+        <a class="ucard" href="/partner?unterstuetzer=gg-wear"><span class="logo" style="--c: var(--win)">GW</span><div><b>GG Wear</b><small>Trikots für Finals</small></div></a>
+        <a class="ucard" href="/partner?unterstuetzer=arena-lan"><span class="logo" style="--c: var(--cyan)">AL</span><div><b>Arena Lan</b><small>LAN-Finale</small></div></a>
+      </div>
+    </div></section>
+
+    <section class="cta">
+      <img src="logo-n.webp" alt="">
+      <h2>Bereit, wenn deine Org es ist</h2>
+      <p>Einladen, Module anhaken, loslegen. Kostenlos, ohne Hosting und ohne dass du dafür eine Konfigurationsdatei anfassen musst.</p>
+      <div class="acts"><span class="btn lg">Bot einladen<svg class="i s"><use href="#i-ext"/></svg></span><span class="btn ghost lg"><svg class="i fill"><use href="#i-discord"/></svg>Support-Server</span></div>
+    </section>
+    <div class="foot">
+      <div class="cols">
+        <div class="fb"><img src="logo-n.webp" alt=""><p>Der Discord-Bot für Rocket-League-Organisationen: Ränge, Teams, Bewerbungen, Tickets und mehr in einem Bot.</p><div class="socials"><span><svg class="i"><use href="#i-dash"/></svg></span><span><svg class="i fill"><use href="#i-discord"/></svg></span></div></div>
+        <div><h4>Seite</h4><ul><li class="on">Home</li><li>Module</li><li>News</li><li>Changelog</li><li>Partner/Sponsorings</li><li>Team</li><li>Kontakt</li></ul></div>
+        <div><h4>Module</h4><ul><li>Ränge</li><li>Teams</li><li>Bewerbungen</li><li>Tickets</li><li>Level</li><li>Alle 23 Module</li></ul></div>
+        <div><h4>Rechtliches</h4><ul><li>Impressum</li><li>Datenschutz</li><li>AGB</li><li>Widerruf</li></ul></div>
+      </div>
+      <div class="bottom"><span>© 2026 RL Nexus. Kein Produkt von Psyonix oder Epic Games.</span><span>Gebaut für Rocket-League-Organisationen · Wer dahintersteckt</span></div>
+    </div>
+  </div>
+
+  <!-- ===================================================== H2 -->
+  <div class="variant"><b>H2</b><h2>Getrennte Abschnitte</h2><span>News nach den Modulen, Changelog als Band nach der Einrichtung, Partner und Sponsoren vor der Aufforderung, Unterstützer als stille Leiste</span></div>
+  <div class="changes"><h3>Was du siehst</h3><ol>
+    <li><b>Hero</b> und <b>Module</b> wie heute. Dann der Abschnitt <b>„Aktuelles“</b>: drei News-Karten gleich groß (Beitrag mit Bild, Partner-Beitrag mit Bild, Termin mit Datumskasten), rechts oben „Alle News“.</li>
+    <li>Nach der <b>Einrichtung</b> ein schmales Band <b>„Zuletzt geändert“</b> mit grünem Rand: links das Bild aus dem Post, rechts Nummer, Titel, die ersten drei Änderungen und zwei Wege („Alle 12 Änderungen“, „Alle Versionen“).</li>
+    <li>Nach <b>Warum RL Nexus</b> der Abschnitt <b>„Partner“</b>: drei Karten wie auf der Partner-Seite (Banner, Logo, Name, Art, Satz, „seit“).</li>
+    <li>Darunter <b>„Sponsoren“</b>: Hauptsponsor NordHost breit mit Banner und Rabattcode, darunter die drei Sponsoren als Karten.</li>
+    <li><b>Unterstützer</b> als stille Leiste direkt über der Aufforderung: Label links, fünf Logos mit Namen, rechts „Alle ansehen“. Ohne Kästen, damit sie nicht mit den Sponsoren um Aufmerksamkeit konkurriert.</li>
+    <li>Jeder Abschnitt hat seinen eigenen Kopf mit Zeile, Überschrift und Weg zur Seite. Die Seite wird länger als in H1, dafür hat jedes Thema seine Stelle.</li>
+  </ol></div>
+  <div class="screen">
+    <div class="bar">
+      <div class="brand"><img src="logo-n.webp" alt=""><div><strong>RL <i>NEXUS</i></strong><small>Esports Management Bot</small></div></div>
+      <nav><a class="on">Home</a><a>Module</a><a class="fresh">News</a><a class="fresh">Changelog</a><a>Partner/Sponsorings</a><a>Team</a><a>Kontakt</a></nav>
+      <div class="acts"><span class="ico"><svg class="i fill"><use href="#i-discord"/></svg></span><span class="btn">Dashboard<svg class="i s"><use href="#i-ext"/></svg></span></div>
+      <span class="menu"><svg class="i"><use href="#i-menu"/></svg></span>
+    </div>
+
+    <section class="hero"><div class="shell in">
+      <div>
+        <span class="pill"><svg class="i s"><use href="#i-bolt"/></svg>Discord-Bot für Rocket-League-Organisationen</span>
+        <h1>Deine Org läuft auf <em>einem</em> Bot.</h1>
+        <p class="lead">Ränge, Teams, Bewerbungen, Tickets, Logging, Level, Stream-Meldungen. RL Nexus bringt alles mit, was eine Rocket-League-Organisation in Discord braucht, und du schaltest nur das ein, was du davon willst.</p>
+        <div class="acts"><span class="btn lg">Bot einladen<svg class="i s"><use href="#i-ext"/></svg></span><span class="btn ghost lg">Module ansehen<svg class="i s"><use href="#i-right"/></svg></span></div>
+        <div class="stats"><div><b>23</b><span>Module</span></div><div><b>60+</b><span>Commands</span></div><div><b>1</b><span>Bot statt fünf</span></div></div>
+      </div>
+      <div class="heute card cut">Rang-Karte wie heute</div>
+    </div></section>
+
+    <section class="sec today"><div class="shell">
+      <div class="shead"><div><div class="eyebrow">Module</div><h2>Nimm, was du brauchst.<br>Lass weg, was du nicht brauchst.</h2></div><span class="btn ghost">Alle 23 Module<svg class="i s"><use href="#i-right"/></svg></span></div>
+      <div class="heute cut">Sechs Modulkarten und die Kategorien-Zeile wie heute</div>
+    </div></section>
+
+    <section class="sec"><div class="shell">
+      <div class="shead">
+        <div><div class="eyebrow">News</div><h2>Aktuelles</h2><p>Was bei RL Nexus passiert: Updates, Partner, Turniere.</p></div>
+        <div class="links"><a class="more" href="/news">Alle News <svg class="i s"><use href="#i-right"/></svg></a></div>
+      </div>
+      <div class="news3">
+        <a class="ncard panel cut" href="/news/team-hub-2-0"><div class="cover" style="--c: var(--blue)"><img src="banner.webp" alt=""></div><div class="body"><div class="meta"><span class="tag" style="--c: var(--blue)">Update</span><span class="new">Neu</span><span>8. Nov.</span></div><h3>Team-Hub 2.0: Kategorien, gezeichnete Karten und ein neues Menü</h3><p>Eure Teams stehen nach Kategorien sortiert in einer Nachricht.</p><span class="more">Weiterlesen <svg class="i s"><use href="#i-right"/></svg></span></div></a>
+        <a class="ncard panel cut" href="/news/apex-vortex-ist-neuer-partner"><div class="cover" style="--c: var(--purple)" data-art="AV"></div><div class="body"><div class="meta"><span class="tag" style="--c: var(--purple-t)">Partner/Sponsoring</span><span class="new">Neu</span><span>6. Nov.</span></div><h3>Apex Vortex Esports ist neuer Partner</h3><p>Drei Teams, ein Server: warum Apex Vortex umgestiegen ist.</p><span class="more">Weiterlesen <svg class="i s"><use href="#i-right"/></svg></span></div></a>
+        <a class="ncard ev panel cut" href="/news/nordliga-season-3-anmeldung"><div class="body"><div class="datebox" style="--c: var(--gold)"><small>Anmeldung bis</small><strong>20.11.2026</strong></div><div class="meta"><span class="tag" style="--c: var(--gold)">Termin</span><span>4. Nov.</span></div><h3>Nordliga Season 3: Anmeldung offen</h3><p>Zwei Divisionen, Ergebnisse direkt über Matchups. Preisgeld von NordHost.</p><span class="more">Zum Termin <svg class="i s"><use href="#i-right"/></svg></span></div></a>
+      </div>
+    </div></section>
+
+    <section class="sec today"><div class="shell">
+      <div class="shead" style="justify-content:center;text-align:center"><div><div class="eyebrow" style="--c: var(--blue);justify-content:center">In drei Schritten</div><h2>In zehn Minuten eingerichtet</h2></div></div>
+      <div class="heute cut">Die drei Schritte wie heute</div>
+    </div></section>
+
+    <section class="sec"><div class="shell">
+      <a class="clband cut" href="/changelog/2.4.0">
+        <div class="post" style="--c: var(--win)"><div class="ph"><img src="logo-n.webp" alt=""><b>RL <i>Nexus</i></b><small>Changelog</small><span class="stamp">Neu</span></div><div class="pv">2.4.0</div><div class="pt">Bewerbungen per DM, Protokoll der Freigaben und eigene Rang-Karten</div><div class="tiles"><div class="tile full" style="--c: var(--win)"><h5>Neu <b>5</b></h5></div><div class="tile" style="--c: var(--purple-t)"><h5>Verbessert <b>4</b></h5></div><div class="tile" style="--c: var(--blue)"><h5>Behoben <b>3</b></h5></div></div></div>
+        <div>
+          <div class="eyebrow" style="--c: var(--win)">Zuletzt geändert</div>
+          <div class="cv">2.4.0 <span>5. November 2026</span></div>
+          <h3>Bewerbungen per DM, Protokoll der Freigaben und eigene Rang-Karten</h3>
+          <ul class="peek"><li>Bewerbungen laufen per DM, mit Zurück, Überspringen und Zusammenfassung.</li><li>Rang-Karte mit eigenem Hintergrund aus Upload oder Galerie.</li><li class="v">Nutzerdaten laden deutlich schneller, auch bei großen Servern.</li></ul>
+          <div class="acts"><span class="more">Alle 12 Änderungen <svg class="i s"><use href="#i-right"/></svg></span><span class="more">Alle Versionen</span></div>
+        </div>
+      </a>
+    </div></section>
+
+    <section class="sec today"><div class="shell">
+      <div class="shead"><div><div class="eyebrow">Warum RL Nexus</div><h2>Gebaut für Orgs, nicht für irgendeinen Server</h2></div></div>
+      <div class="heute cut">Die fünf Argumente wie heute</div>
+    </div></section>
+
+    <section class="sec"><div class="shell">
+      <div class="shead">
+        <div><div class="eyebrow">Partner</div><h2>Mit wem wir arbeiten</h2><p>Organisationen, Creator und Ligen, die RL Nexus jeden Tag nutzen.</p></div>
+        <div class="links"><a class="more" href="/partner">Alle Partner <svg class="i s"><use href="#i-right"/></svg></a></div>
+      </div>
+      <div class="pgrid" style="margin-bottom:0">
+        <a class="pcard panel cut" href="/partner/apex-vortex" style="--c: var(--blue)"><div class="bn img"></div><div class="head"><div class="logo">AV</div><div><h4>Apex Vortex Esports</h4><span class="tag">Organisation</span></div></div><div class="body"><p>Drei Teams von Diamant bis SSL, nutzt Team-Hub und Matchups.</p><div class="pfoot"><span>Seit Juni 2026</span><span class="more">Ansehen <svg class="i s"><use href="#i-right"/></svg></span></div></div></a>
+        <a class="pcard panel cut" href="/partner/kbm-miqo" style="--c: var(--purple-t)"><div class="bn"></div><div class="head"><div class="logo">KM</div><div><h4>KBM Miqo</h4><span class="tag">Creator</span></div></div><div class="body"><p>Streamt Ranked und Coaching, testet die Rang-Karte.</p><div class="pfoot"><span>Seit Juli 2026</span><span class="more">Ansehen <svg class="i s"><use href="#i-right"/></svg></span></div></div></a>
+        <a class="pcard panel cut" href="/partner/nordliga" style="--c: var(--gold)"><div class="bn"></div><div class="head"><div class="logo">NL</div><div><h4>Nordliga RL</h4><span class="tag">Liga</span></div></div><div class="body"><p>3v3-Liga, zwei Divisionen, Ergebnisse über Matchups.</p><div class="pfoot"><span>Seit August 2026</span><span class="more">Ansehen <svg class="i s"><use href="#i-right"/></svg></span></div></div></a>
+      </div>
+    </div></section>
+
+    <section class="sec"><div class="shell">
+      <div class="shead">
+        <div><div class="eyebrow" style="--c: var(--gold)">Sponsorings</div><h2>Wer uns unterstützt</h2><p>Firmen, die Server, Preisgeld und Ausrüstung beisteuern.</p></div>
+        <div class="links"><a class="more" href="/partner#sponsoren">Alle Sponsoren <svg class="i s"><use href="#i-right"/></svg></a><a class="more" href="/kontakt?thema=sponsor">Sponsor werden</a></div>
+      </div>
+      <a class="mainsp panel cut" href="/partner/nordhost">
+        <div class="art"><div class="logo" style="--c: var(--gold)">NH</div></div>
+        <div class="body">
+          <div class="meta"><span class="tag" style="--c: var(--gold)">Hauptsponsor</span><span class="tag" style="--c: var(--silver)">Hosting</span></div>
+          <h3>NordHost GmbH</h3>
+          <p>Rechenzentrum in Hamburg. Stellt die Server, auf denen RL Nexus läuft, und das Preisgeld der Nordliga Season 3.</p>
+          <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-top:4px"><span class="code"><small>Für die Community</small><b>NEXUS15</b></span><span class="more">Mehr erfahren <svg class="i s"><use href="#i-right"/></svg></span></div>
+        </div>
+      </a>
+      <div class="sgrid">
+        <a class="scard panel cut" href="/partner/keyforge"><div class="logo" style="--c: var(--cyan)">KF</div><div><span class="tag" style="--c: var(--silver)">Peripherie</span><h4 style="margin-top:6px">KeyForge</h4><p>Stattet die Nordliga-Sieger aus.</p></div></a>
+        <a class="scard panel cut" href="/partner/enerfuel"><div class="logo" style="--c: var(--win)">EF</div><div><span class="tag" style="--c: var(--silver)">Energy Drink</span><h4 style="margin-top:6px">EnerFuel</h4><p>Unterstützt den Aerial Academy Cup.</p></div></a>
+        <a class="scard panel cut" href="/partner/pixeldock"><div class="logo" style="--c: var(--purple-t)">PD</div><div><span class="tag" style="--c: var(--silver)">Design-Agentur</span><h4 style="margin-top:6px">Pixeldock</h4><p>Hat Rang-Karten und Banner mitgestaltet.</p></div></a>
+      </div>
+      <div class="quiet">
+        <div class="tier" style="--c: var(--faint)">Unterstützer</div>
+        <div class="ustrip">
+          <a class="ucard" href="/partner?unterstuetzer=clipbase"><span class="logo" style="--c: var(--orange)">CB</span><b>Clipbase</b></a>
+          <a class="ucard" href="/partner?unterstuetzer=streammate"><span class="logo" style="--c: var(--blue)">SM</span><b>StreamMate</b></a>
+          <a class="ucard" href="/partner?unterstuetzer=ranktool"><span class="logo" style="--c: var(--red)">RT</span><b>Ranktool</b></a>
+          <a class="ucard" href="/partner?unterstuetzer=gg-wear"><span class="logo" style="--c: var(--win)">GW</span><b>GG Wear</b></a>
+          <a class="ucard" href="/partner?unterstuetzer=arena-lan"><span class="logo" style="--c: var(--cyan)">AL</span><b>Arena Lan</b></a>
+        </div>
+        <a class="more" href="/partner#unterstuetzer" style="color:var(--dim)">Alle ansehen <svg class="i s"><use href="#i-right"/></svg></a>
+      </div>
+    </div></section>
+
+    <section class="cta">
+      <img src="logo-n.webp" alt="">
+      <h2>Bereit, wenn deine Org es ist</h2>
+      <p>Einladen, Module anhaken, loslegen. Kostenlos, ohne Hosting und ohne dass du dafür eine Konfigurationsdatei anfassen musst.</p>
+      <div class="acts"><span class="btn lg">Bot einladen<svg class="i s"><use href="#i-ext"/></svg></span><span class="btn ghost lg"><svg class="i fill"><use href="#i-discord"/></svg>Support-Server</span></div>
+    </section>
+    <div class="foot">
+      <div class="cols">
+        <div class="fb"><img src="logo-n.webp" alt=""><p>Der Discord-Bot für Rocket-League-Organisationen: Ränge, Teams, Bewerbungen, Tickets und mehr in einem Bot.</p><div class="socials"><span><svg class="i"><use href="#i-dash"/></svg></span><span><svg class="i fill"><use href="#i-discord"/></svg></span></div></div>
+        <div><h4>Seite</h4><ul><li class="on">Home</li><li>Module</li><li>News</li><li>Changelog</li><li>Partner/Sponsorings</li><li>Team</li><li>Kontakt</li></ul></div>
+        <div><h4>Module</h4><ul><li>Ränge</li><li>Teams</li><li>Bewerbungen</li><li>Tickets</li><li>Level</li><li>Alle 23 Module</li></ul></div>
+        <div><h4>Rechtliches</h4><ul><li>Impressum</li><li>Datenschutz</li><li>AGB</li><li>Widerruf</li></ul></div>
+      </div>
+      <div class="bottom"><span>© 2026 RL Nexus. Kein Produkt von Psyonix oder Epic Games.</span><span>Gebaut für Rocket-League-Organisationen · Wer dahintersteckt</span></div>
+    </div>
+  </div>
+
+  <!-- ===================================================== Handy -->
+  <div class="variant"><b>H3</b><h2>Beide auf dem Handy</h2><span>390 px Rahmen, 374 px Inhalt · nur die neuen Abschnitte, die heutigen als Platzhalter</span></div>
+  <div class="changes"><h3>Was du siehst</h3><ol>
+    <li><b>H1</b>: das Band „Neu bei RL Nexus“ stapelt: erst der große Beitrag, dann die Version mit kleinem Bild links, dann die zwei Zeilen. „Wer dabei ist“: Hauptsponsor mit Banner oben und Text darunter, Sponsoren-Zeilen, Partner-Karten untereinander, Unterstützer zwei nebeneinander.</li>
+    <li><b>H2</b>: die drei News-Karten untereinander, das Changelog-Band mit dem Bild oben, Partner-Karten untereinander, Hauptsponsor gestapelt, Sponsoren untereinander, Unterstützer zwei nebeneinander.</li>
+    <li>Knöpfe im Hero und in der Aufforderung über die ganze Breite. Nichts scrollt waagerecht.</li>
+  </ol></div>
+  <div class="phones">
+    <div>
+      <p class="phone-label">H1 · Zwei Bänder</p>
+      <div class="phone"><div class="status"><span>9:41</span><span>▲ ▮▮▮ ▰</span></div><div class="screen">
+        <div class="bar"><div class="brand"><img src="logo-n.webp" alt=""><div><strong>RL <i>NEXUS</i></strong><small>Esports Management Bot</small></div></div><span class="menu"><svg class="i"><use href="#i-menu"/></svg></span></div>
+        <section class="hero"><div class="shell in">
+          <div>
+            <span class="pill"><svg class="i s"><use href="#i-bolt"/></svg>Discord-Bot für RL-Orgs</span>
+            <h1>Deine Org läuft auf <em>einem</em> Bot.</h1>
+            <p class="lead">Ränge, Teams, Bewerbungen, Tickets, Logging, Level, Stream-Meldungen. Du schaltest nur ein, was du willst.</p>
+            <div class="acts"><span class="btn lg">Bot einladen<svg class="i s"><use href="#i-ext"/></svg></span><span class="btn ghost lg">Module ansehen</span></div>
+          </div>
+          <div class="heute card cut">Rang-Karte wie heute</div>
+        </div></section>
+        <section class="sec"><div class="shell">
+          <div class="shead"><div><div class="eyebrow">Aktuell</div><h2>Neu bei RL Nexus</h2><p><b style="color:var(--text)">3 neu</b> seit deinem letzten Besuch.</p></div><div class="links"><a class="more" href="/news">Alle News <svg class="i s"><use href="#i-right"/></svg></a><a class="more" href="/changelog">Changelog</a></div></div>
+          <div class="band">
+            <a class="newsbig panel cut" href="/news/team-hub-2-0"><div class="cover" style="--c: var(--blue)"><img src="banner.webp" alt=""></div><div class="body"><div class="meta"><span class="tag" style="--c: var(--blue)">Update</span><span class="new">Neu</span><span>8. Nov.</span></div><h3>Team-Hub 2.0: Kategorien, gezeichnete Karten und ein neues Menü</h3><span class="more">Weiterlesen <svg class="i s"><use href="#i-right"/></svg></span></div></a>
+            <div class="stack">
+              <a class="clcard panel cut" href="/changelog/2.4.0"><div class="post" style="--c: var(--win)"><div class="ph"><img src="logo-n.webp" alt=""><b>RL <i>Nexus</i></b><span class="stamp">Neu</span></div><div class="pv">2.4.0</div><div class="pt">Bewerbungen per DM, Protokoll und eigene Rang-Karten</div><div class="tiles"><div class="tile full" style="--c: var(--win)"><h5>Neu <b>5</b></h5></div><div class="tile" style="--c: var(--purple-t)"><h5>Verb. <b>4</b></h5></div><div class="tile" style="--c: var(--blue)"><h5>Beh. <b>3</b></h5></div></div></div><div><div class="cv">2.4.0 <span>5. Nov.</span></div><b>Bewerbungen per DM, Protokoll der Freigaben und eigene Rang-Karten</b><span class="counts"><span class="n">5</span> · <span class="v">4</span> · <span class="b">3</span></span></div></a>
+              <a class="nrow panel cut" href="/news/apex-vortex-ist-neuer-partner"><div><div class="meta"><span class="tag" style="--c: var(--purple-t)">Partner</span><span class="new">Neu</span></div><b>Apex Vortex Esports ist neuer Partner</b></div><svg class="i" style="color:var(--faint)"><use href="#i-right"/></svg></a>
+              <a class="nrow panel cut" href="/news/nordliga-season-3-anmeldung" style="--c: var(--gold)"><div><div class="meta"><span class="tag" style="--c: var(--gold)">Termin</span></div><b>Nordliga Season 3: Anmeldung offen</b></div><div class="datebox"><small>Bis</small><strong>20.11.</strong></div></a>
+            </div>
+          </div>
+        </div></section>
+        <section class="sec today"><div class="shell"><div class="heute cut">Module, Einrichtung, Warum RL Nexus wie heute</div></div></section>
+        <section class="sec"><div class="shell">
+          <div class="shead"><div><div class="eyebrow">Partner/Sponsorings</div><h2>Wer dabei ist</h2></div><div class="links"><a class="more" href="/partner">Alle ansehen <svg class="i s"><use href="#i-right"/></svg></a></div></div>
+          <div class="who">
+            <div><div class="tier" style="--c: var(--gold)">Hauptsponsor</div>
+              <a class="mainsp panel cut" href="/partner/nordhost"><div class="art"><div class="logo" style="--c: var(--gold)">NH</div></div><div class="body"><div class="meta"><span class="tag" style="--c: var(--gold)">Hauptsponsor</span><span class="tag" style="--c: var(--silver)">Hosting</span></div><h3>NordHost GmbH</h3><p>Stellt die Server, auf denen RL Nexus läuft, und das Preisgeld der Nordliga S3.</p><span class="code"><small>Für die Community</small><b>NEXUS15</b></span></div></a>
+            </div>
+            <div class="splist"><div class="tier" style="--c: var(--silver)">Sponsoren</div>
+              <a class="scard panel cut" href="/partner/keyforge"><div class="logo" style="--c: var(--cyan)">KF</div><div><h4>KeyForge</h4><p>Stattet die Nordliga-Sieger aus.</p></div></a>
+              <a class="scard panel cut" href="/partner/enerfuel"><div class="logo" style="--c: var(--win)">EF</div><div><h4>EnerFuel</h4><p>Unterstützt den Aerial Academy Cup.</p></div></a>
+            </div>
+          </div>
+          <div class="tier" style="--c: var(--red)">Partner</div>
+          <div class="pgrid">
+            <a class="pcard panel cut" href="/partner/apex-vortex" style="--c: var(--blue)"><div class="bn img"></div><div class="head"><div class="logo">AV</div><div><h4>Apex Vortex Esports</h4><span class="tag">Organisation</span></div></div><div class="body"><p>Drei Teams von Diamant bis SSL.</p><div class="pfoot"><span>Seit Juni 2026</span><span class="more">Ansehen</span></div></div></a>
+          </div>
+          <div class="ustrip h1">
+            <div class="tier" style="--c: var(--faint)">Unterstützer</div>
+            <a class="ucard" href="/partner?unterstuetzer=clipbase"><span class="logo" style="--c: var(--orange)">CB</span><div><b>Clipbase</b></div></a>
+            <a class="ucard" href="/partner?unterstuetzer=streammate"><span class="logo" style="--c: var(--blue)">SM</span><div><b>StreamMate</b></div></a>
+            <a class="ucard" href="/partner?unterstuetzer=ranktool"><span class="logo" style="--c: var(--red)">RT</span><div><b>Ranktool</b></div></a>
+            <a class="ucard" href="/partner?unterstuetzer=gg-wear"><span class="logo" style="--c: var(--win)">GW</span><div><b>GG Wear</b></div></a>
+          </div>
+        </div></section>
+        <div class="foot"><div class="bottom"><span>© 2026 RL Nexus</span><span>Impressum · Datenschutz</span></div></div>
+      </div></div>
+    </div>
+    <div>
+      <p class="phone-label">H2 · Getrennte Abschnitte</p>
+      <div class="phone"><div class="status"><span>9:41</span><span>▲ ▮▮▮ ▰</span></div><div class="screen">
+        <div class="bar"><div class="brand"><img src="logo-n.webp" alt=""><div><strong>RL <i>NEXUS</i></strong><small>Esports Management Bot</small></div></div><span class="menu"><svg class="i"><use href="#i-menu"/></svg></span></div>
+        <section class="sec today" style="padding-top:24px"><div class="shell"><div class="heute cut">Hero und Module wie heute</div></div></section>
+        <section class="sec"><div class="shell">
+          <div class="shead"><div><div class="eyebrow">News</div><h2>Aktuelles</h2></div><div class="links"><a class="more" href="/news">Alle News <svg class="i s"><use href="#i-right"/></svg></a></div></div>
+          <div class="news3">
+            <a class="ncard panel cut" href="/news/team-hub-2-0"><div class="cover" style="--c: var(--blue)"><img src="banner.webp" alt=""></div><div class="body"><div class="meta"><span class="tag" style="--c: var(--blue)">Update</span><span class="new">Neu</span><span>8. Nov.</span></div><h3>Team-Hub 2.0: Kategorien, gezeichnete Karten und ein neues Menü</h3><span class="more">Weiterlesen <svg class="i s"><use href="#i-right"/></svg></span></div></a>
+            <a class="ncard ev panel cut" href="/news/nordliga-season-3-anmeldung"><div class="body"><div class="datebox" style="--c: var(--gold)"><small>Anmeldung bis</small><strong>20.11.2026</strong></div><div class="meta"><span class="tag" style="--c: var(--gold)">Termin</span></div><h3>Nordliga Season 3: Anmeldung offen</h3><span class="more">Zum Termin <svg class="i s"><use href="#i-right"/></svg></span></div></a>
+          </div>
+        </div></section>
+        <section class="sec today"><div class="shell"><div class="heute cut">Einrichtung wie heute</div></div></section>
+        <section class="sec"><div class="shell">
+          <a class="clband cut" href="/changelog/2.4.0">
+            <div class="post" style="--c: var(--win)"><div class="ph"><img src="logo-n.webp" alt=""><b>RL <i>Nexus</i></b><small>Changelog</small><span class="stamp">Neu</span></div><div class="pv">2.4.0</div><div class="pt">Bewerbungen per DM, Protokoll der Freigaben und eigene Rang-Karten</div><div class="tiles"><div class="tile full" style="--c: var(--win)"><h5>Neu <b>5</b></h5></div><div class="tile" style="--c: var(--purple-t)"><h5>Verbessert <b>4</b></h5></div><div class="tile" style="--c: var(--blue)"><h5>Behoben <b>3</b></h5></div></div></div>
+            <div><div class="eyebrow" style="--c: var(--win)">Zuletzt geändert</div><div class="cv">2.4.0 <span>5. Nov. 2026</span></div><h3>Bewerbungen per DM, Protokoll der Freigaben und eigene Rang-Karten</h3><ul class="peek"><li>Bewerbungen per DM mit Zurück und Überspringen.</li><li>Rang-Karte mit eigenem Hintergrund.</li><li class="v">Nutzerdaten laden deutlich schneller.</li></ul><div class="acts"><span class="more">Alle 12 Änderungen <svg class="i s"><use href="#i-right"/></svg></span></div></div>
+          </a>
+        </div></section>
+        <section class="sec"><div class="shell">
+          <div class="shead"><div><div class="eyebrow">Partner</div><h2>Mit wem wir arbeiten</h2></div></div>
+          <div class="pgrid" style="margin-bottom:0"><a class="pcard panel cut" href="/partner/kbm-miqo" style="--c: var(--purple-t)"><div class="bn"></div><div class="head"><div class="logo">KM</div><div><h4>KBM Miqo</h4><span class="tag">Creator</span></div></div><div class="body"><p>Streamt Ranked und Coaching, testet die Rang-Karte.</p><div class="pfoot"><span>Seit Juli 2026</span><span class="more">Ansehen</span></div></div></a></div>
+        </div></section>
+        <section class="sec"><div class="shell">
+          <div class="shead"><div><div class="eyebrow" style="--c: var(--gold)">Sponsorings</div><h2>Wer uns unterstützt</h2></div></div>
+          <a class="mainsp panel cut" href="/partner/nordhost"><div class="art"><div class="logo" style="--c: var(--gold)">NH</div></div><div class="body"><div class="meta"><span class="tag" style="--c: var(--gold)">Hauptsponsor</span></div><h3>NordHost GmbH</h3><p>Stellt die Server, auf denen RL Nexus läuft, und das Preisgeld der Nordliga S3.</p><span class="code"><small>Für die Community</small><b>NEXUS15</b></span></div></a>
+          <div class="sgrid"><a class="scard panel cut" href="/partner/keyforge"><div class="logo" style="--c: var(--cyan)">KF</div><div><h4>KeyForge</h4><p>Stattet die Nordliga-Sieger aus.</p></div></a></div>
+          <div class="quiet">
+            <div class="tier" style="--c: var(--faint)">Unterstützer</div>
+            <div class="ustrip">
+              <a class="ucard" href="/partner?unterstuetzer=clipbase"><span class="logo" style="--c: var(--orange)">CB</span><b>Clipbase</b></a>
+              <a class="ucard" href="/partner?unterstuetzer=streammate"><span class="logo" style="--c: var(--blue)">SM</span><b>StreamMate</b></a>
+              <a class="ucard" href="/partner?unterstuetzer=ranktool"><span class="logo" style="--c: var(--red)">RT</span><b>Ranktool</b></a>
+              <a class="ucard" href="/partner?unterstuetzer=gg-wear"><span class="logo" style="--c: var(--win)">GW</span><b>GG Wear</b></a>
+            </div>
+          </div>
+        </div></section>
+        <section class="cta"><h2>Bereit, wenn deine Org es ist</h2><div class="acts"><span class="btn lg">Bot einladen</span></div></section>
+        <div class="foot"><div class="bottom"><span>© 2026 RL Nexus</span><span>Impressum · Datenschutz</span></div></div>
+      </div></div>
+    </div>
+  </div>
+
+  <!-- ===================================================== Annahmen -->
+  <div class="assume">
+    <h2>Annahmen</h2>
+    <ol>
+      <li><b>Reihenfolge der heutigen Abschnitte</b> bleibt: Hero, Module, Einrichtung, Warum RL Nexus, Aufforderung (<code>HomePage.tsx</code>). Die neuen Abschnitte kommen dazwischen; nichts wird ersetzt. Die gestreiften Flächen stehen für den heutigen Inhalt, nicht für eine Änderung daran.</li>
+      <li><b>Was „neu“ heißt</b>: die neuesten drei News-Einträge (ohne Changelog-Einträge, die haben ihren eigenen Platz) und die zuletzt gepostete Version. Angeheftete Beiträge zählen zuerst. Ohne veröffentlichte News oder ohne gepostete Version fällt der jeweilige Teil weg, der Abschnitt bleibt, solange einer von beiden da ist.</li>
+      <li><b>„3 neu seit deinem letzten Besuch“</b> ist dieselbe Browser-Marke wie auf <code>/news</code>; die roten Punkte an News und Changelog im Menü kommen aus derselben Quelle.</li>
+      <li><b>Das Bild aus dem Post</b> ist die Datei aus D2 (siehe <code>changelog-v2.html</code>, Annahme 3), hier klein gezeigt. Auf der Startseite erscheint es ohne Einzelzeilen.</li>
+      <li><b>Hauptsponsor</b> ist der eine Eintrag mit Stufe Hauptsponsor; gibt es keinen, nimmt der erste Sponsor den Platz ohne das gelbe Label, oder die Sponsoren stehen zu dritt. Höchstens drei Sponsoren, drei Partner (die zuletzt angelegten oder im Studio als „auf der Startseite“ markierte; das Feld fehlt in der Spec und ist hier eine Annahme) und fünf Unterstützer in der Reihenfolge der Leiste.</li>
+      <li><b>Ziele</b>: Beitrag <code>/news/&lt;adresse&gt;</code>, Version <code>/changelog/2.4.0</code>, Partner und Sponsor <code>/partner/&lt;name&gt;</code>, Unterstützer <code>/partner?unterstuetzer=&lt;name&gt;</code> (die Spec sagt „eigene Adresse zum Verlinken“, die Form ist hier eine Annahme; das Fenster öffnet sich dann über der Partner-Seite).</li>
+      <li><b>Termin</b>: der Datumskasten zeigt das Datum des Termins (Anmeldeschluss), nicht das Veröffentlichungsdatum. Die Karte führt auf den News-Eintrag.</li>
+      <li><b>Rabattcode</b> steht auf der Startseite nur als Hinweis; kopieren kann man ihn auf der Seite des Sponsors.</li>
+      <li>„Seit Juni 2026“ auf den Partner-Karten ist „Partner seit“ aus der großen Ansicht. KBM Miqo und Nordliga haben in den Vorlagen kein Datum, die hier sind erfunden.</li>
+      <li>Die <b>Zahlen im Hero</b> (23 Module, 60+ Commands) stehen stellvertretend; die echte Seite nimmt sie aus der Registry.</li>
+    </ol>
+    <h2 style="margin-top:28px">Bewusst weggelassen</h2>
+    <ul>
+      <li>Kein eigener Abschnitt „Demnächst“ mit kommenden Terminen: der nächste Termin steht als News-Karte; wer mehr will, geht auf <code>/news</code>.</li>
+      <li>Keine Logo-Wand aller Partner. Drei Karten mit Namen und Art sagen mehr als zwölf kleine Logos.</li>
+      <li>Keine Änderung an Hero, Modulen, Einrichtung, Warum RL Nexus und Aufforderung.</li>
+    </ul>
+  </div>
+</div>
+</body>
+</html>

@@ -1,4 +1,9 @@
 import assert from "node:assert/strict";
+import { existsSync } from "node:fs";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+import type { ISiteChangelog, ISiteVersion } from "../../shared/site-content.ts";
+import { publishSite } from "../site/publish.ts";
 import type { IChangelogVersion, IChangelogView, IVersionInput } from "../../shared/changelog.ts";
 import type { IConfig } from "../config.ts";
 import { query } from "../db.ts";
@@ -19,7 +24,7 @@ const INPUT: IVersionInput = {
 };
 
 /** Test-Kanäle fangen mit 9000000000000000 an, echte nie. */
-const CHANNEL = "900000000000000050";
+export const CHANNEL = "900000000000000050";
 const FOREIGN = "900000000000000099";
 const CHANNEL_KEY = "changelog_channel";
 
@@ -36,7 +41,7 @@ async function setState(value: string | null): Promise<void> {
     else await query("INSERT INTO admin_state (name, value) VALUES (?, ?) ON DUPLICATE KEY UPDATE value = VALUES(value)", [CHANNEL_KEY, value]);
 }
 
-interface IDiscordCall {
+export interface IDiscordCall {
     readonly method: string;
     /** Ohne https://discord.com/api/v10 */
     readonly path: string;
@@ -51,7 +56,7 @@ const reply = (body: unknown, status = 200): Response => new Response(JSON.strin
  * Test-Kanäle mitgeschrieben und von `respond` beantwortet. `rights` sind die
  * Rechte von @everyone, ab Werk Administrator.
  */
-async function withDiscord(config: IConfig, respond: (call: IDiscordCall) => Response | Promise<Response>, run: (calls: IDiscordCall[]) => Promise<void>, rights = String(1 << 3)): Promise<void> {
+export async function withDiscord(config: IConfig, respond: (call: IDiscordCall) => Response | Promise<Response>, run: (calls: IDiscordCall[]) => Promise<void>, rights = String(1 << 3)): Promise<void> {
     const calls: IDiscordCall[] = [];
     const real = globalThis.fetch;
 
@@ -85,7 +90,7 @@ async function withDiscord(config: IConfig, respond: (call: IDiscordCall) => Res
 }
 
 /** Discord nimmt alles an: neue Nachrichten bekommen die nächste ID. */
-function accepting(): (call: IDiscordCall) => Response {
+export function accepting(): (call: IDiscordCall) => Response {
     let next = 51;
 
     return (call) => {
@@ -114,6 +119,13 @@ export async function checkChangelogDb(config: IConfig, http: IHttp): Promise<vo
     };
     const current = async (id: number): Promise<IChangelogVersion | undefined> => ((await dev("GET", "/api/changelog")).json() as IChangelogView).versions.find((entry) => entry.id === id);
     const live = await stateOf();
+    const publicVersion = async (version: string): Promise<ISiteVersion | undefined> => {
+        const file = path.join(config.siteDir, "changelog.json");
+
+        if (!existsSync(file)) return undefined;
+
+        return (JSON.parse(await readFile(file, "utf8")) as { data: ISiteChangelog }).data.versions.find((entry) => entry.version === version);
+    };
 
     try {
         await tidyChangelog();
@@ -226,12 +238,16 @@ export async function checkChangelogDb(config: IConfig, http: IHttp): Promise<vo
                 assert.equal(body.flags, 1 << 15);
                 assert.equal(body.components[0].items[0].media.url, "attachment://changelog.png");
                 assert.ok(alt.includes("Erste Zeile") && alt.includes("Von nutzer2") && !alt.includes("Nur für uns"), alt);
-                assert.deepEqual([body.components[1].components[0].label, body.components[1].components[0].url], ["Alle Änderungen", `${config.publicUrl}/dev/changelog`]);
+                assert.deepEqual([body.components[1].components[0].label, body.components[1].components[0].url], ["Alle Änderungen", `${config.websitePublicUrl}/changelog/9.3.0`]);
 
                 const { posted } = response.json() as IChangelogVersion;
                 assert.deepEqual([posted?.channelId, posted?.messageId, posted?.stale], [CHANNEL, "900000000000000051", false]);
             });
             assert.equal(await audited("changelog.post", "9.3.0%"), 1);
+            // W-0062: Die Version steht öffentlich auf der Webseite, mit Bild und wer gepostet hat.
+            const site = await publicVersion("9.3.0");
+            assert.deepEqual([site?.postedBy, site?.image], ["nutzer2", "/content/media/changelog-9.3.0.png"]);
+            assert.ok(existsSync(path.join(config.siteDir, "media", "changelog-9.3.0.png")));
         });
 
         await check("Während ein Post unterwegs ist: zweiter Klick auf Posten und Version löschen bekommen 409, Discord sieht eine Nachricht", async () => {
@@ -319,6 +335,8 @@ export async function checkChangelogDb(config: IConfig, http: IHttp): Promise<vo
                 assert.deepEqual(said(calls), [`DELETE /channels/${CHANNEL}/messages/900000000000000051`]);
             });
             assert.equal(await audited("changelog.unpost", "9.3.0%"), 1);
+            assert.equal(await publicVersion("9.3.0"), undefined);
+            assert.equal(existsSync(path.join(config.siteDir, "media", "changelog-9.3.0.png")), false);
 
             await withDiscord(config, accepting(), async () => assert.equal((await post()).statusCode, 200));
             await withDiscord(config, () => reply({ message: "Unknown Message", code: 10008 }, 404), async () => {
@@ -347,5 +365,6 @@ export async function checkChangelogDb(config: IConfig, http: IHttp): Promise<vo
     } finally {
         await tidyChangelog();
         await setState(live);
+        await publishSite(config, ["changelog", "news"]);
     }
 }

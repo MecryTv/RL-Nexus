@@ -134,10 +134,17 @@ export async function deleteVersionRow(id: number): Promise<boolean> {
     return (await query<{ affectedRows: number }>("DELETE FROM changelog_versions WHERE id = ?", [id])).affectedRows > 0;
 }
 
-export async function markPosted(id: number, channelId: string, messageId: string, hash: string): Promise<void> {
-    await query("UPDATE changelog_versions SET posted_channel_id = ?, posted_message_id = ?, posted_at = CURRENT_TIMESTAMP(3), posted_hash = ? WHERE id = ?", [channelId, messageId, hash, id]);
+/** W-0062: postedBy steht auf der öffentlichen Seite der Version. */
+export async function markPosted(id: number, channelId: string, messageId: string, hash: string, postedBy: string): Promise<void> {
+    await query("UPDATE changelog_versions SET posted_channel_id = ?, posted_message_id = ?, posted_at = CURRENT_TIMESTAMP(3), posted_hash = ?, posted_by_name = ? WHERE id = ?", [
+        channelId,
+        messageId,
+        hash,
+        postedBy.slice(0, 100),
+        id,
+    ]);
 }
 
 export async function clearPosted(id: number): Promise<void> {
-    await query("UPDATE changelog_versions SET posted_channel_id = NULL, posted_message_id = NULL, posted_at = NULL, posted_hash = NULL WHERE id = ?", [id]);
+    await query("UPDATE changelog_versions SET posted_channel_id = NULL, posted_message_id = NULL, posted_at = NULL, posted_hash = NULL, posted_by_name = NULL WHERE id = ?", [id]);
 }

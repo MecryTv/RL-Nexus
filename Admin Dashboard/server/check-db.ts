@@ -36,6 +36,9 @@ import { checkBetaDb } from "./checks/beta-db.check.ts";
 import { checkServersDb } from "./checks/servers-db.check.ts";
 import { checkSecurityDb } from "./checks/security-db.check.ts";
 import { checkChangelogDb } from "./checks/changelog-db.check.ts";
+import { checkPartnerRoutesDb, checkPartnersDb } from "./checks/partners-db.check.ts";
+import { checkPartnerRoleDb } from "./checks/partner-role.check.ts";
+import { checkNewsDb } from "./checks/news-db.check.ts";
 import { checkMessagesDb } from "./checks/messages-db.check.ts";
 import { checkDatabaseDb } from "./checks/database-db.check.ts";
 import { checkDumpsDb } from "./checks/dumps-db.check.ts";
@@ -82,6 +85,7 @@ const config = loadConfig({ ...ENV, ...DATABASE_ENV }, []);
 /** Entfernt alles, was dieser Check angelegt haben kann. Läuft vorher und nachher. */
 async function tidy(): Promise<void> {
     await query("DELETE FROM dashboard_groups WHERE user_id LIKE '999999999999999999%'");
+    await query("DELETE FROM partner_roles WHERE user_id LIKE '999999999999999999%'").catch(() => undefined);
     await query("DELETE FROM notifications WHERE user_id LIKE '999999999999999999%'");
     await query("DELETE FROM contact_messages WHERE subject LIKE 'check:db%'");
     await query("DELETE FROM admin_audit WHERE user_id IN (?, ?) AND user_name IN ('nutzer1', 'nutzer2')", [USERS.admin, USERS.developer]);
@@ -177,7 +181,8 @@ try {
 
     await check("Jede Änderung steht im Protokoll", async () => {
         const rows = await query<{ action: string }[]>("SELECT action FROM admin_audit WHERE user_id = ? AND target = ? ORDER BY id", [USERS.admin, IDS[0]]);
-        assert.deepEqual(rows.map((row) => row.action), ["group.grant", "group.grant", "group.revoke"]);
+        // W-0062: Gruppe Partner gibt die Rolle @Partner, der Wechsel zu Premium nimmt sie wieder.
+        assert.deepEqual(rows.map((row) => row.action), ["group.grant", "partner.role.give", "group.grant", "partner.role.take", "group.revoke"]);
     });
 
     await check("Die Übersicht zeigt die letzten Aktionen, neueste zuerst, ohne Details", async () => {
@@ -3665,6 +3670,10 @@ try {
     await checkSecurityDb(config);
     await checkMessagesDb(config, { get, write, raw });
     await checkChangelogDb(config, { get, write, raw });
+    await checkPartnersDb(config);
+    await checkPartnerRoleDb(config);
+    await checkPartnerRoutesDb(config, { get, write, raw });
+    await checkNewsDb(config, { get, write, raw });
     await checkDatabaseDb();
     await checkDumpsDb(config);
 } finally {

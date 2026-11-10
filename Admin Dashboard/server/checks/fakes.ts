@@ -345,6 +345,16 @@ globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit): P
         return json({ reposted: [], removed: [], problems: [] });
     }
 
+    // W-0062: Live-Daten eines Partner-Servers.
+    const showcase = new RegExp(`^${config.botApiUrl}/dcapi/admin/servers/(\\d+)/showcase$`).exec(url);
+
+    if (showcase) {
+        if (fake.botDown) throw new TypeError("fetch failed");
+        if (!String(headers.Authorization ?? "").startsWith("Bearer ")) return json({ error: "Unauthorized" }, 401);
+
+        return json({ members: 1240, online: 312, modules: ["teams", "apply"], teams: [{ name: "Apex A", group: null, mmr: 1500, rank: "GC 1", players: 3 }] });
+    }
+
     if (url === `${config.botApiUrl}/dcapi/admin/overview`) {
         if (fake.botDown) throw new TypeError("fetch failed");
         if (!String(headers.Authorization ?? "").startsWith("Bearer ")) return json({ error: "Unauthorized" }, 401);
