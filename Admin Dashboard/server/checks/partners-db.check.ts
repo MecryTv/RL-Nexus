@@ -1,3 +1,4 @@
+import { groupOf } from "../groups.ts";
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
@@ -212,6 +213,31 @@ export async function checkPartnerRoutesDb(config: IConfig, shared: IHttp): Prom
             assert.equal(response.json().group, null);
             // Teil 2: „Einladung kopieren“ im Anlege-Dialog.
             assert.ok("invite" in response.json(), "invite fehlt");
+        });
+
+        await check("Partner: „Partner-Gruppe entfernen“ nimmt nur die Gruppe Partner, Administrator bleibt (Review)", async () => {
+            const admin = "99999999999999999933";
+
+            await query("INSERT INTO dashboard_groups (user_id, group_name, granted_by) VALUES (?, 'administrator', ?)", [admin, USERS.admin]);
+
+            const asAdmin = await http.write("POST", "/api/partners", { ...ENTRY, name: "Check DB Admin-Kontakt", contactId: admin, access: "free" });
+
+            assert.equal(asAdmin.statusCode, 200, asAdmin.body);
+            assert.equal((await http.write("DELETE", `/api/partners/${asAdmin.json().id}/group`)).statusCode, 409);
+            assert.equal(await groupOf(admin), "administrator");
+
+            const asPartner = await http.write("POST", "/api/partners", { ...ENTRY, name: "Check DB Partner-Kontakt", contactId: hand, access: "free" });
+
+            assert.equal(asPartner.statusCode, 200, asPartner.body);
+            assert.equal(await groupOf(hand), "partner");
+
+            const removed = await http.write("DELETE", `/api/partners/${asPartner.json().id}/group`);
+
+            assert.equal(removed.statusCode, 200, removed.body);
+            assert.equal(await groupOf(hand), null);
+            assert.equal(typeof removed.json().role.state, "string");
+            await query("DELETE FROM dashboard_groups WHERE user_id = ?", [admin]);
+            await query("DELETE FROM partner_roles WHERE user_id = ?", [admin]);
         });
 
         await check("Partner: Live-Zahlen eines Servers für die Vorschau im Studio (Teil 2)", async () => {

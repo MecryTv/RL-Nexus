@@ -8,6 +8,7 @@ import { Panel } from "../components/Panel";
 import { Segmented } from "../components/Segmented";
 import { useToast } from "../toast/context";
 import { ContactField, type IContactInfo } from "./ContactField";
+import { GROUP_LABELS } from "../../shared/limits";
 import { ROLE_LABELS } from "./labels.ts";
 import styles from "./studio.module.scss";
 
@@ -60,8 +61,10 @@ export function AccountTab({ value, set, entry, dirty, saving, problem, onSave, 
         setChecking(true);
 
         try {
-            await api(`/api/groups/${entry.contactId}`, { method: "DELETE" });
-            notify("Gruppe Partner und @Partner sind weg. Der Eintrag auf der Webseite bleibt.");
+            const result = await api<{ readonly role: IRoleState }>(`/api/partners/${entry.id}/group`, { method: "DELETE" });
+
+            setRole(result.role);
+            notify(result.role.state === "given" || result.role.state === "pending" ? "Gruppe Partner ist weg. @Partner bleibt, solange er Ansprechpartner eines Partner- oder Sponsor-Eintrags ist." : "Gruppe Partner und @Partner sind weg. Der Eintrag auf der Webseite bleibt.");
             onChanged();
         } catch (error) {
             notify(error instanceof ApiError ? error.message : "Entfernen ging nicht.", "danger");
@@ -72,6 +75,7 @@ export function AccountTab({ value, set, entry, dirty, saving, problem, onSave, 
     };
 
     const changed = value.contactId !== entry.contactId;
+    const partnerGroup = !changed && info?.group === "partner";
 
     return (
         <div className={styles.account}>
@@ -127,16 +131,24 @@ export function AccountTab({ value, set, entry, dirty, saving, problem, onSave, 
                         <Button variant="outline" busy={checking} onClick={() => void recheck()}>
                             Erneut prüfen
                         </Button>
-                        <Button variant="danger" disabled={checking} onClick={() => setRemoving(true)}>
-                            Partner-Gruppe entfernen
-                        </Button>
+                        {partnerGroup && (
+                            <Button variant="danger" disabled={checking || dirty} title={dirty ? "Erst speichern" : undefined} onClick={() => setRemoving(true)}>
+                                Partner-Gruppe entfernen
+                            </Button>
+                        )}
                     </div>
-                    <p className={styles.muted}>„Partner-Gruppe entfernen“ nimmt Zugang und Rolle. Der Eintrag auf der Webseite bleibt, bis du ihn versteckst oder löschst.</p>
+                    <p className={styles.muted}>
+                        {partnerGroup
+                            ? "„Partner-Gruppe entfernen“ nimmt die Gruppe Partner und damit den Zugang zum Bot-Dashboard. Der Eintrag auf der Webseite bleibt, bis du ihn versteckst oder löschst."
+                            : info?.group
+                              ? `Er hat die Gruppe ${GROUP_LABELS[info.group]}, die bleibt. @Partner bekommt er als Ansprechpartner.`
+                              : "Er hat keine Gruppe Partner zum Entfernen."}
+                    </p>
                 </Panel>
             )}
 
             <ConfirmDialog open={removing} title="Partner-Gruppe entfernen?" confirmLabel="Entfernen" tone="danger" busy={checking} onConfirm={() => void removeGroup()} onCancel={() => setRemoving(false)}>
-                <p>Der Ansprechpartner verliert die Gruppe Partner, den Zugang zum Bot-Dashboard und @Partner. Administrator oder Premium hat er dann nicht automatisch.</p>
+                <p>Der Ansprechpartner verliert die Gruppe Partner und den Zugang zum Bot-Dashboard. @Partner behält er, solange er Ansprechpartner eines Partner- oder Sponsor-Eintrags ist.</p>
             </ConfirmDialog>
         </div>
     );
