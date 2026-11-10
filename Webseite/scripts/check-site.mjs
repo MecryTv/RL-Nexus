@@ -8,6 +8,7 @@ import { isSiteChangelog, isSiteLive, isSiteNews, isSiteNewsPost, isSitePartners
 import { parseMarkdown } from "../src/services/markdown.ts";
 import { categoryCounts, isNew, pinned, shares, timeline, upcoming } from "../src/services/news.ts";
 import { navigationFor } from "../src/services/navigation.ts";
+import { playerOf } from "../src/services/video.ts";
 
 const site = JSON.parse(readFileSync(new URL("./fixtures/site.json", import.meta.url), "utf8"));
 const clone = (value) => structuredClone(value);
@@ -168,6 +169,22 @@ check("nginx: Vorschau beim Teilen für Bots und RSS unter /news.xml", () => {
 });
 
 // Was Teil 1 lokal wirklich geschrieben hat (Admin Dashboard/data/site), muss durchgehen.
+check("Video: YouTube und Twitch werden zum Player, alles andere nicht", () => {
+    const host = "nexus-emb.de";
+
+    assert.equal(playerOf("https://www.youtube.com/watch?v=dQw4w9WgXcQ", host)?.src, "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ");
+    assert.equal(playerOf("https://youtu.be/dQw4w9WgXcQ?t=12", host)?.src, "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ");
+    assert.equal(playerOf("https://youtube.com/shorts/abcDEF12345", host)?.service, "YouTube");
+    assert.equal(playerOf("https://www.twitch.tv/videos/123456789", host)?.src, "https://player.twitch.tv/?video=123456789&parent=nexus-emb.de&autoplay=false");
+    assert.equal(playerOf("https://www.twitch.tv/rlnexus", host)?.src, "https://player.twitch.tv/?channel=rlnexus&parent=nexus-emb.de&autoplay=false");
+    assert.equal(playerOf("https://clips.twitch.tv/FunnyClip-abc", host)?.src, "https://clips.twitch.tv/embed?clip=FunnyClip-abc&parent=nexus-emb.de&autoplay=false");
+    assert.equal(playerOf("https://www.twitch.tv/rlnexus/clip/FunnyClip-abc", host)?.service, "Twitch");
+    assert.equal(playerOf("https://www.youtube.com/watch?v=<script>", host), null);
+    assert.equal(playerOf("https://www.youtube.com/@rlnexus", host), null);
+    assert.equal(playerOf("https://example.com/watch?v=dQw4w9WgXcQ", host), null);
+    assert.equal(playerOf("kein Link", host), null);
+});
+
 const live = new URL("../../Admin%20Dashboard/data/site/", import.meta.url);
 const stored = (file) => {
     try {

@@ -17,6 +17,7 @@ const ModuleDetailPage = lazy(() => import("./pages/ModuleDetailPage").then((m) 
 const PreviewPage = lazy(() => import("./pages/PreviewPage").then((m) => ({ default: m.PreviewPage })));
 const PricingPage = lazy(() => import("./pages/PricingPage").then((m) => ({ default: m.PricingPage })));
 const PartnersPage = lazy(() => import("./pages/PartnersPage").then((m) => ({ default: m.PartnersPage })));
+const PartnerPage = lazy(() => import("./pages/PartnerPage").then((m) => ({ default: m.PartnerPage })));
 const TeamPage = lazy(() => import("./pages/TeamPage").then((m) => ({ default: m.TeamPage })));
 const ContactPage = lazy(() => import("./pages/ContactPage").then((m) => ({ default: m.ContactPage })));
 const LegalPage = lazy(() => import("./pages/LegalPage").then((m) => ({ default: m.LegalPage })));
@@ -56,6 +57,7 @@ export function App({ banner }: { readonly banner: ILoaded<IBanner> | null }): J
                     <Route path="commands" element={<Navigate to="/module" replace />} />
                     <Route path="preise" element={<PricingPage />} />
                     <Route path="partner" element={<PartnersPage />} />
+                    <Route path="partner/:slug" element={<PartnerPage />} />
                     <Route path="team" element={<TeamPage />} />
                     {/* Die Kaderübersicht war einmal eine eigene Seite und ist
                         jetzt Teil des Moduls. Alte Links sollen dort ankommen

@@ -48,3 +48,15 @@ export function linksOf(entry: ISiteEntry): { readonly key: keyof IEntryLinks; r
 export function monthYear(day: string | null): string | null {
     return day ? new Intl.DateTimeFormat("de-DE", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${day.slice(0, 10)}T12:00:00Z`)) : null;
 }
+
+/** „06.11.2026“ aus einem Datum oder Zeitpunkt. */
+export function shortDate(value: string): string {
+    const date = /^\d{4}-\d{2}-\d{2}$/.test(value) ? new Date(`${value}T12:00:00Z`) : new Date(value);
+
+    return new Intl.DateTimeFormat("de-DE", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "Europe/Berlin" }).format(date);
+}
+
+/** Absätze aus einem Text mit Leerzeilen. Einzelne Zeilenumbrüche bleiben im Absatz (white-space: pre-line). */
+export function paragraphs(text: string | undefined): string[] {
+    return (text ?? "").split(/\n\s*\n/).map((part) => part.trim()).filter(Boolean);
+}
