@@ -5,6 +5,8 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { isSiteChangelog, isSiteLive, isSiteNews, isSiteNewsPost, isSitePartners } from "../src/services/Content.ts";
+import { parseMarkdown } from "../src/services/markdown.ts";
+import { categoryCounts, isNew, pinned, shares, timeline, upcoming } from "../src/services/news.ts";
 
 const site = JSON.parse(readFileSync(new URL("./fixtures/site.json", import.meta.url), "utf8"));
 const clone = (value) => structuredClone(value);
@@ -79,6 +81,61 @@ check("Changelog: interne Art und fremder Discord-Link fallen durch", () => {
     const link = clone(site.changelog);
     link.versions[0].discordUrl = "https://evil.example/channels/1/2/3";
     assert.ok(!isSiteChangelog(link));
+});
+
+console.log("\n  Zeitstrahl, Neu-Marke und Markdown (W-0062)");
+
+check("Markdown: HTML bleibt Text, javascript-Link wird kein Link", () => {
+    const html = parseMarkdown("<script>alert(1)</script> <img src=x onerror=alert(1)>");
+    assert.deepEqual(html, [{ kind: "p", inline: [{ kind: "text", text: "<script>alert(1)</script> <img src=x onerror=alert(1)>" }] }]);
+
+    const link = parseMarkdown("[klick](javascript:alert(1))");
+    assert.ok(link[0].inline.every((part) => part.kind !== "link"), JSON.stringify(link));
+});
+
+check("Markdown: fett, kursiv, Link, Listen und Absätze", () => {
+    assert.deepEqual(parseMarkdown("**a** und *b* [Discord](https://discord.gg/x)")[0].inline, [
+        { kind: "strong", text: "a" },
+        { kind: "text", text: " und " },
+        { kind: "em", text: "b" },
+        { kind: "text", text: " " },
+        { kind: "link", text: "Discord", href: "https://discord.gg/x" },
+    ]);
+    assert.deepEqual(parseMarkdown("- eins\n- zwei").map((block) => [block.kind, block.items?.length]), [["ul", 2]]);
+    assert.deepEqual(parseMarkdown("1. erst\n2. dann").map((block) => block.kind), ["ol"]);
+    assert.deepEqual(parseMarkdown("Absatz eins\n\nAbsatz zwei").map((block) => block.kind), ["p", "p"]);
+});
+
+check("Zeitstrahl: Beitrag und Version im selben Monat, neueste zuerst, Angeheftetes nicht doppelt", () => {
+    const months = timeline(site.news, site.changelog);
+    const november = months.find((month) => month.key === "2026-11");
+
+    assert.equal(months[0].key, "2026-11");
+    assert.deepEqual(november.entries.map((entry) => entry.kind), ["changelog", "termin"]);
+    assert.equal(november.label, "November 2026");
+    assert.ok(!months.flatMap((month) => month.entries).some((entry) => entry.slug === "apex-vortex-ist-neuer-partner"));
+});
+
+check("Angeheftet: ein großer, kleine dazu", () => {
+    assert.equal(pinned(site.news).big?.slug, "apex-vortex-ist-neuer-partner");
+    assert.deepEqual(pinned(site.news).small, []);
+});
+
+check("Neu-Marke: beim ersten Besuch nichts, danach was nach dem Besuch kam", () => {
+    assert.equal(isNew("2026-11-06T10:00:00.000Z", null), false);
+    assert.equal(isNew("2026-11-06T10:00:00.000Z", "2026-11-01T00:00:00.000Z"), true);
+    assert.equal(isNew("2026-10-06T10:00:00.000Z", "2026-11-01T00:00:00.000Z"), false);
+});
+
+check("Demnächst: nur kommende Termine, früheste zuerst", () => {
+    assert.deepEqual(upcoming(site.news, new Date("2026-11-10T00:00:00.000Z")).map((post) => post.slug), ["nordliga-season-3"]);
+    assert.deepEqual(upcoming(site.news, new Date("2026-12-01T00:00:00.000Z")), []);
+});
+
+check("Anteile einer Version und Arten mit Anzahl", () => {
+    assert.deepEqual(shares(site.changelog.versions[0]), { neu: 1, verbessert: 1, behoben: 1 });
+    assert.equal(categoryCounts(site.news).partner, 1);
+    assert.equal(categoryCounts(site.news).wartung, 1);
 });
 
 // Was Teil 1 lokal wirklich geschrieben hat (Admin Dashboard/data/site), muss durchgehen.
