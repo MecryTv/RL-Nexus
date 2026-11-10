@@ -14,6 +14,11 @@ Die Webseite bekommt eine Seite **Partner/Sponsorings** und eine **News**-Anzeig
 4. Runde 4: Builder als Studio (S1 bis S7) „passt so“, dazu ein Builder für Unterstützer mit großer Ansicht beim Anklicken. Freigegeben am 09.11.2026.
 5. News schreiben dürfen Admins und Developer.
 6. Aus der ursprünglichen Beschreibung: Beim Hinzufügen eines Partners entscheidet man im Pop-up, ob er Free Access bekommt oder den Paid Access nutzen muss.
+7. Nach dem Builder-Check (10.11.2026):
+   - Ist der Ansprechpartner schon Premium, bleibt er Premium. Ist er Administrator, bleibt er Administrator. Beide bekommen trotzdem @Partner.
+   - Mitgliederzahl, Module und Teams eines Partners kommen live von einem verknüpften Discord-Server.
+   - Ein Turnier ist ein News-Eintrag der Art Termin.
+   - Changelog-Einträge erscheinen erst nach dem Post in Discord. Ein Klick öffnet eine eigene öffentliche Seite mit allen Änderungen der Version. Diese Seite wird mit Fable im Stil der Webseite entworfen und vor dem Bau gezeigt.
 
 ## Ziele
 
@@ -40,7 +45,8 @@ Die Webseite bekommt eine Seite **Partner/Sponsorings** und eine **News**-Anzeig
 
 - `/partner`: oben **Sponsoren** mit Hauptsponsor (höchstens einer, groß mit Banner, Leistungen, Rabattcode), Sponsoren als Karten, **Unterstützer** als schmale Logo-Leiste. Darunter die **Partner** mit Filter nach Art (auch „Sponsoren“). Unten „Partner werden“ und „Sponsor werden“, beide ins Kontaktformular mit vorgewähltem Thema.
 - Partner-Karten: ganze Karte klickbar, Banner oben (ohne Banner ein Verlauf in seiner Farbe), Hover hebt die Karte und färbt den Rand.
-- Große Ansicht Partner `/partner/<name>`: Banner, Logo, Name, Art, Region, „Partner seit“; Knöpfe Discord (groß), Webseite, X, Twitch, YouTube, TikTok, nur was eingetragen ist; bis zu vier Kennzahlen; Über uns; Erfolge als kleine Zeitleiste; Teams aus RL Nexus (Schalter, ab Werk aus); rechts Discord-Kasten mit Mitgliederzahl, Steckbrief, genutzte Module, verknüpfte News; unten weitere Partner. Handy: Kennzahlen 2×2, rechte Spalte rutscht unter den Text. Open-Graph-Vorschau mit Banner, Name, Kurztext.
+- Große Ansicht Partner `/partner/<name>`: Banner, Logo, Name, Art, Region, „Partner seit“; Knöpfe Discord (groß), Webseite, X, Twitch, YouTube, TikTok, nur was eingetragen ist; bis zu vier Kennzahlen; Über uns; Erfolge als kleine Zeitleiste; Teams aus RL Nexus (Schalter, ab Werk aus); rechts Discord-Kasten mit Mitgliederzahl, Steckbrief, genutzte Module, verknüpfte News; unten weitere Partner.
+- **Verknüpfter Server:** Im Studio wählt man einen Discord-Server des Ansprechpartners, auf dem RL Nexus läuft. Von dort kommen live die Mitgliederzahl (online und gesamt), die genutzten Module und, wenn der Schalter an ist, die Teams mit Rang und MMR. Ohne verknüpften Server fallen diese Kästen weg. Die Zahlen dürfen zwischengespeichert werden (eigene Festlegung: höchstens 15 Minuten alt). Handy: Kennzahlen 2×2, rechte Spalte rutscht unter den Text. Open-Graph-Vorschau mit Banner, Name, Kurztext.
 - Große Ansicht Sponsor `/partner/<name>`: „Webseite besuchen“ vorn, Discord nur wenn eingetragen; Kennzahlen Sponsor seit, Stufe, Turniere, Branche; „Was wir zusammen machen“ als Kacheln; Kasten „Angebot für die Community“ mit Rabattcode und Gültigkeit; News zum Sponsoring.
 
 ### 2. Webseite: Unterstützer (`studio.html` S6)
@@ -49,6 +55,7 @@ Die Webseite bekommt eine Seite **Partner/Sponsorings** und eine **News**-Anzeig
 - Hover auf ein Logo der Leiste zeigt den Kurztext und „Ansehen →“. Klick öffnet die große Ansicht als **Fenster** über der Seite, am Handy als Blatt von unten. Das Fenster hat eine eigene Adresse zum Verlinken und blättert mit ‹ › durch die Unterstützer.
 - Inhalt: Kopf mit Logo (Banner freiwillig, sonst Verlauf in der Farbe), Art und Untertitel, Kurz vorgestellt, Kennzahlen (Seit, Art, Turniere), „Wie <Name> hilft“, „Unterstützt bei“ (aus verknüpften Turnieren), Angebot (freiwillig), Links.
 - Ein Unterstützer kann ein Ende haben; auf Wunsch verschwindet er danach von selbst aus der Leiste.
+- **Turniere** (gilt auch für Sponsoren): Ein Turnier ist ein News-Eintrag der Art Termin. „Unterstützt bei“ und „+ Turnier“ im Dialog S7 wählen aus diesen Terminen und verlinken auf sie; die Kennzahl „Turniere“ zählt die verknüpften Termine. Wird ein Termin gelöscht, fällt er aus der Verknüpfung.
 
 ### 3. Webseite: News (`news-v2.html` N3, A2)
 
@@ -56,6 +63,8 @@ Die Webseite bekommt eine Seite **Partner/Sponsorings** und eine **News**-Anzeig
 - Eintragsarten: Beitrag (groß mit Bild), Kurzmeldung (ohne Bild), Termin (mit Datumskasten), Changelog (neue Bot-Versionen aus W-0061 erscheinen von selbst mit den ersten drei Änderungen).
 - „Neu“-Marke für alles seit dem letzten Besuch (im Browser gespeichert). Seitenleiste: Suche, Arten mit Anzahl, Demnächst (kommende Termine), Archiv, Nichts verpassen (Discord-Ankündigungen, RSS). Unten „Ältere laden“, Monatsköpfe bleiben beim Scrollen stehen.
 - Beitragsseite A2 `/news/<adresse>`: Lesebalken, verknüpfter Partner/Sponsor als Karte im Text, unten vorheriger und nächster Beitrag. Die Art „Partner“ heißt „Partner/Sponsoring“.
+- **Changelog:** Eine Version aus W-0061 erscheint im Zeitstrahl erst, wenn sie in Discord gepostet ist (Entwürfe nie). Ein Klick öffnet eine öffentliche Seite der Version mit allen Änderungen. Das weicht vom Nicht-Ziel „keine öffentliche Changelog-Seite“ in W-0061 ab; der Nutzer hat es am 10.11.2026 so entschieden. Entwurf der Seite: mit Fable im Stil der Webseite, vor dem Bau zeigen.
+- **Startseite** (eigene Festlegung): Der Block „Neu bei RL Nexus“ aus Runde 1 mit den drei neuesten Einträgen kommt auf die Startseite, im Stil von N3.
 
 ### 4. Admin: Partner und Sponsoren (`admin-v3.html` D3 und L3, `studio.html` S3 und S4)
 
@@ -80,9 +89,17 @@ Die Webseite bekommt eine Seite **Partner/Sponsorings** und eine **News**-Anzeig
 
 ### 7. Rolle @Partner
 
-- Die Rolle hängt an der **Gruppe Partner**: Wer sie bekommt, egal ob über Partner/Sponsorings oder Bot › Gruppen, erhält @Partner; wird sie entfernt, geht die Rolle wieder weg.
+- Die Rolle bekommt, wer die **Gruppe Partner** hat oder **Ansprechpartner eines Partner- oder Sponsor-Eintrags** ist (nicht bei Unterstützern). Fällt beides weg, geht die Rolle wieder weg.
+- Gruppe beim Anlegen: Wer noch keine Gruppe hat, bekommt die Gruppe Partner mit Free oder Paid Access. Wer schon **Premium** ist, bleibt Premium; wer **Administrator** ist, bleibt Administrator. Beide bekommen trotzdem @Partner. Der Dialog sagt das vorher.
 - Auch der Ansprechpartner eines Sponsors bekommt Gruppe und Rolle, wenn ein Discord-Konto verknüpft ist. Ohne Konto: nur Webseite.
 - Ist jemand noch nicht auf dem Server, kommt die Rolle beim Beitritt.
+- Aktionen am Eintrag (eigene Festlegung, jeweils mit Bestätigung, die Gruppe und Rolle nennt):
+  - Löschen nimmt die Gruppe Partner und die Rolle. Administrator und Premium bleiben, nur die Rolle geht.
+  - Verstecken ändert nichts an Gruppe und Rolle.
+  - Wechsel der Art auf Unterstützer nimmt Gruppe Partner und Rolle.
+  - Wechsel des Ansprechpartners: der alte verliert, der neue bekommt.
+  - Ist jemand Ansprechpartner mehrerer Einträge, behält er Gruppe und Rolle, solange einer davon besteht.
+- Abgleich (eigene Festlegung): Beim ersten Start gibt der Abgleich nur dazu und nimmt nie weg. Wer @Partner heute ohne Gruppe trägt, behält sie. Von Hand in Discord vergebene oder genommene Rollen beobachtet der Bot nicht; weggenommen wird nur über die Aktionen oben.
 - Weg wie bei den Shop-Rollen (`Admin Dashboard/server/discord.ts`, `ADMIN_GUILD_ID`). Im Dev-Modus der Dev Server mit einer eigenen Test-Rolle.
 
 ## Eigene Festlegungen (vom Nutzer nicht ausdrücklich bestätigt)
@@ -91,6 +108,9 @@ Die Webseite bekommt eine Seite **Partner/Sponsorings** und eine **News**-Anzeig
 - Große Ansicht der Unterstützer als Fenster statt eigener Seite.
 - Optionales Ende für Unterstützer.
 - Art „Person“ bei Unterstützern: Name erscheint öffentlich, also nur mit Einverständnis eintragen.
+- Live-Zahlen der Partner höchstens 15 Minuten alt.
+- News-Block auf der Startseite.
+- Aktionen am Eintrag und Abgleich der Rolle wie in Teil 7.
 
 ## Dem Umsetzer überlassen
 
