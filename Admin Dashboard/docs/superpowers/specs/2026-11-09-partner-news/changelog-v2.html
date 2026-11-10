@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>W-0062 · Changelog, Runde 2</title>
+<style>
+@font-face { font-family: "Oxanium"; font-weight: 400; src: url("oxanium-400.woff2") format("woff2"); }
+@font-face { font-family: "Oxanium"; font-weight: 600; src: url("oxanium-600.woff2") format("woff2"); }
+@font-face { font-family: "Oxanium"; font-weight: 800; src: url("oxanium-800.woff2") format("woff2"); }
+@font-face { font-family: "Rajdhani"; font-weight: 600; src: url("rajdhani-600.woff2") format("woff2"); }
+@font-face { font-family: "Orbitron"; font-weight: 700; src: url("orbitron-700.woff2") format("woff2"); }
+:root {
+  --base: #050608; --panel: #080d12; --line: rgb(255 255 255 / 8%); --line2: rgb(255 255 255 / 14%);
+  --red: #ff1e2d; --blue: #00afff; --purple: #8a4dff; --purple-t: #a884ff; --win: #35e07f; --gold: #ffc53d; --orange: #ff8a3d; --cyan: #38c8ff;
+  --text: #f2f4f7; --dim: #a8b0bc; --faint: #9aa5b2;
+  --f-display: "Oxanium", "Segoe UI", system-ui, sans-serif; --f-label: "Rajdhani", "Segoe UI", sans-serif; --f-accent: "Orbitron", "Oxanium", sans-serif;
+  --cut: 14px;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--base); color: var(--text); font: 15px/1.6 var(--f-display); padding: 28px 16px 90px; }
+a { color: inherit; text-decoration: none; }
+svg.sym { position: absolute; width: 0; height: 0; overflow: hidden; }
+.i { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+.i.fill { fill: currentColor; stroke: none; }
+.i.s { width: 13px; height: 13px; }
+.doc { max-width: 1280px; margin: 0 auto; }
+.doc > h1 { font-size: 28px; font-weight: 800; margin: 0 0 4px; }
+.doc > h1 small { color: var(--red); font: 600 14px var(--f-label); letter-spacing: .16em; margin-right: 10px; }
+.doc > p.lead { color: var(--dim); max-width: 920px; margin: 0 0 8px; }
+.variant { margin: 48px 0 14px; display: flex; gap: 14px; align-items: baseline; flex-wrap: wrap; }
+.variant b { font: 700 15px var(--f-accent); color: var(--red); letter-spacing: .08em; }
+.variant h2 { margin: 0; font-size: 22px; font-weight: 800; }
+.variant span { color: var(--dim); font-size: 14px; }
+.changes { background: var(--panel); border: 1px solid var(--line); padding: 14px 20px 8px; margin: 0 0 16px; }
+.changes h3 { margin: 0 0 8px; font: 600 13px var(--f-label); letter-spacing: .16em; color: var(--red); text-transform: uppercase; }
+.changes ol, .changes ul { margin: 0; padding-left: 22px; color: var(--dim); font-size: 14px; } .changes li { margin-bottom: 6px; } .changes b { color: var(--text); }
+
+/* ---------- Bildschirm: Kopfzeile und Fußzeile wie die Webseite ---------- */
+.screen { container-type: inline-size; container-name: screen; border: 1px solid var(--line2); background: radial-gradient(1200px 500px at 70% -10%, rgb(255 30 45 / 9%), transparent 60%), var(--base); overflow: hidden; }
+.bar { display: flex; align-items: center; gap: 22px; height: 76px; padding: 0 34px; border-bottom: 1px solid var(--line); background: rgb(5 6 8 / 82%); }
+.brand { display: flex; align-items: center; gap: 12px; margin-right: auto; }
+.brand img { width: 40px; height: 40px; filter: drop-shadow(0 0 10px rgb(255 30 45 / 35%)); }
+.brand strong { display: block; font: 700 16px/1 var(--f-accent); letter-spacing: .06em; } .brand strong i { color: var(--red); font-style: normal; }
+.brand small { display: block; font: 600 12px var(--f-label); letter-spacing: .14em; color: var(--faint); margin-top: 3px; white-space: nowrap; text-transform: uppercase; }
+.bar nav { display: flex; align-items: center; gap: 2px; }
+.bar nav a { position: relative; padding: 9px 13px; font: 600 12.5px var(--f-label); letter-spacing: .1em; text-transform: uppercase; color: var(--dim); white-space: nowrap; }
+.bar nav a.on { color: var(--text); }
+.bar nav a.on::after { content: ""; position: absolute; left: 50%; bottom: 0; width: 22px; height: 2px; transform: translateX(-50%); background: var(--red); box-shadow: 0 0 10px var(--red); }
+.bar nav a.fresh::before { content: ""; position: absolute; right: 4px; top: 7px; width: 6px; height: 6px; background: var(--red); clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
+.bar .acts { display: flex; align-items: center; gap: 12px; }
+.ico { display: grid; place-items: center; width: 40px; height: 40px; color: var(--dim); clip-path: polygon(9px 0, 100% 0, 100% calc(100% - 9px), calc(100% - 9px) 100%, 0 100%, 0 9px); }
+.ico .i { width: 20px; height: 20px; }
+.bar .menu { display: none; width: 42px; height: 42px; place-items: center; color: var(--text); }
+.bar .menu .i { width: 22px; height: 22px; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 44px; padding: 0 18px; font: 600 12.5px var(--f-label); letter-spacing: .12em; text-transform: uppercase; color: #fff; background: linear-gradient(135deg, #ff3344, #ff1e2d 55%, #d81424); clip-path: polygon(11px 0, 100% 0, 100% calc(100% - 11px), calc(100% - 11px) 100%, 0 100%, 0 11px); white-space: nowrap; }
+.btn.ghost { background: rgb(255 255 255 / 5%); color: var(--text); box-shadow: inset 0 0 0 1px var(--line2); }
+.btn.sm { height: 38px; padding: 0 14px; font-size: 12px; }
+.wrap { padding: 44px 34px 64px; max-width: 1240px; margin: 0 auto; }
+.cut { clip-path: polygon(var(--cut) 0, 100% 0, 100% calc(100% - var(--cut)), calc(100% - var(--cut)) 100%, 0 100%, 0 var(--cut)); }
+.panel { background: linear-gradient(180deg, rgb(255 255 255 / 3%), transparent 40%), var(--panel); box-shadow: inset 0 0 0 1px var(--line2); }
+.eyebrow { font: 600 12px var(--f-label); letter-spacing: .22em; color: var(--red); text-transform: uppercase; display: flex; align-items: center; gap: 12px; }
+.eyebrow::before { content: ""; width: 26px; height: 2px; background: currentColor; box-shadow: 0 0 10px currentColor; }
+.meta { font: 600 13px var(--f-label); letter-spacing: .06em; color: var(--faint); display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.meta .dot::before { content: "·"; margin-right: 12px; }
+.tag { display: inline-flex; align-items: center; padding: 5px 10px 4px; font: 600 12px/1 var(--f-label); letter-spacing: .14em; text-transform: uppercase; color: var(--c); background: color-mix(in srgb, var(--c) 13%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 36%, transparent); white-space: nowrap; }
+.more { display: inline-flex; align-items: center; gap: 7px; color: var(--red); font: 600 12.5px var(--f-label); letter-spacing: .14em; text-transform: uppercase; }
+.foot { border-top: 1px solid var(--line); padding: 44px 34px 26px; background: linear-gradient(180deg, rgb(8 13 18 / 0%), rgb(8 13 18 / 80%)); }
+.foot .cols { display: grid; grid-template-columns: 1.15fr 1fr 1fr 1fr; gap: 36px; max-width: 1240px; margin: 0 auto 30px; }
+.foot .fb img { width: 56px; height: 56px; border-radius: 50%; margin-bottom: 12px; }
+.foot .fb p { margin: 0 0 14px; color: var(--dim); font-size: 14px; max-width: 38ch; }
+.foot .socials { display: flex; gap: 8px; } .foot .socials span { display: grid; place-items: center; width: 40px; height: 40px; box-shadow: inset 0 0 0 1px var(--line); color: var(--dim); clip-path: polygon(9px 0, 100% 0, 100% calc(100% - 9px), calc(100% - 9px) 100%, 0 100%, 0 9px); }
+.foot h4 { margin: 0 0 14px; font: 600 12px var(--f-label); letter-spacing: .18em; color: var(--text); text-transform: uppercase; }
+.foot ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 9px; font-size: 14px; color: var(--dim); }
+.foot ul li.on { color: var(--text); font-weight: 600; }
+.foot .bottom { border-top: 1px solid var(--line); padding-top: 20px; display: flex; justify-content: space-between; gap: 8px 24px; flex-wrap: wrap; color: var(--faint); font-size: 13px; max-width: 1240px; margin: 0 auto; }
+
+/* ---------- Das Bild aus dem Discord-Post (D2), als Nachbau ---------- */
+.post { container-type: inline-size; container-name: post; aspect-ratio: 1100 / 580; position: relative; overflow: hidden; display: flex; flex-direction: column; background: radial-gradient(70% 45% at 90% 0%, rgb(255 30 45 / 14%), transparent 70%), linear-gradient(160deg, #0d1219, #05080b 60%); box-shadow: inset 0 0 0 1px var(--line2); color: var(--text); }
+/* cqw am Bild selbst zählt gegen den äußeren Container, bei den Kindern gegen das Bild. Deshalb liegen alle Abstände auf den Kindern. */
+.post > * { margin: 0 5cqw; } .post > :first-child { margin-top: 2.6cqw; } .post > :last-child { margin-bottom: 2cqw; } .post > * + * { margin-top: .8cqw; }
+.post::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 1cqw; background: var(--red); }
+.post .ph { display: flex; align-items: center; gap: 1.4cqw; }
+.post .ph img { width: max(14px, 3.8cqw); height: max(14px, 3.8cqw); }
+.post .ph b { font: 800 max(13px, 2.2cqw)/1 var(--f-display); } .post .ph b i { color: var(--red); font-style: normal; }
+.post .ph small { font: 600 max(12px, 1.6cqw)/1 var(--f-label); letter-spacing: .14em; text-transform: uppercase; color: var(--dim); margin-left: .6cqw; }
+.post .stamp { margin-left: auto; transform: rotate(-6deg); padding: max(3px, .7cqw) max(6px, 1.4cqw) max(2px, .5cqw); font: 700 max(12px, 1.9cqw)/1 var(--f-accent); letter-spacing: .16em; text-transform: uppercase; color: var(--c); box-shadow: inset 0 0 0 max(2px, .3cqw) var(--c); background: color-mix(in srgb, var(--c) 8%, transparent); }
+.post .pv { font: 700 max(22px, 6.4cqw)/1 var(--f-accent); color: var(--red); letter-spacing: .04em; margin-top: 1.2cqw; }
+.post .pt { font: 800 max(13px, 2.5cqw)/1.15 var(--f-display); margin-top: .5cqw; }
+.post .ps { font: 400 max(12px, 1.7cqw)/1.3 var(--f-display); color: var(--dim); margin-top: .4cqw; }
+.post .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 1cqw; margin-top: auto; }
+.post .tile { padding: max(4px, .7cqw) max(6px, 1.4cqw); background: color-mix(in srgb, var(--c) 9%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 42%, transparent); clip-path: polygon(1.2cqw 0, 100% 0, 100% calc(100% - 1.2cqw), calc(100% - 1.2cqw) 100%, 0 100%, 0 1.2cqw); }
+.post .tile.full { grid-column: 1 / -1; }
+.post .tile h5 { margin: 0 0 .5cqw; display: flex; justify-content: space-between; align-items: baseline; gap: 6px; font: 600 max(12px, 1.6cqw)/1 var(--f-label); letter-spacing: .16em; text-transform: uppercase; color: var(--c); }
+.post .tile h5 b { font: 800 max(13px, 2.2cqw)/1 var(--f-display); color: var(--text); letter-spacing: 0; }
+.post .tile ul { margin: 0; padding: 0; list-style: none; font: 400 max(12px, 1.6cqw)/1.25 var(--f-display); color: var(--text); }
+.post .tile li { display: flex; gap: 1cqw; align-items: baseline; }
+.post .tile li::before { content: ""; width: .8cqw; height: .8cqw; flex-shrink: 0; background: var(--a); clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); transform: translateY(-.15cqw); }
+.post .pf { display: flex; justify-content: space-between; font: 600 max(12px, 1.4cqw)/1 var(--f-label); letter-spacing: .12em; text-transform: uppercase; color: var(--faint); margin-top: .6cqw; }
+/* Unter 700 px Breite ohne Einzelzeilen, so zeigt Discord die kleine Vorschau. */
+@container post (max-width: 700px) {
+  .post .tile ul, .post .pf, .post .ps { display: none; }
+  .post .tile h5 { margin: 0; }
+  .post .tiles { margin-bottom: 2cqw; }
+}
+/* Unter 260 px nur Streifen, Logo, Nummer und Stempel. */
+@container post (max-width: 260px) {
+  .post > .ph { margin-top: auto; } .post > .pv { margin-bottom: auto; }
+  .post > * + * { margin-top: max(4px, 1.6cqw); }
+  .post .tiles, .post .pt, .post .ph small { display: none; }
+}
+/* Kleine Vorschau in Listen: Nummer und Stempel untereinander. */
+.post.thumb { justify-content: center; align-items: flex-start; }
+.post.thumb > * { margin: 0 7cqw; } .post.thumb > * + * { margin-top: max(3px, 1.5cqw); }
+.post.thumb .pv { font-size: max(14px, 15cqw); margin-top: 0; }
+.post.thumb .stamp { transform: none; font-size: max(12px, 3.4cqw); letter-spacing: .12em; padding: max(2px, .6cqw) max(5px, 1.4cqw) max(1px, .4cqw); box-shadow: inset 0 0 0 max(1.5px, .5cqw) var(--c); }
+@container post (max-width: 170px) { .post.thumb .stamp { display: none; } }
+
+/* ---------- Seitenkopf der Übersicht ---------- */
+.phead { display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; flex-wrap: wrap; margin-bottom: 28px; }
+.phead h1 { font-size: 42px; line-height: 1.08; font-weight: 800; margin: 14px 0 10px; letter-spacing: -.02em; } .phead h1 em { color: var(--red); font-style: normal; }
+.phead p { color: var(--dim); margin: 0; max-width: 60ch; font-size: 16px; }
+.new { display: inline-flex; align-items: center; padding: 5px 10px 4px; font: 600 12px/1 var(--f-label); letter-spacing: .16em; text-transform: uppercase; color: var(--red); background: rgb(255 30 45 / 12%); box-shadow: inset 0 0 0 1px rgb(255 30 45 / 45%); }
+.counts { font: 600 13px var(--f-label); letter-spacing: .04em; color: var(--faint); }
+.counts b { font-weight: 600; } .counts .n { color: var(--win); } .counts .v { color: var(--purple-t); } .counts .b { color: var(--blue); }
+.share { display: flex; gap: 2px; height: 4px; width: 100%; max-width: 220px; }
+.share i { background: var(--c); }
+
+/* ---------- C5: Verlauf ---------- */
+.latest { display: grid; grid-template-columns: 1.15fr 1fr; align-items: center; margin-bottom: 44px; }
+.latest .post { box-shadow: none; aspect-ratio: auto; height: 100%; }
+.latest .post > .ph { margin-top: auto; } .latest .post > .tiles { margin-top: 1.4cqw; margin-bottom: auto; }
+.latest .lbody { padding: 30px 34px 28px; display: flex; flex-direction: column; gap: 12px; border-left: 1px solid var(--line); }
+.latest .lv { font: 700 44px/1 var(--f-accent); color: var(--red); letter-spacing: .04em; }
+.latest h2 { margin: 0; font-size: 28px; line-height: 1.15; font-weight: 800; }
+.sum { margin: 0; color: var(--dim); font-size: 15px; }
+.peek { margin: 4px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; font-size: 15px; color: var(--text); }
+.peek li { display: flex; gap: 10px; align-items: baseline; }
+.peek li::before { content: ""; width: 8px; height: 8px; flex-shrink: 0; background: var(--win); clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); transform: translateY(-1px); }
+.peek li.v::before { background: var(--purple-t); } .peek li.b::before { background: var(--blue); }
+.latest .more { margin-top: auto; padding-top: 10px; }
+.hist h2 { margin: 0 0 16px; display: flex; align-items: baseline; gap: 14px; font-size: 22px; font-weight: 800; }
+.hist h2 small { color: var(--faint); font: 600 13px var(--f-label); letter-spacing: .14em; text-transform: uppercase; }
+.month { display: flex; align-items: center; gap: 14px; margin: 26px 0 12px; font: 700 12px var(--f-accent); letter-spacing: .12em; text-transform: uppercase; color: var(--red); }
+.month::after { content: ""; flex: 1; height: 1px; background: var(--line2); }
+.month span { color: var(--faint); font: 600 12px var(--f-label); letter-spacing: .12em; }
+.vrow { display: grid; grid-template-columns: 190px 1fr 220px; gap: 24px; align-items: center; padding: 14px 24px 14px 14px; margin-bottom: 10px; transition: transform .2s, box-shadow .2s; }
+.vrow:hover { transform: translateY(-2px); box-shadow: inset 0 0 0 1px rgb(255 30 45 / 45%); }
+.vrow .vinfo { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.vrow .vn { font: 700 20px/1 var(--f-accent); color: var(--red); letter-spacing: .06em; display: flex; align-items: baseline; gap: 14px; }
+.vrow .vn span { font: 600 13px var(--f-label); letter-spacing: .08em; color: var(--faint); }
+.vrow b { font-size: 17px; line-height: 1.3; font-weight: 800; }
+.vrow .vright { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.vrow .go { color: var(--faint); justify-self: end; }
+
+/* ---------- C6: Galerie ---------- */
+.gal { display: grid; grid-template-columns: 236px 1fr; gap: 36px; align-items: start; }
+.rail { position: sticky; top: 20px; display: flex; flex-direction: column; gap: 18px; }
+.rail .big { font: 700 44px/1 var(--f-accent); color: var(--text); letter-spacing: .02em; }
+.rail .big small { display: block; margin-top: 6px; font: 600 12px var(--f-label); letter-spacing: .16em; color: var(--faint); text-transform: uppercase; }
+.rail ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.rail li { display: flex; justify-content: space-between; gap: 10px; padding: 10px 2px; border-bottom: 1px solid var(--line); font-size: 14px; color: var(--dim); }
+.rail li.on { color: var(--text); border-left: 2px solid var(--red); padding-left: 10px; }
+.rail li span { color: var(--faint); font: 600 13px var(--f-label); letter-spacing: .06em; }
+.ggrid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.gcard { display: flex; flex-direction: column; transition: transform .2s, box-shadow .2s; }
+.gcard:hover { transform: translateY(-2px); box-shadow: inset 0 0 0 1px rgb(255 30 45 / 45%); }
+.gcard .post { box-shadow: none; }
+.gcard .gb { padding: 18px 20px 20px; display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--line); }
+.gcard .gv { display: flex; align-items: center; gap: 12px; font: 700 18px/1 var(--f-accent); color: var(--red); letter-spacing: .06em; }
+.gcard .gv span { font: 600 13px var(--f-label); letter-spacing: .08em; color: var(--faint); }
+.gcard .gv .new { margin-left: auto; }
+.gcard h3 { margin: 0; font-size: 17px; line-height: 1.3; font-weight: 800; }
+.gcard .gfoot { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 4px; }
+.gcard .gfoot .i { color: var(--faint); }
+.dbox { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; align-items: center; padding: 18px 20px; background: linear-gradient(100deg, rgb(0 175 255 / 12%), rgb(0 175 255 / 2%) 60%), var(--panel); box-shadow: inset 0 0 0 1px rgb(0 175 255 / 35%); }
+.dbox .lg { grid-row: span 2; width: 44px; height: 44px; display: grid; place-items: center; color: var(--blue); background: rgb(0 175 255 / 12%); clip-path: polygon(9px 0, 100% 0, 100% calc(100% - 9px), calc(100% - 9px) 100%, 0 100%, 0 9px); }
+.dbox .lg .i { width: 22px; height: 22px; }
+.dbox h3 { margin: 0; font-size: 16px; font-weight: 800; } .dbox p { margin: 0; color: var(--dim); font-size: 14px; }
+.dbox .btns { grid-column: 2; display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.dbox.wide { grid-template-columns: auto 1fr auto; }
+.dbox.wide .btns { grid-column: auto; margin: 0; }
+.dbox.wide .lg { grid-row: span 1; width: 54px; height: 54px; }
+
+/* ---------- Seite einer Version: gemeinsam ---------- */
+.back { display: inline-flex; align-items: center; gap: 8px; font: 600 12px var(--f-label); letter-spacing: .16em; text-transform: uppercase; color: var(--dim); margin-bottom: 26px; }
+.vline { display: flex; align-items: baseline; gap: 18px; flex-wrap: wrap; }
+.vnum { font: 700 56px/1 var(--f-accent); color: var(--red); letter-spacing: .04em; }
+.vdate { font: 600 14px var(--f-label); letter-spacing: .08em; color: var(--faint); }
+.vhead h1 { font-size: 36px; line-height: 1.12; font-weight: 800; margin: 14px 0 12px; letter-spacing: -.01em; }
+.vhead .sum { font-size: 16px; max-width: 64ch; }
+.area { display: inline-flex; align-items: center; gap: 7px; font: 600 12.5px var(--f-label); letter-spacing: .1em; text-transform: uppercase; color: var(--faint); white-space: nowrap; }
+.area::before { content: ""; width: 7px; height: 7px; background: var(--a); clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
+.vnav { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 40px; }
+.vnav > * { display: grid; grid-template-columns: 96px 1fr; gap: 14px; align-items: center; padding: 12px 16px 12px 12px; }
+.vnav .post { box-shadow: inset 0 0 0 1px var(--line2); }
+.vnav small { display: block; color: var(--faint); font: 600 12px var(--f-label); letter-spacing: .14em; text-transform: uppercase; margin-bottom: 4px; }
+.vnav b { display: block; font-size: 15px; line-height: 1.3; } .vnav b i { font: 700 14px var(--f-accent); color: var(--red); font-style: normal; letter-spacing: .06em; margin-right: 8px; }
+.vnav .off { grid-template-columns: 1fr; box-shadow: inset 0 0 0 1px var(--line); background: transparent; text-align: right; }
+.vnav .off b { color: var(--dim); font-weight: 600; }
+.vnav .off span { display: block; color: var(--faint); font-size: 13px; margin-top: 2px; }
+
+/* ---------- C7: Lesen (zu C5) ---------- */
+.read { max-width: 900px; }
+.read figure { margin: 30px 0 8px; }
+.read figcaption { margin-top: 10px; color: var(--faint); font-size: 13px; display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.read figcaption a { color: var(--dim); display: inline-flex; align-items: center; gap: 6px; font: 600 12px var(--f-label); letter-spacing: .14em; text-transform: uppercase; }
+.grp { margin-top: 40px; }
+.grp h2 { display: flex; align-items: baseline; gap: 14px; margin: 0 0 14px; font: 800 24px var(--f-display); color: var(--c); }
+.grp h2 small { font: 600 13px var(--f-label); letter-spacing: .12em; text-transform: uppercase; color: var(--faint); }
+.grp h2::after { content: ""; flex: 1; height: 1px; background: color-mix(in srgb, var(--c) 32%, transparent); }
+.list { list-style: none; margin: 0; padding: 0; }
+.list li { display: grid; grid-template-columns: 14px 1fr auto; gap: 14px; padding: 13px 0; border-bottom: 1px solid var(--line); align-items: baseline; }
+.list li::before { content: ""; width: 9px; height: 9px; background: var(--c); clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); transform: translateY(-1px); }
+.list p { margin: 0; font-size: 16px; line-height: 1.55; }
+.list .area { padding-top: 2px; }
+
+/* ---------- C8: Nach Bereich (zu C6) ---------- */
+.two { display: grid; grid-template-columns: 300px 1fr; gap: 40px; align-items: start; }
+.side { position: sticky; top: 20px; display: flex; flex-direction: column; gap: 14px; }
+.side .back { margin-bottom: 4px; }
+.side .sv { font: 700 44px/1 var(--f-accent); color: var(--red); letter-spacing: .04em; margin-top: 6px; }
+.side .sdate { color: var(--faint); font: 600 13px var(--f-label); letter-spacing: .06em; line-height: 1.5; }
+.side .sbtns { display: flex; gap: 8px; flex-wrap: wrap; }
+.pn { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 4px; }
+.pn a, .pn span { display: flex; align-items: center; gap: 8px; padding: 10px 12px; font: 600 12px var(--f-label); letter-spacing: .12em; text-transform: uppercase; color: var(--text); box-shadow: inset 0 0 0 1px var(--line2); background: rgb(255 255 255 / 4%); }
+.pn a i { font: 700 13px var(--f-accent); color: var(--red); font-style: normal; letter-spacing: .06em; }
+.pn span { justify-content: flex-end; color: var(--faint); box-shadow: inset 0 0 0 1px var(--line); background: transparent; }
+.main h1 { font-size: 32px; line-height: 1.15; font-weight: 800; margin: 0 0 10px; }
+.agrp { margin-top: 34px; }
+.agrp h2 { display: flex; align-items: center; gap: 12px; margin: 0 0 6px; font: 800 20px var(--f-display); }
+.agrp h2::before { content: ""; width: 10px; height: 10px; background: var(--a); clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
+.agrp .what { margin: 0 0 10px 22px; color: var(--faint); font-size: 14px; }
+.rows { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line2); }
+.rows li { display: grid; grid-template-columns: 118px 1fr; gap: 16px; padding: 12px 0 12px 22px; border-bottom: 1px solid var(--line); align-items: baseline; }
+.kind { display: inline-flex; align-items: center; gap: 7px; font: 600 12.5px var(--f-label); letter-spacing: .12em; text-transform: uppercase; color: var(--c); white-space: nowrap; }
+.kind::before { content: ""; width: 8px; height: 8px; background: var(--c); clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
+.rows p { margin: 0; font-size: 16px; line-height: 1.55; }
+
+/* ---------- Handy: dieselben Bausteine im schmalen Container ---------- */
+@container screen (max-width: 700px) {
+  .bar { height: 64px; padding: 0 16px; gap: 12px; } .bar nav, .bar .acts { display: none; } .bar .menu { display: grid; }
+  .brand img { width: 34px; height: 34px; } .brand strong { font-size: 14px; } .brand small { font-size: 12px; letter-spacing: .08em; }
+  .wrap { padding: 24px 16px 40px; }
+  .phead h1 { font-size: 30px; } .phead p { font-size: 15px; }
+  .latest { grid-template-columns: 1fr; margin-bottom: 30px; }
+  .latest .post { aspect-ratio: 1100 / 580; height: auto; }
+  .latest .lbody { padding: 18px 18px 20px; border-left: 0; border-top: 1px solid var(--line); }
+  .latest .lv { font-size: 34px; } .latest h2 { font-size: 21px; }
+  .vrow { grid-template-columns: 92px 1fr; gap: 12px 14px; padding: 12px 14px 12px 12px; }
+  .vrow .vright { grid-column: 1 / -1; flex-direction: row; align-items: center; gap: 12px; } .vrow .share { max-width: 120px; } .vrow .go { display: none; }
+  .vrow .vn { font-size: 17px; } .vrow b { font-size: 15px; }
+  .gal { grid-template-columns: 1fr; gap: 20px; }
+  .rail { position: static; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 10px 18px; }
+  .rail .big { font-size: 28px; } .rail .big small { display: inline; margin-left: 8px; }
+  .rail ul { flex-direction: row; gap: 8px; flex-wrap: wrap; } .rail li { padding: 7px 10px; border: 0; box-shadow: inset 0 0 0 1px var(--line); font-size: 13px; } .rail li.on { border: 0; box-shadow: inset 0 0 0 1px rgb(255 30 45 / 55%); }
+  .rail .dbox { display: none; }
+  .ggrid { grid-template-columns: 1fr; gap: 14px; }
+  .vnum { font-size: 40px; } .vhead h1 { font-size: 25px; } .vhead .sum { font-size: 15px; }
+  .read figure { margin-top: 20px; }
+  .grp { margin-top: 30px; } .grp h2 { font-size: 20px; }
+  .list li { grid-template-columns: 14px 1fr; } .list .area { grid-column: 2; padding: 0; }
+  .list p { font-size: 15px; }
+  .vnav { grid-template-columns: 1fr; gap: 10px; margin-top: 28px; }
+  .dbox.wide { grid-template-columns: auto 1fr; } .dbox.wide .btns { grid-column: 2; margin-top: 8px; }
+  .two { grid-template-columns: 1fr; gap: 22px; }
+  .side { position: static; display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; align-items: center; }
+  .side .back, .side .post, .side .sbtns, .side .pn, .side .dbox { grid-column: 1 / -1; }
+  .side .sv { font-size: 34px; margin: 0; } .side .dbox { display: none; }
+  .main h1 { font-size: 24px; }
+  .agrp { margin-top: 26px; } .agrp h2 { font-size: 18px; }
+  .rows li { grid-template-columns: 1fr; gap: 4px; padding-left: 22px; } .rows p { font-size: 15px; }
+  .foot { padding: 28px 16px 20px; } .foot .cols { grid-template-columns: 1fr 1fr; gap: 24px; } .foot .fb { grid-column: 1 / -1; } .foot .bottom { flex-direction: column; }
+}
+
+/* ---------- Handyrahmen ---------- */
+.phones { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 390px)); gap: 28px; justify-content: start; align-items: start; }
+.phone { max-width: 100%; border: 8px solid #1a1f26; border-radius: 34px; overflow: hidden; background: var(--base); box-shadow: 0 0 0 1px #2b323b, 0 24px 50px rgb(0 0 0 / 50%); }
+.phone .status { display: flex; justify-content: space-between; padding: 10px 24px 2px; font: 600 12px var(--f-label); color: var(--dim); letter-spacing: .08em; }
+.phone .screen { border: 0; }
+.phone-label { font: 600 12px var(--f-label); letter-spacing: .16em; text-transform: uppercase; color: var(--faint); margin: 0 0 8px 8px; }
+.assume { margin-top: 48px; }
+.assume h2 { font-size: 22px; font-weight: 800; margin: 0 0 10px; }
+.assume ol, .assume ul { color: var(--dim); font-size: 14px; padding-left: 22px; max-width: 920px; } .assume li { margin-bottom: 8px; } .assume b { color: var(--text); }
+@media (max-width: 760px) { body { padding: 20px 12px 60px; } }
+</style>
+</head>
+<body>
+<svg class="sym" xmlns="http://www.w3.org/2000/svg">
+  <symbol id="i-right" viewBox="0 0 24 24"><path d="M4 12h15M13 6l6 6-6 6"/></symbol>
+  <symbol id="i-left" viewBox="0 0 24 24"><path d="M20 12H5M11 6l-6 6 6 6"/></symbol>
+  <symbol id="i-ext" viewBox="0 0 24 24"><path d="M7 17 17 7M8.5 7H17v8.5"/></symbol>
+  <symbol id="i-chev-l" viewBox="0 0 24 24"><path d="m15 6-6 6 6 6"/></symbol>
+  <symbol id="i-chev-r" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 24 24"><path d="M3.5 7h17M3.5 12h17M3.5 17h17"/></symbol>
+  <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1.5 1.5"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1.5-1.5"/></symbol>
+  <symbol id="i-dash" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="7" height="7"/><rect x="13.5" y="3.5" width="7" height="7"/><rect x="3.5" y="13.5" width="7" height="7"/><rect x="13.5" y="13.5" width="7" height="7"/></symbol>
+  <symbol id="i-discord" viewBox="0 0 24 24"><path d="M20.3 4.9A19.8 19.8 0 0 0 15.4 3.4a13.9 13.9 0 0 0-.6 1.3 18.3 18.3 0 0 0-5.5 0 13.6 13.6 0 0 0-.7-1.3A19.7 19.7 0 0 0 3.7 4.9C.6 9.5-.3 14 .2 18.4a19.9 19.9 0 0 0 6 3 14.6 14.6 0 0 0 1.3-2.1 12.9 12.9 0 0 1-2-1c.2-.1.3-.2.5-.4a14.2 14.2 0 0 0 12.1 0l.5.4a12.9 12.9 0 0 1-2 1 14.4 14.4 0 0 0 1.3 2.1 19.8 19.8 0 0 0 6-3c.6-5.1-1-9.6-3.6-13.5zM8 15.7c-1.2 0-2.1-1.1-2.1-2.4S6.8 10.9 8 10.9s2.2 1.1 2.2 2.4-1 2.4-2.2 2.4zm8 0c-1.2 0-2.1-1.1-2.1-2.4s.9-2.4 2.1-2.4 2.2 1.1 2.2 2.4-1 2.4-2.2 2.4z"/></symbol>
+</svg>
+
+<div class="doc">
+  <h1><small>W-0062</small>Changelog, Runde 2: eigener Menüpunkt, Übersicht und Seite einer Version</h1>
+  <p class="lead">Der Changelog bekommt einen eigenen Punkt in der Navigation. Dahinter liegt eine Übersicht aller in Discord geposteten Versionen und je Version eine Seite mit allen Änderungen. Das Bild aus dem Discord-Post (D2) trägt jetzt beide Seiten: Es ist der Blickfang, nicht ein Stapel aus Stempel, Zählern und Chips. Zwei Übersichten (C5, C6), dazu je eine passende Versionsseite (C7, C8), danach alle vier auf dem Handy.</p>
+
+  <div class="changes"><h3>Geändert gegenüber Runde 1</h3><ol>
+    <li><b>Changelog im Menü</b>: Home · Module · News · Changelog · Partner/Sponsorings · Team · Kontakt. Direkt hinter News, weil beides „was passiert“ ist. Ein kleiner roter Punkt am Tab, wenn seit dem letzten Besuch eine Version dazukam (dieselbe Marke wie „Neu“ in den News).</li>
+    <li><b>Eine Übersicht aller Versionen</b> unter <code>/changelog</code>, nicht mehr nur die neueste mit Liste daneben.</li>
+    <li><b>Das Bild aus dem Post</b> ist der Blickfang: groß auf der Seite einer Version, als Vorschau in der Übersicht. Stempel, Logo und Zähler stecken schon darin, deshalb fallen sie aus dem Seitenkopf.</li>
+    <li><b>Kopf entschlackt</b>: Nummer, Datum, Titel, ein Satz. Statt drei Zähler-Kacheln, Legende und zwei Knöpfen nur noch der Satz „12 Änderungen: 5 neue Funktionen, 4 Verbesserungen, 3 behobene Fehler“. Die Knöpfe sitzen unter dem Bild beziehungsweise in der Seitenleiste.</li>
+    <li><b>Änderungen ohne Kästen</b>: eine Liste mit Linien statt eine Reihe gleich aussehender Kacheln. Der Bereich steht als stilles Wort rechts, nicht als Chip.</li>
+    <li><b>Aufgabennummern (W-0075) fallen weg.</b> Sie sagen Besuchern nichts und bleiben im Admin Dashboard.</li>
+    <li><b>Weniger Großbuchstaben</b>: nur noch für kurze Labels (Datum, Bereich, Knöpfe). Gruppenüberschriften sind normale Wörter in Oxanium.</li>
+    <li>In C8 sind die Änderungen <b>nach Bereich</b> gruppiert statt nach Art, mit einem Satz dazu, wen der Bereich betrifft. Das ersetzt die Legende und beantwortet „betrifft mich das?“.</li>
+  </ol></div>
+
+  <!-- ===================================================== C5 -->
+  <div class="variant"><b>C5</b><h2>Übersicht: Verlauf</h2><span>/changelog · neueste Version groß, darunter der Verlauf nach Monat</span></div>
+  <div class="changes"><h3>Was du siehst</h3><ol>
+    <li><b>Kopfzeile</b> mit dem neuen Menüpunkt Changelog, aktiv markiert, mit rotem Punkt für „seit deinem letzten Besuch neu“.</li>
+    <li><b>Seitenkopf</b> mit einem Satz, wie viele Versionen es gibt und von wann die neueste ist, rechts der Weg zum Discord-Kanal.</li>
+    <li><b>Die neueste Version</b> als breite Karte: links das Bild aus dem Post, rechts Nummer, Titel, der Satz mit den Zahlen und die ersten drei Änderungen. Die ganze Karte führt zur Seite der Version.</li>
+    <li><b>Verlauf</b> nach Monat: je Version eine Zeile mit kleiner Bildvorschau, Nummer, Datum, Titel und rechts einem Balken, der zeigt, wie sich die Änderungen auf Neu, Verbessert und Behoben verteilen, mit den Zahlen als Text darunter.</li>
+    <li>Unten der Kasten <b>„Zuerst auf Discord“</b>.</li>
+  </ol></div>
+  <div class="screen">
+    <div class="bar">
+      <div class="brand"><img src="logo-n.webp" alt=""><div><strong>RL <i>NEXUS</i></strong><small>Esports Management Bot</small></div></div>
+      <nav><a>Home</a><a>Module</a><a>News</a><a class="on fresh">Changelog</a><a>Partner/Sponsorings</a><a>Team</a><a>Kontakt</a></nav>
+      <div class="acts"><span class="ico"><svg class="i fill"><use href="#i-discord"/></svg></span><span class="btn">Dashboard<svg class="i s"><use href="#i-ext"/></svg></span></div>
+      <span class="menu"><svg class="i"><use href="#i-menu"/></svg></span>
+    </div>
+    <div class="wrap">
+      <div class="phead">
+        <div><div class="eyebrow">Changelog</div><h1>Was sich am <em>Bot</em> ändert.</h1><p>Jede Version, die wir in Discord gepostet haben, mit allen Änderungen. Sieben Versionen seit September 2026, die neueste vom 5. November.</p></div>
+        <span class="btn ghost"><svg class="i fill"><use href="#i-discord"/></svg>#changelog auf Discord</span>
+      </div>
+
+      <a class="latest panel cut" href="/changelog/2.4.0">
+        <div class="post" style="--c: var(--win)">
+          <div class="ph"><img src="logo-n.webp" alt=""><b>RL <i>Nexus</i></b><small>Changelog</small><span class="stamp">Neu</span></div>
+          <div class="pv">2.4.0</div>
+          <div class="pt">Bewerbungen per DM, Protokoll der Freigaben und eigene Rang-Karten</div>
+          <div class="ps">12 Änderungen · Bot, Bot-Dashboard, Admin · 05.11.2026</div>
+          <div class="tiles">
+            <div class="tile full" style="--c: var(--win)"><h5>Neu <b>5</b></h5><ul><li style="--a: var(--red)">Bewerbungen laufen per DM: mit Zurück, Überspringen und Zusammenfassung</li><li style="--a: var(--red)">Rang-Karte mit eigenem Hintergrund aus Upload oder Galerie</li><li style="--a: var(--orange)">Eigener Punkt „Protokoll“ für Staff-Freigaben und Team-Änderungen</li><li style="--a: var(--purple)">DM über den Bot an alle oder an eine Person, mit Vorlagen</li><li style="--a: var(--purple)">Die Datenbank wird jede Nacht gesichert</li></ul></div>
+            <div class="tile" style="--c: var(--purple-t)"><h5>Verbessert <b>4</b></h5><ul><li style="--a: var(--red)">Transcript bleibt beim Löschen eines Bewerbungskanals</li><li style="--a: var(--orange)">Einladung passt zu „OAuth2 Code Grant“</li><li style="--a: var(--purple)">Nutzerdaten laden deutlich schneller</li><li style="--a: var(--purple)">Eine Suche für Server, Nutzer, Fälle, Einstellungen</li></ul></div>
+            <div class="tile" style="--c: var(--blue)"><h5>Behoben <b>3</b></h5><ul><li style="--a: var(--red)">Team-Hub: großes Bild bleibt nach Wahl im Menü</li><li style="--a: var(--red)">DM-Bewerbung bei geschlossenen DMs zeigt den Hinweis</li><li style="--a: var(--orange)">Kein „Unable to preload CSS“ nach einem Deploy</li></ul></div>
+          </div>
+          <div class="pf"><span>RL Nexus · Changelog</span><span>von MecryTv</span></div>
+        </div>
+        <div class="lbody">
+          <div class="meta"><span class="new">Neueste Version</span><span>5. November 2026</span></div>
+          <div class="lv">2.4.0</div>
+          <h2>Bewerbungen per DM, Protokoll der Freigaben und eigene Rang-Karten</h2>
+          <p class="sum">12 Änderungen: 5 neue Funktionen, 4 Verbesserungen und 3 behobene Fehler für Bot, Bot-Dashboard und Admin.</p>
+          <ul class="peek"><li>Bewerbungen laufen per DM, mit Zurück, Überspringen und einer Zusammenfassung vor dem Abschicken.</li><li>Rang-Karte mit eigenem Hintergrund: ein Bild hochladen oder eins aus der Galerie des Servers nehmen.</li><li class="v">Nutzerdaten laden deutlich schneller, auch bei großen Servern.</li></ul>
+          <span class="more">Alle 12 Änderungen <svg class="i s"><use href="#i-right"/></svg></span>
+        </div>
+      </a>
+
+      <div class="hist">
+        <h2>Frühere Versionen <small>6 seit September</small></h2>
+        <div class="month">Oktober 2026 <span>3 Versionen</span></div>
+        <a class="vrow panel cut" href="/changelog/2.3.0"><div class="post thumb" style="--c: var(--win)"><span class="pv">2.3.0</span><span class="stamp">Neu</span></div><div class="vinfo"><span class="vn">2.3.0 <span>24. Oktober</span></span><b>Level-System und Rangrollen</b></div><div class="vright"><div class="share"><i style="--c: var(--win); flex: 4"></i><i style="--c: var(--purple-t); flex: 3"></i><i style="--c: var(--blue); flex: 2"></i></div><span class="counts"><b class="n">4 neu</b> · <b class="v">3 verbessert</b> · <b class="b">2 behoben</b></span></div></a>
+        <a class="vrow panel cut" href="/changelog/2.2.1"><div class="post thumb" style="--c: var(--blue)"><span class="pv">2.2.1</span><span class="stamp">Behoben</span></div><div class="vinfo"><span class="vn">2.2.1 <span>17. Oktober</span></span><b>Matchups: Fehler nach dem Absagen</b></div><div class="vright"><div class="share"><i style="--c: var(--purple-t); flex: 1"></i><i style="--c: var(--blue); flex: 3"></i></div><span class="counts"><b class="v">1 verbessert</b> · <b class="b">3 behoben</b></span></div></a>
+        <a class="vrow panel cut" href="/changelog/2.2.0"><div class="post thumb" style="--c: var(--win)"><span class="pv">2.2.0</span><span class="stamp">Neu</span></div><div class="vinfo"><span class="vn">2.2.0 <span>10. Oktober</span></span><b>Matchups und Probetrainings</b></div><div class="vright"><div class="share"><i style="--c: var(--win); flex: 6"></i><i style="--c: var(--purple-t); flex: 2"></i><i style="--c: var(--blue); flex: 3"></i></div><span class="counts"><b class="n">6 neu</b> · <b class="v">2 verbessert</b> · <b class="b">3 behoben</b></span></div></a>
+        <div class="month">September 2026 <span>3 Versionen</span></div>
+        <a class="vrow panel cut" href="/changelog/2.1.0"><div class="post thumb" style="--c: var(--purple-t)"><span class="pv">2.1.0</span><span class="stamp">Verbessert</span></div><div class="vinfo"><span class="vn">2.1.0 <span>26. September</span></span><b>Rollen-Listen und TempVoice</b></div><div class="vright"><div class="share"><i style="--c: var(--win); flex: 3"></i><i style="--c: var(--purple-t); flex: 4"></i><i style="--c: var(--blue); flex: 1"></i></div><span class="counts"><b class="n">3 neu</b> · <b class="v">4 verbessert</b> · <b class="b">1 behoben</b></span></div></a>
+        <a class="vrow panel cut" href="/changelog/2.0.1"><div class="post thumb" style="--c: var(--blue)"><span class="pv">2.0.1</span><span class="stamp">Behoben</span></div><div class="vinfo"><span class="vn">2.0.1 <span>12. September</span></span><b>Erste Korrekturen nach 2.0</b></div><div class="vright"><div class="share"><i style="--c: var(--purple-t); flex: 2"></i><i style="--c: var(--blue); flex: 4"></i></div><span class="counts"><b class="v">2 verbessert</b> · <b class="b">4 behoben</b></span></div></a>
+        <a class="vrow panel cut" href="/changelog/2.0.0"><div class="post thumb" style="--c: var(--win)"><span class="pv">2.0.0</span><span class="stamp">Neu</span></div><div class="vinfo"><span class="vn">2.0.0 <span>5. September</span></span><b>Neues Bot-Dashboard und Team-Hub</b></div><div class="vright"><div class="share"><i style="--c: var(--win); flex: 8"></i><i style="--c: var(--purple-t); flex: 3"></i></div><span class="counts"><b class="n">8 neu</b> · <b class="v">3 verbessert</b></span></div></a>
+      </div>
+
+      <div class="dbox wide cut" style="margin-top: 36px">
+        <div class="lg"><svg class="i fill"><use href="#i-discord"/></svg></div>
+        <div><h3>Zuerst auf Discord</h3><p>Jede Version kommt als Bild in #changelog auf dem RL-Nexus-Server, mit Link hierher. Wer dort ist, verpasst nichts.</p></div>
+        <div class="btns"><span class="btn">Discord beitreten</span></div>
+      </div>
+    </div>
+    <div class="foot">
+      <div class="cols">
+        <div class="fb"><img src="logo-n.webp" alt=""><p>Der Discord-Bot für Rocket-League-Organisationen: Ränge, Teams, Bewerbungen, Tickets und mehr in einem Bot.</p><div class="socials"><span><svg class="i"><use href="#i-dash"/></svg></span><span><svg class="i fill"><use href="#i-discord"/></svg></span></div></div>
+        <div><h4>Seite</h4><ul><li>Home</li><li>Module</li><li>News</li><li class="on">Changelog</li><li>Partner/Sponsorings</li><li>Team</li><li>Kontakt</li></ul></div>
+        <div><h4>Module</h4><ul><li>Ränge</li><li>Teams</li><li>Bewerbungen</li><li>Tickets</li><li>Level</li><li>Alle 23 Module</li></ul></div>
+        <div><h4>Rechtliches</h4><ul><li>Impressum</li><li>Datenschutz</li><li>AGB</li><li>Widerruf</li></ul></div>
+      </div>
+      <div class="bottom"><span>© 2026 RL Nexus. Kein Produkt von Psyonix oder Epic Games.</span><span>Gebaut für Rocket-League-Organisationen · Wer dahintersteckt</span></div>
+    </div>
+  </div>
+
+  <!-- ===================================================== C6 -->
+  <div class="variant"><b>C6</b><h2>Übersicht: Galerie</h2><span>/changelog · alle Versionen gleich groß als Bildkarten, links eine Leiste mit Monaten</span></div>
+  <div class="changes"><h3>Was du siehst</h3><ol>
+    <li>Links eine <b>Leiste</b>: Anzahl der Versionen, die Monate zum Springen mit Anzahl, darunter der Discord-Kasten. Sie bleibt beim Scrollen stehen.</li>
+    <li>Rechts ein <b>Raster aus Bildkarten</b>, zwei nebeneinander, neueste zuerst: das Bild aus dem Post ohne die Einzelzeilen (so wie Discord es in der Vorschau zeigt), darunter Nummer, Datum, Titel und die Zahlen je Art.</li>
+    <li>Die neueste Karte trägt die Marke <b>„Neueste“</b>; sonst sind alle Karten gleich. Die Reihenfolge trägt, nicht die Größe.</li>
+    <li>Ganze Karte klickbar, Hover hebt sie um 2 px und färbt den Rand rot, wie die Partner-Karten.</li>
+  </ol></div>
+  <div class="screen">
+    <div class="bar">
+      <div class="brand"><img src="logo-n.webp" alt=""><div><strong>RL <i>NEXUS</i></strong><small>Esports Management Bot</small></div></div>
+      <nav><a>Home</a><a>Module</a><a>News</a><a class="on">Changelog</a><a>Partner/Sponsorings</a><a>Team</a><a>Kontakt</a></nav>
+      <div class="acts"><span class="ico"><svg class="i fill"><use href="#i-discord"/></svg></span><span class="btn">Dashboard<svg class="i s"><use href="#i-ext"/></svg></span></div>
+      <span class="menu"><svg class="i"><use href="#i-menu"/></svg></span>
+    </div>
+    <div class="wrap">
+      <div class="phead">
+        <div><div class="eyebrow">Changelog</div><h1>Jede Version, <em>alle</em> Änderungen.</h1><p>Was wir am Bot, am Bot-Dashboard und am Admin-Werkzeug ändern, so wie es in Discord gepostet wurde.</p></div>
+      </div>
+      <div class="gal">
+        <aside class="rail">
+          <div class="big">7<small>Versionen seit September 2026</small></div>
+          <ul><li class="on">November 2026<span>1</span></li><li>Oktober 2026<span>3</span></li><li>September 2026<span>3</span></li></ul>
+          <div class="dbox cut"><div class="lg"><svg class="i fill"><use href="#i-discord"/></svg></div><h3>Zuerst auf Discord</h3><p>Jede Version kommt als Bild in #changelog, mit Link hierher.</p><div class="btns"><span class="btn sm">Beitreten</span></div></div>
+        </aside>
+        <div class="ggrid">
+          <a class="gcard panel cut" href="/changelog/2.4.0">
+            <div class="post" style="--c: var(--win)"><div class="ph"><img src="logo-n.webp" alt=""><b>RL <i>Nexus</i></b><small>Changelog</small><span class="stamp">Neu</span></div><div class="pv">2.4.0</div><div class="pt">Bewerbungen per DM, Protokoll der Freigaben und eigene Rang-Karten</div><div class="tiles"><div class="tile full" style="--c: var(--win)"><h5>Neu <b>5</b></h5></div><div class="tile" style="--c: var(--purple-t)"><h5>Verbessert <b>4</b></h5></div><div class="tile" style="--c: var(--blue)"><h5>Behoben <b>3</b></h5></div></div></div>
+            <div class="gb"><div class="gv">2.4.0 <span>5. November 2026</span><span class="new">Neueste</span></div><h3>Bewerbungen per DM, Protokoll der Freigaben und eigene Rang-Karten</h3><div class="gfoot"><span class="counts"><b class="n">5 neu</b> · <b class="v">4 verbessert</b> · <b class="b">3 behoben</b></span><svg class="i"><use href="#i-right"/></svg></div></div>
+          </a>
+          <a class="gcard panel cut" href="/changelog/2.3.0">
+            <div class="post" style="--c: var(--win)"><div class="ph"><img src="logo-n.webp" alt=""><b>RL <i>Nexus</i></b><small>Changelog</small><span class="stamp">Neu</span></div><div class="pv">2.3.0</div><div class="pt">Level-System und Rangrollen</div><div class="tiles"><div class="tile full" style="--c: var(--win)"><h5>Neu <b>4</b></h5></div><div class="tile" style="--c: var(--purple-t)"><h5>Verbessert <b>3</b></h5></div><div class="tile" style="--c: var(--blue)"><h5>Behoben <b>2</b></h5></div></div></div>
+            <div class="gb"><div class="gv">2.3.0 <span>24. Oktober 2026</span></div><h3>Level-System und Rangrollen</h3><div class="gfoot"><span class="counts"><b class="n">4 neu</b> · <b class="v">3 verbessert</b> · <b class="b">2 behoben</b></span><svg class="i"><use href="#i-right"/></svg></div></div>
+          </a>
+          <a class="gcard panel cut" href="/changelog/2.2.1">
+            <div class="post" style="--c: var(--blue)"><div class="ph"><img src="logo-n.webp" alt=""><b>RL <i>Nexus</i></b><small>Changelog</small><span class="stamp">Behoben</span></div><div class="pv">2.2.1</div><div class="pt">Matchups: Fehler nach dem Absagen</div><div class="tiles"><div class="tile" style="--c: var(--purple-t)"><h5>Verbessert <b>1</b></h5></div><div class="tile" style="--c: var(--blue)"><h5>Behoben <b>3</b></h5></div></div></div>
+            <div class="gb"><div class="gv">2.2.1 <span>17. Oktober 2026</span></div><h3>Matchups: Fehler nach dem Absagen</h3><div class="gfoot"><span class="counts"><b class="v">1 verbessert</b> · <b class="b">3 behoben</b></span><svg class="i"><use href="#i-right"/></svg></div></div>
+          </a>
+          <a class="gcard panel cut" href="/changelog/2.2.0">
+            <div class="post" style="--c: var(--win)"><div class="ph"><img src="logo-n.webp" alt=""><b>RL <i>Nexus</i></b><small>Changelog</small><span class="stamp">Neu</span></div><div class="pv">2.2.0</div><div class="pt">Matchups und Probetrainings</div><div class="tiles"><div class="tile full" style="--c: var(--win)"><h5>Neu <b>6</b></h5></div><div class="tile" style="--c: var(--purple-t)"><h5>Verbessert <b>2</b></h5></div><div class="tile" style="--c: var(--blue)"><h5>Behoben <b>3</b></h5></div></div></div>
+            <div class="gb"><div class="gv">2.2.0 <span>10. Oktober 2026</span></div><h3>Matchups und Probetrainings</h3><div class="gfoot"><span class="counts"><b class="n">6 neu</b> · <b class="v">2 verbessert</b> · <b class="b">3 behoben</b></span><svg class="i"><use href="#i-right"/></svg></div></div>
+          </a>
+          <a class="gcard panel cut" href="/changelog/2.1.0">
+            <div class="post" style="--c: var(--purple-t)"><div class="ph"><img src="logo-n.webp" alt=""><b>RL <i>Nexus</i></b><small>Changelog</small><span class="stamp">Verbessert</span></div><div class="pv">2.1.0</div><div class="pt">Rollen-Listen und TempVoice</div><div class="tiles"><div class="tile full" style="--c: var(--win)"><h5>Neu <b>3</b></h5></div><div class="tile" style="--c: var(--purple-t)"><h5>Verbessert <b>4</b></h5></div><div class="tile" style="--c: var(--blue)"><h5>Behoben <b>1</b></h5></div></div></div>
+            <div class="gb"><div class="gv">2.1.0 <span>26. September 2026</span></div><h3>Rollen-Listen und TempVoice</h3><div class="gfoot"><span class="counts"><b class="n">3 neu</b> · <b class="v">4 verbessert</b> · <b class="b">1 behoben</b></span><svg class="i"><use href="#i-right"/></svg></div></div>
+          </a>
+          <a class="gcard panel cut" href="/changelog/2.0.1">
+            <div class="post" style="--c: var(--blue)"><div class="ph"><img src="logo-n.webp" alt=""><b>RL <i>Nexus</i></b><small>Changelog</small><span class="stamp">Behoben</span></div><div class="pv">2.0.1</div><div class="pt">Erste Korrekturen nach 2.0</div><div class="tiles"><div class="tile" style="--c: var(--purple-t)"><h5>Verbessert <b>2</b></h5></div><div class="tile" style="--c: var(--blue)"><h5>Behoben <b>4</b></h5></div></div></div>
+            <div class="gb"><div class="gv">2.0.1 <span>12. September 2026</span></div><h3>Erste Korrekturen nach 2.0</h3><div class="gfoot"><span class="counts"><b class="v">2 verbessert</b> · <b class="b">4 behoben</b></span><svg class="i"><use href="#i-right"/></svg></div></div>
+          </a>
+        </div>
+      </div>
+    </div>
+    <div class="foot">
+      <div class="cols">
+        <div class="fb"><img src="logo-n.webp" alt=""><p>Der Discord-Bot für Rocket-League-Organisationen: Ränge, Teams, Bewerbungen, Tickets und mehr in einem Bot.</p><div class="socials"><span><svg class="i"><use href="#i-dash"/></svg></span><span><svg class="i fill"><use href="#i-discord"/></svg></span></div></div>
+        <div><h4>Seite</h4><ul><li>Home</li><li>Module</li><li>News</li><li class="on">Changelog</li><li>Partner/Sponsorings</li><li>Team</li><li>Kontakt</li></ul></div>
+        <div><h4>Module</h4><ul><li>Ränge</li><li>Teams</li><li>Bewerbungen</li><li>Tickets</li><li>Level</li><li>Alle 23 Module</li></ul></div>
+        <div><h4>Rechtliches</h4><ul><li>Impressum</li><li>Datenschutz</li><li>AGB</li><li>Widerruf</li></ul></div>
+      </div>
+      <div class="bottom"><span>© 2026 RL Nexus. Kein Produkt von Psyonix oder Epic Games.</span><span>Gebaut für Rocket-League-Organisationen · Wer dahintersteckt</span></div>
+    </div>
+  </div>
+
+  <!-- ===================================================== C7 -->
+  <div class="variant"><b>C7</b><h2>Seite einer Version: Lesen</h2><span>/changelog/2.4.0 · passt zu C5 · eine Spalte, das Bild oben, die Änderungen nach Art</span></div>
+  <div class="changes"><h3>Was du siehst</h3><ol>
+    <li><b>Kopf in drei Zeilen</b>: Nummer, Datum und „Neueste“ in einer Zeile, darunter der Titel, darunter ein Satz mit den Zahlen und den Bereichen. Kein Stempel, keine Zähler-Kacheln, keine Legende.</li>
+    <li><b>Das Bild aus dem Post</b> in voller Breite der Lesespalte. Darunter klein: woher es kommt, und die Knöpfe „Zum Post“ und „Link kopieren“.</li>
+    <li><b>Drei Gruppen</b> Neu, Verbessert, Behoben: Überschrift als farbiges Wort mit Zahl und Linie, darunter eine Liste mit Trennlinien statt Kästen. Vor jeder Zeile eine kleine Raute in der Gruppenfarbe, rechts der Bereich als stilles Wort.</li>
+    <li>Unten <b>vorherige und nächste Version</b> mit kleiner Bildvorschau. 2.4.0 ist die neueste, deshalb steht rechts ein Hinweis statt eines Links.</li>
+    <li>Zum Schluss der Kasten <b>„Zuerst auf Discord“</b>.</li>
+  </ol></div>
+  <div class="screen">
+    <div class="bar">
+      <div class="brand"><img src="logo-n.webp" alt=""><div><strong>RL <i>NEXUS</i></strong><small>Esports Management Bot</small></div></div>
+      <nav><a>Home</a><a>Module</a><a>News</a><a class="on">Changelog</a><a>Partner/Sponsorings</a><a>Team</a><a>Kontakt</a></nav>
+      <div class="acts"><span class="ico"><svg class="i fill"><use href="#i-discord"/></svg></span><span class="btn">Dashboard<svg class="i s"><use href="#i-ext"/></svg></span></div>
+      <span class="menu"><svg class="i"><use href="#i-menu"/></svg></span>
+    </div>
+    <div class="wrap">
+      <div class="read">
+        <a class="back" href="/changelog"><svg class="i s"><use href="#i-left"/></svg>Alle Versionen</a>
+        <header class="vhead">
+          <div class="vline"><span class="vnum">2.4.0</span><span class="vdate">5. November 2026</span><span class="new">Neueste</span></div>
+          <h1>Bewerbungen per DM, Protokoll der Freigaben und eigene Rang-Karten</h1>
+          <p class="sum">12 Änderungen: 5 neue Funktionen, 4 Verbesserungen und 3 behobene Fehler. Betrifft den Bot in Discord, das Bot-Dashboard der Server-Admins und das Admin-Werkzeug des Teams.</p>
+        </header>
+        <figure>
+          <div class="post" style="--c: var(--win)">
+            <div class="ph"><img src="logo-n.webp" alt=""><b>RL <i>Nexus</i></b><small>Changelog</small><span class="stamp">Neu</span></div>
+            <div class="pv">2.4.0</div>
+            <div class="pt">Bewerbungen per DM, Protokoll der Freigaben und eigene Rang-Karten</div>
+            <div class="ps">12 Änderungen · Bot, Bot-Dashboard, Admin · 05.11.2026</div>
+            <div class="tiles">
+              <div class="tile full" style="--c: var(--win)"><h5>Neu <b>5</b></h5><ul><li style="--a: var(--red)">Bewerbungen laufen per DM: mit Zurück, Überspringen und Zusammenfassung</li><li style="--a: var(--red)">Rang-Karte mit eigenem Hintergrund aus Upload oder Galerie</li><li style="--a: var(--orange)">Eigener Punkt „Protokoll“ für Staff-Freigaben und Team-Änderungen</li><li style="--a: var(--purple)">DM über den Bot an alle oder an eine Person, mit Vorlagen</li><li style="--a: var(--purple)">Die Datenbank wird jede Nacht gesichert</li></ul></div>
+              <div class="tile" style="--c: var(--purple-t)"><h5>Verbessert <b>4</b></h5><ul><li style="--a: var(--red)">Transcript bleibt beim Löschen eines Bewerbungskanals</li><li style="--a: var(--orange)">Einladung passt zu „OAuth2 Code Grant“</li><li style="--a: var(--purple)">Nutzerdaten laden deutlich schneller</li><li style="--a: var(--purple)">Eine Suche für Server, Nutzer, Fälle, Einstellungen</li></ul></div>
+              <div class="tile" style="--c: var(--blue)"><h5>Behoben <b>3</b></h5><ul><li style="--a: var(--red)">Team-Hub: großes Bild bleibt nach Wahl im Menü</li><li style="--a: var(--red)">DM-Bewerbung bei geschlossenen DMs zeigt den Hinweis</li><li style="--a: var(--orange)">Kein „Unable to preload CSS“ nach einem Deploy</li></ul></div>
+            </div>
+            <div class="pf"><span>RL Nexus · Changelog</span><span>von MecryTv</span></div>
+          </div>
+          <figcaption><span>Das Bild aus dem Post in #changelog, gepostet von MecryTv.</span><span style="display:flex;gap:16px"><a><svg class="i fill s"><use href="#i-discord"/></svg>Zum Post</a><a><svg class="i s"><use href="#i-link"/></svg>Link kopieren</a></span></figcaption>
+        </figure>
+
+        <section class="grp" style="--c: var(--win)">
+          <h2>Neu <small>5 Funktionen</small></h2>
+          <ol class="list">
+            <li><p>Bewerbungen laufen per DM: mit Zurück, Überspringen und einer Zusammenfassung vor dem Abschicken.</p><span class="area" style="--a: var(--red)">Bot</span></li>
+            <li><p>Rang-Karte mit eigenem Hintergrund: ein Bild hochladen oder eins aus der Galerie des Servers nehmen.</p><span class="area" style="--a: var(--red)">Bot</span></li>
+            <li><p>Eigener Punkt „Protokoll“: wer wann eine Staff-Freigabe erteilt oder ein Team geändert hat.</p><span class="area" style="--a: var(--orange)">Bot-Dashboard</span></li>
+            <li><p>DM über den Bot an alle Nutzer oder an eine Person, mit Vorlagen und Vorschau.</p><span class="area" style="--a: var(--purple)">Admin</span></li>
+            <li><p>Die Datenbank wird jede Nacht automatisch gesichert.</p><span class="area" style="--a: var(--purple)">Admin</span></li>
+          </ol>
+        </section>
+        <section class="grp" style="--c: var(--purple-t)">
+          <h2>Verbessert <small>4 Änderungen</small></h2>
+          <ol class="list">
+            <li><p>Beim Löschen eines Bewerbungskanals bleibt ein Transcript erhalten.</p><span class="area" style="--a: var(--red)">Bot</span></li>
+            <li><p>Die Einladung passt zu „Requires OAuth2 Code Grant“; der Dashboard-Link führt nicht mehr ins Leere.</p><span class="area" style="--a: var(--orange)">Bot-Dashboard</span></li>
+            <li><p>Nutzerdaten laden deutlich schneller, auch bei großen Servern.</p><span class="area" style="--a: var(--purple)">Admin</span></li>
+            <li><p>Die Suche findet Server, Nutzer, Fälle und Einstellungen in einem Feld.</p><span class="area" style="--a: var(--purple)">Admin</span></li>
+          </ol>
+        </section>
+        <section class="grp" style="--c: var(--blue)">
+          <h2>Behoben <small>3 Fehler</small></h2>
+          <ol class="list">
+            <li><p>Team-Hub: das große Bild bleibt nach einer Wahl im Menü „Team ansehen“ stehen.</p><span class="area" style="--a: var(--red)">Bot</span></li>
+            <li><p>DM-Bewerbung bei geschlossenen DMs zeigt den Hinweis statt eines Fehlers.</p><span class="area" style="--a: var(--red)">Bot</span></li>
+            <li><p>Nach einem Deploy stürzen offene Tabs nicht mehr mit „Unable to preload CSS“ ab.</p><span class="area" style="--a: var(--orange)">Bot-Dashboard</span></li>
+          </ol>
+        </section>
+
+        <nav class="vnav">
+          <a class="panel cut" href="/changelog/2.3.0"><div class="post thumb" style="--c: var(--win)"><span class="pv">2.3.0</span><span class="stamp">Neu</span></div><div><small>Vorherige Version</small><b><i>2.3.0</i>Level-System und Rangrollen</b></div></a>
+          <div class="off cut"><div><small>Nächste Version</small><b>Noch nichts Neueres</b><span>Die nächste Version steht zuerst auf Discord.</span></div></div>
+        </nav>
+        <div class="dbox wide cut" style="margin-top: 20px">
+          <div class="lg"><svg class="i fill"><use href="#i-discord"/></svg></div>
+          <div><h3>Zuerst auf Discord</h3><p>Jede Version kommt als Bild in #changelog auf dem RL-Nexus-Server, mit Link hierher.</p></div>
+          <div class="btns"><span class="btn">Discord beitreten</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="foot">
+      <div class="cols">
+        <div class="fb"><img src="logo-n.webp" alt=""><p>Der Discord-Bot für Rocket-League-Organisationen: Ränge, Teams, Bewerbungen, Tickets und mehr in einem Bot.</p><div class="socials"><span><svg class="i"><use href="#i-dash"/></svg></span><span><svg class="i fill"><use href="#i-discord"/></svg></span></div></div>
+        <div><h4>Seite</h4><ul><li>Home</li><li>Module</li><li>News</li><li class="on">Changelog</li><li>Partner/Sponsorings</li><li>Team</li><li>Kontakt</li></ul></div>
+        <div><h4>Module</h4><ul><li>Ränge</li><li>Teams</li><li>Bewerbungen</li><li>Tickets</li><li>Level</li><li>Alle 23 Module</li></ul></div>
+        <div><h4>Rechtliches</h4><ul><li>Impressum</li><li>Datenschutz</li><li>AGB</li><li>Widerruf</li></ul></div>
+      </div>
+      <div class="bottom"><span>© 2026 RL Nexus. Kein Produkt von Psyonix oder Epic Games.</span><span>Gebaut für Rocket-League-Organisationen · Wer dahintersteckt</span></div>
+    </div>
+  </div>
+
+  <!-- ===================================================== C8 -->
+  <div class="variant"><b>C8</b><h2>Seite einer Version: Nach Bereich</h2><span>/changelog/2.4.0 · passt zu C6 · Bild und Nummer links, die Änderungen rechts nach Bereich</span></div>
+  <div class="changes"><h3>Was du siehst</h3><ol>
+    <li>Links eine <b>Seitenleiste</b>, die beim Scrollen stehen bleibt: das Bild aus dem Post, Nummer, Datum und wer gepostet hat, „Zum Post“ und „Link kopieren“, darunter Pfeile zur vorherigen und nächsten Version und der Discord-Kasten.</li>
+    <li>Rechts Titel und der Satz mit den Zahlen, dann die Änderungen <b>nach Bereich</b>: Bot, Bot-Dashboard, Admin. Jede Gruppe hat einen Satz, wen sie betrifft („für Server-Admins im Browser“). Wer nur den Bot in Discord nutzt, liest die erste Gruppe und ist fertig.</li>
+    <li>Innerhalb einer Gruppe steht links in der Zeile die <b>Art</b> als farbiges Wort mit Raute (Neu, Verbessert, Behoben), rechts der Text. Reihenfolge: erst Neu, dann Verbessert, dann Behoben.</li>
+    <li>Keine Gruppenüberschrift in Großbuchstaben, keine Chips, keine Aufgabennummern.</li>
+  </ol></div>
+  <div class="screen">
+    <div class="bar">
+      <div class="brand"><img src="logo-n.webp" alt=""><div><strong>RL <i>NEXUS</i></strong><small>Esports Management Bot</small></div></div>
+      <nav><a>Home</a><a>Module</a><a>News</a><a class="on">Changelog</a><a>Partner/Sponsorings</a><a>Team</a><a>Kontakt</a></nav>
+      <div class="acts"><span class="ico"><svg class="i fill"><use href="#i-discord"/></svg></span><span class="btn">Dashboard<svg class="i s"><use href="#i-ext"/></svg></span></div>
+      <span class="menu"><svg class="i"><use href="#i-menu"/></svg></span>
+    </div>
+    <div class="wrap">
+      <div class="two">
+        <aside class="side">
+          <a class="back" href="/changelog"><svg class="i s"><use href="#i-left"/></svg>Alle Versionen</a>
+          <div class="post" style="--c: var(--win)"><div class="ph"><img src="logo-n.webp" alt=""><b>RL <i>Nexus</i></b><small>Changelog</small><span class="stamp">Neu</span></div><div class="pv">2.4.0</div><div class="pt">Bewerbungen per DM, Protokoll der Freigaben und eigene Rang-Karten</div><div class="tiles"><div class="tile full" style="--c: var(--win)"><h5>Neu <b>5</b></h5></div><div class="tile" style="--c: var(--purple-t)"><h5>Verbessert <b>4</b></h5></div><div class="tile" style="--c: var(--blue)"><h5>Behoben <b>3</b></h5></div></div></div>
+          <div class="sv">2.4.0</div>
+          <div class="sdate">5. November 2026<br>gepostet von MecryTv · aktualisiert am 6. November</div>
+          <div class="sbtns"><span class="btn ghost sm"><svg class="i fill s"><use href="#i-discord"/></svg>Zum Post</span><span class="btn ghost sm"><svg class="i s"><use href="#i-link"/></svg>Link kopieren</span></div>
+          <div class="pn"><a href="/changelog/2.3.0"><svg class="i s"><use href="#i-chev-l"/></svg><i>2.3.0</i></a><span>Neueste<svg class="i s"><use href="#i-chev-r"/></svg></span></div>
+          <div class="dbox cut"><div class="lg"><svg class="i fill"><use href="#i-discord"/></svg></div><h3>Zuerst auf Discord</h3><p>Jede Version kommt als Bild in #changelog, mit Link hierher.</p><div class="btns"><span class="btn sm">Beitreten</span></div></div>
+        </aside>
+        <div class="main">
+          <div class="meta" style="margin-bottom: 12px"><span class="new">Neueste Version</span></div>
+          <h1>Bewerbungen per DM, Protokoll der Freigaben und eigene Rang-Karten</h1>
+          <p class="sum" style="font-size:16px">12 Änderungen: 5 neue Funktionen, 4 Verbesserungen und 3 behobene Fehler.</p>
+
+          <section class="agrp" style="--a: var(--red)">
+            <h2>Bot</h2>
+            <p class="what">In Discord, für alle auf dem Server. 5 Änderungen.</p>
+            <ul class="rows">
+              <li><span class="kind" style="--c: var(--win)">Neu</span><p>Bewerbungen laufen per DM: mit Zurück, Überspringen und einer Zusammenfassung vor dem Abschicken.</p></li>
+              <li><span class="kind" style="--c: var(--win)">Neu</span><p>Rang-Karte mit eigenem Hintergrund: ein Bild hochladen oder eins aus der Galerie des Servers nehmen.</p></li>
+              <li><span class="kind" style="--c: var(--purple-t)">Verbessert</span><p>Beim Löschen eines Bewerbungskanals bleibt ein Transcript erhalten.</p></li>
+              <li><span class="kind" style="--c: var(--blue)">Behoben</span><p>Team-Hub: das große Bild bleibt nach einer Wahl im Menü „Team ansehen“ stehen.</p></li>
+              <li><span class="kind" style="--c: var(--blue)">Behoben</span><p>DM-Bewerbung bei geschlossenen DMs zeigt den Hinweis statt eines Fehlers.</p></li>
+            </ul>
+          </section>
+          <section class="agrp" style="--a: var(--orange)">
+            <h2>Bot-Dashboard</h2>
+            <p class="what">Im Browser, für Server-Admins und Staff. 3 Änderungen.</p>
+            <ul class="rows">
+              <li><span class="kind" style="--c: var(--win)">Neu</span><p>Eigener Punkt „Protokoll“: wer wann eine Staff-Freigabe erteilt oder ein Team geändert hat.</p></li>
+              <li><span class="kind" style="--c: var(--purple-t)">Verbessert</span><p>Die Einladung passt zu „Requires OAuth2 Code Grant“; der Dashboard-Link führt nicht mehr ins Leere.</p></li>
+              <li><span class="kind" style="--c: var(--blue)">Behoben</span><p>Nach einem Deploy stürzen offene Tabs nicht mehr mit „Unable to preload CSS“ ab.</p></li>
+            </ul>
+          </section>
+          <section class="agrp" style="--a: var(--purple)">
+            <h2>Admin</h2>
+            <p class="what">Das Werkzeug des RL-Nexus-Teams hinter dem Bot. 4 Änderungen.</p>
+            <ul class="rows">
+              <li><span class="kind" style="--c: var(--win)">Neu</span><p>DM über den Bot an alle Nutzer oder an eine Person, mit Vorlagen und Vorschau.</p></li>
+              <li><span class="kind" style="--c: var(--win)">Neu</span><p>Die Datenbank wird jede Nacht automatisch gesichert.</p></li>
+              <li><span class="kind" style="--c: var(--purple-t)">Verbessert</span><p>Nutzerdaten laden deutlich schneller, auch bei großen Servern.</p></li>
+              <li><span class="kind" style="--c: var(--purple-t)">Verbessert</span><p>Die Suche findet Server, Nutzer, Fälle und Einstellungen in einem Feld.</p></li>
+            </ul>
+          </section>
+        </div>
+      </div>
+    </div>
+    <div class="foot">
+      <div class="cols">
+        <div class="fb"><img src="logo-n.webp" alt=""><p>Der Discord-Bot für Rocket-League-Organisationen: Ränge, Teams, Bewerbungen, Tickets und mehr in einem Bot.</p><div class="socials"><span><svg class="i"><use href="#i-dash"/></svg></span><span><svg class="i fill"><use href="#i-discord"/></svg></span></div></div>
+        <div><h4>Seite</h4><ul><li>Home</li><li>Module</li><li>News</li><li class="on">Changelog</li><li>Partner/Sponsorings</li><li>Team</li><li>Kontakt</li></ul></div>
+        <div><h4>Module</h4><ul><li>Ränge</li><li>Teams</li><li>Bewerbungen</li><li>Tickets</li><li>Level</li><li>Alle 23 Module</li></ul></div>
+        <div><h4>Rechtliches</h4><ul><li>Impressum</li><li>Datenschutz</li><li>AGB</li><li>Widerruf</li></ul></div>
+      </div>
+      <div class="bottom"><span>© 2026 RL Nexus. Kein Produkt von Psyonix oder Epic Games.</span><span>Gebaut für Rocket-League-Organisationen · Wer dahintersteckt</span></div>
+    </div>
+  </div>
+
+  <!-- ===================================================== Handy -->
+  <div class="variant"><b>C9</b><h2>Alle vier auf dem Handy</h2><span>390 px Rahmen, 374 px Inhalt · dieselben Bausteine im schmalen Container</span></div>
+  <div class="changes"><h3>Was du siehst</h3><ol>
+    <li><b>Kopfzeile</b> 64 px hoch mit Logo und Menü-Symbol, die Navigation liegt wie auf der Webseite in der Schublade darunter.</li>
+    <li><b>C5</b>: die neueste Version stapelt, Bild oben (ohne Einzelzeilen, wie in der Discord-Vorschau), Text darunter. Die Zeilen des Verlaufs behalten die kleine Bildvorschau links; Balken und Zahlen rutschen in eine dritte Zeile.</li>
+    <li><b>C6</b>: die Leiste wird zu einer Zeile oben (Anzahl, Monate als Schilder), die Karten stehen untereinander.</li>
+    <li><b>C7</b>: Nummer 40 px, Titel 25 px, das Bild in voller Breite, der Bereich steht unter dem Text statt rechts daneben. Vorherige und nächste Version untereinander.</li>
+    <li><b>C8</b>: die Seitenleiste wird zum Kopf: Bild, darunter Nummer und Datum nebeneinander, Knöpfe, Pfeile. Die Art steht über dem Text statt in einer Spalte. Der Discord-Kasten entfällt oben (er steht in der Fußzeile jeder Seite als Link).</li>
+    <li>Nichts scrollt waagerecht. Kein Text unter 12 px, Fließtext 15 px.</li>
+  </ol></div>
+  <div class="phones">
+    <div>
+      <p class="phone-label">C5 · Übersicht Verlauf</p>
+      <div class="phone"><div class="status"><span>9:41</span><span>▲ ▮▮▮ ▰</span></div><div class="screen">
+        <div class="bar"><div class="brand"><img src="logo-n.webp" alt=""><div><strong>RL <i>NEXUS</i></strong><small>Esports Management Bot</small></div></div><span class="menu"><svg class="i"><use href="#i-menu"/></svg></span></div>
+        <div class="wrap">
+          <div class="phead"><div><div class="eyebrow">Changelog</div><h1>Was sich am <em>Bot</em> ändert.</h1><p>Jede gepostete Version mit allen Änderungen. Sieben seit September 2026.</p></div></div>
+          <a class="latest panel cut" href="/changelog/2.4.0">
+            <div class="post" style="--c: var(--win)"><div class="ph"><img src="logo-n.webp" alt=""><b>RL <i>Nexus</i></b><small>Changelog</small><span class="stamp">Neu</span></div><div class="pv">2.4.0</div><div class="pt">Bewerbungen per DM, Protokoll der Freigaben und eigene Rang-Karten</div><div class="tiles"><div class="tile full" style="--c: var(--win)"><h5>Neu <b>5</b></h5></div><div class="tile" style="--c: var(--purple-t)"><h5>Verbessert <b>4</b></h5></div><div class="tile" style="--c: var(--blue)"><h5>Behoben <b>3</b></h5></div></div></div>
+            <div class="lbody"><div class="meta"><span class="new">Neueste</span><span>5. November 2026</span></div><div class="lv">2.4.0</div><h2>Bewerbungen per DM, Protokoll der Freigaben und eigene Rang-Karten</h2><p class="sum">12 Änderungen: 5 neue Funktionen, 4 Verbesserungen und 3 behobene Fehler.</p><span class="more">Alle 12 Änderungen <svg class="i s"><use href="#i-right"/></svg></span></div>
+          </a>
+          <div class="hist">
+            <h2>Frühere Versionen</h2>
+            <div class="month">Oktober 2026 <span>3</span></div>
+            <a class="vrow panel cut" href="/changelog/2.3.0"><div class="post thumb" style="--c: var(--win)"><span class="pv">2.3.0</span><span class="stamp">Neu</span></div><div class="vinfo"><span class="vn">2.3.0 <span>24. Okt.</span></span><b>Level-System und Rangrollen</b></div><div class="vright"><div class="share"><i style="--c: var(--win); flex: 4"></i><i style="--c: var(--purple-t); flex: 3"></i><i style="--c: var(--blue); flex: 2"></i></div><span class="counts"><b class="n">4</b> · <b class="v">3</b> · <b class="b">2</b></span></div></a>
+            <a class="vrow panel cut" href="/changelog/2.2.1"><div class="post thumb" style="--c: var(--blue)"><span class="pv">2.2.1</span><span class="stamp">Behoben</span></div><div class="vinfo"><span class="vn">2.2.1 <span>17. Okt.</span></span><b>Matchups: Fehler nach dem Absagen</b></div><div class="vright"><div class="share"><i style="--c: var(--purple-t); flex: 1"></i><i style="--c: var(--blue); flex: 3"></i></div><span class="counts"><b class="v">1</b> · <b class="b">3</b></span></div></a>
+            <a class="vrow panel cut" href="/changelog/2.2.0"><div class="post thumb" style="--c: var(--win)"><span class="pv">2.2.0</span><span class="stamp">Neu</span></div><div class="vinfo"><span class="vn">2.2.0 <span>10. Okt.</span></span><b>Matchups und Probetrainings</b></div><div class="vright"><div class="share"><i style="--c: var(--win); flex: 6"></i><i style="--c: var(--purple-t); flex: 2"></i><i style="--c: var(--blue); flex: 3"></i></div><span class="counts"><b class="n">6</b> · <b class="v">2</b> · <b class="b">3</b></span></div></a>
+            <div class="month">September 2026 <span>3</span></div>
+            <a class="vrow panel cut" href="/changelog/2.1.0"><div class="post thumb" style="--c: var(--purple-t)"><span class="pv">2.1.0</span><span class="stamp">Verbessert</span></div><div class="vinfo"><span class="vn">2.1.0 <span>26. Sep.</span></span><b>Rollen-Listen und TempVoice</b></div><div class="vright"><div class="share"><i style="--c: var(--win); flex: 3"></i><i style="--c: var(--purple-t); flex: 4"></i><i style="--c: var(--blue); flex: 1"></i></div><span class="counts"><b class="n">3</b> · <b class="v">4</b> · <b class="b">1</b></span></div></a>
+          </div>
+        </div>
+        <div class="foot"><div class="bottom"><span>© 2026 RL Nexus</span><span>Impressum · Datenschutz</span></div></div>
+      </div></div>
+    </div>
+    <div>
+      <p class="phone-label">C6 · Übersicht Galerie</p>
+      <div class="phone"><div class="status"><span>9:41</span><span>▲ ▮▮▮ ▰</span></div><div class="screen">
+        <div class="bar"><div class="brand"><img src="logo-n.webp" alt=""><div><strong>RL <i>NEXUS</i></strong><small>Esports Management Bot</small></div></div><span class="menu"><svg class="i"><use href="#i-menu"/></svg></span></div>
+        <div class="wrap">
+          <div class="phead"><div><div class="eyebrow">Changelog</div><h1>Jede Version, <em>alle</em> Änderungen.</h1></div></div>
+          <div class="gal">
+            <aside class="rail"><div class="big">7<small>Versionen</small></div><ul><li class="on">Nov<span>1</span></li><li>Okt<span>3</span></li><li>Sep<span>3</span></li></ul></aside>
+            <div class="ggrid">
+              <a class="gcard panel cut" href="/changelog/2.4.0"><div class="post" style="--c: var(--win)"><div class="ph"><img src="logo-n.webp" alt=""><b>RL <i>Nexus</i></b><small>Changelog</small><span class="stamp">Neu</span></div><div class="pv">2.4.0</div><div class="pt">Bewerbungen per DM, Protokoll der Freigaben und eigene Rang-Karten</div><div class="tiles"><div class="tile full" style="--c: var(--win)"><h5>Neu <b>5</b></h5></div><div class="tile" style="--c: var(--purple-t)"><h5>Verbessert <b>4</b></h5></div><div class="tile" style="--c: var(--blue)"><h5>Behoben <b>3</b></h5></div></div></div><div class="gb"><div class="gv">2.4.0 <span>5. Nov. 2026</span><span class="new">Neueste</span></div><h3>Bewerbungen per DM, Protokoll der Freigaben und eigene Rang-Karten</h3><div class="gfoot"><span class="counts"><b class="n">5 neu</b> · <b class="v">4 verbessert</b> · <b class="b">3 behoben</b></span><svg class="i"><use href="#i-right"/></svg></div></div></a>
+              <a class="gcard panel cut" href="/changelog/2.3.0"><div class="post" style="--c: var(--win)"><div class="ph"><img src="logo-n.webp" alt=""><b>RL <i>Nexus</i></b><small>Changelog</small><span class="stamp">Neu</span></div><div class="pv">2.3.0</div><div class="pt">Level-System und Rangrollen</div><div class="tiles"><div class="tile full" style="--c: var(--win)"><h5>Neu <b>4</b></h5></div><div class="tile" style="--c: var(--purple-t)"><h5>Verbessert <b>3</b></h5></div><div class="tile" style="--c: var(--blue)"><h5>Behoben <b>2</b></h5></div></div></div><div class="gb"><div class="gv">2.3.0 <span>24. Okt. 2026</span></div><h3>Level-System und Rangrollen</h3><div class="gfoot"><span class="counts"><b class="n">4 neu</b> · <b class="v">3 verbessert</b> · <b class="b">2 behoben</b></span><svg class="i"><use href="#i-right"/></svg></div></div></a>
+              <a class="gcard panel cut" href="/changelog/2.2.1"><div class="post" style="--c: var(--blue)"><div class="ph"><img src="logo-n.webp" alt=""><b>RL <i>Nexus</i></b><small>Changelog</small><span class="stamp">Behoben</span></div><div class="pv">2.2.1</div><div class="pt">Matchups: Fehler nach dem Absagen</div><div class="tiles"><div class="tile" style="--c: var(--purple-t)"><h5>Verbessert <b>1</b></h5></div><div class="tile" style="--c: var(--blue)"><h5>Behoben <b>3</b></h5></div></div></div><div class="gb"><div class="gv">2.2.1 <span>17. Okt. 2026</span></div><h3>Matchups: Fehler nach dem Absagen</h3><div class="gfoot"><span class="counts"><b class="v">1 verbessert</b> · <b class="b">3 behoben</b></span><svg class="i"><use href="#i-right"/></svg></div></div></a>
+            </div>
+          </div>
+        </div>
+        <div class="foot"><div class="bottom"><span>© 2026 RL Nexus</span><span>Impressum · Datenschutz</span></div></div>
+      </div></div>
+    </div>
+    <div>
+      <p class="phone-label">C7 · Version lesen</p>
+      <div class="phone"><div class="status"><span>9:41</span><span>▲ ▮▮▮ ▰</span></div><div class="screen">
+        <div class="bar"><div class="brand"><img src="logo-n.webp" alt=""><div><strong>RL <i>NEXUS</i></strong><small>Esports Management Bot</small></div></div><span class="menu"><svg class="i"><use href="#i-menu"/></svg></span></div>
+        <div class="wrap">
+          <div class="read">
+            <a class="back" href="/changelog"><svg class="i s"><use href="#i-left"/></svg>Alle Versionen</a>
+            <header class="vhead">
+              <div class="vline"><span class="vnum">2.4.0</span><span class="vdate">5. Nov. 2026</span><span class="new">Neueste</span></div>
+              <h1>Bewerbungen per DM, Protokoll der Freigaben und eigene Rang-Karten</h1>
+              <p class="sum">12 Änderungen: 5 neue Funktionen, 4 Verbesserungen und 3 behobene Fehler für Bot, Bot-Dashboard und Admin.</p>
+            </header>
+            <figure>
+              <div class="post" style="--c: var(--win)"><div class="ph"><img src="logo-n.webp" alt=""><b>RL <i>Nexus</i></b><small>Changelog</small><span class="stamp">Neu</span></div><div class="pv">2.4.0</div><div class="pt">Bewerbungen per DM, Protokoll der Freigaben und eigene Rang-Karten</div><div class="tiles"><div class="tile full" style="--c: var(--win)"><h5>Neu <b>5</b></h5></div><div class="tile" style="--c: var(--purple-t)"><h5>Verbessert <b>4</b></h5></div><div class="tile" style="--c: var(--blue)"><h5>Behoben <b>3</b></h5></div></div></div>
+              <figcaption><span style="display:flex;gap:16px"><a><svg class="i fill s"><use href="#i-discord"/></svg>Zum Post</a><a><svg class="i s"><use href="#i-link"/></svg>Link kopieren</a></span></figcaption>
+            </figure>
+            <section class="grp" style="--c: var(--win)">
+              <h2>Neu <small>5</small></h2>
+              <ol class="list">
+                <li><p>Bewerbungen laufen per DM: mit Zurück, Überspringen und einer Zusammenfassung vor dem Abschicken.</p><span class="area" style="--a: var(--red)">Bot</span></li>
+                <li><p>Rang-Karte mit eigenem Hintergrund: ein Bild hochladen oder eins aus der Galerie des Servers nehmen.</p><span class="area" style="--a: var(--red)">Bot</span></li>
+                <li><p>Eigener Punkt „Protokoll“: wer wann eine Staff-Freigabe erteilt oder ein Team geändert hat.</p><span class="area" style="--a: var(--orange)">Bot-Dashboard</span></li>
+                <li><p>DM über den Bot an alle Nutzer oder an eine Person, mit Vorlagen und Vorschau.</p><span class="area" style="--a: var(--purple)">Admin</span></li>
+                <li><p>Die Datenbank wird jede Nacht automatisch gesichert.</p><span class="area" style="--a: var(--purple)">Admin</span></li>
+              </ol>
+            </section>
+            <section class="grp" style="--c: var(--purple-t)">
+              <h2>Verbessert <small>4</small></h2>
+              <ol class="list">
+                <li><p>Beim Löschen eines Bewerbungskanals bleibt ein Transcript erhalten.</p><span class="area" style="--a: var(--red)">Bot</span></li>
+                <li><p>Die Einladung passt zu „Requires OAuth2 Code Grant“; der Dashboard-Link führt nicht mehr ins Leere.</p><span class="area" style="--a: var(--orange)">Bot-Dashboard</span></li>
+                <li><p>Nutzerdaten laden deutlich schneller, auch bei großen Servern.</p><span class="area" style="--a: var(--purple)">Admin</span></li>
+                <li><p>Die Suche findet Server, Nutzer, Fälle und Einstellungen in einem Feld.</p><span class="area" style="--a: var(--purple)">Admin</span></li>
+              </ol>
+            </section>
+            <section class="grp" style="--c: var(--blue)">
+              <h2>Behoben <small>3</small></h2>
+              <ol class="list">
+                <li><p>Team-Hub: das große Bild bleibt nach einer Wahl im Menü „Team ansehen“ stehen.</p><span class="area" style="--a: var(--red)">Bot</span></li>
+                <li><p>DM-Bewerbung bei geschlossenen DMs zeigt den Hinweis statt eines Fehlers.</p><span class="area" style="--a: var(--red)">Bot</span></li>
+                <li><p>Nach einem Deploy stürzen offene Tabs nicht mehr mit „Unable to preload CSS“ ab.</p><span class="area" style="--a: var(--orange)">Bot-Dashboard</span></li>
+              </ol>
+            </section>
+            <nav class="vnav">
+              <a class="panel cut" href="/changelog/2.3.0"><div class="post thumb" style="--c: var(--win)"><span class="pv">2.3.0</span><span class="stamp">Neu</span></div><div><small>Vorherige Version</small><b><i>2.3.0</i>Level-System und Rangrollen</b></div></a>
+              <div class="off cut"><div><small>Nächste Version</small><b>Noch nichts Neueres</b></div></div>
+            </nav>
+          </div>
+        </div>
+        <div class="foot"><div class="bottom"><span>© 2026 RL Nexus</span><span>Impressum · Datenschutz</span></div></div>
+      </div></div>
+    </div>
+    <div>
+      <p class="phone-label">C8 · Version nach Bereich</p>
+      <div class="phone"><div class="status"><span>9:41</span><span>▲ ▮▮▮ ▰</span></div><div class="screen">
+        <div class="bar"><div class="brand"><img src="logo-n.webp" alt=""><div><strong>RL <i>NEXUS</i></strong><small>Esports Management Bot</small></div></div><span class="menu"><svg class="i"><use href="#i-menu"/></svg></span></div>
+        <div class="wrap">
+          <div class="two">
+            <aside class="side">
+              <a class="back" href="/changelog"><svg class="i s"><use href="#i-left"/></svg>Alle Versionen</a>
+              <div class="post" style="--c: var(--win)"><div class="ph"><img src="logo-n.webp" alt=""><b>RL <i>Nexus</i></b><small>Changelog</small><span class="stamp">Neu</span></div><div class="pv">2.4.0</div><div class="pt">Bewerbungen per DM, Protokoll der Freigaben und eigene Rang-Karten</div><div class="tiles"><div class="tile full" style="--c: var(--win)"><h5>Neu <b>5</b></h5></div><div class="tile" style="--c: var(--purple-t)"><h5>Verbessert <b>4</b></h5></div><div class="tile" style="--c: var(--blue)"><h5>Behoben <b>3</b></h5></div></div></div>
+              <div class="sv">2.4.0</div>
+              <div class="sdate">5. November 2026<br>von MecryTv</div>
+              <div class="sbtns"><span class="btn ghost sm"><svg class="i fill s"><use href="#i-discord"/></svg>Zum Post</span><span class="btn ghost sm"><svg class="i s"><use href="#i-link"/></svg>Link</span></div>
+              <div class="pn"><a href="/changelog/2.3.0"><svg class="i s"><use href="#i-chev-l"/></svg><i>2.3.0</i></a><span>Neueste<svg class="i s"><use href="#i-chev-r"/></svg></span></div>
+            </aside>
+            <div class="main">
+              <h1>Bewerbungen per DM, Protokoll der Freigaben und eigene Rang-Karten</h1>
+              <p class="sum">12 Änderungen: 5 neue Funktionen, 4 Verbesserungen und 3 behobene Fehler.</p>
+              <section class="agrp" style="--a: var(--red)">
+                <h2>Bot</h2><p class="what">In Discord, für alle auf dem Server. 5 Änderungen.</p>
+                <ul class="rows">
+                  <li><span class="kind" style="--c: var(--win)">Neu</span><p>Bewerbungen laufen per DM: mit Zurück, Überspringen und einer Zusammenfassung vor dem Abschicken.</p></li>
+                  <li><span class="kind" style="--c: var(--win)">Neu</span><p>Rang-Karte mit eigenem Hintergrund: ein Bild hochladen oder eins aus der Galerie des Servers nehmen.</p></li>
+                  <li><span class="kind" style="--c: var(--purple-t)">Verbessert</span><p>Beim Löschen eines Bewerbungskanals bleibt ein Transcript erhalten.</p></li>
+                  <li><span class="kind" style="--c: var(--blue)">Behoben</span><p>Team-Hub: das große Bild bleibt nach einer Wahl im Menü „Team ansehen“ stehen.</p></li>
+                  <li><span class="kind" style="--c: var(--blue)">Behoben</span><p>DM-Bewerbung bei geschlossenen DMs zeigt den Hinweis statt eines Fehlers.</p></li>
+                </ul>
+              </section>
+              <section class="agrp" style="--a: var(--orange)">
+                <h2>Bot-Dashboard</h2><p class="what">Im Browser, für Server-Admins und Staff. 3 Änderungen.</p>
+                <ul class="rows">
+                  <li><span class="kind" style="--c: var(--win)">Neu</span><p>Eigener Punkt „Protokoll“: wer wann eine Staff-Freigabe erteilt oder ein Team geändert hat.</p></li>
+                  <li><span class="kind" style="--c: var(--purple-t)">Verbessert</span><p>Die Einladung passt zu „Requires OAuth2 Code Grant“; der Dashboard-Link führt nicht mehr ins Leere.</p></li>
+                  <li><span class="kind" style="--c: var(--blue)">Behoben</span><p>Nach einem Deploy stürzen offene Tabs nicht mehr mit „Unable to preload CSS“ ab.</p></li>
+                </ul>
+              </section>
+              <section class="agrp" style="--a: var(--purple)">
+                <h2>Admin</h2><p class="what">Das Werkzeug des RL-Nexus-Teams. 4 Änderungen.</p>
+                <ul class="rows">
+                  <li><span class="kind" style="--c: var(--win)">Neu</span><p>DM über den Bot an alle Nutzer oder an eine Person, mit Vorlagen und Vorschau.</p></li>
+                  <li><span class="kind" style="--c: var(--win)">Neu</span><p>Die Datenbank wird jede Nacht automatisch gesichert.</p></li>
+                  <li><span class="kind" style="--c: var(--purple-t)">Verbessert</span><p>Nutzerdaten laden deutlich schneller, auch bei großen Servern.</p></li>
+                  <li><span class="kind" style="--c: var(--purple-t)">Verbessert</span><p>Die Suche findet Server, Nutzer, Fälle und Einstellungen in einem Feld.</p></li>
+                </ul>
+              </section>
+            </div>
+          </div>
+        </div>
+        <div class="foot"><div class="bottom"><span>© 2026 RL Nexus</span><span>Impressum · Datenschutz</span></div></div>
+      </div></div>
+    </div>
+  </div>
+
+  <!-- ===================================================== Annahmen -->
+  <div class="assume">
+    <h2>Annahmen</h2>
+    <ol>
+      <li><b>Menü</b>: Home · Module · News · Changelog · Partner/Sponsorings · Team · Kontakt. Bei Paid Access kommt „Preise“ hinter Module dazu, dann sind es acht Punkte; die Schublade sollte dann ab etwa 1100 px statt 940 px greifen, oder „Partner/Sponsorings“ heißt im Kopf nur „Partner“ (die Seite behält den vollen Namen).</li>
+      <li><b>Roter Punkt am Tab</b>: dieselbe Browser-Marke wie „Neu“ in den News (letzter Besuch im localStorage). Keine Zahl, nur ein Punkt. Ein Besuch der Übersicht löscht ihn.</li>
+      <li><b>Das Bild aus dem Post</b> entsteht beim Posten (D2, 1100 × höchstens 580 px) und wird beim Admin-Server gespeichert, damit die Webseite es zeigen kann; die Adresse gehört zu <code>changelog_versions</code> oder leitet sich aus der Version ab. Hier ist es ein Nachbau in HTML, die echte Seite zeigt die Datei. In der Übersicht und auf dem Handy erscheint es ohne Einzelzeilen, also so, wie es Discord in der kleinen Vorschau zeigt; das ist dasselbe Bild, nur verkleinert.</li>
+      <li><b>Der Satz mit den Zahlen</b> („12 Änderungen: 5 neue Funktionen, 4 Verbesserungen und 3 behobene Fehler für Bot, Bot-Dashboard und Admin“) wird aus den Zählern je Art und den vorkommenden Bereichen gebildet. Kein neues Feld.</li>
+      <li><b>Aufgabennummern</b> (W-0075) stehen nicht auf der Webseite. Sie bleiben im Admin Dashboard und im Alt-Text des Bilds, wenn man sie dort will.</li>
+      <li><b>Intern</b> bleibt weg wie im Post. Versionen nur mit internen Zeilen lassen sich nicht posten und erscheinen deshalb nie.</li>
+      <li><b>Adressen</b>: <code>/changelog</code> für die Übersicht, <code>/changelog/2.4.0</code> für eine Version. Der Changelog-Eintrag im News-Zeitstrahl (N3) bleibt und führt auf dieselbe Seite.</li>
+      <li><b>Monate</b> kommen aus <code>released_on</code>. In C5 steht die neueste Version außerhalb der Monatsgruppen; in C6 zählt die Leiste sie zum November.</li>
+      <li><b>Balken</b> in C5: die drei Anteile Neu, Verbessert, Behoben in Reihenfolge, Breite nach Anzahl; die Zahlen stehen daneben als Text, Farbe allein trägt nichts.</li>
+      <li><b>„gepostet von“</b> ist <code>created_name</code>, „aktualisiert am“ erscheint nur, wenn <code>updated_at</code> nach <code>posted_at</code> liegt (C8 zeigt den Fall, C7 nicht).</li>
+      <li><b>„Zum Post“</b> führt zur Nachricht in #changelog und setzt voraus, dass der Kanal auf einem Server liegt, dem Besucher beitreten können. Liegt er nur auf dem Team-Server, fällt der Knopf weg und „Discord beitreten“ zeigt auf den Support-Server.</li>
+      <li><b>Beispielinhalt</b>: die zwölf Zeilen von 2.4.0 wie in Runde 1 (aus echten works-Aufgaben), die Bündelung und die sechs älteren Versionen sind erfunden. Bereiche bei 2.4.0: Bot 5, Bot-Dashboard 3, Admin 4 (Runde 1 hatte sich bei den Chips verzählt).</li>
+      <li>Wird eine Version <b>gelöscht oder ihr Post entfernt</b>, antwortet ihre Adresse mit „Diese Version gibt es nicht mehr“ und dem Weg zur Übersicht.</li>
+    </ol>
+    <h2 style="margin-top:28px">Bewusst weggelassen</h2>
+    <ul>
+      <li>Kein Filter nach Bereich in der Übersicht: sieben Versionen braucht niemand zu filtern. Kommt er später, passt er als Chip-Zeile über den Verlauf.</li>
+      <li>Keine Suche über alle Änderungen auf der Webseite; die sitzt im Admin Dashboard. Die News-Suche findet die Versionen über ihre Zeitstrahl-Einträge.</li>
+      <li>Kein RSS je Version, keine Kommentare. Der Discord-Kanal ist der eine Weg, den die Spec nennt.</li>
+    </ul>
+  </div>
+</div>
+</body>
+</html>

@@ -64,7 +64,8 @@ Die Webseite bekommt eine Seite **Partner/Sponsorings** und eine **News**-Anzeig
 - „Neu“-Marke für alles seit dem letzten Besuch (im Browser gespeichert). Seitenleiste: Suche, Arten mit Anzahl, Demnächst (kommende Termine), Archiv, Nichts verpassen (Discord-Ankündigungen, RSS). Unten „Ältere laden“, Monatsköpfe bleiben beim Scrollen stehen.
 - Beitragsseite A2 `/news/<adresse>`: Lesebalken, verknüpfter Partner/Sponsor als Karte im Text, unten vorheriger und nächster Beitrag. Die Art „Partner“ heißt „Partner/Sponsoring“.
 - **Changelog:** Eine Version aus W-0061 erscheint im Zeitstrahl erst, wenn sie in Discord gepostet ist (Entwürfe nie). Ein Klick öffnet eine öffentliche Seite der Version mit allen Änderungen. Das weicht vom Nicht-Ziel „keine öffentliche Changelog-Seite“ in W-0061 ab; der Nutzer hat es am 10.11.2026 so entschieden. Entwurf der Seite: mit Fable im Stil der Webseite, vor dem Bau zeigen.
-- **Startseite** (eigene Festlegung): Der Block „Neu bei RL Nexus“ aus Runde 1 mit den drei neuesten Einträgen kommt auf die Startseite, im Stil von N3.
+- **Changelog als eigener Menüpunkt** (Nutzer, 10.11.2026): Die Webseite bekommt einen Navigations-Tab „Changelog“ mit einer Übersicht aller geposteten Versionen und der Seite je Version. Entwurf Runde 2 mit Fable, der erste Entwurf (C1, C2) gefiel noch nicht ganz.
+- **Startseite** (Nutzer, 10.11.2026): Neue News, Changelogs, Partner, Sponsorings und Unterstützer erscheinen auch auf der Startseite. Entwurf mit Fable.
 
 ### 4. Admin: Partner und Sponsoren (`admin-v3.html` D3 und L3, `studio.html` S3 und S4)
 
@@ -109,7 +110,6 @@ Die Webseite bekommt eine Seite **Partner/Sponsorings** und eine **News**-Anzeig
 - Optionales Ende für Unterstützer.
 - Art „Person“ bei Unterstützern: Name erscheint öffentlich, also nur mit Einverständnis eintragen.
 - Live-Zahlen der Partner höchstens 15 Minuten alt.
-- News-Block auf der Startseite.
 - Aktionen am Eintrag und Abgleich der Rolle wie in Teil 7.
 
 ## Dem Umsetzer überlassen
