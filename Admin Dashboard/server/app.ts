@@ -36,6 +36,7 @@ import { publicSecurityRoutes } from "./routes/security-public.ts";
 import { securityRoutes } from "./routes/security.ts";
 import { messageRoutes } from "./routes/messages.ts";
 import { mediaRoutes } from "./routes/media.ts";
+import { partnerRoutes } from "./routes/partners.ts";
 import { changelogRoutes } from "./routes/changelog.ts";
 import { publicStatusRoutes, statusRoutes } from "./routes/status.ts";
 import { userRoutes } from "./routes/users.ts";
@@ -106,6 +107,7 @@ export async function buildApp(config: IConfig): Promise<FastifyInstance> {
         await api.register(securityRoutes, { config });
         await api.register(messageRoutes, { config });
         await api.register(mediaRoutes, { config });
+        await api.register(partnerRoutes, { config });
 
         // Nur mit der Developer-Rolle. Der Hook läuft hinter requireSession.
         await api.register(async (dev) => {

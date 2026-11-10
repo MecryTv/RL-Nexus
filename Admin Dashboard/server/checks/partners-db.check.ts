@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import type { IPostInput } from "../../shared/news.ts";
 import type { IEntryInput } from "../../shared/partners.ts";
 import type { IActor } from "../audit.ts";
+import type { IConfig } from "../config.ts";
 import { query } from "../db.ts";
+import type { IHttp } from "./backups-db.check.ts";
+import { USERS, fake } from "./fakes.ts";
 import { createPost, deletePost, duePosts, getPost, updatePost } from "../news/store.ts";
 import { createEntry, deleteEntry, getEntry, listEntries, updateEntry } from "../partners/store.ts";
 import { check, section } from "./harness.ts";
@@ -57,6 +60,68 @@ export async function tidyPartners(): Promise<void> {
     await query("DELETE FROM partner_tournaments WHERE entry_id IN (SELECT id FROM partner_entries WHERE slug LIKE 'check-db-%')");
     await query("DELETE FROM partner_entries WHERE slug LIKE 'check-db-%'");
     await query("DELETE FROM news_posts WHERE slug LIKE 'check-db-%'");
+}
+
+/** W-0062: Routen für Partner, Sponsoren und Unterstützer. Datenbank echt, Discord nachgestellt. */
+export async function checkPartnerRoutesDb(config: IConfig, http: IHttp): Promise<void> {
+    section("Routen für Partner/Sponsorings (W-0062)");
+
+    const contact = "99999999999999999931";
+    const role = config.partnerRoleId!;
+    const buyerJoined = fake.joined.delete(USERS.buyer);
+
+    await tidyPartners();
+
+    try {
+        await check("Partner: ohne Sitzung nichts", async () => {
+            assert.equal((await http.raw("GET", "/api/partners", {})).statusCode, 401);
+        });
+
+        await check("Partner: anlegen gibt Adresse, Gruppe und Rolle", async () => {
+            const response = await http.write("POST", "/api/partners", { ...ENTRY, name: "Check DB Route", contactId: contact, access: "free" });
+
+            assert.equal(response.statusCode, 200, response.body);
+            assert.equal(response.json().slug, "check-db-route");
+            assert.ok(fake.discordCalls.includes(`rolle+ ${contact} ${role}`));
+            assert.equal((await http.get("/api/partners")).json().entries.some((entry: { slug: string }) => entry.slug === "check-db-route"), true);
+        });
+
+        await check("Partner: http-Link wird mit Satz abgelehnt", async () => {
+            const response = await http.write("POST", "/api/partners", { ...ENTRY, name: "Check DB Unsicher", links: { website: "http://example.com" } });
+
+            assert.equal(response.statusCode, 400);
+            assert.match(response.json().error, /https/);
+        });
+
+        await check("Partner: Protokoll des Eintrags", async () => {
+            const entry = (await http.get("/api/partners")).json().entries.find((item: { slug: string }) => item.slug === "check-db-route");
+            const events = (await http.get(`/api/partners/${entry.id}/protokoll`)).json().events as { action: string }[];
+
+            assert.ok(events.some((event) => event.action === "partner.create"));
+        });
+
+        await check("Partner: löschen nimmt Gruppe und Rolle", async () => {
+            const entry = (await http.get("/api/partners")).json().entries.find((item: { slug: string }) => item.slug === "check-db-route");
+
+            assert.equal((await http.write("DELETE", `/api/partners/${entry.id}`)).statusCode, 204);
+            assert.ok(fake.discordCalls.includes(`rolle- ${contact} ${role}`));
+        });
+
+        await check("Partner: Vorab-Prüfung für jemanden, der nicht auf dem Server ist", async () => {
+            const response = await http.get(`/api/partners/contact/${USERS.buyer}`);
+
+            assert.equal(response.statusCode, 200, response.body);
+            assert.equal(response.json().member, false);
+            assert.equal(response.json().group, null);
+        });
+    } finally {
+        await tidyPartners();
+        await query("DELETE FROM dashboard_groups WHERE user_id = ?", [contact]);
+        await query("DELETE FROM partner_roles WHERE user_id = ?", [contact]);
+        await query("DELETE FROM admin_audit WHERE target LIKE 'partner:%' AND detail LIKE 'Check DB%'");
+        fake.memberRoles.delete(contact);
+        if (buyerJoined) fake.joined.add(USERS.buyer);
+    }
 }
 
 /** W-0062: Speicher für Partner und News gegen die echte Datenbank. */
