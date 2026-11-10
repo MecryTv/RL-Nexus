@@ -4,7 +4,7 @@ import type { ISiteEntry } from "../../domain/interfaces/ISiteContent";
 import { Button } from "../ui/Button";
 import { Panel } from "../ui/Panel";
 import { EntryLogo } from "./EntryLogo";
-import { ENTRY_COLOR, sectionOf } from "./entry";
+import { ENTRY_COLOR, offerActive, sectionOf } from "./entry";
 import styles from "./partners.module.scss";
 
 /** Rabattcode zum Kopieren. Ohne Zwischenablage (alter Browser, kein https) bleibt der Code zum Abschreiben stehen. */
@@ -55,7 +55,7 @@ export function MainSponsor({ entry }: { readonly entry: ISiteEntry }): JSX.Elem
                     </div>
                 )}
                 <div className={styles.mainActions}>
-                    {offer?.code && <OfferCode code={offer.code} />}
+                    {offer?.code && offerActive(offer) && <OfferCode code={offer.code} />}
                     <Button to={`/partner/${entry.slug}`} trailingIcon="arrow-right">
                         Mehr erfahren
                     </Button>

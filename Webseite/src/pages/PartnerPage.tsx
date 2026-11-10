@@ -11,7 +11,7 @@ import { EntryLogo } from "../components/partners/EntryLogo";
 import { EntrySections } from "../components/partners/EntrySections";
 import { Pick } from "../components/preview/Pick";
 import { PartnerCard } from "../components/partners/PartnerCard";
-import { ENTRY_COLOR, linksOf, monthYear, sectionOf } from "../components/partners/entry";
+import { ENTRY_COLOR, linksOf, liveFor, monthYear, sectionOf } from "../components/partners/entry";
 import partnerStyles from "../components/partners/partners.module.scss";
 import { NotFoundPage } from "./NotFoundPage";
 import styles from "./PartnerPage.module.scss";
@@ -132,7 +132,7 @@ export function PartnerPage(): JSX.Element {
 
     return (
         <>
-            <EntryView entry={entry} live={live?.servers[entry.slug] ?? null} />
+            <EntryView entry={entry} live={liveFor(live, entry.slug)} />
 
             {more.length > 0 && (
                 <Section>

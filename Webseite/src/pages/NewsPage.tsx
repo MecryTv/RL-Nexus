@@ -13,7 +13,7 @@ import { PageLoader } from "../components/ui/PageLoader";
 import { Panel } from "../components/ui/Panel";
 import { NewMark } from "../components/news/NewMark";
 import { Cover, TimelineEntry } from "../components/news/TimelineEntry";
-import { CATEGORY, day, dayParts, time } from "../components/news/meta";
+import { CATEGORY, day, dayParts, newsFilter, time, type NewsFilter } from "../components/news/meta";
 import { initials } from "../components/partners/entry";
 import newsStyles from "../components/news/news.module.scss";
 import styles from "./NewsPage.module.scss";
@@ -22,7 +22,7 @@ import styles from "./NewsPage.module.scss";
 const PAGE = 12;
 const NO_ITEMS: readonly ITimelineEntry[] = [];
 
-type Filter = NewsCategory | "changelog";
+type Filter = NewsFilter;
 
 function PinnedBig({ post, fresh }: { readonly post: ISiteNewsItem; readonly fresh: boolean }): JSX.Element {
     const color = CATEGORY[post.category].color;
@@ -86,7 +86,7 @@ export function NewsPage(): JSX.Element {
     const [limit, setLimit] = useState(PAGE);
     const loaded = news !== undefined && changelog !== undefined;
 
-    const art = params.get("art") as Filter | null;
+    const art = newsFilter(params.get("art"));
     const query = (params.get("suche") ?? "").trim().toLowerCase();
 
     const all = useMemo(() => (loaded ? timeline(news, changelog).flatMap((month) => month.entries) : NO_ITEMS), [loaded, news, changelog]);

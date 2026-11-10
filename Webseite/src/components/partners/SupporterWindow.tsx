@@ -1,12 +1,12 @@
 import { type CSSProperties, type JSX, useId } from "react";
 import { Link } from "react-router-dom";
-import type { ISiteEntry } from "../../domain/interfaces/ISiteContent";
+import type { ISiteEntry, SectionType } from "../../domain/interfaces/ISiteContent";
 import { Overlay } from "../../shop/Overlay";
 import { Icon } from "../ui/Icon";
 import { Pick } from "../preview/Pick";
 import { EntryLogo } from "./EntryLogo";
 import { OfferCode } from "./SponsorBlock";
-import { ENTRY_COLOR, linksOf, monthYear, sectionOf } from "./entry";
+import { ENTRY_COLOR, linksOf, monthYear, offerActive, sectionOf, supporterBlocks } from "./entry";
 import styles from "./partners.module.scss";
 
 export interface ISupporterViewProps {
@@ -22,12 +22,69 @@ export interface ISupporterViewProps {
 
 /** Der Inhalt des Fensters, ohne Fenster: Die Vorschau im Admin Dashboard (Teil 2) zeigt ihn genauso. */
 export function SupporterView({ entry, position, count, onPrev, onNext, onClose, titleId }: ISupporterViewProps): JSX.Element {
-    const intro = sectionOf(entry, "intro");
-    const help = sectionOf(entry, "help");
-    const offer = sectionOf(entry, "offer");
     const since = monthYear(entry.since);
-    // In der Vorschau wählbar wie die Abschnitte eines Partners; ohne eigenen Abschnitt ist es der Kopf.
-    const partOf = (section: typeof intro): string => (section ? `abschnitt:${entry.sections.indexOf(section)}` : "kopf");
+    const blocks = supporterBlocks(entry);
+    const links = sectionOf(entry, "links") ? linksOf(entry) : [];
+
+    const block = (type: SectionType, index: number): JSX.Element | null => {
+        const section = entry.sections[index];
+
+        if (!section) return null;
+
+        switch (type) {
+            case "intro":
+                return <p>{section.text || entry.shortText}</p>;
+            case "stats": {
+                const facts = section.items?.length
+                    ? section.items.map((item) => ({ label: item.label, value: item.value ?? item.text ?? "" }))
+                    : [...(since ? [{ label: "Seit", value: since }] : []), { label: "Art", value: entry.typeLabel }, { label: "Turniere", value: String(entry.tournaments.length) }];
+
+                return (
+                    <dl className={styles.facts}>
+                        {facts.map((fact) => (
+                            <div key={fact.label}>
+                                <dt>{fact.label}</dt>
+                                <dd>{fact.value}</dd>
+                            </div>
+                        ))}
+                    </dl>
+                );
+            }
+            case "help":
+                return section.items?.length ? (
+                    <div>
+                        <h3 className={styles.miniHead}>{section.title ?? `Wie ${entry.name} hilft`}</h3>
+                        <ul className={styles.helpList}>
+                            {section.items.map((item) => (
+                                <li key={item.label}>{item.label}</li>
+                            ))}
+                        </ul>
+                    </div>
+                ) : null;
+            case "tournaments":
+                return entry.tournaments.length > 0 ? (
+                    <div>
+                        <h3 className={styles.miniHead}>{section.title ?? "Unterstützt bei"}</h3>
+                        <div className={styles.tags}>
+                            {entry.tournaments.map((tournament) => (
+                                <Link key={tournament.slug} className={styles.tag} to={`/news/${tournament.slug}`}>
+                                    {tournament.title}
+                                </Link>
+                            ))}
+                        </div>
+                    </div>
+                ) : null;
+            case "offer":
+                return offerActive(section) ? (
+                    <div>
+                        {section.text && <p>{section.text}</p>}
+                        {section.code && <OfferCode code={section.code} note={section.title} />}
+                    </div>
+                ) : null;
+            default:
+                return null;
+        }
+    };
 
     return (
         <div className={styles.supporter} style={{ "--c": ENTRY_COLOR[entry.color] } as CSSProperties}>
@@ -46,58 +103,17 @@ export function SupporterView({ entry, position, count, onPrev, onNext, onClose,
                     </div>
                 </div>
             </Pick>
+            {/* Die Blöcke folgen den Abschnitten aus dem Studio: Reihenfolge und Ausblenden gelten auch hier. */}
             <div className={styles.supporterBody}>
-                <Pick part={partOf(intro)}>
-                    <p>{intro?.visible !== false && intro?.text ? intro.text : entry.shortText}</p>
-                </Pick>
-                <dl className={styles.facts}>
-                    {since && (
-                        <div>
-                            <dt>Seit</dt>
-                            <dd>{since}</dd>
-                        </div>
-                    )}
-                    <div>
-                        <dt>Art</dt>
-                        <dd>{entry.typeLabel}</dd>
-                    </div>
-                    <div>
-                        <dt>Turniere</dt>
-                        <dd>{entry.tournaments.length}</dd>
-                    </div>
-                </dl>
-                {help?.items && help.items.length > 0 && (
-                    <Pick part={partOf(help)}>
-                        <div>
-                            <h3 className={styles.miniHead}>{help.title ?? `Wie ${entry.name} hilft`}</h3>
-                            <ul className={styles.helpList}>
-                                {help.items.map((item) => (
-                                    <li key={item.label}>{item.label}</li>
-                                ))}
-                            </ul>
-                        </div>
+                {!blocks.some((item) => item.type === "intro") && <p>{entry.shortText}</p>}
+                {blocks.map((item) => (
+                    <Pick key={`${item.type}-${item.index}`} part={`abschnitt:${item.index}`}>
+                        {block(item.type, item.index)}
                     </Pick>
-                )}
-                {entry.tournaments.length > 0 && (
-                    <div>
-                        <h3 className={styles.miniHead}>Unterstützt bei</h3>
-                        <div className={styles.tags}>
-                            {entry.tournaments.map((tournament) => (
-                                <Link key={tournament.slug} className={styles.tag} to={`/news/${tournament.slug}`}>
-                                    {tournament.title}
-                                </Link>
-                            ))}
-                        </div>
-                    </div>
-                )}
-                {offer?.code && (
-                    <Pick part={partOf(offer)}>
-                        <OfferCode code={offer.code} note={offer.title} />
-                    </Pick>
-                )}
+                ))}
             </div>
             <div className={styles.supporterFoot}>
-                {linksOf(entry).map((link) => (
+                {links.map((link) => (
                     <a key={link.key} className={link.key === "website" ? styles.footMain : styles.footLink} href={link.href} target="_blank" rel="noopener noreferrer">
                         {link.label}
                         {link.key === "website" && " ↗"}

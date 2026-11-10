@@ -60,10 +60,10 @@ export function pinned(news: ISiteNews): { readonly big: ISiteNewsItem | null; r
     return { big: news.posts.find((post) => post.pinned === "big") ?? null, small: news.posts.filter((post) => post.pinned === "small").slice(0, 2) };
 }
 
-/** Kommende Termine, früheste zuerst. */
+/** Kommende und laufende Termine, früheste zuerst. Ein Termin über mehrere Tage bleibt bis zu seinem Ende drin. */
 export function upcoming(news: ISiteNews, now: Date, limit = 5): ISiteNewsItem[] {
     return news.posts
-        .filter((post) => post.event !== null && Date.parse(post.event.startsAt) >= now.getTime())
+        .filter((post) => post.event !== null && Date.parse(post.event.endsAt ?? post.event.startsAt) >= now.getTime())
         .sort((a, b) => a.event!.startsAt.localeCompare(b.event!.startsAt))
         .slice(0, limit);
 }

@@ -65,8 +65,10 @@
     padding: 3px 9px 2px;
     background: color-mix(in srgb, var(--c) 13%, transparent);
     box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 36%, transparent);
+    max-width: 100%;
     color: var(--c);
-    white-space: nowrap;
+    /* Inhalte aus dem Admin (Untertitel bis 40 Zeichen, Turniertitel) dürfen umbrechen, sonst läuft das Handy über. */
+    overflow-wrap: anywhere;
 
     @include label(0.75rem, 0.14em);
 }
@@ -381,8 +383,21 @@ a.tag:hover {
     gap: 12px;
     grid-template-columns: repeat(5, minmax(0, 1fr));
 
+    /* In der letzten Spalte öffnet der Kurztext nach links, sonst ragt er beim Drüberfahren über den Rand. */
+    @include from(980px) {
+        li:nth-child(5n) .tip {
+            right: 0;
+            left: auto;
+        }
+    }
+
     @include below(980px) {
         grid-template-columns: repeat(3, minmax(0, 1fr));
+
+        li:nth-child(3n) .tip {
+            right: 0;
+            left: auto;
+        }
     }
 
     @include below(640px) {
@@ -421,16 +436,21 @@ a.tag:hover {
         outline: none;
     }
 
-    &:hover .tip,
-    &:focus-visible .tip {
-        visibility: visible;
-        opacity: 1;
+    /* Nur mit Maus: Am Handy bliebe :hover nach dem Tippen hängen. */
+    @media (hover: hover) {
+        &:hover .tip,
+        &:focus-visible .tip {
+            display: block;
+        }
     }
 }
 
-/* Der Kurztext. Liegt unter dem Eintrag, damit er die Reihe darüber nicht verdeckt. */
+/* Der Kurztext. Liegt unter dem Eintrag, damit er die Reihe darüber nicht verdeckt.
+   Versteckt mit `display: none`: Unsichtbar, aber vorhanden, zählte er zur
+   Breite der Seite und gäbe am letzten Eintrag einer Reihe einen Scrollbalken. */
 .tip {
     position: absolute;
+    display: none;
     z-index: 3;
     top: calc(100% + 8px);
     left: 0;
@@ -445,10 +465,7 @@ a.tag:hover {
     font-size: 0.8rem;
     font-weight: 400;
     line-height: 1.45;
-    opacity: 0;
     pointer-events: none;
-    transition: opacity var(--t-fast);
-    visibility: hidden;
 
     em {
         display: block;
@@ -523,7 +540,7 @@ a.tag:hover {
     display: grid;
     align-items: end;
     gap: 14px;
-    grid-template-columns: 72px 1fr;
+    grid-template-columns: 72px minmax(0, 1fr);
     margin-top: -30px;
     padding: 0 22px;
 

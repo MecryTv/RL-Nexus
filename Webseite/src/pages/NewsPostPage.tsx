@@ -8,7 +8,7 @@ import { Panel } from "../components/ui/Panel";
 import { Blocks } from "../components/news/Blocks";
 import { Pick } from "../components/preview/Pick";
 import { Cover } from "../components/news/TimelineEntry";
-import { CATEGORY, day, readingMinutes, time } from "../components/news/meta";
+import { CATEGORY, day, eventText, readingMinutes, wasUpdated } from "../components/news/meta";
 import { initials } from "../components/partners/entry";
 import newsStyles from "../components/news/news.module.scss";
 import { NotFoundPage } from "./NotFoundPage";
@@ -71,11 +71,7 @@ export function NewsPostView({ post }: { readonly post: ISiteNewsPost }): JSX.El
                     <span>· {readingMinutes(post.blocks)} Min. Lesezeit</span>
                 </div>
                 {post.event && (
-                    <p className={styles.event}>
-                        Termin: {day(post.event.startsAt)}, {time(post.event.startsAt)} Uhr
-                        {post.event.endsAt ? ` bis ${time(post.event.endsAt)} Uhr` : ""}
-                        {post.event.place ? ` · ${post.event.place}` : ""}
-                    </p>
+                    <p className={styles.event}>Termin: {eventText(post.event)}</p>
                 )}
                 <div className={styles.author}>
                     <span className={styles.avatar} aria-hidden="true">
@@ -83,7 +79,7 @@ export function NewsPostView({ post }: { readonly post: ISiteNewsPost }): JSX.El
                     </span>
                     <div>
                         <b>{post.author}</b>
-                        <small>{post.updatedAt !== post.publishedAt ? `Aktualisiert am ${day(post.updatedAt)}` : "RL Nexus"}</small>
+                        <small>{wasUpdated(post.publishedAt, post.updatedAt) ? `Aktualisiert am ${day(post.updatedAt)}` : "RL Nexus"}</small>
                     </div>
                 </div>
             </Pick>

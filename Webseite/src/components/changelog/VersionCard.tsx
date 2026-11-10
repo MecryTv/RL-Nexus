@@ -43,7 +43,7 @@ export function LatestVersion({ version, fresh }: IVersionCardProps): JSX.Elemen
                         </li>
                     ))}
                 </ul>
-                <span className={styles.more}>Alle {version.items.length} Änderungen →</span>
+                <span className={styles.more}>{version.items.length > 0 ? `Alle ${version.items.length} Änderungen` : "Zur Version"} →</span>
             </div>
         </Panel>
     );

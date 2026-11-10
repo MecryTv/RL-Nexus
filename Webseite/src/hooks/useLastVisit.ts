@@ -17,8 +17,11 @@ export function readLastVisit(): string | null {
 }
 
 /**
- * Der Stand von vorher für diese Seite. Mit `remember` setzt die Seite beim
- * Verlassen den neuen Zeitpunkt, damit die Marken beim Lesen nicht verschwinden.
+ * Der Stand von vorher für diese Seite. Mit `remember` setzt die Seite gleich
+ * beim Öffnen den neuen Zeitpunkt: Wer den Tab schließt, verlässt die Seite
+ * nicht, und ein Schreiben erst beim Verlassen ginge dann verloren. Die Marken
+ * auf dieser Seite bleiben trotzdem, weil `before` beim ersten Rendern gelesen
+ * wird und im Zustand bleibt.
  */
 export function useLastVisit(remember: boolean): string | null {
     const [before] = useState(readLastVisit);
@@ -26,13 +29,11 @@ export function useLastVisit(remember: boolean): string | null {
     useEffect(() => {
         if (!remember) return;
 
-        return () => {
-            try {
-                localStorage.setItem(KEY, new Date().toISOString());
-            } catch {
-                // Ohne Speicher gibt es keine Marken.
-            }
-        };
+        try {
+            localStorage.setItem(KEY, new Date().toISOString());
+        } catch {
+            // Ohne Speicher gibt es keine Marken.
+        }
     }, [remember]);
 
     return before;

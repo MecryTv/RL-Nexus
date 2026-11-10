@@ -10,6 +10,8 @@ import { categoryCounts, isNew, pinned, shares, timeline, upcoming } from "../sr
 import { navigationFor } from "../src/services/navigation.ts";
 import { playerOf } from "../src/services/video.ts";
 import { versionSummary } from "../src/components/changelog/meta.ts";
+import { eventText, newsFilter, wasUpdated } from "../src/components/news/meta.ts";
+import { liveFor, offerActive, sectionOf, supporterBlocks } from "../src/components/partners/entry.ts";
 
 const site = JSON.parse(readFileSync(new URL("./fixtures/site.json", import.meta.url), "utf8"));
 const clone = (value) => structuredClone(value);
@@ -216,6 +218,67 @@ check("Vorschau: News-Nachricht lehnt javascript-Knopf ab", () => {
     assert.ok(isNewsPreview(message), "gültig");
     assert.ok(isNewsPreview({ ...message, selected: "titelbild" }), "Titelbild");
     assert.ok(!isNewsPreview({ ...message, post: { ...message.post, blocks: [{ type: "button", label: "x", url: "javascript:alert(1)" }] } }), "javascript-Knopf");
+});
+
+/* --- Abschlussreview Teil 3 ------------------------------------------------ */
+
+check("Review: „Aktualisiert“ erst ab zehn Minuten Abstand zur Veröffentlichung", () => {
+    assert.equal(wasUpdated("2026-11-06T10:00:00.000Z", "2026-11-06T10:00:00.412Z"), false);
+    assert.equal(wasUpdated("2026-11-06T10:00:00.000Z", "2026-11-06T10:09:00.000Z"), false);
+    assert.equal(wasUpdated("2026-11-06T10:00:00.000Z", "2026-11-07T08:00:00.000Z"), true);
+});
+
+check("Review: Termin über zwei Tage nennt beide Daten, „Demnächst“ hält laufende Termine", () => {
+    assert.equal(eventText({ startsAt: "2026-11-22T18:00:00.000Z", endsAt: "2026-11-23T17:00:00.000Z", place: null }), "22.11.2026, 19:00 Uhr bis 23.11.2026, 18:00 Uhr");
+    assert.equal(eventText({ startsAt: "2026-11-22T18:00:00.000Z", endsAt: "2026-11-22T20:00:00.000Z", place: "Discord" }), "22.11.2026, 19:00 bis 21:00 Uhr · Discord");
+    assert.equal(eventText({ startsAt: "2026-11-22T18:00:00.000Z", endsAt: null, place: null }), "22.11.2026, 19:00 Uhr");
+
+    const news = clone(site.news);
+    news.posts[1].event = { startsAt: "2026-11-09T18:00:00.000Z", endsAt: "2026-11-11T18:00:00.000Z", place: null };
+    assert.deepEqual(upcoming(news, new Date("2026-11-10T12:00:00Z")).map((post) => post.slug), ["nordliga-season-3"]);
+});
+
+check("Review: unbekanntes ?art= auf /news gilt als „Alle“", () => {
+    assert.equal(newsFilter("turnier"), "turnier");
+    assert.equal(newsFilter("changelog"), "changelog");
+    assert.equal(newsFilter("gibtsnicht"), null);
+    assert.equal(newsFilter(null), null);
+});
+
+check("Review: ausgeblendete Abschnitte fallen weg, Reihenfolge und Index bleiben", () => {
+    const entry = clone(site.partners.entries[2]);
+    entry.sections = [
+        { type: "intro", visible: true, text: "Hallo" },
+        { type: "stats", visible: false, items: [{ label: "Clips", value: "40" }] },
+        { type: "tournaments", visible: true },
+        { type: "offer", visible: true, code: "CLIP10" },
+    ];
+
+    assert.equal(sectionOf(entry, "stats"), undefined);
+    assert.equal(sectionOf(entry, "intro")?.text, "Hallo");
+    assert.deepEqual(supporterBlocks(entry), [{ type: "intro", index: 0 }, { type: "tournaments", index: 2 }, { type: "offer", index: 3 }]);
+});
+
+check("Review: abgelaufenes Angebot verschwindet, gilt bis Ende des Tages in Berlin", () => {
+    const now = new Date("2026-11-10T12:00:00Z");
+
+    assert.equal(offerActive({ type: "offer", visible: true, code: "A", until: "2026-11-10" }, now), true);
+    assert.equal(offerActive({ type: "offer", visible: true, code: "A", until: "2026-11-09" }, now), false);
+    assert.equal(offerActive({ type: "offer", visible: true, code: "A", until: null }, now), true);
+    assert.equal(offerActive({ type: "offer", visible: true, code: "A", until: "2026-11-10" }, new Date("2026-11-10T23:30:00Z")), false);
+    assert.equal(offerActive(undefined, now), false);
+});
+
+check("Review: Live-Daten nur für eigene Schlüssel (Adresse „constructor“)", () => {
+    assert.equal(liveFor(site.live, "constructor"), null);
+    assert.equal(liveFor(site.live, "apex-vortex")?.members, 1240);
+    assert.equal(liveFor(undefined, "apex-vortex"), null);
+});
+
+check("Review: Version nur mit internen Änderungen", () => {
+    const version = { ...clone(site.changelog.versions[0]), items: [] };
+
+    assert.equal(versionSummary(version), "Diese Version enthält nur interne Änderungen.");
 });
 
 const live = new URL("../../Admin%20Dashboard/data/site/", import.meta.url);

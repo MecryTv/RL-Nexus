@@ -38,6 +38,8 @@ export function countsOf(version: ISiteVersion): Record<ChangeKind, number> {
 export function versionSummary(version: ISiteVersion): string {
     const counts = countsOf(version);
     const total = version.items.length;
+
+    if (total === 0) return "Diese Version enthält nur interne Änderungen.";
     const kinds = KINDS.filter((kind) => counts[kind] > 0).map((kind) => `${counts[kind]} ${counts[kind] === 1 ? KIND[kind].one : KIND[kind].many}`);
     const areas = [...new Set(version.items.map((item) => item.area))];
     const where = areas.length === 1 ? (AREAS[areas[0] ?? ""]?.alone ?? areas[0]) : list(areas.map((area) => areaOf(area).label));

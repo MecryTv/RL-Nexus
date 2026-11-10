@@ -36,3 +36,19 @@ export function readingMinutes(blocks: readonly IBlock[]): number {
 
     return Math.max(1, Math.round(words / 200));
 }
+
+/** „Aktualisiert“ erst, wenn mehr als zehn Minuten zwischen Veröffentlichen und letzter Änderung liegen. Die Zeiten kommen aus Node und der Datenbank und sind nie ganz gleich. */
+export const wasUpdated = (publishedAt: string, updatedAt: string): boolean => Date.parse(updatedAt) - Date.parse(publishedAt) > 10 * 60_000;
+
+/** „22.11.2026, 19:00 bis 21:00 Uhr · Discord“, über zwei Tage mit beiden Daten. */
+export function eventText(event: { readonly startsAt: string; readonly endsAt: string | null; readonly place: string | null }): string {
+    const start = `${day(event.startsAt)}, ${time(event.startsAt)}`;
+    const range = !event.endsAt ? `${start} Uhr` : day(event.endsAt) === day(event.startsAt) ? `${start} bis ${time(event.endsAt)} Uhr` : `${start} Uhr bis ${day(event.endsAt)}, ${time(event.endsAt)} Uhr`;
+
+    return event.place ? `${range} · ${event.place}` : range;
+}
+
+export type NewsFilter = NewsCategory | "changelog";
+
+/** `?art=` aus der Adresse. Unbekanntes (alter Link) gilt als „Alle“. */
+export const newsFilter = (value: string | null): NewsFilter | null => (value === "changelog" || (value !== null && value in CATEGORY) ? (value as NewsFilter) : null);

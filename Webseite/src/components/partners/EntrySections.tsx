@@ -9,7 +9,7 @@ import { Icon } from "../ui/Icon";
 import { Panel } from "../ui/Panel";
 import { EntryLogo } from "./EntryLogo";
 import { OfferCode } from "./SponsorBlock";
-import { monthYear, paragraphs, shortDate } from "./entry";
+import { monthYear, offerActive, paragraphs, shortDate } from "./entry";
 import styles from "./EntrySections.module.scss";
 
 /** Was in die rechte Spalte gehört. Alles andere steht links, in der gespeicherten Reihenfolge. */
@@ -228,7 +228,7 @@ function AsideSection({ entry, section, live }: IEntrySectionProps): JSX.Element
                 </Panel>
             ) : null;
         case "offer":
-            return section.code || section.text ? (
+            return offerActive(section) ? (
                 <div className={[styles.box, styles.offer].join(" ")}>
                     <h3>{section.title ?? "Angebot für die Community"}</h3>
                     {section.text && <p>{section.text}</p>}
@@ -251,7 +251,8 @@ export function EntrySections({ entry, live, place }: { readonly entry: ISiteEnt
     return (
         <>
             {entry.sections.map((section, index) =>
-                section.type !== "stats" && ASIDE_TYPES.has(section.type) === (place === "aside") ? (
+                // Ausgeblendetes zeigt nur die Vorschau der Studios nicht an; der Index bleibt für `abschnitt:<i>`.
+                section.visible && section.type !== "stats" && ASIDE_TYPES.has(section.type) === (place === "aside") ? (
                     <Pick key={`${section.type}-${index}`} part={`abschnitt:${index}`}>
                         <Part entry={entry} section={section} live={live} index={index} />
                     </Pick>
