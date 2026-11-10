@@ -18,6 +18,8 @@ const PreviewPage = lazy(() => import("./pages/PreviewPage").then((m) => ({ defa
 const PricingPage = lazy(() => import("./pages/PricingPage").then((m) => ({ default: m.PricingPage })));
 const PartnersPage = lazy(() => import("./pages/PartnersPage").then((m) => ({ default: m.PartnersPage })));
 const PartnerPage = lazy(() => import("./pages/PartnerPage").then((m) => ({ default: m.PartnerPage })));
+const NewsPage = lazy(() => import("./pages/NewsPage").then((m) => ({ default: m.NewsPage })));
+const NewsPostPage = lazy(() => import("./pages/NewsPostPage").then((m) => ({ default: m.NewsPostPage })));
 const TeamPage = lazy(() => import("./pages/TeamPage").then((m) => ({ default: m.TeamPage })));
 const ContactPage = lazy(() => import("./pages/ContactPage").then((m) => ({ default: m.ContactPage })));
 const LegalPage = lazy(() => import("./pages/LegalPage").then((m) => ({ default: m.LegalPage })));
@@ -56,6 +58,8 @@ export function App({ banner }: { readonly banner: ILoaded<IBanner> | null }): J
                     {/* Die Befehle zeigt der Hilfe-Befehl in Discord (W-0013). Alte Links landen bei den Modulen. */}
                     <Route path="commands" element={<Navigate to="/module" replace />} />
                     <Route path="preise" element={<PricingPage />} />
+                    <Route path="news" element={<NewsPage />} />
+                    <Route path="news/:slug" element={<NewsPostPage />} />
                     <Route path="partner" element={<PartnersPage />} />
                     <Route path="partner/:slug" element={<PartnerPage />} />
                     <Route path="team" element={<TeamPage />} />

@@ -114,11 +114,11 @@
 
 /* W-0062: roter Punkt am Changelog, wenn seit dem letzten Besuch eine Version dazukam. */
 .fresh {
-    display: inline-block;
+    position: absolute;
+    top: 7px;
+    right: 6px;
     width: 6px;
     height: 6px;
-    margin-left: 6px;
-    transform: translateY(-6px);
     border-radius: 50%;
     background: var(--c-red);
 }
@@ -231,6 +231,13 @@
         &::after {
             content: none;
         }
+    }
+
+    /* In der Liste steht der Punkt direkt hinter dem Wort. */
+    .fresh {
+        position: static;
+        margin-right: auto;
+        margin-left: 8px;
     }
 
     .active {

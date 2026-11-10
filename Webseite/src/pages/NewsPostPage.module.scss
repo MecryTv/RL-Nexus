@@ -1,0 +1,135 @@
+@use "mixins" as *;
+
+/* W-0062: Beitragsseite nach Entwurf news-v2 A2. */
+
+.progress {
+    position: sticky;
+    z-index: 5;
+    top: var(--s-header);
+    height: 3px;
+    background: var(--c-line);
+
+    span {
+        display: block;
+        height: 100%;
+        background: var(--c-red);
+        transform: scaleX(0);
+        transform-origin: left;
+    }
+}
+
+.page {
+    padding-top: 40px;
+    padding-bottom: 60px;
+}
+
+.article {
+    max-width: 760px;
+    margin: 0 auto;
+
+    h1 {
+        margin: 14px 0;
+        font-size: clamp(1.8rem, 5vw, 2.5rem);
+        font-weight: 800;
+        line-height: 1.12;
+        overflow-wrap: anywhere;
+    }
+}
+
+.back {
+    color: var(--c-text-dim);
+
+    @include label(0.75rem, 0.16em);
+    @include touch-target;
+
+    &:hover {
+        color: var(--c-text);
+    }
+}
+
+.meta {
+    margin-bottom: 14px;
+}
+
+.event {
+    margin-bottom: 18px;
+    color: var(--c-mod-engagement);
+    font-weight: 600;
+}
+
+.author {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 24px;
+
+    b {
+        display: block;
+    }
+
+    small {
+        color: var(--c-text-faint);
+
+        @include label(0.8125rem, 0.08em);
+    }
+}
+
+.avatar {
+    display: grid;
+    width: 40px;
+    height: 40px;
+    background: rgb(255 30 45 / 12%);
+    box-shadow: inset 0 0 0 1.5px rgb(255 30 45 / 45%);
+    color: var(--c-red-bright);
+    font-family: var(--f-accent);
+    font-size: 0.875rem;
+    font-weight: 700;
+    place-items: center;
+
+    @include bevel-diagonal(9px);
+}
+
+.cover {
+    margin-bottom: 26px;
+    aspect-ratio: 16 / 7;
+
+    @include bevel-diagonal(14px);
+}
+
+.nextPrev {
+    display: grid;
+    gap: 14px;
+    grid-template-columns: 1fr 1fr;
+    max-width: 760px;
+    margin: 34px auto 0;
+    padding-top: 20px;
+    border-top: 1px solid var(--c-line);
+
+    @include below(640px) {
+        grid-template-columns: 1fr;
+    }
+}
+
+.step {
+    padding: 14px 16px;
+
+    small {
+        display: block;
+        color: var(--c-text-faint);
+
+        @include label(0.75rem, 0.14em);
+    }
+
+    a {
+        font-size: 0.95rem;
+        font-weight: 700;
+    }
+}
+
+.stepNext {
+    text-align: right;
+
+    @include below(640px) {
+        text-align: left;
+    }
+}
