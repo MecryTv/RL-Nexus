@@ -67,6 +67,50 @@ export async function checkMedia(): Promise<void> {
             assert.equal(response.statusCode, 200);
             assert.equal((response.json() as { images: unknown[] }).images.length, 1);
         });
+
+        /* --- W-0062 Teil 2: Bilder im Admin anzeigen und von Discord holen --- */
+        const remote = (url: unknown) =>
+            app.inject({
+                method: "POST",
+                url: "/api/media/remote",
+                headers: { cookie, origin: config.publicUrl, "content-type": "application/json" },
+                payload: JSON.stringify({ url }),
+            });
+
+        await check("Bild: der Admin liefert hochgeladene Bilder unter /content/media aus", async () => {
+            const [image] = await listImages(config);
+            const response = await app.inject({ method: "GET", url: image!.url });
+
+            assert.equal(response.statusCode, 200);
+            assert.equal(response.headers["content-type"], "image/webp");
+            assert.match(String(response.headers["cache-control"]), /max-age=3600/);
+            assert.equal((await app.inject({ method: "GET", url: "/content/media/..%2F..%2F.env" })).statusCode, 404);
+            assert.equal((await app.inject({ method: "GET", url: "/content/media/gibtsnicht.webp" })).statusCode, 404);
+        });
+
+        await check("Bild: von Discord nur von cdn.discordapp.com", async () => {
+            assert.equal((await remote("https://example.com/a.png")).statusCode, 400);
+            assert.equal((await remote("https://cdn.discordapp.com.example.com/a.png")).statusCode, 400);
+            assert.equal((await remote(42)).statusCode, 400);
+
+            const real = globalThis.fetch;
+            const icon = createCanvas(4, 4).toBuffer("image/png");
+
+            globalThis.fetch = (async (input: string | URL | Request) => {
+                assert.match(String(input), /^https:\/\/cdn\.discordapp\.com\/icons\//);
+
+                return new Response(new Uint8Array(icon), { status: 200, headers: { "content-type": "image/png" } });
+            }) as typeof fetch;
+
+            try {
+                const response = await remote("https://cdn.discordapp.com/icons/123/abc.png?size=512");
+
+                assert.equal(response.statusCode, 200, response.body);
+                assert.match((response.json() as { url: string }).url, /^\/content\/media\/[0-9a-f]{16}\.webp$/);
+            } finally {
+                globalThis.fetch = real;
+            }
+        });
     } finally {
         await app.close();
         await rm(siteDir, { recursive: true, force: true });

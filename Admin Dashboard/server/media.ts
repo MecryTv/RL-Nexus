@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
-import { mkdir, readdir, rename, stat, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rename, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { createCanvas, loadImage } from "@napi-rs/canvas";
 import { MEDIA_EDGE, MEDIA_MAX, MEDIA_TYPES, type IMedia, type IMediaFile } from "../shared/media.ts";
@@ -80,4 +80,44 @@ export async function listImages(config: IConfig): Promise<IMediaFile[]> {
     );
 
     return files.sort((a, b) => b.at.localeCompare(a.at));
+}
+
+/** Ein Bild aus dem Medienordner für die Vorschau im Admin. Nur Namen, wie sie hier entstehen; sonst null. */
+export async function readMediaFile(config: IConfig, name: string): Promise<{ readonly data: Buffer; readonly type: string } | null> {
+    if (!/^[a-z0-9-]+\.(?:webp|png)$/.test(name)) return null;
+
+    try {
+        return { data: await readFile(path.join(mediaDir(config), name)), type: name.endsWith(".png") ? "image/png" : "image/webp" };
+    } catch {
+        return null;
+    }
+}
+
+const DISCORD_CDN = "https://cdn.discordapp.com/";
+
+/**
+ * W-0062 Teil 2: Logo „Von Discord“ – das Icon eines Servers holen und wie ein
+ * Upload speichern. Nur von Discords CDN, damit der Server keine beliebigen
+ * Adressen abruft.
+ */
+export async function saveRemoteImage(config: IConfig, url: unknown): Promise<IMedia> {
+    if (typeof url !== "string" || !url.startsWith(DISCORD_CDN) || url.length > 300) throw new InvalidInput("Nur Bilder von Discord.");
+
+    let response: Response;
+
+    try {
+        response = await fetch(url, { signal: AbortSignal.timeout(10_000), redirect: "error" });
+    } catch {
+        throw new InvalidInput("Discord liefert das Bild gerade nicht.");
+    }
+
+    const mime = (response.headers.get("content-type") ?? "").split(";")[0]!.trim();
+
+    if (!response.ok || !MEDIA_TYPES.some((type) => type === mime)) throw new InvalidInput("Discord liefert das Bild gerade nicht.");
+
+    const data = Buffer.from(await response.arrayBuffer());
+
+    if (data.length > MEDIA_MAX) throw new InvalidInput("Ein Bild darf höchstens 8 MB groß sein.");
+
+    return saveImage(config, { mime, data: data.toString("base64") });
 }

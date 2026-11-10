@@ -35,7 +35,7 @@ import { internalSecurityRoutes } from "./routes/internal-security.ts";
 import { publicSecurityRoutes } from "./routes/security-public.ts";
 import { securityRoutes } from "./routes/security.ts";
 import { messageRoutes } from "./routes/messages.ts";
-import { mediaRoutes } from "./routes/media.ts";
+import { mediaFileRoutes, mediaRoutes } from "./routes/media.ts";
 import { partnerRoutes } from "./routes/partners.ts";
 import { newsRoutes } from "./routes/news.ts";
 import { changelogRoutes } from "./routes/changelog.ts";
@@ -79,6 +79,7 @@ export async function buildApp(config: IConfig): Promise<FastifyInstance> {
     await app.register(internalServerRoutes, { config });
     await app.register(internalSecurityRoutes, { config });
     await app.register(publicSecurityRoutes, { config });
+    await app.register(mediaFileRoutes, { config });
 
     // Alles hier drin braucht eine Sitzung, die Rolle wird bei jeder Anfrage geprüft.
     await app.register(async (api) => {

@@ -65,7 +65,8 @@ export default defineConfig({
         // Fest, weil die Redirect-URI im Developer Portal diesen Port enthält.
         port: 5174,
         strictPort: true,
-        proxy: { "/api": SERVER, "/public": SERVER },
+        // W-0062 Teil 2: /content/media liefert der Admin-Server (Galerie und Inspektor der Studios).
+        proxy: { "/api": SERVER, "/public": SERVER, "/content": SERVER },
     },
     build: {
         // Keine Quelltext-Karten im ausgelieferten Stand, wie auf der Webseite.
