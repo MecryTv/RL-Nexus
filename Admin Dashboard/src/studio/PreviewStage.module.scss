@@ -1,0 +1,40 @@
+@use "mixins" as *;
+
+/* W-0062 Teil 2: die Bühne der Studios, die Webseite im iframe. */
+
+.preview {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    border: 1px solid var(--c-line);
+    background: #020304;
+}
+
+.note {
+    margin: 0;
+    padding: var(--s-2) var(--s-3);
+    border-bottom: 1px solid var(--c-line);
+    color: var(--c-text-dim);
+    font-size: 0.8125rem;
+    line-height: 1.5;
+}
+
+.stage {
+    display: flex;
+    justify-content: center;
+    background: var(--c-base);
+}
+
+.frame {
+    width: 100%;
+    height: min(78vh, 900px);
+    border: 0;
+    background: var(--c-base);
+
+    &[data-device="handy"] {
+        width: 390px;
+        max-width: 100%;
+        border-right: 1px solid var(--c-line);
+        border-left: 1px solid var(--c-line);
+    }
+}

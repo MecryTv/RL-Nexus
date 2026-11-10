@@ -20,9 +20,18 @@ const STATUSES = Object.values(ModuleStatus);
 
 type Draft = IPreviewMessage | IPartnerPreview | INewsPreview;
 
-const tell = (message: { readonly type: string; readonly part: string; readonly action?: PickAction }): void => {
-    if (window.parent !== window) window.parent.postMessage(message, ADMIN_ORIGIN);
+/**
+ * Wem die Seite antwortet: dem Rahmen im Admin Dashboard oder, bei „Vorschau ↗“
+ * in einem neuen Tab, dem Fenster, das ihn geöffnet hat. Immer nur an ADMIN_ORIGIN.
+ */
+const host = (): Window | null => (window.parent !== window ? window.parent : (window.opener as Window | null));
+
+const tell = (message: { readonly type: string; readonly part?: string; readonly action?: PickAction }): void => {
+    host()?.postMessage(message, ADMIN_ORIGIN);
 };
+
+const isStudioDraft = (data: unknown): boolean =>
+    typeof data === "object" && data !== null && ["rlnexus:vorschau-partner", "rlnexus:vorschau-news"].includes(String((data as { type?: unknown }).type));
 
 /** Links führen in der Vorschau nirgendwohin: Ein Klick soll wählen, nicht die Seite im Rahmen wechseln. */
 const stayHere = (event: MouseEvent): void => {
@@ -78,6 +87,9 @@ export function PreviewPage(): JSX.Element {
 
             if (isPartnerPreview(event.data) || isNewsPreview(event.data)) {
                 setDraft(event.data);
+            } else if (isStudioDraft(event.data)) {
+                // Ein Entwurf aus einem Studio, der die Prüfung nicht besteht: Es bleibt der letzte gültige Stand.
+                tell({ type: "rlnexus:vorschau-ungueltig" });
             } else if (isPreviewMessage(event.data, STATUSES)) {
                 setCategories(event.data.categories);
                 setDraft(event.data);
@@ -86,7 +98,7 @@ export function PreviewPage(): JSX.Element {
 
         window.addEventListener("message", receive);
         // Sagen, dass die Seite bereit ist. Erst danach schickt das Dashboard den Entwurf.
-        if (window.parent !== window) window.parent.postMessage({ type: "rlnexus:vorschau-bereit" }, ADMIN_ORIGIN);
+        tell({ type: "rlnexus:vorschau-bereit" });
 
         return () => {
             window.removeEventListener("message", receive);

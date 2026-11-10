@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { History } from "../../src/studio/history.ts";
 import { partShortcut, studioShortcut } from "../../src/studio/shortcut.ts";
+import { partIndex, readStageMessage } from "../../src/studio/stage.ts";
 import { berlinToIso, isoToBerlin, todayBerlin } from "../../src/studio/time.ts";
 import { check, section } from "./harness.ts";
 
@@ -59,5 +60,18 @@ export async function checkStudio(): Promise<void> {
         assert.equal(isoToBerlin("2026-11-12T17:00:00.000Z"), "2026-11-12T18:00");
         assert.equal(isoToBerlin("2026-07-01T16:00:00.000Z"), "2026-07-01T18:00");
         assert.equal(todayBerlin(new Date("2026-11-10T23:30:00Z")), "2026-11-11");
+    });
+
+    await check("Studio: Nachrichten der Bühne nur in gültiger Form", () => {
+        assert.deepEqual(readStageMessage({ type: "rlnexus:vorschau-wahl", part: "abschnitt:2" }), { kind: "wahl", part: "abschnitt:2" });
+        assert.equal(readStageMessage({ type: "rlnexus:vorschau-wahl", part: "block:<img>" }), null);
+        assert.equal(readStageMessage({ type: "rlnexus:vorschau-aktion", part: "block:1", action: "sprengen" }), null);
+        assert.deepEqual(readStageMessage({ type: "rlnexus:vorschau-aktion", part: "block:1", action: "kopie" }), { kind: "aktion", part: "block:1", action: "kopie" });
+        assert.deepEqual(readStageMessage({ type: "rlnexus:vorschau-ungueltig" }), { kind: "ungueltig" });
+        assert.deepEqual(readStageMessage({ type: "rlnexus:vorschau-bereit" }), { kind: "bereit" });
+        assert.equal(readStageMessage("rlnexus:vorschau-bereit"), null);
+        assert.equal(partIndex("block:12", "block"), 12);
+        assert.equal(partIndex("kopf", "block"), null);
+        assert.equal(partIndex("abschnitt:3", "block"), null);
     });
 }

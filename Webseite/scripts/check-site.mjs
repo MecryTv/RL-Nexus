@@ -281,6 +281,13 @@ check("Review: Version nur mit internen Änderungen", () => {
     assert.equal(versionSummary(version), "Diese Version enthält nur interne Änderungen.");
 });
 
+check("Vorschau: Antwort auch an ein geöffnetes Fenster, Meldung bei ungültigem Entwurf (Teil 2)", () => {
+    const page = readFileSync(new URL("../src/pages/PreviewPage.tsx", import.meta.url), "utf8");
+
+    assert.ok(page.includes("window.opener"), "window.opener");
+    assert.ok(page.includes("rlnexus:vorschau-ungueltig"), "vorschau-ungueltig");
+});
+
 const live = new URL("../../Admin%20Dashboard/data/site/", import.meta.url);
 const stored = (file) => {
     try {
