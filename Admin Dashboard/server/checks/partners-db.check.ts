@@ -14,6 +14,8 @@ import { createPost, deletePost, duePosts, getPost, markPublished, updatePost } 
 import { createEntry, deleteEntry, getEntry, listEntries, updateEntry } from "../partners/store.ts";
 import { publishSite } from "../site/publish.ts";
 import { newEntry } from "../../src/partners/draft.ts";
+import { newPost } from "../../src/news/draft.ts";
+import { berlinToIso, isoToBerlin } from "../../src/studio/time.ts";
 import { SESSION_COOKIE, seal } from "../session.ts";
 import { SECRET, check, section } from "./harness.ts";
 
@@ -154,6 +156,26 @@ export async function checkPartnerRoutesDb(config: IConfig, shared: IHttp): Prom
             assert.equal((await http.write("PUT", `/api/groups/${hand}`, { group: "premium" })).statusCode, 204);
             assert.equal((await http.write("DELETE", `/api/groups/${hand}`)).statusCode, 204);
             assert.ok(!fake.discordCalls.includes(`rolle- ${hand} ${role}`));
+        });
+
+        await check("News: Entwurf und geplanter Beitrag stehen nicht auf der Webseite, veröffentlichter schon (Teil 2)", async () => {
+            const site = async (): Promise<string[]> =>
+                ((JSON.parse(await readFile(path.join(config.siteDir, "news.json"), "utf8")) as { data: { posts: { slug: string }[] } }).data.posts).map((post) => post.slug);
+            const draft = await http.write("POST", "/api/news", { ...newPost("beitrag"), title: "Check DB Entwurf", summary: "Aus check:db." });
+
+            assert.equal(draft.statusCode, 200, draft.body);
+            assert.ok(!(await site()).includes(draft.json().post.slug), "Entwurf auf der Webseite");
+
+            const later = berlinToIso(isoToBerlin(new Date(Date.now() + 3600_000).toISOString()));
+            const scheduled = await http.write("POST", "/api/news", { ...newPost("beitrag"), title: "Check DB Geplant", summary: "Aus check:db.", status: "scheduled", publishAt: later });
+
+            assert.equal(scheduled.statusCode, 200, scheduled.body);
+            assert.ok(!(await site()).includes(scheduled.json().post.slug), "Geplanter Beitrag schon auf der Webseite");
+
+            const published = await http.write("PUT", `/api/news/${draft.json().post.id}`, { ...newPost("beitrag"), title: "Check DB Entwurf", summary: "Aus check:db.", status: "published" });
+
+            assert.equal(published.statusCode, 200, published.body);
+            assert.ok((await site()).includes(draft.json().post.slug), "Veröffentlichter Beitrag fehlt");
         });
 
         await check("Versteckter Partner verschwindet auch aus den News-Dateien", async () => {
