@@ -1,0 +1,333 @@
+@use "mixins" as *;
+
+/* W-0062: Bausteine des Changelogs (Entwürfe changelog-v3 C10 und changelog-v2 C7). */
+
+.share {
+    display: flex;
+    gap: 2px;
+    width: 100%;
+    max-width: 260px;
+    height: 4px;
+
+    i {
+        flex-basis: 0;
+        background: var(--c);
+    }
+}
+
+.counts {
+    color: var(--c-text-faint);
+
+    @include label(0.8125rem, 0.04em);
+
+    b {
+        font-weight: 600;
+    }
+}
+
+.meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+    color: var(--c-text-faint);
+
+    @include label(0.8125rem, 0.06em);
+}
+
+.newest {
+    padding: 5px 10px 4px;
+    background: rgb(255 30 45 / 12%);
+    box-shadow: inset 0 0 0 1px rgb(255 30 45 / 45%);
+    color: var(--c-red-bright);
+    line-height: 1;
+
+    @include label(0.75rem, 0.16em);
+}
+
+.more {
+    color: var(--c-red-bright);
+
+    @include label(0.78rem, 0.14em);
+}
+
+.stretch {
+    transition: color var(--t-fast);
+
+    &::after {
+        position: absolute;
+        content: "";
+        inset: 0;
+    }
+
+    &:hover {
+        color: var(--c-red-bright);
+    }
+
+    &:focus-visible {
+        outline: none;
+
+        &::after {
+            outline: 2px solid var(--c-text);
+            outline-offset: -4px;
+        }
+    }
+}
+
+/* Das Bild aus dem Discord-Post. Die Höhe hält Platz, bis es geladen ist. */
+.post {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 16 / 10;
+    background: var(--c-panel-solid);
+    object-fit: cover;
+    object-position: top;
+}
+
+/* --- Neueste Version ---------------------------------------------------- */
+.latest {
+    display: grid;
+    align-items: stretch;
+    grid-template-columns: 1.15fr 1fr;
+
+    .post {
+        height: 100%;
+        aspect-ratio: auto;
+        min-height: 280px;
+    }
+
+    @include below(860px) {
+        grid-template-columns: 1fr;
+
+        .post {
+            height: auto;
+            min-height: 0;
+            aspect-ratio: 16 / 10;
+        }
+    }
+}
+
+.latestBody {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 0;
+    padding: 30px 34px 28px;
+    border-left: 1px solid var(--c-line);
+
+    h2 {
+        font-size: clamp(1.35rem, 3vw, 1.75rem);
+        font-weight: 800;
+        line-height: 1.15;
+    }
+
+    .more {
+        margin-top: auto;
+        padding-top: 10px;
+    }
+
+    @include below(860px) {
+        padding: 22px 20px;
+        border-top: 1px solid var(--c-line);
+        border-left: 0;
+    }
+}
+
+.latestNumber {
+    color: var(--c-red-bright);
+    font-family: var(--f-accent);
+    font-size: clamp(2rem, 5vw, 2.75rem);
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    line-height: 1;
+}
+
+.sum {
+    color: var(--c-text-dim);
+    font-size: 0.95rem;
+    line-height: 1.55;
+}
+
+.peek {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 4px;
+    font-size: 0.95rem;
+
+    li {
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+
+        &::before {
+            flex-shrink: 0;
+            width: 8px;
+            height: 8px;
+            background: var(--c);
+            clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+            content: "";
+            transform: translateY(-1px);
+        }
+    }
+
+    @include below(640px) {
+        display: none;
+    }
+}
+
+/* --- Ältere Versionen --------------------------------------------------- */
+.card {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+
+    @include below(640px) {
+        display: grid;
+        align-items: center;
+        gap: 14px;
+        grid-template-columns: 96px 1fr;
+        padding: 10px;
+
+        .post {
+            aspect-ratio: 4 / 3;
+
+            @include bevel-diagonal(8px);
+        }
+    }
+}
+
+.cardBody {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+    padding: 18px 20px 20px;
+    border-top: 1px solid var(--c-line);
+
+    h3 {
+        font-size: 1.0625rem;
+        font-weight: 800;
+        line-height: 1.3;
+    }
+
+    @include below(640px) {
+        gap: 5px;
+        padding: 0;
+        border-top: 0;
+
+        h3 {
+            font-size: 0.95rem;
+        }
+    }
+}
+
+.cardNumber {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 12px;
+    color: var(--c-red-bright);
+    font-family: var(--f-accent);
+    font-size: 1.125rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    line-height: 1;
+
+    @include below(640px) {
+        font-size: 0.95rem;
+    }
+}
+
+.cardDate {
+    color: var(--c-text-faint);
+    font-family: var(--f-label);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+}
+
+.cardShare {
+    max-width: none;
+    margin-top: 2px;
+}
+
+/* --- Discord-Kasten ----------------------------------------------------- */
+.discord {
+    display: grid;
+    align-items: center;
+    gap: 6px 14px;
+    grid-template-columns: auto 1fr;
+    padding: 18px 20px;
+    background:
+        linear-gradient(100deg, rgb(0 175 255 / 12%), rgb(0 175 255 / 2%) 60%),
+        var(--c-panel-fill);
+    box-shadow: inset 0 0 0 1px rgb(0 175 255 / 35%);
+
+    @include bevel-diagonal(14px);
+
+    h3 {
+        font-size: 1rem;
+        font-weight: 800;
+    }
+
+    p {
+        color: var(--c-text-dim);
+        font-size: 0.875rem;
+    }
+
+    > div:last-child {
+        grid-column: 2;
+        margin-top: 8px;
+    }
+}
+
+.discordIcon {
+    display: grid;
+    width: 44px;
+    height: 44px;
+    background: rgb(0 175 255 / 12%);
+    color: var(--c-blue);
+    grid-row: span 2;
+    place-items: center;
+
+    @include bevel-diagonal(9px);
+}
+
+/* Schmal: Symbol oben, Text und Knopf darunter über die ganze Breite. */
+.discordNarrow {
+    grid-template-columns: 1fr;
+
+    .discordIcon {
+        grid-row: auto;
+    }
+
+    > div:last-child {
+        grid-column: 1;
+    }
+}
+
+/* Breit: Symbol, Text und Knopf in einer Zeile. */
+.discordWide {
+    grid-template-columns: auto 1fr auto;
+
+    .discordIcon {
+        grid-row: auto;
+        width: 54px;
+        height: 54px;
+    }
+
+    > div:last-child {
+        grid-column: auto;
+        margin-top: 0;
+    }
+
+    @include below(640px) {
+        grid-template-columns: auto 1fr;
+
+        > div:last-child {
+            grid-column: 1 / -1;
+        }
+    }
+}

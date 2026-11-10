@@ -1,0 +1,223 @@
+@use "mixins" as *;
+
+/* W-0062: /changelog nach Entwurf changelog-v3 C10. */
+
+.headerActions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 6px;
+}
+
+.gallery {
+    display: grid;
+    align-items: start;
+    gap: 36px;
+    grid-template-columns: 236px minmax(0, 1fr);
+
+    @include below(980px) {
+        gap: 22px;
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+.empty {
+    display: grid;
+    gap: 18px;
+    grid-column: 1 / -1;
+
+    p {
+        color: var(--c-text-dim);
+    }
+}
+
+/* --- Leiste ------------------------------------------------------------- */
+.rail {
+    position: sticky;
+    top: calc(var(--s-header) + 20px);
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+
+    @include below(980px) {
+        position: static;
+        flex-direction: row;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 12px 18px;
+    }
+}
+
+.total {
+    font-family: var(--f-accent);
+    font-size: 2.75rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    line-height: 1;
+
+    small {
+        display: block;
+        margin-top: 6px;
+        color: var(--c-text-faint);
+
+        @include label(0.75rem, 0.16em);
+    }
+
+    @include below(980px) {
+        font-size: 2rem;
+    }
+}
+
+.months {
+    display: flex;
+    flex-direction: column;
+
+    button {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+        width: 100%;
+        padding: 10px 2px;
+        border-bottom: 1px solid var(--c-line);
+        color: var(--c-text-dim);
+        cursor: pointer;
+        font: inherit;
+        font-size: 0.875rem;
+        text-align: left;
+
+        @include touch-target;
+
+        &:hover {
+            color: var(--c-text);
+        }
+
+        &[aria-current="true"] {
+            padding-left: 10px;
+            border-left: 2px solid var(--c-red);
+            color: var(--c-text);
+        }
+
+        &:focus-visible {
+            @include focus-ring;
+        }
+    }
+
+    /* Am Handy: Monate als Knöpfe nebeneinander. */
+    @include below(980px) {
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 8px;
+
+        button {
+            gap: 8px;
+            width: auto;
+            padding: 7px 12px;
+            border: 0;
+            background: rgb(255 255 255 / 4%);
+            box-shadow: inset 0 0 0 1px var(--c-line);
+
+            &[aria-current="true"] {
+                padding-left: 12px;
+                border: 0;
+                background: rgb(255 30 45 / 16%);
+                box-shadow: inset 0 0 0 1px rgb(255 30 45 / 55%);
+            }
+        }
+    }
+}
+
+.monthShort {
+    display: none;
+}
+
+@include below(980px) {
+    .monthLong {
+        display: none;
+    }
+
+    .monthShort {
+        display: inline;
+    }
+}
+
+.monthCount {
+    color: var(--c-text-faint);
+
+    @include label(0.8125rem, 0.06em);
+}
+
+.railDiscord {
+    @include below(980px) {
+        display: none;
+    }
+}
+
+.endDiscord {
+    display: none;
+    margin-top: 26px;
+
+    @include below(980px) {
+        display: block;
+    }
+}
+
+/* --- Hauptspalte -------------------------------------------------------- */
+.main {
+    min-width: 0;
+}
+
+.month {
+    margin-top: 34px;
+    scroll-margin-top: calc(var(--s-header) + 16px);
+}
+
+.monthHead {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 12px;
+    color: var(--c-red-bright);
+    font-family: var(--f-accent);
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+
+    span {
+        color: var(--c-text-faint);
+
+        @include label(0.75rem, 0.12em);
+    }
+
+    &::after {
+        flex: 1;
+        height: 1px;
+        background: var(--c-line-strong);
+        content: "";
+    }
+}
+
+.grid {
+    display: grid;
+    gap: 20px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+
+    li {
+        display: flex;
+
+        > * {
+            width: 100%;
+        }
+    }
+
+    @include below(640px) {
+        gap: 10px;
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+.loadMore {
+    display: flex;
+    justify-content: center;
+    margin-top: 22px;
+}

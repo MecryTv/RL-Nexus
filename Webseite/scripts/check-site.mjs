@@ -9,6 +9,7 @@ import { parseMarkdown } from "../src/services/markdown.ts";
 import { categoryCounts, isNew, pinned, shares, timeline, upcoming } from "../src/services/news.ts";
 import { navigationFor } from "../src/services/navigation.ts";
 import { playerOf } from "../src/services/video.ts";
+import { versionSummary } from "../src/components/changelog/meta.ts";
 
 const site = JSON.parse(readFileSync(new URL("./fixtures/site.json", import.meta.url), "utf8"));
 const clone = (value) => structuredClone(value);
@@ -183,6 +184,18 @@ check("Video: YouTube und Twitch werden zum Player, alles andere nicht", () => {
     assert.equal(playerOf("https://www.youtube.com/@rlnexus", host), null);
     assert.equal(playerOf("https://example.com/watch?v=dQw4w9WgXcQ", host), null);
     assert.equal(playerOf("kein Link", host), null);
+});
+
+check("Changelog: Satz zu einer Version mit Zahlen und Bereichen", () => {
+    const version = (items) => ({ ...clone(site.changelog.versions[0]), items });
+    const item = (kind, area) => ({ kind, area, text: "x" });
+
+    assert.equal(
+        versionSummary(version([item("neu", "bot"), item("neu", "admin"), item("verbessert", "dashboard"), item("behoben", "bot")])),
+        "4 Änderungen: 2 neue Funktionen, 1 Verbesserung und 1 behobener Fehler für Bot, Admin und Bot-Dashboard."
+    );
+    assert.equal(versionSummary(version([item("behoben", "webseite"), item("behoben", "webseite")])), "2 Änderungen: 2 behobene Fehler für die Webseite.");
+    assert.equal(versionSummary(version([item("neu", "bot")])), "1 Änderung: 1 neue Funktion für den Bot.");
 });
 
 const live = new URL("../../Admin%20Dashboard/data/site/", import.meta.url);
