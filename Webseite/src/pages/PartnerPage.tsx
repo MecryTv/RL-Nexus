@@ -9,6 +9,7 @@ import { PageLoader } from "../components/ui/PageLoader";
 import { Panel } from "../components/ui/Panel";
 import { EntryLogo } from "../components/partners/EntryLogo";
 import { EntrySections } from "../components/partners/EntrySections";
+import { Pick } from "../components/preview/Pick";
 import { PartnerCard } from "../components/partners/PartnerCard";
 import { ENTRY_COLOR, linksOf, monthYear, sectionOf } from "../components/partners/entry";
 import partnerStyles from "../components/partners/partners.module.scss";
@@ -24,7 +25,8 @@ const SHORT_LINK: Readonly<Record<string, string>> = { x: "X", twitch: "TW", you
 export function EntryView({ entry, live }: { readonly entry: ISiteEntry; readonly live: ISiteServer | null }): JSX.Element {
     const color = ENTRY_COLOR[entry.color];
     const sponsor = entry.kind === "sponsor";
-    const stats = sectionOf(entry, "stats")?.items ?? [];
+    const statsSection = sectionOf(entry, "stats");
+    const stats = statsSection?.items ?? [];
     const links = linksOf(entry);
     const website = links.find((link) => link.key === "website");
     const discord = links.find((link) => link.key === "discord");
@@ -33,67 +35,71 @@ export function EntryView({ entry, live }: { readonly entry: ISiteEntry; readonl
 
     return (
         <article className={styles.view} style={{ "--c": color } as CSSProperties}>
-            <div className={styles.banner} style={entry.banner ? { backgroundImage: `url("${entry.banner}")` } : undefined}>
-                <div className={["u-shell", styles.backRow].join(" ")}>
-                    <Link className={styles.back} to="/partner">
-                        ← Partner/Sponsorings
-                    </Link>
-                </div>
-            </div>
-
-            <header className={["u-shell", styles.head].join(" ")}>
-                <EntryLogo name={entry.name} logo={entry.logo} color={entry.color} size="xl" />
-                <div className={styles.identity}>
-                    <div className={partnerStyles.tags}>
-                        <span className={partnerStyles.tag}>{entry.typeLabel}</span>
-                        {entry.subtitle && <span className={[partnerStyles.tag, partnerStyles.quiet].join(" ")}>{entry.subtitle}</span>}
+            <Pick part="kopf">
+                <div className={styles.banner} style={entry.banner ? { backgroundImage: `url("${entry.banner}")` } : undefined}>
+                    <div className={["u-shell", styles.backRow].join(" ")}>
+                        <Link className={styles.back} to="/partner">
+                            ← Partner/Sponsorings
+                        </Link>
                     </div>
-                    <h1>{entry.name}</h1>
-                    {since && (
-                        <p className={styles.sub}>
-                            {sponsor ? "Sponsor" : "Partner"} seit {since}
-                        </p>
-                    )}
                 </div>
-                <div className={styles.actions}>
-                    {sponsor && website && (
-                        <Button href={website.href} trailingIcon="arrow-up-right">
-                            Webseite besuchen
-                        </Button>
-                    )}
-                    {discord && (
-                        <Button href={discord.href} variant={sponsor ? "outline" : "primary"} icon="discord">
-                            Discord beitreten
-                        </Button>
-                    )}
-                    {!sponsor && website && (
-                        <Button href={website.href} variant="outline" trailingIcon="arrow-up-right">
-                            Webseite
-                        </Button>
-                    )}
-                    {small.length > 0 && (
-                        <div className={styles.icons}>
-                            {small.map((link) => (
-                                <a key={link.key} href={link.href} target="_blank" rel="noopener noreferrer" aria-label={link.label} title={link.label}>
-                                    {SHORT_LINK[link.key] ?? link.label}
-                                </a>
-                            ))}
-                        </div>
-                    )}
-                </div>
-            </header>
 
-            {stats.length > 0 && (
-                <div className="u-shell">
-                    <Panel as="dl" className={styles.stats} cut="sm" style={{ "--n": stats.length } as CSSProperties}>
-                        {stats.map((item) => (
-                            <div key={item.label}>
-                                <dt>{item.label}</dt>
-                                <dd>{item.value ?? item.text ?? ""}</dd>
+                <header className={["u-shell", styles.head].join(" ")}>
+                    <EntryLogo name={entry.name} logo={entry.logo} color={entry.color} size="xl" />
+                    <div className={styles.identity}>
+                        <div className={partnerStyles.tags}>
+                            <span className={partnerStyles.tag}>{entry.typeLabel}</span>
+                            {entry.subtitle && <span className={[partnerStyles.tag, partnerStyles.quiet].join(" ")}>{entry.subtitle}</span>}
+                        </div>
+                        <h1>{entry.name}</h1>
+                        {since && (
+                            <p className={styles.sub}>
+                                {sponsor ? "Sponsor" : "Partner"} seit {since}
+                            </p>
+                        )}
+                    </div>
+                    <div className={styles.actions}>
+                        {sponsor && website && (
+                            <Button href={website.href} trailingIcon="arrow-up-right">
+                                Webseite besuchen
+                            </Button>
+                        )}
+                        {discord && (
+                            <Button href={discord.href} variant={sponsor ? "outline" : "primary"} icon="discord">
+                                Discord beitreten
+                            </Button>
+                        )}
+                        {!sponsor && website && (
+                            <Button href={website.href} variant="outline" trailingIcon="arrow-up-right">
+                                Webseite
+                            </Button>
+                        )}
+                        {small.length > 0 && (
+                            <div className={styles.icons}>
+                                {small.map((link) => (
+                                    <a key={link.key} href={link.href} target="_blank" rel="noopener noreferrer" aria-label={link.label} title={link.label}>
+                                        {SHORT_LINK[link.key] ?? link.label}
+                                    </a>
+                                ))}
                             </div>
-                        ))}
-                    </Panel>
-                </div>
+                        )}
+                    </div>
+                </header>
+            </Pick>
+
+            {statsSection && stats.length > 0 && (
+                <Pick part={`abschnitt:${entry.sections.indexOf(statsSection)}`}>
+                    <div className="u-shell">
+                        <Panel as="dl" className={styles.stats} cut="sm" style={{ "--n": stats.length } as CSSProperties}>
+                            {stats.map((item) => (
+                                <div key={item.label}>
+                                    <dt>{item.label}</dt>
+                                    <dd>{item.value ?? item.text ?? ""}</dd>
+                                </div>
+                            ))}
+                        </Panel>
+                    </div>
+                </Pick>
             )}
 
             <div className={["u-shell", styles.body].join(" ")}>

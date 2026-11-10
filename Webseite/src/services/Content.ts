@@ -406,12 +406,14 @@ export function isSitePartners(data: unknown): data is import("../domain/interfa
     return new Set(data.entries.map((entry: unknown) => (entry as Shape).slug)).size === data.entries.length;
 }
 
-export function isSiteLive(data: unknown): data is import("../domain/interfaces/ISiteContent").ISiteLive {
+function isServer(server: unknown): boolean {
     const isTeam = (team: unknown): boolean =>
         isShape(team) && isText(team.name) && isNullable(team.group, isText) && isNullable(team.mmr, isCount) && isNullable(team.rank, isText) && isCount(team.players);
-    const isServer = (server: unknown): boolean =>
-        isShape(server) && isCount(server.members) && isCount(server.online) && isTextList(server.modules) && Array.isArray(server.teams) && server.teams.every(isTeam);
 
+    return isShape(server) && isCount(server.members) && isCount(server.online) && isTextList(server.modules) && Array.isArray(server.teams) && server.teams.every(isTeam);
+}
+
+export function isSiteLive(data: unknown): data is import("../domain/interfaces/ISiteContent").ISiteLive {
     return isShape(data) && isDate(data.at) && isShape(data.servers) && Object.entries(data.servers).every(([slug, server]) => SLUG.test(slug) && isServer(server));
 }
 
@@ -504,4 +506,45 @@ export function isSiteChangelog(data: unknown): data is import("../domain/interf
         isNullable(version.discordUrl, isDiscord);
 
     return isShape(data) && Array.isArray(data.versions) && data.versions.every(isVersion);
+}
+
+/* --- Vorschau für die Studios im Admin Dashboard (W-0062 Teil 2) ----------
+ * Dieselben Prüfungen wie für veröffentlichte Dateien. Teile: kopf, titelbild,
+ * block:<i> (News), abschnitt:<i> (Partner).
+ */
+
+export type PreviewPart = string;
+export type PartnerPreviewView = "gross" | "karte" | "leiste";
+
+export interface IPartnerPreview {
+    readonly type: "rlnexus:vorschau-partner";
+    readonly view: PartnerPreviewView;
+    readonly entry: import("../domain/interfaces/ISiteContent").ISiteEntry;
+    readonly live: import("../domain/interfaces/ISiteContent").ISiteServer | null;
+    readonly selected: PreviewPart | null;
+}
+
+export interface INewsPreview {
+    readonly type: "rlnexus:vorschau-news";
+    readonly post: import("../domain/interfaces/ISiteContent").ISiteNewsPost;
+    readonly selected: PreviewPart | null;
+}
+
+const PART = /^(?:kopf|titelbild|block:\d{1,3}|abschnitt:\d{1,3})$/;
+
+const isPart = (value: unknown): boolean => value === null || (typeof value === "string" && PART.test(value));
+
+export function isPartnerPreview(data: unknown): data is IPartnerPreview {
+    return (
+        isShape(data) &&
+        data.type === "rlnexus:vorschau-partner" &&
+        (data.view === "gross" || data.view === "karte" || data.view === "leiste") &&
+        isEntry(data.entry) &&
+        isNullable(data.live, isServer) &&
+        isPart(data.selected)
+    );
+}
+
+export function isNewsPreview(data: unknown): data is INewsPreview {
+    return isShape(data) && data.type === "rlnexus:vorschau-news" && isSiteNewsPost(data.post) && isPart(data.selected);
 }

@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import type { ISiteEntry } from "../../domain/interfaces/ISiteContent";
 import { Overlay } from "../../shop/Overlay";
 import { Icon } from "../ui/Icon";
+import { Pick } from "../preview/Pick";
 import { EntryLogo } from "./EntryLogo";
 import { OfferCode } from "./SponsorBlock";
 import { ENTRY_COLOR, linksOf, monthYear, sectionOf } from "./entry";
@@ -25,6 +26,8 @@ export function SupporterView({ entry, position, count, onPrev, onNext, onClose,
     const help = sectionOf(entry, "help");
     const offer = sectionOf(entry, "offer");
     const since = monthYear(entry.since);
+    // In der Vorschau wählbar wie die Abschnitte eines Partners; ohne eigenen Abschnitt ist es der Kopf.
+    const partOf = (section: typeof intro): string => (section ? `abschnitt:${entry.sections.indexOf(section)}` : "kopf");
 
     return (
         <div className={styles.supporter} style={{ "--c": ENTRY_COLOR[entry.color] } as CSSProperties}>
@@ -33,16 +36,20 @@ export function SupporterView({ entry, position, count, onPrev, onNext, onClose,
                     <Icon name="close" size={20} />
                 </button>
             )}
-            <div className={styles.supporterArt} style={entry.banner ? { backgroundImage: `url("${entry.banner}")` } : undefined} />
-            <div className={styles.supporterHead}>
-                <EntryLogo name={entry.name} logo={entry.logo} color={entry.color} size="lg" />
-                <div>
-                    <span className={[styles.tag, styles.quiet].join(" ")}>Unterstützer{entry.subtitle ? ` · ${entry.subtitle}` : ""}</span>
-                    <h2 id={titleId}>{entry.name}</h2>
+            <Pick part="kopf">
+                <div className={styles.supporterArt} style={entry.banner ? { backgroundImage: `url("${entry.banner}")` } : undefined} />
+                <div className={styles.supporterHead}>
+                    <EntryLogo name={entry.name} logo={entry.logo} color={entry.color} size="lg" />
+                    <div>
+                        <span className={[styles.tag, styles.quiet].join(" ")}>Unterstützer{entry.subtitle ? ` · ${entry.subtitle}` : ""}</span>
+                        <h2 id={titleId}>{entry.name}</h2>
+                    </div>
                 </div>
-            </div>
+            </Pick>
             <div className={styles.supporterBody}>
-                <p>{intro?.visible !== false && intro?.text ? intro.text : entry.shortText}</p>
+                <Pick part={partOf(intro)}>
+                    <p>{intro?.visible !== false && intro?.text ? intro.text : entry.shortText}</p>
+                </Pick>
                 <dl className={styles.facts}>
                     {since && (
                         <div>
@@ -60,14 +67,16 @@ export function SupporterView({ entry, position, count, onPrev, onNext, onClose,
                     </div>
                 </dl>
                 {help?.items && help.items.length > 0 && (
-                    <div>
-                        <h3 className={styles.miniHead}>{help.title ?? `Wie ${entry.name} hilft`}</h3>
-                        <ul className={styles.helpList}>
-                            {help.items.map((item) => (
-                                <li key={item.label}>{item.label}</li>
-                            ))}
-                        </ul>
-                    </div>
+                    <Pick part={partOf(help)}>
+                        <div>
+                            <h3 className={styles.miniHead}>{help.title ?? `Wie ${entry.name} hilft`}</h3>
+                            <ul className={styles.helpList}>
+                                {help.items.map((item) => (
+                                    <li key={item.label}>{item.label}</li>
+                                ))}
+                            </ul>
+                        </div>
+                    </Pick>
                 )}
                 {entry.tournaments.length > 0 && (
                     <div>
@@ -81,7 +90,11 @@ export function SupporterView({ entry, position, count, onPrev, onNext, onClose,
                         </div>
                     </div>
                 )}
-                {offer?.code && <OfferCode code={offer.code} note={offer.title} />}
+                {offer?.code && (
+                    <Pick part={partOf(offer)}>
+                        <OfferCode code={offer.code} note={offer.title} />
+                    </Pick>
+                )}
             </div>
             <div className={styles.supporterFoot}>
                 {linksOf(entry).map((link) => (

@@ -4,6 +4,7 @@ import type { ISection, ISiteEntry, ISiteServer, SectionType } from "../../domai
 import { categoryOf } from "../../services/categories";
 import { moduleRegistry } from "../../services/registry";
 import { VideoEmbed } from "../news/VideoEmbed";
+import { Pick } from "../preview/Pick";
 import { Icon } from "../ui/Icon";
 import { Panel } from "../ui/Panel";
 import { EntryLogo } from "./EntryLogo";
@@ -251,7 +252,9 @@ export function EntrySections({ entry, live, place }: { readonly entry: ISiteEnt
         <>
             {entry.sections.map((section, index) =>
                 section.type !== "stats" && ASIDE_TYPES.has(section.type) === (place === "aside") ? (
-                    <Part key={`${section.type}-${index}`} entry={entry} section={section} live={live} index={index} />
+                    <Pick key={`${section.type}-${index}`} part={`abschnitt:${index}`}>
+                        <Part entry={entry} section={section} live={live} index={index} />
+                    </Pick>
                 ) : null
             )}
         </>

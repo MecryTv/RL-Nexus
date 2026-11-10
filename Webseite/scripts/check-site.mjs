@@ -4,7 +4,7 @@
  */
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { isSiteChangelog, isSiteLive, isSiteNews, isSiteNewsPost, isSitePartners } from "../src/services/Content.ts";
+import { isNewsPreview, isPartnerPreview, isSiteChangelog, isSiteLive, isSiteNews, isSiteNewsPost, isSitePartners } from "../src/services/Content.ts";
 import { parseMarkdown } from "../src/services/markdown.ts";
 import { categoryCounts, isNew, pinned, shares, timeline, upcoming } from "../src/services/news.ts";
 import { navigationFor } from "../src/services/navigation.ts";
@@ -196,6 +196,26 @@ check("Changelog: Satz zu einer Version mit Zahlen und Bereichen", () => {
     );
     assert.equal(versionSummary(version([item("behoben", "webseite"), item("behoben", "webseite")])), "2 Änderungen: 2 behobene Fehler für die Webseite.");
     assert.equal(versionSummary(version([item("neu", "bot")])), "1 Änderung: 1 neue Funktion für den Bot.");
+});
+
+check("Vorschau: Partner-Nachricht nur mit gültiger Ansicht, Eintrag und Teil", () => {
+    const entry = clone(site.partners.entries[1]);
+    const message = { type: "rlnexus:vorschau-partner", view: "gross", entry, live: site.live.servers["apex-vortex"], selected: "abschnitt:0" };
+
+    assert.ok(isPartnerPreview(message), "gültig");
+    assert.ok(isPartnerPreview({ ...message, live: null, selected: null, view: "karte" }), "ohne Live und Auswahl");
+    assert.ok(!isPartnerPreview({ ...message, view: "x" }), "unbekannte Ansicht");
+    assert.ok(!isPartnerPreview({ ...message, selected: "block:<img>" }), "unbekannter Teil");
+    assert.ok(!isPartnerPreview({ ...message, entry: { ...entry, links: { website: "javascript:alert(1)" } } }), "javascript-Link");
+    assert.ok(!isPartnerPreview({ ...message, type: "rlnexus:vorschau" }), "falscher Typ");
+});
+
+check("Vorschau: News-Nachricht lehnt javascript-Knopf ab", () => {
+    const message = { type: "rlnexus:vorschau-news", post: clone(site.post), selected: "block:2" };
+
+    assert.ok(isNewsPreview(message), "gültig");
+    assert.ok(isNewsPreview({ ...message, selected: "titelbild" }), "Titelbild");
+    assert.ok(!isNewsPreview({ ...message, post: { ...message.post, blocks: [{ type: "button", label: "x", url: "javascript:alert(1)" }] } }), "javascript-Knopf");
 });
 
 const live = new URL("../../Admin%20Dashboard/data/site/", import.meta.url);

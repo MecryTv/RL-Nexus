@@ -1,0 +1,53 @@
+@use "mixins" as *;
+
+/* W-0062: Auswahl in der Vorschau der Studios. Nur im Admin Dashboard zu sehen. */
+
+.pick {
+    position: relative;
+    cursor: pointer;
+    outline: 1px dashed transparent;
+    outline-offset: 4px;
+    transition: outline-color var(--t-fast);
+
+    &:hover {
+        outline-color: rgb(0 175 255 / 55%);
+    }
+}
+
+.selected,
+.selected:hover {
+    outline: 2px solid var(--c-blue);
+}
+
+.tools {
+    position: absolute;
+    z-index: 20;
+    top: -16px;
+    right: 6px;
+    display: flex;
+    gap: 2px;
+    padding: 3px;
+    background: var(--c-blue);
+    box-shadow: 0 6px 18px rgb(0 0 0 / 45%);
+
+    button {
+        display: grid;
+        width: 26px;
+        height: 26px;
+        background: rgb(0 0 0 / 22%);
+        color: #fff;
+        cursor: pointer;
+        font-size: 0.95rem;
+        line-height: 1;
+        place-items: center;
+
+        &:hover {
+            background: rgb(0 0 0 / 45%);
+        }
+
+        &:focus-visible {
+            outline: 2px solid #fff;
+            outline-offset: -2px;
+        }
+    }
+}

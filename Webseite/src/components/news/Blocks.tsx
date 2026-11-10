@@ -4,6 +4,7 @@ import type { IBlock, ISitePartnerCard } from "../../domain/interfaces/ISiteCont
 import { EntryLogo } from "../partners/EntryLogo";
 import { ENTRY_COLOR } from "../partners/entry";
 import { Button } from "../ui/Button";
+import { Pick } from "../preview/Pick";
 import { Markdown } from "./Markdown";
 import { VideoEmbed } from "./VideoEmbed";
 import { dayParts, time } from "./meta";
@@ -114,7 +115,9 @@ export function Blocks({ blocks, partners }: { readonly blocks: readonly IBlock[
     return (
         <div className={styles.blocks}>
             {blocks.map((block, index) => (
-                <Block key={index} block={block} partners={partners} />
+                <Pick key={index} part={`block:${index}`}>
+                    <Block block={block} partners={partners} />
+                </Pick>
             ))}
         </div>
     );

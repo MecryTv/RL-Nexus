@@ -6,6 +6,7 @@ import { useNews, useNewsPost } from "../services/siteContent";
 import { PageLoader } from "../components/ui/PageLoader";
 import { Panel } from "../components/ui/Panel";
 import { Blocks } from "../components/news/Blocks";
+import { Pick } from "../components/preview/Pick";
 import { Cover } from "../components/news/TimelineEntry";
 import { CATEGORY, day, readingMinutes, time } from "../components/news/meta";
 import { initials } from "../components/partners/entry";
@@ -59,32 +60,38 @@ export function NewsPostView({ post }: { readonly post: ISiteNewsPost }): JSX.El
 
     return (
         <div className={styles.article} style={{ "--c": category.color } as CSSProperties}>
-            <Link className={styles.back} to="/news">
-                ← Alle News
-            </Link>
-            <h1>{post.title}</h1>
-            <div className={[newsStyles.meta, styles.meta].join(" ")}>
-                <span className={newsStyles.tag}>{category.label}</span>
-                <span>{day(post.publishedAt)}</span>
-                <span>· {readingMinutes(post.blocks)} Min. Lesezeit</span>
-            </div>
-            {post.event && (
-                <p className={styles.event}>
-                    Termin: {day(post.event.startsAt)}, {time(post.event.startsAt)} Uhr
-                    {post.event.endsAt ? ` bis ${time(post.event.endsAt)} Uhr` : ""}
-                    {post.event.place ? ` · ${post.event.place}` : ""}
-                </p>
-            )}
-            <div className={styles.author}>
-                <span className={styles.avatar} aria-hidden="true">
-                    {initials(post.author) || "RL"}
-                </span>
-                <div>
-                    <b>{post.author}</b>
-                    <small>{post.updatedAt !== post.publishedAt ? `Aktualisiert am ${day(post.updatedAt)}` : "RL Nexus"}</small>
+            <Pick part="kopf">
+                <Link className={styles.back} to="/news">
+                    ← Alle News
+                </Link>
+                <h1>{post.title}</h1>
+                <div className={[newsStyles.meta, styles.meta].join(" ")}>
+                    <span className={newsStyles.tag}>{category.label}</span>
+                    <span>{day(post.publishedAt)}</span>
+                    <span>· {readingMinutes(post.blocks)} Min. Lesezeit</span>
                 </div>
-            </div>
-            {post.cover && <Cover src={post.cover} art="" className={styles.cover} />}
+                {post.event && (
+                    <p className={styles.event}>
+                        Termin: {day(post.event.startsAt)}, {time(post.event.startsAt)} Uhr
+                        {post.event.endsAt ? ` bis ${time(post.event.endsAt)} Uhr` : ""}
+                        {post.event.place ? ` · ${post.event.place}` : ""}
+                    </p>
+                )}
+                <div className={styles.author}>
+                    <span className={styles.avatar} aria-hidden="true">
+                        {initials(post.author) || "RL"}
+                    </span>
+                    <div>
+                        <b>{post.author}</b>
+                        <small>{post.updatedAt !== post.publishedAt ? `Aktualisiert am ${day(post.updatedAt)}` : "RL Nexus"}</small>
+                    </div>
+                </div>
+            </Pick>
+            {post.cover && (
+                <Pick part="titelbild">
+                    <Cover src={post.cover} art="" className={styles.cover} />
+                </Pick>
+            )}
             <Blocks blocks={post.blocks} partners={post.partners} />
         </div>
     );
