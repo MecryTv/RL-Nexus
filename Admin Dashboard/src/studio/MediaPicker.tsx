@@ -109,13 +109,13 @@ export function MediaPicker({ value, onChange, label, discordIcon }: IMediaPicke
             </div>
             <input ref={input} className={styles.file} type="file" accept={MEDIA_TYPES.join(",")} tabIndex={-1} aria-hidden="true" onChange={(event) => upload(event.target.files?.[0])} />
             <p className={styles.hint}>PNG, JPG oder WebP bis 8 MB. Ablegen oder Strg+V geht auch.</p>
-            {gallery && <Gallery key={uploads} value={value} onChange={onChange} />}
+            {gallery && <MediaGallery key={uploads} value={value} onChange={onChange} />}
         </div>
     );
 }
 
-/** Die hochgeladenen Bilder, neueste zuerst. Lädt erst, wenn sie aufgeklappt ist. */
-function Gallery({ value, onChange }: { readonly value: string | null; readonly onChange: (url: string) => void }): JSX.Element {
+/** Die hochgeladenen Bilder, neueste zuerst. Lädt erst, wenn sie gezeigt wird. */
+export function MediaGallery({ value, onChange }: { readonly value: string | null; readonly onChange: (url: string) => void }): JSX.Element {
     const images = useApi<{ readonly images: readonly IMediaFile[] }>("/api/media");
 
     return (

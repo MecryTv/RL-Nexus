@@ -11,7 +11,7 @@ import { Failure, Loading } from "../components/Status";
 import { UnsavedGuard } from "../editor/UnsavedGuard";
 import { useStudioDoc } from "../studio/useStudioDoc";
 import { useToast } from "../toast/context";
-import { newPost, postInput } from "./draft.ts";
+import { newPost, postInput, postProblem } from "./draft.ts";
 import { NewsStudio } from "./NewsStudio";
 import styles from "./news.module.scss";
 
@@ -36,8 +36,7 @@ function NewsEditor({ post, entries, channel, editorKey, onSaved }: IEditorProps
     const [saving, setSaving] = useState(false);
     const [announcing, setAnnouncing] = useState<IPostInput | null>(null);
     const [created, setCreated] = useState<number | null>(null);
-    const checked = checkPostInput(doc.value);
-    const problem = "problem" in checked ? checked.problem : null;
+    const problem = postProblem(doc.value);
 
     const write = async (input: IPostInput): Promise<void> => {
         setSaving(true);

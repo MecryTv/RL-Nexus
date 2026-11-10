@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { checkPostInput, type IBlock } from "../../shared/news.ts";
-import { blockAction, blockLabel, insertBlock, moveBlock, newBlock, newPost, postInput, templatePost, wrapSelection } from "../../src/news/draft.ts";
+import { blockAction, blockLabel, insertBlock, moveBlock, newBlock, newPost, postInput, postProblem, templatePost, wrapSelection } from "../../src/news/draft.ts";
 import { newsMessage } from "../../src/news/preview.ts";
 import { websiteValidators } from "./partner-studio.check.ts";
 import { check, section } from "./harness.ts";
@@ -34,6 +34,14 @@ export async function checkNewsStudio(): Promise<void> {
         assert.equal("slug" in input, false);
         assert.deepEqual(input.event, saved.event);
         assert.ok("input" in checkPostInput(input));
+    });
+
+    await check("Entwurf: ein Bild ohne Alternativtext lässt sich nicht speichern, ein leerer Bild-Baustein meldet das fehlende Bild", () => {
+        const image: IBlock = { type: "image", url: "/content/media/a.png", alt: "", caption: null };
+
+        assert.equal(postProblem({ ...newPost("beitrag"), blocks: [image] }), "Ein Bild braucht einen Alternativtext.");
+        assert.equal(postProblem({ ...newPost("beitrag"), blocks: [{ ...image, alt: "Logo" }] }), null);
+        assert.equal(postProblem({ ...newPost("beitrag"), blocks: [newBlock("image")] }), "Ein Bild-Baustein hat kein Bild.");
     });
 
     await check("Entwurf: Bausteine einfügen, verschieben, kopieren, löschen", () => {

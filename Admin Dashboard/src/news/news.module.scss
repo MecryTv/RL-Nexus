@@ -175,3 +175,152 @@
         @include focus-ring;
     }
 }
+
+/* --- Fächer und Inspektor im News-Studio (Task 15) ------------------------ */
+.trayNote {
+    margin: var(--s-3) 0 0;
+    color: var(--c-text-faint);
+    font-size: 0.8125rem;
+    line-height: 1.5;
+}
+
+.trayCount {
+    margin: 0 0 var(--s-2);
+    color: var(--c-text-faint);
+    font-size: 0.8125rem;
+}
+
+.templates {
+    display: grid;
+    gap: 6px;
+}
+
+.template,
+.blockButton {
+    padding: 10px 12px;
+    background: rgb(255 255 255 / 4%);
+    box-shadow: inset 0 0 0 1px var(--c-line);
+    color: var(--c-text);
+    cursor: pointer;
+    font-size: 0.875rem;
+    text-align: left;
+
+    &:hover:not(:disabled) {
+        background: rgb(255 255 255 / 8%);
+    }
+
+    &:disabled {
+        cursor: not-allowed;
+        opacity: 0.5;
+    }
+
+    &:focus-visible {
+        @include focus-ring;
+    }
+}
+
+.blockGrid {
+    display: grid;
+    gap: 6px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.layers {
+    display: grid;
+    gap: 4px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.layer {
+    display: grid;
+    align-items: center;
+    gap: 6px;
+    grid-template-columns: 28px minmax(0, 1fr) auto;
+    padding: 4px 8px 4px 4px;
+    background: rgb(255 255 255 / 3%);
+    box-shadow: inset 0 0 0 1px var(--c-line);
+
+    &[aria-current="true"] {
+        box-shadow: inset 0 0 0 1px var(--c-blue);
+    }
+}
+
+.layerName {
+    min-width: 0;
+    padding: 6px 0;
+    background: transparent;
+    color: var(--c-text);
+    cursor: pointer;
+    font-size: 0.875rem;
+    text-align: left;
+    overflow-wrap: anywhere;
+
+    &:focus-visible {
+        @include focus-ring;
+    }
+}
+
+.fixed {
+    color: var(--c-text-faint);
+    font-size: 0.75rem;
+}
+
+.iconButton {
+    display: grid;
+    width: 28px;
+    height: 28px;
+    background: transparent;
+    color: var(--c-text-dim);
+    cursor: grab;
+    place-items: center;
+
+    &:hover {
+        color: var(--c-text);
+    }
+
+    &:focus-visible {
+        @include focus-ring;
+    }
+}
+
+.inspector {
+    display: contents;
+
+    &:focus-visible {
+        outline: none;
+    }
+}
+
+.marks {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.mark {
+    min-width: 36px;
+    padding: 6px 8px;
+    background: rgb(255 255 255 / 4%);
+    box-shadow: inset 0 0 0 1px var(--c-line);
+    color: var(--c-text);
+    cursor: pointer;
+    font-weight: 700;
+
+    @include touch-target;
+
+    &:hover {
+        background: rgb(255 255 255 / 8%);
+    }
+
+    &:focus-visible {
+        @include focus-ring;
+    }
+}
+
+.blockActions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}

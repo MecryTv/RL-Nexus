@@ -1,4 +1,4 @@
-import { BLOCK_LABELS, type BlockType, type IBlock, type IPost, type IPostEvent, type IPostInput, type NewsKind } from "../../shared/news.ts";
+import { BLOCK_LABELS, checkPostInput, type BlockType, type IBlock, type IPost, type IPostEvent, type IPostInput, type NewsKind } from "../../shared/news.ts";
 import { moveTo } from "../editor/list.ts";
 import { berlinToIso, todayBerlin } from "../studio/time.ts";
 
@@ -68,6 +68,15 @@ export function postInput(post: IPost): IPostInput {
     const { kind, category, title, summary, cover, blocks, entryId, event, status, publishAt, pinned, announce } = post;
 
     return { kind, category, title, summary, cover, blocks, entryId, event, status, publishAt, pinned, announce };
+}
+
+/** Was das Speichern verhindert, sonst null. Im Studio ist der Alternativtext eines Bildes Pflicht. */
+export function postProblem(input: IPostInput): string | null {
+    const checked = checkPostInput(input);
+
+    if ("problem" in checked) return checked.problem;
+
+    return input.blocks.some((block) => block.type === "image" && !block.alt.trim()) ? "Ein Bild braucht einen Alternativtext." : null;
 }
 
 /** Andere Art: Bausteine bleiben, ein Termin bekommt Beginn und Ende. */
