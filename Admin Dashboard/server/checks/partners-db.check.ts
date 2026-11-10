@@ -13,6 +13,7 @@ import { USERS, fake } from "./fakes.ts";
 import { createPost, deletePost, duePosts, getPost, markPublished, updatePost } from "../news/store.ts";
 import { createEntry, deleteEntry, getEntry, listEntries, updateEntry } from "../partners/store.ts";
 import { publishSite } from "../site/publish.ts";
+import { newEntry } from "../../src/partners/draft.ts";
 import { SESSION_COOKIE, seal } from "../session.ts";
 import { SECRET, check, section } from "./harness.ts";
 
@@ -110,6 +111,22 @@ export async function checkPartnerRoutesDb(config: IConfig, shared: IHttp): Prom
             assert.equal((await http.get("/api/partners")).json().entries.some((entry: { slug: string }) => entry.slug === "check-db-route"), true);
         });
 
+        await check("Partner: aus dem Anlege-Dialog unsichtbar, bis „Auf der Seite zeigen“ an ist; Unterstützer folgt dem Schalter (Teil 2)", async () => {
+            const site = async (): Promise<string[]> =>
+                ((JSON.parse(await readFile(path.join(config.siteDir, "partners.json"), "utf8")) as { data: { entries: { slug: string }[] } }).data.entries).map((entry) => entry.slug);
+            const created = await http.write("POST", "/api/partners", newEntry("partner", "Check DB Unsichtbar", { partnerType: "liga" }));
+
+            assert.equal(created.statusCode, 200, created.body);
+            assert.ok(!(await site()).includes("check-db-unsichtbar"));
+            assert.equal((await http.write("PUT", `/api/partners/${created.json().id}`, { ...newEntry("partner", "Check DB Unsichtbar", { partnerType: "liga" }), visible: true })).statusCode, 200);
+            assert.ok((await site()).includes("check-db-unsichtbar"));
+
+            const supporter = await http.write("POST", "/api/partners", newEntry("supporter", "Check DB Leiste", { supporterType: "firma", visible: true }));
+
+            assert.equal(supporter.statusCode, 200, supporter.body);
+            assert.ok((await site()).includes("check-db-leiste"));
+        });
+
         await check("Partner: http-Link wird mit Satz abgelehnt", async () => {
             const response = await http.write("POST", "/api/partners", { ...ENTRY, name: "Check DB Unsicher", links: { website: "http://example.com" } });
 
@@ -171,6 +188,8 @@ export async function checkPartnerRoutesDb(config: IConfig, shared: IHttp): Prom
             assert.equal(response.statusCode, 200, response.body);
             assert.equal(response.json().member, false);
             assert.equal(response.json().group, null);
+            // Teil 2: „Einladung kopieren“ im Anlege-Dialog.
+            assert.ok("invite" in response.json(), "invite fehlt");
         });
 
         await check("Partner: Live-Zahlen eines Servers für die Vorschau im Studio (Teil 2)", async () => {

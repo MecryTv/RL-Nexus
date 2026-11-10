@@ -135,6 +135,8 @@ export async function partnerRoutes(app: FastifyInstance, { config }: { config: 
             member,
             servers: servers.map((row) => ({ id: row.guild_id, name: row.guild_name, icon: row.guild_icon })),
             assignable: await checkAssignable(config),
+            // Teil 2: „Einladung kopieren“, wenn die Person noch nicht auf dem Server ist.
+            invite: config.discordInviteUrl,
         };
     });
 

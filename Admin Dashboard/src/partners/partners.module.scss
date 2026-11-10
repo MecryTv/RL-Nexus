@@ -1,0 +1,366 @@
+@use "mixins" as *;
+
+/* W-0062 Teil 2: Liste, Anlegen und Konto für Partner/Sponsorings (jetziges Design). */
+
+.muted {
+    margin: 0;
+    color: var(--c-text-faint);
+    font-size: 0.8125rem;
+    line-height: 1.5;
+}
+
+/* --- Kopf und Zahlen ---------------------------------------------------- */
+.headActions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s-2);
+}
+
+.textLink {
+    color: var(--c-text-dim);
+
+    @include label(0.75rem, 0.12em);
+
+    &:hover {
+        color: var(--c-text);
+    }
+}
+
+.stats {
+    display: grid;
+    gap: var(--s-2);
+    margin: 0 0 var(--s-4);
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+
+    div {
+        padding: var(--s-2) var(--s-3);
+        background: var(--c-panel-fill);
+        box-shadow: inset 0 0 0 1px var(--c-line);
+    }
+
+    dt {
+        color: var(--c-text-faint);
+
+        @include label(0.7rem, 0.14em);
+    }
+
+    dd {
+        margin: 2px 0 0;
+        font-size: 1.25rem;
+        font-weight: 800;
+    }
+}
+
+.missing {
+    padding: 0 8px;
+    background: rgb(255 197 61 / 14%);
+    box-shadow: inset 0 0 0 1px rgb(255 197 61 / 45%);
+    color: var(--c-mod-engagement);
+    cursor: pointer;
+    font: inherit;
+
+    &[aria-pressed="true"] {
+        background: rgb(255 197 61 / 30%);
+    }
+
+    &:disabled {
+        background: transparent;
+        box-shadow: none;
+        color: var(--c-text-dim);
+        cursor: default;
+    }
+
+    &:focus-visible {
+        @include focus-ring;
+    }
+}
+
+/* --- Reiter, Suche, Tabelle --------------------------------------------- */
+.toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-2) var(--s-3);
+    margin-bottom: var(--s-3);
+}
+
+.tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.tab {
+    padding: 7px 12px;
+    background: rgb(255 255 255 / 4%);
+    box-shadow: inset 0 0 0 1px var(--c-line);
+    color: var(--c-text-dim);
+    cursor: pointer;
+
+    @include label(0.75rem, 0.1em);
+    @include touch-target;
+
+    span {
+        margin-left: 4px;
+        color: var(--c-text-faint);
+    }
+
+    &[aria-selected="true"] {
+        background: rgb(255 30 45 / 14%);
+        box-shadow: inset 0 0 0 1px rgb(255 30 45 / 50%);
+        color: var(--c-text);
+    }
+
+    &:focus-visible {
+        @include focus-ring;
+    }
+}
+
+.search {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 10px;
+    background: rgb(255 255 255 / 4%);
+    box-shadow: inset 0 0 0 1px var(--c-line);
+    color: var(--c-text-faint);
+
+    input {
+        width: 200px;
+        padding: 8px 0;
+        border: 0;
+        background: transparent;
+        color: var(--c-text);
+        font: inherit;
+
+        &:focus {
+            outline: none;
+        }
+    }
+
+    &:focus-within {
+        box-shadow: inset 0 0 0 1px var(--c-blue);
+    }
+}
+
+.empty {
+    color: var(--c-text-dim);
+}
+
+.table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+
+    th {
+        padding: 8px 10px;
+        border-bottom: 1px solid var(--c-line-strong);
+        color: var(--c-text-faint);
+        text-align: left;
+        white-space: nowrap;
+
+        @include label(0.7rem, 0.12em);
+    }
+
+    td {
+        padding: 8px 10px;
+        border-bottom: 1px solid var(--c-line);
+        vertical-align: middle;
+    }
+
+    @include below(900px) {
+        display: block;
+        overflow-x: auto;
+    }
+}
+
+.dragging {
+    opacity: 0.5;
+}
+
+.grip {
+    display: grid;
+    width: 28px;
+    height: 28px;
+    background: transparent;
+    color: var(--c-text-faint);
+    cursor: grab;
+    place-items: center;
+
+    &:focus-visible {
+        @include focus-ring;
+    }
+}
+
+.name {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 600;
+}
+
+.logo {
+    --c: var(--c-blue);
+
+    display: grid;
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    overflow: hidden;
+    background: color-mix(in srgb, var(--c) 14%, var(--c-panel-solid));
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 50%, transparent);
+    color: var(--c);
+    font-size: 0.7rem;
+    font-weight: 700;
+    place-items: center;
+
+    @include bevel-diagonal(6px);
+
+    img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    &[data-color="red"] {
+        --c: var(--c-red);
+    }
+
+    &[data-color="purple"] {
+        --c: var(--c-purple);
+    }
+
+    &[data-color="gold"] {
+        --c: var(--c-mod-engagement);
+    }
+
+    &[data-color="green"] {
+        --c: var(--c-win);
+    }
+
+    &[data-color="orange"] {
+        --c: var(--c-mod-utility);
+    }
+
+    &[data-color="cyan"] {
+        --c: var(--c-mod-community);
+    }
+
+    &[data-color="silver"] {
+        --c: var(--c-text-dim);
+    }
+}
+
+.rowLink {
+    color: var(--c-blue);
+    font-weight: 600;
+
+    &:hover {
+        text-decoration: underline;
+    }
+}
+
+/* --- Dialoge --------------------------------------------------------------- */
+.dialog {
+    display: grid;
+    gap: var(--s-3);
+}
+
+.footer {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: var(--s-2);
+}
+
+.fieldset {
+    display: grid;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+
+    legend {
+        margin-bottom: 6px;
+        color: var(--c-text-dim);
+        font-size: 0.8125rem;
+        font-weight: 600;
+    }
+}
+
+.check {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.875rem;
+}
+
+/* --- Ansprechpartner und Rolle ------------------------------------------- */
+.contact {
+    display: grid;
+    gap: var(--s-2);
+}
+
+.person {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+
+    img {
+        border-radius: 50%;
+    }
+
+    b {
+        display: block;
+    }
+
+    small {
+        color: var(--c-text-faint);
+    }
+}
+
+.personMark {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--c-panel-solid);
+}
+
+.roleBox {
+    display: grid;
+    gap: 4px;
+    padding: var(--s-2) var(--s-3);
+    background: var(--c-panel-fill);
+    box-shadow: inset 0 0 0 1px var(--c-line-strong);
+
+    p {
+        margin: 0;
+        font-size: 0.8125rem;
+        line-height: 1.5;
+    }
+}
+
+.roleName {
+    color: var(--c-blue);
+}
+
+.good {
+    color: var(--c-win);
+}
+
+.waiting {
+    color: var(--c-mod-engagement);
+}
+
+.bad {
+    color: var(--c-red-bright);
+}
+
+.roleActions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 4px;
+}
