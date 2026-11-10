@@ -1,4 +1,4 @@
-import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { IContentMeta, IEnvelope } from "../shared/content.ts";
 import type { IConfig } from "./config.ts";
@@ -157,6 +157,51 @@ export function writeContent(config: IConfig, file: string, expected: number, da
 
         return next;
     });
+}
+
+/* --- Dateien, die das Admin Dashboard selbst baut (W-0062) --------------- */
+
+async function atomicWrite(target: string, data: string | Buffer): Promise<void> {
+    const temporary = `${target}.${process.pid}-${Date.now()}.tmp`;
+
+    await mkdir(path.dirname(target), { recursive: true });
+    await writeFile(temporary, data);
+    await rename(temporary, target);
+}
+
+/** Wie writeContent, aber ohne Revisionsvergleich: Es gibt nur einen Schreiber, publishSite. */
+export function writeGenerated(config: IConfig, file: string, data: unknown, by: string): Promise<Envelope> {
+    return oneAtATime(file, async () => {
+        const current = (await readLive(config, file).catch(() => null))?.revision ?? 0;
+        const next: Envelope = { revision: current + 1, updatedAt: new Date().toISOString(), updatedBy: by, data };
+
+        await atomicWrite(livePath(config, file), JSON.stringify(next));
+
+        return next;
+    });
+}
+
+/** Eine Datei ohne Hülle (RSS, Vorschau-Seiten, Bilder). */
+export function writeRaw(config: IConfig, file: string, data: string | Buffer): Promise<void> {
+    return oneAtATime(file, () => atomicWrite(livePath(config, file), data));
+}
+
+export async function removeRaw(config: IConfig, file: string): Promise<void> {
+    try {
+        await unlink(livePath(config, file));
+    } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    }
+}
+
+/** Die Dateinamen in einem Unterordner von SITE_DIR, leer wenn es ihn nicht gibt. */
+export async function listRaw(config: IConfig, dir: string): Promise<string[]> {
+    try {
+        return await readdir(livePath(config, dir));
+    } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
+        throw error;
+    }
 }
 
 /** Löscht die gespeicherte Datei. Danach gilt wieder der Stand der Webseite. */

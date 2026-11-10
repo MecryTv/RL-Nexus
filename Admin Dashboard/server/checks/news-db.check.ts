@@ -4,6 +4,7 @@ import type { IConfig } from "../config.ts";
 import { query } from "../db.ts";
 import { runDue } from "../news/clock.ts";
 import { getPost } from "../news/store.ts";
+import { publishSite } from "../site/publish.ts";
 import type { IHttp } from "./backups-db.check.ts";
 import { CHANNEL, accepting, withDiscord } from "./changelog-db.check.ts";
 import { check, section } from "./harness.ts";
@@ -92,5 +93,7 @@ export async function checkNewsDb(config: IConfig, http: IHttp): Promise<void> {
     } finally {
         await tidy();
         await setChannel(saved?.value ?? null);
+        // Die Routen haben die Inhalte der Webseite mit den Prüf-Beiträgen geschrieben: neu bauen, ohne sie.
+        await publishSite(config, ["news", "partners"]);
     }
 }

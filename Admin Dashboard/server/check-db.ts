@@ -3670,7 +3670,7 @@ try {
     await checkSecurityDb(config);
     await checkMessagesDb(config, { get, write, raw });
     await checkChangelogDb(config, { get, write, raw });
-    await checkPartnersDb();
+    await checkPartnersDb(config);
     await checkPartnerRoleDb(config);
     await checkPartnerRoutesDb(config, { get, write, raw });
     await checkNewsDb(config, { get, write, raw });

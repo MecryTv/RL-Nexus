@@ -1,4 +1,8 @@
 import assert from "node:assert/strict";
+import { existsSync } from "node:fs";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import type { IPostInput } from "../../shared/news.ts";
 import type { IEntryInput } from "../../shared/partners.ts";
 import type { IActor } from "../audit.ts";
@@ -8,6 +12,7 @@ import type { IHttp } from "./backups-db.check.ts";
 import { USERS, fake } from "./fakes.ts";
 import { createPost, deletePost, duePosts, getPost, updatePost } from "../news/store.ts";
 import { createEntry, deleteEntry, getEntry, listEntries, updateEntry } from "../partners/store.ts";
+import { publishSite } from "../site/publish.ts";
 import { check, section } from "./harness.ts";
 
 /** Prüf-Einträge heißen „Check DB …“, ihre Adressen beginnen mit check-db-. */
@@ -121,11 +126,13 @@ export async function checkPartnerRoutesDb(config: IConfig, http: IHttp): Promis
         await query("DELETE FROM admin_audit WHERE target LIKE 'partner:%' AND detail LIKE 'Check DB%'");
         fake.memberRoles.delete(contact);
         if (buyerJoined) fake.joined.add(USERS.buyer);
+        // Die Routen haben die Inhalte der Webseite mit dem Prüf-Eintrag geschrieben: neu bauen, ohne ihn.
+        await publishSite(config, ["partners", "news"]);
     }
 }
 
 /** W-0062: Speicher für Partner und News gegen die echte Datenbank. */
-export async function checkPartnersDb(): Promise<void> {
+export async function checkPartnersDb(config: IConfig): Promise<void> {
     section("Partner und News in der Datenbank (W-0062)");
     await tidyPartners();
 
@@ -191,6 +198,32 @@ export async function checkPartnersDb(): Promise<void> {
 
             assert.equal(draft.publishedAt, null);
             assert.equal(draft.slug, post.slug);
+        });
+
+        await check("Webseite: Dateien entstehen und ein zurückgezogener Beitrag verliert seine", async () => {
+            const siteDir = await mkdtemp(path.join(tmpdir(), "rlnexus-site-"));
+            const site = { ...config, siteDir };
+
+            try {
+                const post = await createPost({ ...POST, title: "Check DB Site" }, ACTOR);
+
+                await publishSite(site, ["news", "partners"]);
+                assert.ok(existsSync(path.join(siteDir, "news", "check-db-site.json")));
+                assert.ok(existsSync(path.join(siteDir, "og", "news", "check-db-site.html")));
+                assert.ok(existsSync(path.join(siteDir, "partners.json")));
+                assert.ok(existsSync(path.join(siteDir, "news.xml")));
+
+                await updatePost(post.id, { ...POST, title: "Check DB Site", status: "draft" }, ACTOR);
+                await publishSite(site, ["news"]);
+                assert.equal(existsSync(path.join(siteDir, "news", "check-db-site.json")), false);
+                assert.equal(existsSync(path.join(siteDir, "og", "news", "check-db-site.html")), false);
+
+                const news = JSON.parse(await readFile(path.join(siteDir, "news.json"), "utf8")) as { data: { posts: { slug: string }[] } };
+
+                assert.ok(!news.data.posts.some((item) => item.slug === "check-db-site"));
+            } finally {
+                await rm(siteDir, { recursive: true, force: true });
+            }
         });
 
         await check("News: fällig sind nur geplante, deren Zeit gekommen ist", async () => {
