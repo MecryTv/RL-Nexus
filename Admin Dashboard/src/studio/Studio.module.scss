@@ -1,0 +1,220 @@
+@use "../styles/mixins" as *;
+
+/*
+ * W-0062 Teil 2: Studio-Hülle (Leiste, Fächer, Bühne, Inspektor). Die Breite
+ * kommt aus dem Studio selbst: unter 1000 px Fächer als Reihe über der Bühne
+ * und der Inspektor darunter, unter 700 px alles untereinander.
+ */
+
+.studio {
+    container: studio / inline-size;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    background: var(--c-panel-fill);
+    box-shadow: inset 0 0 0 1px var(--c-line);
+}
+
+/* --- Leiste ------------------------------------------------------------- */
+.bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s-2) var(--s-3);
+    padding: var(--s-2) var(--s-3);
+    border-bottom: 1px solid var(--c-line);
+}
+
+.title {
+    min-width: 0;
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 700;
+    overflow-wrap: anywhere;
+}
+
+.steps {
+    display: flex;
+    gap: 2px;
+}
+
+.step {
+    display: grid;
+    width: 34px;
+    height: 34px;
+    background: transparent;
+    box-shadow: inset 0 0 0 1px var(--c-line);
+    color: var(--c-text);
+    cursor: pointer;
+    place-items: center;
+
+    @include touch-target;
+
+    &:hover:not(:disabled) {
+        background: rgb(255 255 255 / 6%);
+    }
+
+    &:disabled {
+        color: var(--c-text-faint);
+        cursor: default;
+    }
+
+    &:focus-visible {
+        @include focus-ring;
+    }
+}
+
+.barSlot {
+    display: flex;
+    flex: 1 1 auto;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--s-2) var(--s-3);
+    min-width: 0;
+}
+
+/* --- Körper ------------------------------------------------------------- */
+.body {
+    display: grid;
+    min-height: 640px;
+    grid-template-areas: "rail stage inspector";
+    grid-template-columns: 76px minmax(0, 1fr) 320px;
+}
+
+.withTray {
+    grid-template-areas: "rail tray stage inspector";
+    grid-template-columns: 76px 260px minmax(0, 1fr) 320px;
+}
+
+.rail {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: var(--s-2) 6px;
+    border-right: 1px solid var(--c-line);
+    grid-area: rail;
+}
+
+.railButton {
+    display: grid;
+    gap: 4px;
+    padding: 10px 4px;
+    background: transparent;
+    color: var(--c-text-dim);
+    cursor: pointer;
+    place-items: center;
+    text-align: center;
+
+    @include label(0.68rem, 0.06em);
+
+    &:hover {
+        color: var(--c-text);
+    }
+
+    &[aria-pressed="true"] {
+        background: rgb(255 255 255 / 6%);
+        box-shadow: inset 2px 0 0 var(--c-red);
+        color: var(--c-text);
+    }
+
+    &:focus-visible {
+        @include focus-inset;
+    }
+}
+
+.tray {
+    min-width: 0;
+    padding: var(--s-3);
+    overflow-y: auto;
+    border-right: 1px solid var(--c-line);
+    grid-area: tray;
+}
+
+.trayTitle,
+.groupTitle {
+    margin: 0 0 var(--s-2);
+    color: var(--c-text-faint);
+
+    @include label(0.72rem, 0.16em);
+}
+
+.stage {
+    min-width: 0;
+    padding: var(--s-3);
+    grid-area: stage;
+}
+
+.inspector {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-4);
+    min-width: 0;
+    padding: var(--s-3);
+    overflow-y: auto;
+    border-left: 1px solid var(--c-line);
+    grid-area: inspector;
+}
+
+.group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+}
+
+/* --- Schmal --------------------------------------------------------------- */
+@container studio (width < 1000px) {
+    .body,
+    .withTray {
+        grid-template-areas:
+            "rail rail"
+            "tray tray"
+            "stage inspector";
+        grid-template-columns: minmax(0, 1fr) 300px;
+        grid-template-rows: auto auto 1fr;
+    }
+
+    .body:not(.withTray) {
+        grid-template-areas:
+            "rail rail"
+            "stage inspector";
+        grid-template-rows: auto 1fr;
+    }
+
+    .rail {
+        flex-direction: row;
+        flex-wrap: wrap;
+        border-right: 0;
+        border-bottom: 1px solid var(--c-line);
+    }
+
+    .railButton {
+        grid-auto-flow: column;
+        padding: 8px 12px;
+    }
+
+    .tray {
+        max-height: 360px;
+        border-right: 0;
+        border-bottom: 1px solid var(--c-line);
+    }
+}
+
+@container studio (width < 700px) {
+    .body,
+    .withTray,
+    .body:not(.withTray) {
+        grid-template-areas:
+            "rail"
+            "tray"
+            "stage"
+            "inspector";
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: none;
+    }
+
+    .inspector {
+        border-top: 1px solid var(--c-line);
+        border-left: 0;
+    }
+}
