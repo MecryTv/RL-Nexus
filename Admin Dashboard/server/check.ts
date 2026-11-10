@@ -39,6 +39,7 @@ import { checkCache } from "./checks/cache.check.ts";
 import { checkDumps } from "./checks/dumps.check.ts";
 import { checkNames } from "./checks/names.check.ts";
 import { checkStudio } from "./checks/studio.check.ts";
+import { checkPartnerStudio } from "./checks/partner-studio.check.ts";
 import { checkUserdata } from "./checks/userdata.check.ts";
 import { checkStatus, checkStatusHistoryKept, checkStatusRoutes } from "./checks/status.check.ts";
 
@@ -77,5 +78,6 @@ await checkBackups();
 await checkBeta();
 await checkWartungPage();
 await checkStudio();
+await checkPartnerStudio();
 
 finish();

@@ -54,7 +54,7 @@ export const EXTRA_SECTIONS_FOR: Readonly<Record<EntryKind, readonly SectionType
 };
 
 /** Diese Abschnitte dürfen mehrfach vorkommen. */
-const REPEATABLE: ReadonlySet<SectionType> = new Set(["gallery", "video", "quote", "text"]);
+export const REPEATABLE: ReadonlySet<SectionType> = new Set(["gallery", "video", "quote", "text"]);
 
 export const ENTRY_LIMITS = { name: 80, subtitle: 40, shortText: 200, stripText: 60, sectionText: 2000, items: 12, stats: 4, sections: 20, tournaments: 20 } as const;
 
