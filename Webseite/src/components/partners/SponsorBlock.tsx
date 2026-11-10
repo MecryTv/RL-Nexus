@@ -31,7 +31,7 @@ export function OfferCode({ code, note }: { readonly code: string; readonly note
     );
 }
 
-function MainSponsor({ entry }: { readonly entry: ISiteEntry }): JSX.Element {
+export function MainSponsor({ entry }: { readonly entry: ISiteEntry }): JSX.Element {
     const together = sectionOf(entry, "together");
     const offer = sectionOf(entry, "offer");
 
