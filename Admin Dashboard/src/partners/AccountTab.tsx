@@ -75,7 +75,7 @@ export function AccountTab({ value, set, entry, dirty, saving, problem, onSave, 
 
     return (
         <div className={styles.account}>
-            <Panel>
+            <Panel className={styles.accountPanel}>
                 <h2 className={styles.panelTitle}>Ansprechpartner</h2>
                 <ContactField
                     value={value.contactId ?? ""}
@@ -114,7 +114,7 @@ export function AccountTab({ value, set, entry, dirty, saving, problem, onSave, 
             </Panel>
 
             {entry.contactId && (
-                <Panel>
+                <Panel className={styles.accountPanel}>
                     <h2 className={styles.panelTitle}>Rolle auf RL Nexus</h2>
                     <p>
                         <b className={styles.roleName}>@Partner</b> · {role ? ROLE_LABELS[role.state] : "ohne Konto"}

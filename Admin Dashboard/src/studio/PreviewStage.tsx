@@ -14,6 +14,8 @@ export interface IPreviewStageProps {
     readonly device: "desktop" | "handy";
     readonly onPick: (part: string) => void;
     readonly onAction: (part: string, action: StageAction) => void;
+    /** Was das Speichern gerade verhindert. Liegt über der Bühne, damit nichts springt. */
+    readonly problem?: string | null;
 }
 
 /**
@@ -22,7 +24,7 @@ export interface IPreviewStageProps {
  * nach jeder Änderung. Zurück kommen die Wahl eines Teils und die Aktionen der
  * kleinen Leiste, nur vom Origin der Webseite und nur in gültiger Form.
  */
-export function PreviewStage({ message, device, onPick, onAction }: IPreviewStageProps): JSX.Element {
+export function PreviewStage({ message, device, onPick, onAction, problem = null }: IPreviewStageProps): JSX.Element {
     const target = useApi<ITarget>("/api/content/vorschau");
     const frame = useRef<HTMLIFrameElement>(null);
     const [ready, setReady] = useState(0);
@@ -82,13 +84,15 @@ export function PreviewStage({ message, device, onPick, onAction }: IPreviewStag
                     Die Vorschau antwortet nicht. Läuft die Webseite unter {target.data?.url ?? "der eingestellten Adresse"} mit dem neuen Stand?
                 </p>
             )}
-            {invalid && (
-                <p className={styles.note} role="status">
-                    Die Vorschau zeigt den letzten gültigen Stand. Was gerade fehlt, steht neben „Speichern“.
-                </p>
-            )}
             {target.data && (
                 <div className={styles.stage}>
+                    {(problem || invalid) && (
+                        <p className={styles.overlay} role="status">
+                            {problem ? `Speichern geht noch nicht: ${problem}` : ""}
+                            {problem && invalid ? " " : ""}
+                            {invalid ? "Die Vorschau zeigt den letzten gültigen Stand." : ""}
+                        </p>
+                    )}
                     <iframe
                         ref={frame}
                         className={styles.frame}

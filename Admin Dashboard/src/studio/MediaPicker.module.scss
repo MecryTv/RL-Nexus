@@ -48,6 +48,7 @@
 .hint,
 .none {
     margin: 0;
+    grid-column: 1 / -1;
     color: var(--c-text-faint);
     font-size: 0.75rem;
 }

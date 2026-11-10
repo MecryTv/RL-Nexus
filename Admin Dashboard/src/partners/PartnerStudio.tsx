@@ -163,8 +163,7 @@ export function PartnerStudio({ doc, entry, entries, posts, contact, siteOrigin,
             <Button variant="ghost" size="sm" onClick={look}>
                 Ansehen ↗
             </Button>
-            {problem && doc.dirty && <span className={styles.problem}>{problem}</span>}
-            <Button variant="primary" size="sm" busy={saving} disabled={!doc.dirty || problem !== null} onClick={onSave}>
+            <Button variant="primary" size="sm" busy={saving} disabled={!doc.dirty || problem !== null} title={problem ?? undefined} onClick={onSave}>
                 Speichern
             </Button>
         </>
@@ -179,7 +178,7 @@ export function PartnerStudio({ doc, entry, entries, posts, contact, siteOrigin,
                 trays={trays}
                 openTray={trays.some((item) => item.id === tray) ? tray : null}
                 onTray={setTray}
-                stage={<PreviewStage message={message} device={view === "handy" ? "handy" : "desktop"} onPick={(picked) => setSelected(picked === "kopf" ? null : picked)} onAction={act} />}
+                stage={<PreviewStage message={message} device={view === "handy" ? "handy" : "desktop"} problem={doc.dirty ? problem : null} onPick={(picked) => setSelected(picked === "kopf" ? null : picked)} onAction={act} />}
                 inspector={part.inspector ?? <EntrySettings value={value} set={doc.set} entry={entry} entries={entries} posts={posts} contact={contact} onDelete={onDelete} />}
             />
 

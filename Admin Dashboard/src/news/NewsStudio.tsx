@@ -200,12 +200,11 @@ export function NewsStudio({ doc, saved, entries, channel, saving, problem, onSa
             <Button variant="ghost" size="sm" onClick={() => void openPreviewTab(message)}>
                 Vorschau ↗
             </Button>
-            {problem && <span className={styles.problem}>{problem}</span>}
-            <Button variant={publishNow ? "outline" : "primary"} size="sm" busy={saving} disabled={!canSave} onClick={() => onSave()}>
+            <Button variant={publishNow ? "outline" : "primary"} size="sm" busy={saving} disabled={!canSave} title={problem ?? undefined} onClick={() => onSave()}>
                 {saveLabel(value.status, savedStatus)}
             </Button>
             {publishNow && (
-                <Button variant="primary" size="sm" busy={saving} disabled={problem !== null} onClick={() => onSave("published")}>
+                <Button variant="primary" size="sm" busy={saving} disabled={problem !== null} title={problem ?? undefined} onClick={() => onSave("published")}>
                     Veröffentlichen
                 </Button>
             )}
@@ -225,6 +224,7 @@ export function NewsStudio({ doc, saved, entries, channel, saving, problem, onSa
                     <PreviewStage
                         message={message}
                         device={device}
+                        problem={problem}
                         onPick={(part) => {
                             setSelected(part === "kopf" ? null : part);
                             setPicked((count) => count + 1);
