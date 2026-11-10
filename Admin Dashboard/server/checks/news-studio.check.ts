@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { checkPostInput, type IBlock } from "../../shared/news.ts";
-import { blockAction, blockLabel, insertBlock, moveBlock, newBlock, newPost, postInput, postProblem, saveLabel, switchPostKind, templatePost, wrapSelection } from "../../src/news/draft.ts";
+import { blockAction, blockLabel, freshPost, insertBlock, moveBlock, newBlock, newPost, postInput, postProblem, saveLabel, switchPostKind, templatePost, wrapSelection } from "../../src/news/draft.ts";
 import { newsMessage } from "../../src/news/preview.ts";
 import { websiteValidators } from "./partner-studio.check.ts";
 import { check, section } from "./harness.ts";
@@ -61,6 +61,22 @@ export async function checkNewsStudio(): Promise<void> {
 
         assert.deepEqual(back.event, event);
         assert.equal(switchPostKind(termin, "beitrag").event, null);
+    });
+
+    await check("Editor: ein neuerer Stand vom Server (erschienen, von jemand anderem geändert) wird erkannt (Review)", () => {
+        const saved = { ...newPost("beitrag"), id: 3, slug: "a", status: "scheduled" as const, publishAt: "2026-11-12T17:00:00.000Z", publishedAt: null, authorName: "M", createdAt: "2026-11-10T10:00:00.000Z", updatedAt: "2026-11-10T10:00:00.000Z", announcedAt: null };
+        const appeared = { ...saved, status: "published" as const, publishAt: null, publishedAt: "2026-11-12T17:00:00.000Z", updatedAt: "2026-11-12T17:00:00.000Z" };
+        const edited = { ...saved, updatedAt: "2026-11-10T11:00:00.000Z" };
+
+        assert.equal(freshPost(saved, saved), null);
+        assert.equal(freshPost(saved, { ...saved }), null);
+        assert.equal(freshPost(saved, appeared), appeared);
+        assert.equal(freshPost(saved, edited), edited);
+        assert.equal(freshPost(edited, saved), null);
+        // Die Liste hängt nach dem eigenen Speichern noch hinterher: kein neuerer Stand.
+        assert.equal(freshPost(appeared, saved), null);
+        assert.equal(freshPost(null, saved), null);
+        assert.equal(freshPost(saved, null), null);
     });
 
     await check("Entwurf: Bausteine einfügen, verschieben, kopieren, löschen", () => {

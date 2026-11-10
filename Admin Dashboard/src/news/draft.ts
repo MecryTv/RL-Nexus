@@ -79,6 +79,16 @@ export function postProblem(input: IPostInput): string | null {
     return input.blocks.some((block) => block.type === "image" && !block.alt.trim()) ? "Ein Bild braucht einen Alternativtext." : null;
 }
 
+/**
+ * Der Stand aus der Liste, wenn er neuer ist als der im Editor: erschienen
+ * (der Zeitgeber setzt updated_at) oder von jemand anderem gespeichert.
+ */
+export function freshPost(saved: IPost | null, fresh: IPost | null): IPost | null {
+    if (!saved || !fresh || fresh.id !== saved.id) return null;
+
+    return Date.parse(fresh.updatedAt) > Date.parse(saved.updatedAt) ? fresh : null;
+}
+
 /** Der Knopf in der Leiste sagt, was er tut: „Speichern“ nur, wenn der Stand bleibt. */
 export function saveLabel(target: PostState, saved: PostState): string {
     if (target === saved) return "Speichern";

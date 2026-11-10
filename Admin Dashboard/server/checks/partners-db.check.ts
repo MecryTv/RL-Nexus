@@ -179,6 +179,20 @@ export async function checkPartnerRoutesDb(config: IConfig, shared: IHttp): Prom
             assert.ok((await site()).includes(draft.json().post.slug), "Veröffentlichter Beitrag fehlt");
         });
 
+        await check("News: „Geplant“ mit vergangenem Zeitpunkt auf einen veröffentlichten Beitrag lässt ihn veröffentlicht, das Datum bleibt (Review)", async () => {
+            const created = await http.write("POST", "/api/news", { ...newPost("beitrag"), title: "Check DB Erschienen", summary: "Aus check:db.", status: "published" });
+
+            assert.equal(created.statusCode, 200, created.body);
+
+            const before = created.json().post as { id: number; publishedAt: string };
+            const past = new Date(Date.now() - 600_000).toISOString();
+            const stale = await http.write("PUT", `/api/news/${before.id}`, { ...newPost("beitrag"), title: "Check DB Erschienen", summary: "Tippfehler korrigiert.", status: "scheduled", publishAt: past });
+
+            assert.equal(stale.statusCode, 200, stale.body);
+            assert.equal(stale.json().post.status, "published");
+            assert.equal(stale.json().post.publishedAt, before.publishedAt);
+        });
+
         await check("Versteckter Partner verschwindet auch aus den News-Dateien", async () => {
             const created = (await http.write("POST", "/api/partners", { ...ENTRY, name: "Check DB Karte" })).json() as { id: number };
             const news = (

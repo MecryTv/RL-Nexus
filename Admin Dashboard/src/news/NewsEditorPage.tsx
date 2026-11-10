@@ -1,4 +1,4 @@
-import { type JSX, useEffect, useState } from "react";
+import { type JSX, useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { checkPostInput, NEWS_KINDS, type IPost, type IPostInput, type NewsKind, type PostState } from "../../shared/news";
 import type { IEntry } from "../../shared/partners";
@@ -11,7 +11,7 @@ import { Failure, Loading } from "../components/Status";
 import { UnsavedGuard } from "../editor/UnsavedGuard";
 import { useStudioDoc } from "../studio/useStudioDoc";
 import { useToast } from "../toast/context";
-import { newPost, postInput, postProblem } from "./draft.ts";
+import { freshPost, newPost, postInput, postProblem } from "./draft.ts";
 import { NewsStudio } from "./NewsStudio";
 import styles from "./news.module.scss";
 
@@ -31,7 +31,10 @@ function NewsEditor({ post, entries, channel, editorKey, onSaved }: IEditorProps
     const navigate = useNavigate();
     const notify = useToast();
     const [params] = useSearchParams();
-    const [saved, setSaved] = useState<IPost | null>(post);
+    // Was dieser Editor zuletzt gespeichert hat; ein neuerer Stand aus der Liste gewinnt (Review).
+    const [own, setSaved] = useState<IPost | null>(post);
+    const saved = freshPost(own, post) ?? own;
+    const handled = useRef(saved?.updatedAt ?? null);
     const doc = useStudioDoc<IPostInput>(post ? postInput(post) : newPost(kindOf(params.get("art"))));
     const [saving, setSaving] = useState(false);
     const [announcing, setAnnouncing] = useState<IPostInput | null>(null);
@@ -48,6 +51,7 @@ function NewsEditor({ post, entries, channel, editorKey, onSaved }: IEditorProps
             const fresh = result.post.status === "published" && saved?.status !== "published";
 
             setSaved(result.post);
+            handled.current = result.post.updatedAt;
             doc.markSaved(postInput(result.post), sent);
             notify(fresh ? "Veröffentlicht." : result.post.status === "scheduled" ? "Gespeichert und geplant." : "Gespeichert.");
             if (result.warning) notify(result.warning, "danger");
@@ -69,6 +73,17 @@ function NewsEditor({ post, entries, channel, editorKey, onSaved }: IEditorProps
         if (next.input.status === "published" && next.input.announce && !saved?.announcedAt) setAnnouncing(next.input);
         else void write(next.input);
     };
+
+    // Neuerer Stand vom Server, etwa ein geplanter Beitrag ist erschienen (Review): ohne eigene
+    // Änderungen ganz übernehmen, sonst nur den Stand, damit „Speichern“ ihn nicht zurückdreht.
+    useEffect(() => {
+        if (!saved || saving || handled.current === saved.updatedAt) return;
+
+        handled.current = saved.updatedAt;
+
+        if (!doc.dirty) doc.reset(postInput(saved));
+        else if (doc.value.status !== saved.status) doc.set({ ...doc.value, status: saved.status, publishAt: saved.publishAt });
+    }, [saved, saving, doc]);
 
     // Nach dem ersten Speichern die Adresse mit der ID, ohne den Editor neu zu starten.
     useEffect(() => {

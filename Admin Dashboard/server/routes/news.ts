@@ -72,7 +72,11 @@ export async function newsRoutes(app: FastifyInstance, { config }: { config: ICo
 
         if (!previous) throw new PublicError(404, "Diesen Beitrag gibt es nicht mehr.");
 
-        const post = await updatePost(previous.id, inputOf(request.body), actor);
+        const input = inputOf(request.body);
+        // Ein Editor mit altem Stand plant einen inzwischen erschienenen Beitrag in die Vergangenheit:
+        // er bleibt veröffentlicht und behält sein Datum, statt kurz zu verschwinden (Review).
+        const stale = previous.status === "published" && input.status === "scheduled" && input.publishAt !== null && Date.parse(input.publishAt) <= Date.now();
+        const post = await updatePost(previous.id, stale ? { ...input, status: "published", publishAt: null } : input, actor);
 
         await audit(actor, "news.update", `news:${post.id}`, post.title);
 
