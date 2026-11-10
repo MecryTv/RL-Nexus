@@ -81,9 +81,46 @@ export function newEntry(kind: EntryKind, name: string, options: INewEntryOption
     };
 }
 
-/** Andere Art: Name, Logo, Banner, Farbe, Texte und Abschnitte gleicher Art bleiben. */
-export function switchKind(input: IEntryInput, kind: EntryKind): IEntryInput {
+/** Abschnitte der Vorlage in ihrer Reihenfolge; wo der aktuelle Stand denselben Typ hat, gilt seine Fassung. */
+function mergeSections(template: readonly ISection[], current: readonly ISection[]): ISection[] {
+    const pool = [...current];
+    const merged = template.map((section) => {
+        const at = pool.findIndex((item) => item.type === section.type);
+
+        return at === -1 ? section : pool.splice(at, 1)[0]!;
+    });
+
+    return [...merged, ...pool];
+}
+
+/**
+ * Andere Art: Name, Logo, Banner, Farbe, Texte und Abschnitte gleicher Art
+ * bleiben. `back` ist der Stand, mit dem man die Zielart zuletzt verlassen hat:
+ * Dann kommen ihre Abschnitte in alter Reihenfolge, Ansprechpartner, Zugang,
+ * Server und Teams zurück, Änderungen dazwischen bleiben (Review).
+ */
+export function switchKind(input: IEntryInput, kind: EntryKind, back?: IEntryInput): IEntryInput {
     if (input.kind === kind) return input;
+    if (back && back.kind === kind) {
+        return switchKind(
+            {
+                ...input,
+                kind: input.kind,
+                partnerType: input.partnerType ?? back.partnerType,
+                tier: input.tier ?? back.tier,
+                supporterType: input.supporterType ?? back.supporterType,
+                stripText: input.stripText ?? back.stripText,
+                endsOn: input.endsOn ?? back.endsOn,
+                hideAfterEnd: input.kind === "supporter" ? input.hideAfterEnd : back.hideAfterEnd,
+                contactId: input.contactId ?? back.contactId,
+                access: input.access ?? back.access,
+                guildId: input.guildId ?? back.guildId,
+                showTeams: input.showTeams || back.showTeams,
+                sections: mergeSections(back.sections, input.sections),
+            },
+            kind
+        );
+    }
 
     const allowed = new Set<SectionType>([...SECTIONS_FOR[kind], ...EXTRA_SECTIONS_FOR[kind]]);
     const kept = input.sections.filter((section) => allowed.has(section.type));

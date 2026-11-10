@@ -86,9 +86,9 @@ export function saveLabel(target: PostState, saved: PostState): string {
     return target === "published" ? "Veröffentlichen" : target === "scheduled" ? "Planen" : "Als Entwurf speichern";
 }
 
-/** Andere Art: Bausteine bleiben, ein Termin bekommt Beginn und Ende. */
-export function switchPostKind(input: IPostInput, kind: NewsKind): IPostInput {
-    return { ...input, kind, event: kind === "termin" ? (input.event ?? defaultEvent()) : null };
+/** Andere Art: Bausteine bleiben, ein Termin bekommt Beginn und Ende, beim Zurückwechseln die alten (`back`). */
+export function switchPostKind(input: IPostInput, kind: NewsKind, back?: IPostEvent | null): IPostInput {
+    return { ...input, kind, event: kind === "termin" ? (input.event ?? back ?? defaultEvent()) : null };
 }
 
 /** Vorlage: Art, Kategorie und Bausteine. Titel, Kurztext, Bild und Verknüpfung bleiben. */

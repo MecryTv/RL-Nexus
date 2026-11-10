@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { checkPostInput, type IBlock } from "../../shared/news.ts";
-import { blockAction, blockLabel, insertBlock, moveBlock, newBlock, newPost, postInput, postProblem, saveLabel, templatePost, wrapSelection } from "../../src/news/draft.ts";
+import { blockAction, blockLabel, insertBlock, moveBlock, newBlock, newPost, postInput, postProblem, saveLabel, switchPostKind, templatePost, wrapSelection } from "../../src/news/draft.ts";
 import { newsMessage } from "../../src/news/preview.ts";
 import { websiteValidators } from "./partner-studio.check.ts";
 import { check, section } from "./harness.ts";
@@ -52,6 +52,15 @@ export async function checkNewsStudio(): Promise<void> {
         assert.equal(saveLabel("published", "scheduled"), "Veröffentlichen");
         assert.equal(saveLabel("scheduled", "draft"), "Planen");
         assert.equal(saveLabel("draft", "published"), "Als Entwurf speichern");
+    });
+
+    await check("Entwurf: Termin → Beitrag → Termin behält Beginn, Ende und Ort (Review)", () => {
+        const event = { startsAt: "2026-11-20T18:00:00.000Z", endsAt: "2026-11-20T21:00:00.000Z", place: "Bühne 1" };
+        const termin = { ...newPost("termin"), event };
+        const back = switchPostKind(switchPostKind(termin, "beitrag"), "termin", event);
+
+        assert.deepEqual(back.event, event);
+        assert.equal(switchPostKind(termin, "beitrag").event, null);
     });
 
     await check("Entwurf: Bausteine einfügen, verschieben, kopieren, löschen", () => {

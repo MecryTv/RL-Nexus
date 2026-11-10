@@ -1,5 +1,5 @@
-import { type JSX, useCallback, useEffect, useId, useMemo, useState } from "react";
-import { NEWS_KIND_LABELS, NEWS_KINDS, type BlockType, type IPost, type IPostInput, type PostState } from "../../shared/news";
+import { type JSX, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { NEWS_KIND_LABELS, NEWS_KINDS, type BlockType, type IPost, type IPostEvent, type IPostInput, type PostState } from "../../shared/news";
 import type { IEntry } from "../../shared/partners";
 import { Button } from "../components/Button";
 import { ConfirmDialog } from "../components/ConfirmDialog";
@@ -64,6 +64,8 @@ export function NewsStudio({ doc, saved, entries, channel, saving, problem, onSa
     const [focusPick, setFocusPick] = useState(false);
     const focused = useCallback(() => setFocusPick(false), []);
     const [device, setDevice] = useState<"desktop" | "handy">("desktop");
+    // Beginn, Ende und Ort eines Termins, falls man kurz auf Beitrag wechselt (Review).
+    const lastEvent = useRef<IPostEvent | null>(null);
     // Ein Entwurf ohne Zeitpunkt zeigt „jetzt“; ein Zeitpunkt je geöffnetem Studio reicht.
     const [now] = useState(() => new Date());
 
@@ -184,7 +186,10 @@ export function NewsStudio({ doc, saved, entries, channel, saving, problem, onSa
                 legend="Art"
                 options={NEWS_KINDS.map((kind) => ({ value: kind, label: NEWS_KIND_LABELS[kind] }))}
                 value={value.kind}
-                onChange={(kind) => doc.set(switchPostKind(value, kind))}
+                onChange={(kind) => {
+                    if (value.event) lastEvent.current = value.event;
+                    doc.set(switchPostKind(value, kind, lastEvent.current));
+                }}
             />
             <Segmented
                 name={`${id}-ansicht`}

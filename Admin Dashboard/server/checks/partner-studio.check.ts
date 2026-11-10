@@ -73,6 +73,56 @@ export async function checkPartnerStudio(): Promise<void> {
         assert.ok("input" in checkEntryInput(supporter), JSON.stringify(checkEntryInput(supporter)));
     });
 
+    await check("Entwurf: Art hin und zurück verliert nichts, Änderungen dazwischen bleiben (Review)", () => {
+        const base = newEntry("partner", "Apex Vortex", { partnerType: "liga", contactId: "100000000000000001", access: "paid" });
+        const partner: IEntryInput = {
+            ...base,
+            guildId: "300000000000000001",
+            showTeams: true,
+            sections: [
+                ...[...base.sections].reverse().map((item) =>
+                    item.type === "about"
+                        ? { ...item, text: "Seit 2023 dabei." }
+                        : item.type === "achievements"
+                          ? { ...item, items: [{ label: "Meister", date: "2026-05-01" }] }
+                          : item.type === "discord"
+                            ? { ...item, visible: false, text: "Kommt vorbei." }
+                            : item
+                ),
+                { type: "gallery", visible: true, images: ["/content/media/abcdef0123456789.webp"] },
+            ],
+        };
+        const of = (entry: IEntryInput, type: string) => entry.sections.find((item) => item.type === type);
+
+        for (const via of ["sponsor", "supporter"] as const) {
+            const away = switchKind(partner, via);
+            // Dazwischen geändert: die Kennzahlen, die jede Art hat.
+            const edited = { ...away, sections: away.sections.map((item) => (item.type === "stats" ? { ...item, items: [{ label: "Teams", value: "3" }] } : item)) };
+            const back = switchKind(edited, "partner", partner);
+
+            assert.deepEqual(back.sections.map((item) => item.type), partner.sections.map((item) => item.type), via);
+            assert.deepEqual(of(back, "stats")?.items, [{ label: "Teams", value: "3" }], via);
+            assert.equal(of(back, "about")?.text, "Seit 2023 dabei.", via);
+            assert.deepEqual(of(back, "achievements"), of(partner, "achievements"), via);
+            assert.deepEqual(of(back, "discord"), of(partner, "discord"), via);
+            assert.deepEqual(of(back, "gallery"), of(partner, "gallery"), via);
+            assert.equal(back.partnerType, "liga", via);
+            assert.equal(back.contactId, partner.contactId, via);
+            assert.equal(back.access, "paid", via);
+            assert.equal(back.guildId, partner.guildId, via);
+            assert.equal(back.showTeams, true, via);
+        }
+
+        const sponsor: IEntryInput = {
+            ...newEntry("sponsor", "NordHost", { tier: "main" }),
+            sections: [{ type: "about", visible: true, text: "Hosting." }, { type: "offer", visible: true, text: "15 % Rabatt", code: "NEXUS15", until: null }],
+        };
+        const again = switchKind(switchKind(sponsor, "partner"), "sponsor", sponsor);
+
+        assert.deepEqual(again.sections.find((item) => item.type === "offer"), sponsor.sections[1]);
+        assert.equal(again.tier, "main");
+    });
+
     await check("Entwurf: Vorlagen passen zur Art", () => {
         for (const [kind, template] of [["partner", "organisation"], ["partner", "creator"], ["partner", "liga"], ["partner", "community"], ["sponsor", "firma"], ["supporter", "firma"], ["supporter", "creator"], ["supporter", "community"]] as const) {
             const entry = { ...newEntry(kind, "Vorlage", { partnerType: "organisation", tier: "sponsor", supporterType: "firma" }), sections: templateSections(kind, template) };

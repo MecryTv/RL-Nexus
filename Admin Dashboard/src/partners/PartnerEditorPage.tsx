@@ -1,4 +1,4 @@
-import { type JSX, useEffect, useState } from "react";
+import { type JSX, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import type { IPost } from "../../shared/news";
 import { checkEntryInput, type EntryKind, type IEntry, type IEntryInput } from "../../shared/partners";
@@ -41,6 +41,8 @@ function PartnerEditor({ entry, entries, posts, siteOrigin, onSaved }: IEditorPr
     const [pending, setPending] = useState<{ readonly text: string; readonly run: () => void } | null>(null);
     const [acknowledged, setAcknowledged] = useState<string | null>(null);
     const [deleting, setDeleting] = useState(false);
+    // Stand je Art beim Verlassen: Zurückwechseln holt ihn wieder (Review).
+    const left = useRef<Partial<Record<EntryKind, IEntryInput>>>({});
     // Nach dem Löschen erst weg, wenn der Entwurf nicht mehr als ungespeichert gilt.
     const [gone, setGone] = useState(false);
     const contact = useContact(doc.value.contactId);
@@ -78,18 +80,22 @@ function PartnerEditor({ entry, entries, posts, siteOrigin, onSaved }: IEditorPr
     };
 
     const changeKind = (kind: EntryKind): void => {
-        const next = switchKind(doc.value, kind);
+        const next = switchKind(doc.value, kind, left.current[kind]);
         const notice = roleNotice(entry, next, group);
 
         if (notice) {
             setPending({
                 text: `${notice} Das passiert beim Speichern.`,
                 run: () => {
+                    left.current[doc.value.kind] = doc.value;
                     doc.set(next);
                     setAcknowledged(notice);
                 },
             });
-        } else doc.set(next);
+        } else {
+            left.current[doc.value.kind] = doc.value;
+            doc.set(next);
+        }
     };
 
     const remove = async (): Promise<void> => {
