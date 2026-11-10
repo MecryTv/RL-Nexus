@@ -80,6 +80,10 @@ Die Webseite bekommt eine Seite **Partner/Sponsorings** und eine **News**-Anzeig
 - Liste im Reiter Unterstützer: Ziehen ändert die Reihenfolge der Leiste; Zustand Sichtbar, Endet am, Ausgeblendet; „Gestalten“ je Zeile.
 - Studio (S5): Abschnitte wie in Teil 2, Vorlagen Firma, Creator, Community; Ansicht Große Ansicht, In der Leiste, Handy. Inspektor ohne Auswahl: Name, Link, Art mit Untertitel, Kurztext für die Leiste (60 Zeichen), Platz in der Leiste, Zeitraum mit „Am Ende aus der Leiste nehmen“, Sichtbarkeit.
 
+### Bühne der Studios (Entscheidung 10.11.2026)
+
+Die Bühne aller drei Studios bettet die echte Webseite ein, wie heute die Vorschau im Modul-Editor (iframe auf `/vorschau`, Nachrichten per `postMessage`). So steht dort garantiert dasselbe wie auf nexus-emb.de. Die Webseite meldet einen Klick auf einen Teil zurück und zeigt am gewählten Teil die kleine Leiste. Deshalb wird Teil 3 (Webseite) vor Teil 2 (Studios) gebaut.
+
 ### 6. Admin: News-Studio (`studio.html` S1 und S2)
 
 - Leiste: Art Beitrag, Kurzmeldung, Termin; Rückgängig/Wiederholen; Desktop/Handy; Stand (Entwurf, geplant); Vorschau in neuem Tab; Speichern; Veröffentlichen.
