@@ -7,6 +7,7 @@ import { readFileSync } from "node:fs";
 import { isSiteChangelog, isSiteLive, isSiteNews, isSiteNewsPost, isSitePartners } from "../src/services/Content.ts";
 import { parseMarkdown } from "../src/services/markdown.ts";
 import { categoryCounts, isNew, pinned, shares, timeline, upcoming } from "../src/services/news.ts";
+import { navigationFor } from "../src/services/navigation.ts";
 
 const site = JSON.parse(readFileSync(new URL("./fixtures/site.json", import.meta.url), "utf8"));
 const clone = (value) => structuredClone(value);
@@ -136,6 +137,34 @@ check("Anteile einer Version und Arten mit Anzahl", () => {
     assert.deepEqual(shares(site.changelog.versions[0]), { neu: 1, verbessert: 1, behoben: 1 });
     assert.equal(categoryCounts(site.news).partner, 1);
     assert.equal(categoryCounts(site.news).wartung, 1);
+});
+
+console.log("\n  Menü, Kontakt, Datenschutz und nginx (W-0062)");
+
+const source = (path) => readFileSync(new URL(path, import.meta.url), "utf8");
+
+check("Menü: News, Changelog und Partner/Sponsorings in der festgelegten Reihenfolge", () => {
+    assert.deepEqual(navigationFor("free").map((item) => item.to), ["/", "/module", "/news", "/changelog", "/partner", "/team", "/kontakt"]);
+    assert.deepEqual(navigationFor("paid").map((item) => item.to), ["/", "/module", "/preise", "/news", "/changelog", "/partner", "/team", "/kontakt"]);
+    assert.equal(navigationFor("free").find((item) => item.to === "/partner")?.label, "Partner/Sponsorings");
+});
+
+check("Kontakt: Thema Sponsoring und Vorauswahl über ?thema=", () => {
+    assert.match(source("../src/domain/enums/ContactTopic.ts"), /Sponsoring\s*=\s*"sponsoring"/);
+    assert.match(source("../src/components/sections/ContactForm.tsx"), /thema/);
+});
+
+check("Datenschutz nennt den neuen Eintrag im Browser", () => {
+    assert.match(source("../src/pages/LegalPage.tsx"), /rlnexus\.news\.besuch/);
+});
+
+check("nginx: Vorschau beim Teilen für Bots und RSS unter /news.xml", () => {
+    const conf = source("../../Discord%20Bot/nginx/container/website.conf");
+
+    assert.match(conf, /\$rlnexus_og_bot/);
+    assert.match(conf, /Discordbot/);
+    assert.match(conf, /\/content\/og/);
+    assert.match(conf, /location = \/news\.xml/);
 });
 
 // Was Teil 1 lokal wirklich geschrieben hat (Admin Dashboard/data/site), muss durchgehen.

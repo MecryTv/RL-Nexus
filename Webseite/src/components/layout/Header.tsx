@@ -4,6 +4,9 @@ import { siteConfig } from "../../services/SiteConfig";
 import { navigationFor } from "../../services/navigation.ts";
 import { useScrolled } from "../../hooks/useScrolled";
 import { useShopMode } from "../../hooks/useShopMode.ts";
+import { readLastVisit } from "../../hooks/useLastVisit.ts";
+import { isNew } from "../../services/news.ts";
+import { useChangelog } from "../../services/siteContent.ts";
 import { Button } from "../ui/Button";
 import { Icon } from "../ui/Icon";
 import styles from "./Header.module.scss";
@@ -23,6 +26,15 @@ export function Header(): JSX.Element {
     const scrolled = useScrolled(20);
     const navigation = navigationFor(useShopMode());
     const [open, setOpen] = useState(false);
+    // W-0062: Seit dem letzten Besuch eine neue Version? Dann ein Punkt am Menüpunkt.
+    const latest = useChangelog()?.versions[0]?.postedAt;
+    const fresh = latest !== undefined && isNew(latest, readLastVisit());
+    const mark = (to: string): JSX.Element | null =>
+        to === "/changelog" && fresh ? (
+            <span className={styles.fresh}>
+                <span className="u-sr">neu</span>
+            </span>
+        ) : null;
     const { pathname } = useLocation();
 
     // Seitenwechsel schließt das Menü. Sonst bliebe es über der neuen Seite
@@ -86,6 +98,7 @@ export function Header(): JSX.Element {
                     {navigation.map((item) => (
                         <NavLink key={item.to} className={navClass} to={item.to} end={item.to === "/"}>
                             {item.label}
+                            {mark(item.to)}
                         </NavLink>
                     ))}
                 </nav>
@@ -125,6 +138,7 @@ export function Header(): JSX.Element {
                     {navigation.map((item) => (
                         <NavLink key={item.to} className={navClass} to={item.to} end={item.to === "/"}>
                             {item.label}
+                            {mark(item.to)}
                             <Icon name="arrow-right" size={18} />
                         </NavLink>
                     ))}

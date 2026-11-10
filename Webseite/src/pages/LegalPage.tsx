@@ -388,8 +388,8 @@ const PRIVACY: readonly ILegalSection[] = [
             <>
                 <h3>Auf dieser Website</h3>
                 <p>
-                    Die Website selbst setzt keine Cookies. Im Speicher deines Browsers legt sie höchstens zwei Einträge
-                    ab. Beide bleiben in deinem Browser, wir bekommen sie nie zu sehen:
+                    Die Website selbst setzt keine Cookies. Im Speicher deines Browsers legt sie höchstens drei Einträge
+                    ab. Alle bleiben in deinem Browser, wir bekommen sie nie zu sehen:
                 </p>
                 <Facts
                     entries={[
@@ -402,6 +402,11 @@ const PRIVACY: readonly ILegalSection[] = [
                             name: "rlnexus.banner",
                             text: "Nur wenn du den Hinweis oben auf der Seite wegklickst: welchen Stand des Hinweises du weggeklickt hast. Damit bleibt er weg, bis sich sein Text ändert. Liegt im sessionStorage dieses Tabs.",
                             keep: "Bis du den Tab schließt",
+                        },
+                        {
+                            name: "rlnexus.news.besuch",
+                            text: "Wann du zuletzt in den News oder im Changelog warst. Damit sind Beiträge und Versionen, die seitdem dazukamen, als neu markiert. Liegt im localStorage.",
+                            keep: "Bis du ihn löschst",
                         },
                     ]}
                 />
