@@ -3,6 +3,7 @@ import { AUDIT_LABELS } from "../../shared/limits.ts";
 import { checkEntryInput, ENTRY_KINDS, type IEntry, type IEntryInput } from "../../shared/partners.ts";
 import { accessOf } from "../access.ts";
 import { audit, type IActor } from "../audit.ts";
+import { botShowcase } from "../bot.ts";
 import type { IConfig } from "../config.ts";
 import { query } from "../db.ts";
 import { DiscordUnavailable, fetchMember } from "../discord.ts";
@@ -105,6 +106,12 @@ export async function partnerRoutes(app: FastifyInstance, { config }: { config: 
 
         return reply.code(204).send();
     });
+
+    /**
+     * W-0062 Teil 2: Live-Zahlen eines Servers für die Vorschau im Studio, auch
+     * bevor der Eintrag gespeichert ist. null: Der Bot ist nicht dort oder antwortet nicht.
+     */
+    app.get("/api/partners/showcase/:guildId", async (request) => botShowcase(config, snowflake((request.params as { guildId?: string }).guildId)));
 
     /** Vorab-Prüfung im Anlege-Dialog: Wer ist das, welche Gruppe, auf dem Server, welche Server mit RL Nexus, darf der Bot die Rolle geben. */
     app.get("/api/partners/contact/:userId", async (request) => {

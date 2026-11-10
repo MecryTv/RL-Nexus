@@ -172,6 +172,16 @@ export async function checkPartnerRoutesDb(config: IConfig, shared: IHttp): Prom
             assert.equal(response.json().member, false);
             assert.equal(response.json().group, null);
         });
+
+        await check("Partner: Live-Zahlen eines Servers für die Vorschau im Studio (Teil 2)", async () => {
+            const response = await http.get("/api/partners/showcase/300000000000000001");
+
+            assert.equal(response.statusCode, 200, response.body);
+            assert.equal(response.json().members, 1240);
+            assert.equal(response.json().online, 312);
+            assert.deepEqual(response.json().modules, ["teams", "apply"]);
+            assert.equal((await http.get("/api/partners/showcase/abc")).statusCode, 400);
+        });
     } finally {
         await tidyPartners();
         await query("DELETE FROM dashboard_groups WHERE user_id IN (?, ?)", [contact, hand]);
