@@ -1,4 +1,4 @@
-import { BLOCK_LABELS, checkPostInput, type BlockType, type IBlock, type IPost, type IPostEvent, type IPostInput, type NewsKind } from "../../shared/news.ts";
+import { BLOCK_LABELS, checkPostInput, type BlockType, type IBlock, type IPost, type IPostEvent, type IPostInput, type NewsKind, type PostState } from "../../shared/news.ts";
 import { moveTo } from "../editor/list.ts";
 import { berlinToIso, todayBerlin } from "../studio/time.ts";
 
@@ -77,6 +77,13 @@ export function postProblem(input: IPostInput): string | null {
     if ("problem" in checked) return checked.problem;
 
     return input.blocks.some((block) => block.type === "image" && !block.alt.trim()) ? "Ein Bild braucht einen Alternativtext." : null;
+}
+
+/** Der Knopf in der Leiste sagt, was er tut: „Speichern“ nur, wenn der Stand bleibt. */
+export function saveLabel(target: PostState, saved: PostState): string {
+    if (target === saved) return "Speichern";
+
+    return target === "published" ? "Veröffentlichen" : target === "scheduled" ? "Planen" : "Als Entwurf speichern";
 }
 
 /** Andere Art: Bausteine bleiben, ein Termin bekommt Beginn und Ende. */

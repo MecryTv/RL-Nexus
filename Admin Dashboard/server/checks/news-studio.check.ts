@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { checkPostInput, type IBlock } from "../../shared/news.ts";
-import { blockAction, blockLabel, insertBlock, moveBlock, newBlock, newPost, postInput, postProblem, templatePost, wrapSelection } from "../../src/news/draft.ts";
+import { blockAction, blockLabel, insertBlock, moveBlock, newBlock, newPost, postInput, postProblem, saveLabel, templatePost, wrapSelection } from "../../src/news/draft.ts";
 import { newsMessage } from "../../src/news/preview.ts";
 import { websiteValidators } from "./partner-studio.check.ts";
 import { check, section } from "./harness.ts";
@@ -42,6 +42,16 @@ export async function checkNewsStudio(): Promise<void> {
         assert.equal(postProblem({ ...newPost("beitrag"), blocks: [image] }), "Ein Bild braucht einen Alternativtext.");
         assert.equal(postProblem({ ...newPost("beitrag"), blocks: [{ ...image, alt: "Logo" }] }), null);
         assert.equal(postProblem({ ...newPost("beitrag"), blocks: [newBlock("image")] }), "Ein Bild-Baustein hat kein Bild.");
+    });
+
+    await check("Leiste: „Speichern“ heißt nur so, wenn sich der Stand nicht ändert", () => {
+        assert.equal(saveLabel("draft", "draft"), "Speichern");
+        assert.equal(saveLabel("published", "published"), "Speichern");
+        assert.equal(saveLabel("scheduled", "scheduled"), "Speichern");
+        assert.equal(saveLabel("published", "draft"), "Veröffentlichen");
+        assert.equal(saveLabel("published", "scheduled"), "Veröffentlichen");
+        assert.equal(saveLabel("scheduled", "draft"), "Planen");
+        assert.equal(saveLabel("draft", "published"), "Als Entwurf speichern");
     });
 
     await check("Entwurf: Bausteine einfügen, verschieben, kopieren, löschen", () => {

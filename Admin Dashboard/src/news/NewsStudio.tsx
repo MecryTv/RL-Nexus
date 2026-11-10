@@ -14,7 +14,7 @@ import { partIndex, type StageAction } from "../studio/stage.ts";
 import type { IStudioDoc } from "../studio/useStudioDoc";
 import { BlockInspector } from "./BlockInspector";
 import { BlocksTray, LayoutTray, MediaTray } from "./BlocksTray";
-import { blockAction, insertBlock, switchPostKind, templatePost, type NewsTemplate } from "./draft.ts";
+import { blockAction, insertBlock, saveLabel, switchPostKind, templatePost, type NewsTemplate } from "./draft.ts";
 import { PostSettings } from "./PostSettings";
 import { newsMessage } from "./preview.ts";
 import styles from "./news.module.scss";
@@ -171,6 +171,9 @@ export function NewsStudio({ doc, saved, entries, channel, saving, problem, onSa
             <PostSettings value={value} set={doc.set} saved={saved} entries={entries} channel={channel} />
         );
     const canSave = (doc.dirty || !saved) && problem === null;
+    const savedStatus = saved?.status ?? "draft";
+    // Wie in S1: ein Entwurf bleibt mit „Speichern“ Entwurf, daneben steht „Veröffentlichen“.
+    const publishNow = value.status === "draft" && savedStatus === "draft";
 
     const bar = (
         <>
@@ -198,10 +201,10 @@ export function NewsStudio({ doc, saved, entries, channel, saving, problem, onSa
                 Vorschau ↗
             </Button>
             {problem && <span className={styles.problem}>{problem}</span>}
-            <Button variant={value.status === "draft" ? "outline" : "primary"} size="sm" busy={saving} disabled={!canSave} onClick={() => onSave()}>
-                Speichern
+            <Button variant={publishNow ? "outline" : "primary"} size="sm" busy={saving} disabled={!canSave} onClick={() => onSave()}>
+                {saveLabel(value.status, savedStatus)}
             </Button>
-            {value.status === "draft" && (
+            {publishNow && (
                 <Button variant="primary" size="sm" busy={saving} disabled={problem !== null} onClick={() => onSave("published")}>
                     Veröffentlichen
                 </Button>
