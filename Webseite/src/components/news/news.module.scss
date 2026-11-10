@@ -1,0 +1,575 @@
+@use "mixins" as *;
+
+/* W-0062: Bausteine der News (Entwurf news-v2 N3 und A2). `--c` ist die Farbe der Art. */
+
+.newMark {
+    display: inline-block;
+    padding: 1px 7px;
+    background: var(--c-red);
+    color: #fff;
+
+    @include label(0.75rem, 0.16em);
+}
+
+.tag {
+    display: inline-block;
+    padding: 3px 9px 2px;
+    background: color-mix(in srgb, var(--c) 13%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 36%, transparent);
+    color: var(--c);
+    white-space: nowrap;
+
+    @include label(0.75rem, 0.14em);
+}
+
+.meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+    color: var(--c-text-faint);
+
+    @include label(0.8125rem, 0.08em);
+}
+
+/* Der Link spannt sich über die ganze Karte. */
+.stretch {
+    transition: color var(--t-fast);
+
+    &::after {
+        position: absolute;
+        content: "";
+        inset: 0;
+    }
+
+    &:hover {
+        color: var(--c);
+    }
+
+    &:focus-visible {
+        outline: none;
+
+        &::after {
+            outline: 2px solid var(--c-text);
+            outline-offset: -4px;
+        }
+    }
+}
+
+.cover {
+    position: relative;
+    overflow: hidden;
+    background:
+        radial-gradient(circle at 75% 30%, color-mix(in srgb, var(--c) 45%, transparent), transparent 55%),
+        linear-gradient(135deg, #0b1118, #05080b);
+
+    &[data-art]::after {
+        position: absolute;
+        right: 14px;
+        bottom: 10px;
+        color: color-mix(in srgb, var(--c) 40%, transparent);
+        content: attr(data-art);
+        font-family: var(--f-accent);
+        font-size: 2.5rem;
+        font-weight: 700;
+        line-height: 1;
+    }
+
+    img {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+}
+
+/* --- Zeitstrahl --------------------------------------------------------- */
+.timeline {
+    position: relative;
+    padding-left: 132px;
+
+    &::before {
+        position: absolute;
+        top: 6px;
+        bottom: 0;
+        left: 104px;
+        width: 2px;
+        background: linear-gradient(180deg, var(--c-red), var(--c-line-strong) 18%, var(--c-line-strong));
+        content: "";
+    }
+
+    @include below(640px) {
+        padding-left: 26px;
+
+        &::before {
+            left: 6px;
+        }
+    }
+}
+
+/* Monatskopf. Bleibt beim Scrollen unter der Kopfzeile stehen. */
+.month {
+    position: sticky;
+    z-index: 2;
+    top: calc(var(--s-header) + 8px);
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin: 30px 0 16px -132px;
+    pointer-events: none;
+
+    &:first-child {
+        margin-top: 4px;
+    }
+
+    h2 {
+        width: 92px;
+        color: var(--c-red-bright);
+        font-family: var(--f-accent);
+        font-size: 0.75rem;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        text-align: right;
+        text-transform: uppercase;
+    }
+
+    span {
+        margin-left: 6px;
+        padding: 4px 10px;
+        background: var(--c-base);
+        box-shadow: inset 0 0 0 1px var(--c-line-strong);
+        color: var(--c-text-dim);
+
+        @include label(0.75rem, 0.14em);
+    }
+
+    @include below(640px) {
+        margin-left: -26px;
+
+        h2 {
+            width: auto;
+            padding: 4px 8px;
+            background: var(--c-base);
+            text-align: left;
+        }
+
+        span {
+            margin-left: 0;
+        }
+    }
+}
+
+.entries {
+    display: grid;
+    gap: 16px;
+}
+
+.entry {
+    position: relative;
+}
+
+.when {
+    position: absolute;
+    top: 14px;
+    left: -132px;
+    width: 88px;
+    line-height: 1;
+    text-align: right;
+
+    strong {
+        display: block;
+        font-size: 1.625rem;
+        font-weight: 800;
+    }
+
+    small {
+        color: var(--c-text-faint);
+
+        @include label(0.75rem, 0.14em);
+    }
+
+    @include below(640px) {
+        position: static;
+        display: flex;
+        align-items: baseline;
+        gap: 6px;
+        width: auto;
+        margin-bottom: 6px;
+        text-align: left;
+
+        strong {
+            font-size: 1rem;
+        }
+    }
+}
+
+.node {
+    position: absolute;
+    top: 20px;
+    left: -35px;
+    width: 16px;
+    height: 16px;
+    background: var(--c);
+    clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+
+    @include below(640px) {
+        top: 2px;
+        left: -27px;
+        width: 12px;
+        height: 12px;
+    }
+}
+
+.card {
+    display: block;
+}
+
+.cardBody {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+    padding: 16px 20px;
+
+    p {
+        color: var(--c-text-dim);
+        font-size: 0.875rem;
+        line-height: 1.55;
+    }
+}
+
+.entryTitle {
+    font-size: 1.1875rem;
+    font-weight: 800;
+    line-height: 1.25;
+}
+
+.big {
+    display: grid;
+    grid-template-columns: 1fr 230px;
+
+    @include below(640px) {
+        grid-template-columns: 1fr;
+
+        .entryCover {
+            min-height: 120px;
+            order: -1;
+        }
+    }
+}
+
+.entryCover {
+    min-height: 150px;
+}
+
+.short {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 14px;
+    padding: 12px 18px;
+
+    .entryTitle {
+        flex: 1 1 260px;
+        font-size: 1rem;
+    }
+}
+
+.withDate {
+    display: grid;
+    align-items: center;
+    grid-template-columns: 1fr auto;
+
+    .dateBox {
+        margin: 14px 18px 14px 0;
+    }
+
+    @include below(480px) {
+        grid-template-columns: 1fr;
+
+        .dateBox {
+            justify-self: start;
+            margin: 0 20px 16px;
+        }
+    }
+}
+
+.dateBox {
+    padding: 10px 14px;
+    background: color-mix(in srgb, var(--c) 10%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 40%, transparent);
+    text-align: center;
+
+    small {
+        display: block;
+        color: var(--c);
+
+        @include label(0.75rem, 0.16em);
+    }
+
+    strong {
+        font-size: 1.25rem;
+        font-weight: 800;
+        white-space: nowrap;
+    }
+}
+
+.version {
+    color: var(--c);
+    font-family: var(--f-accent);
+    font-size: 0.875rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+}
+
+.changes {
+    padding-left: 18px;
+    color: var(--c-text-dim);
+    font-size: 0.875rem;
+    list-style: disc;
+
+    li + li {
+        margin-top: 2px;
+    }
+}
+
+.more {
+    color: var(--c-red-bright);
+
+    @include label(0.75rem, 0.14em);
+}
+
+/* --- Bausteine eines Beitrags ------------------------------------------ */
+.blocks {
+    display: grid;
+    gap: 22px;
+}
+
+.prose {
+    max-width: 68ch;
+    color: var(--c-text);
+    font-size: 1.0625rem;
+    line-height: 1.7;
+
+    p + p,
+    p + ul,
+    p + ol,
+    ul + p,
+    ol + p {
+        margin-top: 16px;
+    }
+
+    ul,
+    ol {
+        padding-left: 22px;
+    }
+
+    ul {
+        list-style: disc;
+    }
+
+    ol {
+        list-style: decimal;
+    }
+
+    li + li {
+        margin-top: 4px;
+    }
+
+    a {
+        color: var(--c-red-bright);
+        text-decoration: underline;
+        text-underline-offset: 3px;
+    }
+
+    strong {
+        font-weight: 700;
+    }
+}
+
+.lead {
+    color: var(--c-text);
+    font-size: 1.25rem;
+    line-height: 1.6;
+}
+
+.full {
+    max-width: none;
+}
+
+.heading {
+    margin-top: 8px;
+    font-size: 1.5rem;
+    font-weight: 800;
+    line-height: 1.25;
+}
+
+.figure {
+    img {
+        width: 100%;
+
+        @include bevel-diagonal(14px);
+    }
+
+    figcaption {
+        margin-top: 8px;
+        color: var(--c-text-faint);
+        font-size: 0.875rem;
+    }
+}
+
+.gallery {
+    display: grid;
+    gap: 10px;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr));
+
+    img {
+        width: 100%;
+        aspect-ratio: 16 / 10;
+        object-fit: cover;
+
+        @include bevel-diagonal(10px);
+    }
+}
+
+.callout {
+    padding: 16px 20px;
+    background: rgb(0 175 255 / 8%);
+    box-shadow: inset 0 0 0 1px rgb(0 175 255 / 35%);
+    color: var(--c-text);
+    line-height: 1.6;
+
+    @include bevel-diagonal(12px);
+
+    b {
+        display: block;
+        margin-bottom: 6px;
+    }
+
+    p + p {
+        margin-top: 10px;
+    }
+
+    a {
+        color: var(--c-blue);
+        text-decoration: underline;
+    }
+}
+
+.quote {
+    padding: 4px 0 4px 22px;
+    border-left: 3px solid var(--c-red);
+
+    blockquote {
+        font-size: 1.25rem;
+        font-weight: 600;
+        line-height: 1.5;
+        white-space: pre-line;
+    }
+
+    figcaption {
+        margin-top: 8px;
+        color: var(--c-text-dim);
+
+        @include label(0.75rem, 0.12em);
+    }
+}
+
+.linked {
+    position: relative;
+    display: grid;
+    align-items: center;
+    gap: 14px;
+    grid-template-columns: auto 1fr auto;
+    padding: 14px 16px;
+    background: var(--c-panel-fill);
+    box-shadow: inset 0 0 0 1px var(--c-line-strong);
+
+    @include bevel-diagonal(14px);
+
+    small {
+        display: block;
+        color: var(--c-text-faint);
+
+        @include label(0.75rem, 0.14em);
+    }
+
+    b {
+        font-size: 1.125rem;
+    }
+
+    @include below(480px) {
+        grid-template-columns: auto 1fr;
+
+        .linkedMore {
+            grid-column: 1 / -1;
+            justify-self: start;
+        }
+    }
+}
+
+.linkedMore {
+    padding: 8px 12px;
+    background: rgb(255 255 255 / 5%);
+    box-shadow: inset 0 0 0 1px var(--c-line-strong);
+    white-space: nowrap;
+
+    @include label(0.75rem, 0.14em);
+    @include bevel-diagonal(8px);
+    @include touch-target;
+
+    &::after {
+        position: absolute;
+        content: "";
+        inset: 0;
+    }
+
+    &:hover {
+        color: var(--c);
+    }
+
+    &:focus-visible {
+        outline: none;
+
+        &::after {
+            outline: 2px solid var(--c-text);
+            outline-offset: -4px;
+        }
+    }
+}
+
+.event {
+    --c: var(--c-mod-engagement);
+
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 12px 16px;
+    background: var(--c-panel-fill);
+    box-shadow: inset 0 0 0 1px var(--c-line-strong);
+
+    @include bevel-diagonal(12px);
+
+    b {
+        display: block;
+    }
+
+    small {
+        color: var(--c-text-dim);
+        font-size: 0.875rem;
+    }
+
+    .dateBox strong {
+        display: block;
+    }
+}
+
+.button {
+    display: flex;
+}
+
+.divider {
+    height: 1px;
+    border: 0;
+    background: var(--c-line-strong);
+}

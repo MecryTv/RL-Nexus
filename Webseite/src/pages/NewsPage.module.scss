@@ -1,0 +1,313 @@
+@use "mixins" as *;
+
+/* W-0062: /news nach Entwurf news-v2 N3. */
+
+.follow {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 6px;
+}
+
+.freshCount {
+    color: var(--c-text);
+    font-weight: 600;
+}
+
+/* --- Angeheftet --------------------------------------------------------- */
+.pinned {
+    display: grid;
+    grid-template-columns: 1.3fr 1fr;
+    margin-bottom: 14px;
+
+    @include below(860px) {
+        grid-template-columns: 1fr;
+    }
+}
+
+.pinnedCover {
+    min-height: 290px;
+
+    @include below(860px) {
+        min-height: 180px;
+    }
+}
+
+.pinnedBody {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 28px 30px;
+
+    h2 {
+        font-size: clamp(1.4rem, 3vw, 1.875rem);
+        font-weight: 800;
+        line-height: 1.15;
+    }
+
+    p {
+        color: var(--c-text-dim);
+        line-height: 1.6;
+    }
+
+    > span:last-child {
+        margin-top: auto;
+    }
+
+    @include below(640px) {
+        padding: 20px;
+    }
+}
+
+.pin {
+    color: var(--c-mod-engagement);
+
+    @include label(0.75rem, 0.16em);
+}
+
+.pinnedSmall {
+    display: grid;
+    gap: 14px;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+    margin-bottom: 14px;
+}
+
+.mini {
+    display: grid;
+    grid-template-columns: 96px 1fr;
+}
+
+.miniCover {
+    min-height: 100px;
+
+    &[data-art]::after {
+        font-size: 1.5rem;
+    }
+}
+
+.miniBody {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 6px;
+    min-width: 0;
+    padding: 14px 18px;
+
+    h3 {
+        font-size: 1rem;
+        font-weight: 800;
+        line-height: 1.3;
+    }
+}
+
+/* --- Filter ------------------------------------------------------------- */
+.filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 22px 0;
+}
+
+.filter {
+    padding: 7px 12px;
+    background: rgb(255 255 255 / 4%);
+    box-shadow: inset 0 0 0 1px var(--c-line);
+    color: var(--c-text-dim);
+    cursor: pointer;
+
+    @include label(0.75rem, 0.12em);
+    @include touch-target;
+
+    i {
+        margin-left: 6px;
+        color: var(--c-text-faint);
+        font-style: normal;
+    }
+
+    &:hover {
+        color: var(--c-text);
+    }
+
+    &[aria-pressed="true"] {
+        background: rgb(255 30 45 / 16%);
+        box-shadow: inset 0 0 0 1px rgb(255 30 45 / 55%);
+        color: var(--c-text);
+    }
+
+    &:focus-visible {
+        @include focus-ring;
+    }
+}
+
+/* --- Spalten ------------------------------------------------------------ */
+.cols {
+    display: grid;
+    align-items: start;
+    gap: 34px;
+    grid-template-columns: minmax(0, 1fr) 320px;
+
+    @include below(980px) {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+.stream {
+    min-width: 0;
+}
+
+.monthGroup {
+    scroll-margin-top: calc(var(--s-header) + 16px);
+
+    & + & {
+        margin-top: 30px;
+    }
+}
+
+.empty {
+    color: var(--c-text-dim);
+}
+
+.loadMore {
+    display: flex;
+    justify-content: center;
+    margin-top: 22px;
+}
+
+.side {
+    position: sticky;
+    top: calc(var(--s-header) + 20px);
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+
+    @include below(980px) {
+        position: static;
+    }
+}
+
+.search input {
+    width: 100%;
+    padding: 11px 14px;
+    border: 0;
+    background: rgb(255 255 255 / 4%);
+    box-shadow: inset 0 0 0 1px var(--c-line-strong);
+    color: var(--c-text);
+    font: inherit;
+    font-size: 0.9rem;
+
+    &::placeholder {
+        color: var(--c-text-faint);
+    }
+
+    &:focus-visible {
+        outline: 2px solid var(--c-blue);
+        outline-offset: 0;
+    }
+}
+
+.box {
+    padding: 16px 18px 14px;
+
+    h2 {
+        margin-bottom: 10px;
+        color: var(--c-text-faint);
+
+        @include label(0.75rem, 0.18em);
+    }
+}
+
+.soon {
+    li {
+        display: grid;
+        align-items: center;
+        gap: 12px;
+        grid-template-columns: 52px 1fr;
+        padding: 8px 0;
+        border-bottom: 1px solid var(--c-line);
+
+        &:last-child {
+            border: 0;
+        }
+    }
+
+    a {
+        display: block;
+        font-size: 0.875rem;
+        font-weight: 600;
+        line-height: 1.3;
+
+        &:hover {
+            color: var(--c-red-bright);
+        }
+    }
+
+    small {
+        color: var(--c-text-faint);
+        font-size: 0.8125rem;
+    }
+}
+
+.soonDate {
+    padding: 6px 0;
+    background: rgb(255 255 255 / 4%);
+    line-height: 1;
+    text-align: center;
+
+    strong {
+        display: block;
+        font-size: 1.125rem;
+        font-weight: 800;
+    }
+
+    small {
+        color: var(--c);
+
+        @include label(0.75rem, 0.14em);
+    }
+}
+
+.archive {
+    li {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 7px 0;
+        border-bottom: 1px solid var(--c-line);
+        color: var(--c-text-dim);
+        font-size: 0.875rem;
+
+        &:last-child {
+            border: 0;
+        }
+    }
+
+    button {
+        color: var(--c-text);
+        cursor: pointer;
+        font: inherit;
+        font-weight: 600;
+        text-align: left;
+
+        @include touch-target;
+
+        &:hover {
+            color: var(--c-red-bright);
+        }
+
+        &:focus-visible {
+            @include focus-ring;
+        }
+    }
+}
+
+.subscribe p {
+    margin-bottom: 12px;
+    color: var(--c-text-dim);
+    font-size: 0.875rem;
+}
+
+.subscribeActions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}

@@ -1,0 +1,159 @@
+{
+    "partners": {
+        "entries": [
+            {
+                "slug": "nordhost",
+                "kind": "sponsor",
+                "name": "NordHost GmbH",
+                "typeLabel": "Hauptsponsor",
+                "tier": "main",
+                "subtitle": "Hosting",
+                "shortText": "Stellt die Server, auf denen RL Nexus läuft, und das Preisgeld der Nordliga Season 3.",
+                "stripText": null,
+                "color": "gold",
+                "logo": null,
+                "banner": null,
+                "since": "2026-06-01",
+                "links": { "website": "https://nordhost.example" },
+                "sections": [
+                    { "type": "stats", "visible": true, "items": [{ "label": "Sponsor seit", "value": "Juni 2026" }, { "label": "Turniere", "value": "3" }] },
+                    { "type": "about", "visible": true, "text": "NordHost betreibt seit 2014 ein eigenes Rechenzentrum in Hamburg." },
+                    { "type": "offer", "visible": true, "title": "Angebot für die Community", "text": "15 % auf den ersten Server.", "code": "NEXUS15", "until": "2026-12-31" }
+                ],
+                "tournaments": [{ "slug": "nordliga-season-3", "title": "Nordliga Season 3", "date": "2026-11-20T18:00:00.000Z" }],
+                "news": [],
+                "onHome": true
+            },
+            {
+                "slug": "apex-vortex",
+                "kind": "partner",
+                "name": "Apex Vortex Esports",
+                "typeLabel": "Organisation",
+                "tier": null,
+                "subtitle": "",
+                "shortText": "Drei Teams von Diamant bis SSL, alles auf RL Nexus.",
+                "stripText": null,
+                "color": "blue",
+                "logo": "/content/media/0123456789abcdef.webp",
+                "banner": null,
+                "since": "2026-06-01",
+                "links": { "discord": "https://discord.gg/apexvortex", "x": "https://x.com/apexvortex" },
+                "sections": [{ "type": "about", "visible": true, "text": "Seit 2024 dabei." }],
+                "tournaments": [],
+                "news": [{ "slug": "apex-vortex-ist-neuer-partner", "title": "Apex Vortex ist neuer Partner", "date": "2026-11-06T10:00:00.000Z" }],
+                "onHome": false
+            },
+            {
+                "slug": "clipbase",
+                "kind": "supporter",
+                "name": "Clipbase",
+                "typeLabel": "Firma",
+                "tier": null,
+                "subtitle": "Clip-Tool",
+                "shortText": "Clipbase schneidet Highlights automatisch aus Replays.",
+                "stripText": "Clips für alle Cup-Finals",
+                "color": "orange",
+                "logo": null,
+                "banner": null,
+                "since": "2026-03-01",
+                "links": { "website": "https://clipbase.example" },
+                "sections": [{ "type": "help", "visible": true, "items": [{ "label": "Clips aller Cup-Finals auf unserem Kanal" }] }],
+                "tournaments": [],
+                "news": [],
+                "onHome": false
+            }
+        ]
+    },
+    "live": {
+        "at": "2026-11-10T12:00:00.000Z",
+        "servers": {
+            "apex-vortex": { "members": 1240, "online": 312, "modules": ["teams", "apply"], "teams": [{ "name": "Apex A", "group": null, "mmr": 1500, "rank": "GC 1", "players": 3 }] }
+        }
+    },
+    "news": {
+        "posts": [
+            {
+                "slug": "apex-vortex-ist-neuer-partner",
+                "kind": "beitrag",
+                "category": "partner",
+                "title": "Apex Vortex Esports ist neuer Partner",
+                "summary": "Drei Teams, ein Server: warum Apex Vortex umgestiegen ist.",
+                "cover": null,
+                "publishedAt": "2026-11-06T10:00:00.000Z",
+                "pinned": "big",
+                "event": null,
+                "entry": { "slug": "apex-vortex", "name": "Apex Vortex Esports" }
+            },
+            {
+                "slug": "nordliga-season-3",
+                "kind": "termin",
+                "category": "turnier",
+                "title": "Nordliga Season 3: Anmeldung offen",
+                "summary": "Anmeldeschluss am 20. November.",
+                "cover": null,
+                "publishedAt": "2026-11-02T10:00:00.000Z",
+                "pinned": "none",
+                "event": { "startsAt": "2026-11-20T18:00:00.000Z", "endsAt": null, "place": "Discord" },
+                "entry": null
+            },
+            {
+                "slug": "wartung-am-12",
+                "kind": "kurz",
+                "category": "wartung",
+                "title": "Wartung am 12. Oktober",
+                "summary": "Von 2 bis 4 Uhr ist der Bot kurz weg.",
+                "cover": null,
+                "publishedAt": "2026-10-10T10:00:00.000Z",
+                "pinned": "none",
+                "event": null,
+                "entry": null
+            }
+        ]
+    },
+    "post": {
+        "slug": "apex-vortex-ist-neuer-partner",
+        "kind": "beitrag",
+        "category": "partner",
+        "title": "Apex Vortex Esports ist neuer Partner",
+        "summary": "Drei Teams, ein Server: warum Apex Vortex umgestiegen ist.",
+        "cover": null,
+        "publishedAt": "2026-11-06T10:00:00.000Z",
+        "pinned": "big",
+        "event": null,
+        "entry": { "slug": "apex-vortex", "name": "Apex Vortex Esports" },
+        "blocks": [
+            { "type": "text", "md": "Apex Vortex spielt mit **drei Teams** von Diamant bis SSL.", "size": "lead", "width": "text" },
+            { "type": "partner", "entryId": 2 },
+            { "type": "heading", "text": "Was sich ändert" },
+            { "type": "text", "md": "- Bewerbungen per DM\n- Probetrainings als Matchups", "size": "normal", "width": "text" },
+            { "type": "callout", "title": "Neu dabei?", "text": "Schaut im Discord vorbei." },
+            { "type": "quote", "text": "Endlich alles an einem Ort.", "by": "Apex Vortex" },
+            { "type": "event", "title": "Showmatch", "startsAt": "2026-11-22T19:00:00.000Z", "place": "Twitch" },
+            { "type": "video", "url": "https://www.youtube.com/watch?v=abc123" },
+            { "type": "button", "label": "Zum Discord", "url": "https://discord.gg/apexvortex" },
+            { "type": "divider" }
+        ],
+        "author": "MecryTv",
+        "updatedAt": "2026-11-06T10:00:00.000Z",
+        "partners": { "2": { "slug": "apex-vortex", "name": "Apex Vortex Esports", "typeLabel": "Organisation", "color": "blue", "logo": null } }
+    },
+    "changelog": {
+        "versions": [
+            {
+                "version": "2.4.0",
+                "releasedOn": "2026-11-05",
+                "title": "Bewerbungen per DM, Protokoll der Freigaben und eigene Rang-Karten",
+                "items": [
+                    { "kind": "neu", "area": "bot", "text": "Bewerbungen laufen per DM." },
+                    { "kind": "verbessert", "area": "dashboard", "text": "Nutzerdaten laden schneller." },
+                    { "kind": "behoben", "area": "bot", "text": "Team-Hub: großes Bild bleibt nach Wahl im Menü." }
+                ],
+                "image": "/content/media/changelog-2.4.0.png",
+                "postedAt": "2026-11-05T18:00:00.000Z",
+                "postedBy": "MecryTv",
+                "updatedAt": null,
+                "discordUrl": "https://discord.com/channels/1547258700480253982/1/2"
+            }
+        ]
+    }
+}

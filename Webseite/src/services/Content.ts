@@ -332,3 +332,219 @@ export function isPreviewMessage(data: unknown, statuses: readonly string[]): da
         data.commands.every((entry: unknown) => isShape(entry) && isText(entry.path) && typeof entry.description === "string")
     );
 }
+
+/* --- Partner, News und Changelog (W-0062) --------------------------------
+ * Dateien, die das Admin Dashboard selbst baut (Teil 1). Fällt eine durch,
+ * zeigt die Seite einen leeren Zustand statt eines Fehlers.
+ */
+
+const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const MEDIA = /^\/content\/media\/[a-z0-9.-]+\.(?:webp|png)$/;
+const ENTRY_COLORS: readonly unknown[] = ["red", "blue", "purple", "gold", "green", "orange", "cyan", "silver"];
+const SECTION_TYPES: readonly unknown[] = ["stats", "about", "teams", "achievements", "discord", "facts", "modules", "news", "together", "offer", "intro", "help", "tournaments", "links", "gallery", "video", "quote", "text"];
+const LINK_KEYS = ["website", "discord", "x", "twitch", "youtube", "tiktok"] as const;
+const VIDEO_HOSTS: readonly string[] = ["youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be", "twitch.tv", "www.twitch.tv", "clips.twitch.tv"];
+
+const isOptional = (value: unknown, is: (value: unknown) => boolean): boolean => value === undefined || is(value);
+const isNullable = (value: unknown, is: (value: unknown) => boolean): boolean => value === null || is(value);
+const isMedia = (value: unknown): boolean => typeof value === "string" && MEDIA.test(value);
+const isDate = (value: unknown): boolean => typeof value === "string" && Number.isFinite(Date.parse(value));
+const isCount = (value: unknown): boolean => typeof value === "number" && Number.isFinite(value) && value >= 0;
+const isRef = (value: unknown): boolean => isShape(value) && isText(value.slug) && SLUG.test(value.slug) && isText(value.title) && isDate(value.date);
+
+/** Nur https zu YouTube oder Twitch. */
+export function isVideoLink(value: unknown): value is string {
+    return isSafeLink(value) && value.startsWith("https://") && VIDEO_HOSTS.includes(new URL(value).hostname);
+}
+
+function isLinks(value: unknown): boolean {
+    return isShape(value) && Object.keys(value).every((key) => (LINK_KEYS as readonly string[]).includes(key)) && LINK_KEYS.every((key) => isOptional(value[key], isSafeLink));
+}
+
+function isSection(value: unknown): boolean {
+    if (!isShape(value) || !SECTION_TYPES.includes(value.type) || typeof value.visible !== "boolean") return false;
+
+    const isItem = (item: unknown): boolean =>
+        isShape(item) && isText(item.label) && isOptional(item.value, isText) && isOptional(item.text, isText) && isOptional(item.date, isDate);
+
+    return (
+        [value.title, value.text, value.code].every((field) => isOptional(field, isText)) &&
+        isOptional(value.items, (items) => Array.isArray(items) && items.every(isItem)) &&
+        isOptional(value.images, (images) => Array.isArray(images) && images.every(isMedia)) &&
+        isOptional(value.url, value.type === "video" ? isVideoLink : isSafeLink) &&
+        isOptional(value.until, (until) => isNullable(until, isDate))
+    );
+}
+
+function isEntry(value: unknown): boolean {
+    return (
+        isShape(value) &&
+        isText(value.slug) &&
+        SLUG.test(value.slug) &&
+        (value.kind === "partner" || value.kind === "sponsor" || value.kind === "supporter") &&
+        [value.name, value.typeLabel, value.subtitle, value.shortText].every(isText) &&
+        (value.tier === null || value.tier === "main" || value.tier === "sponsor") &&
+        isNullable(value.stripText, isText) &&
+        ENTRY_COLORS.includes(value.color) &&
+        isNullable(value.logo, isMedia) &&
+        isNullable(value.banner, isMedia) &&
+        isNullable(value.since, isDate) &&
+        isLinks(value.links) &&
+        Array.isArray(value.sections) &&
+        value.sections.every(isSection) &&
+        Array.isArray(value.tournaments) &&
+        value.tournaments.every(isRef) &&
+        Array.isArray(value.news) &&
+        value.news.every(isRef) &&
+        typeof value.onHome === "boolean"
+    );
+}
+
+export function isSitePartners(data: unknown): data is import("../domain/interfaces/ISiteContent").ISitePartners {
+    if (!isShape(data) || !Array.isArray(data.entries) || !data.entries.every(isEntry)) return false;
+
+    return new Set(data.entries.map((entry: unknown) => (entry as Shape).slug)).size === data.entries.length;
+}
+
+function isServer(server: unknown): boolean {
+    const isTeam = (team: unknown): boolean =>
+        isShape(team) && isText(team.name) && isNullable(team.group, isText) && isNullable(team.mmr, isCount) && isNullable(team.rank, isText) && isCount(team.players);
+
+    return isShape(server) && isCount(server.members) && isCount(server.online) && isTextList(server.modules) && Array.isArray(server.teams) && server.teams.every(isTeam);
+}
+
+export function isSiteLive(data: unknown): data is import("../domain/interfaces/ISiteContent").ISiteLive {
+    return isShape(data) && isDate(data.at) && isShape(data.servers) && Object.entries(data.servers).every(([slug, server]) => SLUG.test(slug) && isServer(server));
+}
+
+function isEvent(value: unknown): boolean {
+    return isShape(value) && isDate(value.startsAt) && isNullable(value.endsAt, isDate) && isNullable(value.place, isText);
+}
+
+function isNewsItem(value: unknown): boolean {
+    return (
+        isShape(value) &&
+        isText(value.slug) &&
+        SLUG.test(value.slug) &&
+        (value.kind === "beitrag" || value.kind === "kurz" || value.kind === "termin") &&
+        ["update", "partner", "turnier", "ankuendigung", "wartung"].includes(String(value.category)) &&
+        [value.title, value.summary].every(isText) &&
+        isNullable(value.cover, isMedia) &&
+        isDate(value.publishedAt) &&
+        (value.pinned === "none" || value.pinned === "big" || value.pinned === "small") &&
+        isNullable(value.event, isEvent) &&
+        isNullable(value.entry, (entry) => isShape(entry) && isText(entry.slug) && SLUG.test(entry.slug) && isText(entry.name))
+    );
+}
+
+function isNewsBlock(value: unknown): boolean {
+    if (!isShape(value)) return false;
+
+    switch (value.type) {
+        case "text":
+            return isText(value.md) && (value.size === "normal" || value.size === "lead") && (value.width === "text" || value.width === "full");
+        case "heading":
+            return isText(value.text);
+        case "image":
+            return isMedia(value.url) && isText(value.alt) && isNullable(value.caption, isText);
+        case "gallery":
+            return Array.isArray(value.images) && value.images.length > 0 && value.images.every(isMedia);
+        case "callout":
+            return isNullable(value.title, isText) && isText(value.text);
+        case "quote":
+            return isText(value.text) && isNullable(value.by, isText);
+        case "partner":
+            return typeof value.entryId === "number" && Number.isSafeInteger(value.entryId);
+        case "event":
+            return isText(value.title) && isDate(value.startsAt) && isNullable(value.place, isText);
+        case "video":
+            return isVideoLink(value.url);
+        case "button":
+            return isText(value.label) && isSafeLink(value.url);
+        case "divider":
+            return true;
+        default:
+            return false;
+    }
+}
+
+export function isSiteNews(data: unknown): data is import("../domain/interfaces/ISiteContent").ISiteNews {
+    return isShape(data) && Array.isArray(data.posts) && data.posts.every(isNewsItem);
+}
+
+export function isSiteNewsPost(data: unknown): data is import("../domain/interfaces/ISiteContent").ISiteNewsPost {
+    const isCard = (card: unknown): boolean =>
+        isShape(card) && isText(card.slug) && SLUG.test(card.slug) && isText(card.name) && isText(card.typeLabel) && ENTRY_COLORS.includes(card.color) && isNullable(card.logo, isMedia);
+
+    return (
+        isNewsItem(data) &&
+        isShape(data) &&
+        Array.isArray(data.blocks) &&
+        data.blocks.every(isNewsBlock) &&
+        isText(data.author) &&
+        isDate(data.updatedAt) &&
+        isShape(data.partners) &&
+        Object.values(data.partners).every(isCard)
+    );
+}
+
+export function isSiteChangelog(data: unknown): data is import("../domain/interfaces/ISiteContent").ISiteChangelog {
+    const isItem = (item: unknown): boolean => isShape(item) && (item.kind === "neu" || item.kind === "verbessert" || item.kind === "behoben") && isText(item.area) && isText(item.text);
+    const isDiscord = (url: unknown): boolean => isSafeLink(url) && url.startsWith("https://discord.com/channels/");
+    const isVersion = (version: unknown): boolean =>
+        isShape(version) &&
+        isText(version.version) &&
+        /^\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(version.version) &&
+        isDate(version.releasedOn) &&
+        isText(version.title) &&
+        Array.isArray(version.items) &&
+        version.items.every(isItem) &&
+        isMedia(version.image) &&
+        isDate(version.postedAt) &&
+        isNullable(version.postedBy, isText) &&
+        isNullable(version.updatedAt, isDate) &&
+        isNullable(version.discordUrl, isDiscord);
+
+    return isShape(data) && Array.isArray(data.versions) && data.versions.every(isVersion);
+}
+
+/* --- Vorschau für die Studios im Admin Dashboard (W-0062 Teil 2) ----------
+ * Dieselben Prüfungen wie für veröffentlichte Dateien. Teile: kopf, titelbild,
+ * block:<i> (News), abschnitt:<i> (Partner).
+ */
+
+export type PreviewPart = string;
+export type PartnerPreviewView = "gross" | "karte" | "leiste";
+
+export interface IPartnerPreview {
+    readonly type: "rlnexus:vorschau-partner";
+    readonly view: PartnerPreviewView;
+    readonly entry: import("../domain/interfaces/ISiteContent").ISiteEntry;
+    readonly live: import("../domain/interfaces/ISiteContent").ISiteServer | null;
+    readonly selected: PreviewPart | null;
+}
+
+export interface INewsPreview {
+    readonly type: "rlnexus:vorschau-news";
+    readonly post: import("../domain/interfaces/ISiteContent").ISiteNewsPost;
+    readonly selected: PreviewPart | null;
+}
+
+const PART = /^(?:kopf|titelbild|block:\d{1,3}|abschnitt:\d{1,3})$/;
+
+const isPart = (value: unknown): boolean => value === null || (typeof value === "string" && PART.test(value));
+
+export function isPartnerPreview(data: unknown): data is IPartnerPreview {
+    return (
+        isShape(data) &&
+        data.type === "rlnexus:vorschau-partner" &&
+        (data.view === "gross" || data.view === "karte" || data.view === "leiste") &&
+        isEntry(data.entry) &&
+        isNullable(data.live, isServer) &&
+        isPart(data.selected)
+    );
+}
+
+export function isNewsPreview(data: unknown): data is INewsPreview {
+    return isShape(data) && data.type === "rlnexus:vorschau-news" && isSiteNewsPost(data.post) && isPart(data.selected);
+}

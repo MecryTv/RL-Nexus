@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { CONTACT_TOPIC_LABELS, CONTACT_TOPICS } from "../../shared/limits.ts";
 import { checkPostInput, type IPostInput } from "../../shared/news.ts";
 import { checkEntryInput, slugify, type IEntryInput } from "../../shared/partners.ts";
 import { check, section } from "./harness.ts";
@@ -115,6 +116,11 @@ export async function checkPartners(): Promise<void> {
     await check("News: geplant braucht Zeitpunkt", () => {
         assert.notEqual(postProblem({ status: "scheduled", publishAt: null }), null);
     });
+    await check("Kontakt: Thema Sponsoring für „Sponsor werden“ auf der Webseite", () => {
+        assert.ok((CONTACT_TOPICS as readonly string[]).includes("sponsoring"));
+        assert.equal(CONTACT_TOPIC_LABELS.sponsoring, "Sponsoring");
+    });
+
     await check("News: Knopf nur mit https-Link", () => {
         assert.notEqual(postProblem({ blocks: [{ type: "button", label: "Los", url: "javascript:void(0)" }] }), null);
     });

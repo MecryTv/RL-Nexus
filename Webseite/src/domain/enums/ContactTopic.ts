@@ -4,6 +4,8 @@ export enum ContactTopic {
     Bug = "bug",
     Feature = "modulwunsch",
     Partnership = "partnerschaft",
+    /** W-0062: „Sponsor werden“ auf der Seite Partner/Sponsorings. */
+    Sponsoring = "sponsoring",
     Privacy = "datenschutz",
     Other = "sonstiges",
 }
@@ -36,6 +38,12 @@ export const CONTACT_TOPIC_META: Readonly<
         icon: "users",
         accent: "var(--c-blue)",
     },
+    [ContactTopic.Sponsoring]: {
+        label: "Sponsoring",
+        hint: "Als Firma RL Nexus, ein Turnier oder die Community unterstützen.",
+        icon: "trophy",
+        accent: "var(--c-purple)",
+    },
     [ContactTopic.Privacy]: {
         label: "Datenschutz",
         hint: "Auskunft, Löschung oder etwas, das rechtlich klingt.",
@@ -56,6 +64,7 @@ export const CONTACT_TOPIC_ORDER: readonly ContactTopic[] = [
     ContactTopic.Bug,
     ContactTopic.Feature,
     ContactTopic.Partnership,
+    ContactTopic.Sponsoring,
     ContactTopic.Privacy,
     ContactTopic.Other,
 ];

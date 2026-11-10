@@ -18,6 +18,10 @@ const NAVIGATION: readonly INavItem[] = [
     { label: "Home", to: "/" },
     { label: "Module", to: "/module" },
     { label: "Preise", to: "/preise" },
+    // W-0062: News und Changelog sind beide „was passiert“, deshalb nebeneinander.
+    { label: "News", to: "/news" },
+    { label: "Changelog", to: "/changelog" },
+    { label: "Partner/Sponsorings", to: "/partner" },
     { label: "Team", to: "/team" },
     { label: "Kontakt", to: "/kontakt" },
 ];

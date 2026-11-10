@@ -79,7 +79,7 @@
     align-items: center;
     gap: 4px;
 
-    @include below(940px) {
+    @include below(1240px) {
         display: none;
     }
 }
@@ -112,6 +112,17 @@
     }
 }
 
+/* W-0062: roter Punkt am Changelog, wenn seit dem letzten Besuch eine Version dazukam. */
+.fresh {
+    position: absolute;
+    top: 7px;
+    right: 6px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--c-red);
+}
+
 .active {
     color: var(--c-text);
 
@@ -128,7 +139,7 @@
     align-items: center;
     gap: 12px;
 
-    @include below(940px) {
+    @include below(1240px) {
         display: none;
     }
 }
@@ -164,7 +175,7 @@
         background: var(--c-line);
     }
 
-    @include below(940px) {
+    @include below(1240px) {
         display: grid;
     }
 }
@@ -186,7 +197,7 @@
     background: rgb(5 6 8 / 97%);
     backdrop-filter: blur(20px);
 
-    @include from(940px) {
+    @include from(1240px) {
         display: none;
     }
 
@@ -220,6 +231,13 @@
         &::after {
             content: none;
         }
+    }
+
+    /* In der Liste steht der Punkt direkt hinter dem Wort. */
+    .fresh {
+        position: static;
+        margin-right: auto;
+        margin-left: 8px;
     }
 
     .active {

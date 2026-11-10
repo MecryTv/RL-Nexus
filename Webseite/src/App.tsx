@@ -16,6 +16,12 @@ const ModulesPage = lazy(() => import("./pages/ModulesPage").then((m) => ({ defa
 const ModuleDetailPage = lazy(() => import("./pages/ModuleDetailPage").then((m) => ({ default: m.ModuleDetailPage })));
 const PreviewPage = lazy(() => import("./pages/PreviewPage").then((m) => ({ default: m.PreviewPage })));
 const PricingPage = lazy(() => import("./pages/PricingPage").then((m) => ({ default: m.PricingPage })));
+const PartnersPage = lazy(() => import("./pages/PartnersPage").then((m) => ({ default: m.PartnersPage })));
+const PartnerPage = lazy(() => import("./pages/PartnerPage").then((m) => ({ default: m.PartnerPage })));
+const NewsPage = lazy(() => import("./pages/NewsPage").then((m) => ({ default: m.NewsPage })));
+const NewsPostPage = lazy(() => import("./pages/NewsPostPage").then((m) => ({ default: m.NewsPostPage })));
+const ChangelogPage = lazy(() => import("./pages/ChangelogPage").then((m) => ({ default: m.ChangelogPage })));
+const ChangelogVersionPage = lazy(() => import("./pages/ChangelogVersionPage").then((m) => ({ default: m.ChangelogVersionPage })));
 const TeamPage = lazy(() => import("./pages/TeamPage").then((m) => ({ default: m.TeamPage })));
 const ContactPage = lazy(() => import("./pages/ContactPage").then((m) => ({ default: m.ContactPage })));
 const LegalPage = lazy(() => import("./pages/LegalPage").then((m) => ({ default: m.LegalPage })));
@@ -54,6 +60,12 @@ export function App({ banner }: { readonly banner: ILoaded<IBanner> | null }): J
                     {/* Die Befehle zeigt der Hilfe-Befehl in Discord (W-0013). Alte Links landen bei den Modulen. */}
                     <Route path="commands" element={<Navigate to="/module" replace />} />
                     <Route path="preise" element={<PricingPage />} />
+                    <Route path="news" element={<NewsPage />} />
+                    <Route path="news/:slug" element={<NewsPostPage />} />
+                    <Route path="changelog" element={<ChangelogPage />} />
+                    <Route path="changelog/:version" element={<ChangelogVersionPage />} />
+                    <Route path="partner" element={<PartnersPage />} />
+                    <Route path="partner/:slug" element={<PartnerPage />} />
                     <Route path="team" element={<TeamPage />} />
                     {/* Die Kaderübersicht war einmal eine eigene Seite und ist
                         jetzt Teil des Moduls. Alte Links sollen dort ankommen

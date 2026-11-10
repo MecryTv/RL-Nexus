@@ -60,7 +60,7 @@ export const NOTIFICATION_KIND_LABELS: Readonly<Record<NotificationKind, string>
 export const NOTIFICATION_LIMITS = { title: 120, body: 500, link: 190, ids: 50 } as const;
 
 /** Die Themen des Kontaktformulars, wie ContactTopic auf der Webseite. */
-export const CONTACT_TOPICS = ["frage", "bug", "modulwunsch", "partnerschaft", "datenschutz", "sonstiges"] as const;
+export const CONTACT_TOPICS = ["frage", "bug", "modulwunsch", "partnerschaft", "sponsoring", "datenschutz", "sonstiges"] as const;
 export type ContactTopic = (typeof CONTACT_TOPICS)[number];
 
 export const CONTACT_TOPIC_LABELS: Readonly<Record<ContactTopic, string>> = {
@@ -68,6 +68,7 @@ export const CONTACT_TOPIC_LABELS: Readonly<Record<ContactTopic, string>> = {
     bug: "Fehler melden",
     modulwunsch: "Modulwunsch",
     partnerschaft: "Partnerschaft",
+    sponsoring: "Sponsoring",
     datenschutz: "Datenschutz",
     sonstiges: "Sonstiges",
 };

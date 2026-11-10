@@ -87,9 +87,13 @@ function localContent(): Plugin {
                 const file = (request.url ?? "").split("?")[0];
 
                 // Nur Namen, wie es sie gibt. Kein Weg aus den beiden Ordnern heraus.
-                const path = /^\/(?:details\/)?[a-z][a-z0-9-]*\.json$/.test(file)
-                    ? [join(live, file), join(defaults, file)].find((candidate) => existsSync(candidate))
-                    : undefined;
+                // W-0062: dazu News-Beiträge, Bilder unter media/ und der RSS-Feed.
+                const known =
+                    /^\/(?:details\/)?[a-z][a-z0-9-]*\.json$/.test(file) ||
+                    /^\/news\/[a-z0-9-]+\.json$/.test(file) ||
+                    /^\/media\/[a-z0-9.-]+\.(?:webp|png)$/.test(file) ||
+                    file === "/news.xml";
+                const path = known ? [join(live, file), join(defaults, file)].find((candidate) => existsSync(candidate)) : undefined;
 
                 if (path === undefined) {
                     response.statusCode = 404;
@@ -97,7 +101,9 @@ function localContent(): Plugin {
                     return;
                 }
 
-                response.setHeader("Content-Type", "application/json; charset=utf-8");
+                const type = file.endsWith(".webp") ? "image/webp" : file.endsWith(".png") ? "image/png" : file.endsWith(".xml") ? "application/rss+xml; charset=utf-8" : "application/json; charset=utf-8";
+
+                response.setHeader("Content-Type", type);
                 response.setHeader("Cache-Control", "no-cache");
                 response.end(readFileSync(path));
             });

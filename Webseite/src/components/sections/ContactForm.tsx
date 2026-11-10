@@ -1,5 +1,5 @@
 import { type CSSProperties, type FormEvent, type JSX, useId, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { CONTACT_TOPIC_META, CONTACT_TOPIC_ORDER, ContactTopic } from "../../domain/enums/ContactTopic";
 import type { ContactErrors, ContactDelivery, IContactSubmission } from "../../domain/interfaces/IContact";
 import { EMPTY_SUBMISSION, contactService } from "../../services/ContactService";
@@ -25,7 +25,14 @@ type FormState = "idle" | "sending" | "sent" | "failed";
  * sobald das Feld stimmt.
  */
 export function ContactForm(): JSX.Element {
-    const [form, setForm] = useState<IContactSubmission>(EMPTY_SUBMISSION);
+    // W-0062: „Partner werden“ und „Sponsor werden“ kommen mit ?thema= und wählen das Thema vor.
+    const [params] = useSearchParams();
+    const [form, setForm] = useState<IContactSubmission>(() => {
+        const thema = params.get("thema");
+        const topic = (Object.values(ContactTopic) as string[]).includes(thema ?? "") ? (thema as ContactTopic) : EMPTY_SUBMISSION.topic;
+
+        return { ...EMPTY_SUBMISSION, topic };
+    });
     const [errors, setErrors] = useState<ContactErrors>({});
     const [state, setState] = useState<FormState>("idle");
     const [delivery, setDelivery] = useState<ContactDelivery>("endpoint");
