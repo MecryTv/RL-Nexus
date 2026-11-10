@@ -79,6 +79,8 @@ export const AREAS: readonly INavArea[] = [
             { to: "/webseite/banner", label: "Banner", icon: "megaphone", description: "Die Leiste unten auf der Webseite." },
             { to: "/webseite/team", label: "Team", icon: "users", description: "Die Personen und offenen Stellen auf der Team-Seite der Webseite." },
             { to: "/webseite/module", label: "Module", icon: "puzzle", also: ["/webseite/neues-modul"], description: "Kacheln und Detailseiten der Module auf der Webseite." },
+            { to: "/webseite/news", label: "News", icon: "file-text", description: "Beiträge, Kurzmeldungen und Termine auf nexus-emb.de/news." },
+            { to: "/webseite/partner", label: "Partner/Sponsorings", icon: "tag", description: "Was auf nexus-emb.de/partner steht, wer Zugang hat und wer die Rolle @Partner trägt." },
         ],
     },
     {

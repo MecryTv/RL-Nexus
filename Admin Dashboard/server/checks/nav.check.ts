@@ -143,9 +143,19 @@ export async function checkNav(): Promise<void> {
 
         const entries = navEntries("admin");
 
-        // W-0064: Server-Freigaben kam dazu, W-0057 der Bereich Sicherheit mit drei Seiten, W-0058 Nachrichten.
-        assert.equal(entries.length, 22);
+        // W-0064: Server-Freigaben kam dazu, W-0057 der Bereich Sicherheit mit drei Seiten, W-0058 Nachrichten, W-0062 News und Partner/Sponsorings.
+        assert.equal(entries.length, 24);
         assert.ok(entries.every((hit) => !hit.href.startsWith("/dev")));
+    });
+
+    await check("Webseite (W-0062): News und Partner/Sponsorings, die Studios gehören dazu", () => {
+        assert.deepEqual(
+            AREAS.find((area) => area.id === "webseite")?.pages.map((page) => page.to),
+            ["/webseite/banner", "/webseite/team", "/webseite/module", "/webseite/news", "/webseite/partner"]
+        );
+        assert.equal(pageOf("/webseite/news/12")?.page.label, "News");
+        assert.equal(pageOf("/webseite/news/neu")?.page.label, "News");
+        assert.equal(pageOf("/webseite/partner/7")?.page.label, "Partner/Sponsorings");
     });
 
     await check("Datenschutz (W-0051, W-0058): Nutzerdaten, Was bleibt, Nachrichten; ein Profil gehört zu Nutzerdaten", () => {

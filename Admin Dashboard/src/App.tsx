@@ -74,6 +74,12 @@ const router = createBrowserRouter(
                 <Route path="webseite/module/:id" lazy={page(() => import("./pages/ModuleEditorPage"), "ModuleEditorPage")} />
                 {/* Eigene Adresse statt /module/neu: so kann keine Modul-ID damit kollidieren. */}
                 <Route path="webseite/neues-modul" lazy={page(() => import("./pages/ModuleEditorPage"), "ModuleEditorPage")} />
+                {/* W-0062 Teil 2: News und Partner/Sponsorings mit ihren Studios. */}
+                <Route path="webseite/news" lazy={page(() => import("./news/NewsPage"), "NewsPage")} />
+                <Route path="webseite/news/neu" lazy={page(() => import("./news/NewsEditorPage"), "NewsEditorPage")} />
+                <Route path="webseite/news/:id" lazy={page(() => import("./news/NewsEditorPage"), "NewsEditorPage")} />
+                <Route path="webseite/partner" lazy={page(() => import("./partners/PartnersPage"), "PartnersPage")} />
+                <Route path="webseite/partner/:id" lazy={page(() => import("./partners/PartnerEditorPage"), "PartnerEditorPage")} />
                 <Route path="datenschutz/loeschungen" lazy={page(() => import("./userdata/DeletionsPage"), "DeletionsPage")} />
                 <Route path="datenschutz/regeln" lazy={page(() => import("./userdata/RulesPage"), "RulesPage")} />
                 <Route path="datenschutz/nachrichten" lazy={page(() => import("./messages/MessagesPage"), "MessagesPage")} />
