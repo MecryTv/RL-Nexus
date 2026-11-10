@@ -1,0 +1,671 @@
+@use "mixins" as *;
+
+/*
+ * W-0062: Bausteine für Partner, Sponsoren und Unterstützer (Entwurf
+ * partner-v3 P3 und studio S6). `--c` ist immer die Farbe des Eintrags.
+ */
+
+/* --- Logo und Marken ---------------------------------------------------- */
+.logo {
+    display: grid;
+    flex-shrink: 0;
+    overflow: hidden;
+    background: color-mix(in srgb, var(--c) 14%, var(--c-panel-solid));
+    box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--c) 50%, transparent);
+    color: var(--c);
+    font-family: var(--f-accent);
+    font-weight: 700;
+    place-items: center;
+
+    @include bevel-diagonal(11px);
+
+    img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+}
+
+.sm {
+    width: 38px;
+    height: 38px;
+    font-size: 0.75rem;
+
+    @include bevel-diagonal(7px);
+}
+
+.md {
+    width: 62px;
+    height: 62px;
+    font-size: 1.25rem;
+}
+
+.lg {
+    width: 72px;
+    height: 72px;
+    font-size: 1.375rem;
+}
+
+.xl {
+    width: 120px;
+    height: 120px;
+    font-size: 2.25rem;
+
+    @include bevel-diagonal(16px);
+}
+
+.tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.tag {
+    display: inline-block;
+    padding: 3px 9px 2px;
+    background: color-mix(in srgb, var(--c) 13%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 36%, transparent);
+    color: var(--c);
+    white-space: nowrap;
+
+    @include label(0.75rem, 0.14em);
+}
+
+a.tag:hover {
+    background: color-mix(in srgb, var(--c) 24%, transparent);
+}
+
+/* Untertitel und Nebenangaben: grau statt in der Farbe des Eintrags. */
+.quiet {
+    --c: var(--c-text-dim);
+}
+
+/* Der Link spannt sich wie bei ModuleCard über die ganze Karte. */
+.stretch {
+    transition: color var(--t-fast);
+
+    &::after {
+        position: absolute;
+        content: "";
+        inset: 0;
+    }
+
+    &:hover {
+        color: var(--c);
+    }
+
+    &:focus-visible {
+        outline: none;
+
+        &::after {
+            outline: 2px solid var(--c-text);
+            outline-offset: -4px;
+        }
+    }
+}
+
+.cardTitle {
+    margin: 0 0 4px;
+    font-size: 1.125rem;
+    font-weight: 800;
+    line-height: 1.2;
+}
+
+/* --- Partner als Karte -------------------------------------------------- */
+.card {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.cardBanner {
+    height: 84px;
+    background:
+        radial-gradient(circle at 80% 20%, color-mix(in srgb, var(--c) 45%, transparent), transparent 60%),
+        linear-gradient(135deg, #0d141c, #06090d);
+    background-position: center;
+    background-size: cover;
+}
+
+.cardHead {
+    display: flex;
+    align-items: flex-end;
+    gap: 14px;
+    margin-top: -30px;
+    padding: 0 20px;
+
+    > div:last-child {
+        min-width: 0;
+        padding-top: 36px;
+    }
+}
+
+.cardBody {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 12px;
+    padding: 14px 20px 18px;
+
+    p {
+        color: var(--c-text-dim);
+        font-size: 0.875rem;
+        line-height: 1.6;
+    }
+}
+
+.cardFoot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: auto;
+}
+
+/* Die Links liegen über dem aufgespannten Kartenlink und bleiben klickbar. */
+.links {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+
+    a {
+        display: inline-flex;
+        align-items: center;
+        padding: 6px 10px;
+        background: rgb(255 255 255 / 4%);
+        box-shadow: inset 0 0 0 1px var(--c-line);
+        color: var(--c-text-dim);
+        transition: color var(--t-fast);
+
+        @include label(0.75rem, 0.08em);
+        @include touch-target;
+
+        &:hover {
+            color: var(--c-text);
+        }
+    }
+}
+
+.more {
+    color: var(--c-text-faint);
+    white-space: nowrap;
+
+    @include label(0.75rem, 0.14em);
+}
+
+/* --- Sponsoren ---------------------------------------------------------- */
+.sponsors {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.tier {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 10px;
+    color: var(--c);
+    font-family: var(--f-accent);
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+
+    &::after {
+        flex: 1;
+        height: 1px;
+        background: color-mix(in srgb, var(--c) 30%, transparent);
+        content: "";
+    }
+}
+
+.main {
+    display: grid;
+    grid-template-columns: 1fr 1.1fr;
+
+    @include below(860px) {
+        grid-template-columns: 1fr;
+    }
+}
+
+.mainArt {
+    position: relative;
+    min-height: 250px;
+    background:
+        radial-gradient(circle at 30% 30%, color-mix(in srgb, var(--c) 40%, transparent), transparent 65%),
+        linear-gradient(135deg, #13100c, #0a0d12);
+    background-position: center;
+    background-size: cover;
+
+    &::after {
+        position: absolute;
+        background: linear-gradient(90deg, transparent 40%, var(--c-panel-fill));
+        content: "";
+        inset: 0;
+
+        @include below(860px) {
+            background: linear-gradient(180deg, transparent 40%, var(--c-panel-fill));
+        }
+    }
+
+    .logo {
+        position: absolute;
+        z-index: 1;
+        bottom: 26px;
+        left: 28px;
+        background: var(--c-panel-solid);
+    }
+
+    @include below(860px) {
+        min-height: 190px;
+    }
+}
+
+.mainBody {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 28px 30px;
+
+    h3 {
+        font-size: clamp(1.5rem, 3vw, 1.875rem);
+        font-weight: 800;
+        line-height: 1.15;
+    }
+
+    p {
+        color: var(--c-text-dim);
+        line-height: 1.6;
+    }
+
+    @include below(640px) {
+        padding: 22px 20px;
+    }
+}
+
+.does {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+
+    span {
+        padding: 5px 10px;
+        background: rgb(255 255 255 / 5%);
+        box-shadow: inset 0 0 0 1px var(--c-line-strong);
+        font-size: 0.8125rem;
+    }
+}
+
+.mainActions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    margin-top: 4px;
+}
+
+.code {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 8px 8px 14px;
+    background: color-mix(in srgb, var(--c) 10%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 45%, transparent);
+
+    small {
+        display: block;
+        color: var(--c-text-dim);
+        font-size: 0.8125rem;
+    }
+
+    b {
+        color: var(--c);
+        font-family: var(--f-accent);
+        font-size: 1rem;
+        letter-spacing: 0.1em;
+    }
+}
+
+.copy {
+    padding: 8px 12px;
+    background: rgb(255 255 255 / 5%);
+    box-shadow: inset 0 0 0 1px var(--c-line-strong);
+    color: var(--c-text);
+    cursor: pointer;
+    transition: background var(--t-fast);
+
+    @include label(0.75rem, 0.14em);
+    @include bevel-diagonal(8px);
+    @include touch-target;
+
+    &:hover {
+        background: rgb(255 255 255 / 10%);
+    }
+
+    &:focus-visible {
+        @include focus-ring;
+    }
+}
+
+.sponsorGrid {
+    display: grid;
+    gap: 18px;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
+}
+
+.sponsor {
+    display: grid;
+    align-items: center;
+    gap: 14px;
+    grid-template-columns: 72px 1fr;
+    padding: 18px;
+
+    p {
+        margin-top: 4px;
+        color: var(--c-text-dim);
+        font-size: 0.84rem;
+        line-height: 1.55;
+    }
+
+    .cardTitle {
+        margin-top: 6px;
+    }
+}
+
+/* --- Unterstützer-Leiste ----------------------------------------------- */
+.strip {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+
+    @include below(980px) {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    @include below(640px) {
+        gap: 8px;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+.stripItem {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 12px 14px;
+    background: rgb(255 255 255 / 3%);
+    box-shadow: inset 0 0 0 1px var(--c-line);
+    color: var(--c-text);
+    cursor: pointer;
+    text-align: left;
+    transition:
+        background var(--t-fast),
+        box-shadow var(--t-fast);
+
+    b {
+        min-width: 0;
+        font-size: 0.8125rem;
+        line-height: 1.25;
+        overflow-wrap: anywhere;
+    }
+
+    &:hover,
+    &:focus-visible {
+        background: rgb(255 255 255 / 6%);
+        box-shadow: inset 0 0 0 1.5px var(--c-red);
+        outline: none;
+    }
+
+    &:hover .tip,
+    &:focus-visible .tip {
+        visibility: visible;
+        opacity: 1;
+    }
+}
+
+/* Der Kurztext. Liegt unter dem Eintrag, damit er die Reihe darüber nicht verdeckt. */
+.tip {
+    position: absolute;
+    z-index: 3;
+    top: calc(100% + 8px);
+    left: 0;
+    width: max-content;
+    max-width: min(280px, 80vw);
+    padding: 8px 10px;
+    background: var(--c-panel-solid);
+    box-shadow:
+        0 10px 30px rgb(0 0 0 / 50%),
+        inset 0 0 0 1px var(--c-line-strong);
+    color: var(--c-text);
+    font-size: 0.8rem;
+    font-weight: 400;
+    line-height: 1.45;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--t-fast);
+    visibility: hidden;
+
+    em {
+        display: block;
+        margin-top: 2px;
+        color: var(--c-red-bright);
+        font-style: normal;
+
+        @include label(0.75rem, 0.12em);
+    }
+
+    /* Am Handy gibt es kein Drüberfahren, und das Tippen öffnet ohnehin das Fenster. */
+    @media (hover: none) {
+        display: none;
+    }
+}
+
+/* --- Unterstützer-Fenster (S6) ----------------------------------------- */
+.window {
+    max-width: 500px;
+
+    @include below(640px) {
+        align-self: end;
+        max-width: none;
+    }
+}
+
+.supporter {
+    position: relative;
+    background: var(--c-panel-solid);
+    box-shadow:
+        0 30px 70px rgb(0 0 0 / 60%),
+        inset 0 0 0 1px var(--c-line-strong);
+
+    @include bevel-diagonal(14px);
+
+    @include below(640px) {
+        clip-path: polygon(14px 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 0 100%, 0 14px);
+    }
+}
+
+.close {
+    position: absolute;
+    z-index: 2;
+    top: 10px;
+    right: 12px;
+    display: grid;
+    width: 36px;
+    height: 36px;
+    background: rgb(5 6 8 / 72%);
+    color: var(--c-text);
+    cursor: pointer;
+    place-items: center;
+
+    @include touch-target;
+
+    &:focus-visible {
+        @include focus-ring;
+    }
+}
+
+.supporterArt {
+    height: 92px;
+    background:
+        radial-gradient(circle at 78% 18%, color-mix(in srgb, var(--c) 42%, transparent), transparent 60%),
+        linear-gradient(120deg, #13100c, #0a0d12);
+    background-position: center;
+    background-size: cover;
+}
+
+.supporterHead {
+    position: relative;
+    display: grid;
+    align-items: end;
+    gap: 14px;
+    grid-template-columns: 72px 1fr;
+    margin-top: -30px;
+    padding: 0 22px;
+
+    .logo {
+        background: var(--c-panel-solid);
+    }
+
+    h2 {
+        margin-top: 6px;
+        font-size: 1.375rem;
+        font-weight: 800;
+        line-height: 1.15;
+    }
+
+    @include below(640px) {
+        padding: 0 16px;
+    }
+}
+
+.supporterBody {
+    display: grid;
+    gap: 14px;
+    padding: 14px 22px 18px;
+    color: var(--c-text);
+    font-size: 0.875rem;
+    line-height: 1.6;
+
+    @include below(640px) {
+        padding: 12px 16px 14px;
+    }
+}
+
+.facts {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    background: var(--c-base);
+    box-shadow: inset 0 0 0 1px var(--c-line);
+
+    div {
+        padding: 8px 10px;
+        box-shadow: inset -1px 0 0 var(--c-line);
+    }
+
+    dt {
+        color: var(--c-text-dim);
+
+        @include label(0.75rem, 0.1em);
+    }
+
+    dd {
+        font-weight: 800;
+    }
+}
+
+.miniHead {
+    margin-bottom: 6px;
+    color: var(--c-text-dim);
+
+    @include label(0.75rem, 0.14em);
+}
+
+.helpList {
+    display: grid;
+    gap: 5px;
+
+    li {
+        display: flex;
+        gap: 9px;
+
+        &::before {
+            flex: none;
+            width: 7px;
+            height: 7px;
+            margin-top: 8px;
+            background: var(--c-red);
+            clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+            content: "";
+        }
+    }
+}
+
+.supporterFoot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 22px 14px;
+    border-top: 1px solid var(--c-line);
+
+    @include below(640px) {
+        padding: 10px 16px 16px;
+    }
+}
+
+.footMain {
+    padding: 8px 14px;
+    background: var(--c-red);
+    color: #fff;
+
+    @include label(0.75rem, 0.14em);
+    @include bevel-diagonal(8px);
+    @include touch-target;
+
+    &:focus-visible {
+        @include focus-ring;
+    }
+}
+
+.footLink {
+    color: var(--c-text-dim);
+
+    @include label(0.75rem, 0.12em);
+
+    &:hover {
+        color: var(--c-text);
+    }
+}
+
+.pager {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: auto;
+    color: var(--c-text-dim);
+
+    @include label(0.75rem, 0.12em);
+
+    button {
+        width: 32px;
+        height: 32px;
+        color: var(--c-text);
+        cursor: pointer;
+        font-size: 1.1rem;
+
+        @include touch-target;
+
+        &:hover {
+            color: var(--c-red-bright);
+        }
+
+        &:focus-visible {
+            @include focus-ring;
+        }
+    }
+}

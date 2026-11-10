@@ -16,6 +16,7 @@ const ModulesPage = lazy(() => import("./pages/ModulesPage").then((m) => ({ defa
 const ModuleDetailPage = lazy(() => import("./pages/ModuleDetailPage").then((m) => ({ default: m.ModuleDetailPage })));
 const PreviewPage = lazy(() => import("./pages/PreviewPage").then((m) => ({ default: m.PreviewPage })));
 const PricingPage = lazy(() => import("./pages/PricingPage").then((m) => ({ default: m.PricingPage })));
+const PartnersPage = lazy(() => import("./pages/PartnersPage").then((m) => ({ default: m.PartnersPage })));
 const TeamPage = lazy(() => import("./pages/TeamPage").then((m) => ({ default: m.TeamPage })));
 const ContactPage = lazy(() => import("./pages/ContactPage").then((m) => ({ default: m.ContactPage })));
 const LegalPage = lazy(() => import("./pages/LegalPage").then((m) => ({ default: m.LegalPage })));
@@ -54,6 +55,7 @@ export function App({ banner }: { readonly banner: ILoaded<IBanner> | null }): J
                     {/* Die Befehle zeigt der Hilfe-Befehl in Discord (W-0013). Alte Links landen bei den Modulen. */}
                     <Route path="commands" element={<Navigate to="/module" replace />} />
                     <Route path="preise" element={<PricingPage />} />
+                    <Route path="partner" element={<PartnersPage />} />
                     <Route path="team" element={<TeamPage />} />
                     {/* Die Kaderübersicht war einmal eine eigene Seite und ist
                         jetzt Teil des Moduls. Alte Links sollen dort ankommen
