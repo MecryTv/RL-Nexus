@@ -76,7 +76,6 @@ const router = createBrowserRouter(
                 <Route path="webseite/neues-modul" lazy={page(() => import("./pages/ModuleEditorPage"), "ModuleEditorPage")} />
                 {/* W-0062 Teil 2: News und Partner/Sponsorings mit ihren Studios. */}
                 <Route path="webseite/news" lazy={page(() => import("./news/NewsPage"), "NewsPage")} />
-                <Route path="webseite/news/neu" lazy={page(() => import("./news/NewsEditorPage"), "NewsEditorPage")} />
                 <Route path="webseite/news/:id" lazy={page(() => import("./news/NewsEditorPage"), "NewsEditorPage")} />
                 <Route path="webseite/partner" lazy={page(() => import("./partners/PartnersPage"), "PartnersPage")} />
                 <Route path="webseite/partner/:id" lazy={page(() => import("./partners/PartnerEditorPage"), "PartnerEditorPage")} />

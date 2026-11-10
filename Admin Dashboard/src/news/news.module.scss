@@ -9,6 +9,26 @@
     line-height: 1.5;
 }
 
+.address {
+    margin: 0;
+    font-family: ui-monospace, monospace;
+    font-size: 0.8125rem;
+    overflow-wrap: anywhere;
+}
+
+.state {
+    color: var(--c-text-faint);
+    font-size: 0.8125rem;
+    white-space: nowrap;
+}
+
+.problem {
+    max-width: 320px;
+    color: var(--c-mod-engagement);
+    font-size: 0.8125rem;
+    line-height: 1.4;
+}
+
 .headActions {
     display: flex;
     flex-wrap: wrap;

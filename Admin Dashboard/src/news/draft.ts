@@ -1,4 +1,4 @@
-import { BLOCK_LABELS, type BlockType, type IBlock, type IPostEvent, type IPostInput, type NewsKind } from "../../shared/news.ts";
+import { BLOCK_LABELS, type BlockType, type IBlock, type IPost, type IPostEvent, type IPostInput, type NewsKind } from "../../shared/news.ts";
 import { moveTo } from "../editor/list.ts";
 import { berlinToIso, todayBerlin } from "../studio/time.ts";
 
@@ -61,6 +61,13 @@ export function newPost(kind: NewsKind): IPostInput {
         pinned: "none",
         announce: false,
     };
+}
+
+/** Der gespeicherte Beitrag als Entwurf. Die Adresse bleibt nach dem ersten Speichern, deshalb fehlt sie hier. */
+export function postInput(post: IPost): IPostInput {
+    const { kind, category, title, summary, cover, blocks, entryId, event, status, publishAt, pinned, announce } = post;
+
+    return { kind, category, title, summary, cover, blocks, entryId, event, status, publishAt, pinned, announce };
 }
 
 /** Andere Art: Bausteine bleiben, ein Termin bekommt Beginn und Ende. */

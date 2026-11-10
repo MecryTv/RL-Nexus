@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { checkPostInput, type IBlock } from "../../shared/news.ts";
-import { blockAction, blockLabel, insertBlock, moveBlock, newBlock, newPost, templatePost, wrapSelection } from "../../src/news/draft.ts";
+import { blockAction, blockLabel, insertBlock, moveBlock, newBlock, newPost, postInput, templatePost, wrapSelection } from "../../src/news/draft.ts";
 import { newsMessage } from "../../src/news/preview.ts";
 import { websiteValidators } from "./partner-studio.check.ts";
 import { check, section } from "./harness.ts";
@@ -24,6 +24,16 @@ export async function checkNewsStudio(): Promise<void> {
         }
 
         assert.match(newPost("termin").event!.startsAt, /T19:00:00\+0[12]:00$/);
+    });
+
+    await check("Entwurf: ein gespeicherter Beitrag wird wieder zum Entwurf, ohne Adresse und Serverfelder", () => {
+        const saved = { ...newPost("termin"), id: 7, slug: "turnier", publishedAt: null, authorName: "Mecry", createdAt: "2026-11-10T10:00:00.000Z", updatedAt: "2026-11-10T10:00:00.000Z", announcedAt: null };
+        const input = postInput(saved);
+
+        assert.deepEqual(Object.keys(input).sort(), Object.keys(newPost("termin")).sort());
+        assert.equal("slug" in input, false);
+        assert.deepEqual(input.event, saved.event);
+        assert.ok("input" in checkPostInput(input));
     });
 
     await check("Entwurf: Bausteine einfügen, verschieben, kopieren, löschen", () => {
