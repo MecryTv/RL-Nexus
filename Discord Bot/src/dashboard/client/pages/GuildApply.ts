@@ -56,6 +56,8 @@ interface ISubmission {
     decidedName: string | null;
     decidedAt: number | null;
     createdAt: number;
+    /** W-0073: Eine andere angenommene Bewerbung vergibt dieselbe Rolle - Entfernen lässt sie dann stehen. */
+    keepsRole: boolean;
 }
 
 type Mode = "web" | "modal" | "dm";
@@ -322,7 +324,9 @@ function mount(guildId: string, view: "inbox" | "manage"): void {
         const roleName = form?.settings.acceptRole ? data!.guild.roles.find((role) => role.id === form.settings.acceptRole)?.name : null;
         const removeHint =
             entry.status === "accepted"
-                ? `Entfernen ${roleName ? `zieht die Rolle @${roleName} ab und ` : ""}löscht die Bewerbung. Danach kann sich die Person neu bewerben.`
+                ? roleName && entry.keepsRole
+                    ? `Entfernen löscht die Bewerbung. Die Rolle @${roleName} bleibt, weil eine andere angenommene Bewerbung sie vergibt. Danach kann sich die Person neu bewerben.`
+                    : `Entfernen ${roleName ? `zieht die Rolle @${roleName} ab und ` : ""}löscht die Bewerbung. Danach kann sich die Person neu bewerben.`
                 : "Entfernen löscht die Bewerbung. Die Pause nach der Absage fällt damit weg.";
         const drop = confirmButton("btn btn--quiet", "#i-trash", "Entfernen", "Wirklich entfernen?", remove);
 

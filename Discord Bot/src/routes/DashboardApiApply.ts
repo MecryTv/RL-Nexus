@@ -84,7 +84,8 @@ export default class DashboardApiApply extends Route {
             manage,
             settings: await service.Settings(guild.id),
             forms: await service.Forms(guild.id),
-            submissions: list.rows,
+            // W-0073: Behält die Person die Rolle über eine andere Annahme, sagt der Hinweis vor dem Entfernen das.
+            submissions: await Promise.all(list.rows.map(async (row) => ({ ...row, keepsRole: row.status === "accepted" && (await service.RoleKept(guild.id, row)) }))),
             total: list.total,
             page,
             pageSize: PAGE_SIZE,
