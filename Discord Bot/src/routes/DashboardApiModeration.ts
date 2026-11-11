@@ -24,6 +24,7 @@ interface IBody {
     case?: unknown;
     id?: unknown;
     text?: unknown;
+    reason?: unknown;
     url?: unknown;
     name?: unknown;
     config?: unknown;
@@ -42,7 +43,7 @@ function IsRecord(value: unknown): value is Record<string, unknown> {
  * DashboardApiModerationEvidence.
  */
 /** Aktionen an einzelnen Fällen - mit Staff-Freigabe nur mit dem extra Ja (W-0011). */
-const CASE_ACTIONS = new Set(["note", "note-remove", "link", "evidence-remove"]);
+const CASE_ACTIONS = new Set(["note", "note-remove", "link", "evidence-remove", "hide", "unhide"]);
 
 /**
  * W-0011 (Nutzer, 01.11.): Bei der Moderation sind nur die Fälle privat. Gesperrt
@@ -130,7 +131,8 @@ export default class DashboardApiModeration extends Route {
         const cases = this.client.modCases;
 
         if (query.case !== undefined) {
-            const entry = await this.client.moderationService.CaseOf(guild.id, Number(query.case));
+            // W-0071: Ausgeblendete Fälle öffnen nur die, die den Server verwalten.
+            const entry = await this.client.moderationService.CaseOf(guild.id, Number(query.case), manage);
             const [related, origin, counts] = await Promise.all([
                 cases.RelatedTo(guild.id, entry.number),
                 entry.related !== null ? cases.Get(guild.id, entry.related) : Promise.resolve(null),
@@ -150,7 +152,7 @@ export default class DashboardApiModeration extends Route {
         const targetId = query.user && SNOWFLAKE.test(query.user) ? query.user : null;
         const rows = await cases.List(
             guild.id,
-            { action, active: query.status === "active", targetId, query: (query.q ?? "").slice(0, 100) },
+            { action, active: query.status === "active", targetId, query: (query.q ?? "").slice(0, 100), hidden: manage && query.hidden === "1" },
             before,
             PAGE_SIZE + 1
         );
@@ -159,7 +161,12 @@ export default class DashboardApiModeration extends Route {
             more: rows.length > PAGE_SIZE,
         };
 
-        if (before === null) result.stats = await cases.Stats(guild.id);
+        if (before === null) {
+            const stats = await cases.Stats(guild.id);
+
+            // W-0071: Wie viele ausgeblendet sind, sehen nur die, die den Server verwalten.
+            result.stats = manage ? stats : { ...stats, hidden: 0 };
+        }
         // Der Kopf des Verlaufs, wenn nach einem User gefiltert wird.
         if (targetId && before === null) result.target = await this.Target(guild, targetId, await cases.CountsOf(guild.id, targetId));
 
@@ -211,6 +218,7 @@ export default class DashboardApiModeration extends Route {
             evidence: entry.evidence.map((item) => ({ ...item, url: item.kind === "image" ? `${base}/${item.value}` : item.value })),
             logged: entry.logMessage !== null,
             logUrl: entry.logChannel && entry.logMessage ? `https://discord.com/channels/${guild.id}/${entry.logChannel}/${entry.logMessage}` : null,
+            hidden: entry.hidden,
         };
     }
 
@@ -278,6 +286,13 @@ export default class DashboardApiModeration extends Route {
 
                 return { ok: true, case: this.Out(guild, entry), problems };
             }
+
+            // W-0071: ausblenden (Moderations-Team, Grund Pflicht) und wieder einblenden (nur wer den Server verwaltet).
+            case "hide":
+                return { ok: true, case: this.Out(guild, await service.Hide(guild, member, number, body.reason)) };
+
+            case "unhide":
+                return { ok: true, case: this.Out(guild, await service.Unhide(guild, member, number)) };
 
             case "note":
                 return { ok: true, case: this.Out(guild, await service.AddNote(guild.id, actor, number, body.text)) };

@@ -23,6 +23,10 @@ export interface IModCaseRow {
     log_channel: string | null;
     log_message: string | null;
     created_at: number | string;
+    hidden_at?: number | string | null;
+    hidden_by?: string | null;
+    hidden_name?: string | null;
+    hidden_reason?: string | null;
 }
 
 /** Was ein neuer Fall mitbringt - Nummer, Zeit und leere Listen setzt Create(). */
@@ -32,7 +36,10 @@ export type NewModCase = Pick<
 >;
 
 /** Was sich an einem Fall später noch ändert. */
-export type ModCasePatch = Partial<Pick<IModCase, "active" | "details" | "evidence" | "notes" | "logChannel" | "logMessage">>;
+export type ModCasePatch = Partial<Pick<IModCase, "active" | "details" | "evidence" | "notes" | "logChannel" | "logMessage" | "hidden">>;
+
+/** W-0071: Normale Ansichten zeigen keine ausgeblendeten Fälle. */
+const VISIBLE = "hidden_at IS NULL";
 
 function ToCase(row: IModCaseRow): IModCase {
     return {
@@ -56,6 +63,10 @@ function ToCase(row: IModCaseRow): IModCase {
         logChannel: row.log_channel,
         logMessage: row.log_message,
         createdAt: Number(row.created_at),
+        hidden:
+            row.hidden_at === null || row.hidden_at === undefined
+                ? null
+                : { at: Number(row.hidden_at), by: row.hidden_by ?? "0", byName: row.hidden_name ?? "", reason: row.hidden_reason ?? "" },
     };
 }
 
@@ -68,6 +79,12 @@ function ToRow(patch: ModCasePatch): Record<string, unknown> {
     if (patch.notes !== undefined) row.notes = JSON.stringify(patch.notes);
     if (patch.logChannel !== undefined) row.log_channel = patch.logChannel;
     if (patch.logMessage !== undefined) row.log_message = patch.logMessage;
+    if (patch.hidden !== undefined) {
+        row.hidden_at = patch.hidden?.at ?? null;
+        row.hidden_by = patch.hidden?.by ?? null;
+        row.hidden_name = patch.hidden?.byName.slice(0, 100) ?? null;
+        row.hidden_reason = patch.hidden?.reason.slice(0, 500) ?? null;
+    }
 
     return row;
 }
@@ -151,6 +168,7 @@ export default class ModCases extends Model<IModCaseRow> {
         }
 
         if (filter.active) where.push("active = 1");
+        where.push(filter.hidden ? "hidden_at IS NOT NULL" : VISIBLE);
 
         if (filter.targetId) {
             where.push("target_id = ?");
@@ -185,10 +203,14 @@ export default class ModCases extends Model<IModCaseRow> {
         return rows.map(ToCase);
     }
 
-    /** Die noch geltenden Fälle eines Users - neueste zuerst. */
-    async ActiveOf(guildId: string, targetId: string, action: ModAction): Promise<IModCase[]> {
+    /**
+     * Die noch geltenden Fälle eines Users - neueste zuerst. W-0071: ohne die
+     * ausgeblendeten (sie zählen nicht für Stufen); withHidden für das, was
+     * trotzdem enden muss - ein ersetzter Timeout, ein in Discord aufgehobener Bann.
+     */
+    async ActiveOf(guildId: string, targetId: string, action: ModAction, withHidden = false): Promise<IModCase[]> {
         const rows = await this.db.Query<IModCaseRow>(
-            `SELECT * FROM \`${this.Table}\` WHERE guild_id = ? AND target_id = ? AND action = ? AND active = 1 ORDER BY number DESC`,
+            `SELECT * FROM \`${this.Table}\` WHERE guild_id = ? AND target_id = ? AND action = ? AND active = 1${withHidden ? "" : ` AND ${VISIBLE}`} ORDER BY number DESC`,
             [guildId, targetId, action]
         );
 
@@ -198,7 +220,7 @@ export default class ModCases extends Model<IModCaseRow> {
     /** Wie oft ein User schon dran war - je Aktion, für den Kopf seines Verlaufs. */
     async CountsOf(guildId: string, targetId: string): Promise<Partial<Record<ModAction, number>>> {
         const rows = await this.db.Query<{ action: ModAction; total: number }>(
-            `SELECT action, COUNT(*) AS total FROM \`${this.Table}\` WHERE guild_id = ? AND target_id = ? GROUP BY action`,
+            `SELECT action, COUNT(*) AS total FROM \`${this.Table}\` WHERE guild_id = ? AND target_id = ? AND ${VISIBLE} GROUP BY action`,
             [guildId, targetId]
         );
 
@@ -214,7 +236,7 @@ export default class ModCases extends Model<IModCaseRow> {
     async PenaltyCounts(guildId: string, warnSince: number, since: number, targetId?: string): Promise<Map<string, Partial<Record<ModAction, number>>>> {
         const rows = await this.db.Query<{ target_id: string; action: ModAction; total: number }>(
             `SELECT target_id, action, COUNT(*) AS total FROM \`${this.Table}\`
-             WHERE guild_id = ? AND target_id IS NOT NULL ${targetId ? "AND target_id = ?" : ""}
+             WHERE guild_id = ? AND target_id IS NOT NULL AND ${VISIBLE} ${targetId ? "AND target_id = ?" : ""}
                AND ((action = 'warn' AND active = 1 AND created_at >= ?) OR (action IN ('timeout', 'kick', 'ban') AND created_at >= ?))
              GROUP BY target_id, action`,
             [guildId, ...(targetId ? [targetId] : []), warnSince, since]
@@ -230,7 +252,7 @@ export default class ModCases extends Model<IModCaseRow> {
     async RecentPenalties(guildId: string, targetId: string, until: number): Promise<number> {
         const rows = await this.db.Query<{ total: number }>(
             `SELECT COUNT(*) AS total FROM \`${this.Table}\`
-             WHERE guild_id = ? AND target_id = ? AND action IN ('warn', 'timeout', 'kick', 'ban') AND created_at > ? AND created_at <= ?`,
+             WHERE guild_id = ? AND target_id = ? AND ${VISIBLE} AND action IN ('warn', 'timeout', 'kick', 'ban') AND created_at > ? AND created_at <= ?`,
             [guildId, targetId, until - 30 * 86_400_000, until]
         );
 
@@ -240,7 +262,7 @@ export default class ModCases extends Model<IModCaseRow> {
     /** Die Fälle, die sich auf diesen beziehen - etwa der Kick, den ein Warn ausgelöst hat. */
     async RelatedTo(guildId: string, number: number): Promise<IModCase[]> {
         const rows = await this.db.Query<IModCaseRow>(
-            `SELECT * FROM \`${this.Table}\` WHERE guild_id = ? AND related = ? ORDER BY number ASC LIMIT 20`,
+            `SELECT * FROM \`${this.Table}\` WHERE guild_id = ? AND related = ? AND ${VISIBLE} ORDER BY number ASC LIMIT 20`,
             [guildId, number]
         );
 
@@ -259,14 +281,16 @@ export default class ModCases extends Model<IModCaseRow> {
     }
 
     /** Die Zahlen oben im Dashboard: was gerade gilt und was in 30 Tagen passiert ist. */
-    async Stats(guildId: string, now = Date.now()): Promise<{ bans: number; timeouts: number; warns: number; month: number; total: number }> {
+    async Stats(guildId: string, now = Date.now()): Promise<{ bans: number; timeouts: number; warns: number; month: number; total: number; hidden: number }> {
+        // W-0071: Ausgeblendete zählen nirgends mit, nur in hidden (Reiter „Ausgeblendet“).
         const row = await this.db.One<Record<string, number | string | null>>(
             `SELECT` +
-                ` SUM(action = 'ban' AND active = 1) AS bans,` +
-                ` SUM(action = 'timeout' AND active = 1 AND (expires_at IS NULL OR expires_at > ?)) AS timeouts,` +
-                ` SUM(action = 'warn' AND active = 1) AS warns,` +
-                ` SUM(created_at >= ?) AS month,` +
-                ` COUNT(*) AS total` +
+                ` SUM(action = 'ban' AND active = 1 AND hidden_at IS NULL) AS bans,` +
+                ` SUM(action = 'timeout' AND active = 1 AND hidden_at IS NULL AND (expires_at IS NULL OR expires_at > ?)) AS timeouts,` +
+                ` SUM(action = 'warn' AND active = 1 AND hidden_at IS NULL) AS warns,` +
+                ` SUM(created_at >= ? AND hidden_at IS NULL) AS month,` +
+                ` SUM(hidden_at IS NULL) AS total,` +
+                ` SUM(hidden_at IS NOT NULL) AS hidden` +
                 ` FROM \`${this.Table}\` WHERE guild_id = ?`,
             [now, now - 30 * 86_400_000, guildId]
         );
@@ -277,6 +301,7 @@ export default class ModCases extends Model<IModCaseRow> {
             warns: Number(row?.warns ?? 0),
             month: Number(row?.month ?? 0),
             total: Number(row?.total ?? 0),
+            hidden: Number(row?.hidden ?? 0),
         };
     }
 

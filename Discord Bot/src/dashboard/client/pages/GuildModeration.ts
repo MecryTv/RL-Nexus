@@ -22,7 +22,7 @@ import { toast } from "../core/Toast.js";
 import { IRole, rolePicker, select } from "../core/Ui.js";
 
 type Action = "ban" | "unban" | "kick" | "timeout" | "untimeout" | "warn" | "unwarn" | "purge";
-type Tab = "history" | "act" | "settings";
+type Tab = "history" | "act" | "hidden" | "settings";
 
 interface IPerson {
     id: string;
@@ -85,6 +85,8 @@ interface ICase {
     evidence: IEvidence[];
     logged: boolean;
     logUrl: string | null;
+    /** W-0071: ausgeblendet - wer, wann, warum. null: sichtbar. */
+    hidden: { at: number; by: string; byName: string; reason: string } | null;
 }
 
 interface ISupport {
@@ -110,6 +112,8 @@ interface IStats {
     warns: number;
     month: number;
     total: number;
+    /** W-0071: ausgeblendete Fälle, nur für die, die den Server verwalten. */
+    hidden: number;
 }
 
 interface ITarget {
@@ -371,7 +375,13 @@ export function renderModeration(guildId: string): void {
         const list: [Tab, string, string][] = [
             ["history", "#i-scroll", "Verlauf"],
             ["act", "#i-gavel", "Neue Aktion"],
-            ...(meta?.me.manage ? ([["settings", "#i-sliders", "Einstellungen"]] as [Tab, string, string][]) : []),
+            // W-0071: Ausgeblendete Fälle sehen nur die, die den Server verwalten.
+            ...(meta?.me.manage
+                ? ([
+                      ["hidden", "#i-eye", "Ausgeblendet"],
+                      ["settings", "#i-sliders", "Einstellungen"],
+                  ] as [Tab, string, string][])
+                : []),
         ];
 
         tabs.replaceChildren(
@@ -386,6 +396,7 @@ export function renderModeration(guildId: string): void {
                 tabButton.addEventListener("click", () => open(id));
 
                 if (id === "history" && stats?.total) tabButton.append(el("span", "tktab__count", String(stats.total)));
+                if (id === "hidden" && stats?.hidden) tabButton.append(el("span", "tktab__count", String(stats.hidden)));
 
                 return tabButton;
             })
@@ -409,16 +420,21 @@ export function renderModeration(guildId: string): void {
 
         if (next !== tab) clickSound("primary");
 
+        // W-0071: Verlauf und Ausgeblendet teilen sich die Liste - beim Wechsel neu laden.
+        const swap = (next === "hidden") !== (tab === "hidden") && (next === "history" || next === "hidden");
+
         tab = next;
         paintTabs();
         paintPane();
+
+        if (swap) void load(true);
 
         if (focused) document.getElementById(`mctab-${tab}`)?.focus();
     }
 
     function paintPane(): void {
         pane.setAttribute("aria-labelledby", `mctab-${tab}`);
-        pane.replaceChildren(...(tab === "history" ? historyPane() : tab === "act" ? actPane() : settingsPane()));
+        pane.replaceChildren(...(tab === "history" || tab === "hidden" ? historyPane() : tab === "act" ? actPane() : settingsPane()));
     }
 
     /* ------------------------------------------------------------
@@ -484,8 +500,12 @@ export function renderModeration(guildId: string): void {
         const state = chip(entry);
 
         if (state) top.append(state);
+        if (entry.hidden) top.append(el("span", "mcstate is-hidden", `🙈 ${new Date(entry.hidden.at).toLocaleDateString("de-DE")} von ${entry.hidden.byName}`));
 
         const main = el("span", "mcrow__main", top, who);
+
+        // W-0071: Im Reiter „Ausgeblendet“ steht der Grund fürs Ausblenden statt des Fallgrunds.
+        if (entry.hidden) main.append(el("span", "mcrow__reason", `Ausgeblendet: „${entry.hidden.reason}“`));
 
         if (entry.reason) main.append(el("span", "mcrow__reason", `„${entry.reason}“`));
 
@@ -572,7 +592,7 @@ export function renderModeration(guildId: string): void {
 
         listHost.replaceChildren(
             ...(entries.length
-                ? entries.map(row)
+                ? entries.map((entry) => (tab === "hidden" ? hiddenRow(entry) : row(entry)))
                 : [
                       el(
                           "div",
@@ -606,8 +626,9 @@ export function renderModeration(guildId: string): void {
         if (filter.user) query.set("user", filter.user);
         if (!reset && entries.length) query.set("before", String(entries[entries.length - 1].number));
         if (!meta) query.set("meta", "1");
+        if (tab === "hidden") query.set("hidden", "1");
 
-        if (reset && !quiet && tab === "history") skeleton();
+        if (reset && !quiet && (tab === "history" || tab === "hidden")) skeleton();
 
         more.disabled = true;
 
@@ -632,7 +653,7 @@ export function renderModeration(guildId: string): void {
         paintHead();
         paintTabs();
 
-        if (tab === "history") {
+        if (tab === "history" || tab === "hidden") {
             if (!pane.contains(toolbar)) paintPane();
 
             paintTarget();
@@ -828,7 +849,102 @@ export function renderModeration(guildId: string): void {
 
         if (entry.active && lift && meta?.me.actions.includes(lift)) viewMain.append(liftBox(entry, lift));
 
+        // W-0071: Ausgeblendet: Hinweis oben, wieder einblenden nur, wer den Server verwaltet. Sonst unten „Fall ausblenden“.
+        if (entry.hidden) viewMain.prepend(hiddenBanner(entry, me));
+        else viewMain.append(hideBox(entry));
+
         viewSide.replaceChildren(notes(entry, me), evidence(entry, me));
+    }
+
+    /** W-0071: Für die, die den Server verwalten - wer, wann, warum ausgeblendet, und zurück in den Verlauf. */
+    function hiddenBanner(entry: ICase, me: IDetail["me"]): HTMLElement {
+        const hidden = entry.hidden!;
+        const banner = el(
+            "section",
+            "mchidden",
+            el("p", "", el("b", "", "🙈 Ausgeblendet"), ` am ${WHEN.format(hidden.at)} von ${hidden.byName} – „${hidden.reason}“`),
+            el("p", "mcmuted", "Moderatoren sehen diesen Fall nicht. Er zählt nicht mehr für Stufen, eine laufende Strafe in Discord bleibt.")
+        );
+
+        if (me.manage) {
+            const back = button("btn btn--quiet mcgo mcgo--info", icon("#i-eye"), "Wieder einblenden");
+
+            back.addEventListener("click", async () => {
+                back.disabled = true;
+
+                const answer = await call<{ case: ICase }>("", { action: "unhide", case: entry.number });
+
+                back.disabled = false;
+
+                if (!answer) return;
+
+                toast("info", "Wieder eingeblendet", `Fall #${entry.number} steht wieder im Verlauf, mit neuer Karte im Log-Kanal.`);
+                await view(entry.number);
+                void load(true);
+            });
+            banner.append(back);
+        }
+
+        return banner;
+    }
+
+    /** W-0071: Ausblenden statt Löschen - der Grund ist Pflicht. */
+    function hideBox(entry: ICase): HTMLElement {
+        const reason = el("input", "text");
+        const go = button("btn btn--quiet mcgo mcgo--danger", icon("#i-eye"), "Fall ausblenden");
+
+        reason.placeholder = "Grund (Pflicht), etwa „falsche Person“";
+        reason.maxLength = 500;
+        reason.setAttribute("aria-label", "Grund fürs Ausblenden");
+        go.addEventListener("click", async () => {
+            if (reason.value.trim().length < 3) {
+                toast("info", "Grund fehlt", "Schreib kurz dazu, warum der Fall ausgeblendet wird.");
+                reason.focus();
+
+                return;
+            }
+
+            go.disabled = true;
+
+            const answer = await call<{ case: ICase }>("", { action: "hide", case: entry.number, reason: reason.value });
+
+            go.disabled = false;
+
+            if (!answer) return;
+
+            toast("info", "Ausgeblendet", `Moderatoren sehen Fall #${entry.number} nicht mehr. Wer den Server verwaltet, findet ihn unter „Ausgeblendet“.`);
+            hide();
+            void load(true);
+        });
+
+        return el(
+            "section",
+            "mclift",
+            el("h3", "mcside__title", "Ausblenden"),
+            el("p", "mcmuted", "Moderatoren sehen den Fall danach nicht mehr, die Karte im Log-Kanal wird gelöscht. Wer den Server verwaltet, findet ihn unter „Ausgeblendet“."),
+            el("div", "mclift__row", reason, go)
+        );
+    }
+
+    /** W-0071: Im Reiter „Ausgeblendet“ - die Zeile wie im Verlauf, daneben „Einblenden“. */
+    function hiddenRow(entry: ICase): HTMLElement {
+        const back = button("btn btn--quiet", icon("#i-eye"), "Einblenden");
+
+        back.setAttribute("aria-label", `Fall ${entry.number} wieder einblenden`);
+        back.addEventListener("click", async () => {
+            back.disabled = true;
+
+            const answer = await call<{ case: ICase }>("", { action: "unhide", case: entry.number });
+
+            back.disabled = false;
+
+            if (!answer) return;
+
+            toast("info", "Wieder eingeblendet", `Fall #${entry.number} steht wieder im Verlauf, mit neuer Karte im Log-Kanal.`);
+            void load(true);
+        });
+
+        return el("div", "mchidrow", row(entry), back);
     }
 
     /** Aufheben direkt am Fall: Grund dazu, dann der Knopf. */
@@ -888,7 +1004,7 @@ export function renderModeration(guildId: string): void {
                 ? entry.notes.map((item) => {
                       const line = el("article", "mcnote", el("div", "mcnote__head", el("b", "", item.byName), el("time", "", ago(item.at))), el("p", "", item.text));
 
-                      if (item.by === me.id || me.manage) {
+                      if ((item.by === me.id || me.manage) && !entry.hidden) {
                           const remove = button("iconbtn is-danger mcnote__x", icon("#i-trash"));
 
                           remove.setAttribute("aria-label", "Notiz entfernen");
@@ -908,7 +1024,8 @@ export function renderModeration(guildId: string): void {
                 : [el("p", "mcmuted", "Noch keine Notiz.")])
         );
 
-        return el("section", "mcside", el("h3", "mcside__title", icon("#i-note"), "Notizen"), list, text, save);
+        // W-0071: Ausgeblendete Fälle nur lesen.
+        return el("section", "mcside", el("h3", "mcside__title", icon("#i-note"), "Notizen"), list, ...(entry.hidden ? [] : [text, save]));
     }
 
     function evidence(entry: ICase, me: IDetail["me"]): HTMLElement {
@@ -1000,7 +1117,7 @@ export function renderModeration(guildId: string): void {
 
                       const box = el("div", "mcevid__cell", open);
 
-                      if (item.by === me.id || me.manage) {
+                      if ((item.by === me.id || me.manage) && !entry.hidden) {
                           const remove = button("iconbtn is-danger mcevid__x", icon("#i-x"));
 
                           remove.setAttribute("aria-label", "Beweis entfernen");
@@ -1020,7 +1137,7 @@ export function renderModeration(guildId: string): void {
                 : [el("p", "mcmuted", "Noch kein Beweis.")])
         );
 
-        return el("section", "mcside", el("h3", "mcside__title", icon("#i-paperclip"), "Beweise"), grid, el("div", "mcevid__add", upload, file, link, add));
+        return el("section", "mcside", el("h3", "mcside__title", icon("#i-paperclip"), "Beweise"), grid, ...(entry.hidden ? [] : [el("div", "mcevid__add", upload, file, link, add)]));
     }
 
     /* ------------------------------------------------------------

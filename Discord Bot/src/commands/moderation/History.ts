@@ -30,13 +30,16 @@ export default class History extends Command {
 
             const user = interaction.options.getUser("user", true);
             const guildId = member.guild.id;
-            const [cases, counts] = await Promise.all([
+            const manage = this.client.moderationService.CanManage(member);
+            const [cases, counts, hidden] = await Promise.all([
                 this.client.modCases.List(guildId, { targetId: user.id }, null, 10),
                 this.client.modCases.CountsOf(guildId, user.id),
+                // W-0071: Ausgeblendete fehlen für alle; wer den Server verwaltet, sieht nur, wie viele es gibt.
+                manage ? this.client.modCases.List(guildId, { targetId: user.id, hidden: true }, null, 100).then((rows) => rows.length) : Promise.resolve(0),
             ]);
             const link = `${this.client.server.BaseURL}${DASHBOARD_PATH}/guild/${guildId}/moderation?user=${user.id}`;
 
-            await ModSay(interaction, HistoryView(user.username, cases, counts, link));
+            await ModSay(interaction, HistoryView(user.username, cases, counts, link, hidden));
         } catch (error) {
             await Fail(interaction, error, "verlauf");
         }

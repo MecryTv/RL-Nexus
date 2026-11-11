@@ -64,6 +64,8 @@ Unter *Moderation › Einstellungen*: „ab **3** Verwarnungen → **Timeout 1 S
 
 Notizen und Beweise kommen auch später dazu: im Dashboard am Fall oder mit `/fall notiz` und `/fall beweis` (Anhang oder Link).
 
+**Ausblenden statt löschen (W-0071).** Ein Fall wird nie gelöscht. Wer den Fall sieht, kann ihn im Dashboard mit Pflicht-Grund ausblenden (`hidden_at`, `hidden_by`, `hidden_name`, `hidden_reason` in `mod_cases`, Migration 050). Danach fehlt er im Verlauf, in `/verlauf`, `/fall`, den Zahlen oben, beim Zählen für Stufen und in „N. Fall in 30 Tagen“; die Karte im Log-Kanal wird gelöscht. Eine laufende Strafe in Discord bleibt, Bann und Timeout enden weiter über ihn (`ActiveOf(…, withHidden)`). Wer den Server verwaltet, sieht ihn im Reiter **Ausgeblendet** und kann ihn wieder einblenden, dann kommt eine neue Karte in den Log-Kanal. `/verlauf` nennt dieser Gruppe die Zahl der ausgeblendeten Fälle.
+
 ---
 
 ## Beweise (W-0014)
@@ -141,14 +143,15 @@ Der Bot braucht dafür **Mitglieder verschieben** im Ziel-Kanal.
 - **Verlauf** — alle Fälle, neueste zuerst, Suche nach Fallnummer, Name, Discord-ID oder Grund, Filter nach Art und „nur aktive". Mit `?user=<id>` der Verlauf eines Users mit Kopf: Status (auf dem Server, gebannt, stumm bis …), Zahlen je Aktion, Knöpfe für die nächste Aktion. `/verlauf` in Discord verlinkt dorthin.
 - **Ein Fall groß** — Klick auf eine Zeile oder `?fall=12`: alle Angaben, Zusammenhang, „Aufheben" (Bann, Timeout, Warn), Notizen, Beweise (hochladen oder Link).
 - **Neue Aktion** — Aktion wählen (nur die erlaubten), User suchen (bei Entbannen in der Bannliste), Grund, Dauer (Vorschläge oder frei), ein Satz sagt, was passiert. Bann, Kick und Löschen brauchen einen zweiten Klick.
+- **Ausgeblendet** (nur „Server verwalten") — ausgeblendete Fälle mit wer, wann, warum und „Einblenden“.
 - **Einstellungen** (nur „Server verwalten") — Log-Kanal, DM, wie lange Warns zählen, die Stufen und der Support-Warteraum.
 
 Wer die Moderation sieht: `canModerate` an der Serverkarte (`DashboardService.Supported()`) — wer verwaltet, und die Moderatoren-Liste, wenn das Modul an ist. Support-Rollen der Tickets allein reichen nicht.
 
 | Route | |
 |---|---|
-| `GET <base>/api/guild/:id/moderation` | Liste (`q`, `action`, `status=active`, `user`, `before`), mit `meta=1` Rechte, Einstellungen, Kanäle, Log-Ziele und (für wer verwaltet) Sprachkanäle und Rollen für den Warteraum; mit `case=12` ein Fall samt Zusammenhang und User-Kopf |
-| `POST <base>/api/guild/:id/moderation` | `act`, `note`, `note-remove`, `link`, `evidence-remove`, `members`, `bans`, `save`, `logthread` — nur JSON |
+| `GET <base>/api/guild/:id/moderation` | Liste (`q`, `action`, `status=active`, `user`, `before`, `hidden=1` für wer verwaltet), mit `meta=1` Rechte, Einstellungen, Kanäle, Log-Ziele und (für wer verwaltet) Sprachkanäle und Rollen für den Warteraum; mit `case=12` ein Fall samt Zusammenhang und User-Kopf |
+| `POST <base>/api/guild/:id/moderation` | `act`, `note`, `note-remove`, `link`, `evidence-remove`, `hide` (mit `reason`), `unhide`, `members`, `bans`, `save`, `logthread` — nur JSON |
 | `POST <base>/api/guild/:id/moderation/evidence/:fall` | Beweisbild roh als Body (`image/*`), Name in `?name=` |
 | `GET <base>/api/guild/:id/moderation/evidence/:id/:datei` | Ein Beweisbild — nur für die Moderatoren des Servers |
 

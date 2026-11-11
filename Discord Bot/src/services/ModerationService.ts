@@ -32,6 +32,7 @@ import {
     ProofNeeded,
     StageFor,
     STORED_EVIDENCE,
+    HIDE_REASON_MAX,
 } from "../constants/Moderation";
 import { IModCase, IModConfig, IModDetails, IModEnded, IModEvidence, IModMessageProof, IModProofRules, IModStage, IModSupport, ModAction, ModSource } from "../interfaces/services/moderation/IModeration";
 import { NewModCase } from "../models/ModCases";
@@ -438,7 +439,7 @@ export default class ModerationService {
 
         if (action === "timeout") {
             const duration = this.Duration(request.duration, MAX_TIMEOUT, true)!;
-            const earlier = await this.client.modCases.ActiveOf(guild.id, targetId, "timeout");
+            const earlier = await this.client.modCases.ActiveOf(guild.id, targetId, "timeout", true);
             const entry = await this.Record(actor, guild, {
                 ...base,
                 action,
@@ -459,7 +460,7 @@ export default class ModerationService {
         if (action === "untimeout") {
             if (!member!.isCommunicationDisabled()) throw new ModerationError(`${member!.displayName} ist gar nicht stummgeschaltet.`);
 
-            const earlier = await this.client.modCases.ActiveOf(guild.id, targetId, "timeout");
+            const earlier = await this.client.modCases.ActiveOf(guild.id, targetId, "timeout", true);
             const entry = await this.Record(actor, guild, {
                 ...base,
                 action,
@@ -520,7 +521,7 @@ export default class ModerationService {
 
         if (!ban) throw new ModerationError("Dieser User ist hier nicht gebannt.");
 
-        const earlier = await this.client.modCases.ActiveOf(guild.id, targetId, "ban");
+        const earlier = await this.client.modCases.ActiveOf(guild.id, targetId, "ban", true);
         const entry = await this.Record(actor, guild, {
             action: "unban",
             targetId,
@@ -841,12 +842,64 @@ export default class ModerationService {
     /* ----------------------------------------------------------
        Notizen und Beweise
        ---------------------------------------------------------- */
-    async CaseOf(guildId: string, number: number): Promise<IModCase> {
+    /** W-0071: Ausgeblendete Fälle gibt es nur mit withHidden - für die, die den Server verwalten. */
+    async CaseOf(guildId: string, number: number, withHidden = false): Promise<IModCase> {
         const entry = Number.isInteger(number) && number > 0 ? await this.client.modCases.Get(guildId, number) : null;
 
-        if (!entry) throw new ModerationError(`Fall ${CaseRef(number)} gibt es hier nicht.`);
+        if (!entry || (entry.hidden && !withHidden)) throw new ModerationError(`Fall ${CaseRef(number)} gibt es hier nicht.`);
 
         return entry;
+    }
+
+    /**
+     * W-0071: Ein Fall wird nie ganz gelöscht, nur für Moderatoren ausgeblendet.
+     * Grund ist Pflicht. Die Karte im Log-Kanal geht weg - den lesen Moderatoren
+     * mit. Eine laufende Strafe in Discord bleibt, Ausblenden hebt nichts auf.
+     */
+    async Hide(guild: Guild, member: GuildMember, number: number, reason: unknown): Promise<IModCase> {
+        if (!(await this.CanView(member))) throw new ModerationError("Ausblenden darf nur das Moderations-Team.");
+
+        const text = typeof reason === "string" ? reason.trim().slice(0, HIDE_REASON_MAX) : "";
+
+        if (text.length < 3) throw new ModerationError("Schreib kurz dazu, warum der Fall ausgeblendet wird.");
+
+        const entry = await this.CaseOf(guild.id, number);
+        const hidden = await this.client.modCases.Mutate(entry.id, (row) =>
+            row.hidden ? null : { hidden: { at: Date.now(), by: member.id, byName: member.displayName, reason: text }, logChannel: null, logMessage: null }
+        );
+
+        if (!hidden?.hidden || hidden.hidden.by !== member.id) throw new ModerationError(`Fall ${CaseRef(number)} ist schon ausgeblendet.`);
+
+        if (entry.logChannel && entry.logMessage) {
+            const channel = guild.channels.cache.get(entry.logChannel) ?? (await guild.channels.fetch(entry.logChannel).catch(() => null));
+
+            if (channel?.isTextBased()) await channel.messages.delete(entry.logMessage).catch(() => undefined);
+        }
+
+        this.client.pulseService.Emit(guild.id, "moderation", { id: entry.id, action: entry.action });
+        logger.user(`🙈 Fall ${CaseRef(number)} auf ${guild.id} ausgeblendet (von ${member.id})`);
+
+        return hidden;
+    }
+
+    /** W-0071: Wieder einblenden darf nur, wer den Server verwaltet. Der Fall bekommt eine neue Karte im Log-Kanal. */
+    async Unhide(guild: Guild, member: GuildMember, number: number): Promise<IModCase> {
+        if (!this.CanManage(member)) throw new ModerationError("Wieder einblenden darf nur, wer den Server verwaltet.");
+
+        const entry = await this.CaseOf(guild.id, number, true);
+
+        if (!entry.hidden) throw new ModerationError(`Fall ${CaseRef(number)} ist nicht ausgeblendet.`);
+
+        let shown = (await this.client.modCases.Mutate(entry.id, () => ({ hidden: null }))) ?? entry;
+        const { logChannelId } = await this.client.modSettings.Of(guild.id);
+        const message = await SendLog(guild, logChannelId, { ...(await this.LogCard(shown)), flags: MessageFlags.IsComponentsV2, allowedMentions: { parse: [] } });
+
+        if (message) shown = (await this.client.modCases.Mutate(shown.id, () => ({ logChannel: message.channelId, logMessage: message.id }))) ?? shown;
+
+        this.client.pulseService.Emit(guild.id, "moderation", { id: entry.id, action: entry.action });
+        logger.user(`👁️ Fall ${CaseRef(number)} auf ${guild.id} wieder eingeblendet (von ${member.id})`);
+
+        return shown;
     }
 
     async AddNote(guildId: string, author: IModActor, number: number, text: unknown): Promise<IModCase> {
@@ -1123,6 +1176,7 @@ export default class ModerationService {
     async BanRemoved(guild: Guild, userId: string): Promise<void> {
         if (!this.client.databaseService.Ready) return;
 
-        for (const ban of await this.client.modCases.ActiveOf(guild.id, userId, "ban")) await this.End(ban, "discord", null, null, null);
+        // W-0071: auch ein ausgeblendeter Bann endet, wenn ihn jemand in Discord aufhebt.
+        for (const ban of await this.client.modCases.ActiveOf(guild.id, userId, "ban", true)) await this.End(ban, "discord", null, null, null);
     }
 }

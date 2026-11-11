@@ -264,6 +264,8 @@ export const USERDATA_AREAS: readonly IUserdataAreaDef[] = [
             { table: "mail_accounts", column: "created_by", role: "team", time: "created_at", label: "CONCAT('Postfach angelegt: ', address)" },
             { table: "matchups", column: "created_by", role: "team", guild: G, label: "CONCAT('Matchup angelegt: ', opponent)" },
             { table: "mod_cases", column: "moderator_id", role: "team", guild: G, time: ms("created_at"), label: "CONCAT('Fall ', number, ' bearbeitet · ', action)", name: "moderator_name", words: true },
+            // W-0071: wer einen Fall ausgeblendet hat.
+            { table: "mod_cases", column: "hidden_by", role: "team", guild: G, time: ms("hidden_at"), label: "CONCAT('Fall ', number, ' ausgeblendet')", name: "hidden_name", words: true },
             { table: "polls", column: "created_by", role: "team", guild: G, time: ms("created_at"), label: "CONCAT('Umfrage ', number)" },
             { table: "self_role_panels", column: "created_by", role: "team", guild: G, label: "CONCAT('Rollen-Panel angelegt: ', name)" },
             { table: "server_restores", column: "actor_id", role: "team", guild: G, time: ms("started_at"), label: "'Backup zurückgeladen'", name: "actor_name" },

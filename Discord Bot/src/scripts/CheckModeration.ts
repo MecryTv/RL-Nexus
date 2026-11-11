@@ -112,6 +112,7 @@ function SampleCase(patch: Partial<IModCase> = {}): IModCase {
         logChannel: null,
         logMessage: null,
         createdAt: Date.now(),
+        hidden: null,
         ...patch,
     };
 }
@@ -484,6 +485,31 @@ async function checkDatabase(client: BotClient): Promise<void> {
 
     check("Beenden setzt den Status", ended?.active === false && ended.details.ended?.case === second.number);
     check("Die Zahlen oben", (await cases.Stats(GUILD)).total === 2);
+
+    // W-0071: Ausgeblendet statt gelöscht - fehlt überall, außer im Reiter „Ausgeblendet“ und mit withHidden.
+    const warn = await cases.Create({ ...base, action: "warn", active: true });
+    const hidden = await cases.Mutate(warn.id, () => ({ hidden: { at: Date.now(), by: MOD, byName: "Hanna", reason: "falsche Person" }, logChannel: null, logMessage: null }));
+
+    check("Ausblenden setzt wer, wann, warum (W-0071)", hidden?.hidden?.by === MOD && hidden.hidden.reason === "falsche Person");
+    check("  im Verlauf fehlt der Fall", !(await cases.List(GUILD, {}, null, 10)).some((entry) => entry.id === warn.id));
+    check("  im Reiter „Ausgeblendet“ steht nur er", (await cases.List(GUILD, { hidden: true }, null, 10)).map((entry) => entry.id).join() === String(warn.id));
+    check("  zählt nicht für Stufen", (await cases.ActiveOf(GUILD, USER, "warn")).every((entry) => entry.id !== warn.id));
+    check("  mit withHidden ist er da (Bann/Timeout enden trotzdem)", (await cases.ActiveOf(GUILD, USER, "warn", true)).some((entry) => entry.id === warn.id));
+    check("  nicht in den Zahlen je Aktion", (await cases.CountsOf(GUILD, USER)).warn === 1);
+
+    const stats = await cases.Stats(GUILD);
+
+    check("  die Zahlen oben ohne ihn, dazu hidden", stats.total === 2 && stats.hidden === 1, JSON.stringify(stats));
+    const blocked = await client.moderationService.CaseOf(GUILD, warn.number).then(() => false, (error) => error instanceof ModerationError);
+
+    check("  /fall und Notizen finden ihn nicht", blocked);
+    check("  wer den Server verwaltet, öffnet ihn", (await client.moderationService.CaseOf(GUILD, warn.number, true)).id === warn.id);
+
+    const shown = await cases.Mutate(warn.id, () => ({ hidden: null }));
+
+    check("Wieder einblenden: im Verlauf zurück", shown?.hidden === null && (await cases.List(GUILD, {}, null, 10)).some((entry) => entry.id === warn.id));
+    await client.databaseService.Write("DELETE FROM mod_cases WHERE id = ?", [warn.id]);
+    cases.Forget();
 
     let rolled = false;
 

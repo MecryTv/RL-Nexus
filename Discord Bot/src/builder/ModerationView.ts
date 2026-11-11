@@ -196,7 +196,7 @@ export function DetailView(entry: IModCase, link: string | null): IModView {
 }
 
 /** /verlauf: die letzten Fälle eines Users in einer Karte. */
-export function HistoryView(name: string, cases: IModCase[], counts: Partial<Record<IModCase["action"], number>>, link: string | null): IModView {
+export function HistoryView(name: string, cases: IModCase[], counts: Partial<Record<IModCase["action"], number>>, link: string | null, hidden = 0): IModView {
     const summary = (["warn", "timeout", "kick", "ban"] as const)
         .map((action) => `${ACTION_INFO[action].emoji} ${counts[action] ?? 0}`)
         .join("  ·  ");
@@ -217,6 +217,9 @@ export function HistoryView(name: string, cases: IModCase[], counts: Partial<Rec
                       .join("\n")
                 : "Keine Fälle – eine weiße Weste."
         );
+
+    // W-0071: nur für die, die den Server verwalten - die Fälle selbst stehen im Dashboard.
+    if (hidden > 0) builder.subtext(`🙈 ${hidden === 1 ? "1 ausgeblendeter Fall" : `${hidden} ausgeblendete Fälle`} · nur im Dashboard`);
 
     if (link) builder.buttons({ url: link, label: "Ganzer Verlauf im Dashboard", emoji: "🛡️" });
 

@@ -53,6 +53,8 @@ export const PERMISSION_LABEL: Record<ModAction, string> = {
 
 /** Bleibt ein Fall dieser Art aktiv, bis ihn etwas beendet? */
 export const LASTING: ReadonlySet<ModAction> = new Set<ModAction>(["ban", "timeout", "warn"]);
+/** W-0071: So lang darf der Grund fürs Ausblenden eines Falls sein. */
+export const HIDE_REASON_MAX = 500;
 
 // Discord nimmt für das Audit-Log höchstens 512 Zeichen.
 export const MAX_REASON = 500;

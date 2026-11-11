@@ -3364,6 +3364,10 @@ body.no-motion .hero__field .run{display:none}
 }
 .mcstate.is-active{color:color-mix(in srgb,var(--warn) 70%,#fff);border-color:color-mix(in srgb,var(--warn) 40%,transparent);background:color-mix(in srgb,var(--warn) 9%,transparent)}
 .mcstate.is-ok{color:color-mix(in srgb,var(--live) 70%,#fff);border-color:color-mix(in srgb,var(--live) 40%,transparent);background:color-mix(in srgb,var(--live) 8%,transparent)}
+.mcstate.is-hidden{color:color-mix(in srgb,var(--purple-soft) 85%,#fff);border-color:color-mix(in srgb,var(--purple) 45%,transparent);background:color-mix(in srgb,var(--purple) 12%,transparent)}
+.mchidden{display:grid;gap:6px;justify-items:start;padding:12px 14px;margin:0 0 14px;border:1px solid color-mix(in srgb,var(--purple) 45%,transparent);background:color-mix(in srgb,var(--purple) 8%,transparent)}
+.mchidden p{margin:0}
+.mchidrow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center}
 .mcstate.is-ended,.mcstate.is-expired{color:var(--text-3)}
 .mcmuted{font-size:12.5px;font-style:normal;color:var(--text-3)}
 .mcid{font-family:var(--f-mono);font-size:11.5px;color:var(--text-3)}

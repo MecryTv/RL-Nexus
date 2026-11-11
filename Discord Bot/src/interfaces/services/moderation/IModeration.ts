@@ -151,6 +151,16 @@ export interface IModCase {
     logChannel: string | null;
     logMessage: string | null;
     createdAt: number;
+    /** W-0071: Für Moderatoren ausgeblendet. null: sichtbar. */
+    hidden: IModHidden | null;
+}
+
+/** W-0071: Wer einen Fall wann und warum ausgeblendet hat. */
+export interface IModHidden {
+    at: number;
+    by: string;
+    byName: string;
+    reason: string;
 }
 
 /** Filter der Liste im Dashboard. */
@@ -161,4 +171,6 @@ export interface IModFilter {
     targetId?: string | null;
     /** Fallnummer (#12), Discord-ID oder Name. */
     query?: string;
+    /** W-0071: true nur die ausgeblendeten, sonst nur die sichtbaren. */
+    hidden?: boolean;
 }
