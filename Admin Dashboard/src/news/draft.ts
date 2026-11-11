@@ -89,6 +89,19 @@ export function freshPost(saved: IPost | null, fresh: IPost | null): IPost | nul
     return Date.parse(fresh.updatedAt) > Date.parse(saved.updatedAt) ? fresh : null;
 }
 
+/**
+ * Vor einer Ankündigung in Discord fragt das Studio nach: beim Veröffentlichen
+ * und beim Planen (Nutzer, 11.11.2026). Ein schon geplanter Beitrag, der ohnehin
+ * angekündigt wird, fragt beim Speichern nicht noch einmal.
+ */
+export function announceConfirm(next: IPostInput, saved: IPost | null): "published" | "scheduled" | null {
+    if (!next.announce || saved?.announcedAt) return null;
+    if (next.status === "published") return "published";
+    if (next.status === "scheduled" && !(saved?.status === "scheduled" && saved.announce)) return "scheduled";
+
+    return null;
+}
+
 /** Der Knopf in der Leiste sagt, was er tut: „Speichern“ nur, wenn der Stand bleibt. */
 export function saveLabel(target: PostState, saved: PostState): string {
     if (target === saved) return "Speichern";

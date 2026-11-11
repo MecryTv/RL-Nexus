@@ -11,9 +11,11 @@ import { Failure, Loading } from "../components/Status";
 import { UnsavedGuard } from "../editor/UnsavedGuard";
 import { useStudioDoc } from "../studio/useStudioDoc";
 import { useToast } from "../toast/context";
-import { freshPost, newPost, postInput, postProblem } from "./draft.ts";
+import { announceConfirm, freshPost, newPost, postInput, postProblem } from "./draft.ts";
 import { NewsStudio } from "./NewsStudio";
 import styles from "./news.module.scss";
+
+const at = (iso: string): string => new Intl.DateTimeFormat("de-DE", { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Berlin" }).format(new Date(iso));
 
 const kindOf = (value: string | null): NewsKind => NEWS_KINDS.find((kind) => kind === value) ?? "beitrag";
 
@@ -64,13 +66,15 @@ function NewsEditor({ post, entries, channel, editorKey, onSaved }: IEditorProps
         }
     };
 
+    const planned = announcing?.status === "scheduled";
+
     const save = (status?: PostState): void => {
         const next = checkPostInput(status ? { ...doc.value, status, publishAt: null } : doc.value);
 
         if (!("input" in next)) return;
 
-        // Eine Ankündigung in Discord lässt sich nicht zurückholen: vorher fragen.
-        if (next.input.status === "published" && next.input.announce && !saved?.announcedAt) setAnnouncing(next.input);
+        // Eine Ankündigung in Discord lässt sich nicht zurückholen: beim Veröffentlichen und beim Planen vorher fragen.
+        if (announceConfirm(next.input, saved)) setAnnouncing(next.input);
         else void write(next.input);
     };
 
@@ -103,8 +107,8 @@ function NewsEditor({ post, entries, channel, editorKey, onSaved }: IEditorProps
 
             <ConfirmDialog
                 open={announcing !== null}
-                title="Veröffentlichen und in Discord ankündigen?"
-                confirmLabel="Veröffentlichen"
+                title={planned ? "Planen und in Discord ankündigen?" : "Veröffentlichen und in Discord ankündigen?"}
+                confirmLabel={planned ? "Planen" : "Veröffentlichen"}
                 busy={saving}
                 onConfirm={() => {
                     if (announcing) void write(announcing);
@@ -112,7 +116,14 @@ function NewsEditor({ post, entries, channel, editorKey, onSaved }: IEditorProps
                 }}
                 onCancel={() => setAnnouncing(null)}
             >
-                <p>Der Beitrag erscheint auf der Webseite und im Kanal für Ankündigungen. Die Nachricht in Discord geht genau einmal raus und bleibt auch, wenn du den Beitrag später änderst.</p>
+                {planned && announcing?.publishAt ? (
+                    <p>
+                        Der Beitrag erscheint am {at(announcing.publishAt)} Uhr auf der Webseite, und im selben Moment geht die Ankündigung im Kanal raus. Bis dahin kannst du alles ändern oder den
+                        Schalter ausmachen. Danach geht die Nachricht genau einmal raus und bleibt auch, wenn du den Beitrag später änderst.
+                    </p>
+                ) : (
+                    <p>Der Beitrag erscheint auf der Webseite und im Kanal für Ankündigungen. Die Nachricht in Discord geht genau einmal raus und bleibt auch, wenn du den Beitrag später änderst.</p>
+                )}
             </ConfirmDialog>
         </>
     );

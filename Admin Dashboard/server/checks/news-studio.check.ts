@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { checkPostInput, type IBlock } from "../../shared/news.ts";
-import { blockAction, blockLabel, freshPost, insertBlock, moveBlock, newBlock, newPost, postInput, postProblem, saveLabel, switchPostKind, templatePost, wrapSelection } from "../../src/news/draft.ts";
+import { announceConfirm, blockAction, blockLabel, freshPost, insertBlock, moveBlock, newBlock, newPost, postInput, postProblem, saveLabel, switchPostKind, templatePost, wrapSelection } from "../../src/news/draft.ts";
 import { newsMessage } from "../../src/news/preview.ts";
 import { websiteValidators } from "./partner-studio.check.ts";
 import { check, section } from "./harness.ts";
@@ -77,6 +77,24 @@ export async function checkNewsStudio(): Promise<void> {
         assert.equal(freshPost(appeared, saved), null);
         assert.equal(freshPost(null, saved), null);
         assert.equal(freshPost(saved, null), null);
+    });
+
+    await check("Rückfrage vor der Ankündigung in Discord: beim Veröffentlichen und beim Planen, nicht bei jedem Speichern (Nutzer 11.11.)", () => {
+        const later = "2026-11-12T17:00:00.000Z";
+        const draft = { ...newPost("beitrag"), announce: true };
+        const stored = { ...draft, id: 9, slug: "a", publishedAt: null, authorName: "M", createdAt: later, updatedAt: later, announcedAt: null };
+        const planned = { ...stored, status: "scheduled" as const, publishAt: later };
+
+        assert.equal(announceConfirm({ ...draft, status: "published" }, null), "published");
+        assert.equal(announceConfirm({ ...draft, status: "scheduled", publishAt: later }, null), "scheduled");
+        assert.equal(announceConfirm({ ...draft, status: "scheduled", publishAt: later }, stored), "scheduled");
+        // Schon geplant und angekündigt wird später: Speichern fragt nicht noch einmal.
+        assert.equal(announceConfirm({ ...draft, status: "scheduled", publishAt: later }, planned), null);
+        // Schon geplant, Ankündigung erst jetzt eingeschaltet: fragen.
+        assert.equal(announceConfirm({ ...draft, status: "scheduled", publishAt: later }, { ...planned, announce: false }), "scheduled");
+        assert.equal(announceConfirm({ ...draft, announce: false, status: "scheduled", publishAt: later }, null), null);
+        assert.equal(announceConfirm(draft, null), null);
+        assert.equal(announceConfirm({ ...draft, status: "published" }, { ...stored, announcedAt: later }), null);
     });
 
     await check("Entwurf: Bausteine einfügen, verschieben, kopieren, löschen", () => {
