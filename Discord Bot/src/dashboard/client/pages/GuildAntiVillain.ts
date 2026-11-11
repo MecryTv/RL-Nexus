@@ -10,12 +10,14 @@
 import { BASE } from "../core/Base.js";
 import { icon, need } from "../core/Dom.js";
 import { toast } from "../core/Toast.js";
-import { api, button, card, confirmButton, el, face, IRole, loading, rolePicker, row, select, toggle, WHEN } from "../core/Ui.js";
+import { api, button, card, confirmButton, el, face, IRole, loading, radioTiles, rolePicker, row, select, toggle, WHEN } from "../core/Ui.js";
 import { ILogTargets, ILogThread, logTargetSelect } from "../core/LogTarget.js";
 
 type Level = "locker" | "normal" | "streng";
 type Pane = "quarantine" | "guard" | "bait" | "raid" | "log";
 type RaidSwitch = "invites" | "slowmode" | "hold" | "ping" | "verification";
+
+type BaitDesign = "plain" | "bar" | "dot" | "loud" | "keep" | "custom";
 
 interface ISettings {
     level: Level;
@@ -23,7 +25,8 @@ interface ISettings {
     team: "report" | "same";
     trustedRoles: string[];
     quarantine: { roleId: string | null; channelId: string | null; stripRoles: boolean; cleanup: number; dm: boolean; release: "team" | "team-24h" };
-    bait: { channel: boolean; channelId: string | null; role: boolean; roleId: string | null; messageId: string | null };
+    /** W-0063: design, name, topic und top bestimmen, wie der Köder-Kanal aussieht. */
+    bait: { channel: boolean; channelId: string | null; role: boolean; roleId: string | null; messageId: string | null; design: BaitDesign; name: string; topic: string; top: boolean };
     raid: { on: boolean; joins: number; invites: boolean; slowmode: boolean; hold: boolean; ping: boolean; verification: boolean; endMinutes: number };
     nuke: { on: boolean; limits: Record<string, number>; trustedBots: string[] };
     logChannelId: string | null;
@@ -66,6 +69,8 @@ interface IPayload {
     intent: boolean;
     guards: { id: string; name: string; hint: string; icon: string; points: number }[];
     levels: Record<Level, { report: number; hold: number | null }>;
+    /** W-0063: die Namen für den Köder-Kanal. */
+    baitDesigns: { id: BaitDesign; name: string | null; label: string; hint: string }[];
     nukeActions: { id: string; label: string; icon: string; limit: number }[];
     limits: { nuke: [number, number]; joins: [number, number]; end: [number, number]; cleanup: number[]; trusted: number };
     targets: ILogTargets;
@@ -623,7 +628,7 @@ export function renderAntiVillain(guildId: string): void {
             "div",
             "avbait__chan",
             el("h4", "", icon("#i-hash"), name ?? "nicht-schreiben"),
-            el("p", "", "Ein Kanal ganz oben, den alle sehen. Darin steht: „Schreib hier nichts. Wer hier schreibt, wird als Bot behandelt.“ Gekaperte Accounts posten ihren Link in jeden Kanal, auch hier."),
+            el("p", "", "Ein Kanal, den alle sehen. Darin hängt ein Warnbild „STOPP – Hier nichts schreiben“ mit Zähler, darunter Datenschutz, Infos und Support. Gekaperte Accounts posten ihren Link in jeden Kanal, auch hier."),
             el("div", "avcatch", el("span", "", el("b", "", String(data!.lage.bait.caught)), "gefangen, 30 Tage"))
         );
 
@@ -644,7 +649,63 @@ export function renderAntiVillain(guildId: string): void {
 
         if (needsSetup()) rows.append(row("Einrichten", "Legt an, was fehlt: Kanal, Rolle und die Quarantäne", setupButton()));
 
-        return [card("Köder", "Fallen, in die nur Bots und gekaperte Accounts tappen. Ein Mensch liest den Hinweis und lässt es.", el("div", "avbait", box, rows))];
+        // W-0063: Welcher Kanal, wie er heißt, welches Thema, ganz oben.
+        const custom = el("input", "text");
+
+        custom.type = "text";
+        custom.maxLength = 100;
+        custom.value = bait.name;
+        custom.placeholder = "eigener Name, etwa bot-falle";
+        custom.hidden = bait.design !== "custom";
+        custom.setAttribute("aria-label", "Eigener Kanalname");
+        custom.addEventListener("input", () => {
+            bait.name = custom.value;
+            touch();
+        });
+
+        const topic = el("input", "text");
+
+        topic.type = "text";
+        topic.maxLength = 1024;
+        topic.value = bait.topic;
+        topic.setAttribute("aria-label", "Kanalthema");
+        topic.addEventListener("input", () => {
+            bait.topic = topic.value;
+            touch();
+        });
+
+        const designs = radioTiles(
+            data!.baitDesigns.map((entry): [BaitDesign, string, string, string] => [entry.id, entry.label, entry.hint, ""]),
+            bait.design,
+            "Kanal-Design",
+            (value) => {
+                bait.design = value;
+                custom.hidden = value !== "custom";
+                touch();
+            }
+        );
+        const look = el(
+            "div",
+            "avbait__look",
+            row(
+                "Kanal",
+                "Einen vorhandenen nehmen, sonst legt „Einrichten“ einen an",
+                select([["", "neu anlegen lassen"], ...data!.guild.channels.map((channel): [string, string] => [channel.id, `# ${channel.name}`])], bait.channelId ?? "", (value) => {
+                    bait.channelId = value || null;
+                    touch();
+                }, "Köder-Kanal wählen")
+            ),
+            el("span", "apopen__label", "Kanal-Design"),
+            designs,
+            custom,
+            row("Kanalthema", "Steht oben im Kanal", topic),
+            row("Ganz oben", "Der Kanal steht oben in seiner Kategorie", switchLabel(bait.top, "Ganz oben", (on) => {
+                bait.top = on;
+                touch();
+            }))
+        );
+
+        return [card("Köder", "Fallen, in die nur Bots und gekaperte Accounts tappen. Ein Mensch liest den Hinweis und lässt es.", el("div", "avbait", box, rows), look)];
     }
 
     /* ------------------------------------------------------------
@@ -859,7 +920,7 @@ export function renderAntiVillain(guildId: string): void {
     save.addEventListener("click", async () => {
         save.disabled = true;
 
-        const answer = await call<{ settings: ISettings }>("", { action: "save", settings: draft });
+        const answer = await call<{ settings: ISettings; problems?: string[] }>("", { action: "save", settings: draft });
 
         if (!answer) {
             save.disabled = false;
@@ -870,7 +931,10 @@ export function renderAntiVillain(guildId: string): void {
         data!.settings = answer.settings;
         draft = structuredClone(answer.settings);
         dirty = false;
-        toast("info", "Gespeichert", needsSetup() ? "Was noch fehlt, legt „Einrichten“ an." : "Gilt ab sofort.");
+
+        // W-0063: Was am Köder-Kanal nicht ging (Rechte), steht im Hinweis.
+        if (answer.problems?.length) toast("info", "Gespeichert, aber …", answer.problems.join(" "));
+        else toast("info", "Gespeichert", needsSetup() ? "Was noch fehlt, legt „Einrichten“ an." : "Gilt ab sofort.");
         paint();
     });
 

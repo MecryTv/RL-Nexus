@@ -8,7 +8,7 @@ import { SessionOf } from "../utils/dashboard";
 /** Aktionen an einzelnen Fällen - mit Staff-Freigabe nur mit dem extra Ja (W-0011). */
 const CASE_ACTIONS = new Set(["release", "trust", "ban", "deleted"]);
 import { DASHBOARD_PATH } from "../constants/Dashboard";
-import { ANTI_VILLAIN_MODULE, CLEANUP_OPTIONS, GUARDS, LEVELS, MAX_TRUSTED, NUKE_ACTIONS, NUKE_LIMIT_RANGE, PROTOCOL_KEEP_MS, RAID_END_RANGE, RAID_JOINS_RANGE } from "../constants/AntiVillain";
+import { ANTI_VILLAIN_MODULE, BAIT_DESIGNS, CLEANUP_OPTIONS, GUARDS, LEVELS, MAX_TRUSTED, NUKE_ACTIONS, NUKE_LIMIT_RANGE, PROTOCOL_KEEP_MS, RAID_END_RANGE, RAID_JOINS_RANGE } from "../constants/AntiVillain";
 import { IAvCase } from "../interfaces/services/antivillain/IAntiVillain";
 import { AntiVillainError } from "../services/AntiVillainService";
 import { QuarantineError } from "../services/antivillain/Quarantine";
@@ -153,6 +153,7 @@ export default class DashboardApiAntiVillain extends Route {
             intent: this.client.config.GUILD_MEMBER_INTENT === true,
             guards: GUARDS,
             levels: LEVELS,
+            baitDesigns: BAIT_DESIGNS,
             nukeActions: NUKE_ACTIONS,
             limits: { nuke: NUKE_LIMIT_RANGE, joins: RAID_JOINS_RANGE, end: RAID_END_RANGE, cleanup: CLEANUP_OPTIONS, trusted: MAX_TRUSTED },
             targets: await LogTargets(guild, [settings.logChannelId]),
@@ -172,11 +173,16 @@ export default class DashboardApiAntiVillain extends Route {
 
         switch (body.action) {
             case "save": {
-                const settings = await service.Save(guild, body.settings);
+                const before = (await service.Settings(guild.id)).bait;
+
+                await service.Save(guild, body.settings);
+
+                // W-0063: Name, Thema, Platz und Warnung des Köder-Kanals nachziehen.
+                const problems = await service.ApplyBait(guild, before);
 
                 logger.user(`🛡️  Anti-Villain-Einstellungen auf ${guild.id} gespeichert (von ${actor.id})`);
 
-                return { ok: true, settings };
+                return { ok: true, settings: await service.Settings(guild.id), problems };
             }
 
             case "release":

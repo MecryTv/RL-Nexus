@@ -1,5 +1,7 @@
-import { MessageCreateOptions, MessageFlags, TextDisplayBuilder } from "discord.js";
+import { AttachmentBuilder, MessageCreateOptions, MessageFlags, TextDisplayBuilder } from "discord.js";
 import ComponentV2Builder from "./ComponentV2Builder";
+import { BaitAlt, RenderBait } from "./BaitImage";
+import { SUPPORT_URL } from "../constants/Help";
 import { GUARDS, NUKE_ACTIONS } from "../constants/AntiVillain";
 import { IAvCase, IHit, INukeState, IRaidState } from "../interfaces/services/antivillain/IAntiVillain";
 
@@ -161,15 +163,35 @@ export function ChannelNotice(): MessageCreateOptions {
     return { ...card.toMessage(), allowedMentions: { parse: [] } };
 }
 
-export function BaitCard(caught: number): MessageCreateOptions {
-    const card = new ComponentV2Builder({ accentColor: YELLOW })
-        .title("🚫 Bitte hier nichts schreiben")
-        .text("Dieser Kanal ist eine Falle für Bots und gekaperte Accounts. Die posten ihren Link in jeden Kanal, auch hier.")
-        .text("**Wer hier schreibt, wird festgehalten**, bis das Team nachgesehen hat.")
-        .separator()
-        .subtext(`Anti Villain · Köder · ${caught} gefangen in 30 Tagen`);
+export interface IBaitInput {
+    caught: number;
+    /** Der letzte Fang in Millisekunden, null: noch keiner. */
+    lastAt: number | null;
+    /** Die Stufe hält fest (sonst nur melden). */
+    hold: boolean;
+    /** Die Webseite, etwa https://nexus-emb.de. */
+    siteUrl: string;
+}
 
-    return { ...card.toMessage(), allowedMentions: { parse: [] } };
+export const BAIT_FILE = "koeder.png";
+
+/**
+ * W-0063, Entwurf K2: Die Warnung im Köder-Kanal als Bild. Darunter eine Zeile,
+ * die live zählt, und die Links - im Bild wären sie nicht anklickbar.
+ */
+export async function BaitMessage(input: IBaitInput): Promise<MessageCreateOptions> {
+    const site = input.siteUrl.replace(/\/+$/, "");
+    const file = new AttachmentBuilder(await RenderBait(input.caught, input.hold), { name: BAIT_FILE });
+    const card = new ComponentV2Builder({ accentColor: YELLOW })
+        .image(`attachment://${BAIT_FILE}`, BaitAlt(input.caught, input.hold))
+        .subtext(`${input.lastAt ? `Zuletzt gefangen <t:${Math.floor(input.lastAt / 1000)}:R>` : "Noch niemand gefangen"} · Was dabei gespeichert wird, steht im Datenschutz`)
+        .buttons(
+            { url: `${site}/datenschutz`, label: "Datenschutz", emoji: "🔒" },
+            { url: `${site}/module/anti-villain`, label: "Was ist Anti Villain?", emoji: "❓" },
+            { url: SUPPORT_URL, label: "Support", emoji: "💬" }
+        );
+
+    return { ...card.toMessage(), files: [file], allowedMentions: { parse: [] } };
 }
 
 /* ----------------------------------------------------------

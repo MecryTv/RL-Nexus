@@ -5002,6 +5002,9 @@ details.tkcard > summary .tkcard__title{margin:0}
 /* Köder */
 .avbait{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:16px;align-items:start}
 .avbait__chan{padding:16px;border:1px dashed color-mix(in srgb,var(--warn) 55%,transparent);background:color-mix(in srgb,var(--warn) 6%,transparent)}
+.avbait__look{margin-top:18px;padding-top:14px;border-top:1px solid var(--line)}
+.avbait__look>input.text{margin:0 0 12px;max-width:420px}
+.avbait__look input.text{width:min(420px,100%)}
 .avbait__chan h4{display:flex;gap:8px;align-items:center;margin:0 0 6px;font:700 17px var(--f-display);color:#fff;overflow-wrap:anywhere}
 .avbait__chan h4 svg{width:18px;height:18px;flex:none;color:var(--warn)}
 .avbait__chan p{margin:0 0 10px;font-size:14px;line-height:1.5;color:var(--text-2)}

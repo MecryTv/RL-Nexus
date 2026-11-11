@@ -17,9 +17,11 @@ import { IAntiVillainSettings, IAvCase, IDebris, INukeState, IRaidState } from "
 import { IDebrisRow } from "../interfaces/services/serverbackup/IServerBackup";
 import AntiVillainPrune from "../runnables/AntiVillainPrune";
 import TaskTypes from "../enums/TaskTypes";
-import { BaitCard, ChannelNotice, DecidedCard, DeletedView, HoldCard, NukeCard, PersonCard, RaidCard } from "../builder/AntiVillainView";
+import { BaitMessage, ChannelNotice, DecidedCard, DeletedView, HoldCard, NukeCard, PersonCard, RaidCard } from "../builder/AntiVillainView";
+import { BaitCount, RenderBait } from "../builder/BaitImage";
+import { SUPPORT_URL } from "../constants/Help";
 import { ModerationError } from "../services/ModerationService";
-import { DefaultAntiVillainSettings, GUARDS, LEVELS } from "../constants/AntiVillain";
+import { BaitChannelName, DefaultAntiVillainSettings, GUARDS, LEVELS } from "../constants/AntiVillain";
 import { IsModule } from "../constants/Modules";
 import { ScoreBook, Verdict } from "../services/antivillain/Score";
 import { EveryoneAttempt, Fingerprints, HopTracker, IsSleeper, NameSimilarity, NormalizeName, ScamLinks } from "../services/antivillain/Guards";
@@ -519,7 +521,7 @@ function Json(message: { components?: readonly unknown[] }): string {
     return JSON.stringify((message.components ?? []).map((part) => (part as { toJSON?: () => unknown }).toJSON?.() ?? part));
 }
 
-function checkCards(): void {
+async function checkCards(): Promise<void> {
     console.log("\n  — Karten —");
 
     const now = Date.now();
@@ -573,7 +575,29 @@ function checkCards(): void {
     check("Für die Person: nur sie wird gepingt", JSON.stringify(person.allowedMentions?.users) === JSON.stringify([USER]));
 
     check("Im Kanal: ohne Namen", !Json(ChannelNotice()).includes(USER) && Json(ChannelNotice()).includes("Betrugslink"));
-    check("Köder-Kanal: Warnung mit Zähler", Json(BaitCard(7)).includes("Bitte hier nichts schreiben") && Json(BaitCard(7)).includes("7 gefangen"));
+    // W-0063: Die Warnung ist ein Bild (Entwurf K2), Text und Zähler stehen im Alt-Text, die Links darunter.
+    const baitHold = await BaitMessage({ caught: 7, lastAt: now - 60_000, hold: true, siteUrl: "https://nexus-emb.de/" });
+    const baitJson = Json(baitHold);
+    check("Köder-Kanal: Bild mit Zähler und Alt-Text (W-0063)", baitJson.includes("attachment://koeder.png") && baitJson.includes("7 gefangen") && baitJson.includes("festgehalten"), baitJson.slice(0, 400));
+    check("  Knöpfe Datenschutz, Modulseite und Support", baitJson.includes("https://nexus-emb.de/datenschutz") && baitJson.includes("https://nexus-emb.de/module/anti-villain") && baitJson.includes(SUPPORT_URL));
+    check("  die Zeile zum letzten Fang zählt live", baitJson.includes(`<t:${Math.floor((now - 60_000) / 1000)}:R>`));
+
+    const baitReport = Json(await BaitMessage({ caught: 0, lastAt: null, hold: false, siteUrl: "https://nexus-emb.de" }));
+
+    check("  Stufe Locker: gemeldet statt festgehalten, noch niemand gefangen", baitReport.includes("dem Team gemeldet") && !baitReport.includes("festgehalten") && baitReport.includes("Noch niemand gefangen"));
+
+    const png = await RenderBait(1234, true);
+
+    check("  das Bild ist ein PNG mit 1000 × 440", png.subarray(1, 4).toString() === "PNG" && png.readUInt32BE(16) === 1000 && png.readUInt32BE(20) === 440);
+    check("  ab 1000 steht 999+", BaitCount(1234) === "999+" && BaitCount(7) === "7");
+    check(
+        "Kanalname nach Design (W-0063)",
+        BaitChannelName({ design: "bar", name: "" }) === "🚫┃nicht-schreiben" &&
+            BaitChannelName({ design: "keep", name: "x" }) === null &&
+            BaitChannelName({ design: "custom", name: "  Hier Nicht  Posten " }) === "hier-nicht-posten" &&
+            BaitChannelName({ design: "custom", name: "  " }) === null
+    );
+    check("  ab Werk wie bisher, ganz oben", DefaultAntiVillainSettings().bait.design === "plain" && DefaultAntiVillainSettings().bait.top === true);
 
     const raidState: IRaidState = { incidentId: 3, guildId: GUILD, startedAt: now - 120_000, lastJoin: now, members: Array.from({ length: 23 }, (_, index) => `u${index}`), done: [], invitesUntil: now + 900_000, restore: { slowmode: {}, verification: null } };
     const raid = RaidCard({ state: raidState, ping: ROLE, actions: ["Einladungen pausiert", "Slowmode 30 s in 6 Kanälen", "23 Neue festgehalten"], notable: "19 der 23 Accounts sind jünger als einen Tag", ended: false });
@@ -593,7 +617,7 @@ function checkCards(): void {
     const deletedView = Json(DeletedView({ ...base, deleted: Array.from({ length: 20 }, (_, index) => ({ channelId: C1, at: now, text: `Nachricht ${index} ${"x".repeat(480)}`, files: ["bild.png"] })) }));
     check("Gelöschte ansehen: Kanal, Text und Datei", deletedView.includes(`<#${C1}>`) && deletedView.includes("Nachricht 0") && deletedView.includes("bild.png"));
 
-    const all = [hold, HoldCard({ case: { ...base, id: 0 }, userName: "n", avatarUrl: null, ping: null, dashboardUrl: "https://dash.example/x", partial: [], incomplete: false, mode: "report", quarantineChannelId: null }), person, ChannelNotice(), BaitCard(7), raid, nuke];
+    const all = [hold, HoldCard({ case: { ...base, id: 0 }, userName: "n", avatarUrl: null, ping: null, dashboardUrl: "https://dash.example/x", partial: [], incomplete: false, mode: "report", quarantineChannelId: null }), person, ChannelNotice(), baitHold, raid, nuke];
     const worst = Math.max(...all.map((message) => CountParts((message.components ?? []).map((part) => (part as { toJSON: () => unknown }).toJSON()))));
     check("Jede Karte höchstens 40 Bausteine", worst <= 40, String(worst));
 }
@@ -755,7 +779,7 @@ async function checkBait(): Promise<void> {
         const world = FlowWorld();
         const events: string[] = [];
 
-        world.settings.bait = { channel: true, channelId: C2, role: true, roleId: BAITROLE, messageId: "pin1" };
+        world.settings.bait = { ...DefaultAntiVillainSettings().bait, channel: true, channelId: C2, role: true, roleId: BAITROLE, messageId: "pin1" };
         (world.client.avEvents as unknown as Record<string, unknown>).Add = async (_guildId: string, kind: string) => void events.push(kind);
         (world.client.avEvents as unknown as Record<string, unknown>).CountSince = async (_guildId: string, kind: string) => events.filter((entry) => entry === kind).length + 7;
 
@@ -1619,7 +1643,7 @@ async function main(): Promise<void> {
     await checkHold();
     await checkRelease();
     await checkSetup();
-    checkCards();
+    await checkCards();
     await checkFlow();
     await checkBait();
     await checkReport();

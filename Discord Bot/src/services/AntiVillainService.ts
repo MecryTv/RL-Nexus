@@ -6,6 +6,7 @@ import {
     GuildMember,
     InteractionReplyOptions,
     Message,
+    MessageEditOptions,
     MessageFlags,
     PartialGuildMember,
     PermissionFlagsBits,
@@ -15,7 +16,7 @@ import {
 import { LRUCache } from "lru-cache";
 import BotClient from "../client/BotClient";
 import ComponentV2Builder from "../builder/ComponentV2Builder";
-import { BaitCard, ChannelNotice, DeletedView, HoldCard } from "../builder/AntiVillainView";
+import { BaitMessage, ChannelNotice, DeletedView, HoldCard } from "../builder/AntiVillainView";
 import { DASHBOARD_PATH } from "../constants/Dashboard";
 import MessageIndex from "./antivillain/MessageIndex";
 import Quarantine, { QuarantineError } from "./antivillain/Quarantine";
@@ -53,6 +54,11 @@ import {
     NUKE_LIMIT_RANGE,
     RAID_END_RANGE,
     RAID_JOINS_RANGE,
+    BAIT_DESIGN_IDS,
+    BAIT_NAME_MAX,
+    BAIT_TOPIC_MAX,
+    BaitChannelName,
+    LEVELS,
 } from "../constants/AntiVillain";
 import { CleanupMinutes, GuardId, IAntiVillainSettings, IAvCase, IHit, SafetyResult, ShieldLevel } from "../interfaces/services/antivillain/IAntiVillain";
 import { IsLogTarget, WarmLogTarget } from "../utils/logtarget";
@@ -481,6 +487,15 @@ export default class AntiVillainService {
         await this.UpdateBait(guild);
     }
 
+    /** W-0063: Die Warnung im Köder-Kanal - Bild mit Zähler, letzter Fang, Text je nach Stufe. */
+    private async BaitPayload(guild: Guild, settings: IAntiVillainSettings) {
+        const since = Date.now() - PROTOCOL_KEEP_MS;
+        const caught = await this.client.avEvents.CountSince(guild.id, "bait", since).catch(() => 0);
+        const last = await this.client.avEvents.LastAt(guild.id, "bait").catch(() => null);
+
+        return BaitMessage({ caught, lastAt: last !== null && last >= since ? last : null, hold: LEVELS[settings.level].hold !== null, siteUrl: this.client.config.SITE_PUBLIC_URL });
+    }
+
     /** Die Warnung im Köder-Kanal neu senden und anpinnen, wenn sie fehlt (nach einem Laden des Discord-Servers, Plan 32). */
     async SendBait(guild: Guild): Promise<void> {
         const settings = await this.Settings(guild.id);
@@ -488,15 +503,15 @@ export default class AntiVillainService {
 
         if (!channel?.isTextBased() || !("send" in channel)) throw new Error("Köder-Kanal gibt es nicht mehr");
 
-        const caught = await this.client.avEvents.CountSince(guild.id, "bait", Date.now() - PROTOCOL_KEEP_MS).catch(() => 0);
-        const sent = await channel.send(BaitCard(caught));
+        const sent = await channel.send(await this.BaitPayload(guild, settings));
 
         await sent.pin().catch(() => undefined);
         await this.client.moduleSettings.Save(guild.id, ANTI_VILLAIN_MODULE, { ...settings, bait: { ...settings.bait, messageId: sent.id } });
     }
 
     async UpdateBait(guild: Guild): Promise<void> {
-        const { bait } = await this.Settings(guild.id);
+        const settings = await this.Settings(guild.id);
+        const { bait } = settings;
 
         if (!bait.channelId || !bait.messageId) return;
 
@@ -504,11 +519,60 @@ export default class AntiVillainService {
 
         if (!channel?.isTextBased()) return;
 
-        const caught = await this.client.avEvents.CountSince(guild.id, "bait", Date.now() - PROTOCOL_KEEP_MS).catch(() => 0);
         const message = await channel.messages.fetch(bait.messageId).catch(() => null);
-        const card = BaitCard(caught);
 
-        await message?.edit({ components: card.components, allowedMentions: card.allowedMentions }).catch(() => undefined);
+        // W-0063: neues Bild statt nur neuer Text - die alte Datei fliegt raus.
+        await message?.edit({ ...(await this.BaitPayload(guild, settings)), attachments: [] } as MessageEditOptions).catch(() => undefined);
+    }
+
+    /**
+     * W-0063: Was im Dashboard zum Köder-Kanal steht, auf den Kanal anwenden:
+     * Name nach Design, Thema, ganz oben. Ist der Kanal ein anderer geworden,
+     * geht die alte Warnung weg und eine neue in den neuen Kanal. Geändert wird
+     * nur, was abweicht - Discord lässt den Namen nur zweimal in 10 Minuten ändern.
+     */
+    async ApplyBait(guild: Guild, before: IAntiVillainSettings["bait"]): Promise<string[]> {
+        const settings = await this.Settings(guild.id);
+        const { bait } = settings;
+        const problems: string[] = [];
+        const moved = before.channelId !== bait.channelId;
+
+        if (moved && before.channelId && before.messageId) {
+            const old = guild.channels.cache.get(before.channelId);
+
+            if (old?.isTextBased()) await old.messages.delete(before.messageId).catch(() => undefined);
+            if (!bait.channelId) await this.client.moduleSettings.Save(guild.id, ANTI_VILLAIN_MODULE, { ...settings, bait: { ...bait, messageId: null } });
+        }
+
+        if (!bait.channel || !bait.channelId) return problems;
+
+        const channel = guild.channels.cache.get(bait.channelId);
+
+        if (channel?.type !== ChannelType.GuildText) return problems;
+
+        const name = BaitChannelName(bait);
+        const patch: { name?: string; topic?: string | null; position?: number } = {};
+
+        if (name && channel.name !== name) patch.name = name;
+        if ((channel.topic ?? "") !== bait.topic) patch.topic = bait.topic || null;
+        if (bait.top && channel.position !== 0) patch.position = 0;
+
+        if (Object.keys(patch).length > 0) {
+            const done = await channel.edit({ ...patch, reason: "Anti Villain: Köder" }).then(
+                () => true,
+                () => false
+            );
+
+            if (!done) problems.push("Name, Thema oder Platz des Köder-Kanals konnte ich nicht ändern. Mir fehlt dort „Kanäle verwalten“.");
+        }
+
+        if (moved || !bait.messageId) {
+            await this.SendBait(guild).catch(() => problems.push("Die Warnung kam nicht in den Köder-Kanal. Mir fehlen dort „Nachrichten senden“, „Dateien anhängen“ oder „Nachrichten verwalten“."));
+        } else {
+            await this.UpdateBait(guild);
+        }
+
+        return problems;
     }
 
     /** Köder-Kanal ganz oben mit angepinnter Warnung, auf Wunsch die Köder-Rolle. */
@@ -518,12 +582,21 @@ export default class AntiVillainService {
         const problems: string[] = [];
 
         if (bait.channel && !(bait.channelId && guild.channels.cache.has(bait.channelId))) {
-            const made = await guild.channels.create({ name: "nicht-schreiben", type: ChannelType.GuildText, position: 0, reason: "Anti Villain: Köder" }).catch(() => null);
+            const made = await guild.channels
+                .create({
+                    // W-0063: Name nach Design; bei „Name lassen“ oder leerem eigenem Namen wie bisher.
+                    name: BaitChannelName(bait) ?? "nicht-schreiben",
+                    type: ChannelType.GuildText,
+                    topic: bait.topic || undefined,
+                    position: bait.top ? 0 : undefined,
+                    reason: "Anti Villain: Köder",
+                })
+                .catch(() => null);
 
             if (made) {
                 bait.channelId = made.id;
 
-                const sent = await made.send(BaitCard(0)).catch(() => null);
+                const sent = await made.send(await this.BaitPayload(guild, settings)).catch(() => null);
 
                 bait.messageId = sent?.id ?? null;
                 await sent?.pin().catch(() => undefined);
@@ -748,11 +821,21 @@ export default class AntiVillainService {
             },
             bait: {
                 channel: Flag(bait.channel, previous.bait.channel),
-                channelId: channel(bait.channelId, previous.bait.channelId),
+                // W-0063: Nur ein Textkanal taugt als Köder.
+                channelId:
+                    bait.channelId === undefined
+                        ? previous.bait.channelId
+                        : typeof bait.channelId === "string" && guild.channels.cache.get(bait.channelId)?.type === ChannelType.GuildText
+                          ? bait.channelId
+                          : null,
                 role: Flag(bait.role, previous.bait.role),
                 roleId: role(bait.roleId, previous.bait.roleId),
                 // Die angepinnte Warnung setzt nur SetupBait, nie das Dashboard.
                 messageId: previous.bait.messageId,
+                design: OneOf(bait.design, BAIT_DESIGN_IDS, previous.bait.design),
+                name: typeof bait.name === "string" ? bait.name.trim().slice(0, BAIT_NAME_MAX) : previous.bait.name,
+                topic: typeof bait.topic === "string" ? bait.topic.trim().slice(0, BAIT_TOPIC_MAX) : previous.bait.topic,
+                top: Flag(bait.top, previous.bait.top),
             },
             raid: {
                 // Ohne Server Members Intent kommen keine Beitritte an: Einschalten geht dann nicht.

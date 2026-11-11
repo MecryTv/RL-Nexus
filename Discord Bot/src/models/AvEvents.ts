@@ -41,6 +41,13 @@ export default class AvEvents extends Model<IAvEventRow> {
         return Number(row?.total ?? 0);
     }
 
+    /** W-0063: Wann es zuletzt einen Eintrag dieser Art gab, etwa den letzten Fang des Köders. null: keinen in der Frist. */
+    async LastAt(guildId: string, kind: string): Promise<number | null> {
+        const row = await this.db.One<{ last: number | string | null }>(`SELECT MAX(at) AS last FROM \`${this.Table}\` WHERE guild_id = ? AND kind = ?`, [guildId, kind]);
+
+        return row?.last === null || row?.last === undefined ? null : Number(row.last);
+    }
+
     async Prune(before: number): Promise<number> {
         const result = await this.db.Write(`DELETE FROM \`${this.Table}\` WHERE at < ?`, [before]);
 

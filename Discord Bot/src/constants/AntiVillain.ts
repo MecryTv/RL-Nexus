@@ -1,4 +1,4 @@
-import { CleanupMinutes, GuardId, IAntiVillainSettings, NukeAction, ShieldLevel } from "../interfaces/services/antivillain/IAntiVillain";
+import { BaitDesign, CleanupMinutes, GuardId, IAntiVillainSettings, NukeAction, ShieldLevel } from "../interfaces/services/antivillain/IAntiVillain";
 
 /**
  * Anti Villain (Plan 31): der Katalog der Wächter, die Schutzstufen und alle
@@ -114,6 +114,32 @@ export const STAFF_WORDS: readonly string[] = ["admin", "administrator", "mod", 
 export const TEAM_ONLY = "Das entscheidet das Team.";
 export const MODULE_OFF = "Anti Villain ist auf diesem Server aus.";
 
+/** W-0063: Die Namen für den Köder-Kanal, im Dashboard als Kacheln. */
+export const BAIT_DESIGNS: readonly { id: BaitDesign; name: string | null; label: string; hint: string }[] = [
+    { id: "plain", name: "nicht-schreiben", label: "#nicht-schreiben", hint: "wie bisher" },
+    { id: "bar", name: "🚫┃nicht-schreiben", label: "#🚫┃nicht-schreiben", hint: "Emoji und Strich" },
+    { id: "dot", name: "⛔・bot-falle", label: "#⛔・bot-falle", hint: "Emoji und Punkt" },
+    { id: "loud", name: "❌-hier-nichts-posten", label: "#❌-hier-nichts-posten", hint: "deutlich" },
+    { id: "keep", name: null, label: "Name lassen", hint: "für einen vorhandenen Kanal" },
+    { id: "custom", name: null, label: "Eigener Name", hint: "frei, bis 100 Zeichen" },
+];
+export const BAIT_DESIGN_IDS = BAIT_DESIGNS.map((entry) => entry.id);
+export const BAIT_TOPIC = "Falle für Bots und gekaperte Accounts. Bitte hier nichts schreiben.";
+export const BAIT_NAME_MAX = 100;
+export const BAIT_TOPIC_MAX = 1024;
+
+/**
+ * Der Name, den der Köder-Kanal tragen soll; null: nicht anfassen. Eigene
+ * Namen so, wie Discord Textkanäle schreibt (klein, Leerzeichen als „-“), sonst
+ * hielte jeder Vergleich den Namen für geändert.
+ */
+export function BaitChannelName(bait: { design: BaitDesign; name: string }): string | null {
+    if (bait.design === "keep") return null;
+    if (bait.design === "custom") return bait.name.trim().toLowerCase().replace(/\s+/g, "-").slice(0, BAIT_NAME_MAX) || null;
+
+    return BAIT_DESIGNS.find((entry) => entry.id === bait.design)?.name ?? "nicht-schreiben";
+}
+
 export function DefaultAntiVillainSettings(): IAntiVillainSettings {
     return {
         level: "normal",
@@ -121,7 +147,7 @@ export function DefaultAntiVillainSettings(): IAntiVillainSettings {
         team: "report",
         trustedRoles: [],
         quarantine: { roleId: null, channelId: null, stripRoles: true, cleanup: 60, dm: true, release: "team" },
-        bait: { channel: true, channelId: null, role: false, roleId: null, messageId: null },
+        bait: { channel: true, channelId: null, role: false, roleId: null, messageId: null, design: "plain", name: "", topic: BAIT_TOPIC, top: true },
         raid: { on: true, joins: 10, invites: true, slowmode: true, hold: true, ping: true, verification: false, endMinutes: 15 },
         nuke: { on: true, limits: Object.fromEntries(NUKE_ACTIONS.map((action) => [action.id, action.limit])) as Record<NukeAction, number>, trustedBots: [] },
         logChannelId: null,

@@ -12,6 +12,9 @@ export type NukeAction = "channelDelete" | "roleDelete" | "banKick" | "webhook" 
 /** Wie lange die Nachrichten einer festgehaltenen Person zurück aufgeräumt werden, in Minuten. */
 export type CleanupMinutes = 0 | 10 | 60 | 1440;
 
+/** W-0063: Wie der Köder-Kanal heißt. keep: Namen nicht anfassen, custom: der eigene Name. */
+export type BaitDesign = "plain" | "bar" | "dot" | "loud" | "keep" | "custom";
+
 export interface IAntiVillainSettings {
     level: ShieldLevel;
     guards: Record<GuardId, boolean>;
@@ -27,8 +30,21 @@ export interface IAntiVillainSettings {
         dm: boolean;
         release: "team" | "team-24h";
     };
-    /** messageId: die angepinnte Warnung im Köder-Kanal, für den Zähler. */
-    bait: { channel: boolean; channelId: string | null; role: boolean; roleId: string | null; messageId: string | null };
+    /**
+     * messageId: die angepinnte Warnung im Köder-Kanal, für den Zähler.
+     * W-0063: design und name bestimmen den Kanalnamen, topic das Thema, top: ganz oben.
+     */
+    bait: {
+        channel: boolean;
+        channelId: string | null;
+        role: boolean;
+        roleId: string | null;
+        messageId: string | null;
+        design: BaitDesign;
+        name: string;
+        topic: string;
+        top: boolean;
+    };
     raid: { on: boolean; joins: number; invites: boolean; slowmode: boolean; hold: boolean; ping: boolean; verification: boolean; endMinutes: number };
     nuke: { on: boolean; limits: Record<NukeAction, number>; trustedBots: string[] };
     logChannelId: string | null;
