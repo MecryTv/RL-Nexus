@@ -168,7 +168,14 @@ async function checkCatalog(client: BotClient): Promise<void> {
         HELP_AREAS.map((area) => area.id).join()
     );
     check("  ein neuer Bereich hat eine Seite", HelpAreaPage("turniere", real, CONTEXT, 0).blocks.length > 0);
+    // Review W-0085: Ein Bereich „general“ aus dem Admin gäbe „Allgemein“ zweimal; /rank folgt RL Tracking.
+    const rank = real.find((entry) => entry.name === "rank");
+
+    ApplyHelpCatalog({ categories: [{ id: "general", name: "General" }, { id: "community", name: "Community" }], modules: [{ id: "rl-tracking", category: "community" }] });
+    check("  ein Bereich „general“ aus dem Admin: Allgemein nur einmal", HELP_AREAS.filter((area) => area.id === "general").length === 1, HELP_AREAS.map((area) => area.id).join());
+    check("  /rank folgt RL Tracking aus dem Admin", rank !== undefined && AreaOf(rank) === "community");
     ApplyHelpCatalog(null);
+    check("  /rank ohne Katalog unter Immer dabei", rank !== undefined && AreaOf(rank) === "always");
     check("  ohne Katalog wieder der Stand aus dem Code", HELP_AREAS[0].id === "always" && giveaway !== undefined && AreaOf(giveaway) !== "turniere");
     const pages: [string, IHelpPage][] = [];
 

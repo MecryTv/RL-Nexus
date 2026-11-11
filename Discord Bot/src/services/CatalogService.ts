@@ -1,6 +1,7 @@
 import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { ApplyHelpCatalog } from "../constants/Help";
+import logger from "../utils/logger";
 
 /**
  * W-0085: Bereiche und Module, wie sie im Admin Dashboard stehen. Dieselben
@@ -67,6 +68,8 @@ export function Catalog(categoriesFile: unknown, modulesFile: unknown): ICatalog
 export default class CatalogService {
     private current: ICatalog | null = null;
     private stamp = "";
+    /** Für welchen Stand schon gewarnt wurde: einmal je Stand, nicht alle 30 Sekunden. */
+    private warned = "";
     private checkedAt = 0;
     private running: Promise<ICatalog | null> | null = null;
 
@@ -99,11 +102,29 @@ export default class CatalogService {
 
         if (stamp === this.stamp) return this.current;
 
-        const [categories, modules] = await Promise.all(picked.map((entry) => (entry ? readFile(entry.file, "utf8").then(JSON.parse).catch(() => null) : null)));
+        const failed: string[] = [];
+        const [categories, modules] = await Promise.all(
+            picked.map((entry) =>
+                entry
+                    ? readFile(entry.file, "utf8")
+                          .then(JSON.parse)
+                          .catch((error: unknown) => void failed.push(`${entry.file}: ${error instanceof Error ? error.message : String(error)}`))
+                    : null
+            )
+        );
 
-        this.stamp = stamp;
         this.current = Catalog(categories, modules);
         ApplyHelpCatalog(this.current);
+
+        if (failed.length) {
+            // Stand nicht merken: nach einer Reparatur (Rechte, Datei) liest der nächste Durchlauf neu, ohne dass sich die mtime ändern muss.
+            if (this.warned !== stamp) logger.warn(`📚 Katalog aus dem Admin Dashboard nicht lesbar, es gilt der Stand aus dem Code: ${failed.join(" | ")}`);
+            this.warned = stamp;
+            this.stamp = "";
+        } else {
+            this.stamp = stamp;
+            this.warned = "";
+        }
 
         return this.current;
     }

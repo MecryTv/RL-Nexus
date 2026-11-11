@@ -131,7 +131,9 @@ export function AreaOf(entry: IHelpEntry): HelpAreaId {
     const own = entry.group ?? entry.commands[0].text;
 
     // W-0085: Steht das Modul im Admin Dashboard in einem anderen Bereich, gilt der.
-    return (own.module ? MODULE_AREA.get(own.module) : undefined) ?? own.area;
+    const id = own.catalog ?? own.module;
+
+    return (id ? MODULE_AREA.get(id) : undefined) ?? own.area;
 }
 
 /* ----------------------------------------------------------

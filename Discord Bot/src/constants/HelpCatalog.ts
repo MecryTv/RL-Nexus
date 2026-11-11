@@ -495,13 +495,15 @@ export const HELP_CATALOG: HelpCatalog = {
     /* ---------- Rocket League ---------- */
     rank: {
         emoji: "🏅",
-        area: "rocket-league",
+        // W-0085: RL Tracking steht im Admin Dashboard unter „Immer dabei“, ohne eigene Seite im Dashboard.
+        area: "always",
         module: null,
+        catalog: "rl-tracking",
         what: "Deine Rocket-League-Ränge als Karte. Dafür verbindest du einmal dein Epic-Konto.",
         subs: {
             link: {
                 emoji: "🔗",
-                area: "rocket-league",
+                area: "always",
                 module: null,
                 who: "alle",
                 whoText: "Alle Mitglieder",
@@ -513,7 +515,7 @@ export const HELP_CATALOG: HelpCatalog = {
             },
             me: {
                 emoji: "🏅",
-                area: "rocket-league",
+                area: "always",
                 module: null,
                 who: "alle",
                 whoText: "Alle Mitglieder",
@@ -525,7 +527,7 @@ export const HELP_CATALOG: HelpCatalog = {
             },
             search: {
                 emoji: "🔎",
-                area: "rocket-league",
+                area: "always",
                 module: null,
                 who: "alle",
                 whoText: "Alle Mitglieder",
@@ -537,7 +539,7 @@ export const HELP_CATALOG: HelpCatalog = {
             },
             unlink: {
                 emoji: "✂️",
-                area: "rocket-league",
+                area: "always",
                 module: null,
                 who: "alle",
                 whoText: "Alle Mitglieder",

@@ -14,6 +14,9 @@ export const SUPPORT_GUILD_ID = "1547258700480253982";
 /** Ein Bereich der Leiste. W-0085: Neue legt das Admin Dashboard an, deshalb ein freier Text. */
 export type HelpAreaId = string;
 
+/** Die Bereiche aus dem Code. Hilfetexte nennen nur diese, ein Tippfehler fällt so beim Bauen auf. */
+export type BuiltInAreaId = "always" | "rocket-league" | "community" | "support" | "moderation" | "content" | "general";
+
 /** Wie in der Leiste des Dashboards, dazu „Allgemein“ für Befehle ohne Modul. */
 export const HELP_AREAS: { id: HelpAreaId; name: string; emoji: string }[] = [
     { id: "always", name: "Immer dabei", emoji: "⭐" },
@@ -41,7 +44,10 @@ export const MODULE_AREA = new Map<string, HelpAreaId>();
 export function ApplyHelpCatalog(catalog: { categories: { id: string; name: string }[]; modules: { id: string; category: string }[] } | null): void {
     const general = BUILT_IN_AREAS.find((area) => area.id === "general")!;
     const own = BUILT_IN_AREAS.filter((area) => area.id !== "general");
-    const areas = catalog ? catalog.categories.map((entry) => ({ id: entry.id, name: entry.name, emoji: own.find((area) => area.id === entry.id)?.emoji ?? "📦" })) : own.map((area) => ({ ...area }));
+    // „general“ ist „Allgemein“ und steht immer zuletzt. Ein gleichnamiger Bereich aus dem Admin gäbe die ID zweimal, Discord lehnte das Menü ab.
+    const areas = catalog
+        ? catalog.categories.filter((entry) => entry.id !== general.id).map((entry) => ({ id: entry.id, name: entry.name, emoji: own.find((area) => area.id === entry.id)?.emoji ?? "📦" }))
+        : own.map((area) => ({ ...area }));
 
     for (const area of own) if (!areas.some((entry) => entry.id === area.id)) areas.push({ ...area });
 
@@ -59,9 +65,11 @@ export const WHO_LABELS: Record<HelpWho, string> = { alle: "alle", team: "Team",
 /** Ein Befehl oder Unterbefehl, ganz erklärt (Befehlsseite A). */
 export interface IHelpText {
     emoji: string;
-    area: HelpAreaId;
+    area: BuiltInAreaId;
     /** Abschnitt im Dashboard (/guild/<id>/<module>), null ohne eigene Seite. */
     module: string | null;
+    /** W-0085: Modul im Admin Dashboard, wenn es keine Seite im Dashboard hat (RL Tracking). Bestimmt nur den Bereich. */
+    catalog?: string;
     who: HelpWho;
     /** Der Satz, welches Recht es braucht, etwa „Team mit „Mitglieder moderieren““. */
     whoText: string;
@@ -80,8 +88,10 @@ export interface IHelpText {
 /** Ein Befehl mit Unterbefehlen (Gruppe K). Die Reihenfolge in subs ist die der Kapitel. */
 export interface IHelpGroupText {
     emoji: string;
-    area: HelpAreaId;
+    area: BuiltInAreaId;
     module: string | null;
+    /** W-0085: wie IHelpText.catalog. */
+    catalog?: string;
     what: string;
     tip?: string;
     subs: Record<string, IHelpText>;

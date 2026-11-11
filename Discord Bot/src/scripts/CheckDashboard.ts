@@ -12,7 +12,7 @@ process.env.DEV_CLIENT_SECRET ||= "check-secret";
 
 import path from "path";
 import { existsSync } from "node:fs";
-import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, rm, stat, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import BotClient from "../client/BotClient";
 import { SNOWFLAKE } from "../constants/Discord";
@@ -1484,6 +1484,23 @@ async function checkCatalog(): Promise<void> {
         check("Gespeicherte Datei vor dem Standard, je Datei", both?.modules[0].name === "Aus dem Admin" && both.categories.length === 2, JSON.stringify(both));
         check("Ohne gespeicherte Datei: Standard der Webseite", onlyDefault?.modules[0].name === "Aus dem Standard");
         check("Ohne Ordner: null", (await new CatalogService([null, path.join(live, "fehlt")]).Fresh()) === null);
+
+        // Review W-0085: kaputte Datei - Code-Stand, und nach der Reparatur liest der nächste Durchlauf neu, auch bei gleicher mtime.
+        const broken = path.join(live, "modules.json");
+        const good = await readFile(broken, "utf8");
+        const { mtime } = await stat(broken);
+
+        await writeFile(broken, "{ kaputt");
+        await utimes(broken, mtime, mtime);
+
+        const repaired = new CatalogService([live, fallback]);
+        const whileBroken = await repaired.Fresh();
+
+        await writeFile(broken, good);
+        await utimes(broken, mtime, mtime);
+        (repaired as unknown as { checkedAt: number }).checkedAt = 0;
+
+        check("Kaputte Datei: Code-Stand, nach der Reparatur wieder der Katalog", whileBroken === null && (await repaired.Fresh())?.modules[0].name === "Aus dem Admin");
     } finally {
         await rm(live, { recursive: true, force: true });
         await rm(fallback, { recursive: true, force: true });
