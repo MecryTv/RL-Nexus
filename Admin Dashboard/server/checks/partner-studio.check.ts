@@ -3,7 +3,7 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { checkEntryInput, SECTIONS_FOR, type IEntry, type IEntryInput, type ISection } from "../../shared/partners.ts";
-import { addSection, inputOf, newEntry, roleNotice, sectionAction, switchKind, templateSections } from "../../src/partners/draft.ts";
+import { addSection, adoptServerContact, inputOf, newEntry, roleNotice, sectionAction, switchKind, templateSections } from "../../src/partners/draft.ts";
 import { partnerMessage, type IPartnerContext } from "../../src/partners/preview.ts";
 import { check, section } from "./harness.ts";
 
@@ -121,6 +121,21 @@ export async function checkPartnerStudio(): Promise<void> {
 
         assert.deepEqual(again.sections.find((item) => item.type === "offer"), sponsor.sections[1]);
         assert.equal(again.tier, "main");
+    });
+
+    await check("Entwurf: hat der Server den Ansprechpartner ausgetragen, übernimmt ein alter Entwurf das (Review 11.11.)", () => {
+        const draft: IEntryInput = { ...newEntry("partner", "Apex", { partnerType: "organisation", contactId: "100000000000000001", access: "free" }), guildId: "300000000000000001", shortText: "Geändert." };
+        const fresh = { ...draft, contactId: null, access: null, guildId: null } as unknown as Parameters<typeof adoptServerContact>[2];
+        const adopted = adoptServerContact(draft, "100000000000000001", fresh);
+
+        assert.equal(adopted.contactId, null);
+        assert.equal(adopted.access, null);
+        assert.equal(adopted.guildId, null);
+        assert.equal(adopted.shortText, "Geändert.");
+        // Hat jemand im Entwurf schon einen anderen Ansprechpartner eingetragen, bleibt der.
+        assert.equal(adoptServerContact({ ...draft, contactId: "100000000000000002" }, "100000000000000001", fresh).contactId, "100000000000000002");
+        // Hat der Server nichts ausgetragen, bleibt der Entwurf derselbe.
+        assert.equal(adoptServerContact(draft, "100000000000000001", { ...fresh, contactId: "100000000000000001" }), draft);
     });
 
     await check("Entwurf: Vorlagen passen zur Art", () => {

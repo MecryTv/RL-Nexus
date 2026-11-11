@@ -11,7 +11,7 @@ import { Failure, Loading } from "../components/Status";
 import { UnsavedGuard } from "../editor/UnsavedGuard";
 import { useStudioDoc } from "../studio/useStudioDoc";
 import { useToast } from "../toast/context";
-import { inputOf, roleNotice, switchKind } from "./draft.ts";
+import { adoptServerContact, inputOf, roleNotice, switchKind } from "./draft.ts";
 import { useContact } from "./hooks";
 import { AccountTab, ProtocolTab } from "./AccountTab";
 import { PartnerStudio } from "./PartnerStudio";
@@ -43,6 +43,9 @@ function PartnerEditor({ entry, entries, posts, siteOrigin, onSaved }: IEditorPr
     const [deleting, setDeleting] = useState(false);
     // Stand je Art beim Verlassen: Zurückwechseln holt ihn wieder (Review).
     const left = useRef<Partial<Record<EntryKind, IEntryInput>>>({});
+    // Welcher Stand des Servers zuletzt übernommen wurde (Review 11.11.): ein neuerer kommt aus der Liste.
+    const handled = useRef(entry.updatedAt);
+    const known = useRef(entry.contactId);
     // Nach dem Löschen erst weg, wenn der Entwurf nicht mehr als ungespeichert gilt.
     const [gone, setGone] = useState(false);
     const contact = useContact(doc.value.contactId);
@@ -62,6 +65,8 @@ function PartnerEditor({ entry, entries, posts, siteOrigin, onSaved }: IEditorPr
             const saved = await api<IEntry>(`/api/partners/${entry.id}`, { method: "PUT", body: checked.input });
 
             doc.markSaved(inputOf(saved), sent);
+            handled.current = saved.updatedAt;
+            known.current = saved.contactId;
             setAcknowledged(null);
             notify("Gespeichert.");
             onSaved();
@@ -114,6 +119,25 @@ function PartnerEditor({ entry, entries, posts, siteOrigin, onSaved }: IEditorPr
         }
     };
 
+    // Neuerer Stand vom Server, etwa Ansprechpartner anderswo ausgetragen: ohne eigene Änderungen
+    // ganz übernehmen, sonst wenigstens das Austragen, damit Speichern ihn nicht zurückholt.
+    useEffect(() => {
+        // Nur ein neuerer Stand: eine verspätete Antwort mit altem Stand ändert nichts.
+        if (saving || Date.parse(entry.updatedAt) <= Date.parse(handled.current)) return;
+
+        handled.current = entry.updatedAt;
+
+        if (!doc.dirty) doc.reset(inputOf(entry));
+        else {
+            const next = adoptServerContact(doc.value, known.current, entry);
+
+            if (next !== doc.value) doc.set(next);
+        }
+
+        if (entry.contactId === null) left.current = {};
+        known.current = entry.contactId;
+    }, [entry, saving, doc]);
+
     useEffect(() => {
         if (gone && !doc.dirty) navigate("/webseite/partner");
     }, [gone, doc.dirty, navigate]);
@@ -157,7 +181,15 @@ function PartnerEditor({ entry, entries, posts, siteOrigin, onSaved }: IEditorPr
                     onKind={changeKind}
                 />
             )}
-            {shown === "konto" && <AccountTab value={doc.value} set={doc.set} entry={entry} dirty={doc.dirty} saving={saving} problem={problem} onSave={requestSave} onChanged={onSaved} onEntry={(updated) => doc.markSaved(inputOf(updated))} />}
+            {shown === "konto" && <AccountTab value={doc.value} set={doc.set} entry={entry} dirty={doc.dirty} saving={saving} problem={problem} onSave={requestSave} onChanged={onSaved} onEntry={(updated) => {
+                        // Rückgängig und der Art-Wechsel dürfen den ausgetragenen Ansprechpartner nicht zurückholen.
+                        doc.reset(inputOf(updated));
+                        left.current = {};
+                        handled.current = updated.updatedAt;
+                        known.current = updated.contactId;
+                    }}
+                />
+            }
             {shown === "protokoll" && <ProtocolTab entry={entry} />}
 
             <ConfirmDialog

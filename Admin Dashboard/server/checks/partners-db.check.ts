@@ -269,6 +269,11 @@ export async function checkPartnerRoutesDb(config: IConfig, shared: IHttp): Prom
                 }
 
                 assert.equal(removed.json().entry.contactId, null);
+
+                // Im Protokoll des Eintrags steht, wer ausgetragen wurde (Review 11.11.).
+                const [logged] = await query<{ detail: string | null }[]>("SELECT detail FROM admin_audit WHERE action = 'partner.contact.drop' AND target = ? ORDER BY id DESC LIMIT 1", [`partner:${first.json().id}`]);
+
+                assert.ok(logged?.detail?.includes(multi), JSON.stringify(logged));
             } finally {
                 await query("DELETE FROM dashboard_groups WHERE user_id IN (?, ?)", [admin, multi]);
                 await query("DELETE FROM partner_roles WHERE user_id IN (?, ?)", [admin, multi]);

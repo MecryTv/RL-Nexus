@@ -39,7 +39,7 @@ function NewsEditor({ post, entries, channel, editorKey, onSaved }: IEditorProps
     const handled = useRef(saved?.updatedAt ?? null);
     const doc = useStudioDoc<IPostInput>(post ? postInput(post) : newPost(kindOf(params.get("art"))));
     const [saving, setSaving] = useState(false);
-    const [announcing, setAnnouncing] = useState<IPostInput | null>(null);
+    const [announcing, setAnnouncing] = useState<{ readonly input: IPostInput; readonly mode: "publish" | "plan" | "announce" } | null>(null);
     const [created, setCreated] = useState<number | null>(null);
     const problem = postProblem(doc.value);
 
@@ -66,15 +66,15 @@ function NewsEditor({ post, entries, channel, editorKey, onSaved }: IEditorProps
         }
     };
 
-    const planned = announcing?.status === "scheduled";
-
     const save = (status?: PostState): void => {
         const next = checkPostInput(status ? { ...doc.value, status, publishAt: null } : doc.value);
 
         if (!("input" in next)) return;
 
         // Eine Ankündigung in Discord lässt sich nicht zurückholen: beim Veröffentlichen und beim Planen vorher fragen.
-        if (announceConfirm(next.input, saved)) setAnnouncing(next.input);
+        const mode = announceConfirm(next.input, saved);
+
+        if (mode) setAnnouncing({ input: next.input, mode });
         else void write(next.input);
     };
 
@@ -107,20 +107,22 @@ function NewsEditor({ post, entries, channel, editorKey, onSaved }: IEditorProps
 
             <ConfirmDialog
                 open={announcing !== null}
-                title={planned ? "Planen und in Discord ankündigen?" : "Veröffentlichen und in Discord ankündigen?"}
-                confirmLabel={planned ? "Planen" : "Veröffentlichen"}
+                title={announcing?.mode === "plan" ? "Planen und in Discord ankündigen?" : announcing?.mode === "announce" ? "In Discord ankündigen?" : "Veröffentlichen und in Discord ankündigen?"}
+                confirmLabel={announcing?.mode === "plan" ? "Planen" : announcing?.mode === "announce" ? "Ankündigen" : "Veröffentlichen"}
                 busy={saving}
                 onConfirm={() => {
-                    if (announcing) void write(announcing);
+                    if (announcing) void write(announcing.input);
                     setAnnouncing(null);
                 }}
                 onCancel={() => setAnnouncing(null)}
             >
-                {planned && announcing?.publishAt ? (
+                {announcing?.mode === "plan" && announcing.input.publishAt ? (
                     <p>
-                        Der Beitrag erscheint am {at(announcing.publishAt)} Uhr auf der Webseite, und im selben Moment geht die Ankündigung im Kanal raus. Bis dahin kannst du alles ändern oder den
-                        Schalter ausmachen. Danach geht die Nachricht genau einmal raus und bleibt auch, wenn du den Beitrag später änderst.
+                        Der Beitrag erscheint am {at(announcing.input.publishAt)} Uhr auf der Webseite, und im selben Moment geht die Ankündigung im Kanal raus. Bis dahin kannst du alles ändern oder
+                        den Schalter ausmachen. Danach geht die Nachricht genau einmal raus und bleibt auch, wenn du den Beitrag später änderst.
                     </p>
+                ) : announcing?.mode === "announce" ? (
+                    <p>Der Beitrag steht schon auf der Webseite. Die Ankündigung geht jetzt im Kanal raus, genau einmal, und bleibt auch, wenn du den Beitrag später änderst.</p>
                 ) : (
                     <p>Der Beitrag erscheint auf der Webseite und im Kanal für Ankündigungen. Die Nachricht in Discord geht genau einmal raus und bleibt auch, wenn du den Beitrag später änderst.</p>
                 )}

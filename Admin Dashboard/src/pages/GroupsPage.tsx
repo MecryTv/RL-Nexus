@@ -521,8 +521,8 @@ export function GroupsPage(): JSX.Element {
                 )}
                 {revoking?.group === "partner" && (
                     <p>
-                        Ist {nameOf(revoking.user)} Ansprechpartner eines Partner- oder Sponsor-Eintrags, wird er dort überall ausgetragen und verliert @Partner. Die
-                        Einträge bleiben auf der Webseite.
+                        {nameOf(revoking.user)} verliert auch @Partner. Ist er Ansprechpartner eines Partner- oder Sponsor-Eintrags, wird er dort überall ausgetragen;
+                        Zugang und verknüpfter Server fallen weg. Die Einträge bleiben auf der Webseite.
                     </p>
                 )}
             </ConfirmDialog>

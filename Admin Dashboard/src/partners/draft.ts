@@ -81,6 +81,18 @@ export function newEntry(kind: EntryKind, name: string, options: INewEntryOption
     };
 }
 
+/**
+ * Der Server hat den Ansprechpartner ausgetragen (Gruppe Partner entfernt,
+ * Review 11.11.2026): Ein älterer Entwurf übernimmt das, sonst holte ihn das
+ * nächste Speichern still zurück, samt Gruppe, @Partner und Server. Hat der
+ * Entwurf schon einen anderen Ansprechpartner, bleibt der.
+ */
+export function adoptServerContact(draft: IEntryInput, before: string | null, fresh: Pick<IEntryInput, "contactId">): IEntryInput {
+    if (fresh.contactId !== null || before === null || draft.contactId !== before) return draft;
+
+    return { ...draft, contactId: null, access: null, guildId: null };
+}
+
 /** Abschnitte der Vorlage in ihrer Reihenfolge; wo der aktuelle Stand denselben Typ hat, gilt seine Fassung. */
 function mergeSections(template: readonly ISection[], current: readonly ISection[]): ISection[] {
     const pool = [...current];

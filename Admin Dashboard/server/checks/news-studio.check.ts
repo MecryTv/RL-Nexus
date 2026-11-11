@@ -85,16 +85,22 @@ export async function checkNewsStudio(): Promise<void> {
         const stored = { ...draft, id: 9, slug: "a", publishedAt: null, authorName: "M", createdAt: later, updatedAt: later, announcedAt: null };
         const planned = { ...stored, status: "scheduled" as const, publishAt: later };
 
-        assert.equal(announceConfirm({ ...draft, status: "published" }, null), "published");
-        assert.equal(announceConfirm({ ...draft, status: "scheduled", publishAt: later }, null), "scheduled");
-        assert.equal(announceConfirm({ ...draft, status: "scheduled", publishAt: later }, stored), "scheduled");
+        const now = new Date("2026-11-11T10:00:00.000Z");
+
+        assert.equal(announceConfirm({ ...draft, status: "published" }, null, now), "publish");
+        assert.equal(announceConfirm({ ...draft, status: "scheduled", publishAt: later }, null, now), "plan");
+        assert.equal(announceConfirm({ ...draft, status: "scheduled", publishAt: later }, stored, now), "plan");
         // Schon geplant und angekündigt wird später: Speichern fragt nicht noch einmal.
-        assert.equal(announceConfirm({ ...draft, status: "scheduled", publishAt: later }, planned), null);
+        assert.equal(announceConfirm({ ...draft, status: "scheduled", publishAt: later }, planned, now), null);
         // Schon geplant, Ankündigung erst jetzt eingeschaltet: fragen.
-        assert.equal(announceConfirm({ ...draft, status: "scheduled", publishAt: later }, { ...planned, announce: false }), "scheduled");
-        assert.equal(announceConfirm({ ...draft, announce: false, status: "scheduled", publishAt: later }, null), null);
-        assert.equal(announceConfirm(draft, null), null);
-        assert.equal(announceConfirm({ ...draft, status: "published" }, { ...stored, announcedAt: later }), null);
+        assert.equal(announceConfirm({ ...draft, status: "scheduled", publishAt: later }, { ...planned, announce: false }, now), "plan");
+        assert.equal(announceConfirm({ ...draft, announce: false, status: "scheduled", publishAt: later }, null, now), null);
+        assert.equal(announceConfirm(draft, null, now), null);
+        assert.equal(announceConfirm({ ...draft, status: "published" }, { ...stored, announcedAt: later }, now), null);
+        // Geplant für eine Zeit, die schon vorbei ist: erscheint sofort, also wie Veröffentlichen fragen (Review 11.11.).
+        assert.equal(announceConfirm({ ...draft, status: "scheduled", publishAt: "2026-11-11T08:00:00.000Z" }, null, now), "publish");
+        // Steht schon online, Ankündigung nachträglich an: nur ankündigen (Review 11.11.).
+        assert.equal(announceConfirm({ ...draft, status: "published" }, { ...stored, status: "published", announce: false }, now), "announce");
     });
 
     await check("Entwurf: Bausteine einfügen, verschieben, kopieren, löschen", () => {

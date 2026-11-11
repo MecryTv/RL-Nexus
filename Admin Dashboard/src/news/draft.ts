@@ -92,14 +92,16 @@ export function freshPost(saved: IPost | null, fresh: IPost | null): IPost | nul
 /**
  * Vor einer Ankündigung in Discord fragt das Studio nach: beim Veröffentlichen
  * und beim Planen (Nutzer, 11.11.2026). Ein schon geplanter Beitrag, der ohnehin
- * angekündigt wird, fragt beim Speichern nicht noch einmal.
+ * angekündigt wird, fragt beim Speichern nicht noch einmal. „plan“ nur für eine
+ * Zeit in der Zukunft, eine vergangene erscheint sofort; „announce“, wenn der
+ * Beitrag schon online steht (Review 11.11.).
  */
-export function announceConfirm(next: IPostInput, saved: IPost | null): "published" | "scheduled" | null {
+export function announceConfirm(next: IPostInput, saved: IPost | null, now: Date = new Date()): "publish" | "plan" | "announce" | null {
     if (!next.announce || saved?.announcedAt) return null;
-    if (next.status === "published") return "published";
-    if (next.status === "scheduled" && !(saved?.status === "scheduled" && saved.announce)) return "scheduled";
+    if (next.status === "published") return saved?.status === "published" ? "announce" : "publish";
+    if (next.status !== "scheduled" || (saved?.status === "scheduled" && saved.announce)) return null;
 
-    return null;
+    return next.publishAt && Date.parse(next.publishAt) > now.getTime() ? "plan" : "publish";
 }
 
 /** Der Knopf in der Leiste sagt, was er tut: „Speichern“ nur, wenn der Stand bleibt. */

@@ -5,7 +5,7 @@ import { databaseReady, query } from "../db.ts";
 import { DiscordUnavailable, fetchMember, fetchRoles, setMemberRole } from "../discord.ts";
 import { grantGroupIfNone, groupOf, revokeGroupIf } from "../groups.ts";
 import { publishSite } from "../site/publish.ts";
-import { clearContact, entriesOfContact, roleStateOf, setGroupGranted, setRoleState } from "./store.ts";
+import { clearContacts, entriesOfContact, roleStateOf, setGroupGranted, setRoleState } from "./store.ts";
 
 /**
  * Rolle @Partner und Gruppe Partner (W-0062, Spec Teil 7). Die Rolle bekommt,
@@ -115,10 +115,10 @@ export async function applyContact(config: IConfig, next: IEntry | null, previou
 export async function dropContact(config: IConfig, userId: string, actor: IActor): Promise<IRoleState> {
     const entries = (await entriesOfContact(userId)).filter((entry) => entry.kind !== "supporter");
 
-    for (const entry of entries) {
-        await clearContact(entry.id);
-        await audit(actor, "partner.contact.drop", `partner:${entry.id}`, entry.name);
-    }
+    await clearContacts(userId);
+
+    // Im Protokoll steht, wer es war: danach zeigt der Eintrag keinen Ansprechpartner mehr.
+    for (const entry of entries) await audit(actor, "partner.contact.drop", `partner:${entry.id}`, `${entry.name} · bisher ${userId}`);
 
     const role = await syncPartnerRole(config, userId, { mayRemove: true, actor });
 

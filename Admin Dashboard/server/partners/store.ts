@@ -185,9 +185,16 @@ export async function groupGranted(id: number): Promise<boolean> {
     return Boolean(row?.group_granted);
 }
 
-/** Trägt den Ansprechpartner aus: ohne Ansprechpartner gibt es auch keinen Zugang und keinen verknüpften Server. */
-export async function clearContact(id: number): Promise<void> {
-    await query("UPDATE partner_entries SET contact_id = NULL, access = NULL, server_id = NULL, group_granted = 0, updated_at = CURRENT_TIMESTAMP(3) WHERE id = ?", [id]);
+/**
+ * Trägt eine Person bei allen Partner- und Sponsor-Einträgen als Ansprechpartner
+ * aus, in einer Anweisung: ohne Ansprechpartner gibt es auch keinen Zugang und
+ * keinen verknüpften Server.
+ */
+export async function clearContacts(userId: string): Promise<void> {
+    await query(
+        "UPDATE partner_entries SET contact_id = NULL, access = NULL, server_id = NULL, group_granted = 0, updated_at = CURRENT_TIMESTAMP(3) WHERE contact_id = ? AND kind <> 'supporter'",
+        [userId]
+    );
 }
 
 export async function setGroupGranted(id: number, granted: boolean): Promise<void> {
