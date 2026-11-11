@@ -319,7 +319,7 @@ function World(): IWorld {
                 return { id: `m${world.sent.length}`, delete: async () => undefined, edit: async (next: unknown) => void world.edits.push(JSON.stringify(next)) };
             },
             bulkDelete: async (ids: string[]) => void world.deleted.push(...ids),
-            messages: { fetch: async () => ({ edit: async (next: unknown) => void world.edits.push(JSON.stringify(next)), delete: async () => undefined }) },
+            messages: { fetch: async () => ({ edit: async (next: unknown) => void world.edits.push(JSON.stringify(next)), delete: async () => undefined }), delete: async () => undefined },
             permissionOverwrites: { edit: async (target: string, perms: Record<string, boolean>) => void (world.overwrites[id] = { ...perms, [`target:${target}`]: true }) },
         }) as unknown as GuildBasedChannel;
     const channels = new Map<string, GuildBasedChannel>([QCH, LOG, C1, C2, TEXT].map((id) => [id, channel(id)]));
@@ -367,6 +367,7 @@ function World(): IWorld {
 
     let next = 1;
     const db = client as unknown as Record<string, Record<string, unknown>>;
+    db.moduleSettings.Save = async (_guildId: string, _module: string, value: IAntiVillainSettings) => void (world.settings = value);
     db.avCases.Create = async (input: Omit<IAvCase, "id">) => {
         const made = { ...input, id: next++, status: "open", teamMessageId: null, personMessageId: null, createdAt: Date.now(), closedAt: null, closedBy: null } as IAvCase;
         world.cases.set(made.id, made);
@@ -846,6 +847,50 @@ async function checkBait(): Promise<void> {
         JSON.stringify(patches) === JSON.stringify([{ id: TEXT, name: "nicht-schreiben", topic: baitBefore.topic, position: 0, reason: "Anti Villain: Köder" }]) && apply.sent.some((entry) => entry.channelId === TEXT && entry.payload.includes("koeder.png")) && gone.join() === `${C2}:pin1`,
         JSON.stringify(patches)
     );
+
+    // Review W-0063: Senden im neuen Kanal schlägt fehl - die alte ID bleibt nicht stehen.
+    const failing = make();
+    const failChannel = failing.guild.channels.cache.get(TEXT) as unknown as Record<string, unknown>;
+
+    Object.assign(failChannel, { edit: async () => undefined, send: async () => Promise.reject(new Error("Missing Permissions")) });
+    const failBefore = { ...failing.settings.bait };
+
+    failing.settings.bait = { ...failBefore, channelId: TEXT };
+
+    const failProblems = await failing.client.antiVillainService.ApplyBait(failing.guild, failBefore);
+
+    check("  Kanal gewechselt, Senden scheitert: alte Nachrichten-ID ist weg", failing.settings.bait.messageId === null && failProblems.some((text) => text.includes("Warnung kam nicht")), JSON.stringify(failing.settings.bait));
+
+    // Von Hand gelöschte Warnung: beim nächsten Speichern kommt eine neue.
+    const deleted = make();
+    const deletedChannel = deleted.guild.channels.cache.get(C2) as unknown as { messages: object };
+
+    Object.assign(deletedChannel, { messages: { ...deletedChannel.messages, fetch: async () => Promise.reject(Object.assign(new Error("Unknown Message"), { code: 10008 })) } });
+    await deleted.client.antiVillainService.ApplyBait(deleted.guild, { ...deleted.settings.bait });
+    check("  Warnung von Hand gelöscht: Speichern sendet sie neu", deleted.sent.some((entry) => entry.channelId === C2 && entry.payload.includes("koeder.png")));
+
+    // Netzfehler beim Holen: keine zweite Warnung.
+    const flaky = make();
+    const flakyChannel = flaky.guild.channels.cache.get(C2) as unknown as { messages: object };
+
+    Object.assign(flakyChannel, { messages: { ...flakyChannel.messages, fetch: async () => Promise.reject(new Error("ECONNRESET")) } });
+    await flaky.client.antiVillainService.ApplyBait(flaky.guild, { ...flaky.settings.bait });
+    check("  Netzfehler beim Holen: keine zweite Warnung", flaky.sent.length === 0);
+
+    // Discord bremst das Umbenennen: das Speichern wartet nicht 10 Minuten.
+    const slow = make();
+    const slowChannel = slow.guild.channels.cache.get(C2) as unknown as Record<string, unknown>;
+
+    Object.assign(slowChannel, { name: "von-hand", edit: () => new Promise(() => undefined) });
+    slow.client.antiVillainService.baitEditWait = 30;
+
+    const slowBefore = { ...slow.settings.bait };
+
+    slow.settings.bait = { ...slowBefore, design: "dot" };
+
+    const slowProblems = await slow.client.antiVillainService.ApplyBait(slow.guild, slowBefore);
+
+    check("  Umbenennen hängt: Speichern kommt zurück mit Hinweis", slowProblems.some((text) => text.includes("in ein paar Minuten")), JSON.stringify(slowProblems));
 }
 
 /* ----------------------------------------------------------

@@ -95,6 +95,9 @@ export const AntiVillainPanel: IPanelModule<S> = {
 
         const { quarantine: saved, bait } = await client.antiVillainService.Save(guild, patch);
 
+        // W-0063: Die Stufe steht im Bild der Warnung (festhalten oder nur melden).
+        if ("level" in patch) await client.antiVillainService.UpdateBait(guild).catch(() => undefined);
+
         // Wie der Hinweis nach dem Speichern im Dashboard (needsSetup).
         return !saved.roleId || !saved.channelId || (bait.channel && !bait.channelId) || (bait.role && !bait.roleId) ? "Was noch fehlt (Quarantäne-Rolle, -Kanal oder Köder), legt „Einrichten“ im Dashboard an." : null;
     },

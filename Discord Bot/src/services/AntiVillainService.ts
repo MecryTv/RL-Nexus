@@ -10,6 +10,7 @@ import {
     MessageFlags,
     PartialGuildMember,
     PermissionFlagsBits,
+    RESTJSONErrorCodes,
     StringSelectMenuInteraction,
     TextBasedChannel,
 } from "discord.js";
@@ -106,6 +107,8 @@ function OneOf<T extends string | number>(value: unknown, options: readonly T[],
  */
 export default class AntiVillainService {
     private readonly client: BotClient;
+    /** W-0063: So lange wartet das Speichern auf das Umbenennen des Köder-Kanals, danach läuft es im Hintergrund weiter. */
+    baitEditWait = 8_000;
     readonly index = new MessageIndex();
     readonly scores = new ScoreBook();
     readonly hop = new HopTracker();
@@ -509,20 +512,29 @@ export default class AntiVillainService {
         await this.client.moduleSettings.Save(guild.id, ANTI_VILLAIN_MODULE, { ...settings, bait: { ...settings.bait, messageId: sent.id } });
     }
 
-    async UpdateBait(guild: Guild): Promise<void> {
+    /** Die Warnung auf den neuen Stand bringen. false: sie ist weg (von Hand gelöscht) und muss neu gesendet werden. */
+    async UpdateBait(guild: Guild): Promise<boolean> {
         const settings = await this.Settings(guild.id);
         const { bait } = settings;
 
-        if (!bait.channelId || !bait.messageId) return;
+        if (!bait.channelId || !bait.messageId) return false;
 
         const channel = guild.channels.cache.get(bait.channelId);
 
-        if (!channel?.isTextBased()) return;
+        if (!channel?.isTextBased()) return false;
 
-        const message = await channel.messages.fetch(bait.messageId).catch(() => null);
+        let gone = false;
+        const message = await channel.messages.fetch(bait.messageId).catch((error: { code?: number }) => {
+            // Nur „gibt es nicht“ heißt weg - bei einem Netzfehler käme sonst eine zweite Warnung.
+            gone = error?.code === RESTJSONErrorCodes.UnknownMessage;
+
+            return null;
+        });
 
         // W-0063: neues Bild statt nur neuer Text - die alte Datei fliegt raus.
         await message?.edit({ ...(await this.BaitPayload(guild, settings)), attachments: [] } as MessageEditOptions).catch(() => undefined);
+
+        return !gone;
     }
 
     /**
@@ -541,8 +553,10 @@ export default class AntiVillainService {
             const old = guild.channels.cache.get(before.channelId);
 
             if (old?.isTextBased()) await old.messages.delete(before.messageId).catch(() => undefined);
-            if (!bait.channelId) await this.client.moduleSettings.Save(guild.id, ANTI_VILLAIN_MODULE, { ...settings, bait: { ...bait, messageId: null } });
         }
+
+        // Die ID gehört zum alten Kanal - geht das Senden unten schief, holt UpdateBait sie nicht mehr im neuen.
+        if (moved && bait.messageId) await this.client.moduleSettings.Save(guild.id, ANTI_VILLAIN_MODULE, { ...settings, bait: { ...bait, messageId: null } });
 
         if (!bait.channel || !bait.channelId) return problems;
 
@@ -561,18 +575,23 @@ export default class AntiVillainService {
         if ((moved || before.top !== bait.top) && bait.top && channel.position !== 0) patch.position = 0;
 
         if (Object.keys(patch).length > 0) {
-            const done = await channel.edit({ ...patch, reason: "Anti Villain: Köder" }).then(
-                () => true,
-                () => false
-            );
+            // Discord lässt Name und Thema nur zweimal in 10 Minuten ändern, discord.js wartet
+            // dann still bis zu 10 Minuten. So lange hängt das Speichern nicht: es läuft weiter.
+            const done = await Promise.race([
+                channel.edit({ ...patch, reason: "Anti Villain: Köder" }).then(
+                    () => "ok" as const,
+                    () => "failed" as const
+                ),
+                new Promise<"late">((resolve) => setTimeout(resolve, this.baitEditWait, "late")),
+            ]);
 
-            if (!done) problems.push("Name, Thema oder Platz des Köder-Kanals konnte ich nicht ändern. Mir fehlt dort „Kanäle verwalten“.");
+            if (done === "failed") problems.push("Name, Thema oder Platz des Köder-Kanals konnte ich nicht ändern. Mir fehlt dort „Kanäle verwalten“.");
+            if (done === "late") problems.push("Name oder Thema des Köder-Kanals kommen in ein paar Minuten. Discord lässt sie nur zweimal in 10 Minuten ändern.");
         }
 
-        if (moved || !bait.messageId) {
+        // UpdateBait false: die Warnung wurde von Hand gelöscht - dann kommt eine neue.
+        if (moved || !bait.messageId || !(await this.UpdateBait(guild))) {
             await this.SendBait(guild).catch(() => problems.push("Die Warnung kam nicht in den Köder-Kanal. Mir fehlen dort „Nachrichten senden“, „Dateien anhängen“ oder „Nachrichten verwalten“."));
-        } else {
-            await this.UpdateBait(guild);
         }
 
         return problems;

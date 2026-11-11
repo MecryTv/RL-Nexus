@@ -1,5 +1,5 @@
 import { FastifyReply, FastifyRequest } from "fastify";
-import { Guild, PermissionFlagsBits } from "discord.js";
+import { ChannelType, Guild, PermissionFlagsBits } from "discord.js";
 import BotClient from "../client/BotClient";
 import Route from "../structures/Route";
 import { PRIVATE_HINT } from "../constants/StaffGrant";
@@ -154,6 +154,8 @@ export default class DashboardApiAntiVillain extends Route {
             guards: GUARDS,
             levels: LEVELS,
             baitDesigns: BAIT_DESIGNS,
+            // Der Köder muss ein Textkanal sein (Clean), Ankündigungskanäle fallen raus.
+            baitChannels: [...guild.channels.cache.values()].filter((channel) => channel.type === ChannelType.GuildText).map((channel) => channel.id),
             nukeActions: NUKE_ACTIONS,
             limits: { nuke: NUKE_LIMIT_RANGE, joins: RAID_JOINS_RANGE, end: RAID_END_RANGE, cleanup: CLEANUP_OPTIONS, trusted: MAX_TRUSTED },
             targets: await LogTargets(guild, [settings.logChannelId]),

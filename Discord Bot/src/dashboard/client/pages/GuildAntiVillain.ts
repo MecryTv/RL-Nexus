@@ -71,6 +71,8 @@ interface IPayload {
     levels: Record<Level, { report: number; hold: number | null }>;
     /** W-0063: die Namen für den Köder-Kanal. */
     baitDesigns: { id: BaitDesign; name: string | null; label: string; hint: string }[];
+    /** Nur Textkanäle taugen als Köder. */
+    baitChannels: string[];
     nukeActions: { id: string; label: string; icon: string; limit: number }[];
     limits: { nuke: [number, number]; joins: [number, number]; end: [number, number]; cleanup: number[]; trusted: number };
     targets: ILogTargets;
@@ -690,7 +692,7 @@ export function renderAntiVillain(guildId: string): void {
             row(
                 "Kanal",
                 "Einen vorhandenen nehmen, sonst legt „Einrichten“ einen an",
-                select([["", "neu anlegen lassen"], ...data!.guild.channels.map((channel): [string, string] => [channel.id, `# ${channel.name}`])], bait.channelId ?? "", (value) => {
+                select([["", "neu anlegen lassen"], ...data!.guild.channels.filter((channel) => data!.baitChannels.includes(channel.id)).map((channel): [string, string] => [channel.id, `# ${channel.name}`])], bait.channelId ?? "", (value) => {
                     bait.channelId = value || null;
                     touch();
                 }, "Köder-Kanal wählen")
