@@ -146,7 +146,7 @@ Webseite und Admin: neues Modul in `Webseite/src/data/modules.data.ts` (Bereich 
 
 Bot: **Kanäle verwalten** (Team-Kanäle), **Mitglieder verschieben**, Schreiben in Text-Chats von Sprachkanälen. Fehlt etwas, sagt die Steuerkarte genau was.
 
-Steuern dürfen Moderator-Rolle, Owner und „Server verwalten“; das Bot-Team über die Freigabe wie bei der Moderation.
+Steuern dürfen Moderator-Rolle, Owner und „Server verwalten“; das Bot-Team über die Freigabe wie bei der Moderation. **Rollen-Moderatoren steuern auch im Bot-Dashboard** (Nutzer, 11.11.): Sie sehen den Server in ihrer Serverliste und dort nur die Seite Rocket Roulette mit den Reitern Abend und Verlauf; die Einstellungen ändert nur, wer den Server verwaltet **(Claude)**. Dafür braucht `DashboardService` eine Freigabe für dieses Modul, ähnlich wie Moderatoren heute die Moderation sehen (`canModerate`).
 
 ## Daten
 
@@ -163,7 +163,7 @@ Ein laufender Abend übersteht einen Neustart: Startzeit wird beim Start neu ein
 
 1. ~~Wo sitzt ein Moderator, der eine Lobby hostet?~~ Geklärt am 11.11.: bleibt im Hauptvoice (siehe Hosts).
 2. **Bild oder Text je Nachricht.** Entwürfe I, V, M, D (A = Bild, B = Text). Wird eine Nachricht, die sich laufend ändert (Ankündigung, Steuerkarte, Rundenkarte), ein Bild, zeichnet der Bot sie gedrosselt neu (höchstens alle paar Sekunden) **(Claude)**. Eine Einstellung „Bild oder Text“ je Server gibt es nur, wenn der Nutzer beides will.
-3. **Steuern Rollen-Moderatoren auch im Bot-Dashboard?** Heute öffnen Modulseiten nur mit „Server verwalten“. Ohne Erweiterung steuern Rollen-Moderatoren nur in Discord (Steuerkarte), das Dashboard ist für Verwalter. Mit Erweiterung braucht `DashboardService` eine Freigabe für dieses Modul.
+3. ~~Steuern Rollen-Moderatoren auch im Bot-Dashboard?~~ Geklärt am 11.11.: ja (siehe Rechte).
 
 ## Was der Bauende entscheidet
 
