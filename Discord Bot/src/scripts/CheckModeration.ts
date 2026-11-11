@@ -690,6 +690,16 @@ async function checkEvidence(client: BotClient): Promise<void> {
     } as unknown as Guild;
 
     check("Pflicht mit gültigem Beweis: geht durch", (await Refusal(() => service.ActWithProof(halt, owner, warn, "discord", { link: "https://clips.example.com/1" }))) === reached);
+
+    // W-0071 Review: Über die Bot-Team-Freigabe ist member der Bot - gespeichert wird die echte Person.
+    const staff = { id: "345678901234567890", name: "Bot-Team Kim", member: owner };
+
+    check("Ausblenden ohne Grund: abgelehnt", (await Refusal(() => service.Hide(guild, staff, entry.number, " x "))).startsWith("Schreib kurz dazu"));
+
+    const { entry: hiddenCase, problem } = await service.Hide(guild, staff, entry.number, "Test Ausblenden");
+
+    check("Ausblenden speichert die echte Person, nicht den Bot", hiddenCase.hidden?.by === staff.id && hiddenCase.hidden.byName === staff.name && problem === null, JSON.stringify(hiddenCase.hidden));
+    check("  zweites Ausblenden: Fall gibt es nicht mehr", (await Refusal(() => service.Hide(guild, staff, entry.number, "Noch mal"))).includes("gibt es hier nicht"));
 }
 
 async function cleanup(client: BotClient): Promise<void> {

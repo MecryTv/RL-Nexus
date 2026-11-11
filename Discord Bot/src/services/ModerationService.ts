@@ -1,6 +1,6 @@
 import path from "path";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
-import { ChannelType, DiscordAPIError, Guild, GuildMember, Message, MessageFlags, PermissionFlagsBits, User } from "discord.js";
+import { ChannelType, DiscordAPIError, Guild, GuildMember, Message, MessageFlags, PermissionFlagsBits, RESTJSONErrorCodes, User } from "discord.js";
 import BotClient from "../client/BotClient";
 import { CaseCard, ICaseExtra, ICaseMessage } from "../builder/ModerationCard";
 import { CaseView, DirectView } from "../builder/ModerationView";
@@ -549,7 +549,10 @@ export default class ModerationService {
         if (request.caseNumber) {
             warn = await this.client.modCases.Get(guild.id, Number(request.caseNumber));
 
-            if (!warn || warn.action !== "warn") throw new ModerationError(`Fall ${CaseRef(Number(request.caseNumber))} ist keine Verwarnung.`);
+            // W-0071: Einen ausgeblendeten Warn gibt es für Moderatoren nicht - nur wer verwaltet, kann ihn zurücknehmen.
+            if (warn?.hidden && !(actor.member && this.CanManage(actor.member))) warn = null;
+            if (!warn) throw new ModerationError(`Fall ${CaseRef(Number(request.caseNumber))} gibt es hier nicht.`);
+            if (warn.action !== "warn") throw new ModerationError(`Fall ${CaseRef(Number(request.caseNumber))} ist keine Verwarnung.`);
             if (!warn.active) throw new ModerationError(`Fall ${CaseRef(warn.number)} gilt schon nicht mehr.`);
         } else if (typeof request.targetId === "string" && SNOWFLAKE.test(request.targetId)) {
             [warn] = await this.client.modCases.ActiveOf(guild.id, request.targetId, "warn");
@@ -856,30 +859,45 @@ export default class ModerationService {
      * Grund ist Pflicht. Die Karte im Log-Kanal geht weg - den lesen Moderatoren
      * mit. Eine laufende Strafe in Discord bleibt, Ausblenden hebt nichts auf.
      */
-    async Hide(guild: Guild, member: GuildMember, number: number, reason: unknown): Promise<IModCase> {
-        if (!(await this.CanView(member))) throw new ModerationError("Ausblenden darf nur das Moderations-Team.");
+    async Hide(guild: Guild, actor: IModActor, number: number, reason: unknown): Promise<{ entry: IModCase; problem: string | null }> {
+        if (!actor.member || !(await this.CanView(actor.member))) throw new ModerationError("Ausblenden darf nur das Moderations-Team.");
 
         const text = typeof reason === "string" ? reason.trim().slice(0, HIDE_REASON_MAX) : "";
 
         if (text.length < 3) throw new ModerationError("Schreib kurz dazu, warum der Fall ausgeblendet wird.");
 
         const entry = await this.CaseOf(guild.id, number);
-        const hidden = await this.client.modCases.Mutate(entry.id, (row) =>
-            row.hidden ? null : { hidden: { at: Date.now(), by: member.id, byName: member.displayName, reason: text }, logChannel: null, logMessage: null }
-        );
+        let fresh = false;
+        // by/byName aus actor: über die Bot-Team-Freigabe ist member der Bot, actor die echte Person.
+        const hidden = await this.client.modCases.Mutate(entry.id, (row) => {
+            if (row.hidden) return null;
 
-        if (!hidden?.hidden || hidden.hidden.by !== member.id) throw new ModerationError(`Fall ${CaseRef(number)} ist schon ausgeblendet.`);
+            fresh = true;
+
+            return { hidden: { at: Date.now(), by: actor.id, byName: actor.name, reason: text }, logChannel: null, logMessage: null };
+        });
+
+        if (!hidden || !fresh) throw new ModerationError(`Fall ${CaseRef(number)} ist schon ausgeblendet.`);
+
+        // Die Karte im Log-Kanal lesen Moderatoren mit. Geht das Löschen schief, sagt es die Antwort.
+        let problem: string | null = null;
 
         if (entry.logChannel && entry.logMessage) {
             const channel = guild.channels.cache.get(entry.logChannel) ?? (await guild.channels.fetch(entry.logChannel).catch(() => null));
+            const gone = channel?.isTextBased()
+                ? await channel.messages.delete(entry.logMessage).then(
+                      () => true,
+                      (error: { code?: number }) => error?.code === RESTJSONErrorCodes.UnknownMessage
+                  )
+                : !channel;
 
-            if (channel?.isTextBased()) await channel.messages.delete(entry.logMessage).catch(() => undefined);
+            if (!gone) problem = `Die Karte von Fall ${CaseRef(number)} im Log-Kanal konnte ich nicht löschen. Bitte dort von Hand entfernen.`;
         }
 
         this.client.pulseService.Emit(guild.id, "moderation", { id: entry.id, action: entry.action });
-        logger.user(`🙈 Fall ${CaseRef(number)} auf ${guild.id} ausgeblendet (von ${member.id})`);
+        logger.user(`🙈 Fall ${CaseRef(number)} auf ${guild.id} ausgeblendet (von ${actor.id})`);
 
-        return hidden;
+        return { entry: hidden, problem };
     }
 
     /** W-0071: Wieder einblenden darf nur, wer den Server verwaltet. Der Fall bekommt eine neue Karte im Log-Kanal. */

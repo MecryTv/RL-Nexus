@@ -47,7 +47,8 @@ export default class DashboardApiModerationEvidence extends Route {
         if (request.method === "GET") {
             // Die Adresse trägt die interne ID des Falls - er muss zu diesem Server gehören.
             const entry = await this.client.modCases.ById(Number(raw));
-            const target = entry?.guildId === access.guild.id && file ? this.client.moderationService.EvidencePath(entry.guildId, entry.id, file) : null;
+            // W-0071: Beweise eines ausgeblendeten Falls nur für wer den Server verwaltet.
+            const target = entry?.guildId === access.guild.id && (!entry.hidden || access.manage) && file ? this.client.moderationService.EvidencePath(entry.guildId, entry.id, file) : null;
             const info = target ? await stat(target).catch(() => null) : null;
 
             if (!target || !info?.isFile()) return reply.code(404).send({ error: "Not Found" });

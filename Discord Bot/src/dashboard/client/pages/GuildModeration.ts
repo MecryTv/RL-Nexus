@@ -284,6 +284,8 @@ export function renderModeration(guildId: string): void {
     let stats: IStats | null = null;
     let target: ITarget | null = null;
     let tab: Tab = "history";
+    /** W-0071: Welche Liste zuletzt geladen wurde - Verlauf und Ausgeblendet teilen sich `entries`. */
+    let listHidden = false;
     let casesLocked = false;
     let ticket = 0;
     let timer = 0;
@@ -420,8 +422,9 @@ export function renderModeration(guildId: string): void {
 
         if (next !== tab) clickSound("primary");
 
-        // W-0071: Verlauf und Ausgeblendet teilen sich die Liste - beim Wechsel neu laden.
-        const swap = (next === "hidden") !== (tab === "hidden") && (next === "history" || next === "hidden");
+        // W-0071: Verlauf und Ausgeblendet teilen sich die Liste - neu laden, wenn die andere drinsteht
+        // (auch nach dem Umweg über Neue Aktion oder Einstellungen).
+        const swap = (next === "history" || next === "hidden") && (next === "hidden") !== listHidden;
 
         tab = next;
         paintTabs();
@@ -627,6 +630,7 @@ export function renderModeration(guildId: string): void {
         if (!reset && entries.length) query.set("before", String(entries[entries.length - 1].number));
         if (!meta) query.set("meta", "1");
         if (tab === "hidden") query.set("hidden", "1");
+        if (reset) listHidden = tab === "hidden";
 
         if (reset && !quiet && (tab === "history" || tab === "hidden")) skeleton();
 
@@ -906,13 +910,14 @@ export function renderModeration(guildId: string): void {
 
             go.disabled = true;
 
-            const answer = await call<{ case: ICase }>("", { action: "hide", case: entry.number, reason: reason.value });
+            const answer = await call<{ case: ICase; problems?: string[] }>("", { action: "hide", case: entry.number, reason: reason.value });
 
             go.disabled = false;
 
             if (!answer) return;
 
             toast("info", "Ausgeblendet", `Moderatoren sehen Fall #${entry.number} nicht mehr. Wer den Server verwaltet, findet ihn unter „Ausgeblendet“.`);
+            if (answer.problems?.length) toast("info", "Log-Karte steht noch", answer.problems.join(" "));
             hide();
             void load(true);
         });

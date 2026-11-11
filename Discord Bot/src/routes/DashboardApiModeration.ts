@@ -141,7 +141,8 @@ export default class DashboardApiModeration extends Route {
 
             return {
                 case: this.Out(guild, entry),
-                related: [...(origin ? [origin] : []), ...related].map((other) => this.Out(guild, other)),
+                // W-0071: Ein ausgeblendeter Ursprungsfall (etwa der abgelaufene Bann hinter einem Unban) nur für wer verwaltet.
+                related: [...(origin && (!origin.hidden || manage) ? [origin] : []), ...related].map((other) => this.Out(guild, other)),
                 target: entry.targetId ? await this.Target(guild, entry.targetId, counts) : null,
                 me: { id: access.actor.id, manage },
             };
@@ -288,8 +289,11 @@ export default class DashboardApiModeration extends Route {
             }
 
             // W-0071: ausblenden (Moderations-Team, Grund Pflicht) und wieder einblenden (nur wer den Server verwaltet).
-            case "hide":
-                return { ok: true, case: this.Out(guild, await service.Hide(guild, member, number, body.reason)) };
+            case "hide": {
+                const { entry, problem } = await service.Hide(guild, actor, number, body.reason);
+
+                return { ok: true, case: this.Out(guild, entry), problems: problem ? [problem] : [] };
+            }
 
             case "unhide":
                 return { ok: true, case: this.Out(guild, await service.Unhide(guild, member, number)) };
