@@ -20,6 +20,7 @@ import { WantsJSON } from "../utils/admin";
 import { ApplyGate, IApplyAccess } from "../utils/applygate";
 import { PersonOf, SearchMembers } from "../utils/dashboard";
 import { GuildResources } from "../utils/managegate";
+import { CreateLogThread, LogTargetError, LogTargets } from "../utils/logtarget";
 
 interface IBody {
     action?: unknown;
@@ -32,6 +33,7 @@ interface IBody {
     formId?: unknown;
     query?: unknown;
     channelId?: unknown;
+    forumId?: unknown;
 }
 
 /**
@@ -66,7 +68,7 @@ export default class DashboardApiApply extends Route {
 
             return reply.send(await this.Write(access, (request.body ?? {}) as IBody));
         } catch (error) {
-            if (error instanceof ApplyError) return reply.code(400).send({ error: error.message });
+            if (error instanceof ApplyError || error instanceof LogTargetError) return reply.code(400).send({ error: error.message });
 
             throw error;
         }
@@ -79,10 +81,13 @@ export default class DashboardApiApply extends Route {
         const formId = Number(query.form) || undefined;
         const page = Math.max(1, Number(query.page) || 1);
         const list = await this.client.applySubmissions.Page(guild.id, { status, formId, page });
+        const settings = await service.Settings(guild.id);
 
         return {
             manage,
-            settings: await service.Settings(guild.id),
+            settings,
+            // W-0083: Für den Transcript-Kanal auch Forum-Beiträge, wie bei den Log-Kanälen.
+            targets: await LogTargets(guild, [settings.transcriptChannelId]),
             forms: await service.Forms(guild.id),
             // W-0073: Behält die Person die Rolle über eine andere Annahme, sagt der Hinweis vor dem Entfernen das.
             submissions: await Promise.all(list.rows.map(async (row) => ({ ...row, keepsRole: row.status === "accepted" && (await service.RoleKept(guild.id, row)) }))),
@@ -112,6 +117,12 @@ export default class DashboardApiApply extends Route {
                 onlyManage();
 
                 return { ok: true, ...(await service.SaveSettings(guild, body.settings)) };
+
+            // W-0083: Neuer Forum-Beitrag als Transcript-Kanal.
+            case "logthread":
+                onlyManage();
+
+                return { ok: true, thread: await CreateLogThread(guild, body.forumId, "Bewerbungen", "📋 Hier landen die Transcripts der Bewerbungen.") };
 
             // Gesendet wird sofort, nicht erst mit Speichern - wie beim Ticket-Panel.
             case "panel":

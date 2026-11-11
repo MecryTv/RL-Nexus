@@ -11,6 +11,7 @@ import { icon, need } from "../core/Dom.js";
 import { toast } from "../core/Toast.js";
 import { api, button, card, confirmButton, el, IPerson, IRole, loading, personPicker, radioTiles, rolePicker, row, select, stat, toggle, WHEN } from "../core/Ui.js";
 import { sentOn } from "../core/Format.js";
+import { ILogTargets, ILogThread, logTargetSelect } from "../core/LogTarget.js";
 
 type Status = "open" | "accepted" | "declined";
 type Kind = "short" | "long" | "choice";
@@ -78,13 +79,17 @@ interface ISettings {
     categoryId: string | null;
     channelName: string;
     afterDecision: After;
-    /** W-0047: Vor dem Löschen kommt der Kanal als Datei hierhin. */
+    /** W-0047: Vor dem Löschen kommt der Kanal als Datei hierhin. W-0083: auch ein Forum-Beitrag. */
     transcriptChannelId: string | null;
+    /** W-0083: Darf sich zum Testen beliebig oft bewerben. */
+    testerId: string | null;
 }
 
 interface IPayload {
     manage: boolean;
     settings: ISettings;
+    /** W-0083: Textkanäle und Forum-Beiträge für den Transcript-Kanal. */
+    targets: ILogTargets;
     forms: IForm[];
     submissions: ISubmission[];
     total: number;
@@ -827,15 +832,53 @@ function mount(guildId: string, view: "inbox" | "manage"): void {
             drawDeleteNote();
             touch();
         });
-        const transcriptPick = select(
-            [["", "— kein Transcript —"], ...data!.guild.channels.map((entry): [string, string] => [entry.id, `# ${entry.name}`])],
-            draft.transcriptChannelId ?? "",
+        // W-0083: Textkanäle und Forum-Beiträge, wie bei den Log-Kanälen.
+        const transcriptPick = logTargetSelect(
+            data!.targets,
+            draft.transcriptChannelId,
             (value) => {
-                draft.transcriptChannelId = value || null;
+                draft.transcriptChannelId = value;
                 touch();
             },
-            "Transcript-Kanal"
+            async (forumId) => {
+                const answer = await call<{ thread: ILogThread }>("", { action: "logthread", forumId });
+
+                return answer?.thread ?? null;
+            },
+            "— kein Transcript —"
         );
+
+        transcriptPick.setAttribute("aria-label", "Transcript-Kanal");
+
+        // W-0083: Eine Person, die sich zum Testen beliebig oft bewerben darf.
+        const tester = el("div", "tkchips");
+        const drawTester = (): void => {
+            if (!draft.testerId) {
+                tester.replaceChildren(
+                    personPicker(call, null, (person: IPerson | null) => {
+                        if (!person) return;
+
+                        draft.testerId = person.id;
+                        touch();
+                        drawTester();
+                    }, "Mitglied suchen: Name oder ID …")
+                );
+
+                return;
+            }
+
+            const remove = button("", icon("#i-x"));
+
+            remove.setAttribute("aria-label", "Test-Bewerber entfernen");
+            remove.addEventListener("click", () => {
+                draft.testerId = null;
+                touch();
+                drawTester();
+            });
+            tester.replaceChildren(el("span", "tkchip", el("code", "mcid", draft.testerId), remove));
+        };
+
+        drawTester();
         const targetRows = el("div");
         const drawTarget = (): void => {
             const own = draft.target === "channel";
@@ -938,6 +981,7 @@ function mount(guildId: string, view: "inbox" | "manage"): void {
                     }), el("span", "", "an"))
                 ),
                 row("Öffentlicher Link", "Bei Fenster und DM sagt die Seite, wo man sich bewirbt", el("div", "aplink", link, copy)),
+                row("Test-Bewerber", "Darf sich zum Ausprobieren beliebig oft bewerben, ohne Pause nach Absage", tester),
                 longNote
             ),
             card(

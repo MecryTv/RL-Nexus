@@ -23,6 +23,7 @@ import {
     ApplyLink,
     ChannelName,
     CooldownText,
+    OpenText,
     DEFAULT_CHANNEL_NAME,
     DefaultApplySettings,
     DefaultForm,
@@ -56,7 +57,7 @@ import {
     QuestionKind,
 } from "../interfaces/services/apply/IApply";
 import logger from "../utils/logger";
-import { IsLogTarget, SendLog } from "../utils/logtarget";
+import { IsLogTarget, SendLog, WarmLogTarget } from "../utils/logtarget";
 import ApplyFlow from "./ApplyFlow";
 
 /**
@@ -196,11 +197,15 @@ export default class ApplyService {
                     : typeof raw.transcriptChannelId === "string" && IsLogTarget(guild.channels.cache.get(raw.transcriptChannelId))
                       ? raw.transcriptChannelId
                       : null,
+            testerId: raw.testerId === undefined ? previous.testerId : typeof raw.testerId === "string" && /^\d{17,20}$/.test(raw.testerId) ? raw.testerId : null,
         };
     }
 
     /** warning: gespeichert, aber der eigene Kanal geht so noch nicht (Plan 30). */
     async SaveSettings(guild: Guild, input: unknown): Promise<{ settings: IApplySettings; warning: string | null }> {
+        // W-0083: Ein Forum-Beitrag als Transcript-Kanal muss im Cache stehen, sonst kennt CleanSettings ihn nicht.
+        if (input && typeof input === "object") await WarmLogTarget(guild, (input as { transcriptChannelId?: unknown }).transcriptChannelId);
+
         const settings = this.CleanSettings(guild, input, await this.Settings(guild.id));
 
         await this.client.moduleSettings.Save(guild.id, APPLY_MODULE, settings);
@@ -556,21 +561,26 @@ export default class ApplyService {
             throw new ApplyError(`Dein Discord-Konto muss mindestens ${form.settings.minAccountDays} Tage alt sein.`, 400, "Das geht noch nicht");
         }
 
+        const settings = await this.Settings(guildId);
+
+        // W-0083: Der Test-Bewerber darf beliebig oft - ohne „läuft noch“, Pause und „schon angenommen“.
+        if (settings.testerId === userId) return { guild, member, form, settings };
+
         const last = await this.client.applySubmissions.Last(form.id, userId);
 
-        if (last?.status === "open") throw new ApplyError("Deine letzte Bewerbung läuft noch – warte die Antwort ab.");
+        if (last?.status === "open") throw new ApplyError(OpenText(form.name, last.createdAt));
 
         if (last?.status === "declined" && form.settings.cooldownDays && last.decidedAt) {
             const free = last.decidedAt + form.settings.cooldownDays * DAY;
 
             if (Date.now() < free) {
-                throw new ApplyError(CooldownText(form.settings.cooldownDays, free));
+                throw new ApplyError(CooldownText(form.name, last.decidedAt, form.settings.cooldownDays, free));
             }
         }
 
-        if (last?.status === "accepted") throw new ApplyError("Du bist hier schon angenommen.");
+        if (last?.status === "accepted") throw new ApplyError(`Du bist für „${form.name}“ hier schon angenommen.`);
 
-        return { guild, member, form, settings: await this.Settings(guildId) };
+        return { guild, member, form, settings };
     }
 
     /**

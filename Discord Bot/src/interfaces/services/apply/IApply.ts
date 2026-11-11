@@ -110,4 +110,6 @@ export interface IApplySettings {
     afterDecision: AfterDecision;
     /** Vor dem Löschen kommt der eigene Kanal als HTML-Datei hierhin (W-0047). null: kein Transcript. */
     transcriptChannelId: string | null;
+    /** W-0083: Wer sich zum Testen beliebig oft bewerben darf - ohne „läuft noch“, Pause und „schon angenommen“. */
+    testerId: string | null;
 }

@@ -61,9 +61,22 @@ export const STAFF_ONLY = "Bewerbungen werden nur vom Staff Team gesehen und bea
 /** Die Bestätigung nach dem Abschicken, auf jedem Weg gleich (Plan 30). */
 export const RECEIVED = "Deine Bewerbung ist bei uns eingegangen. Das Staff Team wird sich bei dir melden.";
 
-/** Die Pause nach einer Absage. free: ab wann es wieder geht, in Millisekunden. */
-export function CooldownText(days: number, free: number): string {
-    return `Nach einer Absage kannst du es in ${days} Tagen neu versuchen – du kannst es ab <t:${Math.floor(free / 1000)}:D> wieder versuchen.`;
+/**
+ * Ein Tag als Datum, das in Discord und auf der Webseite gleich zu lesen ist.
+ * W-0083: <t:…> stand auf der Webseite roh im Hinweis.
+ */
+function Day(ms: number): string {
+    return new Date(ms).toLocaleDateString("de-DE", { timeZone: "Europe/Berlin", day: "2-digit", month: "2-digit", year: "numeric" });
+}
+
+/** W-0083: Die noch offene Bewerbung mit Formular und Datum - ohne beides hält man die Meldung für einen Fehler. */
+export function OpenText(form: string, createdAt: number): string {
+    return `Deine Bewerbung für „${form}“ vom ${Day(createdAt)} ist noch offen – warte die Antwort ab.`;
+}
+
+/** Die Pause nach einer Absage: wann abgelehnt, wie lang die Pause, ab wann es wieder geht (free, in Millisekunden). */
+export function CooldownText(form: string, declinedAt: number, days: number, free: number): string {
+    return `Deine Bewerbung für „${form}“ wurde am ${Day(declinedAt)} abgelehnt. Nach einer Absage gilt hier eine Pause von ${days} Tagen – ab dem ${Day(free)} kannst du dich wieder bewerben.`;
 }
 
 export function DefaultFormSettings(): IFormSettings {
@@ -99,6 +112,7 @@ export function DefaultApplySettings(): IApplySettings {
         channelName: DEFAULT_CHANNEL_NAME,
         afterDecision: "close",
         transcriptChannelId: null,
+        testerId: null,
     };
 }
 

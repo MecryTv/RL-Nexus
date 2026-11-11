@@ -14,7 +14,7 @@ import ApplyCommand from "../commands/user/Apply";
 import ComponentV2Builder from "../builder/ComponentV2Builder";
 import { ApplyCard, ApplyPanelView, ApplyTranscriptCard, DmQuestionView, DmSummaryView, IsApplyPanel } from "../builder/ApplyView";
 import BotClient from "../client/BotClient";
-import { APPLY_FLOW_PREFIX, ApplyLink, ChannelName, CooldownText, DEFAULT_CHANNEL_NAME, DefaultApplySettings, DefaultForm, DRAFT_TTL, MAX_CHOICES, MAX_QUESTIONS, MAX_REVIEWERS, NextQuestionId, RECEIVED, STAFF_ONLY } from "../constants/Apply";
+import { APPLY_FLOW_PREFIX, ApplyLink, ChannelName, CooldownText, OpenText, DEFAULT_CHANNEL_NAME, DefaultApplySettings, DefaultForm, DRAFT_TTL, MAX_CHOICES, MAX_QUESTIONS, MAX_REVIEWERS, NextQuestionId, RECEIVED, STAFF_ONLY } from "../constants/Apply";
 import { DASHBOARD_PATH } from "../constants/Dashboard";
 import { IApplyForm, IApplyQuestion, IApplySettings, IApplySubmission } from "../interfaces/services/apply/IApply";
 import { CheckDmText, DmRealign, DmStep, EntryOf, FieldText, ModalParts, ModalTitle, RestartHint, SUMMARY } from "../services/ApplyFlow";
@@ -150,11 +150,21 @@ function checkTexts(): void {
 
     check("Ohne Prüferrecht", STAFF_ONLY === "Bewerbungen werden nur vom Staff Team gesehen und bearbeitet.");
     check("Nach dem Abschicken", RECEIVED === "Deine Bewerbung ist bei uns eingegangen. Das Staff Team wird sich bei dir melden.");
+    // W-0083: Mit Formular und echtem Datum - und ohne <t:…>, das auf der Webseite roh dastand.
+    const declined = Date.UTC(2026, 10, 1, 12); // 01.11.2026
+    const free = declined + 14 * DAY;
+
     check(
-        "Pause nach Absage",
-        CooldownText(14, 1_700_000_000_000) === "Nach einer Absage kannst du es in 14 Tagen neu versuchen – du kannst es ab <t:1700000000:D> wieder versuchen.",
-        CooldownText(14, 1_700_000_000_000)
+        "Pause nach Absage: wann abgelehnt, wie lang, ab wann wieder (W-0083)",
+        CooldownText("Spieler", declined, 14, free) === "Deine Bewerbung für „Spieler“ wurde am 01.11.2026 abgelehnt. Nach einer Absage gilt hier eine Pause von 14 Tagen – ab dem 15.11.2026 kannst du dich wieder bewerben.",
+        CooldownText("Spieler", declined, 14, free)
     );
+    check(
+        "Offene Bewerbung: Formular und Datum (W-0083)",
+        OpenText("Spieler", declined) === "Deine Bewerbung für „Spieler“ vom 01.11.2026 ist noch offen – warte die Antwort ab.",
+        OpenText("Spieler", declined)
+    );
+    check("  kein <t:…> in den Texten", !`${CooldownText("x", declined, 1, free)}${OpenText("x", declined)}`.includes("<t:"));
 
     // W-0020: Nach einem Fehler beim Abschicken sagt die Meldung, wie es weitergeht - aber nur einmal.
     check("Fehler am Ende: Hinweis zum Neuanfang", RestartHint("Das Formular gibt es nicht mehr.") === "Das Formular gibt es nicht mehr. Im Kanal kannst du neu anfangen.", RestartHint("Das Formular gibt es nicht mehr."));
@@ -282,6 +292,11 @@ function checkChannelSettings(client: BotClient): void {
     check("Transcript-Kanal wird übernommen", service.CleanSettings(guild, { transcriptChannelId: TEXT }, defaults).transcriptChannelId === TEXT);
     check("Ein Sprachkanal ist kein Transcript-Kanal", service.CleanSettings(guild, { transcriptChannelId: VOICE }, { ...defaults, transcriptChannelId: TEXT }).transcriptChannelId === null);
     check("Ohne Angabe bleibt der Transcript-Kanal", service.CleanSettings(guild, {}, { ...defaults, transcriptChannelId: TEXT }).transcriptChannelId === TEXT);
+    check("Ab Werk kein Test-Bewerber (W-0083)", defaults.testerId === null);
+    check("Test-Bewerber wird übernommen", service.CleanSettings(guild, { testerId: USER }, defaults).testerId === USER);
+    check("  keine ID: kein Test-Bewerber", service.CleanSettings(guild, { testerId: "abc" }, { ...defaults, testerId: USER }).testerId === null);
+    check("  null nimmt ihn heraus", service.CleanSettings(guild, { testerId: null }, { ...defaults, testerId: USER }).testerId === null);
+    check("  ohne Angabe bleibt er", service.CleanSettings(guild, {}, { ...defaults, testerId: USER }).testerId === USER);
 
     const name = (pattern: string, user: string, id: number, form: string) => ChannelName(pattern, { user, id, form });
 
@@ -684,8 +699,28 @@ async function checkEligible(client: BotClient, form: IApplyForm): Promise<void>
     Stub(client, { forms: [{ ...mine, settings: { ...mine.settings, minAccountDays: 30 } }], member: FakeMember({ accountDays: 3 }) });
     await rejects("Konto 3 Tage alt bei 30: noch nicht", () => service.Eligible(GUILD, USER, 7), notYet);
 
-    Stub(client, { forms: [mine], last: { status: "open" } });
+    Stub(client, { forms: [mine], last: { status: "open", createdAt: Date.UTC(2026, 10, 1, 12) } });
     await rejects("Eine Bewerbung läuft noch: gerade nicht", () => service.Eligible(GUILD, USER, 7), notNow);
+    await rejects("  die Meldung nennt Formular und Datum (W-0083)", () => service.Eligible(GUILD, USER, 7), (error) => error.message.includes(`„${mine.name}“`) && error.message.includes("01.11.2026"));
+
+    // W-0083: Der Test-Bewerber darf trotz offener, abgelehnter oder angenommener Bewerbung.
+    for (const status of ["open", "declined", "accepted"] as const) {
+        Stub(client, { forms: [mine], last: { status, decidedAt: Date.now() - DAY, createdAt: Date.now() - DAY }, settings: { testerId: USER }, member: FakeMember({ roles: [ROLE] }) });
+
+        try {
+            const ok = await service.Eligible(GUILD, USER, 7);
+
+            check(`Test-Bewerber trotz „${status}“: darf (W-0083)`, ok.form.id === 7);
+        } catch (error) {
+            check(`Test-Bewerber trotz „${status}“: darf (W-0083)`, false, String(error));
+        }
+    }
+
+    Stub(client, { forms: [{ ...mine, settings: { ...mine.settings, requireRole: ROLE } }], settings: { testerId: USER } });
+    await rejects("  die Voraussetzungen gelten auch für ihn", () => service.Eligible(GUILD, USER, 7), notYet);
+
+    Stub(client, { forms: [mine], last: { status: "open" }, settings: { testerId: "223456789012345678" } });
+    await rejects("  ein anderer Test-Bewerber hilft nicht", () => service.Eligible(GUILD, USER, 7), notNow);
 
     Stub(client, { forms: [mine], last: { status: "accepted" } });
     await rejects("Schon angenommen: gerade nicht", () => service.Eligible(GUILD, USER, 7), notNow);
