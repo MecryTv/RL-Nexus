@@ -9,9 +9,8 @@
  * die Zeile über dem Bild). Gerechnet wird mit StudioCore, die Hülle ist
  * Studio.ts.
  *
- * Plan 38: Die Art "board" ist das Ranglisten-Bild mit vier Bereichen (Kopf,
- * Podium, Zeile, Fuß). Bausteine, Griffe, Grenzen und Inspektor gehören dann
- * zum gewählten Bereich; die Bühne verschiebt sie um dessen Lage im Bild.
+ * Den Modus "board" (Plan 38, Ranglisten-Bild in Bereichen) gibt es seit
+ * W-0050 nicht mehr: Das Bild in Discord ist fest (BoardDesignC).
  */
 
 import { BASE } from "../core/Base.js";
@@ -21,22 +20,17 @@ import { button, confirmButton, el, toggle } from "../core/Ui.js";
 import { pickImage } from "./ImagePicker.js";
 import { iconButton, pathIcon, studio } from "./Studio.js";
 import { Corner, History, IRect, ResizeMode, resizeBox, snapMove, typedNumber } from "./StudioCore.js";
-import { BOARD_AREA_LABEL, BOARD_AREA_TYPES, BOARD_WIDTH, DESIGN_FONTS, DESIGN_SIZE, ELEMENT_LABEL, MAX_ELEMENTS } from "../../../constants/LevelDesign.js";
-import { BoardArea, DesignKind, IBoardDesign, IBoardFill, ICardDesign, IDesignBox, IDesignElement } from "../../../interfaces/services/levels/ILevelDesign.js";
-
-/** Plan 38: Karte, Aufstieg oder Ranglisten-Bild. */
-type IStudioDesign = ICardDesign | IBoardDesign;
+import { DESIGN_FONTS, DESIGN_SIZE, ELEMENT_LABEL, MAX_ELEMENTS } from "../../../constants/LevelDesign.js";
+import { DesignKind, ICardDesign, IDesignBox, IDesignElement } from "../../../interfaces/services/levels/ILevelDesign.js";
 
 export interface ILevelStudioOptions {
-    kind: DesignKind | "board";
+    kind: DesignKind;
     /** Das gespeicherte Design - null: keins, es gilt die Vorgabe. */
-    design: IStudioDesign | null;
-    /** Die Vorgabe ohne eigenes Design: „klassisch“, „banner“ bzw. „podium“. */
+    design: ICardDesign | null;
+    /** Die Vorgabe ohne eigenes Design: „klassisch“ bzw. „banner“. */
     fallback: string;
-    templates: Record<string, IStudioDesign>;
+    templates: Record<string, ICardDesign>;
     placeholders: readonly string[];
-    /** Plan 38, Rangliste: Platzhalter in Kopf und Fuß (frame) und an einem Platz (entry). */
-    areaPlaceholders?: { frame: readonly string[]; entry: readonly string[] };
     guildId: string;
     /** Nur Aufstieg: die Zeile über dem Bild und ob der Aufstieg überhaupt als Bild kommt. */
     upLine?: string;
@@ -47,7 +41,7 @@ export interface ILevelStudioOptions {
 }
 
 interface IState {
-    design: IStudioDesign;
+    design: ICardDesign;
     upLine: string;
 }
 
@@ -58,26 +52,10 @@ interface IPreview {
     values: Record<string, string>;
 }
 
-/** Plan 38: ein Bereich im Ranglisten-Bild - beim Podium Platz 1, bei der Zeile die erste. */
-interface IAreaBox extends IRect {
-    boxes: IDesignBox[];
-    repeats: IRect[];
-}
-
-interface IBoardPreview {
-    image: string;
-    width: number;
-    height: number;
-    areas: Record<BoardArea, IAreaBox | null>;
-    design: IBoardDesign;
-}
-
 type Selection = string | "bg" | null;
 
 const PREVIEW_DELAY = 300;
-const TEMPLATE_LABEL: Record<string, string> = { klassisch: "Klassisch", mittig: "Mittig", panel: "Panel", hud: "HUD", banner: "Banner", leer: "Leer", podium: "Podium", liste: "Liste", kompakt: "Kompakt", arena: "Arena" };
-const AREA_NOTE: Record<BoardArea, string> = { head: "Titel, Server, Zeitraum", podium: "Platz 1–3, ein Muster", row: "alle weiteren Plätze, ein Muster", foot: "Seite, Mitglieder, Zeitraum" };
-const AREA_ICON: Record<BoardArea, string> = { head: "M3 3h18v6H3zM3 13h18M3 17h12", podium: "M3 21V13h6v8M9 21V8h6v13M15 21v-6h6v6", row: "M3 5h18v5H3zM3 14h18v5H3z", foot: "M3 7h18M3 11h18M3 15h18v6H3z" };
+const TEMPLATE_LABEL: Record<string, string> = { klassisch: "Klassisch", mittig: "Mittig", panel: "Panel", hud: "HUD", banner: "Banner", leer: "Leer" };
 const BACKGROUND_LABEL = { image: "Bild", color: "Farbe", gradient: "Verlauf" } as const;
 const KEYS: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
 /** Die Platzhalter der Zeile über dem Aufstiegs-Bild - dieselben wie in der Text-Nachricht. */
@@ -144,13 +122,10 @@ function ResizeRule(element: IDesignElement, width: number, height: number): { m
 }
 
 export function levelStudio(host: HTMLElement, options: ILevelStudioOptions): { dirty(): boolean } {
-    const isBoard = options.kind === "board";
-    // Die Rangliste ist 1000 breit; ihre Höhe kommt mit jeder Vorschau.
-    let W = isBoard ? BOARD_WIDTH : DESIGN_SIZE[options.kind as DesignKind].width;
-    let H = isBoard ? 1100 : DESIGN_SIZE[options.kind as DesignKind].height;
+    const { width: W, height: H } = DESIGN_SIZE[options.kind];
     const up = options.kind === "up";
     const history = new History<IState>();
-    const fallback = (): IStudioDesign => structuredClone(options.templates[options.fallback]);
+    const fallback = (): ICardDesign => structuredClone(options.templates[options.fallback]);
 
     let state: IState = { design: structuredClone(options.design ?? options.templates[options.fallback]), upLine: options.upLine ?? "{user}" };
     let saved = JSON.stringify(state);
@@ -165,68 +140,42 @@ export function levelStudio(host: HTMLElement, options: ILevelStudioOptions): { 
     let thumbsLoading = false;
     let request = 0;
     let timer: number | null = null;
-    // Plan 38: der gewählte Bereich der Rangliste und wo die Bereiche im Bild liegen.
-    let area: BoardArea = "row";
-    let areas: Record<BoardArea, IAreaBox | null> = { head: null, podium: null, row: null, foot: null };
 
     const dirty = (): boolean => JSON.stringify(state) !== saved;
-    const asBoard = (): IBoardDesign => state.design as IBoardDesign;
-    /** Die Bausteine, die gerade bearbeitet werden - bei der Rangliste die des gewählten Bereichs. */
-    const els = (): IDesignElement[] => (isBoard ? asBoard()[area].elements : (state.design as ICardDesign).elements);
-    /** Wo der Bereich im Bild liegt - Griffe, Schild und Hilfslinien werden darum verschoben. */
-    const frame = (): IRect => (isBoard ? (areas[area] ?? { x: 0, y: 0, w: W, h: H }) : { x: 0, y: 0, w: W, h: H });
-
-    /** So weit dürfen Bausteine - die Fläche bzw. das Muster des Bereichs (wie services/levels/Design.ts). */
-    function space(): { width: number; height: number } {
-        if (!isBoard) return { width: W, height: H };
-
-        const design = asBoard();
-
-        if (area === "podium") return { width: design.podium.w, height: design.podium.slotH };
-        if (area === "row") return { width: design.row.w, height: design.row.h };
-
-        return { width: BOARD_WIDTH, height: design[area].h };
-    }
-
-    /** Platzhalter des Bereichs. */
-    function placeholderKeys(): readonly string[] {
-        if (!isBoard || !options.areaPlaceholders) return options.placeholders;
-
-        return area === "podium" || area === "row" ? options.areaPlaceholders.entry : options.areaPlaceholders.frame;
-    }
+    const els = (): IDesignElement[] => state.design.elements;
+    /** So weit dürfen Bausteine - das ganze Bild (wie services/levels/Design.ts). */
+    const space = (): { width: number; height: number } => ({ width: W, height: H });
 
     /* ------------------------------------------------------------
        Hülle
        ------------------------------------------------------------ */
     const discordToggle = up ? button("sto-bt", "So in Discord") : null;
     const reset = confirmButton("sto-bt", "#i-refresh", "Auf Vorgabe zurück", "Wirklich zurück?", async () => {
-        const answer = await options.call<{ design: IStudioDesign | null; upLine?: string; effective?: IStudioDesign; templates?: Record<string, IStudioDesign> }>({ action: "design.save", kind: options.kind, design: null, ...(up ? { upLine: state.upLine } : {}) });
+        const answer = await options.call<{ design: ICardDesign | null; upLine?: string }>({ action: "design.save", kind: options.kind, design: null, ...(up ? { upLine: state.upLine } : {}) });
 
         if (!answer) return;
 
         history.remember(state);
-        resetTemplates(answer.templates);
-        state = { design: answer.effective ?? fallback(), upLine: answer.upLine ?? state.upLine };
+        state = { design: fallback(), upLine: answer.upLine ?? state.upLine };
         saved = JSON.stringify(state);
         own = false;
         selected = null;
         repaint();
         changed();
-        toast("info", "Zurückgesetzt", up ? "Beim Aufstieg kommt wieder das Banner." : isBoard ? "Die Rangliste zeigt wieder die Vorlage Podium." : "/level rang zeigt wieder die Vorlage Klassisch.");
+        toast("info", "Zurückgesetzt", up ? "Beim Aufstieg kommt wieder das Banner." : "/level rang zeigt wieder die Vorlage Klassisch.");
     });
 
     const s = studio(host, {
-        title: up ? "Aufstieg" : isBoard ? "Rangliste" : "Level-Karte",
+        title: up ? "Aufstieg" : "Level-Karte",
         head: options.head,
         panels: [
             { id: "templates", label: "Vorlagen", icon: "#i-layout", render: paintTemplates },
-            ...(isBoard ? [{ id: "areas", label: "Bereiche", icon: "#i-grid", render: paintAreas }] : []),
             { id: "add", label: "Elemente", icon: "#i-plus", render: paintAdders },
             { id: "background", label: "Hintergrund", icon: "#i-image" },
             { id: "layers", label: "Ebenen", icon: "#i-list", render: paintLayers },
         ],
         stageTools: true,
-        pill: isBoard ? "Vorschau: Lifetime, Seite 1" : "Vorschau mit deinen Daten",
+        pill: "Vorschau mit deinen Daten",
         onUndo: () => travel(history.undo(state)),
         onRedo: () => travel(history.redo(state)),
         onPanel: (id) => {
@@ -251,12 +200,11 @@ export function levelStudio(host: HTMLElement, options: ILevelStudioOptions): { 
     const picture = el("img", "");
     const gridlines = el("div", "sto-gridlines");
     const handles = el("div", "sto-handles");
-    const zones = el("div", "sto-zones");
     const guideX = el("div", "sto-guide sto-guide--x");
     const guideY = el("div", "sto-guide sto-guide--y");
     const tag = el("div", "sto-tag");
     const floatBar = el("div", "sto-float");
-    const board = el("div", "sto-board", picture, gridlines, zones, handles, guideX, guideY, tag, floatBar);
+    const board = el("div", "sto-board", picture, gridlines, handles, guideX, guideY, tag, floatBar);
     const discord = el("div", "sto-discord");
 
     picture.alt = up ? "Vorschau des Aufstiegs-Bilds" : "Vorschau der Level-Karte";
@@ -273,75 +221,20 @@ export function levelStudio(host: HTMLElement, options: ILevelStudioOptions): { 
         board.style.aspectRatio = `${W}/${H}`;
         gridlines.style.backgroundSize = `${(10 / W) * 100}% ${(10 / H) * 100}%`;
         board.style.width = zoom === "fit" ? "100%" : `${W * zoom}px`;
-        // Die hohe Rangliste passt beim Einpassen auch in der Höhe ins Fenster.
-        board.style.maxWidth = zoom === "fit" ? (isBoard ? `min(${W * 1.5}px, ${((W / H) * 76).toFixed(2)}vh)` : `${W * 1.5}px`) : "none";
+        board.style.maxWidth = zoom === "fit" ? `${W * 1.5}px` : "none";
     };
 
     s.onTools(applyTools);
     applyTools();
 
-    // Klick daneben: nichts mehr gewählt - der Inspektor zeigt das Ganze. Plan 38: ein Klick in einen anderen Bereich wählt ihn.
+    // Klick daneben: nichts mehr gewählt - der Inspektor zeigt das Ganze.
     board.addEventListener("pointerdown", (event) => {
         const target = event.target as HTMLElement;
 
-        if (!(target === board || target === picture || target === handles || zones.contains(target))) return;
-
-        if (isBoard) {
-            const rect = board.getBoundingClientRect();
-            const hit = areaAt(((event.clientX - rect.left) / rect.width) * W, ((event.clientY - rect.top) / rect.height) * H);
-
-            if (hit && hit !== area) return setArea(hit);
-        }
+        if (!(target === board || target === picture || target === handles)) return;
 
         select(null);
     });
-
-    /** Plan 38: welcher Bereich an dieser Stelle des Bilds liegt - auch jede Wiederholung von Podium und Zeile. */
-    function areaAt(x: number, y: number): BoardArea | null {
-        const inside = (rect: IRect): boolean => x >= rect.x && x <= rect.x + rect.w && y >= rect.y && y <= rect.y + rect.h;
-
-        for (const key of ["podium", "row", "head", "foot"] as const) {
-            const box = areas[key];
-
-            if (box && (inside(box) || box.repeats.some(inside))) return key;
-        }
-
-        return null;
-    }
-
-    /** Plan 38: einen anderen Bereich bearbeiten - Auswahl weg, Griffe des Bereichs aus der letzten Vorschau. */
-    function setArea(next: BoardArea): void {
-        area = next;
-        selected = null;
-        boxes = areas[next]?.boxes ?? [];
-        pending = null;
-        repaint();
-
-        if (s.panel() === "areas") s.refreshPanel();
-    }
-
-    /** Plan 38: der gewählte Bereich mit Schild, seine Wiederholungen gestrichelt. */
-    function paintZones(): void {
-        const box = isBoard ? areas[area] : null;
-
-        if (!box) return void zones.replaceChildren();
-
-        const zone = (rect: IRect, on: boolean): HTMLElement => {
-            const node = el("div", `sto-zone${on ? " is-on" : ""}`);
-
-            node.style.left = `${(rect.x / W) * 100}%`;
-            node.style.top = `${(rect.y / H) * 100}%`;
-            node.style.width = `${(rect.w / W) * 100}%`;
-            node.style.height = `${(rect.h / H) * 100}%`;
-
-            return node;
-        };
-        const current = zone(box, true);
-        const label = area === "row" ? "Zeile · gilt für alle weiteren Plätze" : area === "podium" ? "Podium · gilt für Platz 1–3" : BOARD_AREA_LABEL[area];
-
-        current.append(el("span", "sto-zone__label", label));
-        zones.replaceChildren(current, ...box.repeats.map((rect) => zone(rect, false)));
-    }
 
     discordToggle?.addEventListener("click", () => {
         discord.hidden = !discord.hidden;
@@ -357,12 +250,9 @@ export function levelStudio(host: HTMLElement, options: ILevelStudioOptions): { 
         return boxes.find((box) => box.id === id) ?? null;
     }
 
-    /** box in den Koordinaten des Bereichs - bei Karte und Aufstieg ist das das ganze Bild. */
     function place(node: HTMLElement, box: IRect): void {
-        const origin = frame();
-
-        node.style.left = `${((origin.x + box.x) / W) * 100}%`;
-        node.style.top = `${((origin.y + box.y) / H) * 100}%`;
+        node.style.left = `${(box.x / W) * 100}%`;
+        node.style.top = `${(box.y / H) * 100}%`;
         node.style.width = `${(box.w / W) * 100}%`;
         node.style.height = `${(box.h / H) * 100}%`;
     }
@@ -446,9 +336,7 @@ export function levelStudio(host: HTMLElement, options: ILevelStudioOptions): { 
         if (!box || !element) return;
 
         // In der rechten Hälfte hängen Schild und Leiste an der rechten Kante - sonst ragen sie aus der Bühne.
-        const origin = frame();
-        const x = origin.x + box.x;
-        const y = origin.y + box.y;
+        const { x, y } = box;
         const right = x + box.w / 2 > W / 2;
 
         tag.textContent = `${element.name} · x ${element.x} · y ${element.y}`;
@@ -490,8 +378,8 @@ export function levelStudio(host: HTMLElement, options: ILevelStudioOptions): { 
         guideX.hidden = gx === null;
         guideY.hidden = gy === null;
 
-        if (gx !== null) guideX.style.left = `${((frame().x + gx) / W) * 100}%`;
-        if (gy !== null) guideY.style.top = `${((frame().y + gy) / H) * 100}%`;
+        if (gx !== null) guideX.style.left = `${(gx / W) * 100}%`;
+        if (gy !== null) guideY.style.top = `${(gy / H) * 100}%`;
     }
 
     /** Ziehen: kommt währenddessen eine Vorschau, gelten ihre Rahmen erst nach dem Loslassen. */
@@ -516,7 +404,7 @@ export function levelStudio(host: HTMLElement, options: ILevelStudioOptions): { 
         if (image) {
             handle.style.backgroundImage = `url("${image}")`;
             handle.style.backgroundSize = `${rect.width}px ${rect.height}px`;
-            handle.style.backgroundPosition = `${-((frame().x + box.x) / scale)}px ${-((frame().y + box.y) / scale)}px`;
+            handle.style.backgroundPosition = `${-(box.x / scale)}px ${-(box.y / scale)}px`;
         }
 
         dragging = true;
@@ -687,7 +575,7 @@ export function levelStudio(host: HTMLElement, options: ILevelStudioOptions): { 
     async function refresh(): Promise<void> {
         const mine = ++request;
         const sent = JSON.stringify(state.design);
-        const answer = await options.call<IPreview | IBoardPreview>({ action: "design.preview", kind: options.kind, design: state.design });
+        const answer = await options.call<IPreview>({ action: "design.preview", kind: options.kind, design: state.design });
 
         // Eine Antwort zu einem Stand, den es nicht mehr gibt (inzwischen getippt, Rückgängig), zählt nicht -
         // sonst holte das „Übernehmen“ unten den alten Stand zurück. Die nächste Vorschau ist schon bestellt.
@@ -695,15 +583,7 @@ export function levelStudio(host: HTMLElement, options: ILevelStudioOptions): { 
 
         image = answer.image;
         picture.src = answer.image;
-
-        // Plan 38: die Rangliste wächst mit ihren Bereichen - Größe und Lage der Bereiche kommen mit.
-        if ("areas" in answer) {
-            W = answer.width;
-            H = answer.height;
-            areas = answer.areas;
-            applyTools();
-            paintZones();
-        } else values = answer.values;
+        values = answer.values;
 
         // Was der Bot zurechtgerückt hat, übernimmt der Builder - ohne eigenen Rückgängig-Schritt (Review M8).
         if (!dragging && JSON.stringify(answer.design) !== JSON.stringify(state.design)) {
@@ -712,11 +592,9 @@ export function levelStudio(host: HTMLElement, options: ILevelStudioOptions): { 
             s.setDirty(dirty());
         }
 
-        const next = "areas" in answer ? (answer.areas[area]?.boxes ?? []) : answer.boxes;
-
-        if (dragging) pending = next;
+        if (dragging) pending = answer.boxes;
         else {
-            boxes = next;
+            boxes = answer.boxes;
             paintHandles();
         }
 
@@ -724,18 +602,16 @@ export function levelStudio(host: HTMLElement, options: ILevelStudioOptions): { 
     }
 
     async function save(): Promise<boolean> {
-        const answer = await options.call<{ design: IStudioDesign | null; upLine?: string; effective?: IStudioDesign; templates?: Record<string, IStudioDesign> }>({ action: "design.save", kind: options.kind, design: state.design, ...(up ? { upLine: state.upLine } : {}) });
+        const answer = await options.call<{ design: ICardDesign | null; upLine?: string }>({ action: "design.save", kind: options.kind, design: state.design, ...(up ? { upLine: state.upLine } : {}) });
 
         if (!answer) return false;
-
-        resetTemplates(answer.templates);
 
         state = { design: answer.design ?? fallback(), upLine: answer.upLine ?? state.upLine };
         saved = JSON.stringify(state);
         own = Boolean(answer.design);
         repaint();
         changed();
-        toast("info", "Gespeichert", up ? "Gilt ab dem nächsten Aufstieg." : isBoard ? "Gilt ab der nächsten /level rangliste." : "Gilt ab dem nächsten /level rang.");
+        toast("info", "Gespeichert", up ? "Gilt ab dem nächsten Aufstieg." : "Gilt ab dem nächsten /level rang.");
 
         return true;
     }
@@ -759,7 +635,6 @@ export function levelStudio(host: HTMLElement, options: ILevelStudioOptions): { 
     }
 
     function repaint(): void {
-        paintZones();
         paintHandles();
         paintFloat();
         paintInspector();
@@ -837,7 +712,7 @@ export function levelStudio(host: HTMLElement, options: ILevelStudioOptions): { 
         const draw = (): void =>
             list.replaceChildren(
                 ...Object.keys(options.templates).map((name) => {
-                    const pick = button(`sto-tpl${name === "leer" ? " sto-tpl--empty" : ""}${isBoard ? " sto-tpl--board" : ""}`);
+                    const pick = button(`sto-tpl${name === "leer" ? " sto-tpl--empty" : ""}`);
                     const thumb = thumbs?.[name];
 
                     if (thumb && name !== "leer") {
@@ -877,39 +752,8 @@ export function levelStudio(host: HTMLElement, options: ILevelStudioOptions): { 
         }
     }
 
-    /** Plan 38: nach Speichern oder Zurücksetzen der Rangliste kommen die Vorlagen im neuen Stil - die Bilder dazu frisch. */
-    function resetTemplates(templates: Record<string, IStudioDesign> | undefined): void {
-        if (!templates) return;
-
-        options.templates = templates;
-        thumbs = null;
-        thumbsLoading = false;
-
-        if (s.panel() === "templates") s.refreshPanel();
-    }
-
-    /** Plan 38: die vier Bereiche der Rangliste. */
-    function paintAreas(host: HTMLElement): void {
-        const list = el("div", "sto-areas");
-
-        for (const key of ["head", "podium", "row", "foot"] as const) {
-            const pick = button("sto-layer", pathIcon(AREA_ICON[key]), el("span", "sto-ln", el("span", "", BOARD_AREA_LABEL[key]), el("small", "", AREA_NOTE[key])));
-
-            pick.setAttribute("aria-pressed", String(area === key));
-            pick.addEventListener("click", () => setArea(key));
-            list.append(el("div", `sto-lrow${area === key ? " is-on" : ""}`, pick));
-        }
-
-        host.replaceChildren(
-            el("p", "sto-h", "Bereiche"),
-            list,
-            el("p", "sto-note", "Podium und Zeile sind Muster: Was du am ersten Platz änderst, zeichnet der Bot für jeden Platz. Ein Klick ins Bild wählt den Bereich dort.")
-        );
-    }
-
     function paintAdders(host: HTMLElement): void {
         const room = els().length < MAX_ELEMENTS;
-        const allowed = isBoard ? BOARD_AREA_TYPES[area] : null;
         const add = (type: IDesignElement["type"], label: string): HTMLButtonElement => {
             const action = button("sto-add", pathIcon(ICONS[type]), label);
 
@@ -934,7 +778,7 @@ export function levelStudio(host: HTMLElement, options: ILevelStudioOptions): { 
         };
 
         host.replaceChildren(
-            el("p", "sto-h", isBoard ? `Elemente · ${BOARD_AREA_LABEL[area]}` : "Elemente"),
+            el("p", "sto-h", "Elemente"),
             el(
                 "div",
                 "sto-adds",
@@ -948,11 +792,8 @@ export function levelStudio(host: HTMLElement, options: ILevelStudioOptions): { 
                         ["ring", "Level-Ring"],
                         ["icon", "Server-Icon"],
                     ] as const
-                )
-                    .filter(([type]) => !allowed || allowed.includes(type))
-                    .map(([type, label]) => add(type, label))
+                ).map(([type, label]) => add(type, label))
             ),
-            ...(isBoard && (area === "head" || area === "foot") ? [el("p", "sto-note", "Avatar, Balken und Level-Ring gibt es im Podium und in der Zeile – dort gehören sie zu einem Platz.")] : []),
             ...(room ? [] : [el("p", "sto-full", `Höchstens ${MAX_ELEMENTS} Bausteine – lösch einen, um Platz zu machen.`)])
         );
     }
@@ -995,7 +836,7 @@ export function levelStudio(host: HTMLElement, options: ILevelStudioOptions): { 
         background.dataset.layer = "bg";
         background.setAttribute("aria-pressed", String(selected === "bg"));
         background.addEventListener("click", () => select("bg", true));
-        host.replaceChildren(el("p", "sto-h", isBoard ? `Ebenen · ${BOARD_AREA_LABEL[area]}` : "Ebenen"), el("p", "sto-note", "Oben liegt vorne."), el("div", "sto-layers", ...rows, el("div", `sto-lrow sto-lrow--bg${selected === "bg" ? " is-on" : ""}`, background)));
+        host.replaceChildren(el("p", "sto-h", "Ebenen"), el("p", "sto-note", "Oben liegt vorne."), el("div", "sto-layers", ...rows, el("div", `sto-lrow sto-lrow--bg${selected === "bg" ? " is-on" : ""}`, background)));
     }
 
     /* ------------------------------------------------------------
@@ -1074,40 +915,6 @@ export function levelStudio(host: HTMLElement, options: ILevelStudioOptions): { 
         input.disabled = value === null;
 
         return el("div", "sto-row", input, el("label", "sto-check", none, "keine"));
-    }
-
-    /** Plan 38: Farben mit Bedeutung - „Akzent“ überall, „Medaille“ und „Trend“ an einem Platz. */
-    function keywords(): [string, string][] {
-        if (!isBoard) return [];
-
-        return area === "podium" || area === "row" ? [["accent", "Akzent"], ["medal", "Medaille"], ["trend", "Trend"]] : [["accent", "Akzent"]];
-    }
-
-    /** Eine Farbe - in der Rangliste mit Auswahl „Eigene Farbe“ oder einer Bedeutung. */
-    function paint(key: string, value: string, apply: (value: string) => void): HTMLElement {
-        const words = keywords();
-
-        if (!words.length) return color(key, value, apply);
-
-        const input = color(key, value, apply);
-        const custom = value.startsWith("#");
-
-        input.disabled = !custom;
-
-        return el("div", "sto-row", choice(`${key}:mode`, [["#", "Eigene Farbe"], ...words], custom ? "#" : value, (mode) => apply(mode === "#" ? input.value : mode)), input);
-    }
-
-    /** Wie paint, dazu „keine“. */
-    function paintOptional(key: string, value: string | null, apply: (value: string | null) => void): HTMLElement {
-        const words = keywords();
-
-        if (!words.length) return optionalColor(key, value, apply);
-
-        const input = color(key, value?.startsWith("#") ? value : "#ffffff", apply);
-
-        input.disabled = !value?.startsWith("#");
-
-        return el("div", "sto-row", choice(`${key}:mode`, [["none", "Keine"], ["#", "Eigene Farbe"], ...words], value === null ? "none" : value.startsWith("#") ? "#" : value, (mode) => apply(mode === "none" ? null : mode === "#" ? input.value : mode)), input);
     }
 
     function choice<T extends string | number>(key: string, entries: [T, string][], value: T, apply: (value: T) => void): HTMLSelectElement {
@@ -1238,89 +1045,6 @@ export function levelStudio(host: HTMLElement, options: ILevelStudioOptions): { 
         );
     }
 
-    /** Plan 38: die Maße des gewählten Bereichs. */
-    function areaGroup(): HTMLElement {
-        const design = asBoard();
-        const surface = (fill: IBoardFill, prefix: string): HTMLElement[] => [
-            field("Fläche", paintOptional(`${prefix}-fill`, fill.fill, (value) => (fill.fill = value))),
-            field(`Deckkraft der Fläche: ${fill.fillOpacity} %`, range(`${prefix}-opacity`, fill.fillOpacity, 0, 100, (value) => (fill.fillOpacity = value))),
-            segment([["rect", "Eckig"], ["bevel", "Abgeschrägt"], ["round", "Abgerundet"]], fill.shape, (value) => (fill.shape = value), "Form der Fläche"),
-            ...(fill.shape === "rect" ? [] : [field("Ecken", number(`${prefix}-cut`, fill.cut, 0, 40, (value) => (fill.cut = value)))]),
-        ];
-        const check = (label: string, on: boolean, apply: (on: boolean) => void): HTMLElement =>
-            el(
-                "label",
-                "sto-check",
-                toggle(on, label, (next) => {
-                    history.remember(state);
-                    apply(next);
-                    changed();
-                    paintInspector();
-                }),
-                label
-            );
-
-        if (area === "head" || area === "foot") {
-            const part = design[area];
-
-            return group(BOARD_AREA_LABEL[area], field("Höhe", number(`${area}-h`, part.h, area === "head" ? 40 : 0, area === "head" ? 400 : 300, (value) => (part.h = value))));
-        }
-
-        if (area === "podium") {
-            const podium = design.podium;
-
-            return group(
-                "Podium · Platz 1–3",
-                check("Podium zeigen", podium.on, (on) => (podium.on = on)),
-                el("p", "sto-note", "Aus: Seite 1 zeigt nur Zeilen. Das Muster gilt für alle drei Plätze, die Farbe „Medaille“ macht den Unterschied."),
-                two(field("Höhe des Bereichs", number("podium-h", podium.h, 120, 600, (value) => (podium.h = value))), field("Abstand", number("podium-gap", podium.gap, 0, 60, (value) => (podium.gap = value)))),
-                two(field("Breite eines Platzes", number("podium-w", podium.w, 120, Math.floor((BOARD_WIDTH - 2 * podium.gap) / 3), (value) => (podium.w = value))), field("Höhe eines Platzes", number("podium-slot", podium.slotH, 60, podium.h, (value) => (podium.slotH = value)))),
-                field("Tiefer gesetzt: Platz 1, 2, 3", el("div", "sto-three", ...([0, 1, 2] as const).map((index) => number(`podium-offset-${index}`, podium.offsets[index], 0, 200, (value) => (podium.offsets[index] = value))))),
-                ...surface(podium, "podium")
-            );
-        }
-
-        const row = design.row;
-        const widest = row.columns === 2 ? Math.floor((BOARD_WIDTH - row.x - row.gap) / 2) : BOARD_WIDTH - row.x;
-
-        return group(
-            "Zeile · alle weiteren Plätze",
-            two(field("Höhe", number("row-h", row.h, 30, 200, (value) => (row.h = value))), field("Abstand", number("row-gap", row.gap, 0, 40, (value) => (row.gap = value)))),
-            two(field("Linker Rand", number("row-x", row.x, 0, 200, (value) => (row.x = value))), field("Breite", number("row-w", row.w, Math.min(200, widest), widest, (value) => (row.w = value)))),
-            segment([["1", "Eine Spalte"], ["2", "Zwei Spalten"]], String(row.columns) as "1" | "2", (value) => (row.columns = value === "2" ? 2 : 1), "Spalten"),
-            ...surface(row, "row"),
-            field("Eigene Zeile hervorheben", optionalColor("row-highlight", row.highlight, (value) => (row.highlight = value)))
-        );
-    }
-
-    /** Plan 38: was für das ganze Ranglisten-Bild gilt. */
-    function wholeGroup(): HTMLElement {
-        const design = asBoard();
-        const title = text("board-title", design.title, 80, (value) => (design.title = value));
-
-        title.setAttribute("aria-label", "Titel");
-
-        return group(
-            "Ganzes Bild",
-            field("Titel – steht überall, wo {title} steht", title),
-            placeholderMenu(title, ["guild", "period", "range"], (value) => (design.title = value)),
-            el("p", "sto-note", "Bei den Posts der Aktivsten steht dort „Aktivste der Woche“ bzw. „des Monats“, bei {period} der Zeitraum."),
-            two(field("Akzent", color("board-accent", design.accent, (value) => (design.accent = value))), field("Plätze je Seite", segment([["10", "10"], ["20", "20"]], String(design.perPage) as "10" | "20", (value) => (design.perPage = value === "20" ? 20 : 10), "Plätze je Seite"))),
-            field("Medaillen: Platz 1, 2, 3", el("div", "sto-three", ...([0, 1, 2] as const).map((index) => color(`board-medal-${index}`, design.medals[index], (value) => (design.medals[index] = value))))),
-            el(
-                "label",
-                "sto-check",
-                toggle(design.glow, "Schein in der Akzentfarbe", (on) => {
-                    history.remember(state);
-                    design.glow = on;
-                    changed();
-                }),
-                "Schein in der Akzentfarbe"
-            ),
-            el("p", "sto-note", "Discord blättert mit denselben Plätzen je Seite.")
-        );
-    }
-
     function range(key: string, value: number, min: number, max: number, apply: (value: number) => void): HTMLInputElement {
         const input = el("input", "");
 
@@ -1363,11 +1087,9 @@ export function levelStudio(host: HTMLElement, options: ILevelStudioOptions): { 
                 );
             }
 
-            if (isBoard && selected !== "bg") parts.push(areaGroup(), wholeGroup());
-
             parts.push(backgroundGroup());
 
-            if (!els().length) parts.push(el("p", "sto-note", isBoard ? `${BOARD_AREA_LABEL[area]} ist noch leer. Füg links Elemente hinzu oder nimm eine Vorlage.` : "Noch leer. Nimm links eine Vorlage oder füg Elemente hinzu."));
+            if (!els().length) parts.push(el("p", "sto-note", "Noch leer. Nimm links eine Vorlage oder füg Elemente hinzu."));
 
             s.inspector.replaceChildren(...parts);
 
@@ -1389,12 +1111,9 @@ export function levelStudio(host: HTMLElement, options: ILevelStudioOptions): { 
                     group(
                         "Text",
                         field("Inhalt", input),
-                        placeholderMenu(input, placeholderKeys(), (value) => (element.text = value)),
+                        placeholderMenu(input, options.placeholders, (value) => (element.text = value)),
                         two(field("Schrift", choice(key("font"), fonts, element.font, (value) => (element.font = value))), field("Größe", number(key("size"), element.size, 10, 120, (value) => (element.size = value)))),
-                        // Plan 38: mit der Auswahl „Eigene Farbe / Akzent / …“ braucht die Farbe in der Rangliste eine eigene Zeile.
-                        ...(isBoard
-                            ? [field("Stärke", choice(key("weight"), [[400, "Normal"], [600, "Halbfett"], [700, "Fett"], [800, "Extrafett"]], element.weight, (value) => (element.weight = value))), field("Farbe", paint(key("color"), element.color, (value) => (element.color = value)))]
-                            : [two(field("Stärke", choice(key("weight"), [[400, "Normal"], [600, "Halbfett"], [700, "Fett"], [800, "Extrafett"]], element.weight, (value) => (element.weight = value))), field("Farbe", paint(key("color"), element.color, (value) => (element.color = value))))]),
+                        two(field("Stärke", choice(key("weight"), [[400, "Normal"], [600, "Halbfett"], [700, "Fett"], [800, "Extrafett"]], element.weight, (value) => (element.weight = value))), field("Farbe", color(key("color"), element.color, (value) => (element.color = value)))),
                         segment([["left", "Links"], ["center", "Mitte"], ["right", "Rechts"]], element.align, (value) => (element.align = value), "Ausrichtung")
                     )
                 );
@@ -1410,17 +1129,15 @@ export function levelStudio(host: HTMLElement, options: ILevelStudioOptions): { 
                     group(
                         "Form",
                         field("Art", choice(key("shape"), [["rect", "Rechteck"], ["bevel", "Abgeschrägt"], ["slant", "Schräge Kante"], ["circle", "Kreis"], ["line", "Linie"]], element.shape, (value) => (element.shape = value))),
-                        field("Füllung", paintOptional(key("fill"), element.fill, (value) => (element.fill = value))),
-                        field("Rand", paintOptional(key("stroke"), element.stroke, (value) => (element.stroke = value))),
+                        field("Füllung", optionalColor(key("fill"), element.fill, (value) => (element.fill = value))),
+                        field("Rand", optionalColor(key("stroke"), element.stroke, (value) => (element.stroke = value))),
                         two(field("Randstärke", number(key("strokeWidth"), element.strokeWidth, 0, 12, (value) => (element.strokeWidth = value))), field("Abschrägung", number(key("cut"), element.cut, 0, 150, (value) => (element.cut = value))))
                     )
                 );
                 break;
             case "avatar":
                 sizes.push(field("Größe", number(key("size"), element.size, 24, Math.min(300, space().width, space().height), (value) => (element.size = value))));
-                groups.push(group("Avatar", segment([["circle", "Rund"], ["bevel", "Abgeschrägt"]], element.shape, (value) => (element.shape = value), "Form"), ...(isBoard
-                            ? [field("Ring", number(key("ring"), element.ring, 0, 12, (value) => (element.ring = value))), field("Ringfarbe", paint(key("ringColor"), element.ringColor, (value) => (element.ringColor = value)))]
-                            : [two(field("Ring", number(key("ring"), element.ring, 0, 12, (value) => (element.ring = value))), field("Ringfarbe", paint(key("ringColor"), element.ringColor, (value) => (element.ringColor = value))))])));
+                groups.push(group("Avatar", segment([["circle", "Rund"], ["bevel", "Abgeschrägt"]], element.shape, (value) => (element.shape = value), "Form"), two(field("Ring", number(key("ring"), element.ring, 0, 12, (value) => (element.ring = value))), field("Ringfarbe", color(key("ringColor"), element.ringColor, (value) => (element.ringColor = value))))));
                 break;
             case "bar":
                 sizes.push(two(field("Breite", number(key("w"), element.w, 20, space().width, (value) => (element.w = value))), field("Höhe", number(key("h"), element.h, 4, 60, (value) => (element.h = value)))));
@@ -1430,9 +1147,7 @@ export function levelStudio(host: HTMLElement, options: ILevelStudioOptions): { 
                         segment([["solid", "Durchgehend"], ["segments", "In Feldern"]], element.style, (value) => (element.style = value), "Art"),
                         ...(element.style === "segments" ? [field("Felder", number(key("segments"), element.segments, 2, 40, (value) => (element.segments = value)))] : []),
                         segment([["round", "Rund"], ["bevel", "Abgeschrägt"]], element.corner, (value) => (element.corner = value), "Ecken"),
-                        ...(isBoard
-                            ? [field("Farbe von", paint(key("from"), element.from, (value) => (element.from = value))), field("Farbe bis", paint(key("to"), element.to, (value) => (element.to = value)))]
-                            : [two(field("Farbe von", paint(key("from"), element.from, (value) => (element.from = value))), field("Farbe bis", paint(key("to"), element.to, (value) => (element.to = value))))]),
+                        two(field("Farbe von", color(key("from"), element.from, (value) => (element.from = value))), field("Farbe bis", color(key("to"), element.to, (value) => (element.to = value)))),
                         field("Spur", color(key("track"), element.track, (value) => (element.track = value)))
                     )
                 );
@@ -1444,12 +1159,12 @@ export function levelStudio(host: HTMLElement, options: ILevelStudioOptions): { 
                 groups.push(
                     group(
                         "Level-Ring",
-                        field("Farbe", paint(key("color"), element.color, (next) => (element.color = next))),
+                        field("Farbe", color(key("color"), element.color, (next) => (element.color = next))),
                         field("Spur", color(key("track"), element.track, (next) => (element.track = next))),
                         field("Innen", optionalColor(key("inner"), element.inner, (next) => (element.inner = next))),
                         field("Kleine Zeile", text(key("label"), element.label, 40, (next) => (element.label = next))),
                         field("Wert", value),
-                        placeholderMenu(value, placeholderKeys(), (next) => (element.value = next)),
+                        placeholderMenu(value, options.placeholders, (next) => (element.value = next)),
                         two(field("Schrift", choice(key("font"), fonts, element.font, (next) => (element.font = next))), field("Textfarbe", color(key("textColor"), element.textColor, (next) => (element.textColor = next))))
                     )
                 );
@@ -1516,7 +1231,7 @@ export function levelStudio(host: HTMLElement, options: ILevelStudioOptions): { 
     /* ------------------------------------------------------------
        Los
        ------------------------------------------------------------ */
-    s.openPanel(own ? (isBoard ? "areas" : "layers") : "templates");
+    s.openPanel(own ? "layers" : "templates");
     applyTools();
     repaint();
     changed();

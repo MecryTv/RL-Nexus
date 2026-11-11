@@ -139,17 +139,13 @@ export interface IBoardStyle {
 }
 
 /* ----------------------------------------------------------
-   Plan 38: das Ranglisten-Bild im Baukasten
+   Das Ranglisten-Bild (Plan 38), seit W-0050 fest: BoardDesignC
+   Farben dürfen neben #rrggbb auch "accent", "medal" oder "trend" sein -
+   BoardRenderer setzt sie je Platz ein.
    ---------------------------------------------------------- */
 
 /** Kopf, Podium (Platz 1–3, ein Muster), Zeile (ein Muster für alle weiteren Plätze), Fuß. */
 export type BoardArea = "head" | "podium" | "row" | "foot";
-
-/**
- * Farben in der Rangliste dürfen neben #rrggbb auch eine Bedeutung haben:
- * "accent" überall, "medal" und "trend" nur im Podium und in der Zeile.
- */
-export type BoardColorKeyword = "accent" | "medal" | "trend";
 
 /** Die Fläche hinter jedem Podiumsplatz bzw. jeder Zeile. fill darf eine Bedeutung haben. */
 export interface IBoardFill {

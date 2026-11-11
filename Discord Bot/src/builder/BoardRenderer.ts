@@ -10,7 +10,7 @@ import { BoardArea, IBoardDesign, IBoardFill, IDesignBox } from "../interfaces/s
 import { IBoardEntry, IBoardPage } from "../interfaces/services/levels/ILevels";
 
 /**
- * Plan 38: das Ranglisten-Bild aus dem Baukasten. Kopf, dann auf Seite 1 das
+ * Plan 38, seit W-0050 immer mit BoardDesignC: das Ranglisten-Bild. Kopf, dann auf Seite 1 das
  * Podium (ein Muster je Platz 1–3, versetzt nach offsets und unten am Bereich
  * abgeschnitten), dann die Zeilen (ein Muster je Platz, 1 oder 2 Spalten),
  * dann der Fuß. Die Bausteine zeichnet DesignRenderer - verschoben in ihren
@@ -39,7 +39,7 @@ export interface IBoardAreaBox {
     w: number;
     h: number;
     boxes: IDesignBox[];
-    /** Plan 38: wo das Muster sonst noch steht - die Bühne zeigt dort gestrichelte Rahmen. */
+    /** Wo das Muster sonst noch steht - check:leveldesign prüft daran die Lage der Plätze. */
     repeats: { x: number; y: number; w: number; h: number }[];
 }
 

@@ -130,7 +130,7 @@ async function Post(
 
     if (!channel) errors.push("Den Kanal gibt es nicht mehr.");
     else {
-        // Plan 38: das Bild aus dem Baukasten; {title} und {period} zeigen, was gepostet wird.
+        // Das Ranglisten-Bild (Vorlage C); {title} und {period} zeigen, was gepostet wird.
         const png = await client.levelService.BoardImage(guild, page, null, { title: TOP_TITLE[kind], period: Chip(kind, due) }, hooks);
         const sent = await channel.send({ files: [new AttachmentBuilder(png, { name: kind === "week" ? "aktivste-woche.png" : "aktivste-monat.png" })] }).catch(() => null);
 

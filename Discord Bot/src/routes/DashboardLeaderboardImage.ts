@@ -48,7 +48,7 @@ export default class DashboardLeaderboardImage extends Route {
         if (!kept || now - kept.at > KEEP_MS) {
             const page = await this.client.levelService.Board(guild, "all", 1, null);
 
-            // Plan 38: dasselbe Bild wie in Discord, aus dem Baukasten.
+            // Dasselbe Bild wie in Discord (seit W-0050 fest Vorlage C).
             kept = { at: now, png: await this.client.levelService.BoardImage(guild, page, null) };
             this.cache.set(guild.id, kept);
         }

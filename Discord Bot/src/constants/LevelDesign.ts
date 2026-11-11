@@ -1,4 +1,4 @@
-import { BoardArea, DesignFont, DesignKind, IBoardDesign, IBoardStyle, ICardDesign, IDesignBackground, IDesignElement, ITextElement } from "../interfaces/services/levels/ILevelDesign";
+import { DesignFont, DesignKind, IBoardDesign, IBoardStyle, ICardDesign, IDesignBackground, IDesignElement, ITextElement } from "../interfaces/services/levels/ILevelDesign";
 
 /**
  * Level System, Plan 35: der Designer für Level-Karte und Aufstiegs-Bild,
@@ -44,12 +44,6 @@ export const DESIGN_PLACEHOLDERS = [
 
 /** Titel und kleine Zeile des Ranglisten-Stils (Plan 35). */
 export const BOARD_PLACEHOLDERS = ["guild", "period", "range"] as const;
-
-/** Plan 38: Kopf und Fuß des Ranglisten-Baukastens. */
-export const BOARD_FRAME_PLACEHOLDERS = ["title", "guild", "period", "range", "page", "pages", "total"] as const;
-
-/** Plan 38: ein Platz in Podium und Zeile. */
-export const BOARD_ENTRY_PLACEHOLDERS = ["rank", "name", "level", "xp", "messages", "voice", "voice.hours", "trend"] as const;
 
 export const ELEMENT_LABEL: Record<IDesignElement["type"], string> = {
     text: "Text",
@@ -238,22 +232,12 @@ export const UP_TEMPLATES: Record<"banner" | "klassisch" | "mittig" | "panel" | 
 };
 
 /* ----------------------------------------------------------
-   Plan 38: das Ranglisten-Bild im Baukasten
+   Das Ranglisten-Bild (Plan 38, seit W-0050 fest: BoardDesignC)
    Vier Bereiche (Kopf, Podium, Zeile, Fuß), 1000 breit. Podium und Zeile
    sind Muster - der Bot wiederholt sie je Platz. Farben dürfen "accent",
    im Podium und in der Zeile auch "medal" und "trend" sein.
    ---------------------------------------------------------- */
 export const BOARD_WIDTH = 1000;
-
-/** Was in welchem Bereich stehen darf - Avatar, Balken und Ring brauchen einen Platz. */
-export const BOARD_AREA_TYPES: Record<BoardArea, readonly IDesignElement["type"][]> = {
-    head: ["text", "image", "shape", "icon"],
-    podium: ["text", "image", "shape", "icon", "avatar", "bar", "ring"],
-    row: ["text", "image", "shape", "icon", "avatar", "bar", "ring"],
-    foot: ["text", "image", "shape", "icon"],
-};
-
-export const BOARD_AREA_LABEL: Record<BoardArea, string> = { head: "Kopf", podium: "Podium", row: "Zeile", foot: "Fuß" };
 
 /** Die Farben des bisherigen Bilds (builder/LeaderboardImage.ts). */
 const BOARD = { text: "#f2f4f7", dim: "#a8b0bc", cyan: "#38bdf8" };
@@ -269,159 +253,9 @@ function boardBackground(style: IBoardStyle): IDesignBackground {
     return { mode: style.image ? "image" : "gradient", image: style.image, dim: style.dim, color: "#0d1020", to: "#1a1238", shape: "rect", cut: 16, border: null, borderWidth: 0 };
 }
 
-/** Die Zeile des bisherigen Bilds: Platz, Avatar, Name, Nachrichten und Voice, Level, Punkte, Trend. */
-function classicRow(font: DesignFont): IBoardDesign["row"] {
-    return {
-        x: 40,
-        w: 920,
-        h: 74,
-        gap: 8,
-        columns: 1,
-        fill: "#ffffff",
-        fillOpacity: 5,
-        shape: "bevel",
-        cut: 10,
-        highlight: BOARD.cyan,
-        elements: [
-            line("platz", "Platz", "{rank}", 22, 47, 26, { font, weight: 700, color: "medal", maxWidth: 66 }),
-            { type: "avatar", id: "avatar", name: "Avatar", hidden: false, x: 92, y: 13, opacity: 1, size: 48, shape: "circle", ring: 0, ringColor: "medal" },
-            line("name", "Name", "{name}", 158, 33, 23, { font, weight: 700, color: BOARD.text, maxWidth: 380 }),
-            line("zahlen", "Nachrichten · Voice", "{messages} Nachr. · {voice} Min. ({voice.hours})", 158, 58, 18, { maxWidth: 420 }),
-            line("lvl", "LVL", "LVL", 690, 30, 15, { align: "right", maxWidth: 60 }),
-            line("level", "Level", "{level}", 690, 58, 26, { font, weight: 800, color: "accent", align: "right", maxWidth: 90 }),
-            line("punkte", "Punkte", "{xp}", 838, 38, 25, { font, weight: 700, color: BOARD.text, align: "right", maxWidth: 130 }),
-            line("punkte-label", "PUNKTE", "PUNKTE", 838, 60, 15, { align: "right", maxWidth: 80 }),
-            line("trend", "Trend", "{trend}", 904, 46, 20, { font: "Oxanium", weight: 700, color: "trend", align: "right", maxWidth: 60 }),
-        ],
-    };
-}
-
-function classicFoot(): IBoardDesign["foot"] {
-    return {
-        h: 80,
-        elements: [
-            line("seite", "Seite", "Seite {page} von {pages} · {total} Mitglieder", 40, 46, 20, { maxWidth: 560 }),
-            line("zeitraum", "Zeitraum", "{range}", 960, 46, 20, { align: "right", maxWidth: 300 }),
-        ],
-    };
-}
-
-function classicHead(style: IBoardStyle, center = false): IBoardDesign["head"] {
-    const x = center ? BOARD_WIDTH / 2 : 40;
-    const align = center ? "center" : "left";
-    const chip: IDesignElement[] = [
-        { type: "shape", id: "chip", name: "Rahmen Zeitraum", hidden: false, x: 800, y: 76, opacity: 1, shape: "rect", w: 160, h: 40, fill: null, stroke: BOARD.cyan, strokeWidth: 2, cut: 0 },
-        line("zeitraum", "Zeitraum", "{period}", 880, 103, 20, { weight: 700, color: BOARD.cyan, align: "center", maxWidth: 150 }),
-    ];
-
-    return {
-        h: 140,
-        elements: [
-            line("untertitel", "Kleine Zeile", style.subtitle, x, 64, 20, { color: "accent", align, maxWidth: 560 }),
-            line("titel", "Titel", "{title}", x, 112, 46, { font: style.font, weight: 800, color: BOARD.text, align, maxWidth: 700 }),
-            ...(center ? [] : chip),
-        ],
-    };
-}
-
 function boardBase(style: IBoardStyle, template: string): Pick<IBoardDesign, "kind" | "template" | "background" | "accent" | "medals" | "glow" | "title"> {
     return { kind: "board", template, background: boardBackground(style), accent: style.accent, medals: [...style.medals], glow: true, title: style.title };
 }
-
-/** Das Podium des bisherigen Bilds: Platz 1 in der Mitte und höher. */
-function classicPodium(style: IBoardStyle, on: boolean): IBoardDesign["podium"] {
-    return {
-        on,
-        h: 320,
-        w: 280,
-        slotH: 300,
-        gap: 20,
-        offsets: [0, 40, 40],
-        fill: "medal",
-        fillOpacity: 10,
-        shape: "bevel",
-        cut: 16,
-        elements: [
-            line("platz", "Platz", "{rank}", 140, 44, 34, { font: style.font, weight: 800, color: "medal", align: "center", maxWidth: 80 }),
-            { type: "avatar", id: "avatar", name: "Avatar", hidden: false, x: 94, y: 58, opacity: 1, size: 92, shape: "circle", ring: 4, ringColor: "medal" },
-            line("name", "Name", "{name}", 140, 184, 24, { font: style.font, weight: 700, color: BOARD.text, align: "center", maxWidth: 250 }),
-            line("zeile", "Level und Punkte", "Level {level} · {xp} Punkte", 140, 210, 19, { align: "center", maxWidth: 250 }),
-            line("trend", "Trend", "{trend}", 140, 238, 20, { font: "Oxanium", weight: 700, color: "trend", align: "center", maxWidth: 80 }),
-        ],
-    };
-}
-
-/**
- * Die Vorlagen der Rangliste. Ohne Angabe gilt der Stil ab Werk; mit dem
- * bisherigen Ranglisten-Stil (Plan 35) übernimmt die Vorlage Bild, Abdunkeln,
- * Akzent, Medaillen, Schrift, Titel, kleine Zeile und Podium an/aus.
- */
-export const BOARD_TEMPLATES: Record<"podium" | "liste" | "kompakt" | "arena", (style?: IBoardStyle) => IBoardDesign> = {
-    /** Wie das bisherige Bild: Platz 1–3 groß, darunter die Zeilen. */
-    podium: (style = DefaultBoardStyle()) => ({ ...boardBase(style, "podium"), perPage: 10, head: classicHead(style), podium: classicPodium(style, style.podium), row: classicRow(style.font), foot: classicFoot() }),
-    /** Zehn gleiche Zeilen, ohne Podium. */
-    liste: (style = DefaultBoardStyle()) => ({ ...boardBase(style, "liste"), perPage: 10, head: classicHead(style), podium: classicPodium(style, false), row: classicRow(style.font), foot: classicFoot() }),
-    /** Zwei Spalten, 20 Plätze je Seite. */
-    kompakt: (style = DefaultBoardStyle()) => ({
-        ...boardBase(style, "kompakt"),
-        perPage: 20,
-        head: { ...classicHead(style), h: 130 },
-        podium: classicPodium(style, false),
-        row: {
-            x: 40,
-            w: 456,
-            h: 56,
-            gap: 8,
-            columns: 2,
-            fill: "#ffffff",
-            fillOpacity: 5,
-            shape: "bevel",
-            cut: 8,
-            highlight: BOARD.cyan,
-            elements: [
-                line("platz", "Platz", "{rank}", 14, 36, 22, { font: style.font, weight: 700, color: "medal", maxWidth: 46 }),
-                { type: "avatar", id: "avatar", name: "Avatar", hidden: false, x: 62, y: 10, opacity: 1, size: 36, shape: "circle", ring: 0, ringColor: "medal" },
-                line("name", "Name", "{name}", 110, 28, 19, { font: style.font, weight: 700, color: BOARD.text, maxWidth: 200 }),
-                line("level", "Level", "Level {level}", 110, 47, 15, { maxWidth: 200 }),
-                line("punkte", "Punkte", "{xp}", 396, 30, 20, { font: style.font, weight: 700, color: BOARD.text, align: "right", maxWidth: 90 }),
-                line("punkte-label", "PUNKTE", "PUNKTE", 396, 47, 12, { align: "right", maxWidth: 70 }),
-                line("trend", "Trend", "{trend}", 442, 38, 15, { font: "Oxanium", weight: 700, color: "trend", align: "right", maxWidth: 40 }),
-            ],
-        },
-        foot: classicFoot(),
-    }),
-    /** Das Podium als Treppe wie auf der Web-Rangliste, die Sockel in Medaillenfarbe. */
-    arena: (style = DefaultBoardStyle()) => ({
-        ...boardBase(style, "arena"),
-        perPage: 10,
-        head: classicHead(style, true),
-        // Platz 3 steht 90 tiefer: alles Lesbare bleibt über 380 − 90 = 290, darunter liegt nur der Sockel (Review Plan 38).
-        podium: {
-            on: true,
-            h: 400,
-            w: 260,
-            slotH: 380,
-            gap: 24,
-            offsets: [0, 50, 90],
-            fill: null,
-            fillOpacity: 0,
-            shape: "rect",
-            cut: 0,
-            elements: [
-                { type: "avatar", id: "avatar", name: "Avatar", hidden: false, x: 82, y: 6, opacity: 1, size: 96, shape: "circle", ring: 4, ringColor: "medal" },
-                line("name", "Name", "{name}", 130, 130, 22, { font: style.font, weight: 700, color: BOARD.text, align: "center", maxWidth: 240 }),
-                line("punkte", "Punkte", "{xp} Punkte", 130, 152, 18, { align: "center", maxWidth: 240 }),
-                { type: "shape", id: "sockel", name: "Sockel", hidden: false, x: 0, y: 166, opacity: 0.3, shape: "rect", w: 260, h: 214, fill: "medal", stroke: null, strokeWidth: 0, cut: 0 },
-                { type: "shape", id: "kante", name: "Kante", hidden: false, x: 0, y: 166, opacity: 1, shape: "rect", w: 260, h: 4, fill: "medal", stroke: null, strokeWidth: 0, cut: 0 },
-                line("platz", "Platz", "{rank}", 130, 236, 56, { font: style.font, weight: 800, color: "medal", align: "center", maxWidth: 120 }),
-                line("level", "Level", "LVL {level}", 130, 262, 18, { weight: 700, color: BOARD.text, align: "center", maxWidth: 200 }),
-                line("trend", "Trend", "{trend}", 130, 284, 18, { font: "Oxanium", weight: 700, color: "trend", align: "center", maxWidth: 80 }),
-            ],
-        },
-        row: classicRow(style.font),
-        foot: classicFoot(),
-    }),
-};
 
 /**
  * W-0050: das Ranglisten-Bild in Discord, fest für alle Server (Entwurf C).

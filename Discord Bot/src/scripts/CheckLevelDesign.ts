@@ -15,8 +15,8 @@ import path from "node:path";
 import http from "node:http";
 import { copyFileSync, mkdirSync, rmSync } from "node:fs";
 import { isDeepStrictEqual } from "node:util";
-import { BOARD_TEMPLATES, BOARD_WIDTH, BoardDesignC, CARD_TEMPLATES, DefaultBoardStyle, UP_TEMPLATES } from "../constants/LevelDesign";
-import { CleanBoardDesign, CleanDesign } from "../services/levels/Design";
+import { BoardDesignC, CARD_TEMPLATES, UP_TEMPLATES } from "../constants/LevelDesign";
+import { CleanDesign } from "../services/levels/Design";
 import { GALLERY_ROOT } from "../constants/Gallery";
 import { CARD_SCALE } from "../constants/Welcome";
 import { IDesignData, RenderDesign, ResolveColors } from "../builder/DesignRenderer";
@@ -221,68 +221,24 @@ async function checkLoading(): Promise<void> {
 }
 
 /* ----------------------------------------------------------
-   Plan 38: das Ranglisten-Bild im Baukasten
+   Das Ranglisten-Bild: seit W-0050 fest Vorlage C (BoardDesignC)
    ---------------------------------------------------------- */
 function checkBoardModel(): void {
-    console.log("\nRangliste: Modell und Prüfung");
+    console.log("\nRangliste: Vorlage C");
 
-    for (const [name, make] of Object.entries(BOARD_TEMPLATES) as [string, (style?: ReturnType<typeof DefaultBoardStyle>) => ReturnType<typeof BOARD_TEMPLATES.podium>][]) {
-        const design = make(DefaultBoardStyle());
+    // Review Plan 38, I1: tiefer stehende Podiumsplätze werden unten abgeschnitten - Lesbares darf dort nicht liegen.
+    const { podium } = BoardDesignC();
+    const visible = Math.min(podium.h, podium.offsets[0] + podium.slotH);
+    const lowest = Math.max(...podium.offsets);
+    const cut = podium.elements.filter((element) => {
+        if (element.type === "shape" || element.type === "image") return false;
 
-        check(`Vorlage ${name} kommt unverändert durch die Prüfung`, isDeepStrictEqual(CleanBoardDesign(design), design), JSON.stringify(CleanBoardDesign(design)).slice(0, 300));
-        // Das Studio vergleicht als Text - eine andere Reihenfolge hieße „ungespeichert“, ohne dass sich etwas geändert hat.
-        check(`Vorlage ${name}: auch die Reihenfolge bleibt`, JSON.stringify(CleanBoardDesign(design)) === JSON.stringify(design));
-    }
+        const bottom = element.y + (element.type === "text" ? Math.round(element.size * 1.05) : element.type === "bar" ? element.h : element.size);
 
-    type Raw = { head: { elements: Record<string, unknown>[] }; podium: { elements: Record<string, unknown>[]; offsets: unknown }; row: { elements: Record<string, unknown>[]; w: unknown; columns: unknown }; perPage: unknown };
-    const raw = structuredClone(BOARD_TEMPLATES.podium(DefaultBoardStyle())) as unknown as Raw;
+        return bottom + lowest > visible;
+    });
 
-    raw.head.elements.push({ type: "avatar", id: "kopfavatar", size: 60, x: 10, y: 10 });
-    raw.podium.elements.push({ type: "avatar", id: "podiumavatar", size: 60, x: 10, y: 10 });
-    raw.head.elements.push({ type: "text", id: "kopftext", text: "a", color: "medal" });
-    raw.row.elements.push({ type: "text", id: "zeilentext", text: "a", color: "medal" });
-    raw.row.elements.push({ type: "shape", id: "zeilenform", fill: "trend", stroke: "accent" });
-    raw.row.w = 5_000;
-    raw.row.columns = 3;
-    raw.perPage = 15;
-    raw.podium.offsets = [0, 999, -5];
-
-    const clean = CleanBoardDesign(raw)!;
-    const find = (list: { id: string }[], id: string) => list.find((element) => element.id === id) as Record<string, unknown> | undefined;
-
-    check("Avatar im Kopf fällt weg, im Podium bleibt er", !find(clean.head.elements, "kopfavatar") && Boolean(find(clean.podium.elements, "podiumavatar")));
-    check("Medaille im Kopf wird zur Vorgabe, in der Zeile bleibt sie", find(clean.head.elements, "kopftext")?.color === "#ffffff" && find(clean.row.elements, "zeilentext")?.color === "medal", JSON.stringify([find(clean.head.elements, "kopftext")?.color, find(clean.row.elements, "zeilentext")?.color]));
-    check("Trend und Akzent als Farbe einer Form in der Zeile", find(clean.row.elements, "zeilenform")?.fill === "trend" && find(clean.row.elements, "zeilenform")?.stroke === "accent");
-    check("Zeile höchstens so breit wie das Bild, Spalten 1 oder 2, 10 oder 20 je Seite", clean.row.x + clean.row.w <= BOARD_WIDTH && clean.row.columns === 1 && clean.perPage === 10, JSON.stringify({ x: clean.row.x, w: clean.row.w, columns: clean.row.columns, perPage: clean.perPage }));
-    check("Versatz im Podium geklemmt", clean.podium.offsets.every((offset) => offset >= 0 && offset <= 200), JSON.stringify(clean.podium.offsets));
-    check("Unsinn ist kein Design", CleanBoardDesign("quatsch") === null && CleanBoardDesign(null) === null);
-
-    const style = { ...DefaultBoardStyle(), accent: "#22c55e", medals: ["#111111", "#222222", "#333333"] as [string, string, string], font: "Orbitron" as const, title: "Top {guild}", podium: false };
-    const from = BOARD_TEMPLATES.podium(style);
-
-    check(
-        "Vorlage Podium übernimmt den bisherigen Ranglisten-Stil",
-        from.accent === "#22c55e" && from.medals.join() === "#111111,#222222,#333333" && from.title === "Top {guild}" && !from.podium.on && from.background.mode === "gradient",
-        JSON.stringify({ accent: from.accent, title: from.title, podium: from.podium.on })
-    );
-    check("Kompakt: zwei Spalten, 20 je Seite", BOARD_TEMPLATES.kompakt().row.columns === 2 && BOARD_TEMPLATES.kompakt().perPage === 20);
-
-    // Review Plan 38, I1: Platz 3 steht am tiefsten - Texte, Avatar und Ring dürfen dort nicht abgeschnitten werden.
-    for (const [name, make] of Object.entries(BOARD_TEMPLATES)) {
-        const { podium } = make();
-        const visible = Math.min(podium.h, podium.offsets[0] + podium.slotH);
-        const lowest = Math.max(...podium.offsets);
-        const cut = podium.elements.filter((element) => {
-            if (element.type === "shape" || element.type === "image") return false;
-
-            const bottom = element.y + (element.type === "text" ? Math.round(element.size * 1.05) : element.type === "bar" ? element.h : element.size);
-
-            return bottom + lowest > visible;
-        });
-
-        check(`Vorlage ${name}: im Podium bleibt an jedem Platz alles sichtbar`, !podium.on || cut.length === 0, cut.map((element) => element.id).join(", "));
-    }
-    check("Arena: Podium als Treppe", new Set(BOARD_TEMPLATES.arena().podium.offsets).size === 3);
+    check("C: im Podium bleibt an jedem Platz alles sichtbar", cut.length === 0, cut.map((element) => element.id).join(", "));
 }
 
 /** Eine Seite der Rangliste mit n Plätzen ab Platz start. */
@@ -312,64 +268,31 @@ async function checkBoardRender(): Promise<void> {
     let layout = { podium: 0, rows: 0, mine: 0 };
     const hooks = { onText: (text: string) => void texts.push(text), onLayout: (next: typeof layout) => void (layout = next) };
     const input = (page: IBoardPage, extra: Record<string, unknown> = {}) => ({ page, guildName: "Dev Server", iconUrl: null, viewerId: "u5", ...extra });
+    const design = BoardDesignC();
+    const { head, podium, row, foot } = design;
 
-    const podium = await RenderBoard(BOARD_TEMPLATES.podium(), input(boardPage(10)), 1, hooks);
+    // Platz 5 schaut zu und steht auf der Seite: hervorgehoben, aber keine Zusatzzeile.
+    const first = await RenderBoard(design, input({ ...boardPage(10), viewer: boardPage(10).entries[4] }), 1, hooks);
+    const height = head.h + podium.h + Math.ceil(7 / row.columns) * (row.h + row.gap) + 10 + foot.h;
 
-    check("Podium-Vorlage: 3 Podiumsplätze, 7 Zeilen", layout.podium === 3 && layout.rows === 7, JSON.stringify(layout));
-    check("Es ist ein PNG mit der richtigen Höhe", podium.png.subarray(1, 4).toString() === "PNG" && podium.height === 140 + 320 + 7 * 82 + 10 + 80, String(podium.height));
-    check("Eigene Zeile hervorgehoben", layout.mine === 1);
+    check("Es ist ein PNG mit der richtigen Höhe", first.png.subarray(1, 4).toString() === "PNG" && first.height === height, `${first.height} statt ${height}`);
+    check("Betrachter auf der Seite: hervorgehoben, keine Zusatzzeile", layout.mine === 1 && texts.filter((text) => text === "Spieler 5").length === 1, `${JSON.stringify(layout)} ${texts.filter((text) => text === "Spieler 5").length}`);
     check("Trend als Text: +3, −1, NEU, –", ["+3", "−1", "NEU", "–"].every((trend) => texts.includes(trend)), JSON.stringify(texts.filter((text) => text.length < 5)));
-    check("Kopf, Podium (Platz 1), Zeile (erste) und Fuß mit Rahmen", podium.areas.head?.h === 140 && podium.areas.podium?.x === 360 && podium.areas.podium.y === 140 && podium.areas.row?.y === 460 && podium.areas.row.x === 40 && podium.areas.foot?.y === podium.height - 80 && Boolean(podium.areas.row.boxes.find((box) => box.id === "punkte")), JSON.stringify({ podium: podium.areas.podium && { ...podium.areas.podium, boxes: undefined }, row: podium.areas.row && { ...podium.areas.row, boxes: undefined } }));
+    check(
+        "Kopf, Podium (Platz 1 in der Mitte), Zeile (erste) und Fuß mit Rahmen",
+        first.areas.head?.h === head.h && first.areas.podium?.y === head.h && first.areas.podium.x === (first.width - 3 * podium.w - 2 * podium.gap) / 2 + podium.w + podium.gap && first.areas.row?.y === head.h + podium.h && first.areas.foot?.y === first.height - foot.h && Boolean(first.areas.row.boxes.find((box) => box.id === "punkte")),
+        JSON.stringify({ podium: first.areas.podium && { ...first.areas.podium, boxes: undefined }, row: first.areas.row && { ...first.areas.row, boxes: undefined } })
+    );
 
-    await RenderBoard(BOARD_TEMPLATES.liste(), input(boardPage(10)), 1, hooks);
-    check("Liste: 10 Zeilen, kein Podium", layout.podium === 0 && layout.rows === 10, JSON.stringify(layout));
-
-    const compact = await RenderBoard(BOARD_TEMPLATES.kompakt(), input(boardPage(20)), 1, hooks);
-
-    check("Kompakt: 20 Plätze in zwei Spalten", layout.rows === 20 && compact.height === 130 + 10 * 64 + 10 + 80, `${JSON.stringify(layout)} ${compact.height}`);
-
-    await RenderBoard(BOARD_TEMPLATES.podium(), input(boardPage(10, 2, 11, 20)), 1, hooks);
-    check("Seite 2: nur Zeilen", layout.podium === 0 && layout.rows === 10);
-
-    const two = await RenderBoard(BOARD_TEMPLATES.arena(), input(boardPage(2)), 1, hooks);
+    const two = await RenderBoard(design, input(boardPage(2)), 1, hooks);
 
     check("Zwei Mitglieder: 2 Podiumsplätze, keine Zeile, Bild entsteht", layout.podium === 2 && layout.rows === 0 && two.png.length > 1_000 && two.areas.row === null, JSON.stringify(layout));
 
     texts.length = 0;
+    await RenderBoard(design, input(boardPage(10), { title: "Aktivste der Woche", period: "26.10.–01.11." }), 1, hooks);
+    check("Titel und Zeitraum des Wochenposts", texts.includes("Aktivste der Woche") && texts.includes("26.10.–01.11."), JSON.stringify(texts.slice(0, 3)));
 
-    const own = { ...BOARD_TEMPLATES.podium(), head: { h: 100, elements: [{ type: "text" as const, id: "t", name: "Text", hidden: false, x: 40, y: 30, opacity: 1, text: "Unsere Besten · {period}", font: "Oxanium" as const, size: 30, weight: 700 as const, color: "#ffffff", align: "left" as const, maxWidth: 800 }] } };
-
-    await RenderBoard(own, input(boardPage(10), { title: "Aktivste der Woche", period: "26.10.–01.11." }), 1, hooks);
-    check("Eigenes Design ohne {title}: der Wochenpost entsteht, der Zeitraum steht über {period}", texts.includes("Unsere Besten · 26.10.–01.11."), JSON.stringify(texts.slice(0, 3)));
-
-    texts.length = 0;
-    await RenderBoard(BOARD_TEMPLATES.podium(), input(boardPage(10), { title: "Aktivste der Woche", period: "26.10.–01.11." }), 1, hooks);
-    check("Vorlage: Titel und Zeitraum des Wochenposts", texts.includes("Aktivste der Woche") && texts.includes("26.10.–01.11."));
-
-    // Plan 43: Wer nicht auf der Seite steht, aber Punkte hat, bekommt unter der Liste eine Zusatzzeile.
-    const away = { ...boardPage(10), viewer: { ...boardPage(1, 3, 25).entries[0] } };
-    const base = 140 + 320 + 7 * 82 + 10 + 80;
-    const extra = BOARD_TEMPLATES.podium().row.h + BOARD_TEMPLATES.podium().row.gap;
-
-    texts.length = 0;
-
-    const below = await RenderBoard(BOARD_TEMPLATES.podium(), input(away, { viewerId: "u25" }), 1, hooks);
-
-    check("Betrachter nicht auf der Seite: Zusatzzeile mit ihm, Bild um eine Zeile höher", layout.mine === 1 && texts.includes("Spieler 25") && below.height === base + extra, `${JSON.stringify(layout)} ${below.height} statt ${base + extra}`);
-
-    const onPage = await RenderBoard(BOARD_TEMPLATES.podium(), input({ ...boardPage(10), viewer: boardPage(10).entries[4] }), 1, hooks);
-
-    check("Betrachter auf der Seite: keine Zusatzzeile", layout.mine === 1 && onPage.height === base, `${JSON.stringify(layout)} ${onPage.height}`);
-
-    const nobody = await RenderBoard(BOARD_TEMPLATES.podium(), input(away, { viewerId: null }), 1, hooks);
-
-    check("Ohne Betrachter (Kanal): keine Zusatzzeile", layout.mine === 0 && nobody.height === base, `${JSON.stringify(layout)} ${nobody.height}`);
-
-    const twoColumns = await RenderBoard(BOARD_TEMPLATES.kompakt(), input({ ...boardPage(20), viewer: away.viewer }, { viewerId: "u25" }), 1, hooks);
-
-    check("Zwei Spalten: Zusatzzeile in Spalte 1, eine Zeile höher", layout.mine === 1 && twoColumns.height === compact.height + BOARD_TEMPLATES.kompakt().row.h + BOARD_TEMPLATES.kompakt().row.gap, `${JSON.stringify(layout)} ${twoColumns.height}`);
-
-    const lost = await RenderBoard({ ...BOARD_TEMPLATES.podium(), background: { ...BOARD_TEMPLATES.podium().background, mode: "image", image: "gallery/0/fehlt.png" } }, input(boardPage(10)), 1, hooks);
+    const lost = await RenderBoard({ ...design, background: { ...design.background, mode: "image", image: "gallery/0/fehlt.png" } }, input(boardPage(10)), 1, hooks);
 
     check("Gelöschtes Galeriebild im Hintergrund: Bild entsteht trotzdem", lost.png.length > 1_000);
 
@@ -392,7 +315,7 @@ async function checkBoardAvatars(): Promise<void> {
     page.entries.forEach((entry, index) => (entry.avatar = `http://127.0.0.1:${port}/avatar-${index}.png`));
 
     const started = Date.now();
-    const drawn = await RenderBoard(BOARD_TEMPLATES.podium(), { page, guildName: "Dev", iconUrl: null, viewerId: null }, 1);
+    const drawn = await RenderBoard(BoardDesignC(), { page, guildName: "Dev", iconUrl: null, viewerId: null }, 1);
 
     check("Fünf hängende Avatare: Bild nach höchstens 6 s", drawn.png.length > 1_000 && Date.now() - started < 6_000, `${Date.now() - started} ms`);
     silent.closeAllConnections();
@@ -435,6 +358,12 @@ async function checkBoardFixed(): Promise<void> {
     const second = await RenderBoard(design, input({ ...boardPage(10, 2, 11, 27), viewer: away.viewer }, "u25"), 1, hooks);
 
     check("Seite 2: kein Podium, 10 Zeilen, eigene Zeile darunter, weiter quer", layout.podium === 0 && layout.rows === 10 && layout.mine === 1 && second.width / second.height >= 1.57, `${JSON.stringify(layout)} ${second.height}`);
+
+    // Kein freier Platz: die eigene Zeile hängt links unter der Liste, das Bild wird um eine Zeile höher.
+    const secondPlain = await RenderBoard(design, input(boardPage(10, 2, 11, 27), null), 1, hooks);
+    const below = second.areas.row!.repeats.at(-1)!;
+
+    check("Seite 2: eigene Zeile links unter Platz 15, Bild eine Zeile höher", below.x === design.row.x && below.y === second.areas.row!.y + 5 * step + design.row.gap && second.height === secondPlain.height + step, `${JSON.stringify(below)} ${second.height} statt ${secondPlain.height + step}`);
 }
 
 async function main(): Promise<void> {

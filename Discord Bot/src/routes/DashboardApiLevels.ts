@@ -35,7 +35,6 @@ function Templates<T extends string>(makers: Record<T, () => unknown>): Record<T
     return Object.fromEntries(Object.entries(makers).map(([name, make]) => [name, (make as () => unknown)()])) as Record<T, unknown>;
 }
 
-/** Plan 38: "board" ist das Ranglisten-Bild im Baukasten. */
 /** W-0050: Die Rangliste in Discord ist fest - im Designer gibt es nur noch Karte und Aufstieg. */
 function Kind(value: unknown): DesignKind {
     if (value === "card" || value === "up") return value;

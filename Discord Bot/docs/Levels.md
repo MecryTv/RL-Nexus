@@ -103,7 +103,7 @@ Plan 37, unter *Belohnungen*, je Art an oder aus:
 | **Woche** | Montags ab 18:00 (Berlin) das Podium der Vorwoche, Montag bis Sonntag |
 | **Monat** | Am 1. ab 18:00 das Podium des Vormonats |
 
-Gepostet wird das Ranglisten-Bild im Stil des Servers mit dem Titel „Aktivste der Woche“ bzw. „Aktivste des Monats“ und oben rechts dem Zeitraum („26.10.–01.11.“ bzw. dem Monat). Gezählt werden nur die Punkte im Zeitraum (`level_days`; die Tage sind die UTC-Tage mit dem Datum der Berliner Kalendertage). Der Trend vergleicht mit gleich vielen Tagen davor.
+Gepostet wird das Ranglisten-Bild (fest Vorlage C, siehe unten) mit dem Titel „Aktivste der Woche“ bzw. „Aktivste des Monats“ und oben rechts dem Zeitraum („26.10.–01.11.“ bzw. dem Monat). Gezählt werden nur die Punkte im Zeitraum (`level_days`; die Tage sind die UTC-Tage mit dem Datum der Berliner Kalendertage). Der Trend vergleicht mit gleich vielen Tagen davor.
 
 Auf Wunsch bekommt Platz 1 bis 3 eine **Rolle**, die beim nächsten Post zu den neuen Plätzen wandert. Der Bot nimmt sie nur denen weg, denen er sie selbst gegeben hat (`level_top.holders`).
 
@@ -121,9 +121,9 @@ Plan 37. Im Dashboard unter *Rangliste* und in Discord mit `/level punkte` (nur 
 
 ---
 
-## Designer: Level-Karte, Aufstieg, Rangliste (Studio)
+## Designer: Level-Karte und Aufstieg (Studio)
 
-Plan 35, seit Plan 36 im **Studio** – der gemeinsamen Hülle aller Builder (`layout/Studio.ts`, Spec `2026-10-31-studio-design.md`). Dashboard › *Level-Karte* hat drei Reiter in der Studio-Leiste: **Karte**, **Aufstieg**, **Rangliste**. Alle drei werden einmal gebaut; wer wechselt, verliert nichts.
+Plan 35, seit Plan 36 im **Studio** – der gemeinsamen Hülle aller Builder (`layout/Studio.ts`, Spec `2026-10-31-studio-design.md`). Dashboard › *Level-Karte* hat zwei Reiter in der Studio-Leiste: **Karte** und **Aufstieg**. Beide werden einmal gebaut; wer wechselt, verliert nichts. (Den Reiter **Rangliste** gibt es seit W-0050 nicht mehr.)
 
 **Leiste oben:** Reiter, Rückgängig und Wiederholen (50 Schritte, Strg+Z, Strg+Y bzw. Strg+Umschalt+Z – im Textfeld gilt das Rückgängig des Browsers), Einrasten, Raster 10 px, Zoom (Einpassen, 100 %, 150 %), „Vorschau mit deinen Daten“, beim Aufstieg „So in Discord“, „Auf Vorgabe zurück“, *Test senden* (das gespeicherte Bild per DM) und *Speichern* (nur an, wenn sich etwas geändert hat; mit Ungespeichertem fragt der Browser vor dem Verlassen).
 
@@ -150,23 +150,12 @@ Platzhalter auf Karte und Bild:
 
 Unsere Schriften kennen keinen Pfeil – „→“ zeichnet der Bot als Linie mit Spitze.
 
-**Rangliste** (Plan 38, Spec `2026-10-31-rangliste-baukasten-design.md`): derselbe Baukasten, das Bild in **vier Bereichen**, 1000 breit, die Höhe wächst mit den Plätzen.
+**Rangliste:** Das Bild in Discord gestaltet niemand selbst. Seit W-0050 (11.11.2026) ist es für alle Server fest die Vorlage C (`BoardDesignC()` in `constants/LevelDesign.ts`), quer 1000 × ~626, damit Discord es in voller Breite zeigt. Podium flach, Platz 4–7 links, 8–10 rechts (spaltenweise), die eigene Zeile im freien Platz rechts unten, sonst darunter; im festen Kanal keine. 10 je Seite.
 
-**Seit W-0050 (11.11.2026) ist das Bild in Discord fest:** immer die Vorlage C (`BoardDesignC()` in `constants/LevelDesign.ts`), quer 1000 × ~626, damit Discord es in voller Breite zeigt. Podium flach, Platz 4–7 links, 8–10 rechts (spaltenweise), die eigene Zeile im freien Platz rechts unten, sonst darunter; im festen Kanal keine. 10 je Seite. Ein gespeichertes `boardDesign` wird ignoriert, der Reiter Rangliste im Baukasten ist weg. Was unten zum Baukasten der Rangliste steht, ist Geschichte; Studio-Modus `board`, `BOARD_TEMPLATES` und `CleanBoardDesign` liegen noch im Code, werden aber nicht mehr erreicht.
-
-| Bereich | |
-|---|---|
-| **Kopf** | Frei: Text, Bild, Form, Server-Icon mit `{title}`, `{guild}`, `{period}`, `{range}`, `{page}`, `{pages}`, `{total}` |
-| **Podium** | Ein **Muster** für Platz 1–3 (auf Seite 1, an/aus): Breite und Höhe eines Platzes, Abstand, wie weit Platz 1, 2, 3 tiefer stehen (Treppe), Fläche je Platz |
-| **Zeile** | Ein **Muster** für alle weiteren Plätze: Höhe, Abstand, linker Rand, Breite, eine oder zwei Spalten, Fläche, Farbe für die eigene Zeile |
-| **Fuß** | Frei wie der Kopf |
-
-- Im Podium und in der Zeile gibt es zusätzlich Avatar, Balken (Fortschritt im Level) und Level-Ring, mit `{rank}`, `{name}`, `{level}`, `{xp}`, `{messages}`, `{voice}`, `{voice.hours}`, `{trend}` („+3“, „−1“, „–“, „NEU“). Der Bot wiederholt das Muster für jeden Platz.
-- **Farben mit Bedeutung:** In jedem Farbfeld „Akzent“, im Podium und in der Zeile auch „Medaille“ (Platz 1–3 in ihrer Farbe, ab Platz 4 Grau-Lila) und „Trend“ (grün, rot, blau für neu, grau).
-- **Ganzes Bild:** Titel (`{title}`, mit `{guild}`, `{period}`, `{range}`), Akzent, Medaillenfarben, Schein in der Akzentfarbe, **Plätze je Seite** 10 oder 20 – Discord blättert und springt zu „Meine Seite“ mit derselben Zahl.
-- **Vorlagen:** Podium (wie bisher), Liste (zehn Zeilen), Kompakt (zwei Spalten, 20 je Seite), Arena (Podium als Treppe). Ohne eigenes Design gilt Podium im bisherigen Ranglisten-Stil.
-- **Studio:** Fach *Bereiche* (oder ein Klick ins Bild) wählt den Bereich; Griffe gibt es am ersten Platz des Podiums bzw. an der ersten Zeile, die Wiederholungen sind gestrichelt umrandet. Die Vorschau ist Seite 1 Lifetime mit deinen Daten, aufgefüllt mit Beispiel-Plätzen.
-- Das Bild nehmen `/level rangliste`, das Vorschaubild beim Teilen und die Posts der Aktivsten (dort `{title}` „Aktivste der Woche“ bzw. „des Monats“, `{period}` der Zeitraum). Beim Speichern übernimmt der Ranglisten-Stil Bild, Abdunkeln, Akzent, Medaillen und Titel – so bleibt der Kopf der Web-Rangliste wie das Bild. Scheitert ein Design beim Zeichnen, kommt das bisherige Bild.
+- Gezeichnet wird in vier Bereichen (Kopf, Podium, Zeile, Fuß); Podium und Zeile sind Muster, die `builder/BoardRenderer.ts` je Platz wiederholt. Farben mit Bedeutung: „Medaille“ (Platz 1–3 in ihrer Farbe, ab Platz 4 Grau-Lila) und „Trend“ (grün, rot, blau für neu, grau), Trend als „+3“, „−1“, „–“, „NEU“.
+- Das Bild nehmen `/level rangliste`, die Rangliste im Kanal, das Vorschaubild beim Teilen und die Posts der Aktivsten (dort `{title}` „Aktivste der Woche“ bzw. „des Monats“, `{period}` der Zeitraum).
+- Den Ranglisten-Baukasten aus Plan 38 (eigenes Design in Bereichen, Vorlagen Podium, Liste, Kompakt, Arena) gibt es nicht mehr. Das Feld `boardDesign` steht noch in den Einstellungen, wird aber nicht gelesen.
+- Einstellbar ist nur der **Kopf der offenen Seite** (Hintergrundbild, Abdunkeln, Akzent) unter Levels › *Rangliste* beim Schalter „Öffentliche Rangliste“, gespeichert als `boardStyle`.
 
 **Was der Bot annimmt:** `services/levels/Design.ts` prüft alles aus dem Dashboard – unbekannte Bausteine fallen weg, Zahlen werden geklemmt (der Baustein bleibt auf der Fläche), Farben sind `#rrggbb`, Bilder nur Pfade aus der Galerie (dieselbe Prüfung wie der Welcome-Hintergrund, `CleanGalleryPath`), nie fremde Adressen. Fehlt ein Bild später in der Galerie, zeichnet der Bot ohne es weiter; scheitert ein Design ganz, kommt die bisherige Karte.
 
@@ -213,14 +202,14 @@ Zu sehen sind Platz, Anzeigename, Profilbild, Level, Punkte, Nachrichten und Voi
 | Befehl | |
 |---|---|
 | `/level rang [user]` | Der Stand als Bild – nur der Anhang, ohne Rahmen und Text: Avatar, Level, Platz, Fortschrittsbalken, Nachrichten und Voice-Zeit mit Stunden („2.310 Min. im Voice (38,5 Std.)“). Immer Lifetime |
-| `/level rangliste [zeitraum] [seite]` | Das Ranglisten-Bild (`builder/LeaderboardImage.ts`): Seite 1 mit Podium für Platz 1–3 und Zeilen 4–10, ab Seite 2 zehn Zeilen. Darunter Knöpfe für Lifetime / 7 Tage / 30 Tage und ◀ Zurück, Seite x von y, Weiter ▶, Meine Seite |
+| `/level rangliste [zeitraum] [seite]` | Das Ranglisten-Bild (Vorlage C, `builder/BoardRenderer.ts`; scheitert es, kommt `builder/LeaderboardImage.ts`): Seite 1 mit Podium für Platz 1–3 und Zeilen 4–10, ab Seite 2 zehn Zeilen. Darunter Knöpfe für Lifetime / 7 Tage / 30 Tage und ◀ Zurück, Seite x von y, Weiter ▶, Meine Seite |
 | `/level punkte aktion user [punkte] [grund]` | Plan 37: Punkte von Hand – geben, abziehen, setzen, zurücksetzen. Nur mit „Server verwalten“; ohne antwortet der Bot nur dem Fragenden und ändert nichts. Die Antwort sieht nur, wer fragt |
 
 Drückt jemand anderes als der Fragende einen Knopf, bekommt er die Seite als eigene Antwort, die nur er sieht – die Nachricht im Kanal bleibt. Eine Seite außerhalb des Bereichs (alter Knopf) wird auf die letzte geklemmt. Hat im Zeitraum niemand Punkte, kommt ein kurzer Text nur für den Fragenden.
 
-**Die eigene Zeile** (Plan 43): Steht der Betrachter nicht auf der gezeigten Seite, hat aber Punkte im Zeitraum, hängt das Bild unter die Liste mit etwas Abstand eine weitere, hervorgehobene Zeile mit ihm (in Spalte 1, mit der Farbe zum Hervorheben aus dem Design). Das Bild wird um diese Zeile höher. Das gilt für `/level rangliste` und jede persönliche Ansicht, nicht für die Rangliste im Kanal.
+**Die eigene Zeile** (Plan 43, W-0050): Steht der Betrachter nicht auf der gezeigten Seite, hat aber Punkte im Zeitraum, zeigt das Bild eine weitere, hervorgehobene Zeile mit ihm. Ist rechts unten ein Platz frei (ungerade Zahl an Zeilen, etwa auf Seite 1), steht sie dort und das Bild bleibt gleich hoch; sonst hängt sie unter der Liste und das Bild wird um diese Zeile höher. Das gilt für `/level rangliste` und jede persönliche Ansicht, nicht für die Rangliste im Kanal.
 
-Beide Bilder werden mit `@napi-rs/canvas` gezeichnet, in denselben Schriften wie die Rang-Karte. Wie sie aussehen, stellt der Server im Designer ein (siehe oben); `/level rang` nimmt das eigene Design, sonst die bisherige Karte.
+Beide Bilder werden mit `@napi-rs/canvas` gezeichnet, in denselben Schriften wie die Rang-Karte. `/level rang` nimmt das eigene Design aus dem Designer (siehe oben), sonst die bisherige Karte; das Ranglisten-Bild ist fest.
 
 ---
 
@@ -244,7 +233,7 @@ Beide Seiten speichern nur ihre eigenen Felder; so überschreibt keine die ander
 
 `/dashboard/guild/<id>/level-card` – **Level-Karte**
 
-- Reiter **Level-Karte**, **Aufstieg** (je der Designer) und **Rangliste** (Einstellungen mit Vorschau daneben). Designs und Stil speichern eigene Aktionen; das normale Speichern der anderen Seiten lässt sie stehen.
+- Reiter **Karte** und **Aufstieg**, je der Designer. Designs speichern eigene Aktionen; das normale Speichern der anderen Seiten lässt sie stehen. Einen Reiter Rangliste gibt es seit W-0050 nicht mehr.
 
 `/dashboard/guild/<id>/leaderboard` – **Rangliste**
 
@@ -256,7 +245,7 @@ Beide Seiten speichern nur ihre eigenen Felder; so überschreibt keine die ander
 | Route | |
 |---|---|
 | `GET <base>/api/guild/:id/levels` | Einstellungen, Vorlage, Grenzen, Rangliste (`page`), der Nachtrag (`backfill`); Plan 35: `upMode`, `designs`, `templates`, `designPlaceholders`, `boardPlaceholders`, `designSize`, `fonts`; Plan 37: `topStatus` (letzter Post je Art); Plan 38 (seit W-0050 weg): `designs.boardDesign`, `templates.board`, `boardFramePlaceholders`, `boardEntryPlaceholders`; `designs.board` ist nur noch der Kopf der offenen Seite (Bild, Abdunkeln, Akzent, gespeichert mit `board.save`) |
-| `POST <base>/api/guild/:id/levels` | `save`, `members`, `adjust` (Plan 37: mit `reason`), `log` (Plan 37), `board` (`period`, `page`), `sync`, `reset`; Plan 35: `design.preview` (antwortet mit Bild, Rahmen, bereinigtem `design` und `values`) / `design.thumbs` (Vorlagen klein) / `design.save` (`kind` card oder up, `design`, beim Aufstieg `upLine`) / `design.test` – Plan 38: alle vier auch mit `kind` board (Vorschau mit `width`, `height`, `areas`), `board.preview` / `board.save` (`style`) — nur JSON, 120 je Minute |
+| `POST <base>/api/guild/:id/levels` | `save`, `members`, `adjust` (Plan 37: mit `reason`), `log` (Plan 37), `board` (`period`, `page`), `sync`, `reset`; Plan 35: `design.preview` (antwortet mit Bild, Rahmen, bereinigtem `design` und `values`) / `design.thumbs` (Vorlagen klein) / `design.save` (`kind` card oder up, `design`, beim Aufstieg `upLine`) / `design.test` – alle vier nur mit `kind` card oder up (`board` aus Plan 38 lehnt die Route seit W-0050 ab); `board.save` (`style`, der Kopf der offenen Seite) — nur JSON, 120 je Minute |
 | `GET <base>/rangliste/:id` | Die öffentliche Seite — ohne Anmeldung, mit Open-Graph-Tags bei öffentlicher Rangliste |
 | `GET <base>/rangliste/:id/bild.png` | Das Podium-Bild für die Vorschau beim Teilen, 10 Minuten im Speicher |
 | `GET <base>/api/public/levels/:id` | Die Liste dazu (`period`, `offset`, `q`). 404, solange die Rangliste nicht öffentlich steht |
@@ -278,10 +267,10 @@ Anfang wie überall: `ManageGate()` (`utils/managegate.ts`) — Sitzung, „Serv
 | Nachtrag | `level_backfill` (Migration 043), `services/levels/Backfill.ts`, Runnable `LevelBackfill` (10 Min.) |
 | Zurücksetzen | „Zurücksetzen“ und „Ganze Rangliste löschen“ leeren auch die Tageswerte (`LevelDays.Clear`) |
 | Rangliste | `LevelService.Board()` mit `services/levels/Board.ts` (Reihenfolge, Trend, Fenster) – eine Quelle für Discord, Dashboard und Web |
-| Bilder und Knöpfe | `builder/LeaderboardImage.ts`, `services/levels/BoardMessage.ts`, `events/levels/LevelButtons.ts` (Präfix `lv:`) |
+| Bilder und Knöpfe | `builder/BoardRenderer.ts` (Rückfall `builder/LeaderboardImage.ts`), `services/levels/BoardMessage.ts`, `events/levels/LevelButtons.ts` (Präfix `lv:`) |
 | Farm-Schutz | `LevelService.MessageXp`, `VoiceXp`, `Punished`, `Revoke` (von `AutoModService` aufgerufen) |
-| Ranglisten-Baukasten | `IBoardDesign` in den Einstellungen (`boardDesign`), Vorlagen `BOARD_TEMPLATES`, Prüfung `CleanBoardDesign`, Zeichnen `builder/BoardRenderer.ts` (Bausteine über `DrawElements` aus `DesignRenderer.ts`), `LevelService.BoardImage` / `PerPage` (seit W-0050 immer Vorlage C, 10 je Seite; `BoardDesignPreview`, `SaveBoardDesign`, `BoardThumbs`, `TestBoard` entfernt) |
-| Designer | Typen `interfaces/services/levels/ILevelDesign.ts`, Größen und Vorlagen `constants/LevelDesign.ts`, Prüfung `services/levels/Design.ts`, Zeichnen `builder/DesignRenderer.ts`; gespeichert in den Level-Einstellungen (`cardDesign`, `upDesign`, `upMode`, `upLine`, `boardStyle`). Dashboard: `layout/Studio.ts` (Hülle), `layout/StudioCore.ts` (Rechnen ohne DOM), `layout/LevelStudio.ts`, `pages/GuildLevelCard.ts`, Feldlisten `constants/LevelFields.ts` |
+| Ranglisten-Bild | `BoardDesignC()` (`IBoardDesign`) in `constants/LevelDesign.ts`, Zeichnen `builder/BoardRenderer.ts` (Bausteine über `DrawElements` aus `DesignRenderer.ts`), `LevelService.BoardImage` / `PerPage` (immer Vorlage C, 10 je Seite). Kopf der offenen Seite: `boardStyle`, Prüfung `CleanBoardStyle`. Der Baukasten aus Plan 38 (`BOARD_TEMPLATES`, `CleanBoardDesign`, Studio-Modus `board`) ist entfernt; `boardDesign` bleibt als Feld in den Einstellungen, ungelesen |
+| Designer | Typen `interfaces/services/levels/ILevelDesign.ts`, Größen und Vorlagen `constants/LevelDesign.ts`, Prüfung `services/levels/Design.ts`, Zeichnen `builder/DesignRenderer.ts`; gespeichert in den Level-Einstellungen (`cardDesign`, `upDesign`, `upMode`, `upLine`). Dashboard: `layout/Studio.ts` (Hülle), `layout/StudioCore.ts` (Rechnen ohne DOM), `layout/LevelStudio.ts`, `pages/GuildLevelCard.ts`, Feldlisten `constants/LevelFields.ts` |
 | Live | `LevelService.Changed()` → `PulseService.Emit(…, "levels")`; Dashboard `onPulse` in `pages/GuildLeaderboard.ts` |
 | Doppelte Punkte | Einstellungen `boosts`, `boostChannelId`, `boostMessages` (Plan 43); Rechnung `services/levels/Boost.ts` (`Occurrence`, `ActiveBoost`, `BoostText`, `CleanBoosts`), wirkt in `LevelService.Factor`; Platzhalter `BOOST_PLACEHOLDER_KEYS`, Vorlage `DefaultBoostMessage` |
 | Rangliste im Kanal | Einstellungen `boardPost`; `level_board_posts` (Migration 046, `models/LevelBoardPosts.ts`), `services/levels/BoardPost.ts` (`BoardFingerprint`, `PostBoard`), `BoardChannelPayload` und `lv:card` in `BoardMessage.ts`, Runnable `LevelBoards` (10 Min.), Dashboard-Aktion `boardpost.draw` |
@@ -294,7 +283,7 @@ Anfang wie überall: `ManageGate()` (`utils/managegate.ts`) — Sitzung, „Serv
 
 ```bash
 npm run check:levels   # Kurve, Einstellungen, Karte, immer an, Zählen und Farm-Schutz, Aufstieg, Nachtrag, Zeiträume und Trend, Ranglisten-Bild und Knöpfe, Dashboard-Route, Web-Rangliste; Plan 35: Karte und Aufstieg mit Design, Ranglisten-Stil, Designer-API, Live-Puls; Plan 37: doppelte Punkte, Punkte von Hand und /level punkte, Aktivste und Ankündigungen; Plan 43: Aufstieg ohne DM, Rangliste im Kanal, gestaltete Boost-Ankündigung; mit Datenbank: Rangliste, Belohnungsrollen, Protokoll, level_top und level_board_posts
-npm run check:leveldesign   # Plan 35: Designs prüfen, Vorlagen, Zeichnen samt Rahmen, gelöschtes Galeriebild, lange Namen; Plan 38: Ranglisten-Baukasten (Modell, Vorlagen, Bereiche, Zeichnen); Plan 43: Zusatzzeile mit dem Betrachter; W-0050: Vorlage C (quer, Spalten, eigene Zeile im freien Platz)
+npm run check:leveldesign   # Plan 35: Designs prüfen, Vorlagen, Zeichnen samt Rahmen, gelöschtes Galeriebild, lange Namen; Ranglisten-Bild mit Vorlage C (Podium sichtbar, Höhe, Bereiche, Trend, Wochenpost, gelöschtes Galeriebild, hängende Avatare); W-0050: quer, Spalten, eigene Zeile im freien Platz
 npm run check:studio        # Plan 36: Rückgängig und Wiederholen, Einrasten, Klemmen, Eckgriffe, Tastenkürzel
 ```
 
