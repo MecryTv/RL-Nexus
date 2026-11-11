@@ -117,8 +117,12 @@ export async function RenderBoard(design: IBoardDesign, input: IBoardRenderInput
     const away = input.viewerId && page.viewer?.userId === input.viewerId && !page.entries.some((entry) => entry.userId === input.viewerId) ? page.viewer : null;
     const podiumTop = head.h;
     const rowsTop = podiumTop + (onPodium.length ? podium.h : 0);
-    const awayTop = rowsTop + lines * (row.h + row.gap) + row.gap;
-    const footTop = (away ? awayTop + row.h : rowsTop + lines * (row.h + row.gap)) + 10;
+    // W-0050: Spalten füllen sich von oben nach unten - links 4–7, rechts 8–10.
+    const slotOf = (index: number) => ({ x: row.x + Math.floor(index / lines) * (row.w + row.gap), y: rowsTop + (index % lines) * (row.h + row.gap) });
+    // Ist rechts unten noch ein Platz frei, steht die eigene Zeile dort - das Bild wird nicht höher.
+    const free = rows.length < lines * row.columns;
+    const awaySlot = free ? slotOf(rows.length) : { x: row.x, y: rowsTop + lines * (row.h + row.gap) + row.gap };
+    const footTop = (away && !free ? awaySlot.y + row.h : rowsTop + lines * (row.h + row.gap)) + 10;
     const width = BOARD_WIDTH;
     const height = footTop + foot.h;
     const canvas = createCanvas(width * scale, height * scale);
@@ -205,8 +209,7 @@ export async function RenderBoard(design: IBoardDesign, input: IBoardRenderInput
 
     // Zeilen
     for (const [index, entry] of rows.entries()) {
-        const x = row.x + (index % row.columns) * (row.w + row.gap);
-        const y = rowsTop + Math.floor(index / row.columns) * (row.h + row.gap);
+        const { x, y } = slotOf(index);
         const colors = colorsOf(entry);
         const highlight = entry.userId === input.viewerId ? row.highlight : null;
 
@@ -227,12 +230,12 @@ export async function RenderBoard(design: IBoardDesign, input: IBoardRenderInput
         const colors = colorsOf(away);
 
         ctx.save();
-        ctx.translate(row.x, awayTop);
+        ctx.translate(awaySlot.x, awaySlot.y);
         Plate(ctx, row, row.w, row.h, colors, row.highlight);
         await DrawElements(ctx, row.elements, entryData(away), hooks, colors);
         ctx.restore();
         mine++;
-        areas.row?.repeats.push({ x: row.x, y: awayTop, w: row.w, h: row.h });
+        areas.row?.repeats.push({ x: awaySlot.x, y: awaySlot.y, w: row.w, h: row.h });
     }
 
     // Fuß

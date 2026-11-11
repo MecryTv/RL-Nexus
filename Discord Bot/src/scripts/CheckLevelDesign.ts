@@ -15,7 +15,7 @@ import path from "node:path";
 import http from "node:http";
 import { copyFileSync, mkdirSync, rmSync } from "node:fs";
 import { isDeepStrictEqual } from "node:util";
-import { BOARD_TEMPLATES, BOARD_WIDTH, CARD_TEMPLATES, DefaultBoardStyle, UP_TEMPLATES } from "../constants/LevelDesign";
+import { BOARD_TEMPLATES, BOARD_WIDTH, BoardDesignC, CARD_TEMPLATES, DefaultBoardStyle, UP_TEMPLATES } from "../constants/LevelDesign";
 import { CleanBoardDesign, CleanDesign } from "../services/levels/Design";
 import { GALLERY_ROOT } from "../constants/Gallery";
 import { CARD_SCALE } from "../constants/Welcome";
@@ -399,9 +399,48 @@ async function checkBoardAvatars(): Promise<void> {
     silent.close();
 }
 
+/**
+ * W-0050: Das Discord-Bild ist fest - Entwurf C. Quer, damit Discord es in voller
+ * Breite zeigt (höchstens etwa 550 × 350): Podium flach, darunter Platz 4–7 links
+ * und 8–10 rechts, die eigene Zeile füllt den freien Platz rechts unten.
+ */
+async function checkBoardFixed(): Promise<void> {
+    console.log("\nRangliste: feste Vorlage C (W-0050)");
+
+    const texts: string[] = [];
+    let layout = { podium: 0, rows: 0, mine: 0 };
+    const hooks = { onText: (text: string) => void texts.push(text), onLayout: (next: typeof layout) => void (layout = next) };
+    const input = (page: IBoardPage, viewerId: string | null) => ({ page, guildName: "Dev Server", iconUrl: null, viewerId });
+    const design = BoardDesignC();
+    const plain = await RenderBoard(design, input(boardPage(10, 1, 1, 27), null), 1, hooks);
+    const row = plain.areas.row!;
+    const step = design.row.h + design.row.gap;
+
+    check("C: 3 Podiumsplätze, 7 Zeilen, 10 je Seite", layout.podium === 3 && layout.rows === 7 && design.perPage === 10, JSON.stringify(layout));
+    check("C: quer, Discord zeigt es in voller Breite (Verhältnis ab 1,57)", plain.width === 1000 && plain.width / plain.height >= 1.57, `${plain.width} × ${plain.height}`);
+    check("C: Platz 4 links oben, Platz 7 links unten", row.x === 40 && row.repeats[2].x === 40 && row.repeats[2].y === row.y + 3 * step, JSON.stringify(row.repeats.slice(0, 3)));
+    check("C: Platz 8 rechts oben, Platz 10 rechts darunter", row.repeats[3].x > 500 && row.repeats[3].y === row.y && row.repeats[5].y === row.y + 2 * step, JSON.stringify(row.repeats.slice(3)));
+    check("Fester Kanal: keine eigene Zeile", layout.mine === 0);
+
+    const away = { ...boardPage(10, 1, 1, 27), viewer: { ...boardPage(1, 3, 25).entries[0] } };
+
+    texts.length = 0;
+
+    const mine = await RenderBoard(design, input(away, "u25"), 1, hooks);
+    const last = mine.areas.row!.repeats.at(-1)!;
+
+    check("/level rangliste: eigene Zeile im freien Platz rechts unten", layout.mine === 1 && texts.includes("Spieler 25") && last.x === row.repeats[3].x && last.y === row.y + 3 * step, JSON.stringify(last));
+    check("Eigene Zeile macht das Bild nicht höher", mine.height === plain.height, `${mine.height} statt ${plain.height}`);
+
+    const second = await RenderBoard(design, input({ ...boardPage(10, 2, 11, 27), viewer: away.viewer }, "u25"), 1, hooks);
+
+    check("Seite 2: kein Podium, 10 Zeilen, eigene Zeile darunter, weiter quer", layout.podium === 0 && layout.rows === 10 && layout.mine === 1 && second.width / second.height >= 1.57, `${JSON.stringify(layout)} ${second.height}`);
+}
+
 async function main(): Promise<void> {
     checkModel();
     checkBoardModel();
+    await checkBoardFixed();
     await checkBoardRender();
     await checkBoardAvatars();
     await checkRender();

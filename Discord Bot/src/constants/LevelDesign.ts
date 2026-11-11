@@ -422,3 +422,76 @@ export const BOARD_TEMPLATES: Record<"podium" | "liste" | "kompakt" | "arena", (
         foot: classicFoot(),
     }),
 };
+
+/**
+ * W-0050: das Ranglisten-Bild in Discord, fest für alle Server (Entwurf C).
+ * Quer, damit Discord es in voller Breite zeigt: Podium flach, darunter
+ * Platz 4–7 links und 8–10 rechts, die eigene Zeile im freien Platz.
+ */
+export function BoardDesignC(): IBoardDesign {
+    const style = DefaultBoardStyle();
+    const chip: IDesignElement = { type: "shape", id: "chip", name: "Rahmen Zeitraum", hidden: false, x: 800, y: 34, opacity: 1, shape: "rect", w: 160, h: 38, fill: null, stroke: BOARD.cyan, strokeWidth: 2, cut: 0 };
+
+    return {
+        ...boardBase(style, "c"),
+        perPage: 10,
+        head: {
+            h: 96,
+            elements: [
+                line("untertitel", "Kleine Zeile", style.subtitle, 40, 46, 17, { color: "accent", maxWidth: 560 }),
+                line("titel", "Titel", "{title}", 40, 84, 40, { font: "Oxanium", weight: 800, color: BOARD.text, maxWidth: 700 }),
+                chip,
+                line("zeitraum", "Zeitraum", "{period}", 880, 60, 18, { weight: 700, color: BOARD.cyan, align: "center", maxWidth: 150 }),
+            ],
+        },
+        podium: {
+            on: true,
+            h: 196,
+            w: 296,
+            slotH: 186,
+            gap: 16,
+            offsets: [0, 14, 14],
+            fill: "medal",
+            fillOpacity: 10,
+            shape: "bevel",
+            cut: 14,
+            elements: [
+                line("platz", "Platz", "{rank}", 148, 36, 30, { font: "Oxanium", weight: 800, color: "medal", align: "center", maxWidth: 60 }),
+                line("trend", "Trend", "{trend}", 280, 32, 17, { font: "Oxanium", weight: 700, color: "trend", align: "right", maxWidth: 60 }),
+                { type: "avatar", id: "avatar", name: "Avatar", hidden: false, x: 116, y: 46, opacity: 1, size: 64, shape: "circle", ring: 4, ringColor: "medal" },
+                line("name", "Name", "{name}", 148, 140, 24, { font: "Oxanium", weight: 700, color: BOARD.text, align: "center", maxWidth: 270 }),
+                line("zeile", "Level und Punkte", "Level {level} · {xp} Punkte", 148, 166, 18, { align: "center", maxWidth: 270 }),
+            ],
+        },
+        row: {
+            x: 40,
+            w: 456,
+            h: 60,
+            gap: 8,
+            columns: 2,
+            fill: "#ffffff",
+            fillOpacity: 5,
+            shape: "bevel",
+            cut: 10,
+            highlight: BOARD.cyan,
+            elements: [
+                line("platz", "Platz", "{rank}", 14, 39, 24, { font: "Oxanium", weight: 700, color: "medal", maxWidth: 40 }),
+                { type: "avatar", id: "avatar", name: "Avatar", hidden: false, x: 56, y: 11, opacity: 1, size: 38, shape: "circle", ring: 0, ringColor: "medal" },
+                line("name", "Name", "{name}", 106, 28, 20, { font: "Oxanium", weight: 700, color: BOARD.text, maxWidth: 172 }),
+                line("zahlen", "Nachrichten · Voice", "{messages} Nachr. · {voice.hours}", 106, 49, 15, { maxWidth: 172 }),
+                line("lvl", "LVL", "LVL", 318, 23, 12, { align: "right", maxWidth: 40 }),
+                line("level", "Level", "{level}", 318, 48, 22, { font: "Oxanium", weight: 800, color: "accent", align: "right", maxWidth: 60 }),
+                line("punkte", "Punkte", "{xp}", 398, 31, 21, { font: "Oxanium", weight: 700, color: BOARD.text, align: "right", maxWidth: 76 }),
+                line("punkte-label", "PUNKTE", "PUNKTE", 398, 50, 12, { align: "right", maxWidth: 60 }),
+                line("trend", "Trend", "{trend}", 446, 38, 16, { font: "Oxanium", weight: 700, color: "trend", align: "right", maxWidth: 38 }),
+            ],
+        },
+        foot: {
+            h: 52,
+            elements: [
+                line("seite", "Seite", "Seite {page} von {pages} · {total} Mitglieder", 40, 30, 17, { maxWidth: 560 }),
+                line("zeitraum", "Zeitraum", "{range}", 960, 30, 17, { align: "right", maxWidth: 300 }),
+            ],
+        },
+    };
+}
