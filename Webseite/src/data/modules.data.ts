@@ -505,7 +505,7 @@ export const MODULE_DEFINITIONS: readonly IModuleDefinition[] = [
             "Mitglieder reichen ihre besten Szenen ein, und jede Woche wird der beste Clip gekürt. So landen " +
             "die Highlights deiner Organisation an einer Stelle, statt in fünf Kanälen unterzugehen.",
         category: ModuleCategory.Content,
-        status: ModuleStatus.Planned,
+        status: ModuleStatus.Live,
         icon: "play",
         highlights: [
             "Mitglieder reichen ihre Szenen ein",
