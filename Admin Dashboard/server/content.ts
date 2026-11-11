@@ -83,7 +83,7 @@ async function fromWebsite(config: IConfig, file: string): Promise<unknown> {
 }
 
 /** Der Standard aus dem Build der Webseite. `null` ohne Standard, bei einem neuen Modul ohne Detailtext ist das normal. */
-async function readDefault(config: IConfig, file: string): Promise<Envelope | null> {
+export async function readDefault(config: IConfig, file: string): Promise<Envelope | null> {
     const body = await fromWebsite(config, `content-default/${file}`);
     if (body === null) return null;
     if (!isEnvelope(body)) throw new PublicError(503, `Die Webseite liefert ${file} in einer unbekannten Form.`);

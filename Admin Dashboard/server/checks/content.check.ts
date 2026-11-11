@@ -119,6 +119,22 @@ export async function checkContent(): Promise<void> {
             await write("DELETE", "/api/content/categories");
         });
 
+        await check("Fehlende Module (W-0084): ein gelöschtes taucht als fehlend auf, nach Übernehmen nicht mehr", async () => {
+            assert.deepEqual((await get("/api/content/fehlende-module")).json(), { modules: [] });
+
+            const current = (await get("/api/content/modules")).json() as IEnvelope<IModules>;
+            const [gone, ...rest] = current.data.modules;
+            const without = await write("PUT", "/api/content/modules", { revision: current.revision, data: { modules: rest } });
+            assert.equal(without.statusCode, 200, without.body);
+            assert.deepEqual(((await get("/api/content/fehlende-module")).json() as IModules).modules.map((module) => module.id), [gone.id]);
+
+            const taken = await write("PUT", "/api/content/modules", { revision: (without.json() as IEnvelope<IModules>).revision, data: { modules: [...rest, gone] } });
+            assert.equal(taken.statusCode, 200, taken.body);
+            assert.deepEqual((await get("/api/content/fehlende-module")).json(), { modules: [] });
+
+            await write("DELETE", "/api/content/modules");
+        });
+
         await check("Fremde Symbole, Farben, Kategorien und IDs fallen durch", () => {
             const [first, second] = modules.modules;
             const member = team.members[0];

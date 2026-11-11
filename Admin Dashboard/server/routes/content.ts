@@ -4,7 +4,7 @@ import { accessOf } from "../access.ts";
 import { audit } from "../audit.ts";
 import { publish } from "../events.ts";
 import type { IConfig } from "../config.ts";
-import { contentMeta, readContent, resetContent, writeContent } from "../content.ts";
+import { contentMeta, readContent, readDefault, resetContent, writeContent } from "../content.ts";
 import { bannerOf, parseBanner, parseCategories, parseDetail, parseModules, parseTeam } from "../content-rules.ts";
 import { COMMANDS_FILE, syncCommands } from "../commands-sync.ts";
 import { InvalidInput, PublicError } from "../errors.ts";
@@ -111,6 +111,16 @@ export async function contentRoutes(app: FastifyInstance, { config }: { config: 
         if (result === "offline") throw new PublicError(503, "Der Bot antwortet gerade nicht. Die Commands bleiben, wie sie sind.");
 
         return { result, envelope: (await readContent(config, COMMANDS_FILE)) ?? NO_DETAIL };
+    });
+
+    // W-0084: Module aus dem Standard der Webseite (also aus dem Code), die in der gespeicherten Liste fehlen.
+    // Neue Module kommen so nicht still um die Startseite herum, gelöschte bleiben gelöscht, bis jemand übernimmt.
+    app.get("/api/content/fehlende-module", async () => {
+        const saved = (await readContent(config, "modules.json"))?.data as IModules | undefined;
+        const standard = (await readDefault(config, "modules.json"))?.data as IModules | undefined;
+        const known = new Set((saved?.modules ?? []).map((entry) => entry.id));
+
+        return { modules: (standard?.modules ?? []).filter((entry) => !known.has(entry.id)) } satisfies IModules;
     });
 
     app.get("/api/content/:doc", async (request) => {

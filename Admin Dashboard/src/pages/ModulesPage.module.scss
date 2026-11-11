@@ -88,3 +88,41 @@
 
     @include touch-target;
 }
+
+/* W-0084: Module aus dem Code, die in der gespeicherten Liste fehlen (Entwurf A). */
+.missing {
+    display: grid;
+    gap: var(--s-2);
+    margin-bottom: var(--s-4);
+    padding: var(--s-3) var(--s-4);
+    border: 1px solid rgb(0 175 255 / 45%);
+    background: rgb(0 175 255 / 7%);
+
+    p {
+        margin: 0;
+        color: var(--c-text-dim);
+        font-size: 0.875rem;
+    }
+
+    strong {
+        color: var(--c-text);
+    }
+}
+
+.missingList {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.missingItem {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-2);
+    padding: 4px 4px 4px var(--s-3);
+    border: 1px solid var(--c-line-strong);
+    background: var(--c-panel-solid);
+}
