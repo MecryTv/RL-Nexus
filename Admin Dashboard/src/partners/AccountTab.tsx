@@ -23,6 +23,8 @@ export interface IAccountTabProps {
     readonly problem: string | null;
     readonly onSave: () => void;
     readonly onChanged: () => void;
+    /** Der Server hat den Eintrag geändert (Ansprechpartner ausgetragen): Entwurf übernimmt diesen Stand. */
+    readonly onEntry: (entry: IEntry) => void;
 }
 
 /**
@@ -31,7 +33,7 @@ export interface IAccountTabProps {
  * „Speichern“ gespeichert; „Erneut prüfen“ und „Partner-Gruppe entfernen“
  * wirken sofort.
  */
-export function AccountTab({ value, set, entry, dirty, saving, problem, onSave, onChanged }: IAccountTabProps): JSX.Element {
+export function AccountTab({ value, set, entry, dirty, saving, problem, onSave, onChanged, onEntry }: IAccountTabProps): JSX.Element {
     const id = useId();
     const notify = useToast();
     const [info, setInfo] = useState<IContactInfo | null>(null);
@@ -61,10 +63,15 @@ export function AccountTab({ value, set, entry, dirty, saving, problem, onSave, 
         setChecking(true);
 
         try {
-            const result = await api<{ readonly role: IRoleState }>(`/api/partners/${entry.id}/group`, { method: "DELETE" });
+            const result = await api<{ readonly role: IRoleState; readonly entry: IEntry }>(`/api/partners/${entry.id}/group`, { method: "DELETE" });
 
             setRole(result.role);
-            notify(result.role.state === "given" || result.role.state === "pending" ? "Gruppe Partner ist weg. @Partner bleibt, solange er Ansprechpartner eines Partner- oder Sponsor-Eintrags ist." : "Gruppe Partner und @Partner sind weg. Der Eintrag auf der Webseite bleibt.");
+            notify(
+                result.role.state === "removing"
+                    ? "Gruppe Partner und Zugang sind weg, er ist überall ausgetragen. @Partner geht, sobald Discord wieder erreichbar ist."
+                    : "Gruppe Partner, Zugang und @Partner sind weg. Er ist bei keinem Eintrag mehr Ansprechpartner."
+            );
+            onEntry(result.entry);
             onChanged();
         } catch (error) {
             notify(error instanceof ApiError ? error.message : "Entfernen ging nicht.", "danger");
@@ -139,7 +146,7 @@ export function AccountTab({ value, set, entry, dirty, saving, problem, onSave, 
                     </div>
                     <p className={styles.muted}>
                         {partnerGroup
-                            ? "„Partner-Gruppe entfernen“ nimmt die Gruppe Partner und damit den Zugang zum Bot-Dashboard. Der Eintrag auf der Webseite bleibt, bis du ihn versteckst oder löschst."
+                            ? "„Partner-Gruppe entfernen“ nimmt Gruppe, Zugang und @Partner und trägt ihn bei allen Einträgen als Ansprechpartner aus. Die Einträge bleiben auf der Webseite, bis du sie versteckst oder löschst."
                             : info?.group
                               ? `Er hat die Gruppe ${GROUP_LABELS[info.group]}, die bleibt. @Partner bekommt er als Ansprechpartner.`
                               : "Er hat keine Gruppe Partner zum Entfernen."}
@@ -148,7 +155,8 @@ export function AccountTab({ value, set, entry, dirty, saving, problem, onSave, 
             )}
 
             <ConfirmDialog open={removing} title="Partner-Gruppe entfernen?" confirmLabel="Entfernen" tone="danger" busy={checking} onConfirm={() => void removeGroup()} onCancel={() => setRemoving(false)}>
-                <p>Der Ansprechpartner verliert die Gruppe Partner und den Zugang zum Bot-Dashboard. @Partner behält er, solange er Ansprechpartner eines Partner- oder Sponsor-Eintrags ist.</p>
+                <p>Der Ansprechpartner verliert die Gruppe Partner, den Zugang zum Bot-Dashboard und @Partner.</p>
+                <p>Er wird bei allen Partner- und Sponsor-Einträgen als Ansprechpartner ausgetragen, auch hier; ein verknüpfter Server fällt dort weg. Die Einträge bleiben auf der Webseite, einen neuen Ansprechpartner trägst du danach von Hand ein.</p>
             </ConfirmDialog>
         </div>
     );

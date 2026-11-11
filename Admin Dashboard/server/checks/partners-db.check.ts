@@ -229,29 +229,76 @@ export async function checkPartnerRoutesDb(config: IConfig, shared: IHttp): Prom
             assert.ok("invite" in response.json(), "invite fehlt");
         });
 
-        await check("Partner: „Partner-Gruppe entfernen“ nimmt nur die Gruppe Partner, Administrator bleibt (Review)", async () => {
+        await check("Partner: „Partner-Gruppe entfernen“ trägt den Ansprechpartner bei allen Einträgen aus, Administrator bleibt (Nutzer 11.11.)", async () => {
             const admin = "99999999999999999933";
+            const multi = "99999999999999999934";
+            const listed = async (id: number): Promise<{ contactId: string | null; access: string | null; guildId: string | null }> =>
+                ((await http.get("/api/partners")).json().entries as { id: number; contactId: string | null; access: string | null; guildId: string | null }[]).find((entry) => entry.id === id)!;
 
             await query("INSERT INTO dashboard_groups (user_id, group_name, granted_by) VALUES (?, 'administrator', ?)", [admin, USERS.admin]);
 
-            const asAdmin = await http.write("POST", "/api/partners", { ...ENTRY, name: "Check DB Admin-Kontakt", contactId: admin, access: "free" });
+            try {
+                const asAdmin = await http.write("POST", "/api/partners", { ...ENTRY, name: "Check DB Admin-Kontakt", contactId: admin, access: "free" });
 
-            assert.equal(asAdmin.statusCode, 200, asAdmin.body);
-            assert.equal((await http.write("DELETE", `/api/partners/${asAdmin.json().id}/group`)).statusCode, 409);
-            assert.equal(await groupOf(admin), "administrator");
+                assert.equal(asAdmin.statusCode, 200, asAdmin.body);
+                assert.equal((await http.write("DELETE", `/api/partners/${asAdmin.json().id}/group`)).statusCode, 409);
+                assert.equal(await groupOf(admin), "administrator");
+                assert.equal((await listed(asAdmin.json().id)).contactId, admin);
 
-            const asPartner = await http.write("POST", "/api/partners", { ...ENTRY, name: "Check DB Partner-Kontakt", contactId: hand, access: "free" });
+                const first = await http.write("POST", "/api/partners", { ...ENTRY, name: "Check DB Kontakt Eins", contactId: multi, access: "free", guildId: "300000000000000001" });
+                const second = await http.write("POST", "/api/partners", { ...ENTRY, name: "Check DB Kontakt Zwei", contactId: multi, access: "free" });
 
-            assert.equal(asPartner.statusCode, 200, asPartner.body);
-            assert.equal(await groupOf(hand), "partner");
+                assert.equal(first.statusCode, 200, first.body);
+                assert.equal(second.statusCode, 200, second.body);
+                assert.equal(await groupOf(multi), "partner");
+                assert.ok(fake.discordCalls.includes(`rolle+ ${multi} ${role}`));
 
-            const removed = await http.write("DELETE", `/api/partners/${asPartner.json().id}/group`);
+                const removed = await http.write("DELETE", `/api/partners/${first.json().id}/group`);
 
-            assert.equal(removed.statusCode, 200, removed.body);
-            assert.equal(await groupOf(hand), null);
-            assert.equal(typeof removed.json().role.state, "string");
-            await query("DELETE FROM dashboard_groups WHERE user_id = ?", [admin]);
-            await query("DELETE FROM partner_roles WHERE user_id = ?", [admin]);
+                assert.equal(removed.statusCode, 200, removed.body);
+                assert.equal(await groupOf(multi), null);
+                assert.equal(removed.json().role.state, "none");
+                assert.ok(fake.discordCalls.includes(`rolle- ${multi} ${role}`));
+
+                for (const id of [first.json().id, second.json().id]) {
+                    const entry = await listed(id);
+
+                    assert.equal(entry.contactId, null, `Eintrag ${id}: Ansprechpartner`);
+                    assert.equal(entry.access, null, `Eintrag ${id}: Zugang`);
+                    assert.equal(entry.guildId, null, `Eintrag ${id}: Server`);
+                }
+
+                assert.equal(removed.json().entry.contactId, null);
+            } finally {
+                await query("DELETE FROM dashboard_groups WHERE user_id IN (?, ?)", [admin, multi]);
+                await query("DELETE FROM partner_roles WHERE user_id IN (?, ?)", [admin, multi]);
+                fake.memberRoles.delete(multi);
+            }
+        });
+
+        await check("Gruppen: Gruppe Partner entfernen trägt den Ansprechpartner überall aus, ein Wechsel zu Premium nicht (Nutzer 11.11.)", async () => {
+            const person = "99999999999999999935";
+            const contactOf = async (id: number): Promise<string | null> =>
+                ((await http.get("/api/partners")).json().entries as { id: number; contactId: string | null }[]).find((entry) => entry.id === id)!.contactId;
+
+            try {
+                const created = await http.write("POST", "/api/partners", { ...ENTRY, name: "Check DB Gruppen-Kontakt", contactId: person, access: "free" });
+
+                assert.equal(created.statusCode, 200, created.body);
+                assert.equal(await groupOf(person), "partner");
+
+                assert.equal((await http.write("PUT", `/api/groups/${person}`, { group: "premium" })).statusCode, 204);
+                assert.equal(await contactOf(created.json().id), person);
+
+                assert.equal((await http.write("PUT", `/api/groups/${person}`, { group: "partner" })).statusCode, 204);
+                assert.equal((await http.write("DELETE", `/api/groups/${person}`)).statusCode, 204);
+                assert.equal(await contactOf(created.json().id), null);
+                assert.ok(fake.discordCalls.includes(`rolle- ${person} ${role}`));
+            } finally {
+                await query("DELETE FROM dashboard_groups WHERE user_id = ?", [person]);
+                await query("DELETE FROM partner_roles WHERE user_id = ?", [person]);
+                fake.memberRoles.delete(person);
+            }
         });
 
         await check("Partner: Live-Zahlen eines Servers für die Vorschau im Studio (Teil 2)", async () => {

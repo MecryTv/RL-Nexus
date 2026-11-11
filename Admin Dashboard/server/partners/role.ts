@@ -4,7 +4,8 @@ import type { IConfig } from "../config.ts";
 import { databaseReady, query } from "../db.ts";
 import { DiscordUnavailable, fetchMember, fetchRoles, setMemberRole } from "../discord.ts";
 import { grantGroupIfNone, groupOf, revokeGroupIf } from "../groups.ts";
-import { entriesOfContact, roleStateOf, setGroupGranted, setRoleState } from "./store.ts";
+import { publishSite } from "../site/publish.ts";
+import { clearContact, entriesOfContact, roleStateOf, setGroupGranted, setRoleState } from "./store.ts";
 
 /**
  * Rolle @Partner und Gruppe Partner (W-0062, Spec Teil 7). Die Rolle bekommt,
@@ -103,6 +104,28 @@ export async function applyContact(config: IConfig, next: IEntry | null, previou
     for (const userId of new Set([oldId, newId].filter((id): id is string => id !== null))) {
         await syncPartnerRole(config, userId, { mayRemove: true, actor });
     }
+}
+
+/**
+ * Wer die Gruppe Partner verliert, ist bei keinem Partner- oder Sponsor-Eintrag
+ * mehr Ansprechpartner (Entscheidung des Nutzers, 11.11.2026). Die Einträge
+ * bleiben auf der Webseite, ohne Ansprechpartner, Zugang und Server; einen
+ * neuen trägt man von Hand ein. Danach geht @Partner.
+ */
+export async function dropContact(config: IConfig, userId: string, actor: IActor): Promise<IRoleState> {
+    const entries = (await entriesOfContact(userId)).filter((entry) => entry.kind !== "supporter");
+
+    for (const entry of entries) {
+        await clearContact(entry.id);
+        await audit(actor, "partner.contact.drop", `partner:${entry.id}`, entry.name);
+    }
+
+    const role = await syncPartnerRole(config, userId, { mayRemove: true, actor });
+
+    // Ohne Server fallen Discord-Kasten, Module und Teams auf der Webseite weg.
+    if (entries.length > 0) await publishSite(config, ["partners", "news"]);
+
+    return role;
 }
 
 /** Steht die Rolle des Bots über @Partner? Für die Vorab-Prüfung im Anlege-Dialog. */

@@ -157,7 +157,7 @@ function PartnerEditor({ entry, entries, posts, siteOrigin, onSaved }: IEditorPr
                     onKind={changeKind}
                 />
             )}
-            {shown === "konto" && <AccountTab value={doc.value} set={doc.set} entry={entry} dirty={doc.dirty} saving={saving} problem={problem} onSave={requestSave} onChanged={onSaved} />}
+            {shown === "konto" && <AccountTab value={doc.value} set={doc.set} entry={entry} dirty={doc.dirty} saving={saving} problem={problem} onSave={requestSave} onChanged={onSaved} onEntry={(updated) => doc.markSaved(inputOf(updated))} />}
             {shown === "protokoll" && <ProtocolTab entry={entry} />}
 
             <ConfirmDialog

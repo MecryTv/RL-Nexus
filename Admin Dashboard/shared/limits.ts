@@ -117,6 +117,7 @@ export const AUDIT_LABELS: Readonly<Record<string, string>> = {
     "partner.order": "Reihenfolge der Partner/Sponsorings geändert",
     "partner.role.give": "Rolle @Partner vergeben",
     "partner.role.take": "Rolle @Partner entfernt",
+    "partner.contact.drop": "Ansprechpartner ausgetragen (Gruppe Partner entfernt)",
     "news.create": "News angelegt",
     "news.update": "News geändert",
     "news.delete": "News gelöscht",

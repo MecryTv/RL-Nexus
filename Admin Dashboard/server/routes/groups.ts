@@ -9,7 +9,7 @@ import { query } from "../db.ts";
 import { PublicError } from "../errors.ts";
 import { userRefs } from "../users.ts";
 import { groupOf } from "../groups.ts";
-import { syncPartnerRole } from "../partners/role.ts";
+import { dropContact, syncPartnerRole } from "../partners/role.ts";
 import { body, oneOf, snowflake, text } from "../validate.ts";
 
 /**
@@ -112,7 +112,14 @@ export async function groupRoutes(app: FastifyInstance, { config }: { config: IC
         if (result.affectedRows === 0) throw new PublicError(404, "Diese Person hat keine Gruppe.");
 
         await audit(actor, "group.revoke", userId);
-        await syncPartnerRole(config, userId, { mayRemove: before === "partner", actor }).catch((error: Error) => console.warn("[partner] Rolle nach Gruppenwechsel:", error.message));
+
+        if (before === "partner") {
+            // W-0062: Wer die Gruppe Partner verliert, ist überall nicht mehr Ansprechpartner (Nutzer, 11.11.2026).
+            await dropContact(config, userId, actor);
+            publish("partners");
+        } else {
+            await syncPartnerRole(config, userId, { mayRemove: false, actor }).catch((error: Error) => console.warn("[partner] Rolle nach Gruppenwechsel:", error.message));
+        }
 
         publish("groups");
 

@@ -10,8 +10,8 @@ import { DiscordUnavailable, fetchMember } from "../discord.ts";
 import { InvalidInput, PublicError } from "../errors.ts";
 import { publish } from "../events.ts";
 import { groupOf, revokeGroupIf } from "../groups.ts";
-import { applyContact, checkAssignable, syncPartnerRole } from "../partners/role.ts";
-import { createEntry, deleteEntry, getEntry, listEntries, orderEntries, setGroupGranted, updateEntry } from "../partners/store.ts";
+import { applyContact, checkAssignable, dropContact, syncPartnerRole } from "../partners/role.ts";
+import { createEntry, deleteEntry, getEntry, listEntries, orderEntries, updateEntry } from "../partners/store.ts";
 import { publishSite } from "../site/publish.ts";
 import { userRefs } from "../users.ts";
 import { body, id, oneOf, snowflake } from "../validate.ts";
@@ -150,8 +150,9 @@ export async function partnerRoutes(app: FastifyInstance, { config }: { config: 
     });
 
     /**
-     * „Partner-Gruppe entfernen“ im Reiter Konto (Review-Fund): nimmt nur die
-     * Gruppe Partner. Administrator und Premium bleiben, wie Spec Teil 7 sagt.
+     * „Partner-Gruppe entfernen“ im Reiter Konto: nimmt nur die Gruppe Partner
+     * (Administrator und Premium bleiben) und trägt die Person bei allen
+     * Einträgen als Ansprechpartner aus, damit auch @Partner geht.
      */
     app.delete("/api/partners/:id/group", async (request) => {
         const entry = await entryOf(request);
@@ -161,15 +162,14 @@ export async function partnerRoutes(app: FastifyInstance, { config }: { config: 
 
         const actor = actorOf(request);
 
-        if (entry.groupGranted) await setGroupGranted(entry.id, false);
         await audit(actor, "group.revoke", entry.contactId, "partner");
 
-        const role = await syncPartnerRole(config, entry.contactId, { mayRemove: true, actor });
+        const role = await dropContact(config, entry.contactId, actor);
 
         publish("groups");
         publish("partners");
 
-        return { role };
+        return { role, entry: (await getEntry(entry.id)) ?? entry };
     });
 
     app.get("/api/partners/:id/protokoll", async (request) => {
