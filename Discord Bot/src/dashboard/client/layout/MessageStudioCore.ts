@@ -227,3 +227,24 @@ export function restore(target: IStudioBody, snapshot: IStudioBody): void {
 
     Object.assign(target.doc, copy.doc);
 }
+
+/** W-0080: die Farbe bei „Farbiger Rand“ aus, je Editor gemerkt, solange die Seite offen ist - auch über das Neuaufbauen nach dem Speichern. */
+const offAccents = new Map<string, string>();
+
+/** Was die Farbwahl zeigt: die aktive Farbe, sonst die zuletzt ausgeschaltete, sonst Lila. */
+export function shownAccent(accent: string | undefined, key: string): string {
+    return accent ?? offAccents.get(key) ?? "#8a4dff";
+}
+
+/** Rand aus merkt sich die Farbe und nimmt sie weg, Rand an setzt die gezeigte Farbe. */
+export function switchAccent(doc: { accent?: string }, on: boolean, key: string): void {
+    if (on) {
+        doc.accent = shownAccent(doc.accent, key);
+
+        return;
+    }
+
+    if (doc.accent) offAccents.set(key, doc.accent);
+
+    delete doc.accent;
+}

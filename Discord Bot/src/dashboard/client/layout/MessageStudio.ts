@@ -19,7 +19,7 @@ import { embedPreview, imageUrl } from "./BodyEditor.js";
 import { emojiPicker } from "./EmojiPicker.js";
 import { pickImage } from "./ImagePicker.js";
 import { IMessageBlock, insertPlaceholder, markdown, placeholderMarks, placeholderPicker, placeholderTree, renderPreview, trackField } from "./MessageEditor.js";
-import { authorOf, BLOCK_BUDGET, canAddBlock, canDuplicate, docCost, duplicatePart, EMBED_MAX, MAX_FIELDS, messageLength, messageParts, movePart, removePart, restore } from "./MessageStudioCore.js";
+import { authorOf, BLOCK_BUDGET, canAddBlock, canDuplicate, docCost, duplicatePart, EMBED_MAX, MAX_FIELDS, messageLength, messageParts, movePart, removePart, restore, shownAccent, switchAccent } from "./MessageStudioCore.js";
 import { iconButton, pathIcon, studio } from "./Studio.js";
 import { History } from "./StudioCore.js";
 import { templateBar } from "./Templates.js";
@@ -725,15 +725,17 @@ export function messageStudio(entry: IBody, options: IBodyOptions): IBodyEditor 
     function styleControls(): HTMLElement[] {
         if (entry.kind === "v2") {
             const color = el("input", "");
+            // Je Seite und Editor - so findet der neu gebaute Editor nach dem Speichern die alte Farbe (W-0080).
+            const key = `${location.pathname}|${options.title ?? ""}`;
 
             color.type = "color";
-            color.value = entry.doc.accent ?? "#8a4dff";
+            color.value = shownAccent(entry.doc.accent, key);
             color.disabled = !entry.doc.accent;
             color.setAttribute("aria-label", "Akzentfarbe");
             color.addEventListener("input", () => typed("accent", () => (entry.doc.accent = color.value)));
 
             return [
-                el("label", "sto-check", toggle(Boolean(entry.doc.accent), "Farbiger Rand", (on) => change(() => (on ? (entry.doc.accent = color.value) : delete entry.doc.accent))), "Farbiger Rand"),
+                el("label", "sto-check", toggle(Boolean(entry.doc.accent), "Farbiger Rand", (on) => change(() => switchAccent(entry.doc, on, key))), "Farbiger Rand"),
                 label("Akzent", color),
             ];
         }

@@ -5,7 +5,7 @@
  *   npm run check:studio
  */
 import { History, IRect, resizeBox, shortcutOwner, snapMove, studioShortcut, typedNumber } from "../dashboard/client/layout/StudioCore";
-import { authorOf, canAddBlock, canDuplicate, docCost, duplicatePart, EMBED_MAX, messageLength, messageParts, movePart, offered, removePart, restore, IStudioBody as IBody, IStudioBlock } from "../dashboard/client/layout/MessageStudioCore";
+import { authorOf, canAddBlock, shownAccent, switchAccent, canDuplicate, docCost, duplicatePart, EMBED_MAX, messageLength, messageParts, movePart, offered, removePart, restore, IStudioBody as IBody, IStudioBlock } from "../dashboard/client/layout/MessageStudioCore";
 
 let failures = 0;
 
@@ -242,12 +242,33 @@ function checkMessageParts(): void {
     check("Duplizieren nur, wenn der Baustein noch passt", !canDuplicate({ kind: "v2", content: "", embed: null, doc: full }, "block:0") && canDuplicate({ kind: "v2", content: "", embed: null, doc: full }, "block:13"));
 }
 
+/** W-0080: „Farbiger Rand“ aus und wieder an holt die alte Farbe zurück, auch nach dem Neuaufbau. */
+function checkAccent(): void {
+    const doc: { accent?: string } = { accent: "#00afff" };
+
+    switchAccent(doc, false, "hub");
+    check("Rand aus: Farbe ist weg", doc.accent === undefined);
+    check("Rand aus: Farbwahl zeigt die alte Farbe", shownAccent(doc.accent, "hub") === "#00afff");
+
+    // Nach dem Speichern baut die Seite den Editor neu - ein frisches Objekt ohne Farbe.
+    const fresh: { accent?: string } = {};
+
+    switchAccent(fresh, true, "hub");
+    check("Rand wieder an nach Neuaufbau: alte Farbe", fresh.accent === "#00afff", fresh.accent);
+
+    const other: { accent?: string } = {};
+
+    switchAccent(other, true, "team");
+    check("Anderer Editor ohne gemerkte Farbe: Lila wie bisher", other.accent === "#8a4dff", other.accent);
+}
+
 checkHistory();
 checkTyping();
 checkMove();
 checkResize();
 checkShortcuts();
 checkMessageParts();
+checkAccent();
 
 console.log(failures ? `\n${failures} Prüfung(en) fehlgeschlagen.` : "\nAlles in Ordnung.");
 process.exit(failures ? 1 : 0);
