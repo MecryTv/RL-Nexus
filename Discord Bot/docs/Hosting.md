@@ -414,6 +414,29 @@ Die Mail-Ports öffnet die Anleitung von Mailcow. Alle Container der Seiten, die
 
 > **ufw schützt keinen veröffentlichten Docker-Port.** Docker schreibt seine eigenen iptables-Regeln und hängt sie vor die von ufw: was mit `-p 9443:9443` heraussteht, steht heraus, auch wenn ufw den Port nicht erlaubt. Die Bindung an `127.0.0.1` ist die Sperre, nicht die Firewall.
 
+### Mailcow-Oberfläche über Tailscale
+
+Die Anmeldung von Mailcow steht nicht öffentlich (W-0070): Eine offene Mail-Anmeldung auf einer jungen Domain stuft Google gern als Phishing ein. `https://mail.nexus-emb.de/` antwortet von außen mit 403. Öffentlich bleibt nur, was Mail-Apps brauchen: `/SOGo` (auch CalDAV/CardDAV), `/Microsoft-Server-ActiveSync`, `/autodiscover`, `/mail/config-v1.1.xml` und `/.well-known`. IMAP und SMTP gehen ohnehin an nginx vorbei. Die Oberfläche selbst gibt es unter dem Namen des Hosts im Tailnet, etwa `https://rlnexus-vps.tail0fd142.ts.net/`, nur für Geräte im Tailscale-Netz.
+
+Tailscale läuft dafür direkt auf dem Host, ohne die DNS-Einstellungen anzufassen (Mailcow und Docker brauchen ihre eigenen):
+
+```bash
+curl -fsSL https://pkgs.tailscale.com/stable/debian/trixie.noarmor.gpg -o /usr/share/keyrings/tailscale-archive-keyring.gpg
+curl -fsSL https://pkgs.tailscale.com/stable/debian/trixie.tailscale-keyring.list -o /etc/apt/sources.list.d/tailscale.list
+sudo apt update && sudo apt install -y tailscale
+sudo tailscale up --hostname=rlnexus-vps --accept-dns=false   # Link öffnen, anmelden, „Connect“
+```
+
+Das Zertifikat kommt von Tailscale (im Tailnet unter *DNS → HTTPS Certificates* einschalten) und wird jede Woche per Cron nachgeholt, `tailscale cert` holt nur bei Bedarf ein neues:
+
+```bash
+sudo mkdir -p /etc/ssl/tailscale
+sudo tailscale cert --cert-file /etc/ssl/tailscale/rlnexus-vps.crt --key-file /etc/ssl/tailscale/rlnexus-vps.key rlnexus-vps.<tailnet>.ts.net
+echo '17 4 * * 1 root tailscale cert --cert-file /etc/ssl/tailscale/rlnexus-vps.crt --key-file /etc/ssl/tailscale/rlnexus-vps.key rlnexus-vps.<tailnet>.ts.net >/dev/null 2>&1 && systemctl reload nginx' | sudo tee /etc/cron.d/tailscale-cert
+```
+
+Der zweite Block in `nginx/mail.nexus-emb.de.conf` trägt den Namen aus dem Tailnet. nginx lauscht dafür nicht auf der 100.x-Adresse (fehlte `tailscale0` beim Start, käme nginx gar nicht hoch), sondern lässt unter dem Namen nur Adressen aus `100.64.0.0/10` und `fd7a:115c:a1e0::/48` durch. Der Tailscale-Container `debian-vps-samba` für die Dateifreigabe ist davon unabhängig, er hängt in seinem eigenen Docker-Netz.
+
 ---
 
 ## 7. Im Developer Portal nachtragen
