@@ -13,6 +13,8 @@ export interface IModuleDefinition {
     readonly name: string;
     /** Ein Satz. Steht auf der Kachel. */
     readonly tagline: string;
+    /** W-0085: Ein Satz für das Bot-Dashboard (Leiste und Kachel). Die Webseite zeigt ihn nicht. */
+    readonly botText?: string;
     /** Zwei bis vier Sätze. Steht in der Detailansicht. */
     readonly description: string;
     /** Die ID einer Kategorie aus categories.json. */

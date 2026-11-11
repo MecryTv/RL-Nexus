@@ -1,4 +1,5 @@
 import BotClient from "../../../client/BotClient";
+import { ICatalog } from "../../../services/CatalogService";
 import { ModuleId } from "../../../constants/Modules";
 import IDashboardActivity from "./IDashboardActivity";
 import IDashboardGuild from "./IDashboardGuild";
@@ -10,6 +11,8 @@ export interface IDashboardPayload {
     user: IDashboardUser;
     guilds: IDashboardGuild[];
     inviteURL: string;
+    /** W-0085: Bereiche und Module aus dem Admin Dashboard, `null`: der Stand aus dem Code. */
+    catalog: ICatalog | null;
 }
 
 export default interface IDashboardService {

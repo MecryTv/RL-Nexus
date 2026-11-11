@@ -10,6 +10,8 @@
  * Programmiert ist noch keins. Bis dahin zeigt jedes nur, dass es kommt.
  */
 
+import type { ICatalog } from "../interfaces/IUser.js";
+
 export interface IModulePart {
     /**
      * Abschnitt in der Adresse (/guild/<id>/tickets) und ID der Karte. Beginnt
@@ -377,3 +379,31 @@ export const MODULES: IModule[] = [
  * in guild_settings.modules steht: ein entferntes oder umbenanntes Modul.
  */
 export const KNOWN_MODULES = new Set(MODULES.map((entry) => entry.id));
+
+/**
+ * W-0085: Was im Admin Dashboard steht, gilt auch hier: Bereichsnamen und ihre
+ * Reihenfolge, je Modul Name, Kurztext und Bereich. Symbole, Schalter und Teile
+ * bleiben, ebenso Module, die dort fehlen (ihr Schalter muss bleiben). Bereiche
+ * aus dem Code, die dort fehlen, rücken ans Ende. Einmal beim Start aufrufen,
+ * bevor eine Seite zeichnet.
+ */
+export function applyCatalog(catalog: ICatalog | null | undefined): void {
+    if (!catalog) return;
+
+    const own = [...CATEGORIES];
+    const next = catalog.categories.map((entry) => ({ id: entry.id, name: entry.name }));
+
+    for (const category of own) if (!next.some((entry) => entry.id === category.id)) next.push(category);
+
+    CATEGORIES.splice(0, CATEGORIES.length, ...next);
+
+    for (const entry of catalog.modules) {
+        const module = MODULES.find((candidate) => candidate.id === entry.id);
+
+        if (!module) continue;
+
+        module.name = entry.name;
+        module.category = entry.category;
+        if (entry.text) module.description = entry.text;
+    }
+}

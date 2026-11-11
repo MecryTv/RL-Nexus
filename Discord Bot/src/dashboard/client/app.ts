@@ -28,6 +28,7 @@ import { renderProfile } from "./layout/Profile.js";
 import { buildUserUI } from "./layout/UserMenu.js";
 import { showFailure } from "./layout/Failure.js";
 import { watchScroll } from "./layout/Topbar.js";
+import { applyCatalog } from "./constants/Modules.js";
 
 /**
  * Die Daten kamen nicht. Der Grund steht in der Konsole, hier steht, was der
@@ -151,6 +152,9 @@ async function boot(): Promise<void> {
         if (!redirecting()) failed(page ?? "");
         return;
     }
+
+    // W-0085: Bereiche und Module wie im Admin Dashboard - vor dem ersten Zeichnen.
+    applyCatalog(data.catalog);
 
     renderProfile(data.user);
     buildUserUI(data.user);

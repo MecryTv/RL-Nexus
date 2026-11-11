@@ -19,7 +19,7 @@ import { Cut } from "../utils/cut";
 import path from "path";
 import { pathToFileURL } from "url";
 import BotClient from "../client/BotClient";
-import { HELP_PREFIX, HelpCatalog, IHelpText, IsGroupText, STATUS_URL, SUPPORT_URL } from "../constants/Help";
+import { ApplyHelpCatalog, HELP_AREAS, HELP_PREFIX, HelpCatalog, IHelpText, IsGroupText, STATUS_URL, SUPPORT_URL } from "../constants/Help";
 import { HELP_CATALOG } from "../constants/HelpCatalog";
 import { BuildHelp, CatalogProblems, IHelpSource } from "../services/help/HelpModel";
 import { AreaOf, ComposeHelp, HelpAreaPage, HelpCommandPage, HelpStartPage, IHelpContext, IHelpPage, IHelpStart, PageContainer } from "../builder/HelpView";
@@ -157,6 +157,19 @@ async function checkCatalog(client: BotClient): Promise<void> {
 
     check("Beispiele beginnen mit dem eigenen Befehl", wrong.length === 0, wrong.map(([key]) => key).join(", "));
     const real = BuildHelp(commands, HELP_CATALOG);
+
+    // W-0085: Bereiche und Zuordnung aus dem Admin Dashboard.
+    const giveaway = real.find((entry) => (entry.group ?? entry.commands[0].text).module === "giveaways");
+
+    ApplyHelpCatalog({ categories: [{ id: "community", name: "Gemeinschaft" }, { id: "turniere", name: "Turniere" }], modules: [{ id: "giveaways", category: "turniere" }] });
+    check(
+        "/hilfe: Namen, Reihenfolge und Zuordnung aus dem Admin Dashboard (W-0085)",
+        giveaway !== undefined && AreaOf(giveaway) === "turniere" && HELP_AREAS[0].name === "Gemeinschaft" && HELP_AREAS[1].emoji === "📦" && HELP_AREAS[HELP_AREAS.length - 1].id === "general",
+        HELP_AREAS.map((area) => area.id).join()
+    );
+    check("  ein neuer Bereich hat eine Seite", HelpAreaPage("turniere", real, CONTEXT, 0).blocks.length > 0);
+    ApplyHelpCatalog(null);
+    check("  ohne Katalog wieder der Stand aus dem Code", HELP_AREAS[0].id === "always" && giveaway !== undefined && AreaOf(giveaway) !== "turniere");
     const pages: [string, IHelpPage][] = [];
 
     for (const entry of real) for (const key of [null, ...entry.commands.map((command) => command.key)]) pages.push([key ?? entry.name, HelpCommandPage(entry, key, 0, CONTEXT)]);

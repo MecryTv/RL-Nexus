@@ -26,6 +26,9 @@ import { SUPPORT_GUILD_ID } from "../constants/Help";
 import IDashboardSession from "../interfaces/services/dashboard/IDashboardSession";
 import DashboardService, { AccessEnds, BETA_ERRORS, BetaErrorText, BetaGate, DisplayGroup, LockPlaceholders, MfaRequired, ShopDecision, ShopStatusLines, type IShopGrantRow, type IShopStatusRow } from "../services/DashboardService";
 import { AccessText } from "../dashboard/client/constants/Access";
+import { applyCatalog, CATEGORIES, MODULES } from "../dashboard/client/constants/Modules";
+import CatalogService, { Catalog } from "../services/CatalogService";
+import { ApplyHelpCatalog } from "../constants/Help";
 import { CodeFromForm, RedeemAtAdmin } from "../routes/DashboardBeta";
 import IDashboardGuild, { DashboardRole } from "../interfaces/services/dashboard/IDashboardGuild";
 import { DashboardGroup } from "../interfaces/services/dashboard/IDashboardUser";
@@ -1447,6 +1450,70 @@ async function checkInvite(client: BotClient): Promise<void> {
     }
 }
 
+/** W-0085: Bereiche und Module aus dem Admin Dashboard. */
+async function checkCatalog(): Promise<void> {
+    console.log("\n  — Katalog aus dem Admin Dashboard (W-0085) —");
+
+    const envelope = (data: unknown) => ({ revision: 1, data });
+    const categories = envelope({ categories: [{ id: "always", label: "Immer dabei", color: "#000000" }, { id: "turniere", label: "Turniere", color: "#000000" }, { id: "Kaputt", label: "x" }] });
+    const modules = envelope({
+        modules: [
+            { id: "levels", name: "Level", botText: "Punkte fürs Schreiben.", category: "always" },
+            { id: "clips", name: "Clips", botText: "  ", category: "turniere" },
+            { id: "welcome", name: "Welcome", category: "gibtsnicht" },
+            { id: 5, name: "kaputt", category: "always" },
+        ],
+    });
+    const parsed = Catalog(categories, modules);
+
+    check("Bereiche: kaputte fallen heraus, Reihenfolge bleibt", parsed?.categories.map((entry) => entry.id).join() === "always,turniere", JSON.stringify(parsed?.categories));
+    check("Module: unbekannter Bereich und kaputte fallen heraus, leerer Kurztext ist null", JSON.stringify(parsed?.modules) === JSON.stringify([{ id: "levels", name: "Level", text: "Punkte fürs Schreiben.", category: "always" }, { id: "clips", name: "Clips", text: null, category: "turniere" }]), JSON.stringify(parsed?.modules));
+    check("Ohne Module oder Bereiche: null, dann gilt der Code", Catalog(categories, envelope({ modules: [] })) === null && Catalog(null, modules) === null);
+
+    const live = await mkdtemp(path.join(tmpdir(), "rlnexus-content-"));
+    const fallback = await mkdtemp(path.join(tmpdir(), "rlnexus-default-"));
+
+    try {
+        await writeFile(path.join(fallback, "categories.json"), JSON.stringify(categories));
+        await writeFile(path.join(fallback, "modules.json"), JSON.stringify(envelope({ modules: [{ id: "levels", name: "Aus dem Standard", category: "always" }] })));
+        await writeFile(path.join(live, "modules.json"), JSON.stringify(envelope({ modules: [{ id: "levels", name: "Aus dem Admin", category: "turniere" }] })));
+
+        const both = await new CatalogService([live, fallback]).Fresh();
+        const onlyDefault = await new CatalogService([path.join(live, "fehlt"), fallback]).Fresh();
+
+        check("Gespeicherte Datei vor dem Standard, je Datei", both?.modules[0].name === "Aus dem Admin" && both.categories.length === 2, JSON.stringify(both));
+        check("Ohne gespeicherte Datei: Standard der Webseite", onlyDefault?.modules[0].name === "Aus dem Standard");
+        check("Ohne Ordner: null", (await new CatalogService([null, path.join(live, "fehlt")]).Fresh()) === null);
+    } finally {
+        await rm(live, { recursive: true, force: true });
+        await rm(fallback, { recursive: true, force: true });
+        ApplyHelpCatalog(null);
+    }
+
+    // Das Bot-Dashboard übernimmt Namen, Kurztext und Bereich. Danach zurück auf den Code-Stand, andere Prüfungen lesen MODULES.
+    const savedCategories = CATEGORIES.map((entry) => ({ ...entry }));
+    const savedModules = MODULES.map((entry) => ({ id: entry.id, name: entry.name, description: entry.description, category: entry.category }));
+
+    try {
+        applyCatalog({
+            categories: [{ id: "community", name: "Gemeinschaft" }, { id: "turniere", name: "Turniere" }],
+            modules: [{ id: "giveaways", name: "Verlosungen", text: "Neuer Kurztext.", category: "turniere" }, { id: "polls", name: "Umfragen", text: null, category: "community" }],
+        });
+
+        const giveaways = MODULES.find((entry) => entry.id === "giveaways");
+        const polls = MODULES.find((entry) => entry.id === "polls");
+
+        check("Bot-Dashboard: Bereiche in der Reihenfolge des Admins, fehlende aus dem Code hinten", CATEGORIES.slice(0, 3).map((entry) => entry.name).join() === "Gemeinschaft,Turniere,Immer dabei" && CATEGORIES.length === savedCategories.length + 1, CATEGORIES.map((entry) => entry.name).join());
+        check("Bot-Dashboard: Name, Kurztext und Bereich je Modul", giveaways?.name === "Verlosungen" && giveaways.description === "Neuer Kurztext." && giveaways.category === "turniere");
+        check("Bot-Dashboard: ohne Kurztext bleibt der aus dem Code", polls?.description === savedModules.find((entry) => entry.id === "polls")?.description);
+        check("Bot-Dashboard: Module, die im Admin fehlen, bleiben", MODULES.length === savedModules.length && MODULES.some((entry) => entry.id === "tickets"));
+    } finally {
+        CATEGORIES.splice(0, CATEGORIES.length, ...savedCategories);
+
+        for (const saved of savedModules) Object.assign(MODULES.find((entry) => entry.id === saved.id)!, saved);
+    }
+}
+
 async function main(): Promise<void> {
     const client = new BotClient();
 
@@ -1468,6 +1535,7 @@ async function main(): Promise<void> {
     checkSessions(client);
     await checkLogout(client);
     await checkInvite(client);
+    await checkCatalog();
 
     // RL Tracker, Administration und die Epic-Verknuepfung gibt es nicht mehr.
     for (const gone of ["/admins", "/api/admin", "/user/1059621019947634739/tracking", "/api/tracking/1059621019947634739", "/link/epic"]) {

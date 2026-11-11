@@ -771,7 +771,7 @@ export default class DashboardService implements IDashboardService {
         user.access = await this.ShopEnds(session.userId).catch(() => null);
 
         // W-0069: Ein fertiger Discord-Link ginge ohne state nicht mehr; eingeladen wird über /einladen?guild=…
-        return { user, guilds, inviteURL: `${DASHBOARD_PATH}/einladen` };
+        return { user, guilds, inviteURL: `${DASHBOARD_PATH}/einladen`, catalog: await this.client.catalogService.Fresh() };
     }
 
     /** Zugang laut Shop, mit Cache. Wirft nie: Kann der Bot die Tabellen nicht lesen, bleibt die Schranke offen, außer Beta könnte laufen. */

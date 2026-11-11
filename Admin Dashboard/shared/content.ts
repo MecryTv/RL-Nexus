@@ -97,6 +97,8 @@ export interface IModuleDefinition {
     readonly id: string;
     readonly name: string;
     readonly tagline: string;
+    /** W-0085: Ein Satz für das Bot-Dashboard. Fehlt er, bleibt dort der Text aus dem Bot. */
+    readonly botText?: string;
     readonly description: string;
     readonly category: string;
     readonly status: string;
@@ -194,6 +196,7 @@ export const CONTENT_LIMITS = {
         id: 40, // (16)
         name: 40, // (17)
         tagline: 140, // (64)
+        botText: 200, // (W-0085, heute bis 131)
         description: 600, // (300)
         highlights: 10, // (6)
         highlight: 160, // (86)

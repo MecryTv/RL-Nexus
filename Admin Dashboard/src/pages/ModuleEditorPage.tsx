@@ -124,6 +124,22 @@ function TileForm({
                 />
             </Field>
 
+            <Field
+                id="modul-bottext"
+                label="Kurztext im Bot-Dashboard"
+                hint="Ein Satz, steht im Bot-Dashboard unter dem Namen und auf der Kachel. Leer: der Text aus dem Bot."
+                counter={{ value: (module.botText ?? "").length, max: MODULE.botText }}
+            >
+                <input
+                    id="modul-bottext"
+                    type="text"
+                    maxLength={MODULE.botText}
+                    value={module.botText ?? ""}
+                    onChange={(event) => set({ botText: event.target.value })}
+                    aria-describedby="modul-bottext-hint"
+                />
+            </Field>
+
             <Field id="modul-beschreibung" label="Beschreibung" hint="Zwei bis vier Sätze. Ohne Detailtext steht sie oben auf der Detailseite." counter={{ value: module.description.length, max: MODULE.description }}>
                 <textarea
                     id="modul-beschreibung"

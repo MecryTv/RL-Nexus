@@ -100,6 +100,9 @@ export default function LoadConfig(): IConfig {
         // Die Hauptseite. Das Dashboard verlinkt in der Fusszeile dorthin.
         SITE_PUBLIC_URL: Text("SITE_PUBLIC_URL", "https://nexus-emb.de"),
         ADMIN_INTERNAL_URL: Text("ADMIN_INTERNAL_URL", "http://localhost:3001"),
+        // W-0085: Bereiche und Module aus dem Admin Dashboard. Lokal der Standard der Webseite nebenan.
+        CONTENT_DIR: Text("CONTENT_DIR", ""),
+        CONTENT_DEFAULT_DIR: Text("CONTENT_DEFAULT_DIR", path.join(process.cwd(), "..", "Webseite", "public", "content-default")),
         SERVER_JWT_SECRET: Need("SERVER_JWT_SECRET"),
         SERVER_JWT_EXPIRES_IN: Text("SERVER_JWT_EXPIRES_IN", "30d"),
         SERVER_RATE_LIMIT_MAX: Num("SERVER_RATE_LIMIT_MAX", 100),

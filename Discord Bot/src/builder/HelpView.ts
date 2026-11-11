@@ -2,7 +2,7 @@ import { AttachmentBuilder, ContainerBuilder, MessageFlags } from "discord.js";
 import ComponentV2Builder from "./ComponentV2Builder";
 import { HelpBlock, RenderHelpImages } from "./HelpImage";
 import { ButtonOptions, ISelectMenuOptions } from "../interfaces/builder/IComponentV2Builder";
-import { HELP_ACCENT, HELP_AREAS, HELP_PREFIX, HelpAreaId, IHelpText, STATUS_URL, SUPPORT_URL, WHO_LABELS } from "../constants/Help";
+import { HELP_ACCENT, HELP_AREAS, HELP_PREFIX, HelpAreaId, IHelpText, MODULE_AREA, STATUS_URL, SUPPORT_URL, WHO_LABELS } from "../constants/Help";
 import { IsModule } from "../constants/Modules";
 import { IHelpCommand, IHelpEntry } from "../services/help/HelpModel";
 import { Cut } from "../utils/cut";
@@ -128,7 +128,10 @@ function FieldLine(command: IHelpCommand): string {
 }
 
 export function AreaOf(entry: IHelpEntry): HelpAreaId {
-    return entry.group?.area ?? entry.commands[0].text.area;
+    const own = entry.group ?? entry.commands[0].text;
+
+    // W-0085: Steht das Modul im Admin Dashboard in einem anderen Bereich, gilt der.
+    return (own.module ? MODULE_AREA.get(own.module) : undefined) ?? own.area;
 }
 
 /* ----------------------------------------------------------
@@ -329,7 +332,7 @@ export function HelpCommandPage(entry: IHelpEntry, key: string | null, page: num
             back,
             ...PageButtons((target) => `${HELP_PREFIX}seite:${entry.name}:${sub}:${target}`, current, pages.length),
             ...(module ? [{ url: Dashboard(context, module), label: "Im Dashboard", emoji: "🖥️" }] : []),
-            { url: `${context.docs}#${DOC_ANCHORS[area]}`, label: "Doku", emoji: "📖" },
+            { url: `${context.docs}#${DOC_ANCHORS[area] ?? DOC_ANCHORS.general}`, label: "Doku", emoji: "📖" },
         ],
     };
 }

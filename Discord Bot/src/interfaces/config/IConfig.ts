@@ -37,6 +37,10 @@ export interface IConfig {
      * dorthin weiter (/internal/backups/…), von außen ist der Pfad gesperrt.
      */
     ADMIN_INTERNAL_URL: string;
+    /** W-0085: Inhalte des Admin Dashboards (categories.json, modules.json), leer: keine. */
+    CONTENT_DIR: string;
+    /** W-0085: Standard der Webseite (content-default), wenn das Admin Dashboard noch nichts gespeichert hat. */
+    CONTENT_DEFAULT_DIR: string;
     SERVER_RATE_LIMIT_MAX: number;
     SERVER_RATE_LIMIT_WINDOW: string;
 

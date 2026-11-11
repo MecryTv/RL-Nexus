@@ -7,12 +7,13 @@
  * miteinander zu tun haben.
  */
 export enum ModuleCategory {
+    // W-0085: dieselben Bereiche wie im Bot-Dashboard (Leiste und /hilfe), in dieser Reihenfolge.
+    Always = "always",
+    RocketLeague = "rocket-league",
     Community = "community",
-    Competition = "competition",
+    Support = "support",
     Moderation = "moderation",
-    Engagement = "engagement",
     Content = "content",
-    Utility = "utility",
 }
 
 /** Wie weit ein Modul ist. Bestimmt Abzeichen und Sortierung. */

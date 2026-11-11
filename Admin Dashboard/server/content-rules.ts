@@ -229,10 +229,13 @@ function parseModule(value: unknown, index: number, meta: IContentMeta, category
 
     const featured = flag(data.featured, `${at}: „Auf der Startseite“`);
     const builtIn = flag(data.builtIn, `${at}: „Fest eingebaut“`);
+    // W-0085: leer heißt, das Bot-Dashboard behält seinen eigenen Text.
+    const botText = data.botText === undefined || (typeof data.botText === "string" && data.botText.trim() === "") ? "" : required(data.botText, `${at}: Der Kurztext im Bot-Dashboard`, MODULE.botText);
 
     // Nur setzen, was gesetzt ist: so bleibt die Datei so knapp wie die Daten der Webseite.
     return {
         ...module,
+        ...(botText ? { botText } : {}),
         ...(commands.length > 0 ? { commands } : {}),
         ...(featured ? { featured } : {}),
         ...(builtIn ? { builtIn } : {}),

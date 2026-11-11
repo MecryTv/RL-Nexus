@@ -15,6 +15,19 @@ export interface ICategoryContent {
  * (`npm run export`).
  */
 export const DEFAULT_CATEGORIES: readonly ICategoryMeta[] = [
+    // W-0085: dieselben Bereiche und dieselbe Reihenfolge wie die Leiste im Bot-Dashboard.
+    {
+        id: "always",
+        label: "Immer dabei",
+        description: "Läuft auf jedem Server ohne Schalter: Level, Galerie, Backups, Ränge und das Dashboard.",
+        accent: "var(--c-mod-engagement)",
+    },
+    {
+        id: "rocket-league",
+        label: "Rocket League",
+        description: "Ränge, Teams, Partien und Warteschlangen: der sportliche Teil deiner Organisation.",
+        accent: "var(--c-mod-competition)",
+    },
     {
         id: "community",
         label: "Community",
@@ -22,10 +35,10 @@ export const DEFAULT_CATEGORIES: readonly ICategoryMeta[] = [
         accent: "var(--c-mod-community)",
     },
     {
-        id: "competition",
-        label: "Wettbewerb",
-        description: "Ränge, Teams, Partien und Warteschlangen: der sportliche Teil deiner Organisation.",
-        accent: "var(--c-mod-competition)",
+        id: "support",
+        label: "Support",
+        description: "Hilfe für deine Mitglieder, ohne dass sie in Direktnachrichten landet.",
+        accent: "var(--c-mod-utility)",
     },
     {
         id: "moderation",
@@ -34,22 +47,10 @@ export const DEFAULT_CATEGORIES: readonly ICategoryMeta[] = [
         accent: "var(--c-mod-moderation)",
     },
     {
-        id: "engagement",
-        label: "Aktivität",
-        description: "Gründe, wiederzukommen: Level, Verlosungen und Abstimmungen.",
-        accent: "var(--c-mod-engagement)",
-    },
-    {
         id: "content",
-        label: "Inhalte",
-        description: "Streams, Videos, Clips und Bilder dorthin bringen, wo deine Leute sind.",
+        label: "Inhalte & Meldungen",
+        description: "Streams, Videos und eigene Nachrichten dorthin bringen, wo deine Leute sind.",
         accent: "var(--c-mod-content)",
-    },
-    {
-        id: "utility",
-        label: "Werkzeug",
-        description: "Die unspektakulären Dinge, die einen Server jeden Tag am Laufen halten.",
-        accent: "var(--c-mod-utility)",
     },
 ];
 

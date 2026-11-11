@@ -11,7 +11,8 @@ export const SUPPORT_URL = "https://discord.gg/CjG2HFGw95";
 /** W-0060: „RL Nexus EMB | Support“, der Server hinter SUPPORT_URL. Wer den Bot einlädt, kommt dort hinein. */
 export const SUPPORT_GUILD_ID = "1547258700480253982";
 
-export type HelpAreaId = "always" | "rocket-league" | "community" | "support" | "moderation" | "content" | "general";
+/** Ein Bereich der Leiste. W-0085: Neue legt das Admin Dashboard an, deshalb ein freier Text. */
+export type HelpAreaId = string;
 
 /** Wie in der Leiste des Dashboards, dazu „Allgemein“ für Befehle ohne Modul. */
 export const HELP_AREAS: { id: HelpAreaId; name: string; emoji: string }[] = [
@@ -23,6 +24,32 @@ export const HELP_AREAS: { id: HelpAreaId; name: string; emoji: string }[] = [
     { id: "content", name: "Inhalte & Meldungen", emoji: "📣" },
     { id: "general", name: "Allgemein", emoji: "🧭" },
 ];
+
+/** Der Stand aus dem Code, bevor ein Katalog aus dem Admin Dashboard drüberkommt. */
+const BUILT_IN_AREAS = HELP_AREAS.map((area) => ({ ...area }));
+
+/** W-0085: Modul → Bereich laut Admin Dashboard. Leer: es gilt der Bereich am Hilfetext. */
+export const MODULE_AREA = new Map<string, HelpAreaId>();
+
+/**
+ * W-0085: Bereichsnamen, Reihenfolge und Modul-Zuordnung aus dem Admin
+ * Dashboard (services/CatalogService.ts). Emojis bleiben, ein neuer Bereich
+ * bekommt 📦. Bereiche aus dem Code, die dort fehlen, bleiben hinten dran,
+ * damit kein Befehl ohne Bereich dasteht; „Allgemein“ steht immer zuletzt.
+ * `null`: zurück auf den Stand aus dem Code.
+ */
+export function ApplyHelpCatalog(catalog: { categories: { id: string; name: string }[]; modules: { id: string; category: string }[] } | null): void {
+    const general = BUILT_IN_AREAS.find((area) => area.id === "general")!;
+    const own = BUILT_IN_AREAS.filter((area) => area.id !== "general");
+    const areas = catalog ? catalog.categories.map((entry) => ({ id: entry.id, name: entry.name, emoji: own.find((area) => area.id === entry.id)?.emoji ?? "📦" })) : own.map((area) => ({ ...area }));
+
+    for (const area of own) if (!areas.some((entry) => entry.id === area.id)) areas.push({ ...area });
+
+    HELP_AREAS.splice(0, HELP_AREAS.length, ...areas, { ...general });
+    MODULE_AREA.clear();
+
+    for (const module of catalog?.modules ?? []) MODULE_AREA.set(module.id, module.category);
+}
 
 /** Wer darf: alle, das Team (Moderation, Support) oder wer den Server verwaltet. */
 export type HelpWho = "alle" | "team" | "verwalter";

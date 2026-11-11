@@ -13,6 +13,8 @@ Der Inhalt jeder Seite ist **gezeichnet** (Wunsch des Nutzers: Design der Entwü
 
 `/hilfe befehl:<name>` springt direkt zu einem Befehl, auch zu Unterbefehlen (`fall beweis`) und zu den Rechtsklicks „Hack melden“ (auf eine Person) und „Als Beweis sichern“ (auf eine Nachricht). Die Seiten von `/warn`, `/timeout`, `/kick` und `/ban` haben das Kapitel „Beweise anhängen“ mit den drei Wegen (`IHelpText.evidence`). Developer-Befehle sieht nur, wer in `DEV_USER_IDs` steht. Lange Seiten werden geteilt (◀ ▶), nicht gekürzt.
 
+**Bereiche (W-0085).** Namen und Reihenfolge der Bereiche und welcher Bereich zu einem Modul gehört, kommen aus dem Admin Dashboard wie im Bot-Dashboard (`ApplyHelpCatalog` in `constants/Help.ts`, gefüttert von `services/CatalogService.ts`). Ein Befehl mit Modul steht im Bereich seines Moduls, ohne Modul im Bereich am Hilfetext. Emojis bleiben, ein neuer Bereich bekommt 📦, „Allgemein“ steht immer zuletzt. Ohne Dateien gilt der Stand aus dem Code.
+
 ## Dateien
 
 | Datei | Was |

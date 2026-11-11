@@ -172,6 +172,9 @@ services:
             SERVER_PORT: "3000"
             # Das Modul Backups reicht an das Admin Dashboard weiter, im Docker-Netz.
             ADMIN_INTERNAL_URL: http://admin:3001
+            # W-0085: Bereiche und Module aus dem Admin Dashboard, ohne gespeicherte Datei der Standard der Webseite.
+            CONTENT_DIR: /data/content
+            CONTENT_DEFAULT_DIR: /website/dist/content-default
             TZ: Europe/Berlin
         # Nur auf 127.0.0.1: nginx auf dem Host reicht dashboard.nexus-emb.de
         # hierher. Das Admin Dashboard erreicht den Bot im Docker-Netz unter bot:3000.
@@ -187,6 +190,10 @@ services:
             # Clips der Woche: alle Videos jeder Runde samt runde.json - der Bot liest sie selbst.
             - ./data/clips:/app/clips
             - ./data/logs:/app/logs
+            # W-0085: nur lesen. Die Webseite als ganzer Ordner wie beim Admin Dashboard, weil ein
+            # Ausrollen dist ersetzt - ein Mount von dist selbst sähe danach den alten Stand.
+            - ./data/content:/data/content:ro
+            - ${WEBSITE_DIR:-/var/www/nexus-emb.de}:/website:ro
 
 volumes:
     images:

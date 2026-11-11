@@ -28,6 +28,7 @@ export const MODULE_DEFINITIONS: readonly IModuleDefinition[] = [
         id: "welcome",
         name: "Welcome System",
         tagline: "Der erste Eindruck, den dein Server macht.",
+        botText: "Begrüßt neue Mitglieder mit Grafik, Startrolle und dem Weg zu den wichtigen Kanälen.",
         description:
             "Begrüßt neue Mitglieder mit einer gezeichneten Welcome Card, einer Karte im Components-V2-Stil, " +
             "einem Embed oder einer normalen Nachricht. Dazu Rollen, die jeder Neue automatisch bekommt, und " +
@@ -48,6 +49,7 @@ export const MODULE_DEFINITIONS: readonly IModuleDefinition[] = [
         id: "apply",
         name: "Apply System",
         tagline: "Bewerbungen, die nicht in Direktnachrichten versanden.",
+        botText: "Bewerbungen über einen öffentlichen Link: eigene Formulare, Karten fürs Team, Zu- und Absage.",
         description:
             "Bewerbungen laufen über Formulare, die dein Server selbst baut. Beworben wird auf der Webseite, in " +
             "einem Fenster in Discord oder per DM von RL Nexus, ganz wie es zu deinem Server passt. Jede " +
@@ -70,6 +72,7 @@ export const MODULE_DEFINITIONS: readonly IModuleDefinition[] = [
         id: "reaction-roles",
         name: "Self Roles",
         tagline: "Rollen per Klick, ohne dass ein Moderator etwas tun muss.",
+        botText: "Mitglieder holen sich Rollen selbst, per Schaltfläche oder Auswahlmenü.",
         description:
             "Mitglieder holen sich ihre Rollen selbst aus einem Panel, als Knopfreihe oder als Auswahlmenü. " +
             "Regeln legen fest, wie viele es sein dürfen und wer überhaupt wählen darf.",
@@ -88,6 +91,7 @@ export const MODULE_DEFINITIONS: readonly IModuleDefinition[] = [
         id: "role-lists",
         name: "Rollen-Listen",
         tagline: "Wer zum Staff gehört und wer in welchem Team spielt, immer aktuell.",
+        botText: "Listen, die zeigen, wer welche Rolle hat – Staff, Teams, Creator. Als Karte oder gezeichnetes Bild, immer aktuell.",
         description:
             "Listen, die zeigen, wer welche Rolle hat: Staff, Teams, Creator oder was dein Server braucht. " +
             "Der Bot schreibt sie als Karte oder als gezeichnetes Bild in einen Kanal und zieht sie nach, sobald " +
@@ -107,6 +111,7 @@ export const MODULE_DEFINITIONS: readonly IModuleDefinition[] = [
         id: "voice-hub",
         name: "Temp Voice",
         tagline: "Ein eigener Sprachkanal auf Zuruf, der wieder verschwindet.",
+        botText: "Ein eigener Sprachkanal auf Zuruf, der wieder verschwindet, sobald er leer ist.",
         description:
             "Wer den Hub betritt, bekommt seinen eigenen Sprachkanal und wird hineingezogen. Ist der Letzte " +
             "draußen, verschwindet der Kanal wieder. Eingestellt wird er über ein Menü, und wer mag, speichert " +
@@ -134,7 +139,7 @@ export const MODULE_DEFINITIONS: readonly IModuleDefinition[] = [
             "Verknüpft Discord-Konten mit Epic-Konten und holt Ränge, MMR, Spielzahlen und Karriere-Werte " +
             "aus Rocket League. Das Ergebnis ist die Rang-Karte, dieselbe, deren Farben diese Seite trägt. " +
             "Auch ohne Verknüpfung durchsuchbar, wenn du wissen willst, wen du da gerade scoutest.",
-        category: ModuleCategory.Competition,
+        category: ModuleCategory.Always,
         status: ModuleStatus.Live,
         icon: "crosshair",
         featured: true,
@@ -152,11 +157,12 @@ export const MODULE_DEFINITIONS: readonly IModuleDefinition[] = [
         id: "rank-roles",
         name: "Rank Roles",
         tagline: "Die Rangrolle kommt aus dem Spiel, nicht aus der Selbstauskunft.",
+        botText: "Rollen nach Rocket-League-Rang – je Playlist eine eigene, auf Befehl geholt.",
         description:
             "Rollen nach Rocket-League-Rang, je Playlist eine eigene. Wer den Command eingibt, bekommt die " +
             "Rolle, die zu seinem aktuellen Rang gehört. Der Rang kommt aus dem verknüpften Epic-Konto, einen " +
             "fremden Namen kann niemand angeben.",
-        category: ModuleCategory.Competition,
+        category: ModuleCategory.RocketLeague,
         status: ModuleStatus.Live,
         icon: "tag",
         highlights: [
@@ -172,11 +178,12 @@ export const MODULE_DEFINITIONS: readonly IModuleDefinition[] = [
         id: "teams",
         name: "RL Team-Übersicht",
         tagline: "Kader anlegen, besetzen und aktuell halten.",
+        botText: "Kader mit Captain, Co-Captain, Stamm, Ersatz und Trial – die Ränge holt der Bot aus Prime, von Hand kommt nur der Peak.",
         description:
             "Teams mit Name, Kürzel, Logo und Kader, gegliedert in Gruppen und angezeigt in einem Kanal. Von " +
             "Hand kommt nur der Peak: Name, aktuelle MMR und Rang holt der Bot selbst. Daraus rechnet er die " +
             "Team-MMR, nach WTSI oder nach deiner eigenen Formel.",
-        category: ModuleCategory.Competition,
+        category: ModuleCategory.RocketLeague,
         status: ModuleStatus.Live,
         icon: "shield-users",
         featured: true,
@@ -193,11 +200,12 @@ export const MODULE_DEFINITIONS: readonly IModuleDefinition[] = [
         id: "lft",
         name: "Looking for",
         tagline: "Spieler suchen Teams, Teams suchen Spieler.",
+        botText: "Spieler suchen Teams, Teams suchen Spieler – gefragt wird per DM, der Beitrag landet im Forum.",
         description:
             "Wer sucht, gibt einen Command ein, und der Bot fragt per Direktnachricht die Fragen ab, die euer " +
             "Team im Dashboard festgelegt hat. Erst nach der Vorschau entsteht der Beitrag im Forum, mit Tag " +
             "und einem Knopf, der die Suche beendet.",
-        category: ModuleCategory.Competition,
+        category: ModuleCategory.RocketLeague,
         status: ModuleStatus.Live,
         icon: "user-search",
         highlights: [
@@ -213,11 +221,12 @@ export const MODULE_DEFINITIONS: readonly IModuleDefinition[] = [
         id: "matchups",
         name: "Matchups",
         tagline: "Anstehende Partien, eingetragen von denen, die sie spielen.",
+        botText: "Kündigt anstehende Partien an: Team gegen Team, Zeit und Modus, mit Erinnerung vor dem Anpfiff.",
         description:
             "Captains, Manager und Coaches tragen die Partien ihres Teams selbst ein, über einen Link und ohne " +
             "Rechte im Dashboard. Der Bot kündigt jede Partie im Kanal an, erinnert kurz vor Anpfiff und hält " +
             "danach das Ergebnis fest.",
-        category: ModuleCategory.Competition,
+        category: ModuleCategory.RocketLeague,
         status: ModuleStatus.Live,
         icon: "swords",
         highlights: [
@@ -232,12 +241,13 @@ export const MODULE_DEFINITIONS: readonly IModuleDefinition[] = [
         id: "rl-6mans",
         name: "2, 4 & 6 Mans",
         tagline: "Warteschlangen für 1v1, 2v2 und 3v3, mit eigener Wertung.",
+        botText: "Warteschlangen für 1v1, 2v2 und 3v3 – je Modus eine eigene MMR, ausgeglichene Teams und eine eigene Rangliste.",
         description:
             "Mitglieder stellen sich in eine Warteschlange, und sobald genug da sind, teilt der Bot zwei " +
             "möglichst gleich starke Teams ein. Er legt Sprachkanäle an, würfelt Lobby-Name und Passwort und " +
             "passt nach dem Spiel die MMR an. Die Wertung gehört deinem Server und hat mit den Rängen im Spiel " +
             "nichts zu tun.",
-        category: ModuleCategory.Competition,
+        category: ModuleCategory.RocketLeague,
         status: ModuleStatus.Live,
         icon: "gamepad",
         featured: true,
@@ -258,6 +268,7 @@ export const MODULE_DEFINITIONS: readonly IModuleDefinition[] = [
         id: "moderation",
         name: "Moderation",
         tagline: "Verwarnen, stummschalten, kicken und bannen, mit Akte.",
+        botText: "Verwarnen, stummschalten, kicken und bannen – mit Begründung und Verlauf je Mitglied.",
         description:
             "Jede Aktion wird ein Fall mit fortlaufender Nummer, Grund, Dauer und Verlauf, egal ob sie aus " +
             "Discord oder aus dem Dashboard kommt. Dazu Notizen und Beweise am Fall, eine Karte im Log-Kanal " +
@@ -292,6 +303,7 @@ export const MODULE_DEFINITIONS: readonly IModuleDefinition[] = [
         id: "automod",
         name: "Auto Mod",
         tagline: "Die Regeln, die sonst nachts niemand durchsetzt.",
+        botText: "Filtert Spam, Einladungslinks und Wortlisten, bevor ein Moderator online ist.",
         description:
             "Nimmt aus dem Chat, was niemand sehen soll, bevor ein Moderator online ist. Acht Filter, jeder " +
             "einzeln schaltbar und jeder mit eigener Folge, vom bloßen Löschen bis zum Bann. Auch nachträglich " +
@@ -311,6 +323,7 @@ export const MODULE_DEFINITIONS: readonly IModuleDefinition[] = [
         id: "anti-villain",
         name: "Anti Villain",
         tagline: "Wenn ein Account gekapert ist, zählt jede Minute.",
+        botText: "Hält gekaperte Accounts, Raids und Nukes auf, bevor ein Moderator online ist.",
         description:
             "Hält gekaperte Accounts, Raids und Nukes auf, bevor ein Moderator online ist. Mehrere " +
             "Auffälligkeiten zusammen ergeben einen Verdacht, ab einer Schwelle sieht die Person nur noch die " +
@@ -330,6 +343,7 @@ export const MODULE_DEFINITIONS: readonly IModuleDefinition[] = [
         id: "logging",
         name: "Logging System",
         tagline: "Nachvollziehen, was passiert ist, auch drei Wochen später.",
+        botText: "Protokolliert Nachrichten, Rollen, Beitritte und Moderation in eigenen Kanälen.",
         description:
             "Schreibt mit, was auf deinem Server passiert: 38 Ereignisse in fünf Gruppen, jedes einzeln " +
             "schaltbar und auf Wunsch mit eigenem Kanal. Gelöschte Nachrichten bleiben lesbar, und aus dem " +
@@ -350,11 +364,12 @@ export const MODULE_DEFINITIONS: readonly IModuleDefinition[] = [
         id: "tickets",
         name: "Ticket System",
         tagline: "Support, der nicht in deinen Direktnachrichten landet.",
+        botText: "Support per Schaltfläche: jedes Ticket bekommt einen Kanal nur für Ersteller und Team.",
         description:
             "Support-Anfragen als eigener Kanal, als Beitrag in einem Forum oder ganz per Direktnachricht an " +
             "den Bot. Beim Schließen entsteht ein Transcript im Discord-Look, und im Dashboard liest das Team " +
             "offene Tickets live mit.",
-        category: ModuleCategory.Moderation,
+        category: ModuleCategory.Support,
         status: ModuleStatus.Live,
         icon: "ticket",
         featured: true,
@@ -376,11 +391,12 @@ export const MODULE_DEFINITIONS: readonly IModuleDefinition[] = [
         id: "levels",
         name: "Level System",
         tagline: "Aktivität, die man sieht.",
+        botText: "Punkte für Nachrichten und Zeit im Sprachkanal, mit Rangliste und Belohnungsrollen.",
         description:
             "Punkte fürs Schreiben und für die Zeit im Sprachkanal, Belohnungsrollen ab einem bestimmten Level " +
             "und eine Rangliste. Die Level-Karte hat denselben Stil wie die Rang-Karte, damit auf deinem Server " +
             "nicht zwei verschiedene Produkte nebeneinanderstehen.",
-        category: ModuleCategory.Engagement,
+        category: ModuleCategory.Always,
         status: ModuleStatus.Live,
         icon: "chart-up",
         featured: true,
@@ -397,11 +413,12 @@ export const MODULE_DEFINITIONS: readonly IModuleDefinition[] = [
         id: "giveaways",
         name: "Giveaways",
         tagline: "Verlosungen mit Bedingungen, die auch geprüft werden.",
+        botText: "Verlosungen mit Laufzeit, mehreren Gewinnern und Teilnahmebedingungen.",
         description:
             "Verlosungen mit Laufzeit, mehreren Gewinnern und Bedingungen, die beim Mitmachen und noch einmal " +
             "beim Auslosen geprüft werden. Bonus-Lose für bestimmte Rollen, und wer seinen Gewinn nicht " +
             "rechtzeitig annimmt, wird automatisch ersetzt.",
-        category: ModuleCategory.Engagement,
+        category: ModuleCategory.Community,
         status: ModuleStatus.Live,
         icon: "gift",
         highlights: [
@@ -417,10 +434,11 @@ export const MODULE_DEFINITIONS: readonly IModuleDefinition[] = [
         id: "polls",
         name: "Umfragen",
         tagline: "Abstimmungen im Kanal, mit dem Ergebnis auf einen Blick.",
+        botText: "Abstimmungen direkt im Kanal, mit Laufzeit und Ergebnis auf einen Blick.",
         description:
             "Eigene Umfragen mit Knöpfen und Balken oder Discords eigene Umfrage, je Umfrage wählbar. Mit " +
             "Laufzeit oder ohne Ende, mit Mehrfachwahl und auf Wunsch anonym.",
-        category: ModuleCategory.Engagement,
+        category: ModuleCategory.Community,
         status: ModuleStatus.Live,
         icon: "list-checks",
         highlights: [
@@ -440,6 +458,7 @@ export const MODULE_DEFINITIONS: readonly IModuleDefinition[] = [
         id: "twitch-notifier",
         name: "Twitch Notifier",
         tagline: "Deine Leute erfahren es, wenn es anfängt.",
+        botText: "Meldet, wenn jemand aus deiner Organisation auf Twitch live geht.",
         description:
             "Meldet, wenn jemand aus deiner Organisation auf Twitch live geht, mit einer Karte, die sich " +
             "während des Streams nachzieht. Danach wird daraus auf Wunsch eine Zusammenfassung mit Dauer und " +
@@ -461,6 +480,7 @@ export const MODULE_DEFINITIONS: readonly IModuleDefinition[] = [
         id: "youtube-notifier",
         name: "YouTube Notifier",
         tagline: "Neue Videos, Shorts und Livestreams, sobald sie da sind.",
+        botText: "Meldet neue Videos und Livestreams der YouTube-Kanäle deiner Organisation.",
         description:
             "Meldet neue Videos, Shorts und Livestreams der YouTube-Kanäle deiner Organisation. Jede Art " +
             "bekommt ihre eigene Nachricht, und wer an einem Kanal als Discord-Mitglied eingetragen ist, " +
@@ -480,11 +500,12 @@ export const MODULE_DEFINITIONS: readonly IModuleDefinition[] = [
         id: "gallery",
         name: "Gallery System",
         tagline: "Bilder verwalten, statt sie zu suchen.",
+        botText: "Logos, Grafiken und Vorlagen in Alben sortieren, durchblättern und finden.",
         description:
             "Die Bildverwaltung deiner Organisation: Logos, Grafiken und Vorlagen in Alben sortieren, " +
             "durchblättern und wiederfinden, in Discord über ein Panel oder im Dashboard per Ziehen und " +
             "Ablegen. Die anderen Module holen ihre Bilder von hier, etwa den Hintergrund der Welcome Card.",
-        category: ModuleCategory.Content,
+        category: ModuleCategory.Always,
         status: ModuleStatus.Live,
         icon: "image",
         builtIn: true,
@@ -501,10 +522,11 @@ export const MODULE_DEFINITIONS: readonly IModuleDefinition[] = [
         id: "clips",
         name: "Clips der Woche",
         tagline: "Jede Woche die beste Szene deines Servers.",
+        botText: "Mitglieder laden ihre besten Szenen als Video hoch, abgestimmt wird per Reaktion, die Gewinner verkündet der Bot.",
         description:
             "Mitglieder reichen ihre besten Szenen ein, und jede Woche wird der beste Clip gekürt. So landen " +
             "die Highlights deiner Organisation an einer Stelle, statt in fünf Kanälen unterzugehen.",
-        category: ModuleCategory.Content,
+        category: ModuleCategory.RocketLeague,
         status: ModuleStatus.Live,
         icon: "play",
         highlights: [
@@ -521,11 +543,12 @@ export const MODULE_DEFINITIONS: readonly IModuleDefinition[] = [
         id: "custom-message",
         name: "Custom Message",
         tagline: "Nachrichten im Namen des Bots, gestaltet statt getippt.",
+        botText: "Eigene Nachrichten mit Embeds und Components V2 gestalten und senden.",
         description:
             "Eigene Nachrichten im Dashboard bauen, als Karte, Embed oder normaler Text, mit Knöpfen darunter. " +
             "Gesendet wird von Hand oder nach Termin, und eine gesendete Nachricht lässt sich nachträglich " +
             "ändern. Dazu Stichwörter, auf die der Bot von selbst antwortet.",
-        category: ModuleCategory.Utility,
+        category: ModuleCategory.Content,
         status: ModuleStatus.Live,
         icon: "megaphone",
         highlights: [
@@ -544,7 +567,7 @@ export const MODULE_DEFINITIONS: readonly IModuleDefinition[] = [
             "Alle Module lassen sich im Dashboard zuschalten und einstellen, dazu eine Übersicht über das, was " +
             "auf deinem Server los ist. Angemeldet wird mit Discord, und von dort wird der Bot auch auf deinen " +
             "Server eingeladen.",
-        category: ModuleCategory.Utility,
+        category: ModuleCategory.Always,
         status: ModuleStatus.Live,
         icon: "dashboard",
         builtIn: true,
@@ -561,11 +584,12 @@ export const MODULE_DEFINITIONS: readonly IModuleDefinition[] = [
         id: "backups",
         name: "Backups",
         tagline: "Der alte Stand ist nur ein paar Klicks entfernt.",
+        botText: "Module, Einstellungen, Nachrichten und Daten der Mitglieder sichern und zurückholen.",
         description:
             "Sichert Module, Einstellungen, Nachrichten und die Daten deiner Mitglieder, auf Wunsch auch den " +
             "Discord-Server selbst mit Rollen, Kanälen und Rechten. Von Hand oder automatisch in deinem Rhythmus. " +
             "Geht etwas schief, repariert der Bot den Server, und seine Einstellungen zeigen danach auf die neuen Kanäle.",
-        category: ModuleCategory.Utility,
+        category: ModuleCategory.Always,
         status: ModuleStatus.Live,
         icon: "archive",
         builtIn: true,

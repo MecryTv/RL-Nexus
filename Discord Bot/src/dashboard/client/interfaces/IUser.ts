@@ -17,8 +17,16 @@ export interface IUser {
     access?: IAccessEnd[] | null;
 }
 
+/** W-0085: Bereiche und Module aus dem Admin Dashboard (wie services/CatalogService.ts im Bot). */
+export interface ICatalog {
+    categories: { id: string; name: string }[];
+    modules: { id: string; name: string; text: string | null; category: string }[];
+}
+
 export interface IPayload {
     user: IUser;
     guilds: IGuild[];
     inviteURL: string;
+    /** `null` oder fehlt: der Stand aus dem Code. */
+    catalog?: ICatalog | null;
 }

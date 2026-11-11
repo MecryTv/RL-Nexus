@@ -79,12 +79,12 @@ export async function checkContent(): Promise<void> {
         });
 
         await check("Kategorie mit Modulen lässt sich nicht löschen, Umbenennen geht, Module prüfen gegen die Kategorien", () => {
-            const count = modules.modules.filter((module) => module.category === "competition").length;
-            const without = { categories: categories.categories.filter((entry) => entry.id !== "competition") };
-            const renamed = { categories: categories.categories.map((entry) => (entry.id === "competition" ? { ...entry, label: "Turniere" } : entry)) };
+            const count = modules.modules.filter((module) => module.category === "rocket-league").length;
+            const without = { categories: categories.categories.filter((entry) => entry.id !== "rocket-league") };
+            const renamed = { categories: categories.categories.map((entry) => (entry.id === "rocket-league" ? { ...entry, label: "Turniere" } : entry)) };
 
-            assert.throws(() => parseCategories(without, meta, { modules, previous: categories.categories }), new RegExp(`Wettbewerb hat noch ${count} Module`));
-            assert.equal(parseCategories(renamed, meta, { modules, previous: categories.categories }).categories.find((entry) => entry.id === "competition")?.label, "Turniere");
+            assert.throws(() => parseCategories(without, meta, { modules, previous: categories.categories }), new RegExp(`Rocket League hat noch ${count} Module`));
+            assert.equal(parseCategories(renamed, meta, { modules, previous: categories.categories }).categories.find((entry) => entry.id === "rocket-league")?.label, "Turniere");
             assert.throws(() => parseModules(modules, meta, ["community"]), /Die Kategorie/);
         });
 
@@ -117,6 +117,15 @@ export async function checkContent(): Promise<void> {
 
             await write("DELETE", "/api/content/modules");
             await write("DELETE", "/api/content/categories");
+        });
+
+        await check("Kurztext im Bot-Dashboard (W-0085): kommt mit, leer fällt weg, zu lang nicht", () => {
+            const [first] = modules.modules;
+
+            assert.ok(modules.modules.filter((module) => module.botText).length >= 20, "Standard bringt die Texte aus dem Bot mit");
+            assert.equal(parseModules({ modules: [{ ...first, botText: "Ein Satz." }] }, meta).modules[0].botText, "Ein Satz.");
+            assert.equal("botText" in parseModules({ modules: [{ ...first, botText: "  " }] }, meta).modules[0], false);
+            assert.throws(() => parseModules({ modules: [{ ...first, botText: "x".repeat(201) }] }, meta), /Kurztext im Bot-Dashboard/);
         });
 
         await check("Fehlende Module (W-0084): ein gelöschtes taucht als fehlend auf, nach Übernehmen nicht mehr", async () => {

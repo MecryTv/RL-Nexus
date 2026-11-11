@@ -30,6 +30,7 @@ import LogService from "../services/LogService";
 import SelfRoleService from "../services/SelfRoleService";
 import AutoModService from "../services/AutoModService";
 import AntiVillainService from "../services/AntiVillainService";
+import CatalogService from "../services/CatalogService";
 import ServerBackupService from "../services/ServerBackupService";
 import EpicNameService from "../services/EpicNameService";
 import ApplyService from "../services/ApplyService";
@@ -135,6 +136,8 @@ export default class BotClient extends Client implements IBotClient {
     selfRoleService: SelfRoleService;
     autoModService: AutoModService;
     antiVillainService: AntiVillainService;
+    /** W-0085: Bereiche und Module aus dem Admin Dashboard. */
+    catalogService: CatalogService;
     serverBackupService: ServerBackupService;
     epicNameService: EpicNameService;
     applyService: ApplyService;
@@ -291,6 +294,7 @@ export default class BotClient extends Client implements IBotClient {
         this.selfRoleService = new SelfRoleService(this);
         this.autoModService = new AutoModService(this);
         this.antiVillainService = new AntiVillainService(this);
+        this.catalogService = new CatalogService([this.config.CONTENT_DIR || null, this.config.CONTENT_DEFAULT_DIR || null]);
         this.serverBackupService = new ServerBackupService(this);
         this.epicNameService = new EpicNameService(this);
         this.applyService = new ApplyService(this);
@@ -408,6 +412,9 @@ export default class BotClient extends Client implements IBotClient {
         // Zählt Nachrichten, Sprachkanäle und Beitritte mit und schreibt einmal
         // pro Minute gebündelt weg - siehe docs/Activity.md.
         this.activityService.Start();
+
+        // W-0085: Bereiche und Module aus dem Admin Dashboard für Dashboard und /hilfe.
+        this.catalogService.Start();
 
         this.configService
             .Initialize()
