@@ -1508,6 +1508,8 @@ function mount(guildId: string, view: "teams" | "board"): void {
             for (const knob of saves) knob.disabled = false;
         };
         const categoriesChanged = (): boolean => JSON.stringify(categories) !== categoriesAtStart;
+        // Liegt schon etwas im Kanal, heißt der Knopf „aktualisieren“ - die Meldung nach dem Speichern nennt ihn genauso (W-0076).
+        const publishLabel = (): string => (data!.settings.messageId || data!.teams.some((team) => team.messageId) ? "Übersicht aktualisieren" : "Übersicht senden");
 
         /**
          * Speichert alles der Reihe nach: die Einstellungen, dann die Kategorien
@@ -1535,7 +1537,7 @@ function mount(guildId: string, view: "teams" | "board"): void {
 
             cardEditor?.saved();
             dirty = false;
-            toast("info", "Gespeichert", data!.settings.messageId && (moved || team) ? "Der Hub im Kanal zieht gleich nach." : "Mit „Übersicht senden“ geht sie raus.");
+            toast("info", "Gespeichert", data!.settings.messageId && (moved || team) ? "Der Hub im Kanal zieht gleich nach." : `Mit „${publishLabel()}“ im Reiter „Kanal & Darstellung“ geht sie raus.`);
 
             return true;
         };
@@ -1665,7 +1667,7 @@ function mount(guildId: string, view: "teams" | "board"): void {
             templates: "teamCard",
         });
 
-        const publish = button("btn btn--primary", icon("#i-message"), data!.settings.messageId || data!.teams.some((team) => team.messageId) ? "Übersicht aktualisieren" : "Übersicht senden");
+        const publish = button("btn btn--primary", icon("#i-message"), publishLabel());
 
         publish.addEventListener("click", async () => {
             publish.disabled = true;
