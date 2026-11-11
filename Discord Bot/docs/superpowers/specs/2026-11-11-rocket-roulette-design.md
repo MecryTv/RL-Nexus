@@ -99,7 +99,7 @@ Dazu auf der Steuerkarte: **Runde abbrechen** (alle zurück in den Hauptvoice, R
 
 **Einspringen:** Der Bot fragt im Moderator-Kanal „Ein Platz frei in Lobby45 – wer spielt mit?“ mit Knopf „Ich spiele mit“. Der Erste bekommt den Platz. Will keiner, drückt ein Moderator „Ohne Einspringer“: Der übrige Spieler setzt diese Runde aus und ist nächste Runde sicher dabei **(Claude)**. Die Runde startet erst, wenn das geklärt ist; die übrigen Lobbys werden schon verteilt **(Claude)**.
 
-**Hosts:** je Lobby ein Host. Erst die Moderatoren, je Moderator genau eine Lobby (Nutzer), dann ein zufälliger Spieler aus der Lobby (Nutzer). Als Host zählt nur ein Moderator, der beim Auslosen in einem Roulette-Sprachkanal sitzt (Warteraum, Hauptvoice, Team-Kanal) **(Claude)**. Ein eingesprungener Moderator hostet seine eigene Lobby; war er schon Host einer anderen, bekommt die einen Spieler als Host **(Claude)**. Den Knopf „Lobby ist offen“ erreicht ein Moderator auch ohne im Sprachkanal zu sitzen, Text-Chats von Sprachkanälen lassen sich so öffnen.
+**Hosts:** je Lobby ein Host. Erst die Moderatoren, je Moderator genau eine Lobby (Nutzer), dann ein zufälliger Spieler aus der Lobby (Nutzer). Als Host zählt nur ein Moderator, der beim Auslosen in einem Roulette-Sprachkanal sitzt (Warteraum, Hauptvoice, Team-Kanal) **(Claude)**. Ein eingesprungener Moderator hostet seine eigene Lobby; war er schon Host einer anderen, bekommt die einen Spieler als Host **(Claude)**. Den Knopf „Lobby ist offen“ erreicht ein Moderator auch ohne im Sprachkanal zu sitzen, Text-Chats von Sprachkanälen lassen sich so öffnen. Ein Moderator, der eine Lobby hostet, **bleibt im Hauptvoice** (Nutzer, 11.11.); der Bot verschiebt ihn nie. Nur ein eingesprungener Moderator spielt mit und wird wie ein Spieler in seinen Team-Kanal geschoben **(Claude)**.
 
 **Arena:** je Lobby zufällig aus dem Topf der Standard-Arenen, möglichst nicht zweimal hintereinander dieselbe **(Claude)**.
 
@@ -161,7 +161,7 @@ Ein laufender Abend übersteht einen Neustart: Startzeit wird beim Start neu ein
 
 ## Offen beim Nutzer (Prüfung durch einen frischen Leser, 11.11.)
 
-1. **Wo sitzt ein Moderator, der eine Lobby hostet?** Bleibt er im Hauptvoice (und ist im Spiel nur Zuschauer oder verlässt die Lobby nach dem Aufmachen), oder schiebt ihn der Bot in einen Team-Kanal seiner Lobby? Daran hängen Verschiebe-Logik und die Regel „niemanden verschieben, der nicht teilnimmt“.
+1. ~~Wo sitzt ein Moderator, der eine Lobby hostet?~~ Geklärt am 11.11.: bleibt im Hauptvoice (siehe Hosts).
 2. **Bild oder Text je Nachricht.** Entwürfe I, V, M, D (A = Bild, B = Text). Wird eine Nachricht, die sich laufend ändert (Ankündigung, Steuerkarte, Rundenkarte), ein Bild, zeichnet der Bot sie gedrosselt neu (höchstens alle paar Sekunden) **(Claude)**. Eine Einstellung „Bild oder Text“ je Server gibt es nur, wenn der Nutzer beides will.
 3. **Steuern Rollen-Moderatoren auch im Bot-Dashboard?** Heute öffnen Modulseiten nur mit „Server verwalten“. Ohne Erweiterung steuern Rollen-Moderatoren nur in Discord (Steuerkarte), das Dashboard ist für Verwalter. Mit Erweiterung braucht `DashboardService` eine Freigabe für dieses Modul.
 
