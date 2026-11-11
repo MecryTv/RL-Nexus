@@ -104,21 +104,24 @@ Dazu auf der Steuerkarte: **Runde abbrechen** (alle zurück in den Hauptvoice, R
 
 ## Spielerwünsche
 
-Spieler sagen einem Moderator, mit wem sie in eine Lobby wollen; der Moderator trägt es ein (Nutzer). Auf der Steuerkarte: **„Wunsch eintragen“** → zwei Mitglieder wählen (User-Auswahl von Discord). Ein Mitglied steht in höchstens einem Paar. Ein Wunsch gilt bis ein Moderator ihn löscht **(Claude)**; die Steuerkarte listet die Paare mit „löschen“. Geht ein Wunsch nicht (1v1-Lobby, einer fehlt), sagt die Rundenkarte im Moderator-Kanal das in einer Zeile.
+Spieler sagen einem Moderator, mit wem sie in eine Lobby wollen; der Moderator trägt es ein (Nutzer). Auf der Steuerkarte: **„Wunsch eintragen“** → zwei Mitglieder wählen (User-Auswahl von Discord). Ein Mitglied steht in höchstens einem Paar. Ein Wunsch gilt **bis gelöscht** oder **nur für die nächste Runde**, das wählt der Moderator beim Eintragen (Entwurf C6·2, Nutzer). Steht ein Mitglied schon in einem Paar, ersetzt der neue Wunsch den alten, und die Bestätigung sagt das. Das Fenster „Wünsche“ zeigt alle Paare mit „entfernen“; die Steuerkarte zeigt sie als Paare mit Profilbildern. Geht ein Wunsch nicht (1v1-Lobby, einer fehlt), sagt die Rundenkarte im Moderator-Kanal das in einer Zeile.
 
 ## Nachrichten
 
-Entwürfe: `.works/tasks/W-0087-neues-modul-rocket-roulette/design/` (I Info-Kanal, V Voice-Chat, M Moderator-Kanal, D Dashboard; Wahl des Nutzers steht noch aus). Für jede Nachricht gibt es eine Bild- und eine Text-Fassung; die Bild-Fassung folgt dem Stil, den der Nutzer bei W-0051/W-0052 gewählt hat.
+Gewählt am 11.11. in zwei Runden (Entwürfe in `.works/tasks/W-0087-neues-modul-rocket-roulette/design/`, Runde 2: K2, M2, E). **Alle Karten als Bild** im Stil, den der Nutzer bei W-0051/W-0052 gewählt hat (dunkles Bild, farbiger Streifen oben, Oxanium und Rajdhani, Kacheln). Was live zählen soll (Zeiten), steht als Text unter dem Bild, Knöpfe sind Discord-Knöpfe. Jedes Bild hat einen Alt-Text mit allem, was draufsteht.
 
-| Nachricht | Wo | Inhalt |
-|---|---|---|
-| Ankündigung | Info-Kanal | Startzeit (live), Warteraum, Hauptvoice, Moderatoren, Zahl im Warteraum; später Runde N läuft, beendet |
-| Rundenkarte | Info-Kanal | je Lobby Name, Passwort, Teams, Host, offen/wartet |
-| Lobby-Karte | Text-Chat jedes Team-Kanals | Name, Passwort, beide Teams, Host, Knopf „Lobby ist offen“ |
-| Offen-Ping | Text-Chat beider Team-Kanäle | „Lobby12 ist offen“ mit Erwähnung der Spieler |
-| Steuerkarte | Moderator-Kanal | Zustand, Teilnehmer, Wünsche, Knöpfe |
-| Einspring-Anfrage | Moderator-Kanal | Platz frei, „Ich spiele mit“, „Ohne Einspringer“ |
-| Übersicht | Moderator-Kanal | je Runde Lobbys, Teams, Host; Zahl Runden und Teilnehmer |
+| Nachricht | Wo | Entwurf | Inhalt |
+|---|---|---|---|
+| Ankündigung | Info-Kanal | A1·2 | Datum, Startzeit groß, Zahl im Warteraum mit den ersten Profilbildern (+N), Moderatoren mit Profilbild, Warteraum, Treffpunkt, Modus, „Lobbys etwa“ (aus der Zahl im Warteraum), Leiste geplant/läuft/beendet (gelb, grün mit Rundennummer, grau mit Stempel). Darunter Text „Start in …“ (live) und Knopf „Wie läuft der Abend ab?“ (Erklärung nur für den Fragenden) |
+| Rundenkarte | Info-Kanal | A2·2 | Stempel „Runde N“, je Lobby eine Kachel mit Zustandsstreifen (grün offen, gelb wartet), Name, Passwort in Gold, Modus 3v3/2v2/1v1, Host mit Krone und Profilbild (Marke „Mod“, „Mod · spielt mit“), Teams mit Nummer und Profilbildern; Leiste „Wartet auf Runde N+1“ und „Setzt aus“; ab sieben Lobbys ein zweites Bild |
+| Lobby-Karte | Text-Chat jedes Team-Kanals | A3·2 | Zustand oben rechts („Wartet auf Kim“ → „Offen seit 20:06“ mit Stempel; dieselbe Nachricht wird bearbeitet), Name und Passwort sehr groß, Zeile für den Host mit Krone („sitzt im Treffpunkt“), Teams mit Nummer und Profilbildern, eigenes Team umrandet. Knöpfe „Lobby ist offen“ (nur Host oder Moderator, danach grau) und „Als Text zum Kopieren“ (Name und Passwort nur für den Drückenden) |
+| Offen-Ping | Text-Chat beider Team-Kanäle | P2 | Erwähnung der Spieler als Text (damit Discord pingt), darunter ein flaches grünes Banner-Bild „Lobby ist offen · LOBBY12 · Passwort testo“ |
+| Steuerkarte | Moderator-Kanal | B5·2 | Bild: Stempel, Leiste geplant/gestartet/Runde N/beendet, Kacheln In Lobbys, Warteraum, Offen x/y, Setzen aus; je Lobby eine kleine Kachel mit Zustand und Host; Wünsche als Paare; gelbe Warnzeile (Lobby wartet länger als 3 Minuten auf den Host, Recht fehlt). Text darunter: „Runde N seit …“, Nachzügler. Knöpfe in zwei Reihen: „Runde N+1 auslosen“, „Wünsche“ / „Spieler tauschen“, „Runde abbrechen“, „Abend beenden“ (fragt nach). Vor dem Start: Zeit bis zum Start und „Jetzt starten“ |
+| Wünsche | Fenster nur für den Moderator | C6·2 | Auswahl genau zweier Mitglieder, „gilt bis gelöscht / nur nächste Runde“, vorhandene Paare mit „entfernen“, Bestätigung „Tom + Ben spielen ab Runde 2 zusammen“ |
+| Einspring-Anfrage | Moderator-Kanal | C7 (Runde 1, nicht beanstandet) | Platz frei in LobbyXY, was daraus wird (2v2 usw.), „Ich spiele mit“, „Ohne Einspringer“ |
+| Übersicht | Moderator-Kanal | A8·2 | Datum, von–bis, Runden, Spieler, Lobbys, Dauer; je Runde ein Block (Startzeit, je Lobby beide Teams und Host mit Krone); „Wer war wie oft dabei“ (Runden je Spieler, keine Ergebnisse); bis zu drei Runden je Bild („Bild 1 von 3“), dazu Datei (.txt) und Link ins Dashboard |
+
+Bilder, die sich laufend ändern (Ankündigung, Rundenkarte, Steuerkarte, Lobby-Karte), zeichnet der Bot gedrosselt neu, höchstens alle paar Sekunden je Nachricht **(Claude)**.
 
 ## Befehle
 
@@ -135,9 +138,12 @@ Runden laufen über die Steuerkarte, nicht über Befehle (Nutzer: der Moderator 
 
 Bot-Dashboard, Bereich **Rocket League**, Modul-ID `rocket-roulette`. Reiter:
 
-- **Abend:** planen (Datum, Uhrzeit), sofort starten, beenden; live: Zustand, Teilnehmer im Warteraum und Hauptvoice, aktuelle Runde mit Lobbys; Knöpfe wie auf der Steuerkarte **(Claude)**.
-- **Einstellungen:** alles aus der Tabelle oben.
-- **Verlauf:** vergangene Abende mit ihrer Übersicht **(Claude)**.
+Der Nutzer hat alle drei neuen Richtungen E1, E2, E3 angenommen („passt so“). Zusammengesetzt **(Claude)**:
+
+- **Abend = E1 Leitstand:** Kopf mit Roulette-Rad, „Runde N läuft“, Zeit, Lobbys offen, Fortschrittsleiste und dem großen Knopf „Runde N+1 auslosen“ (daneben Abbrechen, Beenden). Darunter drei Kästen: Warteraum (Profilbilder), Treffpunkt/Moderatoren, Wünsche (+ eintragen). Dann je Lobby eine Karte: Name, Zustand, Team-Hälften blau/orange, Passwort, Host. Ohne laufenden Abend: „Abend planen“ (Datum, Uhrzeit) und „Jetzt starten“.
+- **Neben dem Abend die Live-Vorschau aus E3:** „So sieht es gerade in Discord aus“ mit Umschalter Info-Kanal / Voice-Chat einer Lobby / Steuerkarte. Die Vorschau nutzt dieselben Bilder wie der Bot.
+- **Verlauf = E2 Zeitleiste:** je Abend eine senkrechte Zeitleiste (geplant, Start, Runden, Ende), Runden aufklappbar mit ihren Lobbys; daneben die Zahlen aus der Übersicht.
+- **Einstellungen = Schritte aus E2** (1 Kanäle, 2 Moderation, 3 Lobbys, 4 Fertig; nach der ersten Einrichtung direkt anspringbar). Schritt 1 zeigt die Kanäle als **Weg durch den Abend aus E1** (Warteraum → Treffpunkt → Team-Kanäle → zurück). Schritt 3 mit **Live-Vorschau aus E3** (Lobby-Karte ändert sich mit Lobby-Name, Passwort, Teamgröße).
 
 Webseite und Admin: neues Modul in `Webseite/src/data/modules.data.ts` (Bereich Rocket League, mit `botText`), Detailtext; das Admin zeigt es dank W-0084 als „fehlt, übernehmen“.
 
@@ -158,10 +164,10 @@ Vorschlag **(Claude)**, Form dem Bauenden überlassen:
 
 Ein laufender Abend übersteht einen Neustart: Startzeit wird beim Start neu eingeplant, laufende Runde und Kanäle aus der Datenbank wiedergefunden.
 
-## Offen beim Nutzer (Prüfung durch einen frischen Leser, 11.11.)
+## Fragen aus der Prüfung (alle geklärt am 11.11.)
 
 1. ~~Wo sitzt ein Moderator, der eine Lobby hostet?~~ Geklärt am 11.11.: bleibt im Hauptvoice (siehe Hosts).
-2. **Bild oder Text je Nachricht.** Entwürfe I, V, M, D (A = Bild, B = Text). Wird eine Nachricht, die sich laufend ändert (Ankündigung, Steuerkarte, Rundenkarte), ein Bild, zeichnet der Bot sie gedrosselt neu (höchstens alle paar Sekunden) **(Claude)**. Eine Einstellung „Bild oder Text“ je Server gibt es nur, wenn der Nutzer beides will.
+2. ~~Bild oder Text je Nachricht.~~ Geklärt am 11.11.: alles als Bild, Entwürfe siehe Nachrichten.
 3. ~~Steuern Rollen-Moderatoren auch im Bot-Dashboard?~~ Geklärt am 11.11.: ja (siehe Rechte).
 
 ## Was der Bauende entscheidet
