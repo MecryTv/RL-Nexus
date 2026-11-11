@@ -836,7 +836,7 @@ export function renderLevels(guildId: string, view: LevelView = "levels"): void 
 
         return card(
             "Aktivste der Woche und des Monats",
-            "Das Podium als Ranglisten-Bild im Stil von Level-Karte › Rangliste. Gezählt werden nur die Punkte im Zeitraum.",
+            "Das Podium als Ranglisten-Bild wie bei /level rangliste. Gezählt werden nur die Punkte im Zeitraum.",
             part("week", "Aktivste der Woche", "Montags um 18 Uhr, Montag bis Sonntag davor"),
             part("month", "Aktivste des Monats", "Am 1. um 18 Uhr, der ganze Vormonat")
         );

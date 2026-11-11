@@ -1,32 +1,29 @@
 /**
- * Abschnitt „Level-Karte“ (Plan 35, Plan 36, Plan 38): drei Reiter, jeder ein
- * Studio aus layout/LevelStudio.ts - Level-Karte, Aufstieg und seit Plan 38
- * auch die Rangliste mit ihren vier Bereichen. Alle drei werden einmal gebaut
- * und nur umgeschaltet, so geht beim Wechseln nichts verloren.
+ * Abschnitt „Level-Karte“ (Plan 35, Plan 36): zwei Reiter, jeder ein Studio
+ * aus layout/LevelStudio.ts - Level-Karte und Aufstieg. Beide werden einmal
+ * gebaut und nur umgeschaltet, so geht beim Wechseln nichts verloren. Die
+ * Rangliste in Discord ist seit W-0050 fest, ihr Reiter ist weg.
  */
 
 import { BASE } from "../core/Base.js";
 import { need } from "../core/Dom.js";
 import { api, button, el, loading } from "../core/Ui.js";
 import { levelStudio } from "../layout/LevelStudio.js";
-import { IBoardDesign, ICardDesign } from "../../../interfaces/services/levels/ILevelDesign.js";
+import { ICardDesign } from "../../../interfaces/services/levels/ILevelDesign.js";
 
 interface IPayload {
     upMode: "image" | "text";
     settings: { upLine?: string };
-    designs: { card: ICardDesign | null; up: ICardDesign | null; boardDesign: IBoardDesign | null };
-    templates: { card: Record<string, ICardDesign>; up: Record<string, ICardDesign>; board: Record<string, IBoardDesign> };
+    designs: { card: ICardDesign | null; up: ICardDesign | null };
+    templates: { card: Record<string, ICardDesign>; up: Record<string, ICardDesign> };
     designPlaceholders: string[];
-    boardFramePlaceholders: string[];
-    boardEntryPlaceholders: string[];
 }
 
-type Tab = "card" | "up" | "board";
+type Tab = "card" | "up";
 
 const TABS: [Tab, string][] = [
     ["card", "Karte"],
     ["up", "Aufstieg"],
-    ["board", "Rangliste"],
 ];
 
 export function renderLevelCard(guildId: string): void {
@@ -34,7 +31,7 @@ export function renderLevelCard(guildId: string): void {
     const note = need<HTMLElement>("#levelCardNote");
     const request = api(`${BASE}/api/guild/${encodeURIComponent(guildId)}/levels`, note);
     const call = <T>(body: Record<string, unknown>): Promise<T | null> => request<T>("", body);
-    const hosts: Record<Tab, HTMLElement> = { card: el("div", ""), up: el("div", ""), board: el("div", "") };
+    const hosts: Record<Tab, HTMLElement> = { card: el("div", ""), up: el("div", "") };
     const segments: HTMLElement[] = [];
 
     /** Die Reiter stehen in jeder Studio-Leiste - alle zeigen denselben Stand. */
@@ -88,7 +85,7 @@ export function renderLevelCard(guildId: string): void {
     void request<IPayload>("").then((data) => {
         if (!data) return;
 
-        host.replaceChildren(hosts.card, hosts.up, hosts.board);
+        host.replaceChildren(hosts.card, hosts.up);
 
         levelStudio(hosts.card, {
             kind: "card",
@@ -109,18 +106,6 @@ export function renderLevelCard(guildId: string): void {
             guildId,
             upLine: data.settings.upLine ?? "{user}",
             upMode: data.upMode,
-            head: tabs(),
-            call,
-        });
-        // Plan 38: die Rangliste im Baukasten mit Kopf, Podium, Zeile und Fuß.
-        levelStudio(hosts.board, {
-            kind: "board",
-            design: data.designs.boardDesign,
-            fallback: "podium",
-            templates: data.templates.board,
-            placeholders: data.boardFramePlaceholders,
-            areaPlaceholders: { frame: data.boardFramePlaceholders, entry: data.boardEntryPlaceholders },
-            guildId,
             head: tabs(),
             call,
         });

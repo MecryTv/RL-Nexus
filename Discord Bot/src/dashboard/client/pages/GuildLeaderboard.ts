@@ -15,6 +15,7 @@ import { api, button, card, confirmButton, el, face, IPerson, loading, personPic
 import { PERIOD_LABEL, VoiceText } from "../../../constants/Levels.js";
 import { debounce, onPulse } from "../core/Pulse.js";
 import { BoardPostTitle } from "../constants/LevelFields.js";
+import { galleryUrl, loadGallery, pickImage } from "../layout/ImagePicker.js";
 
 type Period = "all" | "7d" | "30d";
 
@@ -70,13 +71,21 @@ interface IBoardPostStatus {
     updatedAt: number;
 }
 
+/** W-0050: der Kopf der offenen Seite - das Bild in Discord ist fest. */
+interface ILook {
+    image: string | null;
+    dim: number;
+    accent: string;
+}
+
 interface IPayload {
     settings: { public: boolean; boardPost?: IBoardPost; [key: string]: unknown };
     page: number;
     total: number;
     top: IRank[];
     boardPostStatus?: IBoardPostStatus | null;
-    guild: { channels: { id: string; name: string }[] };
+    designs: { board: ILook };
+    guild: { name: string; channels: { id: string; name: string }[] };
 }
 
 /** Plan 37: ein Eintrag im Protokoll, wie LevelService.Log ihn liefert. */
@@ -108,6 +117,8 @@ export function renderLeaderboard(guildId: string): void {
     let period: Period = "all";
     /** Plan 43: Entwurf der Rangliste im Kanal - „Speichern“ schickt nur diesen Teil. */
     let post: IBoardPost | null = null;
+    /** W-0050: Entwurf des Seitenkopfs - „Speichern“ schickt nur diese drei Felder. */
+    let look: ILook | null = null;
 
     /* ------------------------------------------------------------
        Kopf und öffentliche Liste
@@ -151,8 +162,103 @@ export function renderLeaderboard(guildId: string): void {
             "Öffentliche Rangliste",
             "An heißt: jeder mit dem Link sieht die Liste – ohne Anmeldung, ohne Discord-Konto. Zu sehen sind Platz, Name, Bild, Level, Punkte, Nachrichten und Voice-Zeit. Wer mit Discord angemeldet ist, sieht dazu seinen eigenen Platz.",
             row("Öffentlich", "Gilt sofort", el("label", "snitem__switch", box, el("span", "", data!.settings.public ? "an" : "aus"))),
-            ...(data!.settings.public ? [el("div", "lvlink", el("code", "lvlink__url", link), copy, open)] : [])
+            ...(data!.settings.public ? [el("div", "lvlink", el("code", "lvlink__url", link), copy, open)] : []),
+            ...lookRows()
         );
+    }
+
+    /**
+     * W-0050: Hintergrundbild, Abdunkeln und Akzent des Seitenkopfs, mit Vorschau
+     * aus demselben Markup wie die offene Seite. Das Bild in Discord ist fest.
+     */
+    function lookRows(): HTMLElement[] {
+        const saved = data!.designs.board;
+        const draft = (look ??= { image: saved.image, dim: saved.dim, accent: saved.accent });
+        const changed = (): boolean => draft.image !== saved.image || draft.dim !== saved.dim || draft.accent !== saved.accent;
+        const preview = el(
+            "section",
+            "arena__hero",
+            el("div", "arena__id", el("div", "arena__icon", icon("#i-chart-up")), el("div", "", el("h1", "", data!.guild.name), el("p", "", "Punkte fürs Schreiben und für die Zeit im Sprachkanal"))),
+            el("div", "arena__kpis", el("div", "", el("b", "", NUMBER.format(data!.total)), el("span", "", "Mitglieder mit Punkten")))
+        );
+        const save = button("btn btn--primary", icon("#i-check"), "Speichern");
+        const dimValue = el("span", "", `${draft.dim} %`);
+        const dim = el("input", "");
+        const accent = el("input", "");
+        const shade = (): void => {
+            preview.style.setProperty("--arena-accent", draft.accent);
+            preview.style.setProperty("--arena-dim", String(draft.dim / 100));
+            save.disabled = !changed();
+        };
+        const picture = (): void => {
+            const url = draft.image ? galleryUrl(guildId, draft.image) : null;
+
+            preview.classList.toggle("has-bg", Boolean(url));
+
+            if (url) preview.style.setProperty("--arena-bg", `url("${url}")`);
+            else preview.style.removeProperty("--arena-bg");
+        };
+        const choose = button("btn btn--quiet", icon("#i-image"), draft.image ? "Anderes Bild" : "Bild aus der Galerie");
+        const clear = button("btn btn--quiet", icon("#i-x"), "Kein Bild");
+
+        choose.addEventListener("click", async () => {
+            const source = await pickImage(guildId, [], ["gallery", "upload"]);
+
+            if (!source) return;
+
+            draft.image = source;
+            paint();
+        });
+        clear.addEventListener("click", () => {
+            draft.image = null;
+            paint();
+        });
+
+        dim.type = "range";
+        dim.min = "0";
+        dim.max = "90";
+        dim.step = "5";
+        dim.value = String(draft.dim);
+        dim.addEventListener("input", () => {
+            draft.dim = Number(dim.value);
+            dimValue.textContent = `${draft.dim} %`;
+            shade();
+        });
+
+        accent.type = "color";
+        accent.value = draft.accent;
+        accent.addEventListener("input", () => {
+            draft.accent = accent.value;
+            shade();
+        });
+
+        save.addEventListener("click", async () => {
+            save.disabled = true;
+
+            const answer = await call<{ style: ILook }>("", { action: "board.save", style: { image: draft.image, dim: draft.dim, accent: draft.accent } });
+
+            if (!answer) return void (save.disabled = !changed());
+
+            data!.designs.board = { image: answer.style.image, dim: answer.style.dim, accent: answer.style.accent };
+            look = null;
+            toast("info", "Gespeichert", "Der Kopf der offenen Seite sieht jetzt so aus.");
+            paint();
+        });
+
+        shade();
+        picture();
+
+        // Erst nach dem Laden kennt galleryUrl die Adresse eines Galeriebilds.
+        if (draft.image && !galleryUrl(guildId, draft.image)) void loadGallery(guildId).then(picture);
+
+        return [
+            el("p", "tkcard__lead", "Kopf der Seite: Hintergrundbild, Abdunkeln und Akzentfarbe. Das Bild in Discord sieht auf jedem Server gleich aus."),
+            row("Hintergrundbild", draft.image ? "Aus der Galerie" : "Ohne Bild: dunkler Verlauf", el("div", "lvlink", choose, ...(draft.image ? [clear] : []))),
+            row("Abdunkeln", "Damit der Text auf hellen Bildern lesbar bleibt", el("label", "", dim, dimValue)),
+            row("Akzentfarbe", "Kopf, gewählter Zeitraum und Platz 1", accent),
+            preview,
+            el("div", "mcsave", save),
+        ];
     }
 
     /* ------------------------------------------------------------
@@ -248,7 +354,7 @@ export function renderLeaderboard(guildId: string): void {
 
         return card(
             "Rangliste im Kanal",
-            "Seite 1 als Bild, fest in einem Kanal – wie /level rangliste und mit der Gestaltung aus Level-Karte › Rangliste. Die Knöpfe darunter öffnen jedem eine eigene Ansicht, die Nachricht selbst bleibt bei Seite 1.",
+            "Seite 1 als Bild, fest in einem Kanal – wie /level rangliste, nur ohne eigene Zeile. Die Knöpfe darunter öffnen jedem eine eigene Ansicht, die Nachricht selbst bleibt bei Seite 1.",
             row(
                 "Im Kanal zeigen",
                 "Ausschalten löscht die Nachricht",
