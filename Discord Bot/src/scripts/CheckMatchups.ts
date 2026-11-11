@@ -1140,6 +1140,24 @@ async function checkSmallService(): Promise<void> {
     sent.length = 0;
     await (loose as unknown as { Refresh: (guild: Guild, matchup: IMatchup, settings: IMatchupSettings) => Promise<void> }).Refresh(guild, stored, settings);
     check("Art gewechselt: alte Ankündigung weg, neue gesendet", deleted.includes("old") && sent.length === 1 && stored.messageId === "neu", `${deleted.join(",")} · ${sent.length} · ${stored.messageId}`);
+
+    // „Link offen“ umgeschaltet: gesendete Ankündigungen offener Partien ziehen nach (W-0078).
+    const refreshed: { id: number; open: boolean }[] = [];
+    const wait = () => new Promise((resolve) => setTimeout(resolve, 20));
+
+    loose.Settings = async () => ({ ...settings, open: true });
+    loose.Refresh = async (_guild: Guild, matchup: IMatchup, config: IMatchupSettings) => void refreshed.push({ id: matchup.id, open: config.open });
+    model.Announced = async () => [FakeMatchup({ id: 7, messageId: "a7" }), FakeMatchup({ id: 8, messageId: "a8" })];
+    (client.moduleSettings as unknown as Record<string, unknown>).Save = async () => undefined;
+
+    await service.SaveSettings(guild, { open: false });
+    await wait();
+    check("Link offen aus: beide offenen Ankündigungen ziehen ohne Link nach", refreshed.length === 2 && refreshed.every((entry) => !entry.open), JSON.stringify(refreshed));
+
+    refreshed.length = 0;
+    await service.SaveSettings(guild, { open: true, remindMinutes: 15 });
+    await wait();
+    check("Link offen bleibt gleich: keine Ankündigung wird angefasst", refreshed.length === 0, JSON.stringify(refreshed));
 }
 
 async function main(): Promise<void> {

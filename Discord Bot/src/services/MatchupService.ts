@@ -169,9 +169,17 @@ export default class MatchupService {
     }
 
     async SaveSettings(guild: Guild, input: unknown): Promise<IMatchupSettings> {
-        const settings = this.CleanSettings(guild, input, await this.Settings(guild.id));
+        const previous = await this.Settings(guild.id);
+        const settings = this.CleanSettings(guild, input, previous);
 
         await this.client.moduleSettings.Save(guild.id, MATCHUPS_MODULE, settings);
+
+        // „Link offen“ steckt im Knopf „Alle Matchups“: gesendete Ankündigungen nachziehen, im Hintergrund (W-0078).
+        if (settings.open !== previous.open) {
+            void (async () => {
+                for (const matchup of await this.client.matchups.Announced(guild.id)) await this.Refresh(guild, matchup, settings).catch(() => undefined);
+            })().catch(() => undefined);
+        }
 
         return settings;
     }
