@@ -14,9 +14,10 @@ interface IOptionJson {
     readonly options?: readonly IOptionJson[];
 }
 
-interface ICommandJson {
+export interface ICommandJson {
     readonly name: string;
-    readonly description: string;
+    /** W-0086: Rechtsklick-Befehle („Hack melden“) haben in Discord keine Beschreibung. */
+    readonly description?: string;
     readonly options?: readonly IOptionJson[];
 }
 
@@ -43,7 +44,8 @@ export function CommandPaths(json: ICommandJson): ICommandPath[] {
         }
     }
 
-    return paths.length > 0 ? paths : [{ path: json.name, description: json.description }];
+    // W-0086: Ohne Text die leere Zeichenkette - die Webseite verlangt bei jedem Eintrag einen Text, sonst verwirft sie die ganze Liste.
+    return paths.length > 0 ? paths : [{ path: json.name, description: json.description ?? "" }];
 }
 
 /**

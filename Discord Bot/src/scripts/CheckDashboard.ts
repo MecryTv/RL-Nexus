@@ -28,6 +28,7 @@ import DashboardService, { AccessEnds, BETA_ERRORS, BetaErrorText, BetaGate, Dis
 import { AccessText } from "../dashboard/client/constants/Access";
 import { applyCatalog, CATEGORIES, MODULES } from "../dashboard/client/constants/Modules";
 import CatalogService, { Catalog } from "../services/CatalogService";
+import { CommandPaths } from "../routes/AdminCommands";
 import { ApplyHelpCatalog } from "../constants/Help";
 import { CodeFromForm, RedeemAtAdmin } from "../routes/DashboardBeta";
 import IDashboardGuild, { DashboardRole } from "../interfaces/services/dashboard/IDashboardGuild";
@@ -1553,6 +1554,9 @@ async function main(): Promise<void> {
     await checkLogout(client);
     await checkInvite(client);
     await checkCatalog();
+
+    // W-0086: Rechtsklick-Befehle ohne Beschreibung - die Liste fürs Admin Dashboard hat trotzdem einen Text.
+    check("Befehle fürs Admin: Rechtsklick ohne Beschreibung bekommt einen leeren Text", JSON.stringify(CommandPaths({ name: "Hack melden" })) === JSON.stringify([{ path: "Hack melden", description: "" }]));
 
     // RL Tracker, Administration und die Epic-Verknuepfung gibt es nicht mehr.
     for (const gone of ["/admins", "/api/admin", "/user/1059621019947634739/tracking", "/api/tracking/1059621019947634739", "/link/epic"]) {
