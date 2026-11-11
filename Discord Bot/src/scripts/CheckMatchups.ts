@@ -705,6 +705,9 @@ async function checkButtons(client: BotClient, rows: Map<number, IMatchup>): Pro
     check("Fenster mit 3 und 1: eingetragen", JSON.stringify(calls.report[calls.report.length - 1]) === JSON.stringify(["3", "1"]) && rows.get(20)!.score?.us === 3);
     check("…und bestätigt", last()?.content === `✅ Eingetragen. Die Ankündigung steht in <#${TEXT}>.` && ephemeral(last()), JSON.stringify(last()));
 
+    await click("modal", "matchups:reportform:22", CAPTAIN, { fields: { us: "2", them: "3" } });
+    check("Ergebnis geändert: die Antwort sagt „Geändert“ (W-0079)", last()?.content === "✅ Geändert. Ankündigung und Ergebnis sind nachgezogen." && ephemeral(last()), JSON.stringify(last()));
+
     await click("button", "matchups:manage:21", CAPTAIN);
     check("Verwalten mit Recht: Zeit ändern und Absagen", text(last()).includes("matchups:time:21") && text(last()).includes("matchups:cancel:21") && ephemeral(last()), text(last()));
 

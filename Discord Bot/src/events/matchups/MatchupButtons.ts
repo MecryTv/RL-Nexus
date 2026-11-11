@@ -121,7 +121,13 @@ export default class MatchupButtons extends Event {
 
                 // Eintragen zieht Ankündigung und Ergebnis nach - das kann länger als die 3 Sekunden dauern, die Discord wartet.
                 await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+                // Stand vor dem Eintragen: Gab es schon ein Ergebnis, ist es eine Änderung (W-0079).
+                const changed = matchup.score !== null;
+
                 await service.Report(guild, member, matchup.id, interaction.fields.getTextInputValue("us"), interaction.fields.getTextInputValue("them"));
+
+                if (changed) return this.Answer(interaction, "✅ Geändert. Ankündigung und Ergebnis sind nachgezogen.");
 
                 const { channelId } = await service.Settings(guild.id);
 
