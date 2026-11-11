@@ -36,7 +36,7 @@ import { RankOrder, Trend } from "../services/levels/Board";
 import { MODULES as CLIENT_MODULES } from "../dashboard/client/constants/Modules";
 import { BOOST_PLACEHOLDERS as CLIENT_BOOST_PLACEHOLDERS } from "../dashboard/client/constants/Placeholders";
 import { BoardPostTitle, LEVEL_FIELDS, NoChannelHint } from "../dashboard/client/constants/LevelFields";
-import { BOARD_TEMPLATES, CARD_TEMPLATES, DefaultBoardStyle, UP_TEMPLATES } from "../constants/LevelDesign";
+import { BoardDesignC, CARD_TEMPLATES, DefaultBoardStyle, UP_TEMPLATES } from "../constants/LevelDesign";
 import { RenderDesign } from "../builder/DesignRenderer";
 import { IBoardDesign } from "../interfaces/services/levels/ILevelDesign";
 import { CleanBoardStyle } from "../services/levels/Design";
@@ -1739,10 +1739,11 @@ async function checkDesignApi(): Promise<void> {
 
     check("Unbekannte Art: Fehler statt Speichern", broken instanceof LevelError);
 
-    const board = (await route.Write(access, { action: "board.preview", style: { ...DefaultBoardStyle(), podium: false } })) as { image?: string };
-    const style = (await route.Write(access, { action: "board.save", style: { podium: false, accent: "#22c55e", image: "https://evil.example/a.png" } })) as { style?: { podium: boolean; accent: string; image: string | null } };
+    const gone = await route.Write(access, { action: "board.preview", style: DefaultBoardStyle() }).catch((error: Error) => error);
+    const style = (await route.Write(access, { action: "board.save", style: { podium: false, accent: "#22c55e", dim: 55, image: "https://evil.example/a.png" } })) as { style?: { podium: boolean; accent: string; dim: number; image: string | null } };
 
-    check("Ranglisten-Stil: Vorschau und Speichern", Boolean(board.image?.startsWith("data:image/png;base64,")) && style.style?.podium === false && style.style.accent === "#22c55e" && style.style.image === null && world.settings.boardStyle.podium === false);
+    check("W-0050: keine Vorschau des Discord-Bilds mehr", gone instanceof LevelError, String(gone));
+    check("W-0050: offene Seite speichert Akzent, Abdunkeln und nur Galeriebilder", style.style?.accent === "#22c55e" && style.style.dim === 55 && style.style.image === null && world.settings.boardStyle.podium === false);
 
     const kept = (await route.Write(access, { action: "save", settings: { ...world.settings, announceChannelId: TEXT, upMode: "text", upLine: "GG {user}" } })) as { settings?: ILevelSettings };
 
@@ -2236,12 +2237,13 @@ async function checkBoardBot(): Promise<void> {
     };
 
     const broken = World({ boardDesign: { kind: "board", head: null } as unknown as IBoardDesign });
+    let layout = { podium: 0, rows: 0, mine: 0 };
 
     await fill(broken, 3);
 
-    const png = await broken.service.BoardImage(broken.guild, await broken.service.Board(broken.guild, "all", 1, null), null);
+    const png = await broken.service.BoardImage(broken.guild, await broken.service.Board(broken.guild, "all", 1, null), null, {}, { onLayout: (next) => void (layout = next) });
 
-    check("Fehler im Design: das bisherige Bild kommt", isPng(png));
+    check("W-0050: gespeichertes Design zählt nicht, es kommt Vorlage C", isPng(png) && layout.podium === 3, JSON.stringify(layout));
 
     const texts: string[] = [];
     const plain = World();
@@ -2250,11 +2252,11 @@ async function checkBoardBot(): Promise<void> {
     await plain.service.BoardImage(plain.guild, await plain.service.Board(plain.guild, "all", 1, null), null, {}, { onText: (text) => void texts.push(text) });
     check("Ohne eigenes Design: Vorlage Podium mit dem bisherigen Titel", texts.includes("Rangliste") && texts.includes("Lifetime"), JSON.stringify(texts.slice(0, 4)));
 
-    const many = World({ boardDesign: BOARD_TEMPLATES.kompakt() });
+    const many = World({ boardDesign: { ...BoardDesignC(), template: "kompakt", perPage: 20 } });
     const shown: unknown[] = [];
 
     await fill(many, 25);
-    check("Kompakt: 20 Plätze je Seite", (await many.service.PerPage(GUILD)) === 20);
+    check("W-0050: immer 10 je Seite, auch mit altem Kompakt-Design", (await many.service.PerPage(GUILD)) === 10);
 
     const click = (customId: string, userId: string) =>
         HandleBoardButton(many.client, {
@@ -2267,17 +2269,17 @@ async function checkBoardBot(): Promise<void> {
         } as unknown as ButtonInteraction);
 
     await click(`lv:p:all:2:${USER}`, USER);
-    check("Kompakt mit 25 Mitgliedern: 2 Seiten", Buttons(shown.at(-1)).find((button) => button.custom_id === "lv:x")?.label === "Seite 2 von 2", JSON.stringify(Buttons(shown.at(-1)).find((button) => button.custom_id === "lv:x")));
+    check("25 Mitglieder: 3 Seiten", Buttons(shown.at(-1)).find((button) => button.custom_id === "lv:x")?.label === "Seite 2 von 3", JSON.stringify(Buttons(shown.at(-1)).find((button) => button.custom_id === "lv:x")));
 
     await click(`lv:me:all:${USER}`, "90071992547430023");
-    check("Meine Seite für Platz 23: Seite 2", Buttons(shown.at(-1)).find((button) => button.custom_id === "lv:x")?.label === "Seite 2 von 2", JSON.stringify(Buttons(shown.at(-1)).find((button) => button.custom_id === "lv:x")));
+    check("Meine Seite für Platz 23: Seite 3", Buttons(shown.at(-1)).find((button) => button.custom_id === "lv:x")?.label === "Seite 3 von 3", JSON.stringify(Buttons(shown.at(-1)).find((button) => button.custom_id === "lv:x")));
 }
 
 /* ----------------------------------------------------------
-   Plan 38, Task 3: API des Ranglisten-Baukastens
+   W-0050: Das Discord-Bild ist fest - der Baukasten der Rangliste ist weg
    ---------------------------------------------------------- */
 async function checkBoardApi(): Promise<void> {
-    console.log("\n  — Plan 38: Ranglisten-Baukasten (API) —");
+    console.log("\n  — W-0050: kein Ranglisten-Baukasten mehr —");
 
     const world = World();
     const lara = world.member(USER);
@@ -2285,44 +2287,19 @@ async function checkBoardApi(): Promise<void> {
     (world.guild as unknown as { emojis: { cache: Map<string, unknown> } }).emojis = { cache: new Map() };
     (world.client.levels as unknown as { Top: () => Promise<unknown[]> }).Top = async () => [];
     Object.assign(world.client, { levelBackfill: { ...world.client.levelBackfill, Of: async () => null } });
-    await world.service.Credit(lara, 450, { messages: 3, voiceMinutes: 90 }, world.settings, TEXT);
-    world.sent.length = 0;
 
     type Api = { Read: (access: unknown, query: unknown) => Promise<Record<string, unknown>>; Write: (access: unknown, body: unknown) => Promise<Record<string, unknown>> };
     const route = new DashboardApiLevels(world.client) as unknown as Api;
     const access = { guild: world.guild, member: lara, actor: { id: lara.id, name: "Check", staff: false } };
-    const payload = (await route.Read(access, {})) as { templates?: { board?: Record<string, { template: string }> }; designs?: { boardDesign?: unknown }; boardEntryPlaceholders?: string[]; boardFramePlaceholders?: string[] };
+    const payload = (await route.Read(access, {})) as { templates?: Record<string, unknown>; designs?: Record<string, unknown> };
 
-    check(
-        "GET liefert die vier Vorlagen, kein eigenes Design und die Platzhalter",
-        Object.keys(payload.templates?.board ?? {}).join() === "podium,liste,kompakt,arena" && payload.designs?.boardDesign === null && Boolean(payload.boardEntryPlaceholders?.includes("trend")) && Boolean(payload.boardFramePlaceholders?.includes("title")),
-        JSON.stringify({ templates: Object.keys(payload.templates?.board ?? {}), designs: payload.designs })
-    );
+    check("GET: keine Ranglisten-Vorlagen und kein Ranglisten-Design", !("board" in (payload.templates ?? {})) && !("boardDesign" in (payload.designs ?? {})) && "board" in (payload.designs ?? {}), JSON.stringify({ templates: Object.keys(payload.templates ?? {}), designs: Object.keys(payload.designs ?? {}) }));
 
-    const preview = (await route.Write(access, { action: "design.preview", kind: "board", design: BOARD_TEMPLATES.liste() })) as { image?: string; width?: number; height?: number; areas?: Record<string, { boxes: unknown[] } | null>; design?: { template: string } };
+    for (const action of ["design.preview", "design.save", "design.thumbs", "design.test"]) {
+        const refused = await route.Write(access, { action, kind: "board", design: BoardDesignC() }).catch((error: Error) => error);
 
-    check("Vorschau: Bild, Größe und alle vier Bereiche", Boolean(preview.image?.startsWith("data:image/png;base64,")) && preview.width === 1000 && (preview.height ?? 0) > 800 && ["head", "row", "foot"].every((area) => (preview.areas?.[area]?.boxes.length ?? 0) > 0), JSON.stringify({ width: preview.width, height: preview.height, areas: Object.keys(preview.areas ?? {}) }));
-    check("Vorschau mit einem Mitglied: aufgefüllt bis zur vollen Seite", preview.height === 140 + 10 * 82 + 10 + 80, String(preview.height));
-    check("Vorschau gibt das bereinigte Design zurück", preview.design?.template === "liste");
-
-    const thumbs = (await route.Write(access, { action: "design.thumbs", kind: "board" })) as { thumbs?: Record<string, string> };
-
-    check("Vorschaubilder je Vorlage", Object.keys(thumbs.thumbs ?? {}).length === 4 && Object.values(thumbs.thumbs ?? {}).every((url) => url.startsWith("data:image/png")));
-
-    const own = { ...BOARD_TEMPLATES.kompakt(), accent: "#22c55e", medals: ["#111111", "#222222", "#333333"], title: "Unsere Besten" };
-    const saved = (await route.Write(access, { action: "design.save", kind: "board", design: own })) as { design?: { template: string } };
-
-    check("Speichern: Design steht in den Einstellungen", saved.design?.template === "kompakt" && world.settings.boardDesign?.perPage === 20);
-    check("Nach Kompakt hat die Vorlage Podium weiter ein Podium", BOARD_TEMPLATES.podium(world.settings.boardStyle).podium.on, JSON.stringify(world.settings.boardStyle));
-    check("Speichern übernimmt Akzent, Medaillen und Titel für die Web-Rangliste", world.settings.boardStyle.accent === "#22c55e" && world.settings.boardStyle.medals.join() === "#111111,#222222,#333333" && world.settings.boardStyle.title === "Unsere Besten", JSON.stringify(world.settings.boardStyle));
-
-    await route.Write(access, { action: "design.test", kind: "board" });
-    check("Test schickt das Ranglisten-Bild per DM", world.sent.length === 1 && world.sent[0].to === USER && world.sent[0].payload.files?.length === 1, JSON.stringify(world.sent.map((entry) => entry.to)));
-
-    const reset = (await route.Write(access, { action: "design.save", kind: "board", design: null })) as { design?: unknown; effective?: { accent: string; podium: { on: boolean } }; templates?: Record<string, { accent: string }> };
-
-    check("null setzt auf die Vorlage zurück", reset.design === null && world.settings.boardDesign === null);
-    check("Zurücksetzen: das Studio bekommt das Design, das der Bot zeichnet, und die Vorlagen im neuen Stil", reset.effective?.accent === "#22c55e" && reset.effective.podium.on && reset.templates?.liste?.accent === "#22c55e", JSON.stringify({ effective: reset.effective?.accent, liste: reset.templates?.liste?.accent }));
+        check(`${action} mit Rangliste: abgelehnt`, refused instanceof LevelError, String(refused));
+    }
 }
 
 async function main(): Promise<void> {

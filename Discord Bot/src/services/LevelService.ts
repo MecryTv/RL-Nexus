@@ -28,14 +28,14 @@ import {
     VoiceHours,
     XpForLevel,
 } from "../constants/Levels";
-import { BOARD_TEMPLATES, CARD_TEMPLATES, DESIGN_SIZE, DefaultBoardStyle, UP_TEMPLATES } from "../constants/LevelDesign";
-import { IBoardAreaBox, IBoardHooks, RenderBoard } from "../builder/BoardRenderer";
+import { BoardDesignC, CARD_TEMPLATES, DESIGN_SIZE, DefaultBoardStyle, UP_TEMPLATES } from "../constants/LevelDesign";
+import { IBoardHooks, RenderBoard } from "../builder/BoardRenderer";
 import { FillDesign, IDesignData, RenderDesign } from "../builder/DesignRenderer";
 import { RenderLevelCard } from "../builder/LevelCard";
 import { RenderLeaderboard } from "../builder/LeaderboardImage";
-import { CleanBoardDesign, CleanBoardStyle, CleanDesign } from "./levels/Design";
+import { CleanBoardStyle, CleanDesign } from "./levels/Design";
 import { ActiveBoost, BoostText, CleanBoosts } from "./levels/Boost";
-import { BoardArea, DesignKind, IBoardDesign, IBoardStyle, ICardDesign, IDesignBox } from "../interfaces/services/levels/ILevelDesign";
+import { DesignKind, IBoardStyle, ICardDesign, IDesignBox } from "../interfaces/services/levels/ILevelDesign";
 import { CleanDoc } from "../builder/MessageDoc";
 import { IMessageDoc } from "../interfaces/builder/IMessageDoc";
 import { IBoardEntry, IBoardPage, ILevelBonus, ILevelEntry, ILevelLogEntry, ILevelSettings, ITopPost, LevelAdjustMode, LevelPeriod } from "../interfaces/services/levels/ILevels";
@@ -849,128 +849,32 @@ export default class LevelService {
     }
 
     /* ----------------------------------------------------------
-       Plan 38: das Ranglisten-Bild aus dem Baukasten
+       W-0050: das Ranglisten-Bild ist fest (Vorlage C)
        ---------------------------------------------------------- */
-    /** Das eigene Design oder die Vorlage Podium aus dem bisherigen Ranglisten-Stil. */
-    BoardDesign(settings: ILevelSettings): IBoardDesign {
-        return settings.boardDesign ?? BOARD_TEMPLATES.podium(settings.boardStyle ?? DefaultBoardStyle());
-    }
-
     /** Plätze je Seite des Bilds - Discord blättert mit derselben Zahl. */
-    async PerPage(guildId: string): Promise<number> {
-        return this.BoardDesign(await this.Settings(guildId)).perPage;
+    async PerPage(_guildId: string): Promise<number> {
+        return BoardDesignC().perPage;
     }
 
     /**
      * Das Ranglisten-Bild für /level rangliste, das Vorschaubild beim Teilen und
-     * die Posts der Aktivsten (title, period). Scheitert das Design, kommt das
-     * bisherige Bild - nie gar keins.
+     * die Posts der Aktivsten (title, period). Für alle Server gleich; ein früher
+     * gespeichertes Baukasten-Design zählt nicht mehr. Scheitert das Zeichnen,
+     * kommt das alte Bild im Werksstil - nie gar keins.
      */
     async BoardImage(guild: Guild, page: IBoardPage, viewerId: string | null, overrides: { title?: string; period?: string } = {}, hooks: IBoardHooks = {}): Promise<Buffer> {
-        const settings = await this.Settings(guild.id);
-
         try {
-            const { png } = await RenderBoard(this.BoardDesign(settings), { page, guildName: guild.name, iconUrl: guild.iconURL?.({ extension: "png", size: 256 }) ?? null, viewerId, ...overrides }, undefined, hooks);
+            const { png } = await RenderBoard(BoardDesignC(), { page, guildName: guild.name, iconUrl: guild.iconURL?.({ extension: "png", size: 256 }) ?? null, viewerId, ...overrides }, undefined, hooks);
 
             return png;
         } catch (error) {
             logger.warn(`📈 Ranglisten-Bild auf ${guild.id} nicht gezeichnet, das bisherige kommt - ${String(error)}`);
 
-            return RenderLeaderboard({ guildName: guild.name, page, viewerId, title: overrides.title, chip: overrides.period, style: settings.boardStyle ?? DefaultBoardStyle() });
+            return RenderLeaderboard({ guildName: guild.name, page, viewerId, title: overrides.title, chip: overrides.period });
         }
     }
 
-    /**
-     * Seite 1 Lifetime mit den Daten dessen, der das Dashboard bedient - aufgefüllt
-     * mit Beispiel-Plätzen bis zur vollen Seite, damit im Studio jeder Bereich
-     * zu sehen ist.
-     */
-    private async SamplePage(guild: Guild, viewerId: string, perPage: number): Promise<IBoardPage> {
-        const page = await this.Board(guild, "all", 1, viewerId, perPage);
-        const entries = [...page.entries];
-        const trends: IBoardEntry["trend"][] = [2, 0, -1, "new"];
-
-        for (let rank = entries.length + 1; rank <= perPage; rank++) {
-            const before = entries[entries.length - 1];
-
-            // Etwas weniger als der Platz davor, nie 0 - auch wenn der Server erst wenige Punkte hat.
-            entries.push({ rank, userId: `beispiel-${rank}`, name: `Beispiel ${rank}`, avatar: null, level: Math.max(1, (before?.level ?? 12) - (rank % 2)), xp: Math.max(1, Math.round((before?.xp ?? 5_000) * 0.88)), messages: 120, voiceMinutes: 300, trend: trends[rank % trends.length], into: 40, need: 100 });
-        }
-
-        return { ...page, entries, total: Math.max(page.total, perPage) };
-    }
-
-    /** Plan 38: ein Ranglisten-Design aus dem Studio, noch nicht gespeichert - mit Bereichen und Rahmen für die Bühne. */
-    async BoardDesignPreview(member: GuildMember, input: unknown): Promise<{ image: string; width: number; height: number; areas: Record<BoardArea, IBoardAreaBox | null>; design: IBoardDesign }> {
-        const design = CleanBoardDesign(input);
-
-        if (!design) throw new LevelError("Das Design ist leer.");
-
-        const page = await this.SamplePage(member.guild, member.id, design.perPage);
-        const { png, width, height, areas } = await RenderBoard(design, { page, guildName: member.guild.name, iconUrl: member.guild.iconURL?.({ extension: "png", size: 256 }) ?? null, viewerId: member.id });
-
-        return { image: `data:image/png;base64,${png.toString("base64")}`, width, height, areas, design };
-    }
-
-    /** Plan 38: die Vorlagen im Stil des Servers, klein gezeichnet. */
-    async BoardThumbs(member: GuildMember): Promise<Record<string, string>> {
-        const style = (await this.Settings(member.guild.id)).boardStyle ?? DefaultBoardStyle();
-        const thumbs: Record<string, string> = {};
-
-        for (const [name, make] of Object.entries(BOARD_TEMPLATES)) {
-            const design = make(style);
-            const { png } = await RenderBoard(design, { page: await this.SamplePage(member.guild, member.id, design.perPage), guildName: member.guild.name, iconUrl: null, viewerId: null }, 0.4);
-
-            thumbs[name] = `data:image/png;base64,${png.toString("base64")}`;
-        }
-
-        return thumbs;
-    }
-
-    /**
-     * Plan 38: null heißt zurück zur Vorlage Podium. Der bisherige Stil übernimmt
-     * Bild, Abdunkeln, Akzent, Medaillen, Titel und Podium - so bleibt der Kopf
-     * der Web-Rangliste wie das Bild.
-     */
-    async SaveBoardDesign(guild: Guild, input: unknown): Promise<{ design: IBoardDesign | null; effective: IBoardDesign; templates: Record<string, IBoardDesign> }> {
-        const settings = await this.Settings(guild.id);
-        const design = input === null ? null : CleanBoardDesign(input);
-
-        if (input !== null && !design) throw new LevelError("Das Design ist leer.");
-
-        const style = settings.boardStyle ?? DefaultBoardStyle();
-        const boardStyle: IBoardStyle = design
-            ? { ...style, image: design.background.mode === "image" ? design.background.image : null, dim: design.background.dim, accent: design.accent, medals: [...design.medals], title: design.title }
-            : style;
-        const next = { ...settings, boardDesign: design, boardStyle };
-
-        await this.client.moduleSettings.Save(guild.id, LEVELS_MODULE, next);
-
-        // Review: nach dem Zurücksetzen zeigt das Studio, was der Bot zeichnet, und die Vorlagen im neuen Stil.
-        return { design, effective: this.BoardDesign(next), templates: Object.fromEntries(Object.entries(BOARD_TEMPLATES).map(([name, make]) => [name, make(boardStyle)])) };
-    }
-
-    /** Plan 38: das gespeicherte Ranglisten-Bild per DM an den, der „Test senden“ drückt. */
-    async TestBoard(member: GuildMember): Promise<void> {
-        const page = await this.Board(member.guild, "all", 1, member.id, await this.PerPage(member.guild.id));
-
-        if (!page.total) throw new LevelError("Noch hat niemand Punkte - die Rangliste ist leer.");
-
-        const png = await this.BoardImage(member.guild, page, member.id);
-        const sent = await member.send({ content: `So sieht /level rangliste auf **${member.guild.name}** aus.`, files: [new AttachmentBuilder(png, { name: "rangliste.png" })] }).catch(() => null);
-
-        if (!sent) throw new LevelError("Ich kann dir keine DM schicken. Öffne deine DMs für den Server.");
-    }
-
-    /** Das Ranglisten-Bild mit einem Stil, der noch nicht gespeichert ist: Lifetime, Seite 1. */
-    async BoardPreview(guild: Guild, viewerId: string, input: unknown): Promise<string> {
-        const settings = await this.Settings(guild.id);
-        const style = CleanBoardStyle(input, settings.boardStyle ?? DefaultBoardStyle());
-        const png = await RenderLeaderboard({ guildName: guild.name, page: await this.Board(guild, "all", 1, viewerId), viewerId, style });
-
-        return `data:image/png;base64,${png.toString("base64")}`;
-    }
-
+    /** W-0050: Kopf der offenen Seite - Hintergrundbild, Abdunkeln, Akzent. Das Discord-Bild nutzt den Stil nicht. */
     async SaveBoardStyle(guild: Guild, input: unknown): Promise<IBoardStyle> {
         const settings = await this.Settings(guild.id);
         const style = CleanBoardStyle(input, settings.boardStyle ?? DefaultBoardStyle());

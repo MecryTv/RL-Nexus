@@ -3,7 +3,7 @@ import BotClient from "../client/BotClient";
 import Route from "../structures/Route";
 import { DASHBOARD_PATH } from "../constants/Dashboard";
 import { DefaultBoostMessage, DefaultLevelMessage, LEVEL_PLACEHOLDER_KEYS, LevelProgress, MAX_BONUS, MAX_EXCLUDED, MAX_REWARDS, MAX_UP_LINE, UpMode } from "../constants/Levels";
-import { BOARD_ENTRY_PLACEHOLDERS, BOARD_FRAME_PLACEHOLDERS, BOARD_PLACEHOLDERS, BOARD_TEMPLATES, CARD_TEMPLATES, DESIGN_FONTS, DESIGN_PLACEHOLDERS, DESIGN_SIZE, DefaultBoardStyle, MAX_ELEMENTS, UP_TEMPLATES } from "../constants/LevelDesign";
+import { BOARD_PLACEHOLDERS, CARD_TEMPLATES, DESIGN_FONTS, DESIGN_PLACEHOLDERS, DESIGN_SIZE, DefaultBoardStyle, MAX_ELEMENTS, UP_TEMPLATES } from "../constants/LevelDesign";
 import { DesignKind } from "../interfaces/services/levels/ILevelDesign";
 import { ILevelRank } from "../interfaces/services/levels/ILevels";
 import { LevelError, LEVELS_MODULE } from "../services/LevelService";
@@ -36,8 +36,9 @@ function Templates<T extends string>(makers: Record<T, () => unknown>): Record<T
 }
 
 /** Plan 38: "board" ist das Ranglisten-Bild im Baukasten. */
-function Kind(value: unknown): DesignKind | "board" {
-    if (value === "card" || value === "up" || value === "board") return value;
+/** W-0050: Die Rangliste in Discord ist fest - im Designer gibt es nur noch Karte und Aufstieg. */
+function Kind(value: unknown): DesignKind {
+    if (value === "card" || value === "up") return value;
 
     throw new LevelError("Unbekannte Art.");
 }
@@ -116,11 +117,9 @@ export default class DashboardApiLevels extends Route {
             limits: { rewards: MAX_REWARDS, bonus: MAX_BONUS, excluded: MAX_EXCLUDED, elements: MAX_ELEMENTS, upLine: MAX_UP_LINE },
             // Plan 35: der Designer.
             upMode: UpMode(settings),
-            designs: { card: settings.cardDesign ?? null, up: settings.upDesign ?? null, board: settings.boardStyle ?? DefaultBoardStyle(), boardDesign: settings.boardDesign ?? null },
-            // Plan 38: die Vorlagen der Rangliste im bisherigen Stil des Servers.
-            templates: { card: Templates(CARD_TEMPLATES), up: Templates(UP_TEMPLATES), board: Object.fromEntries(Object.entries(BOARD_TEMPLATES).map(([name, make]) => [name, make(settings.boardStyle ?? DefaultBoardStyle())])) },
-            boardFramePlaceholders: BOARD_FRAME_PLACEHOLDERS,
-            boardEntryPlaceholders: BOARD_ENTRY_PLACEHOLDERS,
+            // W-0050: board ist nur noch der Kopf der offenen Seite.
+            designs: { card: settings.cardDesign ?? null, up: settings.upDesign ?? null, board: settings.boardStyle ?? DefaultBoardStyle() },
+            templates: { card: Templates(CARD_TEMPLATES), up: Templates(UP_TEMPLATES) },
             designPlaceholders: DESIGN_PLACEHOLDERS,
             boardPlaceholders: BOARD_PLACEHOLDERS,
             designSize: DESIGN_SIZE,
@@ -201,7 +200,7 @@ export default class DashboardApiLevels extends Route {
             case "design.preview": {
                 const kind = Kind(body.kind);
 
-                return kind === "board" ? service.BoardDesignPreview(member, body.design) : service.DesignPreview(member, kind, body.design);
+                return service.DesignPreview(member, kind, body.design);
             }
 
             case "design.save": {
@@ -209,14 +208,6 @@ export default class DashboardApiLevels extends Route {
 
                 // null heißt ausdrücklich „zurück zur Vorgabe“ - fehlt das Design, ist das ein Fehler, kein Zurücksetzen.
                 if (body.design === undefined) throw new LevelError("Kein Design mitgeschickt.");
-
-                if (kind === "board") {
-                    const board = await service.SaveBoardDesign(guild, body.design);
-
-                    logger.user(`📈 Ranglisten-Bild auf ${guild.id} ${board.design ? "gespeichert" : "zurückgesetzt"} (von ${actor.id})`);
-
-                    return { ok: true, ...board };
-                }
 
                 const saved = await service.SaveDesign(guild, kind, body.design, body.upLine);
 
@@ -229,25 +220,20 @@ export default class DashboardApiLevels extends Route {
             case "design.thumbs": {
                 const kind = Kind(body.kind);
 
-                return { thumbs: kind === "board" ? await service.BoardThumbs(member) : await service.DesignThumbs(member, kind) };
+                return { thumbs: await service.DesignThumbs(member, kind) };
             }
 
             case "design.test": {
-                const kind = Kind(body.kind);
-
-                if (kind === "board") await service.TestBoard(member);
-                else await service.TestDesign(member, kind);
+                await service.TestDesign(member, Kind(body.kind));
 
                 return { ok: true };
             }
 
-            case "board.preview":
-                return { image: await service.BoardPreview(guild, actor.id, body.style) };
-
+            // W-0050: der Kopf der offenen Seite (Hintergrundbild, Abdunkeln, Akzent).
             case "board.save": {
                 const style = await service.SaveBoardStyle(guild, body.style);
 
-                logger.user(`📈 Ranglisten-Stil auf ${guild.id} gespeichert (von ${actor.id})`);
+                logger.user(`📈 Kopf der offenen Rangliste auf ${guild.id} gespeichert (von ${actor.id})`);
 
                 return { ok: true, style };
             }

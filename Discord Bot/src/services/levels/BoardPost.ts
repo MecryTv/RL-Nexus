@@ -11,6 +11,7 @@ import { ChannelType, Guild, Message, SendableChannels } from "discord.js";
 import BotClient from "../../client/BotClient";
 import { IBoardPage, ILevelBoardPost, ILevelSettings } from "../../interfaces/services/levels/ILevels";
 import { LEVELS_MODULE } from "../LevelService";
+import { BoardDesignC } from "../../constants/LevelDesign";
 import { BoardChannelPayload } from "./BoardMessage";
 import logger from "../../utils/logger";
 
@@ -23,9 +24,9 @@ export function BoardFingerprint(board: IBoardPage, designKey: string): string {
     return createHash("sha1").update(JSON.stringify([designKey, period, page, pages, total, range, entries])).digest("hex");
 }
 
-/** Gestaltung, Name und Icon des Servers - ändert sich eins davon, wird neu gezeichnet. */
-function DesignKey(client: BotClient, guild: Guild, settings: ILevelSettings): string {
-    return JSON.stringify([client.levelService.BoardDesign(settings), guild.name, guild.icon ?? null]);
+/** Gestaltung, Name und Icon des Servers - ändert sich eins davon, wird neu gezeichnet. W-0050: die Gestaltung ist fest. */
+function DesignKey(guild: Guild): string {
+    return JSON.stringify([BoardDesignC(), guild.name, guild.icon ?? null]);
 }
 
 /** Wirklich weg (Nachricht oder Kanal) - kein Aussetzer bei Discord. */
@@ -134,7 +135,7 @@ async function Look(client: BotClient, guild: Guild, settings: ILevelSettings, f
 
     try {
         const board = await client.levelService.Board(guild, want.period, 1, null, await client.levelService.PerPage(guild.id));
-        const fingerprint = BoardFingerprint(board, DesignKey(client, guild, settings));
+        const fingerprint = BoardFingerprint(board, DesignKey(guild));
 
         if (message && current && !force && current.fingerprint === fingerprint) {
             if (current.error) await client.levelBoardPosts.Set({ ...current, error: null });
