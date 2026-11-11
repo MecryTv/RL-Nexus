@@ -114,7 +114,7 @@ Unter **Bot** ist „Requires OAuth2 Code Grant“ an (W-0069). Der Bot tritt da
 https://discord.com/oauth2/authorize
   ?client_id=<CLIENT_ID>
   &permissions=8
-  &scope=bot%20applications.commands
+  &scope=bot%20applications.commands%20guilds.join
   &response_type=code
   &redirect_uri=<SERVER_PUBLIC_URL>/einladen/callback
   &state=<einmaliger Wert>
@@ -123,6 +123,8 @@ https://discord.com/oauth2/authorize
 ```
 
 `<base>/einladen/callback` tauscht den Code nur, wenn der `state` im Cookie dieses Browsers steht, höchstens 15 Minuten alt ist, dieselbe Person angemeldet ist und Discord denselben Server nennt. Danach wartet der Rückweg auf die Entscheidung von `GuildJoined` (Freigabe-Pass, Ansprechpartner) und leitet erst dann in die Übersicht des Servers. Passt etwas nicht, kommt die Seite „Einladung nicht abgeschlossen“ (`public/einladen.html`, Werte aus `src/builder/InviteFailPage.ts`), der Bot tritt nicht bei.
+
+**Support-Server (W-0060):** `guilds.join` holt die einladende Person beim Tausch nebenher in „RL Nexus EMB | Support“ (`SUPPORT_GUILD_ID` in `src/constants/Help.ts`, der Server hinter `SUPPORT_URL`). Discord zeigt dafür auf der Zustimmungsseite eine Zeile mehr. Der Bot muss in diesem Server sein und „Einladung erstellen“ dürfen. Klappt der Beitritt nicht (Bot nicht dort, Person dort gebannt, Discord nicht erreichbar), steht nur eine Warnung im Log, die Einladung läuft trotzdem durch. Der Dev-Bot ist meist nicht im Support-Server, lokal steht deshalb diese Warnung.
 
 **Install Link im Portal:** Unter **Installation** sollte kein „Discord Provided Link“ stehen, der führte mit Code Grant ins Leere. Entweder „None“ oder eine eigene Adresse auf `<base>/einladen`.
 

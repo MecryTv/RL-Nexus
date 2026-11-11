@@ -26,6 +26,7 @@ import {
     MAX_SESSIONS,
     OAUTH_SCOPES,
 } from "../constants/Dashboard";
+import { SUPPORT_GUILD_ID } from "../constants/Help";
 import { Open, Seal } from "../utils/seal";
 import logger from "../utils/logger";
 import { BannedFor } from "../utils/security";
@@ -468,12 +469,13 @@ export default class DashboardService implements IDashboardService {
      * W-0069: Mit „Requires OAuth2 Code Grant“ tritt der Bot erst bei, wenn
      * ExchangeInvite den Code eintauscht. Der Link fragt deshalb nach einem Code
      * und trägt den einmaligen state aus /einladen. Der Server ist fest gewählt.
+     * W-0060: guilds.join dazu, damit die Person in den Support-Server kommt.
      */
     InviteURL(guildId: string, state: string): string {
         const query = new URLSearchParams({
             client_id: this.ClientId,
             permissions: INVITE_PERMISSIONS,
-            scope: "bot applications.commands",
+            scope: "bot applications.commands guilds.join",
             response_type: "code",
             redirect_uri: this.InviteRedirectURI,
             state,
@@ -515,9 +517,41 @@ export default class DashboardService implements IDashboardService {
             throw new InviteExchangeFailed("rejected", `Discord hat den Einladungs-Code abgelehnt (${response.status} ${body}). Pruefe die Redirect URI ${this.InviteRedirectURI} im Developer Portal.`);
         }
 
-        const token = (await response.json().catch(() => ({}))) as { guild?: unknown; scope?: unknown };
+        const token = (await response.json().catch(() => ({}))) as { guild?: unknown; scope?: unknown; access_token?: unknown };
+
+        if (typeof token.access_token === "string" && String(token.scope).split(" ").includes("guilds.join")) void this.JoinSupport(token.access_token);
 
         return BotGrantOf(token) ?? null;
+    }
+
+    /**
+     * W-0060: Holt die einladende Person in den Support-Server. Läuft nebenher
+     * und hält die Einladung nie auf; klappt es nicht, steht es nur im Log.
+     * Der Bot muss dort Mitglied sein und Einladungen erstellen dürfen.
+     */
+    async JoinSupport(accessToken: string): Promise<void> {
+        const { developerMode, config } = this.client;
+        const botToken = this.client.token ?? (developerMode ? config.DEV_CLIENT_TOKEN : config.CLIENT_TOKEN);
+
+        try {
+            const me = await fetch(`${DISCORD_API}/users/@me`, { headers: { Authorization: `Bearer ${accessToken}` }, signal: AbortSignal.timeout(5_000) });
+            const user = (await me.json().catch(() => ({}))) as { id?: unknown };
+
+            if (!me.ok || typeof user.id !== "string") throw new Error(`users/@me antwortet ${me.status}`);
+
+            const put = await fetch(`${DISCORD_API}/guilds/${SUPPORT_GUILD_ID}/members/${user.id}`, {
+                method: "PUT",
+                headers: { Authorization: `Bot ${botToken}`, "Content-Type": "application/json" },
+                body: JSON.stringify({ access_token: accessToken }),
+                signal: AbortSignal.timeout(5_000),
+            });
+
+            // 201: neu im Support-Server, 204: war schon drin.
+            if (put.status === 201) logger.info(`🎟️  ${user.id} ist dem Support-Server beigetreten`);
+            else if (put.status !== 204) logger.warn(`🎟️  Support-Server: Beitritt von ${user.id} abgelehnt (${put.status} ${(await put.text().catch(() => "")).slice(0, 200)})`);
+        } catch (error) {
+            logger.warn(`🎟️  Support-Server: Beitritt nicht möglich: ${String(error)}`);
+        }
     }
 
     /** W-0069: Der Bot verlässt einen Server per REST, auch wenn guildCreate noch nicht da war. */

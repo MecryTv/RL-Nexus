@@ -8,6 +8,8 @@ export const HELP_PREFIX = "hilfe:";
 export const HELP_ACCENT = 0xff1e2d;
 export const STATUS_URL = "https://status.nexus-emb.de";
 export const SUPPORT_URL = "https://discord.gg/CjG2HFGw95";
+/** W-0060: „RL Nexus EMB | Support“, der Server hinter SUPPORT_URL. Wer den Bot einlädt, kommt dort hinein. */
+export const SUPPORT_GUILD_ID = "1547258700480253982";
 
 export type HelpAreaId = "always" | "rocket-league" | "community" | "support" | "moderation" | "content" | "general";
 

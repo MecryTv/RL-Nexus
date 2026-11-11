@@ -22,6 +22,7 @@ import { ErrorInfo, SendError, WantsPage } from "../utils/errorpage";
 import { MODULE_IDS, PERMANENT_MODULES } from "../constants/Modules";
 import { AdminStatus, AskAdmin, BackupCall } from "../routes/DashboardApiBackups";
 import { DASHBOARD_HOME, DASHBOARD_PATH, DISCORD_EPOCH, OAUTH_SCOPES, SESSION_COOKIE } from "../constants/Dashboard";
+import { SUPPORT_GUILD_ID } from "../constants/Help";
 import IDashboardSession from "../interfaces/services/dashboard/IDashboardSession";
 import DashboardService, { AccessEnds, BETA_ERRORS, BetaErrorText, BetaGate, DisplayGroup, LockPlaceholders, MfaRequired, ShopDecision, ShopStatusLines, type IShopGrantRow, type IShopStatusRow } from "../services/DashboardService";
 import { AccessText } from "../dashboard/client/constants/Access";
@@ -1248,7 +1249,7 @@ async function checkInvite(client: BotClient): Promise<void> {
     check("Einladung: response_type=code", link.searchParams.get("response_type") === "code", link.href);
     check("  redirect_uri ist der Einladungs-Callback", link.searchParams.get("redirect_uri") === service.InviteRedirectURI && service.InviteRedirectURI.endsWith(`${P}/einladen/callback`), service.InviteRedirectURI);
     check("  state, Server und feste Auswahl", link.searchParams.get("state") === "staat-123" && link.searchParams.get("guild_id") === guildId && link.searchParams.get("disable_guild_select") === "true");
-    check("  scope bot und applications.commands", link.searchParams.get("scope") === "bot applications.commands", String(link.searchParams.get("scope")));
+    check("  scope bot, applications.commands und guilds.join (W-0060)", link.searchParams.get("scope") === "bot applications.commands guilds.join", String(link.searchParams.get("scope")));
 
     const start = { guildId, guildName: "Testserver", guildIcon: null, userId, userName: "Check", userAvatar: null };
     const nonce = CreateInviteState(start);
@@ -1283,7 +1284,7 @@ async function checkInvite(client: BotClient): Promise<void> {
     const left = (id: string): boolean => calls.some((call) => call.method === "DELETE" && call.url.endsWith(`/users/@me/guilds/${id}`));
 
     // Was Discord beim Tausch antwortet, und was GuildJoined danach meldet. Je Fall umgestellt.
-    let tokenReply = (): Response => Response.json({ access_token: "bot-token", token_type: "Bearer", scope: "bot applications.commands", expires_in: 604800, guild: { id: guildId, name: "Testserver" } });
+    let tokenReply = (): Response => Response.json({ access_token: "bot-token", token_type: "Bearer", scope: "bot applications.commands guilds.join", expires_in: 604800, guild: { id: guildId, name: "Testserver" } });
     let joined: "ok" | "contact" | null = "ok";
 
     globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -1308,6 +1309,8 @@ async function checkInvite(client: BotClient): Promise<void> {
         }
         if (init?.method === "DELETE" && url.includes("/users/@me/guilds/")) return new Response(null, { status: 204 });
         if (url.includes("/users/@me/guilds")) return Response.json([]);
+        if (url.endsWith("/users/@me")) return Response.json({ id: userId });
+        if (init?.method === "PUT" && url.includes(`/guilds/${SUPPORT_GUILD_ID}/members/`)) return new Response(null, { status: 201 });
 
         return new Response(null, { status: 404 });
     }) as typeof fetch;
@@ -1367,6 +1370,19 @@ async function checkInvite(client: BotClient): Promise<void> {
         check("Callback: Erfolg führt in die Übersicht des Servers", success.status === 302 && success.headers.get("location") === `${P}/guild/${guildId}/uebersicht`, `${success.status} ${success.headers.get("location")}`);
         check("  der Code wird mit der Einladungs-redirect_uri getauscht", token !== undefined && token.body.includes("code=echter-code") && token.body.includes(`redirect_uri=${encodeURIComponent(service.InviteRedirectURI)}`), token?.body ?? "kein Tausch");
         check("  das Cookie behält die zweite Einladung", String(success.headers.get("set-cookie")).includes(`${INVITE_STATE_COOKIE}=${tabB};`), String(success.headers.get("set-cookie")));
+
+        // W-0060: Mit guilds.join holt der Bot die Person nebenher in den Support-Server.
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        const supportJoin = calls.find((call) => call.method === "PUT" && call.url.endsWith(`/guilds/${SUPPORT_GUILD_ID}/members/${userId}`));
+        check("  W-0060: die Person kommt in den Support-Server", supportJoin !== undefined && supportJoin.body === JSON.stringify({ access_token: "bot-token" }), JSON.stringify(calls.map((call) => `${call.method} ${call.url}`)));
+
+        const mocked = globalThis.fetch;
+        globalThis.fetch = (async () => {
+            throw new Error("offline");
+        }) as typeof fetch;
+        const offline = await service.JoinSupport("offline").then(() => "ok", (error: unknown) => String(error));
+        globalThis.fetch = mocked;
+        check("  W-0060: ist Discord nicht erreichbar, wirft JoinSupport nicht", offline === "ok", offline);
 
         const second = await callback(`code=x&state=${tabB}&guild_id=${otherGuild}`, with_(tabB));
         check("  die zweite Einladung ist danach noch gültig", second.status === 400 && (await second.text()).includes("Anderer Server gewählt"));
