@@ -2245,6 +2245,14 @@ async function checkBoardBot(): Promise<void> {
 
     check("W-0050: gespeichertes Design zählt nicht, es kommt Vorlage C", isPng(png) && layout.podium === 3, JSON.stringify(layout));
 
+    const fallback = await broken.service.BoardImage(broken.guild, await broken.service.Board(broken.guild, "all", 1, null), null, {}, {
+        onText: () => {
+            throw new Error("kaputt");
+        },
+    });
+
+    check("Scheitert das Zeichnen, kommt das alte Bild - nie gar keins", isPng(fallback));
+
     const texts: string[] = [];
     const plain = World();
 

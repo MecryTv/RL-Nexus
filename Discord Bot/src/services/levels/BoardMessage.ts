@@ -54,7 +54,7 @@ async function Payload(client: BotClient, guild: Guild, board: IBoardPage, viewe
 
 /** Eine Seite der Rangliste als Nachricht. ownerId: wessen Knöpfe die Nachricht ändern. */
 export async function BoardMessage(client: BotClient, guild: Guild, period: LevelPeriod, page: number, viewerId: string | null, ownerId: string): Promise<BoardPayload> {
-    // Plan 38: so viele Plätze je Seite, wie das Design zeigt (Kompakt 20).
+    // So viele Plätze je Seite, wie das Bild zeigt - seit W-0050 immer 10.
     const board = await client.levelService.Board(guild, period, page, viewerId, await client.levelService.PerPage(guild.id));
 
     return Payload(client, guild, board, viewerId, ownerId);

@@ -271,7 +271,7 @@ export const MODULES: IModule[] = [
             {
                 id: "level-card",
                 name: "Level-Karte",
-                description: "Level-Karte, Aufstiegs-Bild und Ranglisten-Bild gestalten – mit Vorlagen und Baukasten.",
+                description: "Level-Karte und Aufstiegs-Bild gestalten – mit Vorlagen und Baukasten.",
                 icon: "#i-image",
             },
             {

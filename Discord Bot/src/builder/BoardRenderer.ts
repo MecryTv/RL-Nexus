@@ -113,7 +113,7 @@ export async function RenderBoard(design: IBoardDesign, input: IBoardRenderInput
     const onPodium = podium.on && page.page === 1 ? page.entries.slice(0, 3) : [];
     const rows = page.entries.slice(onPodium.length);
     const lines = Math.ceil(rows.length / row.columns);
-    // Plan 43: Wer zuschaut und nicht auf der Seite steht, aber Punkte hat, kommt mit Abstand unter die Liste.
+    // Plan 43: Wer zuschaut und nicht auf der Seite steht, aber Punkte hat, bekommt eine eigene Zeile - W-0050: im freien Platz, sonst darunter.
     const away = input.viewerId && page.viewer?.userId === input.viewerId && !page.entries.some((entry) => entry.userId === input.viewerId) ? page.viewer : null;
     const podiumTop = head.h;
     const rowsTop = podiumTop + (onPodium.length ? podium.h : 0);

@@ -185,10 +185,12 @@ export function renderLeaderboard(guildId: string): void {
         const dimValue = el("span", "", `${draft.dim} %`);
         const dim = el("input", "");
         const accent = el("input", "");
+        // Review W-0050: Während gespeichert wird, bleibt der Knopf zu - auch wenn jemand weiterschiebt.
+        let busy = false;
         const shade = (): void => {
             preview.style.setProperty("--arena-accent", draft.accent);
             preview.style.setProperty("--arena-dim", String(draft.dim / 100));
-            save.disabled = !changed();
+            save.disabled = busy || !changed();
         };
         const picture = (): void => {
             const url = draft.image ? galleryUrl(guildId, draft.image) : null;
@@ -215,6 +217,7 @@ export function renderLeaderboard(guildId: string): void {
         });
 
         dim.type = "range";
+        dim.setAttribute("aria-label", "Abdunkeln");
         dim.min = "0";
         dim.max = "90";
         dim.step = "5";
@@ -233,14 +236,20 @@ export function renderLeaderboard(guildId: string): void {
         });
 
         save.addEventListener("click", async () => {
-            save.disabled = true;
+            const sent = { ...draft };
 
-            const answer = await call<{ style: ILook }>("", { action: "board.save", style: { image: draft.image, dim: draft.dim, accent: draft.accent } });
+            busy = true;
+            shade();
 
-            if (!answer) return void (save.disabled = !changed());
+            const answer = await call<{ style: ILook }>("", { action: "board.save", style: sent });
+
+            busy = false;
+
+            if (!answer) return shade();
 
             data!.designs.board = { image: answer.style.image, dim: answer.style.dim, accent: answer.style.accent };
-            look = null;
+            // Wer während des Speicherns weiter geändert hat, behält seinen Entwurf.
+            if (look?.image === sent.image && look.dim === sent.dim && look.accent === sent.accent) look = null;
             toast("info", "Gespeichert", "Der Kopf der offenen Seite sieht jetzt so aus.");
             paint();
         });
@@ -255,7 +264,7 @@ export function renderLeaderboard(guildId: string): void {
             el("p", "tkcard__lead", "Kopf der Seite: Hintergrundbild, Abdunkeln und Akzentfarbe. Das Bild in Discord sieht auf jedem Server gleich aus."),
             row("Hintergrundbild", draft.image ? "Aus der Galerie" : "Ohne Bild: dunkler Verlauf", el("div", "lvlink", choose, ...(draft.image ? [clear] : []))),
             row("Abdunkeln", "Damit der Text auf hellen Bildern lesbar bleibt", el("label", "", dim, dimValue)),
-            row("Akzentfarbe", "Kopf, gewählter Zeitraum und Platz 1", accent),
+            row("Akzentfarbe", "Das Leuchten im Kopf der Seite", accent),
             preview,
             el("div", "mcsave", save),
         ];

@@ -113,7 +113,7 @@ export interface ILevelSettings {
     top: { week: ITopPost; month: ITopPost };
     /** Plan 43: die Rangliste fest in einem Kanal. */
     boardPost: IBoardPostSettings;
-    /** Plan 38: das Ranglisten-Bild im Baukasten. null: die Vorlage Podium aus boardStyle. */
+    /** Plan 38: das Ranglisten-Bild im Baukasten. Seit W-0050 nicht mehr genutzt - das Bild ist fest (Vorlage C). */
     boardDesign: IBoardDesign | null;
 }
 
