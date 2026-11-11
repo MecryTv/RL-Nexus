@@ -829,6 +829,24 @@ export default class ApplyService {
     }
 
     /**
+     * Vergibt ein anderes Formular dieselbe Rolle und ist die Person dort (zuletzt)
+     * angenommen, bleibt die Rolle beim Entfernen (W-0073).
+     */
+    async RoleKept(guildId: string, submission: IApplySubmission): Promise<boolean> {
+        const forms = await this.Forms(guildId);
+        const role = forms.find((form) => form.id === submission.formId)?.settings.acceptRole;
+
+        if (!role) return false;
+
+        for (const form of forms) {
+            if (form.id === submission.formId || form.settings.acceptRole !== role) continue;
+            if ((await this.client.applySubmissions.Last(form.id, submission.userId))?.status === "accepted") return true;
+        }
+
+        return false;
+    }
+
+    /**
      * Eine entschiedene Bewerbung entfernen (Plan 30): bei Annahme die Rolle
      * zurück, die Karte weg, der Eintrag weg. Danach kann sich die Person neu
      * bewerben. Was in Discord nicht klappt, hält das Löschen nicht auf - es
@@ -844,7 +862,7 @@ export default class ApplyService {
 
         const left: string[] = [];
         const form = await this.Form(guild.id, submission.formId).catch(() => null);
-        const role = submission.status === "accepted" ? form?.settings.acceptRole : null;
+        const role = submission.status === "accepted" && !(await this.RoleKept(guild.id, submission)) ? form?.settings.acceptRole : null;
 
         if (role) {
             const member = guild.members.cache.get(submission.userId) ?? (await guild.members.fetch(submission.userId).catch(() => null));

@@ -989,6 +989,12 @@ async function checkRemove(form: IApplyForm): Promise<void> {
     loose.applyForms.Get = async () => ({ ...form, guildId: GUILD, settings: { ...form.settings, acceptRole: ROLE } });
     loose.applySubmissions.Get = async (id: number) => entries[id] ?? null;
     loose.applySubmissions.Remove = async (id: number) => void removedIds.push(id);
+    // W-0073: weitere Formulare des Servers und die letzte Bewerbung je Formular und Person.
+    let others: IApplyForm[] = [];
+    const lasts: Record<string, IApplySubmission> = {};
+
+    loose.applyForms.OfGuild = async () => [{ ...form, guildId: GUILD, settings: { ...form.settings, acceptRole: ROLE } }, ...others];
+    loose.applySubmissions.Last = async (formId: number, userId: string) => lasts[`${formId}:${userId}`] ?? null;
     (service as unknown as Record<string, unknown>).CanReview = async (who: GuildMember) => who.id === "reviewer";
 
     const reviewer = { id: "reviewer" } as GuildMember;
@@ -1038,6 +1044,28 @@ async function checkRemove(form: IApplyForm): Promise<void> {
 
     check("Kanal schon weg: keine falsche Meldung", gone.left.length === 0, gone.left.join(" "));
     check("Kanal schon weg: keine Suche im Sammelkanal", !sharedTried);
+
+    // W-0073: Ein zweites Formular vergibt dieselbe Rolle, und dort ist die Person angenommen.
+    const second: IApplyForm = { ...form, id: form.id + 100, guildId: GUILD, settings: { ...form.settings, acceptRole: ROLE } };
+
+    others = [second];
+    lasts[`${second.id}:alex`] = { ...entry(60, "alex", "accepted"), formId: second.id };
+    entries[6] = entry(6, "alex", "accepted");
+    removedRoles.length = 0;
+    await service.Remove(target, reviewer, 6);
+    check("Zweite Annahme mit derselben Rolle: Rolle bleibt", !removedRoles.includes(`alex:${ROLE}`) && removedIds.includes(6), removedRoles.join(", "));
+
+    lasts[`${second.id}:alex`] = { ...entry(61, "alex", "declined"), formId: second.id };
+    entries[7] = entry(7, "alex", "accepted");
+    await service.Remove(target, reviewer, 7);
+    check("Zweites Formular abgelehnt: Rolle wird abgezogen", removedRoles.includes(`alex:${ROLE}`), removedRoles.join(", "));
+
+    removedRoles.length = 0;
+    others = [{ ...second, settings: { ...second.settings, acceptRole: "other-role" } }];
+    lasts[`${second.id}:alex`] = { ...entry(62, "alex", "accepted"), formId: second.id };
+    entries[8] = entry(8, "alex", "accepted");
+    await service.Remove(target, reviewer, 8);
+    check("Zweite Annahme mit anderer Rolle: Rolle wird abgezogen", removedRoles.includes(`alex:${ROLE}`), removedRoles.join(", "));
 }
 
 /* ----------------------------------------------------------
