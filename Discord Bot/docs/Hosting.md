@@ -378,6 +378,16 @@ sudo certbot --nginx -d db.nexus-emb.de
 
 `mail.nexus-emb.de` fehlt hier mit Absicht: Dort nimmt nginx das Zertifikat von Mailcow. Die Ersatzseite bekommt keins, für unbekannte Namen gibt es keins. Verlängert wird automatisch, von certbot (`certbot.timer`) und von Mailcow.
 
+**admin und webmail hinter Cloudflare Access (W-0070):** Access fängt auch `/.well-known/acme-challenge/` ab, certbot kann diese beiden also nicht verlängern. Sie tragen deshalb ein Cloudflare-Ursprungszertifikat (15 Jahre, `*.nexus-emb.de` und `nexus-emb.de`), das nur Cloudflare vertraut; die Domains müssen also über den Proxy laufen. Schlüssel und CSR entstehen auf dem Server, der Schlüssel verlässt ihn nie:
+
+```bash
+sudo mkdir -p /etc/ssl/cloudflare && cd /etc/ssl/cloudflare
+sudo openssl req -new -newkey rsa:2048 -nodes -keyout origin.key -out origin.csr -subj "/CN=admin.nexus-emb.de"
+sudo chmod 600 origin.key && cat origin.csr
+```
+
+In Cloudflare unter *SSL/TLS → Ursprungsserver → Zertifikat erstellen* „Eigenen privaten Schlüssel und CSR verwenden“ wählen, die CSR einfügen, das Zertifikat als `/etc/ssl/cloudflare/origin.pem` speichern. In `admin.nexus-emb.de` und `webmail.nexus-emb.de` unter `/etc/nginx/sites-available/` dann `ssl_certificate /etc/ssl/cloudflare/origin.pem;` und `ssl_certificate_key /etc/ssl/cloudflare/origin.key;`. Die certbot-Verlängerungen für admin, webmail und die unbenutzte Kette `mail.nexus-emb.de` liegen ausgesetzt unter `/root/claude/letsencrypt-renewal-ausgesetzt/`.
+
 Ändert sich eine Vorlage unter `nginx/` später im Repo, die neue Fassung **nicht** einfach drüberkopieren: certbot hat die Datei unter `/etc/nginx/sites-available/` um Zertifikat und Umleitung ergänzt. Die Änderung dort von Hand nachziehen, dann `sudo nginx -t && sudo systemctl reload nginx`.
 
 ### Was nginx damit tut
@@ -416,7 +426,7 @@ Die Mail-Ports öffnet die Anleitung von Mailcow. Alle Container der Seiten, die
 
 ### Mailcow-Oberfläche über Tailscale
 
-Die Anmeldung von Mailcow steht nicht öffentlich (W-0070): Eine offene Mail-Anmeldung auf einer jungen Domain stuft Google gern als Phishing ein. `https://mail.nexus-emb.de/` antwortet von außen mit 403. Öffentlich bleibt nur, was Mail-Apps brauchen: `/SOGo` (auch CalDAV/CardDAV), `/Microsoft-Server-ActiveSync`, `/autodiscover`, `/mail/config-v1.1.xml` und `/.well-known`. IMAP und SMTP gehen ohnehin an nginx vorbei. Die Oberfläche selbst gibt es unter dem Namen des Hosts im Tailnet, etwa `https://rlnexus-vps.tail0fd142.ts.net/`, nur für Geräte im Tailscale-Netz.
+Die Anmeldung von Mailcow steht nicht öffentlich (W-0070): Eine offene Mail-Anmeldung auf einer jungen Domain stuft Google gern als Phishing ein. `https://mail.nexus-emb.de/` leitet auf den Namen im Tailnet weiter (gleicher Pfad); wer nicht im Tailnet ist, kann den Namen nicht auflösen und sieht keine Anmeldung. Öffentlich bleibt nur, was Mail-Apps brauchen: `/SOGo` (auch CalDAV/CardDAV), `/Microsoft-Server-ActiveSync`, `/autodiscover`, `/mail/config-v1.1.xml` und `/.well-known`. IMAP und SMTP gehen ohnehin an nginx vorbei. Die Oberfläche selbst gibt es unter dem Namen des Hosts im Tailnet, etwa `https://rlnexus-vps.tail0fd142.ts.net/`, nur für Geräte im Tailscale-Netz.
 
 Tailscale läuft dafür direkt auf dem Host, ohne die DNS-Einstellungen anzufassen (Mailcow und Docker brauchen ihre eigenen):
 
@@ -434,6 +444,8 @@ sudo mkdir -p /etc/ssl/tailscale
 sudo tailscale cert --cert-file /etc/ssl/tailscale/rlnexus-vps.crt --key-file /etc/ssl/tailscale/rlnexus-vps.key rlnexus-vps.<tailnet>.ts.net
 echo '17 4 * * 1 root tailscale cert --cert-file /etc/ssl/tailscale/rlnexus-vps.crt --key-file /etc/ssl/tailscale/rlnexus-vps.key rlnexus-vps.<tailnet>.ts.net >/dev/null 2>&1 && systemctl reload nginx' | sudo tee /etc/cron.d/tailscale-cert
 ```
+
+Webmail läuft genauso nur im Tailnet, unter demselben Namen auf Port 8444 (`https://rlnexus-vps.<tailnet>.ts.net:8444/`). `webmail.nexus-emb.de` liegt hinter Cloudflare, dort sieht nginx keine Tailnet-Adressen; es leitet deshalb jeden auf diese Adresse weiter. Von außen kommt niemand an 8444: ufw lässt den Port nicht durch, Tailscale nimmt Verbindungen über `tailscale0` schon vor ufw an (Kette `ts-input`).
 
 Der zweite Block in `nginx/mail.nexus-emb.de.conf` trägt den Namen aus dem Tailnet. nginx lauscht dafür nicht auf der 100.x-Adresse (fehlte `tailscale0` beim Start, käme nginx gar nicht hoch), sondern lässt unter dem Namen nur Adressen aus `100.64.0.0/10` und `fd7a:115c:a1e0::/48` durch. Der Tailscale-Container `debian-vps-samba` für die Dateifreigabe ist davon unabhängig, er hängt in seinem eigenen Docker-Netz.
 
