@@ -144,7 +144,7 @@ export function DmStep(draft: IApplyDraft, form: IApplyForm, event: DmEvent): { 
 
     if (event.kind === "restart") return next({ step: 0, answers: {} });
     if (event.kind === "back") return next({ step: Math.max(0, step - 1) });
-    if (!question) return refuse("Alle Fragen sind beantwortet. Schick die Bewerbung unten ab oder fang neu an.");
+    if (!question) return refuse("Alle Fragen sind beantwortet. Schick die Bewerbung oben ab oder fang neu an.");
 
     if (event.kind === "skip") {
         if (question.required) return refuse("Diese Frage muss beantwortet werden.");
@@ -663,7 +663,7 @@ export default class ApplyFlow {
             if (action === "cancel" && !interaction.isModalSubmit()) {
                 this.End(current.userId);
 
-                const notice = ApplyNotice("info", "Abgebrochen", "Abgebrochen. Nichts wurde abgeschickt.");
+                const notice = ApplyNotice("info", "Abgebrochen", "Nichts wurde abgeschickt.");
 
                 await interaction.update({ components: notice.components, allowedMentions: notice.allowedMentions });
 

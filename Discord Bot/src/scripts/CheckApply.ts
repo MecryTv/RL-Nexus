@@ -580,6 +580,11 @@ function checkDm(): void {
 
     check("Neu anfangen: Frage 1, nichts beantwortet", again.step === 0 && Object.keys(again.answers).length === 0);
 
+    const done = DmStep({ ...draft, step: form.questions.length }, form, { kind: "text", text: "Noch was" });
+
+    // Die Knöpfe stehen in der Zusammenfassung darüber (W-0072).
+    check("Text nach der letzten Frage: Hinweis zeigt nach oben", done.error === "Alle Fragen sind beantwortet. Schick die Bewerbung oben ab oder fang neu an.", String(done.error));
+
     const shrunk = { ...form, questions: form.questions.slice(0, 3) };
     let late: ReturnType<typeof DmStep> | null = null;
 

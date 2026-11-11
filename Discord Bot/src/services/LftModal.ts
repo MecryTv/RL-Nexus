@@ -136,7 +136,7 @@ export default class LftModal {
         if (action === "cancel" && interaction.isButton()) {
             this.drafts.delete(draft.userId);
 
-            const notice = ApplyNotice("info", "Abgebrochen", "Abgebrochen. Nichts wurde gespeichert.");
+            const notice = ApplyNotice("info", "Abgebrochen", "Nichts wurde gespeichert.");
 
             await interaction.update({ components: notice.components, allowedMentions: notice.allowedMentions });
 
