@@ -12,7 +12,7 @@ Erfolg heißt: Ein Abend mit 20 bis 40 Leuten läuft durch, ohne dass ein Modera
 
 - Abend mit Startzeit planen, per Discord-Befehl oder im Bot-Dashboard.
 - Warteraum vor und während des Abends, Hauptvoice als Treffpunkt zwischen den Runden.
-- Jede Runde vom Moderator gestartet: wild gemischte Teams, Spielerwünsche, Aussetzer zuerst, Standard-Arena ausgelost.
+- Jede Runde vom Moderator gestartet: wild gemischte Teams, Spielerwünsche, Aussetzer zuerst.
 - Lobby-Daten dort, wo die Spieler sitzen: im Text-Chat ihres Team-Sprachkanals; der Info-Kanal zum Nachschauen.
 - Je Lobby ein Host, der sie im Spiel aufmacht: Moderatoren zuerst, sonst ein Spieler.
 - Steuerkarte im Moderator-Kanal, am Ende eine Übersicht aller Runden.
@@ -37,7 +37,7 @@ Erfolg heißt: Ein Abend mit 20 bis 40 Leuten läuft durch, ohne dass ein Modera
 |---|---|
 | **Abend** | Ein Rocket Roulette mit Startzeit, von „geplant“ bis „beendet“ |
 | **Runde** | Eine Auslosung mit ihren Lobbys, gestartet vom Moderator |
-| **Lobby** | Ein privates Spiel: zwei Teams, Name, Passwort, Arena, Host |
+| **Lobby** | Ein privates Spiel: zwei Teams, Name, Passwort, Host |
 | **Host** | Wer die Lobby im Spiel aufmacht: ein Moderator oder ein Spieler |
 | **Warteraum** | Sprachkanal: hier sammelt man sich vor dem Start und als Nachzügler |
 | **Hauptvoice** | Sprachkanal: Treffpunkt ab dem Start und zwischen den Runden |
@@ -61,7 +61,6 @@ Im Bot-Dashboard (eigene Seite, gewohntes Design wie 2, 4 & 6 Mans, kein Studio)
 | Teamgröße | 3 (Standard); Ausweich-Lobbys 2v2 und 1v1 |
 | Lobby-Name | Muster mit Teamnummern, Standard `Lobby{teams}` (Team 1 gegen 2 = „Lobby12“), oder zufällig |
 | Passwort | fest (z. B. „testo“) oder zufällig je Lobby, ohne `i l o 0 1` wie bei 6 Mans |
-| Arena-Roulette | an/aus; nur Standard-Arenen (Nutzer). Welche Arenen im Topf sind: Liste im Code, im Dashboard abwählbar **(Claude)** |
 
 ## Ablauf eines Abends
 
@@ -101,7 +100,7 @@ Dazu auf der Steuerkarte: **Runde abbrechen** (alle zurück in den Hauptvoice, R
 
 **Hosts:** je Lobby ein Host. Erst die Moderatoren, je Moderator genau eine Lobby (Nutzer), dann ein zufälliger Spieler aus der Lobby (Nutzer). Als Host zählt nur ein Moderator, der beim Auslosen in einem Roulette-Sprachkanal sitzt (Warteraum, Hauptvoice, Team-Kanal) **(Claude)**. Ein eingesprungener Moderator hostet seine eigene Lobby; war er schon Host einer anderen, bekommt die einen Spieler als Host **(Claude)**. Den Knopf „Lobby ist offen“ erreicht ein Moderator auch ohne im Sprachkanal zu sitzen, Text-Chats von Sprachkanälen lassen sich so öffnen. Ein Moderator, der eine Lobby hostet, **bleibt im Hauptvoice** (Nutzer, 11.11.); der Bot verschiebt ihn nie. Nur ein eingesprungener Moderator spielt mit und wird wie ein Spieler in seinen Team-Kanal geschoben **(Claude)**.
 
-**Arena:** je Lobby zufällig aus dem Topf der Standard-Arenen, möglichst nicht zweimal hintereinander dieselbe **(Claude)**.
+**Arena:** Die Arena bleibt den ganzen Abend gleich, deshalb gibt es kein Arena-Roulette, und keine Nachricht nennt die Arena (Nutzer, 11.11.: „Arena bleibt immer eine feste. Deshalb kann die da raus“).
 
 ## Spielerwünsche
 
@@ -114,12 +113,12 @@ Entwürfe: `.works/tasks/W-0087-neues-modul-rocket-roulette/design/` (I Info-Kan
 | Nachricht | Wo | Inhalt |
 |---|---|---|
 | Ankündigung | Info-Kanal | Startzeit (live), Warteraum, Hauptvoice, Moderatoren, Zahl im Warteraum; später Runde N läuft, beendet |
-| Rundenkarte | Info-Kanal | je Lobby Name, Passwort, Arena, Teams, Host, offen/wartet |
-| Lobby-Karte | Text-Chat jedes Team-Kanals | Name, Passwort, Arena, beide Teams, Host, Knopf „Lobby ist offen“ |
+| Rundenkarte | Info-Kanal | je Lobby Name, Passwort, Teams, Host, offen/wartet |
+| Lobby-Karte | Text-Chat jedes Team-Kanals | Name, Passwort, beide Teams, Host, Knopf „Lobby ist offen“ |
 | Offen-Ping | Text-Chat beider Team-Kanäle | „Lobby12 ist offen“ mit Erwähnung der Spieler |
 | Steuerkarte | Moderator-Kanal | Zustand, Teilnehmer, Wünsche, Knöpfe |
 | Einspring-Anfrage | Moderator-Kanal | Platz frei, „Ich spiele mit“, „Ohne Einspringer“ |
-| Übersicht | Moderator-Kanal | je Runde Lobbys, Arena, Teams, Host; Zahl Runden und Teilnehmer |
+| Übersicht | Moderator-Kanal | je Runde Lobbys, Teams, Host; Zahl Runden und Teilnehmer |
 
 ## Befehle
 
@@ -154,7 +153,7 @@ Vorschlag **(Claude)**, Form dem Bauenden überlassen:
 
 - Einstellungen in `module_settings` unter `rocket-roulette`.
 - Abende: Server, Startzeit, Zustand (geplant, läuft, beendet), Nachrichten-IDs von Ankündigung und Steuerkarte, Aussetzer der letzten Runde, Wünsche.
-- Runden: Abend, Nummer, Zeit, Lobbys als JSON (Name, Passwort, Arena, Host, Teams als Discord-IDs und Namen, Kanal-IDs, offen seit).
+- Runden: Abend, Nummer, Zeit, Lobbys als JSON (Name, Passwort, Host, Teams als Discord-IDs und Namen, Kanal-IDs, offen seit).
 - Aufbewahrung: Abende 30 Tage, dann weg **(Claude)**; gehört in die Datenschutzerklärung (W-0009) und in die Nutzerdaten-Auskunft des Admin (`shared/userdata.ts`).
 
 Ein laufender Abend übersteht einen Neustart: Startzeit wird beim Start neu eingeplant, laufende Runde und Kanäle aus der Datenbank wiedergefunden.
@@ -171,4 +170,4 @@ Tabellenform, Custom-IDs, wie die Auslosung genau würfelt, Texte im Detail, Bil
 
 ## Prüfen
 
-`npm run check:roulette` ohne Discord: Auslosung (Rest 0 bis 5, Aussetzer zuerst, Wünsche, Wiederholungen seltener), Host-Verteilung, Lobby-Namen und Passwörter, Arena-Topf, Einstellungen säubern. Danach auf dem Dev-Server (nur dort) ein Abend mit Testkonten.
+`npm run check:roulette` ohne Discord: Auslosung (Rest 0 bis 5, Aussetzer zuerst, Wünsche, Wiederholungen seltener), Host-Verteilung, Lobby-Namen und Passwörter, Einstellungen säubern. Danach auf dem Dev-Server (nur dort) ein Abend mit Testkonten.
