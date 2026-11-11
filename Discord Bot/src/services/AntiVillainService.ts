@@ -529,7 +529,7 @@ export default class AntiVillainService {
      * W-0063: Was im Dashboard zum Köder-Kanal steht, auf den Kanal anwenden:
      * Name nach Design, Thema, ganz oben. Ist der Kanal ein anderer geworden,
      * geht die alte Warnung weg und eine neue in den neuen Kanal. Geändert wird
-     * nur, was abweicht - Discord lässt den Namen nur zweimal in 10 Minuten ändern.
+     * nur, was in diesem Speichern geändert wurde - Discord lässt den Namen nur zweimal in 10 Minuten ändern.
      */
     async ApplyBait(guild: Guild, before: IAntiVillainSettings["bait"]): Promise<string[]> {
         const settings = await this.Settings(guild.id);
@@ -550,12 +550,15 @@ export default class AntiVillainService {
 
         if (channel?.type !== ChannelType.GuildText) return problems;
 
-        const name = BaitChannelName(bait);
+        // Nur was in diesem Speichern geändert wurde (oder alles bei neuem Kanal). Sonst
+        // benennte schon das Speichern einer Raid-Einstellung einen von Hand umbenannten
+        // Kanal zurück - ältere Einstellungen haben design, topic und top nur ab Werk.
+        const name = moved || before.design !== bait.design || before.name !== bait.name ? BaitChannelName(bait) : null;
         const patch: { name?: string; topic?: string | null; position?: number } = {};
 
         if (name && channel.name !== name) patch.name = name;
-        if ((channel.topic ?? "") !== bait.topic) patch.topic = bait.topic || null;
-        if (bait.top && channel.position !== 0) patch.position = 0;
+        if ((moved || before.topic !== bait.topic) && (channel.topic ?? "") !== bait.topic) patch.topic = bait.topic || null;
+        if ((moved || before.top !== bait.top) && bait.top && channel.position !== 0) patch.position = 0;
 
         if (Object.keys(patch).length > 0) {
             const done = await channel.edit({ ...patch, reason: "Anti Villain: Köder" }).then(

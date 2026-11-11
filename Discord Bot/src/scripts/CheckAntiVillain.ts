@@ -809,6 +809,43 @@ async function checkBait(): Promise<void> {
     roleOff.settings.bait.role = false;
     await roleOff.client.antiVillainService.OnMemberUpdate(roleOff.member(USER, [GUILD]), roleOff.member(USER, [GUILD, BAITROLE]));
     check("Köder-Rolle aus: Rolle zählt nicht", roleOff.holds.length === 0);
+
+    // W-0063: ApplyBait setzt nur, was in diesem Speichern geändert wurde - ältere
+    // Einstellungen haben Design, Thema und Platz nur ab Werk.
+    const apply = make();
+    const patches: unknown[] = [];
+
+    const gone: string[] = [];
+
+    for (const id of [C2, TEXT]) {
+        const found = apply.guild.channels.cache.get(id) as unknown as { messages: object };
+
+        Object.assign(found, {
+            name: "von-hand",
+            topic: "altes thema",
+            position: 3,
+            edit: async (patch: unknown) => void patches.push({ id, ...(patch as object) }),
+            messages: { ...found.messages, delete: async (message: string) => void gone.push(`${id}:${message}`) },
+        });
+    }
+
+    const baitBefore = { ...apply.settings.bait };
+
+    await apply.client.antiVillainService.ApplyBait(apply.guild, baitBefore);
+    check("Speichern ohne Köder-Änderung: der Kanal bleibt, wie er ist (W-0063)", patches.length === 0, JSON.stringify(patches));
+
+    apply.settings.bait = { ...apply.settings.bait, design: "dot" };
+    await apply.client.antiVillainService.ApplyBait(apply.guild, baitBefore);
+    check("  neues Design: nur der Name", JSON.stringify(patches) === JSON.stringify([{ id: C2, name: "⛔・bot-falle", reason: "Anti Villain: Köder" }]), JSON.stringify(patches));
+
+    patches.length = 0;
+    apply.settings.bait = { ...baitBefore, channelId: TEXT };
+    await apply.client.antiVillainService.ApplyBait(apply.guild, baitBefore);
+    check(
+        "  anderer Kanal: Name, Thema und Platz, Warnung neu",
+        JSON.stringify(patches) === JSON.stringify([{ id: TEXT, name: "nicht-schreiben", topic: baitBefore.topic, position: 0, reason: "Anti Villain: Köder" }]) && apply.sent.some((entry) => entry.channelId === TEXT && entry.payload.includes("koeder.png")) && gone.join() === `${C2}:pin1`,
+        JSON.stringify(patches)
+    );
 }
 
 /* ----------------------------------------------------------
