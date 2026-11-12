@@ -15,6 +15,26 @@ import BotClient from "../client/BotClient";
 import { DefaultRouletteSettings, LobbyCode, LobbyLabel } from "../constants/RocketRoulette";
 import { RouletteError } from "../services/RouletteService";
 import { Draw, IDrawInput, IDrawResult, PairKey, WithFiller } from "../services/roulette/Draw";
+import { loadImage } from "@napi-rs/canvas";
+import { IRouletteEvening, IRouletteLobby, IRouletteRound } from "../interfaces/services/roulette/IRoulette";
+import {
+    AnnouncementAlt,
+    ControlAlt,
+    IAnnounceView,
+    IControlView,
+    LobbyCardAlt,
+    OpenBannerAlt,
+    RenderAnnouncement,
+    RenderControl,
+    RenderLobbyCard,
+    RenderOpenBanner,
+    RenderRound,
+    RenderSummary,
+    RoundAlt,
+    RoundPages,
+    SummaryAlt,
+    SummaryPages,
+} from "../builder/RouletteImages";
 
 const GUILD = "90071992547409971";
 const TEXT = "90071992547409972";
@@ -237,6 +257,69 @@ function checkDraw(): void {
     check("Niemand doppelt", new Set(Everyone(Draw(Input(Players(23))))).size === 23);
 }
 
+function SampleLobby(index: number, size: 1 | 2 | 3 = 3): IRouletteLobby {
+    const a = Players(size, `a${index}-`);
+    const b = Players(size, `b${index}-`);
+    const names = Object.fromEntries([...a, ...b].map((id) => [id, `Spieler ${id}`]));
+
+    return { teams: [a, b], teamNumbers: [index * 2 + 1, index * 2 + 2], size, host: index === 0 ? "m1" : a[0], hostIsModerator: index === 0, filler: null, name: `Lobby${index * 2 + 1}${index * 2 + 2}`, password: "testo", channels: null, cards: null, openedAt: index === 0 ? Date.now() : null, names: { ...names, m1: "Kim" } };
+}
+
+function SampleRound(lobbies: number): IRouletteRound {
+    return { id: 1, eveningId: 1, guildId: GUILD, number: 2, status: "running", createdAt: Date.now(), endedAt: null, lobbies: Array.from({ length: lobbies }, (_, index) => SampleLobby(index)) };
+}
+
+async function Width(buffer: Buffer): Promise<number> {
+    return buffer.subarray(0, 8).toString("hex") === "89504e470d0a1a0a" ? (await loadImage(buffer)).width : -1;
+}
+
+async function checkImages(): Promise<void> {
+    console.log("\n  — Bilder —");
+
+    const avatars = [{ id: "a1", name: "Nova", url: "http://127.0.0.1:9/kaputt.png" }, { id: "a2", name: "Lukas", url: null }];
+    const announce: IAnnounceView = { status: "planned", startsAt: Date.now() + 3_600_000, waiting: { count: 17, avatars }, moderators: avatars, waitingRoom: "Warteraum", mainVoice: "Roulette-Lounge", teamSize: 3, lobbiesAbout: 3, round: 0 };
+    const round = SampleRound(3);
+    const lobby = round.lobbies[0];
+    const control: IControlView = {
+        status: "running",
+        startsAt: Date.now(),
+        round: 1,
+        inLobbies: 18,
+        waiting: 2,
+        sitOut: 0,
+        lobbies: round.lobbies.map((entry) => ({ name: entry.name, host: { id: entry.host, name: entry.names[entry.host] ?? entry.host, url: null }, hostIsModerator: entry.hostIsModerator, filler: false, openedAt: entry.openedAt })),
+        wishes: [{ a: avatars[0], b: avatars[1], once: false }],
+        warnings: ["Lobby34 wartet seit 4 Minuten auf Lukas."],
+    };
+    const evening: IRouletteEvening = { id: 1, guildId: GUILD, status: "ended", startsAt: Date.now() - 9_000_000, createdBy: "m1", createdAt: Date.now() - 9_000_000, endedAt: Date.now(), announce: null, control: null, round: 7, sitOut: [], wishes: [], history: {}, participants: { "a0-1": { name: "Nova", rounds: 7 }, "a0-2": { name: "Lukas", rounds: 5 } } };
+    const rounds = Array.from({ length: 7 }, (_, index) => ({ ...SampleRound(2), id: index + 1, number: index + 1 }));
+
+    const widths = [
+        await Width(await RenderAnnouncement(announce)),
+        await Width(await RenderRound(round, 0)),
+        await Width(await RenderLobbyCard(lobby, 0, false)),
+        await Width(await RenderLobbyCard(lobby, 1, true)),
+        await Width(await RenderOpenBanner(lobby)),
+        await Width(await RenderControl(control)),
+        await Width(await RenderSummary(evening, rounds, 0)),
+    ];
+
+    check("Jedes Bild ist ein PNG mit 1000 px Breite (auch mit kaputtem Profilbild)", widths.every((width) => width === 1000), widths.join(","));
+    check("Rundenkarte: ab sieben Lobbys ein zweites Bild", RoundPages(SampleRound(6)) === 1 && RoundPages(SampleRound(7)) === 2);
+    check("Übersicht: höchstens drei Runden je Bild", SummaryPages(rounds) === 3 && SummaryPages(rounds.slice(0, 3)) === 1);
+
+    const cardAlt = LobbyCardAlt(lobby, 0, false);
+    const roundAlt = RoundAlt(round, 0);
+
+    check("Alt-Text Lobby-Karte: Name, Passwort, Host, Teams", cardAlt.includes("Lobby12") && cardAlt.includes("testo") && cardAlt.includes("Kim") && cardAlt.includes("Spieler b0-1"), cardAlt);
+    check("Alt-Text Lobby-Karte offen sagt offen", LobbyCardAlt(lobby, 0, true).toLowerCase().includes("offen"));
+    check("Alt-Text Banner: Name und Passwort", OpenBannerAlt(lobby).includes("Lobby12") && OpenBannerAlt(lobby).includes("testo"));
+    check("Alt-Text Rundenkarte: alle Spieler", round.lobbies.every((entry) => [...entry.teams[0], ...entry.teams[1]].every((id) => roundAlt.includes(entry.names[id]))), roundAlt.slice(0, 200));
+    check("Keine Arena in den Alt-Texten", ![cardAlt, roundAlt, AnnouncementAlt(announce), ControlAlt(control), SummaryAlt(evening, rounds, 0)].some((text) => /arena/i.test(text)));
+    check("Alt-Texte höchstens 1024 Zeichen", [cardAlt, RoundAlt(SampleRound(6), 0), AnnouncementAlt(announce), ControlAlt(control), SummaryAlt(evening, rounds, 0)].every((text) => text.length <= 1024));
+    check("Alt-Text Übersicht: Teilnahme ohne Ergebnisse", SummaryAlt(evening, rounds, 0).includes("Nova") && !/sieg|gewonnen/i.test(SummaryAlt(evening, rounds, 0)));
+}
+
 async function checkDatabase(client: BotClient): Promise<void> {
     console.log("\n  — Datenbank —");
 
@@ -315,6 +398,7 @@ async function main(): Promise<void> {
 
     checkSettings(client);
     checkDraw();
+    await checkImages();
 
     await client.configService.Initialize();
 
