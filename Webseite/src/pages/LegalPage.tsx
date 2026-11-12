@@ -150,17 +150,28 @@ const MAIL = <a href={`mailto:${siteConfig.contactMail}`}>{siteConfig.contactMai
 
 const SUPPORT = <External href={siteConfig.supportURL}>Support-Server</External>;
 
-/** Die Anschrift steht in beiden Texten. Einmal hier, damit sie nicht auseinanderläuft. */
+/** Die Anschriften stehen in beiden Texten. Einmal hier, damit sie nicht auseinanderlaufen (W-0088: zwei Anbieter). */
 const ADDRESS = (
-    <address>
-        Connor Olischer
-        <br />
-        Königsberger Straße 8
-        <br />
-        25335 Elmshorn
-        <br />
-        Deutschland
-    </address>
+    <>
+        <address>
+            Connor Olischer
+            <br />
+            Königsberger Straße 8
+            <br />
+            25335 Elmshorn
+            <br />
+            Deutschland
+        </address>
+        <address>
+            Joe Jobst
+            <br />
+            Garzweg 11
+            <br />
+            32602 Vlotho
+            <br />
+            Deutschland
+        </address>
+    </>
 );
 
 /* --- Impressum ----------------------------------------------------------- */
@@ -185,7 +196,13 @@ const IMPRINT: readonly ILegalSection[] = [
     {
         id: "mstv",
         title: "Verantwortlich für den Inhalt nach § 18 Abs. 2 MStV",
-        body: <p>Connor Olischer, Königsberger Straße 8, 25335 Elmshorn</p>,
+        body: (
+            <p>
+                Connor Olischer, Königsberger Straße 8, 25335 Elmshorn
+                <br />
+                Joe Jobst, Garzweg 11, 32602 Vlotho
+            </p>
+        ),
     },
     {
         id: "projekt",
@@ -303,7 +320,7 @@ const PRIVACY: readonly ILegalSection[] = [
         title: "Verantwortlicher",
         body: (
             <>
-                <p>Verantwortlich für diese Website, die Statusseite, das Dashboard und den Discord-Bot RL Nexus ist:</p>
+                <p>Verantwortlich für diese Website, die Statusseite, das Dashboard und den Discord-Bot RL Nexus sind:</p>
                 {ADDRESS}
                 <p>E-Mail: {MAIL}</p>
             </>

@@ -801,7 +801,7 @@ section("Shop: Kündigen");
             await check("AGB und Widerruf als Blöcke und als PDF, Unbekanntes mit Satz", async () => {
                 const agb = await app.inject({ method: "GET", url: "/public/shop/legal/agb" });
                 assert.equal(agb.statusCode, 200, agb.body);
-                assert.equal(agb.json().version, "2026-10-12");
+                assert.equal(agb.json().version, legalVersions().at(-1));
                 assert.equal(agb.json().blocks.length > 5, true);
 
                 const pdf = await app.inject({ method: "GET", url: "/public/shop/legal/widerruf.pdf" });

@@ -17,7 +17,7 @@ const DEFAULT_DIR = path.join(import.meta.dirname, "..", "..", "shared", "legal"
 const FILE = /^(agb|widerruf)-(\d{4}-\d{2}-\d{2})\.md$/;
 
 /** Der Anbieter, für den Fuß von Mails und PDFs. In den Texten selbst steht er ausgeschrieben, je Stand. */
-export const PROVIDER_LINE = "Connor Olischer · Königsberger Straße 8 · 25335 Elmshorn";
+export const PROVIDER_LINE = "Connor Olischer · Königsberger Straße 8 · 25335 Elmshorn · Joe Jobst · Garzweg 11 · 32602 Vlotho";
 
 let dir = DEFAULT_DIR;
 let texts: Map<string, ILegalText> | null = null;

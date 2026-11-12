@@ -27,7 +27,7 @@ const GREEN = "#35e07f";
 const GOLD = "#ffc53d";
 
 /** Verantwortlicher und Aufsicht wie in der Datenschutzerklärung der Webseite. */
-const CONTROLLER = ["Connor Olischer · RL Nexus", "Königsberger Straße 8, 25335 Elmshorn", "support@nexus-emb.de"];
+const CONTROLLER = ["Connor Olischer und Joe Jobst · RL Nexus", "Königsberger Straße 8, 25335 Elmshorn", "Garzweg 11, 32602 Vlotho", "support@nexus-emb.de"];
 const AUTHORITY = "Unabhängiges Landeszentrum für Datenschutz Schleswig-Holstein, Holstenstraße 98, 24103 Kiel";
 
 const BERLIN = { timeZone: "Europe/Berlin" } as const;
@@ -143,12 +143,12 @@ function confirmation(pdf: Pdf, record: IDeletionRecord, code: string, now: Date
     // Beteiligte
     const parties = 176;
     const half = (INNER - 10) / 2;
-    box(pdf, X, parties, half, 62);
-    box(pdf, X + half + 10, parties, half, 62);
+    box(pdf, X, parties, half, 72);
+    box(pdf, X + half + 10, parties, half, 72);
     label(pdf, "Betroffene Person", X + 10, parties + 9, DIM, 7);
     pdf.font("Ox").fontSize(9).fillColor(TEXT).text(`Discord-ID ${record.userId}`, X + 10, parties + 21, { width: half - 20 });
     pdf.font("Ox").fontSize(8).fillColor(DIM).text("Name gelöscht, nur die ID bleibt als Nachweis", X + 10, parties + 34, { width: half - 20 });
-    label(pdf, "Verantwortlicher", X + half + 20, parties + 9, DIM, 7);
+    label(pdf, "Verantwortliche", X + half + 20, parties + 9, DIM, 7);
     pdf.font("Ox").fontSize(9).fillColor(TEXT).text(CONTROLLER.join("\n"), X + half + 20, parties + 21, { width: half - 20, lineGap: 1 });
 
     // Drei Zahlen
@@ -291,7 +291,7 @@ function remaining(pdf: Pdf, record: IDeletionRecord, code: string): void {
     label(pdf, "Beleg prüfen", X + 10, y + 9, DIM, 7);
     pdf.font("Ox").fontSize(8.5).fillColor(TEXT).text(`Prüfcode ${code}. Wir können damit bestätigen, dass dieser Beleg von uns stammt und nicht verändert wurde.`, X + 10, y + 21, { width: INNER - 20 });
 
-    footer(pdf, `RL Nexus · ${CONTROLLER[0].split(" · ")[0]} · ${CONTROLLER[1]}`, code, 2);
+    footer(pdf, `RL Nexus · ${CONTROLLER[0].split(" · ")[0]} · ${CONTROLLER[3]}`, code, 2);
 }
 
 export function deletionReceipt(record: IDeletionRecord, secret: string, now = new Date()): Promise<Buffer> {
