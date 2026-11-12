@@ -607,11 +607,14 @@ export async function RenderControl(view: IControlView): Promise<Buffer> {
         ];
         const quarter = (W - PAD * 2 - 24) / 4;
 
+        // Wie der Stempel: geplant gold, läuft grün, beendet grau (Probelauf W-0087).
+        const tone = view.status === "planned" ? GOLD : view.status === "running" ? GREEN : GREY;
+
         for (const [index, [label, on, done]] of steps.entries()) {
             const x = PAD + index * (quarter + 8);
 
-            Box(ctx, x, 108, quarter, 36, on ? `${GREEN}29` : TILE, 8);
-            Label(ctx, label, x + quarter / 2, 132, on ? GREEN : done ? "#b9c0c9" : MUTED, "center");
+            Box(ctx, x, 108, quarter, 36, on ? `${tone}29` : TILE, 8);
+            Label(ctx, label, x + quarter / 2, 132, on ? tone : done ? "#b9c0c9" : MUTED, "center");
         }
 
         const kpis: [string, string, string][] = [
