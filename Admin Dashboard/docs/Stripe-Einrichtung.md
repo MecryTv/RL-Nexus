@@ -250,7 +250,7 @@ Lege die Produkte im **Live**-Admin-Dashboard erst an, wenn die Live-Schlüssel 
 - **Rückbuchungen:** Der Shop beendet den Zugang und schickt dir eine Mail an support@. Antworten musst du in Stripe unter **Zahlungen → Anfechtungen**, mit Belegen (Bestellung, Zustimmungen, Mails). Die Bestellung samt Zeitpunkt der Häkchen steht im Admin Dashboard bei der Person.
 - **Erstatten:** am besten im Admin Dashboard (*Shop → Kunden → Zugang beenden*), dann endet auch der Zugang. Erstattest du direkt in Stripe, bekommt der Shop das über den Webhook mit; bei voller Erstattung endet der Zugang, bei teilweiser nicht.
 - **Team:** Wer sonst noch in Stripe darf, unter *Einstellungen → Team* mit der kleinsten passenden Rolle einladen.
-- **Eingeschränkter Schlüssel (optional):** Statt des geheimen Schlüssels geht auch ein eingeschränkter (`rk_live_…`). Er braucht Schreibrechte auf Produkte, Preise, Kunden, Checkout Sessions, Abonnements, Rückerstattungen und Kundenportal-Sitzungen sowie Leserechte auf Rechnungen und Rechnungszahlungen. Fehlt ein Recht, meldet der Shop „Stripe lehnt den Schlüssel ab“.
+- **Eingeschränkter Schlüssel (optional):** Statt des geheimen Schlüssels geht auch ein eingeschränkter (`rk_live_…`). Er braucht Schreibrechte auf Produkte, Preise, Gutscheine (Rabatt beim Wechsel, W-0089), Kunden, Checkout Sessions, Abonnements, Rückerstattungen und Kundenportal-Sitzungen sowie Leserechte auf Rechnungen und Rechnungszahlungen. Fehlt ein Recht, meldet der Shop „Stripe lehnt den Schlüssel ab“.
 
 ## Quellen
 
