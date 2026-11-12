@@ -14,6 +14,7 @@ import { ChannelType, Guild, GuildBasedChannel, Role } from "discord.js";
 import BotClient from "../client/BotClient";
 import { DefaultRouletteSettings, LobbyCode, LobbyLabel } from "../constants/RocketRoulette";
 import { RouletteError } from "../services/RouletteService";
+import { Draw, IDrawInput, IDrawResult, PairKey, WithFiller } from "../services/roulette/Draw";
 
 const GUILD = "90071992547409971";
 const TEXT = "90071992547409972";
@@ -101,12 +102,148 @@ function checkSettings(client: BotClient): void {
     check("Clean: leerer Lobby-Name wird die Vorgabe", service.Clean(guild, { lobbyName: "  " }, defaults).lobbyName === "Lobby{teams}");
 }
 
+/** Wiederholbarer Zufall (mulberry32), damit die Auslosung prüfbar bleibt. */
+function Seeded(seed: number): () => number {
+    let state = seed >>> 0;
+
+    return () => {
+        state = (state + 0x6d2b79f5) >>> 0;
+
+        let t = state;
+
+        t = Math.imul(t ^ (t >>> 15), t | 1);
+        t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+}
+
+function Players(count: number, prefix = "p"): string[] {
+    return Array.from({ length: count }, (_, index) => `${prefix}${index + 1}`);
+}
+
+function Input(players: string[], patch: Partial<IDrawInput> = {}): IDrawInput {
+    return { players, moderators: ["m1", "m2", "m3"], sitOutLast: [], wishes: [], history: {}, teamSize: 3, maxLobbies: null, random: Seeded(7), ...patch };
+}
+
+function Everyone(result: IDrawResult): string[] {
+    return [...result.lobbies.flatMap((lobby) => [...lobby.teams[0], ...lobby.teams[1]]), ...result.sitOut];
+}
+
+function TeamOf(result: IDrawResult, id: string): string[] | undefined {
+    return result.lobbies.flatMap((lobby) => lobby.teams).find((team) => team.includes(id));
+}
+
+function checkDraw(): void {
+    console.log("\n  — Auslosung —");
+
+    // restTable: Rest nach Teamgröße 3 laut Spec.
+    const expected: Record<number, [number, number | null]> = { 18: [3, null], 19: [4, 1], 20: [4, null], 21: [4, 2], 22: [4, null], 23: [4, 3] };
+    const table: string[] = [];
+
+    for (const [count, [lobbies, filler]] of Object.entries(expected)) {
+        const result = Draw(Input(Players(Number(count))));
+        const sizes = result.lobbies.map((lobby) => `${lobby.teams[0].length}v${lobby.teams[1].length}`).join(",");
+
+        if (result.lobbies.length !== lobbies || (result.needsFiller?.size ?? null) !== filler || Everyone(result).length !== Number(count)) table.push(`${count}: ${sizes} filler=${result.needsFiller?.size}`);
+    }
+
+    check("Rest-Tabelle für 18 bis 23 Spieler", table.length === 0, table.join(" | "));
+
+    const last22 = Draw(Input(Players(22))).lobbies[3];
+
+    check("  22 Spieler: die vierte Lobby ist ein 2v2", last22.size === 2 && last22.teams[0].length === 2 && last22.teams[1].length === 2);
+
+    const priority = ["p1", "p2", "p3"];
+    let satOut = 0;
+
+    for (let seed = 1; seed <= 40; seed++) {
+        const result = WithFiller(Draw(Input(Players(19), { sitOutLast: priority, random: Seeded(seed) })), null);
+
+        satOut += result.sitOut.filter((id) => priority.includes(id)).length;
+    }
+
+    check("Aussetzer zuerst: wer zuletzt aussetzte, setzt nicht wieder aus", satOut === 0, `${satOut} Mal`);
+
+    let apart = 0;
+
+    for (let seed = 1; seed <= 100; seed++) {
+        const result = Draw(Input(Players(18), { wishes: [{ a: "p4", b: "p9", once: false }], random: Seeded(seed) }));
+
+        if (!TeamOf(result, "p4")?.includes("p9")) apart++;
+    }
+
+    check("Wunsch: beide immer im selben Team", apart === 0, `${apart} von 100 getrennt`);
+
+    const oneVsOne = Draw(Input(Players(4), { teamSize: 1, wishes: [{ a: "p1", b: "p2", once: false }] }));
+
+    check("Wunsch in 1v1 geht nicht: steht in unmetWishes, Teams vollständig", oneVsOne.unmetWishes.length === 1 && oneVsOne.lobbies.every((lobby) => lobby.teams[0].length === 1 && lobby.teams[1].length === 1));
+
+    const repeats = (trials: number) => {
+        const history: Record<string, number> = {};
+        const random = Seeded(99);
+        let total = 0;
+
+        for (let round = 0; round < 50; round++) {
+            const result = Draw(Input(Players(18), { history, random, trials }));
+
+            for (const team of result.lobbies.flatMap((lobby) => lobby.teams)) {
+                for (let i = 0; i < team.length; i++) {
+                    for (let j = i + 1; j < team.length; j++) {
+                        const key = PairKey(team[i], team[j]);
+
+                        total += history[key] ?? 0;
+                        history[key] = (history[key] ?? 0) + 1;
+                    }
+                }
+            }
+        }
+
+        return total;
+    };
+    const scored = repeats(64);
+    const plain = repeats(1);
+
+    check("Seltener dieselben Mitspieler als reiner Zufall", scored < plain, `${scored} gegen ${plain}`);
+    check("  PairKey ist sortiert", PairKey("b", "a") === PairKey("a", "b"));
+
+    const hosts = Draw(Input(Players(18), { moderators: ["m1", "m2"] }));
+
+    check(
+        "Hosts: erst die Moderatoren, je einer eine Lobby, dann ein Spieler der Lobby",
+        hosts.lobbies[0].host === "m1" && hosts.lobbies[1].host === "m2" && hosts.lobbies[0].hostIsModerator && !hosts.lobbies[2].hostIsModerator && [...hosts.lobbies[2].teams[0], ...hosts.lobbies[2].teams[1]].includes(hosts.lobbies[2].host),
+        hosts.lobbies.map((lobby) => lobby.host).join(",")
+    );
+
+    const open = Draw(Input(Players(21), { moderators: ["m1", "m2", "m3", "m4"] }));
+    const filled = WithFiller(open, "m1");
+    const fillerLobby = filled.lobbies[open.needsFiller!.lobbyIndex];
+
+    check(
+        "Einspringer: spielt und hostet seine Lobby, seine alte Lobby bekommt einen Spieler als Host",
+        filled.needsFiller === null && fillerLobby.filler === "m1" && fillerLobby.host === "m1" && fillerLobby.teams[1].includes("m1") && fillerLobby.teams[0].length === fillerLobby.teams[1].length && filled.lobbies[0].host !== "m1" && !filled.lobbies[0].hostIsModerator
+    );
+
+    const without = WithFiller(Draw(Input(Players(21))), null);
+    const smaller = without.lobbies[3];
+
+    check("Ohne Einspringer: einer setzt aus, die Lobby wird kleiner", without.needsFiller === null && without.sitOut.length === 1 && smaller.teams[0].length === 1 && smaller.teams[1].length === 1);
+    check("  ohne Einspringer bei 19: die 1v1-Lobby fällt weg", WithFiller(Draw(Input(Players(19))), null).lobbies.length === 3);
+
+    const capped = Draw(Input(Players(18), { maxLobbies: 2 }));
+
+    check("Feste Kanäle: höchstens so viele Lobbys, der Rest setzt aus", capped.lobbies.length === 2 && capped.sitOut.length === 6 && Everyone(capped).length === 18);
+    check("Teamnummern laufen je Runde ab 1", Draw(Input(Players(18))).lobbies.every((lobby, index) => lobby.teamNumbers[0] === index * 2 + 1 && lobby.teamNumbers[1] === index * 2 + 2));
+    check("Niemand doppelt", new Set(Everyone(Draw(Input(Players(23))))).size === 23);
+}
+
 async function main(): Promise<void> {
     console.log("\n🎰 Rocket Roulette\n");
 
     const client = new BotClient();
 
     checkSettings(client);
+    checkDraw();
 
     console.log(failures === 0 ? "\n✅ Alle Prüfungen bestanden.\n" : `\n❌ ${failures} Prüfung(en) fehlgeschlagen.\n`);
 
