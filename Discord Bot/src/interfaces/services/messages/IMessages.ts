@@ -26,8 +26,11 @@ export interface ICustomEmbed {
     fields: { name: string; value: string; inline: boolean }[];
 }
 
-/** Was ein Knopf unter der Nachricht tut. */
-export type ButtonAction = "role" | "link" | "text";
+/**
+ * Was ein Knopf oder ein Menü-Eintrag tut. "message" zeigt eine andere
+ * gespeicherte Nachricht dieses Servers nur dem Klickenden (W-0091).
+ */
+export type ButtonAction = "role" | "link" | "text" | "message";
 
 export interface ICustomButton {
     /** Eindeutig je Nachricht - steht so in der Custom-ID. */
@@ -43,6 +46,34 @@ export interface ICustomButton {
     url: string | null;
     /** action "text": was nur der Klickende zu sehen bekommt. */
     text: string | null;
+    /** action "message": welche gespeicherte Nachricht dieses Servers. */
+    messageId: number | null;
+}
+
+/**
+ * W-0091: ein Eintrag in einem Auswahlmenü. Tut dasselbe wie ein Knopf; ein
+ * Menü kann keine Seite öffnen, "link" antwortet deshalb mit einem Link-Knopf.
+ */
+export interface ICustomMenuOption {
+    /** Eindeutig je Menü, steht als Wert im Menü. */
+    id: string;
+    label: string;
+    description: string | null;
+    emoji: string | null;
+    action: ButtonAction;
+    roleId: string | null;
+    mode: "toggle" | "add" | "remove";
+    url: string | null;
+    text: string | null;
+    messageId: number | null;
+}
+
+/** W-0091: ein Auswahlmenü unter der Nachricht, je Menü eine Reihe. */
+export interface ICustomMenu {
+    /** Eindeutig je Nachricht - steht so in der Custom-ID. */
+    id: string;
+    placeholder: string;
+    options: ICustomMenuOption[];
 }
 
 export type ScheduleMode = "off" | "once" | "daily" | "weekly";
@@ -72,6 +103,7 @@ export interface ICustomMessage {
     embed: ICustomEmbed | null;
     doc: IMessageDoc;
     buttons: ICustomButton[];
+    menus: ICustomMenu[];
     channelId: string | null;
     messageId: string | null;
     schedule: ISchedule;

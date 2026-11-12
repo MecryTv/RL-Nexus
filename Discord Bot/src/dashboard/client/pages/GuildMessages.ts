@@ -16,16 +16,35 @@ import { IEditorContext, IMessageDoc } from "../layout/MessageEditor.js";
 
 type Tab = "messages" | "responses";
 
-interface IButton {
-    id: string;
+/** Was ein Knopf oder ein Menü-Eintrag tut; "message" zeigt eine andere gespeicherte Nachricht (W-0091). */
+type TargetAction = "role" | "link" | "text" | "message";
+
+interface ITarget {
     label: string;
     emoji: string | null;
-    tone: "primary" | "secondary" | "success" | "danger";
-    action: "role" | "link" | "text";
+    action: TargetAction;
     roleId: string | null;
     mode: "toggle" | "add" | "remove";
     url: string | null;
     text: string | null;
+    messageId: number | null;
+}
+
+interface IButton extends ITarget {
+    id: string;
+    tone: "primary" | "secondary" | "success" | "danger";
+}
+
+/** W-0091: ein Eintrag in einem Auswahlmenü. */
+interface IMenuOption extends ITarget {
+    id: string;
+    description: string | null;
+}
+
+interface IMenu {
+    id: string;
+    placeholder: string;
+    options: IMenuOption[];
 }
 
 interface ISchedule {
@@ -42,6 +61,7 @@ interface IMessage extends IBody {
     id: number;
     name: string;
     buttons: IButton[];
+    menus: IMenu[];
     channelId: string | null;
     channelName: string | null;
     messageId: string | null;
@@ -62,13 +82,27 @@ interface IResponse extends IBody {
 interface IPayload {
     messages: IMessage[];
     responses: IResponse[];
-    limits: { messages: number; responses: number; buttons: number };
+    limits: { messages: number; responses: number; buttons: number; menus: number; menuOptions: number };
     defaults: { message: IMessageDoc; response: IMessageDoc; embed: IEmbed };
     weekdays: string[];
     matches: Record<string, string>;
     kinds: Record<string, string>;
     guild: { name: string; roles: IRole[]; channels: { id: string; name: string }[]; emojis: IServerEmoji[] };
 }
+
+const BUTTON_ACTIONS: [string, string][] = [
+    ["role", "Rolle geben/nehmen"],
+    ["link", "Link öffnen"],
+    ["text", "Text nur für den Klickenden"],
+    ["message", "Gespeicherte Nachricht zeigen"],
+];
+
+const MENU_ACTIONS: [string, string][] = [
+    ["text", "Text nur für den Wählenden"],
+    ["role", "Rolle geben/nehmen"],
+    ["link", "Link zeigen"],
+    ["message", "Gespeicherte Nachricht zeigen"],
+];
 
 const TONES: [string, string][] = [
     ["secondary", "Grau"],
@@ -217,7 +251,7 @@ export function renderMessages(guildId: string): void {
             defaultEmbed: () => structuredClone(data!.defaults.embed),
             touch,
             templates: "message",
-            extras: () => buttonPreview(draft) ?? null,
+            extras: () => extrasPreview(draft) ?? null,
             // Plan 40: „Speichern“ im Studio spiegelt den Knopf unten - samt Name und Kanal.
             pageSave: () => saveButton,
         });
@@ -298,8 +332,96 @@ export function renderMessages(guildId: string): void {
             scheduleBox(draft, touch),
             editor.node,
             buttonBox(draft, touch, editor.refresh),
+            menuBox(draft, touch, editor.refresh),
             el("div", "mcsave snitem__foot", send, saveButton)
         );
+    }
+
+    /**
+     * Das Ziel eines Knopfes oder Menü-Eintrags je nach Aktion: Rolle und was
+     * mit ihr passiert, ein Link, ein Text oder eine gespeicherte Nachricht.
+     */
+    function targetControls(entry: ITarget, ownId: number, touch: () => void, reader = "der Klickende"): { nodes: HTMLElement[]; wide: boolean } {
+        if (entry.action === "role") {
+            return {
+                wide: false,
+                nodes: [
+                    select(
+                        [["", "(Rolle wählen)"], ...data!.guild.roles.map((role): [string, string] => [role.id, `@${role.name}`])],
+                        entry.roleId ?? "",
+                        (value) => {
+                            entry.roleId = value || null;
+                            touch();
+                        },
+                        "Rolle"
+                    ),
+                    select(
+                        [
+                            ["toggle", "an/aus"],
+                            ["add", "nur geben"],
+                            ["remove", "nur nehmen"],
+                        ],
+                        entry.mode,
+                        (value) => {
+                            entry.mode = value as ITarget["mode"];
+                            touch();
+                        },
+                        "Was mit der Rolle passiert"
+                    ),
+                ],
+            };
+        }
+
+        if (entry.action === "link") {
+            const field = el("input", "text");
+
+            field.type = "url";
+            field.value = entry.url ?? "";
+            field.placeholder = "https://…";
+            field.setAttribute("aria-label", "Ziel-Link");
+            field.addEventListener("input", () => {
+                entry.url = field.value;
+                touch();
+            });
+
+            return { wide: false, nodes: [field] };
+        }
+
+        if (entry.action === "message") {
+            // Jede andere Nachricht dieses Servers, nur für den, der klickt oder wählt.
+            const others = data!.messages.filter((message) => message.id !== ownId);
+
+            return {
+                wide: false,
+                nodes: [
+                    select(
+                        [["", others.length ? "(Nachricht wählen)" : "(noch keine andere Nachricht)"], ...others.map((message): [string, string] => [String(message.id), message.name])],
+                        entry.messageId === null ? "" : String(entry.messageId),
+                        (value) => {
+                            entry.messageId = value ? Number(value) : null;
+                            touch();
+                        },
+                        "Gespeicherte Nachricht"
+                    ),
+                ],
+            };
+        }
+
+        // Mehrzeilig: die versteckte Antwort ist oft eine Anleitung,
+        // und in einem einzeiligen Feld macht Enter keine neue Zeile.
+        const field = el("textarea", "text tkarea");
+
+        field.rows = 3;
+        field.maxLength = 1500;
+        field.value = entry.text ?? "";
+        field.placeholder = `Was nur ${reader} liest`;
+        field.setAttribute("aria-label", "Versteckter Text");
+        field.addEventListener("input", () => {
+            entry.text = field.value;
+            touch();
+        });
+
+        return { wide: true, nodes: [field] };
     }
 
     /** Die Knöpfe als Zeilen: Beschriftung, Aktion, Ziel. */
@@ -325,14 +447,10 @@ export function renderMessages(guildId: string): void {
                 });
 
                 const action = select(
-                    [
-                        ["role", "Rolle geben/nehmen"],
-                        ["link", "Link öffnen"],
-                        ["text", "Text nur für den Klickenden"],
-                    ],
+                    BUTTON_ACTIONS,
                     entry.action,
                     (value) => {
-                        entry.action = value as IButton["action"];
+                        entry.action = value as TargetAction;
                         touch();
                         draw();
                         paintPreview();
@@ -346,60 +464,10 @@ export function renderMessages(guildId: string): void {
                     paintPreview();
                 }, "Farbe des Knopfes");
 
-                if (entry.action === "role") {
-                    target.append(
-                        select(
-                            [["", "(Rolle wählen)"], ...data!.guild.roles.map((role): [string, string] => [role.id, `@${role.name}`])],
-                            entry.roleId ?? "",
-                            (value) => {
-                                entry.roleId = value || null;
-                                touch();
-                            },
-                            "Rolle"
-                        ),
-                        select(
-                            [
-                                ["toggle", "an/aus"],
-                                ["add", "nur geben"],
-                                ["remove", "nur nehmen"],
-                            ],
-                            entry.mode,
-                            (value) => {
-                                entry.mode = value as IButton["mode"];
-                                touch();
-                            },
-                            "Was mit der Rolle passiert"
-                        )
-                    );
-                } else if (entry.action === "link") {
-                    const field = el("input", "text");
+                const controls = targetControls(entry, draft.id, touch);
 
-                    field.type = "url";
-                    field.value = entry.url ?? "";
-                    field.placeholder = "https://…";
-                    field.setAttribute("aria-label", "Ziel-Link");
-                    field.addEventListener("input", () => {
-                        entry.url = field.value;
-                        touch();
-                    });
-                    target.append(field);
-                } else {
-                    // Mehrzeilig: die versteckte Antwort ist oft eine Anleitung,
-                    // und in einem einzeiligen Feld macht Enter keine neue Zeile.
-                    const field = el("textarea", "text tkarea");
-
-                    field.rows = 3;
-                    field.maxLength = 1500;
-                    field.value = entry.text ?? "";
-                    field.placeholder = "Was nur der Klickende liest";
-                    field.setAttribute("aria-label", "Versteckter Text");
-                    field.addEventListener("input", () => {
-                        entry.text = field.value;
-                        touch();
-                    });
-                    target.classList.add("cmbtn__target--text");
-                    target.append(field);
-                }
+                target.append(...controls.nodes);
+                if (controls.wide) target.classList.add("cmbtn__target--text");
 
                 remove.title = "Knopf entfernen";
                 remove.addEventListener("click", () => {
@@ -426,6 +494,7 @@ export function renderMessages(guildId: string): void {
                     mode: "toggle",
                     url: null,
                     text: null,
+                    messageId: null,
                 });
                 touch();
                 draw();
@@ -440,14 +509,163 @@ export function renderMessages(guildId: string): void {
         return el("div", "cmbuttonbox", el("h4", "sneditor__title vctitle", "Knöpfe"), el("p", "hintline", `Bis ${data!.limits.buttons} Stück, je fünf in einer Reihe.`), box);
     }
 
-    /** Die Knöpfe in der Vorschau - nur zum Ansehen. */
-    function buttonPreview(draft: IMessage): HTMLElement | undefined {
-        if (!draft.buttons.length) return undefined;
+    /**
+     * W-0091: Auswahlmenüs. Jedes Menü bekommt eine eigene Reihe in Discord, ein
+     * Eintrag tut dasselbe wie ein Knopf; die Antwort sieht nur, wer wählt.
+     */
+    function menuBox(draft: IMessage, touch: () => void, paintPreview: () => void): HTMLElement {
+        const box = el("div", "cmmenus");
+        const draw = (): void => {
+            box.replaceChildren();
 
-        const box = el("div", "tkprev__buttons");
+            draft.menus.forEach((menu, index) => {
+                const placeholder = el("input", "text");
+                const options = el("div", "cmmenu__options");
 
-        for (const entry of draft.buttons) {
-            box.append(el("span", `tkprev__btn is-${entry.action === "link" ? "link" : entry.tone}`, entry.label || "Knopf"));
+                placeholder.type = "text";
+                placeholder.value = menu.placeholder;
+                placeholder.maxLength = 150;
+                placeholder.placeholder = "Bitte wählen …";
+                placeholder.setAttribute("aria-label", `Platzhalter von Menü ${index + 1}`);
+                placeholder.addEventListener("input", () => {
+                    menu.placeholder = placeholder.value;
+                    touch();
+                    paintPreview();
+                });
+
+                for (const option of menu.options) {
+                    const emoji = el("input", "text cmmenu__emoji");
+                    const label = el("input", "text cmbtn__label");
+                    const description = el("input", "text cmbtn__label");
+                    const remove = button("btn btn--quiet btn--icon", icon("#i-x"));
+                    const target = el("div", "cmbtn__target");
+
+                    emoji.type = "text";
+                    emoji.value = option.emoji ?? "";
+                    emoji.maxLength = 64;
+                    emoji.placeholder = "🙂";
+                    emoji.setAttribute("aria-label", "Emoji des Eintrags");
+                    emoji.addEventListener("input", () => {
+                        option.emoji = emoji.value.trim() || null;
+                        touch();
+                    });
+
+                    label.type = "text";
+                    label.value = option.label;
+                    label.maxLength = 80;
+                    label.placeholder = "Eintrag";
+                    label.setAttribute("aria-label", "Name des Eintrags");
+                    label.addEventListener("input", () => {
+                        option.label = label.value;
+                        touch();
+                    });
+
+                    description.type = "text";
+                    description.value = option.description ?? "";
+                    description.maxLength = 100;
+                    description.placeholder = "Beschreibung (optional)";
+                    description.setAttribute("aria-label", "Beschreibung des Eintrags");
+                    description.addEventListener("input", () => {
+                        option.description = description.value || null;
+                        touch();
+                    });
+
+                    const action = select(
+                        MENU_ACTIONS,
+                        option.action,
+                        (value) => {
+                            option.action = value as TargetAction;
+                            touch();
+                            draw();
+                        },
+                        "Was der Eintrag tut"
+                    );
+                    const controls = targetControls(option, draft.id, touch, "der Wählende");
+
+                    target.append(...controls.nodes);
+                    if (controls.wide) target.classList.add("cmbtn__target--text");
+
+                    remove.title = "Eintrag entfernen";
+                    remove.addEventListener("click", () => {
+                        menu.options.splice(menu.options.indexOf(option), 1);
+                        touch();
+                        draw();
+                    });
+
+                    options.append(el("div", "cmmenu__option", el("div", "cmbtn", emoji, label, description, action, remove), target));
+                }
+
+                const addOption = button("btn btn--quiet", icon("#i-plus"), "Eintrag hinzufügen");
+                const removeMenu = button("btn btn--quiet", icon("#i-x"), "Menü entfernen");
+
+                addOption.disabled = menu.options.length >= data!.limits.menuOptions;
+                addOption.addEventListener("click", () => {
+                    menu.options.push(newOption());
+                    touch();
+                    draw();
+                });
+                removeMenu.addEventListener("click", () => {
+                    draft.menus.splice(index, 1);
+                    touch();
+                    draw();
+                    paintPreview();
+                });
+
+                box.append(
+                    el(
+                        "div",
+                        "cmmenu",
+                        el("div", "cmmenu__head", el("strong", "", `Menü ${index + 1}`), placeholder, el("span", "hintline", `${menu.options.length} von ${data!.limits.menuOptions}`)),
+                        options,
+                        el("div", "cmmenu__foot", addOption, removeMenu)
+                    )
+                );
+            });
+
+            const add = button("btn btn--quiet", icon("#i-plus"), "Auswahlmenü hinzufügen");
+
+            add.disabled = draft.menus.length >= data!.limits.menus;
+            add.addEventListener("click", () => {
+                draft.menus.push({ id: `m${Date.now().toString(36).slice(-5)}`, placeholder: "Bitte wählen …", options: [newOption()] });
+                touch();
+                draw();
+                paintPreview();
+            });
+
+            box.append(add);
+        };
+
+        draw();
+
+        return el(
+            "div",
+            "cmbuttonbox",
+            el("h4", "sneditor__title vctitle", "Auswahlmenüs"),
+            el("p", "hintline", `Bis ${data!.limits.menus} Menüs mit je ${data!.limits.menuOptions} Einträgen, jedes in einer eigenen Reihe. Die Antwort sieht nur, wer wählt.`),
+            box
+        );
+    }
+
+    function newOption(): IMenuOption {
+        return { id: String(Date.now()).slice(-6), label: "Eintrag", description: null, emoji: null, action: "text", roleId: null, mode: "toggle", url: null, text: null, messageId: null };
+    }
+
+    /** Menüs und Knöpfe in der Vorschau - nur zum Ansehen. */
+    function extrasPreview(draft: IMessage): HTMLElement | undefined {
+        if (!draft.buttons.length && !draft.menus.length) return undefined;
+
+        const box = el("div", "tkprev__extras");
+
+        for (const menu of draft.menus) box.append(el("div", "tkprev__menu", el("span", "", menu.placeholder || "Bitte wählen …"), el("span", "", "▾")));
+
+        if (draft.buttons.length) {
+            const buttons = el("div", "tkprev__buttons");
+
+            for (const entry of draft.buttons) {
+                buttons.append(el("span", `tkprev__btn is-${entry.action === "link" ? "link" : entry.tone}`, entry.label || "Knopf"));
+            }
+
+            box.append(buttons);
         }
 
         return box;
@@ -564,7 +782,7 @@ export function renderMessages(guildId: string): void {
 
             go.disabled = true;
 
-            const answer = await call<{ message: IMessage }>("", { action: "create", message: { name: name.value.trim(), kind: "v2", content: "", embed: null, doc: data!.defaults.message, buttons: [], schedule: { mode: "off" } } });
+            const answer = await call<{ message: IMessage }>("", { action: "create", message: { name: name.value.trim(), kind: "v2", content: "", embed: null, doc: data!.defaults.message, buttons: [], menus: [], schedule: { mode: "off" } } });
 
             go.disabled = false;
 

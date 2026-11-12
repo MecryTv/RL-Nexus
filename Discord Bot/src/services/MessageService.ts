@@ -1,9 +1,11 @@
-import { ButtonInteraction, Guild, GuildMember, Message, MessageFlags, PermissionFlagsBits } from "discord.js";
+import { ButtonInteraction, Guild, GuildMember, InteractionReplyOptions, Message, MessageFlags, PermissionFlagsBits, StringSelectMenuInteraction } from "discord.js";
 import BotClient from "../client/BotClient";
 import { CleanDoc } from "../builder/MessageDoc";
 import { CustomMessageView, ICustomSource } from "../builder/CustomView";
 import { InfoCard } from "../builder/CommunityView";
+import ComponentV2Builder from "../builder/ComponentV2Builder";
 import {
+    DEFAULT_PLACEHOLDER,
     DefaultEmbed,
     DefaultMessageDoc,
     DefaultResponseDoc,
@@ -21,7 +23,11 @@ import {
     MAX_COOLDOWN,
     MAX_FILTER,
     MAX_LABEL,
+    MAX_MENU_OPTIONS,
+    MAX_MENUS,
     MAX_MESSAGES,
+    MAX_OPTION_DESCRIPTION,
+    MAX_PLACEHOLDER,
     MAX_NAME,
     MAX_PHRASE,
     MAX_RESPONSES,
@@ -29,7 +35,19 @@ import {
     Matches,
     NextRun,
 } from "../constants/Messages";
-import { IAutoResponse, ICustomButton, ICustomEmbed, ICustomMessage, IResponseSettings, ISchedule, MatchMode, MessageKind } from "../interfaces/services/messages/IMessages";
+import {
+    ButtonAction,
+    IAutoResponse,
+    ICustomButton,
+    ICustomEmbed,
+    ICustomMenu,
+    ICustomMenuOption,
+    ICustomMessage,
+    IResponseSettings,
+    ISchedule,
+    MatchMode,
+    MessageKind,
+} from "../interfaces/services/messages/IMessages";
 import { IMessageDoc } from "../interfaces/builder/IMessageDoc";
 import logger from "../utils/logger";
 
@@ -42,8 +60,27 @@ function IsRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /** Was der Payload-Builder braucht - egal ob Nachricht oder Stichwort. */
-function Source(entry: { id: number; kind: MessageKind; content: string; embed: ICustomEmbed | null; doc: IMessageDoc; buttons?: ICustomButton[] }): ICustomSource {
-    return { id: entry.id, kind: entry.kind, content: entry.content, embed: entry.embed, doc: entry.doc, buttons: entry.buttons ?? [] };
+function Source(entry: { id: number; kind: MessageKind; content: string; embed: ICustomEmbed | null; doc: IMessageDoc; buttons?: ICustomButton[]; menus?: ICustomMenu[] }): ICustomSource {
+    return { id: entry.id, kind: entry.kind, content: entry.content, embed: entry.embed, doc: entry.doc, buttons: entry.buttons ?? [], menus: entry.menus ?? [] };
+}
+
+/** Was ein Knopf und ein Menü-Eintrag gemeinsam haben (W-0091). */
+type Target = Pick<ICustomButton, "label" | "emoji" | "action" | "roleId" | "mode" | "url" | "text" | "messageId">;
+
+/** Eine kurze ID, die so in der Custom-ID oder als Wert im Menü steht; doppelte bekommen ein x. */
+function UniqueId(value: unknown, seen: Set<string>, fallback: string): string {
+    let id = typeof value === "string" && /^[a-z0-9]{1,12}$/i.test(value) ? value : fallback;
+
+    while (seen.has(id)) id = `${id}x`;
+
+    seen.add(id);
+
+    return id;
+}
+
+/** Eine kurze Antwort nur für den, der geklickt oder gewählt hat. */
+function Info(text: string): InteractionReplyOptions {
+    return { ...InfoCard(text, MESSAGE_ACCENT), flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral };
 }
 
 /** Leise antworten - mit und ohne Components V2. */
@@ -78,7 +115,17 @@ export default class MessageService {
         guild: Guild,
         input: unknown,
         previous?: ICustomMessage
-    ): { name: string; kind: MessageKind; content: string; embed: ICustomEmbed | null; doc: IMessageDoc; buttons: ICustomButton[]; channelId: string | null; schedule: ISchedule } {
+    ): {
+        name: string;
+        kind: MessageKind;
+        content: string;
+        embed: ICustomEmbed | null;
+        doc: IMessageDoc;
+        buttons: ICustomButton[];
+        menus: ICustomMenu[];
+        channelId: string | null;
+        schedule: ISchedule;
+    } {
         const raw = IsRecord(input) ? input : {};
         const name = typeof raw.name === "string" ? raw.name.trim().slice(0, MAX_NAME) : (previous?.name ?? "");
         const channel = typeof raw.channelId === "string" ? guild.channels.cache.get(raw.channelId) : null;
@@ -90,6 +137,7 @@ export default class MessageService {
             name,
             ...body,
             buttons: raw.buttons === undefined ? (previous?.buttons ?? []) : this.CleanButtons(guild, raw.buttons),
+            menus: raw.menus === undefined ? (previous?.menus ?? []) : this.CleanMenus(guild, raw.menus),
             channelId: raw.channelId === undefined ? (previous?.channelId ?? null) : channel?.isTextBased() ? channel.id : null,
             schedule: this.CleanSchedule(raw.schedule, previous?.schedule),
         };
@@ -145,6 +193,38 @@ export default class MessageService {
         return embed.title || embed.description || embed.image || embed.fields.length || embed.author || embed.footer ? embed : null;
     }
 
+    /**
+     * Was ein Knopf oder Menü-Eintrag tut, geprüft. null: unvollständig, etwa
+     * eine Rolle, die es nicht gibt, oder ein Link ohne https.
+     */
+    private CleanTarget(guild: Guild, raw: Record<string, unknown>): Target | null {
+        const label = typeof raw.label === "string" ? raw.label.trim().slice(0, MAX_LABEL) : "";
+
+        if (!label) return null;
+
+        const action: ButtonAction = raw.action === "link" || raw.action === "text" || raw.action === "message" ? raw.action : "role";
+        const url = typeof raw.url === "string" && /^https:\/\//i.test(raw.url) && URL.canParse(raw.url) ? raw.url.slice(0, 512) : null;
+        const roleId = typeof raw.roleId === "string" && guild.roles.cache.has(raw.roleId) && raw.roleId !== guild.id ? raw.roleId : null;
+        const text = typeof raw.text === "string" ? raw.text.trim().slice(0, MAX_BUTTON_TEXT) : null;
+        const messageId = typeof raw.messageId === "number" && Number.isInteger(raw.messageId) && raw.messageId > 0 ? raw.messageId : null;
+
+        if (action === "link" && !url) return null;
+        if (action === "role" && !roleId) return null;
+        if (action === "text" && !text) return null;
+        if (action === "message" && !messageId) return null;
+
+        return {
+            label,
+            emoji: this.client.ticketService.CleanEmoji(raw.emoji),
+            action,
+            roleId: action === "role" ? roleId : null,
+            mode: raw.mode === "add" || raw.mode === "remove" ? raw.mode : "toggle",
+            url: action === "link" ? url : null,
+            text: action === "text" ? text : null,
+            messageId: action === "message" ? messageId : null,
+        };
+    }
+
     CleanButtons(guild: Guild, input: unknown): ICustomButton[] {
         if (!Array.isArray(input)) return [];
 
@@ -154,40 +234,59 @@ export default class MessageService {
         for (const raw of input) {
             if (!IsRecord(raw)) continue;
 
-            const label = typeof raw.label === "string" ? raw.label.trim().slice(0, MAX_LABEL) : "";
+            const target = this.CleanTarget(guild, raw);
 
-            if (!label) continue;
+            if (!target) continue;
 
-            const action = raw.action === "link" || raw.action === "text" ? raw.action : "role";
-            const url = typeof raw.url === "string" && /^https:\/\//i.test(raw.url) && URL.canParse(raw.url) ? raw.url.slice(0, 512) : null;
-            const roleId = typeof raw.roleId === "string" && guild.roles.cache.has(raw.roleId) && raw.roleId !== guild.id ? raw.roleId : null;
-            const text = typeof raw.text === "string" ? raw.text.trim().slice(0, MAX_BUTTON_TEXT) : null;
-
-            if (action === "link" && !url) continue;
-            if (action === "role" && !roleId) continue;
-            if (action === "text" && !text) continue;
-
-            let id = typeof raw.id === "string" && /^[a-z0-9]{1,12}$/i.test(raw.id) ? raw.id : String(buttons.length + 1);
-
-            while (seen.has(id)) id = `${id}x`;
-
-            seen.add(id);
             buttons.push({
-                id,
-                label,
-                emoji: this.client.ticketService.CleanEmoji(raw.emoji),
+                id: UniqueId(raw.id, seen, String(buttons.length + 1)),
+                ...target,
                 tone: raw.tone === "primary" || raw.tone === "success" || raw.tone === "danger" ? raw.tone : "secondary",
-                action,
-                roleId,
-                mode: raw.mode === "add" || raw.mode === "remove" ? raw.mode : "toggle",
-                url,
-                text,
             });
 
             if (buttons.length >= MAX_BUTTONS) break;
         }
 
         return buttons;
+    }
+
+    /** W-0091: Auswahlmenüs. Ein Menü ohne gültigen Eintrag fällt weg. */
+    CleanMenus(guild: Guild, input: unknown): ICustomMenu[] {
+        if (!Array.isArray(input)) return [];
+
+        const menus: ICustomMenu[] = [];
+        const seen = new Set<string>();
+
+        for (const raw of input) {
+            if (!IsRecord(raw)) continue;
+
+            const options: ICustomMenuOption[] = [];
+            const optionIds = new Set<string>();
+
+            for (const entry of Array.isArray(raw.options) ? raw.options : []) {
+                if (!IsRecord(entry)) continue;
+
+                const target = this.CleanTarget(guild, entry);
+
+                if (!target) continue;
+
+                const description = typeof entry.description === "string" ? entry.description.trim().slice(0, MAX_OPTION_DESCRIPTION) : "";
+
+                options.push({ id: UniqueId(entry.id, optionIds, String(options.length + 1)), ...target, description: description || null });
+
+                if (options.length >= MAX_MENU_OPTIONS) break;
+            }
+
+            if (!options.length) continue;
+
+            const placeholder = typeof raw.placeholder === "string" ? raw.placeholder.trim().slice(0, MAX_PLACEHOLDER) : "";
+
+            menus.push({ id: UniqueId(raw.id, seen, `m${menus.length + 1}`), placeholder: placeholder || DEFAULT_PLACEHOLDER, options });
+
+            if (menus.length >= MAX_MENUS) break;
+        }
+
+        return menus;
     }
 
     CleanSchedule(input: unknown, previous = DefaultSchedule()): ISchedule {
@@ -340,56 +439,123 @@ export default class MessageService {
     }
 
     /* ----------------------------------------------------------
-       Knöpfe
+       Knöpfe und Auswahlmenüs
        ---------------------------------------------------------- */
     async Button(interaction: ButtonInteraction, id: number, buttonId: string): Promise<void> {
         const message = await this.client.customMessages.Get(id);
         const button = message?.buttons.find((entry) => entry.id === buttonId);
-        const reply = (text: string) => interaction.reply({ ...InfoCard(text, MESSAGE_ACCENT), flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral });
+        const answer = (payload: InteractionReplyOptions) => interaction.reply(payload);
 
         if (!message || !button || message.guildId !== interaction.guildId) {
-            await reply("Diesen Knopf gibt es nicht mehr.");
+            await answer(Info("Diesen Knopf gibt es nicht mehr."));
 
             return;
         }
 
-        if (button.action === "text") {
-            await reply(button.text ?? "");
+        await this.Act(interaction, button, answer, "Knopf unter einer Nachricht");
+    }
+
+    /**
+     * W-0091: ein Eintrag aus einem Menü. Zuerst springt das Menü zurück auf den
+     * Platzhalter, sonst ließe sich derselbe Eintrag nicht noch einmal wählen;
+     * die Antwort kommt danach nur für den Wählenden.
+     */
+    async Menu(interaction: StringSelectMenuInteraction, id: number, menuId: string): Promise<void> {
+        // Zuerst bestätigen: Discord wartet nur drei Sekunden, und auch bei einem Fehler steht das Menü wieder leer.
+        await interaction.update({ components: interaction.message.components }).catch(() => interaction.deferUpdate());
+
+        const message = await this.client.customMessages.Get(id);
+        const menu = message?.menus.find((entry) => entry.id === menuId);
+        const option = menu?.options.find((entry) => entry.id === interaction.values[0]);
+        const answer = (payload: InteractionReplyOptions) => interaction.followUp(payload);
+
+        if (!message || !option || message.guildId !== interaction.guildId) {
+            await answer(Info("Diesen Eintrag gibt es nicht mehr."));
 
             return;
         }
 
-        if (button.action !== "role" || !button.roleId) return;
+        await this.Act(interaction, option, answer, "Auswahlmenü unter einer Nachricht");
+    }
+
+    /** Was Knopf und Menü-Eintrag tun, nur für den, der geklickt oder gewählt hat. */
+    private async Act(
+        interaction: ButtonInteraction | StringSelectMenuInteraction,
+        target: Target,
+        answer: (payload: InteractionReplyOptions) => Promise<unknown>,
+        reason: string
+    ): Promise<void> {
+        if (target.action === "text") {
+            await answer(Info(target.text ?? ""));
+
+            return;
+        }
+
+        if (target.action === "link") {
+            // Ein Menü kann keine Seite öffnen: ein Link-Knopf nur für den Wählenden.
+            const card = new ComponentV2Builder({ accentColor: MESSAGE_ACCENT as `#${string}` })
+                .text(`**${target.label}**`)
+                .buttons({ url: target.url ?? "https://discord.com", label: "Öffnen", emoji: "🔗" });
+
+            await answer({ ...card.toMessage({ ephemeral: true }), allowedMentions: { parse: [] } });
+
+            return;
+        }
+
+        if (target.action === "message") {
+            const shown = target.messageId ? await this.client.customMessages.Get(target.messageId) : null;
+
+            if (!shown || shown.guildId !== interaction.guildId) {
+                await answer(Info("Diese Nachricht gibt es nicht mehr."));
+
+                return;
+            }
+
+            const view = await CustomMessageView(this.client, Source(shown), { guild: interaction.guild!.name });
+
+            await answer({
+                content: view.content,
+                embeds: view.embeds,
+                components: view.components,
+                files: view.files,
+                allowedMentions: { parse: [] },
+                flags: view.flags ? MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral : MessageFlags.Ephemeral,
+            });
+
+            return;
+        }
+
+        if (!target.roleId) return;
 
         const member = interaction.member instanceof GuildMember ? interaction.member : await interaction.guild!.members.fetch(interaction.user.id);
-        const role = interaction.guild!.roles.cache.get(button.roleId);
+        const role = interaction.guild!.roles.cache.get(target.roleId);
         const me = interaction.guild!.members.me;
 
         if (!role) {
-            await reply("Diese Rolle gibt es nicht mehr.");
+            await answer(Info("Diese Rolle gibt es nicht mehr."));
 
             return;
         }
 
         if (!me?.permissions.has(PermissionFlagsBits.ManageRoles) || role.comparePositionTo(me.roles.highest) >= 0 || role.managed) {
-            await reply(`Der Bot kann @${role.name} nicht vergeben. Die Rolle muss unter seiner höchsten stehen.`);
+            await answer(Info(`Der Bot kann @${role.name} nicht vergeben. Die Rolle muss unter seiner höchsten stehen.`));
 
             return;
         }
 
         const has = member.roles.cache.has(role.id);
-        const add = button.mode === "add" || (button.mode === "toggle" && !has);
+        const add = target.mode === "add" || (target.mode === "toggle" && !has);
 
         if (add === has) {
-            await reply(has ? `Du hast **${role.name}** schon.` : `Du hast **${role.name}** nicht.`);
+            await answer(Info(has ? `Du hast **${role.name}** schon.` : `Du hast **${role.name}** nicht.`));
 
             return;
         }
 
-        if (add) await member.roles.add(role, "Knopf unter einer Nachricht");
-        else await member.roles.remove(role, "Knopf unter einer Nachricht");
+        if (add) await member.roles.add(role, reason);
+        else await member.roles.remove(role, reason);
 
-        await reply(add ? `✅ **${role.name}** gehört jetzt dir.` : `➖ **${role.name}** ist weg.`);
+        await answer(Info(add ? `✅ **${role.name}** gehört jetzt dir.` : `➖ **${role.name}** ist weg.`));
     }
 
     /* ----------------------------------------------------------

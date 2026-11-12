@@ -11,6 +11,12 @@ export const MESSAGE_ACCENT = "#00afff";
 export const MAX_MESSAGES = 50;
 export const MAX_RESPONSES = 50;
 export const MAX_BUTTONS = 10;
+/** W-0091: Knöpfe belegen höchstens zwei Reihen, Discord erlaubt fünf. */
+export const MAX_MENUS = 3;
+export const MAX_MENU_OPTIONS = 25;
+export const MAX_PLACEHOLDER = 150;
+export const MAX_OPTION_DESCRIPTION = 100;
+export const DEFAULT_PLACEHOLDER = "Bitte wählen …";
 export const MAX_LABEL = 80;
 export const MAX_BUTTON_TEXT = 1500;
 export const MAX_NAME = 80;

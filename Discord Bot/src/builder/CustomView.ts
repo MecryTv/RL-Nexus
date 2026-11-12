@@ -8,12 +8,13 @@ import {
     MessageActionRowComponentBuilder,
     MessageFlags,
     MessageMentionOptions,
+    StringSelectMenuBuilder,
 } from "discord.js";
 import BotClient from "../client/BotClient";
 import { RenderDoc } from "./MessageDoc";
 import { MESSAGE_PREFIX } from "../constants/Messages";
 import { AnyPlaceholderValues, Fill } from "../constants/Placeholders";
-import { ICustomButton, ICustomEmbed, MessageKind } from "../interfaces/services/messages/IMessages";
+import { ICustomButton, ICustomEmbed, ICustomMenu, MessageKind } from "../interfaces/services/messages/IMessages";
 import { IGalleryEntry } from "../interfaces/services/gallery/IGalleryService";
 import { IMessageDoc } from "../interfaces/builder/IMessageDoc";
 import { ButtonOptions } from "../interfaces/builder/IComponentV2Builder";
@@ -41,6 +42,8 @@ export interface ICustomSource {
     embed: ICustomEmbed | null;
     doc: IMessageDoc;
     buttons: ICustomButton[];
+    /** W-0091: Auswahlmenüs, je eines in einer Reihe, vor den Knöpfen. */
+    menus?: ICustomMenu[];
     /**
      * Wie viele Komponenten der Aufrufer selbst noch anhängt - die Self-Role-
      * Panels setzen ihre Knopfreihen hinterher in denselben Container. Ohne das
@@ -79,6 +82,25 @@ function rows(id: number, buttons: ICustomButton[]): ActionRowBuilder<MessageAct
     }
 
     return list;
+}
+
+/** W-0091: der Eintrag im Menü, für Karte und klassische Reihe gleich. */
+function menuOptions(menu: ICustomMenu) {
+    return menu.options.map((option) => ({
+        label: option.label.slice(0, 100),
+        value: option.id,
+        ...(option.description ? { description: option.description.slice(0, 100) } : {}),
+        ...(option.emoji ? { emoji: option.emoji } : {}),
+    }));
+}
+
+/** W-0091: die Menüs als klassische Reihen - für Embed und normale Nachricht. */
+function menuRows(id: number, menus: ICustomMenu[]): ActionRowBuilder<MessageActionRowComponentBuilder>[] {
+    return menus.map((menu) =>
+        new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
+            new StringSelectMenuBuilder().setCustomId(`${MESSAGE_PREFIX}:menu:${id}:${menu.id}`).setPlaceholder(menu.placeholder.slice(0, 150)).addOptions(menuOptions(menu))
+        )
+    );
 }
 
 /** Die Knöpfe innerhalb der Karte - dort baut sie der ComponentV2Builder. */
@@ -196,11 +218,15 @@ function EmbedOf(embed: ICustomEmbed, values: AnyPlaceholderValues): EmbedBuilde
 /** Was an Discord geht - je nach Art der Nachricht. */
 export async function CustomMessageView(client: BotClient, source: ICustomSource, values: AnyPlaceholderValues = {}): Promise<ICustomView> {
     const buttons = source.buttons.slice(0, 10);
+    const menus = (source.menus ?? []).filter((menu) => menu.options.length > 0).slice(0, 3);
 
     if (source.kind === "v2") {
         const chunks = v2Buttons(source.id, buttons);
-        const { builder, files } = await RenderDoc(client, source.doc, values, { reserve: chunks.length + (source.reserve ?? 0) + 1, fallback: "Leere Nachricht" });
+        // Jede Knopfreihe kostet eine Komponente plus eine je Knopf, jedes Menü zwei.
+        const cost = chunks.reduce((sum, chunk) => sum + 1 + chunk.length, 0) + menus.length * 2;
+        const { builder, files } = await RenderDoc(client, source.doc, values, { reserve: cost + (source.reserve ?? 0) + 1, fallback: "Leere Nachricht" });
 
+        for (const menu of menus) builder.select({ customId: `${MESSAGE_PREFIX}:menu:${source.id}:${menu.id}`, placeholder: menu.placeholder.slice(0, 150), options: menuOptions(menu) });
         for (const chunk of chunks) builder.buttons(...chunk);
 
         return { components: [builder.build()], files, flags: MessageFlags.IsComponentsV2, allowedMentions: { parse: [] } };
@@ -212,7 +238,7 @@ export async function CustomMessageView(client: BotClient, source: ICustomSource
     return {
         content: content || undefined,
         embeds: picture ? [EmbedOf(picture.embed, values)] : [],
-        components: rows(source.id, buttons),
+        components: [...menuRows(source.id, menus), ...rows(source.id, buttons)],
         ...(picture?.files.length ? { files: picture.files } : {}),
         allowedMentions: { parse: [] },
     };

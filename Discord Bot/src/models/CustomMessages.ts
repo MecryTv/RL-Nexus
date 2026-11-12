@@ -1,7 +1,7 @@
 import Model from "../structures/Model";
 import { TABLES, TableName, Unpack } from "../constants/Database";
 import { DefaultMessageDoc, DefaultSchedule } from "../constants/Messages";
-import { ICustomButton, ICustomEmbed, ICustomMessage, ISchedule, MessageKind } from "../interfaces/services/messages/IMessages";
+import { ICustomButton, ICustomEmbed, ICustomMenu, ICustomMessage, ISchedule, MessageKind } from "../interfaces/services/messages/IMessages";
 import { IMessageDoc } from "../interfaces/builder/IMessageDoc";
 
 export interface ICustomMessageRow {
@@ -13,6 +13,8 @@ export interface ICustomMessageRow {
     embed: ICustomEmbed | string | null;
     doc: IMessageDoc | string;
     buttons: ICustomButton[] | string;
+    /** W-0091, Migration 053. Ältere Zeilen: null. */
+    menus: ICustomMenu[] | string | null;
     channel_id: string | null;
     message_id: string | null;
     schedule: ISchedule | string;
@@ -30,7 +32,8 @@ function ToMessage(row: ICustomMessageRow): ICustomMessage {
         content: row.content ?? "",
         embed: row.embed ? Unpack<ICustomEmbed | null>(row.embed, null) : null,
         doc: Unpack<IMessageDoc>(row.doc, DefaultMessageDoc()),
-        buttons: Unpack<ICustomButton[]>(row.buttons, []),
+        buttons: Unpack<ICustomButton[]>(row.buttons, []).map((button) => ({ ...button, messageId: button.messageId ?? null })),
+        menus: row.menus ? Unpack<ICustomMenu[]>(row.menus, []) : [],
         channelId: row.channel_id,
         messageId: row.message_id,
         schedule: { ...DefaultSchedule(), ...Unpack<Partial<ISchedule>>(row.schedule, {}) },
@@ -45,7 +48,7 @@ export default class CustomMessages extends Model<ICustomMessageRow> {
     readonly Table: TableName = TABLES.customMessages;
     readonly Key = ["id"] as const;
 
-    async Create(input: Pick<ICustomMessage, "guildId" | "name" | "kind" | "content" | "embed" | "doc" | "buttons" | "channelId" | "schedule" | "createdBy">): Promise<ICustomMessage> {
+    async Create(input: Pick<ICustomMessage, "guildId" | "name" | "kind" | "content" | "embed" | "doc" | "buttons" | "menus" | "channelId" | "schedule" | "createdBy">): Promise<ICustomMessage> {
         const now = Date.now();
         const result = await this.Insert({
             guild_id: input.guildId,
@@ -55,6 +58,7 @@ export default class CustomMessages extends Model<ICustomMessageRow> {
             embed: input.embed ? JSON.stringify(input.embed) : null,
             doc: JSON.stringify(input.doc),
             buttons: JSON.stringify(input.buttons),
+            menus: JSON.stringify(input.menus),
             channel_id: input.channelId,
             message_id: null,
             schedule: JSON.stringify(input.schedule),
@@ -76,7 +80,7 @@ export default class CustomMessages extends Model<ICustomMessageRow> {
         return (await this.Where({ guild_id: guildId }, "id DESC")).map(ToMessage);
     }
 
-    async Save(id: number, patch: Partial<Pick<ICustomMessage, "name" | "kind" | "content" | "embed" | "doc" | "buttons" | "channelId" | "messageId" | "schedule">>): Promise<void> {
+    async Save(id: number, patch: Partial<Pick<ICustomMessage, "name" | "kind" | "content" | "embed" | "doc" | "buttons" | "menus" | "channelId" | "messageId" | "schedule">>): Promise<void> {
         const row: Partial<ICustomMessageRow> = { updated_at: Date.now() };
 
         if (patch.name !== undefined) row.name = patch.name;
@@ -85,6 +89,7 @@ export default class CustomMessages extends Model<ICustomMessageRow> {
         if (patch.embed !== undefined) row.embed = patch.embed ? JSON.stringify(patch.embed) : null;
         if (patch.doc !== undefined) row.doc = JSON.stringify(patch.doc);
         if (patch.buttons !== undefined) row.buttons = JSON.stringify(patch.buttons);
+        if (patch.menus !== undefined) row.menus = JSON.stringify(patch.menus);
         if (patch.channelId !== undefined) row.channel_id = patch.channelId;
         if (patch.messageId !== undefined) row.message_id = patch.messageId;
         if (patch.schedule !== undefined) row.schedule = JSON.stringify(patch.schedule);
@@ -99,7 +104,9 @@ export default class CustomMessages extends Model<ICustomMessageRow> {
     /** Was bis jetzt raus soll - für den Lauf jede Minute. */
     async Due(now: number): Promise<ICustomMessage[]> {
         const rows = await this.db.Query<ICustomMessageRow>(
-            `SELECT * FROM \`${this.Table}\` WHERE JSON_EXTRACT(schedule, '$.next') IS NOT NULL AND JSON_EXTRACT(schedule, '$.next') <= ?`,
+            // JSON_TYPE statt IS NOT NULL: "next": null liefert MariaDB als JSON-null, das als 0 durchs <= rutschte
+            // und jede Nachricht ohne Termin jede Minute neu schickte (W-0091).
+            `SELECT * FROM \`${this.Table}\` WHERE JSON_TYPE(JSON_EXTRACT(schedule, '$.next')) IN ('INTEGER', 'DOUBLE', 'DECIMAL') AND JSON_EXTRACT(schedule, '$.next') <= ?`,
             [now]
         );
 

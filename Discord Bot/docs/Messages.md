@@ -72,10 +72,17 @@ Unter jede Nachricht passen bis zu zehn Knöpfe, je fünf in einer Reihe:
 | **Rolle geben/nehmen** | an/aus (Standard), nur geben oder nur nehmen. Die Rolle muss unter der höchsten Rolle des Bots stehen, sonst sagt er das dem Klickenden |
 | **Link öffnen** | Ein normaler Link-Knopf, `https://` |
 | **Text nur für den Klickenden** | Eine versteckte Antwort — gut für Spoiler, Anleitungen oder Kleingedrucktes |
+| **Gespeicherte Nachricht zeigen** | Eine andere Nachricht dieses Servers aus dem Builder, mit Karte, Bildern und Knöpfen, nur für den Klickenden (W-0091) |
 
 Farbe je Knopf: grau, blau, grün oder rot. Link-Knöpfe haben in Discord immer dasselbe Aussehen.
 
 Die Knöpfe hängen an der Nachricht, nicht an einer Sitzung: In der Custom-ID stehen die ID der Nachricht und die des Knopfes, sie funktionieren also auch Monate später und nach jedem Neustart.
+
+## Auswahlmenüs
+
+Bis zu drei Menüs je Nachricht (W-0091), jedes in einer eigenen Reihe und mit bis zu 25 Einträgen. Zehn Knöpfe belegen zwei Reihen, Discord erlaubt fünf. Ein Eintrag hat Name, optional Emoji und Beschreibung und tut dasselbe wie ein Knopf: Text nur für den Wählenden, Rolle geben/nehmen, Link zeigen (ein Menü kann keine Seite öffnen, deshalb antwortet der Bot mit einem Link-Knopf) oder eine gespeicherte Nachricht zeigen.
+
+Nach jeder Wahl steht das Menü wieder auf dem Platzhalter, damit derselbe Eintrag noch einmal geht; die Antwort kommt danach nur für den Wählenden. In der Karte stehen die Menüs vor den Knöpfen, bei Embed und normaler Nachricht als eigene Reihen darüber. Custom-ID `cm:menu:<nachricht>:<menü>`, der Wert ist die ID des Eintrags.
 
 ---
 
@@ -129,6 +136,7 @@ Anfang wie überall: `ManageGate()` (`utils/managegate.ts`) — Sitzung, „Serv
 |---|---|
 | Tabellen | `custom_messages` (Inhalt, Knöpfe, Kanal, Termin) und `auto_responses` (Stichwort, Antwort, Filter, Zähler) — Migration 018, die Art samt Text und Embed kam mit 019 dazu |
 | Knöpfe | `CustomButtons` hört auf die IDs `cm:btn:<nachricht>:<knopf>` |
+| Menüs | `CustomMenus` hört auf `cm:menu:<nachricht>:<menü>`, Spalte `menus` (Migration 053); Knopf und Eintrag teilen sich `MessageService.Act` |
 | Stichwörter | `AutoResponder` hört auf `MessageCreate`; die Sperre liegt im Speicher, je Stichwort und Kanal |
 | Termine | `CommunityTimers` jede Minute, der nächste Termin steht als `next` im JSON |
 

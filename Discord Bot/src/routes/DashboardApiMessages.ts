@@ -9,6 +9,8 @@ import {
     KIND_LABELS,
     MATCH_LABELS,
     MAX_BUTTONS,
+    MAX_MENU_OPTIONS,
+    MAX_MENUS,
     MAX_MESSAGES,
     MAX_RESPONSES,
     NextRun,
@@ -82,7 +84,7 @@ export default class DashboardApiMessages extends Route {
         return {
             messages: messages.map((message) => this.Out(message, access)),
             responses,
-            limits: { messages: MAX_MESSAGES, responses: MAX_RESPONSES, buttons: MAX_BUTTONS },
+            limits: { messages: MAX_MESSAGES, responses: MAX_RESPONSES, buttons: MAX_BUTTONS, menus: MAX_MENUS, menuOptions: MAX_MENU_OPTIONS },
             defaults: { message: DefaultMessageDoc(), response: DefaultResponseDoc(), embed: DefaultEmbed() },
             weekdays: WEEKDAYS,
             matches: MATCH_LABELS,

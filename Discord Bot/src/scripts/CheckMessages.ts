@@ -14,7 +14,7 @@ process.env.DEV_CLIENT_SECRET ||= "check-secret";
 import { ChannelType, Guild, GuildBasedChannel, Role } from "discord.js";
 import BotClient from "../client/BotClient";
 import { CustomMessageView } from "../builder/CustomView";
-import { DefaultEmbed, DefaultMessageDoc, DefaultResponseDoc, MAX_BUTTONS, Matches, NextRun, WEEKDAYS } from "../constants/Messages";
+import { DefaultEmbed, DefaultMessageDoc, DefaultResponseDoc, MAX_BUTTONS, MAX_MENU_OPTIONS, MAX_MENUS, Matches, NextRun, WEEKDAYS } from "../constants/Messages";
 import { ISchedule } from "../interfaces/services/messages/IMessages";
 import { MessageError } from "../services/MessageService";
 
@@ -216,6 +216,87 @@ async function checkView(client: BotClient): Promise<void> {
     check("Das Embed hat einen Titel", embedJson.includes("Titel"));
     check("Und sein Feld", embedJson.includes("Wert"));
     check("Der Text darüber bleibt", embedded.content === "Dazu ein Wort");
+
+    // W-0091: Menüs stehen vor den Knöpfen, je Menü eine Reihe.
+    const menus = client.messageService.CleanMenus(FakeGuild(), [
+        { id: "a", placeholder: "Modul wählen …", options: Array.from({ length: 25 }, (_, index) => ({ label: `Modul ${index}`, action: "text", text: "x" })) },
+        { id: "b", placeholder: "Zweites", options: [{ label: "Eins", action: "text", text: "x" }] },
+    ]);
+    const card = await CustomMessageView(client, { id: 9, kind: "v2", content: "", embed: null, doc: DefaultMessageDoc(), buttons, menus }, { guild: "Dev Server" });
+    const cardJson = JSON.stringify(card.components.map((component) => component.toJSON()));
+
+    check("Die Karte trägt die Menüs", cardJson.includes("cm:menu:9:a") && cardJson.includes("cm:menu:9:b"));
+    check("Mit Platzhalter", cardJson.includes("Modul wählen …"));
+    check("Alle 25 Einträge", (cardJson.match(/"value":"/g) ?? []).length === 26, String((cardJson.match(/"value":"/g) ?? []).length));
+    check("Menüs vor den Knöpfen", cardJson.indexOf("cm:menu:9:a") < cardJson.indexOf("cm:btn:9:"));
+
+    const text = await CustomMessageView(client, { id: 10, kind: "text", content: "Hallo", embed: null, doc: DefaultMessageDoc(), buttons, menus }, { guild: "Dev Server" });
+
+    check("Normale Nachricht: je Menü eine Reihe, dann die Knöpfe", text.components.length === 4, String(text.components.length));
+    check("Das Menü hat seine Custom-ID", JSON.stringify(text.components[0].toJSON()).includes("cm:menu:10:a"));
+}
+
+/* ----------------------------------------------------------
+   Auswahlmenüs (W-0091)
+   ---------------------------------------------------------- */
+function checkMenus(client: BotClient): void {
+    console.log("\n  — Auswahlmenüs —");
+
+    const guild = FakeGuild();
+    const service = client.messageService;
+    const option = (label: string, extra: object) => ({ label, description: "  Kurz  ", emoji: null, ...extra });
+    const menus = service.CleanMenus(guild, [
+        {
+            id: "doku",
+            placeholder: "  Modul wählen …  ",
+            options: [
+                option("Rocket Roulette", { action: "text", text: "## Rocket Roulette" }),
+                option("Pings", { action: "role", roleId: ROLE, mode: "toggle" }),
+                option("Webseite", { action: "link", url: "https://nexus-emb.de" }),
+                option("Erste Schritte", { action: "message", messageId: 12 }),
+                option("Ohne Rolle", { action: "role", roleId: "123" }),
+                option("Kaputter Link", { action: "link", url: "http://nexus-emb.de" }),
+                option("Leerer Text", { action: "text", text: "   " }),
+                option("Ohne Nachricht", { action: "message", messageId: "abc" }),
+                { label: "   ", action: "text", text: "x" },
+            ],
+        },
+        { id: "doku", placeholder: "", options: [option("Zweites", { action: "text", text: "Hallo" })] },
+        { id: "leer", placeholder: "Nichts", options: [] },
+        "kaputt",
+    ]);
+
+    check("Ein Menü ohne gültige Einträge fällt weg", menus.length === 2, String(menus.length));
+    check("Der Platzhalter wird getrimmt", menus[0]?.placeholder === "Modul wählen …", String(menus[0]?.placeholder));
+    check(
+        "Nur gültige Einträge bleiben",
+        menus[0]?.options.map((entry) => entry.label).join("|") === "Rocket Roulette|Pings|Webseite|Erste Schritte",
+        menus[0]?.options.map((entry) => entry.label).join("|")
+    );
+    check("Die Beschreibung wird getrimmt", menus[0]?.options[0]?.description === "Kurz");
+    check("Rolle, Link und Nachricht kommen mit", menus[0]?.options[1]?.roleId === ROLE && menus[0]?.options[2]?.url === "https://nexus-emb.de" && menus[0]?.options[3]?.messageId === 12);
+    check("Jede Menü-ID nur einmal", new Set(menus.map((entry) => entry.id)).size === menus.length);
+    check("Jede Eintrags-ID nur einmal", new Set(menus[0]?.options.map((entry) => entry.id)).size === menus[0]?.options.length);
+    check("Ohne Platzhalter gibt es einen Standard", (menus[1]?.placeholder ?? "") !== "");
+
+    const many = service.CleanMenus(guild, [{ placeholder: "Viel", options: Array.from({ length: 30 }, (_, index) => option(`Eintrag ${index}`, { action: "text", text: "x" })) }]);
+    check(`Höchstens ${MAX_MENU_OPTIONS} Einträge je Menü`, many[0]?.options.length === MAX_MENU_OPTIONS, String(many[0]?.options.length));
+
+    const four = service.CleanMenus(guild, Array.from({ length: 5 }, () => ({ placeholder: "M", options: [option("A", { action: "text", text: "x" })] })));
+    check(`Höchstens ${MAX_MENUS} Menüs`, four.length === MAX_MENUS, String(four.length));
+
+    const clean = service.Clean(guild, { name: "Doku", doc: DefaultMessageDoc(), buttons: [], channelId: TEXT, schedule: { mode: "off" }, menus: [{ placeholder: "M", options: [option("A", { action: "text", text: "x" })] }] });
+    check("Clean nimmt die Menüs mit", clean.menus.length === 1);
+    check(
+        "Ohne menus bleiben die alten",
+        service.Clean(guild, { name: "Doku" }, { ...clean, id: 1, guildId: GUILD, messageId: null, createdBy: USER, createdAt: 0, updatedAt: 0 }).menus.length === 1
+    );
+
+    const shown = service.CleanButtons(guild, [
+        { label: "Erste Schritte", action: "message", messageId: 5 },
+        { label: "Kaputt", action: "message", messageId: -1 },
+    ]);
+    check("Knopf: gespeicherte Nachricht zeigen kommt durch", shown.length === 1 && shown[0]?.action === "message" && shown[0].messageId === 5, JSON.stringify(shown));
 }
 
 /* ----------------------------------------------------------
@@ -232,15 +313,35 @@ async function checkDatabase(client: BotClient): Promise<void> {
         embed: DefaultEmbed(),
         doc: DefaultMessageDoc(),
         buttons: client.messageService.CleanButtons(FakeGuild(), [{ label: "Rolle", action: "role", roleId: ROLE }]),
+        menus: client.messageService.CleanMenus(FakeGuild(), [{ placeholder: "Wählen", options: [{ label: "Info", action: "text", text: "Hallo" }] }]),
         channelId: TEXT,
         schedule: { mode: "daily", at: null, hour: 9, minute: 0, weekday: 1, next: Date.now() - 1000, replace: true },
         createdBy: USER,
     });
 
     check("Die Nachricht steht in der Tabelle", message.id > 0 && message.buttons.length === 1);
+    check("Die Menüs kommen zurück", message.menus.length === 1 && message.menus[0].options[0]?.text === "Hallo");
     check("Art, Text und Embed kommen zurück", message.kind === "embed" && message.content === "Bitte lesen" && message.embed?.title === "Überschrift");
     check("Sie steht beim Server", (await client.customMessages.OfGuild(GUILD)).length === 1);
     check("Was fällig ist, wird gefunden", (await client.customMessages.Due(Date.now())).some((entry) => entry.id === message.id));
+
+    // Ohne Termin ist next null. MariaDB liefert das als JSON-null, nicht als SQL-NULL: Die Nachricht ging sonst jede Minute neu raus.
+    const plain = await client.customMessages.Create({
+        guildId: GUILD,
+        name: "Ohne Termin",
+        kind: "text",
+        content: "Nur von Hand",
+        embed: null,
+        doc: DefaultMessageDoc(),
+        buttons: [],
+        menus: [],
+        channelId: TEXT,
+        schedule: { mode: "off", at: null, hour: 9, minute: 0, weekday: 1, next: null, replace: false },
+        createdBy: USER,
+    });
+
+    check("Ohne Termin ist nichts fällig", !(await client.customMessages.Due(Date.now())).some((entry) => entry.id === plain.id));
+    await client.customMessages.Remove(plain.id);
 
     await client.customMessages.Save(message.id, { messageId: "900000000000000001", schedule: { ...message.schedule, next: Date.now() + 86_400_000 } });
 
@@ -300,6 +401,7 @@ async function main(): Promise<void> {
 
     checkClean(client);
     checkResponses(client);
+    checkMenus(client);
     await checkView(client);
 
     if (await client.databaseService.Connect()) {

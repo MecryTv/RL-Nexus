@@ -3837,6 +3837,19 @@ body.no-motion .hero__field .run{display:none}
 .tkprev__btn.is-link{background:#4e5058;color:#dbdee1}
 .tkprev__btn.is-link::after{content:" 97";font-size:11px;opacity:.7}
 @media (max-width:620px){.cmbtn__label,.cmbtn__target{flex-basis:100%}}
+/* W-0091: Auswahlmenüs im Custom Message Builder */
+.cmmenus{display:grid;gap:12px;margin-top:6px}
+.cmmenu{display:grid;gap:10px;padding:12px;border:1px solid var(--line);border-radius:8px}
+.cmmenu__head{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.cmmenu__head .text{flex:1;min-width:200px;height:40px}
+.cmmenu__options{display:grid;gap:8px}
+.cmmenu__option{display:grid;gap:8px;padding:10px;border:1px solid var(--line);border-radius:6px}
+.cmmenu__emoji{flex:0 0 56px;width:56px;height:40px;text-align:center}
+.cmmenu__option .btn--icon{flex:0 0 auto}
+.cmmenu__foot{display:flex;flex-wrap:wrap;gap:8px}
+.tkprev__extras{display:grid;gap:8px;margin-top:10px}
+.tkprev__extras .tkprev__buttons{margin-top:0}
+.tkprev__menu{display:flex;align-items:center;justify-content:space-between;height:36px;padding:0 12px;border-radius:6px;background:#1e1f22;color:#949ba4;font-size:13px}
 
 /* Auf dem Handy duerfen Karten und Knopfzeilen schmaler werden als ihr Inhalt. */
 @media (max-width:620px){
