@@ -21,7 +21,7 @@ interface IStream {
     listeners: Map<string, Set<Handler>>;
 }
 
-const KINDS = ["moderation", "voice", "sixmans", "matchups", "lft", "clips", "guild", "levels", "staff"] as const;
+const KINDS = ["moderation", "voice", "sixmans", "roulette", "matchups", "lft", "clips", "guild", "levels", "staff"] as const;
 
 /** Der persönliche Puls (W-0011): Anfragen vom Staff, ein frisch eingeladener Server. */
 const MY_KINDS = ["staff", "guilds"] as const;

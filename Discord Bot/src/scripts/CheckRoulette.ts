@@ -10,13 +10,13 @@
 process.env.CLIENT_SECRET ||= "check-secret";
 process.env.DEV_CLIENT_SECRET ||= "check-secret";
 
-import { ChannelType, Guild, GuildBasedChannel, Role } from "discord.js";
+import { ButtonInteraction, ChannelType, Guild, GuildBasedChannel, GuildMember, Role } from "discord.js";
 import BotClient from "../client/BotClient";
 import { DefaultRouletteSettings, LobbyCode, LobbyLabel } from "../constants/RocketRoulette";
-import { RouletteError } from "../services/RouletteService";
+import RouletteService, { IRouletteActor, RouletteError } from "../services/RouletteService";
 import { Draw, IDrawInput, IDrawResult, PairKey, WithFiller } from "../services/roulette/Draw";
 import { loadImage } from "@napi-rs/canvas";
-import { IRouletteEvening, IRouletteLobby, IRouletteRound } from "../interfaces/services/roulette/IRoulette";
+import { IRouletteEvening, IRouletteLobby, IRouletteRound, IRouletteSettings } from "../interfaces/services/roulette/IRoulette";
 import {
     AnnouncementAlt,
     ControlAlt,
@@ -458,6 +458,366 @@ async function checkDatabase(client: BotClient): Promise<void> {
     check("Aufräumen: älter als 30 Tage weg, jünger bleibt", pruned >= 1 && (await evenings.Get(evening.id)) === null && (await evenings.Get(recent.id)) !== null && (await rounds.List(evening.id)).length === 0);
 }
 
+/* ----------------------------------------------------------
+   Ablauf: Discord im Speicher, echte Datenbank
+   ---------------------------------------------------------- */
+const INFO = "90071992547409981";
+const CONTROL = "90071992547409982";
+const WAIT = "90071992547409983";
+const MAIN = "90071992547409984";
+const OTHER = "90071992547409985";
+const FIX1 = "90071992547409986";
+const FIX2 = "90071992547409987";
+const MODROLE = "90071992547409988";
+const OWNER = "90071992547409989";
+
+interface IFlowWorld {
+    guild: Guild;
+    settings: IRouletteSettings;
+    member: (id: string, voice: string | null, moderator?: boolean) => GuildMember;
+    members: Map<string, GuildMember>;
+    sent: { channelId: string; id: string; payload: string }[];
+    edits: { channelId: string; messageId: string; payload: string }[];
+    created: string[];
+    deleted: string[];
+    log: string[];
+    failMove: Set<string>;
+    service: RouletteService;
+}
+
+/** Ein Server mit Warteraum, Treffpunkt, Info- und Moderator-Kanal. Wer verschoben wird, sitzt danach im Ziel. */
+function FlowWorld(client: BotClient): IFlowWorld {
+    const world = {
+        settings: { ...DefaultRouletteSettings(), categoryId: CATEGORY, infoChannelId: INFO, controlChannelId: CONTROL, waitingRoomId: WAIT, mainVoiceId: MAIN, moderatorRoleId: MODROLE },
+        members: new Map<string, GuildMember>(),
+        sent: [],
+        edits: [],
+        created: [],
+        deleted: [],
+        log: [],
+        failMove: new Set<string>(),
+        service: client.rouletteService,
+    } as unknown as IFlowWorld;
+    const channels = new Map<string, GuildBasedChannel>();
+    const channel = (id: string, type: ChannelType, name: string, parentId: string | null = null) => {
+        const made = {
+            id,
+            type,
+            name,
+            parentId,
+            isTextBased: () => true,
+            isSendable: () => true,
+            isVoiceBased: () => type === ChannelType.GuildVoice,
+            get members() {
+                return new Map([...world.members].filter(([, member]) => member.voice.channelId === id));
+            },
+            send: async (payload: unknown) => {
+                const sent = { channelId: id, id: `m${world.sent.length + 1}`, payload: JSON.stringify(payload) };
+
+                world.sent.push(sent);
+
+                return { id: sent.id, channelId: id };
+            },
+            messages: {
+                edit: async (messageId: string, payload: unknown) => void world.edits.push({ channelId: id, messageId, payload: JSON.stringify(payload) }),
+                delete: async () => undefined,
+            },
+            delete: async () => {
+                world.deleted.push(id);
+                channels.delete(id);
+            },
+        };
+
+        channels.set(id, made as unknown as GuildBasedChannel);
+
+        return made;
+    };
+
+    channel(CATEGORY, ChannelType.GuildCategory, "Roulette");
+    channel(INFO, ChannelType.GuildText, "roulette-info");
+    channel(CONTROL, ChannelType.GuildText, "roulette-mod");
+
+    for (const [id, name] of [
+        [WAIT, "Warteraum"],
+        [MAIN, "Treffpunkt"],
+        [OTHER, "Anderes"],
+        [FIX1, "Fest 1"],
+        [FIX2, "Fest 2"],
+    ]) {
+        channel(id, ChannelType.GuildVoice, name);
+    }
+
+    let made = 0;
+
+    world.guild = {
+        id: GUILD,
+        name: "Dev",
+        ownerId: OWNER,
+        roles: { cache: new Map([[MODROLE, { id: MODROLE, name: "Roulette-Mod" }]]) },
+        channels: {
+            cache: channels,
+            fetch: async (id: string) => channels.get(id) ?? null,
+            create: async (options: { name: string; parent?: string }) => {
+                const id = `auto${++made}`;
+
+                world.created.push(id);
+
+                return channel(id, ChannelType.GuildVoice, options.name, options.parent ?? null);
+            },
+        },
+        members: { cache: world.members, fetch: async (id: string) => world.members.get(id) ?? Promise.reject(new Error("Unknown Member")) },
+    } as unknown as Guild;
+
+    world.member = (id: string, voice: string | null, moderator = false) => {
+        const member = {
+            id,
+            guild: world.guild,
+            displayName: `Spieler ${id}`,
+            user: { id, bot: false, username: id },
+            roles: { cache: new Map(moderator ? [[MODROLE, { id: MODROLE }]] : []) },
+            permissions: { has: () => false },
+            displayAvatarURL: () => "",
+            voice: {
+                channelId: voice,
+                setChannel: async (target: string | { id: string }) => {
+                    world.log.push("move");
+                    if (world.failMove.has(id)) throw new Error("Target user is not connected to voice.");
+                    member.voice.channelId = typeof target === "string" ? target : target.id;
+                },
+            },
+        };
+
+        world.members.set(id, member as unknown as GuildMember);
+
+        return member as unknown as GuildMember;
+    };
+
+    Patch(world, client.rouletteService);
+    client.guilds.cache.set(GUILD, world.guild);
+
+    return world;
+}
+
+/** Ein Service sieht die Einstellungen der Welt und zeichnet ohne Drossel. */
+function Patch(world: IFlowWorld, service: RouletteService): void {
+    (service as unknown as Record<string, unknown>).Settings = async () => world.settings;
+    service.throttleMs = 0;
+}
+
+function Actor(member: GuildMember): IRouletteActor {
+    return { id: member.id, name: member.displayName, member };
+}
+
+/** Ein Knopfdruck oder eine Auswahl; deferReply/deferUpdate landen im Log der Welt. */
+function Press(world: IFlowWorld, member: GuildMember, customId: string, kind: "button" | "user" | "string" = "button", values: string[] = []) {
+    const replies: string[] = [];
+    const interaction = {
+        customId,
+        guild: world.guild,
+        guildId: GUILD,
+        member,
+        user: member.user,
+        values,
+        deferred: false,
+        replied: false,
+        message: { flags: { has: () => false } },
+        inCachedGuild: () => true,
+        isButton: () => kind === "button",
+        isUserSelectMenu: () => kind === "user",
+        isStringSelectMenu: () => kind === "string",
+        deferReply: async () => {
+            world.log.push("defer");
+            interaction.deferred = true;
+        },
+        deferUpdate: async () => {
+            world.log.push("defer");
+            interaction.deferred = true;
+        },
+        editReply: async (payload: unknown) => void replies.push(JSON.stringify(payload)),
+        reply: async (payload: unknown) => {
+            interaction.replied = true;
+            replies.push(JSON.stringify(payload));
+        },
+        followUp: async (payload: unknown) => void replies.push(JSON.stringify(payload)),
+    };
+
+    return { interaction: interaction as unknown as ButtonInteraction, replies };
+}
+
+async function Rejects(promise: Promise<unknown>): Promise<unknown> {
+    try {
+        await promise;
+
+        return null;
+    } catch (error) {
+        return error;
+    }
+}
+
+function LobbyOf(round: IRouletteRound, id: string): IRouletteLobby | undefined {
+    return round.lobbies.find((lobby) => lobby.teams.some((team) => team.includes(id)));
+}
+
+function SameTeam(round: IRouletteRound, a: string, b: string): boolean {
+    return round.lobbies.some((lobby) => lobby.teams.some((team) => team.includes(a) && team.includes(b)));
+}
+
+async function checkFlow(client: BotClient): Promise<void> {
+    console.log("\n  — Ablauf —");
+
+    // Planen und Start
+    let world = FlowWorld(client);
+    const mod = world.member("mod1", MAIN, true);
+    const waiting = Players(3, "w").map((id) => world.member(id, WAIT));
+    const elsewhere = world.member("x1", OTHER);
+    const planned = await world.service.Plan(world.guild, Actor(mod), Date.now() + 60_000);
+
+    check("Planen: Ankündigung im Info-Kanal, Steuerkarte im Moderator-Kanal", planned.status === "planned" && world.sent.some((entry) => entry.channelId === INFO) && world.sent.some((entry) => entry.channelId === CONTROL));
+    await world.service.Start(world.guild, planned.id);
+    check("startMovesOnlyWaiting: Warteraum in den Treffpunkt, andere bleiben", waiting.every((member) => member.voice.channelId === MAIN) && elsewhere.voice.channelId === OTHER);
+
+    const nobody = world.member("n1", MAIN);
+
+    check("permissions: ohne Rolle kein Steuern, mit Rolle schon", !(await world.service.CanControl(nobody)) && (await world.service.CanControl(mod)));
+    check("permissions: NextRound ohne Rolle wirft", (await Rejects(world.service.NextRound(world.guild, Actor(nobody)))) instanceof RouletteError);
+    await cleanup(client);
+
+    // Eine Runde
+    world = FlowWorld(client);
+
+    const m1 = world.member("mod1", MAIN, true);
+    const m2 = world.member("mod2", MAIN, true);
+    const players = Players(12, "p").map((id) => world.member(id, MAIN));
+    const evening = await world.service.Plan(world.guild, Actor(m1), Date.now());
+
+    await world.service.AddWish(world.guild, Actor(m1), "p1", "p2", true);
+    await world.service.AddWish(world.guild, Actor(m1), "p3", "p4", false);
+
+    const round = await world.service.NextRound(world.guild, Actor(m1));
+    const cards = world.sent.filter((entry) => world.created.includes(entry.channelId));
+
+    check("nextRoundFlow: 2 Lobbys, 4 Kanäle in der Kategorie", round.lobbies.length === 2 && world.created.length === 4 && world.created.every((id) => (world.guild.channels.cache.get(id) as unknown as { parentId: string }).parentId === CATEGORY), `${round.lobbies.length} · ${world.created.length}`);
+    check("nextRoundFlow: je Team-Chat eine Lobby-Karte", world.created.every((id) => cards.filter((entry) => entry.channelId === id).length === 1));
+    check("nextRoundFlow: Moderatoren bleiben im Treffpunkt", m1.voice.channelId === MAIN && m2.voice.channelId === MAIN);
+    check(
+        "nextRoundFlow: jeder Spieler im Kanal seines Teams",
+        players.every((player) => {
+            const lobby = LobbyOf(round, player.id);
+
+            return !!lobby?.channels && player.voice.channelId === lobby.channels[lobby.teams[0].includes(player.id) ? 0 : 1];
+        })
+    );
+    check("nextRoundFlow: Rundenkarte im Info-Kanal", world.sent.some((entry) => entry.channelId === INFO && entry.payload.includes("runde-1")));
+    check("wishOnce: Wunsch-Paare im selben Team", SameTeam(round, "p1", "p2") && SameTeam(round, "p3", "p4"));
+    check("wishOnce: einmaliger Wunsch weg, dauerhafter bleibt", JSON.stringify((await client.rouletteEvenings.Get(evening.id))?.wishes) === JSON.stringify([{ a: "p3", b: "p4", once: false }]));
+
+    const first = round.lobbies[0];
+    const notHost = [...first.teams[0], ...first.teams[1]].find((id) => id !== first.host)!;
+
+    check("markOpenRules: Spieler, der nicht Host ist → Fehler", (await Rejects(world.service.MarkOpen(world.guild, world.members.get(notHost)!, evening.id, round.number, 0))) instanceof RouletteError);
+
+    let edits = world.edits.length;
+    let sent = world.sent.length;
+
+    await world.service.MarkOpen(world.guild, world.members.get(first.host)!, evening.id, round.number, 0);
+
+    const cardEdits = world.edits.slice(edits).filter((entry) => first.cards!.includes(entry.messageId) && first.channels!.includes(entry.channelId));
+    const pings = world.sent.slice(sent).filter((entry) => first.channels!.includes(entry.channelId));
+
+    check("markOpenRules: Host → beide Karten bearbeitet", cardEdits.length === 2, String(cardEdits.length));
+    check("markOpenRules: Ping in beiden Team-Chats mit genau den Team-IDs", pings.length === 2 && ([0, 1] as const).every((team) => pings.some((entry) => entry.channelId === first.channels![team] && entry.payload.includes(JSON.stringify({ parse: [], users: first.teams[team] })))));
+
+    const late = Players(2, "late").map((id) => world.member(id, WAIT));
+    const second = await world.service.NextRound(world.guild, Actor(m1));
+
+    check("lateJoiner: Nachzügler sind in Runde 2 dabei", late.every((member) => !!LobbyOf(second, member.id)) && second.number === 2);
+    check("Nächste Runde: Kanäle der alten Runde weg", round.lobbies.every((lobby) => lobby.channels!.every((id) => world.deleted.includes(id))));
+
+    const before = (await client.rouletteRounds.List(evening.id)).length;
+    const both = await Promise.allSettled([world.service.NextRound(world.guild, Actor(m1)), world.service.NextRound(world.guild, Actor(m2))]);
+    const rejected = both.filter((entry): entry is PromiseRejectedResult => entry.status === "rejected");
+
+    check("doubleNext: eine Runde, der zweite bekommt „läuft schon“", rejected.length === 1 && rejected[0].reason instanceof RouletteError && String(rejected[0].reason.message).includes("läuft schon") && (await client.rouletteRounds.List(evening.id)).length === before + 1, rejected.map((entry) => String(entry.reason)).join());
+
+    const current = (await client.rouletteRounds.Current(evening.id))!;
+    const fresh = new RouletteService(client);
+
+    Patch(world, fresh);
+    await fresh.Resume();
+    edits = world.edits.length;
+    await fresh.Handle(Press(world, world.members.get(current.lobbies[0].host)!, `rr:open:${evening.id}:${current.number}:0`).interaction);
+    check("resumeAfterRestart: Knopf „Lobby ist offen“ wirkt mit neuer Service-Instanz", world.edits.slice(edits).some((entry) => current.lobbies[0].cards!.includes(entry.messageId)) && (await client.rouletteRounds.Current(evening.id))!.lobbies[0].openedAt !== null);
+
+    world.log.length = 0;
+    await world.service.Handle(Press(world, m1, `rr:next:${evening.id}`).interaction);
+    check("deferredBeforeMoving: erst bestätigt, dann verschoben", world.log[0] === "defer" && world.log.includes("move"), world.log.slice(0, 3).join());
+
+    world.failMove.add("p5");
+    sent = world.sent.length;
+
+    const failed = await world.service.NextRound(world.guild, Actor(m1));
+    const control = [...world.edits.filter((entry) => entry.channelId === CONTROL), ...world.sent.slice(sent).filter((entry) => entry.channelId === CONTROL)].at(-1);
+
+    check("moveFails: Lobby bleibt, Runde läuft", !!LobbyOf(failed, "p5") && (await client.rouletteRounds.Current(evening.id))?.status === "running");
+    check("moveFails: Steuerkarte nennt ihn", !!control?.payload.includes("Spieler p5"), control?.payload.slice(0, 160));
+    world.failMove.clear();
+    await cleanup(client);
+
+    // Einspringen
+    for (const take of [true, false]) {
+        world = FlowWorld(client);
+
+        const f1 = world.member("mod1", MAIN, true);
+        const f2 = world.member("mod2", MAIN, true);
+
+        Players(13, "p").forEach((id) => world.member(id, MAIN));
+
+        const night = await world.service.Plan(world.guild, Actor(f1), Date.now());
+        const drawn = await world.service.NextRound(world.guild, Actor(f1));
+
+        if (take) {
+            check("fillerFlow: 13 Spieler → Anfrage im Moderator-Kanal, Runde wartet", drawn.status === "drawing" && world.sent.some((entry) => entry.channelId === CONTROL && entry.payload.includes("Ein Platz frei")));
+
+            const filled = await world.service.Fill(world.guild, Actor(f2), night.id, true);
+            const lobby = filled.lobbies.find((entry) => entry.filler === "mod2");
+
+            check("fillerFlow: Moderator springt ein und sitzt in seinem Team-Kanal", !!lobby?.channels && f2.voice.channelId === lobby.channels[1] && filled.status === "running", `${lobby?.channels} · ${f2.voice.channelId}`);
+            await cleanup(client);
+            continue;
+        }
+
+        const skipped = await world.service.Fill(world.guild, Actor(f2), night.id, false);
+        const after = (await client.rouletteEvenings.Get(night.id))!;
+
+        check("fillerFlow: ohne Einspringer setzt einer aus und steht in sitOut", after.sitOut.length === 1 && !LobbyOf(skipped, after.sitOut[0]) && skipped.status === "running", JSON.stringify(after.sitOut));
+
+        await world.service.End(world.guild, Actor(f1));
+
+        const ended = await client.rouletteEvenings.Get(night.id);
+
+        check("endFlow: alle zurück im Treffpunkt", [...world.members.values()].every((member) => member.voice.channelId === MAIN));
+        check("endFlow: Auto-Kanäle gelöscht", world.created.length > 0 && world.created.every((id) => world.deleted.includes(id)));
+        check("endFlow: Übersicht im Moderator-Kanal, Abend beendet", world.sent.some((entry) => entry.channelId === CONTROL && entry.payload.includes("uebersicht")) && ended?.status === "ended");
+        await cleanup(client);
+    }
+
+    // Feste Kanäle
+    world = FlowWorld(client);
+    world.settings = { ...world.settings, teamChannels: "fixed", fixedChannelIds: [FIX1, FIX2] };
+
+    const host = world.member("mod1", MAIN, true);
+
+    Players(12, "p").forEach((id) => world.member(id, MAIN));
+
+    const fixed = await world.service.Plan(world.guild, Actor(host), Date.now());
+    const fixedRound = await world.service.NextRound(world.guild, Actor(host));
+    const fixedEvening = (await client.rouletteEvenings.Get(fixed.id))!;
+
+    check("fixedChannels: 1 Lobby in den festen Kanälen, 6 setzen aus, nichts angelegt", fixedRound.lobbies.length === 1 && fixedEvening.sitOut.length === 6 && world.created.length === 0 && fixedRound.lobbies[0].channels?.join() === [FIX1, FIX2].join());
+    await world.service.End(world.guild, Actor(host));
+    check("fixedChannels: nach dem Ende nichts gelöscht", world.deleted.length === 0);
+}
+
 async function cleanup(client: BotClient): Promise<void> {
     await client.databaseService.Write("DELETE FROM roulette_rounds WHERE guild_id = ?", [GUILD]);
     await client.databaseService.Write("DELETE FROM roulette_evenings WHERE guild_id = ?", [GUILD]);
@@ -481,6 +841,8 @@ async function main(): Promise<void> {
     if (await client.databaseService.Connect()) {
         try {
             await checkDatabase(client);
+            await cleanup(client);
+            await checkFlow(client);
         } finally {
             await cleanup(client).catch((error) => check("Aufräumen lief durch", false, String(error)));
             await client.databaseService.Close();

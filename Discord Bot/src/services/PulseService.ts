@@ -15,7 +15,7 @@ import { ForgetLogTargets } from "../utils/logtarget";
  * Live Tickets haben ihren eigenen Stream (LiveService): dort fließen ganze
  * Nachrichten, und wer was sehen darf, hängt am einzelnen Ticket.
  */
-export type PulseKind = "moderation" | "voice" | "sixmans" | "matchups" | "lft" | "clips" | "guild" | "levels" | "staff" | "guilds";
+export type PulseKind = "moderation" | "voice" | "sixmans" | "roulette" | "matchups" | "lft" | "clips" | "guild" | "levels" | "staff" | "guilds";
 
 /** Der persönliche Puls (W-0011) hängt unter diesem Schlüssel statt unter einer Server-ID. */
 const USER_KEY = "user:";

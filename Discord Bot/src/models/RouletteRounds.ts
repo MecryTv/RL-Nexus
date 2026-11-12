@@ -50,15 +50,22 @@ export default class RouletteRounds extends Model<IRoundRow> {
         return row ? ToRound(row) : null;
     }
 
-    /** Die neueste Runde eines Abends. */
+    /** Die neueste Runde eines Abends. Nach einem Abbruch bekommt die nächste Runde dieselbe Nummer, darum nach ID. */
     async Current(eveningId: number): Promise<IRouletteRound | null> {
-        const row = await this.db.One<IRoundRow>(`SELECT * FROM \`${this.Table}\` WHERE evening_id = ? ORDER BY number DESC LIMIT 1`, [eveningId]);
+        const row = await this.db.One<IRoundRow>(`SELECT * FROM \`${this.Table}\` WHERE evening_id = ? ORDER BY id DESC LIMIT 1`, [eveningId]);
+
+        return row ? ToRound(row) : null;
+    }
+
+    /** Die neueste Runde mit dieser Nummer, für die Knöpfe. */
+    async ByNumber(eveningId: number, number: number): Promise<IRouletteRound | null> {
+        const row = await this.db.One<IRoundRow>(`SELECT * FROM \`${this.Table}\` WHERE evening_id = ? AND number = ? ORDER BY id DESC LIMIT 1`, [eveningId, number]);
 
         return row ? ToRound(row) : null;
     }
 
     async List(eveningId: number): Promise<IRouletteRound[]> {
-        const rows = await this.db.Query<IRoundRow>(`SELECT * FROM \`${this.Table}\` WHERE evening_id = ? ORDER BY number ASC`, [eveningId]);
+        const rows = await this.db.Query<IRoundRow>(`SELECT * FROM \`${this.Table}\` WHERE evening_id = ? ORDER BY number ASC, id ASC`, [eveningId]);
 
         return rows.map(ToRound);
     }

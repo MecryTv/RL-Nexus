@@ -225,6 +225,15 @@ export function WishView(evening: IRouletteEvening, names: Record<string, string
     return card.toMessage({ ephemeral: true });
 }
 
+/** „Spieler tauschen“: zwei wählen, der Bot erkennt, wer gerade in einer Lobby steht. */
+export function SwapView(eveningId: number, round: number) {
+    return new ComponentV2Builder({ accentColor: GOLD })
+        .title("🔁 Spieler tauschen", `Runde ${round}`)
+        .text("Wähle zwei Mitglieder: wer weg ist und wer den Platz bekommt, etwa ein Nachzügler oder ein Moderator. Der Bot erkennt, wer gerade in einer Lobby steht.")
+        .userSelect({ customId: RouletteId("swap", eveningId, round), placeholder: "Genau zwei Mitglieder wählen", minValues: 2, maxValues: 2 })
+        .toMessage({ ephemeral: true });
+}
+
 /** C7: ein Platz ist frei. `resolved` ersetzt die Knöpfe, sobald es geklärt ist. */
 export function FillRequestMessage(eveningId: number, round: number, lobbyName: string, size: number, sitOutName: string, roleId: string | null, resolved: string | null = null): MessageCreateOptions {
     const card = new ComponentV2Builder({ accentColor: resolved ? GREY : GOLD });

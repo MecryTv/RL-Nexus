@@ -34,5 +34,8 @@ export default class Ready extends Event {
 
         // Die Abzeichen der Ränge und Aufgaben als App-Emojis - fehlende lädt er einmal hoch.
         this.client.rankIconService.Initialize().catch((error) => logger.warn(`🎖️  Icons nicht geladen: ${String(error)}`));
+
+        // Rocket Roulette (W-0087): fällige Abende starten, Karten auf den Stand bringen.
+        this.client.rouletteService.Resume().catch((error) => logger.warn(`🎰 Rocket Roulette nicht fortgesetzt: ${String(error)}`));
     }
 }
