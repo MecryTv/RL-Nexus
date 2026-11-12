@@ -95,10 +95,16 @@ export function trialProblem(
  * W-0089: auch am Ende eines Abos, das dafür zum Periodenende gekündigt wird (fulfil.ts).
  */
 export function oneTimeWindow(grants: readonly IGrant[], durationDays: number | null, now: Date): { readonly startsAt: Date; readonly endsAt: Date | null } {
-    const running = grants.filter((grant) => isActive(grant, now) && grant.source !== "trial" && grant.endsAt !== null).sort(laterFirst);
-    const startsAt = running[0]?.endsAt ?? now;
+    const end = grants.filter((grant) => queued(grant, now) && grant.endsAt !== null).sort(laterFirst)[0]?.endsAt;
+    // Ein Abo in der Kulanz endete schon: dann ab jetzt.
+    const startsAt = end && end > now ? end : now;
 
     return { startsAt, endsAt: durationDays === null ? null : new Date(startsAt.getTime() + durationDays * DAY) };
+}
+
+/** Läuft oder wartet schon (später beginnend), ohne Test: Dahinter hängt sich ein Einmalkauf an. */
+function queued(grant: IGrant, now: Date): boolean {
+    return grant.source !== "trial" && (isActive(grant, now) || (grant.endedAt === null && grant.startsAt > now));
 }
 
 /** Was eine Kaufregel vom Produkt braucht. */
@@ -121,6 +127,7 @@ function paidOpen(grants: readonly IGrant[], now: Date): IGrant[] {
 /** Ein Abo zählt beim Vergleich als 30 Tage, unbegrenzt als unendlich lang. */
 const SUBSCRIPTION_DAYS = 30;
 
+/** ponytail: Nach Free Access ist das Ende verschoben, der Beginn nicht; die Spanne enthält dann die eingefrorene Zeit (Review W-0089, Punkt 5). */
 function spanOf(grant: IGrant): number {
     if (grant.source === "subscription") return SUBSCRIPTION_DAYS;
 
@@ -130,20 +137,21 @@ function spanOf(grant: IGrant): number {
 export function purchaseProblem(grants: readonly IGrant[], product: IPlanProduct, banned: boolean, now: Date): string | null {
     if (banned) return BANNED;
 
-    // Ein laufender Test zählt nicht: Der Kauf beendet ihn. Später beginnende zählen beim selben Produkt mit.
-    const running = grants.filter((grant) => isActive(grant, now) && grant.source !== "trial");
-    const owned = [...running, ...paidOpen(grants, now)].filter((grant) => grant.productId === product.id).sort(laterFirst);
+    // Ein laufender Test zählt nicht: Der Kauf beendet ihn. Später beginnende zählen mit, auch ein unbegrenzter hinter einem Geschenk.
+    const running = grants.filter((grant) => queued(grant, now));
+    const owned = running.filter((grant) => grant.productId === product.id).sort(laterFirst);
 
     if (running.some((grant) => grant.endsAt === null)) return "Du hast schon Zugang auf Dauer.";
     if (product.kind === "subscription" && owned.length > 0) return "Dieses Abo hast du schon. Verwalten kannst du es unter „Mein Zugang“.";
     if (owned[0]?.endsAt) return `Diesen Zugang hast du schon. Er läuft bis ${formatDay(owned[0].endsAt)}.`;
     if (product.kind === "subscription" && running.some((grant) => grant.source === "subscription")) return "Du hast schon ein Abo. Verwalten kannst du es unter „Mein Zugang“.";
 
-    // Ein Geschenk wird nie ersetzt (W-0089): ein Abo erst danach.
+    // Ein Abo ersetzt nur Zugänge bis 30 Tage (Nutzer 12.11.), ein Geschenk nie: sonst erst nach dem Ende von allem, was läuft oder wartet.
+    const mode = switchMode(grants, product, now).mode;
     const until = running.sort(laterFirst)[0]?.endsAt;
-    if (product.kind === "subscription" && until && paidOpen(grants, now).length === 0) return `Ein Abo geht erst, wenn dein jetziger Zugang abgelaufen ist (am ${formatDay(until)}).`;
+    if (product.kind === "subscription" && until && mode !== "replace") return `Ein Abo geht erst, wenn dein jetziger Zugang abgelaufen ist (am ${formatDay(until)}).`;
 
-    const end = switchMode(grants, product, now).mode === "replace" ? null : oneTimeWindow(grants, product.durationDays, now).endsAt;
+    const end = mode === "replace" ? null : oneTimeWindow(grants, product.durationDays, now).endsAt;
     if (end !== null && end > LATEST_END) return "Mit diesem Kauf liefe dein Zugang über das Jahr 2037 hinaus. Das geht leider nicht, schreib uns bitte an den Support.";
 
     return null;
@@ -151,19 +159,22 @@ export function purchaseProblem(grants: readonly IGrant[], product: IPlanProduct
 
 /**
  * W-0089, nachdem purchaseProblem nichts fand: replace heißt, die bezahlten
- * Zugänge enden mit der Zahlung und ihr Rest wird Rabatt (ein Abo oder eine
- * längere Laufzeit). append heißt, der neue beginnt am Ende des laufenden,
+ * Zugänge enden mit der Zahlung und ihr Rest wird Rabatt (eine längere
+ * Laufzeit, oder ein Abo statt höchstens 30 Tagen). append heißt, der neue beginnt am Ende des laufenden,
  * ohne Rabatt. new: nichts läuft außer vielleicht einem Test.
  */
 export function switchMode(grants: readonly IGrant[], product: IPlanProduct, now: Date): { readonly mode: "new" | "replace" | "append"; readonly startsAt: Date } {
     const paid = paidOpen(grants, now);
-    const longer = product.kind === "subscription" || (product.durationDays ?? Infinity) > Math.max(...paid.map(spanOf));
+    const longest = Math.max(...paid.map(spanOf));
+    // Aufs Abo nur von höchstens einem Monat, sonst ginge zu viel bezahlte Zeit verloren (Nutzer 12.11.).
+    const longer = product.kind === "subscription" ? longest <= SUBSCRIPTION_DAYS : (product.durationDays ?? Infinity) > longest;
 
     if (paid.length > 0 && longer) return { mode: "replace", startsAt: now };
 
-    const startsAt = oneTimeWindow(grants, product.durationDays, now).startsAt;
-
-    return startsAt > now ? { mode: "append", startsAt } : { mode: "new", startsAt: now };
+    // Auch hinter einem Abo in der Kulanz: append, damit fulfil.ts es kündigt.
+    return grants.some((grant) => queued(grant, now) && grant.endsAt !== null)
+        ? { mode: "append", startsAt: oneTimeWindow(grants, product.durationDays, now).startsAt }
+        : { mode: "new", startsAt: now };
 }
 
 /** Der Monat vor dem Periodenende, wie Stripe ihn zählt: vor dem 31.10. liegt der 30.09. */

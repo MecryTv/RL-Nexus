@@ -202,6 +202,12 @@ export async function checkShop(): Promise<void> {
         assert.match(purchaseProblem([sub], { ...monthly, id: 6 }, false, NOW) ?? "", /^Du hast schon ein Abo\./);
         // Geschenk: ein Abo erst danach, wie bisher.
         assert.match(purchaseProblem([grant({ source: "gift", productId: null })], monthly, false, NOW) ?? "", /Abo geht erst, wenn dein jetziger Zugang abgelaufen ist \(am 26\.10\.2026\)/);
+        // Nutzer 12.11.: aufs Abo nur von höchstens 30 Tagen, sonst ginge zu viel Restzeit verloren. Genannt wird das Ende von allem, auch vom angehängten.
+        const year = grant({ productId: 2, endsAt: new Date(NOW.getTime() + 300 * DAY_MS), startsAt: new Date(NOW.getTime() - 65 * DAY_MS) });
+        const queued = grant({ id: 2, productId: 4, startsAt: year.endsAt as Date, endsAt: new Date(NOW.getTime() + 307 * DAY_MS) });
+        assert.equal(purchaseProblem([year, queued], monthly, false, NOW), "Ein Abo geht erst, wenn dein jetziger Zugang abgelaufen ist (am 19.08.2027).");
+        assert.equal(purchaseProblem([grant({ endsAt: new Date(NOW.getTime() + 29 * DAY_MS) })], monthly, false, NOW), null, "30 Tage lang: Wechsel");
+        assert.match(purchaseProblem([grant({ endsAt: new Date(NOW.getTime() + 30 * DAY_MS) })], monthly, false, NOW) ?? "", /^Ein Abo geht erst/, "31 Tage lang: gesperrt");
     });
 
     await check("W-0089: Wechsel bei Abo und längerer Laufzeit, sonst hinten an", () => {
@@ -219,6 +225,22 @@ export async function checkShop(): Promise<void> {
         assert.deepEqual(switchMode([grant({ source: "trial" })], yearly, NOW), { mode: "new", startsAt: NOW });
         // Ein Geschenk wird nie ersetzt: hinten an.
         assert.deepEqual(switchMode([grant({ source: "gift", productId: null })], yearly, NOW), { mode: "append", startsAt: running.endsAt });
+    });
+
+    await check("W-0089 Review: hinter einem schon angehängten, Abo in der Kulanz, unbegrenzt hinter einem Geschenk", () => {
+        const running = grant({});
+        const queued = grant({ id: 2, productId: 5, startsAt: running.endsAt as Date, endsAt: new Date((running.endsAt as Date).getTime() + 30 * DAY_MS) });
+
+        // Ein dritter beginnt am Ende des schon angehängten, nicht parallel zu ihm.
+        assert.deepEqual(oneTimeWindow([running, queued], 7, NOW).startsAt, queued.endsAt);
+        assert.deepEqual(switchMode([running, queued], week, NOW), { mode: "append", startsAt: queued.endsAt });
+        // Abo in der Kulanz (Verlängerung noch nicht gemeldet): hinten an ab jetzt, nicht „neu“, damit das Abo gekündigt wird.
+        const grace = grant({ source: "subscription", productId: 3, stripeSubscriptionId: "sub_1", endsAt: new Date(NOW.getTime() - 3_600_000) });
+        assert.deepEqual(switchMode([grace], week, NOW), { mode: "append", startsAt: NOW });
+        // Unbegrenzt, aber erst nach einem Geschenk: zählt schon jetzt als Zugang auf Dauer.
+        const later = grant({ id: 3, productId: 4, startsAt: running.endsAt as Date, endsAt: null });
+        assert.equal(purchaseProblem([grant({ source: "gift", productId: null }), later], week, false, NOW), "Du hast schon Zugang auf Dauer.");
+        assert.equal(purchaseProblem([grant({ source: "gift", productId: null }), later], monthly, false, NOW), "Du hast schon Zugang auf Dauer.");
     });
 
     await check("W-0089: Rabatt aus der Restzeit, anteilig und gedeckelt", () => {
@@ -810,6 +832,22 @@ section("Shop: Kündigen");
         const paused = cancelReceivedMail(config, { ...base, frozenRest: 12 * 86_400 }).html;
         assert.doesNotMatch(paused, /05\.11\.2026/);
         assert.match(paused, /12 Tage/);
+    });
+
+    await check("W-0089 Review: sofort kündigen ist wiederholbar, ein schon beendetes Abo bleibt in Ruhe", async () => {
+        const calls: string[] = [];
+        const client = (status: string) => ({
+            subscriptions: {
+                retrieve: async (id: string) => ({ id, status }),
+                cancel: async (id: string) => void calls.push(`cancel ${id}`),
+                update: async (id: string, input: { cancel_at_period_end?: boolean }) => void calls.push(`update ${id} ${String(input.cancel_at_period_end)}`),
+            },
+        });
+
+        await sdkGateway(client("active") as never, "whsec_check").cancelSubscription("sub_1", false);
+        await sdkGateway(client("canceled") as never, "whsec_check").cancelSubscription("sub_2", false);
+        await sdkGateway(client("active") as never, "whsec_check").cancelSubscription("sub_3", true);
+        assert.deepEqual(calls, ["cancel sub_1", "update sub_3 true"]);
     });
 
     await check("Erstatten beim Abo: die letzte bezahlte Rechnung, nicht die letzte (W-0024)", async () => {

@@ -133,7 +133,7 @@ check("W-0089: Was heute fällig ist", () => {
     assert.equal(dueLabel(monthly, replace(0)), "4,99\u00a0€ / Monat");
     assert.equal(
         checkoutSummary(monthly, replace(249)),
-        "Monat · 2,50\u00a0€ im ersten Monat, danach 4,99\u00a0€ / Monat (2,49\u00a0€ Rabatt für deine Restzeit) · Laufzeit monatlich kündbar · Dein jetziger Zugang endet mit der Zahlung · Verlängerung: monatlich, bis du kündigst · Kündigung: jederzeit zum Ende des bezahlten Monats"
+        "Monat · 2,50\u00a0€ im ersten Monat, danach 4,99\u00a0€ / Monat (2,49\u00a0€ Rabatt für deine Restzeit) · Laufzeit monatlich kündbar · Dein bezahlter Zugang endet mit der Zahlung · Verlängerung: monatlich, bis du kündigst · Kündigung: jederzeit zum Ende des bezahlten Monats"
     );
     assert.equal(
         checkoutSummary(product({ title: "Woche", durationDays: 7, priceCents: 299 }), { mode: "append", discountCents: 0, startsAt: UNTIL }),

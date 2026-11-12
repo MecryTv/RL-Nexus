@@ -133,7 +133,7 @@ export function checkoutSummary(product: IShopPublicProduct, offer: IShopSwitch 
         product.title,
         discount > 0 ? `${dueLabel(product, offer)} (${formatPrice(discount)} Rabatt für deine Restzeit)` : dueLabel(product, null),
         `Laufzeit ${durationLabel(product.kind, product.durationDays)}`,
-        ...(offer?.mode === "replace" ? ["Dein jetziger Zugang endet mit der Zahlung"] : []),
+        ...(offer?.mode === "replace" ? ["Dein bezahlter Zugang endet mit der Zahlung"] : []),
         ...(offer?.mode === "append" ? [`Beginn am ${formatDay(offer.startsAt)}`] : []),
         `Verlängerung: ${renewalLabel(product.kind)}`,
         `Kündigung: ${endingLabel(product.kind)}`,

@@ -192,7 +192,8 @@ export function sdkGateway(stripe: Stripe, webhookSecret: string): IStripeGatewa
         cancelSubscription: (subscriptionId, atPeriodEnd) =>
             call(async () => {
                 if (atPeriodEnd) await stripe.subscriptions.update(subscriptionId, { cancel_at_period_end: true });
-                else await stripe.subscriptions.cancel(subscriptionId);
+                // Schon beendet, etwa beim zweiten Versuch nach einem Wechsel (W-0089): nichts zu tun.
+                else if ((await stripe.subscriptions.retrieve(subscriptionId)).status !== "canceled") await stripe.subscriptions.cancel(subscriptionId);
             }),
         pauseSubscription: (subscriptionId) =>
             call(async () => {

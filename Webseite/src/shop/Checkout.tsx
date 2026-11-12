@@ -182,7 +182,7 @@ export function Checkout({ product, me, stripeKey, onPaid, onClose }: ICheckoutP
                         {offer?.mode === "replace" && (
                             <div>
                                 <dt>Bisher</dt>
-                                <dd>{me.productTitle ?? "Dein Zugang"} endet mit der Zahlung</dd>
+                                <dd>Dein bezahlter Zugang endet mit der Zahlung</dd>
                             </div>
                         )}
                         {offer?.mode === "append" && (

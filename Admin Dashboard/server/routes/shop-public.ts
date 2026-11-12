@@ -26,6 +26,7 @@ import {
     logEvent,
     markJoined,
     noteWebhook,
+    openCheckouts,
     orderByNo,
     paidByGrant,
     recordStripeEvent,
@@ -33,6 +34,7 @@ import {
     setCancelAtPeriodEnd,
     setGrantEnd,
     setOrderCheckout,
+    setOrderStatus,
     setStripeCustomer,
     stripeEventSeen,
     upsertCustomer,
@@ -68,6 +70,7 @@ import { activeBanOf, scopeOfRow, type IBanRow } from "../security/store.ts";
 const LOGIN_LIMIT = { rateLimit: { max: 20, timeWindow: "1 minute" } };
 const TRIAL_LIMIT = { rateLimit: { max: 5, timeWindow: "1 minute" } };
 const CHECKOUT_LIMIT = { rateLimit: { max: 10, timeWindow: "1 minute" } };
+const PAYMENT_PENDING = "Deine letzte Zahlung wird noch bearbeitet, etwa eine Lastschrift. Sobald sie durch ist, schalten wir dich frei. Bis dahin geht kein zweiter Kauf.";
 const CANCEL_LIMIT = { rateLimit: { max: 5, timeWindow: "1 minute", keyGenerator: (request: FastifyRequest) => rateKey(request.ip) } };
 
 const HOUR = 3_600_000;
@@ -529,8 +532,17 @@ export async function publicShopRoutes(app: FastifyInstance, { config }: { confi
         const grants = await grantsOf(session.id);
         const problem = purchaseProblem(grants, product, customer.bannedAt !== null, now);
         if (problem) throw new PublicError(409, problem);
-        if (await hasPendingOrder(session.id)) {
-            throw new PublicError(409, "Deine letzte Zahlung wird noch bearbeitet, etwa eine Lastschrift. Sobald sie durch ist, schalten wir dich frei. Bis dahin geht kein zweiter Kauf.");
+        if (await hasPendingOrder(session.id)) throw new PublicError(409, PAYMENT_PENDING);
+
+        // W-0089: Eine neue Kasse schließt die offenen. Sonst ließe sich in zwei Tabs derselbe Zugang zweimal kaufen oder derselbe Rest zweimal anrechnen.
+        for (const open of await openCheckouts(session.id)) {
+            try {
+                await gateway.expireCheckout(open.checkoutId);
+                await setOrderStatus(open.id, "failed");
+            } catch {
+                // Schon bezahlt, der Webhook fehlt noch: Dann wie bei einer Lastschrift warten. Abgelaufen: egal.
+                if ((await gateway.checkoutStatus(open.checkoutId).catch(() => null)) === "complete") throw new PublicError(409, PAYMENT_PENDING);
+            }
         }
 
         // W-0089: Der Rabatt wird hier frisch gerechnet und gilt für diese Bestellung.

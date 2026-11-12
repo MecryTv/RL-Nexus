@@ -2,12 +2,12 @@ import { formatPrice } from "../../shared/shop.ts";
 import type { IConfig } from "../config.ts";
 import { fetchRoles } from "../discord.ts";
 import { publish } from "../events.ts";
-import { LATEST_END, oneTimeWindow } from "./grants.ts";
+import { LATEST_END, isActive, oneTimeWindow } from "./grants.ts";
 import { stripeGateway } from "./stripe.ts";
 import { orderDm, sendShopDm } from "./dm.ts";
 import { legalVersions } from "./legal.ts";
 import { orderMail, sendShopMail } from "./mail.ts";
-import { customerOf, endActiveGrants, grantOfOrder, grantsOf, insertGrant, logEvent, markOrderPaid, orderById, setOrderSteps } from "./records.ts";
+import { customerOf, endActiveGrants, grantOfOrder, grantsOf, insertGrant, logEvent, markOrderPaid, orderById, setOrderSteps, type IOrder } from "./records.ts";
 import { findProduct } from "./store.ts";
 import { syncMember } from "./sync.ts";
 
@@ -33,6 +33,36 @@ export interface IPayment {
 
 const DAY = 86_400_000;
 const MONTH = 31 * DAY;
+
+/**
+ * W-0089: Beim Wechsel endet das alte Abo bei Stripe sofort, hängt sich ein
+ * Einmalkauf an, zum Periodenende (Stripe schickt dann die Mail zur
+ * Kündigung). Frisch gelesen: Beim Wechsel zählen auch Abos, die dieser
+ * Aufruf oder ein abgebrochener vorher schon beendet hat.
+ */
+async function endOldSubscriptions(config: IConfig, order: IOrder): Promise<void> {
+    const replace = order.switchMode === "replace";
+    const now = new Date();
+    const subscriptions = (await grantsOf(order.userId)).filter(
+        (grant) =>
+            grant.source === "subscription" &&
+            grant.orderId !== order.id &&
+            grant.stripeSubscriptionId !== null &&
+            (replace ? (grant.endedAt === null ? isActive(grant, now) : grant.endedAt >= order.createdAt) : grant.endedAt === null && isActive(grant, now) && !grant.cancelAtPeriodEnd)
+    );
+
+    for (const grant of subscriptions) {
+        const subscriptionId = grant.stripeSubscriptionId as string;
+
+        try {
+            await stripeGateway(config).cancelSubscription(subscriptionId, !replace);
+            await logEvent(order.userId, "switch.cancel", `${order.orderNo}: Abo ${subscriptionId} ${replace ? "sofort beendet" : "endet zum Periodenende"}`);
+        } catch (error) {
+            console.error(`🛒 ${order.orderNo}: Abo ${subscriptionId} nicht beendet: ${error instanceof Error ? error.message : String(error)}`);
+            await logEvent(order.userId, "switch.cancel-failed", `${order.orderNo}: Abo ${subscriptionId} von Hand bei Stripe beenden`);
+        }
+    }
+}
 
 /** true: Es wurde etwas erledigt. false: Bestellung unbekannt, nicht bezahlbar oder schon ganz fertig. */
 export async function fulfilOrder(config: IConfig, orderId: number, payment: IPayment): Promise<boolean> {
@@ -93,26 +123,11 @@ export async function fulfilOrder(config: IConfig, orderId: number, payment: IPa
             grantedBy: null,
         });
         await logEvent(order.userId, "order.paid", `${order.orderNo} · ${product.title} · ${formatPrice(payment.amountCents ?? order.amountCents)}`);
-
-        // W-0089, erst nach dem neuen Zugang: Sonst sähe der Webhook zum beendeten Abo kurz keinen Zugang und schickte „abgelaufen“.
-        // Beim Wechsel endet das alte Abo sofort, hängt ein Einmalkauf sich an, zum Periodenende (Stripe schickt dann die Mail zur Kündigung).
-        // ponytail: Stürzt der Prozess genau zwischen Anlegen und Kündigen ab, läuft das alte Abo weiter; im Verlauf fehlt dann switch.cancel.
-        if (order.switchMode !== null) {
-            const subscriptions = grants.filter((grant) => grant.source === "subscription" && grant.endedAt === null && grant.stripeSubscriptionId !== null && !grant.cancelAtPeriodEnd);
-
-            for (const grant of subscriptions) {
-                const subscriptionId = grant.stripeSubscriptionId as string;
-
-                try {
-                    await stripeGateway(config).cancelSubscription(subscriptionId, !replace);
-                    await logEvent(order.userId, "switch.cancel", `${order.orderNo}: Abo ${subscriptionId} ${replace ? "sofort beendet" : "endet zum Periodenende"}`);
-                } catch (error) {
-                    console.error(`🛒 ${order.orderNo}: Abo ${subscriptionId} nicht beendet: ${error instanceof Error ? error.message : String(error)}`);
-                    await logEvent(order.userId, "switch.cancel-failed", `${order.orderNo}: Abo ${subscriptionId} von Hand bei Stripe beenden`);
-                }
-            }
-        }
     }
+
+    // W-0089, erst nach dem neuen Zugang: Sonst sähe der Webhook zum beendeten Abo kurz keinen Zugang und schickte „abgelaufen“.
+    // Solange die Bestellung nicht ganz fertig ist, auch bei der Wiederholung nach einem Abbruch.
+    if (order.switchMode !== null && order.mailStep === null) await endOldSubscriptions(config, order);
 
     const sync = await syncMember(config, order.userId);
     await setOrderSteps(order.id, { joined: sync.joined === "warn" ? "warn" : "done", role: sync.roles === "warn" ? "warn" : "done" });

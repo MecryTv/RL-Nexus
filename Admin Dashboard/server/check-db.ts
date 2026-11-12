@@ -3366,6 +3366,18 @@ try {
                     assert.equal((await buy(kurz.id)).statusCode, 409);
                 });
 
+                await check("Review: Eine neue Kasse schließt die offene, derselbe Rest zählt nicht zweimal", async () => {
+                    kaufStripe.calls.length = 0;
+                    const first = (await buy(jahr.id)).json() as ICheckoutStart;
+                    const second = await buy(monthly.id);
+                    assert.equal(second.statusCode, 200, second.body);
+                    const firstOrder = await records.orderByNo(first.orderNo);
+                    assert.ok(kaufStripe.calls.includes(`ablaufen ${firstOrder?.checkoutId}`), kaufStripe.calls.join(" | "));
+                    assert.equal(firstOrder?.status, "failed");
+                    // Die zweite Kasse bleibt offen, bis der nächste Test sie wieder schließt.
+                    await records.setOrderStatus((await records.orderByNo((second.json() as ICheckoutStart).orderNo))?.id ?? 0, "failed");
+                });
+
                 await check("Wechsel auf das Abo: Gutschein bei Stripe, alter Zugang endet mit der Zahlung, Mail nennt den Rabatt", async () => {
                     kaufStripe.calls.length = 0;
                     shopMails.length = 0;
@@ -3394,14 +3406,30 @@ try {
                     assert.equal(response.statusCode, 200, response.body);
                     const start = response.json() as ICheckoutStart;
                     assert.equal(start.switch?.mode, "replace");
-                    // Rest des bezahlten Monats (2,50 €), unter dem Deckel von 22,49 €.
-                    assert.ok((start.switch?.discountCents ?? 0) >= 240 && (start.switch?.discountCents ?? 0) <= 250, String(start.switch?.discountCents));
+                    // Rest des Monats: Wert ist, was bezahlt wurde, plus der Rabatt, der darin steckt (2,50 € + 2,49 €), unter dem Deckel von 22,49 €.
+                    assert.ok((start.switch?.discountCents ?? 0) >= 490 && (start.switch?.discountCents ?? 0) <= 499, String(start.switch?.discountCents));
 
                     await pay(start.orderNo);
                     assert.ok(kaufStripe.calls.includes("kündigen sub_checkdb_wechsel sofort"), kaufStripe.calls.join(" | "));
                     const grants = await open();
                     assert.deepEqual(grants.map((grant) => [grant.source, grant.productId]), [["one_time", jahr.id]]);
                     assert.ok(Math.abs((grants[0]?.startsAt.getTime() ?? 0) - Date.now()) < 60_000);
+                });
+
+                await check("Review: Bricht ein Wechsel nach dem Beenden ab, kündigt die Wiederholung das alte Abo trotzdem", async () => {
+                    // Ein zweites Abo, als hätte der vorige Aufruf es schon beendet, den neuen Zugang aber nicht mehr angelegt.
+                    const old = await records.insertOrder({ userId: USERS.buyer, productId: monthly.id, amountCents: 499, termsVersion: "2026-10-12" });
+                    await records.markOrderPaid(old.id, { invoiceId: null, paymentIntentId: null });
+                    const sub = await records.insertGrant({ userId: USERS.buyer, source: "subscription", productId: monthly.id, startsAt: new Date(Date.now() - 86_400_000), endsAt: new Date(Date.now() + 20 * 86_400_000), roleId: null, stripeSubscriptionId: "sub_checkdb_abbruch", orderId: old.id, grantedBy: null });
+                    const order = await records.insertOrder({ userId: USERS.buyer, productId: woche.id, amountCents: 299, termsVersion: "2026-10-12", switchMode: "replace", discountCents: 0 });
+                    await query("UPDATE shop_grants SET ended_at = NOW() + INTERVAL 1 SECOND WHERE id = ?", [sub]);
+                    kaufStripe.calls.length = 0;
+
+                    assert.equal(await fulfilOrder(config, order.id, { subscriptionId: null, periodEnd: null, invoiceId: null, paymentIntentId: null, invoice: null }), true);
+                    assert.ok(kaufStripe.calls.includes("kündigen sub_checkdb_abbruch sofort"), kaufStripe.calls.join(" | "));
+                    // Aufräumen für den nächsten Fall: nur das Jahr läuft (der Wechsel hatte es beendet).
+                    await query("UPDATE shop_grants SET ended_at = NOW() WHERE user_id = ? AND order_id = ?", [USERS.buyer, order.id]);
+                    await query("UPDATE shop_grants SET ended_at = NULL WHERE user_id = ? AND product_id = ?", [USERS.buyer, jahr.id]);
                 });
 
                 await check("Kürzer: die Woche hängt sich ans Jahr, ohne Rabatt; ein zweites Mal geht nicht", async () => {

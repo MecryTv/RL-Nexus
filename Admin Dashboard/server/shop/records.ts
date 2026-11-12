@@ -230,10 +230,13 @@ export async function thawGrant(grantId: number, endsAt: Date | null, startsAt: 
     );
 }
 
-/** W-0089: Was für die Zugänge einer Person bezahlt wurde, abzüglich Erstattungen. Grant-ID → Cent. */
+/**
+ * W-0089: Was die Zugänge einer Person wert sind: bezahlt plus der Rabatt aus
+ * einem früheren Wechsel, der darin steckt, abzüglich Erstattungen. Grant-ID → Cent.
+ */
 export async function paidByGrant(userId: string): Promise<Map<number, number>> {
     const rows = await query<{ id: number; cents: number | string }[]>(
-        `SELECT g.id, GREATEST(CAST(o.amount_cents AS SIGNED) - CAST(o.refunded_cents AS SIGNED), 0) AS cents
+        `SELECT g.id, GREATEST(CAST(o.amount_cents AS SIGNED) + CAST(o.discount_cents AS SIGNED) - CAST(o.refunded_cents AS SIGNED), 0) AS cents
            FROM shop_grants g JOIN shop_orders o ON o.id = g.order_id
           WHERE g.user_id = ? AND o.status = 'paid'`,
         [userId]
