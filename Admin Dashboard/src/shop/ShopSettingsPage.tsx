@@ -16,6 +16,9 @@ import { AccessCard } from "./AccessCard";
 import { settingsUntouched } from "./draft";
 import styles from "./shop.module.scss";
 
+/** W-0089: Höchstrabatt beim Wechsel, Prozent vom neuen Preis. */
+const SWITCH_STEPS = [0, 10, 20, 25, 30, 40, 50, 60, 70, 75, 80, 90, 100] as const;
+
 function messageOf(error: unknown): string {
     return error instanceof Error ? error.message : String(error);
 }
@@ -152,6 +155,19 @@ export function ShopSettingsPage(): JSX.Element {
                             hint={`Die Codes selbst legst du im Stripe-Dashboard an.${free ? ` ${LATER}` : ""}`}
                             onChange={(value) => set("promoCodes", value)}
                         />
+                        <Field
+                            id="wechsel-rabatt"
+                            label="Höchstrabatt beim Wechsel"
+                            hint={`Wer auf ein Abo oder eine längere Laufzeit wechselt, bekommt den bezahlten Rest seines Zugangs anteilig als Rabatt, höchstens diesen Teil vom neuen Preis. Rabattcodes gehen dabei nicht.${free ? ` ${LATER}` : ""}`}
+                        >
+                            <select id="wechsel-rabatt" value={draft.switchMaxPercent} onChange={(event) => set("switchMaxPercent", Number(event.target.value))} aria-describedby="wechsel-rabatt-hint">
+                                {SWITCH_STEPS.map((percent) => (
+                                    <option key={percent} value={percent}>
+                                        {percent === 0 ? "Kein Rabatt" : `${percent} %`}
+                                    </option>
+                                ))}
+                            </select>
+                        </Field>
                     </div>
                 </Panel>
 

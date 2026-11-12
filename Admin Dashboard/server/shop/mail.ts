@@ -133,6 +133,11 @@ async function legalFiles(version: string): Promise<IFile[]> {
     return files;
 }
 
+/** W-0089: „für die Restzeit deines vorigen Zugangs, nur im ersten Monat. Bezahlt: 2,49 €“, hinter dem Rabatt. */
+export function restNote(paidCents: number, subscription: boolean): string {
+    return `für die Restzeit deines vorigen Zugangs${subscription ? ", nur im ersten Monat" : ""}. Bezahlt: ${formatPrice(paidCents)}`;
+}
+
 export async function orderMail(
     config: IConfig,
     input: {
@@ -141,7 +146,10 @@ export async function orderMail(
         readonly orderNo: string;
         readonly title: string;
         readonly kind: ProductKind;
+        /** Was bezahlt wurde. */
         readonly priceCents: number;
+        /** W-0089: Rabatt aus der Restzeit des vorigen Zugangs, schon von priceCents abgezogen. */
+        readonly discountCents?: number;
         readonly durationDays: number | null;
         readonly startsAt: Date;
         readonly endsAt: Date | null;
@@ -161,6 +169,7 @@ export async function orderMail(
     const renewal = subscription
         ? "jeden Monat, bis du kündigst. Kündigen geht jederzeit zum Ende des bezahlten Monats."
         : "keine. Der Zugang verlängert sich nicht.";
+    const discount = input.discountCents ?? 0;
 
     return {
         to: input.to,
@@ -169,7 +178,8 @@ export async function orderMail(
             `<h2>Danke, dein Zugang ist aktiv.</h2>` +
             `<p>Hallo ${esc(input.name)}, das ist die Bestätigung deines Vertrags. Bewahr die Mail am besten auf.</p>` +
             `<p><b>Produkt:</b> ${esc(input.title)} (${esc(durationLabel(input.kind, input.durationDays))})<br>` +
-            `<b>Preis:</b> ${esc(formatPrice(input.priceCents))} ${esc(priceSuffix(input.kind))}<br>` +
+            `<b>Preis:</b> ${esc(formatPrice(input.priceCents + discount))} ${esc(priceSuffix(input.kind))}<br>` +
+            (discount > 0 ? `<b>Rabatt:</b> ${esc(`${formatPrice(discount)} ${restNote(input.priceCents, subscription)}`)}<br>` : "") +
             `<b>Laufzeit:</b> ${esc(term)}<br>` +
             `<b>Verlängerung:</b> ${esc(renewal)}<br>` +
             (input.roleName ? `<b>Discord-Rolle:</b> ${esc(input.roleName)}<br>` : "") +

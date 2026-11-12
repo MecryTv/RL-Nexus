@@ -27,13 +27,14 @@ interface ISettingsRow {
     readonly trial_days: number;
     readonly trial_role_id: string | null;
     readonly promo_codes: number;
+    readonly switch_max_percent: number;
     readonly terms_version: string;
     readonly updated_at: Date;
 }
 
 export async function readSettings(): Promise<IShopSettings & { readonly updatedAt: Date; readonly modeChangedAt: Date | null }> {
     const [row] = await query<(ISettingsRow & { access_mode: AccessMode; mode_changed_at: Date | null })[]>(
-        "SELECT access_mode, mode_changed_at, shop_open, paywall, trial_enabled, trial_days, trial_role_id, promo_codes, terms_version, updated_at FROM shop_settings WHERE id = 1"
+        "SELECT access_mode, mode_changed_at, shop_open, paywall, trial_enabled, trial_days, trial_role_id, promo_codes, switch_max_percent, terms_version, updated_at FROM shop_settings WHERE id = 1"
     );
 
     if (!row) throw new PublicError(503, "Die Shop-Einstellungen fehlen. Starte den Admin-Server neu, er legt sie an.");
@@ -47,6 +48,7 @@ export async function readSettings(): Promise<IShopSettings & { readonly updated
         trialDays: row.trial_days,
         trialRoleId: row.trial_role_id,
         promoCodes: row.promo_codes === 1,
+        switchMaxPercent: row.switch_max_percent,
         termsVersion: row.terms_version,
         updatedAt: row.updated_at,
     };
@@ -56,12 +58,13 @@ export async function readSettings(): Promise<IShopSettings & { readonly updated
 export async function writeSettings(settings: IShopSettingsInput, actorId: string): Promise<void> {
     await query(
         `UPDATE shop_settings SET trial_enabled = ?, trial_days = ?, trial_role_id = ?,
-                promo_codes = ?, terms_version = ?, updated_by = ? WHERE id = 1`,
+                promo_codes = ?, switch_max_percent = ?, terms_version = ?, updated_by = ? WHERE id = 1`,
         [
             settings.trialEnabled,
             settings.trialDays,
             settings.trialRoleId,
             settings.promoCodes,
+            settings.switchMaxPercent,
             settings.termsVersion,
             actorId,
         ]

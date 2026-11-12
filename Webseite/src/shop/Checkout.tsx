@@ -4,9 +4,9 @@ import { Button } from "../components/ui/Button";
 import { Icon } from "../components/ui/Icon";
 import { ShopError, startCheckout } from "./api.ts";
 import { Avatar } from "./Avatar";
-import { checkoutSummary, durationLabel, endingLabel, formatPrice, priceSuffix, renewalLabel } from "./logic.ts";
+import { checkoutSummary, dueLabel, durationLabel, endingLabel, formatDay, formatPrice, renewalLabel } from "./logic.ts";
 import { Overlay } from "./Overlay";
-import { TAX_NOTE, type IShopMe, type IShopPublicProduct } from "./types.ts";
+import { TAX_NOTE, type IShopMe, type IShopPublicProduct, type IShopSwitch } from "./types.ts";
 import styles from "./Checkout.module.scss";
 
 export interface ICheckoutProps {
@@ -66,8 +66,10 @@ export function Checkout({ product, me, stripeKey, onPaid, onClose }: ICheckoutP
     const [orderNo, setOrderNo] = useState<string | null>(null);
     const [canConfirm, setCanConfirm] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    // W-0089: Wechsel oder Anhängen. Zuerst, was die Preisseite kannte, nach „Weiter zur Zahlung“ der frisch gerechnete Stand der Bestellung.
+    const [offer, setOffer] = useState<IShopSwitch | null>(me.switches?.[String(product.id)] ?? null);
 
-    const total = `${formatPrice(product.priceCents)} ${priceSuffix(product.kind)}`;
+    const total = dueLabel(product, offer);
     const renewal = renewalLabel(product.kind);
     const ending = endingLabel(product.kind);
     const agreed = consent.terms && consent.start && consent.adult;
@@ -100,6 +102,7 @@ export function Checkout({ product, me, stripeKey, onPaid, onClose }: ICheckoutP
             }
 
             actions.current = loaded.actions;
+            setOffer(start.switch);
             setOrderNo(start.orderNo);
             setPhase("pay");
         } catch (failure) {
@@ -176,6 +179,24 @@ export function Checkout({ product, me, stripeKey, onPaid, onClose }: ICheckoutP
                             <dt>Laufzeit</dt>
                             <dd>{durationLabel(product.kind, product.durationDays)}</dd>
                         </div>
+                        {offer?.mode === "replace" && (
+                            <div>
+                                <dt>Bisher</dt>
+                                <dd>{me.productTitle ?? "Dein Zugang"} endet mit der Zahlung</dd>
+                            </div>
+                        )}
+                        {offer?.mode === "append" && (
+                            <div>
+                                <dt>Beginn</dt>
+                                <dd>{formatDay(offer.startsAt)}, nach deinem jetzigen Zugang</dd>
+                            </div>
+                        )}
+                        {offer !== null && offer.discountCents > 0 && (
+                            <div>
+                                <dt>Rabatt</dt>
+                                <dd>−{formatPrice(offer.discountCents)} für deine Restzeit</dd>
+                            </div>
+                        )}
                         <div>
                             <dt>Verlängerung</dt>
                             <dd>{renewal}</dd>
@@ -234,7 +255,7 @@ export function Checkout({ product, me, stripeKey, onPaid, onClose }: ICheckoutP
 
                     {(phase === "pay" || phase === "paying") && (
                         <>
-                            <p className={styles.summary}>{checkoutSummary(product)}</p>
+                            <p className={styles.summary}>{checkoutSummary(product, offer)}</p>
                             <Button className={styles.wide} onClick={() => void pay()} disabled={!canConfirm || phase === "paying"}>
                                 {phase === "paying" ? "Wird bezahlt …" : "Zahlungspflichtig bestellen"}
                             </Button>

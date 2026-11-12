@@ -184,7 +184,7 @@
 /* --- Karten ----------------------------------------------------------------- */
 .grid {
     display: grid;
-    align-items: end;
+    align-items: stretch;
     gap: 18px;
     grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
 }
@@ -273,6 +273,14 @@
     color: var(--c-text-dim);
     font-size: 0.9rem;
     line-height: 1.5;
+}
+
+/* W-0089: Rabatt oder Beginn unter dem Knopf. */
+.cardHint {
+    margin-top: 8px;
+    color: var(--c-text-dim);
+    font-size: 0.85rem;
+    text-align: center;
 }
 
 .wide {

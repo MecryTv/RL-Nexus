@@ -1,6 +1,6 @@
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { LEGAL_DOCS, maskEmail, type ICancelReceipt, type ICheckoutStart, type ILegalText, type LegalDoc, type IShopMe, type IShopPublicProduct, type IShopState, type IUnlockProgress, type StepState } from "../../shared/shop.ts";
+import { LEGAL_DOCS, formatPrice, maskEmail, type ICancelReceipt, type ICheckoutStart, type IShopSwitch, type ILegalText, type LegalDoc, type IShopMe, type IShopPublicProduct, type IShopState, type IUnlockProgress, type StepState } from "../../shared/shop.ts";
 import type { IConfig } from "../config.ts";
 import { query } from "../db.ts";
 import { BotAuthorization, DiscordUnavailable, avatarUrl, displayName, exchangeShopCode, fetchMe, fetchRoles, leaveGuild, shopAuthorizeUrl, userGuildIds } from "../discord.ts";
@@ -10,7 +10,7 @@ import { publish } from "../events.ts";
 import { seal } from "../session.ts";
 import { expireDue } from "../shop/expiry.ts";
 import { fulfilOrder } from "../shop/fulfil.ts";
-import { accessOf, purchaseProblem, trialProblem } from "../shop/grants.ts";
+import { accessOf, purchasePlan, purchaseProblem, trialProblem, type IGrant, type IPlanProduct } from "../shop/grants.ts";
 import { legalPdf, legalText, legalVersions } from "../shop/legal.ts";
 import { paymentFailedDm, sendShopDm, trialDm } from "../shop/dm.ts";
 import { cancelReceiptMail, cancelReceivedMail, paymentFailedMail, sendShopMail, supportNoteMail, trialMail } from "../shop/mail.ts";
@@ -27,6 +27,7 @@ import {
     markJoined,
     noteWebhook,
     orderByNo,
+    paidByGrant,
     recordStripeEvent,
     saveTokens,
     setCancelAtPeriodEnd,
@@ -164,6 +165,26 @@ function publicProduct(product: { readonly id: number; readonly title: string; r
     };
 }
 
+/** W-0089: für den Verlauf beim Kunden. */
+function switchNote(offer: IShopSwitch | null): string {
+    if (offer === null) return "";
+
+    return offer.mode === "append" ? " · hinten an" : ` · Wechsel, ${formatPrice(offer.discountCents)} Rabatt`;
+}
+
+/** W-0089: Wechsel oder Anhängen für die Seite. null: normaler Kauf. */
+function switchOf(
+    grants: readonly IGrant[],
+    product: IPlanProduct & { readonly priceCents: number },
+    now: Date,
+    paid: ReadonlyMap<number, number>,
+    maxPercent: number
+): IShopSwitch | null {
+    const plan = purchasePlan(grants, product, now, paid, maxPercent);
+
+    return plan.mode === "new" ? null : { mode: plan.mode, discountCents: plan.discountCents, startsAt: plan.startsAt.toISOString() };
+}
+
 export async function publicShopRoutes(app: FastifyInstance, { config }: { config: IConfig }): Promise<void> {
     app.addHook("onRequest", async (request: FastifyRequest, reply: FastifyReply) => {
         if (request.method !== "POST" || !request.url.startsWith("/public/shop/")) return;
@@ -198,6 +219,14 @@ export async function publicShopRoutes(app: FastifyInstance, { config }: { confi
                 const lock = ban?.ban && (ban.website || ban.shop) ? ban.ban : null;
                 const running = access.grant;
                 const title = running === null ? null : running.source === "trial" ? "Test" : ((await findProduct(running.productId ?? 0))?.title ?? null);
+                // Dieselbe Regel wie beim Checkout: Die Seite sieht nur den längsten Zugang, der Server alle.
+                const blocked = Object.fromEntries(
+                    products.flatMap((product) => {
+                        const problem = ban?.shop ? SHOP_BANNED : purchaseProblem(grants, product, banned, now);
+                        return problem === null ? [] : [[String(product.id), problem]];
+                    })
+                );
+                const paid = await paidByGrant(session.id);
 
                 me = {
                     id: session.id,
@@ -212,11 +241,11 @@ export async function publicShopRoutes(app: FastifyInstance, { config }: { confi
                     productTitle: title,
                     roleName: banned ? null : await roleName(config, running?.roleId ?? null),
                     hasBilling: customer.stripeCustomerId !== null,
-                    // Dieselbe Regel wie beim Checkout: Die Seite sieht nur den längsten Zugang, der Server alle.
-                    blocked: Object.fromEntries(
+                    blocked,
+                    switches: Object.fromEntries(
                         products.flatMap((product) => {
-                            const problem = ban?.shop ? SHOP_BANNED : purchaseProblem(grants, product, banned, now);
-                            return problem === null ? [] : [[String(product.id), problem]];
+                            const offer = String(product.id) in blocked ? null : switchOf(grants, product, now, paid, settings.switchMaxPercent);
+                            return offer === null ? [] : [[String(product.id), offer]];
                         })
                     ),
                     gesperrt: lock
@@ -496,13 +525,25 @@ export async function publicShopRoutes(app: FastifyInstance, { config }: { confi
         const customer = await customerOf(session.id);
         if (!customer || !customer.email) throw new PublicError(401, "Melde dich zuerst mit Discord an.");
 
-        const problem = purchaseProblem(await grantsOf(session.id), product, customer.bannedAt !== null, new Date());
+        const now = new Date();
+        const grants = await grantsOf(session.id);
+        const problem = purchaseProblem(grants, product, customer.bannedAt !== null, now);
         if (problem) throw new PublicError(409, problem);
         if (await hasPendingOrder(session.id)) {
             throw new PublicError(409, "Deine letzte Zahlung wird noch bearbeitet, etwa eine Lastschrift. Sobald sie durch ist, schalten wir dich frei. Bis dahin geht kein zweiter Kauf.");
         }
 
-        const order = await insertOrder({ userId: session.id, productId: product.id, amountCents: product.priceCents, termsVersion: settings.termsVersion });
+        // W-0089: Der Rabatt wird hier frisch gerechnet und gilt für diese Bestellung.
+        const offer = switchOf(grants, product, now, await paidByGrant(session.id), settings.switchMaxPercent);
+        const discountCents = offer?.discountCents ?? 0;
+        const order = await insertOrder({
+            userId: session.id,
+            productId: product.id,
+            amountCents: product.priceCents - discountCents,
+            termsVersion: settings.termsVersion,
+            switchMode: offer?.mode ?? null,
+            discountCents,
+        });
         const customerId = await gateway.ensureCustomer({ id: customer.stripeCustomerId, email: customer.email, name: customer.name ?? session.name, discordId: session.id });
         if (customerId !== customer.stripeCustomerId) await setStripeCustomer(session.id, customerId);
 
@@ -515,11 +556,12 @@ export async function publicShopRoutes(app: FastifyInstance, { config }: { confi
             userId: session.id,
             returnUrl: `${config.shopSiteUrl}/preise?bestellung=${order.orderNo}`,
             promoCodes: settings.promoCodes,
+            discount: discountCents > 0 ? { cents: discountCents, name: "Rabatt für deine Restzeit" } : null,
         });
         await setOrderCheckout(order.id, checkout.id);
-        await logEvent(session.id, "checkout", `${order.orderNo} · ${product.title}`);
+        await logEvent(session.id, "checkout", `${order.orderNo} · ${product.title}${switchNote(offer)}`);
 
-        return { orderNo: order.orderNo, clientSecret: checkout.clientSecret };
+        return { orderNo: order.orderNo, clientSecret: checkout.clientSecret, switch: offer };
     });
 
     app.get("/public/shop/orders/:no", async (request): Promise<IUnlockProgress> => {
@@ -602,11 +644,22 @@ export async function publicShopRoutes(app: FastifyInstance, { config }: { confi
             const product = await findProduct(id(String(body(request.body).productId ?? "")));
             if (!product) throw new PublicError(404, "Dieses Produkt gibt es nicht.");
 
-            const problem = purchaseProblem(await grantsOf(session.id), product, false, new Date());
+            const now = new Date();
+            const grants = await grantsOf(session.id);
+            const problem = purchaseProblem(grants, product, false, now);
             if (problem) throw new PublicError(409, problem);
 
             const settings = await readSettings();
-            const order = await insertOrder({ userId: session.id, productId: product.id, amountCents: product.priceCents, termsVersion: settings.termsVersion });
+            const offer = switchOf(grants, product, now, await paidByGrant(session.id), settings.switchMaxPercent);
+            const discountCents = offer?.discountCents ?? 0;
+            const order = await insertOrder({
+                userId: session.id,
+                productId: product.id,
+                amountCents: product.priceCents - discountCents,
+                termsVersion: settings.termsVersion,
+                switchMode: offer?.mode ?? null,
+                discountCents,
+            });
             const monthly = product.kind === "subscription";
 
             await fulfilOrder(config, order.id, {

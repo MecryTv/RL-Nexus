@@ -3,6 +3,7 @@ import type { IConfig } from "../config.ts";
 import { fetchRoles } from "../discord.ts";
 import { publish } from "../events.ts";
 import { LATEST_END, oneTimeWindow } from "./grants.ts";
+import { stripeGateway } from "./stripe.ts";
 import { orderDm, sendShopDm } from "./dm.ts";
 import { legalVersions } from "./legal.ts";
 import { orderMail, sendShopMail } from "./mail.ts";
@@ -30,7 +31,8 @@ export interface IPayment {
     readonly amountCents?: number | null;
 }
 
-const MONTH = 31 * 86_400_000;
+const DAY = 86_400_000;
+const MONTH = 31 * DAY;
 
 /** true: Es wurde etwas erledigt. false: Bestellung unbekannt, nicht bezahlbar oder schon ganz fertig. */
 export async function fulfilOrder(config: IConfig, orderId: number, payment: IPayment): Promise<boolean> {
@@ -61,12 +63,18 @@ export async function fulfilOrder(config: IConfig, orderId: number, payment: IPa
         window = { startsAt: existing.startsAt, endsAt: existing.endsAt };
     } else {
         const grants = await grantsOf(order.userId);
+        const replace = order.switchMode === "replace";
 
         // Der Kauf beendet einen laufenden Test. Ein Einmalkauf auf einen laufenden beginnt an dessen Ende.
-        await endActiveGrants(order.userId, ["trial"]);
+        // W-0089: Ein Wechsel beendet auch die bezahlten Zugänge, ihr Rest war der Rabatt.
+        await endActiveGrants(order.userId, replace ? ["trial", "one_time", "subscription"] : ["trial"]);
 
         window =
-            product.kind === "subscription" ? { startsAt: now, endsAt: payment.periodEnd ?? new Date(now.getTime() + MONTH) } : oneTimeWindow(grants, product.durationDays, now);
+            product.kind === "subscription"
+                ? { startsAt: now, endsAt: payment.periodEnd ?? new Date(now.getTime() + MONTH) }
+                : replace
+                  ? { startsAt: now, endsAt: product.durationDays === null ? null : new Date(now.getTime() + product.durationDays * DAY) }
+                  : oneTimeWindow(grants, product.durationDays, now);
 
         if (window.endsAt !== null && window.endsAt > LATEST_END) {
             await logEvent(order.userId, "grant.capped", `${order.orderNo}: Ende auf 31.12.2037 gekürzt`);
@@ -85,6 +93,25 @@ export async function fulfilOrder(config: IConfig, orderId: number, payment: IPa
             grantedBy: null,
         });
         await logEvent(order.userId, "order.paid", `${order.orderNo} · ${product.title} · ${formatPrice(payment.amountCents ?? order.amountCents)}`);
+
+        // W-0089, erst nach dem neuen Zugang: Sonst sähe der Webhook zum beendeten Abo kurz keinen Zugang und schickte „abgelaufen“.
+        // Beim Wechsel endet das alte Abo sofort, hängt ein Einmalkauf sich an, zum Periodenende (Stripe schickt dann die Mail zur Kündigung).
+        // ponytail: Stürzt der Prozess genau zwischen Anlegen und Kündigen ab, läuft das alte Abo weiter; im Verlauf fehlt dann switch.cancel.
+        if (order.switchMode !== null) {
+            const subscriptions = grants.filter((grant) => grant.source === "subscription" && grant.endedAt === null && grant.stripeSubscriptionId !== null && !grant.cancelAtPeriodEnd);
+
+            for (const grant of subscriptions) {
+                const subscriptionId = grant.stripeSubscriptionId as string;
+
+                try {
+                    await stripeGateway(config).cancelSubscription(subscriptionId, !replace);
+                    await logEvent(order.userId, "switch.cancel", `${order.orderNo}: Abo ${subscriptionId} ${replace ? "sofort beendet" : "endet zum Periodenende"}`);
+                } catch (error) {
+                    console.error(`🛒 ${order.orderNo}: Abo ${subscriptionId} nicht beendet: ${error instanceof Error ? error.message : String(error)}`);
+                    await logEvent(order.userId, "switch.cancel-failed", `${order.orderNo}: Abo ${subscriptionId} von Hand bei Stripe beenden`);
+                }
+            }
+        }
     }
 
     const sync = await syncMember(config, order.userId);
@@ -109,6 +136,7 @@ export async function fulfilOrder(config: IConfig, orderId: number, payment: IPa
                 title: product.title,
                 kind: product.kind,
                 priceCents: order.amountCents,
+                discountCents: order.discountCents,
                 durationDays: product.durationDays,
                 startsAt: window.startsAt,
                 endsAt: product.kind === "subscription" ? null : window.endsAt,
@@ -130,6 +158,7 @@ export async function fulfilOrder(config: IConfig, orderId: number, payment: IPa
             title: product.title,
             kind: product.kind,
             priceCents: order.amountCents,
+            discountCents: order.discountCents,
             orderedAt: order.createdAt,
             paidAt: now,
             startsAt: window.startsAt,

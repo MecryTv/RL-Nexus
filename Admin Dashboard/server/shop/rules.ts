@@ -74,6 +74,7 @@ export function parseSettingsInput(value: unknown): IShopSettingsInput {
         trialDays: whole(input.trialDays, "Die Testdauer", 1, SHOP_LIMITS.maxTrialDays),
         trialRoleId: role === undefined || role === null || role === "" ? null : snowflake(role, "Die Test-Rolle"),
         promoCodes: flag(input.promoCodes, "Rabattcodes"),
+        switchMaxPercent: whole(input.switchMaxPercent, "Der Höchstrabatt beim Wechsel", 0, 100),
         termsVersion,
     };
 }

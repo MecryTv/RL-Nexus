@@ -1,4 +1,4 @@
-import type { ProductKind, ShopStatus } from "../../shared/shop.ts";
+import { SHOP_LIMITS, type ProductKind, type ShopStatus } from "../../shared/shop.ts";
 
 /**
  * Die Regeln für Zugänge, rein und ohne Datenbank: wer gerade Zugang hat, was
@@ -90,37 +90,127 @@ export function trialProblem(
     return null;
 }
 
-/** Ein Einmalkauf beginnt jetzt oder, wenn schon ein befristeter läuft, an dessen Ende. */
+/**
+ * Ein Einmalkauf beginnt jetzt oder, wenn schon ein befristeter läuft, an dessen Ende.
+ * W-0089: auch am Ende eines Abos, das dafür zum Periodenende gekündigt wird (fulfil.ts).
+ */
 export function oneTimeWindow(grants: readonly IGrant[], durationDays: number | null, now: Date): { readonly startsAt: Date; readonly endsAt: Date | null } {
-    const running = grants
-        .filter((grant) => isActive(grant, now) && (grant.source === "one_time" || grant.source === "gift") && grant.endsAt !== null)
-        .sort(laterFirst);
+    const running = grants.filter((grant) => isActive(grant, now) && grant.source !== "trial" && grant.endsAt !== null).sort(laterFirst);
     const startsAt = running[0]?.endsAt ?? now;
 
     return { startsAt, endsAt: durationDays === null ? null : new Date(startsAt.getTime() + durationDays * DAY) };
 }
 
-export function purchaseProblem(
-    grants: readonly IGrant[],
-    product: { readonly kind: ProductKind; readonly durationDays: number | null },
-    banned: boolean,
-    now: Date
-): string | null {
+/** Was eine Kaufregel vom Produkt braucht. */
+export interface IPlanProduct {
+    readonly id: number;
+    readonly kind: ProductKind;
+    readonly durationDays: number | null;
+}
+
+/** Bezahlte Zugänge, die noch nicht vorbei sind, auch später beginnende. Test und Geschenk zählen nicht. */
+function paidOpen(grants: readonly IGrant[], now: Date): IGrant[] {
+    return grants.filter(
+        (grant) =>
+            (grant.source === "one_time" || grant.source === "subscription") &&
+            grant.endedAt === null &&
+            (grant.endsAt === null || grant.endsAt.getTime() + graceOf(grant) > now.getTime())
+    );
+}
+
+/** Ein Abo zählt beim Vergleich als 30 Tage, unbegrenzt als unendlich lang. */
+const SUBSCRIPTION_DAYS = 30;
+
+function spanOf(grant: IGrant): number {
+    if (grant.source === "subscription") return SUBSCRIPTION_DAYS;
+
+    return grant.endsAt === null ? Infinity : Math.round((grant.endsAt.getTime() - grant.startsAt.getTime()) / DAY);
+}
+
+export function purchaseProblem(grants: readonly IGrant[], product: IPlanProduct, banned: boolean, now: Date): string | null {
     if (banned) return BANNED;
 
-    // Ein laufender Test zählt nicht: Der Kauf beendet ihn.
-    const paid = grants.filter((grant) => isActive(grant, now) && grant.source !== "trial").sort(laterFirst);
+    // Ein laufender Test zählt nicht: Der Kauf beendet ihn. Später beginnende zählen beim selben Produkt mit.
+    const running = grants.filter((grant) => isActive(grant, now) && grant.source !== "trial");
+    const owned = [...running, ...paidOpen(grants, now)].filter((grant) => grant.productId === product.id).sort(laterFirst);
 
-    if (paid.some((grant) => grant.endsAt === null)) return "Du hast schon Zugang auf Dauer.";
-    if (paid.some((grant) => grant.source === "subscription")) return "Du hast schon ein Abo. Verwalten kannst du es unter „Mein Zugang“.";
+    if (running.some((grant) => grant.endsAt === null)) return "Du hast schon Zugang auf Dauer.";
+    if (product.kind === "subscription" && owned.length > 0) return "Dieses Abo hast du schon. Verwalten kannst du es unter „Mein Zugang“.";
+    if (owned[0]?.endsAt) return `Diesen Zugang hast du schon. Er läuft bis ${formatDay(owned[0].endsAt)}.`;
+    if (product.kind === "subscription" && running.some((grant) => grant.source === "subscription")) return "Du hast schon ein Abo. Verwalten kannst du es unter „Mein Zugang“.";
 
-    const until = paid[0]?.endsAt;
-    if (product.kind === "subscription" && until) return `Ein Abo geht erst, wenn dein jetziger Zugang abgelaufen ist (am ${formatDay(until)}).`;
+    // Ein Geschenk wird nie ersetzt (W-0089): ein Abo erst danach.
+    const until = running.sort(laterFirst)[0]?.endsAt;
+    if (product.kind === "subscription" && until && paidOpen(grants, now).length === 0) return `Ein Abo geht erst, wenn dein jetziger Zugang abgelaufen ist (am ${formatDay(until)}).`;
 
-    const end = oneTimeWindow(grants, product.durationDays, now).endsAt;
+    const end = switchMode(grants, product, now).mode === "replace" ? null : oneTimeWindow(grants, product.durationDays, now).endsAt;
     if (end !== null && end > LATEST_END) return "Mit diesem Kauf liefe dein Zugang über das Jahr 2037 hinaus. Das geht leider nicht, schreib uns bitte an den Support.";
 
     return null;
+}
+
+/**
+ * W-0089, nachdem purchaseProblem nichts fand: replace heißt, die bezahlten
+ * Zugänge enden mit der Zahlung und ihr Rest wird Rabatt (ein Abo oder eine
+ * längere Laufzeit). append heißt, der neue beginnt am Ende des laufenden,
+ * ohne Rabatt. new: nichts läuft außer vielleicht einem Test.
+ */
+export function switchMode(grants: readonly IGrant[], product: IPlanProduct, now: Date): { readonly mode: "new" | "replace" | "append"; readonly startsAt: Date } {
+    const paid = paidOpen(grants, now);
+    const longer = product.kind === "subscription" || (product.durationDays ?? Infinity) > Math.max(...paid.map(spanOf));
+
+    if (paid.length > 0 && longer) return { mode: "replace", startsAt: now };
+
+    const startsAt = oneTimeWindow(grants, product.durationDays, now).startsAt;
+
+    return startsAt > now ? { mode: "append", startsAt } : { mode: "new", startsAt: now };
+}
+
+/** Der Monat vor dem Periodenende, wie Stripe ihn zählt: vor dem 31.10. liegt der 30.09. */
+function monthBefore(end: Date): Date {
+    const day = end.getUTCDate();
+    const start = new Date(end);
+    start.setUTCDate(1);
+    start.setUTCMonth(start.getUTCMonth() - 1);
+    start.setUTCDate(Math.min(day, new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 0)).getUTCDate()));
+
+    return start;
+}
+
+/**
+ * Was von den bezahlten Zugängen noch übrig ist, anteilig in Cent: bezahlt ×
+ * übrige Zeit / ganze Zeit. paid: Grant-ID → bezahlter Betrag der Bestellung.
+ * ponytail: beim Abo der Betrag der ersten Bestellung, Verlängerungen zu einem neuen Preis kennt der Shop nicht.
+ */
+export function restCents(grants: readonly IGrant[], now: Date, paid: ReadonlyMap<number, number>): number {
+    let rest = 0;
+
+    for (const grant of paidOpen(grants, now)) {
+        if (grant.endsAt === null) continue;
+
+        const end = grant.endsAt.getTime();
+        const start = grant.source === "subscription" ? Math.max(grant.startsAt.getTime(), monthBefore(grant.endsAt).getTime()) : grant.startsAt.getTime();
+        const left = end - Math.max(now.getTime(), start);
+        if (end > start && left > 0) rest += ((paid.get(grant.id) ?? 0) * left) / (end - start);
+    }
+
+    return Math.floor(rest);
+}
+
+/** Wie der Kauf läuft und was er weniger kostet. maxPercent: Höchstrabatt beim Wechsel, Prozent vom neuen Preis. */
+export function purchasePlan(
+    grants: readonly IGrant[],
+    product: IPlanProduct & { readonly priceCents: number },
+    now: Date,
+    paid: ReadonlyMap<number, number>,
+    maxPercent: number
+): { readonly mode: "new" | "replace" | "append"; readonly startsAt: Date; readonly discountCents: number } {
+    const plan = switchMode(grants, product, now);
+    if (plan.mode !== "replace") return { ...plan, discountCents: 0 };
+
+    const cap = Math.min(Math.floor((product.priceCents * maxPercent) / 100), product.priceCents - SHOP_LIMITS.minPriceCents);
+
+    return { ...plan, discountCents: Math.max(0, Math.min(restCents(grants, now, paid), cap)) };
 }
 
 /**

@@ -2399,7 +2399,7 @@ try {
 
             const again = await shopPost("/public/shop/checkout", { productId: monthly.id, consentTerms: true, consentImmediateStart: true, consentAdult: true });
             assert.equal(again.statusCode, 409);
-            assert.match(again.json().error, /schon ein Abo/);
+            assert.match(again.json().error, /^Dieses Abo hast du schon\./);
         });
 
         section("Shop: Webhook");
@@ -3294,6 +3294,141 @@ try {
             await devApp.close();
         }
 
+        section("Shop: Wechsel mit Restzeit (W-0089)");
+
+        {
+            const product = async (title: string, kind: "one_time" | "subscription", durationDays: number | null, priceCents: number): Promise<IShopProduct> =>
+                (
+                    await write("POST", "/api/shop/products", { title, description: "", bullets: [], kind, durationDays, priceCents, badge: "", roleId: "500000000000000001", visible: true })
+                ).json().product as IShopProduct;
+            // Wie dev/zuruecksetzen: Danach erwarten die übrigen Abschnitte den Käufer ohne Kunden.
+            const clear = async (): Promise<void> => {
+                for (const table of ["shop_grants", "shop_orders", "shop_events", "shop_customers"]) await query(`DELETE FROM ${table} WHERE user_id = ?`, [USERS.buyer]);
+            };
+            // Eigene Adresse: Die Kasse erlaubt 10 je Minute und Adresse, spätere Abschnitte kaufen auch noch.
+            const buy = (productId: number) =>
+                app.inject({
+                    method: "POST",
+                    url: "/public/shop/checkout",
+                    remoteAddress: "10.89.0.1",
+                    headers: { cookie: buyerCookie(), origin: SITE, "content-type": "application/json" },
+                    payload: JSON.stringify({ productId, consentTerms: true, consentImmediateStart: true, consentAdult: true }),
+                });
+            const { fulfilOrder } = await import("./shop/fulfil.ts");
+            const pay = async (orderNo: string, subscriptionId: string | null = null): Promise<void> => {
+                const order = await records.orderByNo(orderNo);
+                assert.ok(order);
+                assert.equal(await fulfilOrder(config, order.id, { subscriptionId, periodEnd: subscriptionId ? kaufStripe.periodEnd : null, invoiceId: null, paymentIntentId: null, invoice: null }), true);
+            };
+            const open = async () => (await records.grantsOf(USERS.buyer)).filter((grant) => grant.endedAt === null);
+
+            const kurz = await product("check:db Wechsel 11 Tage", "one_time", 11, 1100);
+            const woche = await product("check:db Wechsel Woche", "one_time", 7, 299);
+            const jahr = await product("check:db Wechsel Jahr", "one_time", 365, 4499);
+
+            try {
+                await clear();
+                await records.upsertCustomer({ id: USERS.buyer, name: "Käufer", email: "kaeufer@example.test" });
+                await query("UPDATE shop_settings SET switch_max_percent = 50 WHERE id = 1");
+
+                // Ein bezahlter Zugang über 11 Tage, davon 10 übrig.
+                const now = Math.floor(Date.now() / 1000) * 1000;
+                const first = await records.insertOrder({ userId: USERS.buyer, productId: kurz.id, amountCents: 1100, termsVersion: "2026-10-12" });
+                await records.markOrderPaid(first.id, { invoiceId: null, paymentIntentId: "pi_checkdb_wechsel" });
+                const old = await records.insertGrant({
+                    userId: USERS.buyer,
+                    source: "one_time",
+                    productId: kurz.id,
+                    startsAt: new Date(now - 86_400_000),
+                    endsAt: new Date(now + 10 * 86_400_000),
+                    roleId: "500000000000000001",
+                    stripeSubscriptionId: null,
+                    orderId: first.id,
+                    grantedBy: null,
+                });
+
+                await check("Die Seite kennt Sperre, Wechsel mit Rabatt und Anhängen", async () => {
+                    const me = ((await shopGet("/public/shop/state")).json() as IShopState).me;
+                    assert.ok(me);
+                    assert.match(me.blocked[String(kurz.id)] ?? "", /^Diesen Zugang hast du schon\. Er läuft bis /);
+                    assert.equal(me.switches[String(kurz.id)], undefined);
+                    // 50 % vom Abo-Preis 4,99 €.
+                    assert.deepEqual(me.switches[String(monthly.id)], { mode: "replace", discountCents: 249, startsAt: me.switches[String(monthly.id)]?.startsAt });
+                    // Rest von 11,00 € nach einem Tag: knapp 10,00 €, unter dem Deckel.
+                    const year = me.switches[String(jahr.id)];
+                    assert.equal(year?.mode, "replace");
+                    assert.ok(year && year.discountCents >= 999 && year.discountCents <= 1000, String(year?.discountCents));
+                    // Kürzer: hinten an, ohne Rabatt.
+                    assert.equal(me.switches[String(woche.id)]?.mode, "append");
+                    assert.equal(me.switches[String(woche.id)]?.discountCents, 0);
+                    assert.equal(Date.parse(me.switches[String(woche.id)]?.startsAt ?? ""), now + 10 * 86_400_000);
+
+                    assert.equal((await buy(kurz.id)).statusCode, 409);
+                });
+
+                await check("Wechsel auf das Abo: Gutschein bei Stripe, alter Zugang endet mit der Zahlung, Mail nennt den Rabatt", async () => {
+                    kaufStripe.calls.length = 0;
+                    shopMails.length = 0;
+                    const response = await buy(monthly.id);
+                    assert.equal(response.statusCode, 200, response.body);
+                    const start = response.json() as ICheckoutStart;
+                    assert.equal(start.switch?.mode, "replace");
+                    assert.equal(start.switch?.discountCents, 249);
+                    assert.match(kaufStripe.calls.find((call) => call.startsWith("checkout")) ?? "", / rabatt 249$/);
+
+                    const order = await records.orderByNo(start.orderNo);
+                    assert.deepEqual([order?.amountCents, order?.switchMode, order?.discountCents], [250, "replace", 249]);
+
+                    await pay(start.orderNo, "sub_checkdb_wechsel");
+                    const grants = await open();
+                    assert.deepEqual(grants.map((grant) => grant.source), ["subscription"]);
+                    assert.notEqual((await records.grantsOf(USERS.buyer)).find((grant) => grant.id === old)?.endedAt, null);
+                    assert.match(String(shopMails[0]?.html), /Rabatt:<\/b> 2,49\s€ für die Restzeit deines vorigen Zugangs, nur im ersten Monat\. Bezahlt: 2,50\s€/);
+                    // Ein altes Einmal-Abo gab es nicht, also nichts zu kündigen.
+                    assert.equal(kaufStripe.calls.some((call) => call.startsWith("kündigen")), false);
+                });
+
+                await check("Vom Abo auf ein Jahr: das Abo endet bei Stripe sofort, das Jahr beginnt jetzt", async () => {
+                    kaufStripe.calls.length = 0;
+                    const response = await buy(jahr.id);
+                    assert.equal(response.statusCode, 200, response.body);
+                    const start = response.json() as ICheckoutStart;
+                    assert.equal(start.switch?.mode, "replace");
+                    // Rest des bezahlten Monats (2,50 €), unter dem Deckel von 22,49 €.
+                    assert.ok((start.switch?.discountCents ?? 0) >= 240 && (start.switch?.discountCents ?? 0) <= 250, String(start.switch?.discountCents));
+
+                    await pay(start.orderNo);
+                    assert.ok(kaufStripe.calls.includes("kündigen sub_checkdb_wechsel sofort"), kaufStripe.calls.join(" | "));
+                    const grants = await open();
+                    assert.deepEqual(grants.map((grant) => [grant.source, grant.productId]), [["one_time", jahr.id]]);
+                    assert.ok(Math.abs((grants[0]?.startsAt.getTime() ?? 0) - Date.now()) < 60_000);
+                });
+
+                await check("Kürzer: die Woche hängt sich ans Jahr, ohne Rabatt; ein zweites Mal geht nicht", async () => {
+                    kaufStripe.calls.length = 0;
+                    const year = (await open())[0];
+                    const response = await buy(woche.id);
+                    assert.equal(response.statusCode, 200, response.body);
+                    const start = response.json() as ICheckoutStart;
+                    assert.equal(start.switch?.mode, "append");
+                    assert.equal(start.switch?.discountCents, 0);
+                    assert.doesNotMatch(kaufStripe.calls.find((call) => call.startsWith("checkout")) ?? "", /rabatt/);
+
+                    await pay(start.orderNo);
+                    const later = (await open()).find((grant) => grant.productId === woche.id);
+                    assert.equal(later?.startsAt.getTime(), year?.endsAt?.getTime());
+                    assert.equal((await open()).length, 2, "das Jahr läuft weiter");
+
+                    const again = await buy(woche.id);
+                    assert.equal(again.statusCode, 409);
+                    assert.match(again.json().error, /^Diesen Zugang hast du schon\./);
+                });
+            } finally {
+                await clear();
+                for (const entry of [kurz, woche, jahr]) await query("DELETE FROM shop_products WHERE id = ?", [entry.id]);
+            }
+        }
+
         section("Shop: Kunden");
 
         // Testpersonen mit 20 Stellen: laufender Test, bezahlter Einmalkauf, gesperrt.
@@ -3635,7 +3770,7 @@ try {
             const state = (await shopGet("/public/shop/state", kuendigtCookie)).json() as IShopState;
             assert.deepEqual([state.me?.productTitle, state.me?.roleName, state.me?.hasBilling], [monthly.title, "Nexus Plus", true]);
             // Was der Server beim Kauf ablehnen würde, steht schon im Zustand: Die Karte bietet es dann nicht an.
-            assert.match(state.me?.blocked[String(monthly.id)] ?? "", /schon ein Abo/);
+            assert.match(state.me?.blocked[String(monthly.id)] ?? "", /^Dieses Abo hast du schon\./);
         });
 
         await check("Anmeldung mit ?ziel=zugang führt danach auf /zugang, ein fremdes Ziel auf /preise", async () => {

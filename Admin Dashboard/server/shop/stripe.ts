@@ -31,6 +31,8 @@ export interface IStripeGateway {
         readonly userId: string;
         readonly returnUrl: string;
         readonly promoCodes: boolean;
+        /** W-0089: Rabatt aus der Restzeit als einmaliger Gutschein. Rabattcodes gehen dann nicht, Stripe erlaubt nicht beides. */
+        readonly discount?: { readonly cents: number; readonly name: string } | null;
     }): Promise<{ readonly id: string; readonly clientSecret: string }>;
     /** Ende des laufenden Abrechnungszeitraums. Steht seit API 2025 an der Abo-Position, nicht mehr am Abo. */
     subscriptionEnd(subscriptionId: string): Promise<Date>;
@@ -141,9 +143,13 @@ export function sdkGateway(stripe: Stripe, webhookSecret: string): IStripeGatewa
 
                 return customer.id;
             }),
-        createCheckout: ({ customerId, priceId, monthly, orderId, orderNo, userId, returnUrl, promoCodes }) =>
+        createCheckout: ({ customerId, priceId, monthly, orderId, orderNo, userId, returnUrl, promoCodes, discount }) =>
             call(async () => {
                 const metadata = { order_id: String(orderId), order_no: orderNo, discord_id: userId };
+                // Beim Abo gilt der Gutschein nur für die erste Rechnung.
+                const coupon = discount
+                    ? await stripe.coupons.create({ amount_off: discount.cents, currency: "eur", duration: "once", max_redemptions: 1, name: discount.name, metadata })
+                    : null;
                 const session = await stripe.checkout.sessions.create({
                     ui_mode: "elements",
                     mode: monthly ? "subscription" : "payment",
@@ -152,7 +158,7 @@ export function sdkGateway(stripe: Stripe, webhookSecret: string): IStripeGatewa
                     return_url: returnUrl,
                     metadata,
                     locale: "de",
-                    ...(promoCodes ? { allow_promotion_codes: true } : {}),
+                    ...(coupon ? { discounts: [{ coupon: coupon.id }] } : promoCodes ? { allow_promotion_codes: true } : {}),
                     ...(monthly
                         ? { subscription_data: { metadata } }
                         : { invoice_creation: { enabled: true, invoice_data: { metadata, footer: TAX_NOTE } }, payment_intent_data: { metadata } }),

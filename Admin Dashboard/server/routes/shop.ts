@@ -65,7 +65,7 @@ const HIDE_HINT = " Stell erst auf Free Access oder mach ein anderes Produkt sic
 function settingsSummary(settings: IShopSettingsInput): string {
     const on = (value: boolean): string => (value ? "an" : "aus");
 
-    return `Test ${on(settings.trialEnabled)} (${settings.trialDays} Tage), Rabattcodes ${on(settings.promoCodes)}`;
+    return `Test ${on(settings.trialEnabled)} (${settings.trialDays} Tage), Rabattcodes ${on(settings.promoCodes)}, Höchstrabatt beim Wechsel ${settings.switchMaxPercent} %`;
 }
 
 /** Bei Paid Access darf das letzte sichtbare Produkt nicht verschwinden. */

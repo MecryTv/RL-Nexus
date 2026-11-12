@@ -230,6 +230,18 @@ export async function thawGrant(grantId: number, endsAt: Date | null, startsAt: 
     );
 }
 
+/** W-0089: Was für die Zugänge einer Person bezahlt wurde, abzüglich Erstattungen. Grant-ID → Cent. */
+export async function paidByGrant(userId: string): Promise<Map<number, number>> {
+    const rows = await query<{ id: number; cents: number | string }[]>(
+        `SELECT g.id, GREATEST(CAST(o.amount_cents AS SIGNED) - CAST(o.refunded_cents AS SIGNED), 0) AS cents
+           FROM shop_grants g JOIN shop_orders o ON o.id = g.order_id
+          WHERE g.user_id = ? AND o.status = 'paid'`,
+        [userId]
+    );
+
+    return new Map(rows.map((row) => [row.id, Number(row.cents)]));
+}
+
 export async function grantsOf(userId: string): Promise<IGrant[]> {
     return (await query<IGrantRow[]>(`SELECT ${GRANT_COLUMNS} FROM shop_grants WHERE user_id = ? ORDER BY id`, [userId])).map(grantOf);
 }
@@ -343,6 +355,10 @@ export interface IOrder {
     readonly userId: string;
     readonly productId: number | null;
     readonly amountCents: number;
+    /** W-0089: Wechsel (der alte Zugang endet mit der Zahlung) oder hinten an. null: normaler Kauf. */
+    readonly switchMode: "replace" | "append" | null;
+    /** W-0089: Rabatt aus der Restzeit, schon von amountCents abgezogen. */
+    readonly discountCents: number;
     /** pending: Kasse fertig, das Geld (Lastschrift) ist unterwegs. */
     readonly status: "open" | "pending" | "paid" | "refunded" | "failed";
     /** Die Checkout Session bei Stripe. */
@@ -364,6 +380,8 @@ interface IOrderRow {
     readonly user_id: string;
     readonly product_id: number | null;
     readonly amount_cents: number;
+    readonly switch_mode: IOrder["switchMode"];
+    readonly discount_cents: number;
     readonly status: IOrder["status"];
     readonly stripe_checkout_id: string | null;
     readonly stripe_payment_intent_id: string | null;
@@ -376,7 +394,7 @@ interface IOrderRow {
 }
 
 const ORDER_COLUMNS =
-    "id, order_no, user_id, product_id, amount_cents, status, stripe_checkout_id, stripe_payment_intent_id, refunded_cents, terms_version, joined_step, role_step, mail_step, created_at";
+    "id, order_no, user_id, product_id, amount_cents, switch_mode, discount_cents, status, stripe_checkout_id, stripe_payment_intent_id, refunded_cents, terms_version, joined_step, role_step, mail_step, created_at";
 
 function orderOf(row: IOrderRow): IOrder {
     return {
@@ -385,6 +403,8 @@ function orderOf(row: IOrderRow): IOrder {
         userId: row.user_id,
         productId: row.product_id,
         amountCents: row.amount_cents,
+        switchMode: row.switch_mode,
+        discountCents: row.discount_cents,
         status: row.status,
         checkoutId: row.stripe_checkout_id,
         paymentIntentId: row.stripe_payment_intent_id,
@@ -398,11 +418,18 @@ function orderOf(row: IOrderRow): IOrder {
 }
 
 /** Die Häkchen sind vorher in der Route geprüft. Hier stehen nur ihre Zeitpunkte. */
-export async function insertOrder(order: { readonly userId: string; readonly productId: number; readonly amountCents: number; readonly termsVersion: string }): Promise<IOrder> {
+export async function insertOrder(order: {
+    readonly userId: string;
+    readonly productId: number;
+    readonly amountCents: number;
+    readonly termsVersion: string;
+    readonly switchMode?: IOrder["switchMode"];
+    readonly discountCents?: number;
+}): Promise<IOrder> {
     const result = await query<{ insertId: number }>(
-        `INSERT INTO shop_orders (user_id, product_id, amount_cents, terms_version, consent_terms, consent_immediate_start, consent_adult)
-         VALUES (?, ?, ?, ?, NOW(), NOW(), NOW())`,
-        [order.userId, order.productId, order.amountCents, order.termsVersion]
+        `INSERT INTO shop_orders (user_id, product_id, amount_cents, switch_mode, discount_cents, terms_version, consent_terms, consent_immediate_start, consent_adult)
+         VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW(), NOW())`,
+        [order.userId, order.productId, order.amountCents, order.switchMode ?? null, order.discountCents ?? 0, order.termsVersion]
     );
 
     await query("UPDATE shop_orders SET order_no = ? WHERE id = ?", [orderNo(result.insertId, new Date()), result.insertId]);

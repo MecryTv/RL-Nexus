@@ -5,7 +5,7 @@ import type { IConfig } from "../config.ts";
 import { fetchRoles, sendDirectMessage } from "../discord.ts";
 import type { IGrant } from "./grants.ts";
 import { legalDay } from "./legal.ts";
-import { dashboardUrl } from "./mail.ts";
+import { dashboardUrl, restNote } from "./mail.ts";
 import { customerOf, logEvent } from "./records.ts";
 import { findProduct } from "./store.ts";
 
@@ -87,7 +87,10 @@ export function orderDm(
         readonly name: string | null;
         readonly title: string;
         readonly kind: ProductKind;
+        /** Was bezahlt wurde. */
         readonly priceCents: number;
+        /** W-0089: Rabatt aus der Restzeit, schon von priceCents abgezogen. */
+        readonly discountCents?: number;
         /** Beim Absenden der Kasse. */
         readonly orderedAt: Date;
         /** Als die Zahlung ankam und der Zugang angelegt wurde. */
@@ -103,7 +106,10 @@ export function orderDm(
 ): IShopDm {
     const site = config.shopSiteUrl;
     const subscription = input.kind === "subscription";
-    const price = `**${formatPrice(input.priceCents)}** ${subscription ? "pro Monat · Abo" : "einmalig"}`;
+    const discount = input.discountCents ?? 0;
+    const price =
+        `**${formatPrice(input.priceCents + discount)}** ${subscription ? "pro Monat · Abo" : "einmalig"}` +
+        (discount > 0 ? `\n-# ${formatPrice(discount)} Rabatt ${restNote(input.priceCents, subscription)}` : "");
     const term = [
         `> **Bestellt:** ${stamp(input.orderedAt, "f")}`,
         // Ein Einmalkauf auf einen laufenden beginnt erst an dessen Ende. Gemessen an der Zahlung, nicht an der Bestellung (Zeit im Kartenformular).

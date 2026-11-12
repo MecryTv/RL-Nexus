@@ -9,7 +9,7 @@ import { loadConfig } from "../config.ts";
 import { addGuildMember, exchangeShopCode, refreshShopTokens, sendDirectMessage, setMemberRole, shopAuthorizeUrl, userGuildIds } from "../discord.ts";
 import { SESSION_COOKIE, seal } from "../session.ts";
 import { berlinEndOfDay, customerStatus, eventText, monthStart, refundSuggestion, trialTarget } from "../shop/customers.ts";
-import { LATEST_END, accessOf, oneTimeWindow, orderNo, purchaseProblem, rolePlan, trialProblem, type IGrant } from "../shop/grants.ts";
+import { LATEST_END, accessOf, oneTimeWindow, orderNo, purchasePlan, purchaseProblem, restCents, rolePlan, switchMode, trialProblem, type IGrant } from "../shop/grants.ts";
 import { makeLimiter, matchCancellation, parseCancelInput, rateKey } from "../shop/cancel.ts";
 import { legalPdf, legalText, legalVersions, parseLegal } from "../shop/legal.ts";
 import { paidProblem, parseProductInput, parseSettingsInput } from "../shop/rules.ts";
@@ -45,6 +45,7 @@ const SETTINGS: IShopSettings = {
     trialDays: 7,
     trialRoleId: null,
     promoCodes: false,
+    switchMaxPercent: 50,
     termsVersion: "2026-10-12",
 };
 
@@ -102,6 +103,9 @@ export async function checkShop(): Promise<void> {
 
         assert.throws(() => parseSettingsInput({ ...SETTINGS, trialDays: 0 }), /Die Testdauer/);
         assert.throws(() => parseSettingsInput({ ...SETTINGS, trialDays: 91 }), /Die Testdauer/);
+        assert.throws(() => parseSettingsInput({ ...SETTINGS, switchMaxPercent: 101 }), /Der Höchstrabatt beim Wechsel/);
+        assert.throws(() => parseSettingsInput({ ...SETTINGS, switchMaxPercent: -1 }), /Der Höchstrabatt beim Wechsel/);
+        assert.equal(parseSettingsInput({ ...SETTINGS, switchMaxPercent: 0 }).switchMaxPercent, 0);
         assert.throws(() => parseSettingsInput({ ...SETTINGS, termsVersion: "morgen" }), /Datum wie 2026-10-12/);
         // Shop und Bezahlschranke schaltet nur noch der Modus (Free oder Paid Access), nicht die Einstellungen.
         assert.equal("paywall" in parseSettingsInput({ ...SETTINGS, paywall: 1, shopOpen: "x" }), false);
@@ -167,21 +171,78 @@ export async function checkShop(): Promise<void> {
         assert.match(trialProblem([grant({})], open, false, NOW) ?? "", /schon Zugang/);
     });
 
-    await check("Kaufregeln: Abo, Einmalkauf, unbegrenzt, Sperre", () => {
-        const yearly = { kind: "one_time", durationDays: 365 } as const;
-        const monthly = { kind: "subscription", durationDays: null } as const;
+    // W-0089: Produkte zum Vergleich. Der laufende Zugang aus grant() ist Produkt 1, 11 Tage, davon 10 übrig.
+    const week = { id: 4, kind: "one_time", durationDays: 7, priceCents: 299 } as const;
+    const yearly = { id: 2, kind: "one_time", durationDays: 365, priceCents: 4499 } as const;
+    const monthly = { id: 3, kind: "subscription", durationDays: null, priceCents: 499 } as const;
+    const month30 = { id: 5, kind: "one_time", durationDays: 30, priceCents: 599 } as const;
 
+    await check("Kaufregeln: Abo, Einmalkauf, unbegrenzt, Sperre", () => {
         assert.equal(purchaseProblem([], yearly, false, NOW), null);
         assert.match(purchaseProblem([], yearly, true, NOW) ?? "", /gesperrt/);
         // Ein laufender Test hindert nicht: Der Kauf beendet ihn.
         assert.equal(purchaseProblem([grant({ source: "trial" })], monthly, false, NOW), null);
-        assert.match(purchaseProblem([grant({ source: "subscription" })], yearly, false, NOW) ?? "", /schon ein Abo/);
         assert.match(purchaseProblem([grant({ endsAt: null })], yearly, false, NOW) ?? "", /auf Dauer/);
-        assert.match(purchaseProblem([grant({})], monthly, false, NOW) ?? "", /Abo geht erst, wenn dein jetziger Zugang abgelaufen ist \(am 26\.10\.2026\)/);
-        // Einmalkauf auf Einmalkauf: verlängert, kein Fehler.
+        // W-0089: Abo und längere Laufzeit sind ein Wechsel, kein Fehler.
+        assert.equal(purchaseProblem([grant({})], monthly, false, NOW), null);
         assert.equal(purchaseProblem([grant({})], yearly, false, NOW), null);
-        // Über 2037 hinaus: abgelehnt.
+        assert.equal(purchaseProblem([grant({ source: "subscription", productId: 3 })], yearly, false, NOW), null);
+        // Über 2037 hinaus: abgelehnt (der kürzere Kauf hinge sich hinten an).
         assert.match(purchaseProblem([grant({ endsAt: new Date(Date.UTC(2037, 0, 1)) })], yearly, false, NOW) ?? "", /2037/);
+    });
+
+    await check("W-0089: Denselben Zugang nicht zweimal, Abo nicht neben Abo", () => {
+        assert.match(purchaseProblem([grant({})], { ...week, id: 1 }, false, NOW) ?? "", /^Diesen Zugang hast du schon\. Er läuft bis 26\.10\.2026\.$/);
+        // Auch wenn er erst später beginnt.
+        assert.match(purchaseProblem([grant({ productId: 4, startsAt: new Date(NOW.getTime() + DAY_MS) })], week, false, NOW) ?? "", /^Diesen Zugang hast du schon/);
+        // Ein beendeter oder abgelaufener zählt nicht.
+        assert.equal(purchaseProblem([grant({ endedAt: NOW })], { ...week, id: 1 }, false, NOW), null);
+        const sub = grant({ source: "subscription", productId: 3, stripeSubscriptionId: "sub_1" });
+        assert.match(purchaseProblem([sub], monthly, false, NOW) ?? "", /^Dieses Abo hast du schon\. Verwalten kannst du es unter „Mein Zugang“\.$/);
+        assert.match(purchaseProblem([sub], { ...monthly, id: 6 }, false, NOW) ?? "", /^Du hast schon ein Abo\./);
+        // Geschenk: ein Abo erst danach, wie bisher.
+        assert.match(purchaseProblem([grant({ source: "gift", productId: null })], monthly, false, NOW) ?? "", /Abo geht erst, wenn dein jetziger Zugang abgelaufen ist \(am 26\.10\.2026\)/);
+    });
+
+    await check("W-0089: Wechsel bei Abo und längerer Laufzeit, sonst hinten an", () => {
+        const running = grant({});
+        const sub = grant({ source: "subscription", productId: 3, stripeSubscriptionId: "sub_1" });
+
+        assert.deepEqual(switchMode([running], yearly, NOW), { mode: "replace", startsAt: NOW });
+        assert.deepEqual(switchMode([running], monthly, NOW), { mode: "replace", startsAt: NOW });
+        assert.deepEqual(switchMode([sub], yearly, NOW), { mode: "replace", startsAt: NOW });
+        // Kürzer oder gleich lang: beginnt am Ende des laufenden. Ein Abo zählt als 30 Tage.
+        assert.deepEqual(switchMode([running], week, NOW), { mode: "append", startsAt: running.endsAt });
+        assert.deepEqual(switchMode([sub], month30, NOW), { mode: "append", startsAt: sub.endsAt });
+        // Ohne Zugang oder im Test: neu.
+        assert.deepEqual(switchMode([], week, NOW), { mode: "new", startsAt: NOW });
+        assert.deepEqual(switchMode([grant({ source: "trial" })], yearly, NOW), { mode: "new", startsAt: NOW });
+        // Ein Geschenk wird nie ersetzt: hinten an.
+        assert.deepEqual(switchMode([grant({ source: "gift", productId: null })], yearly, NOW), { mode: "append", startsAt: running.endsAt });
+    });
+
+    await check("W-0089: Rabatt aus der Restzeit, anteilig und gedeckelt", () => {
+        const running = grant({ id: 7 });
+        const paid = new Map([[7, 1100]]);
+
+        // 11 Tage bezahlt, 10 übrig.
+        assert.equal(restCents([running], NOW, paid), 1000);
+        assert.equal(purchasePlan([running], yearly, NOW, paid, 50).discountCents, 1000);
+        // Höchstens 50 % vom neuen Preis, abgerundet.
+        assert.equal(purchasePlan([running], monthly, NOW, paid, 50).discountCents, 249);
+        // Mindestens 0,50 € bleiben zu zahlen.
+        assert.equal(purchasePlan([running], monthly, NOW, paid, 100).discountCents, 449);
+        assert.equal(purchasePlan([running], yearly, NOW, paid, 0).discountCents, 0);
+        // Hinten an und ohne bezahlte Bestellung: kein Rabatt.
+        assert.deepEqual(purchasePlan([running], week, NOW, paid, 50), { mode: "append", startsAt: running.endsAt, discountCents: 0 });
+        assert.equal(purchasePlan([running], yearly, NOW, new Map(), 50).discountCents, 0);
+        // Abo: Rest des laufenden Monats. 30.09. 12 Uhr bis 31.10. 12 Uhr sind 31 Tage, 15 übrig.
+        const sub = grant({ id: 8, source: "subscription", productId: 3, startsAt: new Date("2026-08-01T00:00:00Z"), endsAt: new Date("2026-10-31T12:00:00Z") });
+        assert.equal(restCents([sub], NOW, new Map([[8, 499]])), 241);
+        // Ein später beginnender zählt voll mit, ein Test oder Geschenk gar nicht.
+        const later = grant({ id: 9, productId: 4, startsAt: running.endsAt as Date, endsAt: new Date((running.endsAt as Date).getTime() + 7 * DAY_MS) });
+        const free = grant({ id: 10, source: "gift", productId: null });
+        assert.equal(restCents([running, later, free, grant({ id: 11, source: "trial" })], NOW, new Map([[7, 1100], [9, 299], [10, 500], [11, 500]])), 1299);
     });
 
     await check("Ein Einmalkauf beginnt jetzt oder am Ende des laufenden", () => {
@@ -271,6 +332,8 @@ export async function checkShop(): Promise<void> {
     await check("Verlauf in Worten", () => {
         assert.equal(eventText("trial.start"), "Test gestartet");
         assert.equal(eventText("admin.gift"), "Zugang geschenkt");
+        assert.equal(eventText("switch.cancel"), "Wechsel: altes Abo bei Stripe beendet");
+        assert.equal(eventText("switch.cancel-failed"), "Wechsel: altes Abo bei Stripe nicht beendet");
         assert.equal(eventText("unbekannt.xy"), "unbekannt.xy");
     });
 
@@ -535,6 +598,17 @@ section("Shop: Kündigen");
         assert.equal(mail.html.includes("<b>Käufer <b>"), false, "Der Name wird maskiert");
         assert.deepEqual(mail.files?.map((file) => file.filename), ["Rechnung RLN-2026-0042.pdf", "AGB 2026-10-12.pdf", "Widerrufsbelehrung 2026-10-12.pdf"]);
         assert.equal(mail.subline, "Bestellung");
+    });
+
+    await check("W-0089: Die Bestellbestätigung nennt Preis, Rabatt aus der Restzeit und was bezahlt wurde", async () => {
+        const base = { to: "k@example.test", name: "K", orderNo: "RLN-2026-0043", title: "Monat", durationDays: null, startsAt: NOW, endsAt: null, invoice: null, roleName: null, termsVersion: "2026-10-12" };
+        const sub = await orderMail(config, { ...base, kind: "subscription", priceCents: 249, discountCents: 250 });
+
+        assert.match(sub.html, /<b>Preis:<\/b> 4,99\s€ \/ Monat<br>/);
+        assert.match(sub.html, /<b>Rabatt:<\/b> 2,50\s€ für die Restzeit deines vorigen Zugangs, nur im ersten Monat\. Bezahlt: 2,49\s€<br>/);
+        const once = await orderMail(config, { ...base, kind: "one_time", durationDays: 365, priceCents: 3499, discountCents: 1000 });
+        assert.match(once.html, /<b>Rabatt:<\/b> 10,00\s€ für die Restzeit deines vorigen Zugangs\. Bezahlt: 34,99\s€<br>/);
+        assert.doesNotMatch((await orderMail(config, { ...base, kind: "subscription", priceCents: 499 })).html, /Rabatt/);
     });
 
     await check("Shop-Mails gehen von noreply@ mit Antwort an support@ und ohne Signatur", async () => {
@@ -905,6 +979,14 @@ section("Shop: Kündigen");
         assert.match(texts(dm), /\/kuendigen/);
         assert.match(texts(dm), /§ 19 UStG/);
         assert.ok(texts(dm).length < 4000, String(texts(dm).length));
+    });
+
+    await check("W-0089: DM Bestellung nennt den Rabatt aus der Restzeit", () => {
+        const dm = texts(orderDm(config, { ...sample, priceCents: 249, discountCents: 250 }));
+
+        assert.match(dm, /\*\*4,99\s€\*\* pro Monat · Abo/);
+        assert.match(dm, /2,50\s€ Rabatt für die Restzeit deines vorigen Zugangs, nur im ersten Monat\. Bezahlt: 2,49\s€/);
+        assert.doesNotMatch(texts(orderDm(config, sample)), /Rabatt/);
     });
 
     await check("DM Bestellung: Einmalkauf ohne Kündigen, Mail-Zeile nach dem, was rausging", () => {

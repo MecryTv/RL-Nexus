@@ -16,6 +16,7 @@ import {
     cancelHint,
     cardAction,
     checkoutSummary,
+    dueLabel,
     durationLabel,
     formatDay,
     formatPrice,
@@ -59,6 +60,7 @@ const me = (changes = {}) => ({
     roleName: null,
     hasBilling: false,
     blocked: {},
+    switches: {},
     ...changes,
 });
 const state = (changes = {}) => ({ open: true, trial: { enabled: true, days: 7 }, products: [], me: null, stripeKey: "pk_test_x", termsVersion: "2026-10-12", dev: false, ...changes });
@@ -98,14 +100,45 @@ check("Was die Karte anbietet", () => {
     assert.deepEqual(cardAction(product(), null, true), { kind: "login" });
     assert.deepEqual(cardAction(product(), me(), false), { kind: "none", note: "Gerade kein Verkauf." });
     assert.deepEqual(cardAction(product(), me({ status: "banned" }), true), { kind: "none", note: "Dein Konto ist für Käufe gesperrt." });
-    assert.deepEqual(cardAction(product(), me({ status: "subscription", until: UNTIL }), true), { kind: "none", note: "Du hast schon ein Abo." });
-    assert.deepEqual(cardAction(monthly, me({ status: "subscription", until: UNTIL }), true), { kind: "none", note: "Du hast schon ein Abo." });
-    assert.deepEqual(cardAction(product(), me({ status: "one_time", until: null }), true), { kind: "none", note: "Du hast Zugang auf Dauer." });
-    assert.deepEqual(cardAction(product(), me({ status: "gift", until: null }), true), { kind: "none", note: "Du hast Zugang auf Dauer." });
-    assert.deepEqual(cardAction(product(), me({ status: "one_time", until: UNTIL }), true), { kind: "buy", label: "Verlängern" });
-    assert.deepEqual(cardAction(monthly, me({ status: "one_time", until: UNTIL }), true), { kind: "none", note: "Ein Abo geht erst nach dem 12.10.2027." });
     assert.deepEqual(cardAction(product(), me({ status: "trial", until: UNTIL }), true), { kind: "buy", label: "Auswählen" });
     assert.deepEqual(cardAction(monthly, me({ status: "expired" }), true), { kind: "buy", label: "Auswählen" });
+});
+
+check("W-0089: Wechsel mit Rabatt, hinten an, derselbe Zugang gesperrt", () => {
+    const person = me({
+        status: "one_time",
+        until: UNTIL,
+        productId: 3,
+        blocked: { 3: "Diesen Zugang hast du schon. Er läuft bis 12.10.2027." },
+        switches: {
+            1: { mode: "replace", discountCents: 1000, startsAt: "2026-11-12T10:00:00.000Z" },
+            2: { mode: "append", discountCents: 0, startsAt: UNTIL },
+            4: { mode: "replace", discountCents: 0, startsAt: "2026-11-12T10:00:00.000Z" },
+        },
+    });
+
+    assert.deepEqual(cardAction(product(), person, true), { kind: "buy", label: "Wechseln", note: "10,00\u00a0€ Rabatt für deine Restzeit" });
+    assert.deepEqual(cardAction(product({ id: 2 }), person, true), { kind: "buy", label: "Verlängern", note: "Beginnt am 12.10.2027" });
+    assert.deepEqual(cardAction(product({ id: 3 }), person, true), { kind: "none", note: "Diesen Zugang hast du schon. Er läuft bis 12.10.2027." });
+    assert.deepEqual(cardAction(product({ id: 4 }), person, true), { kind: "buy", label: "Wechseln" });
+});
+
+check("W-0089: Was heute fällig ist", () => {
+    const monthly = product({ title: "Monat", kind: "subscription", durationDays: null, priceCents: 499 });
+    const replace = (discountCents) => ({ mode: "replace", discountCents, startsAt: "2026-11-12T10:00:00.000Z" });
+
+    assert.equal(dueLabel(product(), null), "44,99\u00a0€ einmalig");
+    assert.equal(dueLabel(product(), replace(1000)), "34,99\u00a0€ einmalig");
+    assert.equal(dueLabel(monthly, replace(249)), "2,50\u00a0€ im ersten Monat, danach 4,99\u00a0€ / Monat");
+    assert.equal(dueLabel(monthly, replace(0)), "4,99\u00a0€ / Monat");
+    assert.equal(
+        checkoutSummary(monthly, replace(249)),
+        "Monat · 2,50\u00a0€ im ersten Monat, danach 4,99\u00a0€ / Monat (2,49\u00a0€ Rabatt für deine Restzeit) · Laufzeit monatlich kündbar · Dein jetziger Zugang endet mit der Zahlung · Verlängerung: monatlich, bis du kündigst · Kündigung: jederzeit zum Ende des bezahlten Monats"
+    );
+    assert.equal(
+        checkoutSummary(product({ title: "Woche", durationDays: 7, priceCents: 299 }), { mode: "append", discountCents: 0, startsAt: UNTIL }),
+        "Woche · 2,99\u00a0€ einmalig · Laufzeit 7 Tage · Beginn am 12.10.2027 · Verlängerung: keine · Kündigung: nicht nötig, läuft aus"
+    );
 });
 
 check("Was die Karte anbietet: Lehnt der Server ab, sagt die Karte seinen Satz", () => {
@@ -117,6 +150,8 @@ check("Was die Karte anbietet: Lehnt der Server ab, sagt die Karte seinen Satz",
         note: "Ein Abo geht erst, wenn dein jetziger Zugang abgelaufen ist (am 01.11.2026).",
     });
     assert.deepEqual(cardAction(product({ id: 2 }), person, true), { kind: "buy", label: "Auswählen" });
+    // Ohne Satz und ohne Wechsel vom Server: normaler Kauf, auch bei laufendem Abo (der Server hätte sonst einen Satz).
+    assert.deepEqual(cardAction(product({ id: 2 }), me({ status: "subscription", until: UNTIL }), true), { kind: "buy", label: "Auswählen" });
 });
 
 check("Die Testleiste", () => {

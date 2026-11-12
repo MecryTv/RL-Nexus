@@ -114,6 +114,8 @@ const EVENT_TEXTS: Readonly<Record<string, string>> = {
     "dm.expired": "Discord-Nachricht: Zugang abgelaufen",
     "dm.failed": "Discord-Nachricht kam nicht an",
     "grant.capped": "Ende auf 2037 gekürzt",
+    "switch.cancel": "Wechsel: altes Abo bei Stripe beendet",
+    "switch.cancel-failed": "Wechsel: altes Abo bei Stripe nicht beendet",
     "admin.trial": "Test angepasst",
     "admin.trial-end": "Test beendet",
     "admin.gift": "Zugang geschenkt",

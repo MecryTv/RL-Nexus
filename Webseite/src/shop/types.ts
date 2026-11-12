@@ -26,6 +26,18 @@ export interface IShopPublicProduct {
     readonly badge: string;
 }
 
+/**
+ * W-0089: Wie ein Kauf bei laufendem Zugang läuft. replace: Der bezahlte
+ * Zugang endet mit der Zahlung, sein Rest wird Rabatt. append: Der neue
+ * beginnt am Ende des laufenden, ohne Rabatt.
+ */
+export interface IShopSwitch {
+    readonly mode: "replace" | "append";
+    readonly discountCents: number;
+    /** Beginn des neuen Zugangs, ISO. */
+    readonly startsAt: string;
+}
+
 export interface IShopMe {
     readonly id: string;
     readonly name: string;
@@ -46,6 +58,8 @@ export interface IShopMe {
     readonly hasBilling: boolean;
     /** Produkt-ID → der Satz, mit dem der Server einen Kauf ablehnen würde. */
     readonly blocked: Readonly<Record<string, string>>;
+    /** W-0089: Produkt-ID → Wechsel oder Anhängen. Fehlt ein Produkt hier und in blocked, ist es ein normaler Kauf. */
+    readonly switches: Readonly<Record<string, IShopSwitch>>;
     /** W-0057: dauerhaft gesperrt für Webseite oder Shop. url führt zur Sperrseite, website: Die Seite Zugang ist gesperrt. */
     readonly gesperrt: { readonly url: string; readonly website: boolean } | null;
 }
@@ -109,6 +123,8 @@ export interface IShopState {
 export interface ICheckoutStart {
     readonly orderNo: string;
     readonly clientSecret: string;
+    /** W-0089: frisch gerechnet, gilt für diese Bestellung. null: normaler Kauf. */
+    readonly switch: IShopSwitch | null;
 }
 
 /** Ein Haken in der Freischalt-Liste: wartet, erledigt, oder gelb mit Hinweis. */

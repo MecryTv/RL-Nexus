@@ -54,9 +54,12 @@ export function ProductCard({ product, action, highlighted, onLogin, onSelect }:
                 {action.kind === "none" ? (
                     <p className={styles.cardNote}>{action.note}</p>
                 ) : (
-                    <Button variant={variant} className={styles.wide} onClick={() => (action.kind === "login" ? onLogin(product) : onSelect?.(product))}>
-                        {action.kind === "login" ? "Auswählen" : action.label}
-                    </Button>
+                    <>
+                        <Button variant={variant} className={styles.wide} onClick={() => (action.kind === "login" ? onLogin(product) : onSelect?.(product))}>
+                            {action.kind === "login" ? "Auswählen" : action.label}
+                        </Button>
+                        {action.kind === "buy" && action.note && <p className={styles.cardHint}>{action.note}</p>}
+                    </>
                 )}
             </div>
         </article>

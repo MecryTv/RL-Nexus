@@ -53,9 +53,21 @@ export class FakeStripe implements IStripeGateway {
         return id ?? `cus_check${++this.next}`;
     }
 
-    async createCheckout({ customerId, priceId, monthly, orderNo }: { readonly customerId: string; readonly priceId: string; readonly monthly: boolean; readonly orderNo: string }): Promise<{ id: string; clientSecret: string }> {
+    async createCheckout({
+        customerId,
+        priceId,
+        monthly,
+        orderNo,
+        discount,
+    }: {
+        readonly customerId: string;
+        readonly priceId: string;
+        readonly monthly: boolean;
+        readonly orderNo: string;
+        readonly discount?: { readonly cents: number; readonly name: string } | null;
+    }): Promise<{ id: string; clientSecret: string }> {
         this.guard();
-        this.calls.push(`checkout ${customerId} ${priceId} ${monthly ? "abo" : "einmal"} ${orderNo}`);
+        this.calls.push(`checkout ${customerId} ${priceId} ${monthly ? "abo" : "einmal"} ${orderNo}${discount ? ` rabatt ${discount.cents}` : ""}`);
         const id = `cs_check${++this.next}`;
 
         return { id, clientSecret: `${id}_secret` };

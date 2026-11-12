@@ -1,4 +1,4 @@
-import type { IShopMe, IShopPublicProduct, IShopState, IUnlockProgress, LegalBlock, ProductKind, ShopStatus, StepState } from "./types.ts";
+import type { IShopMe, IShopPublicProduct, IShopState, IShopSwitch, IUnlockProgress, LegalBlock, ProductKind, ShopStatus, StepState } from "./types.ts";
 
 /**
  * Die Regeln der Preisseite, ohne React. Nur `import type`, damit
@@ -110,37 +110,57 @@ export function endingLabel(kind: ProductKind): string {
     return kind === "subscription" ? "jederzeit zum Ende des bezahlten Monats" : "nicht nötig, läuft aus";
 }
 
-/** Was direkt über „Zahlungspflichtig bestellen“ steht (§ 312j BGB): Produkt, Preis, Laufzeit, Verlängerung, Kündigung. */
-export function checkoutSummary(product: IShopPublicProduct): string {
+/** W-0089: Was heute fällig ist. Beim Abo gilt der Rabatt aus der Restzeit nur im ersten Monat. */
+export function dueLabel(product: IShopPublicProduct, offer: IShopSwitch | null): string {
+    const discount = offer?.discountCents ?? 0;
+    const full = `${formatPrice(product.priceCents)} ${priceSuffix(product.kind)}`;
+    if (discount === 0) return full;
+
+    const due = formatPrice(product.priceCents - discount);
+
+    return product.kind === "subscription" ? `${due} im ersten Monat, danach ${full}` : `${due} einmalig`;
+}
+
+/**
+ * Was direkt über „Zahlungspflichtig bestellen“ steht (§ 312j BGB): Produkt,
+ * Preis, Laufzeit, Verlängerung, Kündigung. Bei einem Wechsel (W-0089) auch
+ * der Rabatt und was mit dem jetzigen Zugang passiert.
+ */
+export function checkoutSummary(product: IShopPublicProduct, offer: IShopSwitch | null = null): string {
+    const discount = offer?.discountCents ?? 0;
+
     return [
         product.title,
-        `${formatPrice(product.priceCents)} ${priceSuffix(product.kind)}`,
+        discount > 0 ? `${dueLabel(product, offer)} (${formatPrice(discount)} Rabatt für deine Restzeit)` : dueLabel(product, null),
         `Laufzeit ${durationLabel(product.kind, product.durationDays)}`,
+        ...(offer?.mode === "replace" ? ["Dein jetziger Zugang endet mit der Zahlung"] : []),
+        ...(offer?.mode === "append" ? [`Beginn am ${formatDay(offer.startsAt)}`] : []),
         `Verlängerung: ${renewalLabel(product.kind)}`,
         `Kündigung: ${endingLabel(product.kind)}`,
     ].join(" · ");
 }
 
-export type CardAction = { readonly kind: "login" } | { readonly kind: "buy"; readonly label: "Auswählen" | "Verlängern" } | { readonly kind: "none"; readonly note: string };
+export type CardAction =
+    | { readonly kind: "login" }
+    | { readonly kind: "buy"; readonly label: "Auswählen" | "Verlängern" | "Wechseln"; readonly note?: string }
+    | { readonly kind: "none"; readonly note: string };
 
-/** sellable: Shop offen und Stripe eingerichtet. */
+/**
+ * sellable: Shop offen und Stripe eingerichtet. Was geht, entscheidet der
+ * Server (blocked, switches), er kennt alle Zugänge, die Seite nur den längsten.
+ */
 export function cardAction(product: IShopPublicProduct, me: IShopMe | null, sellable: boolean): CardAction {
     if (!sellable) return { kind: "none", note: "Gerade kein Verkauf." };
     if (me === null) return { kind: "login" };
     if (me.status === "banned") return { kind: "none", note: "Dein Konto ist für Käufe gesperrt." };
 
-    // Der Server kennt alle Zugänge (etwa Test und Geschenk nebeneinander). Sein Satz geht vor.
     const refused = me.blocked?.[String(product.id)];
     if (refused) return { kind: "none", note: refused };
 
-    if (me.status === "subscription") return { kind: "none", note: "Du hast schon ein Abo." };
-
-    if (me.status === "one_time" || me.status === "gift") {
-        if (me.until === null) return { kind: "none", note: "Du hast Zugang auf Dauer." };
-        if (product.kind === "subscription") return { kind: "none", note: `Ein Abo geht erst nach dem ${formatDay(me.until)}.` };
-
-        return { kind: "buy", label: "Verlängern" };
-    }
+    // W-0089: Abo oder länger ersetzt den jetzigen Zugang, kürzer hängt sich an.
+    const offer = me.switches?.[String(product.id)];
+    if (offer?.mode === "replace") return { kind: "buy", label: "Wechseln", ...(offer.discountCents > 0 ? { note: `${formatPrice(offer.discountCents)} Rabatt für deine Restzeit` } : {}) };
+    if (offer?.mode === "append") return { kind: "buy", label: "Verlängern", note: `Beginnt am ${formatDay(offer.startsAt)}` };
 
     // Kein Zugang, abgelaufen oder im Test: Der Kauf beendet den Test.
     return { kind: "buy", label: "Auswählen" };
