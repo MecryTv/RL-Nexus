@@ -77,6 +77,8 @@ export interface IUserSelectOptions {
     customId: string;
     placeholder?: string;
     defaultUser?: string | null;
+    minValues?: number;
+    maxValues?: number;
     disabled?: boolean;
 }
 

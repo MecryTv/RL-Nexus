@@ -268,6 +268,8 @@ export default class ComponentV2Builder {
 
         if (options.placeholder) menu.setPlaceholder(options.placeholder);
         if (options.defaultUser) menu.setDefaultUsers(options.defaultUser);
+        if (options.minValues !== undefined) menu.setMinValues(options.minValues);
+        if (options.maxValues !== undefined) menu.setMaxValues(options.maxValues);
         if (options.disabled) menu.setDisabled(true);
 
         this.container.addActionRowComponents(

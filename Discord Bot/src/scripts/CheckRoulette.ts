@@ -35,6 +35,7 @@ import {
     SummaryAlt,
     SummaryPages,
 } from "../builder/RouletteImages";
+import { AnnouncementMessage, ControlMessage, FillRequestMessage, HowToMessage, LobbyMessage, OpenPingMessage, ReadRouletteId, RoundMessages, RouletteId, SummaryMessages, WishView } from "../builder/RouletteView";
 
 const GUILD = "90071992547409971";
 const TEXT = "90071992547409972";
@@ -320,6 +321,80 @@ async function checkImages(): Promise<void> {
     check("Alt-Text Übersicht: Teilnahme ohne Ergebnisse", SummaryAlt(evening, rounds, 0).includes("Nova") && !/sieg|gewonnen/i.test(SummaryAlt(evening, rounds, 0)));
 }
 
+/** Alle Knöpfe und Auswahlen einer Nachricht, flach. */
+function Controls(message: { components?: readonly unknown[] }): { custom_id: string; disabled?: boolean; label?: string; type: number; min_values?: number; max_values?: number }[] {
+    const found: { custom_id: string; disabled?: boolean; label?: string; type: number; min_values?: number; max_values?: number }[] = [];
+    const walk = (node: unknown): void => {
+        if (Array.isArray(node)) return node.forEach(walk);
+        if (!node || typeof node !== "object") return;
+
+        const record = node as Record<string, unknown>;
+
+        if (typeof record.custom_id === "string") found.push(record as never);
+        Object.values(record).forEach(walk);
+    };
+
+    walk(JSON.parse(JSON.stringify(message.components ?? [])));
+
+    return found;
+}
+
+async function checkMessages(): Promise<void> {
+    console.log("\n  — Nachrichten —");
+
+    const id = RouletteId("open", 7, 2, 1);
+    const read = ReadRouletteId(id);
+
+    check("Custom-ID: hin und zurück", id.startsWith("rr:") && read?.action === "open" && read.eveningId === 7 && read.round === 2 && read.lobby === 1, id);
+    check("Custom-ID: ohne Runde und Lobby", ReadRouletteId(RouletteId("end", 3))?.round === null && ReadRouletteId(RouletteId("end", 3))?.lobby === null);
+    check("Custom-ID: fremde IDs sind null", ReadRouletteId("av:raid:1") === null && ReadRouletteId("rr:quatsch:1") === null && ReadRouletteId("rr:open:x") === null);
+
+    const round = SampleRound(3);
+    const lobby = round.lobbies[0];
+    const ref = { eveningId: 7, round: 2, lobby: 0 };
+    const waiting = Controls(await LobbyMessage(ref, lobby, 0, false));
+    const opened = Controls(await LobbyMessage(ref, lobby, 0, true));
+
+    check("Lobby-Karte: Knopf „Lobby ist offen“ und Kopieren", waiting.some((entry) => entry.custom_id === RouletteId("open", 7, 2, 0) && !entry.disabled) && waiting.some((entry) => entry.custom_id === RouletteId("copy", 7, 2, 0)));
+    check("Lobby-Karte offen: Knopf ist grau", opened.some((entry) => entry.custom_id === RouletteId("open", 7, 2, 0) && entry.disabled === true));
+
+    const ping = await OpenPingMessage(lobby, 0);
+
+    check("Offen-Ping: erwähnt und erlaubt nur das Team", JSON.stringify(ping.allowedMentions) === JSON.stringify({ parse: [], users: lobby.teams[0] }) && lobby.teams[0].every((member) => JSON.stringify(ping.components).includes(`<@${member}>`)));
+    check("Offen-Ping: mit Banner-Bild", (ping.files?.length ?? 0) === 1);
+
+    const view: IControlView = { status: "running", startsAt: Date.now(), round: 2, inLobbies: 18, waiting: 0, sitOut: 0, lobbies: [], wishes: [], warnings: [] };
+    const control = Controls(await ControlMessage(7, view));
+    const planned = Controls(await ControlMessage(7, { ...view, status: "planned", round: 0 }));
+
+    check("Steuerkarte: Runde auslosen, Wünsche, Tauschen, Abbrechen, Beenden", ["next", "wish", "swap", "abort", "end"].every((action) => control.some((entry) => ReadRouletteId(entry.custom_id)?.action === action)), control.map((entry) => entry.custom_id).join(" "));
+    check("Steuerkarte: Beenden fragt erst nach (kein endok)", !control.some((entry) => ReadRouletteId(entry.custom_id)?.action === "endok"));
+    check("Steuerkarte vor dem Start: start statt next", planned.some((entry) => ReadRouletteId(entry.custom_id)?.action === "start") && !planned.some((entry) => ReadRouletteId(entry.custom_id)?.action === "next"));
+
+    const announce = Controls(await AnnouncementMessage({ status: "planned", startsAt: Date.now() + 60_000, waiting: { count: 0, avatars: [] }, moderators: [], waitingRoom: "W", mainVoice: "T", teamSize: 3, lobbiesAbout: 0, round: 0 }, 7));
+
+    check("Ankündigung: Knopf „Wie läuft der Abend ab?“", announce.some((entry) => ReadRouletteId(entry.custom_id)?.action === "howto"));
+    check("Anleitung: nur für den Fragenden", (Number(HowToMessage().flags) & 64) === 64);
+
+    const evening: IRouletteEvening = { id: 7, guildId: GUILD, status: "running", startsAt: Date.now(), createdBy: "m1", createdAt: Date.now(), endedAt: null, announce: null, control: null, round: 2, sitOut: [], wishes: [{ a: "a0-1", b: "b0-1", once: false }], history: {}, participants: {} };
+    const wish = WishView(evening, { "a0-1": "Nova", "b0-1": "Lukas" });
+    const wishControls = Controls(wish);
+    const select = wishControls.find((entry) => ReadRouletteId(entry.custom_id)?.action === "wishadd" && entry.type === 5);
+
+    check("Wünsche: nur für den Moderator", (Number(wish.flags) & 64) === 64);
+    check("Wünsche: genau zwei Mitglieder wählen", select?.min_values === 2 && select?.max_values === 2, JSON.stringify(select));
+    check("Wünsche: Paar mit „entfernen“", wishControls.some((entry) => ReadRouletteId(entry.custom_id)?.action === "wishdel") && JSON.stringify(wish.components).includes("Nova"));
+
+    const fill = Controls(FillRequestMessage(7, 2, "Lobby45", 2, "Nova", "123"));
+
+    check("Einspring-Anfrage: Ich spiele mit, Ohne Einspringer", ["fill", "nofill"].every((action) => fill.some((entry) => ReadRouletteId(entry.custom_id)?.action === action)));
+    check("Rundenkarte: ab sieben Lobbys zwei Nachrichten", (await RoundMessages(SampleRound(7))).length === 2 && (await RoundMessages(SampleRound(3))).length === 1);
+
+    const summary = await SummaryMessages({ ...evening, status: "ended", endedAt: Date.now() }, Array.from({ length: 4 }, (_, index) => ({ ...SampleRound(2), number: index + 1 })));
+
+    check("Übersicht: ein Bild je drei Runden, dazu eine .txt", summary.length === 2 && summary.some((message) => (message.files ?? []).some((file) => JSON.stringify((file as { name?: string }).name ?? "").includes(".txt"))));
+}
+
 async function checkDatabase(client: BotClient): Promise<void> {
     console.log("\n  — Datenbank —");
 
@@ -399,6 +474,7 @@ async function main(): Promise<void> {
     checkSettings(client);
     checkDraw();
     await checkImages();
+    await checkMessages();
 
     await client.configService.Initialize();
 
