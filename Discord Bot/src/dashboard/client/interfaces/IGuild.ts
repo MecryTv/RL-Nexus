@@ -17,6 +17,8 @@ export interface IGuild {
     /** Moderation - wer verwaltet und wer auf der Moderatoren-Liste steht. */
     canModerate: boolean;
     canReview: boolean;
+    /** W-0087: Rocket Roulette steuern (Moderator-Rolle des Moduls). */
+    canRoulette: boolean;
     created: string;
     /** Seit wann RL Nexus dabei ist - null ohne Bot. */
     joined: string | null;

@@ -337,6 +337,7 @@ export function StaffOverlay(cards: IDashboardGuild[], grantOf: (guildId: string
             canSupport: open,
             canModerate: open,
             canReview: open,
+            canRoulette: true,
             staff: { grantId: grant.id, until: grant.endsAt ?? 0, private: open, by: grant.answeredBy ?? "" },
         };
     });
@@ -913,7 +914,7 @@ export default class DashboardService implements IDashboardService {
             if (owner === null || !(await this.ShopAccess(owner)).allowed) continue;
 
             // Co-Admins sehen den Server wie ein Guardian: Moderation, Tickets, Transcripts, aber kein Verwalten der Module.
-            kept.push(guild.role === "Admin" ? { ...guild, canManage: false, canModerate: true, canReview: true } : guild);
+            kept.push(guild.role === "Admin" ? { ...guild, canManage: false, canModerate: true, canReview: true, canRoulette: true } : guild);
         }
 
         return kept;
@@ -1105,6 +1106,13 @@ export default class DashboardService implements IDashboardService {
         return Boolean(guild?.canSupport);
     }
 
+    /** W-0087: Rocket Roulette steuern: wer verwaltet und wer die Moderator-Rolle des Moduls hat. Wirft SessionExpired. */
+    async CanRoulette(session: IDashboardSession, guildId: string): Promise<boolean> {
+        const guild = (await this.GuildsOf(session)).find((entry) => entry.id === guildId);
+
+        return Boolean(guild?.canManage || guild?.canRoulette);
+    }
+
     /** Moderation: wer verwaltet und wer auf der Moderatoren-Liste steht. Wirft SessionExpired. */
     async CanModerate(session: IDashboardSession, guildId: string): Promise<boolean> {
         const guild = (await this.GuildsOf(session)).find((entry) => entry.id === guildId);
@@ -1207,7 +1215,7 @@ export default class DashboardService implements IDashboardService {
         // Erst sammeln, welche Server überhaupt in die Liste gehören - danach
         // stehen die IDs fest und Teams und Module kommen in zwei Abfragen für
         // alle auf einmal statt in einer je Karte.
-        const picked = new Map<string, { raw: IRawGuild; role: DashboardRole; canManage: boolean; canModerate: boolean; canReview: boolean; member?: boolean }>();
+        const picked = new Map<string, { raw: IRawGuild; role: DashboardRole; canManage: boolean; canModerate: boolean; canReview: boolean; canSupport: boolean; canRoulette: boolean; member?: boolean }>();
         // W-0064: Discords Liste enthält jeden Server, auf dem die Person Mitglied ist.
         const memberOf = new Set(raw.map((guild) => guild.id));
 
@@ -1217,12 +1225,12 @@ export default class DashboardService implements IDashboardService {
 
             if (!guild.owner && !admin) continue;
 
-            picked.set(guild.id, { raw: guild, role: guild.owner ? "Owner" : "Admin", canManage: true, canModerate: true, canReview: true });
+            picked.set(guild.id, { raw: guild, role: guild.owner ? "Owner" : "Admin", canManage: true, canModerate: true, canReview: true, canSupport: true, canRoulette: true });
         }
 
         // Moderatoren und Pruefer: kein Verwalten, aber auf einer Liste des Servers.
-        for (const { raw: guild, moderate, review } of await this.Supported(session.userId, raw.filter((entry) => !picked.has(entry.id)))) {
-            picked.set(guild.id, { raw: guild, role: "Moderator", canManage: false, canModerate: moderate, canReview: review });
+        for (const { raw: guild, moderate, review, support, roulette } of await this.Supported(session.userId, raw.filter((entry) => !picked.has(entry.id)))) {
+            picked.set(guild.id, { raw: guild, role: "Moderator", canManage: false, canModerate: moderate, canReview: review, canSupport: support, canRoulette: roulette });
         }
 
         // Entwickler und Seiten-Admins sehen zusätzlich jeden Server, auf dem der Bot
@@ -1237,6 +1245,8 @@ export default class DashboardService implements IDashboardService {
                     canManage: false,
                     canModerate: false,
                     canReview: false,
+                    canSupport: false,
+                    canRoulette: false,
                     member: memberOf.has(guild.id),
                 });
             }
@@ -1247,7 +1257,7 @@ export default class DashboardService implements IDashboardService {
 
         const list = [...picked.values()]
             .map((entry) => ({
-                ...this.Card(entry.raw, entry.role, entry.canManage, entry.canModerate, entry.canReview, facts),
+                ...this.Card(entry.raw, entry.role, entry, facts),
                 ...(entry.member === undefined ? {} : { member: entry.member }),
                 signature: signatures.get(entry.raw.id) ?? null,
             }))
@@ -1308,22 +1318,24 @@ export default class DashboardService implements IDashboardService {
      * Bot, Discords Liste nennt sie nicht. moderate: auch die Moderation - die
      * gibt es nur über die Moderatoren-Liste, nicht über eine Support-Rolle.
      */
-    private async Supported(userId: string, candidates: IRawGuild[]): Promise<{ raw: IRawGuild; moderate: boolean; review: boolean }[]> {
+    private async Supported(userId: string, candidates: IRawGuild[]): Promise<{ raw: IRawGuild; moderate: boolean; review: boolean; support: boolean; roulette: boolean }[]> {
         const present = candidates.filter((guild) => this.client.guilds.cache.has(guild.id));
 
         if (present.length === 0 || !this.client.databaseService.Ready) return [];
 
         try {
             const modules = await this.client.settings.ModulesOf(present.map((guild) => guild.id));
-            const found: { raw: IRawGuild; moderate: boolean; review: boolean }[] = [];
+            const found: { raw: IRawGuild; moderate: boolean; review: boolean; support: boolean; roulette: boolean }[] = [];
 
             for (const raw of present) {
                 const on = modules.get(raw.id) ?? [];
                 const tickets = on.includes("tickets");
                 const apply = on.includes("apply");
 
-                // Moderatoren brauchen etwas, das sie betreuen: Tickets, Moderation - oder Bewerbungen.
-                if (!tickets && !apply && !on.includes("moderation")) continue;
+                const rocket = on.includes("rocket-roulette");
+
+                // Moderatoren brauchen etwas, das sie betreuen: Tickets, Moderation, Bewerbungen - oder einen Roulette-Abend.
+                if (!tickets && !apply && !rocket && !on.includes("moderation")) continue;
 
                 const { moderators } = await this.client.settings.Of(raw.id);
                 const config = tickets ? await this.client.ticketSettings.Of(raw.id) : null;
@@ -1333,8 +1345,10 @@ export default class DashboardService implements IDashboardService {
                 ].filter((role): role is string => Boolean(role));
 
                 const review = apply ? await this.client.applyService.Settings(raw.id) : null;
+                // W-0087: die Moderator-Rolle von Rocket Roulette steuert den Abend, sonst nichts.
+                const rouletteRole = rocket ? (await this.client.rouletteService.Settings(raw.id)).moderatorRoleId : null;
 
-                if (roles.length === 0 && !moderators.users.includes(userId) && !review?.reviewRoles.length && !review?.reviewUsers.includes(userId)) continue;
+                if (roles.length === 0 && !moderators.users.includes(userId) && !review?.reviewRoles.length && !review?.reviewUsers.includes(userId) && !rouletteRole) continue;
 
                 const guild = this.client.guilds.cache.get(raw.id)!;
                 const member = guild.members.cache.get(userId) ?? (await guild.members.fetch(userId).catch(() => null));
@@ -1346,9 +1360,10 @@ export default class DashboardService implements IDashboardService {
                 // Pruefer: eigene Liste im Apply System.
                 const reviews = Boolean(review && (review.reviewUsers.includes(userId) || review.reviewRoles.some((role) => member.roles.cache.has(role))));
 
-                if (listed || reviews || roles.some((role) => member.roles.cache.has(role))) {
-                    found.push({ raw, moderate: listed && on.includes("moderation"), review: reviews });
-                }
+                const support = listed || reviews || roles.some((role) => member.roles.cache.has(role));
+                const roulette = Boolean(rouletteRole && member.roles.cache.has(rouletteRole));
+
+                if (support || roulette) found.push({ raw, moderate: listed && on.includes("moderation"), review: reviews, support, roulette });
             }
 
             return found;
@@ -1359,7 +1374,9 @@ export default class DashboardService implements IDashboardService {
         }
     }
 
-    private Card(guild: IRawGuild, role: DashboardRole, canManage: boolean, canModerate: boolean, canReview: boolean, facts: IGuildFacts): IDashboardGuild {
+    private Card(guild: IRawGuild, role: DashboardRole, access: { canManage: boolean; canModerate: boolean; canReview: boolean; canSupport: boolean; canRoulette: boolean }, facts: IGuildFacts): IDashboardGuild {
+        const { canManage, canModerate, canReview, canRoulette } = access;
+
         const known = this.client.guilds.cache.get(guild.id);
 
         // Nur zählen, wenn die Liste vollständig ist. Ein halb gefüllter Cache
@@ -1377,9 +1394,11 @@ export default class DashboardService implements IDashboardService {
             active: Boolean(known),
             role,
             canManage,
-            canSupport: canManage || role === "Moderator",
+            // Nur über die Roulette-Rolle: kein Support. Sonst wie bisher jeder Moderator.
+            canSupport: canManage || (role === "Moderator" && access.canSupport),
             canModerate,
             canReview,
+            canRoulette,
             created: CreatedAt(guild.id).toISOString(),
             joined: known ? new Date(known.joinedTimestamp).toISOString() : null,
             teams: facts.teams.get(guild.id) ?? 0,

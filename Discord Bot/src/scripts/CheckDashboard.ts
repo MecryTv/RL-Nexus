@@ -1575,6 +1575,7 @@ async function checkRoulette(client: BotClient): Promise<void> {
 
     swap(loose.dashboardService, "CanManage", async (session: { userId: string }) => session.userId === people.manager);
     swap(loose.dashboardService, "GuildAllowed", async () => true);
+    swap(loose.dashboardService, "CanRoulette", async (session: { userId: string }) => session.userId === people.manager || session.userId === people.mod);
     swap(loose.staffGrantService, "Active", () => null);
     swap(loose.settings, "Of", async () => ({ modules: ["rocket-roulette"], moderators: { users: [], roles: [] } }));
     swap(loose.rouletteService, "Settings", async () => ({ ...DefaultRouletteSettings(), moderatorRoleId: ROLE }));
@@ -1622,6 +1623,66 @@ async function checkRoulette(client: BotClient): Promise<void> {
     }
 }
 
+/**
+ * W-0087 Aufgabe 9: Wer nur die Moderator-Rolle von Rocket Roulette hat, sieht
+ * den Server als Moderator mit Rocket Roulette, ohne zu verwalten. Ohne Rolle
+ * oder mit ausgeschaltetem Modul sieht er ihn nicht. Discord und Datenbank
+ * sind nachgestellt, die Serverliste baut der echte Code.
+ */
+async function checkRouletteModerators(client: BotClient): Promise<void> {
+    console.log("\n  — Rollen-Moderatoren von Rocket Roulette (W-0087) —");
+
+    const GUILD_ID = "90071992547408801";
+    const ROLE = "90071992547408802";
+    const people = { mod: "90071992547408811", plain: "90071992547408812" };
+    const service = client.dashboardService as unknown as Record<string, unknown>;
+    const loose = client as unknown as Record<string, Record<string, unknown>>;
+    const restore: (() => void)[] = [];
+    const swap = (target: Record<string, unknown>, key: string, value: unknown): void => {
+        const had = Object.prototype.hasOwnProperty.call(target, key);
+        const before = target[key];
+
+        target[key] = value;
+        restore.push(() => {
+            if (had) target[key] = before;
+            else delete target[key];
+        });
+    };
+    const members = new Map<string, Record<string, unknown>>();
+    const guild = { id: GUILD_ID, name: "Roulette", icon: null, memberCount: 99, joinedTimestamp: Date.now(), members: { cache: members, fetch: async (id: string) => members.get(id) ?? Promise.reject(new Error("Unknown Member")) } };
+    let modules = ["rocket-roulette"];
+
+    members.set(people.mod, { id: people.mod, roles: { cache: new Map([[ROLE, { id: ROLE }]]) }, user: { bot: false } });
+    members.set(people.plain, { id: people.plain, roles: { cache: new Map() }, user: { bot: false } });
+    swap(service, "Fetch", async () => [{ id: GUILD_ID, name: "Roulette", icon: null, owner: false, permissions: "0" }]);
+    swap(service, "Warm", () => undefined);
+    swap(service, "IsStaff", async () => false);
+    swap(loose.databaseService, "Query", async () => []);
+    swap(loose.teams, "CountsOf", async () => new Map());
+    swap(loose.settings, "ModulesOf", async () => new Map([[GUILD_ID, modules]]));
+    swap(loose.settings, "Of", async () => ({ modules, moderators: { users: [], roles: [] } }));
+    swap(loose.rouletteService, "Settings", async () => ({ ...DefaultRouletteSettings(), moderatorRoleId: ROLE }));
+    Object.defineProperty(client.databaseService, "Ready", { get: () => true, configurable: true });
+    restore.push(() => void delete (client.databaseService as unknown as Record<string, unknown>).Ready);
+    client.guilds.cache.set(GUILD_ID, guild as never);
+    restore.push(() => void client.guilds.cache.delete(GUILD_ID));
+
+    const load = (userId: string) => (service.LoadGuilds as (session: unknown) => Promise<IDashboardGuild[]>).call(client.dashboardService, { id: `rr9-${userId}-${modules.length}`, userId, username: userId, avatar: null, accessToken: "egal", mfa: true, expiresAt: Date.now() + 60_000 });
+
+    try {
+        const seen = (await load(people.mod)).find((entry) => entry.id === GUILD_ID);
+
+        check("Nur mit Roulette-Rolle: Server als Moderator, canRoulette, kein Verwalten", seen?.role === "Moderator" && seen.canRoulette === true && seen.canManage === false, JSON.stringify(seen && { role: seen.role, canRoulette: seen.canRoulette, canManage: seen.canManage }));
+        check("Nur mit Roulette-Rolle: keine Live Tickets, keine Moderation, keine Bewerbungen", seen?.canSupport === false && seen.canModerate === false && seen.canReview === false);
+        check("Ohne Rolle: Server nicht sichtbar", !(await load(people.plain)).some((entry) => entry.id === GUILD_ID));
+
+        modules = [];
+        check("Modul aus: Server nicht sichtbar", !(await load(people.mod)).some((entry) => entry.id === GUILD_ID));
+    } finally {
+        for (const undo of restore.reverse()) undo();
+    }
+}
+
 async function main(): Promise<void> {
     const client = new BotClient();
 
@@ -1645,6 +1706,7 @@ async function main(): Promise<void> {
     await checkInvite(client);
     await checkCatalog();
     await checkRoulette(client);
+    await checkRouletteModerators(client);
 
     // W-0086: Rechtsklick-Befehle ohne Beschreibung - die Liste fürs Admin Dashboard hat trotzdem einen Text.
     check("Befehle fürs Admin: Rechtsklick ohne Beschreibung bekommt einen leeren Text", JSON.stringify(CommandPaths({ name: "Hack melden" })) === JSON.stringify([{ path: "Hack melden", description: "" }]));

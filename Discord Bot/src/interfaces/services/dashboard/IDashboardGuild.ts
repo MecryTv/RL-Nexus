@@ -33,6 +33,8 @@ export default interface IDashboardGuild {
     canModerate: boolean;
     // Darf Bewerbungen sehen und entscheiden: wer verwaltet und wer im Apply System als Pruefer eingetragen ist.
     canReview: boolean;
+    // W-0087: Rocket Roulette steuern: wer verwaltet und wer die Moderator-Rolle des Moduls hat.
+    canRoulette: boolean;
     created: string;
     // Seit wann RL Nexus auf dem Server ist (ISO) - null, wenn der Bot fehlt.
     joined: string | null;

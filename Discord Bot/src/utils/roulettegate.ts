@@ -70,9 +70,11 @@ export async function RouletteGate(client: BotClient, request: FastifyRequest, r
     }
 
     let manage = false;
+    let control = false;
 
     try {
         manage = await service.CanManage(session, id);
+        control = manage || (await service.CanRoulette(session, id));
     } catch (error) {
         if (!(error instanceof SessionExpired)) throw error;
 
@@ -85,7 +87,8 @@ export async function RouletteGate(client: BotClient, request: FastifyRequest, r
 
     if (!stand) return null;
 
-    if (!manage && !(await client.rouletteService.CanControl(stand.member))) {
+    // W-0087 Aufgabe 9: dieselbe Antwort wie in der Serverliste - Verwalter oder die Moderator-Rolle des Moduls.
+    if (!control) {
         reply.code(403).send({ error: "Forbidden", hint: MODS_ONLY });
 
         return null;

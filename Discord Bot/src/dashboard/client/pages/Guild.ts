@@ -183,7 +183,7 @@ export function renderGuild(data: IPayload): void {
     const staffView = guild.role === "Staff";
     const lockedPrivate = staffView && Boolean(guild.staff) && !guild.staff?.private;
     const only = supportOnly
-        ? new Set([...SUPPORT_SECTIONS, ...(guild.canModerate ? ["moderation"] : []), ...(guild.canReview ? ["applications"] : [])])
+        ? new Set([...(guild.canSupport ? SUPPORT_SECTIONS : []), ...(guild.canModerate ? ["moderation"] : []), ...(guild.canReview ? ["applications"] : []), ...(guild.canRoulette ? ["rocket-roulette"] : [])])
         : staffView && !guild.staff
           ? new Set(["uebersicht"])
           : null;
@@ -194,7 +194,7 @@ export function renderGuild(data: IPayload): void {
         note.hidden = false;
 
         if (supportOnly) {
-            const open = ["Live Tickets", "Transcriptions", ...(guild.canModerate ? ["die Moderation"] : []), ...(guild.canReview ? ["Bewerbungen"] : [])];
+            const open = [...(guild.canSupport ? ["Live Tickets", "Transcriptions"] : []), ...(guild.canModerate ? ["die Moderation"] : []), ...(guild.canReview ? ["Bewerbungen"] : []), ...(guild.canRoulette ? ["Rocket Roulette"] : [])];
 
             note.querySelector("span")!.textContent =
                 `Du bist hier Moderator: ${open.join(", ")} ${open.length > 1 ? "stehen" : "steht"} dir offen. Einstellungen brauchen „Server verwalten“ auf dem Server selbst.`;
@@ -210,7 +210,7 @@ export function renderGuild(data: IPayload): void {
     const loadModules = bindModules(guild, only, nav);
 
     bindNavSearch(guild.canManage && only === null, nav);
-    const show = bindSections(guild.id, supportOnly ? "live-tickets" : "uebersicht");
+    const show = bindSections(guild.id, supportOnly ? (guild.canSupport ? "live-tickets" : guild.canRoulette ? "rocket-roulette" : "uebersicht") : "uebersicht");
 
     const user = { id: data.user.id, name: data.user.name, avatar: data.user.avatar };
 
