@@ -1,5 +1,6 @@
 import { IRouletteSettings } from "../interfaces/services/roulette/IRoulette";
 import { ALPHABET, LobbyCode } from "./SixMans";
+import { ParseDate, ParseTime, ZonedDate } from "../services/RunnableService";
 
 /**
  * Rocket Roulette (W-0087): Roulette-Abend mit privaten Rocket-League-Lobbys.
@@ -47,4 +48,28 @@ export function LobbyLabel(pattern: string, teams: number[]): string {
     const numbers = teams.join("");
 
     return pattern.includes("{teams}") ? pattern.split("{teams}").join(numbers) : `${pattern}${numbers}`;
+}
+
+/**
+ * Startzeit aus „/roulette planen zeit: datum:“ in deutscher Zeit. Ohne Datum
+ * heute, ist die Zeit schon vorbei morgen. Unsinn oder ein Datum in der
+ * Vergangenheit ergibt null.
+ */
+export function StartTime(time: string, date: string | null, now: number): number | null {
+    const clock = ParseTime(time.trim().replace(/^(\d):/, "0$1:"));
+
+    if (!clock) return null;
+
+    if (date?.trim()) {
+        const day = ParseDate(date);
+        const at = day ? ZonedDate(day.year, day.month, day.day, clock.hours, clock.minutes).getTime() : null;
+
+        return at !== null && at > now ? at : null;
+    }
+
+    const today = new Intl.DateTimeFormat("de-DE", { timeZone: "Europe/Berlin", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date(now));
+    const part = (type: string) => Number(today.find((entry) => entry.type === type)?.value);
+    const at = ZonedDate(part("year"), part("month"), part("day"), clock.hours, clock.minutes).getTime();
+
+    return at > now ? at : ZonedDate(part("year"), part("month"), part("day") + 1, clock.hours, clock.minutes).getTime();
 }

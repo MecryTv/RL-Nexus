@@ -12,7 +12,8 @@ process.env.DEV_CLIENT_SECRET ||= "check-secret";
 
 import { ButtonInteraction, ChannelType, Guild, GuildBasedChannel, GuildMember, Role } from "discord.js";
 import BotClient from "../client/BotClient";
-import { DefaultRouletteSettings, LobbyCode, LobbyLabel } from "../constants/RocketRoulette";
+import { DefaultRouletteSettings, LobbyCode, LobbyLabel, StartTime } from "../constants/RocketRoulette";
+import { ZonedDate } from "../services/RunnableService";
 import RouletteService, { IRouletteActor, RouletteError } from "../services/RouletteService";
 import { Draw, IDrawInput, IDrawResult, PairKey, WithFiller } from "../services/roulette/Draw";
 import { loadImage } from "@napi-rs/canvas";
@@ -85,6 +86,20 @@ function FakeGuild(): Guild {
         roles: { cache: new Map([[GUILD, { id: GUILD, name: "@everyone" } as Role]]) },
         iconURL: () => null,
     } as unknown as Guild;
+}
+
+function checkStartTime(): void {
+    console.log("\n  — Startzeit —");
+
+    const at = (year: number, month: number, day: number, hours: number) => ZonedDate(year, month, day, hours, 0).getTime();
+
+    check("Ohne Datum, Zeit kommt noch: heute", StartTime("20:00", null, at(2026, 11, 12, 18)) === at(2026, 11, 12, 20));
+    check("Ohne Datum, Zeit ist vorbei: morgen", StartTime("20:00", null, at(2026, 11, 12, 21)) === at(2026, 11, 13, 20));
+    check("Mit Datum: 14.11. 20:00 deutscher Zeit", StartTime("20:00", "14.11.2026", at(2026, 11, 12, 18)) === Date.UTC(2026, 10, 14, 19, 0));
+    check("Über die Zeitumstellung: 28.03.2027 20:00 ist Sommerzeit", StartTime("20:00", "28.03.2027", at(2027, 3, 27, 12)) === Date.UTC(2027, 2, 28, 18, 0));
+    check("Unsinnige Zeit: null", StartTime("25:00", null, at(2026, 11, 12, 18)) === null && StartTime("abends", null, at(2026, 11, 12, 18)) === null);
+    check("Datum in der Vergangenheit: null", StartTime("20:00", "01.11.2026", at(2026, 11, 12, 18)) === null);
+    check("Einstellige Stunde geht auch", StartTime("9:30", "14.11.2026", at(2026, 11, 12, 18)) === ZonedDate(2026, 11, 14, 9, 30).getTime());
 }
 
 function checkSettings(client: BotClient): void {
@@ -833,6 +848,7 @@ async function main(): Promise<void> {
 
     checkSettings(client);
     checkDraw();
+    checkStartTime();
     await checkImages();
     await checkMessages();
 
