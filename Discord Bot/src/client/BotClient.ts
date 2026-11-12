@@ -42,6 +42,7 @@ import RankIconService from "../services/RankIconService";
 import MatchupService from "../services/MatchupService";
 import RoleListService from "../services/RoleListService";
 import SixMansService from "../services/SixMansService";
+import RouletteService from "../services/RouletteService";
 import RankRoleService from "../services/RankRoleService";
 import ReportService from "../services/ReportService";
 import HelpService from "../services/help/HelpService";
@@ -151,6 +152,8 @@ export default class BotClient extends Client implements IBotClient {
     matchupService: MatchupService;
     roleListService: RoleListService;
     sixMansService: SixMansService;
+    /** W-0087: Rocket Roulette. */
+    rouletteService: RouletteService;
     reportService: ReportService;
     helpService: HelpService;
     /** /einstellungen (W-0014 Teil 3) - nicht verwechseln mit settings, den Server-Einstellungen. */
@@ -309,6 +312,7 @@ export default class BotClient extends Client implements IBotClient {
         this.matchupService = new MatchupService(this);
         this.roleListService = new RoleListService(this);
         this.sixMansService = new SixMansService(this);
+        this.rouletteService = new RouletteService(this);
         this.reportService = new ReportService(this);
         this.helpService = new HelpService(this);
         this.settingsPanel = new SettingsService(this);

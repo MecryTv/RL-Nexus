@@ -96,6 +96,13 @@ export const MODULES: IModule[] = [
         ],
     },
     {
+        id: "rocket-roulette",
+        name: "Rocket Roulette",
+        description: "Roulette-Abend mit privaten Matches: Teams jede Runde neu gemischt, Lobbys mit Name und Passwort, danach alle zurück in den Treffpunkt.",
+        icon: "#i-sparkle",
+        category: "rocket-league",
+    },
+    {
         id: "lft",
         name: "Looking for",
         description: "Spieler suchen Teams, Teams suchen Spieler – gefragt wird per DM, der Beitrag landet im Forum.",

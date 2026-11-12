@@ -12,6 +12,7 @@ import { ModerationPanel } from "./Moderation";
 import { RankRolesPanel } from "./RankRoles";
 import { CustomMessagePanel, GiveawaysPanel, PollsPanel, ReactionRolesPanel, RoleListsPanel } from "./Simple";
 import { SixMansPanel } from "./SixMans";
+import { RocketRoulettePanel } from "./RocketRoulette";
 import { TeamsPanel } from "./Teams";
 import { TempVoicePanel } from "./TempVoice";
 import { TicketsPanel } from "./Tickets";
@@ -26,7 +27,7 @@ import { YouTubePanel } from "./YouTube";
  */
 export const PANEL_AREAS: readonly { name: string; ids: readonly PanelModuleId[] }[] = [
     { name: "Immer dabei", ids: ["levels", "backups"] },
-    { name: "Rocket League", ids: ["rl-6mans", "lft", "teams", "rank-roles", "clips", "matchups"] },
+    { name: "Rocket League", ids: ["rl-6mans", "lft", "teams", "rank-roles", "clips", "matchups", "rocket-roulette"] },
     { name: "Moderation", ids: ["moderation", "automod", "anti-villain", "logging"] },
     { name: "Community", ids: ["welcome", "apply", "voice-hub", "reaction-roles", "role-lists", "giveaways", "polls"] },
     { name: "Support", ids: ["tickets"] },
@@ -37,6 +38,7 @@ const ALL: Record<PanelModuleId, IPanelModule<any>> = {
     levels: LevelsPanel,
     backups: BackupsPanel,
     "rl-6mans": SixMansPanel,
+    "rocket-roulette": RocketRoulettePanel,
     lft: LookingForPanel,
     teams: TeamsPanel,
     "rank-roles": RankRolesPanel,

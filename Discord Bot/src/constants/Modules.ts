@@ -16,6 +16,7 @@ export const MODULE_IDS = [
     "rank-roles",
     "clips",
     "matchups",
+    "rocket-roulette",
     "role-lists",
     "moderation",
     "automod",

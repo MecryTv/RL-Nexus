@@ -8,6 +8,7 @@
 process.env.CLIENT_SECRET ||= "check-secret";
 process.env.DEV_CLIENT_SECRET ||= "check-secret";
 
+import { DefaultRouletteSettings } from "../constants/RocketRoulette";
 import { ChannelType, Guild, GuildBasedChannel, GuildMember, Role } from "discord.js";
 import SettingsService from "../services/settings/SettingsService";
 import BotClient from "../client/BotClient";
@@ -208,6 +209,7 @@ async function checkRegisters(client: BotClient): Promise<Partial<Record<PanelMo
         automod: DefaultAutoModSettings(),
         "anti-villain": DefaultAntiVillainSettings(),
         logging: DefaultLogSettings(),
+        "rocket-roulette": DefaultRouletteSettings(),
     };
     const clean: Partial<Record<PanelModuleId, (patch: Record<string, unknown>, previous: never) => unknown>> = {
         moderation: (patch, previous) => client.moderationService.Clean(guild, patch, previous),
@@ -231,10 +233,11 @@ async function checkRegisters(client: BotClient): Promise<Partial<Record<PanelMo
         automod: (patch, previous) => client.autoModService.Clean(guild, patch, previous),
         "anti-villain": (patch, previous) => client.antiVillainService.Clean(guild, patch, previous),
         logging: (patch, previous) => client.logService.Clean(guild, patch, previous),
+        "rocket-roulette": (patch, previous) => client.rouletteService.Clean(guild, patch, previous),
     };
     const order = PANEL_AREAS.flatMap((area) => area.ids).join(",");
 
-    check("23 Module in der Reihenfolge der Bereiche, ohne Gallery", Object.keys(PANEL_MODULES).join(",") === order && Object.keys(PANEL_MODULES).length === 23 && !("gallery" in PANEL_MODULES), Object.keys(PANEL_MODULES).join(","));
+    check("24 Module in der Reihenfolge der Bereiche, ohne Gallery", Object.keys(PANEL_MODULES).join(",") === order && Object.keys(PANEL_MODULES).length === 24 && !("gallery" in PANEL_MODULES), Object.keys(PANEL_MODULES).join(","));
     check("Höchstens 25 Module (Menü und Auswahl bei modul:)", Object.keys(PANEL_MODULES).length <= 25);
 
     for (const panel of Object.values(PANEL_MODULES)) {
@@ -490,9 +493,9 @@ async function checkView(start: Partial<Record<PanelModuleId, unknown>>): Promis
 
     const missing = rows.filter((row) => !overviewJson.includes(`"value":"${row.panel.id}"`)).map((row) => row.panel.id);
 
-    check("Übersicht: Menü „Modul wählen“ mit allen 23 Modulen", overviewJson.includes(`"custom_id":"set:m"`) && rows.length === 23 && missing.length === 0, missing.join(","));
+    check("Übersicht: Menü „Modul wählen“ mit allen 24 Modulen", overviewJson.includes(`"custom_id":"set:m"`) && rows.length === 24 && missing.length === 0, missing.join(","));
     check("Übersicht: nach den Bereichen der Dashboard-Leiste", titles.join(",") === PANEL_AREAS.map((area) => area.name).join(","), titles.join(","));
-    check("Übersicht: Nummern 1 bis 23 durchgezählt", numbers.join(",") === Array.from({ length: 23 }, (_, index) => index + 1).join(","));
+    check("Übersicht: Nummern 1 bis 24 durchgezählt", numbers.join(",") === Array.from({ length: 24 }, (_, index) => index + 1).join(","));
 
     const dim = overviewBlocks.flatMap((block) => (block.kind === "settings" ? block.items.filter((item) => item.dim).map((item) => item.label) : []));
 

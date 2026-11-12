@@ -48,6 +48,7 @@
         "check:security": "tsx src/scripts/CheckSecurity.ts",
         "check:settings": "tsx src/scripts/CheckSettings.ts",
         "check:sixmans": "tsx src/scripts/CheckSixMans.ts",
+        "check:roulette": "tsx src/scripts/CheckRoulette.ts",
         "check:staffgrant": "tsx src/scripts/CheckStaffGrant.ts",
         "check:teams": "tsx src/scripts/CheckTeams.ts",
         "icons:teams": "tsx src/scripts/RenderTeamIcons.ts",

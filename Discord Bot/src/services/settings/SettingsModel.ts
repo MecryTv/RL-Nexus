@@ -27,6 +27,7 @@ export type PanelModuleId =
     | "rank-roles"
     | "clips"
     | "matchups"
+    | "rocket-roulette"
     | "moderation"
     | "automod"
     | "anti-villain"

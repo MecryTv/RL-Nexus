@@ -259,17 +259,18 @@ export function DefaultSixSettings(): IMansSettings {
  * Name und Passwort für die private Lobby. Kurz, gut vorlesbar und ohne
  * Zeichen, die im Spiel Ärger machen - getippt wird das auf einem Controller.
  */
-const ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789";
+export const ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789";
 
 export function LobbyName(roundId: number): string {
-    return `m${roundId}${Pick(3)}`;
+    return `m${roundId}${LobbyCode(3)}`;
 }
 
 export function LobbyPass(): string {
-    return Pick(5);
+    return LobbyCode(5);
 }
 
-function Pick(length: number): string {
+/** Zufällige Zeichen aus ALPHABET, auch für Rocket Roulette (W-0087). */
+export function LobbyCode(length: number): string {
     let out = "";
 
     for (let index = 0; index < length; index++) out += ALPHABET[Math.floor(Math.random() * ALPHABET.length)];
