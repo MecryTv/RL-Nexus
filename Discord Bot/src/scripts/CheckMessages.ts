@@ -17,6 +17,7 @@ import { CustomMessageView } from "../builder/CustomView";
 import { DefaultEmbed, DefaultMessageDoc, DefaultResponseDoc, MAX_BUTTONS, MAX_MENU_OPTIONS, MAX_MENUS, Matches, NextRun, WEEKDAYS } from "../constants/Messages";
 import { ISchedule } from "../interfaces/services/messages/IMessages";
 import { MessageError } from "../services/MessageService";
+import { PanelsOf } from "../utils/guildpanels";
 
 const GUILD = "90071992547409941";
 const USER = "90071992547409942";
@@ -297,6 +298,13 @@ function checkMenus(client: BotClient): void {
         { label: "Kaputt", action: "message", messageId: -1 },
     ]);
     check("Knopf: gespeicherte Nachricht zeigen kommt durch", shown.length === 1 && shown[0]?.action === "message" && shown[0].messageId === 5, JSON.stringify(shown));
+
+    // Discord nimmt genau ein Emoji; mehrere oder eins mit Satzzeichen ließen die ganze Nachricht scheitern (Review W-0091).
+    const emojiOf = (emoji: string) => service.CleanMenus(guild, [{ placeholder: "E", options: [option("A", { action: "text", text: "x", emoji })] }])[0]?.options[0]?.emoji ?? null;
+    check("Emoji: eins geht", emojiOf("⭐") === "⭐");
+    check("Emoji: Familie, Flagge und Tastenkappe zählen als eins", emojiOf("👨‍👩‍👧") === "👨‍👩‍👧" && emojiOf("🇩🇪") === "🇩🇪" && emojiOf("1️⃣") === "1️⃣");
+    check("Emoji: zwei fallen weg", emojiOf("⭐⭐") === null && emojiOf("🇩🇪🇦🇹") === null, `${emojiOf("⭐⭐")} ${emojiOf("🇩🇪🇦🇹")}`);
+    check("Emoji: mit Satzzeichen fällt weg", emojiOf("😀!") === null, String(emojiOf("😀!")));
 }
 
 /* ----------------------------------------------------------
@@ -341,6 +349,10 @@ async function checkDatabase(client: BotClient): Promise<void> {
     });
 
     check("Ohne Termin ist nichts fällig", !(await client.customMessages.Due(Date.now())).some((entry) => entry.id === plain.id));
+
+    // Nur Menüs, keine Knöpfe: nach einem Zurückladen muss sie trotzdem neu gepostet werden (Review W-0091).
+    await client.customMessages.Save(plain.id, { messageId: "900000000000000002", menus: client.messageService.CleanMenus(FakeGuild(), [{ placeholder: "M", options: [{ label: "A", action: "text", text: "x" }] }]) });
+    check("Eine Nachricht nur mit Menüs zählt als Panel", (await PanelsOf(client, GUILD)).some((panel) => panel.kind === "message" && panel.key === String(plain.id)));
     await client.customMessages.Remove(plain.id);
 
     await client.customMessages.Save(message.id, { messageId: "900000000000000001", schedule: { ...message.schedule, next: Date.now() + 86_400_000 } });

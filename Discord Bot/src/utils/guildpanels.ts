@@ -78,7 +78,7 @@ export async function PanelsOf(client: BotClient, guildId: string, withData = fa
     }
 
     for (const message of await client.customMessages.OfGuild(guildId)) {
-        if (message.buttons.length > 0 && message.schedule.mode === "off" && message.channelId && message.messageId) {
+        if ((message.buttons.length > 0 || message.menus.length > 0) && message.schedule.mode === "off" && message.channelId && message.messageId) {
             add({ kind: "message", key: String(message.id), channelId: message.channelId, messageId: message.messageId, label: `Nachricht „${message.name}“` }, message);
         }
     }

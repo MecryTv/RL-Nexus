@@ -402,8 +402,10 @@ export default class TicketService {
         if (custom) return this.client.emojis.cache.has(custom[1]) ? text : null;
 
         const unicode = text.length > 0 && text.length <= 16 && !/[\s<>:\w]/.test(text.replace(/[0-9#*]️?⃣/g, ""));
+        // Discord nimmt genau ein Emoji: "⭐⭐" oder "😀!" ließen die ganze Nachricht scheitern.
+        const single = [...new Intl.Segmenter().segment(text)].length === 1;
 
-        return unicode && /\p{Extended_Pictographic}|\p{Regional_Indicator}|⃣/u.test(text) ? text : null;
+        return unicode && single && /\p{Extended_Pictographic}|\p{Regional_Indicator}|⃣/u.test(text) ? text : null;
     }
 
     async Save(guild: Guild, input: unknown): Promise<ITicketConfig> {
