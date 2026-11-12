@@ -121,7 +121,7 @@ export const AREAS: readonly IArea[] = [
     {
         id: "teams",
         label: "Teams und Wettbewerb",
-        tables: ["team_groups", "teams", "matches", "matchups", "lft_requests", "sixmans_players", "sixmans_rounds"],
+        tables: ["team_groups", "teams", "matches", "matchups", "lft_requests", "sixmans_players", "sixmans_rounds", "roulette_evenings", "roulette_rounds"],
         children: [{ table: "team_members", parent: "teams", key: "team_id" }],
         members: true,
     },

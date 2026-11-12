@@ -159,7 +159,7 @@ export const USERDATA_AREAS: readonly IUserdataAreaDef[] = [
     {
         id: "teams",
         label: "Teams und Clubs",
-        inside: ["Teams", "Clubs", "6mans"],
+        inside: ["Teams", "Clubs", "6mans", "Rocket Roulette"],
         icon: "users",
         sources: [
             { table: "team_members", column: "user_id", role: "person", time: "joined_at", label: "CONCAT('Mitglied in Team ', team_id)" },
@@ -170,6 +170,12 @@ export const USERDATA_AREAS: readonly IUserdataAreaDef[] = [
             { table: "teams", column: "players", role: "json", guild: G, time: "created_at", label: "CONCAT('Spieler in ', name)" },
             { table: "sixmans_rounds", column: "blue", role: "json", guild: G, label: "'6mans-Runde, Team Blau'" },
             { table: "sixmans_rounds", column: "orange", role: "json", guild: G, label: "'6mans-Runde, Team Orange'" },
+            // W-0087 Rocket Roulette. team: Wer den Abend geplant hat, wird anonymisiert, der Abend bleibt für die anderen.
+            { table: "roulette_evenings", column: "created_by", role: "team", guild: G, time: ms("created_at"), label: "'Rocket Roulette geplant'" },
+            { table: "roulette_evenings", column: "participants", role: "json", guild: G, time: ms("starts_at"), label: "'Rocket Roulette, dabei gewesen'" },
+            { table: "roulette_evenings", column: "sit_out", role: "json", guild: G, time: ms("starts_at"), label: "'Rocket Roulette, ausgesetzt'" },
+            { table: "roulette_evenings", column: "wishes", role: "json", guild: G, time: ms("starts_at"), label: "'Rocket Roulette, Wunsch-Paar'" },
+            { table: "roulette_rounds", column: "lobbies", role: "json", guild: G, time: ms("created_at"), label: "CONCAT('Rocket Roulette, Runde ', number)" },
         ],
     },
     {
@@ -332,6 +338,10 @@ export const USERDATA_IGNORED: Readonly<Record<string, string>> = {
     "giveaways.*": "Bedingungen und Einstellungen; Gewinner stehen als Quelle results",
     "clip_rounds.*": "Preise der Runde; Gewinner stehen als Quelle winners",
     "sixmans_rounds.*": "names, before_mmr und reports nennen dieselben Personen wie blue und orange; channels sind Kanäle",
+    // W-0087: Der ganze Abend samt Runden fällt 30 Tage nach dem Ende weg (KEEP_MS im Bot).
+    "roulette_evenings.announce": "Kanal und Nachricht der Ankündigung, keine Person",
+    "roulette_evenings.control": "Kanal und Nachricht der Steuerkarte, keine Person",
+    "roulette_evenings.history": "Zähler je Paar aus zwei IDs, dieselben Personen wie participants; der Abend fällt 30 Tage nach dem Ende weg",
     "teams.*": "Einstellungen des Teams; Spieler stehen als Quelle players",
     "matchups.*": "Notiz und Ergebnis eines Matchups",
     "shop_products.*": "Produkt im Shop",

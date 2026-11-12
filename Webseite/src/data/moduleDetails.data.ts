@@ -809,6 +809,88 @@ export const MODULE_DETAILS: Readonly<Record<string, IModuleDetail>> = {
         ],
     },
 
+    "rocket-roulette": {
+        intro: [
+            "Ein Abend mit vielen Leuten und ohne feste Teams endet oft im Durcheinander: Wer spielt mit wem, wer macht die Lobby auf, wie hieß das Passwort noch mal, und wo sind eigentlich die fünf, die eben noch im Voice waren?",
+            "Rocket Roulette nimmt euch das ab. Ihr legt eine Startzeit fest, alle sammeln sich im Warteraum, und zur Startzeit holt der Bot alle in den Treffpunkt. Jede Runde lost ein Moderator per Knopf neu aus. Der Bot mischt die Teams, verteilt Lobby-Name und Passwort und schiebt jedes Team in seinen eigenen Sprachkanal.",
+            "Nach der Runde sind alle wieder im Treffpunkt, wer später kam, ist ab jetzt dabei. Ergebnisse gibt es keine, und das ist Absicht: Es geht um einen entspannten Abend, nicht um eine Rangliste.",
+        ],
+        concepts: {
+            title: "Wer was macht",
+            lead: "Moderatoren steuern, alle anderen spielen.",
+            entries: [
+                {
+                    label: "Moderatoren",
+                    text: "Haben die Rolle aus den Einstellungen. Sie losen jede Runde aus, tragen Wünsche ein, hosten je eine Lobby und bleiben dafür im Treffpunkt.",
+                    color: "var(--c-red)",
+                },
+                {
+                    label: "Spieler",
+                    text: "Sitzen im Warteraum oder im Treffpunkt. Wer mit wem spielen möchte, sagt es einem Moderator.",
+                    color: "var(--c-blue)",
+                },
+                {
+                    label: "Host",
+                    text: "Macht die Lobby in Rocket League auf und meldet sie per Knopf als offen. Fehlt ein Moderator, übernimmt ein Spieler aus der Lobby.",
+                    color: "var(--c-mod-engagement)",
+                },
+                {
+                    label: "Server-Verwaltung",
+                    text: "Stellt Kanäle, Rolle, Teamgröße und Passwort ein. Steuern kann sie den Abend auch.",
+                    color: "var(--c-mod-moderation)",
+                },
+            ],
+        },
+        automations: {
+            title: "Was von selbst passiert",
+            lead: "Jede Karte ist ein Bild, mit Alt-Text für alle, die vorlesen lassen.",
+            entries: [
+                {
+                    title: "Start zur Startzeit",
+                    text: "Wer im Warteraum sitzt, landet im Treffpunkt. Die Ankündigung im Info-Kanal zählt bis dahin herunter.",
+                    icon: "clock",
+                },
+                {
+                    title: "Teams und Kanäle",
+                    text: "Jede Runde neu gemischt. Wünsche kommen ins selbe Team, wer zuletzt aussetzen musste, ist sicher dabei, dieselben Mitspieler möglichst selten.",
+                    icon: "users",
+                },
+                {
+                    title: "Lobby ist offen",
+                    text: "Sobald der Host die Lobby meldet, pingt der Bot beide Teams im Text-Chat ihres Kanals, mit Name und Passwort.",
+                    icon: "megaphone",
+                },
+                {
+                    title: "Übersicht am Ende",
+                    text: "Alle Runden mit Teams und Host, dazu wer wie oft dabei war. Nach 30 Tagen ist der Abend gelöscht.",
+                    icon: "calendar",
+                },
+            ],
+        },
+        setup: {
+            title: "Einrichten",
+            lead: "In vier Schritten im Dashboard.",
+            entries: [
+                {
+                    title: "Kanäle",
+                    text: "Warteraum, Treffpunkt und wohin die Team-Kanäle kommen: automatisch in eine Kategorie oder feste Sprachkanäle. Dazu der Info-Kanal für Ankündigung und Rundenkarten.",
+                },
+                {
+                    title: "Moderation",
+                    text: "Die Moderator-Rolle und der Kanal für die Steuerkarte und die Übersicht.",
+                },
+                {
+                    title: "Lobbys",
+                    text: "Teamgröße, Lobby-Name mit Teamnummern und ein festes oder gewürfeltes Passwort, mit Vorschau der Karte.",
+                },
+                {
+                    title: "Abend planen",
+                    text: "Mit /roulette planen oder im Dashboard. Ab dann läuft alles über die Steuerkarte.",
+                },
+            ],
+        },
+    },
+
     "rl-6mans": {
         intro: [
             "Wer an einem Abend spielen will, aber kein festes Team hat, schreibt „wer ist dabei?“ in den Chat und wartet. Irgendwann sind es sechs, dann beginnt die Diskussion, wer mit wem spielt, und die besten drei landen zufällig im selben Team.",

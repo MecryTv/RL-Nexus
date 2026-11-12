@@ -238,6 +238,29 @@ export const MODULE_DEFINITIONS: readonly IModuleDefinition[] = [
         ],
     },
     {
+        id: "rocket-roulette",
+        name: "Rocket Roulette",
+        tagline: "Ein Abend mit privaten Matches, jede Runde neue Teams.",
+        botText: "Roulette-Abend mit privaten Matches: Teams jede Runde neu gemischt, Lobbys mit Name und Passwort, danach alle zurück in den Treffpunkt.",
+        description:
+            "Ihr legt eine Startzeit fest, alle sammeln sich im Warteraum. Zur Startzeit holt der Bot alle in den " +
+            "Treffpunkt, und jede Runde lost ein Moderator neu aus: wild gemischte Teams, Lobby-Name und Passwort, " +
+            "jedes Team in seinem eigenen Sprachkanal. Nach der Runde kommen alle zurück, Nachzügler sind ab der " +
+            "nächsten dabei. Ergebnisse zählt der Bot keine, es geht ums Spielen.",
+        category: ModuleCategory.RocketLeague,
+        status: ModuleStatus.Live,
+        icon: "sparkle",
+        commands: ["roulette planen", "roulette start", "roulette beenden", "roulette status"],
+        highlights: [
+            "Teams jede Runde neu gemischt, dieselben Mitspieler möglichst selten",
+            "Wünsche: zwei Mitglieder landen im selben Team",
+            "Wer aussetzen musste, ist nächste Runde sicher dabei",
+            "Lobby-Karte mit Name und Passwort im Voice-Chat jedes Teams",
+            "Moderatoren hosten, fehlt einer, macht ein Spieler die Lobby auf",
+            "Steuern in Discord oder im Dashboard, mit Übersicht am Ende",
+        ],
+    },
+    {
         id: "rl-6mans",
         name: "2, 4 & 6 Mans",
         tagline: "Warteschlangen für 1v1, 2v2 und 3v3, mit eigener Wertung.",
