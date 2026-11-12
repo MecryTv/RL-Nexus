@@ -32,7 +32,7 @@ export async function tidyBackups(config: IConfig): Promise<void> {
     );
 
     await query("DELETE FROM poll_votes WHERE poll_id IN (SELECT id FROM polls WHERE guild_id IN (?, ?))", [GUILD, OTHER]).catch(() => undefined);
-    for (const table of ["polls", "levels", "guild_settings", "teams", "module_settings", "server_id_map"]) {
+    for (const table of ["polls", "levels", "level_days", "level_log", "level_backfill", "guild_settings", "teams", "module_settings", "server_id_map"]) {
         if (existing.has(table)) await query(`DELETE FROM ${table} WHERE guild_id IN (?, ?)`, [GUILD, OTHER]);
     }
 
@@ -108,6 +108,24 @@ export async function checkBackupsDb(config: IConfig, http: IHttp): Promise<void
             const [stored] = await query<{ created_at: Date }[]>("SELECT created_at FROM guild_settings WHERE guild_id = ?", [GUILD]);
             assert.equal((data.tables.guild_settings[0].created_at as Date).getTime(), stored.created_at.getTime(), "Datum kommt genau so zurück");
             assert.equal(await backupData(meta.id, OTHER), null, "fremder Server sieht das Backup nicht");
+        });
+
+        await check("W-0090: Tages-XP, XP-Verlauf und Nachberechnung kommen mit, Staff-Freigaben nie", async () => {
+            await query("INSERT INTO level_days (guild_id, user_id, day, xp) VALUES (?, '1', 20000, 3)", [GUILD]);
+            await query("INSERT INTO level_log (guild_id, user_id, actor_id, mode, amount, created_at) VALUES (?, '1', '2', 'add', 5, 1)", [GUILD]);
+            // Ohne die Zeile liefe die Nachberechnung nach dem Zurückladen noch einmal und gäbe die XP doppelt.
+            await query("INSERT INTO level_backfill (guild_id, mode, claimed_at) VALUES (?, 'backfill', 1)", [GUILD]);
+
+            const meta = await createBackup({ guildId: GUILD, guildName: "check:db Server", kind: "hand", note: null, byName: "nutzer1" });
+            const data = await backupData(meta.id, GUILD);
+            assert.equal(data?.tables.level_days?.length, 1);
+            assert.equal(data?.tables.level_log?.length, 1);
+            assert.equal(data?.tables.level_backfill?.[0]?.mode, "backfill");
+            assert.equal("staff_grants" in (data?.tables ?? {}), false);
+            assert.ok((EXCLUDED_TABLES as readonly string[]).includes("staff_grant_log"));
+            await deleteBackup(meta.id, GUILD);
+            // Die folgenden Fälle zählen die Zeilen des Bereichs Level.
+            for (const table of ["level_days", "level_log", "level_backfill"]) await query(`DELETE FROM ${table} WHERE guild_id = ?`, [GUILD]);
         });
 
         await check("Löschen nur von Hand angelegter", async () => {

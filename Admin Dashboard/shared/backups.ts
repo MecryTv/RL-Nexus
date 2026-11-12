@@ -105,7 +105,14 @@ export const AREAS: readonly IArea[] = [
     { id: "nachrichten", label: "Nachrichten und Panels", tables: ["custom_messages", "self_role_panels", "auto_responses", "role_lists"], children: [], members: false },
     { id: "bewerbungen", label: "Bewerbungen", tables: ["apply_forms", "apply_submissions"], children: [], members: true },
     { id: "voice", label: "Voice und Streams", tables: ["voice_hubs", "stream_notifiers"], children: [], members: false },
-    { id: "level", label: "Level und Aktivität", tables: ["levels", "member_activity", "guild_activity", "channel_activity"], children: [], members: true },
+    {
+        id: "level",
+        label: "Level und Aktivität",
+        // W-0090: level_backfill muss mit den XP zurückkommen, sonst liefe die Nachberechnung danach noch einmal.
+        tables: ["levels", "member_activity", "guild_activity", "channel_activity", "level_days", "level_log", "level_top", "level_board_posts", "level_backfill"],
+        children: [],
+        members: true,
+    },
     { id: "tickets", label: "Tickets", tables: ["tickets", "ticket_transcripts", "ticket_blacklist"], children: [], members: true },
     { id: "moderation", label: "Moderation", tables: ["mod_cases"], children: [], members: true },
     {
@@ -131,9 +138,10 @@ export const AREAS: readonly IArea[] = [
 /** Tabellen mit guild_id, die bewusst nicht gesichert werden: offene Kanäle und Warteschlangen, ein alter Stand wäre falsch. */
 // av_*: Anti Villain ist Live-Zustand, der zu einem Zeitpunkt gehört. Ein Sicherheits-Backup entsteht vor dem Fall
 // des Nukers - zurückgeladen, löschte es dessen gemerkte Rollen. Also nie im Backup, nie überschrieben.
+// staff_grants, staff_grant_log (W-0090): Protokoll der Staff-Zugriffe. Ein Zurückladen darf es nie überschreiben.
 // server_*: Zuordnung alter zu neuer IDs und laufende Ladevorgänge (Plan 32), ebenfalls Live-Zustand;
 // dazu die Einladungen, Anfragen und Sperren von „ein Server pro Person“ (W-0064), die das Team führt.
-export const EXCLUDED_TABLES = ["temp_voices", "support_waits", "av_cases", "av_trust", "av_reports", "av_incidents", "av_events", "av_debris", "server_id_map", "server_restores", "server_invites", "server_requests", "server_blocks", "invite_passes"] as const;
+export const EXCLUDED_TABLES = ["temp_voices", "support_waits", "av_cases", "av_trust", "av_reports", "av_incidents", "av_events", "av_debris", "server_id_map", "server_restores", "server_invites", "server_requests", "server_blocks", "invite_passes", "staff_grants", "staff_grant_log"] as const;
 
 export interface IBackupMeta {
     readonly id: number;
