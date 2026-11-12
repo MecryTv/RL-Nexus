@@ -10,7 +10,7 @@
 process.env.CLIENT_SECRET ||= "check-secret";
 process.env.DEV_CLIENT_SECRET ||= "check-secret";
 
-import { ButtonInteraction, ChannelType, Guild, GuildBasedChannel, GuildMember, Role } from "discord.js";
+import { ButtonInteraction, ChannelType, Guild, GuildBasedChannel, GuildMember, PermissionFlagsBits, Role } from "discord.js";
 import BotClient from "../client/BotClient";
 import { DefaultRouletteSettings, LobbyCode, LobbyLabel, StartTime } from "../constants/RocketRoulette";
 import { ZonedDate } from "../services/RunnableService";
@@ -282,7 +282,7 @@ function SampleLobby(index: number, size: 1 | 2 | 3 = 3): IRouletteLobby {
 }
 
 function SampleRound(lobbies: number): IRouletteRound {
-    return { id: 1, eveningId: 1, guildId: GUILD, number: 2, status: "running", createdAt: Date.now(), endedAt: null, lobbies: Array.from({ length: lobbies }, (_, index) => SampleLobby(index)) };
+    return { id: 1, eveningId: 1, guildId: GUILD, number: 2, status: "running", createdAt: Date.now(), endedAt: null, restore: null, lobbies: Array.from({ length: lobbies }, (_, index) => SampleLobby(index)) };
 }
 
 async function Width(buffer: Buffer): Promise<number> {
@@ -497,6 +497,11 @@ interface IFlowWorld {
     deleted: string[];
     log: string[];
     failMove: Set<string>;
+    /** Nach jeder gesendeten Nachricht, mit dem Kanal. */
+    onSend: ((channelId: string) => Promise<void>) | null;
+    /** So viele Kanäle scheitern beim Anlegen. */
+    failCreate: number;
+    modules: string[];
     service: RouletteService;
 }
 
@@ -511,6 +516,9 @@ function FlowWorld(client: BotClient): IFlowWorld {
         deleted: [],
         log: [],
         failMove: new Set<string>(),
+        onSend: null,
+        failCreate: 0,
+        modules: ["rocket-roulette"],
         service: client.rouletteService,
     } as unknown as IFlowWorld;
     const channels = new Map<string, GuildBasedChannel>();
@@ -530,6 +538,7 @@ function FlowWorld(client: BotClient): IFlowWorld {
                 const sent = { channelId: id, id: `m${world.sent.length + 1}`, payload: JSON.stringify(payload) };
 
                 world.sent.push(sent);
+                await world.onSend?.(id);
 
                 return { id: sent.id, channelId: id };
             },
@@ -573,6 +582,11 @@ function FlowWorld(client: BotClient): IFlowWorld {
             cache: channels,
             fetch: async (id: string) => channels.get(id) ?? null,
             create: async (options: { name: string; parent?: string }) => {
+                if (world.failCreate > 0) {
+                    world.failCreate--;
+                    throw new Error("Missing Permissions");
+                }
+
                 const id = `auto${++made}`;
 
                 world.created.push(id);
@@ -608,6 +622,7 @@ function FlowWorld(client: BotClient): IFlowWorld {
     };
 
     Patch(world, client.rouletteService);
+    (client.settings as unknown as Record<string, unknown>).Of = async () => ({ modules: world.modules, moderators: { users: [], roles: [] } });
     client.guilds.cache.set(GUILD, world.guild);
 
     return world;
@@ -833,6 +848,129 @@ async function checkFlow(client: BotClient): Promise<void> {
     check("fixedChannels: nach dem Ende nichts gelöscht", world.deleted.length === 0);
 }
 
+/** Review W-0087: die Befunde aus dem Abschluss-Review, je ein Test. */
+async function checkReviewFixes(client: BotClient): Promise<void> {
+    console.log("\n  — Review-Befunde —");
+
+    const lobbiesWithChannels = async (eveningId: number) => ((await client.rouletteRounds.Current(eveningId))?.lobbies ?? []).filter((lobby) => lobby.channels).length;
+
+    // I1: Jede Lobby steht in der Datenbank, sobald sie verteilt ist, nicht erst am Ende.
+    let world = FlowWorld(client);
+    let mod = world.member("mod1", MAIN, true);
+
+    Players(12, "p").forEach((id) => world.member(id, MAIN));
+
+    let night = await world.service.Plan(world.guild, Actor(mod), Date.now());
+    const seen: number[] = [];
+
+    world.onSend = async (channelId) => {
+        if (channelId.startsWith("auto")) seen.push(await lobbiesWithChannels(night.id));
+    };
+    await world.service.NextRound(world.guild, Actor(mod));
+    world.onSend = null;
+    check("I1: beim letzten Kartenversand steht die erste Lobby schon mit Kanälen in der Datenbank", seen.length === 4 && seen[3] >= 1, seen.join(","));
+
+    // I1: „Lobby ist offen“ auf einer Lobby, die noch verteilt wird: ablehnen statt Erfolg melden.
+    const pending = await client.rouletteRounds.Create({ eveningId: night.id, guildId: GUILD, number: 9, lobbies: [{ ...SampleLobby(0), host: "p1", openedAt: null }] });
+    const rejected = await Rejects(world.service.MarkOpen(world.guild, world.members.get("p1")!, night.id, 9, 0));
+
+    check("I1: „Lobby ist offen“ während des Verteilens wird abgelehnt", rejected instanceof RouletteError && String((rejected as Error).message).includes("verteilt") && (await client.rouletteRounds.Get(pending.id))?.lobbies[0].openedAt === null, String(rejected));
+    await cleanup(client);
+
+    // I1 + I2: Kanal-Anlage scheitert für Lobby 0; Einspringen trifft trotzdem die Lobby mit dem freien Platz, und ein „offen“ dazwischen bleibt.
+    world = FlowWorld(client);
+    mod = world.member("mod1", MAIN, true);
+
+    const mod2 = world.member("mod2", MAIN, true);
+
+    Players(13, "p").forEach((id) => world.member(id, MAIN));
+    night = await world.service.Plan(world.guild, Actor(mod), Date.now());
+    world.failCreate = 1;
+
+    const drawn = await world.service.NextRound(world.guild, Actor(mod));
+    const fillerIndex = drawn.lobbies.findIndex((lobby) => lobby.teams[0].length !== lobby.teams[1].length);
+    const openIndex = drawn.lobbies.findIndex((lobby) => lobby.channels && lobby.cards);
+    let opened = false;
+
+    world.onSend = async () => {
+        if (opened || openIndex < 0) return;
+        opened = true;
+        await world.service.MarkOpen(world.guild, world.members.get(drawn.lobbies[openIndex].host)!, night.id, drawn.number, openIndex);
+    };
+
+    const filled = await world.service.Fill(world.guild, Actor(mod2), night.id, true);
+
+    world.onSend = null;
+    check("I2: Einspringen trifft die Lobby mit dem freien Platz, nicht die ohne Kanäle", filled.lobbies[fillerIndex]?.filler === "mod2" && filled.lobbies[0].teams[0].length === filled.lobbies[0].teams[1].length, JSON.stringify(filled.lobbies.map((lobby) => [lobby.teams[0].length, lobby.teams[1].length, lobby.filler])));
+    check("I1: „Lobby ist offen“ während des Einspringens bleibt erhalten", opened && (await client.rouletteRounds.Current(night.id))!.lobbies[openIndex].openedAt !== null, `${opened} ${openIndex}`);
+    await cleanup(client);
+
+    // I3: Fehlende Rechte des Bots stehen auf der Steuerkarte.
+    world = FlowWorld(client);
+    mod = world.member("mod1", MAIN, true);
+    (world.guild.members as unknown as { me: unknown }).me = { id: "bot", permissionsIn: () => ({ has: (flag: bigint) => flag !== PermissionFlagsBits.MoveMembers }) };
+    night = await world.service.Plan(world.guild, Actor(mod), Date.now() + 60_000);
+
+    const control = [...world.sent, ...world.edits].filter((entry) => entry.channelId === CONTROL).at(-1);
+
+    check("I3: fehlendes Recht „Mitglieder verschieben“ steht auf der Steuerkarte", !!control?.payload.includes("Mitglieder verschieben"), control?.payload.slice(0, 200));
+    await cleanup(client);
+
+    // I4: Feste Kanäle, die während der Runde aus der Liste fliegen, löscht der Bot nicht.
+    world = FlowWorld(client);
+    world.settings = { ...world.settings, teamChannels: "fixed", fixedChannelIds: [FIX1, FIX2] };
+    mod = world.member("mod1", MAIN, true);
+    Players(6, "p").forEach((id) => world.member(id, MAIN));
+    await world.service.Plan(world.guild, Actor(mod), Date.now());
+    await world.service.NextRound(world.guild, Actor(mod));
+    world.settings = { ...world.settings, teamChannels: "auto", fixedChannelIds: [] };
+    await world.service.End(world.guild, Actor(mod));
+    check("I4: früher feste Kanäle werden nach dem Ende nicht gelöscht", !world.deleted.includes(FIX1) && !world.deleted.includes(FIX2), world.deleted.join());
+    await cleanup(client);
+
+    // I5: Abbruch gibt Aussetzern ihren sicheren Platz und Einmal-Wünsche zurück.
+    world = FlowWorld(client);
+    world.settings = { ...world.settings, teamChannels: "fixed", fixedChannelIds: [FIX1, FIX2] };
+    mod = world.member("mod1", MAIN, true);
+    Players(12, "p").forEach((id) => world.member(id, MAIN));
+    night = await world.service.Plan(world.guild, Actor(mod), Date.now());
+    await world.service.NextRound(world.guild, Actor(mod));
+
+    const firstSitOut = [...(await client.rouletteEvenings.Get(night.id))!.sitOut].sort();
+    const [a, b] = firstSitOut;
+
+    await world.service.AddWish(world.guild, Actor(mod), a, b, true);
+    await world.service.NextRound(world.guild, Actor(mod));
+    await world.service.AbortRound(world.guild, Actor(mod));
+
+    const after = (await client.rouletteEvenings.Get(night.id))!;
+
+    check("I5: nach dem Abbruch gelten wieder die Aussetzer von vorher", [...after.sitOut].sort().join() === firstSitOut.join(), `${after.sitOut} / ${firstSitOut}`);
+    check("I5: nach dem Abbruch ist der Einmal-Wunsch wieder da", after.wishes.some((wish) => wish.once && [wish.a, wish.b].sort().join() === [a, b].sort().join()), JSON.stringify(after.wishes));
+    await cleanup(client);
+
+    // Modul aus: ein geplanter Abend startet nicht von selbst.
+    world = FlowWorld(client);
+    mod = world.member("mod1", MAIN, true);
+    world.member("w1", WAIT);
+
+    const planned = await world.service.Plan(world.guild, Actor(mod), Date.now() + 60_000);
+
+    world.modules = [];
+    await world.service.Tick(Date.now() + 120_000);
+    check("Modul aus: der geplante Abend startet nicht und niemand wird verschoben", (await client.rouletteEvenings.Get(planned.id))?.status === "planned" && world.members.get("w1")!.voice.channelId === WAIT);
+    world.modules = ["rocket-roulette"];
+    await cleanup(client);
+
+    // Aufbewahrung: auch ein nie beendeter Abend ist nach 30 Tagen weg.
+    const day = 24 * 3_600_000;
+    const forgotten = await client.rouletteEvenings.Create({ guildId: GUILD, startsAt: Date.now() - 31 * day, createdBy: "m1" });
+
+    await client.rouletteEvenings.Prune(Date.now() - 30 * day);
+    check("Aufbewahrung: ein vergessener, nie beendeter Abend fällt nach 30 Tagen weg", (await client.rouletteEvenings.Get(forgotten.id)) === null);
+    await cleanup(client);
+}
+
 async function cleanup(client: BotClient): Promise<void> {
     await client.databaseService.Write("DELETE FROM roulette_rounds WHERE guild_id = ?", [GUILD]);
     await client.databaseService.Write("DELETE FROM roulette_evenings WHERE guild_id = ?", [GUILD]);
@@ -859,6 +997,8 @@ async function main(): Promise<void> {
             await checkDatabase(client);
             await cleanup(client);
             await checkFlow(client);
+            await cleanup(client);
+            await checkReviewFixes(client);
         } finally {
             await cleanup(client).catch((error) => check("Aufräumen lief durch", false, String(error)));
             await client.databaseService.Close();

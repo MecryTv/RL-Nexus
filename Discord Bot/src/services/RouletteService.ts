@@ -257,23 +257,31 @@ export default class RouletteService {
 
             const number = evening.round + 1;
             const lobbies = result.lobbies.map((lobby) => this.Dress(guild, settings, lobby));
-            const created = await this.client.rouletteRounds.Create({ eveningId: evening.id, guildId: guild.id, number, lobbies });
+            const pending = result.needsFiller?.lobbyIndex ?? null;
+            // Review I5: was vorher galt, für einen Abbruch.
+            const created = await this.client.rouletteRounds.Create({
+                eveningId: evening.id,
+                guildId: guild.id,
+                number,
+                lobbies,
+                status: pending === null ? "running" : "drawing",
+                restore: { sitOut: evening.sitOut, wishes: evening.wishes.filter((wish) => wish.once) },
+            });
 
             evening = await this.Save(evening.id, (current) => ({ round: number, sitOut: result.sitOut, wishes: current.wishes.filter((wish) => !wish.once) }));
 
-            const pending = result.needsFiller?.lobbyIndex ?? null;
-            const dealt: IRouletteLobby[] = [];
-
+            // Review I1: jede Lobby steht in der Datenbank, sobald sie verteilt ist. Ein Neustart mittendrin
+            // verliert so höchstens eine Lobby, und „Lobby ist offen“ wirkt schon während der Rest verteilt wird.
             for (const [index, lobby] of lobbies.entries()) {
-                dealt.push(index === pending ? lobby : await this.Deal(guild, settings, { eveningId: evening.id, round: number, lobby: index }, lobby, failed));
+                if (index !== pending) await this.SaveLobby(created.id, index, await this.Deal(guild, settings, { eveningId: evening.id, round: number, lobby: index }, lobby, failed));
             }
 
-            const round = await this.SaveRound(created.id, () => ({ lobbies: dealt, status: pending === null ? "running" : "drawing" }));
+            const round = await this.SaveRound(created.id, () => null);
 
-            this.Warn(evening.id, [...failed.map((name) => `${name} ließ sich nicht verschieben.`), ...result.unmetWishes.map((wish) => `Wunsch ${this.Name(guild, wish.a)} + ${this.Name(guild, wish.b)} ging diesmal nicht.`)], true);
+            this.Warn(evening.id, [...failed, ...result.unmetWishes.map((wish) => `Wunsch ${this.Name(guild, wish.a)} + ${this.Name(guild, wish.b)} ging diesmal nicht.`)]);
 
             if (pending !== null) {
-                const lobby = dealt[pending];
+                const lobby = round.lobbies[pending];
                 const sitOut = lobby.teams[0].map((id) => lobby.names[id] ?? id).join(" oder ");
                 const ref = await this.Send(guild, settings.controlChannelId, FillRequestMessage(evening.id, number, lobby.name, lobby.size, sitOut, settings.moderatorRoleId));
 
@@ -298,7 +306,8 @@ export default class RouletteService {
 
             let evening = await this.Evening(guild, eveningId);
             const round = await this.client.rouletteRounds.Current(evening.id);
-            const index = round?.lobbies.findIndex((lobby) => !lobby.channels) ?? -1;
+            // Review I2: die Lobby mit dem freien Platz, nicht einfach die erste ohne Kanäle (Anlegen kann scheitern).
+            const index = round?.lobbies.findIndex((lobby) => !lobby.channels && lobby.teams[0].length !== lobby.teams[1].length) ?? -1;
 
             if (evening.status !== "running" || round?.status !== "drawing" || index < 0) throw new RouletteError("Der freie Platz ist schon geklärt.");
             if (take && round.lobbies.some((lobby) => lobby.teams.some((team) => team.includes(actor.id)))) throw new RouletteError("Du spielst in dieser Runde schon mit.");
@@ -306,23 +315,35 @@ export default class RouletteService {
             const draft: IDrawResult = { lobbies: round.lobbies, sitOut: [], needsFiller: { lobbyIndex: index, size: round.lobbies[index].size }, unmetWishes: [] };
             const result = WithFiller(draft, take ? actor.id : null);
             const failed: string[] = [];
-            const lobbies: IRouletteLobby[] = [];
+            const drawn = result.lobbies as IRouletteLobby[];
+            const changed = new Map<number, IRouletteLobby>();
 
-            for (const [position, drawn] of (result.lobbies as IRouletteLobby[]).entries()) {
-                const lobby = { ...drawn, names: { ...drawn.names, [drawn.host]: drawn.names[drawn.host] ?? (drawn.host === actor.id ? actor.name : this.Name(guild, drawn.host)) } };
+            for (const [position, entry] of drawn.entries()) {
+                const lobby = { ...entry, names: { ...entry.names, [entry.host]: entry.names[entry.host] ?? (entry.host === actor.id ? actor.name : this.Name(guild, entry.host)) } };
                 const ref = { eveningId: evening.id, round: round.number, lobby: position };
 
                 if (position === index) {
-                    lobbies.push(await this.Deal(guild, settings, ref, lobby, failed));
+                    changed.set(position, await this.Deal(guild, settings, ref, lobby, failed));
                     continue;
                 }
 
                 // Der Moderator hostete eine andere Lobby: dort hostet jetzt ein Spieler.
-                if (lobby.host !== round.lobbies[position].host) await this.Recard(guild, ref, lobby);
-                lobbies.push(lobby);
+                if (lobby.host !== round.lobbies[position].host) {
+                    await this.Recard(guild, ref, lobby);
+                    changed.set(position, lobby);
+                }
             }
 
-            const saved = await this.SaveRound(round.id, () => ({ lobbies, status: "running" }));
+            // Review I1: nur die geänderten Lobbys schreiben, alles andere (etwa „offen“) bleibt, wie es in der Datenbank steht.
+            const saved = await this.SaveRound(round.id, (current) => ({
+                status: "running",
+                lobbies: drawn.map((_, position) => {
+                    const stored = current.lobbies[position];
+                    const next = changed.get(position);
+
+                    return next ? { ...next, openedAt: stored?.openedAt ?? next.openedAt } : stored;
+                }),
+            }));
 
             if (result.sitOut.length) evening = await this.Save(evening.id, (current) => ({ sitOut: [...new Set([...current.sitOut, ...result.sitOut])] }));
 
@@ -336,7 +357,7 @@ export default class RouletteService {
                 this.fillRequests.delete(round.id);
             }
 
-            this.Warn(evening.id, failed.map((name) => `${name} ließ sich nicht verschieben.`), true);
+            this.Warn(evening.id, failed);
             await this.PostRound(guild, settings, evening, saved);
             await this.Refresh(guild, evening);
             this.Pulse(guild, evening);
@@ -353,6 +374,8 @@ export default class RouletteService {
 
         if (evening.status !== "running" || !Live(round) || !lobby) throw new RouletteError("Diese Runde ist schon vorbei.");
         if (member.id !== lobby.host && !(await this.CanControl(member))) throw new RouletteError(`Nur ${lobby.names[lobby.host] ?? "der Host"} oder ein Moderator meldet die Lobby als offen.`);
+        // Review I1: ohne Kanäle und Karten gäbe es nichts zu pingen.
+        if (!lobby.channels || !lobby.cards) throw new RouletteError("Die Lobby wird gerade noch verteilt. Gleich nochmal drücken.");
         if (lobby.openedAt) return;
 
         const now = Date.now();
@@ -436,7 +459,7 @@ export default class RouletteService {
                 hostIsModerator: old.host === out ? false : old.hostIsModerator,
                 names: { ...old.names, [into]: this.Name(guild, into) },
             };
-            const saved = await this.SaveRound(round.id, (current) => ({ lobbies: current.lobbies.map((entry, position) => (position === index ? lobby : entry)) }));
+            const saved = await this.SaveRound(round.id, (current) => ({ lobbies: current.lobbies.map((entry, position) => (position === index ? { ...lobby, openedAt: entry.openedAt } : entry)) }));
             const failed: string[] = [];
             const areas = this.Areas(settings, saved);
             const incoming = guild.members.cache.get(into);
@@ -446,7 +469,7 @@ export default class RouletteService {
             if (lobby.channels && outgoing?.voice.channelId && lobby.channels.includes(outgoing.voice.channelId)) await this.Move(outgoing, settings.mainVoiceId, failed);
 
             await this.Recard(guild, { eveningId: evening.id, round: round.number, lobby: index }, lobby);
-            this.Warn(evening.id, failed.map((name) => `${name} ließ sich nicht verschieben.`), true);
+            this.Warn(evening.id, failed);
             await this.Refresh(guild, evening);
             this.Pulse(guild, evening);
 
@@ -470,9 +493,15 @@ export default class RouletteService {
 
             await this.Finish(guild, settings, evening, round, "aborted", failed);
 
-            const saved = await this.Save(evening.id, () => ({ round: round.number - 1 }));
+            // Review I5: die Runde zählt nicht. Wer zuletzt aussetzte, ist wieder zuerst dran, Einmal-Wünsche gelten wieder.
+            const saved = await this.Save(evening.id, (current) => {
+                const restore = round.restore;
+                const back = (restore?.wishes ?? []).filter((wish) => !current.wishes.some((other) => [other.a, other.b].some((id) => id === wish.a || id === wish.b)));
 
-            this.Warn(saved.id, failed.map((name) => `${name} ließ sich nicht verschieben.`), true);
+                return { round: round.number - 1, ...(restore ? { sitOut: restore.sitOut, wishes: [...current.wishes, ...back] } : {}) };
+            });
+
+            this.Warn(saved.id, failed);
             await this.Refresh(guild, saved);
             this.Pulse(guild, saved);
         });
@@ -599,7 +628,7 @@ export default class RouletteService {
             };
         };
 
-        if (kind === "round") return RenderRound({ id: 0, eveningId: 0, guildId: guild.id, number: 1, status: "running", createdAt: now, endedAt: null, lobbies: [sample(0), sample(1)] }, 0);
+        if (kind === "round") return RenderRound({ id: 0, eveningId: 0, guildId: guild.id, number: 1, status: "running", createdAt: now, endedAt: null, restore: null, lobbies: [sample(0), sample(1)] }, 0);
 
         const lobby = live ?? sample(0);
 
@@ -631,6 +660,9 @@ export default class RouletteService {
 
         const show = async (view: { components: unknown[] }): Promise<void> => void (await interaction.editReply({ ...view, flags: MessageFlags.IsComponentsV2, allowedMentions: { parse: [] } } as never));
         const say = (text: string) => show(new ComponentV2Builder({ accentColor: GOLD }).text(text).toMessage());
+
+        // Ist das Modul aus, tun die alten Knöpfe nichts mehr.
+        if (!(await this.On(guild.id))) return void (await say("Rocket Roulette ist auf diesem Server aus."));
 
         try {
             switch (id.action) {
@@ -748,13 +780,13 @@ export default class RouletteService {
         for (const evening of await this.client.rouletteEvenings.Due(now)) {
             const guild = this.client.guilds.cache.get(evening.guildId);
 
-            if (guild) await this.Start(guild, evening.id).catch((error) => logger.warn(`🎰 Rocket Roulette #${evening.id} startet nicht: ${error instanceof Error ? error.message : String(error)}`));
+            if (guild && (await this.On(guild.id))) await this.Start(guild, evening.id).catch((error) => logger.warn(`🎰 Rocket Roulette #${evening.id} startet nicht: ${error instanceof Error ? error.message : String(error)}`));
         }
 
         for (const evening of await this.client.rouletteEvenings.Running()) {
             const guild = this.client.guilds.cache.get(evening.guildId);
 
-            if (!guild) continue;
+            if (!guild || !(await this.On(guild.id))) continue;
 
             const settings = await this.Settings(guild.id);
             const count = this.InVoice(guild, settings.waitingRoomId).length;
@@ -782,6 +814,10 @@ export default class RouletteService {
     /* ----------------------------------------------------------
        Bausteine
        ---------------------------------------------------------- */
+    private async On(guildId: string): Promise<boolean> {
+        return (await this.client.settings.Of(guildId)).modules.includes(ROULETTE_MODULE);
+    }
+
     /** Je Server nur eine Aktion, die verschiebt oder auslost. Der Zweite bekommt eine Meldung statt zu warten. */
     private async Locked<T>(guildId: string, run: () => Promise<T>): Promise<T> {
         if (this.busy.has(guildId)) throw new RouletteError("Das läuft schon, einen Moment bitte.");
@@ -835,6 +871,11 @@ export default class RouletteService {
         return round;
     }
 
+    /** Eine Lobby in die Runde schreiben, „offen“ aus der Datenbank behalten: ein Klick dazwischen geht nicht verloren (Review I1). */
+    private SaveLobby(roundId: number, index: number, lobby: IRouletteLobby): Promise<IRouletteRound> {
+        return this.SaveRound(roundId, (current) => ({ lobbies: current.lobbies.map((entry, position) => (position === index ? { ...lobby, openedAt: entry.openedAt ?? lobby.openedAt } : entry)) }));
+    }
+
     /** Name, Passwort und Anzeigenamen für eine ausgeloste Lobby. */
     private Dress(guild: Guild, settings: IRouletteSettings, lobby: IDrawLobby): IRouletteLobby {
         const ids = [...lobby.teams[0], ...lobby.teams[1], lobby.host];
@@ -855,12 +896,12 @@ export default class RouletteService {
         const channels = await this.TeamChannels(guild, settings, ref.lobby, lobby);
 
         if (!channels) {
-            failed.push(`die Team-Kanäle von ${lobby.name}`);
+            failed.push(`Die Team-Kanäle von ${lobby.name} ließen sich nicht anlegen.`);
 
             return lobby;
         }
 
-        const placed: IRouletteLobby = { ...lobby, channels };
+        const placed: IRouletteLobby = { ...lobby, channels, ...(settings.teamChannels === "auto" ? { auto: true } : {}) };
         const areas = this.Areas(settings, null, channels);
         const avatars = this.Avatars(guild, [...lobby.teams[0], ...lobby.teams[1], lobby.host]);
         const cards: string[] = [];
@@ -911,7 +952,8 @@ export default class RouletteService {
             for (const [team, channelId] of lobby.channels.entries()) {
                 for (const member of this.InVoice(guild, channelId)) await this.Move(member, settings.mainVoiceId, failed);
 
-                if (settings.fixedChannelIds.includes(channelId)) {
+                // Review I4: gelöscht wird nur, was der Bot selbst angelegt hat, egal was gerade in den Einstellungen steht.
+                if (!lobby.auto) {
                     const card = lobby.cards?.[team];
                     const channel = guild.channels.cache.get(channelId);
 
@@ -1065,6 +1107,8 @@ export default class RouletteService {
         const warnings = [...(this.warnings.get(evening.id) ?? [])];
 
         if (round?.status === "drawing") warnings.unshift("Ein Platz ist frei: die Einspring-Anfrage beantworten.");
+        // Review I3: was dem Bot an Rechten fehlt, steht ganz oben.
+        warnings.unshift(...this.Rights(guild, settings));
 
         for (const lobby of lobbies) {
             if (round && !lobby.openedAt && lobby.channels && now - round.createdAt > HOST_WAIT_WARN_MS) {
@@ -1085,9 +1129,48 @@ export default class RouletteService {
         };
     }
 
-    /** Warnungen der letzten Aktion für die Steuerkarte. `lines` sind fertige Sätze, sonst Namen. */
-    private Warn(eveningId: number, items: string[], lines = false): void {
-        const text = [...new Set(lines ? items : items.map((name) => `${name} ließ sich nicht verschieben.`))];
+    /** Was dem Bot an Rechten fehlt, als Sätze für die Steuerkarte (Spec „Rechte“: „Fehlt etwas, sagt die Steuerkarte genau was“). */
+    private Rights(guild: Guild, settings: IRouletteSettings): string[] {
+        const me = guild.members.me;
+
+        if (!me) return [];
+
+        const missing = new Set<string>();
+        const voice: [bigint, string][] = [
+            [PermissionFlagsBits.ViewChannel, "Kanal ansehen"],
+            [PermissionFlagsBits.Connect, "Verbinden"],
+            [PermissionFlagsBits.MoveMembers, "Mitglieder verschieben"],
+        ];
+        const text: [bigint, string][] = [
+            [PermissionFlagsBits.ViewChannel, "Kanal ansehen"],
+            [PermissionFlagsBits.SendMessages, "Nachrichten senden"],
+            [PermissionFlagsBits.AttachFiles, "Dateien anhängen"],
+        ];
+        const need = (id: string | null, flags: [bigint, string][]) => {
+            const channel = id ? guild.channels.cache.get(id) : undefined;
+
+            if (!channel) return;
+
+            const granted = me.permissionsIn(channel);
+
+            for (const [flag, label] of flags) if (!granted.has(flag)) missing.add(`Mir fehlt „${label}“ in ${channel.name}.`);
+        };
+
+        need(settings.waitingRoomId, voice);
+        need(settings.mainVoiceId, voice);
+        need(settings.infoChannelId, text);
+        need(settings.controlChannelId, text);
+
+        if (settings.teamChannels === "fixed") for (const id of settings.fixedChannelIds) need(id, [...voice, [PermissionFlagsBits.SendMessages, "Nachrichten senden"]]);
+        else if (settings.categoryId) need(settings.categoryId, [[PermissionFlagsBits.ManageChannels, "Kanäle verwalten"], ...voice]);
+        else if (me.permissions && !me.permissions.has(PermissionFlagsBits.ManageChannels)) missing.add("Mir fehlt „Kanäle verwalten“ für die Team-Kanäle.");
+
+        return [...missing];
+    }
+
+    /** Warnungen der letzten Aktion für die Steuerkarte: Namen werden zu „… ließ sich nicht verschieben.“, fertige Sätze bleiben. */
+    private Warn(eveningId: number, items: string[]): void {
+        const text = [...new Set(items.map((item) => (item.endsWith(".") ? item : `${item} ließ sich nicht verschieben.`)))];
 
         if (text.length) this.warnings.set(eveningId, text);
         else this.warnings.delete(eveningId);

@@ -176,6 +176,7 @@ export const USERDATA_AREAS: readonly IUserdataAreaDef[] = [
             { table: "roulette_evenings", column: "sit_out", role: "json", guild: G, time: ms("starts_at"), label: "'Rocket Roulette, ausgesetzt'" },
             { table: "roulette_evenings", column: "wishes", role: "json", guild: G, time: ms("starts_at"), label: "'Rocket Roulette, Wunsch-Paar'" },
             { table: "roulette_rounds", column: "lobbies", role: "json", guild: G, time: ms("created_at"), label: "CONCAT('Rocket Roulette, Runde ', number)" },
+            { table: "roulette_rounds", column: "restore", role: "json", guild: G, time: ms("created_at"), label: "CONCAT('Rocket Roulette, vor Runde ', number)" },
         ],
     },
     {

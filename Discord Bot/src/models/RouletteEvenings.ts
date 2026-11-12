@@ -139,9 +139,10 @@ export default class RouletteEvenings extends Model<IEveningRow> {
         return this.Get(id);
     }
 
-    /** Löscht Abende, die vor `before` endeten, samt ihren Runden. */
+    /** Löscht Abende, die vor `before` endeten oder nie endeten und davor begannen, samt ihren Runden. */
     async Prune(before: number): Promise<number> {
-        const old = await this.db.Query<{ id: number }>(`SELECT id FROM \`${this.Table}\` WHERE status = 'ended' AND ended_at < ?`, [before]);
+        // Review W-0087: auch Abende, die nie beendet wurden (vergessen, Bot vom Server geworfen), nach der Frist ab Start.
+        const old = await this.db.Query<{ id: number }>(`SELECT id FROM \`${this.Table}\` WHERE (status = 'ended' AND ended_at < ?) OR (status <> 'ended' AND starts_at < ?)`, [before, before]);
 
         if (!old.length) return 0;
 

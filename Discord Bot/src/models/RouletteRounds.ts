@@ -12,6 +12,7 @@ interface IRoundRow {
     created_at: number | string;
     ended_at: number | string | null;
     lobbies: unknown;
+    restore?: unknown;
 }
 
 function ToRound(row: IRoundRow): IRouletteRound {
@@ -24,6 +25,7 @@ function ToRound(row: IRoundRow): IRouletteRound {
         createdAt: Number(row.created_at),
         endedAt: row.ended_at === null ? null : Number(row.ended_at),
         lobbies: Unpack<IRouletteLobby[]>(row.lobbies, []),
+        restore: Unpack<IRouletteRound["restore"]>(row.restore ?? null, null),
     };
 }
 
@@ -31,14 +33,15 @@ export default class RouletteRounds extends Model<IRoundRow> {
     readonly Table: TableName = TABLES.rouletteRounds;
     readonly Key = ["id"] as const;
 
-    async Create(input: { eveningId: number; guildId: string; number: number; lobbies: IRouletteLobby[] }): Promise<IRouletteRound> {
+    async Create(input: { eveningId: number; guildId: string; number: number; lobbies: IRouletteLobby[]; status?: RoundStatus; restore?: IRouletteRound["restore"] }): Promise<IRouletteRound> {
         const { insertId } = await this.Insert({
             evening_id: input.eveningId,
             guild_id: input.guildId,
             number: input.number,
-            status: "drawing",
+            status: input.status ?? "drawing",
             created_at: Date.now(),
             lobbies: JSON.stringify(input.lobbies),
+            restore: input.restore ? JSON.stringify(input.restore) : null,
         });
 
         return (await this.Get(insertId))!;

@@ -44,6 +44,8 @@ export interface IRouletteLobby extends IDrawLobby {
     openedAt: number | null;
     /** Anzeigenamen beim Auslosen, für Bilder und Übersicht. */
     names: Record<string, string>;
+    /** Der Bot hat die Kanäle angelegt und darf sie löschen (Review I4). Fehlt bei festen Kanälen. */
+    auto?: boolean;
 }
 
 export interface IRouletteRound {
@@ -55,6 +57,8 @@ export interface IRouletteRound {
     createdAt: number;
     endedAt: number | null;
     lobbies: IRouletteLobby[];
+    /** Was vor der Auslosung galt; ein Abbruch schreibt es zurück (Review I5). */
+    restore: { sitOut: string[]; wishes: IDrawWish[] } | null;
 }
 
 export type RouletteTeamSize = 1 | 2 | 3;

@@ -1618,6 +1618,23 @@ async function checkRoulette(client: BotClient): Promise<void> {
         check("Lesen: Moderator sieht den Stand, manage ist false", read.status === 200 && body.manage === false && body.evening === null, `${read.status}`);
         check("Bild-Vorschau liefert image/png", png(await fetch(`${url}?image=announce`, { headers: cookie(people.manager) })));
         check("Vorschau der Lobby-Karte mit ungespeicherten Werten", png(await fetch(`${url}?image=lobby&name=${encodeURIComponent("Runde{teams}")}&password=abc23&size=2`, { headers: cookie(people.manager) })));
+    // Review W-0087 C1: Rollen-Moderatoren sind „supportOnly“. Die Seite muss auch für sie geladen werden.
+    const guildPage = await readFile(path.join(process.cwd(), "src", "dashboard", "client", "pages", "Guild.ts"), "utf8");
+    const block = guildPage.indexOf("if (!supportOnly) {");
+    let depth = 0;
+    let end = -1;
+
+    for (let index = guildPage.indexOf("{", block); index < guildPage.length; index++) {
+        if (guildPage[index] === "{") depth++;
+        if (guildPage[index] === "}" && --depth === 0) {
+            end = index;
+            break;
+        }
+    }
+
+    const roulette = guildPage.indexOf('whenShown(["rocket-roulette"]');
+
+    check("Rollen-Moderatoren: die Roulette-Seite wird auch bei supportOnly geladen", block > 0 && end > block && roulette > 0 && !(roulette > block && roulette < end), `${block} ${end} ${roulette}`);
     } finally {
         for (const undo of restore.reverse()) undo();
     }
