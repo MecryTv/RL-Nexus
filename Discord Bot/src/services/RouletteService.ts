@@ -13,10 +13,10 @@ import {
 import BotClient from "../client/BotClient";
 import ComponentV2Builder from "../builder/ComponentV2Builder";
 import { DASHBOARD_PATH } from "../constants/Dashboard";
-import { DefaultRouletteSettings, HOST_WAIT_WARN_MS, IMAGE_THROTTLE_MS, KEEP_MS, LobbyCode, LobbyLabel, MAX_FIXED_CHANNELS, MAX_LOBBY_NAME, MAX_PASSWORD, ROULETTE_MODULE } from "../constants/RocketRoulette";
+import { DefaultRouletteSettings, HOST_WAIT_WARN_MS, IMAGE_THROTTLE_MS, KEEP_MS, LobbyCode, LobbyLabel, MAX_FIXED_CHANNELS, MAX_LOBBY_NAME, MAX_PASSWORD, ROULETTE_MODULE, StartTime } from "../constants/RocketRoulette";
 import { IAvatar, IMessageRef, IRouletteEvening, IRouletteLobby, IRouletteRound, IRouletteSettings, RouletteTeamSize } from "../interfaces/services/roulette/IRoulette";
 import { Draw, IDrawLobby, IDrawResult, PairKey, WithFiller } from "./roulette/Draw";
-import { AvatarMap, IAnnounceView, IControlView } from "../builder/RouletteImages";
+import { AvatarMap, IAnnounceView, IControlView, RenderAnnouncement, RenderControl, RenderLobbyCard, RenderRound } from "../builder/RouletteImages";
 import {
     AnnouncementMessage,
     ControlMessage,
@@ -508,6 +508,102 @@ export default class RouletteService {
             await this.Refresh(guild, evening);
             this.Pulse(guild, evening);
         });
+    }
+
+    /* ----------------------------------------------------------
+       Dashboard
+       ---------------------------------------------------------- */
+    /** Der Stand für das Bot-Dashboard: Abend, laufende Runde, wer wo sitzt, die letzten Abende. */
+    async Snapshot(guild: Guild) {
+        const settings = await this.Settings(guild.id);
+        const evening = await this.client.rouletteEvenings.ActiveOf(guild.id);
+        const current = evening ? await this.client.rouletteRounds.Current(evening.id) : null;
+        const avatars = (channelId: string | null) => this.InVoice(guild, channelId).map((member) => this.Avatar(guild, member.id));
+        const history = await this.client.rouletteEvenings.History(guild.id, 20);
+
+        return {
+            settings,
+            evening,
+            round: Live(current) ? current : null,
+            rooms: { waiting: avatars(settings.waitingRoomId), main: avatars(settings.mainVoiceId) },
+            moderators: [...this.InVoice(guild, settings.waitingRoomId), ...this.InVoice(guild, settings.mainVoiceId)].filter((member) => this.IsModerator(member, settings)).map((member) => member.id),
+            names: evening ? this.WishNames(guild, evening) : {},
+            warnings: evening ? this.ControlView(guild, settings, evening, Live(current) ? current : null).warnings : [],
+            history: history.map((entry) => ({
+                id: entry.id,
+                startsAt: entry.startsAt,
+                endedAt: entry.endedAt,
+                rounds: entry.round,
+                players: Object.keys(entry.participants).length,
+                top: Object.values(entry.participants)
+                    .sort((a, b) => b.rounds - a.rounds || a.name.localeCompare(b.name, "de"))
+                    .slice(0, 12),
+            })),
+        };
+    }
+
+    /**
+     * Dieselben Bilder wie in Discord. Ohne Abend ein Beispiel, damit die
+     * Einstellungen eine Vorschau haben; Name, Passwort und Größe dürfen dafür
+     * aus dem noch nicht gespeicherten Formular kommen.
+     */
+    async Preview(guild: Guild, kind: "announce" | "round" | "lobby" | "control", options: { lobby?: number; team?: 0 | 1; name?: string; password?: string; size?: RouletteTeamSize } = {}): Promise<Buffer> {
+        const settings = await this.Settings(guild.id);
+        const active = await this.client.rouletteEvenings.ActiveOf(guild.id);
+        const now = Date.now();
+        const evening: IRouletteEvening = active ?? {
+            id: 0,
+            guildId: guild.id,
+            status: "planned",
+            startsAt: StartTime("20:00", null, now) ?? now,
+            createdBy: guild.ownerId,
+            createdAt: now,
+            endedAt: null,
+            announce: null,
+            control: null,
+            round: 0,
+            sitOut: [],
+            wishes: [],
+            history: {},
+            participants: {},
+        };
+        const current = active ? await this.client.rouletteRounds.Current(active.id) : null;
+        const round = Live(current) ? current : null;
+
+        if (kind === "announce") return RenderAnnouncement(this.AnnounceView(guild, settings, evening));
+        if (kind === "control") return RenderControl(this.ControlView(guild, settings, evening, round));
+
+        const custom = options.name !== undefined || options.password !== undefined || options.size !== undefined;
+        const live = round && !custom ? round.lobbies[options.lobby ?? 0] : undefined;
+
+        if (kind === "round" && round && !custom) return RenderRound(round, 0, this.RoundAvatars(guild, round), this.Extra(guild, settings, evening));
+
+        const size = options.size ?? settings.teamSize;
+        const names = ["Nova", "Lukas", "Mia", "Tom", "Ben", "Ali", "Jan", "Eva", "Kai", "Leo", "Max", "Pia"];
+        const sample = (index: number): IRouletteLobby => {
+            const ids = names.slice(index * 6, index * 6 + size * 2).map((name) => `sample-${name}`);
+
+            return {
+                teams: [ids.slice(0, size), ids.slice(size)],
+                teamNumbers: [index * 2 + 1, index * 2 + 2],
+                size,
+                host: index === 0 ? "sample-Kim" : ids[0],
+                hostIsModerator: index === 0,
+                filler: null,
+                name: LobbyLabel(options.name?.trim().slice(0, MAX_LOBBY_NAME) || settings.lobbyName, [index * 2 + 1, index * 2 + 2]),
+                password: options.password?.trim().slice(0, MAX_PASSWORD) || (settings.password.mode === "fixed" ? settings.password.value : LobbyCode(5)),
+                channels: null,
+                cards: null,
+                openedAt: index === 0 ? now - 120_000 : null,
+                names: Object.fromEntries([["sample-Kim", "Kim"], ...ids.map((id) => [id, id.replace("sample-", "")])]),
+            };
+        };
+
+        if (kind === "round") return RenderRound({ id: 0, eveningId: 0, guildId: guild.id, number: 1, status: "running", createdAt: now, endedAt: null, lobbies: [sample(0), sample(1)] }, 0);
+
+        const lobby = live ?? sample(0);
+
+        return RenderLobbyCard(lobby, options.team ?? 0, !!lobby.openedAt, live ? this.Avatars(guild, [...lobby.teams[0], ...lobby.teams[1], lobby.host]) : {});
     }
 
     DashboardUrl(guildId: string): string {

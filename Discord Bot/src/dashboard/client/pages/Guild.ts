@@ -228,6 +228,7 @@ export function renderGuild(data: IPayload): void {
         if (guild.canManage && !staffView) whenShown(["protokoll"], () => void import("./GuildProtocol.js").then((module) => module.renderProtocol(guild.id, user.id)));
 
         // RL 6Mans: Einstellungen und die Live-Ansicht.
+        whenShown(["rocket-roulette"], () => void import("./GuildRoulette.js").then((module) => module.renderRoulette(guild.id)));
         whenShown(["rl-6mans"], () => void import("./GuildSixMans.js").then((module) => module.renderSixMans(guild.id)));
         whenShown(["sixmans-live"], () => void import("./GuildSixMans.js").then((module) => module.renderSixMansLive(guild.id)));
         whenShown(["sixmans-board"], () => void import("./GuildSixMans.js").then((module) => module.renderSixMansBoard(guild.id)));

@@ -20,6 +20,7 @@ import { MAX_IMAGE_BYTES } from "../constants/Gallery";
 import { PLACEHOLDER_KEYS } from "../constants/Placeholders";
 import { ErrorInfo, SendError, WantsPage } from "../utils/errorpage";
 import { MODULE_IDS, PERMANENT_MODULES } from "../constants/Modules";
+import { DefaultRouletteSettings } from "../constants/RocketRoulette";
 import { AdminStatus, AskAdmin, BackupCall } from "../routes/DashboardApiBackups";
 import { DASHBOARD_HOME, DASHBOARD_PATH, DISCORD_EPOCH, OAUTH_SCOPES, SESSION_COOKIE } from "../constants/Dashboard";
 import { SUPPORT_GUILD_ID } from "../constants/Help";
@@ -1532,6 +1533,95 @@ async function checkCatalog(): Promise<void> {
     }
 }
 
+/**
+ * W-0087: Rocket Roulette im Dashboard. Ein Rollen-Moderator steuert den Abend,
+ * die Einstellungen bleiben bei denen, die den Server verwalten. Discord, die
+ * Datenbank und der Abend sind hier nachgestellt, die Route läuft echt.
+ */
+async function checkRoulette(client: BotClient): Promise<void> {
+    console.log("\n  — Rocket Roulette im Dashboard (W-0087) —");
+
+    const GUILD_ID = "90071992547408701";
+    const ROLE = "90071992547408702";
+    const people = { manager: "90071992547408711", mod: "90071992547408712", stranger: "90071992547408713" };
+    const loose = client as unknown as Record<string, Record<string, unknown>>;
+    const restore: (() => void)[] = [];
+    const swap = (target: Record<string, unknown>, key: string, value: unknown): void => {
+        const had = Object.prototype.hasOwnProperty.call(target, key);
+        const before = target[key];
+
+        target[key] = value;
+        restore.push(() => {
+            if (had) target[key] = before;
+            else delete target[key];
+        });
+    };
+    const members = new Map<string, Record<string, unknown>>();
+    const guild = {
+        id: GUILD_ID,
+        name: "Roulette",
+        ownerId: "0",
+        members: { me: null, cache: members, fetch: async (id: string) => members.get(id) ?? Promise.reject(new Error("Unknown Member")) },
+        channels: { cache: new Map() },
+        roles: { cache: new Map() },
+        emojis: { cache: new Map() },
+    };
+
+    for (const id of Object.values(people)) {
+        members.set(id, { id, guild, displayName: id, user: { id, bot: false }, roles: { cache: new Map(id === people.mod ? [[ROLE, { id: ROLE }]] : []) }, permissions: { has: () => false }, displayAvatarURL: () => "" });
+    }
+
+    let drawn = 0;
+
+    swap(loose.dashboardService, "CanManage", async (session: { userId: string }) => session.userId === people.manager);
+    swap(loose.dashboardService, "GuildAllowed", async () => true);
+    swap(loose.staffGrantService, "Active", () => null);
+    swap(loose.settings, "Of", async () => ({ modules: ["rocket-roulette"], moderators: { users: [], roles: [] } }));
+    swap(loose.rouletteService, "Settings", async () => ({ ...DefaultRouletteSettings(), moderatorRoleId: ROLE }));
+    swap(loose.rouletteService, "NextRound", async () => {
+        drawn++;
+
+        return { id: 1, number: 1, status: "running", lobbies: [] };
+    });
+    swap(loose.rouletteService, "SaveSettings", async () => {
+        throw new Error("darf nicht ankommen");
+    });
+    swap(loose.rouletteEvenings, "ActiveOf", async () => null);
+    swap(loose.rouletteEvenings, "History", async () => []);
+    Object.defineProperty(client.databaseService, "Ready", { get: () => true, configurable: true });
+    restore.push(() => void delete (client.databaseService as unknown as Record<string, unknown>).Ready);
+    client.guilds.cache.set(GUILD_ID, guild as never);
+    restore.push(() => void client.guilds.cache.delete(GUILD_ID));
+
+    const cookie = (userId: string) => ({ Cookie: `${SESSION_COOKIE}=${encodeURIComponent(client.dashboardService.Sign({ id: `rr-${userId}`, userId, username: userId, avatar: null, accessToken: "egal", mfa: true, expiresAt: Date.now() + 60_000 }))}` });
+    const url = `${BASE}${P}/api/guild/${GUILD_ID}/roulette`;
+    const post = (userId: string, body: object) => fetch(url, { method: "POST", headers: { ...cookie(userId), "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify(body) });
+    const png = (response: Response) => response.status === 200 && (response.headers.get("content-type") ?? "").startsWith("image/png");
+
+    try {
+        const next = await post(people.mod, { action: "next" });
+
+        check("Rollen-Moderator darf die Runde auslosen", next.status === 200 && drawn === 1, `${next.status} ${await next.text()}`);
+
+        const settings = await post(people.mod, { action: "settings", settings: {} });
+
+        check("Rollen-Moderator darf die Einstellungen nicht ändern (403)", settings.status === 403, `${settings.status}`);
+
+        const stranger = await fetch(url, { headers: { ...cookie(people.stranger), Accept: "application/json" } });
+
+        check("Fremder bekommt 403", stranger.status === 403, `${stranger.status}`);
+
+        const read = await fetch(url, { headers: { ...cookie(people.mod), Accept: "application/json" } });
+        const body = (await read.json().catch(() => ({}))) as { manage?: boolean; evening?: unknown };
+
+        check("Lesen: Moderator sieht den Stand, manage ist false", read.status === 200 && body.manage === false && body.evening === null, `${read.status}`);
+        check("Bild-Vorschau liefert image/png", png(await fetch(`${url}?image=announce`, { headers: cookie(people.manager) })));
+        check("Vorschau der Lobby-Karte mit ungespeicherten Werten", png(await fetch(`${url}?image=lobby&name=${encodeURIComponent("Runde{teams}")}&password=abc23&size=2`, { headers: cookie(people.manager) })));
+    } finally {
+        for (const undo of restore.reverse()) undo();
+    }
+}
+
 async function main(): Promise<void> {
     const client = new BotClient();
 
@@ -1554,6 +1644,7 @@ async function main(): Promise<void> {
     await checkLogout(client);
     await checkInvite(client);
     await checkCatalog();
+    await checkRoulette(client);
 
     // W-0086: Rechtsklick-Befehle ohne Beschreibung - die Liste fürs Admin Dashboard hat trotzdem einen Text.
     check("Befehle fürs Admin: Rechtsklick ohne Beschreibung bekommt einen leeren Text", JSON.stringify(CommandPaths({ name: "Hack melden" })) === JSON.stringify([{ path: "Hack melden", description: "" }]));

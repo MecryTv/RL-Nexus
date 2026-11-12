@@ -5528,3 +5528,110 @@ body.sg-locked{overflow:hidden}
   .prpick{flex:1 1 140px;max-width:none}
   .prlife__lb:not(:first-of-type):not(.prlife__lb--end){display:none}
 }
+
+/* ------------------------------------------------------------------
+   Rocket Roulette (W-0087): Leitstand, Zeitleiste, Einstellungen in
+   Schritten. GuildRoulette.ts. Eckig wie der Rest, Gold fürs Passwort.
+   ------------------------------------------------------------------ */
+.rr{display:grid;gap:12px;min-width:0}
+.rrbox{display:grid;gap:8px;align-content:start;min-width:0;padding:14px 16px;border:1px solid var(--line);background:rgba(255,255,255,.018)}
+.rrlabel{font:700 12px/1.2 var(--f-label);letter-spacing:.1em;text-transform:uppercase;color:var(--text-2)}
+.rrlabel--gap{margin-top:8px}
+.rrmuted{color:var(--text-2);font-size:14px}
+.rrbig{font:800 28px/1.1 var(--f-display);color:var(--text)}
+.rrsub{color:var(--text-2);font-size:15px}
+.rrrow{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.rrrow--split{justify-content:space-between;margin-top:6px}
+.rrnote{margin:0}
+.rrnote .btn{flex:0 0 auto;width:auto;margin-left:auto}
+.rrnote--warn{border-color:rgba(255,197,61,.45);background:rgba(255,197,61,.08);color:#f6d27a}
+.rrhead{display:flex;flex-wrap:wrap;gap:18px;align-items:center;padding:16px;border:1px solid var(--line-strong);background:linear-gradient(135deg,rgba(255,30,45,.08),rgba(255,197,61,.04))}
+.rrhead__text{display:grid;gap:4px;flex:1 1 260px;min-width:0}
+.rrhead__act{display:grid;gap:8px;justify-items:end}
+.rrbtn--big{min-height:48px;padding:0 22px;font-size:16px}
+.rrwheel{position:relative;width:64px;height:64px;flex:none;border-radius:50%;border:3px solid var(--warn);background:conic-gradient(var(--brand) 0 36deg,#14171c 0 72deg,var(--brand) 0 108deg,#14171c 0 144deg,var(--brand) 0 180deg,#14171c 0 216deg,var(--brand) 0 252deg,#14171c 0 288deg,var(--brand) 0 324deg,#14171c 0)}
+.rrwheel::after{content:"";position:absolute;inset:20px;border-radius:50%;background:var(--warn)}
+.rrsteps{display:flex;gap:4px;margin-top:6px}
+.rrsteps span{width:26px;height:6px;background:var(--line-strong)}
+.rrsteps .is-done{background:var(--live)}
+.rrsteps .is-on{background:var(--warn)}
+.rrfield{display:grid;gap:4px}
+.rrwhen{width:auto;max-width:100%}
+.rrgrid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.rrgrid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.rrstack{display:flex;align-items:center;flex-wrap:wrap}
+.rrstack .travatar{width:34px;height:34px;margin-right:-8px;border:2px solid var(--bg-panel);font-size:13px}
+.rrstack__more{margin-left:14px;padding:4px 8px;font:700 13px var(--f-display);background:var(--line-strong);color:var(--text)}
+.rrstack-v{display:grid;gap:6px;width:100%}
+.rrwishes{display:flex;flex-wrap:wrap;gap:6px}
+.rrpair{display:inline-flex;align-items:center;gap:6px;padding:5px 9px;border:1px solid var(--line-strong);background:rgba(255,255,255,.03);font-size:14px}
+.rrx{display:inline-grid;place-items:center;width:24px;height:24px;padding:0;border:0;background:none;color:var(--text-2);cursor:pointer}
+.rrx:hover{color:var(--loss)}
+.rrx svg{width:13px;height:13px}
+.rrlink{display:inline-flex;align-items:center;gap:6px;justify-self:start;min-height:32px;padding:0;border:0;background:none;color:var(--brand-bright);font:600 14px var(--f-label);cursor:pointer}
+.rrlink svg{width:14px;height:14px}
+.rrpanel{border-color:rgba(255,197,61,.4)}
+.rrpick{display:grid;gap:6px;min-width:0}
+.rrseg{display:inline-flex;flex-wrap:wrap;gap:2px;justify-self:start}
+.rrseg button{min-height:36px;padding:0 14px;border:1px solid var(--line-strong);background:none;color:var(--text-2);font:600 14px var(--f-label);cursor:pointer}
+.rrseg button.is-on{border-color:var(--brand);background:rgba(255,30,45,.14);color:#fff}
+.rrseg button:focus-visible,.rrwiz button:focus-visible,.rrx:focus-visible,.rrlink:focus-visible{outline:2px solid var(--blue);outline-offset:-2px}
+.rrlobby{display:grid;gap:10px;min-width:0;padding:12px;border:1px solid var(--line);border-top:3px solid var(--warn);background:rgba(255,255,255,.02)}
+.rrlobby.is-open{border-top-color:var(--live)}
+.rrlobby__top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.rrlobby__top b{font:800 18px var(--f-display)}
+.rrlobby__meta{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:14px;color:var(--text-2)}
+.rrchip{padding:3px 8px;font:800 12px var(--f-display);letter-spacing:.06em;text-transform:uppercase}
+.rrchip--ok{background:rgba(53,224,127,.16);color:var(--live)}
+.rrchip--wait{background:rgba(255,197,61,.16);color:var(--warn)}
+.rrhalves{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.rrhalf{display:grid;gap:3px;min-width:0;padding:8px;font-size:14px;overflow-wrap:anywhere}
+.rrhalf--blue{background:rgba(0,175,255,.08);border-left:3px solid var(--blue)}
+.rrhalf--orange{background:rgba(255,138,31,.08);border-left:3px solid #ff8a1f}
+.rrhalf--blue .rrlabel{color:#8fb8ff}
+.rrhalf--orange .rrlabel{color:#ffb67a}
+.rrpw{font:800 15px var(--f-display);color:var(--warn);background:none;letter-spacing:.06em}
+.rrpreview{gap:10px}
+.rrshot{display:block;width:100%;height:auto;max-width:720px;border:1px solid var(--line);background:#2b2d31}
+.rrtimeline{display:grid;gap:0;margin:0;padding:0;list-style:none}
+.rrtimeline li{position:relative;display:grid;gap:2px;margin-left:6px;padding:0 0 14px 24px;border-left:2px solid var(--line-strong)}
+.rrtimeline li::before{content:"";position:absolute;left:-7px;top:2px;width:12px;height:12px;border-radius:50%;background:var(--bg-panel);border:2px solid var(--line-strong)}
+.rrtimeline li.is-done::before{background:var(--live);border-color:var(--live)}
+.rrtimeline li.is-on::before{background:var(--warn);border-color:var(--warn)}
+.rrtimeline li:last-child{border-left-color:transparent}
+.rrtimeline small{color:var(--text-2)}
+.rrpast{border:1px solid var(--line);background:rgba(255,255,255,.018)}
+.rrpast summary{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;padding:12px 14px;cursor:pointer}
+.rrpast[open] summary{border-bottom:1px solid var(--line)}
+.rrpast .rrwishes{padding:12px 14px}
+.rrwiz{display:flex;flex-wrap:wrap;gap:2px;margin-bottom:6px}
+.rrwiz button{flex:1 1 140px;min-height:40px;padding:0 12px;border:0;border-bottom:3px solid var(--line-strong);background:none;color:var(--text-2);font:700 14px var(--f-label);letter-spacing:.06em;text-transform:uppercase;text-align:left;cursor:pointer}
+.rrwiz button.is-done{border-bottom-color:var(--live);color:var(--text)}
+.rrwiz button.is-on{border-bottom-color:var(--brand);color:#fff}
+.rrstep{display:grid;gap:12px;min-width:0}
+.rrflow{display:flex;flex-wrap:wrap;gap:8px;align-items:stretch}
+.rrnode{display:grid;gap:6px;align-content:start;flex:1 1 180px;min-width:0;padding:12px;border:1px solid var(--line-strong);background:rgba(255,255,255,.025)}
+.rrnode .pick{width:100%;max-width:100%}
+.rrnode__ic svg{width:20px;height:20px;color:var(--warn)}
+.rrarrow{align-self:center;font:700 20px var(--f-display);color:var(--text-3)}
+.rrfieldrow{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px 16px;padding:10px 0;border-top:1px solid var(--line)}
+.rrfieldrow > div:first-child{display:grid;gap:3px;flex:1 1 240px;min-width:0}
+.rrfieldrow .pick,.rrfieldrow .text{width:auto;min-width:200px;max-width:100%}
+.rrexamples{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
+.rrcheck{display:grid;gap:0;margin:0;padding:0;list-style:none}
+.rrcheck li{display:grid;grid-template-columns:20px 160px minmax(0,1fr);gap:10px;align-items:center;padding:9px 0;border-top:1px solid var(--line)}
+.rrcheck svg{width:16px;height:16px}
+.rrcheck .is-ok svg{color:var(--live)}
+.rrcheck .is-missing svg,.rrcheck .is-missing span{color:var(--warn)}
+@media (max-width:900px){
+  .rrgrid3,.rrgrid2{grid-template-columns:1fr}
+  .rrhead__act{justify-items:start;width:100%}
+}
+@media (max-width:560px){
+  .rrarrow{display:none}
+  .rrnode{flex-basis:100%}
+  .rrfieldrow .pick,.rrfieldrow .text{min-width:0;width:100%}
+  .rrcheck li{grid-template-columns:20px minmax(0,1fr)}
+  .rrcheck li span{grid-column:2}
+  .rrbig{font-size:24px}
+}
