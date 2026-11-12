@@ -61,7 +61,7 @@ function countdownText(milliseconds: number): string {
     return days > 0 ? `${days}T ${clock}` : clock;
 }
 
-/** Für Vorleser: „Noch 3 Tage und 4 Stunden, bis 11. Oktober um 20:00“. */
+/** Für Vorleser: „Noch 3 Tage und 4 Stunden bis 11. Oktober um 20:00“. */
 function countdownSpoken(milliseconds: number, target: number): string {
     const minutes = Math.max(1, Math.ceil(milliseconds / 60_000));
     const units = [
@@ -71,7 +71,7 @@ function countdownSpoken(milliseconds: number, target: number): string {
     ] as const;
     const parts = units.filter(([value]) => value > 0).slice(0, 2).map(([value, one, many]) => `${value} ${value === 1 ? one : many}`);
 
-    return `Noch ${parts.join(" und ")}, bis ${DATE.format(target)}.`;
+    return `Noch ${parts.join(" und ")} bis ${DATE.format(target)}.`;
 }
 
 /**

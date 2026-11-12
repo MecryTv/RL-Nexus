@@ -53,7 +53,7 @@ export function ErrorInfo(code: number): IErrorInfo {
             return {
                 code,
                 title: "Dafür fehlen dir die Rechte",
-                text: "Auf diesem Server darfst du das nicht. Dafür braucht es „Server verwalten“ – oder einen Platz auf der Liste des Teams.",
+                text: "Auf diesem Server darfst du das nicht. Dafür braucht es „Server verwalten“ oder einen Platz auf der Liste des Teams.",
                 hint: "Frag jemanden, der den Server verwaltet.",
                 action: OVERVIEW,
             };
@@ -90,7 +90,7 @@ export function ErrorInfo(code: number): IErrorInfo {
                 code: code >= 400 && code <= 599 ? code : 500,
                 title: "Da ist etwas schiefgegangen",
                 text: "Der Fehler liegt beim Bot, nicht bei dir. Er steht im Log; wer ihn gebaut hat, weiß also Bescheid.",
-                hint: "Lade die Seite neu – bleibt es dabei, sag jemandem vom Team Bescheid.",
+                hint: "Lade die Seite neu. Bleibt es dabei, sag jemandem vom Team Bescheid.",
                 action: OVERVIEW,
             };
     }

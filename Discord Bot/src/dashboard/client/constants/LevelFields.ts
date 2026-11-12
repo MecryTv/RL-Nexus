@@ -20,7 +20,7 @@ export type LevelView = keyof typeof LEVEL_FIELDS;
 export function NoChannelHint(announce: "current" | "channel" | "off"): string {
     return announce === "current"
         ? "Noch kein Kanal gewählt. Aufstiege im Chat kommen weiter dort an, die aus dem Voice und dem Nachtrag nicht. Speichern geht erst mit Kanal."
-        : "Noch kein Kanal gewählt. Ohne Kanal kommt keine Aufstiegs-Nachricht, und speichern geht erst mit Kanal.";
+        : "Noch kein Kanal gewählt. Ohne Kanal kommt keine Aufstiegs-Nachricht, und Speichern geht erst mit Kanal.";
 }
 
 /** W-0045: die Meldung nach dem Speichern der Rangliste im Kanal. */

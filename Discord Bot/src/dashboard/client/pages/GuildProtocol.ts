@@ -663,7 +663,7 @@ export function renderProtocol(guildId: string, me: string): void {
 
         if (!host.contains(list)) host.replaceChildren(statsHost, filtersHost, list, note);
 
-        note.textContent = `Ältere Einträge als ${data.keepDays} Tage löscht der Bot.`;
+        note.textContent = `Einträge, die älter als ${data.keepDays} Tage sind, löscht der Bot.`;
         paintStats();
 
         // Die Filterleiste nur neu, wenn neue Personen oder Bereiche dazukommen - und nie unter dem Fokus weg.

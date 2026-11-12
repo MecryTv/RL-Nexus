@@ -18,13 +18,13 @@ interface IReason {
 const REASONS: readonly IReason[] = [
     {
         title: "Ein Bot statt fünf",
-        text: `Ränge, Tickets, Level, Logging, Stream-Meldungen, normalerweise fünf Bots, fünf Dashboards, fünf Ausfälle. Hier sind es ${moduleRegistry.total} Module in einem Prozess, mit einer Datenbank und einer Anmeldung.`,
+        text: `Ränge, Tickets, Level, Logging, Stream-Meldungen: normalerweise fünf Bots, fünf Dashboards, fünf Ausfälle. Hier sind es ${moduleRegistry.total} Module in einem Prozess, mit einer Datenbank und einer Anmeldung.`,
         icon: "puzzle",
         wide: true,
     },
     {
         title: "Auf Rocket League zugeschnitten",
-        text: "Ränge, MR, Season-Rewards und Kader sind nicht angeflanscht, sondern der Kern. Ein allgemeiner Server-Bot kann das nicht, und ein Tracker-Bot kann den Rest nicht.",
+        text: "Ränge, MMR, Season-Rewards und Kader sind nicht angeflanscht, sondern der Kern. Ein allgemeiner Server-Bot kann das nicht, und ein Tracker-Bot kann den Rest nicht.",
         icon: "crosshair",
     },
     {
@@ -38,7 +38,7 @@ const REASONS: readonly IReason[] = [
         icon: "dashboard",
     },
     {
-        title: "Deutsch, und ansprechbar",
+        title: "Deutsch und ansprechbar",
         text: "Oberfläche, Antworten und Support auf Deutsch. Wer eine Frage hat, landet nicht in einem Ticketsystem, sondern bei den Leuten, die die Module bauen.",
         icon: "message-square",
     },

@@ -46,7 +46,7 @@ export default class Settings extends Command {
         } catch (error) {
             if (!(error instanceof PanelError)) logger.error("⚙️ /einstellungen fehlgeschlagen", error);
 
-            const content = `❌ ${error instanceof PanelError ? error.message : "Da ging etwas schief – versuch es gleich nochmal."}`;
+            const content = `❌ ${error instanceof PanelError ? error.message : "Da ging etwas schief. Versuch es gleich nochmal."}`;
 
             if (interaction.deferred) await interaction.editReply({ content }).catch(() => undefined);
             else await interaction.reply({ content, flags: MessageFlags.Ephemeral }).catch(() => undefined);

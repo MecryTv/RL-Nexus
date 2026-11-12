@@ -200,7 +200,7 @@ export function renderPolls(guildId: string): void {
                     "tkempty tkempty--big",
                     icon("#i-list-checks"),
                     el("b", "", "Noch keine Umfrage."),
-                    el("span", "", "Eigene Umfragen mit Balken und anonymen Stimmen – oder Discords eigene. Auch per /umfrage."),
+                    el("span", "", "Eigene Umfragen mit Balken und anonymen Stimmen oder Discords eigene. Auch per /umfrage."),
                     go
                 ),
             ];
@@ -287,7 +287,7 @@ export function renderPolls(guildId: string): void {
             actions.append(
                 confirmButton("btn btn--quiet", "#i-lock", "Jetzt beenden", "Wirklich beenden?", async () => {
                     if (await call("", { action: "end", number: poll.number })) {
-                        toast("info", "Beendet", `Umfrage #${poll.number} ist zu – das Ergebnis steht in Discord.`);
+                        toast("info", "Beendet", `Umfrage #${poll.number} ist zu, das Ergebnis steht in Discord.`);
                         await reload();
                         await view(poll.number);
                     }
@@ -299,7 +299,7 @@ export function renderPolls(guildId: string): void {
             confirmButton("btn btn--quiet is-danger", "#i-trash", "Löschen", "Wirklich löschen?", async () => {
                 if (await call("", { action: "delete", number: poll.number })) {
                     hide();
-                    toast("info", "Gelöscht", `Umfrage #${poll.number} ist weg – auch die Nachricht in Discord.`);
+                    toast("info", "Gelöscht", `Umfrage #${poll.number} ist weg, auch die Nachricht in Discord.`);
                     await reload();
                 }
             })
@@ -316,9 +316,9 @@ export function renderPolls(guildId: string): void {
 
         const who =
             poll.kind === "native"
-                ? el("p", "hintline", "Bei Discord-Umfragen zählt Discord – wer was gewählt hat, steht in Discord selbst.")
+                ? el("p", "hintline", "Bei Discord-Umfragen zählt Discord. Wer was gewählt hat, steht in Discord selbst.")
                 : poll.settings.anonymous
-                  ? el("p", "hintline", "Anonym – wer was gewählt hat, sieht niemand, auch nicht hier.")
+                  ? el("p", "hintline", "Anonym: Wer was gewählt hat, sieht niemand, auch nicht hier.")
                   : el(
                         "div",
                         "plvoters",
@@ -538,7 +538,7 @@ export function renderPolls(guildId: string): void {
             settings.append(
                 row(
                     "Anonym",
-                    "Niemand sieht, wer was gewählt hat – auch nicht im Dashboard",
+                    "Niemand sieht, wer was gewählt hat, auch nicht im Dashboard",
                     toggle(draft.settings.anonymous, "Anonym", (on) => {
                         draft.settings.anonymous = on;
                         paintPreview();
@@ -549,7 +549,7 @@ export function renderPolls(guildId: string): void {
                     "Wann die Balken zu sehen sind",
                     select(
                         [
-                            ["live", "Immer – live"],
+                            ["live", "Immer (live)"],
                             ["voted", "Nach der eigenen Stimme"],
                             ["end", "Erst am Ende"],
                         ],
@@ -563,7 +563,7 @@ export function renderPolls(guildId: string): void {
                 ),
                 row(
                     "Nur für Rollen",
-                    "Leer: jeder darf abstimmen",
+                    "Leer: Jeder darf abstimmen",
                     rolePicker(data!.guild.roles, draft.settings.roles, (ids) => {
                         draft.settings.roles = ids;
                     })
@@ -582,13 +582,13 @@ export function renderPolls(guildId: string): void {
 
                 return answer?.thread ?? null;
             },
-            "— Kanal wählen —"
+            "(Kanal wählen)"
         );
 
         settings.append(
             row(
                 "Laufzeit",
-                own ? "Danach ist sie zu – oder ohne Ende, bis ihr sie beendet" : "Discord: eine Stunde bis 32 Tage",
+                own ? "Danach ist sie zu (oder ohne Ende, bis ihr sie beendet)" : "Discord: eine Stunde bis 32 Tage",
                 select(durations, draft.duration ? String(draft.duration) : "", (value) => {
                     draft.duration = value ? Number(value) : null;
                     paintPreview();

@@ -233,7 +233,7 @@ export function DoneCard(input: { job: IRestoreJob; backupLabel: string; minutes
         `${input.backupLabel} · ${Minutes(input.minutes * 60_000)} · <@${job.actorId}>`
     );
 
-    if (cancelled) card.text(`abgebrochen nach ${job.done} von ${job.ops.length} Schritten. Was bis dahin gemacht war, bleibt.`);
+    if (cancelled) card.text(`Abgebrochen nach ${job.done} von ${job.ops.length} Schritten. Was bis dahin gemacht war, bleibt.`);
     if (bot.length) done.push(`✅ ${bot.join(", ")}`);
     if (done.length && !cancelled) card.text(Fit(done));
     if (problems.length) card.separator().text(`⚠️ **Ging nicht**\n${Fit(problems.slice(0, 10))}${problems.length > 10 ? `\nund ${problems.length - 10} weitere` : ""}`);

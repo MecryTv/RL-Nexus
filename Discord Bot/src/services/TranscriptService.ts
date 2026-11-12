@@ -576,7 +576,7 @@ export default class TranscriptService {
             .list([
                 `**Ersteller:** ${who(meta.opener, "–")}`,
                 `**Bearbeiter:** ${who(meta.claimer, "niemand")}`,
-                `**Geschlossen von:** ${who(meta.closer, "unbekannt")}${meta.reason ? ` – ${escapeMarkdown(meta.reason)}` : ""}`,
+                `**Geschlossen von:** ${who(meta.closer, "unbekannt")}${meta.reason ? ` · ${escapeMarkdown(meta.reason)}` : ""}`,
                 `**Geöffnet:** <t:${Math.floor(meta.openedAt / 1000)}:f> · **Dauer:** ${Duration(meta.closedAt - meta.openedAt)}`,
                 `**Nachrichten:** ${meta.messages} · **Anhänge:** ${meta.files}`,
             ]);

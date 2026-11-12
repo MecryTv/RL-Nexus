@@ -257,9 +257,9 @@ function mount(guildId: string, view: "base" | "list" | "all"): void {
             "Der Bot meldet jede eingetragene Partie und erinnert kurz vor Anpfiff.",
             row(
                 "Kanal",
-                "Ohne Kanal bleibt es still – eingetragen wird trotzdem",
+                "Ohne Kanal bleibt es still, eingetragen wird trotzdem",
                 select(
-                    [["", "— kein Kanal —"], ...data!.guild.channels.map((entry): [string, string] => [entry.id, `# ${entry.name}`])],
+                    [["", "(kein Kanal)"], ...data!.guild.channels.map((entry): [string, string] => [entry.id, `# ${entry.name}`])],
                     draft.channelId ?? "",
                     (value) => {
                         draft.channelId = value || null;
@@ -270,7 +270,7 @@ function mount(guildId: string, view: "base" | "list" | "all"): void {
             ),
             row(
                 "Wer wird gepingt",
-                `Bis zu ${data!.limits.pings} Rollen – bei Ankündigung und Erinnerung`,
+                `Bis zu ${data!.limits.pings} Rollen, bei Ankündigung und Erinnerung`,
                 rolePicker(
                     data!.guild.roles,
                     draft.pingRoles,
@@ -282,7 +282,7 @@ function mount(guildId: string, view: "base" | "list" | "all"): void {
                     data!.limits.pings
                 )
             ),
-            row("Erinnern", "Minuten vor Anpfiff – 0 heißt: keine Erinnerung", minutes),
+            row("Erinnern", "Minuten vor Anpfiff (0 heißt: keine Erinnerung)", minutes),
             row(
                 "Farbe nach Stand",
                 "Rot vor und während des Spiels, grün bei Sieg, rot bei Niederlage, grau bei Unentschieden und Absage. Aus: die Farbe aus dem Editor",
@@ -296,8 +296,8 @@ function mount(guildId: string, view: "base" | "list" | "all"): void {
                     el("span", "", "an")
                 )
             ),
-            row("Höchstens im Voraus", "Tage – so weit dürfen Captains planen", ahead),
-            row("Vorschläge für die Liga", "Mit | getrennt – im Formular stehen sie zur Auswahl", leagues),
+            row("Höchstens im Voraus", "So viele Tage dürfen Captains im Voraus planen", ahead),
+            row("Vorschläge für die Liga", "Mit | getrennt, im Formular stehen sie zur Auswahl", leagues),
             el("div", "mcsave lvsave", save)
         );
     }
@@ -351,11 +351,11 @@ function mount(guildId: string, view: "base" | "list" | "all"): void {
 
         return card(
             "Der Link für die Captains",
-            `Eintragen darf, wer im Kader als ${data!.entryRoles.join(", ")} steht – der Bot nimmt die Team-Übersicht als Grundlage. Wer den Server verwaltet, darf für jedes Team eintragen.`,
+            `Eintragen darf, wer im Kader als ${data!.entryRoles.join(", ")} steht. Der Bot nimmt die Team-Übersicht als Grundlage. Wer den Server verwaltet, darf für jedes Team eintragen.`,
             row("Adresse", "Ohne Anmeldung sichtbar, eintragen nur angemeldet", el("div", "aplink", field, copy)),
             row(
                 "Link offen",
-                "Aus: die Seite ist zu, die Knöpfe zur Webseite fallen in Discord weg. In Discord eintragen geht weiter.",
+                "Aus: Die Seite ist zu, die Knöpfe zur Webseite fallen in Discord weg. In Discord eintragen geht weiter.",
                 el(
                     "label",
                     "snitem__switch",
@@ -392,7 +392,7 @@ function mount(guildId: string, view: "base" | "list" | "all"): void {
                     el("span", "", "an")
                 )
             ),
-            row("Erinnern, wenn das Ergebnis fehlt", `Stunden nach Anpfiff, einmal unter der Ankündigung – 0 heißt aus, höchstens ${data!.limits.resultRemind}`, hours),
+            row("Erinnern, wenn das Ergebnis fehlt", `Stunden nach Anpfiff, einmal unter der Ankündigung. 0 heißt aus, höchstens ${data!.limits.resultRemind}`, hours),
             el("div", "mcsave lvsave", save)
         );
     }
@@ -433,10 +433,10 @@ function mount(guildId: string, view: "base" | "list" | "all"): void {
             pageSave: () => save,
             kinds: data!.bodyKinds,
             context: context(MATCHUP_PLACEHOLDERS),
-            defaultEmbed: () => embedOf("Gleich geht es los", "{team} vs. {gegner} – {countdown}"),
+            defaultEmbed: () => embedOf("Gleich geht es los", "{team} vs. {gegner} · {countdown}"),
             touch,
             title: "Die Erinnerung",
-            hint: "Kommt kurz vor Anpfiff – wie kurz, steht oben.",
+            hint: "Kommt kurz vor Anpfiff. Wie kurz, steht oben.",
             templates: "matchupRemind",
         });
 
@@ -453,7 +453,7 @@ function mount(guildId: string, view: "base" | "list" | "all"): void {
 
         return card(
             "Die drei Nachrichten",
-            "Selbst gebaut – mit Platzhaltern, Vorlagen und Live-Vorschau. Zeiten setzt Discord in die Zeitzone jedes Lesers.",
+            "Selbst gebaut, mit Platzhaltern, Vorlagen und Live-Vorschau. Zeiten setzt Discord in die Zeitzone jedes Lesers.",
             el("div", "tmmsgs", announce.node, remind.node, result.node),
             el("div", "mcsave lvsave", save)
         );
@@ -492,7 +492,7 @@ function mount(guildId: string, view: "base" | "list" | "all"): void {
 
         mode.setAttribute("aria-label", "Modus");
 
-        for (const value of data!.bestOf) best.append(new Option(value ? `Best of ${value}` : "— offen —", String(value), false, (current?.bestOf ?? 0) === value));
+        for (const value of data!.bestOf) best.append(new Option(value ? `Best of ${value}` : "(offen)", String(value), false, (current?.bestOf ?? 0) === value));
 
         best.setAttribute("aria-label", "Best-of");
 

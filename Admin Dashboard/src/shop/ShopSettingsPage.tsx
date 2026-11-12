@@ -102,7 +102,7 @@ export function ShopSettingsPage(): JSX.Element {
                     <h2 className={styles.boxTitle}>Verkauf</h2>
                     <p className={styles.fact}>
                         Discord-Server: <b>{view.data.guildId}</b>
-                        {view.data.developerMode ? " (Dev Server, wegen --dev)" : ""}. Dorthin holt der Bot die Käufer und vergibt die Rollen.
+                        {view.data.developerMode ? " (Dev-Server, wegen --dev)" : ""}. Dorthin holt der Bot die Käufer und vergibt die Rollen.
                     </p>
                 </Panel>
 

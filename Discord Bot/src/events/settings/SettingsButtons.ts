@@ -136,7 +136,7 @@ export default class SettingsButtons extends Event {
         } catch (error) {
             if (!(error instanceof PanelError)) logger.error(`⚙️ /einstellungen (${interaction.customId}) fehlgeschlagen`, error);
 
-            const content = `❌ ${error instanceof PanelError ? error.message : "Da ging etwas schief – versuch es gleich nochmal."}`;
+            const content = `❌ ${error instanceof PanelError ? error.message : "Da ging etwas schief. Versuch es gleich nochmal."}`;
 
             if (interaction.deferred || interaction.replied) await interaction.followUp({ content, flags: MessageFlags.Ephemeral }).catch(() => undefined);
             else await interaction.reply({ content, flags: MessageFlags.Ephemeral }).catch(() => undefined);

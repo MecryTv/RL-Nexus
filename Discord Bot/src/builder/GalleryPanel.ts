@@ -86,7 +86,7 @@ export async function RenderPanel(client: BotClient, state: IPanelState): Promis
     if (categories.length > 0) {
         builder.select({
             customId: `${PANEL_PREFIX}:cat`,
-            placeholder: "📁 | Kategorie wählen...",
+            placeholder: "📁 | Kategorie wählen …",
             options: CategoryOptions(categories, state),
         });
     }
@@ -94,7 +94,7 @@ export async function RenderPanel(client: BotClient, state: IPanelState): Promis
     if (subcategories.length > 0) {
         builder.select({
             customId: `${PANEL_PREFIX}:sub`,
-            placeholder: "📂 | Unterordner wählen...",
+            placeholder: "📂 | Unterordner wählen …",
             options: [
                 {
                     label: `➔ direkt in ${state.category}`,
@@ -184,12 +184,12 @@ function Deleting(
 ): IPanelView {
     const selectable = images.slice(0, MAX_OPTIONS);
 
-    builder.text("🗑️ **Löschen** — markiere die Bilder, die verschwinden sollen.");
+    builder.text("🗑️ **Löschen:** Markiere die Bilder, die verschwinden sollen.");
 
     if (selectable.length > 0) {
         builder.select({
             customId: `${PANEL_PREFIX}:pick`,
-            placeholder: "🖼️ | Bilder markieren...",
+            placeholder: "🖼️ | Bilder markieren …",
             minValues: 1,
             maxValues: selectable.length,
             options: selectable.map((image) => ({
@@ -228,12 +228,12 @@ function Moving(
     if (!state.moving) {
         const selectable = images.slice(0, MAX_OPTIONS);
 
-        builder.text("📦 **Verschieben** — wähle zuerst das Bild aus.");
+        builder.text("📦 **Verschieben:** Wähle zuerst das Bild aus.");
 
         if (selectable.length > 0) {
             builder.select({
                 customId: `${PANEL_PREFIX}:pick`,
-                placeholder: "🖼️ | Bild wählen...",
+                placeholder: "🖼️ | Bild wählen …",
                 options: selectable.map((image) => ({ label: image.file.slice(0, 100), value: image.file })),
             });
         }
@@ -243,7 +243,7 @@ function Moving(
         return { components: [builder.build()], files };
     }
 
-    builder.text(`📦 **Verschieben** — navigiere zum Zielordner und bestätige.\nAktuelles Ziel: \`${Breadcrumb(state)}\``);
+    builder.text(`📦 **Verschieben:** Navigiere zum Zielordner und bestätige.\nAktuelles Ziel: \`${Breadcrumb(state)}\``);
 
     builder.buttons(
         {

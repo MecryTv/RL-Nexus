@@ -15,7 +15,7 @@ export default class Timeout extends Command {
             .setContexts(InteractionContextType.Guild)
             .addUserOption((option) => option.setName("user").setDescription("Wen?").setRequired(true))
             .addStringOption((option) =>
-                option.setName("dauer").setDescription("Wie lange? Etwa 10m, 2h, 1d – höchstens 28 Tage").setRequired(true).setAutocomplete(true)
+                option.setName("dauer").setDescription("Wie lange? Etwa 10m, 2h oder 1d, höchstens 28 Tage").setRequired(true).setAutocomplete(true)
             )
             .addStringOption((option) => option.setName("grund").setDescription("Warum? Steht im Log und in der DM").setMaxLength(MAX_REASON))
             .addAttachmentOption((option) => option.setName("beweis").setDescription("Ein Screenshot als Beweis: PNG, JPG, GIF oder WebP"))

@@ -107,7 +107,7 @@ export function Evaluate(formula: string, values: Record<string, number>): numbe
     function primary(): number {
         const token = peek();
 
-        if (!token) throw new FormulaError("Die Formel hört mitten drin auf.");
+        if (!token) throw new FormulaError("Die Formel hört mittendrin auf.");
 
         if (token.kind === "op" && token.value === "-") {
             at++;

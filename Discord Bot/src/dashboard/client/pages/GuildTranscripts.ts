@@ -112,7 +112,7 @@ function removeButton(entry: IEntry, onDelete: (entry: IEntry) => Promise<boolea
     remove.addEventListener("click", async () => {
         if (!sure) {
             remove.classList.add("is-sure");
-            remove.title = "Nochmal klicken – dann ist es weg";
+            remove.title = "Nochmal klicken, dann ist es weg";
             sure = setTimeout(() => {
                 sure = null;
                 remove.classList.remove("is-sure");
@@ -379,7 +379,7 @@ export function renderTranscripts(guildId: string): void {
                 "span",
                 "",
                 enabled
-                    ? "Sie entstehen, sobald ein Ticket geschlossen wird – samt Bildern und Anhängen."
+                    ? "Sie entstehen, sobald ein Ticket geschlossen wird, samt Bildern und Anhängen."
                     : canDelete
                       ? "Einschalten geht im Ticket System unter Einrichtung › Nach dem Schließen."
                       : "Einschalten kann, wer den Server verwaltet."

@@ -168,8 +168,8 @@ export function emojiPicker(options: IEmojiPickerOptions): HTMLButtonElement {
 
     function show(): void {
         button.replaceChildren(value ? emojiNode(value, options.emojis) : icon("#i-smile"));
-        button.setAttribute("aria-label", options.insert ? options.label : `${options.label}: ${labelOf(value)} – ändern`);
-        button.title = options.insert ? options.label : value ? `${labelOf(value)} – ändern` : "Emoji wählen";
+        button.setAttribute("aria-label", options.insert ? options.label : `${options.label}: ${labelOf(value)} (ändern)`);
+        button.title = options.insert ? options.label : value ? `${labelOf(value)} (ändern)` : "Emoji wählen";
     }
 
     button.addEventListener("click", () =>
@@ -282,7 +282,7 @@ function content(options: IEmojiPickerOptions, choose: (value: string | null) =>
         grid.replaceChildren(...cells);
         empty.hidden = cells.length > 0;
         empty.textContent =
-            mode === "server" ? "Kein Server-Emoji mit diesem Namen – schau unter Standard." : "Nichts gefunden – füg unten ein eigenes Emoji ein.";
+            mode === "server" ? "Kein Server-Emoji mit diesem Namen. Schau unter Standard." : "Nichts gefunden. Füg unten ein eigenes Emoji ein.";
     }
 
     for (const [key, label] of [

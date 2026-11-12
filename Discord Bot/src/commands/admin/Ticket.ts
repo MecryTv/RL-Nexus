@@ -56,7 +56,7 @@ export default class Ticket extends Command {
         }
 
         if (!this.client.databaseService.Ready) {
-            return this.Say(interaction, "Red", "Keine Datenbank", "Die Einstellungen stehen in der Datenbank – die erreiche ich gerade nicht.");
+            return this.Say(interaction, "Red", "Keine Datenbank", "Die Einstellungen stehen in der Datenbank, und die erreiche ich gerade nicht.");
         }
 
         const sub = interaction.options.getSubcommand();
@@ -77,7 +77,7 @@ export default class Ticket extends Command {
         const state = NewSetupState(guild.id);
 
         if (!(await this.client.settings.Of(guild.id)).modules.includes("tickets")) {
-            state.notice = "⚠️ Das Modul ist aus – einschalten mit `/module an modul:tickets`.";
+            state.notice = "⚠️ Das Modul ist aus. Einschalten kannst du es mit `/module an modul:tickets`.";
         }
 
         const view = await SetupView(this.client, guild, state);

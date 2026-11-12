@@ -123,8 +123,8 @@ export function ContactPage(): JSX.Element {
                             <h2>Dieselben Leute, die den Bot bauen</h2>
                             <p>
                                 Es gibt keine Support-Abteilung. Wer hier schreibt, landet bei den Leuten, die die
-                                Module entwickeln. Was bedeutet, dass ein guter Fehlerbericht schneller behoben wird
-                                als anderswo, und eine schlechte Frage länger dauert.
+                                Module entwickeln. Ein guter Fehlerbericht wird deshalb schneller behoben als
+                                anderswo, und eine schlechte Frage dauert länger.
                             </p>
                         </div>
                         <div className={styles.aboutActions}>

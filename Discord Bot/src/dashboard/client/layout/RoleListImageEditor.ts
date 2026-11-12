@@ -191,7 +191,7 @@ export function renderImageEditor(host: HTMLElement, options: IImageEditorOption
         }
 
         return [
-            el("p", "tkcard__lead", "Setzt alle Bereiche auf einen Schlag. Danach lässt sich jede Einstellung einzeln ändern – und als eigene Vorlage für andere Listen speichern."),
+            el("p", "tkcard__lead", "Setzt alle Bereiche auf einen Schlag. Danach lässt sich jede Einstellung einzeln ändern und als eigene Vorlage für andere Listen speichern."),
             el(
                 "div",
                 "presets",

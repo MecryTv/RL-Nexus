@@ -575,7 +575,7 @@ export const HELP_CATALOG: HelpCatalog = {
                     anpfiff: "Deutsche Zeit, etwa „morgen 20:00“ oder „Sa 18:00“.",
                     liga: "Liga oder Turnier. Leer heißt Freundschaftsspiel.",
                     modus: "1v1 bis 4v4, ab Werk 3v3.",
-                    bestof: "Best-of, oder offen.",
+                    bestof: "Best-of oder offen.",
                     stream: "Stream-Link, nur https.",
                     notiz: "Eine kurze Notiz.",
                 },
@@ -622,7 +622,7 @@ export const HELP_CATALOG: HelpCatalog = {
                 when: "Abend ansetzen",
                 what: "Legt einen Abend mit Startzeit an. Im Info-Kanal erscheint die Ankündigung, im Moderator-Kanal die Steuerkarte. Zur Startzeit holt der Bot alle aus dem Warteraum in den Treffpunkt.",
                 examples: [
-                    { code: "/roulette planen zeit:20:00", text: "Heute um 20 Uhr, ist das schon vorbei morgen" },
+                    { code: "/roulette planen zeit:20:00", text: "Heute um 20 Uhr, ist das schon vorbei, morgen" },
                     { code: "/roulette planen zeit:19:30 datum:14.11.2026", text: "Am 14. November um halb acht" },
                 ],
                 fields: { zeit: "Deutsche Zeit, etwa 20:00.", datum: "Etwa 14.11.2026. Leer heißt heute." },
@@ -719,7 +719,7 @@ export const HELP_CATALOG: HelpCatalog = {
         module: null,
         who: "verwalter",
         whoText: MANAGE,
-        what: "Öffnet die Einstellungen eines Moduls als Panel, nur für dich. Jedes Modul ist dabei, außer der Gallery. Jede Einstellung hat eine Nummer, im Menü wählst du sie, darunter erscheint das passende Feld. Was du änderst, gilt sofort, wie im Dashboard.",
+        what: "Öffnet die Einstellungen eines Moduls als Panel, nur für dich. Jedes Modul ist dabei, außer der Galerie. Jede Einstellung hat eine Nummer, im Menü wählst du sie, darunter erscheint das passende Feld. Was du änderst, gilt sofort, wie im Dashboard.",
         examples: [
             { code: "/einstellungen modul:Tickets", text: "Die Einstellungen der Tickets, mit Panel senden" },
             { code: "/einstellungen", text: "Erst alle Module zur Auswahl" },

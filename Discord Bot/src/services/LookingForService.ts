@@ -203,11 +203,11 @@ export default class LookingForService {
         const questions = raw.questions === undefined ? previous.questions : this.CleanQuestions(raw.questions);
         const tag = IsRecord(raw.tag) ? raw.tag : {};
 
-        if (!questions.length) throw new LftError(`${label}: ohne Fragen gibt es nichts zu beantworten.`);
+        if (!questions.length) throw new LftError(`${label}: Ohne Fragen gibt es nichts zu beantworten.`);
 
         const title = Text(raw.title, MAX_TITLE, previous.title);
 
-        if (!title) throw new LftError(`${label}: der Titel des Beitrags fehlt – ein Forum-Beitrag braucht eine Überschrift.`);
+        if (!title) throw new LftError(`${label}: Der Titel des Beitrags fehlt, ein Forum-Beitrag braucht eine Überschrift.`);
 
         return {
             on: typeof raw.on === "boolean" ? raw.on : previous.on,
@@ -222,8 +222,8 @@ export default class LookingForService {
             },
             questions,
             title,
-            post: this.CleanBody(guild, `${label} – Beitrag`, raw.post, previous.post),
-            preview: this.CleanBody(guild, `${label} – Vorschau`, raw.preview, previous.preview),
+            post: this.CleanBody(guild, `${label} (Beitrag)`, raw.post, previous.post),
+            preview: this.CleanBody(guild, `${label} (Vorschau)`, raw.preview, previous.preview),
         };
     }
 
@@ -580,7 +580,7 @@ export default class LookingForService {
     private Explain(error: unknown, where: string): LftError {
         const code = (error as { code?: number | string }).code;
 
-        if (Number(code) === 50013) return new LftError(`Dem Bot fehlt „Kanäle verwalten“ in #${where} – die Tags konnte er nicht anlegen.`);
+        if (Number(code) === 50013) return new LftError(`Dem Bot fehlt „Kanäle verwalten“ in #${where}, deshalb konnte er die Tags nicht anlegen.`);
 
         return new LftError(`Die Tags in #${where} konnte der Bot nicht anlegen: ${error instanceof Error ? error.message : String(error)}`);
     }
@@ -616,7 +616,7 @@ export default class LookingForService {
     async Start(member: GuildMember, kind: LftKind): Promise<string> {
         const { settings, side } = await this.Check(member, kind);
 
-        if (this.talking.has(member.id)) throw new LftError("Ich habe dir schon geschrieben – schau in deine DMs. Mit **abbrechen** kommst du dort raus.");
+        if (this.talking.has(member.id)) throw new LftError("Ich habe dir schon geschrieben, schau in deine DMs. Mit **abbrechen** kommst du dort raus.");
 
         const dm = await member.user.createDM().catch(() => null);
 
@@ -629,12 +629,12 @@ export default class LookingForService {
             .catch(async (error: unknown) => {
                 const normalized = error instanceof Error ? error : new Error(String(error));
 
-                await dm.send({ content: "Da ist etwas schiefgegangen – das Team weiß davon. Versuch es später noch einmal." }).catch(() => undefined);
+                await dm.send({ content: "Da ist etwas schiefgegangen. Das Team weiß davon. Versuch es später noch einmal." }).catch(() => undefined);
                 await this.client.guardian.ReportError(normalized, null, `Looking for: Gespräch mit ${member.id}`);
             })
             .finally(() => this.talking.delete(member.id));
 
-        return `Ich habe dir eine Nachricht geschickt: dort stehen **${side.questions.length} Fragen** zur ${KIND_LABELS[kind]}.`;
+        return `Ich habe dir eine Nachricht geschickt. Dort stehen **${side.questions.length} Fragen** zur ${KIND_LABELS[kind]}.`;
     }
 
     /**
@@ -642,7 +642,7 @@ export default class LookingForService {
      * Fenster gleich (Plan 30). Wirft LftError mit dem Satz für sie.
      */
     async Check(member: GuildMember, kind: LftKind): Promise<{ settings: ILftSettings; side: ILftSide }> {
-        if (!this.client.databaseService.Ready) throw new LftError("Die Datenbank ist gerade nicht da – versuch es in einem Moment noch einmal.");
+        if (!this.client.databaseService.Ready) throw new LftError("Die Datenbank ist gerade nicht da. Versuch es in einem Moment noch einmal.");
 
         const guild = member.guild;
         const settings = await this.Settings(guild.id);
@@ -650,11 +650,11 @@ export default class LookingForService {
         const label = KIND_LABELS[kind];
 
         if (!side.on) throw new LftError(`Die ${label} ist auf diesem Server gerade aus.`);
-        if (!side.questions.length) throw new LftError(`Für die ${label} sind noch keine Fragen eingestellt – sag das jemandem vom Team.`);
+        if (!side.questions.length) throw new LftError(`Für die ${label} sind noch keine Fragen eingestellt. Sag das jemandem vom Team.`);
 
         const forum = side.forumId ? guild.channels.cache.get(side.forumId) : null;
 
-        if (forum?.type !== ChannelType.GuildForum) throw new LftError(`Für die ${label} fehlt noch das Forum – sag das jemandem vom Team.`);
+        if (forum?.type !== ChannelType.GuildForum) throw new LftError(`Für die ${label} fehlt noch das Forum. Sag das jemandem vom Team.`);
 
         const open = await this.client.lftRequests.Open(guild.id, member.id, kind);
 
@@ -662,7 +662,7 @@ export default class LookingForService {
             const link = this.Link(guild.id, open);
 
             throw new LftError(
-                `Du hast schon eine laufende ${label}${link ? `: ${link}` : ""}. Beende sie zuerst – mit dem Knopf unter dem Beitrag oder mit \`/lookingfor beenden\`.`
+                `Du hast schon eine laufende ${label}${link ? `: ${link}` : ""}. Beende sie zuerst, mit dem Knopf unter dem Beitrag oder mit \`/lookingfor beenden\`.`
             );
         }
 
@@ -700,7 +700,7 @@ export default class LookingForService {
                 await dm.send({
                     content:
                         step.reason === "cancel"
-                            ? "Alles klar, abgebrochen – gespeichert ist nichts. Mit `/lookingfor` fängst du neu an."
+                            ? "Alles klar, abgebrochen. Gespeichert ist nichts. Mit `/lookingfor` fängst du neu an."
                             : "⌛ Ich habe eine Weile nichts gehört und höre hier auf. Mit `/lookingfor` fängst du neu an.",
                 }).catch(() => undefined);
 
@@ -711,7 +711,7 @@ export default class LookingForService {
         }
 
         if (!answers.length) {
-            await dm.send({ content: "Ohne eine einzige Antwort gibt es nichts zu zeigen – abgebrochen." }).catch(() => undefined);
+            await dm.send({ content: "Ohne eine einzige Antwort gibt es nichts zu zeigen. Abgebrochen." }).catch(() => undefined);
 
             return;
         }
@@ -728,7 +728,7 @@ export default class LookingForService {
 
         if (!click || click.customId === STEP_CANCEL) {
             await dm.send({
-                content: click ? "Weggeworfen – nichts landet im Forum. Mit `/lookingfor` fängst du neu an." : "⌛ Die Vorschau ist abgelaufen – nichts landet im Forum.",
+                content: click ? "Weggeworfen, nichts landet im Forum. Mit `/lookingfor` fängst du neu an." : "⌛ Die Vorschau ist abgelaufen, nichts landet im Forum.",
             }).catch(() => undefined);
 
             return;
@@ -783,13 +783,13 @@ export default class LookingForService {
             if (SKIP_WORDS.includes(text.toLowerCase())) {
                 if (!question.required) return { ok: true, value: null };
 
-                await dm.send({ content: "Diese Frage ist Pflicht – ohne Antwort geht es hier nicht weiter." }).catch(() => undefined);
+                await dm.send({ content: "Diese Frage ist Pflicht. Ohne Antwort geht es hier nicht weiter." }).catch(() => undefined);
 
                 continue;
             }
 
             if (!text) {
-                await dm.send({ content: "Da war kein Text dabei – schreib deine Antwort als Nachricht." }).catch(() => undefined);
+                await dm.send({ content: "Da war kein Text dabei. Schreib deine Antwort als Nachricht." }).catch(() => undefined);
 
                 continue;
             }
@@ -836,11 +836,11 @@ export default class LookingForService {
         // einem anderen Fenster, ein geschlossenes Forum.
         const open = await this.client.lftRequests.Open(guild.id, member.id, kind);
 
-        if (open) return { ok: false, message: `Du hast inzwischen schon eine laufende ${KIND_LABELS[kind]} – diese hier habe ich verworfen.` };
+        if (open) return { ok: false, message: `Du hast inzwischen schon eine laufende ${KIND_LABELS[kind]}, diese hier habe ich verworfen.` };
 
         const forum = side.forumId ? guild.channels.cache.get(side.forumId) : null;
 
-        if (forum?.type !== ChannelType.GuildForum) return { ok: false, message: "Das Forum gibt es nicht mehr – sag das jemandem vom Team. Deine Antworten sind leider weg." };
+        if (forum?.type !== ChannelType.GuildForum) return { ok: false, message: "Das Forum gibt es nicht mehr. Sag das jemandem vom Team. Deine Antworten sind leider weg." };
 
         // Fehlt der Tag noch, wird er jetzt angelegt: das Forum kann ihn
         // verlangen, und ohne Tag lehnt Discord den Beitrag ab.
@@ -883,7 +883,7 @@ export default class LookingForService {
         if (!thread) {
             await this.client.lftRequests.Remove(request.id);
 
-            return { ok: false, message: `In ${side.forumId ? `<#${side.forumId}>` : "dem Forum"} durfte der Bot keinen Beitrag anlegen – sag das jemandem vom Team.` };
+            return { ok: false, message: `In ${side.forumId ? `<#${side.forumId}>` : "dem Forum"} durfte der Bot keinen Beitrag anlegen. Sag das jemandem vom Team.` };
         }
 
         // Bei einem Forum-Beitrag hat die erste Nachricht dieselbe ID wie der
@@ -1002,7 +1002,7 @@ export default class LookingForService {
             const own = request.userId === interaction.user.id;
 
             if (!own && !(await this.CanManage(interaction.member))) {
-                return say("Das darf nur, wer die Suche gestartet hat – oder das Team.");
+                return say("Das darf nur, wer die Suche gestartet hat, oder das Team.");
             }
 
             if (what === "kill") {
@@ -1014,7 +1014,7 @@ export default class LookingForService {
             }
 
             await this.Close(interaction.guild, id, interaction.user.id);
-            await say(own ? "Deine Suche ist beendet – der Beitrag ist zu." : `Die Suche von **${request.userName}** ist beendet.`);
+            await say(own ? "Deine Suche ist beendet, der Beitrag ist zu." : `Die Suche von **${request.userName}** ist beendet.`);
         } catch (error) {
             if (!(error instanceof LftError)) throw error;
 

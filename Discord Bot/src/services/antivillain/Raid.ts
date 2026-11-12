@@ -247,7 +247,7 @@ export default class Raid {
             return member && now - member.user.createdTimestamp < DAY;
         }).length;
 
-        return young ? `${young} der ${state.members.length} Accounts sind jünger als einen Tag` : null;
+        return young ? `${young} der ${state.members.length} Accounts sind jünger als ein Tag` : null;
     }
 
     private async Save(state: IRaidState): Promise<void> {

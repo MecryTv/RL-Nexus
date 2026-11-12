@@ -25,7 +25,7 @@ export default class Case extends Command {
             .addSubcommand((sub) =>
                 sub
                     .setName("notiz")
-                    .setDescription("Schreibt eine Notiz an einen Fall – nur das Team sieht sie")
+                    .setDescription("Schreibt eine Notiz an einen Fall, die nur das Team sieht")
                     .addIntegerOption((option) => option.setName("nummer").setDescription("Welcher Fall?").setRequired(true).setMinValue(1))
                     .addStringOption((option) => option.setName("text").setDescription("Die Notiz").setRequired(true).setMaxLength(MAX_NOTE))
             )
@@ -34,7 +34,7 @@ export default class Case extends Command {
                     .setName("beweis")
                     .setDescription("Hängt ein Bild oder einen Link als Beweis an einen Fall")
                     .addIntegerOption((option) => option.setName("nummer").setDescription("Welcher Fall?").setRequired(true).setMinValue(1))
-                    .addAttachmentOption((option) => option.setName("bild").setDescription("Ein Screenshot – PNG, JPG, GIF oder WebP"))
+                    .addAttachmentOption((option) => option.setName("bild").setDescription("Ein Screenshot: PNG, JPG, GIF oder WebP"))
                     .addStringOption((option) => option.setName("link").setDescription("Oder ein https-Link").setMaxLength(500))
             );
     }
@@ -63,7 +63,7 @@ export default class Case extends Command {
                 const image = interaction.options.getAttachment("bild");
                 const link = interaction.options.getString("link");
 
-                if (!image && !link) throw new ModerationError(`Hänge ein Bild an oder gib einen Link an – dann landet er an Fall ${CaseRef(number)}.`);
+                if (!image && !link) throw new ModerationError(`Hänge ein Bild an oder gib einen Link an, dann landet der Beweis an Fall ${CaseRef(number)}.`);
 
                 const result = await service.AddProof(member.guild, ActorOf(member), number, { image: image ?? undefined, link });
 

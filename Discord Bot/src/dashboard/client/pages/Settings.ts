@@ -63,7 +63,7 @@ export function paintProfileCard(user: IUser): void {
             selection?.removeAllRanges();
             selection?.addRange(range);
 
-            toast("info", "Kopieren nicht möglich", "Die ID ist markiert - mit Strg+C kopieren.");
+            toast("info", "Kopieren nicht möglich", "Die ID ist markiert, mit Strg+C kopieren.");
         }
 
         const writing = navigator.clipboard?.writeText(user.id);

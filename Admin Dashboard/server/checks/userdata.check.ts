@@ -212,7 +212,7 @@ export async function checkUserdata(): Promise<void> {
         const announcement = await renderDeletionImage("ankuendigung", dmInput);
         assert.match(announcement.alt, /23:30 Uhr/);
         assert.match(announcement.alt, /Level und Aktivität 412/);
-        assert.match(announcement.alt, /Bleibt: Shop – Rechnungen bewahren wir auf\./);
+        assert.match(announcement.alt, /Bleibt: Shop \(Rechnungen bewahren wir auf\)\./);
         assert.doesNotMatch((await renderDeletionImage("ankuendigung", { ...dmInput, kept: [] })).alt, /Bleibt/);
         assert.match((await renderDeletionImage("erledigt", dmInput)).alt, /427 Einträge auf 3 Servern gelöscht/);
     });

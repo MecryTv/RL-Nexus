@@ -98,7 +98,7 @@ export default class TicketSetupHandler extends Event {
 
             const normalized = error instanceof Error ? error : new Error(String(error));
 
-            await this.Fail(interaction, "Das hat nicht geklappt – ich habe es den Entwicklern gemeldet.");
+            await this.Fail(interaction, "Das hat nicht geklappt. Ich habe es den Entwicklern gemeldet.");
             await this.client.guardian.ReportError(normalized, interaction, `Ticket-Setup: ${interaction.customId}`);
         }
     }
@@ -257,7 +257,7 @@ export default class TicketSetupHandler extends Event {
         if (action === "unpanel") {
             const removed = await this.client.ticketService.RemovePanel(guild);
 
-            state.notice = removed ? "🗑️ Panel entfernt." : "Es stand kein Panel mehr da – jetzt ist es auch vergessen.";
+            state.notice = removed ? "🗑️ Panel entfernt." : "Es stand kein Panel mehr da, jetzt ist es auch vergessen.";
 
             return this.Show(interaction, state);
         }
@@ -368,7 +368,7 @@ export default class TicketSetupHandler extends Event {
                 .setTitle(option ? "Option bearbeiten" : "Option hinzufügen")
                 .addLabelComponents(
                     field("name", "Name", "Steht auf dem Knopf bzw. im Menü", option?.name ?? "", true, 80),
-                    field("description", "Beschreibung", "Kurzer Satz - nur im Auswahlmenü sichtbar", option?.description ?? "", false, 100),
+                    field("description", "Beschreibung", "Kurzer Satz, nur im Auswahlmenü sichtbar", option?.description ?? "", false, 100),
                     field("emoji", "Emoji", "Standard-Emoji oder ein Server-Emoji wie <:name:123>", option?.emoji ?? "", false, 64)
                 )
         );

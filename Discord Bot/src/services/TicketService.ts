@@ -260,7 +260,7 @@ export default class TicketService {
 
         if (error instanceof DiscordAPIError && (error.code === 50013 || error.code === 50001)) {
             return new TicketError(
-                "Mir fehlen dafür Rechte auf dem Server – etwa „Kanäle verwalten“, „Rollen verwalten“ oder Zugriff auf den Kanal."
+                "Mir fehlen dafür Rechte auf dem Server, etwa „Kanäle verwalten“, „Rollen verwalten“ oder Zugriff auf den Kanal."
             );
         }
 
@@ -740,13 +740,13 @@ export default class TicketService {
         if (same) {
             throw new TicketError(
                 same.contact === "modmail"
-                    ? "Du hast dazu schon ein offenes Ticket – schreib mir einfach per DM."
+                    ? "Du hast dazu schon ein offenes Ticket. Schreib mir einfach per DM."
                     : `Du hast dazu schon ein offenes Ticket: <#${same.channelId}>`
             );
         }
 
         if (config.limit > 0 && open.length >= config.limit) {
-            throw new TicketError(`Du hast schon ${open.length} offene(s) Ticket(s) – schließe zuerst eins.`);
+            throw new TicketError(`Du hast schon ${open.length} offene(s) Ticket(s). Schließ zuerst eins.`);
         }
 
         if (config.contact === "modmail") {
@@ -755,7 +755,7 @@ export default class TicketService {
             if (other) {
                 const where = this.client.guilds.cache.get(other.guildId)?.name ?? "einem anderen Server";
 
-                throw new TicketError(`Du hast schon ein offenes ModMail-Ticket auf **${where}** – schreib dort per DM weiter.`);
+                throw new TicketError(`Du hast schon ein offenes ModMail-Ticket auf **${where}**. Schreib dort per DM weiter.`);
             }
         }
     }
@@ -768,7 +768,7 @@ export default class TicketService {
 
         await this.Gate(guild, user, config, option);
 
-        if (!option) throw new TicketError("Diese Option gibt es nicht mehr – das Panel ist wohl veraltet.");
+        if (!option) throw new TicketError("Diese Option gibt es nicht mehr, das Panel ist wohl veraltet.");
 
         const forum = config.surface === "forum" ? guild.channels.cache.get(config.forumId ?? "") : null;
 
@@ -837,7 +837,7 @@ export default class TicketService {
             if (channel) await channel.delete().catch(() => undefined);
 
             if (sentDirect) {
-                await this.SendDirect(user, InfoView("⚠️ Das Ticket ließ sich auf dem Server doch nicht anlegen – versuch es gleich nochmal.", "#ffc53d"));
+                await this.SendDirect(user, InfoView("⚠️ Das Ticket ließ sich auf dem Server doch nicht anlegen. Versuch es gleich nochmal.", "#ffc53d"));
             }
 
             throw this.Explain(error);
@@ -1020,7 +1020,7 @@ export default class TicketService {
         }
 
         await this.Update(context, { claimedBy: null });
-        await this.Say(context, `↩️ ${member} gibt das Ticket zurück – es wartet wieder auf das Team.`);
+        await this.Say(context, `↩️ ${member} gibt das Ticket zurück. Es wartet wieder auf das Team.`);
         await this.Notify(context, `↩️ Dein Ticket ${TicketNumber(context.ticket.number, context.ticket.code)} wartet wieder auf das Team.`);
 
         void this.SyncThread(context);
@@ -1055,7 +1055,7 @@ export default class TicketService {
         this.RequireOpen(context);
 
         if (user.id === context.ticket.openerId) {
-            throw new TicketError("Den Ersteller kannst du nicht entfernen – schließ das Ticket stattdessen.");
+            throw new TicketError("Den Ersteller kannst du nicht entfernen. Schließ das Ticket stattdessen.");
         }
 
         if (!context.ticket.members.includes(user.id)) throw new TicketError(`${user} ist nicht im Ticket.`);
@@ -1206,7 +1206,7 @@ export default class TicketService {
         await this.Notify(
             context,
             seconds === 0
-                ? "⏱️ Slowmode aus – du kannst wieder ohne Pause schreiben."
+                ? "⏱️ Slowmode aus, du kannst wieder ohne Pause schreiben."
                 : `⏱️ Slowmode: Du kannst nur alle **${SlowmodeLabel(seconds)}** eine Nachricht schicken.`
         );
     }
@@ -1258,7 +1258,7 @@ export default class TicketService {
                 else await this.SendDirect(opener, view);
             }
         } else {
-            await this.Notify(context, `🔓 Dein Ticket ${TicketNumber(context.ticket.number, context.ticket.code)} ist wieder offen – du kannst weiterschreiben.`, "#35e07f");
+            await this.Notify(context, `🔓 Dein Ticket ${TicketNumber(context.ticket.number, context.ticket.code)} ist wieder offen, du kannst weiterschreiben.`, "#35e07f");
         }
 
         await this.Say(context, frozen ? `🥶 ${member} hat das Ticket eingefroren.` : `🔓 ${member} hat das Ticket wieder freigegeben.`);
@@ -1381,7 +1381,7 @@ export default class TicketService {
         const delivered = opener ? await this.SendDirect(opener, relay) : false;
 
         if (!delivered) {
-            throw new TicketError("Im Ticket steht die Nachricht, beim User kam sie nicht an – er hat DMs vermutlich geschlossen.");
+            throw new TicketError("Im Ticket steht die Nachricht, beim User kam sie nicht an. Er hat DMs vermutlich geschlossen.");
         }
     }
 
@@ -1582,7 +1582,7 @@ export default class TicketService {
 
     private async RelayToTeam(user: User, ticket: ITicket, pending: IPending, original: Message | null): Promise<void> {
         if (ticket.status === "frozen") {
-            await this.Answer(original, "❄️ Dein Ticket ist gerade eingefroren – das Team meldet sich bei dir.", "#5ccdff");
+            await this.Answer(original, "❄️ Dein Ticket ist gerade eingefroren. Das Team meldet sich bei dir.", "#5ccdff");
             return;
         }
 
@@ -1590,7 +1590,7 @@ export default class TicketService {
             const wait = (this.lastRelay.get(ticket.id) ?? 0) + ticket.slowmode * 1000 - Date.now();
 
             if (wait > 0) {
-                await this.Answer(original, `⏱️ Slowmode: warte noch ${Math.ceil(wait / 1000)} Sekunden.`);
+                await this.Answer(original, `⏱️ Slowmode: Warte noch ${Math.ceil(wait / 1000)} Sekunden.`);
                 return;
             }
         }
@@ -1640,7 +1640,7 @@ export default class TicketService {
             await original?.react("✅").catch(() => undefined);
             void this.client.tickets.CountMessage(ticket.id).catch(() => undefined);
         } catch {
-            await this.Answer(original, "⚠️ Deine Nachricht kam nicht an – versuch es gleich nochmal.");
+            await this.Answer(original, "⚠️ Deine Nachricht kam nicht an. Versuch es gleich nochmal.");
         }
     }
 
@@ -1658,7 +1658,7 @@ export default class TicketService {
         if (await this.SendDirect(opener, RelayView("team", name, message.content, files, links))) {
             await message.react("✅").catch(() => undefined);
         } else {
-            await this.Answer(message, "⚠️ Kam beim User nicht an – er hat DMs vermutlich geschlossen.");
+            await this.Answer(message, "⚠️ Kam beim User nicht an, er hat DMs vermutlich geschlossen.");
         }
     }
 

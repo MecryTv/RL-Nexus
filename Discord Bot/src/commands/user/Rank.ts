@@ -75,7 +75,7 @@ export default class Rank extends Command {
                     .addStringOption((option) =>
                         option
                             .setName("epicname")
-                            .setDescription("Dein Epic Games Name - genau wie im Spiel geschrieben")
+                            .setDescription("Dein Epic-Games-Name, genau wie im Spiel geschrieben")
                             .setRequired(true)
                             .setMaxLength(MAX_NAME)
                     )
@@ -83,7 +83,7 @@ export default class Rank extends Command {
             .addSubcommand((sub) =>
                 sub
                     .setName("unlink")
-                    .setDescription(`Trennt dein Epic-Konto wieder - frühestens ${LINK_COOLDOWN_DAYS} Tage nach dem Verbinden`)
+                    .setDescription(`Trennt dein Epic-Konto wieder, frühestens ${LINK_COOLDOWN_DAYS} Tage nach dem Verbinden`)
             )
             .addSubcommand((sub) => sub.setName("me").setDescription("Zeigt deine eigenen Ränge"))
             .addSubcommand((sub) =>
@@ -93,7 +93,7 @@ export default class Rank extends Command {
                     .addStringOption((option) =>
                         option
                             .setName("epicname")
-                            .setDescription("Der Epic Games Name - genau wie im Spiel geschrieben")
+                            .setDescription("Der Epic-Games-Name, genau wie im Spiel geschrieben")
                             .setRequired(true)
                             .setMaxLength(MAX_NAME)
                     )
@@ -143,7 +143,7 @@ export default class Rank extends Command {
 
         if (!profile) {
             await interaction.editReply({
-                content: `Den Epic-Namen **${name}** gibt es nicht. Prüf die Schreibweise - genau wie im Spiel.`,
+                content: `Den Epic-Namen **${name}** gibt es nicht. Prüf die Schreibweise, sie muss genau wie im Spiel sein.`,
             });
 
             return null;
@@ -201,7 +201,7 @@ export default class Rank extends Command {
 
         if (!this.client.databaseService.Ready) {
             await interaction.reply({
-                content: "Ohne Datenbank lässt sich nichts verknüpfen - die Verknüpfung steht dort.",
+                content: "Ohne Datenbank lässt sich nichts verknüpfen, denn die Verknüpfung steht dort.",
                 flags: MessageFlags.Ephemeral,
             });
 
@@ -271,7 +271,7 @@ export default class Rank extends Command {
     private async Unlink(interaction: ChatInputCommandInteraction): Promise<void> {
         if (!this.client.databaseService.Ready) {
             await interaction.reply({
-                content: "Ohne Datenbank gibt es nichts zu trennen - die Verknüpfung steht dort.",
+                content: "Ohne Datenbank gibt es nichts zu trennen, denn die Verknüpfung steht dort.",
                 flags: MessageFlags.Ephemeral,
             });
 
@@ -297,7 +297,7 @@ export default class Rank extends Command {
                     `**${current.display_name ?? current.account_id}** ist noch gesperrt. ` +
                     `Trennen geht wieder in **${waitLabel(cooldown.waitMs)}**.
 ` +
-                    `Die Frist gilt auch fürs Trennen — sonst wäre sie mit einem Zwischenschritt umgangen.`,
+                    `Die Frist gilt auch fürs Trennen, sonst ließe sie sich mit einem Zwischenschritt umgehen.`,
             });
 
             return;
@@ -320,7 +320,7 @@ export default class Rank extends Command {
     private async Me(interaction: ChatInputCommandInteraction): Promise<void> {
         if (!this.client.databaseService.Ready) {
             await interaction.reply({
-                content: "Ohne Datenbank kenne ich keine Verknüpfungen. Nimm solange `/rank search`.",
+                content: "Ohne Datenbank kenne ich keine Verknüpfungen. Nimm so lange `/rank search`.",
                 flags: MessageFlags.Ephemeral,
             });
 

@@ -4,7 +4,7 @@ import Command from "../../structures/Command";
 import Category from "../../enums/Category";
 import ComponentV2Builder from "../../builder/ComponentV2Builder";
 
-const SCOPE_FILE = `# Sprint 12 — Scope
+const SCOPE_FILE = `# Sprint 12: Scope
 
 - #12 Turnier-Bracket Rendering
 - #14 Redis-Layer: TTL-Index-Leak fixen
@@ -29,9 +29,9 @@ export default class ComponentV2Test extends Command {
                     .setName("demo")
                     .setDescription("Welches Layout gezeigt werden soll (Standard: board)")
                     .addChoices(
-                        { name: "Board — alle Komponenten", value: "board" },
-                        { name: "Basic — Titel, Text, Thumbnail", value: "basic" },
-                        { name: "Limits — Text-Kürzung auf 4000 Zeichen", value: "limits" }
+                        { name: "Board: alle Komponenten", value: "board" },
+                        { name: "Basic: Titel, Text, Thumbnail", value: "basic" },
+                        { name: "Limits: Text-Kürzung auf 4000 Zeichen", value: "limits" }
                     )
             )
             .addBooleanOption((option) =>
@@ -64,7 +64,7 @@ export default class ComponentV2Test extends Command {
         if (demo === "limits") {
             await interaction.reply(
                 new ComponentV2Builder({ accentColor: "Orange" })
-                    .title("🧪 | Limit Demo", "5000 Zeichen rein, 4000 raus — der Rest wird gekürzt")
+                    .title("🧪 | Limit Demo", "5000 Zeichen rein, 4000 raus, der Rest wird gekürzt")
                     .separator()
                     .text("A".repeat(5000))
                     .toMessage({ ephemeral })
@@ -77,7 +77,7 @@ export default class ComponentV2Test extends Command {
         const user = interaction.user.id;
 
         const board = new ComponentV2Builder({ accentColor: "#B57BFF" })
-            .title("📋 Sprint 12 — Aufgabenplanung", "Zeitraum 11.08. – 24.08.2026 · zuletzt aktualisiert vor 12 Minuten")
+            .title("📋 Sprint 12: Aufgabenplanung", "Zeitraum 11.08. – 24.08.2026 · zuletzt aktualisiert vor 12 Minuten")
             .progress(9, 15, { label: "erledigt" })
             .separator({ spacing: "large" })
 
@@ -105,9 +105,9 @@ export default class ComponentV2Test extends Command {
 
             .heading("☑️ Offen")
             .list([
-                "`#16` Match-Reminder Scheduler — *frei* · 22.08.",
-                "`#17` Admin-Dashboard: KPI-Charts — *frei* · 23.08.",
-                "`#18` Docker-Compose für Prod-VPS — *frei* · 24.08.",
+                "`#16` Match-Reminder Scheduler · *frei* · 22.08.",
+                "`#17` Admin-Dashboard: KPI-Charts · *frei* · 23.08.",
+                "`#18` Docker-Compose für Prod-VPS · *frei* · 24.08.",
             ])
             .subtext("Freie Aufgaben kannst du dir unten selbst zuweisen.")
             .separator()

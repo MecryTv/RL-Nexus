@@ -307,7 +307,7 @@ export default class RoleListService {
     async Create(guild: Guild, input: { name: unknown; template: unknown }): Promise<IRoleList> {
         const count = await this.client.roleLists.CountOf(guild.id);
 
-        if (count >= MAX_LISTS) throw new RoleListError(`Höchstens ${MAX_LISTS} Listen – lösch eine, bevor du eine neue anlegst.`);
+        if (count >= MAX_LISTS) throw new RoleListError(`Höchstens ${MAX_LISTS} Listen. Lösch eine, bevor du eine neue anlegst.`);
 
         const key: ListTemplateKey = Object.keys(LIST_TEMPLATES).includes(String(input.template)) ? (input.template as ListTemplateKey) : "empty";
         const template = LIST_TEMPLATES[key];
@@ -797,7 +797,7 @@ export default class RoleListService {
     async SavePreset(guildId: string, name: unknown, image: unknown): Promise<IRoleListPreset[]> {
         const presets = await this.Presets(guildId);
 
-        if (presets.length >= MAX_PRESETS) throw new RoleListError(`Höchstens ${MAX_PRESETS} eigene Vorlagen – lösch eine, bevor du eine neue speicherst.`);
+        if (presets.length >= MAX_PRESETS) throw new RoleListError(`Höchstens ${MAX_PRESETS} eigene Vorlagen. Lösch eine, bevor du eine neue speicherst.`);
 
         const preset: IRoleListPreset = { id: `own-${Date.now().toString(36)}${presets.length}`, name: CleanPresetName(name), image: CleanImage(image, DefaultListSettings().image) };
 

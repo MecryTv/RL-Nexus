@@ -76,7 +76,7 @@ export default class Module extends Command {
         }
 
         if (!this.client.databaseService.Ready) {
-            await this.Reply(interaction, "Red", "Keine Datenbank", "Die Module stehen in der Datenbank – die erreiche ich gerade nicht.");
+            await this.Reply(interaction, "Red", "Keine Datenbank", "Die Module stehen in der Datenbank, und die erreiche ich gerade nicht.");
 
             return;
         }
@@ -100,7 +100,7 @@ export default class Module extends Command {
                 interaction,
                 "Yellow",
                 "Gehört fest dazu",
-                `\`${moduleId}\` lässt sich nicht ausschalten – das Modul gehört fest zum Bot.`
+                `\`${moduleId}\` lässt sich nicht ausschalten, das Modul gehört fest zum Bot.`
             );
 
             return;

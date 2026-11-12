@@ -48,7 +48,7 @@ export function AccountTab({ value, set, entry, dirty, saving, problem, onSave, 
             const next = await api<IRoleState>(`/api/partners/${entry.id}/role`, { method: "POST" });
 
             setRole(next);
-            notify(next.state === "given" ? "@Partner ist vergeben." : `@Partner: ${ROLE_LABELS[next.state]}${next.note ? ` – ${next.note}` : ""}`, next.state === "missing" ? "danger" : "ok");
+            notify(next.state === "given" ? "@Partner ist vergeben." : `@Partner: ${ROLE_LABELS[next.state]}${next.note ? ` (${next.note})` : ""}`, next.state === "missing" ? "danger" : "ok");
             onChanged();
         } catch (error) {
             notify(error instanceof ApiError ? error.message : "Die Prüfung ging nicht.", "danger");

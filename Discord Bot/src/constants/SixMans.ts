@@ -225,7 +225,7 @@ export function DefaultDm(): ISixBody {
     return card(
         SIXMANS_ACCENT,
         "## 🎮 Deine Runde steht",
-        "**{modus}** auf **{guild}** – Runde **#{runde}**, **Lobby** `{lobby}`, **Passwort** `{passwort}`.",
+        "**{modus}** auf **{guild}**, Runde **#{runde}**, **Lobby** `{lobby}`, **Passwort** `{passwort}`.",
         "---",
         "🔵 {blau}\n🟠 {orange}"
     );

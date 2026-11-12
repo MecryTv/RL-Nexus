@@ -580,7 +580,7 @@ function ranks(host: HTMLElement, sub: HTMLElement, activity: IActivity, userId:
     if (!found) {
         sub.textContent = "";
         host.replaceChildren(
-            hint("Dafür braucht der Bot die vollständige Mitgliederliste - das Members-Intent ist aus.")
+            hint("Dafür braucht der Bot die vollständige Mitgliederliste. Das Members-Intent ist aber aus.")
         );
 
         return;
@@ -792,7 +792,7 @@ export async function renderOverview(guild: IGuild, userId: string, waiting: Pro
     }
 
     if (!guild.active) {
-        note("RL Nexus ist nicht auf diesem Server - ohne den Bot gibt es nichts zu zählen.");
+        note("RL Nexus ist nicht auf diesem Server. Ohne den Bot gibt es nichts zu zählen.");
         fold();
 
         return;
@@ -805,7 +805,7 @@ export async function renderOverview(guild: IGuild, userId: string, waiting: Pro
     if (!result.ok) {
         note(
             result.reason === "offline"
-                ? "Die Aktivität steht in der Datenbank des Bots - die ist gerade nicht erreichbar."
+                ? "Die Aktivität steht in der Datenbank des Bots, die gerade nicht erreichbar ist."
                 : "Die Aktivität lässt sich gerade nicht laden. Lade die Seite in einem Moment neu."
         );
         fold();

@@ -34,16 +34,16 @@ export const MAX_AVATAR = 200;
 export const MAX_RING = 12;
 
 export const LAYOUT_LABELS: Record<WelcomeLayout, string> = {
-    classic: "Klassisch – Avatar links, Streifen am Rand",
-    center: "Mittig – Avatar oben, Text darunter",
-    panel: "Panel – Text auf dunkler Fläche, Bild rechts frei",
-    hud: "HUD – Rahmen mit Eckwinkeln wie die Rang-Karte",
+    classic: "Klassisch: Avatar links, Streifen am Rand",
+    center: "Mittig: Avatar oben, Text darunter",
+    panel: "Panel: Text auf dunkler Fläche, Bild rechts frei",
+    hud: "HUD: Rahmen mit Eckwinkeln wie die Rang-Karte",
 };
 
 export const FONT_LABELS: Record<WelcomeFont, string> = {
-    oxanium: "Oxanium – kräftig, die Standardschrift",
-    orbitron: "Orbitron – breit und technisch",
-    rajdhani: "Rajdhani – schmal und ruhig",
+    oxanium: "Oxanium: kräftig, die Standardschrift",
+    orbitron: "Orbitron: breit und technisch",
+    rajdhani: "Rajdhani: schmal und ruhig",
 };
 
 const HEX = /^#[0-9a-f]{6}$/i;
@@ -316,7 +316,7 @@ export function DefaultDoc(kind: "join" | "leave"): IMessageDoc {
                 type: "text",
                 body:
                     kind === "join"
-                        ? "## 👋 Willkommen, {user}!\nSchön, dass du auf **{guild}** bist – du bist Mitglied Nr. {member.number}."
+                        ? "## 👋 Willkommen, {user}!\nSchön, dass du auf **{guild}** bist. Du bist Mitglied Nr. {member.number}."
                         : "## 👋 {user.name} hat den Server verlassen\nJetzt sind es noch {guild.members} Mitglieder.",
             },
         ],

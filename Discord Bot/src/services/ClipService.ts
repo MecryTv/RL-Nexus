@@ -217,10 +217,10 @@ export default class ClipService {
         const set = [schedule.openAt, schedule.closeAt, schedule.endAt].filter((value) => value !== null).length;
 
         if (set === 0) return schedule;
-        if (!Planned(schedule)) throw new ClipError("Lege alle drei Termine fest – Öffnen, Schließen und das Ende der Abstimmung – oder keinen.");
+        if (!Planned(schedule)) throw new ClipError("Lege alle drei Termine fest (Öffnen, Schließen und Ende der Abstimmung) oder keinen.");
 
         if (schedule.closeAt - schedule.openAt < MIN_GAP || schedule.endAt - schedule.closeAt < MIN_GAP) {
-            throw new ClipError("Erst öffnen, dann schließen, dann endet die Abstimmung – mit mindestens fünf Minuten dazwischen.");
+            throw new ClipError("Erst öffnen, dann schließen, dann endet die Abstimmung. Dazwischen liegen jeweils mindestens fünf Minuten.");
         }
 
         if (schedule.endAt > Date.now() + 2 * 365 * DAY) throw new ClipError("Plane höchstens zwei Jahre im Voraus.");

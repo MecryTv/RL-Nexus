@@ -43,7 +43,7 @@ export function SessionOf(client: BotClient, request: FastifyRequest): IDashboar
 export function Unconfigured(reply: FastifyReply): FastifyReply {
     return reply.code(503).send({
         error: "Dashboard nicht eingerichtet",
-        hint: "CLIENT_SECRET (bzw. DEV_CLIENT_SECRET) in der .env setzen - siehe docs/Dashboard.md.",
+        hint: "CLIENT_SECRET (bzw. DEV_CLIENT_SECRET) in der .env setzen, siehe docs/Dashboard.md.",
     });
 }
 

@@ -34,8 +34,8 @@ const MAX = 25;
 
 // Was Moderatoren dürfen - und was nicht. Dieselbe Grenze zieht der Bot.
 const RIGHTS: [boolean, string][] = [
-    [true, "Live Tickets und Transcriptions – alle Tickets, alle Aktionen"],
-    [true, "Moderation – Verlauf, Fälle, Bannen, Kicken, Timeouts und Warns"],
+    [true, "Live Tickets und Transcriptions: alle Tickets, alle Aktionen"],
+    [true, "Moderation: Verlauf, Fälle, Bannen, Kicken, Timeouts und Warns"],
     [true, "In Discord: die Ticket-Kanäle, das Aktions-Menü und die Moderations-Befehle"],
     [false, "Einstellungen und Module des Servers"],
     [false, "Transcripts löschen"],
@@ -193,7 +193,7 @@ export function renderTeam(guildId: string): void {
             "section",
             "tkcard",
             el("h3", "tkcard__title", "Rollen"),
-            el("p", "tkcard__lead", "Jeder mit einer dieser Rollen ist Moderator – auch wer die Rolle später bekommt."),
+            el("p", "tkcard__lead", "Jeder mit einer dieser Rollen ist Moderator, auch wer die Rolle später bekommt."),
             list
         );
     }
@@ -241,7 +241,7 @@ export function renderTeam(guildId: string): void {
 
                               return button;
                           })
-                        : [el("span", "tkempty", "Niemand gefunden – oder schon eingetragen.")])
+                        : [el("span", "tkempty", "Niemand gefunden oder schon eingetragen.")])
                 );
             }, 300);
         });
@@ -270,7 +270,7 @@ export function renderTeam(guildId: string): void {
             "section",
             "tkcard",
             el("h3", "tkcard__title", "Einzelne User"),
-            el("p", "tkcard__lead", "Auch ohne passende Rolle – gilt, solange sie auf dem Server sind."),
+            el("p", "tkcard__lead", "Gilt auch ohne passende Rolle, solange sie auf dem Server sind."),
             list,
             query,
             results

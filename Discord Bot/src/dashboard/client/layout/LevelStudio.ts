@@ -794,7 +794,7 @@ export function levelStudio(host: HTMLElement, options: ILevelStudioOptions): { 
                     ] as const
                 ).map(([type, label]) => add(type, label))
             ),
-            ...(room ? [] : [el("p", "sto-full", `Höchstens ${MAX_ELEMENTS} Bausteine – lösch einen, um Platz zu machen.`)])
+            ...(room ? [] : [el("p", "sto-full", `Höchstens ${MAX_ELEMENTS} Bausteine. Lösch einen, um Platz zu machen.`)])
         );
     }
 
@@ -1037,7 +1037,7 @@ export function levelStudio(host: HTMLElement, options: ILevelStudioOptions): { 
                   ]
                 : []),
             two(field(bg.mode === "gradient" ? "Farbe oben links" : "Farbe", color("bg-color", bg.color, (value) => (bg.color = value))), ...(bg.mode === "gradient" ? [field("Farbe unten rechts", color("bg-to", bg.to, (value) => (bg.to = value)))] : [])),
-            el("p", "sto-note", "Die Form ist der Umriss des ganzen Bilds – außerhalb bleibt es durchsichtig."),
+            el("p", "sto-note", "Die Form ist der Umriss des ganzen Bilds, außerhalb bleibt es durchsichtig."),
             segment([["rect", "Eckig"], ["bevel", "Abgeschrägt"], ["round", "Abgerundet"]], bg.shape, (value) => (bg.shape = value), "Form des Bilds"),
             ...(bg.shape === "rect" ? [] : [field("Ecken", number("bg-cut", bg.cut, 0, 60, (value) => (bg.cut = value)))]),
             field("Rand", optionalColor("bg-border", bg.border, (value) => (bg.border = value))),
@@ -1082,7 +1082,7 @@ export function levelStudio(host: HTMLElement, options: ILevelStudioOptions): { 
                         field("Text", line),
                         placeholderMenu(line, LINE_PLACEHOLDERS, (value) => (state.upLine = value)),
                         el("p", "sto-note", "Gepingt wird nur die Person, die aufsteigt."),
-                        ...(options.upMode === "text" ? [el("p", "sto-note", "Unter Belohnungen steht der Aufstieg gerade auf „Als Text“ – das Bild kommt erst bei „Als Bild“.")] : [])
+                        ...(options.upMode === "text" ? [el("p", "sto-note", "Unter Belohnungen steht der Aufstieg gerade auf „Als Text“. Das Bild kommt erst bei „Als Bild“.")] : [])
                     )
                 );
             }

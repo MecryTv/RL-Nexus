@@ -84,7 +84,7 @@ export default class MessageService {
         const channel = typeof raw.channelId === "string" ? guild.channels.cache.get(raw.channelId) : null;
         const body = this.CleanBody(guild, raw, previous, DefaultMessageDoc());
 
-        if (!name) throw new MessageError("Gib der Nachricht einen Namen – nur ihr seht ihn.");
+        if (!name) throw new MessageError("Gib der Nachricht einen Namen. Nur ihr seht ihn.");
 
         return {
             name,
@@ -110,9 +110,9 @@ export default class MessageService {
         const content = typeof raw.content === "string" ? raw.content.trim().slice(0, MAX_CONTENT) : (previous?.content ?? "");
         const embed = raw.embed === undefined ? (previous?.embed ?? null) : this.CleanEmbed(raw.embed);
 
-        if (kind === "v2" && !doc.blocks.length) throw new MessageError("Die Karte ist leer – schreib etwas hinein.");
-        if (kind === "text" && !content) throw new MessageError("Die Nachricht ist leer – schreib einen Text.");
-        if (kind === "embed" && !embed) throw new MessageError("Das Embed ist leer – schreib zumindest Überschrift oder Text.");
+        if (kind === "v2" && !doc.blocks.length) throw new MessageError("Die Karte ist leer. Schreib etwas hinein.");
+        if (kind === "text" && !content) throw new MessageError("Die Nachricht ist leer. Schreib einen Text.");
+        if (kind === "embed" && !embed) throw new MessageError("Das Embed ist leer. Schreib zumindest eine Überschrift oder einen Text.");
 
         return { kind, content, embed, doc };
     }
@@ -256,7 +256,7 @@ export default class MessageService {
         const view = await CustomMessageView(this.client, Source(message), { guild: guild.name });
         const sent = await channel.send(view).catch(() => null);
 
-        if (!sent) throw new MessageError("Die Nachricht ging nicht raus – darf der Bot in den Kanal schreiben?");
+        if (!sent) throw new MessageError("Die Nachricht ging nicht raus. Darf der Bot in den Kanal schreiben?");
 
         await this.client.customMessages.Save(message.id, { messageId: sent.id, channelId: channel.id });
         logger.user(`✉️ Nachricht "${message.name}" auf ${guild.id} gesendet`);
@@ -275,7 +275,7 @@ export default class MessageService {
         if (!target) {
             await this.client.customMessages.Save(message.id, { messageId: null });
 
-            throw new MessageError("Die Nachricht ist in Discord nicht mehr da – schick sie neu.");
+            throw new MessageError("Die Nachricht ist in Discord nicht mehr da. Schick sie neu.");
         }
 
         const view = await CustomMessageView(this.client, Source(message), { guild: guild.name });
@@ -372,7 +372,7 @@ export default class MessageService {
         }
 
         if (!me?.permissions.has(PermissionFlagsBits.ManageRoles) || role.comparePositionTo(me.roles.highest) >= 0 || role.managed) {
-            await reply(`Der Bot kann @${role.name} nicht vergeben – die Rolle muss unter seiner höchsten stehen.`);
+            await reply(`Der Bot kann @${role.name} nicht vergeben. Die Rolle muss unter seiner höchsten stehen.`);
 
             return;
         }
@@ -415,7 +415,7 @@ export default class MessageService {
             try {
                 new RegExp(phrase, "i");
             } catch {
-                throw new MessageError("Dieses Muster versteht der Bot nicht – prüf die Regex.");
+                throw new MessageError("Dieses Muster versteht der Bot nicht. Prüf die Regex.");
             }
         }
 

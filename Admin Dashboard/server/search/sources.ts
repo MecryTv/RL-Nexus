@@ -44,7 +44,7 @@ export function matched(hits: readonly ISearchHit[]): ISearchHit[] {
 const foundRank = (title: string, context: string, wanted: string): number => rankOf(title, context, wanted) ?? 2;
 
 export function mailHit(account: Pick<IMailAccountRow, "id" | "address"> & { readonly label: string | null }, mail: IMailSummary, text: string): ISearchHit {
-    const title = mail.subject.trim() || "(ohne Betreff)";
+    const title = mail.subject.trim() || "(kein Betreff)";
     const context = `${mail.from?.name || mail.from?.address || "Unbekannt"} · ${day(mail.date)}`;
 
     return {

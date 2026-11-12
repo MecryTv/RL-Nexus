@@ -131,7 +131,7 @@ export function DefaultVotingMessage(): IClipBody {
         CLIPS_ACCENT,
         "## 🗳️ Abstimmung läuft",
         "Das Einreichen ist vorbei, {anzahl} sind dabei. Reagier im {kanal} mit {emoji} auf deinen Lieblingsclip.",
-        "Jede Person hat eine Stimme. Wer umentscheidet, reagiert einfach auf einen anderen Clip.",
+        "Jede Person hat eine Stimme. Wer sich umentscheidet, reagiert einfach auf einen anderen Clip.",
         "-# Abstimmung bis {ende} ({ende.countdown})"
     );
 }

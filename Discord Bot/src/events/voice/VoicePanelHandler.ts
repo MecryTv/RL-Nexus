@@ -155,7 +155,7 @@ export default class VoicePanelHandler extends Event {
             .addLabelComponents(
                 new LabelBuilder()
                     .setLabel(isName ? "Neuer Name" : "Wie viele Plätze?")
-                    .setDescription(isName ? "So heißt dein Kanal danach" : `0 bis ${MAX_LIMIT} – 0 heißt unbegrenzt`)
+                    .setDescription(isName ? "So heißt dein Kanal danach" : `0 bis ${MAX_LIMIT}, 0 heißt unbegrenzt`)
                     .setTextInputComponent(
                         new TextInputBuilder()
                             .setCustomId("value")

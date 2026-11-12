@@ -28,7 +28,7 @@ export default class Roulette extends Command {
                     .setName("planen")
                     .setDescription("Legt einen Abend mit Startzeit an")
                     .addStringOption((option) => option.setName("zeit").setDescription("Deutsche Zeit, etwa 20:00").setRequired(true).setMaxLength(5))
-                    .addStringOption((option) => option.setName("datum").setDescription("Etwa 14.11.2026. Leer heißt heute, ist die Zeit vorbei morgen").setMaxLength(10))
+                    .addStringOption((option) => option.setName("datum").setDescription("Etwa 14.11.2026. Leer heißt heute, ist die Zeit vorbei, morgen").setMaxLength(10))
             )
             .addSubcommand((sub) => sub.setName("start").setDescription("Startet den Abend sofort"))
             .addSubcommand((sub) => sub.setName("beenden").setDescription("Beendet den Abend, die Übersicht kommt in den Moderator-Kanal"))

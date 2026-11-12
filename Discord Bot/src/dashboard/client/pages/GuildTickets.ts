@@ -122,10 +122,10 @@ const MESSAGE_LABELS: Record<string, string> = {
 const MESSAGE_HINTS: Record<string, string> = {
     panel: "Steht im Server-Kanal. Darunter kommen die Knöpfe bzw. das Auswahlmenü mit den Themen.",
     modmailPanel:
-        "Das Panel bei ModMail: erklärt, dass es per DM weitergeht. Darunter steht nur der Knopf „Ticket per DM starten“ – die Themen fragt der Bot in der DM ab.",
+        "Das Panel bei ModMail: erklärt, dass es per DM weitergeht. Darunter steht nur der Knopf „Ticket per DM starten“. Die Themen fragt der Bot in der DM ab.",
     opened: "Die erste Nachricht im Ticket, mit Statuszeile und Aktions-Menü darunter.",
     dm: "Bekommt der User per DM, sobald sein ModMail-Ticket steht.",
-    closed: "Wird beim Schließen geschickt – mit {closer} und {reason}.",
+    closed: "Wird beim Schließen geschickt, mit {closer} und {reason}.",
     frozen: "Sieht der User, wenn das Team das Ticket einfriert.",
     blacklisted: "Die Absage an einen gesperrten User.",
 };
@@ -145,7 +145,7 @@ const MAX_OPTIONS = 25;
 
 const PANEL_TOASTS: Record<string, [string, string]> = {
     sent: ["Panel gesendet", "Der Bot hat das Panel in den Kanal gestellt."],
-    updated: ["Panel aktualisiert", "Dort stand schon eins – jetzt ist es auf dem neuen Stand. Ein zweites gibt es nicht."],
+    updated: ["Panel aktualisiert", "Dort stand schon eins, jetzt ist es auf dem neuen Stand. Ein zweites gibt es nicht."],
     moved: ["Panel umgezogen", "Das Panel steht im neuen Kanal, das alte ist weg."],
 };
 
@@ -187,7 +187,7 @@ function select(
     entries: { value: string; label: string }[],
     active: string | null,
     onPick: (value: string | null) => void,
-    empty = "— keine —"
+    empty = "(keine)"
 ): HTMLSelectElement {
     const picker = el("select", "pick", el("option", "", empty));
 
@@ -583,7 +583,7 @@ export function renderTickets(guildId: string, canManage: boolean, user: ITicket
 
         const flow = card(
             "So läuft ein Ticket",
-            "Zwei Entscheidungen – der Rest passt sich daran an.",
+            "Zwei Entscheidungen, der Rest passt sich daran an.",
             choice(
                 "Wie meldet sich der User?",
                 "contact",
@@ -593,7 +593,7 @@ export function renderTickets(guildId: string, canManage: boolean, user: ITicket
                         symbol: "#i-message",
                         title: "Im Server",
                         tag: "Klassisch",
-                        text: "Ein Klick im Panel öffnet das Ticket – dort schreibt der User direkt mit dem Team.",
+                        text: "Ein Klick im Panel öffnet das Ticket. Dort schreibt der User direkt mit dem Team.",
                     },
                     {
                         value: "modmail",
@@ -615,7 +615,7 @@ export function renderTickets(guildId: string, canManage: boolean, user: ITicket
                 "surface",
                 [
                     { value: "channel", symbol: "#i-hash", title: "Textkanal", text: "Ein privater Kanal je Ticket, in der Kategorie seines Themas." },
-                    { value: "forum", symbol: "#i-forum", title: "Forum-Post", text: "Ein Post je Ticket – Tags zeigen Thema, Priorität und Status." },
+                    { value: "forum", symbol: "#i-forum", title: "Forum-Post", text: "Ein Post je Ticket. Tags zeigen Thema, Priorität und Status." },
                 ],
                 cfg.surface,
                 (value) => {
@@ -629,7 +629,7 @@ export function renderTickets(guildId: string, canManage: boolean, user: ITicket
         if (!modmail && cfg.surface === "forum") {
             flow.append(
                 alert(
-                    "Forum-Posts sieht jeder, der das Forum sehen darf – auch die Tickets anderer. Für vertrauliche Anliegen ist der Textkanal oder ModMail die bessere Wahl."
+                    "Forum-Posts sieht jeder, der das Forum sehen darf (auch die Tickets anderer). Für vertrauliche Anliegen ist der Textkanal oder ModMail die bessere Wahl."
                 )
             );
         }
@@ -671,7 +671,7 @@ export function renderTickets(guildId: string, canManage: boolean, user: ITicket
                                   cfg.forumId = value;
                                   touch();
                               },
-                              "— Forum wählen —"
+                              "(Forum wählen)"
                           )
                       ),
                   ]
@@ -722,7 +722,7 @@ export function renderTickets(guildId: string, canManage: boolean, user: ITicket
                 const result = await send({ action: "logthread", forumId });
                 const thread = (result?.thread ?? null) as ILogThread | null;
 
-                if (thread) toast("info", "Beitrag angelegt", `„${thread.name}“ in #${thread.parentName} – speichern nicht vergessen.`);
+                if (thread) toast("info", "Beitrag angelegt", `„${thread.name}“ in #${thread.parentName}. Speichern nicht vergessen.`);
 
                 return thread;
             }
@@ -736,17 +736,17 @@ export function renderTickets(guildId: string, canManage: boolean, user: ITicket
             row("Kanal löschen", "Forum-Posts verschwinden ebenfalls", removal),
             row(
                 "Transcript speichern",
-                "Der ganze Verlauf im Discord-Look – im Dashboard unter Transcriptions",
+                "Der ganze Verlauf im Discord-Look, im Dashboard unter Transcriptions",
                 toggle(transcripts.enabled, "Transcript speichern", "transcripts-enabled", (on) => {
                     transcripts.enabled = on;
                     touch();
                     paintPane();
                 })
             ),
-            row("Log-Kanal", "Karte mit Link und HTML-Datei für das Team – Textkanal oder Forum-Beitrag", log),
+            row("Log-Kanal", "Karte mit Link und HTML-Datei für das Team (Textkanal oder Forum-Beitrag)", log),
             row(
                 "Kopie an den Ersteller",
-                modmail ? "Bei ModMail nicht nötig – das Gespräch steht schon in seinen DMs" : "Per DM, mit Link und HTML-Datei",
+                modmail ? "Bei ModMail nicht nötig, das Gespräch steht schon in seinen DMs" : "Per DM, mit Link und HTML-Datei",
                 toggle(
                     transcripts.dm && !modmail,
                     "Kopie an den Ersteller",
@@ -773,7 +773,7 @@ export function renderTickets(guildId: string, canManage: boolean, user: ITicket
         cfg.options.forEach((option, index) => list.append(topic(option, index)));
 
         if (cfg.options.length === 0) {
-            list.append(el("p", "tkempty", "Noch kein Thema – ohne Thema kann niemand ein Ticket öffnen."));
+            list.append(el("p", "tkempty", "Noch kein Thema. Ohne Thema kann niemand ein Ticket öffnen."));
         }
 
         const full = cfg.options.length >= MAX_OPTIONS;
@@ -805,7 +805,7 @@ export function renderTickets(guildId: string, canManage: boolean, user: ITicket
         return [
             hint(
                 cfg.contact === "modmail"
-                    ? "Bei ModMail fragt der Bot das Thema per DM ab – im Kanal steht nur der Knopf „Ticket per DM starten“. Die Reihenfolge hier ist die Reihenfolge in der DM."
+                    ? "Bei ModMail fragt der Bot das Thema per DM ab. Im Kanal steht nur der Knopf „Ticket per DM starten“. Die Reihenfolge hier ist die Reihenfolge in der DM."
                     : "Jedes Thema ist ein Knopf bzw. ein Eintrag im Panel. Die Reihenfolge hier ist die Reihenfolge dort."
             ),
             list,
@@ -846,7 +846,7 @@ export function renderTickets(guildId: string, canManage: boolean, user: ITicket
         code.disabled = !canManage;
         code.autocomplete = "off";
         code.spellcheck = false;
-        code.title = "Kürzel für die Ticket-ID: SUP ergibt SUP-1, SUP-2 … – 2 bis 6 Buchstaben oder Ziffern. Leer: aus dem Namen.";
+        code.title = "Kürzel für die Ticket-ID: SUP ergibt SUP-1, SUP-2 … (2 bis 6 Buchstaben oder Ziffern). Leer: aus dem Namen.";
         code.setAttribute("aria-label", `Kürzel für die Ticket-IDs von Thema ${index + 1}`);
 
         const name = field(option.name, "Name des Themas", 80, (value) => {
@@ -891,7 +891,7 @@ export function renderTickets(guildId: string, canManage: boolean, user: ITicket
             paintPane();
         });
 
-        const description = field(option.description, "Kurze Beschreibung – steht im Auswahlmenü", 100, (value) => {
+        const description = field(option.description, "Kurze Beschreibung, steht im Auswahlmenü", 100, (value) => {
             option.description = value;
             touch();
         });
@@ -931,13 +931,13 @@ export function renderTickets(guildId: string, canManage: boolean, user: ITicket
                               option.categoryId = value;
                               touch();
                           },
-                          "— ohne Kategorie —"
+                          "(ohne Kategorie)"
                       )
                   )
                 : hint(option.tagId ? "Der Forum-Tag steht bereit." : "Der Forum-Tag entsteht beim Speichern."),
             row(
                 "Eigene Support-Rolle",
-                "Statt der allgemeinen – nur sie sieht diese Tickets",
+                "Statt der allgemeinen, nur sie sieht diese Tickets",
                 select(
                     resources.roles.map((role) => ({ value: role.id, label: `@${role.name}` })),
                     option.supportRoleId,
@@ -946,7 +946,7 @@ export function renderTickets(guildId: string, canManage: boolean, user: ITicket
                         touch();
                         paintPane();
                     },
-                    "— allgemeine Rolle —"
+                    "(allgemeine Rolle)"
                 )
             )
         );
@@ -958,7 +958,7 @@ export function renderTickets(guildId: string, canManage: boolean, user: ITicket
             paintPane();
         });
 
-        const ownRow = row("Eigene Eröffnungs-Nachricht", "Statt der allgemeinen – nur für dieses Thema", own);
+        const ownRow = row("Eigene Eröffnungs-Nachricht", "Statt der allgemeinen, nur für dieses Thema", own);
 
         if (option.opened) {
             const edit = el("button", "btn btn--quiet tktopic__edit", icon("#i-message"), "Bearbeiten");
@@ -1000,7 +1000,7 @@ export function renderTickets(guildId: string, canManage: boolean, user: ITicket
         const count = (): void => {
             const on = optional.filter((action) => cfg.actions.includes(action.value)).length;
 
-            lead.textContent = `${on} von ${optional.length} an – das Menü im Ticket zeigt nur, was hier an ist.`;
+            lead.textContent = `${on} von ${optional.length} an. Das Menü im Ticket zeigt nur, was hier an ist.`;
         };
 
         const grid = el("div", "tkacts");
@@ -1106,7 +1106,7 @@ export function renderTickets(guildId: string, canManage: boolean, user: ITicket
             list.append(button);
         }
 
-        const about = hint(current.startsWith("option:") ? "Diese Eröffnung gilt nur für dieses Thema – sonst gilt die allgemeine." : MESSAGE_HINTS[current] ?? "");
+        const about = hint(current.startsWith("option:") ? "Diese Eröffnung gilt nur für dieses Thema, sonst gilt die allgemeine." : MESSAGE_HINTS[current] ?? "");
 
         // Plan 40: die Nachricht im Nachrichten-Studio, nur als Karte. Die Vorschau rechts ist in diesem Reiter aus.
         const studio = bodyEditor(
@@ -1145,7 +1145,7 @@ export function renderTickets(guildId: string, canManage: boolean, user: ITicket
                     "span",
                     "",
                     placed
-                        ? "Speichern zieht es automatisch nach. Es gibt immer nur ein Panel – auch ein vergessenes im Kanal ersetzt der Bot."
+                        ? "Speichern zieht es automatisch nach. Es gibt immer nur ein Panel. Auch ein vergessenes im Kanal ersetzt der Bot."
                         : "Wähle einen Kanal und schick es los."
                 )
             )
@@ -1167,19 +1167,19 @@ export function renderTickets(guildId: string, canManage: boolean, user: ITicket
                 panelChannel = value;
                 paintPane();
             },
-            "— Kanal wählen —"
+            "(Kanal wählen)"
         );
 
         picker.dataset.key = "panel-channel";
 
         const explain = dirty
-            ? "Speichere zuerst deine Änderungen – sonst schickt der Bot den alten Stand."
+            ? "Speichere zuerst deine Änderungen. Sonst schickt der Bot den alten Stand."
             : !panelChannel
               ? "Wähle einen Textkanal."
               : !placed
                 ? `Der Bot schickt das Panel in #${channelName(panelChannel)}.`
                 : same
-                  ? "Der Bot bearbeitet die vorhandene Nachricht – ein zweites Panel gibt es nicht."
+                  ? "Der Bot bearbeitet die vorhandene Nachricht, ein zweites Panel gibt es nicht."
                   : `Das Panel zieht nach #${channelName(panelChannel)} um, die Nachricht in #${channelName(placed.channelId)} verschwindet.`;
 
         const sendButton = el("button", "btn btn--primary", icon(same ? "#i-refresh" : "#i-message"), !placed ? "Panel senden" : same ? "Panel aktualisieren" : "Hierher umziehen");
@@ -1353,7 +1353,7 @@ export function renderTickets(guildId: string, canManage: boolean, user: ITicket
         side.replaceChildren(
             el("div", "tkside__head", el("span", "tkside__live", "Live-Vorschau"), el("b", "", labelOf(key))),
             body,
-            el("p", "tkside__foot", "Angedeutet wie in Discord – Knöpfe und Menüs lassen sich hier nicht anklicken.")
+            el("p", "tkside__foot", "Angedeutet wie in Discord. Knöpfe und Menüs lassen sich hier nicht anklicken.")
         );
     }
 
@@ -1423,7 +1423,7 @@ export function renderTickets(guildId: string, canManage: boolean, user: ITicket
         config = structuredClone(result.config);
         dirty = false;
         bar.hidden = true;
-        toast("info", "Gespeichert", data.panel ? "Der Bot arbeitet ab sofort damit – das Panel ist schon nachgezogen." : "Der Bot arbeitet ab sofort damit.");
+        toast("info", "Gespeichert", data.panel ? "Der Bot arbeitet ab sofort damit. Das Panel ist schon nachgezogen." : "Der Bot arbeitet ab sofort damit.");
         paintAll();
     });
 

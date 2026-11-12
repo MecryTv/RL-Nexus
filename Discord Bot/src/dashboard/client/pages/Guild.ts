@@ -598,7 +598,7 @@ function bindModules(guild: IGuild, only: Set<string> | null, side: INav): (modu
             const fixed = document.createElement("span");
 
             fixed.className = "modalways";
-            fixed.textContent = "Immer an – dieses Modul gehört fest dazu.";
+            fixed.textContent = "Immer an. Dieses Modul gehört fest dazu.";
             tile.querySelector(".acct__text")!.append(fixed);
         }
 

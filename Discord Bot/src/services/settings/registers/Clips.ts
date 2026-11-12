@@ -40,7 +40,7 @@ export const ClipsPanel: IPanelModule<S> = {
         {
             title: "Runden",
             fields: [
-                F<S>("toggle", "auto", "Termine automatisch", "An: der Bot öffnet und schließt die Runden zu den Terminen aus dem Dashboard.", (s) => s.auto, (value: boolean) => ({ auto: value })),
+                F<S>("toggle", "auto", "Termine automatisch", "An: Der Bot öffnet und schließt die Runden zu den Terminen aus dem Dashboard.", (s) => s.auto, (value: boolean) => ({ auto: value })),
                 F<S>("toggle", "public", "Clip-Seite öffentlich", "Alle Runden mit Clips und Gewinnern sind ohne Anmeldung zu sehen.", (s) => s.publicBoard, (value: boolean) => ({ publicBoard: value })),
             ],
         },

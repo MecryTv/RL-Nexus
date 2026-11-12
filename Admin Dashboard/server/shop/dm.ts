@@ -131,7 +131,7 @@ export function orderDm(
             {
                 type: 9,
                 components: [text(`### 📦 ${escapeMarkdown(input.title)}\n${price}\n-# ${subscription ? "Verlängert sich jeden Monat, bis du kündigst." : "Verlängert sich nicht."}`)],
-                accessory: { type: 11, media: { url: "attachment://logo.png" }, description: "RL Nexus Logo" },
+                accessory: { type: 11, media: { url: "attachment://logo.png" }, description: "Logo von RL Nexus" },
             },
             divider(),
             text(`### 🗓️ Laufzeit\n${term.join("\n")}`),
@@ -174,7 +174,7 @@ export function paymentFailedDm(config: IConfig, input: { readonly title: string
             // Kein Datum: Das gespeicherte Ende ist in diesem Moment nicht verlässlich (Spec).
             text(`## Zahlung hat nicht geklappt\nStripe konnte ${what} gerade nicht einziehen und versucht es in den nächsten Tagen noch ein paar Mal.`),
             divider(),
-            text("> Dein Zugang läuft bis zum Ende des bezahlten Monats weiter.\n-# Ändere die Zahlungsart unter Mein Zugang, dann klappt der nächste Versuch."),
+            text("> Dein Zugang läuft bis zum Ende des bezahlten Monats weiter.\n-# Ändere die Zahlungsart unter „Mein Zugang“, dann klappt der nächste Versuch."),
             row(link("Zahlungsart ändern", `${config.shopSiteUrl}/zugang`, "💳"), accessButton()),
         ]),
     };

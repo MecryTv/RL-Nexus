@@ -489,7 +489,7 @@ export function renderAntiVillain(guildId: string): void {
                 touch();
             },
             async (forumId) => (await call<{ thread: ILogThread }>("", { action: "logthread", forumId }))?.thread ?? null,
-            "— kein Meldekanal —"
+            "(kein Meldekanal)"
         );
 
         picker.setAttribute("aria-label", "Kanal für die Team-Karten");
@@ -630,7 +630,7 @@ export function renderAntiVillain(guildId: string): void {
             "div",
             "avbait__chan",
             el("h4", "", icon("#i-hash"), name ?? "nicht-schreiben"),
-            el("p", "", "Ein Kanal, den alle sehen. Darin hängt ein Warnbild „STOPP – Hier nichts schreiben“ mit Zähler, darunter Datenschutz, Infos und Support. Gekaperte Accounts posten ihren Link in jeden Kanal, auch hier."),
+            el("p", "", "Ein Kanal, den alle sehen. Darin hängt ein Warnbild „STOPP. Hier nichts schreiben.“ mit Zähler, darunter Datenschutz, Infos und Support. Gekaperte Accounts posten ihren Link in jeden Kanal, auch hier."),
             el("div", "avcatch", el("span", "", el("b", "", String(data!.lage.bait.caught)), "gefangen, 30 Tage"))
         );
 
@@ -821,7 +821,7 @@ export function renderAntiVillain(guildId: string): void {
                 "Viele Beitritte auf einmal: Der Server geht in den Raid-Modus, bis die Welle vorbei ist.",
                 ...(data!.intent
                     ? []
-                    : [el("div", "notice snnotice", icon("#i-warn"), el("span", "", "Dem Bot fehlt das Members-Intent (GUILD_MEMBER_INTENT). Ohne sieht er niemanden beitreten, Raid-Schutz geht dann nicht. Es muss im Discord Developer Portal und in der .env an sein."))]),
+                    : [el("div", "notice snnotice", icon("#i-warn"), el("span", "", "Dem Bot fehlt das Members-Intent (GUILD_MEMBER_INTENT). Ohne das Intent sieht er niemanden beitreten, Raid-Schutz geht dann nicht. Es muss im Discord Developer Portal und in der .env an sein."))]),
                 row("Raid-Schutz", "Erkennt Wellen von Beitritten", power),
                 row("Welle", "Ab so vielen Beitritten in 30 Sekunden", numberField(raid.joins, data!.limits.joins, "Beitritte in 30 Sekunden", (value) => {
                     raid.joins = value;

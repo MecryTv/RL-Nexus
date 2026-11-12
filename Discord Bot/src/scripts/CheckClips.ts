@@ -257,7 +257,7 @@ async function checkMessages(client: BotClient): Promise<void> {
         winners: [{ place: 1, entryId: 7, userId: USER_B, name: "B", votes: 4, prize: "Nitro", url: "", kind: "video", messageUrl: "https://discord.com/channels/1/2/3" }],
     };
 
-    check("Gewinner mit Erwähnung, Stimmen und Preis", WinnerText(done) === `🥇 <@${USER_B}> – 4 Stimmen · Nitro`, WinnerText(done));
+    check("Gewinner mit Erwähnung, Stimmen und Preis", WinnerText(done) === `🥇 <@${USER_B}> · 4 Stimmen · Nitro`, WinnerText(done));
     check("Ohne Gewinner sagt die Ansage das", WinnerText({ ...done, winners: [] }).includes("keine Gewinner"));
 
     const view = await ClipNoticeView(client, DefaultMessages().open, values);

@@ -53,7 +53,7 @@ function failed(page: string): void {
             code: "Keine Verbindung",
             title: "Der Inhalt lässt sich gerade nicht laden",
             text: "Der Bot antwortet nicht oder Discord hat die Anfrage gebremst. Deine Einstellungen sind davon nicht betroffen.",
-            hint: "Lade die Seite in einem Moment neu – bleibt es dabei, läuft der Bot vermutlich nicht.",
+            hint: "Lade die Seite in einem Moment neu. Bleibt es dabei, läuft der Bot vermutlich nicht.",
         });
 
         return;

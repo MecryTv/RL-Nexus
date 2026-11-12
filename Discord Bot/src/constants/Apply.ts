@@ -56,10 +56,10 @@ export const STATUS_LABELS: Record<ApplyStatus, string> = {
 };
 
 /** Wer ohne Prüferrecht an eine Bewerbung will - an der Karte und im Dashboard (Plan 30). */
-export const STAFF_ONLY = "Bewerbungen werden nur vom Staff Team gesehen und bearbeitet.";
+export const STAFF_ONLY = "Bewerbungen sieht und bearbeitet nur das Staff-Team.";
 
 /** Die Bestätigung nach dem Abschicken, auf jedem Weg gleich (Plan 30). */
-export const RECEIVED = "Deine Bewerbung ist bei uns eingegangen. Das Staff Team wird sich bei dir melden.";
+export const RECEIVED = "Deine Bewerbung ist bei uns eingegangen. Das Staff-Team wird sich bei dir melden.";
 
 /**
  * Ein Tag als Datum, das in Discord und auf der Webseite gleich zu lesen ist.
@@ -71,12 +71,12 @@ function Day(ms: number): string {
 
 /** W-0083: Die noch offene Bewerbung mit Formular und Datum - ohne beides hält man die Meldung für einen Fehler. */
 export function OpenText(form: string, createdAt: number): string {
-    return `Deine Bewerbung für „${form}“ vom ${Day(createdAt)} ist noch offen – warte die Antwort ab.`;
+    return `Deine Bewerbung für „${form}“ vom ${Day(createdAt)} ist noch offen. Warte die Antwort ab.`;
 }
 
 /** Die Pause nach einer Absage: wann abgelehnt, wie lang die Pause, ab wann es wieder geht (free, in Millisekunden). */
 export function CooldownText(form: string, declinedAt: number, days: number, free: number): string {
-    return `Deine Bewerbung für „${form}“ wurde am ${Day(declinedAt)} abgelehnt. Nach einer Absage gilt hier eine Pause von ${days} Tagen – ab dem ${Day(free)} kannst du dich wieder bewerben.`;
+    return `Deine Bewerbung für „${form}“ wurde am ${Day(declinedAt)} abgelehnt. Nach einer Absage gilt hier eine Pause von ${days} Tagen. Ab dem ${Day(free)} kannst du dich wieder bewerben.`;
 }
 
 export function DefaultFormSettings(): IFormSettings {

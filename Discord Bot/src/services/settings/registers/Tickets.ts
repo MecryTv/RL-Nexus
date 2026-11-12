@@ -23,7 +23,7 @@ export const TicketsPanel: IPanelModule<S> = {
             fields: [
                 F<S>("choice", "contact", "Kontaktweg", "Klassisch mit eigenem Kanal oder ModMail über die DMs des Bots.", (s) => s.contact, (value: string) => ({ contact: value }), { choices: CONTACTS.map((id): [string, string] => [id, CONTACT_LABELS[id]]) }),
                 F<S>("choice", "surface", "Ort", "Ein Kanal je Ticket oder ein Beitrag in einem Forum.", (s) => s.surface, (value: string) => ({ surface: value }), { choices: SURFACES.map((id): [string, string] => [id, SURFACE_LABELS[id]]) }),
-                F<S>("channel", "forum", "Forum", "Nur beim Ort Forum-Post: hier entstehen die Tickets.", (s) => s.forumId, (value: string | null) => ({ forumId: value }), { channelTypes: [ChannelType.GuildForum] }),
+                F<S>("channel", "forum", "Forum", "Nur beim Ort Forum-Post: Hier entstehen die Tickets.", (s) => s.forumId, (value: string | null) => ({ forumId: value }), { channelTypes: [ChannelType.GuildForum] }),
                 F<S>("choice", "style", "Panel-Stil", "Wie man im Panel die Art des Tickets wählt.", (s) => s.style, (value: string) => ({ style: value }), { choices: PANEL_STYLES.map((id): [string, string] => [id, STYLE_LABELS[id]]) }),
                 F<S>("role", "support", "Support-Rolle", "Sieht und bearbeitet alle Tickets.", (s) => s.supportRoleId, (value: string | null) => ({ supportRoleId: value })),
             ],

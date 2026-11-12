@@ -214,7 +214,7 @@ function checkText(): void {
     const titled = Staff({ titles: { "100000000000000005": { title: "Head of Support", seen: 0 } } });
     const sections = json(RoleListText(titled, "sections", GroupMembers(titled, ROLES, MEMBERS), context));
 
-    check("Mit Abschnitten: Titel hinter der Person", sections.includes("<@100000000000000005> – Head of Support"), sections.slice(0, 400));
+    check("Mit Abschnitten: Titel hinter der Person", sections.includes("<@100000000000000005> · Head of Support"), sections.slice(0, 400));
 
     const crowd = Array.from({ length: 500 }, (_, index) => Member(`2000000000000${String(10000 + index)}`, `Spieler ${index}`, [SUPPORT], index));
     const big = RoleListText(Staff(), "sections", GroupMembers(Staff(), ROLES, [...MEMBERS, ...crowd]), context);

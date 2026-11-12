@@ -18,7 +18,7 @@ export const LOG_CATEGORIES: readonly ILogCategory[] = [
     { id: "messages", name: "Messages", hint: "Gelöscht, bearbeitet, angepinnt, Reaktionen", icon: "#i-message" },
     { id: "members", name: "Members", hint: "Kommen, gehen, Namen, Rollen, Boosts", icon: "#i-users" },
     { id: "server", name: "Server", hint: "Kanäle, Rollen, Emojis, Termine, Webhooks", icon: "#i-settings" },
-    { id: "voice", name: "Voice", hint: "Wer wo mitredet – und wer verschoben wird", icon: "#i-mic" },
+    { id: "voice", name: "Voice", hint: "Wer wo mitredet und wer verschoben wird", icon: "#i-mic" },
     { id: "moderation", name: "Moderation", hint: "Bann, Kick, Timeout, AutoMod", icon: "#i-gavel" },
 ] as const;
 
@@ -29,21 +29,21 @@ export const LOG_CATEGORIES: readonly ILogCategory[] = [
  */
 export const LOG_EVENTS: readonly ILogEventInfo[] = [
     // ---------- Nachrichten ----------
-    { key: "messageDelete", category: "messages", name: "Message Delete", hint: "Mit Text, Anhängen und – wenn möglich – wer gelöscht hat", needs: "audit" },
+    { key: "messageDelete", category: "messages", name: "Message Delete", hint: "Mit Text, Anhängen und, wenn möglich, wer gelöscht hat", needs: "audit" },
     { key: "messageEdit", category: "messages", name: "Message Edit", hint: "Vorher und nachher, mit Sprung zur Nachricht" },
     { key: "messageBulk", category: "messages", name: "Message Bulk Delete", hint: "Eine Karte je Aufräumaktion, nicht je Nachricht" },
     { key: "messagePin", category: "messages", name: "Message Pin", hint: "Wer im Kanal etwas angepinnt oder losgelöst hat", needs: "audit" },
-    { key: "reactionAdd", category: "messages", name: "Reaction Add", hint: "Wer welches Emoji unter welche Nachricht setzt – auf großen Servern viel" },
+    { key: "reactionAdd", category: "messages", name: "Reaction Add", hint: "Wer welches Emoji unter welche Nachricht setzt (auf großen Servern viel)" },
     { key: "reactionRemove", category: "messages", name: "Reaction Remove", hint: "" },
     { key: "reactionClear", category: "messages", name: "Reaction Clear", hint: "Alle Reaktionen einer Nachricht auf einmal weg" },
 
     // ---------- Mitglieder ----------
     { key: "memberJoin", category: "members", name: "Member Join", hint: "Mit Alter des Kontos", needs: "members" },
-    { key: "memberLeave", category: "members", name: "Member Leave", hint: "Wer von selbst geht – Kicks stehen unter Moderation", needs: "members" },
+    { key: "memberLeave", category: "members", name: "Member Leave", hint: "Wer von selbst geht. Kicks stehen unter Moderation", needs: "members" },
     { key: "memberNickname", category: "members", name: "Nickname Change", hint: "Vorher und nachher", needs: "members" },
     { key: "memberRoles", category: "members", name: "Role Change", hint: "Dazu und weg, mit dem, der es getan hat", needs: "members" },
     { key: "memberProfile", category: "members", name: "Profile Update", hint: "Discord-Name, Anzeigename oder Profilbild geändert", needs: "members" },
-    { key: "memberBoost", category: "members", name: "Server Boost", hint: "Wer den Server boostet – und wer aufhört", needs: "members" },
+    { key: "memberBoost", category: "members", name: "Server Boost", hint: "Wer den Server boostet und wer aufhört", needs: "members" },
     { key: "memberScreening", category: "members", name: "Membership Screening", hint: "Nur bei eingeschalteter Mitgliederprüfung", needs: "members" },
 
     // ---------- Server ----------

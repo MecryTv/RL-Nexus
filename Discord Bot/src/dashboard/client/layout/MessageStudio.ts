@@ -184,7 +184,7 @@ export function messageStudio(entry: IBody, options: IBodyOptions): IBodyEditor 
             if (entry.kind === "embed" && entry.embed) parts.push(embedPreview(entry.embed, values, context().guildId, context()));
             if (extra) parts.push(extra);
 
-            body.replaceChildren(...(parts.length ? parts : [el("p", "stm-empty", entry.kind === "text" ? "Noch nichts geschrieben – schreib rechts." : "Noch leer. Füg links unter Bausteine etwas hinzu.")]));
+            body.replaceChildren(...(parts.length ? parts : [el("p", "stm-empty", entry.kind === "text" ? "Noch nichts geschrieben. Schreib rechts." : "Noch leer. Füg links unter Bausteine etwas hinzu.")]));
         }
 
         const above = options.above?.() ?? null;
@@ -440,7 +440,7 @@ export function messageStudio(entry: IBody, options: IBodyOptions): IBodyEditor 
         counter = update;
         update();
 
-        const blocks = entry.kind === "v2" ? [el("span", "stm-count", `${docCost(entry.doc)} von ${BLOCK_BUDGET} Bausteinen belegt${docCost(entry.doc) > BLOCK_BUDGET - 6 ? " – für Knöpfe und Menü sollte Platz bleiben." : "."}`)] : [];
+        const blocks = entry.kind === "v2" ? [el("span", "stm-count", `${docCost(entry.doc)} von ${BLOCK_BUDGET} Bausteinen belegt${docCost(entry.doc) > BLOCK_BUDGET - 6 ? ". Für Knöpfe und Menü sollte Platz bleiben." : "."}`)] : [];
 
         return group("Länge der ganzen Nachricht", el("div", "stm-meter", bar), text, ...blocks);
     }
@@ -502,7 +502,7 @@ export function messageStudio(entry: IBody, options: IBodyOptions): IBodyEditor 
                 if (source) change(() => block.images.push(source));
             });
 
-            return [group("Bilder", list, add, el("p", "sto-note", "Bis zu zehn – Discord zeigt sie als Galerie."))];
+            return [group("Bilder", list, add, el("p", "sto-note", "Bis zu zehn, Discord zeigt sie als Galerie."))];
         }
 
         return [
@@ -678,7 +678,7 @@ export function messageStudio(entry: IBody, options: IBodyOptions): IBodyEditor 
 
         fly.replaceChildren(
             el("p", "sto-h", "Bausteine"),
-            ...(list.childElementCount ? [list] : [el("p", "sto-note", isCustom() ? "Diese Art gestaltest du rechts." : "Eine normale Nachricht ist nur Text – schreib ihn rechts.")])
+            ...(list.childElementCount ? [list] : [el("p", "sto-note", isCustom() ? "Diese Art gestaltest du rechts." : "Eine normale Nachricht ist nur Text. Schreib ihn rechts.")])
         );
     }
 

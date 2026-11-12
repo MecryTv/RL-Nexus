@@ -206,7 +206,7 @@ export default class SixMansService {
 
     /** Jemand stellt sich an. Sind genug zusammen, geht es sofort los. */
     async Join(member: GuildMember, mode: ManMode): Promise<{ queue: ISixWaiting[]; started: ISixRound | null }> {
-        if (!this.client.databaseService.Ready) throw new SixMansError("Die Datenbank ist gerade nicht da – versuch es in einem Moment noch einmal.");
+        if (!this.client.databaseService.Ready) throw new SixMansError("Die Datenbank ist gerade nicht da. Versuch es in einem Moment noch einmal.");
 
         const guildId = member.guild.id;
         const settings = await this.Settings(guildId);
@@ -220,7 +220,7 @@ export default class SixMansService {
         const running = await this.client.sixRounds.Running(guildId);
 
         if (running.some((round) => [...round.blue, ...round.orange].includes(member.id))) {
-            throw new SixMansError("Du bist noch in einer laufenden Runde – meldet erst das Ergebnis.");
+            throw new SixMansError("Du bist noch in einer laufenden Runde. Meldet erst das Ergebnis.");
         }
 
         const player = await this.client.sixPlayers.Ensure(guildId, mode, member.id, member.displayName, settings.start);
@@ -440,11 +440,11 @@ export default class SixMansService {
         const manage = member.permissions.has(PermissionFlagsBits.ManageGuild);
         const team: SixTeam = round.blue.includes(member.id) ? 1 : round.orange.includes(member.id) ? 2 : 0;
 
-        if (!team && !manage) throw new SixMansError("Melden darf, wer mitgespielt hat – oder das Team.");
+        if (!team && !manage) throw new SixMansError("Melden darf, wer mitgespielt hat, oder das Team.");
 
         // Ohne Bestätigung zählt der erste Klick; ein Verwalter entscheidet immer.
         if (!settings.confirm || manage) {
-            return { round: await this.Finish(guild, settings, round, winner), text: `${TEAM_EMOJI[winner]} **${TEAM_LABELS[winner]}** gewinnt – die MMR ist angepasst.` };
+            return { round: await this.Finish(guild, settings, round, winner), text: `${TEAM_EMOJI[winner]} **${TEAM_LABELS[winner]}** gewinnt, die MMR ist angepasst.` };
         }
 
         const reports = { ...round.reports, [team === 1 ? "blue" : "orange"]: winner };
@@ -460,7 +460,7 @@ export default class SixMansService {
                 guild,
                 settings,
                 { ...round, reports },
-                `⏳ ${TEAM_EMOJI[mine]} **${TEAM_LABELS[mine]}** meldet **${TEAM_LABELS[winner]}** – das andere Team muss noch bestätigen.`
+                `⏳ ${TEAM_EMOJI[mine]} **${TEAM_LABELS[mine]}** meldet **${TEAM_LABELS[winner]}**, das andere Team muss noch bestätigen.`
             );
 
             return { round: { ...round, reports }, text: "Gemeldet. Jetzt muss das andere Team dasselbe sagen." };
@@ -469,10 +469,10 @@ export default class SixMansService {
         if (other !== winner) {
             await this.Refresh(guild, settings, { ...round, reports }, "⚠️ Die Teams melden Verschiedenes. Wer den Server verwaltet, entscheidet.");
 
-            throw new SixMansError("Das andere Team hat etwas anderes gemeldet – das muss jemand aus dem Team klären.");
+            throw new SixMansError("Das andere Team hat etwas anderes gemeldet. Das muss jemand aus dem Team klären.");
         }
 
-        return { round: await this.Finish(guild, settings, round, winner), text: `${TEAM_EMOJI[winner]} **${TEAM_LABELS[winner]}** gewinnt – bestätigt.` };
+        return { round: await this.Finish(guild, settings, round, winner), text: `${TEAM_EMOJI[winner]} **${TEAM_LABELS[winner]}** gewinnt (bestätigt).` };
     }
 
     /**
@@ -526,7 +526,7 @@ export default class SixMansService {
         const playing = [...round.blue, ...round.orange].includes(member?.id ?? "");
 
         if (member && !playing && !member.permissions.has(PermissionFlagsBits.ManageGuild)) {
-            throw new SixMansError("Abbrechen darf, wer mitgespielt hat – oder das Team.");
+            throw new SixMansError("Abbrechen darf, wer mitgespielt hat, oder das Team.");
         }
 
         await this.client.sixRounds.Finish(roundId, 0, 0);
@@ -534,7 +534,7 @@ export default class SixMansService {
         const done = (await this.client.sixRounds.Get(roundId))!;
         const settings = await this.Settings(guild.id);
 
-        await this.Refresh(guild, settings, done, "✖️ **Abgebrochen** – die MMR bleibt, wie sie war.").catch(() => undefined);
+        await this.Refresh(guild, settings, done, "✖️ **Abgebrochen.** Die MMR bleibt, wie sie war.").catch(() => undefined);
 
         this.client.pulseService.Emit(guild.id, "sixmans", { round: roundId, done: true });
 
@@ -609,7 +609,7 @@ export default class SixMansService {
 
                 const { queue, started } = await this.Join(interaction.member, mode);
 
-                return say(started ? `Es geht los – ${MODE_LABELS[mode]} steht im Kanal.` : `Du stehst in ${MODE_LABELS[mode]} (${queue.length}/${mode}).`);
+                return say(started ? `Es geht los, ${MODE_LABELS[mode]} steht im Kanal.` : `Du stehst in ${MODE_LABELS[mode]} (${queue.length}/${mode}).`);
             }
 
             if (what === "leave") {

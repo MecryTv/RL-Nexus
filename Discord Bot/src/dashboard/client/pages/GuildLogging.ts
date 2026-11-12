@@ -105,11 +105,11 @@ export function renderLogging(guildId: string): void {
         const lines: string[] = [];
 
         if (!data!.ready.members) {
-            lines.push('Ohne das Members-Intent bei Discord sieht der Bot niemanden kommen oder gehen – die Mitglieder-Ereignisse bleiben still. Einschalten kann das nur das RL Nexus Team.');
+            lines.push('Ohne das Members-Intent bei Discord sieht der Bot niemanden kommen oder gehen. Die Mitglieder-Ereignisse bleiben still. Einschalten kann das nur das RL Nexus Team.');
         }
 
         if (!data!.ready.audit) {
-            lines.push('Dem Bot fehlt das Recht „Audit-Log ansehen". Ohne das kann er nicht sagen, wer gelöscht, gekickt oder gebannt hat – die Karten nennen dann niemanden.');
+            lines.push('Dem Bot fehlt das Recht „Audit-Log ansehen“. Ohne das kann er nicht sagen, wer gelöscht, gekickt oder gebannt hat. Die Karten nennen dann niemanden.');
         }
 
         return lines.map((text) => el("div", "notice snnotice", icon("#i-warn"), el("span", "", text)));
@@ -168,7 +168,7 @@ export function renderLogging(guildId: string): void {
         test.addEventListener("click", async () => {
             test.disabled = true;
 
-            if (await call("", { action: "test", event: event.key })) toast("info", "Test gesendet", `„${event.name}" liegt im Kanal.`);
+            if (await call("", { action: "test", event: event.key })) toast("info", "Test gesendet", `„${event.name}“ liegt im Kanal.`);
 
             test.disabled = false;
         });
@@ -176,7 +176,7 @@ export function renderLogging(guildId: string): void {
         const hints = [
             event.hint,
             event.needs === "members" && !data!.ready.members ? "Braucht das Members-Intent" : null,
-            event.needs === "audit" && !data!.ready.audit ? 'Braucht „Audit-Log ansehen"' : null,
+            event.needs === "audit" && !data!.ready.audit ? 'Braucht „Audit-Log ansehen“' : null,
         ]
             .filter(Boolean)
             .join(" · ");

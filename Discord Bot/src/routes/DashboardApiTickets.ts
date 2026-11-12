@@ -182,7 +182,7 @@ export default class DashboardApiTickets extends Route {
                 guild,
                 body.forumId,
                 "Ticket-Logs",
-                "📄 Hier landen die Transcripts geschlossener Tickets – eingestellt im Dashboard von RL Nexus."
+                "📄 Hier landen die Transcripts geschlossener Tickets, eingestellt im Dashboard von RL Nexus."
             );
 
             logger.user(`🎫 Log-Beitrag ${thread.id} in ${thread.parentId} auf ${guild.id} angelegt (von ${userId})`);

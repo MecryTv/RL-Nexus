@@ -139,7 +139,7 @@ export default class SupportService {
         const [, action, userId] = interaction.customId.split(":");
 
         // Meldungen von vor dem Umzug in die Moderation tragen "claim" und eine Kanal-ID.
-        if (action !== "take" || !userId) return "Diese Meldung ist veraltet – der Warteraum steht jetzt unter Moderation.";
+        if (action !== "take" || !userId) return "Diese Meldung ist veraltet. Der Warteraum steht jetzt unter Moderation.";
 
         const guild = interaction.guild;
         const support = await this.Config(guild.id);
@@ -171,7 +171,7 @@ export default class SupportService {
         if (!target || target.id === wait.channelId) {
             await this.Paint(guild, wait, "claimed");
 
-            return `Übernommen. Geh in einen Sprachkanal – etwa über den Support-Hub in Temp Voice – und klick dann auf „Zu mir holen“: dann zieht der Bot <@${userId}> zu dir.`;
+            return `Übernommen. Geh in einen Sprachkanal (etwa über den Support-Hub in Temp Voice) und klick dann auf „Zu mir holen“. Dann zieht der Bot <@${userId}> zu dir.`;
         }
 
         const moved = await waiting.voice
@@ -182,7 +182,7 @@ export default class SupportService {
         if (!moved) {
             await this.Paint(guild, wait, "claimed");
 
-            return `Der Bot darf <@${userId}> nicht nach <#${target.id}> verschieben – ihm fehlt dort „Mitglieder verschieben“.`;
+            return `Der Bot darf <@${userId}> nicht nach <#${target.id}> verschieben. Ihm fehlt dort „Mitglieder verschieben“.`;
         }
 
         // Die Meldung schließt Voice(): der Wechsel aus dem Warteraum kommt als eigenes Ereignis.
@@ -228,7 +228,7 @@ export default class SupportService {
             if (!channel?.isTextBased()) continue;
 
             const ping = support.roles.map((role) => `<@&${role}>`).join(" ");
-            const text = `${ping ? `${ping}\n` : ""}⏳ <@${wait.userId}> wartet seit **${support.remindAfter} Minuten** in <#${wait.channelId}> – noch hat niemand übernommen.`;
+            const text = `${ping ? `${ping}\n` : ""}⏳ <@${wait.userId}> wartet seit **${support.remindAfter} Minuten** in <#${wait.channelId}>. Noch hat niemand übernommen.`;
 
             await channel
                 .send({

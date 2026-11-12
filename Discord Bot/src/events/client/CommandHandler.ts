@@ -35,9 +35,9 @@ export default class CommandHandler extends Event {
         if (!command) {
             await interaction.reply(
                 new ComponentV2Builder({ accentColor: "Red" })
-                    .title("❌ | Unknown Command")
+                    .title("❌ | Unbekannter Befehl")
                     .separator()
-                    .text("This command does not exist.")
+                    .text("Diesen Befehl gibt es nicht.")
                     .toMessage({ ephemeral: true })
             );
 
@@ -47,9 +47,9 @@ export default class CommandHandler extends Event {
         if (command.developerOnly && !this.client.config.DEV_USER_IDs.includes(interaction.user.id)) {
             await interaction.reply(
                 new ComponentV2Builder({ accentColor: "Red" })
-                    .title("⚠️ | Developer Command")
+                    .title("⚠️ | Nur für Entwickler")
                     .separator()
-                    .text("This command is only available to the bot developers.")
+                    .text("Diesen Befehl können nur die Entwickler des Bots nutzen.")
                     .toMessage({ ephemeral: true })
             );
 
@@ -80,9 +80,9 @@ export default class CommandHandler extends Event {
 
             await interaction.reply(
                 new ComponentV2Builder({ accentColor: "Yellow" })
-                    .title("⚠️ | Command Cooldown")
+                    .title("⚠️ | Kurz warten")
                     .separator()
-                    .text(`Please wait another \`${remaining}\` seconds before run this command again.`)
+                    .text(`Warte noch \`${remaining}\` Sekunden, dann geht der Befehl wieder.`)
                     .toMessage({ ephemeral: true })
             );
 

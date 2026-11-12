@@ -35,7 +35,7 @@ export default class Help extends Command {
             const found = help.Find(wanted, developer);
 
             if (!found) {
-                await interaction.editReply({ content: `Einen Befehl „${wanted.slice(0, 80)}“ gibt es nicht. Tipp \`/hilfe\` für alle Befehle.`, allowedMentions: { parse: [] } });
+                await interaction.editReply({ content: `Einen Befehl „${wanted.slice(0, 80)}“ gibt es nicht. Alle Befehle zeigt \`/hilfe\`.`, allowedMentions: { parse: [] } });
 
                 return;
             }

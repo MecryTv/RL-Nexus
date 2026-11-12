@@ -178,12 +178,12 @@ function card(accent: string, ...blocks: string[]): ILftBody {
 /** Die Fragen, mit denen eine Spieler-Suche anfängt. */
 export function DefaultPlayerQuestions(): ILftQuestion[] {
     return [
-        { id: "q1", label: "Welchen Rang hast du – aktuell und als Peak?", hint: "Zum Beispiel: Champ 1 Div 2, Peak Champ 2", kind: "short", choices: [], required: true, max: 200 },
+        { id: "q1", label: "Welchen Rang hast du, aktuell und als Peak?", hint: "Zum Beispiel: Champ 1 Div 2, Peak Champ 2", kind: "short", choices: [], required: true, max: 200 },
         { id: "q2", label: "Auf welcher Plattform spielst du?", hint: "", kind: "choice", choices: ["PC", "PlayStation", "Xbox", "Nintendo Switch"], required: true, max: 100 },
         { id: "q3", label: "Wann kannst du meistens spielen?", hint: "Tage und Uhrzeiten reichen", kind: "short", choices: [], required: true, max: 200 },
         { id: "q4", label: "Welche Position liegt dir am besten?", hint: "", kind: "choice", choices: ["Ist mir gleich", "Striker", "Midfield", "Defender"], required: true, max: 100 },
-        { id: "q5", label: "Was suchst du in einem Team?", hint: "Ziele, Turniere, wie viel Training – ein paar Sätze", kind: "long", choices: [], required: true, max: 1024 },
-        { id: "q6", label: "Wie heißt du bei Epic?", hint: "Für den Tracker – freiwillig", kind: "short", choices: [], required: false, max: 100 },
+        { id: "q5", label: "Was suchst du in einem Team?", hint: "Ein paar Sätze zu Zielen, Turnieren und Training", kind: "long", choices: [], required: true, max: 1024 },
+        { id: "q6", label: "Wie heißt du bei Epic?", hint: "Für den Tracker, freiwillig", kind: "short", choices: [], required: false, max: 100 },
     ];
 }
 
@@ -194,7 +194,7 @@ export function DefaultTeamQuestions(): ILftQuestion[] {
         { id: "q2", label: "Wen sucht ihr?", hint: "", kind: "choice", choices: ["Stammspieler", "Ersatzspieler", "Coach", "Manager"], required: true, max: 100 },
         { id: "q3", label: "Welchen Rang sollte er mitbringen?", hint: "Von – bis", kind: "short", choices: [], required: true, max: 200 },
         { id: "q4", label: "Wann und wie oft trainiert ihr?", hint: "", kind: "short", choices: [], required: true, max: 200 },
-        { id: "q5", label: "Was bietet ihr – und was habt ihr vor?", hint: "Turniere, Coach, Ziele für die Season", kind: "long", choices: [], required: true, max: 1024 },
+        { id: "q5", label: "Was bietet ihr und was habt ihr vor?", hint: "Turniere, Coach, Ziele für die Season", kind: "long", choices: [], required: true, max: 1024 },
     ];
 }
 
@@ -226,11 +226,11 @@ export function DefaultPreview(): ILftBody {
     return card(
         LFT_ACCENT,
         "## 📋 Passt das so?",
-        "So kommt dein Beitrag ins Forum – Titel: **{post.titel}**",
+        "So kommt dein Beitrag ins Forum. Titel: **{post.titel}**",
         "---",
         "{antworten}",
         "---",
-        "-# „Abschicken“ stellt ihn in {forum}. „Abbrechen“ wirft alles weg – dann war es das, und du kannst neu anfangen."
+        "-# „Abschicken“ stellt ihn in {forum}. „Abbrechen“ wirft alles weg, danach kannst du neu anfangen."
     );
 }
 
@@ -239,7 +239,7 @@ export function DefaultDm(): ILftDm {
         intro: card(
             LFT_ACCENT,
             "## 🔎 {art}",
-            "Ich stelle dir jetzt **{fragen.anzahl} Fragen**. Antworte einfach hier im Chat – eine Nachricht je Frage.",
+            "Ich stelle dir jetzt **{fragen.anzahl} Fragen**. Antworte einfach hier im Chat, eine Nachricht je Frage.",
             "---",
             "-# Schreib **abbrechen**, wenn du aussteigen willst. Freiwillige Fragen überspringst du mit **-**."
         ),
@@ -247,7 +247,7 @@ export function DefaultDm(): ILftDm {
         done: card(
             "#3ba55c",
             "## ✅ Dein Beitrag steht",
-            "[{post.titel}]({post.url}) – ab jetzt sichtbar in {forum}.",
+            "[{post.titel}]({post.url}) ist ab jetzt in {forum} zu sehen.",
             "---",
             "-# Fertig mit der Suche? Der Knopf unter deinem Beitrag beendet sie, oder du nimmst `/lookingfor beenden`."
         ),

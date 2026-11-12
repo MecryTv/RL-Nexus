@@ -256,7 +256,7 @@ export default class ApplyService {
         const base = previous ?? { ...DefaultForm(), questions: [], settings: DefaultFormSettings() };
         const name = Text(raw.name, MAX_NAME, base.name);
 
-        if (!name) throw new ApplyError("Gib dem Formular einen Namen – der steht auch auf der öffentlichen Seite.");
+        if (!name) throw new ApplyError("Gib dem Formular einen Namen. Er steht auch auf der öffentlichen Seite.");
 
         const questions = raw.questions === undefined ? base.questions : this.CleanQuestions(raw.questions);
 
@@ -623,13 +623,13 @@ export default class ApplyService {
             const value = Text(raw[question.id], question.max);
 
             if (!value) {
-                if (question.required) throw new ApplyError(`„${question.label}" fehlt noch.`);
+                if (question.required) throw new ApplyError(`„${question.label}“ fehlt noch.`);
 
                 continue;
             }
 
             if (question.kind === "choice" && !question.choices.includes(value)) {
-                throw new ApplyError(`Bei „${question.label}" ist das keine der Möglichkeiten.`);
+                throw new ApplyError(`Bei „${question.label}“ ist das keine der Möglichkeiten.`);
             }
 
             answers.push({ id: question.id, value });

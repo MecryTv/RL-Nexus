@@ -223,7 +223,7 @@ export async function renderMatchupsPage(): Promise<void> {
 
         mode.setAttribute("aria-label", "Modus");
 
-        for (const value of data!.bestOf) best.append(new Option(value ? `Best of ${value}` : "— nicht festgelegt —", String(value), false, (current?.bestOf ?? 0) === value));
+        for (const value of data!.bestOf) best.append(new Option(value ? `Best of ${value}` : "(nicht festgelegt)", String(value), false, (current?.bestOf ?? 0) === value));
 
         best.setAttribute("aria-label", "Best-of");
 
@@ -298,7 +298,7 @@ export async function renderMatchupsPage(): Promise<void> {
             ...(me.teams.length > 1 || me.manage ? [field("Für welches Team", "", team)] : []),
             field("Gegner", "", opponent),
             field("Liga oder Turnier", "Freilassen, wenn es ein Freundschaftsspiel ist", league),
-            field("Anpfiff", `Höchstens ${data!.settings.maxAhead} Tage im Voraus – in deiner Zeitzone`, at),
+            field("Anpfiff", `Höchstens ${data!.settings.maxAhead} Tage im Voraus, in deiner Zeitzone`, at),
             el("div", "apfield", el("span", "apfield__label", "Modus und Best-of"), el("div", "lftag", mode, best)),
             field("Stream-Link", "Steht als „Live“ in der Nachricht", stream),
             field("Notiz", "", note),
@@ -501,7 +501,7 @@ export async function renderMatchupsPage(): Promise<void> {
 
             go.addEventListener("click", () => (window.location.href = login()));
 
-            return el("div", "apsheet", el("p", "apfield__hint", "Eintragen? Der Bot muss wissen, für welches Team du sprichst – das steht im Kader der Team-Übersicht."), el("div", "apform__foot", go));
+            return el("div", "apsheet", el("p", "apfield__hint", "Eintragen? Der Bot muss wissen, für welches Team du sprichst. Das steht im Kader der Team-Übersicht."), el("div", "apform__foot", go));
         }
 
         return el(

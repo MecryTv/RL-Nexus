@@ -65,7 +65,7 @@ export async function checkAccess(): Promise<void> {
 
         const dev = await ask(["--dev"]);
         assert.equal(dev.statusCode, 503);
-        assert.match(dev.json().error, /Dev-Bot muss auf dem Dev Server sein/);
+        assert.match(dev.json().error, /Dev-Bot muss auf dem Dev-Server sein/);
     });
 
     await check("Innerhalb einer Minute fragt die Prüfung Discord nicht erneut", async () => {

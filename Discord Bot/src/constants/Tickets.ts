@@ -116,24 +116,24 @@ function Text(accent: string, body: string): IMessageDoc {
 export const DEFAULT_MESSAGES: Record<TicketMessageKey, IMessageDoc> = {
     panel: Text(
         "#ff1e2d",
-        "# 🎫 Support\nDu hast eine Frage, ein Problem oder eine Bewerbung? Wähle unten aus, worum es geht – das Team von **{guild}** meldet sich bei dir."
+        "# 🎫 Support\nDu hast eine Frage, ein Problem oder eine Bewerbung? Wähle unten aus, worum es geht, dann meldet sich das Team von **{guild}** bei dir."
     ),
     modmailPanel: Text(
         "#ff1e2d",
-        "# 📬 Support per DM\nKlick unten auf **Ticket per DM starten** – ich schreibe dir, und du wählst dein Thema direkt in der DM. Du kannst {bot} auch einfach selbst anschreiben.\nDein Anliegen landet beim Team von **{guild}**, die Antwort kommt ebenfalls per DM.\n-# Damit das klappt, müssen Direktnachrichten von Servermitgliedern erlaubt sein."
+        "# 📬 Support per DM\nKlick unten auf **Ticket per DM starten**. Ich schreibe dir, und du wählst dein Thema direkt in der DM. Du kannst {bot} auch einfach selbst anschreiben.\nDein Anliegen landet beim Team von **{guild}**, die Antwort kommt ebenfalls per DM.\n-# Damit das klappt, müssen Direktnachrichten von Servermitgliedern erlaubt sein."
     ),
     opened: Text(
         "#00afff",
-        "## Ticket {ticket.id} · {ticket.option}\nHallo {user}, danke für deine Anfrage! {support.role} ist informiert und übernimmt gleich.\nBeschreib dein Anliegen schon mal so genau wie möglich – Screenshots helfen."
+        "## Ticket {ticket.id} · {ticket.option}\nHallo {user}, danke für deine Anfrage! {support.role} ist informiert und übernimmt gleich.\nBeschreib dein Anliegen schon mal so genau wie möglich. Screenshots helfen."
     ),
     dm: Text(
         "#ff1e2d",
-        "## 📬 Dein Ticket auf {guild}\nWir haben dein Ticket **{ticket.id}** ({ticket.option}) erhalten. Schreib einfach hier weiter – alles landet direkt beim Team."
+        "## 📬 Dein Ticket auf {guild}\nWir haben dein Ticket **{ticket.id}** ({ticket.option}) erhalten. Schreib einfach hier weiter, alles landet direkt beim Team."
     ),
     closed: Text("#6b7683", "## 🔒 Ticket geschlossen\n{closer} hat das Ticket **{ticket.id}** geschlossen.\n-# Grund: {reason}"),
     frozen: Text(
         "#5ccdff",
-        "## ❄️ Ticket eingefroren\nDas Team hat das Ticket kurz angehalten. Du kannst gerade nicht schreiben – wir melden uns."
+        "## ❄️ Ticket eingefroren\nDas Team hat das Ticket kurz angehalten. Du kannst gerade nicht schreiben, wir melden uns."
     ),
     blacklisted: Text("#ff4d5e", "## 🚫 Gesperrt\nDu kannst auf **{guild}** keine Tickets mehr öffnen."),
 };
@@ -154,7 +154,7 @@ export const PANEL_STATES: Record<PanelState, { title: string; text: string }> =
     sent: { title: "Panel gesendet", text: "Das Ticket-Panel steht jetzt in {channel}." },
     updated: {
         title: "Panel aktualisiert",
-        text: "In {channel} stand schon ein Panel – es ist jetzt auf dem neuen Stand. Ein zweites schicke ich nicht.",
+        text: "In {channel} stand schon ein Panel, es ist jetzt auf dem neuen Stand. Ein zweites schicke ich nicht.",
     },
     moved: { title: "Panel umgezogen", text: "Das Panel steht jetzt in {channel}, das alte habe ich entfernt." },
 };

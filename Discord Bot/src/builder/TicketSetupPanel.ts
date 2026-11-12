@@ -66,7 +66,7 @@ function Start(builder: ComponentV2Builder, config: ITicketConfig): void {
     builder
         .text(
             [
-                `**Kontakt:** ${CONTACT_LABELS[config.contact]} – ${config.contact === "direct" ? "der User sitzt im Ticket" : "der User schreibt dem Bot per DM"}`,
+                `**Kontakt:** ${CONTACT_LABELS[config.contact]} (${config.contact === "direct" ? "der User sitzt im Ticket" : "der User schreibt dem Bot per DM"})`,
                 `**Oberfläche:** ${config.surface === "channel" ? "ein Textkanal je Ticket" : "ein Forum-Post je Ticket (mit Tags)"}`,
                 `**Panel:** ${STYLE_LABELS[config.style]}`,
                 `**Support-Rolle:** ${Mention(config.supportRoleId, "role")}`,
@@ -129,7 +129,7 @@ function Options(builder: ComponentV2Builder, config: ITicketConfig, state: ISet
                                 ? "Tag steht"
                                 : "_Tag fehlt_";
 
-                      return `${index + 1}. ${option.emoji ?? "•"} **${option.name}** — ${option.description || "_ohne Beschreibung_"}\n-# Ziel: ${target} · Rolle: ${option.supportRoleId ? `<@&${option.supportRoleId}>` : "allgemeine"}`;
+                      return `${index + 1}. ${option.emoji ?? "•"} **${option.name}**: ${option.description || "_ohne Beschreibung_"}\n-# Ziel: ${target} · Rolle: ${option.supportRoleId ? `<@&${option.supportRoleId}>` : "allgemeine"}`;
                   })
                   .join("\n")
     );
@@ -161,11 +161,11 @@ function Options(builder: ComponentV2Builder, config: ITicketConfig, state: ISet
         builder.channelSelect({
             customId: `${SETUP_PREFIX}:cat`,
             channelTypes: [ChannelType.GuildCategory],
-            placeholder: `Kategorie für „${chosen.name}" …`,
+            placeholder: `Kategorie für „${chosen.name}“ …`,
         });
     }
 
-    builder.roleSelect({ customId: `${SETUP_PREFIX}:optrole`, placeholder: `Eigene Support-Rolle für „${chosen.name}" …` });
+    builder.roleSelect({ customId: `${SETUP_PREFIX}:optrole`, placeholder: `Eigene Support-Rolle für „${chosen.name}“ …` });
 }
 
 function Actions(builder: ComponentV2Builder, client: BotClient, config: ITicketConfig): void {
@@ -208,7 +208,7 @@ function Messages(builder: ComponentV2Builder, config: ITicketConfig): void {
                           ? " _(nur bei Klassisch)_"
                           : "";
 
-                return `${MESSAGE_LABELS[key]} — ${blocks} Baustein(e)${unused}`;
+                return `${MESSAGE_LABELS[key]} · ${blocks} Baustein(e)${unused}`;
             }).join("\n")
         )
         .subtext("Hier gibt es die Kurzfassung: Text, Farbe, ein Bild. Bausteine, Platzhalter-Hilfe und die Bildauswahl stehen im Dashboard.")
@@ -226,12 +226,12 @@ function Transcripts(builder: ComponentV2Builder, config: ITicketConfig): void {
     builder
         .text(
             [
-                `**Transcripts:** ${enabled ? "an – jedes geschlossene Ticket steht im Dashboard unter Transcriptions" : "aus"}`,
+                `**Transcripts:** ${enabled ? "an, jedes geschlossene Ticket steht im Dashboard unter Transcriptions" : "aus"}`,
                 `**Log-Kanal:** ${channelId ? `<#${channelId}>` : "_keiner_"}`,
-                `**Kopie per DM an den Ersteller:** ${dm ? "an" : "aus"}${modmail ? " _(bei ModMail entfällt sie – das Gespräch steht schon in seinen DMs)_" : ""}`,
+                `**Kopie per DM an den Ersteller:** ${dm ? "an" : "aus"}${modmail ? " _(bei ModMail entfällt sie, das Gespräch steht schon in seinen DMs)_" : ""}`,
             ].join("\n")
         )
-        .subtext("Ein Transcript zeigt den ganzen Verlauf im Discord-Look – auch Components V2, Bilder und Anhänge.")
+        .subtext("Ein Transcript zeigt den ganzen Verlauf im Discord-Look, auch Components V2, Bilder und Anhänge.")
         .buttons(
             { customId: `${SETUP_PREFIX}:trsave`, label: `Transcripts: ${enabled ? "an" : "aus"}`, emoji: "🔁" },
             { customId: `${SETUP_PREFIX}:trdm`, label: `DM an Ersteller: ${dm ? "an" : "aus"}`, emoji: "🔁", disabled: !enabled },
@@ -264,8 +264,8 @@ async function Panel(
                 !target
                     ? "Wähle unten einen Kanal."
                     : here
-                      ? "Ein Klick bringt es auf den neuen Stand – ein zweites Panel gibt es nicht."
-                      : `Ziel: <#${target}>${placed ? " – das alte Panel verschwindet dann." : ""}`,
+                      ? "Ein Klick bringt es auf den neuen Stand, ein zweites Panel gibt es nicht."
+                      : `Ziel: <#${target}>${placed ? ". Das alte Panel verschwindet dann." : ""}`,
                 config.options.length === 0 ? "\n⚠️ Ohne Öffnungs-Option kann das Panel nicht gesendet werden." : "",
             ]
                 .filter(Boolean)

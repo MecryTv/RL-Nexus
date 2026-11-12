@@ -1145,6 +1145,6 @@ export default class LogService {
                 .toMessage()
         );
 
-        if (!sent) throw new LogError("Die Nachricht ging nicht raus – darf der Bot in den Kanal schreiben?");
+        if (!sent) throw new LogError("Die Nachricht ging nicht raus. Darf der Bot in den Kanal schreiben?");
     }
 }

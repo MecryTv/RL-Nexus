@@ -35,7 +35,7 @@ function stepNote(deletion: IDeletion): string {
     if (deletion.state === "geloescht" && deletion.result) {
         const { deleted, anonymized, kept, servers } = deletion.result;
         const total = [...Object.values(deleted), ...Object.values(anonymized)].reduce((sum, rows) => sum + (rows ?? 0), 0);
-        const stayed = kept.length > 0 ? ` · ${kept.map((entry) => entry.label).join(", ")} blieb` : "";
+        const stayed = kept.length > 0 ? ` · ${kept.map((entry) => entry.label).join(", ")} ${kept.length === 1 ? "blieb" : "blieben"}` : "";
 
         return `${formatNumber(total)} Einträge auf ${servers} ${servers === 1 ? "Server" : "Servern"}${stayed}${deletion.code ? ` · Prüfcode ${deletion.code}` : ""}`;
     }

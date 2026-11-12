@@ -203,7 +203,7 @@ export default class GiveawayService {
         if (!message) {
             await this.client.giveaways.Patch(giveaway.id, { status: "cancelled", endedAt: Date.now() });
 
-            throw new GiveawayError("Das Giveaway ging nicht raus – darf der Bot in den Kanal schreiben?");
+            throw new GiveawayError("Das Giveaway ging nicht raus. Darf der Bot in den Kanal schreiben?");
         }
 
         return (await this.client.giveaways.Patch(giveaway.id, { status: "running", messageId: message.id, startsAt: running.startsAt, endsAt: running.endsAt }))!;
@@ -260,7 +260,7 @@ export default class GiveawayService {
         if (requirements.serverDays && now - (member.joinedTimestamp ?? now) < requirements.serverDays * DAY) {
             const left = Math.ceil((requirements.serverDays * DAY - (now - (member.joinedTimestamp ?? now))) / DAY);
 
-            missing.push(`Du musst ${requirements.serverDays} Tage auf dem Server sein – noch ${left} ${left === 1 ? "Tag" : "Tage"}.`);
+            missing.push(`Du musst ${requirements.serverDays} Tage auf dem Server sein, dir fehlen noch ${left} ${left === 1 ? "Tag" : "Tage"}.`);
         }
 
         if (requirements.accountDays && now - member.user.createdTimestamp < requirements.accountDays * DAY) {
@@ -270,7 +270,7 @@ export default class GiveawayService {
         if (requirements.messages && this.client.databaseService.Ready) {
             const written = await this.client.activity.MemberMessages(member.guild.id, member.id, DayOf(now) - 13).catch(() => 0);
 
-            if (written < requirements.messages) missing.push(`Du brauchst ${requirements.messages} Nachrichten in den letzten 14 Tagen – bisher ${written}.`);
+            if (written < requirements.messages) missing.push(`Du brauchst ${requirements.messages} Nachrichten in den letzten 14 Tagen, bisher sind es ${written}.`);
         }
 
         if (requirements.linked && !(await this.client.accounts.On(member.id, "epic").catch(() => null))) {
@@ -302,7 +302,7 @@ export default class GiveawayService {
         const entry = await this.client.giveaways.Entry(giveaway.id, member.id);
 
         if (entry) {
-            const text = `✅ Du bist schon dabei – mit **${entry.tickets} ${entry.tickets === 1 ? "Los" : "Losen"}**. Ausgelost wird <t:${Math.floor(giveaway.endsAt / 1000)}:R>.`;
+            const text = `✅ Du bist schon dabei, mit **${entry.tickets} ${entry.tickets === 1 ? "Los" : "Losen"}**. Ausgelost wird <t:${Math.floor(giveaway.endsAt / 1000)}:R>.`;
 
             await interaction.reply({ ...EntryCard(text, giveaway.id), flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral });
 
@@ -320,7 +320,7 @@ export default class GiveawayService {
         const tickets = this.Tickets(member, giveaway.bonus);
 
         await this.client.giveaways.Join(giveaway.id, member.id, tickets);
-        await reply(`🎉 Du bist dabei – mit **${tickets} ${tickets === 1 ? "Los" : "Losen"}**. Viel Glück! Ausgelost wird <t:${Math.floor(giveaway.endsAt / 1000)}:R>.`);
+        await reply(`🎉 Du bist dabei, mit **${tickets} ${tickets === 1 ? "Los" : "Losen"}**. Viel Glück! Ausgelost wird <t:${Math.floor(giveaway.endsAt / 1000)}:R>.`);
         this.Redraw(giveaway.id);
     }
 
@@ -342,13 +342,13 @@ export default class GiveawayService {
         const answer = (text: string) => interaction.update({ ...InfoCard(text, GIVEAWAY_ACCENT), flags: MessageFlags.IsComponentsV2 });
 
         if (!giveaway || !winner) {
-            await answer("Dieser Gewinn ist schon angenommen – oder die Frist ist vorbei.");
+            await answer("Dieser Gewinn ist schon angenommen, oder die Frist ist vorbei.");
 
             return;
         }
 
         if (winner.deadline && winner.deadline < Date.now()) {
-            await answer("Die Frist ist leider abgelaufen – es wurde neu ausgelost.");
+            await answer("Die Frist ist leider abgelaufen, es wurde neu ausgelost.");
 
             return;
         }
@@ -358,7 +358,7 @@ export default class GiveawayService {
 
         const saved = await this.client.giveaways.Patch(giveaway.id, { results: giveaway.results });
 
-        await answer(`✅ Angenommen! **${giveaway.prize}** gehört dir – das Team meldet sich bei dir.`);
+        await answer(`✅ Angenommen! **${giveaway.prize}** gehört dir. Das Team meldet sich bei dir.`);
 
         if (saved) await this.Render(saved);
 

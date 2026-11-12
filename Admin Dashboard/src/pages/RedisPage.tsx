@@ -103,7 +103,7 @@ function Overview(): JSX.Element {
                                 </span>
                             ))}
                             <span>frei {formatBytes(Math.max(0, data.maxBytes - data.bytes))}</span>
-                            <span className={styles.faintText}>Ist er voll, fliegt das am längsten Ungenutzte raus.</span>
+                            <span className={styles.faintText}>Ist der Speicher voll, fliegt das am längsten Ungenutzte raus.</span>
                         </p>
                     </div>
 

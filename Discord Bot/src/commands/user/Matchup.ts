@@ -28,10 +28,10 @@ export default class Matchup extends Command {
                 sub
                     .setName("neu")
                     .setDescription("Trägt ein neues Matchup ein")
-                    .addStringOption((option) => option.setName("team").setDescription("Für welches Team").setRequired(true).setAutocomplete(true))
-                    .addStringOption((option) => option.setName("gegner").setDescription("Gegen wen").setRequired(true).setMaxLength(MAX_OPPONENT))
+                    .addStringOption((option) => option.setName("team").setDescription("Für welches Team?").setRequired(true).setAutocomplete(true))
+                    .addStringOption((option) => option.setName("gegner").setDescription("Gegen wen?").setRequired(true).setMaxLength(MAX_OPPONENT))
                     .addStringOption((option) => option.setName("anpfiff").setDescription("Deutsche Zeit, etwa „morgen 20:00“ oder „Sa 18:00“").setRequired(true).setAutocomplete(true))
-                    .addStringOption((option) => option.setName("liga").setDescription("Liga oder Turnier – leer heißt Freundschaftsspiel").setMaxLength(MAX_LEAGUE).setAutocomplete(true))
+                    .addStringOption((option) => option.setName("liga").setDescription("Liga oder Turnier. Leer heißt Freundschaftsspiel").setMaxLength(MAX_LEAGUE).setAutocomplete(true))
                     .addStringOption((option) =>
                         option
                             .setName("modus")

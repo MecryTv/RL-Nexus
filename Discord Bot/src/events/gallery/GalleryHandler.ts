@@ -151,7 +151,7 @@ export default class GalleryHandler extends Event {
 
         const deadline = Math.floor((Date.now() + UPLOAD_TIMEOUT) / 1000);
         state.notice =
-            `⏳ Poste jetzt Bilder oder Links in diesen Kanal — mehrere in einer Nachricht gehen. ` +
+            `⏳ Poste jetzt Bilder oder Links in diesen Kanal, gern mehrere in einer Nachricht. ` +
             `Läuft ab <t:${deadline}:R>`;
 
         await this.Apply(interaction, state);
@@ -170,7 +170,7 @@ export default class GalleryHandler extends Event {
         const message = collected?.first();
 
         if (!message) {
-            state.notice = "⌛ Zeitfenster abgelaufen — es wurde nichts hochgeladen.";
+            state.notice = "⌛ Zeitfenster abgelaufen, es wurde nichts hochgeladen.";
             return this.Apply(interaction, state, true);
         }
 
@@ -203,7 +203,7 @@ export default class GalleryHandler extends Event {
         state.notice =
             saved.length > 0
                 ? `✅ ${saved.length} Bild(er) hochgeladen${skipped.length ? ` · ${skipped.length} übersprungen` : ""}`
-                : `❌ Nichts gespeichert — ${skipped[0] ?? "keine gültigen Bilder dabei"}`;
+                : `❌ Nichts gespeichert: ${skipped[0] ?? "keine gültigen Bilder dabei"}`;
 
         await this.Apply(interaction, state, true);
     }
@@ -272,7 +272,7 @@ export default class GalleryHandler extends Event {
                     ),
                 new LabelBuilder()
                     .setLabel("Unterordner")
-                    .setDescription("Optional — leer lassen für eine Hauptkategorie")
+                    .setDescription("Optional, leer lassen für eine Hauptkategorie")
                     .setTextInputComponent(
                         new TextInputBuilder()
                             .setCustomId("subcategory")
@@ -303,7 +303,7 @@ export default class GalleryHandler extends Event {
         const subcategory = raw ? SanitizeName(raw) : null;
 
         if (!category) {
-            state.notice = "⚠️ Ungültiger Name — erlaubt sind Buchstaben, Zahlen, `-` und `_`.";
+            state.notice = "⚠️ Ungültiger Name. Erlaubt sind Buchstaben, Zahlen, `-` und `_`.";
         } else {
             const created = await this.client.galleryService.CreateCategory({
                 guildId: state.homeGuildId,
@@ -319,7 +319,7 @@ export default class GalleryHandler extends Event {
                 state.page = 0;
             } else {
                 state.notice = subcategory
-                    ? `⚠️ Gibt es schon — oder die Hauptkategorie \`${category}\` fehlt noch.`
+                    ? `⚠️ Gibt es schon, oder die Hauptkategorie \`${category}\` fehlt noch.`
                     : `⚠️ \`${category}\` gibt es bereits.`;
             }
         }

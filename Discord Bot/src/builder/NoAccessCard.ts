@@ -16,7 +16,7 @@ export const NO_ACCESS_TITLE = "Kein Admin mit Zugang";
 /** Admins (Recht „Server verwalten“) können selbst Zugang holen, alle anderen wenden sich an sie. */
 export function NoAccessText(guildName: string, manager: boolean): string {
     return manager
-        ? `Auf ${guildName} hat gerade kein Admin Zugang zu RL Nexus. Mindestens einer braucht ihn, du oder ein anderer Admin mit „Server verwalten“. Dann gehen die Commands wieder.`
+        ? `Auf ${guildName} hat gerade kein Admin Zugang zu RL Nexus. Mindestens einer braucht ihn: du oder ein anderer Admin mit „Server verwalten“. Dann gehen die Commands wieder.`
         : `Auf ${guildName} hat gerade kein Admin Zugang zu RL Nexus, deshalb gehen die Commands nicht. Wende dich an den Owner oder einen Admin des Servers.`;
 }
 

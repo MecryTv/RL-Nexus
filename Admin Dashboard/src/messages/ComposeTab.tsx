@@ -354,7 +354,7 @@ export function ComposeTab({
             </ConfirmDialog>
 
             <ConfirmDialog open={asking === "one"} title={`An ${name} senden?`} confirmLabel="Senden" busy={busy === "send"} onConfirm={() => send("one")} onCancel={() => setAsking(null)}>
-                <p>„{content.title}“ geht sofort als DM über den Bot hinaus und lässt sich nicht zurückholen.</p>
+                <p>„{content.title}“ geht sofort als DM über den Bot raus und lässt sich nicht zurückholen.</p>
             </ConfirmDialog>
         </div>
     );

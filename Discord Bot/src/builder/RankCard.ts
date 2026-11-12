@@ -835,7 +835,7 @@ async function drawCareer(ctx: SKRSContext2D, y: number, height: number, profile
 
     ctx.font = "800 34px Oxanium";
     ctx.fillStyle = COLORS.text;
-    ctx.fillText("KARRIERE STATS", PAD + 74, y + 44);
+    ctx.fillText("KARRIERE-STATS", PAD + 74, y + 44);
 
     const chartFile = path.join(STAT_ICON_ROOT, "shots.png");
     const chart = await image(chartFile);
@@ -919,7 +919,7 @@ function ago(iso: string): string {
 function drawFreshness(ctx: SKRSContext2D, profile: IPrimeProfile): void {
     const stale = profile.stale === true;
     const text = stale
-        ? `Rocket League antwortet gerade nicht — angezeigt wird der Stand von ${ago(profile.fetchedAt)}`
+        ? `Rocket League antwortet gerade nicht, angezeigt wird der Stand von ${ago(profile.fetchedAt)}`
         : `Stand ${ago(profile.fetchedAt)} · wird alle 10 Minuten erneuert`;
 
     // Links unten, nicht rechts: rechts unten laeuft die rote Eckklammer des

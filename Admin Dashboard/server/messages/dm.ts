@@ -247,7 +247,7 @@ const oneLine = (text: string): string => text.replace(/\s+/g, " ").trim();
 
 /** Alles, was im Bild steht, höchstens 1024 Zeichen. Wird es zu lang, kürzt es die Kacheln, die Fußzeile bleibt. */
 export function altOf(content: IMessageContent, sender: string, at: Date): string {
-    const head = [content.title, content.intro, content.big ? `${content.big.text}${content.big.note ? ` – ${content.big.note}` : ""}` : ""].filter(Boolean).map(oneLine).map(sentence).join(" ");
+    const head = [content.title, content.intro, content.big?.text ?? "", content.big?.note ?? ""].filter(Boolean).map(oneLine).map(sentence).join(" ");
     const boxes = content.boxes.map((box) => sentence(oneLine(box.label ? `${box.label}: ${box.text}` : box.text))).join(" ");
     const footer = footerOf(content, sender, at);
     const room = 1024 - head.length - footer.length - 2;

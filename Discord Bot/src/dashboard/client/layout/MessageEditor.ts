@@ -672,7 +672,7 @@ export function renderEditor(host: HTMLElement, doc: IMessageDoc, context: IEdit
         const empty = document.createElement("p");
 
         empty.className = "hintline";
-        empty.textContent = "Noch kein Baustein – ohne Text bleibt die Nachricht leer.";
+        empty.textContent = "Noch kein Baustein. Ohne Text bleibt die Nachricht leer.";
         list.append(empty);
     }
 
@@ -680,7 +680,7 @@ export function renderEditor(host: HTMLElement, doc: IMessageDoc, context: IEdit
     const used = docCost(doc);
 
     cost.className = "hintline";
-    cost.textContent = `${used} von ${BLOCK_BUDGET} Bausteinen belegt${used > BLOCK_BUDGET - 6 ? " – für Knöpfe und Menü sollte Platz bleiben." : "."}`;
+    cost.textContent = `${used} von ${BLOCK_BUDGET} Bausteinen belegt${used > BLOCK_BUDGET - 6 ? ". Für Knöpfe und Menü sollte Platz bleiben." : "."}`;
 
     host.replaceChildren(bar, list, cost);
 }
@@ -890,7 +890,7 @@ export function renderPreview(host: HTMLElement, doc: IMessageDoc, context: IEdi
         const empty = document.createElement("p");
 
         empty.className = "hintline";
-        empty.textContent = "Leere Nachricht – der Bot schickt dann nur einen kurzen Platzhalter.";
+        empty.textContent = "Leere Nachricht: Der Bot schickt dann nur einen kurzen Platzhalter.";
         card.append(empty);
     }
 

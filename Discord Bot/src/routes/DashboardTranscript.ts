@@ -81,7 +81,7 @@ export default class DashboardTranscript extends Route {
         if (!entry || (!grant && (!paid || !(await service.CanRead(session.userId, entry))))) {
             return file !== undefined
                 ? reply.code(404).send({ error: "Not Found" })
-                : Missing(reply, 404, "Dieses Transcript gibt es nicht – oder du darfst es nicht sehen.");
+                : Missing(reply, 404, "Dieses Transcript gibt es nicht, oder du darfst es nicht sehen.");
         }
 
         if (file !== undefined) {

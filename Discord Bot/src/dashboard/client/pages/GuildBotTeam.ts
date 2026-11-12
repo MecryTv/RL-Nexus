@@ -147,11 +147,11 @@ export async function openRemoveDialog(guild: Pick<IGuild, "id" | "name" | "team
     confirm.addEventListener("input", check);
     check();
 
-    const ticketText = facts.openTickets === 1 ? "1 offenes Ticket bleibt" : `${facts.openTickets} offene Tickets bleiben`;
+    const ticketText = facts.openTickets === 1 ? "1 offenes Ticket bleibt als Kanal" : `${facts.openTickets} offene Tickets bleiben als Kanäle`;
     const summary = el(
         "p",
         "tsummary",
-        `RL Nexus verlässt „${guild.name}“ jetzt. ${ticketText} als Kanäle stehen.`,
+        `RL Nexus verlässt „${guild.name}“ jetzt. ${ticketText} stehen.`,
         notify.checked ? ` ${facts.owner.name} bekommt eine DM.` : ""
     );
     notify.addEventListener("change", () => (summary.lastChild!.textContent = notify.checked ? ` ${facts.owner.name} bekommt eine DM.` : ""));

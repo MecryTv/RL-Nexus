@@ -47,7 +47,7 @@ export const COOKIE_HTML = `
   <div class="cookiebar__inner">
     <span class="cookiebar__mark"><svg><use href="#i-shield"/></svg></span>
     <p class="cookiebar__text">
-      RL Nexus setzt nur Cookies, die für die Anmeldung nötig sind — kein Tracking, keine Werbung,
+      RL Nexus setzt nur Cookies, die für die Anmeldung nötig sind. Kein Tracking, keine Werbung,
       keine Weitergabe. Was gespeichert wird, steht im <a href="${BASE}/privacy">Datenschutz</a>.
     </p>
     <button class="btn btn--primary" type="button" id="cookieOk">Verstanden</button>

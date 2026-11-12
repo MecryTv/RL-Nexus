@@ -82,7 +82,7 @@ export default class TicketHandler extends Event {
 
             const normalized = error instanceof Error ? error : new Error(String(error));
 
-            await this.Fail(interaction, "Das hat nicht geklappt – ich habe es den Entwicklern gemeldet.");
+            await this.Fail(interaction, "Das hat nicht geklappt. Ich habe es den Entwicklern gemeldet.");
             await this.client.guardian.ReportError(normalized, interaction, `Ticket Error: ${interaction.customId}`);
         }
     }
@@ -152,7 +152,7 @@ export default class TicketHandler extends Event {
                 Edit(
                     InfoView(
                         ticket.contact === "modmail"
-                            ? `📬 Dein Ticket ${TicketNumber(ticket.number, ticket.code)} ist offen – schreib mir einfach hier per DM weiter.`
+                            ? `📬 Dein Ticket ${TicketNumber(ticket.number, ticket.code)} ist offen. Schreib mir einfach hier per DM weiter.`
                             : `🎫 Dein Ticket ${TicketNumber(ticket.number, ticket.code)} steht bereit: <#${ticket.channelId}>`,
                         "#35e07f"
                     )
@@ -174,7 +174,7 @@ export default class TicketHandler extends Event {
         try {
             const channelId = await this.client.ticketService.OfferDirect(guild, interaction.user);
             const builder = new ComponentV2Builder({ accentColor: "#35e07f" })
-                .text("📬 Schau in deine DMs – dort wählst du dein Thema.")
+                .text("📬 Schau in deine DMs, dort wählst du dein Thema.")
                 .buttons({ url: `https://discord.com/channels/@me/${channelId}`, label: "Zur DM", emoji: "📬" });
 
             await interaction.editReply(Edit({ components: [builder.build()], files: [] }));
@@ -238,7 +238,7 @@ export default class TicketHandler extends Event {
                 return this.AskText(interaction, "close", ticketId, {
                     title: "Ticket schließen",
                     label: "Grund",
-                    hint: "Optional – steht in der Abschluss-Nachricht",
+                    hint: "Optional, steht in der Abschluss-Nachricht",
                     id: "reason",
                     required: false,
                     max: 300,
@@ -248,7 +248,7 @@ export default class TicketHandler extends Event {
                 return this.AskText(interaction, "note", ticketId, {
                     title: "Team-Notiz",
                     label: "Notiz",
-                    hint: "Nur fürs Team – der User sieht sie nie",
+                    hint: "Nur fürs Team, der User sieht sie nie",
                     id: "note",
                     required: true,
                     max: 1000,
@@ -402,8 +402,8 @@ export default class TicketHandler extends Event {
                 return this.Done(
                     interaction,
                     on
-                        ? "🛡️ Anonymer Modus an – deine Nachrichten in diesem Ticket erscheinen unter dem Team-Alias."
-                        : "🛡️ Anonymer Modus aus – du schreibst wieder unter deinem Namen."
+                        ? "🛡️ Anonymer Modus an: Deine Nachrichten in diesem Ticket erscheinen unter dem Team-Alias."
+                        : "🛡️ Anonymer Modus aus: Du schreibst wieder unter deinem Namen."
                 );
             }
 
@@ -509,7 +509,7 @@ export default class TicketHandler extends Event {
                 .addLabelComponents(
                     field("date", "Datum", "TT.MM.JJJJ", true, 10, "24.12.2026"),
                     field("time", "Uhrzeit", "HH:MM in deutscher Zeit", true, 5, "18:30"),
-                    field("note", "Notiz", "Optional – worum es im Gespräch geht", false, 300)
+                    field("note", "Notiz", "Optional, worum es im Gespräch geht", false, 300)
                 )
         );
     }
@@ -534,7 +534,7 @@ export default class TicketHandler extends Event {
         if (action === "note") {
             await service.AddNote(context, member, interaction.fields.getTextInputValue("note"));
 
-            return this.Done(interaction, "📝 Notiz gespeichert – nur das Team sieht sie.");
+            return this.Done(interaction, "📝 Notiz gespeichert. Nur das Team sieht sie.");
         }
 
         if (action === "blacklist") {
@@ -564,7 +564,7 @@ export default class TicketHandler extends Event {
     private async CloseFromDirect(interaction: ButtonInteraction): Promise<void> {
         await this.Answer(
             interaction,
-            InfoView("🔒 Schließen kann nur das Team. Schreib einfach hier, wenn sich dein Anliegen erledigt hat – dann schließt es das Ticket.")
+            InfoView("🔒 Schließen kann nur das Team. Schreib einfach hier, wenn sich dein Anliegen erledigt hat, dann schließt es das Ticket.")
         );
     }
 

@@ -63,7 +63,7 @@ export function DevBar({ state, onDone }: IDevBarProps): JSX.Element | null {
                 <Button variant="ghost" disabled={busy} onClick={() => void run("ablauf", "Laufende Zugänge sind jetzt abgelaufen.")}>
                     Zugang ablaufen lassen
                 </Button>
-                <Button variant="ghost" disabled={busy} onClick={() => void run("zahlung-fehlgeschlagen", "Die Mail ‚Zahlung hat nicht geklappt‘ ist raus.")}>
+                <Button variant="ghost" disabled={busy} onClick={() => void run("zahlung-fehlgeschlagen", "Die Mail „Zahlung hat nicht geklappt“ ist raus.")}>
                     Zahlung fehlgeschlagen
                 </Button>
                 <Button variant="ghost" disabled={busy} onClick={() => void run("kuendigen", "Das Abo ist zum Ende gekündigt, die Mail ist raus.")}>

@@ -111,7 +111,7 @@ export async function ReadSnapshot(guild: Guild, input: IReadInput): Promise<ISe
         if (channel.isThread() || input.skipChannels.has(channel.id)) continue;
 
         if (!KNOWN.has(channel.type)) {
-            skipped.push(`Kanal #${channel.name}: diese Art kann ein Backup nicht anlegen`);
+            skipped.push(`Kanal #${channel.name}: Diese Art kann ein Backup nicht anlegen`);
             continue;
         }
 

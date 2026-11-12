@@ -318,7 +318,7 @@ export default class ModerationService {
         if (!MOD_ACTIONS.includes(request.action)) throw new ModerationError("Diese Aktion gibt es nicht.");
 
         if (!(await this.Allowed(actor, request.action))) {
-            throw new ModerationError(`Dafür brauchst du „${PERMISSION_LABEL[request.action]}“ – oder einen Platz auf der Moderatoren-Liste.`);
+            throw new ModerationError(`Dafür brauchst du „${PERMISSION_LABEL[request.action]}“ oder einen Platz auf der Moderatoren-Liste.`);
         }
 
         return this.Run(guild, { id: actor.id, name: actor.displayName, member: actor }, request, source, null);
@@ -366,11 +366,11 @@ export default class ModerationService {
 
     private async Ready(guild: Guild): Promise<void> {
         if (!this.client.databaseService.Ready) {
-            throw new ModerationError("Ohne Datenbank gibt es keinen Verlauf – und gerade ist sie nicht erreichbar.");
+            throw new ModerationError("Ohne Datenbank gibt es keinen Verlauf, und gerade ist sie nicht erreichbar.");
         }
 
         if (!(await this.client.settings.Of(guild.id)).modules.includes("moderation")) {
-            throw new ModerationError("Das Modul Moderation ist hier aus – einschalten im Dashboard oder mit `/module an modul:moderation`.");
+            throw new ModerationError("Das Modul Moderation ist hier aus. Einschalten kannst du es im Dashboard oder mit `/module an modul:moderation`.");
         }
     }
 
@@ -611,7 +611,7 @@ export default class ModerationService {
             .slice(0, count);
 
         if (picked.length === 0) {
-            throw new ModerationError("Nichts zu löschen – nur Nachrichten der letzten 14 Tage zählen, angeheftete bleiben stehen.");
+            throw new ModerationError("Nichts zu löschen: Nur Nachrichten der letzten 14 Tage zählen, angeheftete bleiben stehen.");
         }
 
         const deleted = await channel.bulkDelete(picked, true).catch((error) => {
@@ -657,8 +657,8 @@ export default class ModerationService {
         if (!able) {
             throw new ModerationError(
                 (action === "timeout" || action === "untimeout") && member.permissions.has(PermissionFlagsBits.Administrator)
-                    ? `${name} ist Admin – Admins lassen sich nicht stummschalten.`
-                    : `Bei ${name} geht das nicht: meine höchste Rolle steht nicht über der von ${name}.`
+                    ? `${name} ist Admin, und Admins lassen sich nicht stummschalten.`
+                    : `Bei ${name} geht das nicht: Meine höchste Rolle steht nicht über der von ${name}.`
             );
         }
     }
@@ -702,17 +702,17 @@ export default class ModerationService {
 
     private Failed(error: unknown, verb: string): ModerationError {
         if (error instanceof DiscordAPIError && (error.code === 50013 || error.code === 50001)) {
-            return new ModerationError(`Discord lässt mich nicht ${verb} – mir fehlt ein Recht oder meine Rolle steht zu tief.`);
+            return new ModerationError(`Discord lässt mich nicht ${verb}. Mir fehlt ein Recht oder meine Rolle steht zu tief.`);
         }
 
         logger.warn(`🛡️ Moderation: ${verb} fehlgeschlagen - ${String(error)}`);
 
-        return new ModerationError(`Das ${verb.charAt(0).toUpperCase()}${verb.slice(1)} ging nicht – Discord hat abgelehnt.`);
+        return new ModerationError(`Das ${verb.charAt(0).toUpperCase()}${verb.slice(1)} ging nicht, Discord hat abgelehnt.`);
     }
 
     /** Steht im Audit-Log von Discord: Grund, wer und welcher Fall. */
     private Audit(actor: IModActor, entry: IModCase): string {
-        return `${entry.reason ?? "Ohne Grund"} – ${actor.name} (Fall ${CaseRef(entry.number)})`.slice(0, 512);
+        return `${entry.reason ?? "Ohne Grund"} · ${actor.name} (Fall ${CaseRef(entry.number)})`.slice(0, 512);
     }
 
     private Direct(user: User, entry: IModCase, guild: Guild): Promise<boolean> {

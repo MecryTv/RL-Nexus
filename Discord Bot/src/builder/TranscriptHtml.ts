@@ -786,7 +786,7 @@ ${participants ? `<div class="people"><b>Beteiligt</b><span>${participants}</spa
 </div>
 </header>`}
 <main class="log">
-${transcript.truncated ? `<p class="note">${apply ? "Der Kanal" : "Das Ticket"} hatte mehr Nachrichten, als ein Transcript fasst – die ältesten fehlen.</p>` : ""}
+${transcript.truncated ? `<p class="note">${apply ? "Der Kanal" : "Das Ticket"} hatte mehr Nachrichten, als ein Transcript fasst. Die ältesten fehlen.</p>` : ""}
 ${messages.join("\n")}
 </main>
 <footer class="foot">Transcript von RL Nexus · erstellt ${Stamp(meta.closedAt)} · Anhänge, die der Bot nicht sichern konnte, sind als „nicht gesichert“ markiert.</footer>

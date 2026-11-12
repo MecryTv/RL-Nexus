@@ -236,7 +236,7 @@ export function renderMessages(guildId: string): void {
         });
 
         const channel = select(
-            [["", "— Kanal wählen —"], ...data!.guild.channels.map((entry): [string, string] => [entry.id, `# ${entry.name}`])],
+            [["", "(Kanal wählen)"], ...data!.guild.channels.map((entry): [string, string] => [entry.id, `# ${entry.name}`])],
             draft.channelId ?? "",
             (value) => {
                 draft.channelId = value || null;
@@ -292,7 +292,7 @@ export function renderMessages(guildId: string): void {
             el(
                 "div",
                 "snsettings",
-                row("Name", "Nur für euch – in Discord steht er nicht", name),
+                row("Name", "Nur für euch, in Discord steht er nicht", name),
                 row("Kanal", "Wohin die Nachricht geht", channel)
             ),
             scheduleBox(draft, touch),
@@ -349,7 +349,7 @@ export function renderMessages(guildId: string): void {
                 if (entry.action === "role") {
                     target.append(
                         select(
-                            [["", "— Rolle —"], ...data!.guild.roles.map((role): [string, string] => [role.id, `@${role.name}`])],
+                            [["", "(Rolle wählen)"], ...data!.guild.roles.map((role): [string, string] => [role.id, `@${role.name}`])],
                             entry.roleId ?? "",
                             (value) => {
                                 entry.roleId = value || null;
@@ -551,7 +551,7 @@ export function renderMessages(guildId: string): void {
         const go = button("btn btn--primary snadd__go", icon("#i-plus"), "Anlegen");
 
         name.type = "text";
-        name.placeholder = "Name der Nachricht – etwa „Regeln“";
+        name.placeholder = "Name der Nachricht, etwa „Regeln“";
         name.maxLength = 80;
         name.setAttribute("aria-label", "Name der neuen Nachricht");
         go.disabled = data!.messages.length >= data!.limits.messages;
@@ -771,7 +771,7 @@ export function renderMessages(guildId: string): void {
             }
 
             const pick = select(
-                [["", "— hinzufügen —"], ...options.filter(([id]) => !list.includes(id))],
+                [["", "+ Hinzufügen"], ...options.filter(([id]) => !list.includes(id))],
                 "",
                 (value) => {
                     if (!value) return;
@@ -797,7 +797,7 @@ export function renderMessages(guildId: string): void {
         const go = button("btn btn--primary snadd__go", icon("#i-plus"), "Anlegen");
 
         phrase.type = "text";
-        phrase.placeholder = "Stichwort – etwa „wann ist training“";
+        phrase.placeholder = "Stichwort, etwa „wann ist training“";
         phrase.maxLength = 200;
         phrase.setAttribute("aria-label", "Neues Stichwort");
         go.disabled = data!.responses.length >= data!.limits.responses;
@@ -838,14 +838,14 @@ export function renderMessages(guildId: string): void {
                       "snlist",
                       ...(data.messages.length
                           ? data.messages.map(messageItem)
-                          : [el("div", "tkempty tkempty--big", icon("#i-layout"), el("b", "", "Noch keine Nachricht."), el("span", "", "Leg oben eine an – Inhalt und Knöpfe kommen danach."))])
+                          : [el("div", "tkempty tkempty--big", icon("#i-layout"), el("b", "", "Noch keine Nachricht."), el("span", "", "Leg oben eine an. Inhalt und Knöpfe kommen danach."))])
                   )
                 : el(
                       "div",
                       "snlist",
                       ...(data.responses.length
                           ? data.responses.map(responseItem)
-                          : [el("div", "tkempty tkempty--big", icon("#i-bot"), el("b", "", "Noch kein Stichwort."), el("span", "", "Etwa „discord link“ – der Bot antwortet dann von selbst."))])
+                          : [el("div", "tkempty tkempty--big", icon("#i-bot"), el("b", "", "Noch kein Stichwort."), el("span", "", "Etwa „discord link“. Der Bot antwortet dann von selbst."))])
                   );
 
         host.replaceChildren(head(), tabs(), tab === "messages" ? newMessage() : newResponse(), list);

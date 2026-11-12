@@ -77,11 +77,11 @@ export default class VoiceService {
 
         const hubs = await this.client.voiceHubs.OfGuild(guild.id);
 
-        if (!hubs.length) throw new VoiceError("Leg zuerst einen Hub an – sonst steuert das Panel nichts.");
+        if (!hubs.length) throw new VoiceError("Leg zuerst einen Hub an, sonst steuert das Panel nichts.");
 
         const sent = await channel.send({ ...VoicePanel(hubs[0].config, false), flags: MessageFlags.IsComponentsV2 }).catch(() => null);
 
-        if (!sent) throw new VoiceError("Die Nachricht ging nicht raus – darf der Bot in den Kanal schreiben?");
+        if (!sent) throw new VoiceError("Die Nachricht ging nicht raus. Darf der Bot in den Kanal schreiben?");
 
         await this.client.moduleSettings.Save(guild.id, VOICE_MODULE, { ...settings, panelMessageId: sent.id });
 
@@ -293,7 +293,7 @@ export default class VoiceService {
             await this.client.tempVoices.Save(channelId, temp.settings, next.id);
             await channel.permissionOverwrites.edit(next.id, { Connect: true, ViewChannel: true, ManageChannels: true }).catch(() => undefined);
             await channel
-                .send({ ...InfoCard(`🔄 <@${next.id}> hat den Kanal übernommen – der bisherige Besitzer ist weg.`), flags: MessageFlags.IsComponentsV2 })
+                .send({ ...InfoCard(`🔄 <@${next.id}> hat den Kanal übernommen, der bisherige Besitzer ist weg.`), flags: MessageFlags.IsComponentsV2 })
                 .catch(() => undefined);
         }
     }
@@ -399,7 +399,7 @@ export default class VoiceService {
             case "userlimit": {
                 const limit = Math.floor(Number((input.text ?? "").trim()));
 
-                if (!Number.isFinite(limit) || limit < 0 || limit > MAX_LIMIT) throw new VoiceError(`Eine Zahl von 0 bis ${MAX_LIMIT} – 0 heißt unbegrenzt.`);
+                if (!Number.isFinite(limit) || limit < 0 || limit > MAX_LIMIT) throw new VoiceError(`Eine Zahl von 0 bis ${MAX_LIMIT}, 0 heißt unbegrenzt.`);
 
                 settings.limit = limit;
                 await this.Apply(channel, temp, settings);
@@ -412,14 +412,14 @@ export default class VoiceService {
                 await this.Apply(channel, temp, settings);
 
                 return settings.privacy === "private"
-                    ? "🔒 Privat – nur wer vertraut ist oder eingeladen wurde, kommt rein."
-                    : "🔓 Offen – jeder darf rein.";
+                    ? "🔒 Privat: Nur wer vertraut ist oder eingeladen wurde, kommt rein."
+                    : "🔓 Offen: Jeder darf rein.";
 
             case "stealthmode":
                 settings.stealth = !settings.stealth;
                 await this.Apply(channel, temp, settings);
 
-                return settings.stealth ? "👻 Unsichtbar – andere sehen den Kanal nicht mehr." : "👀 Wieder sichtbar.";
+                return settings.stealth ? "👻 Unsichtbar: Andere sehen den Kanal nicht mehr." : "👀 Wieder sichtbar.";
 
             case "region": {
                 const region = (input.text ?? "").trim();
@@ -487,7 +487,7 @@ export default class VoiceService {
                     .then(() => true)
                     .catch(() => false);
 
-                return sent ? `🔗 Einladung an ${named} verschickt.` : `🔗 ${named} nimmt keine DMs an – schick ihm den Link selbst: ${invite.url}`;
+                return sent ? `🔗 Einladung an ${named} verschickt.` : `🔗 ${named} nimmt keine DMs an. Schick ihm den Link selbst: ${invite.url}`;
             }
 
             case "kickuser": {
@@ -538,7 +538,7 @@ export default class VoiceService {
         const presets = await this.client.voicePresets.Of(member.id);
 
         if (presets.length >= MAX_PRESETS && !presets.some((preset) => preset.name === clean)) {
-            throw new VoiceError(`Mehr als ${MAX_PRESETS} Presets gehen nicht – lösch erst eines.`);
+            throw new VoiceError(`Mehr als ${MAX_PRESETS} Presets gehen nicht. Lösch erst eines.`);
         }
 
         const saved = await this.client.voicePresets.Save(member.id, clean, temp.settings);

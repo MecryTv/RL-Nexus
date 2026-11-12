@@ -725,7 +725,7 @@ export default class RouletteService {
                 case "nofill":
                     await this.Fill(guild, actor, id.eveningId, id.action === "fill");
 
-                    return await say(id.action === "fill" ? "Du springst ein. Der Bot schiebt dich in deinen Team-Kanal." : "Erledigt: einer setzt diese Runde aus und ist nächste Runde sicher dabei.");
+                    return await say(id.action === "fill" ? "Du springst ein. Der Bot schiebt dich in deinen Team-Kanal." : "Erledigt: Einer setzt diese Runde aus und ist nächste Runde sicher dabei.");
                 case "wish": {
                     await this.Allow(actor);
 

@@ -94,8 +94,10 @@ function MissingModules({ doc, missing }: { readonly doc: IContentDoc<IModules>;
     return (
         <div className={styles.missing} role="status">
             <p>
-                <strong>{open.length === 1 ? "1 Modul aus dem Code fehlt auf der Webseite." : `${open.length} Module aus dem Code fehlen auf der Webseite.`}</strong> Sie sind im Bot, stehen
-                aber nicht in dieser Liste. Übernehmen fügt sie mit den Texten aus dem Code hinzu, danach lassen sie sich wie alle anderen bearbeiten.
+                <strong>{open.length === 1 ? "1 Modul aus dem Code fehlt auf der Webseite." : `${open.length} Module aus dem Code fehlen auf der Webseite.`}</strong>{" "}
+                {open.length === 1
+                    ? "Es ist im Bot, steht aber nicht in dieser Liste. Übernehmen fügt es mit den Texten aus dem Code hinzu, danach lässt es sich wie alle anderen bearbeiten."
+                    : "Sie sind im Bot, stehen aber nicht in dieser Liste. Übernehmen fügt sie mit den Texten aus dem Code hinzu, danach lassen sie sich wie alle anderen bearbeiten."}
             </p>
             <ul className={styles.missingList}>
                 {open.map((module) => (

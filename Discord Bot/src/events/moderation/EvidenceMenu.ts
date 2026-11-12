@@ -74,7 +74,7 @@ export default class EvidenceMenu extends Event {
         } catch (error) {
             if (!(error instanceof ModerationError)) logger.error(`🛡️ Als Beweis sichern (${interaction.customId}) fehlgeschlagen`, error);
 
-            const view = show(ModErrorView(error instanceof ModerationError ? error.message : "Da ging etwas schief – versuch es gleich nochmal."));
+            const view = show(ModErrorView(error instanceof ModerationError ? error.message : "Da ging etwas schief. Versuch es gleich nochmal."));
 
             if (interaction.deferred || interaction.replied) await interaction.editReply(view).catch(() => undefined);
             else await interaction.reply({ ...view, flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral }).catch(() => undefined);

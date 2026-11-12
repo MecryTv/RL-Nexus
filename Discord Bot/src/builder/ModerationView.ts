@@ -76,7 +76,7 @@ function Facts(entry: IModCase, mentions: boolean): string[] {
         const stage = entry.details.stage;
         const then = stage
             ? ` → ${ACTION_INFO[stage.action].label}${stage.duration ? ` (${FormatDuration(stage.duration)})` : ""}${
-                  stage.case !== null ? `, Fall ${CaseRef(stage.case)}` : stage.error ? ` – ging nicht: ${escapeMarkdown(stage.error)}` : ""
+                  stage.case !== null ? `, Fall ${CaseRef(stage.case)}` : stage.error ? `, ging nicht: ${escapeMarkdown(stage.error)}` : ""
               }`
             : "";
 
@@ -141,7 +141,7 @@ export function DirectView(entry: IModCase, guildName: string): IModView {
     const lines: string[] = [];
 
     if (entry.reason) lines.push(`**Grund:** ${escapeMarkdown(entry.reason)}`);
-    if (entry.duration) lines.push(`**Dauer:** ${FormatDuration(entry.duration)}${entry.expiresAt ? ` – endet ${Stamp(entry.expiresAt)}` : ""}`);
+    if (entry.duration) lines.push(`**Dauer:** ${FormatDuration(entry.duration)}${entry.expiresAt ? ` · endet ${Stamp(entry.expiresAt)}` : ""}`);
     else if (entry.action === "ban") lines.push("**Dauer:** dauerhaft");
     if (entry.action === "warn" && entry.details.warns) lines.push(`Das ist deine **${entry.details.warns}.** aktive Verwarnung.`);
 
@@ -165,7 +165,7 @@ export function DoneView(entry: IModCase, logged: boolean, problems: string[] = 
             : `${info.emoji} ${target ?? "Der User"} wurde ${info.past}`;
     const extra = [CaseFooter(entry), logged ? "im Log-Kanal vermerkt" : ""].filter(Boolean).join(" · ");
     const builder = new ComponentV2Builder({ accentColor: info.color })
-        .text(`### ${headline} – Fall ${CaseRef(entry.number)}`)
+        .text(`### ${headline} · Fall ${CaseRef(entry.number)}`)
         .text(Facts(entry, false).filter((line) => !line.startsWith("**Moderator:**") && !line.startsWith("**User:**")).join("\n") || "Ohne Grund.");
 
     if (problems.length) builder.text(`**Nicht gesichert:**\n${problems.map((problem) => `- ${problem}`).join("\n")}`);
@@ -211,11 +211,11 @@ export function HistoryView(name: string, cases: IModCase[], counts: Partial<Rec
                           const status = StatusText(entry);
 
                           return `${info.emoji} **Fall ${CaseRef(entry.number)}** · ${info.label} · ${Stamp(entry.createdAt, "d")}${
-                              entry.reason ? ` – ${escapeMarkdown(entry.reason).slice(0, 80)}` : ""
+                              entry.reason ? ` · ${escapeMarkdown(entry.reason).slice(0, 80)}` : ""
                           }${status ? `\n-# ${status}` : ""}`;
                       })
                       .join("\n")
-                : "Keine Fälle – eine weiße Weste."
+                : "Keine Fälle, eine weiße Weste."
         );
 
     // W-0071: nur für die, die den Server verwalten - die Fälle selbst stehen im Dashboard.

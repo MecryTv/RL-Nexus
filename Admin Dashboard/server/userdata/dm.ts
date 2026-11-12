@@ -369,7 +369,7 @@ function cancelled(): (ctx: SKRSContext2D) => Promise<number> {
 
 /** Alt-Text mit allem, was auf dem Bild steht. */
 function altOf(kind: DmKind, input: IDmInput): string {
-    const kept = (word: string): string => (input.kept.length > 0 ? ` ${word}: ${input.kept.map((entry) => `${entry.label} – ${sentence(entry.note)}`).join("; ")}.` : "");
+    const kept = (word: string): string => (input.kept.length > 0 ? ` ${word}: ${input.kept.map((entry) => `${entry.label} (${sentence(entry.note)})`).join("; ")}.` : "");
 
     switch (kind) {
         case "ankuendigung":

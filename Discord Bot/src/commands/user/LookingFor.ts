@@ -19,7 +19,7 @@ export default class LookingFor extends Command {
     constructor(client: BotClient) {
         super(client, {
             name: "lookingfor",
-            description: "Sucht ein Team oder Spieler – der Bot fragt dich per DM",
+            description: "Sucht ein Team oder Spieler. Der Bot fragt dich per DM",
             category: Category.User,
             cooldown: 15,
             developerOnly: false,
@@ -107,6 +107,6 @@ export default class LookingFor extends Command {
 
         const link = service.Link(interaction.guildId, request);
 
-        await this.Say(interaction, `Deine ${KIND_LABELS[request.kind]} ist beendet${link ? ` – der Beitrag ist zu: ${link}` : "."}`);
+        await this.Say(interaction, `Deine ${KIND_LABELS[request.kind]} ist beendet${link ? `, der Beitrag ist zu: ${link}` : "."}`);
     }
 }

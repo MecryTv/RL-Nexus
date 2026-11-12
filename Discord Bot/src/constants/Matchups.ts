@@ -44,7 +44,7 @@ export const OUTCOME_COLORS = { win: "#3ba55c", loss: "#f23f43", draw: "#9aa3ad"
 export const REMIND_ACCENT = "#ffc53d";
 
 /** Wer nicht eintragen darf, liest das - nur für sich. */
-export const MATCHUP_NO_RIGHT = "Das dürfen Captain, Co-Captain, Manager und Coach des Teams – und wer den Server verwaltet.";
+export const MATCHUP_NO_RIGHT = "Das dürfen Captain, Co-Captain, Manager und Coach des Teams sowie alle, die den Server verwalten.";
 
 /** Wenn ParseKickoff nichts versteht. */
 export const KICKOFF_HELP = "Das verstehe ich nicht. Schreib es so: „heute 20:00“, „morgen 19:30“, „Sa 18:00“ oder „31.10. 20:00“.";

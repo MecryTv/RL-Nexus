@@ -24,7 +24,7 @@ export default class Ban extends Command {
             .addUserOption((option) => option.setName("user").setDescription("Wen?").setRequired(true))
             .addStringOption((option) => option.setName("grund").setDescription("Warum? Steht im Log und in der DM").setMaxLength(MAX_REASON))
             .addStringOption((option) =>
-                option.setName("dauer").setDescription("Befristet, etwa 3d oder 1w – leer bleibt er dauerhaft").setAutocomplete(true)
+                option.setName("dauer").setDescription("Befristet, etwa 3d oder 1w. Leer bleibt er dauerhaft").setAutocomplete(true)
             )
             .addIntegerOption((option) =>
                 option

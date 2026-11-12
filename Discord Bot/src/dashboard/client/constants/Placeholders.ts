@@ -41,7 +41,7 @@ export const TWITCH_PLACEHOLDERS: IPlaceholder[] = [
     { key: "streamer", label: "Streamer", sample: "MecryTv" },
     { key: "streamer.login", label: "Twitch-Name", sample: "mecrytv" },
     { key: "streamer.avatar", label: "Profilbild (Bild)", sample: "" },
-    { key: "stream.title", label: "Titel des Streams", sample: "Ranked 2v2 bis GC – !discord" },
+    { key: "stream.title", label: "Titel des Streams", sample: "Ranked 2v2 bis GC | !discord" },
     { key: "stream.game", label: "Spiel", sample: "Rocket League" },
     { key: "stream.url", label: "Link zum Stream", sample: "https://twitch.tv/mecrytv" },
     { key: "stream.viewers", label: "Zuschauer", sample: "128" },
@@ -235,7 +235,7 @@ const LFT_WHO: IPlaceholder[] = [
     { key: "art", label: "Art der Suche", sample: "Spieler-Suche" },
 ];
 
-const ANSWER_SAMPLE = "**Welchen Rang hast du – aktuell und als Peak?**\n> Champ 1 Div 2, Peak Champ 2\n\n**Auf welcher Plattform spielst du?**\n> PC";
+const ANSWER_SAMPLE = "**Welchen Rang hast du, aktuell und als Peak?**\n> Champ 1 Div 2, Peak Champ 2\n\n**Auf welcher Plattform spielst du?**\n> PC";
 
 const LFT_ANSWERS: IPlaceholder[] = [
     { key: "antworten", label: "Alle Antworten (Frage und Antwort)", sample: ANSWER_SAMPLE },
@@ -273,7 +273,7 @@ export const LFT_QUESTION_PLACEHOLDERS: IPlaceholder[] = [
     { key: "user.name", label: "Name", sample: "Lara" },
     { key: "guild", label: "Servername", sample: "Dein Server" },
     { key: "art", label: "Art der Suche", sample: "Spieler-Suche" },
-    { key: "frage", label: "Die Frage", sample: "Welchen Rang hast du – aktuell und als Peak?" },
+    { key: "frage", label: "Die Frage", sample: "Welchen Rang hast du, aktuell und als Peak?" },
     { key: "frage.hinweis", label: "Hinweis zur Frage (leer, wenn keiner)", sample: "\n-# Zum Beispiel: Champ 1 Div 2, Peak Champ 2" },
     { key: "frage.nummer", label: "Die wievielte Frage", sample: "1" },
     { key: "frage.pflicht", label: "Pflicht oder freiwillig", sample: "Pflichtfrage" },
@@ -442,7 +442,7 @@ export const CLIP_PLACEHOLDERS: IPlaceholder[] = [
 /** Die Gewinner-Ansage kennt zusätzlich die Plätze. */
 export const CLIP_WINNER_PLACEHOLDERS: IPlaceholder[] = [
     ...CLIP_PLACEHOLDERS,
-    { key: "gewinner", label: "Die Gewinner als Liste", sample: "🥇 @Sophie – 21 Stimmen · Discord Nitro\n🥈 @Mo – 14 Stimmen\n🥉 @Lara – 9 Stimmen" },
+    { key: "gewinner", label: "Die Gewinner als Liste", sample: "🥇 @Sophie · 21 Stimmen · Discord Nitro\n🥈 @Mo · 14 Stimmen\n🥉 @Lara · 9 Stimmen" },
     { key: "platz1", label: "Platz 1 (Erwähnung)", sample: "@Sophie" },
     { key: "platz2", label: "Platz 2 (Erwähnung)", sample: "@Mo" },
     { key: "platz3", label: "Platz 3 (Erwähnung)", sample: "@Lara" },

@@ -110,7 +110,7 @@ export function renderVoice(guildId: string): void {
         const used = new Set(data!.hubs.map((hub) => hub.channelId));
         const free = data!.guild.voice.filter((entry) => !used.has(entry.id));
         const pick = select(
-            [["", free.length ? "— Sprachkanal wählen —" : "Alle Sprachkanäle sind schon Hubs"], ...free.map((entry): [string, string] => [entry.id, `🔊 ${entry.name}`])],
+            [["", free.length ? "(Sprachkanal wählen)" : "Alle Sprachkanäle sind schon Hubs"], ...free.map((entry): [string, string] => [entry.id, `🔊 ${entry.name}`])],
             "",
             () => undefined,
             "Sprachkanal für den Hub"
@@ -138,7 +138,7 @@ export function renderVoice(guildId: string): void {
 
             data!.hubs.push(answer.hub);
             open = answer.hub.id;
-            toast("info", "Hub angelegt", `Wer „${answer.hub.channelName}" betritt, bekommt jetzt seinen eigenen Kanal.`);
+            toast("info", "Hub angelegt", `Wer „${answer.hub.channelName}“ betritt, bekommt jetzt seinen eigenen Kanal.`);
             paint();
         });
 
@@ -181,7 +181,7 @@ export function renderVoice(guildId: string): void {
                 "div",
                 "snitem__head",
                 el("div", "snitem__face", icon("#i-mic")),
-                el("div", "snitem__name", el("b", "", hub.channelName ? `🔊 ${hub.channelName}` : "(Kanal gelöscht)"), el("span", "", `Neue Kanäle heißen „${hub.config.name}"`)),
+                el("div", "snitem__name", el("b", "", hub.channelName ? `🔊 ${hub.channelName}` : "(Kanal gelöscht)"), el("span", "", `Neue Kanäle heißen „${hub.config.name}“`)),
                 edit,
                 remove
             )
@@ -237,8 +237,8 @@ export function renderVoice(guildId: string): void {
 
         const privacy = select(
             [
-                ["public", "Offen – jeder darf rein"],
-                ["private", "Privat – nur Vertraute"],
+                ["public", "Offen (jeder darf rein)"],
+                ["private", "Privat (nur Vertraute)"],
             ],
             config.defaults.privacy,
             (value) => {
@@ -300,7 +300,7 @@ export function renderVoice(guildId: string): void {
 
         /* --- Support-Hub: Kanäle ohne Panel. Den Warteraum gibt es unter Moderation. --- */
         const offHint = "Abgeschaltete Optionen stehen im Auswahlmenü nicht mehr drin.";
-        const supportHint = "Ein Support-Hub schickt kein Panel – diese Optionen greifen dort nicht.";
+        const supportHint = "Ein Support-Hub schickt kein Panel. Diese Optionen greifen dort nicht.";
         const panelHint = el("p", "hintline", config.support ? supportHint : offHint);
         const supportSwitch = toggle(config.support, "Support-Hub", (on) => {
             config.support = on;
@@ -314,7 +314,7 @@ export function renderVoice(guildId: string): void {
             el(
                 "div",
                 "snsettings",
-                row("Name der Kanäle", "Vorlage – {user}, {nummer} und {spiel} werden ersetzt", name),
+                row("Name der Kanäle", "Vorlage: {user}, {nummer} und {spiel} werden ersetzt", name),
                 row("Kategorie", "Wo die neuen Kanäle landen", category),
                 row("Plätze", "0 heißt unbegrenzt", limit),
                 row("Zutritt", "Gilt für jeden neuen Kanal", privacy),
@@ -326,7 +326,7 @@ export function renderVoice(guildId: string): void {
             el(
                 "p",
                 "hintline",
-                "Für Teamler: wer diesen Hub betritt, bekommt einen eigenen Talk ohne Panel. Mit „Übernehmen“ in der Meldung des Warteraums holt der Bot den Wartenden dorthin. Den Warteraum selbst stellst du unter Moderation ein. Tipp: Gib in Discord nur dem Team das Recht, diesen Hub zu betreten."
+                "Für Teamler: Wer diesen Hub betritt, bekommt einen eigenen Talk ohne Panel. Mit „Übernehmen“ in der Meldung des Warteraums holt der Bot den Wartenden dorthin. Den Warteraum selbst stellst du unter Moderation ein. Tipp: Gib in Discord nur dem Team das Recht, diesen Hub zu betreten."
             ),
             el("div", "snsettings", row("Support-Hub", "Kanäle aus diesem Hub bekommen kein Panel", el("label", "snitem__switch", supportSwitch, el("span", "", "an")))),
             el("h4", "sneditor__title vctitle", "Was das Panel anbietet"),
@@ -357,7 +357,7 @@ export function renderVoice(guildId: string): void {
             "Wohin das Panel geht"
         );
         const target = select(
-            [["", "— Kanal wählen —"], ...data!.guild.channels.map((entry): [string, string] => [entry.id, `# ${entry.name}`])],
+            [["", "(Kanal wählen)"], ...data!.guild.channels.map((entry): [string, string] => [entry.id, `# ${entry.name}`])],
             settings.panelChannelId ?? "",
             (value) => {
                 settings.panelChannelId = value || null;
@@ -396,7 +396,7 @@ export function renderVoice(guildId: string): void {
 
         return card(
             "Steuer-Panel",
-            "Das Auswahlmenü, mit dem jeder seinen eigenen Kanal einstellt. Im Chat des Sprachkanals steht es automatisch – ein fester Kanal ist praktisch, wenn ihr die Kanal-Chats aus habt.",
+            "Das Auswahlmenü, mit dem jeder seinen eigenen Kanal einstellt. Im Chat des Sprachkanals steht es automatisch. Ein fester Kanal ist praktisch, wenn ihr die Kanal-Chats aus habt.",
             row("Wohin", "Im Sprachkanal-Chat oder an einer festen Stelle", where),
             row("Fester Kanal", "Nur nötig, wenn das Panel an einer Stelle stehen soll", target),
             el("div", "mcsave", ...(data!.settings.panel === "channel" ? [send] : []), saveButton)
@@ -430,7 +430,7 @@ export function renderVoice(guildId: string): void {
             )
         );
 
-        return card("Gerade offen", `${data!.open.length} Kanal${data!.open.length === 1 ? "" : "e"} – sie verschwinden, sobald der letzte rausgeht.`, list);
+        return card("Gerade offen", `${data!.open.length} Kanal${data!.open.length === 1 ? "" : "e"}. Sie verschwinden, sobald der letzte rausgeht.`, list);
     }
 
     /* ------------------------------------------------------------
@@ -450,7 +450,7 @@ export function renderVoice(guildId: string): void {
                           "tkempty tkempty--big",
                           icon("#i-mic"),
                           el("b", "", "Noch kein Hub."),
-                          el("span", "", "Wähle oben einen Sprachkanal – wer ihn betritt, bekommt seinen eigenen.")
+                          el("span", "", "Wähle oben einen Sprachkanal. Wer ihn betritt, bekommt seinen eigenen.")
                       ),
                   ])
         );

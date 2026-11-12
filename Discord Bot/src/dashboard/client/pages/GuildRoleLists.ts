@@ -185,7 +185,7 @@ export async function renderRoleLists(guildId: string): Promise<void> {
             const tile = button(
                 "rltile",
                 el("b", "", list.name),
-                el("span", "", `${channel ? `#${channel.name}` : list.channelId ? "Kanal fehlt" : "kein Kanal"} ·${list.members} Mitglied${list.members === 1 ? "" : "er"} · ${d.designs[list.design]}`),
+                el("span", "", `${channel ? `#${channel.name}` : list.channelId ? "Kanal fehlt" : "kein Kanal"} · ${list.members} Mitglied${list.members === 1 ? "" : "er"} · ${d.designs[list.design]}`),
                 el("span", "rltile__chips", ...list.settings.roles.map((entry) => el("i", "", entry.label))),
                 el("span", "", list.messageId ? "Im Kanal" : "Noch nicht gesendet")
             );
@@ -240,7 +240,7 @@ export async function renderRoleLists(guildId: string): Promise<void> {
                     "rlnew",
                     el("b", "", "Neue Liste"),
                     row("Name", "Steht in der Leiste, Mitglieder sehen ihn nicht", input("", d.limits.name, "Name der Liste", (value) => (name = value), "z. B. Staff")),
-                    row("Vorlage", "Staff und Teams suchen passende Rollen über den Namen – alles lässt sich danach ändern", seg),
+                    row("Vorlage", "Staff und Teams suchen passende Rollen über den Namen. Alles lässt sich danach ändern", seg),
                     el("div", "mcsave lvsave", make)
                 )
             );
@@ -319,7 +319,7 @@ export async function renderRoleLists(guildId: string): Promise<void> {
             image.src = answer.image;
             image.alt = "Das Bild, wie der Bot es schickt";
             preview.replaceChildren(
-                el("span", "rlprevhead", "So steht es in Discord – nur das Bild"),
+                el("span", "rlprevhead", "So steht es in Discord: nur das Bild"),
                 message(image),
                 el("span", "hintline", "Genau das geht in den Kanal: 1200 Pixel breit, die Höhe wächst mit der Zahl der Leute.")
             );
@@ -395,7 +395,7 @@ export async function renderRoleLists(guildId: string): Promise<void> {
                             }),
                     },
                     {
-                        label: d.guild.roleIcons[entry.roleId] ? "Rollen-Icon aus Discord (nur im Bild)" : "Rollen-Icon aus Discord – diese Rolle hat keins",
+                        label: d.guild.roleIcons[entry.roleId] ? "Rollen-Icon aus Discord (nur im Bild)" : "Rollen-Icon aus Discord (diese Rolle hat keins)",
                         icon: "#i-shield",
                         run: () => {
                             entry.icon = { kind: "role" };
@@ -495,9 +495,9 @@ export async function renderRoleLists(guildId: string): Promise<void> {
         const list = draft!;
         const settings = list.settings;
         const board = list.design === "board";
-        const channels: [string, string][] = [["", "— kein Kanal —"], ...d.guild.channels.map((entry): [string, string] => [entry.id, `# ${entry.name}`])];
+        const channels: [string, string][] = [["", "(kein Kanal)"], ...d.guild.channels.map((entry): [string, string] => [entry.id, `# ${entry.name}`])];
         // In Discord gelöscht: steht als fehlend da, bis jemand einen neuen wählt.
-        const missing = (id: string | null): [string, string][] => (id && !d.guild.channels.some((entry) => entry.id === id) ? [[id, "Kanal fehlt – wähl einen neuen"]] : []);
+        const missing = (id: string | null): [string, string][] => (id && !d.guild.channels.some((entry) => entry.id === id) ? [[id, "Kanal fehlt, wähl einen neuen"]] : []);
         const designs = el("div", "seg");
 
         for (const [key, label] of Object.entries(d.designs) as [RoleListDesign, string][]) {
@@ -525,7 +525,7 @@ export async function renderRoleLists(guildId: string): Promise<void> {
             touch(true);
         });
 
-        const onlyImage = card("Nur das Bild", "Als Bild schickt der Bot nur das Bild als Datei – ohne Karte, Embed, Text oder Knopf darunter. Überschrift, Farben und Aussehen stellst du im Reiter „Bild“ ein.");
+        const onlyImage = card("Nur das Bild", "Als Bild schickt der Bot nur das Bild als Datei, ohne Karte, Embed, Text oder Knopf darunter. Überschrift, Farben und Aussehen stellst du im Reiter „Bild“ ein.");
         const toImage = button("btn btn--primary", icon("#i-image"), "Zum Reiter „Bild“");
 
         toImage.addEventListener("click", () => {
@@ -573,7 +573,7 @@ export async function renderRoleLists(guildId: string): Promise<void> {
             card(
                 "Rollen",
                 "Von oben nach unten, wie in der Liste. Links das Symbol, daneben der Name in der Liste. Über das Personen-Symbol bekommt jede Person einen eigenen Titel.",
-                el("div", "rlroles", ...(settings.roles.length ? settings.roles.map(roleRow) : [el("p", "hintline", "Noch keine Rolle – füg unten die erste hinzu.")])),
+                el("div", "rlroles", ...(settings.roles.length ? settings.roles.map(roleRow) : [el("p", "hintline", "Noch keine Rolle. Füg unten die erste hinzu.")])),
                 el("div", "rladd", select(free.length ? free.map((role): [string, string] => [role.id, `@${role.name}`]) : [["", "Alle Rollen sind schon drin"]], picked, (value) => (picked = value), "Rolle hinzufügen"), add)
             ),
             card(
@@ -765,7 +765,7 @@ export async function renderRoleLists(guildId: string): Promise<void> {
                 return;
             }
 
-            if (!d.intent && !window.confirm("Der Bot sieht gerade nicht alle Mitglieder – die Liste wäre unvollständig. Trotzdem senden?")) {
+            if (!d.intent && !window.confirm("Der Bot sieht gerade nicht alle Mitglieder. Die Liste wäre unvollständig. Trotzdem senden?")) {
                 send.disabled = false;
 
                 return;

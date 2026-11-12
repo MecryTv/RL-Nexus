@@ -232,7 +232,7 @@ export async function renderApplyPage(): Promise<void> {
                 (field as HTMLTextAreaElement).maxLength = question.max;
             } else if (question.kind === "choice") {
                 field = el("select", "pick");
-                field.append(new Option("— bitte wählen —", ""));
+                field.append(new Option("(bitte wählen)", ""));
 
                 for (const one of question.choices) field.append(new Option(one, one));
             } else {
@@ -301,7 +301,7 @@ export async function renderApplyPage(): Promise<void> {
                     icon("#i-check"),
                     el("b", "", "Abgeschickt"),
                     // Derselbe Satz wie RECEIVED im Bot (constants/Apply.ts) - der Client importiert keine Bot-Konstanten.
-                    el("span", "", "Deine Bewerbung ist bei uns eingegangen. Das Staff Team wird sich bei dir melden.")
+                    el("span", "", "Deine Bewerbung ist bei uns eingegangen. Das Staff-Team wird sich bei dir melden.")
                 )
             );
         });
@@ -326,7 +326,7 @@ export async function renderApplyPage(): Promise<void> {
             "div",
             "apsheet",
             el("div", "apsheet__head", el("h2", "", `${form.emoji ? `${form.emoji} ` : ""}${form.name}`), ...(form.description ? [el("p", "", form.description)] : [])),
-            ...(data.me ? [] : [el("div", "notice", icon("#i-warn"), el("span", "", "Zum Abschicken meldest du dich mit Discord an – der Server muss wissen, wer sich bewirbt."))]),
+            ...(data.me ? [] : [el("div", "notice", icon("#i-warn"), el("span", "", "Zum Abschicken meldest du dich mit Discord an. Der Server muss wissen, wer sich bewirbt."))]),
             ...(data.me && !data.me.member ? [el("div", "notice", icon("#i-warn"), el("span", "", "Du bist auf diesem Server noch kein Mitglied. Tritt ihm erst bei."))] : []),
             box,
             // W-0048: fest auf jeder öffentlichen Bewerbung, egal was der Server fragt.

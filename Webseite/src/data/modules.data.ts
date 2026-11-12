@@ -91,7 +91,7 @@ export const MODULE_DEFINITIONS: readonly IModuleDefinition[] = [
         id: "role-lists",
         name: "Rollen-Listen",
         tagline: "Wer zum Staff gehört und wer in welchem Team spielt, immer aktuell.",
-        botText: "Listen, die zeigen, wer welche Rolle hat – Staff, Teams, Creator. Als Karte oder gezeichnetes Bild, immer aktuell.",
+        botText: "Listen, die zeigen, wer welche Rolle hat: Staff, Teams, Creator. Als Karte oder gezeichnetes Bild, immer aktuell.",
         description:
             "Listen, die zeigen, wer welche Rolle hat: Staff, Teams, Creator oder was dein Server braucht. " +
             "Der Bot schreibt sie als Karte oder als gezeichnetes Bild in einen Kanal und zieht sie nach, sobald " +
@@ -157,7 +157,7 @@ export const MODULE_DEFINITIONS: readonly IModuleDefinition[] = [
         id: "rank-roles",
         name: "Rank Roles",
         tagline: "Die Rangrolle kommt aus dem Spiel, nicht aus der Selbstauskunft.",
-        botText: "Rollen nach Rocket-League-Rang – je Playlist eine eigene, auf Befehl geholt.",
+        botText: "Rollen nach Rocket-League-Rang, je Playlist eine eigene, auf Befehl geholt.",
         description:
             "Rollen nach Rocket-League-Rang, je Playlist eine eigene. Wer den Command eingibt, bekommt die " +
             "Rolle, die zu seinem aktuellen Rang gehört. Der Rang kommt aus dem verknüpften Epic-Konto, einen " +
@@ -178,7 +178,7 @@ export const MODULE_DEFINITIONS: readonly IModuleDefinition[] = [
         id: "teams",
         name: "RL Team-Übersicht",
         tagline: "Kader anlegen, besetzen und aktuell halten.",
-        botText: "Kader mit Captain, Co-Captain, Stamm, Ersatz und Trial – die Ränge holt der Bot aus Prime, von Hand kommt nur der Peak.",
+        botText: "Kader mit Captain, Co-Captain, Stamm, Ersatz und Trial. Die Ränge holt der Bot aus Prime, von Hand kommt nur der Peak.",
         description:
             "Teams mit Name, Kürzel, Logo und Kader, gegliedert in Gruppen und angezeigt in einem Kanal. Von " +
             "Hand kommt nur der Peak: Name, aktuelle MMR und Rang holt der Bot selbst. Daraus rechnet er die " +
@@ -200,7 +200,7 @@ export const MODULE_DEFINITIONS: readonly IModuleDefinition[] = [
         id: "lft",
         name: "Looking for",
         tagline: "Spieler suchen Teams, Teams suchen Spieler.",
-        botText: "Spieler suchen Teams, Teams suchen Spieler – gefragt wird per DM, der Beitrag landet im Forum.",
+        botText: "Spieler suchen Teams, Teams suchen Spieler. Gefragt wird per DM, der Beitrag landet im Forum.",
         description:
             "Wer sucht, gibt einen Command ein, und der Bot fragt per Direktnachricht die Fragen ab, die euer " +
             "Team im Dashboard festgelegt hat. Erst nach der Vorschau entsteht der Beitrag im Forum, mit Tag " +
@@ -253,7 +253,7 @@ export const MODULE_DEFINITIONS: readonly IModuleDefinition[] = [
         commands: ["roulette planen", "roulette start", "roulette beenden", "roulette status"],
         highlights: [
             "Teams jede Runde neu gemischt, dieselben Mitspieler möglichst selten",
-            "Wünsche: zwei Mitglieder landen im selben Team",
+            "Wünsche: Zwei Mitglieder landen im selben Team",
             "Wer aussetzen musste, ist nächste Runde sicher dabei",
             "Lobby-Karte mit Name und Passwort im Voice-Chat jedes Teams",
             "Moderatoren hosten, fehlt einer, macht ein Spieler die Lobby auf",
@@ -264,7 +264,7 @@ export const MODULE_DEFINITIONS: readonly IModuleDefinition[] = [
         id: "rl-6mans",
         name: "2, 4 & 6 Mans",
         tagline: "Warteschlangen für 1v1, 2v2 und 3v3, mit eigener Wertung.",
-        botText: "Warteschlangen für 1v1, 2v2 und 3v3 – je Modus eine eigene MMR, ausgeglichene Teams und eine eigene Rangliste.",
+        botText: "Warteschlangen für 1v1, 2v2 und 3v3: je Modus eine eigene MMR, ausgeglichene Teams und eine eigene Rangliste.",
         description:
             "Mitglieder stellen sich in eine Warteschlange, und sobald genug da sind, teilt der Bot zwei " +
             "möglichst gleich starke Teams ein. Er legt Sprachkanäle an, würfelt Lobby-Name und Passwort und " +
@@ -291,7 +291,7 @@ export const MODULE_DEFINITIONS: readonly IModuleDefinition[] = [
         id: "moderation",
         name: "Moderation",
         tagline: "Verwarnen, stummschalten, kicken und bannen, mit Akte.",
-        botText: "Verwarnen, stummschalten, kicken und bannen – mit Begründung und Verlauf je Mitglied.",
+        botText: "Verwarnen, stummschalten, kicken und bannen, mit Begründung und Verlauf je Mitglied.",
         description:
             "Jede Aktion wird ein Fall mit fortlaufender Nummer, Grund, Dauer und Verlauf, egal ob sie aus " +
             "Discord oder aus dem Dashboard kommt. Dazu Notizen und Beweise am Fall, eine Karte im Log-Kanal " +
@@ -302,7 +302,7 @@ export const MODULE_DEFINITIONS: readonly IModuleDefinition[] = [
         featured: true,
         highlights: [
             "Verwarnung, Timeout, Kick und Bann, befristet oder dauerhaft",
-            "Stufen: ab einer Zahl von Verwarnungen folgt die Strafe von selbst",
+            "Stufen: Ab einer Zahl von Verwarnungen folgt die Strafe von selbst",
             "Notizen und Beweisbilder an jedem Fall",
             "Verlauf je Mitglied im Dashboard",
             "Befristete Banns hebt der Bot selbst wieder auf",
@@ -387,7 +387,7 @@ export const MODULE_DEFINITIONS: readonly IModuleDefinition[] = [
         id: "tickets",
         name: "Ticket System",
         tagline: "Support, der nicht in deinen Direktnachrichten landet.",
-        botText: "Support per Schaltfläche: jedes Ticket bekommt einen Kanal nur für Ersteller und Team.",
+        botText: "Support per Schaltfläche: Jedes Ticket bekommt einen Kanal nur für Ersteller und Team.",
         description:
             "Support-Anfragen als eigener Kanal, als Beitrag in einem Forum oder ganz per Direktnachricht an " +
             "den Bot. Beim Schließen entsteht ein Transcript im Discord-Look, und im Dashboard liest das Team " +
@@ -466,7 +466,7 @@ export const MODULE_DEFINITIONS: readonly IModuleDefinition[] = [
         icon: "list-checks",
         highlights: [
             "Eigene Umfrage mit Knöpfen oder Discord-Umfrage",
-            "Anonym: niemand sieht, wer was gewählt hat",
+            "Anonym: Niemand sieht, wer was gewählt hat",
             "Zwei bis zehn Antworten, auf Wunsch mit Mehrfachwahl",
             "Balken immer, nach der eigenen Stimme oder erst am Ende",
             "Abstimmen nur für bestimmte Rollen",
@@ -537,7 +537,7 @@ export const MODULE_DEFINITIONS: readonly IModuleDefinition[] = [
             "Hochladen im Dashboard oder über ein Panel in Discord",
             "Jedes Bild wird verkleinert und als WebP gespeichert",
             "Verschieben, löschen und Alben anlegen an einer Stelle",
-            "Fest eingebaut: die anderen Module greifen darauf zu",
+            "Fest eingebaut: Die anderen Module greifen darauf zu",
         ],
         commands: ["gallery"],
     },
@@ -618,7 +618,7 @@ export const MODULE_DEFINITIONS: readonly IModuleDefinition[] = [
         builtIn: true,
         highlights: [
             "Von Hand sichern, mit Notiz, bis zu zehn Backups je Server",
-            "Auch den Discord-Server: Rollen, Kanäle, Rechte, Emojis, Bans",
+            "Auch den Discord-Server: Rollen, Kanäle, Rechte, Emojis, Banns",
             "Reparieren legt an, was fehlt, und löscht nichts",
             "Automatisch jeden Tag, alle drei Tage, jede Woche oder jeden Monat",
             "Vor jedem Laden sichert der Bot den jetzigen Stand",

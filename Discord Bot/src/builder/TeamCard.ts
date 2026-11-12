@@ -67,7 +67,7 @@ const COLUMNS = [
 
 type ColumnId = (typeof COLUMNS)[number]["id"];
 
-const HEADERS: Record<ColumnId, string> = { role: "Rolle", player: "Spieler", rank: "Rang Schnitt", "3v3": "3v3", "2v2": "2v2", "1v1": "1v1", peak: "Peak", value: "Schnitt" };
+const HEADERS: Record<ColumnId, string> = { role: "Rolle", player: "Spieler", rank: "Rang-Schnitt", "3v3": "3v3", "2v2": "2v2", "1v1": "1v1", peak: "Peak", value: "Schnitt" };
 
 /** Das Motiv von RL Nexus - der Hintergrund, wenn der Server keinen eigenen wählt (Plan 27). */
 const DEFAULT_BACKGROUND = path.join(GALLERY_ROOT, "privacy", "RL Card background.webp");

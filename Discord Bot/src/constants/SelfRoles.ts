@@ -40,7 +40,7 @@ export function DefaultBody(): IPanelBody {
         embed: null,
         doc: {
             ...DefaultMessageDoc(),
-            blocks: [{ type: "text", body: "## Hol dir deine Rollen\nKlick an, was auf dich passt – und wieder ab, wenn nicht mehr." }],
+            blocks: [{ type: "text", body: "## Hol dir deine Rollen\nKlick an, was auf dich passt, und wieder ab, wenn nicht mehr." }],
         },
     };
 }

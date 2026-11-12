@@ -122,7 +122,7 @@ export default class StreamService {
     private async YouTubeAccount(text: string): Promise<{ id: string; name: string; login: string | null; avatar: string | null }> {
         const channel = await ResolveChannel(text, this.client.config.YOUTUBE_API_KEY);
 
-        if (!channel) throw new StreamError("Diesen YouTube-Kanal finde ich nicht – am sichersten ist der Link zum Kanal oder die Kanal-ID (UC…).");
+        if (!channel) throw new StreamError("Diesen YouTube-Kanal finde ich nicht. Am sichersten ist der Link zum Kanal oder die Kanal-ID (UC…).");
 
         return { id: channel.id, name: channel.title, login: channel.handle, avatar: channel.avatar };
     }
@@ -219,10 +219,10 @@ export default class StreamService {
                       thumbnail: "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg",
                       short: kind === "short",
                   }, kind);
-        const view = await this.Card(notifier, kind, values, "🧪 Test aus dem Dashboard – so sieht die echte Meldung aus.");
+        const view = await this.Card(notifier, kind, values, "🧪 Test aus dem Dashboard: So sieht die echte Meldung aus.");
         const sent = await SendLog(guild, notifier.config.channelId, { ...view, flags: MessageFlags.IsComponentsV2, allowedMentions: { parse: [] } });
 
-        if (!sent) throw new StreamError("Die Nachricht ging nicht raus – darf der Bot in den Kanal schreiben?");
+        if (!sent) throw new StreamError("Die Nachricht ging nicht raus. Darf der Bot in den Kanal schreiben?");
     }
 
     /* ----------------------------------------------------------
@@ -357,7 +357,7 @@ export default class StreamService {
 
             await this.LinkedRole(guild, notifier, true);
 
-            state.problem = notifier.config.channelId && !message ? "Die Live-Karte ging nicht raus – darf der Bot in den Kanal schreiben?" : null;
+            state.problem = notifier.config.channelId && !message ? "Die Live-Karte ging nicht raus. Darf der Bot in den Kanal schreiben?" : null;
             state.live = {
                 streamId: stream.id,
                 messageId: message?.id ?? null,
@@ -508,7 +508,7 @@ export default class StreamService {
             const sent = await SendLog(guild, notifier.config.channelId, { ...view, flags: MessageFlags.IsComponentsV2 });
 
             if (sent) last = { id: entry.id, title: entry.title, kind, at: Date.now() };
-            else problem = "Die Meldung ging nicht raus – darf der Bot in den Kanal schreiben?";
+            else problem = "Die Meldung ging nicht raus. Darf der Bot in den Kanal schreiben?";
 
             if (kind === "live") {
                 liveVideo = entry.id;
@@ -579,7 +579,7 @@ export default class StreamService {
         const target = guild.roles.cache.get(roleId)!;
         const me = guild.members.me;
 
-        if (target.managed) throw new StreamError("Diese Rolle verwaltet eine Integration – der Bot kann sie nicht vergeben.");
+        if (target.managed) throw new StreamError("Diese Rolle verwaltet eine Integration. Der Bot kann sie nicht vergeben.");
         if (!me?.permissions.has(PermissionFlagsBits.ManageRoles) || target.comparePositionTo(me.roles.highest) >= 0) {
             throw new StreamError(`Die Live-Rolle @${target.name} muss unter der höchsten Rolle des Bots stehen, und er braucht „Rollen verwalten“.`);
         }

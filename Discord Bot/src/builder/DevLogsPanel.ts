@@ -63,7 +63,7 @@ function SessionMenu(builder: ComponentV2Builder, sessions: ISessionEntry[], sta
 
     builder.select({
         customId: `${PANEL_PREFIX}:session`,
-        placeholder: "🗂️ | Session wählen...",
+        placeholder: "🗂️ | Session wählen …",
         options: slice.map((entry) => ({
             label: `Session #${entry.sessionNumber}`,
             value: String(entry.sessionNumber),
@@ -139,7 +139,7 @@ async function Overview(
     const summary = stats
         ? `📄 **Zeilen:** ${stats.lines} • ${stats.errors ? "🔴" : "⚪"} **Fehler:** ${stats.errors} • ` +
           `${stats.warnings ? "🟡" : "⚪"} **Warnungen:** ${stats.warnings}`
-        : "⏳ *Für sehr große Dateien wird die Statistik übersprungen — bitte herunterladen.*";
+        : "⏳ *Für sehr große Dateien wird die Statistik übersprungen. Lade die Datei bitte herunter.*";
 
     const builder = Head(state, `📄 | Session #${entry.sessionNumber}`, StatusLabel(entry));
 
@@ -202,8 +202,8 @@ async function Page(devlogs: IDevLogsService, state: IDevLogsState, file: ILogFi
     const hint = !errorPages.length
         ? ""
         : here === -1
-          ? `\n🔴 **${errorPages.length}** Fehlerstelle(n) in dieser Datei — nutze die Fehler-Navigation.`
-          : `\n🔴 **Fehlerstelle ${here + 1}/${errorPages.length}** — auf dieser Seite.`;
+          ? `\n🔴 **${errorPages.length}** Fehlerstelle(n) in dieser Datei. Nutze die Fehler-Navigation.`
+          : `\n🔴 **Fehlerstelle ${here + 1}/${errorPages.length}** auf dieser Seite.`;
 
     const builder = Head(state, `📄 | Session #${file.entry.sessionNumber}`, `Seite ${page + 1}/${pages}`);
 
@@ -243,7 +243,7 @@ async function Search(devlogs: IDevLogsService, state: IDevLogsState, file: ILog
     const term = state.term ?? "";
     const { matches, total } = await devlogs.Search(file, term);
 
-    const builder = Head(state, `🔍 | ${total} Treffer`, `Session #${file.entry.sessionNumber} · "${term}"`);
+    const builder = Head(state, `🔍 | ${total} Treffer`, `Session #${file.entry.sessionNumber} · „${term}“`);
 
     if (total === 0) {
         builder.text(`Keine Zeile in Session #${file.entry.sessionNumber} enthält \`${Fence(term)}\`.`);
@@ -279,7 +279,7 @@ export async function RenderPanel(client: BotClient, state: IDevLogsState): Prom
     if (!file) {
         state.view = "list";
         state.session = null;
-        state.notice = "❌ Diese Session gibt es nicht mehr — evtl. automatisch aufgeräumt.";
+        state.notice = "❌ Diese Session gibt es nicht mehr, sie wurde wohl automatisch aufgeräumt.";
 
         return List(devlogs, state);
     }

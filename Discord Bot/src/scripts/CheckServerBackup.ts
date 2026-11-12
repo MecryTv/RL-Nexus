@@ -963,7 +963,7 @@ async function checkCards(): Promise<void> {
         ["done", "Ging nicht"],
         ["done", "Der Stand davor liegt als Sicherheits-Backup bereit"],
         ["done", "1 Panel neu gepostet"],
-        ["cancelled", "abgebrochen nach 2 von"],
+        ["cancelled", "Abgebrochen nach 2 von"],
         ["notice", "🛡️ Gesichert vor dem Anti-Nuke"],
         ["notice", "Tim"],
         ["notice", "bleibt 7 Tage"],

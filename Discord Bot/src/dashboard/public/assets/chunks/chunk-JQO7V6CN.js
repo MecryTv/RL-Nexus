@@ -1,0 +1,1 @@
+import{a as e}from"./chunk-HUFDLLFV.js";var a,i,n,l,t=e(()=>{"use strict";a={card:{width:900,height:300},up:{width:900,height:260}},i=30,n=["Oxanium","Orbitron","Rajdhani"],l={text:"Text",image:"Bild",shape:"Form",avatar:"Avatar",bar:"Balken",ring:"Level-Ring",icon:"Server-Icon"}});export{a,i as b,n as c,l as d,t as e};

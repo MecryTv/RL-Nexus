@@ -24,7 +24,7 @@ interface IFact {
 }
 
 /** Stand der Datenschutzerklärung. Bei jeder inhaltlichen Änderung nachziehen. */
-const UPDATED = "9. November 2026";
+const UPDATED = "12. November 2026";
 
 /**
  * Impressum und Datenschutzerklärung.
@@ -45,7 +45,7 @@ export function LegalPage({ kind }: ILegalPageProps): JSX.Element {
     const title = isImprint ? "Impressum" : "Datenschutzerklärung";
     const lead = isImprint
         ? "Angaben gemäß § 5 DDG und § 18 Abs. 2 MStV."
-        : "Was RL Nexus speichert, warum, wie lange, und wie du es wieder loswirst.";
+        : "Was RL Nexus speichert, warum, wie lange und wie du es wieder loswirst.";
     const sections = isImprint ? IMPRINT : PRIVACY;
 
     usePageMeta(title, lead);
@@ -634,7 +634,7 @@ const PRIVACY: readonly ILegalSection[] = [
                         Ranglisten der letzten 7 und 30 Tage. Einmal hat der Bot aus den Aktivitätszahlen der letzten 14
                         Tage Punkte nachgetragen. Keine Nachrichteninhalte. Schaltet ein Server seine Rangliste
                         öffentlich, zeigt das Dashboard Platz, Anzeigename, Profilbild, Level, Punkte, Nachrichten und
-                        Voice-Zeit auch ohne Anmeldung. Meldest du dich dort mit Discord an, sieht nur du zusätzlich
+                        Voice-Zeit auch ohne Anmeldung. Meldest du dich dort mit Discord an, siehst nur du zusätzlich
                         deinen eigenen Platz. Ändert jemand mit dem Recht „Server verwalten“ deine Punkte von Hand,
                         speichert der Bot, wer das wann getan hat, wie viel, deinen Stand davor und danach und den
                         Grund, gelöscht nach 180 Tagen. Gehörst du in einer Woche oder einem Monat zu den zehn

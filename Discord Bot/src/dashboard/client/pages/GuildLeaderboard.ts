@@ -160,7 +160,7 @@ export function renderLeaderboard(guildId: string): void {
 
         return card(
             "Öffentliche Rangliste",
-            "An heißt: jeder mit dem Link sieht die Liste – ohne Anmeldung, ohne Discord-Konto. Zu sehen sind Platz, Name, Bild, Level, Punkte, Nachrichten und Voice-Zeit. Wer mit Discord angemeldet ist, sieht dazu seinen eigenen Platz.",
+            "An heißt: Jeder mit dem Link sieht die Liste, ohne Anmeldung und ohne Discord-Konto. Zu sehen sind Platz, Name, Bild, Level, Punkte, Nachrichten und Voice-Zeit. Wer mit Discord angemeldet ist, sieht dazu seinen eigenen Platz.",
             row("Öffentlich", "Gilt sofort", el("label", "snitem__switch", box, el("span", "", data!.settings.public ? "an" : "aus"))),
             ...(data!.settings.public ? [el("div", "lvlink", el("code", "lvlink__url", link), copy, open)] : []),
             ...lookRows()
@@ -280,7 +280,7 @@ export function renderLeaderboard(guildId: string): void {
         const changed = JSON.stringify(draft) !== JSON.stringify(saved);
         const when = (at: number) => new Date(at).toLocaleString("de-DE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
         const channel = select(
-            [["", "— Kanal wählen —"], ...data!.guild.channels.map((entry): [string, string] => [entry.id, `# ${entry.name}`])],
+            [["", "(Kanal wählen)"], ...data!.guild.channels.map((entry): [string, string] => [entry.id, `# ${entry.name}`])],
             draft.channelId ?? "",
             (value) => {
                 draft.channelId = value || null;
@@ -363,7 +363,7 @@ export function renderLeaderboard(guildId: string): void {
 
         return card(
             "Rangliste im Kanal",
-            "Seite 1 als Bild, fest in einem Kanal – wie /level rangliste, nur ohne eigene Zeile. Die Knöpfe darunter öffnen jedem eine eigene Ansicht, die Nachricht selbst bleibt bei Seite 1.",
+            "Seite 1 als Bild, fest in einem Kanal (wie /level rangliste, nur ohne eigene Zeile). Die Knöpfe darunter öffnen jedem eine eigene Ansicht, die Nachricht selbst bleibt bei Seite 1.",
             row(
                 "Im Kanal zeigen",
                 "Ausschalten löscht die Nachricht",

@@ -486,7 +486,7 @@ export default class AntiVillainService {
     /** In den Köder getappt: 100 Punkte, ins Protokoll, Zähler an der angepinnten Warnung. */
     private async Caught(guild: Guild, member: GuildMember, how: string): Promise<void> {
         await this.Score(guild, member, [{ guard: "bait", detail: how }]);
-        await this.client.avEvents.Add(guild.id, "bait", `${member.user.username} in den Köder getappt`, how).catch(() => undefined);
+        await this.client.avEvents.Add(guild.id, "bait", `${member.user.username} in die Falle getappt`, how).catch(() => undefined);
         await this.UpdateBait(guild);
     }
 

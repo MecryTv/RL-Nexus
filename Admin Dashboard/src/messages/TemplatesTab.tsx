@@ -123,7 +123,7 @@ export function TemplatesTab({ templates, guildId, onChanged }: { readonly templ
     return (
         <>
             <div className={styles.toolbar}>
-                <p className={styles.dim}>Nur für Änderungen an dem, was die Leute schon nutzen, Wartung, Störungen, Datenschutz und Hinweise an eine Person. Keine Werbung.</p>
+                <p className={styles.dim}>Nur für Änderungen an dem, was die Leute schon nutzen, für Wartung, Störungen, Datenschutz und Hinweise an eine Person. Keine Werbung.</p>
                 <Button variant="primary" icon="plus" onClick={() => setDraft({ id: null, name: "", audience: "all", content: EMPTY_CONTENT })}>
                     Neue Vorlage
                 </Button>

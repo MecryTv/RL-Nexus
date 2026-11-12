@@ -98,7 +98,7 @@ export const MODULE_DETAILS: Readonly<Record<string, IModuleDetail>> = {
 
     apply: {
         intro: [
-            "Bewerbungen laufen auf den meisten Servern über Direktnachrichten an die Person, die gerade online ist. Das funktioniert, bis es zwei Bewerbungen gleichzeitig gibt: dann weiß niemand, wer schon geantwortet hat, die Zusage kommt doppelt, und drei Wochen später kann keiner mehr sagen, warum jemand abgelehnt wurde.",
+            "Bewerbungen laufen auf den meisten Servern über Direktnachrichten an die Person, die gerade online ist. Das funktioniert, bis es zwei Bewerbungen gleichzeitig gibt: Dann weiß niemand, wer schon geantwortet hat, die Zusage kommt doppelt, und drei Wochen später kann keiner mehr sagen, warum jemand abgelehnt wurde.",
             "Das Apply System verlegt den Vorgang dorthin, wo alle Beteiligten ihn sehen. Dein Server baut sich seine Formulare selbst, und Bewerber füllen sie über einen öffentlichen Link aus, angemeldet mit Discord. Jede Bewerbung landet als Karte im Team-Kanal, mit den Antworten oben und zwei Knöpfen darunter. Wer annimmt, vergibt damit gleichzeitig die Rolle.",
             "Für eine Organisation mit mehreren Teams ist das keine Bequemlichkeit, sondern eine Voraussetzung: Main, Academy und Content-Team suchen unterschiedliche Leute und stellen unterschiedliche Fragen. Jedes Formular hat seine eigenen Fragen, seinen eigenen Kanal und seine eigene Rolle bei Annahme.",
         ],
@@ -187,7 +187,7 @@ export const MODULE_DETAILS: Readonly<Record<string, IModuleDetail>> = {
             entries: [
                 {
                     label: "Mehrere möglich",
-                    text: "Der Standard: jede Rolle lässt sich einzeln an- und abwählen. Für Benachrichtigungen, etwa Scrim- und Turnier-Pings.",
+                    text: "Der Standard: Jede Rolle lässt sich einzeln an- und abwählen. Für Benachrichtigungen, etwa Scrim- und Turnier-Pings.",
                     color: "var(--c-mod-community)",
                 },
                 {
@@ -306,7 +306,7 @@ export const MODULE_DETAILS: Readonly<Record<string, IModuleDetail>> = {
     },
     "voice-hub": {
         intro: [
-            "Sprachkanäle sind das einzige, was auf einem Rocket-League-Server wirklich dauerhaft belegt ist, und gleichzeitig das, was die Kanalliste am schnellsten unbrauchbar macht. Irgendwann stehen dort dreißig Kanäle mit Namen wie „3v3 #7“, von denen zwei benutzt werden.",
+            "Sprachkanäle sind das Einzige, was auf einem Rocket-League-Server wirklich dauerhaft belegt ist, und gleichzeitig das, was die Kanalliste am schnellsten unbrauchbar macht. Irgendwann stehen dort dreißig Kanäle mit Namen wie „3v3 #7“, von denen zwei benutzt werden.",
             "Ein Hub dreht das um: Es gibt einen Kanal zum Betreten. Wer hineingeht, bekommt sofort einen eigenen Kanal und wird hineingezogen. Wer ihn als Letzter verlässt, löscht ihn damit. Die Liste ist also immer genau so lang wie die Zahl der Gruppen, die gerade spielen.",
             "Der Besitzer stellt seinen Kanal über ein Menü ein: umbenennen, Plätze begrenzen, privat machen, Leute einladen oder hinauswerfen. Wer das jedes Mal gleich haben will, speichert es als Preset, und beim nächsten eigenen Kanal gilt es von selbst, auf jedem Server mit RL Nexus.",
         ],
@@ -403,7 +403,7 @@ export const MODULE_DETAILS: Readonly<Record<string, IModuleDetail>> = {
                 },
                 {
                     label: "Playlists",
-                    text: "1v1, 2v2 und 3v3 einzeln, jede mit Rang, Division und MMR. Die Farbe folgt der Rangstufe. Diamant blau, Champion violett, Grand Champion rot.",
+                    text: "1v1, 2v2 und 3v3 einzeln, jede mit Rang, Division und MMR. Die Farbe folgt der Rangstufe: Diamant blau, Champion violett, Grand Champion rot.",
                     color: "var(--c-blue)",
                 },
                 {
@@ -976,7 +976,7 @@ export const MODULE_DETAILS: Readonly<Record<string, IModuleDetail>> = {
             entries: [
                 {
                     label: "Aktiv",
-                    text: "Der Fall wirkt noch: der Bann steht, der Timeout läuft, die Verwarnung zählt.",
+                    text: "Der Fall wirkt noch: Der Bann steht, der Timeout läuft, die Verwarnung zählt.",
                     color: "var(--c-loss)",
                 },
                 {
@@ -1069,7 +1069,7 @@ export const MODULE_DETAILS: Readonly<Record<string, IModuleDetail>> = {
                 },
                 {
                     label: "Spam, Wiederholung",
-                    text: "Zu viele Nachrichten in kurzer Zeit, oder dieselbe mehrfach am Stück.",
+                    text: "Zu viele Nachrichten in kurzer Zeit oder dieselbe mehrfach am Stück.",
                     color: "var(--c-mod-engagement)",
                 },
                 {
@@ -1401,7 +1401,7 @@ export const MODULE_DETAILS: Readonly<Record<string, IModuleDetail>> = {
                 },
                 {
                     label: "Belohnungsrollen",
-                    text: "Bis zu 25, je eine ab einem Level. Entweder bleiben alle erreichten Rollen, oder nur die höchste.",
+                    text: "Bis zu 25, je eine ab einem Level. Entweder bleiben alle erreichten Rollen oder nur die höchste.",
                     color: "var(--c-mod-engagement)",
                 },
             ],
@@ -1470,7 +1470,7 @@ export const MODULE_DETAILS: Readonly<Record<string, IModuleDetail>> = {
             entries: [
                 {
                     label: "Rollen",
-                    text: "Eine von mehreren oder alle davon. Auch als Ausschluss: mit dieser Rolle geht es nicht.",
+                    text: "Eine von mehreren oder alle davon. Auch als Ausschluss: Mit dieser Rolle geht es nicht.",
                     color: "var(--c-red)",
                 },
                 {
@@ -1480,7 +1480,7 @@ export const MODULE_DETAILS: Readonly<Record<string, IModuleDetail>> = {
                 },
                 {
                     label: "Kontoalter",
-                    text: "Das Discord-Konto mindestens so viele Tage alt. Die wirksamste Bedingung gegen Zweitkonten.",
+                    text: "Das Discord-Konto ist mindestens so viele Tage alt. Die wirksamste Bedingung gegen Zweitkonten.",
                     color: "var(--c-mod-moderation)",
                 },
                 {
@@ -1853,7 +1853,7 @@ export const MODULE_DETAILS: Readonly<Record<string, IModuleDetail>> = {
     backups: {
         intro: [
             "Eine falsch gesetzte Einstellung, ein gelöschtes Panel, ein Test, der mehr geändert hat als gedacht: Auf einem Server mit vielen Modulen ist schnell etwas weg, das jemand über Wochen eingerichtet hat.",
-            "Backups sichert den ganzen Stand eines Servers. Welche Module an sind und wie sie eingestellt sind, Nachrichten und Panels, dazu die Daten der Mitglieder wie Level, Tickets oder Verwarnungen. Auf Wunsch auch den Discord-Server selbst: Rollen, Kanäle, Rechte, wer welche Rolle hat, Emojis, Bans und die Servereinstellungen.",
+            "Backups sichert den ganzen Stand eines Servers. Welche Module an sind und wie sie eingestellt sind, Nachrichten und Panels, dazu die Daten der Mitglieder wie Level, Tickets oder Verwarnungen. Auf Wunsch auch den Discord-Server selbst: Rollen, Kanäle, Rechte, wer welche Rolle hat, Emojis, Banns und die Servereinstellungen.",
             "Zurückgeladen wird im Dashboard in vier Schritten, mit den Unterschieden zu jetzt, bevor etwas passiert. Reparieren legt an, was fehlt, und löscht nichts. Danach zeigen die Einstellungen des Bots auf die neuen Kanäle und Rollen. Vorher sichert der Bot den jetzigen Stand, damit sich auch das wieder rückgängig machen lässt.",
         ],
         concepts: {
@@ -1877,7 +1877,7 @@ export const MODULE_DETAILS: Readonly<Record<string, IModuleDetail>> = {
                 },
                 {
                     label: "Discord-Server",
-                    text: "Rollen, Kanäle und Rechte, wer welche Rolle hat, Emojis, Bans und Einstellungen. Bans hebt der Bot beim Laden nie auf, und was über seiner Rolle steht, fasst er nicht an.",
+                    text: "Rollen, Kanäle und Rechte, wer welche Rolle hat, Emojis, Banns und Einstellungen. Banns hebt der Bot beim Laden nie auf, und was über seiner Rolle steht, fasst er nicht an.",
                     color: "var(--c-blue)",
                 },
                 {

@@ -151,7 +151,7 @@ export function NewsPage(): JSX.Element {
                 }
                 lead={
                     <>
-                        Updates, Partner, Turniere und alles, was ihr wissen solltet.
+                        Updates, Partner, Turniere und alles, was du wissen solltest.
                         {freshCount > 0 && <b className={styles.freshCount}> {freshCount === 1 ? "1 Eintrag ist neu" : `${freshCount} Einträge sind neu`} seit deinem letzten Besuch.</b>}
                     </>
                 }

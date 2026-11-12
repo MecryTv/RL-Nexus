@@ -771,7 +771,7 @@ export function renderGallery(guildId: string, canManage: boolean): void {
             // statt erst Megabytes durchs Netz zu schicken.
             if (picked.size > MAX_UPLOAD_BYTES) {
                 entry.phase = "failed";
-                entry.error = `Zu groß – ${megabytes(picked.size)}, höchstens ${megabytes(MAX_UPLOAD_BYTES)}.`;
+                entry.error = `Zu groß: ${megabytes(picked.size)}, höchstens ${megabytes(MAX_UPLOAD_BYTES)}.`;
             } else if (!accepted.includes(picked.type)) {
                 entry.phase = "failed";
                 entry.error = "Nur PNG, JPG, GIF oder WebP.";

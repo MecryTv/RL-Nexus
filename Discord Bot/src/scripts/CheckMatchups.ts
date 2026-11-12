@@ -669,7 +669,7 @@ async function checkButtons(client: BotClient, rows: Map<number, IMatchup>): Pro
     const last = () => answers[answers.length - 1];
     const ephemeral = (answer: Answer | undefined) => ((answer?.flags ?? 0) & 64) === 64;
     const text = (answer: Answer | undefined) => `${answer?.content ?? ""} ${JSON.stringify((answer?.components ?? []).map((entry) => entry.toJSON()))}`;
-    const hint = "Das dürfen Captain, Co-Captain, Manager und Coach des Teams – und wer den Server verwaltet.";
+    const hint = "Das dürfen Captain, Co-Captain, Manager und Coach des Teams sowie alle, die den Server verwalten.";
 
     rows.set(20, FakeMatchup({ id: 20, at: now - HOUR, messageId: "520", liveAt: now, resultRemindedAt: now }));
     rows.set(21, FakeMatchup({ id: 21, at: now + DAY, messageId: "521" }));

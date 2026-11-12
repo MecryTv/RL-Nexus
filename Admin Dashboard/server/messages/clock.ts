@@ -27,8 +27,8 @@ const MISS_LIMIT = 25;
 /** Zwischenstände gehen höchstens so oft an die Oberfläche; Ende und Anhalten sofort. */
 const PUBLISH_EVERY_MS = 10_000;
 const CLOCK = { id: "0", name: "Nachrichten über den Bot" };
-const RESTART = "Neustart beim Senden, unklar ob angekommen";
-const STUCK = "beim Senden hängen geblieben, unklar ob angekommen";
+const RESTART = "Neustart beim Senden, unklar, ob angekommen";
+const STUCK = "beim Senden hängen geblieben, unklar, ob angekommen";
 
 // ponytail: Zähler nur im Speicher; nach einem Neustart beginnen sie bei 0. Ein
 // Spam-Signal hält ohnehin sofort an, die Grenzen sind Schätzungen.

@@ -183,7 +183,7 @@ export default class DevLogsHandler extends Event {
         }
 
         if (file.size > MAX_UPLOAD_BYTES) {
-            state.notice = `❌ ${(file.size / 1024 / 1024).toFixed(1)} MB — zu groß für einen Discord-Upload.`;
+            state.notice = `❌ ${(file.size / 1024 / 1024).toFixed(1)} MB, zu groß für einen Discord-Upload.`;
 
             return this.Apply(interaction, state);
         }

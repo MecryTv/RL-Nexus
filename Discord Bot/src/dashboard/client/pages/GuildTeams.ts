@@ -410,7 +410,7 @@ function mount(guildId: string, view: "teams" | "board"): void {
         ...data!.guild.forums.map((entry): [string, string] => [entry.id, `💬 ${entry.name}`]),
         ...data!.guild.voice.map((entry): [string, string] => [entry.id, `🔊 ${entry.name}`]),
     ];
-    const roleOptions = (): [string, string][] => [["", "— keine —"], ...data!.guild.roles.map((role): [string, string] => [role.id, `@${role.name}`])];
+    const roleOptions = (): [string, string][] => [["", "(keine)"], ...data!.guild.roles.map((role): [string, string] => [role.id, `@${role.name}`])];
 
     /* ------------------------------------------------------------
        Kopf
@@ -491,8 +491,8 @@ function mount(guildId: string, view: "teams" | "board"): void {
 
         return card(
             "Kategorien",
-            `Damit stehen die Teams im Hub unter Überschriften. Bis zu ${data!.limits.groups} Stück – ohne Kategorie geht es auch. Anlegen und zuordnen geht auch direkt im Hub unter Anzeige › Nachrichten.`,
-            ...(data!.groups.length ? [list] : [el("div", "tkempty", icon("#i-folder"), el("span", "", "Noch keine Kategorie – alle Teams stehen untereinander."))]),
+            `Damit stehen die Teams im Hub unter Überschriften. Bis zu ${data!.limits.groups} Stück, ohne Kategorie geht es auch. Anlegen und zuordnen geht auch direkt im Hub unter Anzeige › Nachrichten.`,
+            ...(data!.groups.length ? [list] : [el("div", "tkempty", icon("#i-folder"), el("span", "", "Noch keine Kategorie, alle Teams stehen untereinander."))]),
             el("div", "snadd__row", icon("#i-folder"), name, add)
         );
     }
@@ -526,7 +526,7 @@ function mount(guildId: string, view: "teams" | "board"): void {
 
             openTeam = answer.team.id;
             name.value = "";
-            toast("info", "Angelegt", "Jetzt den Kader eintragen – gespeichert wird mit Speichern.");
+            toast("info", "Angelegt", "Jetzt den Kader eintragen. Gespeichert wird mit „Speichern“.");
             void reload();
         };
 
@@ -686,13 +686,13 @@ function mount(guildId: string, view: "teams" | "board"): void {
                 "snitem__body",
                 text("Name", "So steht er auf der Karte", draft.name, data!.limits.name, (value) => (draft.name = value)),
                 text("Kürzel", "Zwei bis vier Zeichen, etwa VYX", draft.tag, data!.limits.tag, (value) => (draft.tag = value.toUpperCase())),
-                text("Region", "Wo das Team spielt, etwa EU – steht auf der gezeichneten Karte", draft.region ?? "", 16, (value) => (draft.region = value)),
+                text("Region", "Wo das Team spielt, etwa EU (steht auf der gezeichneten Karte)", draft.region ?? "", 16, (value) => (draft.region = value)),
                 text("Beschreibung", "Ein Satz über das Team", draft.description, data!.limits.description, (value) => (draft.description = value), true),
                 row(
                     "Kategorie",
                     "Unter welcher Überschrift das Team steht",
                     select(
-                        [["", "— ohne Kategorie —"], ...data!.groups.map((entry): [string, string] => [String(entry.id), entry.name])],
+                        [["", "(ohne Kategorie)"], ...data!.groups.map((entry): [string, string] => [String(entry.id), entry.name])],
                         draft.groupId ? String(draft.groupId) : "",
                         (value) => {
                             draft.groupId = value ? Number(value) : null;
@@ -881,7 +881,7 @@ function mount(guildId: string, view: "teams" | "board"): void {
             el("p", "tmremove__lead", el("b", "", `${team.name} löschen?`), " Die Karte im Kanal geht mit. Soll auch weg, was der Bot für das Team angelegt hat?"),
             el("div", "mcdur", ...(role ? [chip("role", `Rolle @${role.name}`)] : []), ...(rooms.length ? [chip("channels", `Kanäle (${rooms.length})`)] : [])),
             ...(rooms.length
-                ? [el("p", "hintline", `${rooms.join(" · ")}${team.created.categoryId ? " – die Kategorie nur, wenn danach nichts mehr darin steht." : ""}`)]
+                ? [el("p", "hintline", `${rooms.join(" · ")}${team.created.categoryId ? ". Die Kategorie nur, wenn danach nichts mehr darin steht." : ""}`)]
                 : []),
             el("div", "mcsave", back, go)
         );
@@ -930,7 +930,7 @@ function mount(guildId: string, view: "teams" | "board"): void {
         const box = el("div", "tmchannels");
         const draw = (): void => {
             const category = select(
-                [["", "— keine Kategorie —"], ...data!.guild.categories.map((entry): [string, string] => [entry.id, entry.name])],
+                [["", "(keine Kategorie)"], ...data!.guild.categories.map((entry): [string, string] => [entry.id, entry.name])],
                 draft.channels.categoryId ?? "",
                 (value) => {
                     draft.channels.categoryId = value || null;
@@ -1148,7 +1148,7 @@ function mount(guildId: string, view: "teams" | "board"): void {
             epic.value = "";
             drawTracker();
             touch();
-            hint.textContent = "Kein Epic-Konto verknüpft – trag den Namen selbst ein (/rank link verbindet es).";
+            hint.textContent = "Kein Epic-Konto verknüpft. Trag den Namen selbst ein (/rank link verbindet es).";
         };
 
         /* --- Das Mitglied. Wer sein Epic-Konto verbunden hat, bringt den Namen mit. --- */
@@ -1216,7 +1216,7 @@ function mount(guildId: string, view: "teams" | "board"): void {
                       return el("label", "tmpeak__box", el("span", "tmpeak__label", slot), field);
                   })
               )
-            : el("p", "tmplayer__facts", "Diese Rechnung nimmt nur die aktuellen Werte – einen Peak brauchst du nicht.");
+            : el("p", "tmplayer__facts", "Diese Rechnung nimmt nur die aktuellen Werte, einen Peak brauchst du nicht.");
 
         /* --- Was Prime zuletzt hergab --- */
         const facts: string[] = [];
@@ -1302,7 +1302,7 @@ function mount(guildId: string, view: "teams" | "board"): void {
                 return;
             }
 
-            toast("info", "Gespeichert", draft.roles.sync ? "Die Rollen gehen gleich an die Kader." : "Der Bot vergibt keine Rollen mehr – wer eine hat, behält sie.");
+            toast("info", "Gespeichert", draft.roles.sync ? "Die Rollen gehen gleich an die Kader." : "Der Bot vergibt keine Rollen mehr. Wer eine hat, behält sie.");
             void reload();
         });
 
@@ -1315,7 +1315,7 @@ function mount(guildId: string, view: "teams" | "board"): void {
             toast(
                 "info",
                 answer.members ? "Abgleich läuft" : "Alles stimmt",
-                answer.members ? `${answer.members} Mitglied${answer.members === 1 ? "" : "er"} – das dauert einen Moment.` : "Jeder im Kader hat seine Rollen."
+                answer.members ? `${answer.members} Mitglied${answer.members === 1 ? "" : "er"}, das dauert einen Moment.` : "Jeder im Kader hat seine Rollen."
             );
         });
 
@@ -1356,7 +1356,7 @@ function mount(guildId: string, view: "teams" | "board"): void {
             el(
                 "p",
                 "hintline",
-                `„Jetzt abgleichen“ geht alle Kader durch: Wem eine Rolle fehlt, der bekommt sie. Wer eine dieser Rollen hat und in keinem Kader steht, verliert sie.${data!.memberIntent ? "" : " Das Members-Intent ist aus – der Bot sieht dabei nur Mitglieder, die er gerade kennt."}`
+                `„Jetzt abgleichen“ geht alle Kader durch: Wem eine Rolle fehlt, der bekommt sie. Wer eine dieser Rollen hat und in keinem Kader steht, verliert sie.${data!.memberIntent ? "" : " Das Members-Intent ist aus. Der Bot sieht dabei nur Mitglieder, die er gerade kennt."}`
             ),
             el("div", "mcsave lvsave", save, sync)
         );
@@ -1582,8 +1582,8 @@ function mount(guildId: string, view: "teams" | "board"): void {
                     const state = own ? (own.kind === "emoji" ? "eigenes Emoji" : "eigenes Bild") : "Standard";
 
                     chip.dataset.role = role;
-                    chip.title = `${label}: ${state} – ändern`;
-                    chip.setAttribute("aria-label", `Abzeichen für ${label}: ${state} – ändern`);
+                    chip.title = `${label}: ${state} (ändern)`;
+                    chip.setAttribute("aria-label", `Abzeichen für ${label}: ${state} (ändern)`);
                     chip.setAttribute("aria-haspopup", "dialog");
                     chip.addEventListener("click", () =>
                         openEmojiPicker(chip, {
@@ -1663,7 +1663,7 @@ function mount(guildId: string, view: "teams" | "board"): void {
             defaultEmbed: () => structuredClone(EMPTY_EMBED),
             touch,
             title: "Die Nachricht je Team",
-            hint: "{team.roster} ist der Kader, {team.mmr} die Team-MMR. Je Aufgabe gibt es {team.captain.rank} und mehr – im Menü „Aufgaben-Platzhalter“.",
+            hint: "{team.roster} ist der Kader, {team.mmr} die Team-MMR. Je Aufgabe gibt es {team.captain.rank} und mehr, zu finden im Menü „Aufgaben-Platzhalter“.",
             templates: "teamCard",
         });
 
@@ -1685,7 +1685,7 @@ function mount(guildId: string, view: "teams" | "board"): void {
 
             if (!answer) return;
 
-            const missing = answer.failed ? ` ${answer.failed} kam${answer.failed === 1 ? "" : "en"} nicht durch – darf der Bot im Kanal schreiben?` : "";
+            const missing = answer.failed ? ` ${answer.failed} kam${answer.failed === 1 ? "" : "en"} nicht durch. Darf der Bot im Kanal schreiben?` : "";
 
             toast("info", answer.failed ? "Nicht alles steht im Kanal" : "Steht im Kanal", `${answer.sent} Nachricht${answer.sent === 1 ? "" : "en"} geschrieben.${missing}`);
             void reload();
@@ -1715,12 +1715,12 @@ function mount(guildId: string, view: "teams" | "board"): void {
         });
 
         const layoutHint: Record<string, string> = {
-            hub: "Eine Nachricht: oben dein Kopf, darunter Kennzahlen, die Teams nach Kategorien und ein Menü. Wer ein Team wählt, bekommt die gezeichnete Team-Karte – nur für sich.",
+            hub: "Eine Nachricht: oben dein Kopf, darunter Kennzahlen, die Teams nach Kategorien und ein Menü. Wer ein Team wählt, bekommt die gezeichnete Team-Karte (nur für sich).",
             cards: "Je Team eine eigene Nachricht, untereinander im Kanal. Wie sie aussieht, stellst du unter „Nachrichten“ im Editor ein.",
         };
         const messageHint: Record<string, string> = {
             hub: "Oben der Kopf des Hubs, darunter Kategorien, Menü und Knopf. Ganz unten die Team-Karte, die bekommt, wer im Menü ein Team wählt.",
-            cards: "Die Nachricht geht so oft raus, wie es Teams gibt – je Team eine eigene.",
+            cards: "Die Nachricht geht so oft raus, wie es Teams gibt: je Team eine eigene.",
         };
 
         const hint = el("p", "hintline", layoutHint[draft.layout]);
@@ -1881,13 +1881,13 @@ function mount(guildId: string, view: "teams" | "board"): void {
             });
 
             categoryBox.replaceChildren(
-                list.length ? el("div", "tmgroups", ...list) : el("div", "tkempty", icon("#i-folder"), el("span", "", "Noch keine Kategorie – alle Teams stehen ohne Überschrift untereinander.")),
+                list.length ? el("div", "tmgroups", ...list) : el("div", "tkempty", icon("#i-folder"), el("span", "", "Noch keine Kategorie, alle Teams stehen ohne Überschrift untereinander.")),
                 el("div", "snadd__row", icon("#i-folder"), newCategory, addCategory)
             );
         };
 
         const paintAssign = (): void => {
-            const options: [string, string][] = [["", "— ohne Kategorie —"], ...categories.categories.map((entry): [string, string] => [String(entry.id), entry.name || "(ohne Namen)"])];
+            const options: [string, string][] = [["", "(ohne Kategorie)"], ...categories.categories.map((entry): [string, string] => [String(entry.id), entry.name || "(ohne Namen)"])];
 
             assignBox.replaceChildren(
                 ...(data!.teams.length
@@ -1954,7 +1954,7 @@ function mount(guildId: string, view: "teams" | "board"): void {
 
                 const missing =
                     now.to === "apply" && !data!.apply
-                        ? "Das Apply System ist aus – so steht kein Knopf da."
+                        ? "Das Apply System ist aus, so steht kein Knopf da."
                         : now.to === "web" && !validUrl(now.url)
                           ? "Ohne Adresse steht kein Knopf da."
                           : now.to === "channel" && !linkOptions("").some(([id]) => id !== "" && id === now.channelId)
@@ -1983,7 +1983,7 @@ function mount(guildId: string, view: "teams" | "board"): void {
                               row(
                                   "Kanal",
                                   "Wer ihn nicht sehen darf, landet nirgends",
-                                  select(linkOptions("— Kanal wählen —"), now.channelId ?? "", (value) => {
+                                  select(linkOptions("(Kanal wählen)"), now.channelId ?? "", (value) => {
                                       draft.hubButton = { ...draft.hubButton, channelId: value || null };
                                       touch();
                                       paintButton();
@@ -1998,7 +1998,7 @@ function mount(guildId: string, view: "teams" | "board"): void {
             }
 
             buttonBox.replaceChildren(
-                el("p", "hintline", "Unter den Teams steht ein Menü mit allen Teams, die Kategorie steht beim Team mit dabei. Ab 26 Teams kommt ein zweites Menü dazu – mehr Einträge lässt Discord in einem Menü nicht zu."),
+                el("p", "hintline", "Unter den Teams steht ein Menü mit allen Teams, die Kategorie steht beim Team mit dabei. Ab 26 Teams kommt ein zweites Menü dazu. Mehr Einträge lässt Discord in einem Menü nicht zu."),
                 ...parts
             );
         };
@@ -2143,7 +2143,7 @@ function mount(guildId: string, view: "teams" | "board"): void {
 
         const hubLineCard = card(
             "Zeile je Team im Hub",
-            "Im Team-Hub steht jedes Team als eine Zeile unter seiner Kategorie. Hier stellst du ein, was darin steht – mit den Platzhaltern der Team-Karte. Wie viele Teams je Kategorie dastehen, steht unter „Kanal & Darstellung“.",
+            "Im Team-Hub steht jedes Team als eine Zeile unter seiner Kategorie. Hier stellst du mit den Platzhaltern der Team-Karte ein, was darin steht. Wie viele Teams je Kategorie dastehen, steht unter „Kanal & Darstellung“.",
             row("Zeile je Team", "Etwa {team.rank.icon}, {team.name}, {team.tag}, {team.players}, {team.mmr}. Ohne Kürzel fallen die Backticks weg", lineInput),
             el("div", "tmline", linePick, lineReset),
             hubListPreview,
@@ -2218,7 +2218,7 @@ function mount(guildId: string, view: "teams" | "board"): void {
             "div",
             "tmdrawn",
             bar("Eine Team-Karte"),
-            el("p", "hintline", "Die zeichnet der Bot. So bekommt sie, wer im Menü ein Team wählt – nur für sich."),
+            el("p", "hintline", "Die zeichnet der Bot. So bekommt sie, wer im Menü ein Team wählt (nur für sich)."),
             cardEditor.node
         );
 
@@ -2284,7 +2284,7 @@ function mount(guildId: string, view: "teams" | "board"): void {
             row(
                 "Kanal",
                 "Dort landen die Nachrichten",
-                select(channelOptions("— kein Kanal —"), draft.channelId ?? "", (value) => {
+                select(channelOptions("(kein Kanal)"), draft.channelId ?? "", (value) => {
                     draft.channelId = value || null;
                     touch();
                 }, "Kanal für die Übersicht")
@@ -2325,7 +2325,7 @@ function mount(guildId: string, view: "teams" | "board"): void {
                 "Ränge zeigen als",
                 Object.keys(data!.rankIcons).length
                     ? "Gilt für {team.lineup}, {team.roster}, {team.rank} und {epicname.rank}. Was auf .rank.icon endet, ist immer das Icon"
-                    : "Gilt für {team.lineup}, {team.roster}, {team.rank} und {epicname.rank}. Die Icons legt der Bot beim Start an – bis dahin steht der Text da",
+                    : "Gilt für {team.lineup}, {team.roster}, {team.rank} und {epicname.rank}. Die Icons legt der Bot beim Start an, bis dahin steht der Text da",
                 select(
                     Object.entries(data!.rankStyles).map(([id, label]): [string, string] => [id, label]),
                     draft.rankStyle,
@@ -2343,7 +2343,7 @@ function mount(guildId: string, view: "teams" | "board"): void {
                 "Aufgaben zeigen als",
                 Object.keys(data!.roleIcons).length
                     ? "Gilt für {team.lineup}, {team.roster}, {team.staff} und {spieler.role}. {spieler.role.icon} ist immer das Abzeichen"
-                    : "Gilt für {team.lineup}, {team.roster}, {team.staff} und {spieler.role}. Die Abzeichen legt der Bot beim Start an – bis dahin steht der Text da",
+                    : "Gilt für {team.lineup}, {team.roster}, {team.staff} und {spieler.role}. Die Abzeichen legt der Bot beim Start an, bis dahin steht der Text da",
                 select(
                     Object.entries(data!.rankStyles).map(([id, label]): [string, string] => [id, label]),
                     draft.roleStyle,
@@ -2363,7 +2363,7 @@ function mount(guildId: string, view: "teams" | "board"): void {
 
         const texts = card(
             "Die Nachrichten",
-            "Selbst gebaut – mit Platzhaltern, Vorlagen und Live-Vorschau. Gezeigt wird nur, was die gewählte Darstellung braucht.",
+            "Selbst gebaut mit Platzhaltern, Vorlagen und Live-Vorschau. Gezeigt wird nur, was die gewählte Darstellung braucht.",
             messages,
             el("div", "mcsave lvsave", saveButton())
         );

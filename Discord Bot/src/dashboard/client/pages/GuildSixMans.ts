@@ -330,7 +330,7 @@ function mount(guildId: string, view: "base" | "live" | "board"): void {
 
             const none = !MODES.some((mode) => draft.modes[mode]);
 
-            warn.replaceChildren(...(none ? [icon("#i-warn"), el("span", "", "Kein Modus ist an – das Panel hat dann nichts anzubieten.")] : []));
+            warn.replaceChildren(...(none ? [icon("#i-warn"), el("span", "", "Kein Modus ist an. Das Panel hat dann nichts anzubieten.")] : []));
             warn.hidden = !none;
         };
 
@@ -338,14 +338,14 @@ function mount(guildId: string, view: "base" | "live" | "board"): void {
 
         return card(
             "Wie gespielt wird",
-            "Jeder Modus hat seine eigene Warteschlange und seine eigene MMR: wer in 6 Mans oben steht, fängt in 2 Mans trotzdem beim Startwert an.",
+            "Jeder Modus hat seine eigene Warteschlange und seine eigene MMR: Wer in 6 Mans oben steht, fängt in 2 Mans trotzdem beim Startwert an.",
             row("Modi", "Was im Panel zur Auswahl steht", modes),
             warn,
             row(
                 "Kanal",
                 "Dort stehen Panel und Runden",
                 select(
-                    [["", "— kein Kanal —"], ...data!.guild.channels.map((entry): [string, string] => [entry.id, `# ${entry.name}`])],
+                    [["", "(kein Kanal)"], ...data!.guild.channels.map((entry): [string, string] => [entry.id, `# ${entry.name}`])],
                     draft.channelId ?? "",
                     (value) => {
                         draft.channelId = value || null;
@@ -358,7 +358,7 @@ function mount(guildId: string, view: "base" | "live" | "board"): void {
                 "Kategorie für die Sprachkanäle",
                 "Dort entstehen Blau und Orange",
                 select(
-                    [["", "— keine —"], ...data!.guild.categories.map((entry): [string, string] => [entry.id, entry.name])],
+                    [["", "(keine)"], ...data!.guild.categories.map((entry): [string, string] => [entry.id, entry.name])],
                     draft.categoryId ?? "",
                     (value) => {
                         draft.categoryId = value || null;
@@ -367,17 +367,17 @@ function mount(guildId: string, view: "base" | "live" | "board"): void {
                     "Kategorie für die Sprachkanäle"
                 )
             ),
-            switchRow("Sprachkanäle anlegen", "Zwei Kanäle je Runde – wer schon im Voice sitzt, wird hinübergezogen", draft.voice, (on) => (draft.voice = on)),
+            switchRow("Sprachkanäle anlegen", "Zwei Kanäle je Runde. Wer schon im Voice sitzt, wird hinübergezogen", draft.voice, (on) => (draft.voice = on)),
             switchRow("DM an alle", "Jeder Teilnehmer bekommt Lobby und Passwort per DM", draft.dm, (on) => (draft.dm = on)),
-            switchRow("Ergebnis bestätigen lassen", "An: das andere Team muss dasselbe melden. Aus: ein Klick genügt", draft.confirm, (on) => (draft.confirm = on)),
+            switchRow("Ergebnis bestätigen lassen", "An: Das andere Team muss dasselbe melden. Aus: Ein Klick genügt", draft.confirm, (on) => (draft.confirm = on)),
             row("Start-MMR", "Womit jeder in jedem Modus anfängt", number(draft.start, data!.limits.start[0], data!.limits.start[1], "Start-MMR", (value) => (draft.start = value))),
             row("Höchster Ausschlag", "So viel bewegt eine Runde höchstens", number(draft.k, data!.limits.k[0], data!.limits.k[1], "Höchster Ausschlag", (value) => (draft.k = value))),
             row(
                 "Aus der Warteschlange nach",
-                "Minuten ohne Runde – 0 heißt: niemand fliegt raus",
+                "Minuten ohne Runde. 0 heißt: Niemand fliegt raus",
                 number(draft.idleMinutes, 0, data!.limits.idle, "Minuten in der Warteschlange", (value) => (draft.idleMinutes = value))
             ),
-            el("p", "hintline", "Die Warteschlangen leben im Bot: nach einem Neustart sind sie leer. Runden und Wertung stehen in der Datenbank."),
+            el("p", "hintline", "Die Warteschlangen leben im Bot: Nach einem Neustart sind sie leer. Runden und Wertung stehen in der Datenbank."),
             el("div", "mcsave lvsave", save, panel)
         );
     }
@@ -449,7 +449,7 @@ function mount(guildId: string, view: "base" | "live" | "board"): void {
 
         return card(
             "Die vier Nachrichten",
-            "Selbst gebaut – mit Platzhaltern, Vorlagen und Live-Vorschau. Die Knöpfe hängt der Bot selbst an.",
+            "Selbst gebaut, mit Platzhaltern, Vorlagen und Live-Vorschau. Die Knöpfe hängt der Bot selbst an.",
             el("div", "tmmsgs", panel.node, round.node, result.node, dm.node),
             el("div", "mcsave lvsave", save)
         );
@@ -510,7 +510,7 @@ function mount(guildId: string, view: "base" | "live" | "board"): void {
 
             return card(
                 `${data!.modeLabels[mode]} · ${data!.modeHints[mode]}`,
-                `${queue.length} von ${mode} – bei ${mode} geht es von allein los.`,
+                `${queue.length} von ${mode}. Bei ${mode} geht es von allein los.`,
                 el("div", "aplist", ...(rows.length ? rows : [el("div", "tkempty", icon("#i-users"), el("span", "", "Gerade wartet niemand."))])),
                 ...(queue.length ? [el("div", "mcsave", clear)] : [])
             );
@@ -558,7 +558,7 @@ function mount(guildId: string, view: "base" | "live" | "board"): void {
 
         return card(
             "Läuft gerade",
-            "Wer nicht meldet, blockiert die Warteschlange – hier kannst du eine festgefahrene Runde abbrechen.",
+            "Wer nicht meldet, blockiert die Warteschlange. Hier kannst du eine festgefahrene Runde abbrechen.",
             el("div", "aplist", ...(rows.length ? rows : [el("div", "tkempty", icon("#i-gamepad"), el("span", "", "Gerade läuft keine Runde."))]))
         );
     }
@@ -679,10 +679,10 @@ function mount(guildId: string, view: "base" | "live" | "board"): void {
 
         return card(
             "Öffentliche Rangliste",
-            "Eine Seite ohne Anmeldung – mit allen drei Modi, Stufen und Bilanz. Ohne Freigabe antwortet sie mit „gibt es nicht“.",
+            "Eine Seite ohne Anmeldung, mit allen drei Modi, Stufen und Bilanz. Ohne Freigabe antwortet sie mit „gibt es nicht“.",
             row(
                 "Öffentlich",
-                "Aus: die Seite zeigt nichts, auch nicht mit Link",
+                "Aus: Die Seite zeigt nichts, auch nicht mit Link",
                 el(
                     "label",
                     "snitem__switch",
@@ -823,7 +823,7 @@ function mount(guildId: string, view: "base" | "live" | "board"): void {
                 return;
             }
 
-            toast("info", "Gespeichert", "Die neuen Stufen stehen überall – auch in Discord.");
+            toast("info", "Gespeichert", "Die neuen Stufen stehen überall, auch in Discord.");
             void reload();
         });
 
@@ -831,7 +831,7 @@ function mount(guildId: string, view: "base" | "live" | "board"): void {
 
         return card(
             "Die Stufen",
-            `Eigene Namen für die MMR dieses Servers – mit den Rängen im Spiel hat das nichts zu tun. Bis zu ${data!.limits.ranks} Stufen; die unterste gilt immer ab 0.`,
+            `Eigene Namen für die MMR dieses Servers. Mit den Rängen im Spiel hat das nichts zu tun. Bis zu ${data!.limits.ranks} Stufen; die unterste gilt immer ab 0.`,
             el("p", "hintline", "Ab welcher MMR · Zeichen · Name · Farbe"),
             list,
             el("div", "mcsave", add),

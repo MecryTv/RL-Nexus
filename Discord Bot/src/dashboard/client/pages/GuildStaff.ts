@@ -508,7 +508,7 @@ export function lockPrivate(section: HTMLElement, guild: IGuild): void {
         note.hidden = true;
 
         if (grant?.private === "asked") {
-            body.replaceChildren(el("div", "sglock__icon", icon("#i-lock")), el("h3", "", "Privater Bereich"), el("p", "", `Angefragt. Sobald ${who} Ja sagt, geht diese Seite von selbst auf.`));
+            body.replaceChildren(el("div", "sglock__icon", icon("#i-lock")), el("h3", "", "Privater Bereich"), el("p", "", `Angefragt. Sobald ${grant.answeredBy?.name ?? "der Gefragte"} Ja sagt, geht diese Seite von selbst auf.`));
 
             return;
         }

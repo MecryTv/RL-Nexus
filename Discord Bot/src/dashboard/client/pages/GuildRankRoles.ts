@@ -91,13 +91,13 @@ export function renderRankRoles(guildId: string): void {
                     "div",
                     "notice",
                     icon("#i-warn"),
-                    el("span", "", "Der Bot ist gerade nicht mit Prime verbunden und kommt an keine Ränge – der Befehl sagt das dann auch.")
+                    el("span", "", "Der Bot ist gerade nicht mit Prime verbunden und kommt an keine Ränge. Der Befehl sagt das dann auch.")
                 )
             );
         }
 
         if (!data!.bot.canManageRoles) {
-            list.push(el("div", "notice", icon("#i-warn"), el("span", "", "Dem Bot fehlt „Rollen verwalten“ – er kann sonst keine Rolle vergeben.")));
+            list.push(el("div", "notice", icon("#i-warn"), el("span", "", "Dem Bot fehlt „Rollen verwalten“, ohne das kann er keine Rolle vergeben.")));
         }
 
         return list;
@@ -132,7 +132,7 @@ export function renderRankRoles(guildId: string): void {
     function rules(): HTMLElement {
         return card(
             "Wie es läuft",
-            "Mitglieder bekommen die Rollen mit /rank me, sobald ihr Epic-Konto mit /rank link verbunden ist. Der Bot fragt Rocket League nur dann – wer aufsteigt, ruft /rank me noch einmal auf.",
+            "Mitglieder bekommen die Rollen mit /rank me, sobald ihr Epic-Konto mit /rank link verbunden ist. Der Bot fragt Rocket League nur dann. Wer aufsteigt, ruft /rank me noch einmal auf.",
             row(
                 "Alte Rolle abnehmen",
                 "Beim Aufstieg geht die vorherige Rolle derselben Playlist weg",
@@ -157,7 +157,7 @@ export function renderRankRoles(guildId: string): void {
        ------------------------------------------------------------ */
     function playlistCard(playlist: Playlist): HTMLElement {
         const entry = draft!.playlists[playlist];
-        const roles: [string, string][] = [["", "— keine Rolle —"], ...data!.guild.roles.map((role): [string, string] => [role.id, `@${role.name}`])];
+        const roles: [string, string][] = [["", "(keine Rolle)"], ...data!.guild.roles.map((role): [string, string] => [role.id, `@${role.name}`])];
 
         const grid = el(
             "div",
@@ -217,7 +217,7 @@ export function renderRankRoles(guildId: string): void {
             rules(),
             ...data.playlists.map(playlistCard),
             el("div", "mcsave lvsave", save),
-            el("p", "hintline", "Die Rollen müssen unter der höchsten Rolle des Bots stehen – sonst darf er sie nicht vergeben.")
+            el("p", "hintline", "Die Rollen müssen unter der höchsten Rolle des Bots stehen, sonst darf er sie nicht vergeben.")
         );
     }
 

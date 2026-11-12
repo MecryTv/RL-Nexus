@@ -272,7 +272,7 @@ function Wizard({ guildId, initial, carried }: { readonly guildId: string; reado
                                     return (
                                         <Panel as="li" cut="sm" key={area.id} accent={on ? "rgb(255 30 45 / 55%)" : undefined} className={[styles.card, on ? styles.cardOn : null].filter(Boolean).join(" ")}>
                                             <Switch checked={on} label={area.label} onChange={(value) => toggle(area.id, value)} />
-                                            <span className={styles.faint}>{count === 0 ? "Im Backup leer: zurückladen löscht, was jetzt da ist." : `${formatNumber(count)} Zeilen`}</span>
+                                            <span className={styles.faint}>{count === 0 ? "Im Backup leer: Zurückladen löscht, was jetzt da ist." : `${formatNumber(count)} Zeilen`}</span>
                                             {/* Gelb erst, wenn es zählt: eingeschaltet geht verloren, was seither passiert ist. */}
                                             {area.members && (on ? <span className={[styles.meh, styles.small].join(" ")}>Daten der Mitglieder, {lossText(backup.createdAt, now)}</span> : <span className={styles.faint}>Daten der Mitglieder</span>)}
                                         </Panel>

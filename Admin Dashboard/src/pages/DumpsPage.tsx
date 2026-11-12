@@ -275,7 +275,7 @@ function StateNote({ data, now }: { readonly data: IDumpsOverview; readonly now:
                 <div className={[styles.note, styles.caution].join(" ")} role="status">
                     <b>Die letzte Probe ist nicht bestanden</b>
                     {data.probe?.error && <code>{data.probe.error}</code>}
-                    <p>Die nächste Nacht probt noch einmal. Bis dahin lieber eine ältere Sicherung als Rückfall im Kopf behalten.</p>
+                    <p>Die nächste Nacht probt noch einmal. Bis dahin lieber eine ältere Sicherung als Reserve im Kopf behalten.</p>
                 </div>
             );
         case "never":

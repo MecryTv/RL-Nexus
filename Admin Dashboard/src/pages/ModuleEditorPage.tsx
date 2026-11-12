@@ -250,7 +250,7 @@ function DetailForm({ detail, meta, onChange }: { readonly detail: IModuleDetail
     if (detail === null) {
         return (
             <div className={styles.empty}>
-                <p>Dieses Modul hat noch keine Detailseite. Ohne zeigt die Webseite dort nur Beschreibung, Stichpunkte und Commands.</p>
+                <p>Dieses Modul hat noch keine Detailseite. Ohne sie zeigt die Webseite dort nur Beschreibung, Stichpunkte und Commands.</p>
                 <Button icon="plus" onClick={() => onChange({ intro: [""] })}>
                     Detailseite anlegen
                 </Button>

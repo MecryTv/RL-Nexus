@@ -148,20 +148,20 @@ function checkDefaults(): void {
 function checkTexts(): void {
     console.log("\n  — Texte —");
 
-    check("Ohne Prüferrecht", STAFF_ONLY === "Bewerbungen werden nur vom Staff Team gesehen und bearbeitet.");
-    check("Nach dem Abschicken", RECEIVED === "Deine Bewerbung ist bei uns eingegangen. Das Staff Team wird sich bei dir melden.");
+    check("Ohne Prüferrecht", STAFF_ONLY === "Bewerbungen sieht und bearbeitet nur das Staff-Team.");
+    check("Nach dem Abschicken", RECEIVED === "Deine Bewerbung ist bei uns eingegangen. Das Staff-Team wird sich bei dir melden.");
     // W-0083: Mit Formular und echtem Datum - und ohne <t:…>, das auf der Webseite roh dastand.
     const declined = Date.UTC(2026, 10, 1, 12); // 01.11.2026
     const free = declined + 14 * DAY;
 
     check(
         "Pause nach Absage: wann abgelehnt, wie lang, ab wann wieder (W-0083)",
-        CooldownText("Spieler", declined, 14, free) === "Deine Bewerbung für „Spieler“ wurde am 01.11.2026 abgelehnt. Nach einer Absage gilt hier eine Pause von 14 Tagen – ab dem 15.11.2026 kannst du dich wieder bewerben.",
+        CooldownText("Spieler", declined, 14, free) === "Deine Bewerbung für „Spieler“ wurde am 01.11.2026 abgelehnt. Nach einer Absage gilt hier eine Pause von 14 Tagen. Ab dem 15.11.2026 kannst du dich wieder bewerben.",
         CooldownText("Spieler", declined, 14, free)
     );
     check(
         "Offene Bewerbung: Formular und Datum (W-0083)",
-        OpenText("Spieler", declined) === "Deine Bewerbung für „Spieler“ vom 01.11.2026 ist noch offen – warte die Antwort ab.",
+        OpenText("Spieler", declined) === "Deine Bewerbung für „Spieler“ vom 01.11.2026 ist noch offen. Warte die Antwort ab.",
         OpenText("Spieler", declined)
     );
     check("  kein <t:…> in den Texten", !`${CooldownText("x", declined, 1, free)}${OpenText("x", declined)}`.includes("<t:"));

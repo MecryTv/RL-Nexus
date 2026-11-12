@@ -18,7 +18,7 @@ export const ApplyPanel: IPanelModule<S> = {
         {
             title: "Bewerben",
             fields: [
-                F<S>("toggle", "open", "Bewerbungen offen", "Aus: niemand kann sich bewerben, auf keinem Weg.", (s) => s.open, (value: boolean) => ({ open: value })),
+                F<S>("toggle", "open", "Bewerbungen offen", "Aus: Niemand kann sich bewerben, auf keinem Weg.", (s) => s.open, (value: boolean) => ({ open: value })),
                 F<S>("choice", "mode", "Weg", "Wo man das Formular ausfüllt.", (s) => s.mode, (value: string) => ({ mode: value }), {
                     choices: [
                         ["web", "Webseite"],

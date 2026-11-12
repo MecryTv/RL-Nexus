@@ -7,7 +7,7 @@ export function Metric({ label, value }: { readonly label: string; readonly valu
     return (
         <Panel cut="sm" className={styles.metric}>
             <p className={styles.label}>{label}</p>
-            <div className={styles.value}>{value ?? "—"}</div>
+            <div className={styles.value}>{value ?? "–"}</div>
         </Panel>
     );
 }

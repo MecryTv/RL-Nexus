@@ -355,6 +355,9 @@ export async function checkShop(): Promise<void> {
         assert.equal(eventText("trial.start"), "Test gestartet");
         assert.equal(eventText("admin.gift"), "Zugang geschenkt");
         assert.equal(eventText("switch.cancel"), "Wechsel: altes Abo bei Stripe beendet");
+        assert.equal(eventText("mail.access"), "Mail zum Zugangsmodus geschickt");
+        assert.equal(eventText("subscription.renewed.frozen"), "Abo verlängert, während der Zugang ruht");
+        assert.equal(eventText("subscription.ended.frozen"), "Abo bei Stripe beendet, während der Zugang ruht");
         assert.equal(eventText("switch.cancel-failed"), "Wechsel: altes Abo bei Stripe nicht beendet");
         assert.equal(eventText("unbekannt.xy"), "unbekannt.xy");
     });

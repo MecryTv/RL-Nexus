@@ -133,12 +133,12 @@ export function renderSelfRoles(guildId: string): void {
 
         name.type = "text";
         name.maxLength = data!.limits.name;
-        name.placeholder = 'Name des Panels – etwa „Spiele"';
+        name.placeholder = "Name des Panels, etwa „Spiele“";
         name.setAttribute("aria-label", "Name des neuen Panels");
 
         const create = async (): Promise<void> => {
             if (!name.value.trim()) {
-                toast("info", "Ohne Namen geht nicht", "Nur ihr seht ihn – in Discord steht er nicht.");
+                toast("info", "Ohne Namen geht nicht", "Nur ihr seht ihn, in Discord steht er nicht.");
 
                 return;
             }
@@ -154,7 +154,7 @@ export function renderSelfRoles(guildId: string): void {
             data!.panels = [answer.panel, ...data!.panels];
             open = answer.panel.id;
             name.value = "";
-            toast("info", "Angelegt", "Jetzt Rollen dazu – gesendet wird erst auf Knopfdruck.");
+            toast("info", "Angelegt", "Jetzt Rollen dazu. Gesendet wird erst auf Knopfdruck.");
             paint();
         };
 
@@ -226,7 +226,7 @@ export function renderSelfRoles(guildId: string): void {
         });
 
         const channel = select(
-            [["", "— Kanal wählen —"], ...data!.guild.channels.map((entry): [string, string] => [entry.id, `# ${entry.name}`])],
+            [["", "(Kanal wählen)"], ...data!.guild.channels.map((entry): [string, string] => [entry.id, `# ${entry.name}`])],
             draft.channelId ?? "",
             (value) => {
                 draft.channelId = value || null;
@@ -270,7 +270,7 @@ export function renderSelfRoles(guildId: string): void {
         });
 
         const require = select(
-            [["", "— ohne Voraussetzung —"], ...data!.guild.roles.map((role): [string, string] => [role.id, `@${role.name}`])],
+            [["", "(ohne Voraussetzung)"], ...data!.guild.roles.map((role): [string, string] => [role.id, `@${role.name}`])],
             draft.requireRole ?? "",
             (value) => {
                 draft.requireRole = value || null;
@@ -313,7 +313,7 @@ export function renderSelfRoles(guildId: string): void {
             el(
                 "div",
                 "snitem__body",
-                row("Name", "Nur für euch – in Discord steht er nicht", name),
+                row("Name", "Nur für euch, in Discord steht er nicht", name),
                 row("Kanal", "Wohin das Panel geht", channel),
                 row("Art", "Knöpfe stehen offen da, ein Menü ist kompakter", kind),
                 row("Regel", draft.mode === "single" ? "Die neue Rolle ersetzt die vorherige aus diesem Panel" : "Jede Rolle lässt sich einzeln an- und abwählen", mode),

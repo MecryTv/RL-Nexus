@@ -208,8 +208,8 @@ function mount(guildId: string, view: "base" | Kind | "requests"): void {
         return true;
     };
 
-    const forumOptions = (): [string, string][] => [["", "— kein Forum —"], ...data!.guild.forums.map((entry): [string, string] => [entry.id, `# ${entry.name}`])];
-    const channelOptions = (): [string, string][] => [["", "— kein Kanal —"], ...data!.guild.channels.map((entry): [string, string] => [entry.id, `# ${entry.name}`])];
+    const forumOptions = (): [string, string][] => [["", "(kein Forum)"], ...data!.guild.forums.map((entry): [string, string] => [entry.id, `# ${entry.name}`])];
+    const channelOptions = (): [string, string][] => [["", "(kein Kanal)"], ...data!.guild.channels.map((entry): [string, string] => [entry.id, `# ${entry.name}`])];
     const forumName = (id: string | null): string | null => data!.guild.forums.find((entry) => entry.id === id)?.name ?? null;
 
     /**
@@ -223,7 +223,7 @@ function mount(guildId: string, view: "base" | Kind | "requests"): void {
         (): IEditorContext => {
             const extra: IPlaceholder[] = (questions?.() ?? []).flatMap((question, index) => [
                 { key: `frage${index + 1}`, label: `Frage ${index + 1}`, sample: question.label || `Frage ${index + 1}` },
-                { key: `antwort${index + 1}`, label: `Antwort ${index + 1}${question.label ? ` – ${question.label}` : ""}`, sample: question.choices[0] ?? `Antwort ${index + 1}` },
+                { key: `antwort${index + 1}`, label: `Antwort ${index + 1}${question.label ? `: ${question.label}` : ""}`, sample: question.choices[0] ?? `Antwort ${index + 1}` },
             ]);
             const placeholders = [...list, ...extra];
 
@@ -321,9 +321,9 @@ function mount(guildId: string, view: "base" | Kind | "requests"): void {
                     ? el(
                           "span",
                           "",
-                          `Beide nutzen dasselbe Forum. Der Bot legt dort zwei Tags an – „${draft.player.tag.name}“ und „${draft.team.tag.name}“ –, dazu „${data!.closedTag.name}“ für beendete Suchen. So bleiben Spieler und Teams auseinanderzuhalten.`
+                          `Beide nutzen dasselbe Forum. Der Bot legt dort zwei Tags an („${draft.player.tag.name}“ und „${draft.team.tag.name}“), dazu „${data!.closedTag.name}“ für beendete Suchen. So bleiben Spieler und Teams auseinanderzuhalten.`
                       )
-                    : el("span", "", `Getrennte Foren: in jedem legt der Bot seinen Tag und „${data!.closedTag.name}“ an. Ein Forum für beide geht auch – dann stehen dort beide Tags.`)
+                    : el("span", "", `Getrennte Foren: In jedem legt der Bot seinen Tag und „${data!.closedTag.name}“ an. Ein Forum für beide geht auch, dann stehen dort beide Tags.`)
             );
 
             warn.replaceChildren(
@@ -362,7 +362,7 @@ function mount(guildId: string, view: "base" | Kind | "requests"): void {
             });
 
             return [
-                el("h4", "srhead", `${data!.kinds[which]} – ${data!.leads[which]}`),
+                el("h4", "srhead", `${data!.kinds[which]}: ${data!.leads[which]}`),
                 row(
                     "Forum",
                     "Dort entstehen die Beiträge",
@@ -383,7 +383,7 @@ function mount(guildId: string, view: "base" | Kind | "requests"): void {
 
         const cards = card(
             "Wo die Beiträge landen",
-            "Je Seite ein Forum – oder für beide dasselbe. Die Tags legt der Bot beim Speichern an; vorhandene Tags des Forums bleiben stehen.",
+            "Je Seite ein Forum oder für beide dasselbe. Die Tags legt der Bot beim Speichern an; vorhandene Tags des Forums bleiben stehen.",
             ...side("player"),
             ...side("team"),
             warn,
@@ -486,7 +486,7 @@ function mount(guildId: string, view: "base" | Kind | "requests"): void {
                 "Forum",
                 "Wo das Panel steht",
                 select(
-                    [["", "— Forum der Spieler-Suche —"], ...data!.guild.forums.map((entry): [string, string] => [entry.id, `# ${entry.name}`])],
+                    [["", "(Forum der Spieler-Suche)"], ...data!.guild.forums.map((entry): [string, string] => [entry.id, `# ${entry.name}`])],
                     draft.forumId ?? "",
                     (value) => {
                         draft.forumId = value || null;
@@ -571,7 +571,7 @@ function mount(guildId: string, view: "base" | Kind | "requests"): void {
 
         return card(
             "Meldung ans Team",
-            "Sobald ein Beitrag steht, kann der Bot es im Team-Kanal sagen – mit zwei Knöpfen: Suche beenden und Beitrag löschen.",
+            "Sobald ein Beitrag steht, kann der Bot es im Team-Kanal sagen, mit zwei Knöpfen: Suche beenden und Beitrag löschen.",
             box,
             el("div", "mcsave lvsave", save)
         );
@@ -609,7 +609,7 @@ function mount(guildId: string, view: "base" | Kind | "requests"): void {
             defaultEmbed: () => embedOf("Frage {frage.nummer} von {fragen.anzahl}", "{frage}{frage.hinweis}"),
             touch,
             title: "Eine Frage",
-            hint: "Diese Nachricht kommt je Frage einmal – {frage} ist die Frage selbst.",
+            hint: "Diese Nachricht kommt je Frage einmal, {frage} ist die Frage selbst.",
             templates: "lftQuestion",
         });
 
@@ -675,11 +675,11 @@ function mount(guildId: string, view: "base" | Kind | "requests"): void {
 
         return card(
             "Ablauf und Rechte",
-            "Eine Suche endet von allein oder von Hand. Beendet heißt: der Beitrag bekommt den Tag und wird geschlossen – lesen kann ihn weiter jeder.",
+            "Eine Suche endet von allein oder von Hand. Beendet heißt: Der Beitrag bekommt den Tag und wird geschlossen. Lesen kann ihn weiter jeder.",
             el("span", "apopen__label", "Wie gefragt wird"),
             asks,
             askNote,
-            row("Läuft ab nach", "Tagen – 0 heißt: läuft, bis jemand sie beendet", days),
+            row("Läuft ab nach", "In Tagen, 0 heißt: läuft, bis jemand sie beendet", days),
             row(
                 "Fremde Suchen beenden dürfen",
                 `Bis zu ${data!.limits.managers} Rollen. „Server verwalten“ und „Beiträge verwalten“ dürfen immer`,
@@ -694,7 +694,7 @@ function mount(guildId: string, view: "base" | Kind | "requests"): void {
                     data!.limits.managers
                 )
             ),
-            el("p", "hintline", "Wer selbst gesucht hat, darf seine Suche immer beenden – mit dem Knopf am Beitrag oder mit `/lookingfor beenden`."),
+            el("p", "hintline", "Wer selbst gesucht hat, darf seine Suche immer beenden, mit dem Knopf am Beitrag oder mit /lookingfor beenden."),
             el("div", "mcsave lvsave", save)
         );
     }
@@ -726,7 +726,7 @@ function mount(guildId: string, view: "base" | Kind | "requests"): void {
         const list = el("div", "apquestions");
         const line = el("p", "hintline");
         const counted = (): string =>
-            `Je Frage gibt es zwei Platzhalter: {frage1} ist die erste Frage, {antwort1} die Antwort darauf – ${draft.questions.length ? `hier also bis {antwort${draft.questions.length}}` : "sobald die erste Frage steht"}.`;
+            `Je Frage gibt es zwei Platzhalter: {frage1} ist die erste Frage, {antwort1} die Antwort darauf, ${draft.questions.length ? `hier also bis {antwort${draft.questions.length}}` : "sobald die erste Frage steht"}.`;
         const drawList = (): void => {
             list.replaceChildren(...draft.questions.map((question, index) => questionRow(draft, question, index, touch, drawList, refresh)), addRow(draft, touch, drawList, refresh));
         };
@@ -780,11 +780,11 @@ function mount(guildId: string, view: "base" | Kind | "requests"): void {
 
         return [
             card(
-                `${data!.kinds[which]} – ${data!.leads[which]}`,
+                `${data!.kinds[which]}: ${data!.leads[which]}`,
                 "Steht der Schalter aus, sagt der Befehl das und fragt nichts.",
                 row(
                     "Nimmt Anfragen an",
-                    forum ? `Die Beiträge gehen nach # ${forum}` : "Erst mit Forum – das steht unter „Looking for“",
+                    forum ? `Die Beiträge gehen nach # ${forum}` : "Erst mit Forum, das steht unter „Looking for“",
                     el(
                         "label",
                         "snitem__switch",
@@ -796,7 +796,7 @@ function mount(guildId: string, view: "base" | Kind | "requests"): void {
                     )
                 ),
                 ...(forum ? [] : [el("div", "notice", icon("#i-warn"), el("span", "", "Ohne Forum entsteht kein Beitrag. Das Forum stellst du unter „Looking for“ ein."))]),
-                row("Titel des Beitrags", `Höchstens ${data!.limits.title} Zeichen – Platzhalter gehen`, title)
+                row("Titel des Beitrags", `Höchstens ${data!.limits.title} Zeichen, Platzhalter gehen`, title)
             ),
             card(
                 "Die Fragen",
@@ -804,7 +804,7 @@ function mount(guildId: string, view: "base" | Kind | "requests"): void {
                 list,
                 line
             ),
-            card("Der Beitrag und die Vorschau", "Selbst gebaut – mit Platzhaltern, Vorlagen und Live-Vorschau.", el("div", "tmmsgs", post.node, preview.node), el("div", "mcsave lvsave", save)),
+            card("Der Beitrag und die Vorschau", "Selbst gebaut mit Platzhaltern, Vorlagen und Live-Vorschau.", el("div", "tmmsgs", post.node, preview.node), el("div", "mcsave lvsave", save)),
         ];
     }
 
@@ -1002,7 +1002,7 @@ function mount(guildId: string, view: "base" | Kind | "requests"): void {
             : [el("div", "tkempty", icon("#i-inbox"), el("span", "", filter.status ? "Dazu gibt es gerade nichts." : "Noch hat niemand gesucht."))];
 
         return card(
-            kind ? `Anfragen – ${data!.kinds[kind]}` : "Alle Anfragen",
+            kind ? `Anfragen: ${data!.kinds[kind]}` : "Alle Anfragen",
             "Laufende zuerst. Ein Klick zeigt die Antworten, so wie sie im Beitrag stehen.",
             el("div", "apfilter", ...(kind ? [] : [kinds]), status, ...(pages > 1 ? [back, next] : [])),
             el("div", "aplist", ...list),
@@ -1077,7 +1077,7 @@ function mount(guildId: string, view: "base" | Kind | "requests"): void {
                     "apanswers",
                     ...(entry.answers.length
                         ? entry.answers.map((answer) => el("div", "apanswer", el("b", "", answer.label), el("p", "", answer.value)))
-                        : [el("div", "apanswer", el("b", "", "Keine Antworten"), el("p", "", "— leer —"))])
+                        : [el("div", "apanswer", el("b", "", "Keine Antworten"), el("p", "", "(leer)"))])
                 ),
                 el(
                     "p",

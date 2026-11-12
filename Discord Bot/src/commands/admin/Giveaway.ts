@@ -88,7 +88,7 @@ export default class Giveaway extends Command {
         if (!guild) return void (await say("Nur auf einem Server."));
         if (!this.client.databaseService.Ready) return void (await say("Die Datenbank ist gerade nicht erreichbar.", "#ff4d5e"));
         if (!(await this.client.settings.Of(guild.id)).modules.includes(GIVEAWAYS_MODULE)) {
-            return void (await say("Das Modul Giveaways ist aus – einschalten im Dashboard oder mit `/module an modul:giveaways`."));
+            return void (await say("Das Modul Giveaways ist aus. Einschalten kannst du es im Dashboard oder mit `/module an modul:giveaways`."));
         }
 
         await interaction.deferReply({ flags: MessageFlags.Ephemeral });
@@ -101,7 +101,7 @@ export default class Giveaway extends Command {
                 const text = interaction.options.getString("dauer", true);
                 const seconds = ParseDuration(text);
 
-                if (seconds === null) throw new GiveawayError(`„${text}“ verstehe ich nicht als Dauer – etwa 1h, 3d oder 1w.`);
+                if (seconds === null) throw new GiveawayError(`„${text}“ verstehe ich nicht als Dauer. Schreib sie etwa so: 1h, 3d oder 1w.`);
 
                 const member = interaction.member instanceof GuildMember ? interaction.member : await guild.members.fetch(interaction.user.id);
                 const role = interaction.options.getRole("rolle");
@@ -116,7 +116,7 @@ export default class Giveaway extends Command {
                     settings: { ping: ping?.id ?? null },
                 });
 
-                await say(`🎉 Giveaway #${giveaway.number} läuft in <#${giveaway.channelId}> – ausgelost wird <t:${Math.floor(giveaway.endsAt / 1000)}:R>.`);
+                await say(`🎉 Giveaway #${giveaway.number} läuft in <#${giveaway.channelId}>, ausgelost wird <t:${Math.floor(giveaway.endsAt / 1000)}:R>.`);
 
                 return;
             }
@@ -129,7 +129,7 @@ export default class Giveaway extends Command {
                 const done = await service.End(giveaway);
                 const winners = done.results.winners.map((winner) => `<@${winner.userId}>`).join(", ");
 
-                await say(winners ? `🎉 Ausgelost: ${winners}` : "Ausgelost – aber niemand erfüllt die Bedingungen.");
+                await say(winners ? `🎉 Ausgelost: ${winners}` : "Ausgelost, aber niemand erfüllt die Bedingungen.");
             } else if (sub === "neu") {
                 const user = interaction.options.getUser("user");
                 const done = await service.Reroll(giveaway, user?.id ?? "all");

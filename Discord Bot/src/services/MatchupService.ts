@@ -246,7 +246,7 @@ export default class MatchupService {
         if (!Number.isFinite(at) || at <= 0) throw new MatchupError("Wann wird gespielt? Setz Datum und Uhrzeit.");
 
         // Eine Minute Luft nach hinten: zwischen Absenden und Ankommen liegt Zeit.
-        if (at < Date.now() - MINUTE) throw new MatchupError("Dieser Zeitpunkt ist vorbei – trag den nächsten Termin ein.");
+        if (at < Date.now() - MINUTE) throw new MatchupError("Dieser Zeitpunkt ist vorbei. Trag den nächsten Termin ein.");
         if (at > Date.now() + settings.maxAhead * DAY) throw new MatchupError(`So weit im Voraus geht es nicht: höchstens ${settings.maxAhead} Tage.`);
 
         const stream = Text(raw.stream, 512, previous?.stream ?? "");
@@ -278,7 +278,7 @@ export default class MatchupService {
             throw new MatchupError(
                 access.teams.length
                     ? "Für dieses Team darfst du nichts eintragen."
-                    : "Du stehst in keinem Kader als Captain, Co-Captain, Manager oder Coach – wende dich an das Team."
+                    : "Du stehst in keinem Kader als Captain, Co-Captain, Manager oder Coach. Wende dich an das Team."
             );
         }
 
@@ -484,11 +484,11 @@ export default class MatchupService {
         this.Allowed(await this.Access(guild, member), matchup);
 
         if (matchup.status === "cancelled") throw new MatchupError("Diese Partie ist abgesagt.");
-        if (matchup.at > Date.now() + MINUTE) throw new MatchupError("Die Partie läuft noch nicht – Ergebnisse gibt es danach.");
+        if (matchup.at > Date.now() + MINUTE) throw new MatchupError("Die Partie läuft noch nicht, Ergebnisse gibt es danach.");
 
         const score = { us: Score(us), them: Score(them) };
 
-        if (score.us < 0 || score.them < 0) throw new MatchupError("Trag beide Zahlen ein – zum Beispiel 3 zu 1.");
+        if (score.us < 0 || score.them < 0) throw new MatchupError("Trag beide Zahlen ein, zum Beispiel 3 zu 1.");
         if (this.reporting.has(id)) throw new MatchupError("Das Ergebnis wird gerade schon eingetragen.");
 
         this.reporting.add(id);

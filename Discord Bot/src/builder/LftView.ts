@@ -206,5 +206,5 @@ export function PanelValues(guild: Guild): AnyPlaceholderValues {
 
 /** Was der Bot sagt, wenn eine Antwort zu lang war. */
 export function TooLong(length: number, max: number): string {
-    return `Das sind **${length} Zeichen**, erlaubt sind **${max}**. Schreib es etwas kürzer – oder ${CANCEL_WORDS[0]}.`;
+    return `Das sind **${length} Zeichen**, erlaubt sind **${max}**. Schreib es etwas kürzer oder brich mit **${CANCEL_WORDS[0]}** ab.`;
 }

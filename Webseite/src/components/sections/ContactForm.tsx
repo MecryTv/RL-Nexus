@@ -262,7 +262,7 @@ export function ContactForm(): JSX.Element {
                 {/* --- Absenden --------------------------------------------- */}
                 <div className={styles.footer}>
                     <Button type="submit" size="lg" disabled={state === "sending"} trailingIcon="arrow-right">
-                        {state === "sending" ? "Wird gesendet…" : "Nachricht senden"}
+                        {state === "sending" ? "Wird gesendet …" : "Nachricht senden"}
                     </Button>
                     <p className={styles.note}>
                         <Icon name="lock" size={14} />

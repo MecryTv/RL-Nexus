@@ -68,7 +68,7 @@ export function DefaultMessageDoc(): IMessageDoc {
 }
 
 export function DefaultResponseDoc(): IMessageDoc {
-    return { accent: MESSAGE_ACCENT, blocks: [{ type: "text", body: "Schau mal in <#123> – dort steht alles." }] };
+    return { accent: MESSAGE_ACCENT, blocks: [{ type: "text", body: "Schau mal in <#123>, dort steht alles." }] };
 }
 
 /**

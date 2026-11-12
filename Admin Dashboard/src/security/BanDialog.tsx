@@ -125,7 +125,7 @@ export function BanDialog({ mode, onClose, onDone }: { readonly mode: BanDialogM
             }
 
             notify(
-                [`${accounts(result.banIds.length)} gesperrt.`, result.undelivered ? `${formatNumber(result.undelivered)} DM nicht zustellbar, die Sperre gilt trotzdem.` : "", failed ? `${formatNumber(failed)} Beleg nicht gespeichert.` : ""].filter(Boolean).join(" "),
+                [`${accounts(result.banIds.length)} gesperrt.`, result.undelivered ? `${formatNumber(result.undelivered)} ${result.undelivered === 1 ? "DM" : "DMs"} nicht zustellbar, die Sperre gilt trotzdem.` : "", failed ? `${formatNumber(failed)} ${failed === 1 ? "Beleg" : "Belege"} nicht gespeichert.` : ""].filter(Boolean).join(" "),
                 failed || result.undelivered ? "danger" : undefined
             );
             onDone(banId);

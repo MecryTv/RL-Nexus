@@ -24,7 +24,7 @@ export const FAILED: Record<number, string> = {
     401: "Deine Sitzung ist abgelaufen, lade die Seite neu.",
     403: "Diesen Server darfst du nicht verwalten.",
     // Fastify antwortet englisch ("Payload Too Large"), bevor die Route läuft.
-    413: `Zu groß – höchstens ${megabytes(MAX_UPLOAD_BYTES)}.`,
+    413: `Zu groß, höchstens ${megabytes(MAX_UPLOAD_BYTES)}.`,
     429: "Zu viele Anfragen auf einmal, warte einen Moment.",
     503: "Der Bot erreicht gerade seine Datenbank nicht.",
 };

@@ -334,7 +334,7 @@ export function renderLive(guildId: string, user: ILiveUser, staff = false): voi
        Liste
        ------------------------------------------------------------ */
     function paintStatus(): void {
-        status.textContent = broken ? "Verbindung weg – verbinde neu …" : "Live";
+        status.textContent = broken ? "Verbindung weg, verbinde neu …" : "Live";
         status.classList.toggle("is-off", broken);
         soundButton.setAttribute("aria-pressed", String(sound));
         soundButton.setAttribute("aria-label", sound ? "Ton bei neuen Tickets: an" : "Ton bei neuen Tickets: aus");
@@ -483,7 +483,7 @@ export function renderLive(guildId: string, user: ILiveUser, staff = false): voi
                 "span",
                 "",
                 ended
-                    ? "Der Verlauf steht gleich unter Transcriptions – sofern der Server Transcripts speichert."
+                    ? "Der Verlauf steht gleich unter Transcriptions, sofern der Server Transcripts speichert."
                     : "Der Verlauf läuft hier live mit, und du antwortest direkt von hier."
             )
         );
@@ -619,7 +619,7 @@ export function renderLive(guildId: string, user: ILiveUser, staff = false): voi
             await run<{ frozen?: boolean }>({ action: "freeze" }, (answer) => (answer.frozen ? "Das Ticket ist eingefroren." : "Das Ticket ist wieder offen."));
         } else if (value === "anonymous_mode") {
             await run<{ anonymous?: boolean }>({ action: "anonymous_mode" }, (answer) =>
-                answer.anonymous ? "Anonymer Modus an – du schreibst unter dem Team-Alias." : "Anonymer Modus aus – du schreibst wieder unter deinem Namen."
+                answer.anonymous ? "Anonymer Modus an. Du schreibst unter dem Team-Alias." : "Anonymer Modus aus. Du schreibst wieder unter deinem Namen."
             );
         } else {
             openPanel(value);
@@ -701,8 +701,8 @@ export function renderLive(guildId: string, user: ILiveUser, staff = false): voi
                 reason.type = "text";
                 reason.maxLength = 300;
                 reason.placeholder = closing
-                    ? "Grund (optional) – steht im Ticket und im Transcript"
-                    : "Grund (optional) – der User kann hier danach keine Tickets mehr öffnen";
+                    ? "Grund (optional), steht im Ticket und im Transcript"
+                    : "Grund (optional). Der User kann hier danach keine Tickets mehr öffnen";
 
                 const confirm = submit(
                     closing ? "Ticket schließen" : "Sperren und schließen",
@@ -769,12 +769,12 @@ export function renderLive(guildId: string, user: ILiveUser, staff = false): voi
 
                 text.rows = 2;
                 text.maxLength = 1000;
-                text.placeholder = "Nur fürs Team – der User sieht sie nie";
+                text.placeholder = "Nur fürs Team, der User sieht sie nie";
 
                 const confirm = submit(
                     "Notiz speichern",
                     () => (text.value.trim() ? { action: "staff_note", text: text.value.trim() } : null),
-                    "Notiz gespeichert – nur das Team sieht sie."
+                    "Notiz gespeichert. Nur das Team sieht sie."
                 );
 
                 keys(text, confirm);
@@ -854,7 +854,7 @@ export function renderLive(guildId: string, user: ILiveUser, staff = false): voi
                                           return done;
                                       })
                                   )
-                                : [note("Niemand gefunden – oder schon im Ticket.")])
+                                : [note("Niemand gefunden oder schon im Ticket.")])
                         );
                     }, 250);
                 });

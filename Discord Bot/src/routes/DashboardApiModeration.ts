@@ -321,9 +321,9 @@ export default class DashboardApiModeration extends Route {
             }
 
             case "logthread": {
-                if (!manage) throw new ModerationError("Das geht nur, wer den Server verwaltet.");
+                if (!manage) throw new ModerationError("Das darf nur, wer den Server verwaltet.");
 
-                const thread = await CreateLogThread(guild, body.forumId, "Mod-Logs", "🛡️ Hier meldet RL Nexus jeden Moderations-Fall – eingestellt im Dashboard.");
+                const thread = await CreateLogThread(guild, body.forumId, "Mod-Logs", "🛡️ Hier meldet RL Nexus jeden Moderations-Fall, eingestellt im Dashboard.");
 
                 logger.user(`🛡️ Log-Beitrag ${thread.id} in ${thread.parentId} auf ${guild.id} angelegt (von ${member.id})`);
 

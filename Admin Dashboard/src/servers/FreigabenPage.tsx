@@ -56,7 +56,7 @@ export function FreigabenPage(): JSX.Element {
             {data.paid && !data.started && (
                 <div className={styles.start}>
                     <p>
-                        <b>Ein Server pro Person ist noch aus.</b> Beim Start bekommen {formatNumber(data.preview)} {data.preview === 1 ? "Person" : "Personen"} mit zwei oder mehr Servern die Wahl-DM und haben 24 Stunden Zeit. Danach geht der Bot von jedem zweiten
+                        <b>Ein Server pro Person ist noch aus.</b> Beim Start bekommen {formatNumber(data.preview)} {data.preview === 1 ? "Person" : "Personen"} mit zwei oder mehr Servern die Wahl-DM und haben 24 Stunden Zeit. Danach geht der Bot von jedem weiteren
                         Server ohne Freigabe sofort wieder.
                     </p>
                     <Button variant="danger" icon="power" onClick={() => setStarting(true)}>

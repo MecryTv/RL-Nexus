@@ -515,7 +515,7 @@ export default class DashboardService implements IDashboardService {
         if (!response.ok) {
             const body = (await response.text().catch(() => "")).slice(0, 300);
 
-            throw new InviteExchangeFailed("rejected", `Discord hat den Einladungs-Code abgelehnt (${response.status} ${body}). Pruefe die Redirect URI ${this.InviteRedirectURI} im Developer Portal.`);
+            throw new InviteExchangeFailed("rejected", `Discord hat den Einladungs-Code abgelehnt (${response.status} ${body}). Prüfe die Redirect URI ${this.InviteRedirectURI} im Developer Portal.`);
         }
 
         const token = (await response.json().catch(() => ({}))) as { guild?: unknown; scope?: unknown; access_token?: unknown };
@@ -658,7 +658,7 @@ export default class DashboardService implements IDashboardService {
 
         if (!response.ok) {
             throw new Error(
-                `Discord hat den Code abgelehnt (${response.status}). Pruefe Client Secret und Redirect URI.`
+                `Discord hat den Code abgelehnt (${response.status}). Prüfe Client Secret und Redirect URI.`
             );
         }
 

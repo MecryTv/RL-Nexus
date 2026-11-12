@@ -212,7 +212,7 @@ export function renderGiveaways(guildId: string): void {
                     "tkempty tkempty--big",
                     icon("#i-gift"),
                     el("b", "", "Noch kein Giveaway."),
-                    el("span", "", "Preis, Dauer, Kanal – fertig. Bedingungen, Bonus-Lose und eine Frist für die Gewinner sind optional. Auch per /giveaway."),
+                    el("span", "", "Preis, Dauer, Kanal: fertig. Bedingungen, Bonus-Lose und eine Frist für die Gewinner sind optional. Auch per /giveaway."),
                     go
                 ),
             ];
@@ -545,7 +545,7 @@ export function renderGiveaways(guildId: string): void {
                 draft.channelId = value;
             },
             async (forumId) => (await call<{ thread: ILogThread }>("", { action: "logthread", forumId }))?.thread ?? null,
-            "— Kanal wählen —"
+            "(Kanal wählen)"
         );
 
         // Bonus-Lose.
@@ -663,7 +663,7 @@ export function renderGiveaways(guildId: string): void {
                     ),
                     card(
                         "Bedingungen",
-                        "Wer mitmachen darf. Geprüft beim Mitmachen – und beim Auslosen noch einmal.",
+                        "Wer mitmachen darf. Geprüft beim Mitmachen und beim Auslosen noch einmal.",
                         row(
                             "Pflicht-Rollen",
                             req.allRoles ? "Alle davon nötig" : "Eine davon reicht",
@@ -674,7 +674,7 @@ export function renderGiveaways(guildId: string): void {
                         ),
                         row(
                             "Alle Rollen nötig",
-                            "Aus: eine der Rollen reicht",
+                            "Aus: Eine der Rollen reicht",
                             toggle(req.allRoles, "Alle Rollen nötig", (on) => {
                                 req.allRoles = on;
                                 paintPreview();
@@ -682,7 +682,7 @@ export function renderGiveaways(guildId: string): void {
                         ),
                         row(
                             "Ausgeschlossen",
-                            "Wer eine davon hat, darf nicht – etwa das Team",
+                            "Wer eine davon hat, darf nicht mitmachen (etwa das Team)",
                             rolePicker(data!.guild.roles, req.forbidden, (ids) => {
                                 req.forbidden = ids;
                                 paintPreview();
@@ -690,7 +690,7 @@ export function renderGiveaways(guildId: string): void {
                         ),
                         row(
                             "Server-Booster",
-                            "Nur Booster – oder gerade keine",
+                            "Nur Booster oder gerade keine",
                             select(
                                 [
                                     ["any", "Egal"],
@@ -706,7 +706,7 @@ export function renderGiveaways(guildId: string): void {
                             )
                         ),
                         row("Tage auf dem Server", "0 = egal", number(req.serverDays, 0, 3650, (value) => (req.serverDays = value), "Tage auf dem Server")),
-                        row("Alter des Discord-Kontos", "In Tagen, 0 = egal – hält Zweitkonten fern", number(req.accountDays, 0, 3650, (value) => (req.accountDays = value), "Kontoalter in Tagen")),
+                        row("Alter des Discord-Kontos", "In Tagen, 0 = egal. Hält Zweitkonten fern", number(req.accountDays, 0, 3650, (value) => (req.accountDays = value), "Kontoalter in Tagen")),
                         row("Nachrichten in 14 Tagen", "Aktivität auf dem Server, 0 = egal", number(req.messages, 0, 10_000, (value) => (req.messages = value), "Nachrichten")),
                         row(
                             "Rocket-League-Konto",
@@ -717,7 +717,7 @@ export function renderGiveaways(guildId: string): void {
                             })
                         )
                     ),
-                    card("Bonus-Lose", "Mehr Gewinnchance für bestimmte Rollen – etwa Booster doppelt (+1 Los).", bonusHost),
+                    card("Bonus-Lose", "Mehr Gewinnchance für bestimmte Rollen, etwa Booster doppelt (+1 Los).", bonusHost),
                     card(
                         "Gewinner",
                         "",
@@ -730,7 +730,7 @@ export function renderGiveaways(guildId: string): void {
                         ),
                         row(
                             "Frist zum Annehmen",
-                            "Wer sich nicht meldet, wird ersetzt – automatisch",
+                            "Wer sich nicht meldet, wird automatisch ersetzt",
                             select(
                                 limits.claim.map((hours): [string, string] => [String(hours), hours ? (hours >= 48 ? `${hours / 24} Tage` : `${hours} Stunden`) : "Keine Frist"]),
                                 String(draft.settings.claimHours),

@@ -42,7 +42,7 @@ export function logTargetSelect(
     active: string | null,
     onPick: (value: string | null) => void,
     onCreate: (forumId: string) => Promise<ILogThread | null>,
-    empty = "— kein Log-Kanal —"
+    empty = "(kein Log-Kanal)"
 ): HTMLSelectElement {
     const picker = document.createElement("select");
     const known = new Set([...targets.channels.map((channel) => channel.id), ...targets.threads.map((thread) => thread.id)]);

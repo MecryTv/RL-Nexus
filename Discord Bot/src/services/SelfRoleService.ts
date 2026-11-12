@@ -61,7 +61,7 @@ export default class SelfRoleService {
         const raw = IsRecord(input) ? input : {};
         const name = (typeof raw.name === "string" ? raw.name.trim() : (previous?.name ?? "")).slice(0, MAX_NAME);
 
-        if (!name) throw new SelfRoleError("Gib dem Panel einen Namen – nur ihr seht ihn.");
+        if (!name) throw new SelfRoleError("Gib dem Panel einen Namen. Nur ihr seht ihn.");
 
         const kind: PanelKind = raw.kind === "select" || raw.kind === "buttons" ? raw.kind : (previous?.kind ?? "buttons");
         const mode: PanelMode = raw.mode === "single" || raw.mode === "multi" ? raw.mode : (previous?.mode ?? "multi");
@@ -116,9 +116,9 @@ export default class SelfRoleService {
 
     /** Kann der Bot diese Rolle überhaupt vergeben? */
     private CheckRole(guild: Guild, role: Role, me: GuildMember | null): void {
-        if (role.managed) throw new SelfRoleError(`@${role.name} gehört zu einer Integration – die kann niemand von Hand vergeben.`);
+        if (role.managed) throw new SelfRoleError(`@${role.name} gehört zu einer Integration. Die kann niemand von Hand vergeben.`);
         if (!me?.permissions.has(PermissionFlagsBits.ManageRoles) || role.comparePositionTo(me.roles.highest) >= 0) {
-            throw new SelfRoleError(`@${role.name} muss unter der höchsten Rolle des Bots stehen, und er braucht „Rollen verwalten".`);
+            throw new SelfRoleError(`@${role.name} muss unter der höchsten Rolle des Bots stehen, und er braucht „Rollen verwalten“.`);
         }
     }
 
@@ -186,7 +186,7 @@ export default class SelfRoleService {
 
         const sent = await channel.send(view).catch(() => null);
 
-        if (!sent) throw new SelfRoleError("Die Nachricht ging nicht raus – darf der Bot in den Kanal schreiben?");
+        if (!sent) throw new SelfRoleError("Die Nachricht ging nicht raus. Darf der Bot in den Kanal schreiben?");
 
         await this.client.selfRolePanels.Save(panel.id, { messageId: sent.id });
 
@@ -298,7 +298,7 @@ export default class SelfRoleService {
         }
 
         if (panel.maxRoles > 0 && wanted.size > panel.maxRoles) {
-            await this.Answer(interaction, `Aus diesem Panel sind höchstens ${panel.maxRoles} Rollen erlaubt – du hast schon ${held.size}.`);
+            await this.Answer(interaction, `Aus diesem Panel sind höchstens ${panel.maxRoles} Rollen erlaubt, du hast schon ${held.size}.`);
 
             return;
         }
@@ -307,7 +307,7 @@ export default class SelfRoleService {
             if (add.length) await member.roles.add(add, `Self Roles: ${panel.name}`);
             if (remove.length) await member.roles.remove(remove, `Self Roles: ${panel.name}`);
         } catch {
-            await this.Answer(interaction, "Das hat nicht geklappt – meine Rolle steht wohl zu weit unten.");
+            await this.Answer(interaction, "Das hat nicht geklappt. Meine Rolle steht wohl zu weit unten.");
 
             return;
         }

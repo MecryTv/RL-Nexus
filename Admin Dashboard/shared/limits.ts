@@ -160,7 +160,7 @@ export const AUDIT_LABELS: Readonly<Record<string, string>> = {
     "beta.remove": "Beta-Zugang entzogen",
     "beta.redeem": "Beta-Code eingelöst",
     "userdata.export": "Auskunft geladen",
-    "userdata.rules": "Was bleibt geändert",
+    "userdata.rules": "„Was bleibt“ geändert",
     "userdata.plan": "Löschung geplant",
     "userdata.cancel": "Löschung abgebrochen",
     "userdata.stop": "Löschung angehalten",

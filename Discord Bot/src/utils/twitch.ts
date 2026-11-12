@@ -54,7 +54,7 @@ export default class TwitchApi {
         const params = new URLSearchParams({ client_id: this.clientId, client_secret: this.secret, grant_type: "client_credentials" });
         const response = await fetch(`https://id.twitch.tv/oauth2/token?${params}`, { method: "POST", signal: AbortSignal.timeout(TIMEOUT) });
 
-        if (!response.ok) throw new TwitchError(`Twitch lehnt die App ab (${response.status}) - stimmen TWITCH_CLIENT_ID und TWITCH_CLIENT_SECRET?`);
+        if (!response.ok) throw new TwitchError(`Twitch lehnt die App ab (${response.status}). Stimmen TWITCH_CLIENT_ID und TWITCH_CLIENT_SECRET?`);
 
         const body = (await response.json()) as { access_token: string; expires_in: number };
 

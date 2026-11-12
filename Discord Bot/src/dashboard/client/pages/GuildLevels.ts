@@ -205,7 +205,7 @@ export function renderLevels(guildId: string, view: LevelView = "levels"): void 
 
         return card(
             "Punkte",
-            "Wie schnell es vorangeht. Die Punkte je Nachricht sind zufällig zwischen den beiden Werten – das macht Spam weniger berechenbar.",
+            "Wie schnell es vorangeht. Die Punkte je Nachricht sind zufällig zwischen den beiden Werten. Das macht Spam weniger berechenbar.",
             row(
                 "Punkte für Nachrichten",
                 "Nur alle paar Sekunden, sonst zählt jedes „k“",
@@ -292,7 +292,7 @@ export function renderLevels(guildId: string, view: LevelView = "levels"): void 
             }
 
             const pick = select(
-                [["", "— hinzufügen —"], ...options.filter(([id]) => !list.some((entry) => entry.id === id))],
+                [["", "+ Hinzufügen"], ...options.filter(([id]) => !list.some((entry) => entry.id === id))],
                 "",
                 (value) => {
                     if (!value) return;
@@ -332,7 +332,7 @@ export function renderLevels(guildId: string, view: LevelView = "levels"): void 
             }
 
             const pick = select(
-                [["", "— hinzufügen —"], ...options.filter(([id]) => !list.includes(id))],
+                [["", "+ Hinzufügen"], ...options.filter(([id]) => !list.includes(id))],
                 "",
                 (value) => {
                     if (!value) return;
@@ -401,7 +401,7 @@ export function renderLevels(guildId: string, view: LevelView = "levels"): void 
         );
 
         const target = select(
-            [["", "— Kanal wählen —"], ...data!.guild.channels.map((channel): [string, string] => [channel.id, `# ${channel.name}`])],
+            [["", "(Kanal wählen)"], ...data!.guild.channels.map((channel): [string, string] => [channel.id, `# ${channel.name}`])],
             settings.announceChannelId ?? "",
             (value) => {
                 settings.announceChannelId = value || null;
@@ -517,7 +517,7 @@ export function renderLevels(guildId: string, view: LevelView = "levels"): void 
             }
 
             const pick = select(
-                [["", "— Rolle hinzufügen —"], ...data!.guild.roles.filter((role) => !settings.rewards.some((reward) => reward.roleId === role.id)).map((role): [string, string] => [role.id, `@${role.name}`])],
+                [["", "+ Rolle hinzufügen"], ...data!.guild.roles.filter((role) => !settings.rewards.some((reward) => reward.roleId === role.id)).map((role): [string, string] => [role.id, `@${role.name}`])],
                 "",
                 (value) => {
                     if (!value) return;
@@ -545,16 +545,16 @@ export function renderLevels(guildId: string, view: LevelView = "levels"): void 
 
             sync.disabled = false;
 
-            if (answer) toast("info", "Nachgetragen", `${answer.touched} Mitglied(er) geprüft.`);
+            if (answer) toast("info", "Nachgetragen", `${answer.touched === 1 ? "1 Mitglied" : `${answer.touched} Mitglieder`} geprüft.`);
         });
 
         return el(
             "div",
             "lvrewardbox",
-            row("Belohnungsrollen", `Bis ${data!.limits.rewards} Stück – die Rolle muss unter der höchsten Rolle des Bots stehen`, box),
+            row("Belohnungsrollen", `Bis ${data!.limits.rewards} Stück. Die Rolle muss unter der höchsten Rolle des Bots stehen`, box),
             row(
                 "Alte behalten",
-                "Aus heißt: die neue Rolle ersetzt die vorherige",
+                "Aus heißt: Die neue Rolle ersetzt die vorherige",
                 el("label", "snitem__switch", toggle(settings.stack, "Alte behalten", (on) => {
                     settings.stack = on;
                     touch();
@@ -719,7 +719,7 @@ export function renderLevels(guildId: string, view: LevelView = "levels"): void 
         draw();
 
         const channel = select(
-            [["", "— kein Kanal —"], ...data!.guild.channels.map((entry): [string, string] => [entry.id, `# ${entry.name}`])],
+            [["", "(kein Kanal)"], ...data!.guild.channels.map((entry): [string, string] => [entry.id, `# ${entry.name}`])],
             settings.boostChannelId ?? "",
             (value) => {
                 settings.boostChannelId = value || null;
@@ -800,7 +800,7 @@ export function renderLevels(guildId: string, view: LevelView = "levels"): void 
             const post = settings.top[kind];
             const state = data!.topStatus?.[kind] ?? null;
             const channel = select(
-                [["", "— Kanal wählen —"], ...data!.guild.channels.map((entry): [string, string] => [entry.id, `# ${entry.name}`])],
+                [["", "(Kanal wählen)"], ...data!.guild.channels.map((entry): [string, string] => [entry.id, `# ${entry.name}`])],
                 post.channelId ?? "",
                 (value) => {
                     post.channelId = value || null;

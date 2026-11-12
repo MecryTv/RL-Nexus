@@ -159,7 +159,7 @@ export function renderWelcome(guildId: string): void {
     function message(): HTMLElement {
         const current = draft![which];
         const channel = select(
-            [["", "— Kanal wählen —"], ...data!.guild.channels.map((entry): [string, string] => [entry.id, `# ${entry.name}`])],
+            [["", "(Kanal wählen)"], ...data!.guild.channels.map((entry): [string, string] => [entry.id, `# ${entry.name}`])],
             current.channelId ?? "",
             (value) => {
                 current.channelId = value || null;
@@ -186,7 +186,7 @@ export function renderWelcome(guildId: string): void {
                     return;
                 }
 
-                if (await call("", { action: "test", which })) toast("info", "Test gesendet", "Schau in den Kanal – so sieht es für neue Mitglieder aus.");
+                if (await call("", { action: "test", which })) toast("info", "Test gesendet", "Schau in den Kanal, so sieht es für neue Mitglieder aus.");
             },
         });
 
@@ -197,7 +197,7 @@ export function renderWelcome(guildId: string): void {
                 : "Was passiert, wenn jemand geht. Wer gebannt wird, zählt dabei mit.",
             row(
                 which === "join" ? "Begrüßen" : "Verabschieden",
-                "Aus heißt: der Bot sagt nichts",
+                "Aus heißt: Der Bot sagt nichts",
                 el("label", "snitem__switch", toggle(current.on, which === "join" ? "Begrüßung an" : "Abschied an", (on) => {
                     current.on = on;
                     touch();
@@ -218,7 +218,7 @@ export function renderWelcome(guildId: string): void {
             const key = `{${entry.key}}`;
             const chip = button("phchip", el("code", "", key), el("span", "phchip__label", entry.label));
 
-            chip.title = `${entry.label} – Beispiel: ${entry.sample}`;
+            chip.title = `${entry.label} (Beispiel: ${entry.sample})`;
             chip.addEventListener("click", async () => {
                 await navigator.clipboard.writeText(key).catch(() => undefined);
                 toast("info", "Kopiert", `${key} steht in der Zwischenablage.`);
@@ -226,7 +226,7 @@ export function renderWelcome(guildId: string): void {
             chips.append(chip);
         }
 
-        return el("div", "phhint", el("p", "hintline phhint__lead", "Diese Platzhalter kennt der Bot – in den Texten und auf der Karte:"), chips);
+        return el("div", "phhint", el("p", "hintline phhint__lead", "Diese Platzhalter kennt der Bot in den Texten und auf der Karte:"), chips);
     }
 
     /* ------------------------------------------------------------
@@ -359,9 +359,9 @@ export function renderWelcome(guildId: string): void {
             row(label, hint, el("label", "snitem__switch", toggle(value, label, (on) => edit("", () => onChange(on))), el("span", "", "an")));
 
         /* --- Eigene Anordnung: Größe der Überschrift und des Avatars stehen dann auf der Bühne --- */
-        const SIZE_HINT = `${data!.limits.titleMin} bis ${data!.limits.titleMax} Pixel – lange Namen werden von selbst kleiner`;
+        const SIZE_HINT = `${data!.limits.titleMin} bis ${data!.limits.titleMax} Pixel, lange Namen werden von selbst kleiner`;
         const AVATAR_HINT = "Im Layout Mittig und Panel etwas kleiner, damit der Text Platz hat";
-        const OWN_HINT = "Gilt nur ohne eigene Anordnung – sonst über „Größe“ unter Position";
+        const OWN_HINT = "Gilt nur ohne eigene Anordnung, sonst über „Größe“ unter Position";
 
         const group = (title: string, ...children: Node[]): HTMLElement => el("section", "sto-group sto-rows", el("h3", "sto-h", title), ...children);
 
@@ -446,7 +446,7 @@ export function renderWelcome(guildId: string): void {
             return [
                 row(
                     "Akzentfarbe",
-                    "Streifen, Rahmen, Ring und die kleine Zeile – aus heißt: neutral, ohne Farbe",
+                    "Streifen, Rahmen, Ring und die kleine Zeile. Aus heißt: neutral, ohne Farbe",
                     el(
                         "div",
                         "wcline",
@@ -505,7 +505,7 @@ export function renderWelcome(guildId: string): void {
                     row("Schrift", "Für die Überschrift", select(Object.entries(data!.fonts), entry.font, (value) => edit("", () => (entry.font = value)), "Schrift der Überschrift")),
                     ...colors(),
                     ...accent(),
-                    row("Ring", "Stärke des Rahmens um den Avatar – 0 heißt keiner", range(entry.ringWidth, 0, data!.limits.ringMax, 1, "Stärke des Rings", " px", (value) => (entry.ringWidth = value), "paint")),
+                    row("Ring", "Stärke des Rahmens um den Avatar (0 heißt keiner)", range(entry.ringWidth, 0, data!.limits.ringMax, 1, "Stärke des Rings", " px", (value) => (entry.ringWidth = value), "paint")),
                     row(
                         "Form des Avatars",
                         "Rund oder mit abgeschrägten Ecken",
@@ -607,7 +607,7 @@ export function renderWelcome(guildId: string): void {
 
         sync();
 
-        return row("Hintergrund", "Aus der Galerie oder ein eigenes Bild – ohne zeichnet der Bot einen Farbverlauf", el("div", "wcbg", pick, drop, warn));
+        return row("Hintergrund", "Aus der Galerie oder ein eigenes Bild (ohne zeichnet der Bot einen Farbverlauf)", el("div", "wcbg", pick, drop, warn));
     }
 
     /* ------------------------------------------------------------

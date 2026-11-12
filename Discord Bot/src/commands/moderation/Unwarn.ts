@@ -14,7 +14,7 @@ export default class Unwarn extends Command {
             .setName(this.name)
             .setDescription(this.description)
             .setContexts(InteractionContextType.Guild)
-            .addUserOption((option) => option.setName("user").setDescription("Seine neueste Verwarnung – oder wähle unten den Fall"))
+            .addUserOption((option) => option.setName("user").setDescription("Seine neueste Verwarnung, oder wähle unten den Fall"))
             .addIntegerOption((option) => option.setName("fall").setDescription("Welche Verwarnung genau?").setMinValue(1).setAutocomplete(true))
             .addStringOption((option) => option.setName("grund").setDescription("Warum?").setMaxLength(MAX_REASON));
     }
@@ -37,7 +37,7 @@ export default class Unwarn extends Command {
                 warns
                     .filter((warn) => !typed || String(warn.number).startsWith(typed))
                     .map((warn) => ({
-                        name: `#${warn.number} · ${warn.targetName ?? warn.targetId} – ${warn.reason ?? "ohne Grund"}`.slice(0, 100),
+                        name: `#${warn.number} · ${warn.targetName ?? warn.targetId}: ${warn.reason ?? "ohne Grund"}`.slice(0, 100),
                         value: warn.number,
                     }))
             )

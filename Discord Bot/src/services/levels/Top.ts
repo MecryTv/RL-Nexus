@@ -99,7 +99,7 @@ export async function PostTop(client: BotClient, guild: Guild, kind: LevelTopKin
         await Post(client, guild, kind, settings, { ...post, channelId: post.channelId }, due, previous, hooks);
     } catch (error) {
         logger.warn(`📈 ${TOP_TITLE[kind]} auf ${guild.id} abgebrochen - ${String(error)}`);
-        await client.levelTop.Finish(guild.id, kind, previous, "Der Post ist abgebrochen, ein Fehler beim Zeichnen oder in der Datenbank. Der nächste Zeitraum kommt wieder.").catch(() => undefined);
+        await client.levelTop.Finish(guild.id, kind, previous, "Der Post ist abgebrochen (Fehler beim Zeichnen oder in der Datenbank). Zum nächsten Zeitraum kommt wieder einer.").catch(() => undefined);
     }
 
     return true;

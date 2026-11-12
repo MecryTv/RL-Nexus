@@ -66,7 +66,7 @@ export const LevelsPanel: IPanelModule<S> = {
                 F<S>("choice", "announceDelete", "Löschen nach", "Die Nachricht im Chat verschwindet wieder.", (s) => String(s.announceDelete ?? 0), (value: string) => ({ announceDelete: Number(value) }), {
                     choices: ANNOUNCE_DELETE.map((minutes): [string, string] => [String(minutes), minutes ? `${minutes} Min.` : "nie"]),
                 }),
-                F<S>("toggle", "stack", "Rollen stapeln", "An: alte Belohnungsrollen bleiben. Aus: die neue ersetzt sie.", (s) => s.stack, (value: boolean) => ({ stack: value })),
+                F<S>("toggle", "stack", "Rollen stapeln", "An: Alte Belohnungsrollen bleiben. Aus: Die neue ersetzt sie.", (s) => s.stack, (value: boolean) => ({ stack: value })),
                 F<S>("toggle", "public", "Rangliste öffentlich", "Die Rangliste ist ohne Anmeldung zu sehen.", (s) => s.public, (value: boolean) => ({ public: value })),
             ],
         },

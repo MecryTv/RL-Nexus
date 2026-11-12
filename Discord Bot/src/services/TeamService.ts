@@ -191,9 +191,9 @@ export function RoleProblem(guild: Guild, roleId: string): string | null {
     const role = guild.roles.cache.get(roleId);
 
     if (!role) return "Diese Rolle gibt es nicht mehr.";
-    if (!me?.permissions.has(PermissionFlagsBits.ManageRoles)) return "Dem Bot fehlt „Rollen verwalten“ – er kann keine Rollen vergeben.";
-    if (role.managed) return `@${role.name} gehört einer Integration – die vergibt der Bot nicht.`;
-    if (me.roles.highest.comparePositionTo(role) <= 0) return `@${role.name} steht über der Rolle des Bots – zieh die Bot-Rolle in den Servereinstellungen darüber.`;
+    if (!me?.permissions.has(PermissionFlagsBits.ManageRoles)) return "Dem Bot fehlt „Rollen verwalten“, deshalb kann er keine Rollen vergeben.";
+    if (role.managed) return `@${role.name} gehört einer Integration. Die vergibt der Bot nicht.`;
+    if (me.roles.highest.comparePositionTo(role) <= 0) return `@${role.name} steht über der Rolle des Bots. Zieh die Bot-Rolle in den Servereinstellungen darüber.`;
 
     return null;
 }
@@ -753,7 +753,7 @@ export default class TeamService {
 
                 const emoji = await icons.Upload(BadgeName(guild.id, role, badge.value), image);
 
-                if (!emoji) throw new TeamError(`Aus dem Bild für ${ROLE_LABELS[role]} ließ sich kein Emoji machen - ist es ein Bild bis 256 KB?`);
+                if (!emoji) throw new TeamError(`Aus dem Bild für ${ROLE_LABELS[role]} ließ sich kein Emoji machen. Ist es ein Bild bis 256 KB?`);
 
                 created.push(emoji);
                 result[role] = { ...badge, emoji };
@@ -1121,7 +1121,7 @@ export default class TeamService {
         let roleId = before.roleId && guild.roles.cache.has(before.roleId) ? before.roleId : null;
 
         if (closed && !roleId && !want.role) {
-            throw new TeamError("Private Kanäle sieht nur die Team-Rolle – wähl eine Rolle aus oder lass sie mit anlegen.");
+            throw new TeamError("Private Kanäle sieht nur die Team-Rolle. Wähl eine Rolle aus oder lass sie mit anlegen.");
         }
 
         try {
@@ -1200,7 +1200,7 @@ export default class TeamService {
 
             throw new TeamError(
                 error instanceof DiscordAPIError && error.code === 50013
-                    ? "Discord hat abgelehnt: dem Bot fehlen Rechte. Prüf „Rollen verwalten“ und „Kanäle verwalten“."
+                    ? "Discord hat abgelehnt: Dem Bot fehlen Rechte. Prüf „Rollen verwalten“ und „Kanäle verwalten“."
                     : "Discord hat das Anlegen abgelehnt. Versuch es gleich noch einmal."
             );
         } finally {
@@ -1368,7 +1368,7 @@ export default class TeamService {
     /** Was dem Vergeben im Weg steht - das Dashboard zeigt es über den Rollen. */
     RoleProblems(guild: Guild, teams: ITeam[], settings: ITeamSettings): string[] {
         if (!settings.roles.sync) return [];
-        if (!guild.members.me?.permissions.has(PermissionFlagsBits.ManageRoles)) return ["Dem Bot fehlt „Rollen verwalten“ – er kann keine Rollen vergeben."];
+        if (!guild.members.me?.permissions.has(PermissionFlagsBits.ManageRoles)) return ["Dem Bot fehlt „Rollen verwalten“, deshalb kann er keine Rollen vergeben."];
 
         return [...ManagedRoles(teams, settings.roles)].flatMap((roleId) => {
             const problem = guild.roles.cache.has(roleId) ? RoleProblem(guild, roleId) : null;

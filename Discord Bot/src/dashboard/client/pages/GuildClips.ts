@@ -216,7 +216,7 @@ export function renderClips(guildId: string): void {
 
         if (data!.missing.length) {
             list.push(
-                warning(`Dem Bot fehlen im Clip-Kanal diese Rechte: ${data!.missing.join(", ")}. Ohne sie kann er den Kanal nicht öffnen und schließen, keine Reaktionen setzen oder ihn nicht leeren.`)
+                warning(`Dem Bot fehlen im Clip-Kanal diese Rechte: ${data!.missing.join(", ")}. Ohne sie kann er den Kanal nicht öffnen, schließen oder leeren und keine Reaktionen setzen.`)
             );
         }
 
@@ -272,7 +272,7 @@ export function renderClips(guildId: string): void {
             return card(
                 "Diese Runde",
                 data!.nextOpen
-                    ? `Gerade läuft keine Runde. Nach Plan geht der Kanal am ${WHEN.format(data!.nextOpen)} auf – oder du öffnest ihn jetzt.`
+                    ? `Gerade läuft keine Runde. Nach Plan geht der Kanal am ${WHEN.format(data!.nextOpen)} auf, oder du öffnest ihn jetzt.`
                     : "Gerade läuft keine Runde, und es ist kein Termin geplant. Leg unten fest, wann der Kanal aufgeht, wann er schließt und wann gekürt wird.",
                 ...(ready ? [] : [el("p", "hintline", "„Jetzt öffnen“ braucht den Clip-Kanal und Termine für Schließen und Ende, die noch kommen.")]),
                 actions
@@ -389,21 +389,21 @@ export function renderClips(guildId: string): void {
             row(
                 "Clip-Kanal",
                 "Nur hier wird hochgeladen und abgestimmt. Der Bot öffnet, schließt und leert ihn selbst",
-                select([["", "— Kanal wählen —"], ...channels], cfg.channelId ?? "", (value) => {
+                select([["", "(Kanal wählen)"], ...channels], cfg.channelId ?? "", (value) => {
                     cfg.channelId = value || null;
                     touch();
                 }, "Clip-Kanal")
             ),
             row(
                 "Ansagen in",
-                "Ohne Angabe im Clip-Kanal – dort räumt das Leeren sie am Ende mit weg",
-                select([["", "— im Clip-Kanal —"], ...channels], cfg.announceChannelId ?? "", (value) => {
+                "Ohne Angabe im Clip-Kanal. Dort räumt das Leeren sie am Ende mit weg",
+                select([["", "(im Clip-Kanal)"], ...channels], cfg.announceChannelId ?? "", (value) => {
                     cfg.announceChannelId = value || null;
                     touch();
                 }, "Kanal für die Ansagen")
             ),
             el("h4", "srhead", "Abstimmung"),
-            row("Emoji", "Setzt der Bot unter jeden Clip. Wer damit reagiert, stimmt ab – eine Stimme pro Person", emoji),
+            row("Emoji", "Setzt der Bot unter jeden Clip. Wer damit reagiert, stimmt ab. Eine Stimme pro Person", emoji),
             row(
                 "Clips je Person",
                 `1 bis ${data!.limits.perUser} je Runde`,
@@ -567,7 +567,7 @@ export function renderClipMessages(guildId: string): void {
             card(
                 "Die drei Ansagen",
                 channel
-                    ? `Sie gehen in #${channel}. Text, Embed oder Karte – mit Bildern, Platzhaltern und Live-Vorschau.`
+                    ? `Sie gehen in #${channel}. Text, Embed oder Karte, mit Bildern, Platzhaltern und Live-Vorschau.`
                     : "Wähle zuerst auf der Hauptseite den Clip-Kanal. Ohne Kanal gehen keine Ansagen raus.",
                 el("div", "tmmsgs", ...blocks),
                 el("div", "mcsave lvsave", save)
@@ -673,7 +673,7 @@ export function renderClipBlocked(guildId: string): void {
                 key === "warn"
                     ? data!.warnDays
                         ? `Zählen ${data!.warnDays} Tage, wie in der Moderation eingestellt`
-                        : "Zählen, solange sie gelten – wie in der Moderation eingestellt"
+                        : "Zählen, solange sie gelten, wie in der Moderation eingestellt"
                     : "Zählen so viele Tage, wie unten steht";
 
             return row(many, hint, el("div", "clpenalty", el("label", "snitem__switch", on, el("span", "", "zählt")), el("span", "clpenalty__from", "ab"), count));
@@ -703,7 +703,7 @@ export function renderClipBlocked(guildId: string): void {
             "Ausschluss nach Strafen",
             "Wer die Schwelle erreicht, ist von selbst raus und darf wieder mitmachen, sobald die Strafen nicht mehr zählen. Eine zurückgenommene Verwarnung zählt nicht.",
             ...rows,
-            row("Zeitraum", `Wie lange Timeouts, Kicks und Banns zählen – 1 bis ${data!.limits.penaltyDays} Tage`, el("div", "clpenalty", days, el("span", "clpenalty__from", "Tage"))),
+            row("Zeitraum", `Wie lange Timeouts, Kicks und Banns zählen: 1 bis ${data!.limits.penaltyDays} Tage`, el("div", "clpenalty", days, el("span", "clpenalty__from", "Tage"))),
             el("div", "mcsave lvsave", save)
         );
     }
@@ -877,7 +877,7 @@ export function renderClipArchive(guildId: string): void {
             video.setAttribute("aria-label", `Clip von ${entry.userName}`);
             media.append(video);
         } else {
-            media.append(el("div", "clcard__link", icon("#i-play"), el("span", "", "Keine Kopie – das Video ließ sich nicht sichern.")));
+            media.append(el("div", "clcard__link", icon("#i-play"), el("span", "", "Keine Kopie. Das Video ließ sich nicht sichern.")));
         }
 
         const facts = [`Platz ${entry.rank ?? "–"}`, ...(entry.size ? [megabytes(entry.size)] : [])].join(" · ");

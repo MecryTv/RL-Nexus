@@ -77,7 +77,7 @@ export const MODULES: IModule[] = [
     {
         id: "rl-6mans",
         name: "2, 4 & 6 Mans",
-        description: "Warteschlangen für 1v1, 2v2 und 3v3 – je Modus eine eigene MMR, ausgeglichene Teams und eine eigene Rangliste.",
+        description: "Warteschlangen für 1v1, 2v2 und 3v3: je Modus eine eigene MMR, ausgeglichene Teams und eine eigene Rangliste.",
         icon: "#i-gamepad",
         category: "rocket-league",
         parts: [
@@ -105,7 +105,7 @@ export const MODULES: IModule[] = [
     {
         id: "lft",
         name: "Looking for",
-        description: "Spieler suchen Teams, Teams suchen Spieler – gefragt wird per DM, der Beitrag landet im Forum.",
+        description: "Spieler suchen Teams, Teams suchen Spieler. Gefragt wird per DM, der Beitrag landet im Forum.",
         icon: "#i-user-search",
         category: "rocket-league",
         parts: [
@@ -124,7 +124,7 @@ export const MODULES: IModule[] = [
             {
                 id: "lft-requests",
                 name: "Anfragen",
-                description: "Alles, was gesucht wird - beenden, löschen und nachlesen.",
+                description: "Alles, was gesucht wird: beenden, löschen und nachlesen.",
                 icon: "#i-inbox",
             },
         ],
@@ -132,7 +132,7 @@ export const MODULES: IModule[] = [
     {
         id: "teams",
         name: "RL Team-Übersicht",
-        description: "Kader mit Captain, Co-Captain, Stamm, Ersatz und Trial – die Ränge holt der Bot aus Prime, von Hand kommt nur der Peak.",
+        description: "Kader mit Captain, Co-Captain, Stamm, Ersatz und Trial. Die Ränge holt der Bot aus Prime, von Hand kommt nur der Peak.",
         icon: "#i-shield-users",
         category: "rocket-league",
         parts: [
@@ -147,7 +147,7 @@ export const MODULES: IModule[] = [
     {
         id: "rank-roles",
         name: "Rank Roles",
-        description: "Rollen nach Rocket-League-Rang – je Playlist eine eigene, auf Befehl geholt.",
+        description: "Rollen nach Rocket-League-Rang, je Playlist eine eigene, auf Befehl geholt.",
         icon: "#i-shield-check",
         category: "rocket-league",
     },
@@ -167,7 +167,7 @@ export const MODULES: IModule[] = [
             {
                 id: "clip-blocked",
                 name: "Sperrliste",
-                description: "Wer nicht mitmachen darf – von Hand gesperrt oder nach Strafen ausgeschlossen.",
+                description: "Wer nicht mitmachen darf: von Hand gesperrt oder nach Strafen ausgeschlossen.",
                 icon: "#i-user-x",
             },
             {
@@ -188,13 +188,13 @@ export const MODULES: IModule[] = [
             {
                 id: "matchup-list",
                 name: "Eintragen",
-                description: "Eine Partie eintragen oder ändern - dasselbe Formular wie über den Link.",
+                description: "Eine Partie eintragen oder ändern, im selben Formular wie über den Link.",
                 icon: "#i-clock",
             },
             {
                 id: "matchup-all",
                 name: "Alle Partien",
-                description: "Was ansteht und was war - absagen, Ergebnis melden, löschen.",
+                description: "Was ansteht und was war: absagen, Ergebnis melden, löschen.",
                 icon: "#i-list-checks",
             },
         ],
@@ -202,7 +202,7 @@ export const MODULES: IModule[] = [
     {
         id: "moderation",
         name: "Moderation",
-        description: "Verwarnen, stummschalten, kicken und bannen – mit Begründung und Verlauf je Mitglied.",
+        description: "Verwarnen, stummschalten, kicken und bannen, mit Begründung und Verlauf je Mitglied.",
         icon: "#i-gavel",
         category: "moderation",
     },
@@ -259,7 +259,7 @@ export const MODULES: IModule[] = [
     {
         id: "role-lists",
         name: "Rollen-Listen",
-        description: "Listen, die zeigen, wer welche Rolle hat – Staff, Teams, Creator. Als Karte oder gezeichnetes Bild, immer aktuell.",
+        description: "Listen, die zeigen, wer welche Rolle hat: Staff, Teams, Creator. Als Karte oder gezeichnetes Bild, immer aktuell.",
         icon: "#i-users",
         category: "community",
     },
@@ -280,13 +280,13 @@ export const MODULES: IModule[] = [
             {
                 id: "level-card",
                 name: "Level-Karte",
-                description: "Level-Karte und Aufstiegs-Bild gestalten – mit Vorlagen und Baukasten.",
+                description: "Level-Karte und Aufstiegs-Bild gestalten, mit Vorlagen und Baukasten.",
                 icon: "#i-image",
             },
             {
                 id: "leaderboard",
                 name: "Rangliste",
-                description: "Wer wie viele Punkte hat – auf Wunsch auch öffentlich ohne Anmeldung.",
+                description: "Wer wie viele Punkte hat, auf Wunsch auch öffentlich ohne Anmeldung.",
                 icon: "#i-crown",
             },
         ],
@@ -315,7 +315,7 @@ export const MODULES: IModule[] = [
     {
         id: "tickets",
         name: "Ticket System",
-        description: "Support per Schaltfläche: jedes Ticket bekommt einen Kanal nur für Ersteller und Team.",
+        description: "Support per Schaltfläche: Jedes Ticket bekommt einen Kanal nur für Ersteller und Team.",
         icon: "#i-ticket",
         category: "support",
         parts: [

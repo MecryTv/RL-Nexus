@@ -27,7 +27,7 @@ export const MatchupsPanel: IPanelModule<S> = {
         {
             title: "Captains und Ergebnisse",
             fields: [
-                F<S>("toggle", "open", "Link offen", "Aus: die Seite für Captains ist zu, in Discord eintragen geht weiter.", (s) => s.open, (value: boolean) => ({ open: value })),
+                F<S>("toggle", "open", "Link offen", "Aus: Die Seite für Captains ist zu, in Discord eintragen geht weiter.", (s) => s.open, (value: boolean) => ({ open: value })),
                 F<S>("number", "ahead", "Tage im Voraus", "So weit im Voraus dürfen Captains Partien eintragen.", (s) => s.maxAhead, (value: number) => ({ maxAhead: value }), { min: 1, max: MAX_AHEAD, unit: "Tage" }),
                 F<S>("toggle", "results", "Ergebnisse eintragen", "Nach Anpfiff dürfen Captains das Ergebnis melden.", (s) => s.results, (value: boolean) => ({ results: value })),
                 F<S>("toggle", "discord", "Ergebnis-Knopf", "Der Knopf „Ergebnis eintragen“ unter der Ankündigung, aus heißt nur über Link und Dashboard.", (s) => s.discordResults, (value: boolean) => ({ discordResults: value })),

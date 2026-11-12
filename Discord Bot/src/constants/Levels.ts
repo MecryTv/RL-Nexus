@@ -144,7 +144,7 @@ export function UpMode(settings: Pick<ILevelSettings, "upMode" | "message">): "i
 export function DefaultLevelMessage(): IMessageDoc {
     return {
         accent: LEVELS_ACCENT,
-        blocks: [{ type: "text", body: "## 🎉 Level {level}!\n{user} ist aufgestiegen – weiter so.\n-# {xp} Punkte · Platz {rank}" }],
+        blocks: [{ type: "text", body: "## 🎉 Level {level}!\n{user} ist aufgestiegen, weiter so.\n-# {xp} Punkte · Platz {rank}" }],
     };
 }
 

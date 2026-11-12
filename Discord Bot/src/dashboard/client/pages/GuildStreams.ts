@@ -84,14 +84,14 @@ const BRAND: Record<Platform, { name: string; symbol: string; input: string; hin
     twitch: {
         name: "Twitch",
         symbol: "#i-twitch",
-        input: "Twitch-Name oder Link – etwa twitch.tv/rocketleague",
+        input: "Twitch-Name oder Link, etwa twitch.tv/rocketleague",
         hint: "Der Bot fragt Twitch jede Minute, wer live ist. Die Karte zieht Titel, Spiel und Zuschauer nach und wird am Ende zur Zusammenfassung.",
     },
     youtube: {
         name: "YouTube",
         symbol: "#i-youtube",
         input: "Kanal-Link, @Name oder Kanal-ID (UC…)",
-        hint: "Der Bot liest alle fünf Minuten den Feed der Kanäle – neue Videos und Shorts ohne API-Schlüssel, Livestreams mit.",
+        hint: "Der Bot liest alle fünf Minuten den Feed der Kanäle: neue Videos und Shorts ohne API-Schlüssel, Livestreams mit.",
     },
 };
 
@@ -202,7 +202,7 @@ export function renderStreams(guildId: string, platform: Platform): void {
             if (!answer) return;
 
             clickSound("primary");
-            toast("info", `${answer.notifier.name} ist drin`, "Wähl jetzt den Kanal – dann meldet der Bot sich dort.");
+            toast("info", `${answer.notifier.name} ist drin`, "Wähl jetzt den Kanal, dann meldet der Bot sich dort.");
             data!.notifiers.push(answer.notifier);
             open = answer.notifier.id;
             paint();
@@ -312,7 +312,7 @@ export function renderStreams(guildId: string, platform: Platform): void {
                 streamer: notifier.name,
                 "streamer.login": notifier.login ?? "",
                 "streamer.avatar": notifier.avatar ?? "",
-                "stream.title": notifier.live?.title ?? "Ranked 2v2 bis GC – !discord",
+                "stream.title": notifier.live?.title ?? "Ranked 2v2 bis GC | !discord",
                 "stream.game": notifier.live?.game ?? "Rocket League",
                 "stream.url": notifier.url,
                 "stream.viewers": String(notifier.live?.viewers ?? 128),
@@ -381,7 +381,7 @@ export function renderStreams(guildId: string, platform: Platform): void {
                         // Gesendet wird, was gespeichert ist.
                         if (draft.dirty && !(await save(notifier, null))) return;
 
-                        if (await call("", { action: "test", id: notifier.id, kind: draft.kind })) toast("info", "Test gesendet", "Schau in den Kanal – so sieht die echte Meldung aus.");
+                        if (await call("", { action: "test", id: notifier.id, kind: draft.kind })) toast("info", "Test gesendet", "Schau in den Kanal, so sieht die echte Meldung aus.");
                     },
                 }
             );
@@ -399,11 +399,11 @@ export function renderStreams(guildId: string, platform: Platform): void {
             async (forumId) => {
                 const answer = await call<{ thread: ILogThread }>("", { action: "logthread", forumId });
 
-                if (answer) toast("info", "Beitrag angelegt", `„${answer.thread.name}“ in #${answer.thread.parentName} – speichern nicht vergessen.`);
+                if (answer) toast("info", "Beitrag angelegt", `„${answer.thread.name}“ in #${answer.thread.parentName}. Speichern nicht vergessen.`);
 
                 return answer?.thread ?? null;
             },
-            "— Kanal wählen —"
+            "(Kanal wählen)"
         );
 
         const ping = pingSelect(data!.guild.roles, config.ping, (value) => {
@@ -432,7 +432,7 @@ export function renderStreams(guildId: string, platform: Platform): void {
             "snsettings",
             row("Kanal", "Textkanal oder Beitrag in einem Forum", target),
             row("Ping", "Wer bei jeder Meldung benachrichtigt wird", ping),
-            row("Discord-User", platform === "twitch" ? "Für {streamer.mention} und die Live-Rolle – erkennt der Bot auch am Streaming-Status" : "Für {channel.mention} und die Live-Rolle bei Livestreams", personHost)
+            row("Discord-User", platform === "twitch" ? "Für {streamer.mention} und die Live-Rolle (erkennt der Bot auch am Streaming-Status)" : "Für {channel.mention} und die Live-Rolle bei Livestreams", personHost)
         );
 
         if (platform === "twitch") {
@@ -477,7 +477,7 @@ export function renderStreams(guildId: string, platform: Platform): void {
                 kinds.append(el("label", `snkind${locked ? " is-locked" : ""}`, box, el("span", "", KIND_PLURAL[kind])));
             }
 
-            settings.append(row("Was melden", data!.ready.youtubeLive ? "Jede Art mit eigener Nachricht" : "Livestreams erkennt der Bot gerade nicht – ihm fehlt der Zugang zur YouTube-API", kinds));
+            settings.append(row("Was melden", data!.ready.youtubeLive ? "Jede Art mit eigener Nachricht" : "Livestreams erkennt der Bot gerade nicht, ihm fehlt der Zugang zur YouTube-API", kinds));
         }
 
         // Die Nachricht je Art - bei YouTube umschaltbar.
@@ -589,19 +589,19 @@ export function renderStreams(guildId: string, platform: Platform): void {
         return card(
             "Live-Rolle",
             platform === "twitch"
-                ? "Wer in Discord als „streamt auf Twitch“ angezeigt wird, bekommt diese Rolle – und verliert sie nach dem Stream. Die Streamer aus der Liste bekommen sie auch, sobald der Bot sie live sieht."
-                : "Wer an einem Kanal als Discord-User steht, bekommt diese Rolle, solange sein Livestream läuft – und verliert sie danach.",
+                ? "Wer in Discord als „streamt auf Twitch“ angezeigt wird, bekommt diese Rolle und verliert sie nach dem Stream. Die Streamer aus der Liste bekommen sie auch, sobald der Bot sie live sieht."
+                : "Wer an einem Kanal als Discord-User steht, bekommt diese Rolle, solange sein Livestream läuft, und verliert sie danach.",
             ...(platform === "twitch" && !data!.ready.presence
                 ? [el("div", "notice", icon("#i-warn"), el("span", "", "Für den Streaming-Status braucht der Bot das Presence Intent bei Discord, und das kann nur das RL Nexus Team einschalten. Die Streamer aus der Liste bekommen die Rolle auch ohne."))]
                 : []),
             ...(platform === "youtube" && !data!.ready.youtubeLive
-                ? [el("div", "notice", icon("#i-warn"), el("span", "", "Livestreams erkennt der Bot gerade nicht – ihm fehlt der Zugang zur YouTube-API."))]
+                ? [el("div", "notice", icon("#i-warn"), el("span", "", "Livestreams erkennt der Bot gerade nicht, ihm fehlt der Zugang zur YouTube-API."))]
                 : []),
             ...(missing
-                ? [el("div", "notice", icon("#i-info"), el("span", "", `${missing === 1 ? "Ein Kanal hat" : `${missing} Kanäle haben`} noch keinen Discord-User – ohne den weiß der Bot nicht, wem die Rolle gehört.`))]
+                ? [el("div", "notice", icon("#i-info"), el("span", "", `${missing === 1 ? "Ein Kanal hat" : `${missing} Kanäle haben`} noch keinen Discord-User. Ohne den weiß der Bot nicht, wem die Rolle gehört.`))]
                 : []),
             row("Rolle", "Muss unter der höchsten Rolle des Bots stehen", role),
-            ...(platform === "twitch" ? [row("Für wen", "Gilt für den Streaming-Status – etwa nur für eure Streamer-Rolle", filter)] : []),
+            ...(platform === "twitch" ? [row("Für wen", "Gilt für den Streaming-Status, etwa nur für eure Streamer-Rolle", filter)] : []),
             el("div", "mcsave", saveButton)
         );
     }
@@ -678,7 +678,7 @@ export function renderStreams(guildId: string, platform: Platform): void {
                           "tkempty tkempty--big",
                           icon(brand.symbol),
                           el("b", "", platform === "twitch" ? "Noch kein Streamer." : "Noch kein Kanal."),
-                          el("span", "", "Oben hinzufügen, Kanal wählen – fertig. Die Nachricht lässt sich danach anpassen.")
+                          el("span", "", "Oben hinzufügen, Kanal wählen, fertig. Die Nachricht lässt sich danach anpassen.")
                       ),
                   ])
         );

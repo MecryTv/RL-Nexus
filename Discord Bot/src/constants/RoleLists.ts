@@ -300,7 +300,7 @@ export const LIST_TEMPLATES: Record<ListTemplateKey, { label: string; heading: s
     teams: {
         label: "Teams",
         heading: "Unsere Spieler",
-        lead: "Wer für uns aufläuft – {anzahl} Leute.",
+        lead: "Wer für uns aufläuft: {anzahl} Leute.",
         button: "Bei uns bewerben",
         // label null: der Name der Rolle
         match: [{ pattern: /team|main|academy/i, label: null, emoji: "🥇" }],

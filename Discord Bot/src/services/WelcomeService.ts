@@ -94,8 +94,8 @@ export default class WelcomeService {
         };
 
         if (message.on && !message.channelId) throw new WelcomeError(which === "join" ? "Wähle einen Kanal für die Begrüßung." : "Wähle einen Kanal für den Abschied.");
-        if (message.on && kind === "text" && !message.content) throw new WelcomeError("Die Nachricht ist leer – schreib einen Text.");
-        if (message.on && kind === "embed" && !message.embed) throw new WelcomeError("Das Embed ist leer – schreib zumindest Überschrift oder Text.");
+        if (message.on && kind === "text" && !message.content) throw new WelcomeError("Die Nachricht ist leer. Schreib einen Text.");
+        if (message.on && kind === "embed" && !message.embed) throw new WelcomeError("Das Embed ist leer. Schreib zumindest eine Überschrift oder einen Text.");
 
         return message;
     }
@@ -156,7 +156,7 @@ export default class WelcomeService {
             const role = guild.roles.cache.get(id);
 
             if (!role) continue;
-            if (role.managed) throw new WelcomeError(`@${role.name} verwaltet eine Integration – die kann der Bot nicht vergeben.`);
+            if (role.managed) throw new WelcomeError(`@${role.name} verwaltet eine Integration. Die kann der Bot nicht vergeben.`);
             if (!me?.permissions.has(PermissionFlagsBits.ManageRoles) || role.comparePositionTo(me.roles.highest) >= 0) {
                 throw new WelcomeError(`@${role.name} muss unter der höchsten Rolle des Bots stehen, und er braucht „Rollen verwalten“.`);
             }
@@ -324,7 +324,7 @@ export default class WelcomeService {
         const payload = await this.Payload(member, message, which);
         const sent = await channel.send({ ...payload, content: `${payload.content ?? ""}`.trim() || undefined }).catch(() => null);
 
-        if (!sent) throw new WelcomeError("Die Nachricht ging nicht raus – darf der Bot in den Kanal schreiben?");
+        if (!sent) throw new WelcomeError("Die Nachricht ging nicht raus. Darf der Bot in den Kanal schreiben?");
 
         logger.user(`👋 Test-${which === "join" ? "Begrüßung" : "Abschied"} auf ${guild.id} gesendet (von ${member.id})`);
     }

@@ -63,7 +63,7 @@ export function RoleListText(settings: IRoleListSettings, design: "compact" | "s
     const titled = (member: IRoleListMember): string => {
         const title = settings.titles[member.id]?.title;
 
-        return title ? `${person(member)} – ${escapeMarkdown(title)}` : person(member);
+        return title ? `${person(member)} · ${escapeMarkdown(title)}` : person(member);
     };
 
     // Je Gruppe, wie viele Leute sichtbar bleiben. Gekürzt wird bei der Gruppe mit den meisten sichtbaren.

@@ -412,7 +412,7 @@ export async function checkMessagesDb(config: IConfig, http: IHttp): Promise<voi
             await query("DELETE FROM bot_message_recipients WHERE message_id = ? AND user_id = ?", [fourth, P.cancelled]);
 
             assert.ok((await recoverSending()) >= 1);
-            assert.deepEqual(await rowOf(fourth, P.data), { state: "failed", reason: "Neustart beim Senden, unklar ob angekommen" });
+            assert.deepEqual(await rowOf(fourth, P.data), { state: "failed", reason: "Neustart beim Senden, unklar, ob angekommen" });
 
             const rec = recorder(() => null);
             let result = "idle";
@@ -443,7 +443,7 @@ export async function checkMessagesDb(config: IConfig, http: IHttp): Promise<voi
 
             assert.equal(result, "done");
             assert.ok(!rec.calls.includes(P.data), "nicht neu geschickt");
-            assert.deepEqual(await rowOf(fifth, P.data), { state: "failed", reason: "beim Senden hängen geblieben, unklar ob angekommen" });
+            assert.deepEqual(await rowOf(fifth, P.data), { state: "failed", reason: "beim Senden hängen geblieben, unklar, ob angekommen" });
 
             const done = await messageRow(fifth);
             assert.equal(done?.failed, 1);

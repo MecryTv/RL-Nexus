@@ -246,7 +246,7 @@ function mount(guildId: string, view: "inbox" | "manage"): void {
         return card(
             "Bewerbungen",
             data!.manage
-                ? "Offene zuerst. Ein Klick klappt die Antworten auf – entschieden wird hier oder direkt an der Karte in Discord."
+                ? "Offene zuerst. Ein Klick klappt die Antworten auf. Entschieden wird hier oder direkt an der Karte in Discord."
                 : "Du siehst die Bewerbungen dieses Servers und kannst sie entscheiden.",
             el("div", "apfilter", status, form),
             el("div", "aplist", ...list),
@@ -290,7 +290,7 @@ function mount(guildId: string, view: "inbox" | "manage"): void {
             ...(form?.questions ?? []).map((question) => {
                 const answer = entry.answers.find((one) => one.id === question.id);
 
-                return el("div", "apanswer", el("b", "", question.label), el("p", "", answer?.value ?? "— keine Antwort —"));
+                return el("div", "apanswer", el("b", "", question.label), el("p", "", answer?.value ?? "(keine Antwort)"));
             })
         );
 
@@ -298,7 +298,7 @@ function mount(guildId: string, view: "inbox" | "manage"): void {
 
         noteField.type = "text";
         noteField.maxLength = data!.limits.note;
-        noteField.placeholder = "Kurze Begründung – kommt mit der Nachricht an den Bewerber";
+        noteField.placeholder = "Kurze Begründung (kommt mit der Nachricht an den Bewerber)";
         noteField.setAttribute("aria-label", "Begründung");
 
         const decide = async (status: Status): Promise<void> => {
@@ -341,12 +341,12 @@ function mount(guildId: string, view: "inbox" | "manage"): void {
                 "snitem__body",
                 answers,
                 ...(entry.status === "open"
-                    ? [row("Begründung", "Steht in der Nachricht an den Bewerber – freiwillig", noteField), el("div", "mcsave", yes, no)]
+                    ? [row("Begründung", "Steht in der Nachricht an den Bewerber (freiwillig)", noteField), el("div", "mcsave", yes, no)]
                     : [
                           el(
                               "p",
                               "hintline",
-                              `${data!.statuses[entry.status]} von ${entry.decidedName ?? "unbekannt"}${entry.decidedAt ? ` · ${WHEN.format(new Date(entry.decidedAt))}` : ""}${entry.note ? ` · „${entry.note}"` : ""}`
+                              `${data!.statuses[entry.status]} von ${entry.decidedName ?? "unbekannt"}${entry.decidedAt ? ` · ${WHEN.format(new Date(entry.decidedAt))}` : ""}${entry.note ? ` · „${entry.note}“` : ""}`
                           ),
                           el("p", "hintline", removeHint),
                           el("div", "mcsave", drop),
@@ -366,7 +366,7 @@ function mount(guildId: string, view: "inbox" | "manage"): void {
 
         name.type = "text";
         name.maxLength = 80;
-        name.placeholder = "Wofür bewirbt man sich? Etwa „Moderator\"";
+        name.placeholder = "Wofür bewirbt man sich? Etwa „Moderator“";
         name.setAttribute("aria-label", "Name des neuen Formulars");
 
         const create = async (): Promise<void> => {
@@ -386,7 +386,7 @@ function mount(guildId: string, view: "inbox" | "manage"): void {
 
             openForm = answer.form.id;
             name.value = "";
-            toast("info", "Angelegt", "Jetzt die Fragen anpassen – gespeichert wird mit Speichern.");
+            toast("info", "Angelegt", "Jetzt die Fragen anpassen. Gespeichert wird mit „Speichern“.");
             void reload();
         };
 
@@ -429,7 +429,7 @@ function mount(guildId: string, view: "inbox" | "manage"): void {
                 "div",
                 "snitem__head",
                 el("span", "snitem__face", form.emoji ? el("span", "", form.emoji) : icon("#i-clipboard")),
-                el("div", "snitem__name", el("b", "", form.name), el("span", "", `${form.questions.length} Frage(n) · ${form.open ? "nimmt Bewerbungen an" : "geschlossen"}`)),
+                el("div", "snitem__name", el("b", "", form.name), el("span", "", `${form.questions.length === 1 ? "1 Frage" : `${form.questions.length} Fragen`} · ${form.open ? "nimmt Bewerbungen an" : "geschlossen"}`)),
                 toggleOpen
             )
         );
@@ -491,7 +491,7 @@ function mount(guildId: string, view: "inbox" | "manage"): void {
                 "div",
                 "snitem__body",
                 text("Name", "Steht auf der öffentlichen Seite", draft.name, 80, (value) => (draft.name = value)),
-                text("Emoji", "Klein vor dem Namen – darf leer bleiben", draft.emoji ?? "", 8, (value) => (draft.emoji = value.trim() || null)),
+                text("Emoji", "Klein vor dem Namen, darf leer bleiben", draft.emoji ?? "", 8, (value) => (draft.emoji = value.trim() || null)),
                 text("Beschreibung", "Ein, zwei Sätze: worum geht es, was erwartet ihr", draft.description, 1000, (value) => (draft.description = value), true),
                 row(
                     "Nimmt Bewerbungen an",
@@ -627,8 +627,8 @@ function mount(guildId: string, view: "inbox" | "manage"): void {
     }
 
     function formSettings(draft: IForm, touch: () => void): HTMLElement[] {
-        const channels: [string, string][] = [["", "— Kanal des Moduls —"], ...data!.guild.channels.map((entry): [string, string] => [entry.id, `# ${entry.name}`])];
-        const roles: [string, string][] = [["", "— keine —"], ...data!.guild.roles.map((role): [string, string] => [role.id, `@${role.name}`])];
+        const channels: [string, string][] = [["", "(Kanal des Moduls)"], ...data!.guild.channels.map((entry): [string, string] => [entry.id, `# ${entry.name}`])];
+        const roles: [string, string][] = [["", "(keine)"], ...data!.guild.roles.map((role): [string, string] => [role.id, `@${role.name}`])];
 
         return [
             row(
@@ -792,7 +792,7 @@ function mount(guildId: string, view: "inbox" | "manage"): void {
 
         // Plan 30: Wo die Karte landet. Die Zeilen zum eigenen Kanal stehen nur da, wenn er gewählt ist.
         const sharedPick = select(
-            [["", "— kein Kanal —"], ...data!.guild.channels.map((entry): [string, string] => [entry.id, `# ${entry.name}`])],
+            [["", "(kein Kanal)"], ...data!.guild.channels.map((entry): [string, string] => [entry.id, `# ${entry.name}`])],
             draft.channelId ?? "",
             (value) => {
                 draft.channelId = value || null;
@@ -801,7 +801,7 @@ function mount(guildId: string, view: "inbox" | "manage"): void {
             "Sammelkanal"
         );
         const categoryPick = select(
-            [["", "— keine Kategorie —"], ...data!.guild.categories.map((entry): [string, string] => [entry.id, entry.name])],
+            [["", "(keine Kategorie)"], ...data!.guild.categories.map((entry): [string, string] => [entry.id, entry.name])],
             draft.categoryId ?? "",
             (value) => {
                 draft.categoryId = value || null;
@@ -845,7 +845,7 @@ function mount(guildId: string, view: "inbox" | "manage"): void {
 
                 return answer?.thread ?? null;
             },
-            "— kein Transcript —"
+            "(kein Transcript)"
         );
 
         transcriptPick.setAttribute("aria-label", "Transcript-Kanal");
@@ -955,7 +955,7 @@ function mount(guildId: string, view: "inbox" | "manage"): void {
         return [
             card(
                 "Wer Bewerbungen sieht",
-                "Diese Rollen und Personen kommen an die Bewerbungen – im Dashboard und an den Karten in Discord. Wer den Server verwaltet, darf immer.",
+                "Diese Rollen und Personen kommen an die Bewerbungen: im Dashboard und an den Karten in Discord. Wer den Server verwaltet, darf immer.",
                 row(
                     "Rollen",
                     `Bis zu ${data!.limits.reviewers}`,

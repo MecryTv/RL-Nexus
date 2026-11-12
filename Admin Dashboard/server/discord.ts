@@ -163,7 +163,7 @@ export async function fetchMember(config: IConfig, userId: string): Promise<IDis
         // Bot gemeint ist.
         throw new DiscordUnavailable(
             config.developerMode
-                ? `Discord kennt den Server ${config.guildId} nicht (Code ${code ?? "?"}). Der Dev-Bot muss auf dem Dev Server sein, sonst kann er die Rollen nicht lesen. Server-ID steht in DEV_ADMIN_GUILD_ID.`
+                ? `Discord kennt den Server ${config.guildId} nicht (Code ${code ?? "?"}). Der Dev-Bot muss auf dem Dev-Server sein, sonst kann er die Rollen nicht lesen. Die Server-ID steht in DEV_ADMIN_GUILD_ID.`
                 : `Discord kennt den Server nicht (Code ${code ?? "?"}). Ist der Bot noch drauf?`
         );
     }

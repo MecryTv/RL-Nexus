@@ -446,7 +446,7 @@ export function renderRoulette(guildId: string): void {
     }
 
     function swapForm(): HTMLElement {
-        return pairForm("Spieler tauschen", "Jemand ist weg: wähle ihn und wer seinen Platz bekommt, etwa einen Nachzügler oder einen Moderator. Der Bot schiebt beide passend um.", ["Wer ist weg?", "Wer übernimmt?"], "Tauschen", (a, b) => act({ action: "swap", a, b }));
+        return pairForm("Spieler tauschen", "Jemand ist weg: Wähl ihn und die Person, die seinen Platz bekommt, etwa einen Nachzügler oder einen Moderator. Der Bot schiebt beide passend um.", ["Wer ist weg?", "Wer übernimmt?"], "Tauschen", (a, b) => act({ action: "swap", a, b }));
     }
 
     function lobbyCard(lobby: ILobby): HTMLElement {

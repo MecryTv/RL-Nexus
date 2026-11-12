@@ -50,9 +50,9 @@ function StateLine({ banner, now }: { readonly banner: IBanner; readonly now: nu
     const state = bannerState(banner, now);
     const tones: Readonly<Record<typeof state, BadgeTone>> = { sichtbar: "ok", geplant: "info", abgelaufen: "neutral", aus: "neutral" };
 
-    let text = "Die Webseite zeigt keinen Banner.";
+    let text = "Die Webseite zeigt kein Banner.";
 
-    if (state === "sichtbar") text = banner.showUntil ? `Bis ${formatDateTime(banner.showUntil)}.` : "Ohne Ende, bis du ihn ausschaltest.";
+    if (state === "sichtbar") text = banner.showUntil ? `Bis ${formatDateTime(banner.showUntil)}.` : "Ohne Ende, bis du es ausschaltest.";
     if (state === "geplant" && banner.showFrom) text = `Erscheint am ${formatDateTime(banner.showFrom)}.`;
     if (state === "abgelaufen" && banner.showUntil) text = `Seit ${formatDateTime(banner.showUntil)} nicht mehr zu sehen.`;
 
@@ -129,7 +129,7 @@ export function BannerPage(): JSX.Element {
 
     return (
         <>
-            <PageHeader title="Banner" meta="Besucher können sie für ihre Sitzung wegklicken, nach jeder Änderung erscheint sie wieder.">
+            <PageHeader title="Banner" meta="Besucher können es für ihre Sitzung wegklicken, nach jeder Änderung erscheint es wieder.">
                 <ResetAction doc={doc} what="Das Banner" />
             </PageHeader>
 

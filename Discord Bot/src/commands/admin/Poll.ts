@@ -42,7 +42,7 @@ export default class Poll extends Command {
                     .setDescription("Startet eine Umfrage")
                     .addStringOption((option) => option.setName("frage").setDescription("Die Frage").setRequired(true).setMaxLength(MAX_QUESTION))
                     .addStringOption((option) =>
-                        option.setName("antworten").setDescription("Zwei bis zehn Antworten, getrennt mit | – etwa: Ja | Nein | Vielleicht").setRequired(true).setMaxLength(1000)
+                        option.setName("antworten").setDescription("Zwei bis zehn Antworten, getrennt mit |, etwa: Ja | Nein | Vielleicht").setRequired(true).setMaxLength(1000)
                     )
                     .addStringOption((option) =>
                         option
@@ -50,7 +50,7 @@ export default class Poll extends Command {
                             .setDescription("Eigene Umfrage mit Knöpfen oder Discords Umfrage")
                             .addChoices({ name: "Eigene mit Knöpfen (Balken, anonym möglich)", value: "buttons" }, { name: "Discord-Umfrage", value: "native" })
                     )
-                    .addStringOption((option) => option.setName("dauer").setDescription("Wie lange? Etwa 1h, 3d – leer: ohne Ende (Discord: 1 Tag)").setAutocomplete(true))
+                    .addStringOption((option) => option.setName("dauer").setDescription("Wie lange? Etwa 1h, 3d. Leer: ohne Ende (Discord: 1 Tag)").setAutocomplete(true))
                     .addBooleanOption((option) => option.setName("mehrfach").setDescription("Mehrere Antworten erlaubt"))
                     .addBooleanOption((option) => option.setName("anonym").setDescription("Niemand sieht, wer was gewählt hat (nur eigene)"))
                     .addChannelOption((option) =>
@@ -89,7 +89,7 @@ export default class Poll extends Command {
         if (!guild) return void (await say("Nur auf einem Server."));
         if (!this.client.databaseService.Ready) return void (await say("Die Datenbank ist gerade nicht erreichbar.", "#ff4d5e"));
         if (!(await this.client.settings.Of(guild.id)).modules.includes(POLLS_MODULE)) {
-            return void (await say("Das Modul Umfragen ist aus – einschalten im Dashboard oder mit `/module an modul:polls`.", "#ffc53d"));
+            return void (await say("Das Modul Umfragen ist aus. Einschalten kannst du es im Dashboard oder mit `/module an modul:polls`.", "#ffc53d"));
         }
 
         await interaction.deferReply({ flags: MessageFlags.Ephemeral });
@@ -102,7 +102,7 @@ export default class Poll extends Command {
                 if (poll.status === "ended") throw new PollError(`Umfrage #${poll.number} ist schon beendet.`);
 
                 await this.client.pollService.End(poll);
-                await say(`✅ Umfrage #${poll.number} ist beendet – das Ergebnis steht in der Nachricht.`);
+                await say(`✅ Umfrage #${poll.number} ist beendet, das Ergebnis steht in der Nachricht.`);
 
                 return;
             }
@@ -110,7 +110,7 @@ export default class Poll extends Command {
             const text = interaction.options.getString("dauer");
             const seconds = text ? ParseDuration(text) : null;
 
-            if (text && seconds === null) throw new PollError(`„${text}“ verstehe ich nicht als Dauer – etwa 1h, 3d oder 1w.`);
+            if (text && seconds === null) throw new PollError(`„${text}“ verstehe ich nicht als Dauer. Schreib sie etwa so: 1h, 3d oder 1w.`);
 
             const kind = interaction.options.getString("art") === "native" ? "native" : "buttons";
             const member = interaction.member instanceof GuildMember ? interaction.member : await guild.members.fetch(interaction.user.id);

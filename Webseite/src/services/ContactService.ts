@@ -77,7 +77,7 @@ export class ContactService {
         const email = input.email.trim();
         const discord = input.discord.trim();
 
-        if (name.length < LIMITS.name.min) errors.name = "Bitte trag einen Namen ein - mindestens zwei Zeichen.";
+        if (name.length < LIMITS.name.min) errors.name = "Bitte trag einen Namen ein, mindestens zwei Zeichen.";
         else if (name.length > LIMITS.name.max) errors.name = `Höchstens ${LIMITS.name.max} Zeichen.`;
 
         // Eine der beiden Kontaktmöglichkeiten muss da sein. Beide zu verlangen
@@ -92,7 +92,7 @@ export class ContactService {
         else if (subject.length > LIMITS.subject.max) errors.subject = `Höchstens ${LIMITS.subject.max} Zeichen.`;
 
         if (message.length < LIMITS.message.min) {
-            errors.message = `Bitte schreib etwas mehr - mindestens ${LIMITS.message.min} Zeichen.`;
+            errors.message = `Bitte schreib etwas mehr, mindestens ${LIMITS.message.min} Zeichen.`;
         } else if (message.length > LIMITS.message.max) {
             errors.message = `Höchstens ${LIMITS.message.max} Zeichen.`;
         }
@@ -201,7 +201,7 @@ export class ContactService {
         ].filter((line): line is string => line !== null);
 
         const body = lines.join("\n");
-        const shortened = body.length > 1400 ? `${body.slice(0, 1400)}\n\n[gekürzt - bitte im Mailprogramm ergänzen]` : body;
+        const shortened = body.length > 1400 ? `${body.slice(0, 1400)}\n\n[gekürzt, bitte im Mailprogramm ergänzen]` : body;
 
         const url = `mailto:${this.recipient}?subject=${encodeURIComponent(
             `[${meta.label}] ${input.subject.trim()}`

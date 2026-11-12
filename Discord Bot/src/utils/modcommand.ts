@@ -20,7 +20,7 @@ export function ReadDuration(text: string | null, permanent: boolean): number | 
 
     const seconds = ParseDuration(value);
 
-    if (seconds === null) throw new ModerationError(`„${text}“ verstehe ich nicht als Dauer – etwa 10m, 2h, 3d oder 1w.`);
+    if (seconds === null) throw new ModerationError(`„${text}“ verstehe ich nicht als Dauer. Beispiele: 10m, 2h, 3d oder 1w.`);
 
     return seconds;
 }
@@ -52,7 +52,7 @@ export async function ModSay(interaction: ChatInputCommandInteraction, view: IMo
 export function Fail(interaction: ChatInputCommandInteraction, error: unknown, what: string): Promise<void> {
     if (!(error instanceof ModerationError)) logger.error(`🛡️ /${interaction.commandName} (${what}) fehlgeschlagen`, error);
 
-    return ModSay(interaction, ModErrorView(error instanceof ModerationError ? error.message : "Da ging etwas schief – versuch es gleich nochmal."));
+    return ModSay(interaction, ModErrorView(error instanceof ModerationError ? error.message : "Da ging etwas schief. Versuch es gleich nochmal."));
 }
 
 /** Das Mitglied hinter dem Befehl - samt Rollen, die Rechteprüfung braucht sie. */

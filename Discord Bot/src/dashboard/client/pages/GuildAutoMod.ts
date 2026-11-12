@@ -119,7 +119,7 @@ export function renderAutoMod(guildId: string): void {
                 "div",
                 "notice snnotice",
                 icon("#i-warn"),
-                el("span", "", "Verwarnen, Timeout, Kick und Bann legen einen Fall in der Moderation an – und die ist auf diesem Server aus. Bis dahin löscht der Bot nur.")
+                el("span", "", "Verwarnen, Timeout, Kick und Bann legen einen Fall in der Moderation an, und die ist auf diesem Server aus. Bis dahin löscht der Bot nur.")
             ),
         ];
     }
@@ -215,7 +215,7 @@ export function renderAutoMod(guildId: string): void {
             rows.push(
                 row(
                     "Nur ganze Wörter",
-                    "Aus heißt: auch mitten im Wort. „ass\" trifft dann auch „Klasse\"",
+                    "Aus heißt: auch mitten im Wort. „ass“ trifft dann auch „Klasse“",
                     el("label", "snitem__switch", toggle(entry.whole, "Nur ganze Wörter", (on) => {
                         entry.whole = on;
                         touch();
@@ -272,7 +272,7 @@ export function renderAutoMod(guildId: string): void {
         rows.push(
             row(
                 "Nachricht löschen",
-                "Aus heißt: der Bot meldet nur",
+                "Aus heißt: Der Bot meldet nur",
                 el("label", "snitem__switch", toggle(entry.delete, "Nachricht löschen", (on) => {
                     entry.delete = on;
                     touch();
@@ -287,14 +287,14 @@ export function renderAutoMod(guildId: string): void {
         notice.rows = 2;
         notice.value = entry.notice;
         notice.maxLength = data!.limits.notice;
-        notice.placeholder = "Leer lassen: der Bot sagt nichts";
+        notice.placeholder = "Leer lassen: Der Bot sagt nichts";
         notice.setAttribute("aria-label", "Hinweis im Kanal");
         notice.addEventListener("input", () => {
             entry.notice = notice.value;
             touch();
         });
 
-        rows.push(row("Hinweis im Kanal", "Kurz, mit Erwähnung – verschwindet nach acht Sekunden", notice));
+        rows.push(row("Hinweis im Kanal", "Kurz, mit Erwähnung (verschwindet nach acht Sekunden)", notice));
 
         return rows;
     }
@@ -322,16 +322,16 @@ export function renderAutoMod(guildId: string): void {
 
             result.className = `hintline amtry__out${answer.hit ? " is-hit" : " is-clear"}`;
             result.textContent = answer.hit
-                ? `Würde greifen: ${info(answer.hit.filter).name} – erkannt: ${answer.hit.match}`
+                ? `Würde greifen: ${info(answer.hit.filter).name} (erkannt: ${answer.hit.match})`
                 : "Geht durch. Kein Filter würde anspringen.";
         });
 
         return card(
             "Probe",
-            "Was würde mit diesem Text passieren? Es wird nichts gelöscht und niemand bestraft – gerechnet wird mit dem, was gerade hier steht.",
+            "Was würde mit diesem Text passieren? Es wird nichts gelöscht und niemand bestraft. Gerechnet wird mit dem, was gerade hier steht.",
             el("label", "mcfield", el("span", "mcfield__label", "Text"), area),
             el("div", "amtry", run, result),
-            el("p", "hintline", "Spam und Wiederholung lassen sich so nicht prüfen – die hängen am Verlauf eines Mitglieds.")
+            el("p", "hintline", "Spam und Wiederholung lassen sich so nicht prüfen. Die hängen am Verlauf eines Mitglieds.")
         );
     }
 
@@ -396,7 +396,7 @@ export function renderAutoMod(guildId: string): void {
             ),
             row(
                 "Moderatoren",
-                "Wer „Nachrichten verwalten\" darf, bleibt außen vor",
+                "Wer „Nachrichten verwalten“ darf, bleibt außen vor",
                 el("label", "snitem__switch", toggle(draft!.ignoreMods, "Moderatoren ausnehmen", (on) => {
                     draft!.ignoreMods = on;
                     touch();
@@ -442,7 +442,7 @@ export function renderAutoMod(guildId: string): void {
         host.replaceChildren(
             ...notices(),
             head(),
-            card("Filter", "Jeder Filter greift für sich. Greifen mehrere, zählt der erste von oben – doppelte Strafe gibt es nicht.", el("div", "amlist", ...data.filters.map(filterRow))),
+            card("Filter", "Jeder Filter greift für sich. Greifen mehrere, zählt der erste von oben. Doppelte Strafe gibt es nicht.", el("div", "amlist", ...data.filters.map(filterRow))),
             tryCard(),
             exceptions(),
             reports(),

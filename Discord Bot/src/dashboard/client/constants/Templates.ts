@@ -81,7 +81,7 @@ export const TEMPLATES: Record<TemplateScope, ITemplate[]> = {
                     BLUE,
                     "## 👋 Willkommen, {user.name}!\nSchön, dass du auf **{guild}** gelandet bist.",
                     "---",
-                    "Du bist Mitglied Nr. **{member.number}** – sag gern kurz Hallo.\n-# Konto erstellt {created}"
+                    "Du bist Mitglied Nr. **{member.number}**. Sag gern kurz Hallo.\n-# Konto erstellt {created}"
                 ),
             },
         },
@@ -103,7 +103,7 @@ export const TEMPLATES: Record<TemplateScope, ITemplate[]> = {
         {
             id: "esports",
             name: "Esports",
-            hint: "Kantige Karte in Rot – passt zum Rest des Bots",
+            hint: "Kantige Karte in Rot, passt zum Rest des Bots",
             body: {
                 kind: "v2",
                 content: "{user}",
@@ -119,7 +119,7 @@ export const TEMPLATES: Record<TemplateScope, ITemplate[]> = {
             id: "plain",
             name: "Eine Zeile",
             hint: "Nur Text, ohne Karte und ohne Embed",
-            body: { kind: "text", content: "{user} ist da – willkommen auf **{guild}**! 👋" },
+            body: { kind: "text", content: "{user} ist da. Willkommen auf **{guild}**! 👋" },
         },
     ],
 
@@ -169,7 +169,7 @@ export const TEMPLATES: Record<TemplateScope, ITemplate[]> = {
             id: "default",
             name: "Standard",
             hint: "Kurz, mit Punkten und Platz",
-            body: { doc: card(BLUE, "## 🎉 Level {level}!\n{user} ist aufgestiegen – weiter so.\n-# {xp} Punkte · Platz {rank}") },
+            body: { doc: card(BLUE, "## 🎉 Level {level}!\n{user} ist aufgestiegen, weiter so.\n-# {xp} Punkte · Platz {rank}") },
         },
         {
             id: "hype",
@@ -180,7 +180,7 @@ export const TEMPLATES: Record<TemplateScope, ITemplate[]> = {
                     GREEN,
                     "# ⚡ LEVEL {level}\n{user} war fleißig.",
                     "---",
-                    "**{xp}** Punkte insgesamt · Platz **{rank}**\n-# Noch {xp.next} Punkte bis Level {level}+1"
+                    "**{xp}** Punkte insgesamt · Platz **{rank}**\n-# Noch {xp.next} Punkte bis zum nächsten Level"
                 ),
             },
         },
@@ -206,7 +206,7 @@ export const TEMPLATES: Record<TemplateScope, ITemplate[]> = {
         {
             id: "plain",
             name: "Nur Text",
-            hint: "Eine Zeile ohne Karte – gut für belebte Kanäle",
+            hint: "Eine Zeile ohne Karte, gut für belebte Kanäle",
             body: { kind: "text", content: "🎉 {user} ist jetzt **Level {level}** · {xp} Punkte · Platz {rank}" },
         },
     ],
@@ -220,7 +220,7 @@ export const TEMPLATES: Record<TemplateScope, ITemplate[]> = {
             body: {
                 kind: "v2",
                 content: "",
-                doc: card(BLUE, "## Hol dir deine Rollen\nKlick an, was auf dich passt – und wieder ab, wenn nicht mehr."),
+                doc: card(BLUE, "## Hol dir deine Rollen\nKlick an, was auf dich passt, und wieder ab, wenn nicht mehr."),
             },
         },
         {
@@ -234,7 +234,7 @@ export const TEMPLATES: Record<TemplateScope, ITemplate[]> = {
                     RED,
                     "## 🎮 Was spielst du?",
                     "---",
-                    "Wähl deine Spiele – so siehst du die passenden Kanäle und wirst nur dort gepingt, wo du mitspielst."
+                    "Wähl deine Spiele. So siehst du die passenden Kanäle und wirst nur dort gepingt, wo du mitspielst."
                 ),
             },
         },
@@ -258,7 +258,7 @@ export const TEMPLATES: Record<TemplateScope, ITemplate[]> = {
             hint: "Zwei Zeilen über den Knöpfen, ohne Karte",
             body: {
                 kind: "text",
-                content: "**Deine Rollen**\nKlick unten an, was auf dich passt – und wieder ab, wenn nicht mehr.",
+                content: "**Deine Rollen**\nKlick unten an, was auf dich passt, und wieder ab, wenn nicht mehr.",
             },
         },
     ],
@@ -286,7 +286,7 @@ export const TEMPLATES: Record<TemplateScope, ITemplate[]> = {
                     title: "Regeln",
                     description: "**1.** Sei freundlich.\n**2.** Kein Spam.\n**3.** Keine Werbung ohne Absprache.\n**4.** Was das Team sagt, gilt.",
                     color: BLUE,
-                    footer: { text: "Mit dem Bleiben stimmst du zu", icon: null },
+                    footer: { text: "Wer bleibt, stimmt den Regeln zu", icon: null },
                 }),
             },
         },
@@ -344,7 +344,7 @@ export const TEMPLATES: Record<TemplateScope, ITemplate[]> = {
             body: {
                 kind: "v2",
                 content: "",
-                doc: card(RED, "# 🛡️ {guild}", "Wähl unten ein Team – den Kader siehst nur du.", "-# Die Ränge kommen aus Rocket League · Stand {updated}"),
+                doc: card(RED, "# 🛡️ {guild}", "Wähl unten ein Team. Den Kader siehst nur du.", "-# Die Ränge kommen aus Rocket League · Stand {updated}"),
             },
         },
     ],
@@ -390,7 +390,7 @@ export const TEMPLATES: Record<TemplateScope, ITemplate[]> = {
         {
             id: "short",
             name: "Knapp",
-            hint: "Eine Karte ohne Kader – nur die Eckdaten",
+            hint: "Eine Karte ohne Kader, nur die Eckdaten",
             body: {
                 kind: "v2",
                 content: "",
@@ -421,7 +421,7 @@ export const TEMPLATES: Record<TemplateScope, ITemplate[]> = {
         {
             id: "card-plain",
             name: "Nur Text",
-            hint: "Ohne Karte – Tracker-Links stehen dann als volle Adresse da",
+            hint: "Ohne Karte. Tracker-Links stehen dann als volle Adresse da",
             body: {
                 kind: "text",
                 content: "**{team.name}** `{team.tag}` · Ø {team.mmr}\n\n{team.lineup}\n\n{team.staff}\n\n{team.leagues}",
@@ -434,7 +434,7 @@ export const TEMPLATES: Record<TemplateScope, ITemplate[]> = {
         {
             id: "lft-post-card",
             name: "Karte",
-            hint: "Kopf mit Name, darunter alle Antworten – die Vorgabe",
+            hint: "Kopf mit Namen, darunter alle Antworten (die Vorgabe)",
             body: {
                 kind: "v2",
                 content: "",
@@ -486,7 +486,7 @@ export const TEMPLATES: Record<TemplateScope, ITemplate[]> = {
         {
             id: "lft-post-plain",
             name: "Nur Text",
-            hint: "Ohne Karte und Embed – schlicht und kurz",
+            hint: "Ohne Karte und Embed, schlicht und kurz",
             body: {
                 kind: "text",
                 content: "**{art} · {user.name}**\n{user} · {erstellt}\n\n{antworten}",
@@ -505,7 +505,7 @@ export const TEMPLATES: Record<TemplateScope, ITemplate[]> = {
                 doc: card(
                     BLUE,
                     "## 📋 Passt das so?",
-                    "So kommt dein Beitrag ins Forum – Titel: **{post.titel}**",
+                    "So kommt dein Beitrag ins Forum. Titel: **{post.titel}**",
                     "---",
                     "{antworten}",
                     "---",
@@ -516,7 +516,7 @@ export const TEMPLATES: Record<TemplateScope, ITemplate[]> = {
         {
             id: "lft-preview-short",
             name: "Knapp",
-            hint: "Nur die Zeilen – für viele Fragen",
+            hint: "Nur die Zeilen, gut bei vielen Fragen",
             body: {
                 kind: "v2",
                 content: "",
@@ -545,7 +545,7 @@ export const TEMPLATES: Record<TemplateScope, ITemplate[]> = {
                 doc: card(
                     BLUE,
                     "## 🔎 {art}",
-                    "Ich stelle dir jetzt **{fragen.anzahl} Fragen**. Antworte einfach hier im Chat – eine Nachricht je Frage.",
+                    "Ich stelle dir jetzt **{fragen.anzahl} Fragen**. Antworte einfach hier im Chat, eine Nachricht je Frage.",
                     "---",
                     "-# Schreib **abbrechen**, wenn du aussteigen willst. Freiwillige Fragen überspringst du mit **-**."
                 ),
@@ -558,7 +558,7 @@ export const TEMPLATES: Record<TemplateScope, ITemplate[]> = {
             body: {
                 kind: "v2",
                 content: "",
-                doc: card(BLUE, "**{fragen.anzahl} Fragen für deine {art}** – dein Beitrag landet danach in {forum}.", "-# **abbrechen** beendet das hier."),
+                doc: card(BLUE, "**{fragen.anzahl} Fragen für deine {art}**. Dein Beitrag landet danach in {forum}.", "-# **abbrechen** beendet das hier."),
             },
         },
         {
@@ -567,7 +567,7 @@ export const TEMPLATES: Record<TemplateScope, ITemplate[]> = {
             hint: "Ohne Karte",
             body: {
                 kind: "text",
-                content: "Hi {user.name}! Für deine {art} auf **{guild}** habe ich {fragen.anzahl} Fragen. Antworte einfach hier – **abbrechen** beendet es.",
+                content: "Hi {user.name}! Für deine {art} auf **{guild}** habe ich {fragen.anzahl} Fragen. Antworte einfach hier, **abbrechen** beendet es.",
             },
         },
     ],
@@ -615,7 +615,7 @@ export const TEMPLATES: Record<TemplateScope, ITemplate[]> = {
                 doc: card(
                     GREEN,
                     "## ✅ Dein Beitrag steht",
-                    "[{post.titel}]({post.url}) – ab jetzt sichtbar in {forum}.",
+                    "[{post.titel}]({post.url}) ist ab jetzt in {forum} zu sehen.",
                     "---",
                     "-# Fertig mit der Suche? Der Knopf unter deinem Beitrag beendet sie, oder du nimmst `/lookingfor beenden`."
                 ),
@@ -713,7 +713,7 @@ export const TEMPLATES: Record<TemplateScope, ITemplate[]> = {
         {
             id: "mu-short",
             name: "Knapp",
-            hint: "Zwei Zeilen – gut für Kanäle mit vielen Partien",
+            hint: "Zwei Zeilen, gut für Kanäle mit vielen Partien",
             body: {
                 kind: "v2",
                 content: "",
@@ -742,7 +742,7 @@ export const TEMPLATES: Record<TemplateScope, ITemplate[]> = {
             hint: "Ohne Karte und Embed",
             body: {
                 kind: "text",
-                content: "⚔️ **{team} vs. {gegner}** – {zeit} ({countdown})\n-# {liga} · {modus}{bestof}\n{stream}",
+                content: "⚔️ **{team} vs. {gegner}** · {zeit} ({countdown})\n-# {liga} · {modus}{bestof}\n{stream}",
             },
         },
     ],
@@ -755,7 +755,7 @@ export const TEMPLATES: Record<TemplateScope, ITemplate[]> = {
             body: {
                 kind: "v2",
                 content: "",
-                doc: card("#ffc53d", "## ⏰ Gleich geht es los", "**{team} vs. {gegner}** – {countdown}", "-# {liga} · {modus}{bestof} · Anpfiff {zeit.kurz}", "{stream}"),
+                doc: card("#ffc53d", "## ⏰ Gleich geht es los", "**{team} vs. {gegner}** · {countdown}", "-# {liga} · {modus}{bestof} · Anpfiff {zeit.kurz}", "{stream}"),
             },
         },
         {
@@ -765,7 +765,7 @@ export const TEMPLATES: Record<TemplateScope, ITemplate[]> = {
             body: {
                 kind: "v2",
                 content: "{team.role}",
-                doc: card("#ffc53d", "## ⏰ {team}, aufstellen!", "Gegen **{gegner}** {countdown} – {liga}", "{stream}"),
+                doc: card("#ffc53d", "## ⏰ {team}, aufstellen!", "Gegen **{gegner}** {countdown} · {liga}", "{stream}"),
             },
         },
         {
@@ -774,7 +774,7 @@ export const TEMPLATES: Record<TemplateScope, ITemplate[]> = {
             hint: "Eine Zeile",
             body: {
                 kind: "text",
-                content: "⏰ **{team} vs. {gegner}** {countdown} – {liga}{bestof} {stream}",
+                content: "⏰ **{team} vs. {gegner}** {countdown} · {liga}{bestof} {stream}",
             },
         },
     ],
@@ -823,7 +823,7 @@ export const TEMPLATES: Record<TemplateScope, ITemplate[]> = {
             hint: "Ohne Karte",
             body: {
                 kind: "text",
-                content: "{ausgang} **{team} {ergebnis} {gegner}** – {liga} · {zeit.kurz}",
+                content: "{ausgang} **{team} {ergebnis} {gegner}** · {liga} · {zeit.kurz}",
             },
         },
     ],
@@ -974,7 +974,7 @@ export const TEMPLATES: Record<TemplateScope, ITemplate[]> = {
             body: {
                 kind: "v2",
                 content: "",
-                doc: card(BLUE, "## 🎮 Deine Runde steht", "**{modus}** auf **{guild}** – Runde **#{runde}**, **Lobby** `{lobby}`, **Passwort** `{passwort}`.", "---", "🔵 {blau}\n🟠 {orange}"),
+                doc: card(BLUE, "## 🎮 Deine Runde steht", "**{modus}** auf **{guild}**: Runde **#{runde}**, **Lobby** `{lobby}`, **Passwort** `{passwort}`.", "---", "🔵 {blau}\n🟠 {orange}"),
             },
         },
         {
@@ -983,7 +983,7 @@ export const TEMPLATES: Record<TemplateScope, ITemplate[]> = {
             hint: "Zwei Zeilen",
             body: {
                 kind: "text",
-                content: "🎮 {modus} Runde #{runde} auf **{guild}** – Lobby `{lobby}`, Passwort `{passwort}`.",
+                content: "🎮 {modus} Runde #{runde} auf **{guild}**: Lobby `{lobby}`, Passwort `{passwort}`.",
             },
         },
     ],

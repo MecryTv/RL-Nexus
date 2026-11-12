@@ -90,7 +90,7 @@ export default class DashboardApiMatchupsPublic extends Route {
         if (!WantsJSON(request)) return reply.code(415).send({ error: "Nur application/json" });
 
         if (!session) {
-            return reply.code(401).send({ error: "Nicht angemeldet", hint: "Melde dich mit Discord an – der Bot muss wissen, für welches Team du sprichst." });
+            return reply.code(401).send({ error: "Nicht angemeldet", hint: "Melde dich mit Discord an. Der Bot muss wissen, für welches Team du sprichst." });
         }
 
         if (!member) return reply.code(403).send({ error: "Du bist auf diesem Server kein Mitglied." });

@@ -26,7 +26,7 @@ export function VoicePanel(config: IHubConfig, inChannel: boolean): IVoiceView {
         .text("## 🔊 Dein Sprachkanal")
         .text(
             inChannel
-                ? "Alles hier steuerst du selbst – solange der Kanal dir gehört."
+                ? "Alles hier steuerst du selbst, solange der Kanal dir gehört."
                 : "Wähle eine Option, während du in deinem eigenen Kanal sitzt."
         );
 
@@ -63,14 +63,14 @@ export function VoiceState(temp: ITempVoice, note: string): IVoiceView {
 export function VoiceUserPrompt(action: string, label: string): IVoiceView {
     const builder = new ComponentV2Builder({ accentColor: VOICE_ACCENT });
 
-    return view(builder.text(`**${label}** – wähle jemanden aus.`).userSelect({ customId: `${VOICE_PREFIX}:user:${action}`, placeholder: "Mitglied auswählen" }));
+    return view(builder.text(`**${label}:** Wähle jemanden aus.`).userSelect({ customId: `${VOICE_PREFIX}:user:${action}`, placeholder: "Mitglied auswählen" }));
 }
 
 export function VoiceRegionPrompt(current: string | null): IVoiceView {
     const builder = new ComponentV2Builder({ accentColor: VOICE_ACCENT });
 
     return view(
-        builder.text("**Region** – wo laufen die Stimmen entlang?").select({
+        builder.text("**Region:** Wo laufen die Stimmen entlang?").select({
             customId: `${VOICE_PREFIX}:region`,
             placeholder: "Region wählen",
             options: VOICE_REGIONS.map(([value, label]) => ({ label, value: value || "auto", default: (current ?? "") === value })),

@@ -1145,7 +1145,7 @@ export function renderBackupList(guildId: string): void {
 
                     return tile(
                         entry.label,
-                        count === 0 ? "Im Backup leer: zurückladen löscht, was jetzt da ist." : `${numbers.format(count)} Einträge`,
+                        count === 0 ? "Im Backup leer: Zurückladen löscht, was jetzt da ist." : `${numbers.format(count)} Einträge`,
                         areas.has(entry.id),
                         (value) => {
                             if (value) areas.add(entry.id);

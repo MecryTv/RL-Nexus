@@ -49,7 +49,7 @@ export default class SaveEvidence extends Command {
         } catch (error) {
             if (!(error instanceof ModerationError)) logger.error("🛡️ Als Beweis sichern fehlgeschlagen", error);
 
-            await say(ModErrorView(error instanceof ModerationError ? error.message : "Da ging etwas schief – versuch es gleich nochmal.")).catch(() => undefined);
+            await say(ModErrorView(error instanceof ModerationError ? error.message : "Da ging etwas schief. Versuch es gleich nochmal.")).catch(() => undefined);
         }
     }
 }

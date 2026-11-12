@@ -44,7 +44,7 @@ export const GROUPS: Record<DashboardGroup, { label: string; icon: string; color
         label: "Guardian",
         icon: "#i-shield-check",
         color: "var(--live)",
-        grants: "Moderiert mindestens einen Server mit RL Nexus – ohne eigenes Abo. Dort stehen Live Tickets, Transcriptions und Moderation offen.",
+        grants: "Moderiert mindestens einen Server mit RL Nexus, ohne eigenes Abo. Dort stehen Live Tickets, Transcriptions und Moderation offen.",
     },
     free: {
         label: "Free",

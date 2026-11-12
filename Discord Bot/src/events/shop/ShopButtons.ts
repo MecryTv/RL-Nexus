@@ -33,7 +33,7 @@ export default class ShopButtons extends Event {
             logger.warn(`🛒 ${interaction.customId} fehlgeschlagen - ${String(error)}`);
 
             if (!interaction.replied && !interaction.deferred) {
-                await interaction.reply({ content: "Da ging etwas schief - versuch es gleich nochmal.", flags: MessageFlags.Ephemeral }).catch(() => undefined);
+                await interaction.reply({ content: "Da ging etwas schief. Versuch es gleich nochmal.", flags: MessageFlags.Ephemeral }).catch(() => undefined);
             }
         }
     }
@@ -42,7 +42,7 @@ export default class ShopButtons extends Event {
         const lines = await this.client.dashboardService.ShopStatus(interaction.user.id);
 
         if (lines === null) {
-            await interaction.reply({ content: "Der Bot erreicht gerade seine Datenbank nicht - versuch es gleich nochmal.", flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: "Der Bot erreicht gerade seine Datenbank nicht. Versuch es gleich nochmal.", flags: MessageFlags.Ephemeral });
 
             return;
         }
@@ -53,7 +53,7 @@ export default class ShopButtons extends Event {
         if (lines.length > 0) view.text(lines.join("\n"));
         else view.text("Gerade läuft bei dir kein Zugang.");
 
-        view.subtext("Rechnungen, Zahlungsart und Kündigung findest du unter Mein Zugang.");
+        view.subtext("Rechnungen, Zahlungsart und Kündigung findest du unter „Mein Zugang“.");
         view.buttons(
             ...(lines.length === 0 ? [{ url: `${site}/preise`, label: "Preise", emoji: "🛒" }] : []),
             { url: `${site}/zugang`, label: "Mein Zugang", emoji: "👤" }

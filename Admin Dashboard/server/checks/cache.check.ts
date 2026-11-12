@@ -42,8 +42,8 @@ export async function checkCache(): Promise<void> {
     section("Redis als Cache (W-0066)");
 
     try {
-        await check("Status: „MariaDB + Redis Cache“ nur, solange Redis verbunden ist", () => {
-            assert.equal(databaseLabel("11.8.6", true), "MariaDB 11.8.6 + Redis Cache");
+        await check("Status: „MariaDB + Redis-Cache“ nur, solange Redis verbunden ist", () => {
+            assert.equal(databaseLabel("11.8.6", true), "MariaDB 11.8.6 + Redis-Cache");
             assert.equal(databaseLabel("11.8.6", false), "MariaDB 11.8.6");
             assert.equal(databaseLabel(null, undefined), "MariaDB");
         });

@@ -229,7 +229,7 @@ export async function renderClipsBoard(): Promise<void> {
         const back = wanted !== null ? [el("p", "clback", weekLink(null, icon("#i-arrow"), "Zur neuesten Runde"))] : [];
 
         host.replaceChildren(
-            el("header", "board__head", crest, el("div", "board__title", el("h1", "", data.guild.name), el("p", "", "Clips der Woche – die besten Szenen dieses Servers"))),
+            el("header", "board__head", crest, el("div", "board__title", el("h1", "", data.guild.name), el("p", "", "Clips der Woche: die besten Szenen dieses Servers"))),
             ...back,
             el(
                 "div",

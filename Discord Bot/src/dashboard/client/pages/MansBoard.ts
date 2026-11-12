@@ -97,7 +97,7 @@ export async function renderMansBoard(): Promise<void> {
             "header",
             "board__head",
             crest,
-            el("div", "board__title", el("h1", "", data.guild.name), el("p", "", "2, 4 & 6 Mans – die Wertung dieses Servers, nicht die Ränge aus dem Spiel"))
+            el("div", "board__title", el("h1", "", data.guild.name), el("p", "", "2, 4 & 6 Mans: die Wertung dieses Servers, nicht die Ränge aus dem Spiel"))
         );
     }
 

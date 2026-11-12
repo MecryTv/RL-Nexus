@@ -111,7 +111,7 @@ export async function checkSearch(): Promise<void> {
         assert.equal(found.href, mailPath(3, "INBOX", 42));
         assert.deepEqual([found.kind, found.title, found.place, found.at, found.rank], ["mails", "Rechnung Oktober", "Postfach Info", mail.date, 0]);
         assert.match(found.context, /^Max · /);
-        assert.equal(mailHit({ id: 3, address: "info@example.test", label: null }, { ...mail, subject: "" }, "max").title, "(ohne Betreff)");
+        assert.equal(mailHit({ id: 3, address: "info@example.test", label: null }, { ...mail, subject: "" }, "max").title, "(kein Betreff)");
         assert.equal(mailHit({ id: 3, address: "info@example.test", label: null }, mail, "x").place, "Postfach info@example.test");
     });
 

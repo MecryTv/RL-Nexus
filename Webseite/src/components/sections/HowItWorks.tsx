@@ -24,7 +24,7 @@ const STEPS: readonly IStep[] = [
     },
     {
         title: "Module wählen",
-        text: "Jedes Modul hat einen Schalter. Was aus ist, läuft nicht, hört nicht mit und legt nichts an. Ein abgeschaltetes Modul ist wirklich aus.",
+        text: "Jedes Modul hat einen Schalter. Was aus ist, läuft nicht, hört nicht mit und legt nichts an.",
         icon: "puzzle",
         accent: "var(--c-mod-competition)",
     },

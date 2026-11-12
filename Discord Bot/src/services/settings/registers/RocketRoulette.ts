@@ -23,7 +23,7 @@ export const RocketRoulettePanel: IPanelModule<S> = {
             fields: [
                 F<S>("channel", "info", "Info-Kanal", "Ankündigung und Rundenkarten mit allen Lobbys.", (s) => s.infoChannelId, (value: string | null) => ({ infoChannelId: value }), { channelTypes: TEXT }),
                 F<S>("channel", "control", "Moderator-Kanal", "Steuerkarte, Einspring-Anfragen und die Übersicht am Ende.", (s) => s.controlChannelId, (value: string | null) => ({ controlChannelId: value }), { channelTypes: TEXT }),
-                F<S>("channel", "waiting", "Warteraum", "Sprachkanal: hier sammeln sich alle vor dem Start, später die Nachzügler.", (s) => s.waitingRoomId, (value: string | null) => ({ waitingRoomId: value }), { channelTypes: VOICE }),
+                F<S>("channel", "waiting", "Warteraum", "Sprachkanal: Hier sammeln sich alle vor dem Start, später die Nachzügler.", (s) => s.waitingRoomId, (value: string | null) => ({ waitingRoomId: value }), { channelTypes: VOICE }),
                 F<S>("channel", "main", "Treffpunkt", "Sprachkanal: ab dem Start und zwischen den Runden.", (s) => s.mainVoiceId, (value: string | null) => ({ mainVoiceId: value }), { channelTypes: VOICE }),
                 F<S>("channel", "category", "Kategorie", "Hier legt der Bot die Team-Kanäle an.", (s) => s.categoryId, (value: string | null) => ({ categoryId: value }), { channelTypes: [ChannelType.GuildCategory] }),
                 F<S>("choice", "channels", "Team-Kanäle", "Automatisch je Team ein Sprachkanal, oder feste Kanäle aus dem Dashboard.", (s) => s.teamChannels, (value: string) => ({ teamChannels: value }), {

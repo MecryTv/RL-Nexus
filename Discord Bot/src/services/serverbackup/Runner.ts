@@ -154,7 +154,7 @@ export async function RunOps(guild: Guild, job: IRestoreJob, deps: IRunDeps): Pr
     const emojiRoles = (wanted: string[]): string[] => {
         const ids = roles(wanted);
 
-        if (wanted.length && !ids.length) throw new Skip("Die Rollen dafür gibt es nicht - sonst dürfte es jeder benutzen");
+        if (wanted.length && !ids.length) throw new Skip("Die Rollen dafür gibt es nicht, sonst dürfte es jeder benutzen");
 
         return ids;
     };

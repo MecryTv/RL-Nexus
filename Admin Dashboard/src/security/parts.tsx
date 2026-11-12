@@ -136,7 +136,7 @@ export function EvidencePicker({ onAdd }: { readonly onAdd: (entries: PendingEvi
         >
             <label className={styles.pick}>
                 <Icon name="image" size={16} />
-                Bild wählen, hineinziehen oder mit Strg V einfügen
+                Bild wählen, hineinziehen oder mit Strg+V einfügen
                 <input type="file" accept="image/png,image/jpeg,image/webp" multiple className="u-sr" onChange={(event) => void take([...(event.target.files ?? [])]).then(() => (event.target.value = ""))} />
             </label>
             <div className={styles.linkRow}>

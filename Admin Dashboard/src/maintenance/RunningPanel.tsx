@@ -127,7 +127,7 @@ export function RunningPanel({ state, onChange }: { readonly state: IMaintenance
                             <p className={styles.hint}>Die Seite rückt innerhalb von 30 Sekunden nach.</p>
                         </>
                     ) : (
-                        <p className={styles.hint}>Die Wartung läuft ohne Fahrplan, der Schalter wurde wohl von Hand gesetzt. Die Seite zeigt „Gleich wieder da.“. Beende sie hier, dann lässt sich eine neue mit Plan starten.</p>
+                        <p className={styles.hint}>Die Wartung läuft ohne Fahrplan, der Schalter wurde wohl von Hand gesetzt. Die Seite zeigt „Gleich wieder da“. Beende sie hier, dann lässt sich eine neue mit Plan starten.</p>
                     )}
                 </Panel>
 

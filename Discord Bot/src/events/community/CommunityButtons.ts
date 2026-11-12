@@ -27,7 +27,7 @@ export default class CommunityButtons extends Event {
 
         try {
             if (!this.client.databaseService.Ready) {
-                await interaction.reply({ content: "Der Bot erreicht gerade seine Datenbank nicht - versuch es gleich nochmal.", flags: MessageFlags.Ephemeral });
+                await interaction.reply({ content: "Der Bot erreicht gerade seine Datenbank nicht. Versuch es gleich nochmal.", flags: MessageFlags.Ephemeral });
 
                 return;
             }
@@ -41,7 +41,7 @@ export default class CommunityButtons extends Event {
             logger.warn(`🎛️ ${interaction.customId} fehlgeschlagen - ${String(error)}`);
 
             if (!interaction.replied && !interaction.deferred) {
-                await interaction.reply({ content: "Da ging etwas schief - versuch es gleich nochmal.", flags: MessageFlags.Ephemeral }).catch(() => undefined);
+                await interaction.reply({ content: "Da ging etwas schief. Versuch es gleich nochmal.", flags: MessageFlags.Ephemeral }).catch(() => undefined);
             }
         }
     }

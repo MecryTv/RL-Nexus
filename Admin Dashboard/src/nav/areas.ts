@@ -40,7 +40,7 @@ export const AREAS: readonly INavArea[] = [
         short: "Start",
         icon: "home",
         pages: [
-            { to: "/", label: "Übersicht", icon: "dashboard", description: "Dienste, Postfächer, neueste Mails und letzte Aktionen auf einen Blick." },
+            { to: "/", label: "Übersicht", icon: "dashboard", description: "Dienste, Postfächer, neueste Mails und letzte Aktionen." },
             { to: "/post", label: "Postfach", icon: "mail", unread: true, also: ["/kontakt"], description: "Mails und Formulare an die Postfächer von RL Nexus." },
         ],
     },

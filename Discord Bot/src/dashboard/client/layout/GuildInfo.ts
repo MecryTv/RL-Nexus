@@ -16,7 +16,7 @@ const DAY = new Intl.DateTimeFormat("de-DE", { day: "2-digit", month: "2-digit",
 // Was RL Nexus auf einem Server macht - für Server ohne Bot.
 const FEATURES: [string, string][] = [
     ["#i-badge", "Rang-Rollen nach dem aktuellen Rocket-League-Rang"],
-    ["#i-gamepad", "6Mans-Queues mit Match-Ergebnissen und Rangliste"],
+    ["#i-gamepad", "6-Mans-Warteschlangen mit Match-Ergebnissen und Rangliste"],
     ["#i-ticket", "Ticket-System mit Live Tickets und Transcripts"],
     ["#i-image", "Galerie für Logos, Grafiken und Vorlagen"],
 ];
@@ -164,7 +164,7 @@ function content(guild: IGuild): HTMLElement[] {
                 ? "Du kannst hier alles einstellen."
                 : moderator
                   ? "Als Moderator stehen dir Live Tickets und Transcriptions offen."
-                  : "Sichtbar über deine RL Nexus-Gruppe – ändern nur mit eigener Berechtigung auf dem Server."
+                  : "Sichtbar über deine RL-Nexus-Gruppe. Ändern geht nur mit eigener Berechtigung auf dem Server."
         ),
         el(
             "div",

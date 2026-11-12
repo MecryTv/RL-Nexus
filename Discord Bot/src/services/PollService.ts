@@ -98,7 +98,7 @@ export default class PollService {
                 throw new PollError("Discord-Umfragen laufen eine Stunde bis 32 Tage.");
             }
         } else if (seconds !== null && (!Number.isFinite(seconds) || seconds < 60 || seconds > MAX_POLL_SECONDS)) {
-            throw new PollError("Eine Umfrage läuft mindestens eine Minute und höchstens ein Jahr - oder ohne Ende.");
+            throw new PollError("Eine Umfrage läuft mindestens eine Minute und höchstens ein Jahr, oder sie läuft ohne Ende.");
         }
 
         return {
@@ -156,7 +156,7 @@ export default class PollService {
             await this.client.polls.Remove(poll.id);
             logger.warn(`📊 Umfrage auf ${guild.id} nicht gesendet - ${String(error)}`);
 
-            throw new PollError("Die Umfrage ging nicht raus – darf der Bot in den Kanal schreiben?");
+            throw new PollError("Die Umfrage ging nicht raus. Darf der Bot in den Kanal schreiben?");
         }
 
         await this.client.polls.SetMessage(poll.id, message.id);
@@ -193,7 +193,7 @@ export default class PollService {
         else if (!poll.settings.multi) next = current.includes(optionId) ? [] : [optionId];
         else if (current.includes(optionId)) next = current.filter((id) => id !== optionId);
         else if (poll.settings.maxChoices && current.length >= poll.settings.maxChoices) {
-            await interaction.reply({ content: `Höchstens ${poll.settings.maxChoices} Antworten - wähl erst eine ab.`, flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: `Höchstens ${poll.settings.maxChoices} Antworten. Wähl erst eine ab.`, flags: MessageFlags.Ephemeral });
 
             return;
         } else next = [...current, optionId];

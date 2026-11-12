@@ -285,7 +285,7 @@ function UploadPane(): HTMLElement {
     const hint = document.createElement("p");
 
     hint.className = "hintline";
-    hint.textContent = `Das Bild landet im Album „${CUSTOM_ALBUM}" deines Servers, wird auf 1920 px verkleinert und als WebP gespeichert. Höchstens ${megabytes(MAX_UPLOAD_BYTES)}.`;
+    hint.textContent = `Das Bild landet im Album „${CUSTOM_ALBUM}“ deines Servers, wird auf 1920 px verkleinert und als WebP gespeichert. Höchstens ${megabytes(MAX_UPLOAD_BYTES)}.`;
 
     const file = document.createElement("input");
 
@@ -349,7 +349,7 @@ function UrlPane(): HTMLElement {
         const value = input.value.trim();
 
         if (!value.startsWith("https://")) {
-            say(box, "Nur https-Adressen – Discord lädt nichts anderes.");
+            say(box, "Nur https-Adressen, Discord lädt nichts anderes.");
 
             return;
         }
@@ -362,7 +362,7 @@ function UrlPane(): HTMLElement {
 
     hint.className = "hintline";
     hint.textContent =
-        "Die Adresse bleibt, wie sie ist – der Bot lädt sie nicht herunter. Verschwindet das Bild dort, bleibt die Nachricht leer.";
+        "Die Adresse bleibt, wie sie ist. Der Bot lädt sie nicht herunter. Verschwindet das Bild dort, bleibt die Nachricht leer.";
 
     box.append(form, hint);
 
@@ -479,7 +479,7 @@ async function upload(box: HTMLElement, file: File, status: HTMLElement, drop: H
     if (!guildId) return;
 
     if (file.size > MAX_UPLOAD_BYTES) {
-        status.textContent = `Zu groß – ${megabytes(file.size)}, höchstens ${megabytes(MAX_UPLOAD_BYTES)}.`;
+        status.textContent = `Zu groß: ${megabytes(file.size)}, höchstens ${megabytes(MAX_UPLOAD_BYTES)}.`;
 
         return;
     }

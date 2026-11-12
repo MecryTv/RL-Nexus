@@ -32,7 +32,7 @@ export const SixMansPanel: IPanelModule<S> = {
                 F<S>("channel", "category", "Kategorie", "Hier entstehen die Sprachkanäle für Blau und Orange.", (s) => s.categoryId, (value: string | null) => ({ categoryId: value }), { channelTypes: [ChannelType.GuildCategory] }),
                 F<S>("toggle", "voice", "Sprachkanäle", "Zwei Sprachkanäle je Runde, wer schon im Voice sitzt, wird hinübergezogen.", (s) => s.voice, (value: boolean) => ({ voice: value })),
                 F<S>("toggle", "dm", "DM beim Start", "Jeder Teilnehmer bekommt Lobby und Passwort per DM.", (s) => s.dm, (value: boolean) => ({ dm: value })),
-                F<S>("toggle", "confirm", "Ergebnis bestätigen", "An: das andere Team muss dasselbe melden. Aus: ein Klick genügt.", (s) => s.confirm, (value: boolean) => ({ confirm: value })),
+                F<S>("toggle", "confirm", "Ergebnis bestätigen", "An: Das andere Team muss dasselbe melden. Aus: Ein Klick genügt.", (s) => s.confirm, (value: boolean) => ({ confirm: value })),
             ],
         },
         {

@@ -359,7 +359,7 @@ export function renderModeration(guildId: string): void {
             ...tiles.map(([symbol, label, value, action, active]) => {
                 const tile = button(`tkstat${value && action ? " is-warn" : ""}`, el("span", "tkstat__mark", icon(symbol)), el("span", "tkstat__text", el("small", "", label), el("b", "", String(value))));
 
-                tile.title = action ? `Zeigt nur ${label.toLowerCase()}` : "Zeigt alle Fälle";
+                tile.title = action ? `Zeigt nur ${label.replace(/^Aktive/, "aktive")}` : "Zeigt alle Fälle";
                 tile.addEventListener("click", () => {
                     filter.action = action;
                     filter.active = active;
@@ -606,8 +606,8 @@ export function renderModeration(guildId: string): void {
                               "span",
                               "",
                               filter.q || filter.action || filter.active || filter.user
-                                  ? "Andere Suche oder weniger Filter – oder alle Fälle zeigen."
-                                  : "Jede Aktion – hier oder mit /ban, /kick, /timeout und /warn in Discord – wird ein Fall mit Nummer."
+                                  ? "Andere Suche oder weniger Filter, oder alle Fälle zeigen."
+                                  : "Jede Aktion (hier oder mit /ban, /kick, /timeout und /warn in Discord) wird ein Fall mit Nummer."
                           )
                       ),
                   ])
@@ -813,12 +813,12 @@ export function renderModeration(guildId: string): void {
             );
         }
 
-        if (entry.details.dm !== undefined) facts.append(fact("DM", entry.details.dm ? "zugestellt" : "nicht zustellbar – DMs zu"));
+        if (entry.details.dm !== undefined) facts.append(fact("DM", entry.details.dm ? "zugestellt" : "nicht zustellbar (DMs zu)"));
 
         if (entry.details.ended) {
             const ended = entry.details.ended;
 
-            facts.append(fact("Beendet", `${WHEN.format(ended.at)}${ended.byName ? ` · ${ended.byName}` : ""}${ended.reason ? ` – „${ended.reason}“` : ""}`));
+            facts.append(fact("Beendet", `${WHEN.format(ended.at)}${ended.byName ? ` · ${ended.byName}` : ""}${ended.reason ? ` · „${ended.reason}“` : ""}`));
         }
 
         if (entry.logUrl) {
@@ -866,7 +866,7 @@ export function renderModeration(guildId: string): void {
         const banner = el(
             "section",
             "mchidden",
-            el("p", "", el("b", "", "🙈 Ausgeblendet"), ` am ${WHEN.format(hidden.at)} von ${hidden.byName} – „${hidden.reason}“`),
+            el("p", "", el("b", "", "🙈 Ausgeblendet"), ` am ${WHEN.format(hidden.at)} von ${hidden.byName}: „${hidden.reason}“`),
             el("p", "mcmuted", "Moderatoren sehen diesen Fall nicht. Er zählt nicht mehr für Stufen, eine laufende Strafe in Discord bleibt.")
         );
 
@@ -984,7 +984,7 @@ export function renderModeration(guildId: string): void {
 
         text.rows = 3;
         text.maxLength = 1000;
-        text.placeholder = "Was das Team wissen sollte – nur intern.";
+        text.placeholder = "Was das Team wissen sollte (nur intern)";
         text.setAttribute("aria-label", "Neue Notiz");
         save.addEventListener("click", async () => {
             if (!text.value.trim()) return;
@@ -1174,7 +1174,7 @@ export function renderModeration(guildId: string): void {
         // Die Strafe gilt - nur der Beweis kam nicht an.
         if (answer.problems?.length) toast("info", "Beweis nicht gesichert", answer.problems.join(" "));
 
-        toast("info", `${ACTIONS[entry.action].label} · Fall #${entry.number}`, entry.target ? `${entry.target.name} – erledigt.` : "Erledigt.");
+        toast("info", `${ACTIONS[entry.action].label} · Fall #${entry.number}`, entry.target ? `${entry.target.name}: erledigt.` : "Erledigt.");
         void load(true, true);
 
         return entry;
@@ -1301,17 +1301,17 @@ export function renderModeration(guildId: string): void {
                     missing: !draft.target ? "Wähle, wen." : !draft.duration ? "Wie lange? Wähle eine Dauer." : null,
                 };
             case "kick":
-                return { text: `${who} fliegt vom Server – und kann mit einer Einladung zurück.`, missing: draft.target ? null : "Wähle, wen." };
+                return { text: `${who} fliegt vom Server und kann mit einer Einladung zurück.`, missing: draft.target ? null : "Wähle, wen." };
             case "ban": {
                 const wipe = meta?.presets.deletes.find(([seconds]) => seconds === draft.deleteSeconds);
 
                 return {
-                    text: `${who} wird ${duration ? `für ${duration}` : "dauerhaft"} gebannt${draft.deleteSeconds && wipe ? ` – Nachrichten (${wipe[1].toLowerCase()}) verschwinden` : ""}.`,
+                    text: `${who} wird ${duration ? `für ${duration}` : "dauerhaft"} gebannt${draft.deleteSeconds && wipe ? `, Nachrichten (${wipe[1].replace(/^Letzte/, "letzte")}) verschwinden` : ""}.`,
                     missing: draft.target ? null : "Wähle, wen.",
                 };
             }
             case "unban":
-                return { text: `${who} darf wieder auf den Server.`, missing: draft.target ? null : "Wähle, wen – aus der Bannliste." };
+                return { text: `${who} darf wieder auf den Server.`, missing: draft.target ? null : "Wähle, wen (aus der Bannliste)." };
             case "untimeout":
                 return { text: `${who} darf wieder schreiben und sprechen.`, missing: draft.target ? null : "Wähle, wen." };
             case "unwarn":
@@ -1432,7 +1432,7 @@ export function renderModeration(guildId: string): void {
                 said.textContent = "";
             } else if (seconds === null || seconds < 60 || seconds > max) {
                 draft.duration = null;
-                said.textContent = seconds === null ? "Verstehe ich nicht – etwa 10m, 2h, 3d oder 1w." : `Zwischen 60 Sekunden und ${formatDuration(max)}.`;
+                said.textContent = seconds === null ? "Verstehe ich nicht. Etwa 10m, 2h, 3d oder 1w." : `Zwischen 60 Sekunden und ${formatDuration(max)}.`;
             } else {
                 draft.duration = seconds;
                 said.textContent = `= ${formatDuration(seconds)}`;
@@ -1513,7 +1513,7 @@ export function renderModeration(guildId: string): void {
             const channel = el("select", "pick");
             const count = el("input", "text mccount__input");
 
-            channel.append(new Option("— Kanal wählen —", ""), ...meta.channels.map((entry) => new Option(`# ${entry.name}`, entry.id)));
+            channel.append(new Option("(Kanal wählen)", ""), ...meta.channels.map((entry) => new Option(`# ${entry.name}`, entry.id)));
             channel.value = draft.channelId ?? "";
             channel.addEventListener("change", () => {
                 draft.channelId = channel.value || null;
@@ -1530,7 +1530,7 @@ export function renderModeration(guildId: string): void {
             });
 
             who.push(
-                el("div", "mcgrid2", field("Kanal", channel), field("Wie viele", count, "1 bis 100 – nur die letzten 14 Tage, angeheftete bleiben.")),
+                el("div", "mcgrid2", field("Kanal", channel), field("Wie viele", count, "1 bis 100, nur aus den letzten 14 Tagen. Angeheftete bleiben.")),
                 field("Nur von einem User (optional)", personPicker("members", draft.target, pickPerson, "Mitglied suchen: Name oder ID …"))
             );
         } else {
@@ -1547,7 +1547,7 @@ export function renderModeration(guildId: string): void {
         reason.value = draft.reason;
         reason.dataset.key = "mc-reason";
         reason.placeholder =
-            draft.action === "warn" ? "Was ist passiert? Steht im Log und in der DM." : "Warum? Steht im Log – und, wo es eine gibt, in der DM.";
+            draft.action === "warn" ? "Was ist passiert? Steht im Log und in der DM." : "Warum? Steht im Log und, wo es eine gibt, in der DM.";
         reason.addEventListener("input", () => {
             draft.reason = reason.value;
             paintSubmit();
@@ -1589,15 +1589,15 @@ export function renderModeration(guildId: string): void {
                 el(
                     "p",
                     "hintline",
-                    `Stufen: ${meta.config.stages
+                    `Stufen, die von selbst greifen: ${meta.config.stages
                         .map((stage) => `${stage.warns} → ${ACTIONS[stage.action].label}${stage.duration ? ` ${formatDuration(stage.duration)}` : ""}`)
-                        .join(" · ")} – greifen von selbst.`
+                        .join(" · ")}.`
                 )
             );
         }
 
         if (meta.config.dm && ["warn", "timeout", "kick", "ban", "untimeout", "unwarn"].includes(draft.action)) {
-            details.push(el("p", "hintline", "Der User bekommt eine DM mit Grund und Dauer – ohne deinen Namen."));
+            details.push(el("p", "hintline", "Der User bekommt eine DM mit Grund und Dauer, ohne deinen Namen."));
         }
 
         paintSubmit();
@@ -1640,11 +1640,11 @@ export function renderModeration(guildId: string): void {
             async (forumId) => {
                 const answer = await call<{ thread: ILogThread }>("", { action: "logthread", forumId });
 
-                if (answer) toast("info", "Beitrag angelegt", `„${answer.thread.name}“ in #${answer.thread.parentName} – speichern nicht vergessen.`);
+                if (answer) toast("info", "Beitrag angelegt", `„${answer.thread.name}“ in #${answer.thread.parentName}. Speichern nicht vergessen.`);
 
                 return answer?.thread ?? null;
             },
-            "— kein Log —"
+            "(kein Log)"
         );
 
         const dm = el("input", "switch");
@@ -1731,7 +1731,7 @@ export function renderModeration(guildId: string): void {
                               remove
                           );
                       })
-                    : [el("p", "mcmuted", "Keine Stufen – Verwarnungen bleiben dann ohne Folgen.")])
+                    : [el("p", "mcmuted", "Keine Stufen. Verwarnungen bleiben dann ohne Folgen.")])
             );
         };
 
@@ -1780,7 +1780,7 @@ export function renderModeration(guildId: string): void {
         const resources = meta.resources ?? { roles: [], channels: [], voice: [] };
         const support = cfg.support;
         const room = select(
-            [["", "— kein Warteraum —"], ...resources.voice.map((entry): [string, string] => [entry.id, `🔊 ${entry.name}`])],
+            [["", "(kein Warteraum)"], ...resources.voice.map((entry): [string, string] => [entry.id, `🔊 ${entry.name}`])],
             support.channelId ?? "",
             (value) => {
                 support.channelId = value || null;
@@ -1790,7 +1790,7 @@ export function renderModeration(guildId: string): void {
             "Sprachkanal für den Warteraum"
         );
         const notify = select(
-            [["", "— kein Kanal —"], ...resources.channels.map((entry): [string, string] => [entry.id, `# ${entry.name}`])],
+            [["", "(kein Kanal)"], ...resources.channels.map((entry): [string, string] => [entry.id, `# ${entry.name}`])],
             support.notifyChannelId ?? "",
             (value) => {
                 support.notifyChannelId = value || null;
@@ -1815,7 +1815,7 @@ export function renderModeration(guildId: string): void {
         const paintSupport = (): void => {
             supportNote.replaceChildren(
                 ...(support.channelId && !support.notifyChannelId
-                    ? [el("div", "notice", icon("#i-warn"), el("span", "", "Wähle auch den Kanal für die Meldung – sonst wartet jemand, ohne dass es jemand merkt."))]
+                    ? [el("div", "notice", icon("#i-warn"), el("span", "", "Wähle auch den Kanal für die Meldung. Sonst wartet jemand, ohne dass es jemand merkt."))]
                     : [])
             );
         };
@@ -1850,13 +1850,13 @@ export function renderModeration(guildId: string): void {
         return [
             card(
                 "Log und Benachrichtigung",
-                "Jeder Fall als Karte im Log – ein Textkanal oder ein Beitrag in einem Forum. Die Karte zieht nach, wenn sich am Fall etwas ändert.",
+                "Jeder Fall als Karte im Log: ein Textkanal oder ein Beitrag in einem Forum. Die Karte zieht nach, wenn sich am Fall etwas ändert.",
                 el("div", "row", el("div", "row__text", el("b", "", "Log-Kanal"), el("i", "", "Textkanal oder Forum-Beitrag")), log),
-                el("div", "row", el("div", "row__text", el("b", "", "DM an den User"), el("i", "", "Grund und Dauer – ohne den Namen des Moderators")), dm)
+                el("div", "row", el("div", "row__text", el("b", "", "DM an den User"), el("i", "", "Grund und Dauer, ohne den Namen des Moderators")), dm)
             ),
             card(
                 "Verwarnungen und Stufen",
-                "Erreicht ein User so viele aktive Verwarnungen, folgt die Strafe von selbst – als eigener Fall mit Verweis auf die Verwarnung.",
+                "Erreicht ein User so viele aktive Verwarnungen, folgt die Strafe von selbst, als eigener Fall mit Verweis auf die Verwarnung.",
                 el("div", "row", el("div", "row__text", el("b", "", "Verwarnungen zählen"), el("i", "", "Ältere zählen für die Stufen nicht mehr mit")), days),
                 stages,
                 add
@@ -1876,13 +1876,13 @@ export function renderModeration(guildId: string): void {
                 line("Meldung in", "Dorthin geht die Karte, wenn jemand wartet", notify),
                 line(
                     "Wer wird gepingt",
-                    "Bis zu 5 Rollen – ohne Rolle kommt die Karte ohne Ping",
+                    "Bis zu 5 Rollen. Ohne Rolle kommt die Karte ohne Ping",
                     rolePicker(resources.roles, support.roles, (ids) => {
                         support.roles = ids;
                         touch();
                     }, [], 5)
                 ),
-                line("Erinnern nach", "Minuten – 0 heißt: nie erinnern", remind),
+                line("Erinnern nach", "In Minuten, 0 heißt: nie erinnern", remind),
                 supportNote
             ),
             el("div", "mcsave", reset, save),

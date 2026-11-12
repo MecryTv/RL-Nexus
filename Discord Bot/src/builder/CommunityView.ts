@@ -166,7 +166,7 @@ export function VoteReply(poll: IPoll, mine: string[], tally: IPollTally | null)
         );
     }
 
-    builder.subtext(poll.settings.multi ? "Klick eine Antwort nochmal an, um sie abzuwählen." : "Klick eine andere Antwort, um umzustimmen - dieselbe nochmal zieht zurück.");
+    builder.subtext(poll.settings.multi ? "Klick eine Antwort nochmal an, um sie abzuwählen." : "Klick eine andere Antwort, um umzustimmen, oder dieselbe nochmal, um die Stimme zurückzuziehen.");
 
     if (chosen.length) builder.buttons({ customId: `${POLL_PREFIX}:clear:${poll.id}`, label: "Stimme zurückziehen", emoji: "↩️" });
 
@@ -184,7 +184,7 @@ export function GiveawayCard(giveaway: IGiveaway, entries: number, rules: string
     if (ping.text && running) builder.text(ping.text);
 
     builder.text(
-        `## 🎉 ${escapeMarkdown(giveaway.prize)}${running ? "" : giveaway.status === "cancelled" ? " – abgebrochen" : " – beendet"}${
+        `## 🎉 ${escapeMarkdown(giveaway.prize)}${running ? "" : giveaway.status === "cancelled" ? " (abgebrochen)" : " (beendet)"}${
             giveaway.description ? `\n${giveaway.description}` : ""
         }`
     );
@@ -211,7 +211,7 @@ export function GiveawayCard(giveaway: IGiveaway, entries: number, rules: string
                 ? `🏆 **Gewinner:** ${winners
                       .map((winner) => `<@${winner.userId}>${winner.status === "claimed" ? " ✅" : winner.status === "pending" && winner.deadline ? ` ⏳ bis ${Stamp(winner.deadline, "R")}` : ""}`)
                       .join(", ")}`
-                : "Niemand hat die Bedingungen erfüllt – keine Gewinner."
+                : "Niemand hat die Bedingungen erfüllt, deshalb gibt es keine Gewinner."
         );
     } else {
         builder.text("Dieses Giveaway wurde abgebrochen.");
@@ -233,12 +233,12 @@ export function GiveawayCard(giveaway: IGiveaway, entries: number, rules: string
 /** Die DM an einen Gewinner - mit Knopf, wenn er sich melden muss. */
 export function WinnerDm(giveaway: IGiveaway, guildName: string, deadline: number | null): ICommunityView {
     const builder = new ComponentV2Builder({ accentColor: GIVEAWAY_ACCENT }).text(
-        `### 🎉 Du hast gewonnen!\n**${escapeMarkdown(giveaway.prize)}** – beim Giveaway auf **${escapeMarkdown(guildName)}**.`
+        `### 🎉 Du hast gewonnen!\n**${escapeMarkdown(giveaway.prize)}** beim Giveaway auf **${escapeMarkdown(guildName)}**.`
     );
 
     if (deadline) {
         builder
-            .text(`Nimm den Gewinn bis ${Stamp(deadline)} an – danach wird neu ausgelost.`)
+            .text(`Nimm den Gewinn bis ${Stamp(deadline)} an, danach wird neu ausgelost.`)
             .buttons({ customId: `${GIVEAWAY_PREFIX}:claim:${giveaway.id}`, label: "Gewinn annehmen", emoji: "✅", tone: "success" });
     } else {
         builder.subtext("Das Team des Servers meldet sich bei dir.");
@@ -253,7 +253,7 @@ export function WinnerAnnouncement(giveaway: IGiveaway, userIds: string[], rerol
     const claim = giveaway.settings.dm && giveaway.settings.claimHours > 0 ? `\n-# Bitte nehmt den Gewinn innerhalb von ${giveaway.settings.claimHours} Stunden per DM an.` : "";
     const text = userIds.length
         ? `${reroll ? "🔄 Neu ausgelost" : "🎉 Glückwunsch"} ${mentions}! ${userIds.length === 1 ? "Du hast" : "Ihr habt"} **${escapeMarkdown(giveaway.prize)}** gewonnen.${claim}`
-        : `😕 Beim Giveaway **${escapeMarkdown(giveaway.prize)}** gibt es keine (weiteren) Gewinner – niemand erfüllt die Bedingungen.`;
+        : `😕 Beim Giveaway **${escapeMarkdown(giveaway.prize)}** gibt es keine (weiteren) Gewinner, weil niemand die Bedingungen erfüllt.`;
 
     return {
         components: [new ComponentV2Builder({ accentColor: GIVEAWAY_ACCENT }).text(text).build()],

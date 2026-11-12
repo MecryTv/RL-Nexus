@@ -26,13 +26,13 @@ export function PrizeText(prizes: string[]): string {
 
 /** Die Gewinner als Liste - oder ein Satz, wenn es keine gibt. */
 export function WinnerText(round: IClipRound): string {
-    if (!round.winners.length) return "Diesmal gibt es keine Gewinner – es kam keine Stimme zusammen.";
+    if (!round.winners.length) return "Diesmal gibt es keine Gewinner, weil niemand abgestimmt hat.";
 
     return round.winners
         .map((winner) => {
             const votes = winner.votes === 1 ? "1 Stimme" : `${winner.votes} Stimmen`;
 
-            return `${MEDALS[winner.place - 1] ?? `${winner.place}.`} <@${winner.userId}> – ${votes}${winner.prize ? ` · ${winner.prize}` : ""}`;
+            return `${MEDALS[winner.place - 1] ?? `${winner.place}.`} <@${winner.userId}> · ${votes}${winner.prize ? ` · ${winner.prize}` : ""}`;
         })
         .join("\n");
 }
