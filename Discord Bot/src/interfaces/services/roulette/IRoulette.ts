@@ -1,5 +1,62 @@
 /** Rocket Roulette (W-0087). Siehe docs/superpowers/specs/2026-11-11-rocket-roulette-design.md. */
 
+import { IDrawLobby, IDrawWish } from "../../../services/roulette/Draw";
+
+export type EveningStatus = "planned" | "running" | "ended";
+export type RoundStatus = "drawing" | "running" | "ended" | "aborted";
+
+/** Ein Mitglied für Bilder und Dashboard: ohne Profilbild zeichnet der Bot Initialen. */
+export interface IAvatar {
+    id: string;
+    name: string;
+    url: string | null;
+}
+
+export interface IMessageRef {
+    channelId: string;
+    messageId: string;
+}
+
+export interface IRouletteEvening {
+    id: number;
+    guildId: string;
+    status: EveningStatus;
+    startsAt: number;
+    createdBy: string;
+    createdAt: number;
+    endedAt: number | null;
+    announce: IMessageRef | null;
+    control: IMessageRef | null;
+    round: number;
+    sitOut: string[];
+    wishes: IDrawWish[];
+    history: Record<string, number>;
+    participants: Record<string, { name: string; rounds: number }>;
+}
+
+export interface IRouletteLobby extends IDrawLobby {
+    name: string;
+    password: string;
+    /** Sprachkanäle von Team 0 und Team 1. */
+    channels: [string, string] | null;
+    /** Die Lobby-Karten in den Text-Chats der beiden Kanäle. */
+    cards: [string, string] | null;
+    openedAt: number | null;
+    /** Anzeigenamen beim Auslosen, für Bilder und Übersicht. */
+    names: Record<string, string>;
+}
+
+export interface IRouletteRound {
+    id: number;
+    eveningId: number;
+    guildId: string;
+    number: number;
+    status: RoundStatus;
+    createdAt: number;
+    endedAt: number | null;
+    lobbies: IRouletteLobby[];
+}
+
 export type RouletteTeamSize = 1 | 2 | 3;
 
 export interface IRouletteSettings {

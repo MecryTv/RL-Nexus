@@ -237,6 +237,77 @@ function checkDraw(): void {
     check("Niemand doppelt", new Set(Everyone(Draw(Input(Players(23))))).size === 23);
 }
 
+async function checkDatabase(client: BotClient): Promise<void> {
+    console.log("\n  — Datenbank —");
+
+    const evenings = client.rouletteEvenings;
+    const rounds = client.rouletteRounds;
+    const now = Date.now();
+    const day = 24 * 3_600_000;
+
+    const evening = await evenings.Create({ guildId: GUILD, startsAt: now + 60_000, createdBy: "m1" });
+
+    check("Abend anlegen, als aktiv wiederfinden", (await evenings.ActiveOf(GUILD))?.id === evening.id && evening.status === "planned" && evening.round === 0);
+
+    let second: string | null = null;
+
+    try {
+        await evenings.Create({ guildId: GUILD, startsAt: now, createdBy: "m1" });
+    } catch (error) {
+        second = error instanceof RouletteError ? error.message : String(error);
+    }
+
+    check("Nur ein aktiver Abend je Server", second !== null && second.includes("schon"), String(second));
+    check("Fällig: noch nicht vor der Startzeit", !(await evenings.Due(now)).some((entry) => entry.id === evening.id));
+    check("Fällig: ab der Startzeit", (await evenings.Due(now + 120_000)).some((entry) => entry.id === evening.id));
+
+    const running = await evenings.Mutate(evening.id, () => ({ status: "running", round: 1, sitOut: ["p9"], wishes: [{ a: "p1", b: "p2", once: true }], history: { "p1|p2": 2 }, participants: { p1: { name: "Nova", rounds: 1 } } }));
+
+    check("Mutate schreibt Zustand und JSON", running?.status === "running" && running.sitOut.join() === "p9" && running.wishes[0].once && running.history["p1|p2"] === 2 && running.participants.p1.name === "Nova");
+    check("  laufende Abende sind nicht fällig", !(await evenings.Due(now + 120_000)).some((entry) => entry.id === evening.id));
+
+    let rolledBack = false;
+
+    try {
+        await evenings.Mutate(evening.id, () => {
+            throw new RouletteError("abgelehnt");
+        });
+    } catch (error) {
+        rolledBack = error instanceof RouletteError;
+    }
+
+    check("Mutate: ein Fehler lässt den Abend, wie er war", rolledBack && (await evenings.Get(evening.id))?.round === 1);
+
+    const lobbies = [
+        { teams: [["p1", "p2", "p3"], ["p4", "p5", "p6"]] as [string[], string[]], teamNumbers: [1, 2] as [number, number], size: 3 as const, host: "m1", hostIsModerator: true, filler: null, name: "Lobby12", password: "testo", channels: ["11", "12"] as [string, string], cards: null, openedAt: null, names: { p1: "Nova" } },
+    ];
+    const round = await rounds.Create({ eveningId: evening.id, guildId: GUILD, number: 1, lobbies });
+
+    check("Runde mit Lobbys kommt unverändert zurück", JSON.stringify((await rounds.Current(evening.id))?.lobbies) === JSON.stringify(lobbies) && round.status === "drawing");
+
+    const done = await rounds.Mutate(round.id, () => ({ status: "ended", endedAt: now }));
+
+    check("Runde beenden", done?.status === "ended" && (await rounds.List(evening.id)).length === 1);
+
+    await evenings.Mutate(evening.id, () => ({ status: "ended", endedAt: now - 31 * day }));
+
+    const recent = await evenings.Create({ guildId: GUILD, startsAt: now, createdBy: "m1" });
+
+    await evenings.Mutate(recent.id, () => ({ status: "ended", endedAt: now - 29 * day }));
+
+    const pruned = await evenings.Prune(now - 30 * day);
+
+    check("Aufräumen: älter als 30 Tage weg, jünger bleibt", pruned >= 1 && (await evenings.Get(evening.id)) === null && (await evenings.Get(recent.id)) !== null && (await rounds.List(evening.id)).length === 0);
+}
+
+async function cleanup(client: BotClient): Promise<void> {
+    await client.databaseService.Write("DELETE FROM roulette_rounds WHERE guild_id = ?", [GUILD]);
+    await client.databaseService.Write("DELETE FROM roulette_evenings WHERE guild_id = ?", [GUILD]);
+    await client.databaseService.Write("DELETE FROM module_settings WHERE guild_id = ?", [GUILD]);
+    client.rouletteEvenings.Forget();
+    client.rouletteRounds.Forget();
+}
+
 async function main(): Promise<void> {
     console.log("\n🎰 Rocket Roulette\n");
 
@@ -244,6 +315,19 @@ async function main(): Promise<void> {
 
     checkSettings(client);
     checkDraw();
+
+    await client.configService.Initialize();
+
+    if (await client.databaseService.Connect()) {
+        try {
+            await checkDatabase(client);
+        } finally {
+            await cleanup(client).catch((error) => check("Aufräumen lief durch", false, String(error)));
+            await client.databaseService.Close();
+        }
+    } else {
+        console.log("\n  — Datenbank —\n  übersprungen: keine Verbindung");
+    }
 
     console.log(failures === 0 ? "\n✅ Alle Prüfungen bestanden.\n" : `\n❌ ${failures} Prüfung(en) fehlgeschlagen.\n`);
 

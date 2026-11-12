@@ -57,6 +57,8 @@ export const TABLES = {
     roleLists: "role_lists",
     sixmansPlayers: "sixmans_players",
     sixmansRounds: "sixmans_rounds",
+    rouletteEvenings: "roulette_evenings",
+    rouletteRounds: "roulette_rounds",
     supportWaits: "support_waits",
     clipRounds: "clip_rounds",
     clipEntries: "clip_entries",

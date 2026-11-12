@@ -100,6 +100,8 @@ import ServerRestoresModel from "../models/ServerRestores";
 import EpicNameCasesModel from "../models/EpicNameCases";
 import AvDebrisModel from "../models/AvDebris";
 import { SixMansPlayers, SixMansRounds } from "../models/SixMans";
+import RouletteEvenings from "../models/RouletteEvenings";
+import RouletteRounds from "../models/RouletteRounds";
 import TeamGroups from "../models/TeamGroups";
 import ApplySubmissions from "../models/ApplySubmissions";
 import SupportWaits from "../models/SupportWaits";
@@ -215,6 +217,9 @@ export default class BotClient extends Client implements IBotClient {
     avDebris: AvDebrisModel;
     sixPlayers: SixMansPlayers;
     sixRounds: SixMansRounds;
+    /** W-0087: Rocket Roulette. */
+    rouletteEvenings: RouletteEvenings;
+    rouletteRounds: RouletteRounds;
     supportWaits: SupportWaits;
     clipRounds: ClipRounds;
     clipEntries: ClipEntries;
@@ -371,6 +376,8 @@ export default class BotClient extends Client implements IBotClient {
         this.avDebris = new AvDebrisModel(this);
         this.sixPlayers = new SixMansPlayers(this);
         this.sixRounds = new SixMansRounds(this);
+        this.rouletteEvenings = new RouletteEvenings(this);
+        this.rouletteRounds = new RouletteRounds(this);
         this.supportWaits = new SupportWaits(this);
         this.clipRounds = new ClipRounds(this);
         this.clipEntries = new ClipEntries(this);
