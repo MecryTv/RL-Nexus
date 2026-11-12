@@ -66,6 +66,8 @@ export function CleanEmoji(value: unknown): string | null {
     if (!emoji) return null;
     if (/^<a?:[a-z0-9_]{2,32}:\d{17,20}>$/i.test(emoji)) return emoji;
 
-    // Kein Buchstabe, keine Ziffer, höchstens ein paar Zeichen: dann ist es ein Emoji.
-    return emoji.length <= 8 && !/[a-z0-9<>:@#]/i.test(emoji) ? emoji : null;
+    // Genau ein Graphem mit Emoji-Zeichen: "⭐⭐", "😀!" oder "!" lehnt Discord ab, dann scheitert das ganze Panel (W-0093).
+    const single = [...new Intl.Segmenter().segment(emoji)].length === 1;
+
+    return single && /\p{Extended_Pictographic}|\p{Regional_Indicator}|⃣/u.test(emoji) ? emoji : null;
 }

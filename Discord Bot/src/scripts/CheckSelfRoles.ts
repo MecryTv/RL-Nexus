@@ -131,6 +131,11 @@ function checkClean(client: BotClient): void {
     check("Ein animiertes ebenso", CleanEmoji("<a:rl:123456789012345678>") !== null);
     check("Buchstaben nicht", CleanEmoji("lol") === null);
     check("Und nichts bleibt nichts", CleanEmoji("  ") === null);
+    // Discord nimmt genau ein Emoji, sonst scheitert das ganze Panel (W-0093).
+    check("Familie, Flagge und Tastenkappe zählen als eins", CleanEmoji("👨‍👩‍👧") !== null && CleanEmoji("🇩🇪") !== null && CleanEmoji("1️⃣") !== null);
+    check("Zwei Emojis nicht", CleanEmoji("⭐⭐") === null && CleanEmoji("🇩🇪🇦🇹") === null, `${CleanEmoji("⭐⭐")} ${CleanEmoji("🇩🇪🇦🇹")}`);
+    check("Emoji mit Satzzeichen nicht", CleanEmoji("😀!") === null, String(CleanEmoji("😀!")));
+    check("Nur ein Satzzeichen auch nicht", CleanEmoji("!") === null && CleanEmoji("—") === null, `${CleanEmoji("!")} ${CleanEmoji("—")}`);
 }
 
 /* ----------------------------------------------------------
