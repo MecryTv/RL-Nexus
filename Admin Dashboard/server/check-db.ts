@@ -28,7 +28,7 @@ import { backupDatabaseName, ensureBackupDatabase } from "./backups/store.ts";
 import { signToken } from "./bot.ts";
 import { forgetAllUsers, forgetUser, namesFilled } from "./users.ts";
 import { deletionRound } from "./userdata/clock.ts";
-import type { ICancelReceipt, ICheckoutStart, ICustomerDetail, ICustomerList, IShopProduct, IShopProductList, IShopSettingsView, IShopState, IUnlockProgress } from "../shared/shop.ts";
+import type { ICancelReceipt, ICheckoutStart, ICustomerDetail, ICustomerList, IShopProduct, IShopProductList, IShopSettingsView, IShopState, IUnlockProgress, IWithdrawReceipt } from "../shared/shop.ts";
 import type { IIncidentList, IPublicStatus, IStatusDetail } from "../shared/status.ts";
 import { buildApp } from "./app.ts";
 import { checkBackupsDb } from "./checks/backups-db.check.ts";
@@ -3699,7 +3699,7 @@ try {
             for (const action of ["shop.trial", "shop.trial-end", "shop.gift", "shop.end", "shop.ban", "shop.unban", "shop.resync"]) assert.equal(actions.includes(action), true, action);
         });
 
-        section("Shop: Kündigen und Mein Zugang");
+        section("Shop: Kündigen, Widerrufen und Mein Zugang");
 
         const KUENDIGT = "99999999999999999951";
         await records.upsertCustomer({ id: KUENDIGT, name: "check kuendigen", email: `${KUENDIGT}@example.test` });
@@ -3784,6 +3784,79 @@ try {
             assert.deepEqual(kaufStripe.calls, [] as string[]);
             assert.equal(shopMails.some((entry) => String(entry.subject).includes("Kündigung") && String(entry.to) === config.contactMail), true);
             assert.equal(shopMails.some((entry) => entry.subject === "Deine Kündigung ist eingegangen" && String(entry.to) === "fremd@example.test"), true);
+        });
+
+        // W-0096: Widerrufen mit Rechnungsnummer. Nichts geht automatisch an Stripe, die Rückzahlung macht der Support.
+        let withdrawIp = 0;
+        const widerrufen = (payload: unknown, cookie?: string) =>
+            app.inject({
+                method: "POST",
+                url: "/public/shop/withdraw",
+                // Jede Anfrage von einer eigenen Adresse: Die Route lässt je Adresse nur fünf in der Minute durch.
+                remoteAddress: `198.51.100.${++withdrawIp}`,
+                headers: { origin: SITE, "content-type": "application/json", ...(cookie ? { cookie } : {}) },
+                payload: JSON.stringify(payload),
+            });
+        const withdrawForm = { name: "Check Person", invoiceNo: ` ${cancelOrder.orderNo.toLowerCase()} `, email: `${KUENDIGT}@example.test` };
+        const withdrawEvents = async (): Promise<number> =>
+            Number((await query<{ n: number }[]>("SELECT COUNT(*) AS n FROM shop_events WHERE user_id = ? AND kind = 'withdraw.received'", [KUENDIGT]))[0]?.n ?? 0);
+        const supportMail = () => shopMails.find((entry) => String(entry.to) === config.contactMail);
+        const withdrawReceipt = (to: string) => shopMails.find((entry) => entry.subject === "Dein Widerruf ist eingegangen" && String(entry.to) === to);
+
+        await check("Widerrufen mit Rechnungsnummer und Mail des Kunden: zugeordnet mit Produkt und Kaufdatum, Verlauf beim Kunden, Mails an support@ und an die Person, nichts bei Stripe", async () => {
+            kaufStripe.calls.length = 0;
+            shopMails.length = 0;
+            const events = await withdrawEvents();
+
+            const response = await widerrufen(withdrawForm);
+            assert.equal(response.statusCode, 200, response.body);
+            const receipt = response.json() as IWithdrawReceipt;
+            assert.deepEqual([receipt.matched, receipt.title, receipt.mailed], [true, monthly.title, true]);
+            assert.equal(Math.abs(Date.parse(receipt.boughtAt ?? "") - cancelOrder.createdAt.getTime()) < 1000, true);
+
+            assert.deepEqual(kaufStripe.calls, [] as string[], "keine Erstattung und keine Kündigung bei Stripe");
+            assert.equal((await records.orderById(cancelOrder.id))?.status, "paid");
+            assert.equal(await withdrawEvents(), events + 1);
+
+            assert.equal(supportMail()?.subject, `[Shop] Widerruf ${cancelOrder.orderNo}`);
+            for (const part of [`Rechnungsnummer: ${cancelOrder.orderNo}`, `Mail für die Bestätigung: ${withdrawForm.email}`, "Angemeldet: nein", KUENDIGT, monthly.title]) {
+                assert.equal(String(supportMail()?.html).includes(part), true, part);
+            }
+            assert.match(String(withdrawReceipt(withdrawForm.email)?.html), new RegExp(`${cancelOrder.orderNo}[\\s\\S]*${monthly.title}`));
+        });
+
+        await check("Widerrufen mit unbekannter Rechnungsnummer: kein Fehler, nicht zugeordnet, Hinweis an support@ und Eingangsbestätigung", async () => {
+            shopMails.length = 0;
+
+            const response = await widerrufen({ ...withdrawForm, invoiceNo: "RLN-2026-99999999", email: "widerruf@example.test" });
+            assert.equal(response.statusCode, 200, response.body);
+            const receipt = response.json() as IWithdrawReceipt;
+            assert.deepEqual([receipt.matched, receipt.title, receipt.boughtAt, receipt.mailed], [false, null, null, true]);
+            assert.match(String(supportMail()?.html), /Keine Bestellung mit dieser Nummer/);
+            assert.notEqual(withdrawReceipt("widerruf@example.test"), undefined);
+        });
+
+        await check("Widerrufen mit fremder Mail: nicht zugeordnet, kein Produkt in der Antwort, kein Verlauf, support@ erfährt, wem die Nummer gehört", async () => {
+            shopMails.length = 0;
+            const events = await withdrawEvents();
+
+            const response = await widerrufen({ ...withdrawForm, email: "fremd@example.test" });
+            const receipt = response.json() as IWithdrawReceipt;
+            assert.deepEqual([response.statusCode, receipt.matched, receipt.title, receipt.boughtAt], [200, false, null, null]);
+            assert.equal(await withdrawEvents(), events);
+            assert.equal(String(supportMail()?.html).includes(KUENDIGT), true);
+            assert.equal(String(withdrawReceipt("fremd@example.test")?.html).includes(monthly.title), false);
+        });
+
+        await check("Widerrufen: falsche Rechnungsnummer 400, angemeldet ohne Mail geht die Bestätigung an die Discord-Mail", async () => {
+            const wrong = await widerrufen({ ...withdrawForm, invoiceNo: "RLN-2026-42" });
+            assert.deepEqual([wrong.statusCode, wrong.json().error], [400, "Die Rechnungsnummer sieht so aus: RLN-2026-0042. Sie steht in der Bestätigung und auf der Rechnung."]);
+
+            shopMails.length = 0;
+            const response = await widerrufen({ ...withdrawForm, email: "" }, kuendigtCookie);
+            assert.equal(response.statusCode, 200, response.body);
+            assert.equal((response.json() as IWithdrawReceipt).matched, true);
+            assert.notEqual(withdrawReceipt(`${KUENDIGT}@example.test`), undefined);
         });
 
         await check("Mein Zugang: Kundenportal nur angemeldet, Zustand mit Produkt, Rolle und Rechnungen", async () => {

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import type { Options } from "nodemailer/lib/mailer/index.js";
-import { customerMatches, durationLabel, formatPrice, maskEmail, parsePrice, priceSuffix, type IShopSettings } from "../../shared/shop.ts";
+import { customerMatches, durationLabel, formatPrice, maskEmail, parsePrice, priceSuffix, type IShopSettings, type IWithdrawReceipt } from "../../shared/shop.ts";
 import { EMPTY_DRAFT, draftOf, inputOf, previewOf, settingsUntouched } from "../../src/shop/draft.ts";
 import { accessFacts, freeSummary, noticeText, stripeWarning, switchFacts, switchTitle } from "../../src/shop/access.ts";
 import { readSession } from "../access.ts";
@@ -10,11 +10,11 @@ import { addGuildMember, exchangeShopCode, refreshShopTokens, sendDirectMessage,
 import { SESSION_COOKIE, seal } from "../session.ts";
 import { berlinEndOfDay, customerStatus, eventText, monthStart, refundSuggestion, trialTarget } from "../shop/customers.ts";
 import { LATEST_END, accessOf, oneTimeWindow, orderNo, purchasePlan, purchaseProblem, restCents, rolePlan, switchMode, trialProblem, type IGrant } from "../shop/grants.ts";
-import { makeLimiter, matchCancellation, parseCancelInput, rateKey } from "../shop/cancel.ts";
-import { legalPdf, legalText, legalVersions, parseLegal } from "../shop/legal.ts";
+import { makeLimiter, matchCancellation, ownReceipt, parseCancelInput, parseWithdrawInput, rateKey, withdrawalMatches } from "../shop/cancel.ts";
+import { legalPdf, legalText, legalVersions, parseLegal, pdfSafe } from "../shop/legal.ts";
 import { paidProblem, parseProductInput, parseSettingsInput } from "../shop/rules.ts";
 import { escapeMarkdown, expiredDm, expiredFacts, orderDm, paymentFailedDm, trialDm, type IShopDm } from "../shop/dm.ts";
-import { cancelReceiptMail, cancelReceivedMail, dashboardUrl, endedMail, giftMail, orderMail, pausedMail, resumedMail, sendShopMail, setShopMailer, trialMail } from "../shop/mail.ts";
+import { cancelReceiptMail, cancelReceivedMail, dashboardUrl, endedMail, giftMail, orderMail, pausedMail, resumedMail, sendShopMail, setShopMailer, trialMail, withdrawReceiptMail } from "../shop/mail.ts";
 import { SHOP_COOKIE, readShopSession, readShopState, shopSessionCookie } from "../shop/session.ts";
 import { sdkGateway, setStripeGateway, syncToStripe } from "../shop/stripe.ts";
 import { syncWith } from "../shop/sync.ts";
@@ -359,6 +359,7 @@ export async function checkShop(): Promise<void> {
         assert.equal(eventText("subscription.renewed.frozen"), "Abo verlängert, während der Zugang ruht");
         assert.equal(eventText("subscription.ended.frozen"), "Abo bei Stripe beendet, während der Zugang ruht");
         assert.equal(eventText("switch.cancel-failed"), "Wechsel: altes Abo bei Stripe nicht beendet");
+        assert.equal(eventText("withdraw.received"), "Widerruf über /widerrufen eingegangen");
         assert.equal(eventText("unbekannt.xy"), "unbekannt.xy");
     });
 
@@ -395,6 +396,22 @@ export async function checkShop(): Promise<void> {
         assert.equal(pdf?.subarray(0, 5).toString(), "%PDF-");
         assert.equal((pdf?.length ?? 0) > 1000, true);
         assert.equal(await legalPdf("agb", "1999-01-01"), null);
+    });
+
+    await check("Widerruf ab 2026-11-12: online über /widerrufen mit Rechnungsnummer, Musterformular fragt sie ab, PDF ohne Ersatzzeichen", async () => {
+        const blocks = legalText("widerruf", "2026-11-12")?.blocks ?? [];
+        const online = blocks.findIndex((block) => block.kind === "p" && block.text.includes("nexus-emb.de/widerrufen"));
+
+        assert.equal(blocks[online - 1]?.text.startsWith("Um Ihr Widerrufsrecht auszuüben"), true, "direkt nach dem Absatz zur Erklärung");
+        assert.match(blocks[online]?.text ?? "", /„Vertrag hier widerrufen“ .*Rechnungsnummer aus der Bestellbestätigung/);
+        assert.equal(pdfSafe(blocks[online]?.text ?? "?").includes("?"), false, "Anführungszeichen gibt es im PDF");
+
+        const form = blocks.filter((block) => block.kind === "li").map((block) => block.text);
+        assert.equal(form[form.indexOf("Bestellt am (*)/erhalten am (*)") + 1], "Rechnungsnummer (aus der Bestätigung, etwa RLN-2026-0042)");
+
+        const live = legalText("widerruf", "2026-10-12")?.blocks.map((block) => block.text).join("\n") ?? "";
+        assert.doesNotMatch(live, /widerrufen auf|Rechnungsnummer/, "der live aktive Stand bleibt, wie er ist");
+        assert.equal((await legalPdf("widerruf", "2026-11-12"))?.subarray(0, 5).toString(), "%PDF-");
     });
 
     await check("Einstellungen: Stand der Rechtstexte muss es geben", () => {
@@ -461,6 +478,61 @@ section("Shop: Kündigen");
         assert.throws(() => parseCancelInput({ ...raw, email: "keine-mail" }, false), /Mail/);
         assert.throws(() => parseCancelInput({ ...raw, email: "m@x.de", reference: "" }, false), /Discord-Name oder Bestellnummer/);
         assert.equal(parseCancelInput({ ...raw, email: " M@x.de " }, false).email, "M@x.de");
+    });
+
+    section("Shop: Widerruf");
+
+    const WITHDRAW_FORMAT = "Die Rechnungsnummer sieht so aus: RLN-2026-0042. Sie steht in der Bestätigung und auf der Rechnung.";
+
+    await check("Widerruf prüfen: Rechnungsnummer Pflicht, RLN- mit Jahr und mindestens vier Ziffern, Schreibweise egal", () => {
+        const raw = { name: "Connor", invoiceNo: " rln-2026-0042 ", email: "m@x.de" };
+
+        assert.deepEqual(parseWithdrawInput(raw, false), { name: "Connor", invoiceNo: "RLN-2026-0042", email: "m@x.de" });
+        assert.equal(parseWithdrawInput({ ...raw, invoiceNo: "RLN-2026-12345" }, false).invoiceNo, "RLN-2026-12345");
+        for (const wrong of ["", "2026-0042", "RLN-26-0042", "RLN-2026-042", "RLN 2026 0042", "RLN-2026-0042x", "XRLN-2026-0042", "RLN-2026-00 42", "RLN-2026-12345678901"]) {
+            assert.throws(() => parseWithdrawInput({ ...raw, invoiceNo: wrong }, false), (error: Error) => error.message === WITHDRAW_FORMAT, wrong);
+        }
+
+        assert.throws(() => parseWithdrawInput({ ...raw, name: " " }, false), /Dein Name/);
+        assert.throws(() => parseWithdrawInput({ ...raw, email: "" }, false), /Gib eine Mail an, an die die Bestätigung gehen soll\./);
+        assert.equal(parseWithdrawInput({ ...raw, email: "" }, true).email, "");
+        assert.throws(() => parseWithdrawInput({ ...raw, email: "keine-mail" }, false), /Mail/);
+    });
+
+    await check("Bestätigung ohne Gesamtgrenze nur an die eigene Mail des zugeordneten Kunden (Review W-0096)", () => {
+        assert.equal(ownReceipt(true, " M@x.de ", "m@x.de"), true);
+        assert.equal(ownReceipt(true, "fremd@x.de", "m@x.de"), false, "angemeldet mit eigener Bestellung, aber fremde Adresse");
+        assert.equal(ownReceipt(false, "m@x.de", "m@x.de"), false);
+        assert.equal(ownReceipt(true, "m@x.de", null), false);
+    });
+
+    await check("Widerruf zuordnen: nur ein Kauf, und nur mit der Mail des Kunden oder angemeldet als er", () => {
+        const order = { userId: "284901234567897731", status: "paid" } as const;
+
+        assert.equal(withdrawalMatches(order, "M@x.de", " m@x.de ", null), true);
+        assert.equal(withdrawalMatches(order, "m@x.de", "fremd@x.de", null), false);
+        assert.equal(withdrawalMatches(order, "m@x.de", "", order.userId), true);
+        assert.equal(withdrawalMatches(order, "m@x.de", "fremd@x.de", order.userId), true);
+        assert.equal(withdrawalMatches(order, "m@x.de", "", "123456789012345678"), false);
+        assert.equal(withdrawalMatches(order, null, "", null), false, "ohne Mail beim Kunden passt keine leere Angabe");
+        assert.equal(withdrawalMatches(null, "m@x.de", "m@x.de", null), false);
+        for (const status of ["pending", "refunded"] as const) assert.equal(withdrawalMatches({ ...order, status }, "m@x.de", "m@x.de", null), true, status);
+        for (const status of ["open", "failed"] as const) assert.equal(withdrawalMatches({ ...order, status }, "m@x.de", "m@x.de", null), false, status);
+    });
+
+    await check("Widerrufsbestätigung: Eingang mit Uhrzeit, Rechnungsnummer, Produkt nur wenn zugeordnet, keine eigenen Fristen oder Beträge", () => {
+        const base = { to: "m@x.de", receivedAt: new Date("2026-11-13T12:30:00Z"), name: "Connor <b>", invoiceNo: "RLN-2026-0042" };
+        const matched = withdrawReceiptMail(config, { ...base, order: { title: "Monat", boughtAt: new Date("2026-11-10T09:00:00Z") } });
+
+        assert.equal(matched.subject, "Dein Widerruf ist eingegangen");
+        for (const part of ["13.11.2026", "13:30", "RLN-2026-0042", "Monat", "10.11.2026", "Wir prüfen den Widerruf und melden uns."]) assert.match(matched.html, new RegExp(part), part);
+        assert.equal(matched.html.includes("Connor <b>"), false, "Name maskiert");
+
+        const unmatched = withdrawReceiptMail(config, { ...base, order: null });
+        assert.match(unmatched.html, /von Hand/);
+        assert.match(unmatched.html, /Wir prüfen den Widerruf und melden uns\./);
+        assert.doesNotMatch(unmatched.html, /Monat|10\.11\.2026/);
+        assert.doesNotMatch(matched.html + unmatched.html, /\d+ Tage|vierzehn|€|Euro/, "keine eigenen Fristen oder Beträge");
     });
 
     section("Shop: Discord");
@@ -774,7 +846,7 @@ section("Shop: Kündigen");
         assert.deepEqual(lines({ subscriptions: 1, trials: 1, customers: 1 }), ["1 Abo wird bei Stripe pausiert.", "1 Test wird angehalten.", "1 Kunde bekommt eine kurze Mail.", site]);
         assert.deepEqual(lines({ dayGrants: 1, customers: 1 }), ["1 Zugang nach Tagen wird angehalten.", "1 Kunde bekommt eine kurze Mail.", site]);
         assert.deepEqual(lines(none), [site]);
-        assert.match(accessFacts(none)[0].detail, /AGB, Widerruf, „Verträge hier kündigen“ und „Mein Zugang“/);
+        assert.match(accessFacts(none)[0].detail, /AGB, Widerruf, „Verträge hier kündigen“, „Vertrag hier widerrufen“ und „Mein Zugang“/);
     });
 
     await check("Beta Access: Rückfragen und Hinweis je Wechsel", () => {
@@ -1287,6 +1359,36 @@ section("Shop: Kündigen");
             setStripeGateway(null);
             assert.equal((await post(FakeStripe.SIGNATURE)).statusCode, 503);
             setStripeGateway(stripe);
+        });
+
+        await check("Widerrufen ohne Datenbank: nur von der Webseite, falsche Nummer 400, sonst Eingang bestätigt und Hinweis an support@, nichts bei Stripe", async () => {
+            const mails: Options[] = [];
+            setShopMailer(async (options) => void mails.push(options));
+            const calls = stripe.calls.length;
+            const form = { name: "Connor", invoiceNo: "rln-2026-0042", email: "widerruf@example.test" };
+
+            try {
+                assert.equal((await publicPost("/public/shop/withdraw", form, "https://boese.example", "")).statusCode, 403);
+
+                const wrong = await publicPost("/public/shop/withdraw", { ...form, invoiceNo: "0042" }, site, "");
+                assert.deepEqual([wrong.statusCode, wrong.json()], [400, { error: WITHDRAW_FORMAT }]);
+
+                const response = await publicPost("/public/shop/withdraw", form, site, "");
+                assert.equal(response.statusCode, 200, response.body);
+                const receipt = response.json() as IWithdrawReceipt;
+                assert.deepEqual([receipt.matched, receipt.title, receipt.boughtAt, receipt.email, receipt.mailed], [false, null, null, maskEmail(form.email), true]);
+                assert.equal(Number.isNaN(Date.parse(receipt.receivedAt)), false);
+
+                const support = mails.find((mail) => String(mail.to) === config.contactMail);
+                assert.equal(support?.subject, "[Shop] Widerruf RLN-2026-0042 (von Hand zuordnen)");
+                for (const part of ["Name: Connor", "Rechnungsnummer: RLN-2026-0042", `Mail für die Bestätigung: ${form.email}`, "Angemeldet: nein", "von Hand"]) {
+                    assert.equal(String(support?.html).includes(part), true, part);
+                }
+                assert.equal(mails.some((mail) => mail.subject === "Dein Widerruf ist eingegangen" && String(mail.to) === form.email), true);
+                assert.equal(stripe.calls.length, calls);
+            } finally {
+                setShopMailer(null);
+            }
         });
 
         await check("Dev-Knöpfe gibt es ohne --dev nicht", async () => {

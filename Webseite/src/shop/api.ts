@@ -1,4 +1,4 @@
-import type { IBlockedView, ICancelInput, ICancelReceipt, ICheckoutStart, ILegalText, IShopState, IUnlockProgress, LegalDoc } from "./types.ts";
+import type { IBlockedView, ICancelInput, ICancelReceipt, ICheckoutStart, ILegalText, IShopState, IUnlockProgress, IWithdrawInput, IWithdrawReceipt, LegalDoc } from "./types.ts";
 
 /**
  * Die Preisseite spricht nur `/api/shop/*`. Im Betrieb reicht nginx das an
@@ -70,6 +70,11 @@ export async function openPortal(): Promise<string> {
 /** Kündigen ohne Anmeldung (§ 312k BGB). Angemeldet darf die Mail leer sein. */
 export function sendCancellation(input: ICancelInput): Promise<ICancelReceipt> {
     return post<ICancelReceipt>("/cancel", input);
+}
+
+/** Widerrufen ohne Anmeldung (W-0096). Erstattet wird nach der Prüfung von Hand. */
+export function sendWithdrawal(input: IWithdrawInput): Promise<IWithdrawReceipt> {
+    return post<IWithdrawReceipt>("/withdraw", input);
 }
 
 /** W-0057: was die Seite /gesperrt zeigt. */

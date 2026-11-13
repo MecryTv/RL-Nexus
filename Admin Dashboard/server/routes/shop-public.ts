@@ -1,19 +1,19 @@
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { LEGAL_DOCS, formatPrice, maskEmail, type ICancelReceipt, type ICheckoutStart, type IShopSwitch, type ILegalText, type LegalDoc, type IShopMe, type IShopPublicProduct, type IShopState, type IUnlockProgress, type StepState } from "../../shared/shop.ts";
+import { LEGAL_DOCS, formatPrice, maskEmail, type ICancelReceipt, type IWithdrawReceipt, type ICheckoutStart, type IShopSwitch, type ILegalText, type LegalDoc, type IShopMe, type IShopPublicProduct, type IShopState, type IUnlockProgress, type StepState } from "../../shared/shop.ts";
 import type { IConfig } from "../config.ts";
 import { query } from "../db.ts";
 import { BotAuthorization, DiscordUnavailable, avatarUrl, displayName, exchangeShopCode, fetchMe, fetchRoles, leaveGuild, shopAuthorizeUrl, userGuildIds } from "../discord.ts";
 import { InvalidInput, PublicError } from "../errors.ts";
-import { makeLimiter, matchCancellation, parseCancelInput, rateKey, type ICancelCandidate } from "../shop/cancel.ts";
+import { makeLimiter, matchCancellation, ownReceipt, parseCancelInput, parseWithdrawInput, rateKey, withdrawalMatches, type ICancelCandidate } from "../shop/cancel.ts";
 import { publish } from "../events.ts";
 import { seal } from "../session.ts";
 import { expireDue } from "../shop/expiry.ts";
 import { fulfilOrder } from "../shop/fulfil.ts";
-import { accessOf, purchasePlan, purchaseProblem, trialProblem, type IGrant, type IPlanProduct } from "../shop/grants.ts";
+import { accessOf, formatDay, purchasePlan, purchaseProblem, trialProblem, type IGrant, type IPlanProduct } from "../shop/grants.ts";
 import { legalPdf, legalText, legalVersions } from "../shop/legal.ts";
 import { paymentFailedDm, sendShopDm, trialDm } from "../shop/dm.ts";
-import { cancelReceiptMail, cancelReceivedMail, paymentFailedMail, sendShopMail, supportNoteMail, trialMail } from "../shop/mail.ts";
+import { cancelReceiptMail, cancelReceivedMail, paymentFailedMail, sendShopMail, supportNoteMail, trialMail, withdrawReceiptMail } from "../shop/mail.ts";
 import {
     cancelCandidates,
     customerOf,
@@ -38,6 +38,8 @@ import {
     setStripeCustomer,
     stripeEventSeen,
     upsertCustomer,
+    type ICustomer,
+    type IOrder,
 } from "../shop/records.ts";
 import {
     clearShopSession,
@@ -74,11 +76,15 @@ const PAYMENT_PENDING = "Deine letzte Zahlung wird noch bearbeitet, etwa eine La
 const CANCEL_LIMIT = { rateLimit: { max: 5, timeWindow: "1 minute", keyGenerator: (request: FastifyRequest) => rateKey(request.ip) } };
 
 const HOUR = 3_600_000;
-// Grenzen für die Mails von /kuendigen (siehe makeLimiter).
+// Grenzen für die Mails von /kuendigen und /widerrufen (siehe makeLimiter).
 const receiptPerAddress = makeLimiter(3, 24 * HOUR);
 const receiptsAll = makeLimiter(100, HOUR);
 const supportSame = makeLimiter(1, 24 * HOUR);
 const supportAll = makeLimiter(30, HOUR);
+/** Unter dieser Pseudo-ID stehen Widerrufe ohne Zuordnung in shop_events. */
+const WITHDRAW_EVENTS = "widerruf";
+// /widerrufen zählt die Bestätigungen je Adresse für sich: Wer am selben Tag kündigt und widerruft, bekommt beide. Die übrigen Grenzen gelten gemeinsam.
+const withdrawReceiptPerAddress = makeLimiter(3, 24 * HOUR);
 
 const STAMP = new Intl.DateTimeFormat("de-DE", { dateStyle: "medium", timeStyle: "medium", timeZone: "Europe/Berlin" });
 
@@ -448,7 +454,7 @@ export async function publicShopRoutes(app: FastifyInstance, { config }: { confi
         }
 
         // Eine zugeordnete Kündigung geht an die eigene Mail des Kunden. Sonst zählen die Grenzen: höchstens drei je Adresse am Tag und 100 in der Stunde.
-        const allowed = receiptPerAddress(to.toLowerCase()) && (match !== null || receiptsAll("all"));
+        const allowed = receiptPerAddress(to.toLowerCase()) && (ownReceipt(match !== null, to, match?.email ?? null) || receiptsAll("all"));
         const mailed =
             allowed &&
             (await sendShopMail(
@@ -468,6 +474,71 @@ export async function publicShopRoutes(app: FastifyInstance, { config }: { confi
         if (!mailed && match) await logEvent(match.userId, "mail.failed", "Kündigungsbestätigung").catch(() => undefined);
 
         return { receivedAt: receivedAt.toISOString(), matched: match !== null, title, endsAt: match?.endsAt?.toISOString() ?? null, email: maskEmail(to), mailed };
+    });
+
+    // W-0096: Widerrufen ohne Anmeldung. Nichts geht automatisch an Stripe: Der Support prüft und erstattet von Hand.
+    // Deshalb geht jeder Widerruf an support@, und die Person bekommt immer eine Eingangsbestätigung.
+    app.post("/public/shop/withdraw", { config: CANCEL_LIMIT }, async (request): Promise<IWithdrawReceipt> => {
+        const session = readShopSession(request, config);
+        const input = parseWithdrawInput(request.body, session !== null);
+        const receivedAt = new Date();
+        const account = session ? await customerOf(session.id).catch(() => null) : null;
+        const to = input.email !== "" ? input.email : (account?.email ?? "");
+        if (to === "") throw new InvalidInput("Gib eine Mail an, an die die Bestätigung gehen soll.");
+
+        let order: IOrder | null = null;
+        let owner: ICustomer | null = null;
+        let title: string | null = null;
+        let problem: string | null = null;
+
+        try {
+            order = await orderByNo(input.invoiceNo);
+            owner = order ? await customerOf(order.userId) : null;
+            title = order?.productId ? ((await findProduct(order.productId))?.title ?? null) : null;
+        } catch (error) {
+            problem = `Die Bestellung ließ sich nicht nachschlagen (${error instanceof Error ? error.message : String(error)}). Bitte von Hand zuordnen.`;
+        }
+
+        const matched = withdrawalMatches(order, owner?.email ?? null, input.email, session?.id ?? null);
+
+        if (matched && order) {
+            await logEvent(order.userId, "withdraw.received", `über /widerrufen, ${input.invoiceNo}`).catch(() => undefined);
+            publish("shop");
+        }
+
+        const lines = [
+            `Eingang: ${STAMP.format(receivedAt)}`,
+            `Name: ${input.name}`,
+            `Rechnungsnummer: ${input.invoiceNo}`,
+            `Mail für die Bestätigung: ${to}`,
+            `Angemeldet: ${session ? `${session.name} (${session.id})` : "nein"}`,
+            ...(order
+                ? [`${matched ? "Zugeordnet" : "Nicht zugeordnet, Mail und Anmeldung passen nicht zur Bestellung von"}: ${owner?.name ?? "?"} (${order.userId}), ${title ?? "Produkt unbekannt"}, bestellt am ${formatDay(order.createdAt)}, ${formatPrice(order.amountCents)}, Status ${order.status}`]
+                : problem === null
+                  ? ["Keine Bestellung mit dieser Nummer. Bitte von Hand zuordnen."]
+                  : []),
+            ...(problem ? [problem] : []),
+            "Nichts automatisch erstattet oder gekündigt: bitte prüfen und von Hand erledigen.",
+        ];
+
+        // Review W-0096: Ein Widerruf darf nie nur im Log landen. Nicht zugeordnete stehen deshalb in shop_events unter „widerruf“
+        // (wie Webhooks unter „stripe“), zugeordnete beim Kunden. Zugeordnete gehen an der Gesamtgrenze vorbei an support@.
+        if (!(matched && order)) await logEvent(WITHDRAW_EVENTS, "withdraw.received", lines.join(" · ")).catch(() => undefined);
+
+        // Gleiche Angabe zweimal: eine Mail reicht.
+        const fresh = supportSame(`widerruf|${input.invoiceNo}|${to.toLowerCase()}`);
+        if (fresh && (matched || supportAll("all"))) {
+            await sendShopMail(config, supportNoteMail(config, { subject: `Widerruf ${input.invoiceNo}${matched ? "" : " (von Hand zuordnen)"}`, text: lines.join(" · ") }));
+        } else if (fresh) {
+            console.warn(`🛒 Widerruf ohne Mail an support@ (Grenze erreicht): ${lines.join(" · ")}`);
+        }
+
+        const bought = matched && order ? { title, boughtAt: order.createdAt } : null;
+        const allowed = withdrawReceiptPerAddress(to.toLowerCase()) && (ownReceipt(matched, to, owner?.email ?? null) || receiptsAll("all"));
+        const mailed = allowed && (await sendShopMail(config, withdrawReceiptMail(config, { to, receivedAt, name: input.name, invoiceNo: input.invoiceNo, order: bought })));
+        if (!mailed && matched && order) await logEvent(order.userId, "mail.failed", "Widerrufsbestätigung").catch(() => undefined);
+
+        return { receivedAt: receivedAt.toISOString(), matched, title: bought?.title ?? null, boughtAt: bought?.boughtAt.toISOString() ?? null, email: maskEmail(to), mailed };
     });
 
     app.post("/public/shop/logout", { config: LOGIN_LIMIT }, async (_request, reply) => reply.header("Set-Cookie", clearShopSession(config)).code(204).send());

@@ -28,6 +28,7 @@ const LegalPage = lazy(() => import("./pages/LegalPage").then((m) => ({ default:
 const ShopLegalPage = lazy(() => import("./pages/ShopLegalPage").then((m) => ({ default: m.ShopLegalPage })));
 const AccessPage = lazy(() => import("./pages/AccessPage").then((m) => ({ default: m.AccessPage })));
 const CancelPage = lazy(() => import("./pages/CancelPage").then((m) => ({ default: m.CancelPage })));
+const WithdrawPage = lazy(() => import("./pages/WithdrawPage").then((m) => ({ default: m.WithdrawPage })));
 const BlockedPage = lazy(() => import("./pages/BlockedPage").then((m) => ({ default: m.BlockedPage })));
 const NotFoundPage = lazy(() => import("./pages/NotFoundPage").then((m) => ({ default: m.NotFoundPage })));
 
@@ -77,6 +78,7 @@ export function App({ banner }: { readonly banner: ILoaded<IBanner> | null }): J
                     <Route path="widerruf" element={<ShopLegalPage key="widerruf" doc="widerruf" />} />
                     <Route path="zugang" element={<AccessPage />} />
                     <Route path="kuendigen" element={<CancelPage />} />
+                    <Route path="widerrufen" element={<WithdrawPage />} />
                     <Route path="gesperrt" element={<BlockedPage />} />
                     <Route path="datenschutz" element={<LegalPage kind="datenschutz" />} />
                     <Route path="*" element={<NotFoundPage />} />

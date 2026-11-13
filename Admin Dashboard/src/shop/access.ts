@@ -49,7 +49,7 @@ export function accessFacts(preview: IAccessPreview): IAccessFact[] {
     facts.push({
         count: null,
         lead: "Die Webseite zeigt keine Preise mehr.",
-        detail: "AGB, Widerruf, „Verträge hier kündigen“ und „Mein Zugang“ bleiben unten in der Fußzeile erreichbar.",
+        detail: "AGB, Widerruf, „Verträge hier kündigen“, „Vertrag hier widerrufen“ und „Mein Zugang“ bleiben unten in der Fußzeile erreichbar.",
     });
 
     return facts;

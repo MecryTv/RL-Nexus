@@ -89,6 +89,27 @@ export interface ICancelReceipt {
     readonly mailed: boolean;
 }
 
+/* Widerrufen mit Rechnungsnummer (W-0096) */
+
+export interface IWithdrawInput {
+    readonly name: string;
+    /** RLN-2026-0042. Bestell- und Rechnungsnummer sind dieselbe. */
+    readonly invoiceNo: string;
+    /** Leer nur angemeldet: dann die Discord-Mail. */
+    readonly email: string;
+}
+
+export interface IWithdrawReceipt {
+    readonly receivedAt: string;
+    /** Die Nummer gehört zu einem Kauf dieser Person. Erstattet wird von Hand. */
+    readonly matched: boolean;
+    readonly title: string | null;
+    readonly boughtAt: string | null;
+    /** Wohin die Bestätigung ging, gekürzt. */
+    readonly email: string;
+    readonly mailed: boolean;
+}
+
 /* Rechtstexte */
 
 export type LegalDoc = "agb" | "widerruf";

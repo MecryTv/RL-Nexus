@@ -40,6 +40,7 @@ npm run build
 | `/preise` | Zugang zum Bot-Dashboard kaufen: Karten, Test, Kasse mit Stripe, Freischalten (siehe „Preise und Shop“) |
 | `/zugang` | Mein Zugang: Status, nächste Zahlung, Rolle, Kundenportal von Stripe |
 | `/kuendigen` | Verträge kündigen, auch ohne Anmeldung (§ 312k BGB), in zwei Schritten |
+| `/widerrufen` | Vertrag widerrufen, auch ohne Anmeldung, mit Rechnungsnummer, in zwei Schritten |
 | `/agb`, `/widerruf` | AGB und Widerrufsbelehrung, vom Admin-Server geladen, mit PDF |
 | `/impressum`, `/datenschutz` | Rechtliches |
 
@@ -253,6 +254,12 @@ dann den Origin von nexus-emb.de statt `http://localhost:5173`.
   vorausgefüllt. Schritt 2 zeigt Eingang und, wenn der Server das Abo
   zuordnen konnte, das Vertragsende. Der Fuß jeder Seite verlinkt die Seite
   als „Verträge hier kündigen“.
+- **Widerrufen (`/widerrufen`):** Name, Rechnungsnummer (Pflicht, Format
+  `RLN-2026-0042`) und Mail, dann eine Zusammenfassung zum Bestätigen
+  (`POST /api/shop/withdraw`). Danach Eingang und, wenn der Server die Nummer
+  einem Kauf zuordnen konnte, Produkt und Kaufdatum. Nichts geht automatisch
+  an Stripe, der Support erstattet von Hand. Im Fuß als „Vertrag hier
+  widerrufen“.
 - **AGB und Widerruf:** Die Texte liegen im Admin Dashboard
   (`shared/legal/`) und kommen über `/api/shop/legal/*`, dieselben wie im
   PDF an der Bestellbestätigung.

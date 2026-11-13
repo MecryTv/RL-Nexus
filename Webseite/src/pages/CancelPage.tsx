@@ -29,7 +29,8 @@ function validate(input: ICancelInput, loggedIn: boolean): Errors {
     return errors;
 }
 
-function Field({ id, label, hint, error, children }: { readonly id: string; readonly label: string; readonly hint?: string; readonly error?: string; readonly children: JSX.Element }): JSX.Element {
+/** Ein Feld mit Hinweis oder Fehler darunter. Auch für /widerrufen. */
+export function Field({ id, label, hint, error, children }: { readonly id: string; readonly label: string; readonly hint?: string; readonly error?: string; readonly children: JSX.Element }): JSX.Element {
     return (
         <div className={[form.field, error !== undefined && form.invalid].filter(Boolean).join(" ")}>
             <label className={form.label} htmlFor={id}>

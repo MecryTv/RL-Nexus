@@ -58,6 +58,8 @@ class SiteConfigService implements ISiteConfig {
         { label: "Widerruf", to: "/widerruf" },
         // § 312k BGB: Der Weg zum Kündigen steht auf jeder Seite.
         { label: "Verträge hier kündigen", to: "/kuendigen" },
+        // W-0096: Der Weg zum Widerrufen daneben, mit Rechnungsnummer.
+        { label: "Vertrag hier widerrufen", to: "/widerrufen" },
     ];
 }
 

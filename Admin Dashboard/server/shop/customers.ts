@@ -95,6 +95,7 @@ const EVENT_TEXTS: Readonly<Record<string, string>> = {
     "subscription.period": "Neue Abo-Periode",
     "subscription.cancel": "Abo gekündigt",
     "cancel.received": "Kündigung über /kuendigen eingegangen",
+    "withdraw.received": "Widerruf über /widerrufen eingegangen",
     "subscription.resume": "Kündigung zurückgenommen",
     "payment.failed": "Zahlung fehlgeschlagen",
     "order.refund-failed": "Erstattung gescheitert",

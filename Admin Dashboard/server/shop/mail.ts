@@ -53,7 +53,7 @@ function footer(config: IConfig): string {
         `<a href="${esc(href)}" target="_blank" style="color:#a8b0bc;text-decoration:none;margin-right:12px;"><b style="color:#ff1e2d;">›</b> ${label}</a>`;
     const site = config.shopSiteUrl;
 
-    return `${esc(PROVIDER_LINE)}<br>${link(`${site}/zugang`, "Mein Zugang")}${link(`${site}/kuendigen`, "Verträge hier kündigen")}${link(`${site}/impressum`, "Impressum")}${link(`${site}/datenschutz`, "Datenschutz")}<br>Diese Mail kommt automatisch vom Shop. Fragen? Antworte einfach, die Antwort geht an ${esc(config.contactMail)}.`;
+    return `${esc(PROVIDER_LINE)}<br>${link(`${site}/zugang`, "Mein Zugang")}${link(`${site}/kuendigen`, "Verträge hier kündigen")}${link(`${site}/widerrufen`, "Vertrag hier widerrufen")}${link(`${site}/impressum`, "Impressum")}${link(`${site}/datenschutz`, "Datenschutz")}<br>Diese Mail kommt automatisch vom Shop. Fragen? Antworte einfach, die Antwort geht an ${esc(config.contactMail)}.`;
 }
 
 async function deliver(config: IConfig, options: Options): Promise<void> {
@@ -361,6 +361,38 @@ export function cancelReceiptMail(
             content +
             contract +
             (extraordinary ? "<p>Deine außerordentliche Kündigung schauen wir uns an und melden uns dazu.</p>" : ""),
+    };
+}
+
+/**
+ * Eingangsbestätigung nach /widerrufen (W-0096). Geht immer raus, auch ohne
+ * Zuordnung. Sagt nichts zu Fristen oder Beträgen: Das steht in der
+ * Widerrufsbelehrung, und erstattet wird erst nach der Prüfung von Hand.
+ */
+export function withdrawReceiptMail(
+    _config: IConfig,
+    input: {
+        readonly to: string;
+        readonly receivedAt: Date;
+        readonly name: string;
+        readonly invoiceNo: string;
+        /** null: Die Nummer ließ sich keinem Kauf dieser Person zuordnen. */
+        readonly order: { readonly title: string | null; readonly boughtAt: Date } | null;
+    }
+): IShopMail {
+    const order = input.order
+        ? `<p><b>Vertrag:</b> ${esc(input.order.title ?? "Kauf")}<br><b>Gekauft am:</b> ${esc(formatDay(input.order.boughtAt))}</p>`
+        : "<p>Wir ordnen ihn von Hand deiner Bestellung zu.</p>";
+
+    return {
+        to: input.to,
+        subject: "Dein Widerruf ist eingegangen",
+        html:
+            `<h2>Dein Widerruf ist eingegangen.</h2>` +
+            `<p>Wir haben ihn am <b>${esc(TIME_FORMAT.format(input.receivedAt))} Uhr</b> erhalten. Das hast du uns geschickt:</p>` +
+            `<p><b>Name:</b> ${esc(input.name)}<br><b>Rechnungsnummer:</b> ${esc(input.invoiceNo)}</p>` +
+            order +
+            "<p>Wir prüfen den Widerruf und melden uns.</p>",
     };
 }
 

@@ -1,6 +1,7 @@
-import { CANCEL_KINDS, type ICancelInput } from "../../shared/shop.ts";
+import { CANCEL_KINDS, type ICancelInput, type IWithdrawInput } from "../../shared/shop.ts";
 import { InvalidInput } from "../errors.ts";
 import { body, oneOf, text } from "../validate.ts";
+import type { IOrder } from "./records.ts";
 
 /**
  * Kündigen ohne Anmeldung (§ 312k BGB). Hier nur die Regeln: Eingabe prüfen
@@ -9,6 +10,9 @@ import { body, oneOf, text } from "../validate.ts";
  * Zugeordnet wird nur, wenn Name, Discord-ID oder Bestellnummer passen **und**
  * die Mail die des Kunden ist (oder die Person angemeldet genau dieser Kunde
  * ist). Sonst könnte jeder mit einer fremden Bestellnummer fremde Abos kündigen.
+ *
+ * Dazu Widerrufen ohne Anmeldung (W-0096), mit denselben Grenzen. Dort passiert
+ * nichts automatisch, der Support erstattet von Hand.
  */
 
 const MAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -48,20 +52,63 @@ export function rateKey(ip: string): string {
     return `${groups.slice(0, 4).join(":")}::/64`;
 }
 
+/** Die Mail für die Bestätigung. Angemeldet darf sie leer sein, dann geht die Bestätigung an die Discord-Mail. */
+function receiptAddress(value: unknown, loggedIn: boolean): string {
+    const email = text(value, "Die Mail", { max: 190 });
+
+    if (email === "" && !loggedIn) throw new InvalidInput("Gib eine Mail an, an die die Bestätigung gehen soll.");
+    if (email !== "" && !MAIL.test(email)) throw new InvalidInput("Die Mail sieht nicht wie eine Adresse aus, etwa name@beispiel.de.");
+
+    return email;
+}
+
 export function parseCancelInput(raw: unknown, loggedIn: boolean): ICancelInput {
     const input = body(raw);
     const kind = oneOf(input.kind, CANCEL_KINDS, "Die Art der Kündigung");
     const name = text(input.name, "Dein Name", { min: 1, max: 100 });
     const reference = text(input.reference, "Discord-Name oder Bestellnummer", { min: 1, max: 100 });
-    const email = text(input.email, "Die Mail", { max: 190 });
+    const email = receiptAddress(input.email, loggedIn);
     const reason = text(input.reason, "Der Grund", { max: 1000 });
 
-    // Angemeldet geht die Bestätigung an die Discord-Mail, die Person muss sie nicht abtippen.
-    if (email === "" && !loggedIn) throw new InvalidInput("Gib eine Mail an, an die die Bestätigung gehen soll.");
-    if (email !== "" && !MAIL.test(email)) throw new InvalidInput("Die Mail sieht nicht wie eine Adresse aus, etwa name@beispiel.de.");
     if (kind === "extraordinary" && reason === "") throw new InvalidInput("Bei einer außerordentlichen Kündigung brauchen wir den Grund.");
 
     return { kind, reason, name, reference, email };
+}
+
+/** RLN-2026-0042 (grants.ts, orderNo): Jahr, dann die laufende Nummer, ab 10.000 fünfstellig. Wie bei /public/shop/orders/:no. */
+const INVOICE_NO = /^RLN-\d{4}-\d{4,10}$/;
+
+/** W-0096: Widerrufen auf /widerrufen. Die Rechnungsnummer ist Pflicht, damit der Support den Kauf gleich findet. */
+export function parseWithdrawInput(raw: unknown, loggedIn: boolean): IWithdrawInput {
+    const input = body(raw);
+    const name = text(input.name, "Dein Name", { min: 1, max: 100 });
+    const invoiceNo = text(input.invoiceNo, "Die Rechnungsnummer", { max: 30 }).toUpperCase();
+
+    if (!INVOICE_NO.test(invoiceNo)) throw new InvalidInput("Die Rechnungsnummer sieht so aus: RLN-2026-0042. Sie steht in der Bestätigung und auf der Rechnung.");
+
+    return { name, invoiceNo, email: receiptAddress(input.email, loggedIn) };
+}
+
+/**
+ * Gehört die Rechnungsnummer zu dieser Person? Wie beim Kündigen nur mit der
+ * Mail des Kunden oder angemeldet als er, sonst verriete die Antwort Produkt und
+ * Kaufdatum zu jeder geratenen Nummer. Offen oder gescheitert ist kein Kauf.
+ */
+export function withdrawalMatches(order: Pick<IOrder, "userId" | "status"> | null, customerEmail: string | null, email: string, sessionUserId: string | null): boolean {
+    if (!order || order.status === "open" || order.status === "failed") return false;
+
+    const mail = email.trim().toLowerCase();
+
+    return (mail !== "" && (customerEmail ?? "").toLowerCase() === mail) || order.userId === sessionUserId;
+}
+
+/**
+ * Darf die Eingangsbestätigung an der Gesamtgrenze vorbei? Nur wenn sie an die
+ * eigene Mail des zugeordneten Kunden geht. Sonst könnte ein angemeldeter Kunde
+ * mit einer eigenen Bestellung Bestätigungen an beliebige Adressen schicken (Review W-0096).
+ */
+export function ownReceipt(matched: boolean, to: string, customerEmail: string | null): boolean {
+    return matched && customerEmail !== null && customerEmail.trim().toLowerCase() === to.trim().toLowerCase();
 }
 
 /** Eine Person, auf die die Angabe passen könnte, mit ihrem laufenden Abo (falls eins läuft). */
