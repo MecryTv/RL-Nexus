@@ -284,6 +284,14 @@ export interface IWithdrawInput {
     readonly email: string;
 }
 
+/** Ein Kauf zur Auswahl auf /widerrufen, nur angemeldet. Ohne offene und gescheiterte Bestellungen. */
+export interface IWithdrawOrder {
+    readonly orderNo: string;
+    /** null: Das Produkt gibt es nicht mehr. */
+    readonly title: string | null;
+    readonly boughtAt: string;
+}
+
 /** Wie ICancelReceipt, statt des Vertragsendes das Kaufdatum. */
 export interface IWithdrawReceipt {
     readonly receivedAt: string;

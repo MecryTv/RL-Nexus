@@ -469,6 +469,21 @@ export async function orderByNo(no: string): Promise<IOrder | null> {
     return row ? orderOf(row) : null;
 }
 
+/** W-0096: Käufe für die Auswahl auf /widerrufen, neueste zuerst. Offen oder gescheitert ist kein Kauf (wie withdrawalMatches). */
+export async function withdrawableOrders(userId: string): Promise<{ orderNo: string; title: string | null; boughtAt: Date }[]> {
+    const rows = await query<{ order_no: string; title: string | null; created_at: Date }[]>(
+        `SELECT o.order_no, p.title, o.created_at
+           FROM shop_orders o
+           LEFT JOIN shop_products p ON p.id = o.product_id
+          WHERE o.user_id = ? AND o.status NOT IN ('open', 'failed') AND o.order_no IS NOT NULL
+          ORDER BY o.created_at DESC, o.id DESC
+          LIMIT 20`,
+        [userId]
+    );
+
+    return rows.map((row) => ({ orderNo: row.order_no, title: row.title, boughtAt: row.created_at }));
+}
+
 export async function orderByPaymentIntent(paymentIntentId: string): Promise<IOrder | null> {
     const [row] = await query<IOrderRow[]>(`SELECT ${ORDER_COLUMNS} FROM shop_orders WHERE stripe_payment_intent_id = ? LIMIT 1`, [paymentIntentId]);
 

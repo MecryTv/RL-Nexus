@@ -28,7 +28,7 @@ import { backupDatabaseName, ensureBackupDatabase } from "./backups/store.ts";
 import { signToken } from "./bot.ts";
 import { forgetAllUsers, forgetUser, namesFilled } from "./users.ts";
 import { deletionRound } from "./userdata/clock.ts";
-import type { ICancelReceipt, ICheckoutStart, ICustomerDetail, ICustomerList, IShopProduct, IShopProductList, IShopSettingsView, IShopState, IUnlockProgress, IWithdrawReceipt } from "../shared/shop.ts";
+import type { ICancelReceipt, ICheckoutStart, ICustomerDetail, ICustomerList, IShopProduct, IShopProductList, IShopSettingsView, IShopState, IUnlockProgress, IWithdrawOrder, IWithdrawReceipt } from "../shared/shop.ts";
 import type { IIncidentList, IPublicStatus, IStatusDetail } from "../shared/status.ts";
 import { buildApp } from "./app.ts";
 import { checkBackupsDb } from "./checks/backups-db.check.ts";
@@ -3857,6 +3857,50 @@ try {
             assert.equal(response.statusCode, 200, response.body);
             assert.equal((response.json() as IWithdrawReceipt).matched, true);
             assert.notEqual(withdrawReceipt(`${KUENDIGT}@example.test`), undefined);
+        });
+
+        await check("Widerrufen angemeldet: Auswahl nur mit Sitzung, nur eigene Käufe ohne offene und gescheiterte, neueste zuerst", async () => {
+            const withdrawOrders = (cookie?: string) => app.inject({ method: "GET", url: "/public/shop/withdraw/orders", headers: cookie ? { cookie } : {} });
+
+            const anonymous = await withdrawOrders();
+            assert.deepEqual([anonymous.statusCode, anonymous.json()], [401, { error: "Melde dich zuerst mit Discord an." }]);
+
+            const WAEHLT = "99999999999999999953";
+            await records.upsertCustomer({ id: WAEHLT, name: "check widerruf auswahl", email: `${WAEHLT}@example.test` });
+            const order = async (daysAgo: number, status: "open" | "pending" | "paid" | "refunded" | "failed") => {
+                const created = await records.insertOrder({ userId: WAEHLT, productId: monthly.id, amountCents: 499, termsVersion: "2026-10-12" });
+                const at = new Date(Date.now() - daysAgo * 86_400_000);
+                await query("UPDATE shop_orders SET created_at = ? WHERE id = ?", [at, created.id]);
+                if (status === "pending") await records.setOrderPending(created.id);
+                if (status === "paid" || status === "refunded") await records.markOrderPaid(created.id, { invoiceId: null, paymentIntentId: null, amountCents: 499 });
+                if (status === "refunded" || status === "failed") await records.setOrderStatus(created.id, status, status === "refunded" ? 499 : 0);
+
+                return { orderNo: created.orderNo, at };
+            };
+            // In dieser Reihenfolge angelegt, damit die Sortierung nach Datum und nicht nach ID geprüft wird.
+            const refunded = await order(3, "refunded");
+            const paid = await order(1, "paid");
+            const pending = await order(2, "pending");
+            await order(0, "open");
+            await order(0, "failed");
+
+            const mine = await withdrawOrders(shopSessionCookie(config, { id: WAEHLT, name: "check", avatar: null, exp: Math.floor(Date.now() / 1000) + 600 }).split(";")[0]);
+            assert.equal(mine.statusCode, 200, mine.body);
+            const list = mine.json() as IWithdrawOrder[];
+            assert.deepEqual(
+                list.map((entry) => entry.orderNo),
+                [paid, pending, refunded].map((entry) => entry.orderNo),
+                "ohne offene, gescheiterte und fremde, neueste zuerst"
+            );
+            assert.deepEqual(Object.keys(list[0]).sort(), ["boughtAt", "orderNo", "title"]);
+            assert.deepEqual(
+                list.map((entry) => entry.title),
+                [monthly.title, monthly.title, monthly.title]
+            );
+            assert.equal(Math.abs(Date.parse(list[0].boughtAt) - paid.at.getTime()) < 1000, true, list[0].boughtAt);
+
+            // Die Person von oben sieht nur ihre eine Bestellung.
+            assert.deepEqual(((await withdrawOrders(kuendigtCookie)).json() as IWithdrawOrder[]).map((entry) => entry.orderNo), [cancelOrder.orderNo]);
         });
 
         await check("Mein Zugang: Kundenportal nur angemeldet, Zustand mit Produkt, Rolle und Rechnungen", async () => {

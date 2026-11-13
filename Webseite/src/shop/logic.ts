@@ -1,4 +1,4 @@
-import type { IShopMe, IShopPublicProduct, IShopState, IShopSwitch, IUnlockProgress, LegalBlock, ProductKind, ShopStatus, StepState } from "./types.ts";
+import type { IShopMe, IShopPublicProduct, IShopState, IShopSwitch, IUnlockProgress, IWithdrawOrder, LegalBlock, ProductKind, ShopStatus, StepState } from "./types.ts";
 
 /**
  * Die Regeln der Preisseite, ohne React. Nur `import type`, damit
@@ -244,3 +244,8 @@ export function passLine(progress: IUnlockProgress): string {
 }
 
 export const ORDER_NO = /^RLN-\d{4}-\d{4,10}$/;
+
+/** Ein Eintrag der Auswahl auf /widerrufen: „RLN-2026-0042 · Pro 30 Tage · 10.11.2026“. Ohne Produkt fehlt der Titel. */
+export function withdrawOrderLabel(order: IWithdrawOrder): string {
+    return [order.orderNo, order.title, formatDay(order.boughtAt)].filter(Boolean).join(" · ");
+}

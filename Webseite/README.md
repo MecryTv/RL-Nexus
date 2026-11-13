@@ -257,7 +257,9 @@ dann den Origin von nexus-emb.de statt `http://localhost:5173`.
 - **Widerrufen (`/widerrufen`):** Name, Rechnungsnummer (Pflicht, Format
   `RLN-2026-0042`) und Mail, dann eine Zusammenfassung zum Bestätigen
   (`POST /api/shop/withdraw`). Danach Eingang und, wenn der Server die Nummer
-  einem Kauf zuordnen konnte, Produkt und Kaufdatum. Nichts geht automatisch
+  einem Kauf zuordnen konnte, Produkt und Kaufdatum. Angemeldet wählt man
+  die Bestellung aus den eigenen Käufen (`GET /api/shop/withdraw/orders`),
+  „Andere Nummer eingeben“ zeigt das Textfeld. Nichts geht automatisch
   an Stripe, der Support erstattet von Hand. Im Fuß als „Vertrag hier
   widerrufen“.
 - **AGB und Widerruf:** Die Texte liegen im Admin Dashboard

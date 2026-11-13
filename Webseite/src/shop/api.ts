@@ -1,4 +1,4 @@
-import type { IBlockedView, ICancelInput, ICancelReceipt, ICheckoutStart, ILegalText, IShopState, IUnlockProgress, IWithdrawInput, IWithdrawReceipt, LegalDoc } from "./types.ts";
+import type { IBlockedView, ICancelInput, ICancelReceipt, ICheckoutStart, ILegalText, IShopState, IUnlockProgress, IWithdrawInput, IWithdrawOrder, IWithdrawReceipt, LegalDoc } from "./types.ts";
 
 /**
  * Die Preisseite spricht nur `/api/shop/*`. Im Betrieb reicht nginx das an
@@ -75,6 +75,11 @@ export function sendCancellation(input: ICancelInput): Promise<ICancelReceipt> {
 /** Widerrufen ohne Anmeldung (W-0096). Erstattet wird nach der Prüfung von Hand. */
 export function sendWithdrawal(input: IWithdrawInput): Promise<IWithdrawReceipt> {
     return post<IWithdrawReceipt>("/withdraw", input);
+}
+
+/** Die eigenen Käufe zur Auswahl beim Widerrufen, neueste zuerst. Ohne Anmeldung 401. */
+export function loadWithdrawOrders(): Promise<readonly IWithdrawOrder[]> {
+    return call<readonly IWithdrawOrder[]>("/withdraw/orders");
 }
 
 /** W-0057: was die Seite /gesperrt zeigt. */

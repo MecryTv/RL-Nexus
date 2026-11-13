@@ -99,6 +99,14 @@ export interface IWithdrawInput {
     readonly email: string;
 }
 
+/** Ein Kauf zur Auswahl auf /widerrufen, nur angemeldet. */
+export interface IWithdrawOrder {
+    readonly orderNo: string;
+    /** null: Das Produkt gibt es nicht mehr. */
+    readonly title: string | null;
+    readonly boughtAt: string;
+}
+
 export interface IWithdrawReceipt {
     readonly receivedAt: string;
     /** Die Nummer gehört zu einem Kauf dieser Person. Erstattet wird von Hand. */

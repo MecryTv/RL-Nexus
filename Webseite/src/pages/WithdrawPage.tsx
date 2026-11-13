@@ -5,9 +5,9 @@ import { Button } from "../components/ui/Button";
 import { Panel } from "../components/ui/Panel";
 import { usePageMeta } from "../hooks/usePageMeta";
 import { siteConfig } from "../services/SiteConfig";
-import { ShopError, loadState, sendWithdrawal } from "../shop/api.ts";
-import { ORDER_NO, formatDay } from "../shop/logic.ts";
-import type { IShopMe, IWithdrawInput, IWithdrawReceipt } from "../shop/types.ts";
+import { ShopError, loadState, loadWithdrawOrders, sendWithdrawal } from "../shop/api.ts";
+import { ORDER_NO, formatDay, withdrawOrderLabel } from "../shop/logic.ts";
+import type { IShopMe, IWithdrawInput, IWithdrawOrder, IWithdrawReceipt } from "../shop/types.ts";
 import form from "../components/sections/ContactForm.module.scss";
 import { Field } from "./CancelPage";
 import styles from "./Account.module.scss";
@@ -48,6 +48,8 @@ export function WithdrawPage(): JSX.Element {
 
     const id = useId();
     const [me, setMe] = useState<IShopMe | null>(null);
+    const [orders, setOrders] = useState<readonly IWithdrawOrder[]>([]);
+    const [other, setOther] = useState(false);
     const [input, setInput] = useState<IWithdrawInput>({ name: "", invoiceNo: "", email: "" });
     const [errors, setErrors] = useState<Errors>({});
     const [reviewing, setReviewing] = useState(false);
@@ -63,19 +65,24 @@ export function WithdrawPage(): JSX.Element {
         if (node && moved.current) node.focus();
     }, []);
 
-    // Angemeldet vorausfüllen. Klappt das nicht, geht das Formular trotzdem.
+    // Angemeldet vorausfüllen und die eigenen Käufe zur Auswahl holen. Klappt das nicht, geht das Formular wie ohne Anmeldung.
     useEffect(() => {
         let alive = true;
 
-        loadState().then(
-            (state) => {
+        loadState()
+            .then(async (state) => {
                 if (!alive || state.me === null) return;
                 const person = state.me;
                 setMe(person);
                 setInput((current) => ({ ...current, name: current.name || person.name }));
-            },
-            () => undefined
-        );
+
+                const list = await loadWithdrawOrders();
+                if (!alive || list.length === 0) return;
+                setOrders(list);
+                // Die neueste vorauswählen. Wer schon eine Nummer getippt hat, behält sie.
+                setInput((current) => (current.invoiceNo === "" ? { ...current, invoiceNo: list[0].orderNo } : current));
+            })
+            .catch(() => undefined);
 
         return () => {
             alive = false;
@@ -85,6 +92,14 @@ export function WithdrawPage(): JSX.Element {
     const field = <K extends keyof IWithdrawInput>(key: K, value: IWithdrawInput[K]): void => {
         setInput((current) => ({ ...current, [key]: value }));
         setErrors((current) => ({ ...current, [key]: undefined }));
+    };
+
+    // Mit Käufen steht eine Auswahl da. Das Textfeld nur bei „Andere Nummer eingeben“ (Wert "") oder einer Nummer, die nicht in der Liste steht.
+    const chosen = orders.find((order) => order.orderNo === input.invoiceNo);
+    const typing = other || chosen === undefined;
+    const pick = (value: string): void => {
+        setOther(value === "");
+        field("invoiceNo", value);
     };
 
     // Beim Verlassen prüfen, leer erst beim Weiter. Stimmt die Nummer, steht sie danach so da, wie sie gespeichert wird.
@@ -133,6 +148,24 @@ export function WithdrawPage(): JSX.Element {
     };
 
     const note = (key: keyof Errors, hint?: string): string | undefined => (errors[key] !== undefined || hint !== undefined ? `${id}-${key}-note` : undefined);
+    const invoiceField = (
+        <Field id={`${id}-invoiceNo`} label="Rechnungsnummer *" error={errors.invoiceNo} hint="Etwa RLN-2026-0042 aus der Bestätigung.">
+            <input
+                id={`${id}-invoiceNo`}
+                className={form.input}
+                type="text"
+                value={input.invoiceNo}
+                maxLength={30}
+                autoComplete="off"
+                spellCheck={false}
+                required
+                onChange={(event) => field("invoiceNo", event.target.value)}
+                onBlur={checkInvoice}
+                aria-invalid={errors.invoiceNo !== undefined}
+                aria-describedby={note("invoiceNo", "hint")}
+            />
+        </Field>
+    );
     const questions = (
         <>
             Fragen? <a href={`mailto:${siteConfig.contactMail}`}>{siteConfig.contactMail}</a>
@@ -193,6 +226,14 @@ export function WithdrawPage(): JSX.Element {
                                             <dt>Rechnungsnummer</dt>
                                             <dd>{input.invoiceNo}</dd>
                                         </div>
+                                        {chosen && (
+                                            <div>
+                                                <dt>Kauf</dt>
+                                                <dd>
+                                                    {chosen.title ? `${chosen.title}, ` : ""}gekauft am {formatDay(chosen.boughtAt)}
+                                                </dd>
+                                            </div>
+                                        )}
                                         <div>
                                             <dt>Bestätigung an</dt>
                                             <dd>{input.email !== "" ? input.email : `deine Discord-Mail (${me?.email ?? ""})`}</dd>
@@ -239,23 +280,22 @@ export function WithdrawPage(): JSX.Element {
                                             />
                                         </Field>
 
-                                        <Field id={`${id}-invoiceNo`} label="Rechnungsnummer *" error={errors.invoiceNo} hint="Etwa RLN-2026-0042 aus der Bestätigung.">
-                                            <input
-                                                id={`${id}-invoiceNo`}
-                                                className={form.input}
-                                                type="text"
-                                                value={input.invoiceNo}
-                                                maxLength={30}
-                                                autoComplete="off"
-                                                spellCheck={false}
-                                                required
-                                                onChange={(event) => field("invoiceNo", event.target.value)}
-                                                onBlur={checkInvoice}
-                                                aria-invalid={errors.invoiceNo !== undefined}
-                                                aria-describedby={note("invoiceNo", "hint")}
-                                            />
-                                        </Field>
+                                        {orders.length === 0 && invoiceField}
                                     </div>
+
+                                    {orders.length > 0 && (
+                                        <Field id={`${id}-order`} label="Welche Bestellung? *" hint="Deine Käufe, der neueste oben. Fehlt einer, nimm „Andere Nummer eingeben“.">
+                                            <select id={`${id}-order`} className={form.input} value={typing ? "" : input.invoiceNo} required onChange={(event) => pick(event.target.value)} aria-describedby={`${id}-order-note`}>
+                                                {orders.map((order) => (
+                                                    <option key={order.orderNo} value={order.orderNo}>
+                                                        {withdrawOrderLabel(order)}
+                                                    </option>
+                                                ))}
+                                                <option value="">Andere Nummer eingeben</option>
+                                            </select>
+                                        </Field>
+                                    )}
+                                    {orders.length > 0 && typing && invoiceField}
 
                                     <Field
                                         id={`${id}-email`}

@@ -1,6 +1,6 @@
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { LEGAL_DOCS, formatPrice, maskEmail, type ICancelReceipt, type IWithdrawReceipt, type ICheckoutStart, type IShopSwitch, type ILegalText, type LegalDoc, type IShopMe, type IShopPublicProduct, type IShopState, type IUnlockProgress, type StepState } from "../../shared/shop.ts";
+import { LEGAL_DOCS, formatPrice, maskEmail, type ICancelReceipt, type IWithdrawOrder, type IWithdrawReceipt, type ICheckoutStart, type IShopSwitch, type ILegalText, type LegalDoc, type IShopMe, type IShopPublicProduct, type IShopState, type IUnlockProgress, type StepState } from "../../shared/shop.ts";
 import type { IConfig } from "../config.ts";
 import { query } from "../db.ts";
 import { BotAuthorization, DiscordUnavailable, avatarUrl, displayName, exchangeShopCode, fetchMe, fetchRoles, leaveGuild, shopAuthorizeUrl, userGuildIds } from "../discord.ts";
@@ -38,6 +38,7 @@ import {
     setStripeCustomer,
     stripeEventSeen,
     upsertCustomer,
+    withdrawableOrders,
     type ICustomer,
     type IOrder,
 } from "../shop/records.ts";
@@ -539,6 +540,13 @@ export async function publicShopRoutes(app: FastifyInstance, { config }: { confi
         if (!mailed && matched && order) await logEvent(order.userId, "mail.failed", "Widerrufsbestätigung").catch(() => undefined);
 
         return { receivedAt: receivedAt.toISOString(), matched, title: bought?.title ?? null, boughtAt: bought?.boughtAt.toISOString() ?? null, email: maskEmail(to), mailed };
+    });
+
+    // W-0096: Angemeldet wählt die Seite den Kauf aus einer Liste, statt die Nummer abtippen zu lassen. Nur eigene Käufe.
+    app.get("/public/shop/withdraw/orders", async (request): Promise<IWithdrawOrder[]> => {
+        const session = sessionOf(request, config);
+
+        return (await withdrawableOrders(session.id)).map((order) => ({ ...order, boughtAt: order.boughtAt.toISOString() }));
     });
 
     app.post("/public/shop/logout", { config: LOGIN_LIMIT }, async (_request, reply) => reply.header("Set-Cookie", clearShopSession(config)).code(204).send());

@@ -30,6 +30,7 @@ import {
     stepsOf,
     trialStrip,
     waitingHint,
+    withdrawOrderLabel,
 } from "../src/shop/logic.ts";
 import { leavesPricing } from "../src/services/navigation.ts";
 
@@ -226,6 +227,11 @@ check("Die Pass-Karte und die Bestellnummer", () => {
     assert.equal(passLine(progress({ until: null })), "Jahr · unbegrenzt");
     assert.equal(ORDER_NO.test("RLN-2026-0042"), true);
     assert.equal(ORDER_NO.test("RLN-26-1"), false);
+});
+
+check("Widerrufen: ein Kauf in der Auswahl mit Nummer, Produkt und Tag in Berliner Zeit", () => {
+    assert.equal(withdrawOrderLabel({ orderNo: "RLN-2026-0042", title: "Pro 30 Tage", boughtAt: "2026-11-09T23:30:00.000Z" }), "RLN-2026-0042 · Pro 30 Tage · 10.11.2026");
+    assert.equal(withdrawOrderLabel({ orderNo: "RLN-2026-0042", title: null, boughtAt: "2026-11-10T12:00:00.000Z" }), "RLN-2026-0042 · 10.11.2026");
 });
 
 check("Rechtstexte: Listenpunkte werden zu Listen, der Stand als Datum", () => {
