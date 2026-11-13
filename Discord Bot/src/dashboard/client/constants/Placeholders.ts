@@ -148,6 +148,8 @@ export const TEAM_CARD_PLACEHOLDERS: IPlaceholder[] = [
     { key: "team.coach", label: "Coach", sample: "@Lara" },
     { key: "team.manager", label: "Manager", sample: "—" },
     { key: "team.players", label: "Wie viele spielen", sample: "4" },
+    { key: "team.available", label: "Heute da, etwa 3/4 (Abmeldungen)", sample: "3/4" },
+    { key: "team.absent", label: "Wer heute abgemeldet ist", sample: "Kuzai (bis 15.11.)" },
     { key: "team.role", label: "Rolle des Teams", sample: "@Vyrox Main" },
     { key: "team.channel", label: "Kanal des Teams", sample: "#vyrox-main" },
     { key: "team.logo", label: "Logo (Bild)", sample: "" },

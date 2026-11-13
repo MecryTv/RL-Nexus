@@ -91,6 +91,7 @@ import { CleanEmoji } from "../constants/SelfRoles";
 import { Unpack } from "../constants/Database";
 import { APPLY_MODULE } from "../constants/Apply";
 import { Evaluate, FormulaError } from "../utils/formula";
+import { AbsenceSettingsOf } from "../constants/Absences";
 import logger from "../utils/logger";
 
 export class TeamError extends Error {}
@@ -485,6 +486,7 @@ export function NormalizeTeamSettings(stored: unknown | null): ITeamSettings {
         hubButton: IsRecord(raw.hubButton) ? HubButtonOf(raw.hubButton) : { ...DefaultHubButton(), on: typeof hubApply === "boolean" ? hubApply : true },
         hubLine: HubLine(raw.hubLine),
         moreIds: Array.isArray(raw.moreIds) ? raw.moreIds.filter((id): id is string => typeof id === "string" && /^\d{1,20}$/.test(id)) : [],
+        absences: AbsenceSettingsOf(raw.absences, defaults.absences),
     };
 }
 
@@ -546,7 +548,7 @@ export function Download(url: string): Promise<Buffer | null> {
 }
 
 /** Nur Bilder, die klein genug sind - ein riesiges Bild würde beim Entpacken den Speicher fressen. */
-async function Usable(buffer: Buffer | null): Promise<Buffer | null> {
+export async function Usable(buffer: Buffer | null): Promise<Buffer | null> {
     if (!buffer || buffer.length > MAX_IMAGE_BYTES) return null;
 
     const image = await loadImage(buffer).catch(() => null);
@@ -697,6 +699,7 @@ export default class TeamService {
             hubLine: raw.hubLine === undefined ? previous.hubLine : HubLine(raw.hubLine),
             // Die weiteren Nachrichten im Kanal führt der Bot selbst, der Browser kennt sie nicht.
             moreIds: previous.moreIds,
+            absences: AbsenceSettingsOf(raw.absences, previous.absences),
         };
     }
 
@@ -868,6 +871,9 @@ export default class TeamService {
         settings.moreIds = latest.moreIds;
 
         await this.client.moduleSettings.Save(guild.id, TEAMS_MODULE, settings);
+
+        // W-0095: Panel an oder aus, andere Rollen oder Gründe - alle Panels neu.
+        if (JSON.stringify(previous.absences) !== JSON.stringify(settings.absences)) void this.client.absenceService.RefreshAll(guild.id).catch(() => undefined);
 
         // Andere Rollen je Aufgabe oder das Vergeben frisch an: die Kader bekommen
         // sie gleich. Geht es aus, bleibt jede Rolle, wo sie ist.
@@ -1047,6 +1053,8 @@ export default class TeamService {
         // Der ganze Kader, nicht nur wer neu ist: wer seine Rolle verloren hat, bekommt sie so zurück.
         this.Reassign(guild, settings, teams, teams.map((entry) => (entry.id === id ? team : entry)), MembersOf(team));
         await this.Refresh(guild, team).catch(() => undefined);
+        // W-0095: Kader oder Kanäle geändert - das Panel zählt neu oder zieht um.
+        void this.client.absenceService.Refresh(guild.id, [team.id]).catch(() => undefined);
 
         return team;
     }
@@ -1083,6 +1091,8 @@ export default class TeamService {
         const [teams, settings] = await Promise.all([this.Teams(guild.id), this.Settings(guild.id)]);
 
         await this.Withdraw(guild, team).catch(() => undefined);
+        // W-0095: Das Panel „Verfügbarkeit“ gehört zum Team.
+        await this.client.absenceService.DropPanel(guild, id).catch(() => undefined);
         await this.client.teams.Remove(id);
 
         this.Reassign(guild, settings, teams, teams.filter((entry) => entry.id !== id));
@@ -1694,7 +1704,16 @@ export default class TeamService {
 
         if (sync) await this.Sync(teams).catch((error) => logger.warn(`🛡️ Prime-Abgleich fehlgeschlagen: ${String(error)}`));
 
-        return { views: teams.map((team) => this.Look(team, groups, settings)), groups, settings };
+        const views = teams.map((team) => this.Look(team, groups, settings));
+
+        // W-0095: für {team.available} und {team.absent}. Klappt das nicht, sind eben alle da.
+        if (settings.absences.enabled) {
+            const info = await this.client.absenceService.ViewInfo(teams).catch(() => new Map<number, { here: number; of: number; names: string }>());
+
+            for (const view of views) view.absence = info.get(view.team.id);
+        }
+
+        return { views, groups, settings };
     }
 
     /**
@@ -1755,6 +1774,7 @@ export default class TeamService {
             images: await this.CardImages(guild, view.team, settings),
             design: settings.card,
             lines: { title: flat(settings.card.title), subtitle: line(settings.card.subtitle), footer: flat(settings.card.footer) },
+            absence: settings.absences.enabled && settings.absences.card ? await this.client.absenceService.CardMarks(view.team).catch(() => null) : null,
         };
     }
 
@@ -1965,7 +1985,7 @@ export default class TeamService {
 
         // Alle Teams, damit {epicname.rank} auch Spieler anderer Teams kennt.
         const { views } = await this.Views(guild, false);
-        const payload = await TeamCardView(this.client, settings, this.Look(team, groups, settings), guild, views);
+        const payload = await TeamCardView(this.client, settings, views.find((view) => view.team.id === team.id) ?? this.Look(team, groups, settings), guild, views);
         const channel = guild.channels.cache.get(settings.channelId);
         const message = channel?.isTextBased() ? await channel.messages.fetch(team.messageId).catch(() => null) : null;
 

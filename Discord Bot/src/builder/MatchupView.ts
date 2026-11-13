@@ -120,6 +120,8 @@ export interface IMatchupViewExtra {
     accent?: string | null;
     /** Diese Rollen werden erwähnt - nur beim ersten Senden. */
     ping?: string[];
+    /** W-0095: kleine Zeile ganz unten, etwa „⚠ Abgemeldet: Kuzai“. */
+    note?: string | null;
 }
 
 /**
@@ -140,7 +142,7 @@ export async function MatchupView(client: BotClient, source: IMatchupBody, value
     if (body.kind === "v2") {
         const doc = {
             accent: extra.accent ?? body.doc.accent,
-            blocks: [...(top ? [{ type: "text" as const, body: top }] : []), ...body.doc.blocks],
+            blocks: [...(top ? [{ type: "text" as const, body: top }] : []), ...body.doc.blocks, ...(extra.note ? [{ type: "text" as const, body: `-# ${extra.note}` }] : [])],
         };
         const view = await CustomMessageView(client, { id: 0, kind: "v2", content: "", embed: null, doc, buttons: [], reserve }, values);
 
@@ -152,7 +154,7 @@ export async function MatchupView(client: BotClient, source: IMatchupBody, value
     // „Farbe nach Stand“ gilt auch für ein Embed (W-0027).
     const embed = extra.accent && body.embed ? { ...body.embed, color: extra.accent } : body.embed;
     const view = await CustomMessageView(client, { id: 0, kind: body.kind, content: body.content, embed, doc: body.doc, buttons: [] }, values);
-    const content = [top, view.content ?? ""].filter(Boolean).join("\n").slice(0, 2000);
+    const content = [top, view.content ?? "", extra.note ? `-# ${extra.note}` : ""].filter(Boolean).join("\n").slice(0, 2000);
 
     return { ...view, content: content || undefined, components: [...view.components, ...rows], allowedMentions };
 }

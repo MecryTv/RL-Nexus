@@ -168,6 +168,8 @@ export const USERDATA_AREAS: readonly IUserdataAreaDef[] = [
             { table: "clubs", column: "leader_id", role: "team", time: "created_at", label: "CONCAT('Leitet Club ', name)" },
             { table: "sixmans_players", column: "user_id", role: "person", guild: G, time: ms("updated_at"), label: "CONCAT('6mans · ', wins, ' Siege')", name: "name" },
             { table: "teams", column: "players", role: "json", guild: G, time: "created_at", label: "CONCAT('Spieler in ', name)" },
+            // W-0095: eigene Abmeldungen, gehören der Person.
+            { table: "team_absences", column: "user_id", role: "person", guild: G, time: ms("created_at"), label: "CONCAT('Abgemeldet ', starts_on, ' bis ', ends_on, ' bei Team ', team_id)" },
             { table: "sixmans_rounds", column: "blue", role: "json", guild: G, label: "'6mans-Runde, Team Blau'" },
             { table: "sixmans_rounds", column: "orange", role: "json", guild: G, label: "'6mans-Runde, Team Orange'" },
             // W-0087 Rocket Roulette. team: Wer den Abend geplant hat, wird anonymisiert, der Abend bleibt für die anderen.

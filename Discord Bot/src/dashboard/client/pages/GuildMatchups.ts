@@ -531,13 +531,14 @@ function mount(guildId: string, view: "base" | "list" | "all"): void {
                 stream: stream.value,
                 note: note.value,
             };
-            const answer = await call("", current ? { action: "save", id: current.id, matchup } : { action: "create", matchup });
+            const answer = await call<{ warning?: string | null }>("", current ? { action: "save", id: current.id, matchup } : { action: "create", matchup });
 
             save.disabled = false;
 
             if (!answer) return;
 
-            toast("info", current ? "Geändert" : "Eingetragen", data!.settings.channelId ? "Steht im Kanal." : "Ohne Kanal bleibt es still.");
+            // W-0095: Wer zum Anpfiff abgemeldet ist, steht im Hinweis.
+            toast("info", current ? "Geändert" : "Eingetragen", answer.warning ?? (data!.settings.channelId ? "Steht im Kanal." : "Ohne Kanal bleibt es still."));
             editing = null;
             void reload();
         });

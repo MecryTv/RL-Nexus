@@ -147,7 +147,7 @@ export async function renderMatchupsPage(): Promise<void> {
             return false;
         }
 
-        const answer = (await response.json().catch(() => ({}))) as { error?: string; hint?: string };
+        const answer = (await response.json().catch(() => ({}))) as { error?: string; hint?: string; warning?: string | null };
 
         if (!response.ok) {
             toast("info", "Das ging nicht", answer.error ?? answer.hint ?? "Versuch es noch einmal.");
@@ -155,7 +155,8 @@ export async function renderMatchupsPage(): Promise<void> {
             return false;
         }
 
-        toast("info", done, "Das Team sieht es in Discord.");
+        // W-0095: Wer zum Anpfiff abgemeldet ist, steht im Hinweis.
+        toast("info", done, answer.warning ?? "Das Team sieht es in Discord.");
 
         editing = null;
 

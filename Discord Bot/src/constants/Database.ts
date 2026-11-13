@@ -72,6 +72,8 @@ export const TABLES = {
     serverIdMap: "server_id_map",
     serverRestores: "server_restores",
     epicNameCases: "epic_name_cases",
+    // W-0095: Abmeldungen im Modul RL Team-Übersicht.
+    teamAbsences: "team_absences",
     avDebris: "av_debris",
 } as const;
 

@@ -2,6 +2,7 @@ import { IMessageDoc } from "../../builder/IMessageDoc";
 import { ICustomEmbed, MessageKind } from "../messages/IMessages";
 import { ITeamListSettings } from "../../../constants/TeamList";
 import { ITeamOrder } from "../../../constants/TeamOrder";
+import { IAbsenceSettings } from "./IAbsences";
 
 /**
  * RL Team-Übersicht: Kader eines Servers, gegliedert in Gruppen, angezeigt in
@@ -243,6 +244,8 @@ export interface ITeamSettings {
     hubLine: string;
     /** Hub: die weiteren Nachrichten unter der Kopf-Nachricht. Gehören dem Bot, nie aus dem Browser. */
     moreIds: string[];
+    /** W-0095: Abmeldungen. */
+    absences: IAbsenceSettings;
 }
 
 /** Was eine Karte über ein Team weiß, nachdem gerechnet wurde. */
@@ -259,4 +262,6 @@ export interface ITeamView {
     }[];
     /** Der älteste Stand im Kader - dafür steht "Stand" unter der Karte. */
     fetchedAt: number;
+    /** W-0095: heute da und wer heute fehlt, für {team.available} und {team.absent}. Fehlt: keine Abmeldungen geladen. */
+    absence?: { here: number; of: number; names: string };
 }

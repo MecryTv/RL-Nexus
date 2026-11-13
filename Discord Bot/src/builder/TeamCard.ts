@@ -41,6 +41,8 @@ export interface ITeamCardData {
     design: ITeamCardDesign;
     /** Die drei Zeilen, Platzhalter schon eingesetzt. Leer: die Zeile fehlt. */
     lines: { title: string; subtitle: string; footer: string };
+    /** W-0095: wer heute abgemeldet ist (Spieler-ID → „BIS 15.11.“) und wie viele da sind. null: nichts zeigen. */
+    absence?: { marks: Record<string, string>; here: number; of: number } | null;
 }
 
 export const TEAM_CARD_SCALE = 2;
@@ -485,11 +487,12 @@ async function DrawHead(ctx: SKRSContext2D, data: ITeamCardData, accent: string,
     ctx.fillText(Fit(ctx, data.lines.title, max), x, top + 40);
 
     let chip = x;
-    const chips: { text: string; tone: "tag" | "place" | "plain" }[] = [
+    const chips: { text: string; tone: "tag" | "place" | "plain" | "away" }[] = [
         ...(design.chips.tag && view.team.tag ? [{ text: view.team.tag, tone: "tag" as const }] : []),
         ...(design.chips.group && view.group ? [{ text: view.group.name, tone: "plain" as const }] : []),
         ...(design.chips.place && data.place ? [{ text: `Platz ${data.place.place} von ${data.place.of}`, tone: "place" as const }] : []),
         ...(design.chips.region && view.team.region ? [{ text: view.team.region, tone: "plain" as const }] : []),
+        ...(data.absence ? [{ text: `${data.absence.here}/${data.absence.of} da`, tone: "away" as const }] : []),
     ];
 
     ctx.font = "700 15px Rajdhani";
@@ -501,7 +504,7 @@ async function DrawHead(ctx: SKRSContext2D, data: ITeamCardData, accent: string,
         // Passt eine Marke nicht mehr, fällt nur sie weg - Platz und Region dahinter sollen bleiben.
         if (chip + w > x + max) continue;
 
-        const border = entry.tone === "tag" ? Alpha(accent, 0.7) : entry.tone === "place" ? "rgba(255,197,61,0.7)" : "rgba(255,255,255,0.22)";
+        const border = entry.tone === "tag" ? Alpha(accent, 0.7) : entry.tone === "place" ? "rgba(255,197,61,0.7)" : entry.tone === "away" ? "rgba(245,165,36,0.6)" : "rgba(255,255,255,0.22)";
 
         if (entry.tone === "tag") {
             ctx.fillStyle = Alpha(accent, 0.14);
@@ -511,12 +514,31 @@ async function DrawHead(ctx: SKRSContext2D, data: ITeamCardData, accent: string,
         ctx.strokeStyle = border;
         ctx.lineWidth = 1;
         ctx.strokeRect(chip + 0.5, top + 56.5, w - 1, 25);
-        ctx.fillStyle = entry.tone === "tag" ? "#bfe9ff" : entry.tone === "place" ? COLORS.gold : COLORS.soft;
+        ctx.fillStyle = entry.tone === "tag" ? "#bfe9ff" : entry.tone === "place" ? COLORS.gold : entry.tone === "away" ? "#ffc967" : COLORS.soft;
         Caps(ctx, text, chip + 10, top + 74, 1.8);
         chip += w + 8;
     }
 
     DrawUnder(ctx, x, max, top, accent, description, leagues);
+}
+
+function AbsenceMarkWidth(ctx: SKRSContext2D, text: string): number {
+    ctx.font = "700 13px Rajdhani";
+
+    return CapsWidth(ctx, text, 1) + 14;
+}
+
+/** W-0095: die rote Marke „BIS 15.11.“ hinter einem abgemeldeten Spieler. */
+function DrawAbsenceMark(ctx: SKRSContext2D, text: string, x: number, y: number): void {
+    const w = AbsenceMarkWidth(ctx, text);
+
+    ctx.fillStyle = "rgba(255,30,45,0.18)";
+    ctx.fillRect(x, y, w, 22);
+    ctx.strokeStyle = "rgba(255,30,45,0.6)";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x + 0.5, y + 0.5, w - 1, 21);
+    ctx.fillStyle = "#ff8a92";
+    Caps(ctx, text, x + 7, y + 16, 1);
 }
 
 /** Unterzeile und Ligen unter den Marken. */
@@ -646,9 +668,23 @@ async function DrawTable(ctx: SKRSContext2D, data: ITeamCardData, layout: ILayou
                     ctx.fillText("zählt nicht", column.x + 42, middle + 16);
                 }
             } else if (column.id === "player") {
+                const mark = data.absence?.marks[player.id];
+
+                ctx.font = "600 20px Oxanium";
+
+                // W-0095: abgemeldet - hinter dem Namen eine rote Marke, der Name macht ihr Platz.
+                const markWidth = mark ? AbsenceMarkWidth(ctx, mark) : 0;
+
+                // AbsenceMarkWidth stellt die Schrift um - gekürzt wird in der Schrift, in der gezeichnet wird (Review W-0095).
+                ctx.font = "600 20px Oxanium";
+
+                const name = Fit(ctx, label, column.width - 12 - (mark ? markWidth + 10 : 0));
+
                 ctx.font = "600 20px Oxanium";
                 ctx.fillStyle = "#ffffff";
-                ctx.fillText(Fit(ctx, label, column.width - 12), column.x, middle + 7);
+                ctx.fillText(name, column.x, middle + 7);
+
+                if (mark) DrawAbsenceMark(ctx, mark, column.x + ctx.measureText(name).width + 10, middle - 10);
             } else if (column.id === "rank") {
                 // Der Rang zum Schnitt des Spielers, nicht zu 3v3 (Plan 27).
                 const rank = CardRank(value);

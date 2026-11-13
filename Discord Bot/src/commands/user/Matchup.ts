@@ -157,9 +157,12 @@ export default class Matchup extends Command {
             new ButtonBuilder().setCustomId(`${MATCHUPS_PREFIX}:cancel:${matchup.id}`).setStyle(ButtonStyle.Danger).setLabel("Absagen"),
         ];
 
+        // W-0095: Eintragen geht, der Hinweis sagt, wer dann fehlt.
+        const warning = await this.client.absenceService.MatchupWarning(interaction.guildId, matchup.teamId, matchup.at);
+
         await this.Say(
             interaction,
-            settings.channelId ? `✅ Eingetragen. Die Ankündigung steht in <#${settings.channelId}>.` : "✅ Eingetragen.",
+            [settings.channelId ? `✅ Eingetragen. Die Ankündigung steht in <#${settings.channelId}>.` : "✅ Eingetragen.", ...(warning ? [`⚠ ${warning}`] : [])].join("\n"),
             [new ActionRowBuilder<ButtonBuilder>().addComponents(buttons)]
         );
     }

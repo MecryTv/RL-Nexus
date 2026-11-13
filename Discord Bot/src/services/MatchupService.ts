@@ -648,9 +648,12 @@ export default class MatchupService {
 
             for (const matchup of due) {
 
+                // W-0095: wer an dem Tag abgemeldet ist, ohne Grund.
+                const absent = await this.client.absenceService.MatchupAbsent(guild.id, matchup.teamId, matchup.at).catch(() => null);
                 const view = await MatchupView(this.client, settings.remind, await this.Values(guild, matchup), {
                     rows: LinkRows(["📺 Stream", matchup.stream]),
                     ping: settings.pingRoles,
+                    note: absent ? `⚠ Abgemeldet: ${absent.names.join(", ")}` : null,
                 });
 
                 await channel.send(view).catch(() => undefined);

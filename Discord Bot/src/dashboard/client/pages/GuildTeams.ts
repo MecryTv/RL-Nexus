@@ -126,6 +126,8 @@ interface ISettings {
     hubButton: { on: boolean; to: "apply" | "web" | "channel"; url: string | null; channelId: string | null; label: string };
     hubLine: string;
     moreIds: string[];
+    /** W-0095. */
+    absences: { enabled: boolean; viewers: string[]; reasonRequired: boolean; reasons: string[]; maxDays: number; aheadDays: number; panel: boolean; card: boolean; matchupWarning: boolean };
 }
 
 /** Wer spielt - dieselbe Liste wie PLAYING_ROLES im Bot (constants/Teams.ts, wird nicht ins Dashboard gebündelt). */
@@ -1359,6 +1361,110 @@ function mount(guildId: string, view: "teams" | "board"): void {
                 `„Jetzt abgleichen“ geht alle Kader durch: Wem eine Rolle fehlt, der bekommt sie. Wer eine dieser Rollen hat und in keinem Kader steht, verliert sie.${data!.memberIntent ? "" : " Das Members-Intent ist aus. Der Bot sieht dabei nur Mitglieder, die er gerade kennt."}`
             ),
             el("div", "mcsave lvsave", save, sync)
+        );
+    }
+
+    /* ------------------------------------------------------------
+       W-0095: Abmeldungen
+       ------------------------------------------------------------ */
+    function absenceCard(): HTMLElement {
+        const draft = structuredClone(data!.settings);
+        const absences = draft.absences;
+        const save = button("btn btn--primary", icon("#i-check"), "Speichern");
+        const touch = (): void => {
+            save.disabled = false;
+        };
+
+        save.disabled = true;
+        save.addEventListener("click", async () => {
+            save.disabled = true;
+            absences.reasons = reasons.value.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+
+            if (!(await call("", { action: "settings", settings: draft }))) {
+                save.disabled = false;
+
+                return;
+            }
+
+            toast("info", "Gespeichert", absences.panel ? "Die Panels in den Team-Kanälen ziehen gleich nach." : "Gilt ab sofort.");
+            void reload();
+        });
+
+        const switchRow = (label: string, hint: string, on: boolean, set: (on: boolean) => void): HTMLElement => {
+            const state = el("span", "", on ? "an" : "aus");
+
+            return row(
+                label,
+                hint,
+                el(
+                    "label",
+                    "snitem__switch",
+                    toggle(on, label, (next) => {
+                        set(next);
+                        state.textContent = next ? "an" : "aus";
+                        touch();
+                    }),
+                    state
+                )
+            );
+        };
+        const days = (value: number, set: (value: number) => void, label: string): HTMLInputElement => {
+            const input = el("input", "text tmnumber");
+
+            input.type = "number";
+            input.min = "1";
+            input.max = "365";
+            input.value = String(value);
+            input.setAttribute("aria-label", label);
+            input.addEventListener("input", () => {
+                const number = Math.round(Number(input.value));
+
+                if (Number.isFinite(number) && number >= 1 && number <= 365) {
+                    set(number);
+                    touch();
+                }
+            });
+
+            return input;
+        };
+        const viewers = el(
+            "div",
+            "tmroles",
+            ...Object.entries(data!.roles).map(([role, label]) =>
+                el(
+                    "label",
+                    "tmroles__item",
+                    el("span", "tmroles__label", label),
+                    toggle(absences.viewers.includes(role), `Gründe für ${label}`, (on) => {
+                        absences.viewers = on ? [...absences.viewers, role] : absences.viewers.filter((entry) => entry !== role);
+                        touch();
+                    })
+                )
+            )
+        );
+        const reasons = el("textarea", "text tkarea");
+
+        reasons.value = absences.reasons.join("\n");
+        reasons.rows = 4;
+        reasons.setAttribute("aria-label", "Gründe, einer je Zeile");
+        reasons.addEventListener("input", touch);
+
+        return card(
+            "Abmeldungen",
+            "Spieler melden sich mit /abmelden für einen Zeitraum ab, Captains sehen es mit /abmeldungen. Grund und Notiz sehen nur die Aufgaben unten und wer „Server verwalten“ hat.",
+            switchRow("Abmeldungen", "Aus: /abmelden und /abmeldungen antworten nur mit einem Hinweis", absences.enabled, (on) => (absences.enabled = on)),
+            switchRow("Panel im Team-Kanal", "Ein Bild „Verfügbarkeit“ im ersten Textkanal jedes Teams, ohne Gründe. Es wird bearbeitet, nicht neu gepostet", absences.panel, (on) => (absences.panel = on)),
+            switchRow("Hinweis auf der Team-Karte", "„BIS 15.11.“ hinter dem Namen und „3/4 DA“ oben, wenn heute jemand fehlt", absences.card, (on) => (absences.card = on)),
+            switchRow("Warnung bei Matchups", "Beim Eintragen und in der Erinnerung steht, wer dann abgemeldet ist (ohne Grund)", absences.matchupWarning, (on) => (absences.matchupWarning = on)),
+            switchRow("Grund ist Pflicht", "Aus: der Grund ist freiwillig", absences.reasonRequired, (on) => (absences.reasonRequired = on)),
+            row("Höchstens am Stück", "Tage", days(absences.maxDays, (value) => (absences.maxDays = value), "Höchstens so viele Tage am Stück")),
+            row("Höchstens im Voraus", "Tage", days(absences.aheadDays, (value) => (absences.aheadDays = value), "Höchstens so viele Tage im Voraus")),
+            el("h4", "srhead", "Wer die Gründe sieht"),
+            viewers,
+            el("h4", "srhead", "Gründe zur Auswahl"),
+            el("p", "hintline", "Einer je Zeile, höchstens 10. „Krank“ ist eine Gesundheitsangabe, deshalb sehen Gründe nur die Aufgaben oben."),
+            reasons,
+            el("div", "mcsave lvsave", save)
         );
     }
 
@@ -2661,7 +2767,7 @@ function mount(guildId: string, view: "teams" | "board"): void {
     function paint(): void {
         if (!data) return;
 
-        host.replaceChildren(head(), ...(view === "board" ? board() : [groups(), ...teamList(), roleCard(), formula()]));
+        host.replaceChildren(head(), ...(view === "board" ? board() : [groups(), ...teamList(), roleCard(), absenceCard(), formula()]));
     }
 
     loading(host, 3);

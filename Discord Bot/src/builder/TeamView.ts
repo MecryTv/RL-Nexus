@@ -256,6 +256,9 @@ export function TeamOwnValues(view: ITeamView, settings: ITeamSettings, formats:
         "team.lineup": LineupText(view, true, formats),
         "team.staff": StaffText(view, formats),
         "team.players": String(view.players.filter((entry) => PLAYING_ROLES.includes(entry.player.role)).length),
+        // W-0095: ohne geladene Abmeldungen sind alle da.
+        "team.available": view.absence ? `${view.absence.here}/${view.absence.of}` : `${view.players.filter((entry) => PLAYING_ROLES.includes(entry.player.role)).length}/${view.players.filter((entry) => PLAYING_ROLES.includes(entry.player.role)).length}`,
+        "team.absent": view.absence?.names || "—",
         "team.role": view.team.roleId ? `<@&${view.team.roleId}>` : "—",
         "team.channel": ChannelsText(view, "first"),
         "team.channels": ChannelsText(view, "text"),

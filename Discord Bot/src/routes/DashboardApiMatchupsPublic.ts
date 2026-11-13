@@ -101,10 +101,12 @@ export default class DashboardApiMatchupsPublic extends Route {
         try {
             switch (body.action) {
                 case "create":
-                    return reply.send({ ok: true, matchup: await service.Create(open.guild, member, body.matchup) });
+                case "save": {
+                    const matchup = body.action === "create" ? await service.Create(open.guild, member, body.matchup) : await service.Save(open.guild, member, matchupId, body.matchup);
 
-                case "save":
-                    return reply.send({ ok: true, matchup: await service.Save(open.guild, member, matchupId, body.matchup) });
+                    // W-0095: Eintragen geht, der Hinweis sagt, wer dann fehlt.
+                    return reply.send({ ok: true, matchup, warning: await this.client.absenceService.MatchupWarning(open.guild.id, matchup.teamId, matchup.at) });
+                }
 
                 case "cancel":
                     return reply.send({ ok: true, matchup: await service.Cancel(open.guild, member, matchupId) });

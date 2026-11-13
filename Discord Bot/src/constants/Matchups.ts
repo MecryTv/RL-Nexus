@@ -52,11 +52,11 @@ export const KICKOFF_HELP = "Das verstehe ich nicht. Schreib es so: „heute 20:
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
 
-const WEEKDAYS: Record<string, number> = {
+export const WEEKDAYS: Record<string, number> = {
     so: 0, sonntag: 0, mo: 1, montag: 1, di: 2, dienstag: 2, mi: 3, mittwoch: 3,
     do: 4, donnerstag: 4, fr: 5, freitag: 5, sa: 6, samstag: 6,
 };
-const WEEKDAY_SHORT = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
+export const WEEKDAY_SHORT = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
 
 /** Ganze Wörter für die Vorschläge beim Tippen: „mor“ wird zu „morgen“ (W-0027). */
 const DAY_WORDS = ["heute", "morgen", "übermorgen", "montag", "dienstag", "mittwoch", "donnerstag", "freitag", "samstag", "sonntag"];

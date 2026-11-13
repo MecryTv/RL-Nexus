@@ -258,6 +258,7 @@ Beide Nachrichten – Kopf des Hubs und die Nachricht je Team – baut der Serve
 | `{team.roster}` | Der ganze Kader, nach Aufgaben gruppiert |
 | `{team.name}` `{team.tag}` `{team.region}` `{team.group}` `{team.description}` | Die Eckdaten; `{team.group}` ist die Kategorie, ohne steht „ohne Kategorie“ da |
 | `{team.mmr}` `{team.players}` | Team-MMR und wie viele mitspielen |
+| `{team.available}` `{team.absent}` | Heute da, etwa „3/4“, und wer heute abgemeldet ist: „Kuzai (bis 15.11.)“ (siehe [Abmeldungen](#abmeldungen)) |
 | `{team.rank}` `{team.rank.short}` `{team.rank.icon}` | Der Rang zur Team-MMR, nach „Ränge zeigen als": Text, Icon oder beides; kurz „GC1 D1"; `.icon` immer als Icon |
 | `{team.captain}` `{team.cocaptain}` `{team.player}` `{team.sub}` `{team.trial}` `{team.coach}` `{team.manager}` | Einzeln, als Erwähnung — `{team.player}` ist der Stamm, `{team.sub}` der Ersatz. Je Aufgabe gibt es dazu Rang, MMR und mehr, siehe [Platzhalter je Aufgabe](#platzhalter-je-aufgabe) |
 | `{team.role}` `{team.logo}` | Rolle und Bild |
@@ -341,6 +342,19 @@ Vorlagen zum Anklicken gibt es für beide Nachrichten: *Aufstellung* (Kopf, Aufs
 
 Nach jeder Änderung an einem Team zieht der Bot die Karte im Kanal nach. **Einsammeln** löscht die Nachrichten wieder; die Teams bleiben.
 
+## Abmeldungen
+
+Spieler melden sich für einen Zeitraum ab, Captains sehen es (W-0095). Gilt für jeden, der mit Discord-Konto im Kader steht; das Team erkennt der Bot am Kader.
+
+- **`/abmelden`** öffnet ein Formular: Von, Bis (einschließlich, leer heißt nur der eine Tag), Grund aus der Liste und Notiz. Steht man in mehreren Teams, wählt man oben ein Team oder „Alle meine Teams“. Datumsangaben wie „heute“, „morgen“, „Sa“, „15.11.“ oder „20.11.26“ gehen; ein Wochentag bei „Bis“ zählt ab dem Starttag („Mi“ bis „Fr“ meint den Freitag danach). Wer schon etwas eingetragen hat, sieht erst seine Abmeldungen mit „Neue Abmeldung“, „Zurückmelden“, „Ändern“ und „Löschen“.
+- **Regeln:** nicht rückwirkend (beim Ändern darf der alte Start bleiben), höchstens 60 Tage am Stück und 90 Tage im Voraus (einstellbar). Überschneidet oder berührt eine neue Abmeldung eine alte im selben Team, werden beide eins. Am Tag nach „Bis“ ist man von selbst wieder da; „Zurückmelden“ beendet, was heute läuft (gestern als letzter Tag, oder ganz weg, wenn es erst heute begann).
+- **`/abmeldungen [team]`** zeigt ein Bild (Stil der Statusmeldung): oben „3/4 heute da“, Kacheln für heute weg, bald weg (14 Tage) und das nächste Matchup mit „x/y da“, darunter je Abmeldung Zeitraum, Grund und Notiz. Nur für den Fragenden. Grund und Notiz sehen die Aufgaben aus „Wer die Gründe sieht“ (ab Werk Captain, Co-Captain, Manager, Coach) und wer „Server verwalten“ hat; andere im Kader sehen die Liste ohne. „Krank“ ist eine Gesundheitsangabe, deshalb nie im Panel oder in der Matchup-Erinnerung.
+- **Panel im Team-Kanal** (ab Werk aus): dasselbe Bild ohne Gründe, Titel „Verfügbarkeit“, im ersten Textkanal des Teams. Es wird bearbeitet statt neu gepostet: nach jeder Abmeldung, nach dem Speichern des Teams oder der Einstellungen und beim Tageswechsel (Lauf `TeamAbsences`, alle 10 Minuten, tut nur nach dem Start und an einem neuen Tag etwas). Wo es steht, merkt sich `teams.absence_channel_id`/`absence_message_id`.
+- **Team-Karte:** Fehlt heute jemand, zeigt die gezeichnete Karte „BIS 15.11.“ hinter dem Namen und „3/4 DA“ bei den Marken oben. Für die Karte aus dem Editor gibt es `{team.available}` und `{team.absent}`.
+- **Matchups:** Die Erinnerung vor Anpfiff nennt unten, wer an dem Tag abgemeldet ist (ohne Grund). Beim Eintragen über den Link, im Dashboard und mit `/matchup neu` steht „2 von 4 sind dann abgemeldet: …“; eintragen geht trotzdem.
+- **Einstellungen** im Dashboard unter RL Team-Übersicht, Karte „Abmeldungen“: an/aus, Panel, Karte, Matchup-Warnung, Grund Pflicht, Dauer, Vorlauf, wer die Gründe sieht, die Gründe (höchstens 10).
+- **Dahinter:** Tabelle `team_absences` (Migration 054, Tage als `JJJJ-MM-TT` in deutscher Zeit), eigene Tabelle, weil jedes Speichern im Dashboard `teams.players` neu schreibt. Abgelaufenes verschwindet nach 30 Tagen. Im Admin Dashboard: Backup-Bereich „Teams und Wettbewerb“, Nutzerdaten-Bereich „Teams und Clubs“.
+
 ---
 
 ## Dashboard
@@ -386,6 +400,7 @@ Gerechnet wird **nur im Bot**: die Seite zeigt die Werte, die aus der Route komm
 ```bash
 npm run check:teams   # Formel-Rechner, Team-MMR, Kader saeubern, die Karten, Rollen im Kader, Raenge, Rang-Icons, Aufgaben-Abzeichen, Platzhalter je Spieler, gezeichnete Karte, Menues ab 26 Teams, Team-Hub samt Kette; mit Datenbank: teams.created
 npm run icons:teams   # die Abzeichen der Aufgaben neu malen: SVG in teamicons/ -> PNG fuer Galerie und Emojis
+npm run check:absences # Abmeldungen: Tage lesen, Regeln, Zusammenlegen, Zurueckmelden, Stand je Team, Einstellungen, Bild; mit Datenbank: anlegen, aendern, loeschen, aufraeumen
 npm run check:epicname # Epic-Name geaendert: erkennen, selbst holen, Fall und DM, Fenster, umbenennen in allen Kadern und /rank link, Platzhalter, Captain, getippte DM
 ```
 

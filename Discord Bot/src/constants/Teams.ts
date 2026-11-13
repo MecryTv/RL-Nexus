@@ -19,6 +19,7 @@ import {
 import { RankText } from "./Prime";
 import { DefaultTeamList } from "./TeamList";
 import { DefaultTeamOrder } from "./TeamOrder";
+import { DefaultAbsenceSettings } from "./Absences";
 
 /**
  * RL Team-Übersicht: Grenzen, Beschriftungen und die Vorgaben. Siehe docs/Teams.md.
@@ -294,6 +295,7 @@ export function DefaultTeamSettings(): ITeamSettings {
         hubButton: DefaultHubButton(),
         hubLine: DEFAULT_HUB_LINE,
         moreIds: [],
+        absences: DefaultAbsenceSettings(),
     };
 }
 

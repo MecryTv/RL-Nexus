@@ -33,6 +33,7 @@ import AntiVillainService from "../services/AntiVillainService";
 import CatalogService from "../services/CatalogService";
 import ServerBackupService from "../services/ServerBackupService";
 import EpicNameService from "../services/EpicNameService";
+import AbsenceService from "../services/AbsenceService";
 import ApplyService from "../services/ApplyService";
 import TeamService from "../services/TeamService";
 import LookingForService from "../services/LookingForService";
@@ -98,6 +99,7 @@ import AvEventsModel from "../models/AvEvents";
 import ServerIdMapModel from "../models/ServerIdMap";
 import ServerRestoresModel from "../models/ServerRestores";
 import EpicNameCasesModel from "../models/EpicNameCases";
+import TeamAbsences from "../models/TeamAbsences";
 import AvDebrisModel from "../models/AvDebris";
 import { SixMansPlayers, SixMansRounds } from "../models/SixMans";
 import RouletteEvenings from "../models/RouletteEvenings";
@@ -143,6 +145,7 @@ export default class BotClient extends Client implements IBotClient {
     catalogService: CatalogService;
     serverBackupService: ServerBackupService;
     epicNameService: EpicNameService;
+    absenceService: AbsenceService;
     applyService: ApplyService;
     teamService: TeamService;
     rankRoleService: RankRoleService;
@@ -214,6 +217,7 @@ export default class BotClient extends Client implements IBotClient {
     serverIdMap: ServerIdMapModel;
     serverRestores: ServerRestoresModel;
     epicNameCases: EpicNameCasesModel;
+    teamAbsences: TeamAbsences;
     avDebris: AvDebrisModel;
     sixPlayers: SixMansPlayers;
     sixRounds: SixMansRounds;
@@ -305,6 +309,7 @@ export default class BotClient extends Client implements IBotClient {
         this.catalogService = new CatalogService([this.config.CONTENT_DIR || null, this.config.CONTENT_DEFAULT_DIR || null]);
         this.serverBackupService = new ServerBackupService(this);
         this.epicNameService = new EpicNameService(this);
+        this.absenceService = new AbsenceService(this);
         this.applyService = new ApplyService(this);
         this.teamService = new TeamService(this);
         this.rankRoleService = new RankRoleService(this);
@@ -373,6 +378,7 @@ export default class BotClient extends Client implements IBotClient {
         this.serverIdMap = new ServerIdMapModel(this);
         this.serverRestores = new ServerRestoresModel(this);
         this.epicNameCases = new EpicNameCasesModel(this);
+        this.teamAbsences = new TeamAbsences(this);
         this.avDebris = new AvDebrisModel(this);
         this.sixPlayers = new SixMansPlayers(this);
         this.sixRounds = new SixMansRounds(this);

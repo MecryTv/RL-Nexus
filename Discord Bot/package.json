@@ -42,6 +42,7 @@
         "check:rankroles": "tsx src/scripts/CheckRankRoles.ts",
         "check:rolelists": "tsx src/scripts/CheckRoleLists.ts",
         "check:serverbackup": "tsx src/scripts/CheckServerBackup.ts",
+        "check:absences": "tsx src/scripts/CheckAbsences.ts",
         "check:epicname": "tsx src/scripts/CheckEpicName.ts",
         "check:selfroles": "tsx src/scripts/CheckSelfRoles.ts",
         "check:servers": "tsx src/scripts/CheckServers.ts",

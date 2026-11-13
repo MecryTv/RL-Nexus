@@ -5648,3 +5648,6 @@ body.sg-locked{overflow:hidden}
   .rrcheck li span{grid-column:2}
   .rrbig{font-size:24px}
 }
+
+/* W-0095: Zahlenfelder der Abmeldungen */
+.tmnumber { max-width: 110px; }
