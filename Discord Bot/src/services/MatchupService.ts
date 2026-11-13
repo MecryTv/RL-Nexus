@@ -302,6 +302,7 @@ export default class MatchupService {
         await this.Announce(guild, matchup, settings).catch(() => undefined);
 
         this.client.pulseService.Emit(guild.id, "matchups", { id: matchup.id });
+        this.client.absenceService.MatchupChanged(guild.id, matchup.teamId);
         logger.user(`⚔️ Matchup #${matchup.id} auf ${guild.id}: ${matchup.teamName} vs. ${matchup.opponent} (von ${member.id})`);
 
         return matchup;
@@ -328,6 +329,7 @@ export default class MatchupService {
         await this.Refresh(guild, saved, settings).catch(() => undefined);
 
         this.client.pulseService.Emit(guild.id, "matchups", { id });
+        this.client.absenceService.MatchupChanged(guild.id, previous.teamId, saved.teamId);
 
         return saved;
     }
@@ -448,6 +450,7 @@ export default class MatchupService {
         await this.Refresh(guild, done).catch(() => undefined);
 
         this.client.pulseService.Emit(guild.id, "matchups", { id });
+        this.client.absenceService.MatchupChanged(guild.id, done.teamId);
         logger.user(`⚔️ Matchup #${id} auf ${guild.id} abgesagt (von ${member.id})`);
 
         return done;
@@ -471,6 +474,7 @@ export default class MatchupService {
 
         await this.client.matchups.Remove(id);
         this.client.pulseService.Emit(guild.id, "matchups", { id });
+        this.client.absenceService.MatchupChanged(guild.id, matchup.teamId);
     }
 
     /** Das Ergebnis - aus Sicht des eigenen Teams. */
@@ -507,6 +511,7 @@ export default class MatchupService {
         }
 
         this.client.pulseService.Emit(guild.id, "matchups", { id });
+        this.client.absenceService.MatchupChanged(guild.id, done.teamId);
         logger.user(`⚔️ Matchup #${id} auf ${guild.id}: ${score.us}:${score.them} (von ${member.id})`);
 
         return done;
@@ -667,6 +672,7 @@ export default class MatchupService {
             for (const matchup of await this.client.matchups.Live(guild.id, now)) {
                 await this.Refresh(guild, matchup, settings, now).catch(() => undefined);
                 await this.client.matchups.SetLive(matchup.id);
+                this.client.absenceService.MatchupChanged(guild.id, matchup.teamId);
 
                 done.live++;
             }
@@ -675,6 +681,7 @@ export default class MatchupService {
             for (const matchup of await this.client.matchups.Ended(guild.id, now)) {
                 await this.Refresh(guild, matchup, settings, now).catch(() => undefined);
                 await this.client.matchups.SetLive(matchup.id);
+                this.client.absenceService.MatchupChanged(guild.id, matchup.teamId);
 
                 done.live++;
             }

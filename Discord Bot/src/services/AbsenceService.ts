@@ -488,6 +488,21 @@ export default class AbsenceService {
         if (shown === "hub" && settings.messageId) await this.client.teamService.Publish(guild).catch(() => undefined);
     }
 
+    /**
+     * Ein Matchup kam dazu, änderte sich, fiel weg oder wurde angepfiffen: Die
+     * Kachel „nächstes Matchup“ im Panel stimmt sonst bis zum nächsten Tag nicht.
+     * Nur mit Panel, im Hintergrund.
+     */
+    MatchupChanged(guildId: string, ...teamIds: (number | null)[]): void {
+        const ids = [...new Set(teamIds.filter((id): id is number => id !== null))];
+
+        if (!ids.length) return;
+
+        void this.Settings(guildId)
+            .then((settings) => (settings.enabled && settings.panel ? this.Refresh(guildId, ids) : undefined))
+            .catch((error) => logger.warn(`🗓 Panel nach Matchup auf ${guildId} nicht nachgezogen: ${String(error)}`));
+    }
+
     /** Alle Teams eines Servers, etwa nach dem Speichern der Einstellungen. */
     async RefreshAll(guildId: string): Promise<void> {
         await this.Refresh(
