@@ -414,6 +414,27 @@ export async function checkShop(): Promise<void> {
         assert.equal((await legalPdf("widerruf", "2026-11-12"))?.subarray(0, 5).toString(), "%PDF-");
     });
 
+    await check("Widerruf ab 2026-11-13: amtlicher Einschub zur Online-Funktion (Gestaltungshinweis 3), Musterformular wie im Gesetz", async () => {
+        const blocks = legalText("widerruf", "2026-11-13")?.blocks ?? [];
+        const before = legalText("widerruf", "2026-11-12")?.blocks ?? [];
+        const declare = blocks.find((block) => block.kind === "p" && block.text.startsWith("Um Ihr Widerrufsrecht auszuüben"))?.text ?? "";
+
+        assert.match(
+            declare,
+            /das jedoch nicht vorgeschrieben ist\. Sie können Ihr Widerrufsrecht auch online unter nexus-emb\.de\/widerrufen ausüben\. Wenn Sie diese Online-Funktion nutzen, übermitteln wir Ihnen auf einem dauerhaften Datenträger \(z\. B\. durch eine E-Mail\) unverzüglich eine Eingangsbestätigung mit Informationen zum Inhalt der Widerrufserklärung sowie dem Datum und der Uhrzeit ihres Eingangs\.$/,
+            "wortgleich mit dem Muster, im selben Absatz"
+        );
+        assert.equal(blocks.some((block) => /Rechnungsnummer|„Vertrag hier widerrufen“/.test(block.text)), false, "kein eigener Wortlaut, keine Zusatzzeile");
+
+        const form = (list: typeof blocks) => list.filter((block) => block.kind === "li").map((block) => block.text);
+        assert.deepEqual(form(blocks), form(before).filter((line) => !line.startsWith("Rechnungsnummer")), "Formular wie zuvor, nur ohne Zusatzzeile");
+        assert.equal(pdfSafe(declare).includes("?"), false);
+
+        const agb = (version: string) => legalText("agb", version)?.blocks.map((block) => block.text).join("\n");
+        assert.equal(agb("2026-11-13"), agb("2026-11-12"), "die AGB bleiben, wie sie sind");
+        assert.equal((await legalPdf("widerruf", "2026-11-13"))?.subarray(0, 5).toString(), "%PDF-");
+    });
+
     await check("Einstellungen: Stand der Rechtstexte muss es geben", () => {
         assert.throws(() => parseSettingsInput({ ...SETTINGS, termsVersion: "2027-01-01" }), /Für den Stand 2027-01-01 gibt es keine Rechtstexte in shared\/legal\./);
     });
