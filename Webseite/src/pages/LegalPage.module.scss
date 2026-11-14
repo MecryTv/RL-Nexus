@@ -135,6 +135,11 @@ $wide: 1080px;
         font-style: normal;
     }
 
+    p + .addresses,
+    .addresses + p {
+        margin-top: 16px;
+    }
+
     ul {
         display: flex;
         flex-direction: column;
@@ -224,4 +229,36 @@ $wide: 1080px;
     border-top: 1px solid var(--c-line);
     color: var(--c-text-faint);
     font-size: 0.88rem;
+}
+
+/* W-0102: Die beiden Anbieter als zwei Karten nebeneinander, auf schmalen
+   Bildschirmen untereinander. Rahmen und Füllung wie die Kacheln der Seite,
+   dazu ein kurzer roter Strich oben, damit jede Karte für sich steht. */
+.addresses {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 14px;
+
+    address {
+        padding: 14px 18px;
+
+        @include panel($cut: 12px);
+
+        &::after {
+            position: absolute;
+            top: 0;
+            left: 12px;
+            width: 28px;
+            height: 2px;
+            background: var(--c-red);
+            content: "";
+        }
+    }
+}
+
+.addressName {
+    display: block;
+    margin-bottom: 4px;
+    color: var(--c-text);
+    font-weight: 700;
 }

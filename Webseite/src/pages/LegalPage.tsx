@@ -150,12 +150,14 @@ const MAIL = <a href={`mailto:${siteConfig.contactMail}`}>{siteConfig.contactMai
 
 const SUPPORT = <External href={siteConfig.supportURL}>Support-Server</External>;
 
-/** Die Anschriften stehen in beiden Texten. Einmal hier, damit sie nicht auseinanderlaufen (W-0088: zwei Anbieter). */
+/**
+ * Die Anschriften stehen in beiden Texten. Einmal hier, damit sie nicht auseinanderlaufen (W-0088: zwei Anbieter).
+ * W-0102: als zwei Karten, damit man auf einen Blick zwei Anbieter sieht.
+ */
 const ADDRESS = (
-    <>
+    <div className={styles.addresses}>
         <address>
-            Connor Olischer
-            <br />
+            <span className={styles.addressName}>Connor Olischer</span>
             Königsberger Straße 8
             <br />
             25335 Elmshorn
@@ -163,15 +165,14 @@ const ADDRESS = (
             Deutschland
         </address>
         <address>
-            Joe Jobst
-            <br />
+            <span className={styles.addressName}>Joe Jobst</span>
             Garzweg 11
             <br />
             32602 Vlotho
             <br />
             Deutschland
         </address>
-    </>
+    </div>
 );
 
 /* --- Impressum ----------------------------------------------------------- */
