@@ -16,7 +16,7 @@ import { toast } from "../core/Toast.js";
 import { api, button, card, confirmButton, el, IRole, loading, row, select, stat, toggle } from "../core/Ui.js";
 import { bodyEditor, IBody, IEmbed } from "../layout/BodyEditor.js";
 import { IEditorContext } from "../layout/MessageEditor.js";
-import { IServerEmoji } from "../layout/EmojiPicker.js";
+import { emojiNode, emojiPicker, IServerEmoji } from "../layout/EmojiPicker.js";
 
 interface IPanelRole {
     roleId: string;
@@ -202,9 +202,16 @@ export function renderSelfRoles(guildId: string): void {
         const save = button("btn btn--primary", icon("#i-check"), "Speichern");
         /** Ein eingetippter, noch nicht geprüfter Link: Speichern nähme ihn nicht mit, also gesperrt. */
         let unchecked = (): boolean => false;
+        /** Die Discord-Vorschau unter dem Kopf - Emoji, Beschriftung und Farbe der Rollen stehen darin. */
+        let refreshPreview = (): void => undefined;
         const touch = (): void => {
             dirty.add(draft.id);
             save.disabled = unchecked();
+        };
+        // Nur bei Rollen neu zeichnen - im Kopf der Nachricht macht der Editor das selbst.
+        const touchRole = (): void => {
+            touch();
+            refreshPreview();
         };
 
         save.disabled = !dirty.has(draft.id);
@@ -360,6 +367,8 @@ export function renderSelfRoles(guildId: string): void {
                   extras: () => rolePreview(draft),
               });
 
+        refreshPreview = () => editor?.refresh();
+
         /* --- Die Nachricht, an die das Panel soll --- */
         const link = el("input", "text");
         const check = button("btn btn--quiet", icon("#i-search"), "Prüfen");
@@ -391,7 +400,7 @@ export function renderSelfRoles(guildId: string): void {
         const roleBox = el("div", "srroles");
         const drawRoles = (): void => {
             roleBox.replaceChildren(
-                ...draft.roles.map((entry) => roleRow(draft, entry, touch, () => {
+                ...draft.roles.map((entry) => roleRow(draft, entry, touchRole, () => {
                     drawRoles();
                     editor?.refresh();
                 })),
@@ -539,7 +548,17 @@ export function renderSelfRoles(guildId: string): void {
        ------------------------------------------------------------ */
     function roleRow(draft: IPanel, entry: IPanelRole, touch: () => void, redraw: () => void): HTMLElement {
         const label = el("input", "text");
-        const emoji = el("input", "text srrole__emoji");
+        // Dieselbe Auswahl wie bei Tickets und Umfragen: eigene Server-Emojis und die von Discord.
+        const emoji = emojiPicker({
+            value: entry.emoji,
+            emojis: data!.guild.emojis,
+            label: `Emoji für ${nameOf(entry.roleId)}`,
+            onPick: (value) => {
+                entry.emoji = value;
+                mark();
+                touch();
+            },
+        });
         const remove = button("btn btn--quiet btn--icon", icon("#i-x"));
         const reactions = draft.kind === "reactions";
         // Bei Reaktionen steht kein Text in Discord, nur das Emoji - die Spalte zeigt, ob es fehlt.
@@ -547,11 +566,15 @@ export function renderSelfRoles(guildId: string): void {
         const mark = (): void => {
             const missing = reactions && !entry.emoji;
 
-            hint.textContent = entry.emoji ? `Reaktion ${entry.emoji}` : "Emoji fehlt noch";
+            if (entry.emoji) hint.replaceChildren("Reaktion ", emojiNode(entry.emoji, data!.guild.emojis));
+            else hint.textContent = "Emoji fehlt noch";
+
             hint.classList.toggle("is-missing", missing);
             emoji.classList.toggle("is-missing", missing);
             emoji.setAttribute("aria-invalid", String(missing));
         };
+
+        emoji.classList.add("srrole__emoji");
 
         label.type = "text";
         label.value = entry.label;
@@ -563,16 +586,6 @@ export function renderSelfRoles(guildId: string): void {
             touch();
         });
 
-        emoji.type = "text";
-        emoji.value = entry.emoji ?? "";
-        emoji.maxLength = 60;
-        emoji.placeholder = "Emoji";
-        emoji.setAttribute("aria-label", `Emoji für ${nameOf(entry.roleId)}`);
-        emoji.addEventListener("input", () => {
-            entry.emoji = emoji.value.trim() || null;
-            mark();
-            touch();
-        });
         mark();
 
         remove.title = "Rolle aus dem Panel nehmen";
@@ -664,11 +677,14 @@ export function renderSelfRoles(guildId: string): void {
 
         const box = el("div", "tkprev__buttons");
 
+        // Eigene Server-Emojis als Bild, nicht als <:name:id> - wie in Discord.
+        const face = (value: string | null): Node | string => (value ? emojiNode(value, data!.guild.emojis) : "?");
+
         for (const entry of draft.roles) {
             box.append(
                 draft.kind === "reactions"
-                    ? el("span", "srprev__react", `${entry.emoji ?? "?"} 1`)
-                    : el("span", `tkprev__btn is-${entry.style}`, `${entry.emoji ? `${entry.emoji} ` : ""}${entry.label || nameOf(entry.roleId)}`)
+                    ? el("span", "srprev__react", face(entry.emoji), " 1")
+                    : el("span", `tkprev__btn is-${entry.style}`, ...(entry.emoji ? [face(entry.emoji), " "] : []), entry.label || nameOf(entry.roleId))
             );
         }
 
