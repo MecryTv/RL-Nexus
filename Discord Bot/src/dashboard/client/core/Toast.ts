@@ -26,19 +26,24 @@ export function toastHost(): HTMLElement | null {
     return host;
 }
 
-export function toast(kind: "info" | "invite", title: string, body: string): void {
+/**
+ * warn: gespeichert ist, aber etwas hat nicht geklappt. Bleibt länger stehen
+ * und kommt auch, wenn jemand die Einblendungen abgeschaltet hat - sonst ginge
+ * der Hinweis unbemerkt verloren.
+ */
+export function toast(kind: "info" | "invite" | "warn", title: string, body: string): void {
     const host = toastHost();
 
-    if (!host || !prefs.toasts) return;
+    if (!host || (!prefs.toasts && kind !== "warn")) return;
 
     while (host.children.length >= TOAST_MAX && host.firstElementChild) host.firstElementChild.remove();
 
     const element = document.createElement("div");
-    element.className = kind === "invite" ? "toast toast--invite" : "toast";
+    element.className = kind === "info" ? "toast" : `toast toast--${kind}`;
 
     const mark = document.createElement("span");
     mark.className = "toast__mark";
-    mark.appendChild(icon(kind === "invite" ? "#i-plus" : "#i-check"));
+    mark.appendChild(icon(kind === "invite" ? "#i-plus" : kind === "warn" ? "#i-warn" : "#i-check"));
 
     const text = document.createElement("div");
     const heading = document.createElement("b");
@@ -58,7 +63,7 @@ export function toast(kind: "info" | "invite", title: string, body: string): voi
     element.append(mark, text, close, bar);
     host.appendChild(element);
 
-    const timer = window.setTimeout(dismiss, 3600);
+    const timer = window.setTimeout(dismiss, kind === "warn" ? 7200 : 3600);
 
     function dismiss(): void {
         window.clearTimeout(timer);

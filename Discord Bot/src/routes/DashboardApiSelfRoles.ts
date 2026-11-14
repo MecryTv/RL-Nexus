@@ -3,7 +3,7 @@ import BotClient from "../client/BotClient";
 import Route from "../structures/Route";
 import { DASHBOARD_PATH } from "../constants/Dashboard";
 import { KIND_LABELS as BODY_KINDS } from "../constants/Messages";
-import { DefaultBody, KIND_LABELS, MAX_DESCRIPTION, MAX_LABEL, MAX_NAME, MAX_PANELS, MAX_ROLES, MODE_LABELS, SELF_ROLE_MODULE, TONE_LABELS } from "../constants/SelfRoles";
+import { DefaultBody, KIND_LABELS, MAX_DESCRIPTION, MAX_LABEL, MAX_NAME, MAX_PANELS, MAX_REACTIONS, MAX_ROLES, MODE_LABELS, SELF_ROLE_MODULE, TONE_LABELS } from "../constants/SelfRoles";
 import { SelfRoleError } from "../services/SelfRoleService";
 import { WantsJSON } from "../utils/admin";
 import logger from "../utils/logger";
@@ -13,11 +13,13 @@ interface IBody {
     action?: unknown;
     id?: unknown;
     panel?: unknown;
+    link?: unknown;
+    channelId?: unknown;
 }
 
 /**
- * Self Roles im Dashboard: Panels anlegen, bauen, senden und wieder einsammeln.
- * Siehe docs/SelfRoles.md.
+ * Self Roles im Dashboard: Panels anlegen, bauen, senden und wieder einsammeln -
+ * oder an eine vorhandene Nachricht hängen und wieder lösen. Siehe docs/SelfRoles.md.
  */
 export default class DashboardApiSelfRoles extends Route {
     constructor(client: BotClient) {
@@ -63,7 +65,7 @@ export default class DashboardApiSelfRoles extends Route {
             modes: MODE_LABELS,
             tones: TONE_LABELS,
             bodyKinds: BODY_KINDS,
-            limits: { panels: MAX_PANELS, roles: MAX_ROLES, name: MAX_NAME, label: MAX_LABEL, description: MAX_DESCRIPTION },
+            limits: { panels: MAX_PANELS, roles: MAX_ROLES, reactions: MAX_REACTIONS, name: MAX_NAME, label: MAX_LABEL, description: MAX_DESCRIPTION },
             guild: { name: guild.name, ...GuildResources(guild) },
         };
     }
@@ -77,17 +79,27 @@ export default class DashboardApiSelfRoles extends Route {
             case "create":
                 return { ok: true, panel: await service.Create(guild, member, body.panel) };
 
+            // warning: gespeichert ist, nur das Nachziehen in Discord ging nicht (etwa kein Platz mehr an der Nachricht).
             case "save":
-                return { ok: true, panel: await service.Save(guild, id, body.panel) };
+                return { ok: true, ...(await service.Save(guild, member, id, body.panel)) };
+
+            case "inspect":
+                return { ok: true, message: await service.Inspect(guild, member, body.link, body.channelId) };
 
             case "send": {
-                const panel = await service.Send(guild, await service.Panel(guild.id, id));
+                const stored = await service.Panel(guild.id, id);
 
-                logger.user(`🎭 Self-Role-Panel ${id} auf ${guild.id} gesendet (von ${actor.id})`);
+                // Anhängen nur an Nachrichten in Kanälen, die der Anhängende selbst lesen darf.
+                await service.CheckReader(guild, member, stored);
+
+                const panel = await service.Send(guild, stored);
+
+                logger.user(`🎭 Self-Role-Panel ${id} auf ${guild.id} ${panel.attached ? "angehängt" : "gesendet"} (von ${actor.id})`);
 
                 return { ok: true, panel };
             }
 
+            // Bei einem angehängten Panel heißt das: lösen, die Nachricht bleibt.
             case "recall":
                 await service.Delete(guild, await service.Panel(guild.id, id));
 

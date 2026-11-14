@@ -2,11 +2,12 @@ import { IMessageDoc } from "../../builder/IMessageDoc";
 import { ICustomEmbed, MessageKind } from "../messages/IMessages";
 
 /**
- * Self Roles: ein Panel ist eine Nachricht mit Knöpfen oder einem Auswahlmenü,
- * aus dem sich Mitglieder ihre Rollen selbst holen. Siehe docs/SelfRoles.md.
+ * Self Roles: ein Panel ist eine Nachricht mit Knöpfen, einem Auswahlmenü oder
+ * Reaktionen, aus der sich Mitglieder ihre Rollen selbst holen. Siehe docs/SelfRoles.md.
  */
 
-export type PanelKind = "buttons" | "select";
+/** reactions: jede Rolle hat ein Emoji, eine Reaktion holt sie, Wegnehmen gibt sie zurück. */
+export type PanelKind = "buttons" | "select" | "reactions";
 
 /** multi: jede Rolle einzeln. single: genau eine aus diesem Panel. */
 export type PanelMode = "multi" | "single";
@@ -48,8 +49,25 @@ export interface ISelfRolePanel {
     body: IPanelBody;
     roles: ISelfRole[];
     channelId: string | null;
+    /** Wo das Panel gerade steht. Bei angehängten Panels gleich targetId, solange es dran hängt. */
     messageId: string | null;
+    /** W-0101: das Panel hängt an einer Nachricht, die es schon gibt, statt eine eigene zu schicken. */
+    attached: boolean;
+    /** Die vorhandene Nachricht (im Kanal channelId). Bleibt auch nach dem Lösen stehen. */
+    targetId: string | null;
     createdBy: string;
     createdAt: number;
     updatedAt: number;
+}
+
+/** Was „Prüfen“ über eine vorhandene Nachricht meldet. */
+export interface IMessageInfo {
+    channelId: string;
+    channelName: string;
+    messageId: string;
+    author: string;
+    /** Von RL Nexus selbst - nur dann gehen auch Knöpfe und Menü. */
+    own: boolean;
+    excerpt: string;
+    createdAt: number;
 }

@@ -847,7 +847,12 @@ async function checkPanels(): Promise<void> {
     const selfRoles = [
         { id: 1, name: "Neu", channelId: NEW_CHANNEL, messageId: "m-gone", buttons: [] },
         { id: 2, name: "Ränge", channelId: TEXT, messageId: "m-role", buttons: [{ roleId: NEW_ROLE }] },
+        // W-0101: angehängt an fremde Nachrichten - nie löschen oder neu posten, nur wieder anhängen.
+        { id: 3, name: "Spiele", attached: true, channelId: TEXT, messageId: "m-foreign", targetId: "m-foreign", roles: [{ roleId: NEW_ROLE }] },
+        { id: 4, name: "Weg", attached: true, channelId: TEXT, messageId: "m-lost", targetId: "m-lost", roles: [{ roleId: NEW_ROLE }] },
+        { id: 5, name: "Alt", attached: true, channelId: TEXT, messageId: "m-old", targetId: "m-old", roles: [{ roleId: "90071992547407299" }] },
     ];
+    const attached: string[] = [];
 
     Object.defineProperty(client, "user", { configurable: true, value: { id: BOT } });
     loose.databaseService.Bump = () => undefined;
@@ -864,7 +869,17 @@ async function checkPanels(): Promise<void> {
     loose.sixMansService.Settings = async () => ({ channelId: null, panelMessageId: null });
     loose.matchups.Announced = async () => [];
     loose.selfRoleService.Panel = async (_guildId: string, id: number) => selfRoles.find((panel) => panel.id === id);
-    loose.selfRoleService.Send = async (_guild: Guild, panel: { channelId: string; messageId: string }) => void (panel.channelId === TEXT && standing.has(panel.messageId) ? edited.push("selfrole") : sent.push(`selfrole@${panel.channelId}`));
+    loose.selfRoleService.Send = async (_guild: Guild, panel: { id: number; attached?: boolean; channelId: string; messageId: string }) => {
+        if (panel.attached) {
+            if (panel.messageId === "m-lost") throw new Error("Die Nachricht finde ich nicht.");
+
+            attached.push(String(panel.id));
+
+            return;
+        }
+
+        void (panel.channelId === TEXT && standing.has(panel.messageId) ? edited.push("selfrole") : sent.push(`selfrole@${panel.channelId}`));
+    };
     loose.ticketService.SendPanel = async (_guild: Guild, channelId: string) => void sent.push(`ticket@${channelId}`);
     loose.voiceService.SendPanel = async () => void sent.push(standing.has("m-voice") ? "voice doppelt" : "voice");
 
@@ -875,6 +890,10 @@ async function checkPanels(): Promise<void> {
     check("Rollen-Panel mit umgeschriebener Rolle: neu gezeichnet", edited.includes("selfrole") && report.redrawn.includes("Rollen-Panel „Ränge“"), JSON.stringify(report));
     check("Panel, das nur neu senden kann: alte Nachricht des Bots weg, dann neu", deleted.includes("m-voice") && sent.includes("voice") && !sent.includes("voice doppelt"), `${deleted.join()} ${sent.join()}`);
     check("Köder-Warnung gehört zu den Panels", (await PanelsOf(client, GUILD)).some((panel) => panel.kind === "bait"));
+    check("Angehängtes Panel mit umgeschriebener Rolle: wieder angehängt", attached.includes("3") && report.redrawn.includes("Rollen-Panel „Spiele“"), `${attached.join()} ${JSON.stringify(report)}`);
+    check("Fehlt seine Nachricht, steht es bei den Problemen", report.problems.some((problem) => problem.startsWith("Rollen-Panel „Weg“")), JSON.stringify(report.problems));
+    check("Ohne neue IDs bleibt ein angehängtes Panel, wie es ist", !attached.includes("5"), attached.join());
+    check("Fremde Nachrichten werden weder gelöscht noch neu gepostet", !deleted.some((id) => id.startsWith("m-foreign") || id === "m-lost") && !sent.some((entry) => entry.startsWith("selfrole@") && entry !== `selfrole@${NEW_CHANNEL}`), `${deleted.join()} ${sent.join()}`);
 }
 
 /* ----------------------------------------------------------

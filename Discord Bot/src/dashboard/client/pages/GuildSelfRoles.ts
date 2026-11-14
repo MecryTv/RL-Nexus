@@ -1,13 +1,17 @@
 /**
  * Abschnitt: Self Roles.
  *
- * Ein Panel je Karte: Name, Kanal, Art (Knöpfe oder Auswahlmenü), die Regeln,
- * der Kopf der Nachricht mit Live-Vorschau und darunter die Rollen. Gesendet
- * wird erst auf Knopfdruck; danach zieht jede Änderung die Nachricht nach.
+ * Ein Panel je Karte: Name, Kanal, Art (Knöpfe, Auswahlmenü oder Reaktionen),
+ * die Regeln, der Kopf der Nachricht mit Live-Vorschau und darunter die Rollen.
+ * Gesendet wird erst auf Knopfdruck; danach zieht jede Änderung die Nachricht nach.
+ *
+ * W-0101: statt einer eigenen Nachricht kann das Panel an einer vorhandenen
+ * hängen. Dann gibt es keinen Kopf, dafür Link oder ID mit „Prüfen“.
  */
 
 import { BASE } from "../core/Base.js";
 import { icon, need } from "../core/Dom.js";
+import { ago } from "../core/Format.js";
 import { toast } from "../core/Toast.js";
 import { api, button, card, confirmButton, el, IRole, loading, row, select, stat, toggle } from "../core/Ui.js";
 import { bodyEditor, IBody, IEmbed } from "../layout/BodyEditor.js";
@@ -26,7 +30,7 @@ interface IPanelRole {
 interface IPanel {
     id: number;
     name: string;
-    kind: "buttons" | "select";
+    kind: "buttons" | "select" | "reactions";
     mode: "multi" | "single";
     maxRoles: number;
     requireRole: string | null;
@@ -34,6 +38,19 @@ interface IPanel {
     roles: IPanelRole[];
     channelId: string | null;
     messageId: string | null;
+    attached: boolean;
+    targetId: string | null;
+}
+
+/** Was „Prüfen“ über eine vorhandene Nachricht meldet. */
+interface IFound {
+    channelId: string;
+    channelName: string;
+    messageId: string;
+    author: string;
+    own: boolean;
+    excerpt: string;
+    createdAt: number;
 }
 
 interface IPayload {
@@ -43,7 +60,7 @@ interface IPayload {
     modes: Record<string, string>;
     tones: Record<string, string>;
     bodyKinds: Record<string, string>;
-    limits: { panels: number; roles: number; name: number; label: number; description: number };
+    limits: { panels: number; roles: number; reactions: number; name: number; label: number; description: number };
     guild: { name: string; roles: IRole[]; channels: { id: string; name: string }[]; emojis: IServerEmoji[] };
 }
 
@@ -75,6 +92,9 @@ export function renderSelfRoles(guildId: string): void {
      */
     const drafts = new Map<number, IPanel>();
     const dirty = new Set<number>();
+    /** Das letzte Ergebnis von „Prüfen“ je Panel, und welche schon einmal von selbst geprüft wurden. */
+    const found = new Map<number, IFound>();
+    const checked = new Set<number>();
 
     function draftOf(panel: IPanel): IPanel {
         const known = drafts.get(panel.id);
@@ -105,6 +125,9 @@ export function renderSelfRoles(guildId: string): void {
     });
 
     const nameOf = (id: string): string => data!.guild.roles.find((role) => role.id === id)?.name ?? "gelöschte Rolle";
+    const channelOf = (id: string | null): string => `#${data!.guild.channels.find((channel) => channel.id === id)?.name ?? "unbekannt"}`;
+    /** Discord erlaubt nur 20 verschiedene Reaktionen an einer Nachricht. */
+    const roleLimit = (draft: IPanel): number => (draft.kind === "reactions" ? data!.limits.reactions : data!.limits.roles);
 
     /* ------------------------------------------------------------
        Kopf
@@ -118,7 +141,7 @@ export function renderSelfRoles(guildId: string): void {
             "div",
             "tkhead snhead",
             stat("#i-sparkle", "Panels", `${panels.length} / ${data!.limits.panels}`),
-            stat("#i-upload", "Gesendet", String(sent), sent ? "is-ok" : ""),
+            stat("#i-upload", "In Discord", String(sent), sent ? "is-ok" : ""),
             stat("#i-badge", "Rollen", String(roles)),
             stat("#i-list-checks", "Offen", open ? "ein Panel" : "keins")
         );
@@ -177,15 +200,27 @@ export function renderSelfRoles(guildId: string): void {
         const draft = draftOf(panel);
         const box = el("div", "snitem");
         const save = button("btn btn--primary", icon("#i-check"), "Speichern");
+        /** Ein eingetippter, noch nicht geprüfter Link: Speichern nähme ihn nicht mit, also gesperrt. */
+        let unchecked = (): boolean => false;
         const touch = (): void => {
             dirty.add(draft.id);
-            save.disabled = false;
+            save.disabled = unchecked();
         };
 
         save.disabled = !dirty.has(draft.id);
 
         const isOpen = open === draft.id;
-        const state = draft.messageId ? "gesendet" : draft.channelId ? "bereit" : "kein Kanal";
+        const state = draft.attached
+            ? draft.messageId
+                ? `angehängt an ${channelOf(draft.channelId)}`
+                : draft.targetId
+                  ? `noch nicht angehängt (${channelOf(draft.channelId)})`
+                  : "keine Nachricht gewählt"
+            : draft.messageId
+              ? "gesendet"
+              : draft.channelId
+                ? "bereit"
+                : "kein Kanal";
         const toggleOpen = button("btn btn--quiet snitem__edit", icon(isOpen ? "#i-up" : "#i-sliders"), isOpen ? "Zuklappen" : "Bearbeiten");
 
         if (isOpen) box.classList.add("is-open");
@@ -199,13 +234,14 @@ export function renderSelfRoles(guildId: string): void {
             el(
                 "div",
                 "snitem__head",
-                el("span", "snitem__face", icon(draft.kind === "select" ? "#i-list-checks" : "#i-grid")),
+                el("span", "snitem__face", icon(draft.kind === "select" ? "#i-list-checks" : draft.kind === "reactions" ? "#i-smile" : "#i-grid")),
                 el(
                     "div",
                     "snitem__name",
                     el("b", "", draft.name),
                     el("span", "", `${data!.kinds[draft.kind]} · ${draft.roles.length} Rolle(n) · ${state}`)
                 ),
+                ...(draft.attached && draft.messageId ? [el("span", "srchip", "angehängt")] : []),
                 toggleOpen,
                 ...(isOpen ? [] : [sendButton(draft)])
             )
@@ -235,16 +271,46 @@ export function renderSelfRoles(guildId: string): void {
             "Kanal des Panels"
         );
 
+        /* --- Wo das Panel steht (W-0101) --- */
+        const live = Boolean(draft.messageId);
+        const where = segment(
+            [
+                ["new", "Neue Nachricht"],
+                ["attached", "Vorhandene Nachricht"],
+            ],
+            draft.attached ? "attached" : "new",
+            (value) => {
+                draft.attached = value === "attached";
+                touch();
+                paint();
+            },
+            "Wo steht das Panel?",
+            live
+        );
+        const info = found.get(draft.id);
+        // Nur Reaktionen gehen an Nachrichten, die nicht von RL Nexus sind.
+        const foreign = draft.attached && info?.own === false;
+
+        // Ein Bearbeiten im Kanal würde die Nachricht wechseln - erst lösen.
+        channel.disabled = draft.attached && live;
+
+        if (isOpen && draft.attached && draft.targetId && draft.channelId && !info && !checked.has(draft.id)) {
+            checked.add(draft.id);
+            void inspect(draft, linkOf(draft), touch);
+        }
+
         const kind = select(
             Object.entries(data!.kinds).map(([value, label]): [string, string] => [value, label]),
             draft.kind,
             (value) => {
-                draft.kind = value === "select" ? "select" : "buttons";
+                draft.kind = value === "select" || value === "reactions" ? value : "buttons";
                 touch();
                 paint();
             },
             "Art des Panels"
         );
+
+        for (const option of kind.options) option.disabled = foreign && option.value !== "reactions";
 
         const mode = select(
             Object.entries(data!.modes).map(([value, label]): [string, string] => [value, label]),
@@ -279,18 +345,47 @@ export function renderSelfRoles(guildId: string): void {
             "Voraussetzung"
         );
 
-        /* --- Der Kopf der Nachricht --- */
-        const editor = bodyEditor(draft.body, {
-            pageSave: () => save,
-            kinds: data!.bodyKinds,
-            context,
-            defaultEmbed: () => structuredClone(EMPTY_EMBED),
-            touch,
-            title: "Kopf der Nachricht",
-            hint: "Was über den Rollen steht.",
-            templates: "selfRoles",
-            extras: () => rolePreview(draft),
+        /* --- Der Kopf der Nachricht - an einer vorhandenen bleibt sie, wie sie ist --- */
+        const editor = draft.attached
+            ? null
+            : bodyEditor(draft.body, {
+                  pageSave: () => save,
+                  kinds: data!.bodyKinds,
+                  context,
+                  defaultEmbed: () => structuredClone(EMPTY_EMBED),
+                  touch,
+                  title: "Kopf der Nachricht",
+                  hint: "Was über den Rollen steht.",
+                  templates: "selfRoles",
+                  extras: () => rolePreview(draft),
+              });
+
+        /* --- Die Nachricht, an die das Panel soll --- */
+        const link = el("input", "text");
+        const check = button("btn btn--quiet", icon("#i-search"), "Prüfen");
+
+        link.type = "text";
+        link.value = linkOf(draft);
+        link.placeholder = "https://discord.com/channels/…";
+        link.disabled = check.disabled = live;
+        link.setAttribute("aria-label", "Nachrichtenlink oder ID");
+        check.addEventListener("click", () => void inspect(draft, link.value, touch, check));
+        link.addEventListener("keydown", (event) => {
+            if (event.key === "Enter") void inspect(draft, link.value, touch, check);
         });
+
+        const waiting = el("p", "srnote srnote--warn", "Neuer Link: erst „Prüfen“, dann speichern.");
+        const syncLink = (): void => {
+            const open = unchecked();
+
+            waiting.hidden = !open;
+            save.disabled = open || !dirty.has(draft.id);
+            save.title = open ? "Erst den Link prüfen" : "";
+        };
+
+        unchecked = () => draft.attached && link.value.trim() !== linkOf(draft);
+        link.addEventListener("input", syncLink);
+        syncLink();
 
         /* --- Die Rollen --- */
         const roleBox = el("div", "srroles");
@@ -298,38 +393,56 @@ export function renderSelfRoles(guildId: string): void {
             roleBox.replaceChildren(
                 ...draft.roles.map((entry) => roleRow(draft, entry, touch, () => {
                     drawRoles();
-                    editor.refresh();
+                    editor?.refresh();
                 })),
                 addRole(draft, touch, () => {
                     drawRoles();
-                    editor.refresh();
+                    editor?.refresh();
                 })
             );
         };
 
         drawRoles();
 
+        const kindHint = foreign
+            ? "Die Nachricht ist nicht von RL Nexus: Discord erlaubt hier nur Reaktionen"
+            : draft.kind === "reactions"
+              ? "Jede Rolle bekommt ein Emoji, Reagieren holt sie, Wegnehmen gibt sie zurück"
+              : "Knöpfe stehen offen da, ein Menü ist kompakter";
+
         box.append(
             el(
                 "div",
                 "snitem__body",
                 row("Name", "Nur für euch, in Discord steht er nicht", name),
-                row("Kanal", "Wohin das Panel geht", channel),
-                row("Art", "Knöpfe stehen offen da, ein Menü ist kompakter", kind),
+                row("Wo steht das Panel?", live ? (draft.attached ? "Erst lösen, dann umstellen" : "Erst einsammeln, dann umstellen") : "Eigene Nachricht oder eine, die es schon gibt", where),
+                ...(draft.attached
+                    ? [
+                          row(
+                              "Nachricht",
+                              "Rechtsklick auf die Nachricht → Nachrichtenlink kopieren. Oder die ID.",
+                              el("div", "srlink", el("div", "srlink__row", link, check), waiting, ...(info ? [foundBox(info)] : []))
+                          ),
+                          row("Kanal", "Nur nötig, wenn du statt des Links die ID einfügst", channel),
+                      ]
+                    : [row("Kanal", "Wohin das Panel geht", channel)]),
+                row("Art", kindHint, kind),
                 row("Regel", draft.mode === "single" ? "Die neue Rolle ersetzt die vorherige aus diesem Panel" : "Jede Rolle lässt sich einzeln an- und abwählen", mode),
                 ...(draft.mode === "multi" ? [row("Höchstzahl", "0 heißt: ohne Grenze", max)] : []),
                 row("Voraussetzung", "Nur wer diese Rolle hat, darf das Panel benutzen", require),
-                editor.node,
-                el("h4", "srhead", `Rollen (${draft.roles.length} / ${data!.limits.roles})`),
+                ...(editor ? [editor.node] : []),
+                el("h4", "srhead", `Rollen (${draft.roles.length} / ${roleLimit(draft)})`),
+                ...(draft.kind === "reactions" ? [el("p", "srnote", "Bei Reaktionen braucht jede Rolle ein eigenes Emoji.")] : []),
                 roleBox,
-                el("div", "mcsave", save, sendButton(draft), recallButton(draft), deleteButton(draft))
+                el("div", "mcsave", save, sendButton(draft), recallButton(draft), deleteButton(draft)),
+                ...(draft.attached ? [el("p", "srnote", "„Anhängen“ setzt die Reaktionen bzw. die Reihe. „Lösen“ nimmt sie wieder ab, die Nachricht selbst bleibt stehen.")] : [])
             )
         );
 
         save.addEventListener("click", async () => {
             save.disabled = true;
 
-            const answer = await call<{ panel: IPanel }>("", { action: "save", id: draft.id, panel: draft });
+            const answer = await call<{ panel: IPanel; warning?: string | null }>("", { action: "save", id: draft.id, panel: draft });
 
             if (!answer) {
                 save.disabled = false;
@@ -338,11 +451,87 @@ export function renderSelfRoles(guildId: string): void {
             }
 
             settle(answer.panel);
-            toast("info", "Gespeichert", answer.panel.messageId ? "Die Nachricht in Discord zieht nach." : "Gesendet wird erst auf Knopfdruck.");
+
+            // Gespeichert ist es - nur die Nachricht in Discord zog nicht nach.
+            if (answer.warning) toast("warn", "Gespeichert, aber nicht nachgezogen", answer.warning);
+            else toast("info", "Gespeichert", answer.panel.messageId ? "Die Nachricht in Discord zieht nach." : "Gesendet wird erst auf Knopfdruck.");
+
             paint();
         });
 
         return box;
+    }
+
+    /* ------------------------------------------------------------
+       Eine vorhandene Nachricht (W-0101)
+       ------------------------------------------------------------ */
+    /** Zwei bis drei Knöpfe, von denen einer gedrückt ist. */
+    function segment(entries: [string, string][], active: string, onPick: (value: string) => void, label: string, blocked: boolean): HTMLElement {
+        const box = el("div", "seg srseg");
+
+        box.setAttribute("role", "group");
+        box.setAttribute("aria-label", label);
+
+        for (const [value, text] of entries) {
+            const item = button("", text);
+
+            item.setAttribute("aria-pressed", String(value === active));
+            item.disabled = blocked;
+            item.addEventListener("click", () => {
+                if (value !== active) onPick(value);
+            });
+            box.append(item);
+        }
+
+        return box;
+    }
+
+    function linkOf(draft: IPanel): string {
+        return draft.targetId && draft.channelId ? `https://discord.com/channels/${guildId}/${draft.channelId}/${draft.targetId}` : "";
+    }
+
+    /** Fragt den Bot nach der Nachricht und übernimmt Kanal und ID ins Panel. */
+    async function inspect(draft: IPanel, link: string, touch: () => void, trigger?: HTMLButtonElement): Promise<void> {
+        if (!link.trim()) {
+            toast("info", "Erst den Link", "Rechtsklick auf die Nachricht → Nachrichtenlink kopieren.");
+
+            return;
+        }
+
+        if (trigger) trigger.disabled = true;
+
+        const answer = await call<{ message: IFound }>("", { action: "inspect", link: link.trim(), channelId: draft.channelId });
+
+        if (trigger) trigger.disabled = false;
+        if (!answer) return;
+
+        const message = answer.message;
+
+        found.set(draft.id, message);
+
+        if (draft.channelId !== message.channelId || draft.targetId !== message.messageId) {
+            draft.channelId = message.channelId;
+            draft.targetId = message.messageId;
+            touch();
+        }
+
+        if (!message.own && draft.kind !== "reactions") {
+            draft.kind = "reactions";
+            touch();
+            toast("info", "Auf Reaktionen gestellt", "Die Nachricht ist nicht von RL Nexus, da gehen nur Reaktionen.");
+        }
+
+        paint();
+    }
+
+    function foundBox(info: IFound): HTMLElement {
+        return el(
+            "div",
+            `srfound${info.own ? "" : " is-warn"}`,
+            el("div", "srfound__meta", el("b", "", `#${info.channelName}`), el("span", "", `von ${info.author}`), el("span", "", ago(info.createdAt))),
+            el("div", "srfound__text", `„${info.excerpt}“`),
+            el("div", "srfound__can", info.own ? "Nachricht von RL Nexus: Knöpfe, Menü und Reaktionen gehen." : "Nicht von RL Nexus: Discord erlaubt hier nur Reaktionen.")
+        );
     }
 
     /* ------------------------------------------------------------
@@ -352,6 +541,17 @@ export function renderSelfRoles(guildId: string): void {
         const label = el("input", "text");
         const emoji = el("input", "text srrole__emoji");
         const remove = button("btn btn--quiet btn--icon", icon("#i-x"));
+        const reactions = draft.kind === "reactions";
+        // Bei Reaktionen steht kein Text in Discord, nur das Emoji - die Spalte zeigt, ob es fehlt.
+        const hint = el("span", "srrole__hint");
+        const mark = (): void => {
+            const missing = reactions && !entry.emoji;
+
+            hint.textContent = entry.emoji ? `Reaktion ${entry.emoji}` : "Emoji fehlt noch";
+            hint.classList.toggle("is-missing", missing);
+            emoji.classList.toggle("is-missing", missing);
+            emoji.setAttribute("aria-invalid", String(missing));
+        };
 
         label.type = "text";
         label.value = entry.label;
@@ -370,8 +570,10 @@ export function renderSelfRoles(guildId: string): void {
         emoji.setAttribute("aria-label", `Emoji für ${nameOf(entry.roleId)}`);
         emoji.addEventListener("input", () => {
             entry.emoji = emoji.value.trim() || null;
+            mark();
             touch();
         });
+        mark();
 
         remove.title = "Rolle aus dem Panel nehmen";
         remove.setAttribute("aria-label", `${nameOf(entry.roleId)} entfernen`);
@@ -381,13 +583,13 @@ export function renderSelfRoles(guildId: string): void {
             redraw();
         });
 
-        const extra = draft.kind === "select" ? description(entry, touch) : tone(entry, touch);
+        const extra = reactions ? el("span", "") : draft.kind === "select" ? description(entry, touch) : tone(entry, touch);
 
         return el(
             "div",
             "srrole",
             el("span", "srrole__name", el("b", "", `@${nameOf(entry.roleId)}`)),
-            label,
+            reactions ? hint : label,
             emoji,
             extra,
             el("label", "snitem__switch", toggle(entry.locked, `${nameOf(entry.roleId)} festhalten`, (on) => {
@@ -428,9 +630,9 @@ export function renderSelfRoles(guildId: string): void {
 
     function addRole(draft: IPanel, touch: () => void, redraw: () => void): HTMLElement {
         const left = data!.guild.roles.filter((role) => !draft.roles.some((entry) => entry.roleId === role.id));
-        const full = draft.roles.length >= data!.limits.roles;
+        const full = draft.roles.length >= roleLimit(draft);
         const picker = select(
-            [["", full ? `Höchstens ${data!.limits.roles} Rollen` : "+ Rolle hinzufügen"], ...left.map((role): [string, string] => [role.id, `@${role.name}`])],
+            [["", full ? `Höchstens ${roleLimit(draft)} Rollen` : "+ Rolle hinzufügen"], ...left.map((role): [string, string] => [role.id, `@${role.name}`])],
             "",
             (value) => {
                 if (!value) return;
@@ -463,7 +665,11 @@ export function renderSelfRoles(guildId: string): void {
         const box = el("div", "tkprev__buttons");
 
         for (const entry of draft.roles) {
-            box.append(el("span", `tkprev__btn is-${entry.style}`, `${entry.emoji ? `${entry.emoji} ` : ""}${entry.label || nameOf(entry.roleId)}`));
+            box.append(
+                draft.kind === "reactions"
+                    ? el("span", "srprev__react", `${entry.emoji ?? "?"} 1`)
+                    : el("span", `tkprev__btn is-${entry.style}`, `${entry.emoji ? `${entry.emoji} ` : ""}${entry.label || nameOf(entry.roleId)}`)
+            );
         }
 
         return box;
@@ -473,12 +679,17 @@ export function renderSelfRoles(guildId: string): void {
        Knöpfe am Panel
        ------------------------------------------------------------ */
     function sendButton(panel: IPanel): HTMLButtonElement {
-        const send = button("btn btn--quiet", icon("#i-upload"), panel.messageId ? "Aktualisieren" : "Senden");
+        const send = button(
+            "btn btn--quiet",
+            icon(panel.attached ? "#i-link" : "#i-upload"),
+            panel.messageId ? "Aktualisieren" : panel.attached ? "Anhängen" : "Senden"
+        );
 
         const unsaved = dirty.has(panel.id);
+        const nowhere = panel.attached ? !panel.targetId : !panel.channelId;
 
-        send.disabled = !panel.channelId || !panel.roles.length || unsaved;
-        send.title = !panel.channelId ? "Erst einen Kanal wählen" : !panel.roles.length ? "Erst Rollen hinzufügen" : unsaved ? "Erst speichern" : "";
+        send.disabled = nowhere || !panel.roles.length || unsaved;
+        send.title = nowhere ? (panel.attached ? "Erst die Nachricht prüfen" : "Erst einen Kanal wählen") : !panel.roles.length ? "Erst Rollen hinzufügen" : unsaved ? "Erst speichern" : "";
         send.addEventListener("click", async () => {
             send.disabled = true;
 
@@ -491,7 +702,11 @@ export function renderSelfRoles(guildId: string): void {
             }
 
             settle(answer.panel);
-            toast("info", panel.messageId ? "Aktualisiert" : "Gesendet", "Das Panel steht im Kanal.");
+            toast(
+                "info",
+                panel.messageId ? "Aktualisiert" : panel.attached ? "Angehängt" : "Gesendet",
+                panel.attached ? "Das Panel hängt an der Nachricht." : "Das Panel steht im Kanal."
+            );
             paint();
         });
 
@@ -501,13 +716,20 @@ export function renderSelfRoles(guildId: string): void {
     function recallButton(panel: IPanel): HTMLElement {
         if (!panel.messageId) return el("span", "");
 
-        return confirmButton("btn btn--quiet", "#i-eraser", "Einsammeln", "Wirklich löschen?", async () => {
+        // Angehängt: nur die eigenen Reaktionen bzw. die Reihe kommen ab, die Nachricht bleibt.
+        const attached = panel.attached;
+
+        return confirmButton("btn btn--quiet", "#i-eraser", attached ? "Lösen" : "Einsammeln", attached ? "Wirklich lösen?" : "Wirklich löschen?", async () => {
             const answer = await call<{ panel: IPanel }>("", { action: "recall", id: panel.id });
 
             if (!answer) return;
 
             settle(answer.panel);
-            toast("info", "Eingesammelt", "Die Nachricht in Discord ist weg, das Panel bleibt.");
+            toast(
+                "info",
+                attached ? "Gelöst" : "Eingesammelt",
+                attached ? "Reaktionen bzw. Reihe sind ab, die Nachricht bleibt stehen." : "Die Nachricht in Discord ist weg, das Panel bleibt."
+            );
             paint();
         });
     }
@@ -520,7 +742,7 @@ export function renderSelfRoles(guildId: string): void {
             drafts.delete(panel.id);
             dirty.delete(panel.id);
             open = null;
-            toast("info", "Gelöscht", "Panel und Nachricht sind weg.");
+            toast("info", "Gelöscht", panel.attached ? "Das Panel ist weg, die Nachricht bleibt stehen." : "Panel und Nachricht sind weg.");
             paint();
         });
     }

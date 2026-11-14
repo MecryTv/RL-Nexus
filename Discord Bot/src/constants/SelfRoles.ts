@@ -15,10 +15,13 @@ export const MAX_ROLES = 25;
 export const MAX_NAME = 80;
 export const MAX_LABEL = 80;
 export const MAX_DESCRIPTION = 100;
+/** Discord: höchstens 20 verschiedene Reaktionen an einer Nachricht. */
+export const MAX_REACTIONS = 20;
 
 export const KIND_LABELS: Record<string, string> = {
     buttons: "Knöpfe",
     select: "Auswahlmenü",
+    reactions: "Reaktionen",
 };
 
 export const MODE_LABELS: Record<string, string> = {
@@ -70,4 +73,16 @@ export function CleanEmoji(value: unknown): string | null {
     const single = [...new Intl.Segmenter().segment(emoji)].length === 1;
 
     return single && /\p{Extended_Pictographic}|\p{Regional_Indicator}|⃣/u.test(emoji) ? emoji : null;
+}
+
+/**
+ * Woran sich ein Emoji wiedererkennen lässt: bei einem eigenen die ID, sonst
+ * das Zeichen ohne FE0F - Discord schickt "❤" auch mal ohne den Zusatz zurück.
+ * Nimmt den gespeicherten Text oder das Emoji aus einem Gateway-Ereignis.
+ */
+export function EmojiKey(emoji: string | { id: string | null; name: string | null } | null): string {
+    if (!emoji) return "";
+    if (typeof emoji !== "string") return emoji.id ?? (emoji.name ?? "").replace(/\uFE0F/g, "");
+
+    return /^<a?:\w+:(\d+)>$/.exec(emoji)?.[1] ?? emoji.replace(/\uFE0F/g, "");
 }

@@ -52,8 +52,9 @@ export async function PanelsOf(client: BotClient, guildId: string, withData = fa
     const panels: IPanelRef[] = [];
     const add = (panel: IPanelRef, source: unknown) => panels.push(withData ? { ...panel, data: JSON.stringify(source) } : panel);
 
+    // Angehängte Panels (W-0101) gehören zu einer fremden Nachricht: die löscht und postet ein Zurückladen nie.
     for (const panel of await client.selfRolePanels.OfGuild(guildId)) {
-        if (panel.channelId && panel.messageId) add({ kind: "selfrole", key: String(panel.id), channelId: panel.channelId, messageId: panel.messageId, label: `Rollen-Panel „${panel.name}“` }, panel);
+        if (panel.channelId && panel.messageId && !panel.attached) add({ kind: "selfrole", key: String(panel.id), channelId: panel.channelId, messageId: panel.messageId, label: `Rollen-Panel „${panel.name}“` }, panel);
     }
 
     const tickets = await client.ticketSettings.Of(guildId);
@@ -215,6 +216,8 @@ export async function AfterRestore(client: BotClient, guild: Guild, tables: read
 
     // Rollen-Listen merken sich, welche Listen auf welche Rollen hören - das stimmt jetzt nicht mehr.
     client.roleListService.Forget(guild.id);
+    // Und Self Roles, welche Nachricht zu welchem Panel gehört (Reaktionen, Nachziehen).
+    await client.selfRoleService.Track(guild.id);
 
     const after = await PanelsOf(client, guild.id);
     const report: IRestoreReport = { reposted: [], removed: [], problems: [] };
@@ -295,6 +298,22 @@ export async function AfterServerRestore(client: BotClient, guild: Guild, remapp
             redrawn.push(panel.kind === "team" ? "Team-Übersicht und Karten" : panel.label);
         } catch (error) {
             problems.push(`${panel.label}: ${error instanceof Error ? error.message : String(error)}`);
+        }
+    }
+
+    // Angehängte Self-Role-Panels (W-0101) gehören zu einer fremden Nachricht: nie löschen
+    // oder neu posten, aber mit den neuen Rollen-IDs wieder anhängen. Ist die Nachricht weg,
+    // steht es bei den Problemen.
+    for (const panel of fresh.length ? await client.selfRolePanels.OfGuild(guild.id) : []) {
+        if (!panel.attached || !panel.messageId || !fresh.some((id) => JSON.stringify(panel).includes(id))) continue;
+
+        const label = `Rollen-Panel „${panel.name}“`;
+
+        try {
+            await client.selfRoleService.Send(guild, panel);
+            redrawn.push(label);
+        } catch (error) {
+            problems.push(`${label}: ${error instanceof Error ? error.message : String(error)}`);
         }
     }
 

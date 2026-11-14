@@ -15,6 +15,8 @@ export interface ISelfRolePanelRow {
     roles: ISelfRole[] | string;
     channel_id: string | null;
     message_id: string | null;
+    attached: number | boolean;
+    target_id: string | null;
     created_by: string;
     created_at: number | string;
     updated_at: number | string;
@@ -33,13 +35,15 @@ function ToPanel(row: ISelfRolePanelRow): ISelfRolePanel {
         roles: Unpack<ISelfRole[]>(row.roles, []),
         channelId: row.channel_id,
         messageId: row.message_id,
+        attached: Boolean(Number(row.attached ?? 0)),
+        targetId: row.target_id ?? null,
         createdBy: row.created_by,
         createdAt: Number(row.created_at),
         updatedAt: Number(row.updated_at),
     };
 }
 
-type PanelPatch = Partial<Pick<ISelfRolePanel, "name" | "kind" | "mode" | "maxRoles" | "requireRole" | "body" | "roles" | "channelId" | "messageId">>;
+type PanelPatch = Partial<Pick<ISelfRolePanel, "name" | "kind" | "mode" | "maxRoles" | "requireRole" | "body" | "roles" | "channelId" | "messageId" | "attached" | "targetId">>;
 
 /** Die Self-Role-Panels eines Servers. */
 export default class SelfRolePanels extends Model<ISelfRolePanelRow> {
@@ -59,6 +63,8 @@ export default class SelfRolePanels extends Model<ISelfRolePanelRow> {
             roles: JSON.stringify(input.roles ?? []),
             channel_id: input.channelId ?? null,
             message_id: null,
+            attached: input.attached ? 1 : 0,
+            target_id: input.targetId ?? null,
             created_by: input.createdBy,
             created_at: now,
             updated_at: now,
@@ -77,6 +83,11 @@ export default class SelfRolePanels extends Model<ISelfRolePanelRow> {
         return (await this.Where({ guild_id: guildId }, "id DESC")).map(ToPanel);
     }
 
+    /** Alle Panels, die gerade in Discord stehen - für die Zuordnung Nachricht → Panel beim Start. */
+    async Placed(): Promise<ISelfRolePanel[]> {
+        return (await this.db.Query<ISelfRolePanelRow>(`SELECT * FROM \`${this.Table}\` WHERE message_id IS NOT NULL`)).map(ToPanel);
+    }
+
     async Save(id: number, patch: PanelPatch): Promise<void> {
         const row: Partial<ISelfRolePanelRow> = { updated_at: Date.now() };
 
@@ -89,6 +100,8 @@ export default class SelfRolePanels extends Model<ISelfRolePanelRow> {
         if (patch.roles !== undefined) row.roles = JSON.stringify(patch.roles);
         if (patch.channelId !== undefined) row.channel_id = patch.channelId;
         if (patch.messageId !== undefined) row.message_id = patch.messageId;
+        if (patch.attached !== undefined) row.attached = patch.attached ? 1 : 0;
+        if (patch.targetId !== undefined) row.target_id = patch.targetId;
 
         await this.Update([id], row);
     }

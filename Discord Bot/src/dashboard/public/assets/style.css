@@ -1004,6 +1004,11 @@ body:has(.controls.is-stuck) .topbar{box-shadow:none}
 .setnav--legal .legal__num{margin-right:2px;font-size:11px;color:var(--text-3)}
 .setnav--legal a[aria-current="true"] .legal__num{color:var(--brand)}
 .legal__address{margin:0 0 14px;font-style:normal;font-size:14.5px;line-height:1.75;color:var(--text)}
+/* W-0102: die beiden Anbieter als zwei Karten, wie auf der Webseite. */
+.legal__addresses{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin:0 0 16px}
+.legal__addresses .legal__address{position:relative;margin:0;padding:14px 18px;background:var(--panel-fill);border:1px solid var(--line-strong);clip-path:polygon(0 0,calc(100% - 12px) 0,100% 12px,100% 100%,0 100%)}
+.legal__addresses .legal__address::before{position:absolute;top:0;left:0;width:28px;height:2px;background:var(--brand);content:""}
+.legal__name{display:block;margin-bottom:4px;font-weight:700}
 .legal__updated{margin-top:34px;font-size:12.5px;color:var(--text-3)}
 .doc.legal h2{scroll-margin-top:calc(var(--topbar-h) + 20px)}
 
@@ -1105,6 +1110,8 @@ body:has(.cookiebar:not([hidden])) .footer{padding-bottom:120px}
 .toast p{font-size:12.5px;color:var(--text-3);margin-top:2px}
 .toast__bar{position:absolute;left:0;bottom:0;height:2px;width:100%;background:var(--brand);transform-origin:left;animation:drain 3.6s linear forwards}
 .toast--invite .toast__bar{background:var(--blue)}
+.toast--warn .toast__mark{background:color-mix(in srgb,var(--warn) 14%,transparent);color:var(--warn)}
+.toast--warn .toast__bar{background:var(--warn);animation-duration:7.2s}
 @keyframes drain{to{transform:scaleX(0)}}
 .toast__x{margin-left:auto;color:var(--text-3);align-self:flex-start}
 .toast__x svg{width:14px;height:14px}
@@ -4565,12 +4572,37 @@ details.tmhub__menu[open] > summary svg{transform:rotate(180deg)}
 .srrole--add{grid-template-columns:minmax(0,260px)}
 .srrole__name{min-width:0;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .srrole__emoji{text-align:center}
+/* Felder füllen ihre Spalte - mit fester Breite lief das Emoji-Feld unter die Farbauswahl. */
+.srrole>.text,.srrole>.pick{width:100%;min-width:0;box-sizing:border-box}
 .srprev__menu{display:flex;align-items:center;justify-content:space-between;gap:8px;height:38px;padding:0 12px;border:1px solid var(--line);border-radius:6px;color:var(--text-3);font-size:13px}
 .srprev__menu svg{width:14px;height:14px}
+.srprev__react{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 9px;border-radius:13px;font-size:12.5px;color:var(--text-2);background:rgba(255,255,255,.06);border:1px solid var(--line)}
+/* W-0101: an eine vorhandene Nachricht hängen */
+.srchip{flex:none;padding:3px 8px;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--live);border:1px solid color-mix(in srgb,var(--live) 45%,transparent);background:color-mix(in srgb,var(--live) 8%,transparent)}
+.srseg button:disabled{opacity:.5;cursor:not-allowed}
+.row:has(> .srlink){flex-wrap:wrap}
+.row > .srlink{flex:1 1 320px;display:grid;gap:8px;min-width:0}
+.srlink__row{display:flex;gap:8px}
+.srlink__row .text{flex:1 1 200px;min-width:0}
+.srlink__row .btn{flex:none;width:auto}
+.srfound{display:grid;gap:4px;padding:10px 12px;border:1px solid var(--line);border-left:3px solid var(--live);background:rgba(255,255,255,.02);font-size:12.5px}
+.srfound.is-warn{border-left-color:var(--warn)}
+.srfound__meta{display:flex;flex-wrap:wrap;gap:2px 12px;color:var(--text-3)}
+.srfound__meta b{color:var(--text);font-weight:600}
+.srfound__text{color:var(--text-2);overflow-wrap:anywhere}
+.srfound__can{color:var(--text-3)}
+.srfound.is-warn .srfound__can{color:var(--warn)}
+.srrole__hint{min-width:0;font-size:12.5px;color:var(--text-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.srrole__hint.is-missing{color:var(--loss)}
+.srrole__emoji.is-missing{border-color:color-mix(in srgb,var(--loss) 60%,transparent)}
+.srnote{margin:6px 0 0;font-size:12px;color:var(--text-3)}
+.srnote--warn{margin:0;color:var(--warn)}
+.srnote[hidden]{display:none}
 @media (max-width:760px){
   .srrole{grid-template-columns:minmax(0,1fr) auto;row-gap:6px}
   .srrole__name{grid-column:1 / -1}
   .srrole--add{grid-template-columns:minmax(0,1fr)}
+  .srlink__row{flex-wrap:wrap}
 }
 
 /* ----------------------------------------------------------

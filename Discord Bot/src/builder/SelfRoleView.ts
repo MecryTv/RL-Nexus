@@ -16,7 +16,8 @@ import { ISelfRole, ISelfRolePanel } from "../interfaces/services/selfroles/ISel
 /**
  * Ein Self-Role-Panel als Nachricht: oben der Kopf (Karte, Embed oder Text -
  * derselbe Bau wie bei Custom Message), darunter die Rollen als Knopfreihen
- * oder als Auswahlmenü.
+ * oder als Auswahlmenü. Bei Reaktionen nur der Kopf, die Reaktionen setzt der
+ * SelfRoleService danach.
  *
  * Die Custom-ID trägt Panel und Rolle und übersteht deshalb jeden Neustart:
  * selfrole:<panel>:<rolle> für einen Knopf, selfrole:menu:<panel> für das Menü.
@@ -37,7 +38,8 @@ export function LabelOf(role: ISelfRole, nameOf: (id: string) => string): string
 export function PanelRows(panel: ISelfRolePanel, nameOf: (id: string) => string): ActionRowBuilder<MessageActionRowComponentBuilder>[] {
     const roles = panel.roles.slice(0, 25);
 
-    if (!roles.length) return [];
+    // Reaktionen hängen an der Nachricht selbst, eine Reihe gibt es dafür nicht.
+    if (!roles.length || panel.kind === "reactions") return [];
 
     if (panel.kind === "select") {
         const menu = new StringSelectMenuBuilder()
