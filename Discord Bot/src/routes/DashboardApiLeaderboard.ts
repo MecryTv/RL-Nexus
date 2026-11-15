@@ -57,7 +57,8 @@ export default class DashboardApiLeaderboard extends Route {
         const period = IsPeriod(query.period) ? query.period : "all";
         const offset = Math.max(0, Math.floor(Number(query.offset) || 0));
         const session = SessionOf(this.client, request);
-        const board = await service.Board(guild, period, Math.floor(offset / CHUNK) + 1, session?.userId ?? null, CHUNK);
+        // W-0118: Seiten und Suche lesen aus derselben Rangliste, je Server und Zeitraum höchstens alle 60 s neu gerechnet.
+        const board = await service.Board(guild, period, Math.floor(offset / CHUNK) + 1, session?.userId ?? null, CHUNK, undefined, true);
         const search = typeof query.q === "string" ? query.q.slice(0, 50) : "";
 
         // Ohne Discord-IDs; die eigene Zeile erkennt die Seite an me.
@@ -82,7 +83,7 @@ export default class DashboardApiLeaderboard extends Route {
             total: board.total,
             offset: (board.page - 1) * CHUNK,
             entries: board.entries.map(out),
-            ...(search ? { matches: await service.Search(guild, period, search, CHUNK) } : {}),
+            ...(search ? { matches: await service.Search(guild, period, search, CHUNK, true) } : {}),
             viewer: session && board.viewer ? out(board.viewer) : null,
             signedIn: Boolean(session),
             updatedAt: Date.now(),

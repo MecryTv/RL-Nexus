@@ -47,7 +47,7 @@ import { IconImage, RANK_ICON_FILES, RANK_ICON_ROOT, RankIconImage, RankIconName
 import { IsImageFile } from "../constants/Gallery";
 import { ITeam, ITeamGroup, ITeamPlayer, ITeamSettings, ITeamView, TeamRole } from "../interfaces/services/teams/ITeams";
 import DashboardApiTeams, { HubParts } from "../routes/DashboardApiTeams";
-import { ApplyCategoryDraft, ParseCategoryDraft, EmojiId, NeedsResend, NormalizeTeamSettings, RolePlan, RoleTargets, SameMessage, TeamError, TeamOverwrites, TextName, ViewFacts } from "../services/TeamService";
+import { ApplyCategoryDraft, ParseCategoryDraft, EmojiId, NeedsResend, NormalizeTeamSettings, RolePlan, RoleTargets, SameMessage, TeamError, TeamOverwrites, TextName, Usable, ViewFacts } from "../services/TeamService";
 import { Evaluate, FormulaError } from "../utils/formula";
 
 const GUILD = "90071992547409951";
@@ -423,6 +423,16 @@ async function checkCardImages(client: BotClient): Promise<void> {
     check("Emoji nicht ladbar: Standard-Abzeichen", images.badges.sub === null);
     check("Ohne eigenes Abzeichen: Standard", images.badges.trial === null);
     check("Emoji-ID nur aus der Zahl", EmojiId("<:xx:123456789012345678>") === "123456789012345678" && EmojiId("<:xx:12/../a>") === null && EmojiId("🔥") === null);
+
+    // W-0118: Usable liest die Maße aus dem Dateikopf, bevor etwas entpackt wird.
+    const bomb = Buffer.alloc(33);
+
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52]).copy(bomb);
+    bomb.writeUInt32BE(30_000, 16);
+    bomb.writeUInt32BE(30_000, 20);
+
+    check("Usable: ein PNG-Kopf mit 30000×30000 fällt weg", (await Usable(bomb)) === null);
+    check("Usable: ein echtes kleines Bild bleibt", (await Usable(png)) === png);
 
     const gallery = await service.CardImages(guild, FakeTeam([], { logo: "default/rocketleague/teamicons/Coach.png" }), DefaultTeamSettings(), download);
 

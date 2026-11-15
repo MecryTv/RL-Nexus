@@ -36,7 +36,7 @@ import {
 } from "../constants/Moderation";
 import { IModCase, IModConfig, IModDetails, IModEnded, IModEvidence, IModMessageProof, IModProofRules, IModStage, IModSupport, ModAction, ModSource } from "../interfaces/services/moderation/IModeration";
 import { NewModCase } from "../models/ModCases";
-import { Shrink } from "../utils/image";
+import { IMAGE_TOO_LARGE, Shrink } from "../utils/image";
 import logger from "../utils/logger";
 import { IsLogTarget, SendLog, WarmLogTarget } from "../utils/logtarget";
 
@@ -970,8 +970,8 @@ export default class ModerationService {
         if (buffer.length === 0 || buffer.length > MAX_EVIDENCE_BYTES) throw new ModerationError("Das Bild ist leer oder größer als 8 MB.");
 
         const entry = await this.CaseOf(guildId, number);
-        const image = await Shrink(buffer, type).catch(() => {
-            throw new ModerationError("Das Bild ließ sich nicht lesen.");
+        const image = await Shrink(buffer, type).catch((error: unknown) => {
+            throw new ModerationError(error instanceof Error && error.message === IMAGE_TOO_LARGE ? IMAGE_TOO_LARGE : "Das Bild ließ sich nicht lesen.");
         });
         const directory = path.join(EVIDENCE_ROOT, guildId, String(entry.id));
 

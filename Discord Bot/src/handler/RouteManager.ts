@@ -2,7 +2,7 @@ import path from "path";
 import { pathToFileURL } from "node:url";
 import { Collection } from "discord.js";
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { glob } from "glob";
+import { glob } from "node:fs/promises";
 import BotClient from "../client/BotClient";
 import IRouteManager from "../interfaces/services/server/IRouteManager";
 import Route from "../structures/Route";
@@ -58,10 +58,10 @@ export default class RouteManager implements IRouteManager {
     }
 
     async Load(): Promise<number> {
-        const files = await glob("**/*.{ts,js}", {
-            cwd: path.join(__dirname, "../routes"),
-            absolute: true,
-        });
+        const dir = path.join(__dirname, "../routes");
+        const files: string[] = [];
+
+        for await (const file of glob("**/*.{ts,js}", { cwd: dir })) files.push(path.join(dir, file));
 
         for (const file of files) {
             try {

@@ -12,6 +12,7 @@ import {
 } from "discord.js";
 import { createHash } from "node:crypto";
 import { loadImage } from "@napi-rs/canvas";
+import { ImageSize } from "../utils/image";
 import BotClient from "../client/BotClient";
 import { ICustomView } from "../builder/CustomView";
 import { HubMessages, PlayerValues, TeamCardView, TeamOwnValues, TeamValues } from "../builder/TeamView";
@@ -553,9 +554,12 @@ export function Download(url: string): Promise<Buffer | null> {
 export async function Usable(buffer: Buffer | null): Promise<Buffer | null> {
     if (!buffer || buffer.length > MAX_IMAGE_BYTES) return null;
 
-    const image = await loadImage(buffer).catch(() => null);
+    // W-0118: die Maße aus dem Dateikopf, bevor irgendetwas entpackt wird.
+    const size = ImageSize(buffer);
 
-    return image && image.width <= MAX_IMAGE_EDGE && image.height <= MAX_IMAGE_EDGE ? buffer : null;
+    if (!size || size.width > MAX_IMAGE_EDGE || size.height > MAX_IMAGE_EDGE) return null;
+
+    return (await loadImage(buffer).catch(() => null)) ? buffer : null;
 }
 
 /** Was SameMessage von einer Nachricht braucht - Message passt, die Checks bauen es nach. */

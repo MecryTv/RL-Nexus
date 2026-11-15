@@ -1,6 +1,5 @@
 import path from "path";
-import { unlink } from "node:fs/promises";
-import { glob } from "glob";
+import { glob, unlink } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 import { Collection } from "discord.js";
 import BotClient from "../client/BotClient";
@@ -242,10 +241,10 @@ export default class RunnableService implements IRunnableService {
     }
 
     private async LoadRunnables(): Promise<void> {
-        const files = await glob("**/*.{ts,js}", {
-            cwd: path.join(__dirname, "../runnables"),
-            absolute: true,
-        });
+        const dir = path.join(__dirname, "../runnables");
+        const files: string[] = [];
+
+        for await (const file of glob("**/*.{ts,js}", { cwd: dir })) files.push(path.join(dir, file));
 
         for (const file of files) {
             try {

@@ -1,10 +1,12 @@
 import { Guild, GuildMember, Message, PartialGuildMember, VoiceState } from "discord.js";
+import { LRUCache } from "lru-cache";
 import BotClient from "../client/BotClient";
 import {
     CHANNEL_DAYS,
     DAY_MS,
     DayOf,
     FLUSH_MS,
+    FORGET_MS,
     HOUR_MS,
     HourOf,
     KEEP_DAYS,
@@ -53,6 +55,10 @@ export default class ActivityService {
     private members = new Map<string, MemberBucket>();
     private voice = new Map<string, IVoiceSession>();
     private timer: NodeJS.Timeout | null = null;
+    /** W-0119: gerade gelöschte Personen. Ein weiteres Vergessen verlängert die Frist. */
+    private forgotten = new LRUCache<string, true>({ max: 10_000, ttl: FORGET_MS });
+    /** Das Schreiben, das gerade läuft (oder zuletzt lief) - ForgetUser wartet darauf. */
+    private writing: Promise<void> = Promise.resolve();
 
     constructor(client: BotClient) {
         this.client = client;
@@ -217,11 +223,25 @@ export default class ActivityService {
      * Nach einer Löschung im Admin Dashboard (W-0051): Gepuffertes der Person
      * verwerfen, sonst schriebe der nächste Flush ihre Aktivität zurück. Läuft
      * sie gerade im Sprachkanal, zählt das ab jetzt nicht mehr.
+     *
+     * W-0119: Das Admin Dashboard ruft das vor und nach der Löschung. Für FORGET_MS
+     * schreibt danach weder Flush noch das Level System etwas für die Person. Läuft
+     * gerade ein Schreiben mit Zeilen von vorher, endet das Versprechen erst danach -
+     * so kommt die Löschung sicher hinterher.
      */
-    ForgetUser(userId: string): void {
+    ForgetUser(userId: string): Promise<void> {
+        this.forgotten.set(userId, true);
+
         for (const map of [this.members, this.voice] as Map<string, unknown>[]) {
             for (const key of [...map.keys()]) if (key.endsWith(`:${userId}`)) map.delete(key);
         }
+
+        return this.writing;
+    }
+
+    /** W-0119: Wurde die Person gerade gelöscht? Dann schreibt der Bot nichts für sie. */
+    Forgotten(userId: string): boolean {
+        return this.forgotten.has(userId);
     }
 
     /**
@@ -256,13 +276,24 @@ export default class ActivityService {
 
         const channels = [...this.channels.values()].filter((row) => row.messages > 0).map((row) => ({ ...row }));
 
+        // W-0119: Gelöschte Personen fallen direkt vor dem Schreiben raus, samt Puffer -
+        // auch was seit dem Vergessen dazukam. Stunden und Kanäle tragen keine ID.
+        for (const [key, bucket] of this.members) if (this.forgotten.has(bucket.userId)) this.members.delete(key);
+
         const members = [...this.members.values()]
             .map((bucket) => ({ ...bucket, voice: Minutes(bucket.voiceMs, bucket.day < day) }))
             .filter((row) => row.messages > 0 || row.voice > 0);
 
         if (hours.length + channels.length + members.length > 0) {
+            const write = this.client.activity.Add(hours, channels, members);
+
+            this.writing = write.then(
+                () => undefined,
+                () => undefined
+            );
+
             try {
-                await this.client.activity.Add(hours, channels, members);
+                await write;
             } catch (error) {
                 logger.warn(`📊 Aktivität nicht geschrieben, nächster Versuch in einer Minute - ${String(error)}`);
 

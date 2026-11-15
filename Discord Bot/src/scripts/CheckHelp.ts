@@ -10,7 +10,7 @@ process.env.DEV_CLIENT_SECRET ||= "check-secret";
 import { ApplicationCommandType, Collection, ContextMenuCommandBuilder, Guild, SlashCommandBuilder } from "discord.js";
 import HelpService from "../services/help/HelpService";
 import HelpButtons from "../events/help/HelpButtons";
-import { glob } from "glob";
+import { glob } from "node:fs/promises";
 import { createCanvas, loadImage } from "@napi-rs/canvas";
 import { RenderHelpBanner } from "../builder/HelpBanner";
 import { DrawText, Fit, HelpAlt, HelpBlock, LoadEmojis, RenderHelpImages, Runs, SetEmojiLoader, TextWidth } from "../builder/HelpImage";
@@ -120,8 +120,11 @@ function checkModel(): void {
 
 /** Alle Befehle, geladen wie im ConstructionHandler, nur ohne Discord. */
 async function RealCommands(client: BotClient): Promise<IHelpSource[]> {
-    const files = await glob("**/*.{ts,js}", { cwd: path.join(__dirname, "../commands"), absolute: true });
+    const dir = path.join(__dirname, "../commands");
+    const files: string[] = [];
     const list: IHelpSource[] = [];
+
+    for await (const file of glob("**/*.{ts,js}", { cwd: dir })) files.push(path.join(dir, file));
 
     for (const file of files) {
         const imported = await import(pathToFileURL(file).href);

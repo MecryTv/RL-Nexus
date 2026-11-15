@@ -34,6 +34,7 @@ import {
     MESSAGE_ACCENT,
     Matches,
     NextRun,
+    Pattern,
 } from "../constants/Messages";
 import {
     ButtonAction,
@@ -603,6 +604,9 @@ export default class MessageService {
             } catch {
                 throw new MessageError("Dieses Muster versteht der Bot nicht. Prüf die Regex.");
             }
+
+            // W-0118: Geprüft wird mit RE2 wie beim Abgleich. Rückbezüge und Lookarounds kann RE2 nicht.
+            if (!Pattern(phrase)) throw new MessageError("Rückbezüge wie \\1 und Lookarounds wie (?=…) gehen hier nicht. Schreib das Muster ohne sie.");
         }
 
         return {

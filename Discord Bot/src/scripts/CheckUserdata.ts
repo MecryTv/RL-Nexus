@@ -10,8 +10,11 @@
 process.env.CLIENT_SECRET ||= "check-secret";
 process.env.DEV_CLIENT_SECRET ||= "check-secret";
 
+import { GuildMember } from "discord.js";
 import BotClient from "../client/BotClient";
+import { DAY_MS, FLUSH_MS, FORGET_MS } from "../constants/Activity";
 import { ADMIN_SCOPE } from "../constants/Admin";
+import { ILevelSettings } from "../interfaces/services/levels/ILevels";
 import { AskAdmin, UNREACHABLE } from "../events/userdata/UserdataButtons";
 import ActivityService from "../services/ActivityService";
 import LevelService from "../services/LevelService";
@@ -33,6 +36,71 @@ function check(name: string, passed: boolean, detail = ""): void {
 /** Der Inhalt eines Tokens, ohne die Signatur zu prüfen. */
 function payloadOf(token: string): { sub?: string; scope?: string[] } {
     return JSON.parse(Buffer.from(token.split(".")[1] ?? "", "base64url").toString("utf8")) as { sub?: string; scope?: string[] };
+}
+
+/** W-0119: Nach dem Vergessen schreibt der Bot 10 Minuten nichts für die Person, auch nicht aus älteren Puffern. */
+async function checkTombstone(): Promise<void> {
+    console.log("\n  — Sperrliste nach dem Vergessen (W-0119) —");
+
+    const written: string[] = [];
+    let release: () => void = () => undefined;
+    let slow = false;
+    const client = {
+        databaseService: { Ready: true },
+        activity: {
+            Add: async (_hours: unknown, _channels: unknown, members: { userId: string }[]) => {
+                if (slow) await new Promise<void>((resolve) => (release = resolve));
+                written.push(...members.map((row) => row.userId));
+            },
+        },
+    };
+    const activity = new ActivityService(client as unknown as BotClient);
+    const members = (activity as unknown as { members: Map<string, unknown> }).members;
+    const day = Math.floor(Date.now() / DAY_MS);
+    const count = (userId: string) => members.set(`9:${day}:${userId}`, { guildId: "9", userId, day, messages: 3, voice: 0, voiceMs: 0 });
+
+    count(GONE);
+    count(STAYS);
+    await activity.ForgetUser(GONE);
+    // Was nach dem Vergessen noch gezählt wird (die Person schreibt weiter), geht auch nicht raus.
+    count(GONE);
+    await activity.Flush();
+
+    check("Flush nach dem Vergessen: keine Zeile für die Person", !written.includes(GONE), written.join(","));
+    check("Andere Personen werden normal geschrieben", written.includes(STAYS), written.join(","));
+    check("Die Sperre hält mindestens 10 Minuten, länger als ein Flush", activity.Forgotten(GONE) && FORGET_MS >= 10 * 60_000 && FORGET_MS > FLUSH_MS);
+
+    // Ein Flush hat seine Zeilen schon genommen und schreibt noch: Vergessen wartet, bis er durch ist.
+    const LATER = "333333333333333333";
+
+    written.length = 0;
+    slow = true;
+    count(LATER);
+
+    const flushing = activity.Flush();
+    let forgot = false;
+    const forgetting = activity.ForgetUser(LATER).then(() => (forgot = true));
+
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    check("Vergessen wartet auf ein laufendes Schreiben", !forgot);
+    release();
+    await Promise.all([flushing, forgetting]);
+    check("… und ist danach fertig, die Löschung kommt hinterher", forgot && written.includes(LATER), written.join(","));
+    slow = false;
+
+    // Das Level System legt für eine gerade gelöschte Person nichts an.
+    const added: string[] = [];
+    const levels = new LevelService({
+        activityService: activity,
+        levels: { Of: async () => null, Add: async (_guildId: string, userId: string) => void added.push(userId) },
+        levelDays: { Add: async () => undefined },
+    } as unknown as BotClient);
+    const member = (id: string) => ({ id, guild: { id: "9" } }) as unknown as GuildMember;
+
+    levels.PulseDelay = 0;
+    await levels.Credit(member(GONE), 0, { messages: 1 }, {} as ILevelSettings, null);
+    await levels.Credit(member(STAYS), 0, { messages: 1 }, {} as ILevelSettings, null);
+    check("Level: keine Punkte für die gerade gelöschte Person, andere normal", added.join(",") === STAYS, added.join(","));
 }
 
 async function main(): Promise<void> {
@@ -61,6 +129,8 @@ async function main(): Promise<void> {
     people.set(`9:${STAYS}`, []);
     index.ForgetUser(GONE);
     check("Anti-Villain: Nachrichten der Person auf allen Servern weg", [...people.keys()].join(",") === `9:${STAYS}`);
+
+    await checkTombstone();
 
     console.log("\n  — Knöpfe fragen das Admin Dashboard —");
 

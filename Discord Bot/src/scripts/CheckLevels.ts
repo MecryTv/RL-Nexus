@@ -1324,6 +1324,17 @@ async function checkPublic(): Promise<void> {
         return reply as IFakeReply & { body: { viewer: { me?: boolean; rank: number } | null; signedIn: boolean; entries: { rank: number; me?: boolean }[]; matches?: { rank: number; offset: number }[]; kpi: { members: number } } };
     };
 
+    // W-0118: zählt, wie oft die ganze Rangliste gerechnet wird (jede Rechnung liest alle Zeilen).
+    let computed = 0;
+    const levels = world.client.levels as unknown as { All: (guildId: string) => Promise<unknown> };
+    const all = levels.All.bind(levels);
+
+    levels.All = async (guildId: string) => {
+        computed++;
+
+        return all(guildId);
+    };
+
     const privateReply = await ask(closed);
     const anon = await ask(world);
     const signed = await ask(world, {}, SESSION);
@@ -1337,6 +1348,13 @@ async function checkPublic(): Promise<void> {
     check("Antwort hängt am Cookie (Vary)", anon.headers["vary"] === "Cookie" && signed.headers["vary"] === "Cookie", JSON.stringify([anon.headers["vary"], signed.headers["vary"]]));
     check("Suche findet den Platz", search.body.matches?.[0]?.rank === 37 && search.body.matches?.[0]?.offset === 0, JSON.stringify(search.body.matches));
     check("Alle Plätze: offset 100 liefert Platz 101", page3.body.entries[0]?.rank === 101 && anon.body.kpi.members === 120, JSON.stringify(page3.body.entries[0]));
+    check("W-0118: vier Anfragen in 60 s (Seite, Anmeldung, Suche, offset) rechnen einmal", computed === 1, String(computed));
+
+    await Promise.all([ask(world, { period: "7d" }), ask(world, { period: "7d", offset: "50" }), ask(world, { period: "7d", q: "spieler 3" })]);
+    check("W-0118: gleichzeitige Anfragen teilen sich eine Rechnung, je Zeitraum eine", computed === 2, String(computed));
+
+    await world.service.Board(world.guild, "all", 1, null);
+    check("W-0118: Dashboard und Discord rechnen weiter frisch", computed === 3, String(computed));
 
     const page = async (target: IWorld) => {
         const reply = FakeReply();

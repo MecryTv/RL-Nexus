@@ -44,6 +44,7 @@ import { createCanvas } from "@napi-rs/canvas";
 import axios, { InternalAxiosRequestConfig } from "axios";
 import fastify from "fastify";
 import GalleryService from "../services/GalleryService";
+import { IMAGE_TOO_LARGE } from "../utils/image";
 import BotClient from "../client/BotClient";
 import RouteManager from "../handler/RouteManager";
 import DashboardApiGalleryEdit from "../routes/DashboardApiGalleryEdit";
@@ -1095,6 +1096,36 @@ async function main(): Promise<void> {
         const muellDateien = await readdir(path.join(ROOT, "label-muell")).catch(() => []);
 
         check("Abgelehnter Muell hinterlaesst keine Datei", muellDateien.length === 0, muellDateien.join(", "));
+
+        // W-0118: Nur der Kopf eines PNG/GIF mit 30000x30000 Pixeln - entpackt waeren das Gigabytes.
+        console.log("\n  — Bildbombe: Masse aus dem Dateikopf —");
+
+        const bombe = Buffer.alloc(33);
+
+        Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52]).copy(bombe);
+        bombe.writeUInt32BE(30_000, 16);
+        bombe.writeUInt32BE(30_000, 20);
+
+        const gifBombe = Buffer.alloc(13);
+
+        gifBombe.write("GIF89a", 0, "ascii");
+        gifBombe.writeUInt16LE(30_000, 6);
+        gifBombe.writeUInt16LE(30_000, 8);
+
+        for (const [name, buffer, mime] of [["PNG", bombe, "image/png"], ["GIF", gifBombe, "image/gif"]] as const) {
+            const fehler = await service
+                .AddUpload({ guildId: GUILD, category: "bombe" }, buffer, mime, "bombe")
+                .then(
+                    () => "kein Fehler",
+                    (error: Error) => error.message
+                );
+
+            check(`${name} mit 30000x30000 wird abgelehnt`, fehler === IMAGE_TOO_LARGE, fehler);
+        }
+
+        const bombenDateien = await readdir(path.join(ROOT, "bombe")).catch(() => []);
+
+        check("Abgelehnte Bildbombe hinterlaesst keine Datei", bombenDateien.length === 0, bombenDateien.join(", "));
 
         console.log("\n  — Overview(): Sammel-Logik fuer die Dashboard-Uebersicht —");
 

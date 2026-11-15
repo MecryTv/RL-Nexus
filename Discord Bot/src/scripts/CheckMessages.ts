@@ -174,6 +174,27 @@ function checkResponses(client: BotClient): void {
     }
 
     check("Eine kaputte Regex wird abgelehnt", refused);
+
+    // W-0118: RE2 statt RegExp, sonst hält (a+)+$ den ganzen Bot sekundenlang an.
+    const started = performance.now();
+    const bomb = !Matches("a".repeat(28) + "!", "(a+)+$", "regex") && !Matches("a".repeat(1990) + "!", "(a+)+$", "regex");
+    const took = performance.now() - started;
+
+    check("(a+)+$ blockiert den Bot nicht", bomb && took < 200, `${took.toFixed(1)} ms`);
+    check("Geprüft werden höchstens 2000 Zeichen", !Matches("a".repeat(2000) + "Z", "z", "regex") && Matches("a".repeat(1999) + "Z", "z", "regex"));
+    check("Ein gespeicherter Lookahead löst nichts aus", !Matches("ab", "a(?=b)", "regex"));
+
+    for (const phrase of ["(a)\\1", "a(?=b)", "(?<!x)y"]) {
+        let message = "";
+
+        try {
+            service.CleanResponse(guild, { phrase, match: "regex", doc: DefaultResponseDoc() });
+        } catch (error) {
+            message = error instanceof MessageError ? error.message : "";
+        }
+
+        check(`RE2 lehnt ${phrase} beim Speichern ab`, message.startsWith("Rückbezüge"), message);
+    }
 }
 
 /* ----------------------------------------------------------

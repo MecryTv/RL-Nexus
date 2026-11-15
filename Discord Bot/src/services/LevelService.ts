@@ -52,6 +52,17 @@ const VOICE_CATCHUP = 5;
 
 export const LEVELS_MODULE = "levels";
 
+/** W-0118: so lange gilt eine gerechnete Rangliste der Web-Rangliste (passt zu max-age=60). */
+const SHARED_RANKING_MS = 60_000;
+
+/** Eine gerechnete Rangliste: Zeilen in Reihenfolge, Plätze jetzt und vor sieben Tagen, Gesamtstand. */
+interface IRanking {
+    rows: ILevelDaySum[];
+    order: Map<string, number>;
+    before: Map<string, number>;
+    life: Map<string, ILevelEntry>;
+}
+
 function IsRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -84,6 +95,8 @@ export default class LevelService {
     private voiceCarry = 0;
     /** Plan 35: je Server ein Zeitgeber für den nächsten "levels"-Puls. */
     private readonly pulses = new Map<string, NodeJS.Timeout>();
+    /** W-0118: Ranglisten der Web-Rangliste je Server und Zeitraum, auch solche, die gerade gerechnet werden. */
+    private readonly rankings = new LRUCache<string, Promise<IRanking>>({ max: 200, ttl: SHARED_RANKING_MS });
     /** In den Prüfungen kürzer. */
     PulseDelay = LEVEL_PULSE_MS;
 
@@ -426,6 +439,9 @@ export default class LevelService {
         const points = Math.max(0, xp);
         const before = points > 0 ? ((await this.client.levels.Of(member.guild.id, member.id))?.level ?? 0) : 0;
 
+        // W-0119: gerade gelöscht (Admin Dashboard) - direkt vor dem Schreiben nichts mehr anlegen.
+        if (this.client.activityService?.Forgotten(member.id)) return;
+
         await this.client.levels.Add(member.guild.id, member.id, points, extra);
         await this.client.levelDays.Add(member.guild.id, member.id, Today(), { xp: points, messages: extra.messages, voiceMinutes: extra.voiceMinutes });
         this.Changed(member.guild.id);
@@ -618,7 +634,7 @@ export default class LevelService {
      * vor sieben Tagen. Plan 37: mit custom feste Tage (Aktivste der Woche bzw.
      * des Monats), verglichen mit gleich vielen Tagen davor.
      */
-    private async Ranked(guildId: string, period: LevelPeriod, custom?: { from: number; to: number }): Promise<{ rows: ILevelDaySum[]; order: Map<string, number>; before: Map<string, number>; life: Map<string, ILevelEntry> }> {
+    private async Ranked(guildId: string, period: LevelPeriod, custom?: { from: number; to: number }): Promise<IRanking> {
         const today = Today();
         const lifetime = await this.client.levels.All(guildId);
         const life = new Map(lifetime.map((entry) => [entry.userId, entry]));
@@ -648,13 +664,36 @@ export default class LevelService {
     }
 
     /**
+     * W-0118: die Web-Rangliste ohne Anmeldung rechnet je Server und Zeitraum höchstens
+     * einmal in 60 Sekunden. Gleichzeitige Anfragen warten auf dieselbe Rechnung, Seiten
+     * und Suche lesen daraus. So bestimmt die Zahl der Anfragen nicht mehr die Rechenzeit.
+     */
+    private Shared(guildId: string, period: LevelPeriod): Promise<IRanking> {
+        const key = `${guildId}:${period}`;
+        let ranking = this.rankings.get(key);
+
+        if (!ranking) {
+            const started = this.Ranked(guildId, period);
+
+            // Scheitert die Rechnung, rechnet die nächste Anfrage neu.
+            started.catch(() => {
+                if (this.rankings.get(key) === started) this.rankings.delete(key);
+            });
+            this.rankings.set(key, started);
+            ranking = started;
+        }
+
+        return ranking;
+    }
+
+    /**
      * Plan 34: eine Seite der Rangliste - für das Bild in Discord, das Dashboard
      * und die Web-Rangliste. Die Seite wird auf 1 bis pages geklemmt (alte
      * Knöpfe). Namen und Avatare aus dem Cache, fehlende werden nachgeladen.
      */
-    async Board(guild: Guild, period: LevelPeriod, page: number, viewerId: string | null, size = PER_PAGE, custom?: { from: number; to: number }): Promise<IBoardPage> {
+    async Board(guild: Guild, period: LevelPeriod, page: number, viewerId: string | null, size = PER_PAGE, custom?: { from: number; to: number }, shared = false): Promise<IBoardPage> {
         const settings = await this.Settings(guild.id);
-        const { rows, order, before, life } = await this.Ranked(guild.id, period, custom);
+        const { rows, order, before, life } = await (shared && !custom ? this.Shared(guild.id, period) : this.Ranked(guild.id, period, custom));
         const pages = Math.max(1, Math.ceil(rows.length / size));
         const current = Math.min(pages, Math.max(1, Math.floor(page) || 1));
         const slice = rows.slice((current - 1) * size, current * size);
@@ -701,12 +740,12 @@ export default class LevelService {
      * Plan 34, Web-Rangliste: wer im Zeitraum Punkte hat und dessen Name die
      * Suche enthält (ohne Groß/klein), mit Platz und dem Anfang des Ladeblocks.
      */
-    async Search(guild: Guild, period: LevelPeriod, query: string, size: number): Promise<{ name: string; rank: number; offset: number }[]> {
+    async Search(guild: Guild, period: LevelPeriod, query: string, size: number, shared = false): Promise<{ name: string; rank: number; offset: number }[]> {
         const needle = query.trim().toLowerCase();
 
         if (!needle) return [];
 
-        const { order } = await this.Ranked(guild.id, period);
+        const { order } = await (shared ? this.Shared(guild.id, period) : this.Ranked(guild.id, period));
         const found: { name: string; rank: number; offset: number }[] = [];
 
         for (const member of guild.members.cache.values()) {

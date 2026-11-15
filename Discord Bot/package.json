@@ -71,11 +71,11 @@
         "axios": "^1.19.0",
         "discord.js": "^14.27.0",
         "fastify": "^5.12.0",
-        "glob": "^13.0.6",
         "jsqr": "^1.4.0",
         "lru-cache": "^11.5.2",
         "mariadb": "^3.5.4",
-        "nodemailer": "^10.0.13"
+        "nodemailer": "^10.0.13",
+        "re2": "^1.27.1"
     },
     "devDependencies": {
         "@types/node": "^26.2.0",

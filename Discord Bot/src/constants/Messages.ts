@@ -1,5 +1,7 @@
+import RE2 from "re2";
 import { ICustomEmbed, IResponseSettings, ISchedule } from "../interfaces/services/messages/IMessages";
 import { IMessageDoc } from "../interfaces/builder/IMessageDoc";
+import logger from "../utils/logger";
 
 /**
  * Custom Message: Grenzen, Vorgaben und das Ausrechnen des nächsten Termins.
@@ -103,6 +105,25 @@ export function NextRun(schedule: ISchedule, from = Date.now()): number | null {
     return null;
 }
 
+/** W-0118: So viel einer Nachricht prüft ein Regex-Stichwort höchstens. */
+export const MAX_MATCH_TEXT = 2000;
+
+/** Gespeicherte Muster, die RE2 nicht versteht - je Muster nur einmal ins Log. */
+const broken = new Set<string>();
+
+/**
+ * W-0118: Muster aus dem Dashboard laufen mit RE2 statt RegExp. RE2 verfolgt nicht
+ * zurück, ein Muster wie (a+)+$ braucht also lineare Zeit statt Minuten. Was RE2 nicht
+ * kann (Rückbezüge, Lookarounds), gibt null.
+ */
+export function Pattern(phrase: string): RE2 | null {
+    try {
+        return new RE2(phrase, "i");
+    } catch {
+        return null;
+    }
+}
+
 /** Passt der Text auf das Stichwort? */
 export function Matches(content: string, phrase: string, mode: string): boolean {
     const text = content.toLowerCase().trim();
@@ -114,12 +135,17 @@ export function Matches(content: string, phrase: string, mode: string): boolean 
     if (mode === "starts") return text.startsWith(needle);
 
     if (mode === "regex") {
-        try {
-            // Ein Muster aus dem Dashboard - kaputte Ausdrücke sollen nichts auslösen.
-            return new RegExp(phrase, "i").test(content);
-        } catch {
-            return false;
+        // Ein Muster aus dem Dashboard - kaputte oder für RE2 unbekannte Ausdrücke lösen nichts aus.
+        const pattern = Pattern(phrase);
+
+        if (pattern) return pattern.test(content.slice(0, MAX_MATCH_TEXT));
+
+        if (!broken.has(phrase)) {
+            broken.add(phrase);
+            logger.warn(`[Messages] Regex-Stichwort ohne Wirkung, RE2 versteht es nicht: ${phrase}`);
         }
+
+        return false;
     }
 
     return text.includes(needle);

@@ -4,12 +4,19 @@ import { HasAdminScope } from "../constants/Admin";
 import { SNOWFLAKE } from "../constants/Discord";
 import Route from "../structures/Route";
 
-/** Was der Bot zu einer Person im Speicher hält, vergessen. Nach einer Löschung im Admin Dashboard (W-0051). */
-export function ForgetUser(client: BotClient, userId: string): void {
-    client.activityService.ForgetUser(userId);
+/**
+ * Was der Bot zu einer Person im Speicher hält, vergessen. Nach einer Löschung im Admin Dashboard (W-0051).
+ * W-0119: Das Admin Dashboard ruft das vor und nach der Löschung; danach schreibt der Bot 10 Minuten
+ * nichts für die Person (FORGET_MS). Fertig erst, wenn ein laufendes Schreiben der Aktivität durch ist.
+ */
+export async function ForgetUser(client: BotClient, userId: string): Promise<void> {
+    const writing = client.activityService.ForgetUser(userId);
+
     client.levelService.ForgetUser(userId);
     client.dashboardService.ForgetAccess(userId);
     client.antiVillainService.index.ForgetUser(userId);
+
+    await writing;
 }
 
 /**
@@ -32,7 +39,7 @@ export default class AdminUserForget extends Route {
         const id = (request.params as { id?: string }).id ?? "";
         if (!SNOWFLAKE.test(id)) return reply.code(400).send({ error: "Ungültige ID." });
 
-        ForgetUser(this.client, id);
+        await ForgetUser(this.client, id);
 
         return reply.code(204).send();
     }

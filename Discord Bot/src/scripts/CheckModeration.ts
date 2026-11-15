@@ -45,6 +45,7 @@ import Giveaway from "../commands/admin/Giveaway";
 import { ActInput } from "../routes/DashboardApiModeration";
 import { IsLogTarget } from "../utils/logtarget";
 import { ReadDuration } from "../utils/modcommand";
+import { IMAGE_TOO_LARGE } from "../utils/image";
 
 // Erfundene Snowflakes - 17-stellig wie echte, aber es gibt sie bei Discord nicht.
 const GUILD = "90071992547409981";
@@ -600,9 +601,12 @@ async function checkEvidence(client: BotClient): Promise<void> {
     check("Ein Nachrichtenlink von woanders: ein Problem, kein Absturz", foreign.problems.length === 1 && foreign.problems[0].includes("anderen Server"), foreign.problems.join(" | "));
     check("Und kein Beweis dazu", foreign.entry.evidence.length === linked.entry.evidence.length);
 
+    // W-0118: ein GIF-Kopf mit 1×1 Pixeln, sonst lehnt die Größenprüfung den Text dahinter als Maße ab.
+    const gif = (text: string) => Buffer.from(`GIF89a\x01\x00\x01\x00${text}`, "latin1");
+
     await Promise.all([
-        service.AddImage(GUILD, author, entry.number, Buffer.from("GIF89a eins"), "image/gif", "eins.gif"),
-        service.AddImage(GUILD, author, entry.number, Buffer.from("GIF89a zwei"), "image/gif", "zwei.gif"),
+        service.AddImage(GUILD, author, entry.number, gif("eins"), "image/gif", "eins.gif"),
+        service.AddImage(GUILD, author, entry.number, gif("zwei"), "image/gif", "zwei.gif"),
     ]);
 
     const both = await service.CaseOf(GUILD, entry.number);
@@ -610,7 +614,19 @@ async function checkEvidence(client: BotClient): Promise<void> {
     const contents = await Promise.all(images.map(async (image) => String(await service.EvidenceFile(both, image))));
 
     check("Zwei Bilder zugleich: jede Nummer nur einmal", images.length === 2 && new Set(both.evidence.map((evidence) => evidence.id)).size === both.evidence.length, JSON.stringify(both.evidence.map((evidence) => evidence.id)));
-    check("Und zwei Dateien - keine überschreibt die andere", contents.sort().join(" | ") === "GIF89a eins | GIF89a zwei", contents.join(" | "));
+    check("Und zwei Dateien - keine überschreibt die andere", contents.sort().join(" | ") === `${gif("eins")} | ${gif("zwei")}`, contents.join(" | "));
+
+    // W-0118: Kopf eines PNG mit 30000×30000 Pixeln - abgelehnt, bevor entpackt wird.
+    const bomb = Buffer.alloc(33);
+
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52]).copy(bomb);
+    bomb.writeUInt32BE(30_000, 16);
+    bomb.writeUInt32BE(30_000, 20);
+
+    const huge = await Refusal(() => service.AddImage(GUILD, author, entry.number, bomb, "image/png", "bombe.png"));
+
+    check("Ein Beweisbild über 8000 Pixeln: abgelehnt mit Grund", huge === IMAGE_TOO_LARGE, huge);
+    check("Und das Riesenbild landet nicht im Fall", (await service.CaseOf(GUILD, entry.number)).evidence.length === both.evidence.length);
 
     await client.modCases.Mutate(entry.id, (current) => ({
         evidence: Array.from({ length: MAX_EVIDENCE }, (_, index) => ({ ...current.evidence[0], id: index + 1 })),
@@ -618,7 +634,7 @@ async function checkEvidence(client: BotClient): Promise<void> {
 
     const folder = path.join(EVIDENCE_ROOT, GUILD, String(entry.id));
     const stored = (await readdir(folder).catch(() => [])).length;
-    const fullImage = await Refusal(() => service.AddImage(GUILD, author, entry.number, Buffer.from("GIF89a drei"), "image/gif", "drei.gif"));
+    const fullImage = await Refusal(() => service.AddImage(GUILD, author, entry.number, gif("drei"), "image/gif", "drei.gif"));
 
     check("Ein Bild bei 20 Beweisen: abgelehnt", fullImage.startsWith(`Mehr als ${MAX_EVIDENCE}`), fullImage);
     check("Und es bleibt keine Datei liegen", (await readdir(folder).catch(() => [])).length === stored, String(stored));

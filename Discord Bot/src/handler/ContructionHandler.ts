@@ -1,6 +1,6 @@
 import BotClient from "../client/BotClient";
 import IConstructionHandler from "../interfaces/handlers/IContructionHandler";
-import { glob } from "glob";
+import { glob } from "node:fs/promises";
 import path from "path";
 import { pathToFileURL } from "node:url";
 import Command from "../structures/Command";
@@ -17,10 +17,10 @@ export default class ConstructionHandler implements IConstructionHandler {
     }
 
     async LoadEvents(): Promise<void> {
-    const files = await glob("**/*.{ts,js}", {
-        cwd: path.join(__dirname, "../events"),
-        absolute: true,
-    });
+    const dir = path.join(__dirname, "../events");
+    const files: string[] = [];
+
+    for await (const file of glob("**/*.{ts,js}", { cwd: dir })) files.push(path.join(dir, file));
 
     let loaded = 0;
 
@@ -61,10 +61,10 @@ export default class ConstructionHandler implements IConstructionHandler {
 }
 
     async LoadCommands(): Promise<void> {
-        const files = await glob("**/*.{ts,js}", {
-            cwd: path.join(__dirname, "../commands"),
-            absolute: true,
-        });
+        const dir = path.join(__dirname, "../commands");
+        const files: string[] = [];
+
+        for await (const file of glob("**/*.{ts,js}", { cwd: dir })) files.push(path.join(dir, file));
 
         for (const file of files) {
             const imported = await import(pathToFileURL(file).href);

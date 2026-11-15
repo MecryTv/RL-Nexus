@@ -12,6 +12,12 @@ export const DAY_MS = 24 * HOUR_MS;
 /** Wie oft das Gezählte in die Datenbank geht. Ein Neustart kostet höchstens so viel. */
 export const FLUSH_MS = 60 * 1000;
 
+/**
+ * W-0119: So lange nach dem letzten Vergessen (Löschung im Admin Dashboard) schreibt der
+ * Bot nichts mehr für die Person - deutlich länger als ein Flush.
+ */
+export const FORGET_MS = 10 * 60 * 1000;
+
 /** Aufbewahrung der Zahlen je Server und je Kanal. */
 export const KEEP_DAYS = 90;
 /** Aufbewahrung der Zahlen je Mitglied - die einzigen mit Discord-ID. */

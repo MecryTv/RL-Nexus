@@ -10,7 +10,7 @@ process.env.CLIENT_SECRET ||= "check-secret";
 process.env.DEV_CLIENT_SECRET ||= "check-secret";
 
 import { createHmac } from "node:crypto";
-import { glob } from "glob";
+import { glob } from "node:fs/promises";
 import path from "path";
 import { pathToFileURL } from "node:url";
 import BotClient from "../client/BotClient";
@@ -205,7 +205,10 @@ async function main(): Promise<void> {
 
     // Nur bauen, nicht bei Discord registrieren: Der Konstruktor legt Name, Modul und data fest.
     const known = new Set<string>([...MODULE_IDS, "rl-tracking", "dashboard"]);
-    const files = await glob("**/*.{ts,js}", { cwd: path.join(__dirname, "../commands"), absolute: true });
+    const dir = path.join(__dirname, "../commands");
+    const files: string[] = [];
+
+    for await (const file of glob("**/*.{ts,js}", { cwd: dir })) files.push(path.join(dir, file));
 
     for (const file of files.sort()) {
         const imported = await import(pathToFileURL(file).href);
