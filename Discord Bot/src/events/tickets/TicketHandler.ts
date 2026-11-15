@@ -220,7 +220,7 @@ export default class TicketHandler extends Event {
        ---------------------------------------------------------- */
     private async Action(interaction: StringSelectMenuInteraction, ticketId: number): Promise<void> {
         const service = this.client.ticketService;
-        const context = await service.Context(ticketId);
+        const context = await service.Context(ticketId, interaction.guildId);
         const member = await this.Member(interaction);
         const action = interaction.values[0];
 
@@ -437,7 +437,7 @@ export default class TicketHandler extends Event {
         await interaction.deferUpdate();
 
         const service = this.client.ticketService;
-        const context = await service.Context(ticketId);
+        const context = await service.Context(ticketId, interaction.guildId);
         const member = await this.Member(interaction);
         const user = interaction.users.first();
 
@@ -457,7 +457,7 @@ export default class TicketHandler extends Event {
     ): Promise<void> {
         await interaction.deferUpdate();
 
-        const context = await this.client.ticketService.Context(ticketId);
+        const context = await this.client.ticketService.Context(ticketId, interaction.guildId);
         const member = await this.Member(interaction);
 
         await this.Done(interaction, await work(context, member));
@@ -522,7 +522,7 @@ export default class TicketHandler extends Event {
         await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
         const service = this.client.ticketService;
-        const context = await service.Context(Number(argument));
+        const context = await service.Context(Number(argument), interaction.guildId);
         const member = await this.Member(interaction);
 
         if (action === "close") {

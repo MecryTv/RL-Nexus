@@ -669,6 +669,9 @@ export default class RouletteService {
                 case "howto":
                     return await show(HowToMessage());
                 case "copy": {
+                    // W-0108: Name und Passwort nur für Lobbys dieses Servers.
+                    await this.Evening(guild, id.eveningId);
+
                     const lobby = (await this.client.rouletteRounds.ByNumber(id.eveningId, id.round ?? 0))?.lobbies[id.lobby ?? 0];
 
                     return await (lobby ? show(CopyMessage(lobby)) : say("Diese Lobby gibt es nicht mehr."));

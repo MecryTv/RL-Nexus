@@ -14,7 +14,7 @@
 process.env.CLIENT_SECRET ||= "check-secret";
 process.env.DEV_CLIENT_SECRET ||= "check-secret";
 
-import { ChannelType, Collection, Guild, GuildMember, Message, User } from "discord.js";
+import { ChannelType, Collection, Guild, GuildMember, Interaction, Message, User } from "discord.js";
 import BotClient from "../client/BotClient";
 import { CleanDoc, IsImageSource } from "../builder/MessageDoc";
 import { InfoView, IsImageFile, IsPanelMessage, ITicketView, MenuOptions, PanelView, RELAY_MARK, RelayView } from "../builder/TicketPanel";
@@ -31,7 +31,9 @@ import {
     MESSAGE_KEYS,
     TicketNumber,
     AssignCodes,
+    TICKET_PREFIX,
 } from "../constants/Tickets";
+import TicketHandler from "../events/tickets/TicketHandler";
 import { AttachmentKey } from "../constants/Transcripts";
 import { ITicket, ITicketConfig } from "../interfaces/services/tickets/ITicket";
 import { ITranscript, ITranscriptMessage, ITranscriptUser } from "../interfaces/services/tickets/ITranscript";
@@ -697,6 +699,61 @@ async function checkModMail(client: BotClient): Promise<void> {
     check("Nach dem Öffnen fragt der Bot beim nächsten Mal wieder", service.AskServer(asker));
 }
 
+/* ----------------------------------------------------------
+   W-0108: Klicks hängen am Server, die DM-Themenwahl an der Mitgliedschaft
+   ---------------------------------------------------------- */
+async function checkBinding(client: BotClient): Promise<void> {
+    console.log("\n  — W-0108: Server und Mitgliedschaft —");
+
+    const service = client.ticketService;
+    const tickets = client.tickets as unknown as { Get: (id: number) => Promise<ITicket | null> };
+    const saved = tickets.Get;
+    const OTHER_SERVER = "Dieses Ticket gehört zu einem anderen Server.";
+    const refusal = async (run: () => Promise<unknown>): Promise<string> => {
+        try {
+            await run();
+
+            return "";
+        } catch (error) {
+            return error instanceof TicketError ? error.message : `kein TicketError: ${String(error)}`;
+        }
+    };
+
+    tickets.Get = async () => FakeTicket();
+
+    try {
+        check("Ticket-ID eines anderen Servers: abgebrochen", (await refusal(() => service.Context(1, "90071992547400000"))) === OTHER_SERVER);
+        check("Aus einer DM ohne Server: abgebrochen", (await refusal(() => service.Context(1, null))) === OTHER_SERVER);
+        check("Derselbe Server: kein Abbruch wegen des Servers", (await refusal(() => service.Context(1, GUILD))) !== OTHER_SERVER);
+
+        // Der Handler reicht den Server des Klicks weiter: das Aktions-Menü eines fremden Tickets bricht ab.
+        const replies: string[] = [];
+        const interaction = {
+            customId: `${TICKET_PREFIX}:act:1`,
+            guildId: "90071992547400000",
+            values: ["claim"],
+            deferred: false,
+            replied: false,
+            isMessageComponent: () => true,
+            isModalSubmit: () => false,
+            isButton: () => false,
+            isStringSelectMenu: () => true,
+            isUserSelectMenu: () => false,
+            reply: async (payload: unknown) => void replies.push(JSON.stringify(payload)),
+        };
+
+        await new TicketHandler(client).Execute(interaction as unknown as Interaction);
+        check("Aktions-Menü mit fremder Ticket-ID: abgebrochen", replies.some((reply) => reply.includes(OTHER_SERVER)), replies.join(" | ").slice(0, 300));
+    } finally {
+        tickets.Get = saved;
+    }
+
+    const gate = (service as unknown as { Gate: (guild: Guild, user: User, config: ITicketConfig, option: null) => Promise<void> }).Gate.bind(service);
+    const left = { id: GUILD, members: { fetch: async () => Promise.reject(new Error("Unknown Member")) } } as unknown as Guild;
+
+    check("DM-Themenwahl: Ausgetretene und Gebannte bekommen kein Ticket", (await refusal(() => gate(left, { id: USER } as User, DefaultConfig(), null))) === "Du bist auf diesem Server nicht (mehr) Mitglied.");
+}
+
 async function checkDatabase(client: BotClient): Promise<void> {
     console.log("\n  — Datenbank —");
 
@@ -859,6 +916,7 @@ async function main(): Promise<void> {
     await checkTranscripts(client);
     await checkLive(client);
     await checkModMail(client);
+    await checkBinding(client);
 
     if (await client.databaseService.Connect()) {
         try {

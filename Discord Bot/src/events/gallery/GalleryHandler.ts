@@ -8,6 +8,7 @@ import {
     MessageFlags,
     ModalBuilder,
     ModalSubmitInteraction,
+    PermissionFlagsBits,
     TextInputBuilder,
     TextInputStyle,
 } from "discord.js";
@@ -37,6 +38,15 @@ export default class GalleryHandler extends Event {
         if (!interaction.customId.startsWith(PANEL_PREFIX)) return;
 
         try {
+            // W-0108: Die Rechte gelten bei jedem Klick, nicht nur beim Öffnen mit /gallery.
+            const guild = interaction.guild;
+
+            if (!guild || (interaction.user.id !== guild.ownerId && !interaction.memberPermissions?.has(PermissionFlagsBits.Administrator))) {
+                await interaction.reply({ content: "Die Bild-Verwaltung ist nur für Administratoren.", flags: MessageFlags.Ephemeral });
+
+                return;
+            }
+
             if (interaction.isModalSubmit()) await this.Modal(interaction);
             else await this.Component(interaction);
         } catch (error) {

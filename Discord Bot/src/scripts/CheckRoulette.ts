@@ -971,6 +971,38 @@ async function checkReviewFixes(client: BotClient): Promise<void> {
     await cleanup(client);
 }
 
+/** W-0108: „Kopieren“ zeigt Lobby-Name und Passwort nur für Abende dieses Servers. Ohne Datenbank: Abend und Runde sind Attrappen. */
+async function checkCopy(client: BotClient): Promise<void> {
+    console.log("\n  — W-0108: Kopieren nur auf dem eigenen Server —");
+
+    const world = FlowWorld(client);
+    const member = world.member("p1", MAIN);
+    const evenings = client.rouletteEvenings as unknown as Record<string, unknown>;
+    const rounds = client.rouletteRounds as unknown as Record<string, unknown>;
+    const saved = { Get: evenings.Get, ByNumber: rounds.ByNumber };
+    let owner = "90071992547400000";
+
+    evenings.Get = async (id: number) => ({ id, guildId: owner, status: "running" });
+    rounds.ByNumber = async () => SampleRound(1);
+
+    try {
+        const foreign = Press(world, member, RouletteId("copy", 77, 2, 0));
+
+        await world.service.Handle(foreign.interaction);
+        check("Abend eines anderen Servers: kein Passwort", !foreign.replies.join().includes("testo") && foreign.replies.join().includes("Diesen Abend gibt es nicht mehr"), foreign.replies.join(" | ").slice(0, 300));
+
+        owner = GUILD;
+
+        const own = Press(world, member, RouletteId("copy", 77, 2, 0));
+
+        await world.service.Handle(own.interaction);
+        check("Eigener Abend: Name und Passwort zum Kopieren", own.replies.join().includes("testo"), own.replies.join(" | ").slice(0, 300));
+    } finally {
+        evenings.Get = saved.Get;
+        rounds.ByNumber = saved.ByNumber;
+    }
+}
+
 async function cleanup(client: BotClient): Promise<void> {
     await client.databaseService.Write("DELETE FROM roulette_rounds WHERE guild_id = ?", [GUILD]);
     await client.databaseService.Write("DELETE FROM roulette_evenings WHERE guild_id = ?", [GUILD]);
@@ -1006,6 +1038,8 @@ async function main(): Promise<void> {
     } else {
         console.log("\n  — Datenbank —\n  übersprungen: keine Verbindung");
     }
+
+    await checkCopy(client);
 
     console.log(failures === 0 ? "\n✅ Alle Prüfungen bestanden.\n" : `\n❌ ${failures} Prüfung(en) fehlgeschlagen.\n`);
 

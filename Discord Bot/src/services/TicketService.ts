@@ -227,10 +227,13 @@ export default class TicketService {
         return this.channels.has(channelId);
     }
 
-    async Context(ticketId: number): Promise<ITicketContext> {
+    /** guildId: der Server des Klicks (null in einer DM). Ohne Angabe wird nicht abgeglichen - für Timer und Routen, die selbst prüfen. */
+    async Context(ticketId: number, guildId?: string | null): Promise<ITicketContext> {
         const ticket = await this.client.tickets.Get(ticketId);
 
         if (!ticket) throw new TicketError("Dieses Ticket gibt es nicht mehr.");
+        // W-0108: Eine Ticket-ID aus einem anderen Server wirkt hier nicht.
+        if (guildId !== undefined && ticket.guildId !== guildId) throw new TicketError("Dieses Ticket gehört zu einem anderen Server.");
 
         const guild = this.client.guilds.cache.get(ticket.guildId);
 
@@ -728,6 +731,10 @@ export default class TicketService {
      * Mit Option prüft es auch, ob dazu schon ein Ticket offen ist.
      */
     private async Gate(guild: Guild, user: User, config: ITicketConfig, option: ITicketOption | null): Promise<void> {
+        // W-0108: Die alte Themenwahl in der DM öffnet nichts mehr für Ausgetretene und Gebannte.
+        // Frisch geholt: ohne Members-Intent bliebe ein Ausgetretener sonst im Speicher.
+        if (!(await guild.members.fetch({ user: user.id, force: true }).catch(() => null))) throw new TicketError("Du bist auf diesem Server nicht (mehr) Mitglied.");
+
         if (!(await this.client.settings.Of(guild.id)).modules.includes("tickets")) {
             throw new TicketError("Das Ticket-System ist auf diesem Server ausgeschaltet.");
         }

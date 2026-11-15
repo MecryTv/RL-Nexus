@@ -1,4 +1,4 @@
-import { Guild, GuildMember, Interaction, PermissionFlagsBits } from "discord.js";
+import { Guild, Interaction, PermissionFlagsBits } from "discord.js";
 import BotClient from "../client/BotClient";
 import { COOLDOWN_MS, LOG_KEEP_DAYS, SEEN_DEDUPE_MS } from "../constants/StaffGrant";
 import { IStaffChange, IStaffGrant, IStaffLogEntry, StaffAccessMode, StaffLogKind } from "../interfaces/services/staffgrant/IStaffGrant";
@@ -181,7 +181,9 @@ export default class StaffGrantService {
         }
     }
 
-    Answer(id: number, userId: string, yes: boolean, minutes: number, allowPrivate: boolean): Promise<IStaffGrant> {
+    async Answer(id: number, userId: string, yes: boolean, minutes: number, allowPrivate: boolean): Promise<IStaffGrant> {
+        await this.Approver(id, userId);
+
         return this.Apply(
             id,
             (grant) => Machine.Answer(grant, userId, yes, minutes, allowPrivate, Date.now()),
@@ -198,11 +200,16 @@ export default class StaffGrantService {
         return this.Apply(id, (grant) => Machine.Withdraw(this.Own(grant, staffId), Date.now()), () => "Zurückgezogen");
     }
 
-    End(id: number, by: string): Promise<IStaffGrant> {
+    async End(id: number, by: string): Promise<IStaffGrant> {
+        // Staff beendet die eigene Freigabe immer, ohne den Server zu verwalten.
+        if (this.live.get(id)?.staffId !== by) await this.Approver(id, by);
+
         return this.Apply(id, (grant) => Machine.End(grant, by, Date.now()), (grant) => `Beendet von ${this.NameOf(grant.guildId, by)}`);
     }
 
-    Extend(id: number, by: string): Promise<IStaffGrant> {
+    async Extend(id: number, by: string): Promise<IStaffGrant> {
+        await this.Approver(id, by);
+
         return this.Apply(id, (grant) => Machine.Extend(grant, by, Date.now()), (grant) => `Verlängert von ${this.NameOf(grant.guildId, by)} bis ${CLOCK.format(grant.endsAt!)}`);
     }
 
@@ -210,7 +217,9 @@ export default class StaffGrantService {
         return this.Apply(id, (grant) => Machine.AskPrivate(this.Own(grant, staffId), reason, Date.now()), () => "Private Bereiche angefragt");
     }
 
-    AnswerPrivate(id: number, userId: string, yes: boolean): Promise<IStaffGrant> {
+    async AnswerPrivate(id: number, userId: string, yes: boolean): Promise<IStaffGrant> {
+        await this.Approver(id, userId);
+
         return this.Apply(
             id,
             (grant) => Machine.AnswerPrivate(grant, userId, yes, Date.now()),
@@ -218,7 +227,9 @@ export default class StaffGrantService {
         );
     }
 
-    RemovePrivate(id: number, by: string): Promise<IStaffGrant> {
+    async RemovePrivate(id: number, by: string): Promise<IStaffGrant> {
+        await this.Approver(id, by);
+
         return this.Apply(id, (grant) => Machine.RemovePrivate(grant, by, Date.now()), (grant) => `Private Bereiche weggenommen von ${this.NameOf(grant.guildId, by)}`);
     }
 
@@ -250,11 +261,6 @@ export default class StaffGrantService {
                 ((grant.status === "open" && !grant.denied.includes(userId)) ||
                     (grant.status === "active" && grant.private === "asked" && !grant.privateDenied.includes(userId)))
         );
-    }
-
-    /** Das Ersatz-Mitglied für Staff mit Freigabe: der Bot selbst. „Von wem“ steht im actor der Gates. */
-    StandIn(userId: string, guild: Guild): GuildMember | null {
-        return this.Active(userId, guild.id) ? guild.members.me : null;
     }
 
     /** Eine Änderung von Staff mit Freigabe, bei Einstellungen mit vorher und nachher (W-0049). */
@@ -353,6 +359,28 @@ export default class StaffGrantService {
     /* ----------------------------------------------------------
        Intern
        ---------------------------------------------------------- */
+    /**
+     * W-0108 (Strix vuln-0012): Die Liste der Gefragten steht seit der Anfrage
+     * fest. Wer antwortet, verlängert oder beendet, muss es jetzt noch dürfen:
+     * Owner oder Mitglied mit „Server verwalten“, frisch von Discord geholt.
+     * Gibt es die Freigabe nicht mehr, sagt das Apply.
+     */
+    private async Approver(id: number, userId: string): Promise<void> {
+        const grant = this.live.get(id);
+
+        if (!grant) return;
+
+        const guild = this.client.guilds.cache.get(grant.guildId);
+
+        if (guild?.ownerId === userId) return;
+
+        const member = guild ? await guild.members.fetch({ user: userId, force: true }).catch(() => null) : null;
+
+        if (!member?.permissions.has(PermissionFlagsBits.ManageGuild)) {
+            throw new StaffGrantError("Das darf nur, wer den Server jetzt noch verwaltet: der Owner oder wer „Server verwalten“ hat.");
+        }
+    }
+
     private Own(grant: IStaffGrant, staffId: string): IStaffGrant {
         if (grant.staffId !== staffId) throw new StaffGrantError("Das ist nicht deine Anfrage.");
 

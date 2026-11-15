@@ -143,8 +143,10 @@ export default class LiveService {
 
         if (!guild || !this.client.databaseService.Ready) return null;
 
-        // W-0011: Staff mit Freigabe arbeitet über den Bot.
-        const member = this.client.staffGrantService.StandIn(userId, guild) ?? guild.members.cache.get(userId) ?? (await guild.members.fetch(userId).catch(() => null));
+        // W-0011: Staff mit Freigabe arbeitet über den Bot - W-0108: nur mit dem Ja für die privaten Bereiche und solange er Staff ist.
+        const grant = this.client.staffGrantService.Active(userId, guildId);
+        const stand = grant?.private === "on" && (await this.client.dashboardService.IsStaff(userId)) ? guild.members.me : null;
+        const member = stand ?? guild.members.cache.get(userId) ?? (await guild.members.fetch(userId).catch(() => null));
 
         if (!member) return null;
 

@@ -36,6 +36,16 @@ export default class DevLogsHandler extends Event {
         if (!interaction.customId.startsWith(PANEL_PREFIX)) return;
 
         try {
+            // W-0108: Jeder Klick prüft erneut, ob hier ein Entwickler klickt.
+            if (!this.client.config.DEV_USER_IDs.includes(interaction.user.id)) {
+                await interaction.reply({
+                    ...this.Notice("⚠️ | Nur für Entwickler", "Die Logs können nur die Entwickler des Bots sehen."),
+                    flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral,
+                });
+
+                return;
+            }
+
             if (interaction.isModalSubmit()) await this.Modal(interaction);
             else await this.Component(interaction);
         } catch (error) {

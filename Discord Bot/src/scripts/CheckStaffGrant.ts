@@ -7,7 +7,7 @@
 process.env.CLIENT_SECRET ||= "check-secret";
 process.env.DEV_CLIENT_SECRET ||= "check-secret";
 
-import { Guild, Interaction } from "discord.js";
+import { Guild, Interaction, PermissionFlagsBits } from "discord.js";
 import { IStaffCardInput, StaffGrantCard } from "../builder/StaffGrantView";
 import StaffGrantDm from "../services/staffgrant/StaffGrantDm";
 import DashboardApiStaff from "../routes/DashboardApiStaff";
@@ -401,12 +401,26 @@ function FakeStore() {
     };
 }
 
+/** W-0108: Server, wie Approver() sie fragt - Owner „1“, „2“ hat „Server verwalten“, „4“ nicht mehr, „5“ ist ausgetreten. */
+function FakeGuilds(): Map<string, unknown> {
+    const member = (manage: boolean) => ({ permissions: { has: (flag: bigint) => manage && flag === PermissionFlagsBits.ManageGuild } });
+    const fetch = async ({ user, force }: { user: string; force?: boolean }) => {
+        if (!force) throw new Error("Approver muss frisch holen");
+        if (user === "2") return member(true);
+        if (user === "4") return member(false);
+
+        throw new Error("Unknown Member");
+    };
+
+    return new Map(["100", "101", "102", "103"].map((id) => [id, { id, ownerId: "1", members: { cache: new Map(), fetch } }]));
+}
+
 function FakeClient(store: ReturnType<typeof FakeStore>): BotClient {
     return {
         ...store,
         pulseService: new PulseService({} as BotClient),
         databaseService: { Ready: true },
-        guilds: { cache: new Map() },
+        guilds: { cache: FakeGuilds() },
         users: { cache: new Map() },
     } as unknown as BotClient;
 }
@@ -980,6 +994,8 @@ function ApiApp() {
         staff2: { userId: "901", username: "Ana" },
         owner: { userId: "1", username: "Lukas" },
         other: { userId: "3", username: "Fremd" },
+        // Gefragt, aber in dieser Welt ohne „Server verwalten“ (members.fetch findet niemanden).
+        former: { userId: "2", username: "Ex" },
     };
     const cards: Record<string, Partial<IDashboardGuild>> = {
         "900": { role: "Staff", canManage: false },
@@ -1104,6 +1120,9 @@ async function checkApi(): Promise<void> {
     check("Gefragter sieht die Anfrage", mine.requests?.length === 1 && mine.requests[0].reason === "Zeige dir die Rangliste" && mine.requests[0].staff.name === "Joe");
     check("Nicht-Gefragter antwortet: 403", (await meApi("other", "POST", { grantId: grant!.id, kind: "grant", answer: "yes" })).statusCode === 403);
 
+    const former = await meApi("former", "POST", { grantId: grant!.id, kind: "grant", answer: "yes", minutes: 60 });
+    check("W-0108: Gefragter ohne „Server verwalten“ antwortet: 400, bleibt offen", former.statusCode === 400 && former.body.includes("jetzt noch verwaltet") && service.Get(grant!.id)?.status === "open", former.body);
+
     const yes = await meApi("owner", "POST", { grantId: grant!.id, kind: "grant", answer: "yes", minutes: 60 });
     check("Gefragter erlaubt: 200", yes.statusCode === 200, yes.body);
     check("Staff sieht: läuft", ((await guildApi("staff", "GET")).json() as { grant?: { status: string } }).grant?.status === "active");
@@ -1226,6 +1245,62 @@ async function checkReviewFixes(): Promise<void> {
         await late.Tick(Date.now());
 
         check("I5: Tick lädt nach, wenn Load zu früh kam", late.Active("900", "100")?.id === open.id);
+    }
+
+    // W-0108: Live Tickets heben Staff nur mit privatem Ja und solange er Staff ist auf den Bot an.
+    {
+        let grant: IStaffGrant | null = Running({ private: "none", endsAt: Date.now() + 60 * MIN });
+        let staff = true;
+        const human = { id: "900", displayName: "Joe", permissions: { has: () => false } };
+        const bot = { id: "bot", displayName: "RL Nexus", permissions: { has: () => true } };
+        const live = new LiveService({
+            guilds: { cache: new Map([["100", { id: "100", members: { cache: new Map([["900", human]]), me: bot } }]]) },
+            databaseService: { Ready: true },
+            ticketSettings: { Of: async () => ({ options: [] }) },
+            staffGrantService: { Active: () => grant },
+            dashboardService: { IsStaff: async () => staff },
+        } as unknown as BotClient);
+        const who = async () => (await live.Access("900", "100"))?.member.id;
+
+        check("W-0108: Freigabe ohne privates Ja: Live Tickets nicht als Bot", (await who()) === "900");
+
+        grant = Running({ private: "on", endsAt: Date.now() + 60 * MIN });
+        check("W-0108: Mit privatem Ja: als Bot", (await who()) === "bot");
+
+        staff = false;
+        check("W-0108: Gruppe weg: nicht mehr als Bot", (await who()) === "900");
+    }
+
+    // W-0108 (Strix vuln-0012): Wer gefragt wurde, muss bei jedem Schritt noch Owner oder Verwalter sein.
+    {
+        const store = FakeStore();
+        const service = FakeService(store, { "100": ["2", "4", "5"] });
+        const refused = (promise: Promise<unknown>) => promise.then(() => "", (error: unknown) => (error instanceof StaffGrantError ? error.message : `kein StaffGrantError: ${String(error)}`));
+        const open = await service.Request(RequestOf(GUILD));
+
+        check("W-0108: Auch ein Nein zählt nur von Verwaltern", (await refused(service.Answer(open.id, "4", false, 60, false))) !== "" && service.Get(open.id)?.denied.length === 0);
+        check("W-0108: Verwalter-Recht verloren: Ja abgelehnt", (await refused(service.Answer(open.id, "4", true, 60, false))).includes("jetzt noch verwaltet") && service.Get(open.id)?.status === "open");
+        check("W-0108: Ausgetreten: Ja abgelehnt", (await refused(service.Answer(open.id, "5", true, 60, false))).includes("jetzt noch verwaltet") && service.Get(open.id)?.status === "open");
+        check("W-0108: Noch Verwalter: Ja geht", (await refused(service.Answer(open.id, "2", true, 60, false))) === "" && service.Get(open.id)?.status === "active");
+
+        const endsAt = service.Get(open.id)!.endsAt!;
+
+        check("W-0108: Verlängern ohne Recht abgelehnt", (await refused(service.Extend(open.id, "4"))) !== "" && service.Get(open.id)!.endsAt === endsAt);
+        check("W-0108: Verlängern als Verwalter geht", (await refused(service.Extend(open.id, "2"))) === "" && service.Get(open.id)!.endsAt! > endsAt);
+
+        await service.AskPrivate(open.id, "900", "Ticket #12");
+        check("W-0108: Private Bereiche ohne Recht: abgelehnt", (await refused(service.AnswerPrivate(open.id, "4", true))) !== "" && service.Get(open.id)?.private === "asked");
+        check("W-0108: Private Bereiche als Verwalter: offen", (await refused(service.AnswerPrivate(open.id, "2", true))) === "" && service.Get(open.id)?.private === "on");
+        check("W-0108: Wegnehmen ohne Recht: abgelehnt", (await refused(service.RemovePrivate(open.id, "4"))) !== "" && service.Get(open.id)?.private === "on");
+        check("W-0108: Beenden ohne Recht: abgelehnt", (await refused(service.End(open.id, "4"))) !== "" && service.Get(open.id)?.status === "active");
+
+        const dm = new StaffGrantDm({ staffGrantService: service, guilds: { cache: new Map() }, users: { cache: new Map() }, server: { BaseURL: "https://x" } } as unknown as BotClient);
+        const click = Click("button", `sg:more:${open.id}`, "4");
+
+        await dm.OnInteraction(click as unknown as Interaction);
+        check("W-0108: DM-Knopf ohne Recht: Satz statt Wirkung", click.calls.some((call) => call.startsWith("followUp:") && call.includes("jetzt noch verwaltet")), click.calls.join(","));
+
+        check("W-0108: Staff beendet die eigene Freigabe ohne Verwalter-Recht", (await refused(service.End(open.id, "900"))) === "" && service.Get(open.id) === null);
     }
 
     // I6: Ohne Members-Intent keine Abfrage aller Mitglieder (sie hinge bis zum Timeout)

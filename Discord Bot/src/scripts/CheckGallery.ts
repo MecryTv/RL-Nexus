@@ -57,6 +57,11 @@ import {
     UPLOAD_TYPES,
 } from "../constants/Gallery";
 import { DASHBOARD_PATH, SESSION_COOKIE } from "../constants/Dashboard";
+import { Interaction } from "discord.js";
+import GalleryHandler from "../events/gallery/GalleryHandler";
+import DevLogsHandler from "../events/devlogs/DevLogsHandler";
+import { PANEL_PREFIX as GALLERY_PANEL } from "../builder/GalleryPanel";
+import { PANEL_PREFIX as DEVLOGS_PANEL } from "../builder/DevLogsPanel";
 
 // Eine Snowflake, die es bei Discord nicht gibt.
 const GUILD = "100000000000000001";
@@ -912,6 +917,57 @@ async function checkDownloadGuard(): Promise<void> {
     }
 }
 
+/**
+ * W-0108: Galerie- und DevLogs-Panel prüfen die Rechte bei jedem Klick erneut,
+ * nicht nur beim Öffnen. Es gibt kein eigenes check:devlogs - beide Panels
+ * funktionieren gleich, darum steht DevLogs mit hier.
+ */
+async function checkPanelClicks(): Promise<void> {
+    console.log("\n  — W-0108: Rechte bei jedem Klick (Galerie, DevLogs) —");
+
+    const client = { config: { DEV_USER_IDs: ["dev"] }, guardian: { ReportError: async () => undefined } } as unknown as BotClient;
+    const click = (customId: string, userId: string, admin = false) => {
+        const calls: string[] = [];
+        const interaction = {
+            customId,
+            user: { id: userId },
+            guild: { id: GUILD, ownerId: "owner" },
+            memberPermissions: { has: () => admin },
+            message: { id: "w0108-panel" },
+            isMessageComponent: () => true,
+            isModalSubmit: () => false,
+            isStringSelectMenu: () => false,
+            isButton: () => true,
+            reply: async (payload: unknown) => void calls.push(`reply:${JSON.stringify(payload)}`),
+            update: async (payload: unknown) => void calls.push(`update:${JSON.stringify(payload)}`),
+        };
+
+        return { interaction: interaction as unknown as Interaction, calls };
+    };
+    const gallery = new GalleryHandler(client);
+    const devlogs = new DevLogsHandler(client);
+
+    let run = click(`${GALLERY_PANEL}:next`, "user");
+    await gallery.Execute(run.interaction);
+    check("Galerie: Klick ohne Administrator wird abgewiesen", run.calls.length === 1 && run.calls[0].startsWith("reply:") && run.calls[0].includes("nur für Administratoren"), run.calls.join(" | ").slice(0, 300));
+
+    run = click(`${GALLERY_PANEL}:next`, "user", true);
+    await gallery.Execute(run.interaction);
+    check("Galerie: Administrator kommt durch", run.calls.length === 1 && run.calls[0].startsWith("update:"), run.calls.join(" | ").slice(0, 300));
+
+    run = click(`${GALLERY_PANEL}:next`, "owner");
+    await gallery.Execute(run.interaction);
+    check("Galerie: Owner kommt durch", run.calls.length === 1 && run.calls[0].startsWith("update:"), run.calls.join(" | ").slice(0, 300));
+
+    run = click(`${DEVLOGS_PANEL}:next`, "user", true);
+    await devlogs.Execute(run.interaction);
+    check("DevLogs: Klick ohne Entwickler wird abgewiesen, auch als Administrator", run.calls.length === 1 && run.calls[0].startsWith("reply:") && run.calls[0].includes("Nur für Entwickler"), run.calls.join(" | ").slice(0, 300));
+
+    run = click(`${DEVLOGS_PANEL}:next`, "dev");
+    await devlogs.Execute(run.interaction);
+    check("DevLogs: Entwickler kommt durch", run.calls.length === 1 && run.calls[0].startsWith("update:"), run.calls.join(" | ").slice(0, 300));
+}
+
 async function main(): Promise<void> {
     console.log("\n🖼️  Galerie: Store() und der Weg auf die Platte\n");
 
@@ -1115,6 +1171,7 @@ async function main(): Promise<void> {
 
     await checkWriteRoute();
     await checkDownloadGuard();
+    await checkPanelClicks();
 
     console.log(failures === 0 ? "\n✅ Alle Prüfungen bestanden.\n" : `\n❌ ${failures} Prüfung(en) fehlgeschlagen.\n`);
     process.exit(failures === 0 ? 0 : 1);
