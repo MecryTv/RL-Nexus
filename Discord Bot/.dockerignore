@@ -12,6 +12,8 @@ logs
 transcripts
 evidence
 clips
+# W-0111: Daten des Servers (Transcripts, Beweise, Clips, Logs) nie in den Build-Cache.
+data
 
 .git
 .gitignore

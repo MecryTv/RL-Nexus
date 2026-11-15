@@ -34,6 +34,17 @@ services:
         container_name: rlnexus-admin
         restart: unless-stopped
         logging: *logging
+        # W-0111: Das Dateisystem des Containers ist schreibgeschützt, geschrieben
+        # wird nur in die eingehängten Ordner (data/content, data/flags) und /tmp.
+        # Keine Linux-Rechte, keine neuen Rechte über setuid.
+        read_only: true
+        tmpfs:
+            - /tmp
+        cap_drop:
+            - ALL
+        security_opt:
+            - "no-new-privileges:true"
+        mem_limit: 1g
         # Einzeln statt env_file: Das Admin Dashboard bekommt nur, was es braucht.
         environment:
             CLIENT_ID: ${CLIENT_ID:?CLIENT_ID fehlt in der .env}
@@ -79,8 +90,10 @@ services:
             CONTACT_MAIL: ${CONTACT_MAIL:-support@nexus-emb.de}
             CONTACT_WEBHOOK_URL: ${CONTACT_WEBHOOK_URL:-}
             # Das Postfach: Mailcow per IMAP und SMTP. Die Postfächer trägt man in der
-            # Oberfläche ein. MAIL_KEY verschlüsselt ihre Passwörter, leer: aus SERVER_JWT_SECRET abgeleitet.
-            MAIL_KEY: ${MAIL_KEY:-}
+            # Oberfläche ein. MAIL_KEY verschlüsselt ihre Passwörter. W-0111: Pflicht und
+            # eigener Schlüssel (openssl rand -hex 32), nicht mehr aus SERVER_JWT_SECRET
+            # abgeleitet, das auch der Bot kennt. Nach einem Wechsel die Passwörter neu eingeben.
+            MAIL_KEY: ${MAIL_KEY:?MAIL_KEY fehlt in der .env (openssl rand -hex 32)}
             MAIL_IMAP_HOST: ${MAIL_IMAP_HOST:-${MAIL_DOMAIN:-mail.nexus-emb.de}}
             MAIL_IMAP_PORT: ${MAIL_IMAP_PORT:-993}
             MAIL_SMTP_HOST: ${MAIL_SMTP_HOST:-${MAIL_DOMAIN:-mail.nexus-emb.de}}
@@ -133,10 +146,26 @@ services:
     # Wartung, Inhalten aus dem Admin Dashboard und Kontaktformular
     # (nginx/container/website.conf). nginx auf dem Host reicht nexus-emb.de hierher.
     website:
-        image: nginx:stable-alpine
+        image: nginx:stable-alpine@sha256:901e593c95dc85f5a729f5765516321366ef4ac401821431d408897e95287d0a
         container_name: rlnexus-website
         restart: unless-stopped
         logging: *logging
+        # W-0111: schreibgeschützt bis auf Laufzeit-Ordner im Speicher. nginx braucht
+        # als root-Master CHOWN für seine Temp-Ordner und SETUID/SETGID für den Worker.
+        read_only: true
+        tmpfs:
+            - /var/cache/nginx
+            - /var/run
+            - /tmp
+        cap_drop:
+            - ALL
+        cap_add:
+            - CHOWN
+            - SETUID
+            - SETGID
+            - NET_BIND_SERVICE
+        security_opt:
+            - "no-new-privileges:true"
         ports:
             - "127.0.0.1:8090:80"
         volumes:
@@ -149,10 +178,25 @@ services:
 
     # Die Statusseite, genauso (nginx/container/status.conf).
     status:
-        image: nginx:stable-alpine
+        image: nginx:stable-alpine@sha256:901e593c95dc85f5a729f5765516321366ef4ac401821431d408897e95287d0a
         container_name: rlnexus-status
         restart: unless-stopped
         logging: *logging
+        # W-0111: wie die Hauptseite.
+        read_only: true
+        tmpfs:
+            - /var/cache/nginx
+            - /var/run
+            - /tmp
+        cap_drop:
+            - ALL
+        cap_add:
+            - CHOWN
+            - SETUID
+            - SETGID
+            - NET_BIND_SERVICE
+        security_opt:
+            - "no-new-privileges:true"
         ports:
             - "127.0.0.1:8091:80"
         volumes:
@@ -165,8 +209,49 @@ services:
         container_name: rlnexus-bot
         restart: unless-stopped
         logging: *logging
-        env_file: .env
+        # W-0111: wie beim Admin Dashboard. Geschrieben wird nur in die Volumes
+        # (images, transcripts, evidence, clips, logs) und /tmp. Die Speichergrenze
+        # fängt ein entgleistes Bild ab, bevor es den Server trifft (W-0118).
+        read_only: true
+        tmpfs:
+            - /tmp
+        cap_drop:
+            - ALL
+        security_opt:
+            - "no-new-privileges:true"
+        mem_limit: 1536m
+        # W-0111: nur die Variablen, die src/utils/config.ts liest, statt der ganzen
+        # .env. Stripe, Mail-Schlüssel und Redis bleiben beim Admin Dashboard.
         environment:
+            CLIENT_TOKEN: ${CLIENT_TOKEN:?CLIENT_TOKEN fehlt in der .env}
+            CLIENT_ID: ${CLIENT_ID:?CLIENT_ID fehlt in der .env}
+            CLIENT_SECRET: ${CLIENT_SECRET:-}
+            DEV_CLIENT_TOKEN: ${DEV_CLIENT_TOKEN:?DEV_CLIENT_TOKEN fehlt in der .env}
+            DEV_CLIENT_ID: ${DEV_CLIENT_ID:?DEV_CLIENT_ID fehlt in der .env}
+            DEV_CLIENT_SECRET: ${DEV_CLIENT_SECRET:-}
+            DEV_GUILD_ID: ${DEV_GUILD_ID:?DEV_GUILD_ID fehlt in der .env}
+            DEV_USER_IDs: ${DEV_USER_IDs:-}
+            SERVER_JWT_SECRET: ${SERVER_JWT_SECRET:?SERVER_JWT_SECRET fehlt in der .env}
+            SERVER_JWT_EXPIRES_IN: ${SERVER_JWT_EXPIRES_IN:-}
+            SERVER_PUBLIC_URL: ${SERVER_PUBLIC_URL:-}
+            SITE_PUBLIC_URL: ${SITE_PUBLIC_URL:-}
+            SERVER_RATE_LIMIT_MAX: ${SERVER_RATE_LIMIT_MAX:-}
+            SERVER_RATE_LIMIT_WINDOW: ${SERVER_RATE_LIMIT_WINDOW:-}
+            DATABASE_NAME: ${DATABASE_NAME:-}
+            DATABASE_USER: ${DATABASE_USER:-}
+            DATABASE_PASSWORD: ${DATABASE_PASSWORD:-}
+            DATABASE_POOL_LIMIT: ${DATABASE_POOL_LIMIT:-}
+            GUILD_MEMBER_INTENT: ${GUILD_MEMBER_INTENT:-}
+            GUILD_PRESENCE_INTENT: ${GUILD_PRESENCE_INTENT:-}
+            PRIME_API_TOKEN: ${PRIME_API_TOKEN:-}
+            TWITCH_CLIENT_ID: ${TWITCH_CLIENT_ID:-}
+            TWITCH_CLIENT_SECRET: ${TWITCH_CLIENT_SECRET:-}
+            YOUTUBE_API_KEY: ${YOUTUBE_API_KEY:-}
+            SMTP_HOST: ${SMTP_HOST:-}
+            SMTP_PORT: ${SMTP_PORT:-}
+            SMTP_USER: ${SMTP_USER:-}
+            SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+            SMTP_FROM: ${SMTP_FROM:-}
             DATABASE_HOST: host.docker.internal
             DATABASE_PORT: "3306"
             SERVER_PORT: "3000"

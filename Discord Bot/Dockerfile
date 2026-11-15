@@ -10,7 +10,8 @@
 #
 # Siehe docs/Hosting.md.
 
-FROM node:24-slim AS build
+# W-0111: Basis per Digest fest, Update bewusst: docker buildx imagetools inspect node:24-slim
+FROM node:24-slim@sha256:dc26ae92c9fb15cf6b1d63e20f0944b2efe0f115b20e00be48fb23fceb061c54 AS build
 
 WORKDIR /app
 
@@ -20,7 +21,7 @@ RUN npm ci
 COPY . .
 RUN npm run build
 
-FROM node:24-slim
+FROM node:24-slim@sha256:dc26ae92c9fb15cf6b1d63e20f0944b2efe0f115b20e00be48fb23fceb061c54
 
 ENV NODE_ENV=production
 
