@@ -47,5 +47,10 @@ export async function StaffOnly(
  * nicht mit.
  */
 export function WantsJSON(request: FastifyRequest): boolean {
-    return (request.headers["content-type"] ?? "").toLowerCase().includes("application/json");
+    // W-0113: genau der Medientyp (nicht "application/jsonx" oder "text/plain; x=application/json"),
+    // und nur von der eigenen Seite, wenn der Browser es sagt.
+    const type = (request.headers["content-type"] ?? "").split(";")[0].trim().toLowerCase();
+    const site = request.headers["sec-fetch-site"];
+
+    return type === "application/json" && (site === undefined || site === "same-origin");
 }

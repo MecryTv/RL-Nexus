@@ -3,6 +3,7 @@ import BotClient from "../../client/BotClient";
 import Event from "../../structures/Event";
 import logger from "../../utils/logger";
 import { StartBans } from "../../utils/security";
+import { WaitForDatabase } from "../../services/DatabaseService";
 
 export default class Ready extends Event {
     constructor(client: BotClient) {
@@ -28,6 +29,11 @@ export default class Ready extends Event {
 
         // W-0057: die dauerhaften Sperren, danach alle 5 Minuten und auf Zuruf des Admin Dashboards neu.
         StartBans(this.client);
+
+        // W-0104: Abmeldungen im Bot-Dashboard gelten auch nach dem Neustart.
+        void WaitForDatabase(this.client.databaseService)
+            .then(() => this.client.dashboardService.LoadRevoked())
+            .catch((error) => logger.warn(`🔐 Abmeldungen nicht geladen: ${String(error)}`));
 
         // Der Status unter dem Namen des Bots - fünf Ansagen im Wechsel.
         this.client.presenceService.Start();

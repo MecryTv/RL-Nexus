@@ -75,6 +75,8 @@ export const TABLES = {
     // W-0095: Abmeldungen im Modul RL Team-Übersicht.
     teamAbsences: "team_absences",
     avDebris: "av_debris",
+    // W-0104: abgemeldete Sitzungen des Bot-Dashboards.
+    revokedSessions: "dashboard_revoked_sessions",
 } as const;
 
 export type TableName = (typeof TABLES)[keyof typeof TABLES];

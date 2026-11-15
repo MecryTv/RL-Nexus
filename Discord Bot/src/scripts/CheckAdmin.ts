@@ -9,6 +9,7 @@
 process.env.CLIENT_SECRET ||= "check-secret";
 process.env.DEV_CLIENT_SECRET ||= "check-secret";
 
+import { createHmac } from "node:crypto";
 import { glob } from "glob";
 import path from "path";
 import { pathToFileURL } from "node:url";
@@ -48,6 +49,13 @@ async function main(): Promise<void> {
 
     const foreign = await fetch(`${BASE}/dcapi/admin/overview`, { headers: bearer(plugin) });
     check("Token ohne Scope admin 403", foreign.status === 403, `${foreign.status}`);
+
+    // W-0113: scope als Zeichenkette statt Liste, von Hand signiert - "admin".includes("admin") wäre wahr.
+    const data = [{ alg: "HS256", typ: "JWT" }, { sub: "admin-dashboard:1", iat: Math.floor(Date.now() / 1000), exp: Math.floor(Date.now() / 1000) + 60, scope: ADMIN_SCOPE }]
+        .map((part) => Buffer.from(JSON.stringify(part)).toString("base64url"))
+        .join(".");
+    const stringScope = await fetch(`${BASE}/dcapi/admin/overview`, { headers: bearer(`${data}.${createHmac("sha256", secret).update(data).digest("base64url")}`) });
+    check("Scope als Zeichenkette \"admin\" 401", stringScope.status === 401, `${stringScope.status}`);
 
     const ok = await fetch(`${BASE}/dcapi/admin/overview`, { headers: bearer(admin) });
     const body = (await ok.json()) as Record<string, any>;

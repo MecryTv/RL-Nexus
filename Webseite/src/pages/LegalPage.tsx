@@ -455,12 +455,12 @@ const PRIVACY: readonly ILegalSection[] = [
                 <Facts
                     entries={[
                         {
-                            name: "rlnexus_session",
+                            name: "__Host-rlnexus_session",
                             text: "Hält dich angemeldet. Enthält ein signiertes Token mit deiner Discord-ID.",
                             keep: "7 Tage",
                         },
                         {
-                            name: "rlnexus_oauth_state",
+                            name: "__Host-rlnexus_oauth_state",
                             text: "Schützt die Anmeldung mit Discord gegen untergeschobene Anfragen.",
                             keep: "10 Minuten",
                         },

@@ -22,7 +22,11 @@ import { ErrorInfo, SendError, WantsPage } from "../utils/errorpage";
 import { MODULE_IDS, PERMANENT_MODULES } from "../constants/Modules";
 import { DefaultRouletteSettings } from "../constants/RocketRoulette";
 import { AdminStatus, AskAdmin, BackupCall } from "../routes/DashboardApiBackups";
-import { DASHBOARD_HOME, DASHBOARD_PATH, DISCORD_EPOCH, OAUTH_SCOPES, SESSION_COOKIE } from "../constants/Dashboard";
+import { DASHBOARD_HOME, DASHBOARD_PATH, DEVELOPER_MODE, DISCORD_EPOCH, OAUTH_SCOPES, SESSION_COOKIE } from "../constants/Dashboard";
+import { FastifyRequest } from "fastify";
+import { WantsJSON } from "../utils/admin";
+import { ChannelType, Guild, GuildMember } from "discord.js";
+import { Lists } from "../routes/DashboardApiResources";
 import { SUPPORT_GUILD_ID } from "../constants/Help";
 import IDashboardSession from "../interfaces/services/dashboard/IDashboardSession";
 import DashboardService, { AccessEnds, BETA_ERRORS, BetaErrorText, BetaGate, DisplayGroup, LockPlaceholders, MfaRequired, ShopDecision, ShopStatusLines, type IShopGrantRow, type IShopStatusRow } from "../services/DashboardService";
@@ -1102,11 +1106,26 @@ async function checkLogout(client: BotClient): Promise<void> {
     }) as typeof fetch;
 
     try {
-        const response = await realFetch(`${BASE}${P}/logout`, { headers: { cookie: `${SESSION_COOKIE}=${service.Sign(session)}` }, ...MANUAL });
+        const copy = { headers: { cookie: `${SESSION_COOKIE}=${service.Sign(session)}` }, ...MANUAL };
+
+        // W-0113: Ein Link auf einer fremden Seite meldet nicht ab.
+        const foreign = await realFetch(`${BASE}${P}/logout`, { headers: { ...copy.headers, "sec-fetch-site": "cross-site" }, ...MANUAL });
+        check(
+            "Abmelden von fremder Seite: weiter zur Startseite, Sitzung bleibt",
+            foreign.status === 302 && foreign.headers.get("location") === HOME && foreign.headers.get("set-cookie") === null && calls.length === 0,
+            `${foreign.status} ${foreign.headers.get("location")} ${foreign.headers.get("set-cookie")} ${calls.length}`
+        );
+
+        const before = await realFetch(`${BASE}${P}/api/notifications`, copy);
+        const response = await realFetch(`${BASE}${P}/logout`, copy);
         const revoke = calls.find((call) => call.url.endsWith("/oauth2/token/revoke"));
 
         check("Abmelden: zurück zum Login, Cookie gelöscht", response.status === 302 && String(response.headers.get("set-cookie")).includes("Max-Age=0"), `${response.status}`);
         check("Abmelden: der Discord-Token wird widerrufen", revoke !== undefined && revoke.body.includes("token=token-zum-widerrufen") && revoke.body.includes("token_type_hint=access_token"), JSON.stringify(calls));
+
+        // W-0104: Die Kopie des Cookies trägt ihr Ablaufdatum selbst - der Bot merkt sich die Abmeldung.
+        const after = await realFetch(`${BASE}${P}/api/notifications`, copy);
+        check("Abmelden: kopiertes Cookie vorher gültig, danach 401", before.status === 200 && after.status === 401, `${before.status} ${after.status}`);
     } finally {
         globalThis.fetch = realFetch;
     }
@@ -1760,6 +1779,11 @@ async function main(): Promise<void> {
     // 1,4 MB, die niemand liest: ohne Abbruch bleibt die Antwort im Server stecken und Stop() wartet ewig.
     await logo.body?.cancel();
 
+    // W-0114: Galerie-Bilder nur als das, was sie sind - der Browser rät nicht.
+    const galleryImage = await fetch(`${BASE}/images/default/rocketleague/plattforms/steam.png`);
+    check("Galerie-Bild mit nosniff", galleryImage.status === 200 && galleryImage.headers.get("x-content-type-options") === "nosniff", `${galleryImage.status} ${galleryImage.headers.get("x-content-type-options")}`);
+    await galleryImage.body?.cancel();
+
     const escape = await fetch(`${BASE}${P}/assets/images/..%2F..%2F..%2F..%2F.env`);
     check("Pfad aus images heraus ist 403", escape.status === 403, `${escape.status}`);
 
@@ -1776,6 +1800,22 @@ async function main(): Promise<void> {
     check(`  scope ist ${OAUTH_SCOPES.join(" + ")}`, target.searchParams.get("scope") === OAUTH_SCOPES.join(" "), String(target.searchParams.get("scope")));
     check("  state ist gesetzt", (target.searchParams.get("state") ?? "").length > 20);
     check("  state-Cookie ist HttpOnly und SameSite=Lax", cookie.includes("HttpOnly") && cookie.includes("SameSite=Lax"), cookie);
+    // W-0113: im Betrieb __Host- mit Secure und Path=/, mit --dev der schlichte Name.
+    check(
+        DEVELOPER_MODE ? "  state-Cookie mit --dev ohne __Host-" : "  state-Cookie mit __Host-, Secure und Path=/",
+        DEVELOPER_MODE ? cookie.startsWith("rlnexus_oauth_state=") : cookie.startsWith("__Host-rlnexus_oauth_state=") && cookie.includes("; Secure") && cookie.includes("; Path=/;"),
+        cookie
+    );
+
+    // W-0113: Secure im Betrieb auch dann, wenn SERVER_PUBLIC_URL mit http beginnt; mit --dev nur bei https.
+    const secureBei = (developerMode: boolean, base: string) => new DashboardService({ developerMode, server: { BaseURL: base } } as unknown as BotClient).Secure;
+    check("Secure: im Betrieb auch mit http, mit --dev nur mit https", secureBei(false, "http://127.0.0.1:3999") && !secureBei(true, "http://localhost:3999") && secureBei(true, "https://dev.example"));
+
+    // W-0113: WantsJSON verlangt genau application/json, von der eigenen Seite oder ohne Angabe.
+    const wants = (headers: Record<string, string>) => WantsJSON({ headers } as unknown as FastifyRequest);
+    check("WantsJSON: application/jsonx und text/plain nein", !wants({ "content-type": "application/jsonx" }) && !wants({ "content-type": "text/plain" }));
+    check("WantsJSON: mit charset und Großbuchstaben ja", wants({ "content-type": "Application/JSON; charset=utf-8" }));
+    check("WantsJSON: same-origin ja, same-site und cross-site nein", wants({ "content-type": "application/json", "sec-fetch-site": "same-origin" }) && !wants({ "content-type": "application/json", "sec-fetch-site": "same-site" }) && !wants({ "content-type": "application/json", "sec-fetch-site": "cross-site" }));
 
     const evil = await fetch(`${BASE}${P}/login?return=//evil.example`, MANUAL);
     const evilCookie = evil.headers.get("set-cookie") ?? "";
@@ -2169,6 +2209,12 @@ async function main(): Promise<void> {
     });
     check("Modul-Schalter nimmt nur JSON (CSRF)", alsText.status === 415, `${alsText.status}`);
 
+    // W-0113: genau der Medientyp, und nur von der eigenen Seite.
+    const versteckt = await fetch(modulesApi, { method: "POST", headers: { ...mitSitzung, "Content-Type": "text/plain; x=application/json" }, body: "tickets" });
+    const fremdeSeite = await fetch(modulesApi, { method: "POST", headers: { ...mitSitzung, "Content-Type": "application/json", "Sec-Fetch-Site": "cross-site" }, body: "{}" });
+    check("Modul-Schalter: text/plain mit application/json im Zusatz 415", versteckt.status === 415, `${versteckt.status}`);
+    check("Modul-Schalter: JSON von fremder Seite 415", fremdeSeite.status === 415, `${fremdeSeite.status}`);
+
     const erfunden = await fetch(modulesApi, {
         method: "POST",
         headers: { ...mitSitzung, "Content-Type": "application/json" },
@@ -2312,6 +2358,12 @@ async function main(): Promise<void> {
 
     const listenOhneSitzung = await fetch(`${BASE}${P}/api/guild/${id}/resources`, MANUAL);
     check("Kanal- und Rollenlisten ohne Sitzung ist 401", listenOhneSitzung.status === 401, `${listenOhneSitzung.status}`);
+
+    // W-0114: Moderatoren bekommen nur Kanäle, die sie sehen; wer verwaltet, alle.
+    const raum = (channelId: string, sichtbar: boolean) => ({ id: channelId, name: `kanal-${channelId}`, type: ChannelType.GuildText, rawPosition: Number(channelId), isThread: () => false, permissionsFor: () => ({ has: () => sichtbar }) });
+    const listenServer = { id: "1", channels: { cache: new Map([["2", raum("2", true)], ["3", raum("3", false)]]) }, roles: { cache: new Map() }, emojis: { cache: new Map() } } as unknown as Guild;
+    const kanalIds = (viewer: GuildMember | null) => Lists(listenServer, viewer).channels.map((channel) => channel.id).join(",");
+    check("Kanallisten: Verwalter alle, Moderator nur sichtbare", kanalIds(null) === "2,3" && kanalIds({} as GuildMember) === "2", `${kanalIds(null)} / ${kanalIds({} as GuildMember)}`);
 
     const health = await fetch(`${BASE}/dcapi/health`);
     check("Bestehende API bleibt tokenpflichtig", health.status === 401, `${health.status}`);

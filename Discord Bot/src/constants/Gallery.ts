@@ -98,11 +98,21 @@ const INTERNAL_NETWORKS: Array<[network: string, prefix: number]> = [
     ["169.254.0.0", 16], // Link-local, darunter die Metadaten-Dienste der Clouds
     ["172.16.0.0", 12],
     ["192.168.0.0", 16],
+    // W-0114: IETF-Protokolle, Benchmark-Netz, Multicast und reserviert - nichts davon ist ein oeffentlicher Bildserver.
+    ["192.0.0.0", 24],
+    ["198.18.0.0", 15],
+    ["224.0.0.0", 4],
+    ["240.0.0.0", 4],
     // :: (das IPv6-Gegenstueck zu 0.0.0.0), ::1 und die veralteten IPv4-kompatiblen
     // ::a.b.c.d - ein Linux mit aktivem sit0 fuehrt ::127.0.0.1 als eigene Adresse.
     ["::", 96],
     ["fc00::", 7], // Unique local
     ["fe80::", 10], // Link-local
+    // W-0114: NAT64 (64:ff9b::7f00:1 ist 127.0.0.1 hinter einem NAT64-Gateway), 6to4 mit eingebetteter IPv4 und Multicast.
+    ["64:ff9b::", 96],
+    ["64:ff9b:1::", 48],
+    ["2002::", 16],
+    ["ff00::", 8],
 ];
 
 const INTERNAL = new BlockList();

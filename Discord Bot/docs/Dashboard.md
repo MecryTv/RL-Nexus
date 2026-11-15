@@ -108,7 +108,7 @@ Jeder Scope kostet eine Zeile mehr im Zustimmungsdialog — wer `guilds.members.
 
 ### 4. Einladelink für den Bot (Requires OAuth2 Code Grant)
 
-Unter **Bot** ist „Requires OAuth2 Code Grant“ an (W-0069). Der Bot tritt damit erst bei, wenn der Bot selbst den Code von Discord eintauscht. Ein fertiger Link aus dem URL-Generator geht nicht mehr. Eingeladen wird nur über `<base>/einladen?guild=<id>`: Die Route prüft Anmeldung, „Server verwalten“ und Sperren, legt den Freigabe-Pass an, dazu einen einmaligen `state` (im Speicher und im Cookie `rlnexus_invite_state`), und leitet hierhin:
+Unter **Bot** ist „Requires OAuth2 Code Grant“ an (W-0069). Der Bot tritt damit erst bei, wenn der Bot selbst den Code von Discord eintauscht. Ein fertiger Link aus dem URL-Generator geht nicht mehr. Eingeladen wird nur über `<base>/einladen?guild=<id>`: Die Route prüft Anmeldung, „Server verwalten“ und Sperren, legt den Freigabe-Pass an, dazu einen einmaligen `state` (im Speicher und im Cookie `__Host-rlnexus_invite_state`, lokal mit `--dev` ohne Präfix), und leitet hierhin:
 
 ```
 https://discord.com/oauth2/authorize

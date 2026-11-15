@@ -9,10 +9,11 @@
 process.env.CLIENT_SECRET ||= "check-secret";
 process.env.DEV_CLIENT_SECRET ||= "check-secret";
 
-import { ChannelType, Guild, GuildBasedChannel, Message, Role } from "discord.js";
+import { ChannelType, Guild, GuildBasedChannel, Message, PartialMessage, Partials, Role } from "discord.js";
 import BotClient from "../client/BotClient";
 import { CapsShare, DefaultAutoModSettings, FILTERS, MAX_WORDS, Normalize } from "../constants/AutoMod";
 import { IAutoModSettings } from "../interfaces/services/automod/IAutoMod";
+import AutoModEdits from "../events/automod/AutoModEdits";
 
 const GUILD = "90071992547409931";
 const TEXT = "90071992547409932";
@@ -175,6 +176,38 @@ function checkFilters(client: BotClient): void {
     check("Die Probe lässt beide aus", service.Try(spam, "egal was") === null);
 }
 
+/* ----------------------------------------------------------
+   Bearbeitete Nachrichten außerhalb des Caches (W-0122)
+   ---------------------------------------------------------- */
+async function checkEdits(client: BotClient): Promise<void> {
+    console.log("\n  — Bearbeitet —");
+
+    check("Der Client meldet auch unvollständige Nachrichten", client.options.partials?.includes(Partials.Message) === true);
+
+    const checked: unknown[] = [];
+    const service = client.autoModService;
+    const real = service.Check;
+
+    service.Check = async (message: Message | PartialMessage) => void checked.push(message);
+
+    try {
+        const edits = new AutoModEdits(client);
+        const full = { partial: false, content: "discord.gg/boese", member: {}, guild: {}, author: { id: "1", bot: false } } as unknown as Message;
+        const partial = { partial: true, fetch: async () => full } as unknown as PartialMessage;
+
+        await edits.Execute(partial, partial);
+        check("Unvollständig: nachgeladen und geprüft", checked.length === 1 && checked[0] === full, `${checked.length}`);
+
+        await edits.Execute({ partial: false, content: "discord.gg/boese" } as unknown as Message, full);
+        check("Gleicher Text: nicht noch einmal gezählt", checked.length === 1, `${checked.length}`);
+
+        await edits.Execute({ partial: false, content: "harmlos" } as unknown as Message, full);
+        check("Geänderter Text: geprüft", checked.length === 2 && checked[1] === full, `${checked.length}`);
+    } finally {
+        service.Check = real;
+    }
+}
+
 async function main(): Promise<void> {
     console.log("\n🛡️  Auto Mod\n");
 
@@ -183,6 +216,7 @@ async function main(): Promise<void> {
     checkCatalog();
     checkClean(client);
     checkFilters(client);
+    await checkEdits(client);
 
     console.log(failures === 0 ? "\n✅ Alle Prüfungen bestanden.\n" : `\n❌ ${failures} Prüfung(en) fehlgeschlagen.\n`);
 

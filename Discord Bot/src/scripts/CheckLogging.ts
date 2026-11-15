@@ -9,10 +9,11 @@
 process.env.CLIENT_SECRET ||= "check-secret";
 process.env.DEV_CLIENT_SECRET ||= "check-secret";
 
-import { ChannelType, Guild, GuildBasedChannel, GuildMember, Role } from "discord.js";
+import { ChannelType, Guild, GuildBasedChannel, GuildMember, MessageCreateOptions, Role } from "discord.js";
 import BotClient from "../client/BotClient";
 import { DefaultLogSettings, LOG_CATEGORIES, LOG_EVENTS, MAX_IGNORE } from "../constants/Logging";
 import { ILogSettings } from "../interfaces/services/logging/ILogging";
+import { SendLog } from "../utils/logtarget";
 
 const GUILD = "90071992547409931";
 const TEXT = "90071992547409932";
@@ -134,6 +135,23 @@ function checkRouting(client: BotClient, settings: ILogSettings): void {
     check("Mit der Vorgabe schon", client.logService.Skip(DefaultLogSettings(), { user: { id: "2", bot: true } }));
 }
 
+/* ----------------------------------------------------------
+   Pings im Log-Kanal
+   ---------------------------------------------------------- */
+async function checkMentions(): Promise<void> {
+    console.log("\n  — Pings —");
+
+    const sent: MessageCreateOptions[] = [];
+    const channel = { id: TEXT, type: ChannelType.GuildText, isTextBased: () => true, send: async (payload: MessageCreateOptions) => (sent.push(payload), null) };
+    const guild = { id: GUILD, channels: { cache: new Map([[TEXT, channel]]) } } as unknown as Guild;
+
+    await SendLog(guild, TEXT, { content: "@everyone <@&1>" });
+    check("Ohne eigene Angabe pingt nichts", JSON.stringify(sent[0]?.allowedMentions) === JSON.stringify({ parse: [] }), JSON.stringify(sent[0]?.allowedMentions));
+
+    await SendLog(guild, TEXT, { content: "<@&1>", allowedMentions: { roles: [ROLE] } });
+    check("Gewollte Pings bleiben", JSON.stringify(sent[1]?.allowedMentions) === JSON.stringify({ roles: [ROLE] }), JSON.stringify(sent[1]?.allowedMentions));
+}
+
 async function main(): Promise<void> {
     console.log("\n📜 Logging System\n");
 
@@ -144,6 +162,8 @@ async function main(): Promise<void> {
     const settings = checkClean(client);
 
     checkRouting(client, settings);
+
+    await checkMentions();
 
     console.log(failures === 0 ? "\n✅ Alle Prüfungen bestanden.\n" : `\n❌ ${failures} Prüfung(en) fehlgeschlagen.\n`);
 

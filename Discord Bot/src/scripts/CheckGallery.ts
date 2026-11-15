@@ -693,6 +693,18 @@ async function checkDownloadGuard(): Promise<void> {
         "fe80::1",
         "::",
         "::127.0.0.1", // veraltet IPv4-kompatibel - ["::", 96] in constants/Gallery.ts
+        // W-0114: reservierte Bereiche, NAT64, 6to4 und Multicast
+        "192.0.0.8",
+        "198.18.0.1",
+        "198.19.255.254",
+        "224.0.0.1",
+        "239.255.255.250",
+        "240.0.0.1",
+        "255.255.255.255",
+        "64:ff9b::7f00:1",
+        "64:ff9b:1::1",
+        "2002:7f00:1::1",
+        "ff02::1",
     ];
 
     for (const address of intern) {
@@ -701,7 +713,7 @@ async function checkDownloadGuard(): Promise<void> {
 
     // 172.32.0.1 liegt direkt hinter 172.16.0.0/12 - zusammen mit 172.16.0.1 oben
     // ist damit die Grenze dieses Bereichs von beiden Seiten abgesteckt.
-    for (const address of ["93.184.216.34", "172.32.0.1", "2606:4700::1111"]) {
+    for (const address of ["93.184.216.34", "172.32.0.1", "2606:4700::1111", "198.20.0.1", "223.255.255.254"]) {
         check(`${address} gilt als oeffentlich`, !IsInternalAddress(address), "wird als intern gesperrt");
     }
 

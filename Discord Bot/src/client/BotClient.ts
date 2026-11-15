@@ -269,7 +269,9 @@ export default class BotClient extends Client implements IBotClient {
             ],
             // Einen DM-Kanal kennt der Bot beim ersten Mal noch nicht - ohne dieses
             // Partial verwirft discord.js die Nachricht, statt sie zu melden.
-            partials: [Partials.Channel],
+            // W-0122: Partials.Message, damit auch Bearbeiten und Löschen von Nachrichten
+            // außerhalb des Caches ankommt (Auto Mod prüft sonst späte Bearbeitungen nicht).
+            partials: [Partials.Channel, Partials.Message],
         });
 
         // Jedes Modul hat seinen eigenen interactionCreate-Handler, inzwischen gut

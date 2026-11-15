@@ -7,8 +7,9 @@ export const ADMIN_SCOPE = "admin";
 export const RESTART_DELAY = 500;
 
 /**
- * Die Schlüssel aus der .env.example. Das Admin Dashboard erfährt nur, ob sie
- * gesetzt sind, nie den Wert. Kommt in der .env.example einer dazu, gehört er hierher.
+ * Die Schlüssel, die der Bot-Container bekommt (environment in docker-compose.prod.yml,
+ * W-0111). Das Admin Dashboard erfährt nur, ob sie gesetzt sind, nie den Wert.
+ * Bekommt der Bot dort einen dazu, gehört er hierher.
  */
 export const ADMIN_ENV_KEYS = [
     "CLIENT_TOKEN",
@@ -24,7 +25,6 @@ export const ADMIN_ENV_KEYS = [
     "DATABASE_NAME",
     "DATABASE_POOL_LIMIT",
     "DATABASE_USER",
-    "DATABASE_ROOT_PASSWORD",
     "DATABASE_PASSWORD",
     "SERVER_JWT_SECRET",
     "SERVER_PORT",
@@ -45,14 +45,6 @@ export const ADMIN_ENV_KEYS = [
     "SMTP_USER",
     "SMTP_PASSWORD",
     "SMTP_FROM",
-    "ADMIN_GUILD_ID",
-    "ADMIN_ROLE_ID",
-    "DEVELOPER_ROLE_ID",
-    "SITE_DOMAIN",
-    "DASHBOARD_DOMAIN",
-    "ADMIN_DOMAIN",
-    "WEBSITE_DIR",
-    "ADMIN_DIR",
 ] as const;
 
 /** Ob das Token vom Admin Dashboard kommt. Die Signatur hat der RouteManager vorher geprüft. */

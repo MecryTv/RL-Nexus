@@ -1,4 +1,4 @@
-import { ChannelType, Guild } from "discord.js";
+import { ChannelType, Guild, GuildMember } from "discord.js";
 import { FastifyReply, FastifyRequest } from "fastify";
 import BotClient from "../client/BotClient";
 import Route from "../structures/Route";
@@ -36,9 +36,13 @@ export default class DashboardApiResources extends Route {
 
         if (!id || !SNOWFLAKE.test(id)) return reply.code(404).send({ error: "Not Found" });
 
+        let manage: boolean;
+
         try {
+            manage = await service.CanManage(session, id);
+
             // Dieselben Leute, die die Listen schon in einer Modul-Route bekommen.
-            if (!(await service.CanManage(session, id)) && !(await service.CanModerate(session, id))) {
+            if (!manage && !(await service.CanModerate(session, id))) {
                 return reply.code(403).send({ error: "Forbidden", hint: "Nur wer den Server verwaltet oder moderiert." });
             }
         } catch (error) {
@@ -51,17 +55,23 @@ export default class DashboardApiResources extends Route {
 
         if (!guild) return reply.code(404).send({ error: "Der Bot ist auf diesem Server nicht (mehr) dabei." });
 
+        // W-0114: Moderatoren sehen nur Kanäle, die sie in Discord selbst sehen. Wer verwaltet,
+        // bekommt alles - sonst gälten Kanäle in offenen Auswahlfeldern als gelöscht.
+        const viewer = manage ? null : await guild.members.fetch(session.userId).catch(() => null);
+
+        if (!manage && !viewer) return reply.code(403).send({ error: "Forbidden", hint: "Nur wer den Server verwaltet oder moderiert." });
+
         reply.header("Cache-Control", "no-store");
 
-        return reply.send(Lists(guild));
+        return reply.send(Lists(guild, viewer));
     }
 }
 
-/** Alles, was eine Modul-Route an Kanälen und Rollen schicken kann - Text und Ankündigung, Sprache und Bühne, Forum und Medien. */
-function Lists(guild: Guild) {
+/** Alles, was eine Modul-Route an Kanälen und Rollen schicken kann - Text und Ankündigung, Sprache und Bühne, Forum und Medien. viewer: nur, was er sieht. */
+export function Lists(guild: Guild, viewer: GuildMember | null = null) {
     const rooms = (...types: ChannelType[]) =>
         [...guild.channels.cache.values()]
-            .filter((channel) => types.includes(channel.type) && !channel.isThread())
+            .filter((channel) => types.includes(channel.type) && !channel.isThread() && (!viewer || channel.permissionsFor(viewer).has("ViewChannel")))
             .sort((a, b) => ("rawPosition" in a && "rawPosition" in b ? a.rawPosition - b.rawPosition : 0))
             .map((channel) => ({ id: channel.id, name: channel.name }));
 

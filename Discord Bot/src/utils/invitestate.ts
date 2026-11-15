@@ -1,6 +1,7 @@
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import { LRUCache } from "lru-cache";
 import { PASS_MINUTES } from "./invitepass";
+import { COOKIE_PREFIX } from "../constants/Dashboard";
 
 /**
  * W-0069: Einladen mit „Requires OAuth2 Code Grant“. Der Bot tritt erst bei,
@@ -13,7 +14,7 @@ import { PASS_MINUTES } from "./invitepass";
  * dann zeigt der Rückweg „Einladung nicht mehr gültig“ und man lädt neu ein.
  */
 
-export const INVITE_STATE_COOKIE = "rlnexus_invite_state";
+export const INVITE_STATE_COOKIE = `${COOKIE_PREFIX}rlnexus_invite_state`;
 /** So lange wie der Freigabe-Pass. Gezählt wird auf dem Server, nicht über das Cookie. */
 export const INVITE_LIFETIME = PASS_MINUTES * 60_000;
 /** Abgelaufene Einladungen bleiben etwas länger im Speicher, damit die Fehlerseite Server und Uhrzeiten nennen kann. */

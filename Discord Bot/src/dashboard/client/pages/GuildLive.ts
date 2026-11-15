@@ -183,9 +183,10 @@ function parse(html: string): DocumentFragment {
     for (const node of template.content.querySelectorAll("*")) {
         for (const attribute of [...node.attributes]) {
             const name = attribute.name.toLowerCase();
-            const value = attribute.value.trim().toLowerCase();
+            // W-0114: Browser streichen Tab und Zeilenumbruch aus Adressen ("/\t/host" wird "//host"), "/\host" lesen sie als "//host".
+            const value = attribute.value.replace(/[\t\r\n]/g, "").trim().toLowerCase();
             // Alles, was eine Adresse trägt, auch xlink:href in SVG und action an Formularknöpfen.
-            const foreign = ["href", "src", "xlink:href", "action", "formaction"].includes(name) && !/^(https?:|#|\/(?!\/))/.test(value);
+            const foreign = ["href", "src", "xlink:href", "action", "formaction"].includes(name) && !/^(https?:|#|\/(?![\/\\]))/.test(value);
 
             if (name.startsWith("on") || name === "srcdoc" || foreign) node.removeAttribute(attribute.name);
         }

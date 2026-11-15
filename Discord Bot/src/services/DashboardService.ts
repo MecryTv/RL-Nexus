@@ -27,6 +27,7 @@ import {
     OAUTH_SCOPES,
 } from "../constants/Dashboard";
 import { SUPPORT_GUILD_ID } from "../constants/Help";
+import { TABLES } from "../constants/Database";
 import { Open, Seal } from "../utils/seal";
 import logger from "../utils/logger";
 import { BannedFor } from "../utils/security";
@@ -401,6 +402,9 @@ export default class DashboardService implements IDashboardService {
     private guildsLoading = new Map<string, Promise<IDashboardGuild[]>>();
     // W-0011: wem eine Sitzung gehört - damit Joined weiß, wem der Puls gilt.
     private sessionUsers = new LRUCache<string, string>({ max: MAX_SESSIONS });
+    // W-0104: abgemeldete Sitzungen (id → expiresAt in ms), bis ihr Cookie von selbst abliefe.
+    // ponytail: wächst mit jeder Abmeldung bis zu deren Ablauf (höchstens 7 Tage), bei sehr vielen Abmeldungen DB-Abfrage mit LRU davor.
+    private revoked = new Map<string, number>();
 
     // Läuft höchstens einmal gleichzeitig - sonst stößt jeder Seitenaufruf eine
     // weitere Mitglieder-Abfrage an.
@@ -437,8 +441,9 @@ export default class DashboardService implements IDashboardService {
         return `${this.client.server.BaseURL}${DASHBOARD_PATH}/callback`;
     }
 
+    // W-0113: Im Betrieb immer, auch wenn SERVER_PUBLIC_URL versehentlich mit http beginnt (__Host- verlangt es ohnehin).
     get Secure(): boolean {
-        return this.RedirectURI.startsWith("https:");
+        return !this.client.developerMode || this.RedirectURI.startsWith("https:");
     }
 
     get IsConfigured(): boolean {
@@ -738,6 +743,9 @@ export default class DashboardService implements IDashboardService {
         if (typeof session.accessToken !== "string" || !session.accessToken) return null;
         if (typeof session.expiresAt !== "number" || session.expiresAt <= Date.now()) return null;
 
+        // W-0104: abgemeldet - auch eine vorher kopierte Cookie-Kopie gilt nicht mehr.
+        if (this.revoked.has(session.id)) return null;
+
         // Cookies von vor der Zwei-Faktor-Pflicht tragen das Merkmal nicht. Sie
         // gelten damit nicht mehr - sonst liefe die Regel sieben Tage lang an
         // allen vorbei, die gerade angemeldet sind. Kostet einmal ein neues
@@ -750,9 +758,13 @@ export default class DashboardService implements IDashboardService {
         return session;
     }
 
-    // Räumt die Caches. Die Sitzung selbst lebt im Cookie - die beendet erst der
-    // Aufrufer, indem er es löscht (siehe DashboardLogout).
+    // Räumt die Caches und merkt sich die Sitzung als abgemeldet (W-0104): Das
+    // Cookie löscht der Aufrufer (siehe DashboardLogout), eine Kopie davon gilt
+    // ab jetzt auch nicht mehr - nach einem Neustart über LoadRevoked.
     Destroy(session: IDashboardSession): void {
+        this.revoked.set(session.id, session.expiresAt);
+        void this.SaveRevoked(session);
+
         this.guilds.delete(session.id);
 
         // Erst einsammeln, dann löschen - während der Iteration zu mutieren
@@ -760,6 +772,36 @@ export default class DashboardService implements IDashboardService {
         for (const key of [...this.members.keys()]) {
             if (key.startsWith(`${session.id}:`)) this.members.delete(key);
         }
+    }
+
+    // W-0104: Abmeldung in die Datenbank, abgelaufene räumen. Ohne Datenbank gilt sie bis zum Neustart.
+    private async SaveRevoked(session: IDashboardSession): Promise<void> {
+        const now = Date.now();
+
+        for (const [id, expiresAt] of this.revoked) if (expiresAt <= now) this.revoked.delete(id);
+
+        const db = this.client.databaseService;
+
+        if (!db.Ready) return;
+
+        try {
+            await db.Write(`INSERT IGNORE INTO \`${TABLES.revokedSessions}\` (id, expires_at) VALUES (?, ?)`, [session.id, session.expiresAt]);
+            await db.Write(`DELETE FROM \`${TABLES.revokedSessions}\` WHERE expires_at <= ?`, [now]);
+        } catch (error) {
+            logger.warn(`🔐 Abmeldung nicht gespeichert: ${String(error)}`);
+        }
+    }
+
+    /** W-0104: beim Start die Abmeldungen, deren Cookies noch gelten würden. */
+    async LoadRevoked(): Promise<void> {
+        if (!this.client.databaseService.Ready) return;
+
+        const rows = await this.client.databaseService.Query<{ id: string; expires_at: number }>(
+            `SELECT id, expires_at FROM \`${TABLES.revokedSessions}\` WHERE expires_at > ?`,
+            [Date.now()]
+        );
+
+        for (const row of rows) this.revoked.set(row.id, Number(row.expires_at));
     }
 
     async Payload(session: IDashboardSession): Promise<IDashboardPayload> {

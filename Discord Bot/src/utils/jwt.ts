@@ -77,6 +77,8 @@ export function VerifyToken(token: string, secret: string | undefined): IJWTPayl
 
         if (typeof payload?.sub !== "string" || typeof payload?.exp !== "number") return null;
         if (payload.exp <= Math.floor(Date.now() / 1000)) return null;
+        // W-0113: scope nur als Liste von Zeichenketten - "admin".includes("admin") wäre sonst auch wahr.
+        if (payload.scope !== undefined && !(Array.isArray(payload.scope) && payload.scope.every((entry) => typeof entry === "string"))) return null;
 
         return payload;
     } catch {

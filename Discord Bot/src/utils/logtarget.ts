@@ -159,5 +159,6 @@ export async function SendLog(guild: Guild, channelId: string | null, payload: M
 
     if (!IsLogTarget(channel) || !channel?.isTextBased()) return null;
 
-    return channel.send(payload).catch(() => null);
+    // Logs zeigen fremden Text: ohne eigene Angabe pingt nichts.
+    return channel.send({ allowedMentions: { parse: [] }, ...payload }).catch(() => null);
 }

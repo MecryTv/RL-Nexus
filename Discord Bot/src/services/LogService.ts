@@ -375,8 +375,9 @@ export default class LogService {
        ---------------------------------------------------------- */
     // ponytail: gemeldet wird nur, was discord.js im Cache hat - ohne Cache
     // schickt Discord kein Ereignis mit Inhalt. In der Praxis reicht das:
-    // gelöscht wird fast immer kurz nach dem Schreiben. Wer weiter zurück will,
-    // braucht Partials.Message und einen größeren Cache im BotClient.
+    // gelöscht wird fast immer kurz nach dem Schreiben. Seit W-0122 kommen mit
+    // Partials.Message auch unvollständige Nachrichten an, die hier still
+    // übergangen werden. Wer weiter zurück will, braucht einen größeren Cache im BotClient.
     private async MessageDelete(message: Message | PartialMessage): Promise<void> {
         const settings = await this.Active(message.guild);
 

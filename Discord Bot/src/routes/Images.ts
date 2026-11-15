@@ -42,6 +42,7 @@ export default class Images extends Route {
             .header("Content-Type", TypeOf(file) as string)
             .header("Content-Length", info.size)
             .header("Cache-Control", CACHE_CONTROL)
+            .header("X-Content-Type-Options", "nosniff")
             .send(createReadStream(file));
     }
 }

@@ -74,8 +74,12 @@ export const INVITE_PERMISSIONS = "8";
 export const MANAGE_GUILD = 1n << 5n;
 export const ADMINISTRATOR = 1n << 3n;
 
-export const SESSION_COOKIE = "rlnexus_session";
-export const STATE_COOKIE = "rlnexus_oauth_state";
+// W-0113: Im Betrieb mit __Host-: der Browser nimmt solche Cookies nur mit Secure,
+// Path=/ und ohne Domain an, ein Cookie einer anderen Subdomain kann sie nicht
+// überschatten. Mit --dev (Pfad /dashboard, oft http) ohne Präfix.
+export const COOKIE_PREFIX = DEVELOPER_MODE ? "" : "__Host-";
+export const SESSION_COOKIE = `${COOKIE_PREFIX}rlnexus_session`;
+export const STATE_COOKIE = `${COOKIE_PREFIX}rlnexus_oauth_state`;
 
 export const SESSION_LIFETIME = 7 * 24 * 60 * 60 * 1000;
 export const STATE_LIFETIME = 10 * 60 * 1000;

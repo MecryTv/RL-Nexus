@@ -1,7 +1,7 @@
 import { FastifyReply, FastifyRequest } from "fastify";
 import BotClient from "../client/BotClient";
 import Route from "../structures/Route";
-import { ClearCookie, DASHBOARD_PATH, SafeReturnPath, SESSION_COOKIE } from "../constants/Dashboard";
+import { ClearCookie, DASHBOARD_HOME, DASHBOARD_PATH, SafeReturnPath, SESSION_COOKIE } from "../constants/Dashboard";
 import { SessionOf } from "../utils/dashboard";
 
 export default class DashboardLogout extends Route {
@@ -16,6 +16,12 @@ export default class DashboardLogout extends Route {
     }
 
     async Handle(request: FastifyRequest, reply: FastifyReply): Promise<unknown> {
+        // W-0113: Ein Link oder Bild auf einer fremden Seite meldet niemanden ab. Der Browser sagt, woher
+        // die Anfrage kommt; ohne den Header (ältere Browser) bleibt es wie bisher.
+        const site = request.headers["sec-fetch-site"];
+
+        if (site !== undefined && site !== "same-origin" && site !== "none") return reply.redirect(DASHBOARD_HOME, 302);
+
         const service = this.client.dashboardService;
         const session = SessionOf(this.client, request);
 

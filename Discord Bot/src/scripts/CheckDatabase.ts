@@ -21,11 +21,14 @@ import { TeamMMR, WTSI } from "../constants/WTSI";
 import PlayerRanks from "../models/PlayerRanks";
 import { DAY_MS, HOUR_MS, SplitSpan } from "../constants/Activity";
 import { PERMANENT_MODULES } from "../constants/Modules";
+import DashboardService from "../services/DashboardService";
 
 // Eine Snowflake, die es bei Discord nicht gibt - Stand 2262.
 const GUILD = "9007199254740991";
 const USER_A = "9007199254740992";
 const USER_B = "9007199254740993";
+const REVOKED = "check-abgemeldet-9007199254740991";
+const REVOKED_OLD = "check-abgelaufen-9007199254740991";
 
 let failures = 0;
 
@@ -749,6 +752,39 @@ async function checkActivity(client: BotClient): Promise<void> {
     check("Danach ist nichts mehr da", (await model.Hours(GUILD, 0)).length === 0);
 }
 
+/**
+ * W-0104: Abmelden im Bot-Dashboard übersteht einen Neustart. Ein frischer
+ * DashboardService ist ein neu gestarteter Bot; erst LoadRevoked kennt die Abmeldung.
+ */
+async function checkRevoked(client: BotClient): Promise<void> {
+    console.log("\n  — Abgemeldete Sitzungen —");
+
+    const db = client.databaseService;
+    const session = { id: REVOKED, userId: USER_A, username: "Check", avatar: null, accessToken: "token", mfa: true as const, expiresAt: Date.now() + 60_000 };
+    const cookie = client.dashboardService.Sign(session);
+
+    await db.Write(`INSERT IGNORE INTO \`${TABLES.revokedSessions}\` (id, expires_at) VALUES (?, ?)`, [REVOKED_OLD, Date.now() - 1000]);
+
+    client.dashboardService.Destroy(session);
+
+    // Gespeichert wird im Hintergrund: erst die Abmeldung, danach das Aufräumen.
+    const row = (id: string) => db.One<{ id: string }>(`SELECT id FROM \`${TABLES.revokedSessions}\` WHERE id = ?`, [id]);
+
+    for (let tries = 0; tries < 30 && (await row(REVOKED_OLD)); tries++) await new Promise((resolve) => setTimeout(resolve, 100));
+
+    check("Abgelaufene Abmeldungen sind weggeräumt", (await row(REVOKED_OLD)) === null);
+    check("Abmeldung steht in der Datenbank", (await row(REVOKED))?.id === REVOKED);
+    check("Im laufenden Bot gilt das Cookie nicht mehr", client.dashboardService.Session(cookie) === null);
+
+    const restarted = new DashboardService(client);
+
+    check("Nach dem Neustart vor dem Laden noch gültig", restarted.Session(cookie)?.id === REVOKED);
+
+    await restarted.LoadRevoked();
+
+    check("Nach LoadRevoked abgewiesen", restarted.Session(cookie) === null);
+}
+
 async function cleanup(client: BotClient): Promise<void> {
     const service = client.databaseService;
 
@@ -766,6 +802,7 @@ async function cleanup(client: BotClient): Promise<void> {
     await service.Write(`DELETE FROM \`${TABLES.clubs}\` WHERE tag = ?`, ["PRF"]);
     await service.Write(`DELETE FROM \`${TABLES.ranks}\` WHERE user_id IN (?, ?)`, [USER_A, USER_B]);
     await service.Write(`DELETE FROM \`${TABLES.profiles}\` WHERE user_id IN (?, ?)`, [USER_A, USER_B]);
+    await service.Write(`DELETE FROM \`${TABLES.revokedSessions}\` WHERE id IN (?, ?)`, [REVOKED, REVOKED_OLD]);
 
     const left = await service.One<{ total: number }>(
         `SELECT COUNT(*) AS total FROM \`${TABLES.teams}\` WHERE guild_id = ?`,
@@ -815,6 +852,7 @@ async function main(): Promise<void> {
         await checkMatches(client, teamId);
         await checkCache(client);
         await checkActivity(client);
+        await checkRevoked(client);
     } finally {
         console.log("\n  — Aufräumen —");
 
