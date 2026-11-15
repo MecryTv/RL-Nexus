@@ -1,4 +1,5 @@
 import { gzipSync } from "node:zlib";
+import type { IServerPartJson } from "../../shared/backups.ts";
 import { sourcesOf } from "../../shared/userdata.ts";
 import { countAreas, encodeRows, packBackup, unpackBackup, unpackServer } from "../backups/data.ts";
 import { backupDatabaseName, backupsReason, ensureBackupDatabase } from "../backups/store.ts";
@@ -71,6 +72,42 @@ export function scrubTables(tables: Readonly<Record<string, readonly Row[]>>, id
     return { tables: cleaned, removed, count };
 }
 
+/**
+ * W-0119: Die Personen auch aus dem Discord-Teil eines Backups nehmen: Mitglied mit Rollen, Bann mit Grund und eigene
+ * Rechte in Kanälen (Overwrite vom Typ 1). Die Zähler stimmen danach. removed hält die Originale für die Ablage.
+ */
+export function scrubServer(server: IServerPartJson | null, ids: ReadonlySet<string>): { server: IServerPartJson | null; removed: Record<string, unknown[]>; count: number } {
+    if (!server) return { server, removed: {}, count: 0 };
+
+    const hit = (entry: unknown): boolean => ids.has(String((entry as { id?: unknown } | null)?.id));
+    const next: Record<string, unknown> = { ...server };
+    const removed: Record<string, unknown[]> = {};
+
+    for (const key of ["members", "bans"]) {
+        const list = server[key];
+        if (!Array.isArray(list) || !list.some(hit)) continue;
+
+        removed[key] = list.filter(hit);
+        next[key] = list.filter((entry) => !hit(entry));
+    }
+
+    const channels = Array.isArray(server.channels) ? (server.channels as { overwrites?: unknown[] }[]) : [];
+    const own = (overwrite: unknown): boolean => hit(overwrite) && (overwrite as { type?: unknown }).type === 1;
+    const overwrites = channels.flatMap((channel) => (channel.overwrites ?? []).filter(own));
+
+    if (overwrites.length > 0) {
+        removed.overwrites = overwrites;
+        next.channels = channels.map((channel) => ({ ...channel, overwrites: (channel.overwrites ?? []).filter((entry) => !own(entry)) }));
+    }
+
+    const count = Object.values(removed).reduce((sum, list) => sum + list.length, 0);
+    if (count === 0) return { server, removed, count };
+
+    const length = (key: string, fallback: number | null): number | null => (Array.isArray(next[key]) ? (next[key] as unknown[]).length : fallback);
+
+    return { server: { ...next, counts: { ...server.counts, members: length("members", server.counts.members), bans: length("bans", server.counts.bans) ?? 0 } }, removed, count };
+}
+
 async function ensureQuarantine(): Promise<void> {
     await query(`CREATE TABLE IF NOT EXISTS ${quarantineTable()} (
         id          INT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -108,14 +145,24 @@ export async function scrubBackups(config: IConfig, deletionId: number, userId: 
         if (!row) continue;
 
         const result = scrubTables(unpackBackup(row.data), new Set([userId]));
-        if (result.count === 0) continue;
+        // W-0119: auch der Discord-Teil, und ein Backup mit Treffern nur dort wird nicht übersprungen.
+        const server = scrubServer(unpackServer(row.data), new Set([userId]));
+        if (result.count + server.count === 0) continue;
 
-        const data = packBackup(result.tables, unpackServer(row.data));
-        const kept = gzipSync(JSON.stringify(Object.fromEntries(Object.entries(result.removed).map(([table, rows]) => [table, encodeRows(rows)]))));
+        const data = packBackup(result.tables, server.server);
+        const removed = Object.fromEntries(Object.entries(result.removed).map(([table, rows]) => [table, encodeRows(rows)]));
+        // Der Discord-Teil unter einem Schlüssel, den keine Tabelle hat.
+        const kept = gzipSync(JSON.stringify(server.count > 0 ? { ...removed, $server: server.removed } : removed));
 
         await query(`INSERT INTO ${quarantineTable()} (deletion_id, user_id, backup_id, guild_id, data, purge_at) VALUES (?, ?, ?, ?, ?, ?)`, [deletionId, userId, id, row.guild_id, kept, purgeAt]);
-        await query(`UPDATE ${backups} SET data = ?, bytes = ?, counts = ? WHERE id = ?`, [data, data.length, JSON.stringify(countAreas(result.tables)), id]);
-        total += result.count;
+        await query(`UPDATE ${backups} SET data = ?, bytes = ?, counts = ?, server_counts = ? WHERE id = ?`, [
+            data,
+            data.length,
+            JSON.stringify(countAreas(result.tables)),
+            server.server ? JSON.stringify(server.server.counts) : null,
+            id,
+        ]);
+        total += result.count + server.count;
     }
 
     return total;

@@ -192,19 +192,12 @@ export function WithdrawPage(): JSX.Element {
                                         Rechnungsnummer {input.invoiceNo}: {receipt.title ? `${receipt.title}, ` : ""}gekauft am <b>{formatDay(receipt.boughtAt)}</b>.
                                     </p>
                                 ) : (
-                                    <p className={styles.text}>Die Rechnungsnummer {input.invoiceNo} ordnen wir von Hand deiner Bestellung zu.</p>
+                                    <p className={styles.text}>Rechnungsnummer {input.invoiceNo}.</p>
                                 )}
                                 <p className={styles.text}>Wir prüfen den Widerruf und melden uns.</p>
-                                {receipt.mailed ? (
-                                    <p className={styles.note}>
-                                        Die Bestätigung geht an {receipt.email}. Kommt keine Mail, schau im Spam-Ordner nach. {questions}
-                                    </p>
-                                ) : (
-                                    <p className={styles.problem}>
-                                        Die Bestätigung per Mail an {receipt.email} ging gerade nicht raus. Der Widerruf ist trotzdem eingegangen. Mach dir am besten ein
-                                        Bildschirmfoto von dieser Seite. {questions}
-                                    </p>
-                                )}
+                                <p className={styles.note}>
+                                    Die Bestätigung geht an {receipt.email}. Kommt keine Mail, auch nicht im Spam, mach ein Bildschirmfoto dieser Seite. {questions}
+                                </p>
                                 <div className={styles.actions}>
                                     <Button to={me ? "/zugang" : "/"} variant="outline">
                                         {me ? "Zu Mein Zugang" : "Zur Startseite"}

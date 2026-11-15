@@ -1,6 +1,7 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
 import type { IMe, Role } from "../shared/api.ts";
 import type { IConfig } from "./config.ts";
+import { databaseReady, query } from "./db.ts";
 import { DiscordUnavailable, avatarUrl, displayName, fetchMember } from "./discord.ts";
 import { SESSION_COOKIE, clearCookie, open, parseCookies, type ISession } from "./session.ts";
 
@@ -101,8 +102,46 @@ export function readSession(request: FastifyRequest, config: IConfig, now = Date
     const session = open<ISession>(parseCookies(request.headers.cookie)[SESSION_COOKIE] ?? "", config.jwtSecret);
 
     if (!session || typeof session.id !== "string" || typeof session.exp !== "number") return null;
+    if (revoked.has(sessionKey(session))) return null;
 
     return session.exp * 1000 > now ? session : null;
+}
+
+/**
+ * W-0104: Beim Abmelden widerrufene Sitzungen, bis sie ohnehin ablaufen. Das
+ * Cookie trägt keine eigene ID, also zählen Discord-ID und Ablauf in Sekunden.
+ * Zwei Anmeldungen derselben Person in derselben Sekunde teilen sich den Schlüssel.
+ */
+const revoked = new Map<string, number>();
+
+function sessionKey(session: ISession): string {
+    return `${session.id}:${session.exp}`;
+}
+
+/** Sofort im Speicher, dazu in der Datenbank, damit der Widerruf einen Neustart übersteht. Scheitert die, gilt er bis zum Neustart. */
+export async function revokeSession(session: ISession, now = Date.now()): Promise<void> {
+    for (const [key, exp] of revoked) if (exp * 1000 <= now) revoked.delete(key);
+    revoked.set(sessionKey(session), session.exp);
+
+    if (!databaseReady()) return;
+
+    try {
+        await query("INSERT IGNORE INTO admin_revoked_sessions (session_key, expires_at) VALUES (?, ?)", [sessionKey(session), session.exp]);
+    } catch (error) {
+        console.error(`🔐 Abmeldung von ${session.id} nicht gespeichert: ${error instanceof Error ? error.message : String(error)}`);
+    }
+}
+
+/** Beim Start, nach connectDatabase. Abgelaufene räumt cleanup.ts weg. */
+export async function loadRevoked(): Promise<void> {
+    if (!databaseReady()) return;
+
+    try {
+        const rows = await query<{ session_key: string; expires_at: number }[]>("SELECT session_key, expires_at FROM admin_revoked_sessions WHERE expires_at > UNIX_TIMESTAMP()");
+        for (const row of rows) revoked.set(row.session_key, Number(row.expires_at));
+    } catch (error) {
+        console.error(`🔐 Widerrufene Sitzungen nicht geladen: ${error instanceof Error ? error.message : String(error)}`);
+    }
 }
 
 /** Wer anfragt. Hinter requireSession immer gesetzt. */

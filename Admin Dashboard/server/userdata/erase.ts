@@ -1,4 +1,4 @@
-import { USERDATA_AREAS, type IDeletionResult, type IUserdataRule, type IUserdataSource, type UserdataArea } from "../../shared/userdata.ts";
+import { USERDATA_ALWAYS_KEPT, USERDATA_AREAS, USERDATA_DEFAULTS, type IDeletionResult, type IUserdataRule, type IUserdataSource, type UserdataArea } from "../../shared/userdata.ts";
 import { audit } from "../audit.ts";
 import { botForgetUser } from "../bot.ts";
 import type { IConfig } from "../config.ts";
@@ -82,7 +82,9 @@ export async function erasePerson(id: string, run: TransactionQuery, rules: read
     const guilds = new Set<string>();
 
     for (const area of USERDATA_AREAS) {
-        const rule = rules.find((entry) => entry.area === area.id);
+        const saved = rules.find((entry) => entry.area === area.id);
+        // W-0119: Was immer bleibt, bleibt auch, wenn die übergebenen Regeln „löschen“ sagen. Sonst verschwände das Protokoll des Teams.
+        const rule = saved?.keep || !USERDATA_ALWAYS_KEPT.includes(area.id) ? saved : { note: "", basis: null, law: null, years: null, ...USERDATA_DEFAULTS[area.id], keep: true };
 
         if (rule?.keep) {
             let rows = 0;
@@ -135,6 +137,9 @@ export async function executeDeletion(config: IConfig, id: number): Promise<IDel
     if (!record || record.state !== "geplant") return null;
 
     const [rules, columns] = await Promise.all([userdataRules(), nullableColumns()]);
+    // W-0119: Der Bot vergisst die Person schon vor der Transaktion, sonst schreibt sein Speichern alle 60 Sekunden gepufferte
+    // Aktivität in die Lücke (dazu merkt sich der Bot die ID eine Weile, Bot-Teil von W-0119). Nach dem Commit noch einmal, nur das zählt.
+    await botForgetUser(config, record.userId, record.plannedBy);
     const result = await withTransaction(async (run) => {
         if (!(await claimDeletion(id, run))) return null;
 

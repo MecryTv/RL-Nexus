@@ -1,3 +1,4 @@
+import { loadRevoked } from "./access.ts";
 import { warmNames } from "./search/sources.ts";
 import { scheduleDeletions } from "./userdata/clock.ts";
 import { scheduleMessages } from "./messages/clock.ts";
@@ -35,6 +36,8 @@ const config: IConfig = (() => {
 })();
 
 await connectDatabase(config);
+// W-0104: Beim Abmelden widerrufene Sitzungen gelten auch nach einem Neustart nicht.
+await loadRevoked();
 // W-0066: Redis als Cache, falls eingerichtet. Ohne Redis geht alles direkt an MariaDB.
 await connectCache(config);
 const backupProblem = await ensureBackupDatabase(config);

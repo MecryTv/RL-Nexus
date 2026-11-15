@@ -13,15 +13,20 @@ import { open, seal } from "../session.ts";
 
 const LIFETIME = 15 * 60_000;
 
+/** W-0113: eigener Schlüssel, sonst ginge auch ein anderes versiegeltes Cookie (Sitzung, OAuth-State) als Wert durch. */
+function blockedSecret(config: IConfig): string {
+    return `blocked:${config.jwtSecret}`;
+}
+
 export function blockedToken(config: IConfig, view: IBlockedView, now = Date.now()): string {
-    return seal({ ...view, exp: now + LIFETIME }, config.jwtSecret);
+    return seal({ ...view, exp: now + LIFETIME }, blockedSecret(config));
 }
 
 export async function publicSecurityRoutes(app: FastifyInstance, { config }: { config: IConfig }): Promise<void> {
     // Unter /public/shop/: Die Webseite erreicht das Admin Dashboard nur über /api/shop/ (nginx im Container).
     app.get("/public/shop/blocked", { config: { rateLimit: { max: 30, timeWindow: "1 minute" } } }, async (request): Promise<IBlockedView> => {
         const token = String((request.query as { s?: string }).s ?? "");
-        const value = token ? open<IBlockedView & { exp?: number }>(token, config.jwtSecret) : null;
+        const value = token ? open<IBlockedView & { exp?: number }>(token, blockedSecret(config)) : null;
 
         if (!value || typeof value.exp !== "number" || value.exp < Date.now() || (value.kind !== "ban" && value.kind !== "vpn")) throw new PublicError(404, "Dieser Link ist abgelaufen. Melde dich neu an.");
 

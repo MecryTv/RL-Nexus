@@ -24,7 +24,7 @@ interface IFact {
 }
 
 /** Stand der Datenschutzerklärung. Bei jeder inhaltlichen Änderung nachziehen. */
-const UPDATED = "12. November 2026";
+const UPDATED = "15. November 2026";
 
 /**
  * Impressum und Datenschutzerklärung.
@@ -930,7 +930,10 @@ const PRIVACY: readonly ILegalSection[] = [
                 <p>
                     Den Nachweis der Löschung (Discord-ID, Zeitpunkte und Zahlen, keine Inhalte) bewahren wir drei
                     Jahre auf (Art. 6 Abs. 1 lit. c, Art. 5 Abs. 2 DSGVO). Ebenso lange steht im Protokoll unseres
-                    Teams, was es zu deiner Person erledigt hat, etwa eine Auskunft oder eine Löschung. In
+                    Teams, was es zu deiner Person erledigt hat, etwa eine Auskunft oder eine Löschung. Warst du
+                    selbst in unserem Team, bleibt im Protokoll noch 12 Monate nach der Löschung mit deiner Discord-ID
+                    stehen, was du dort erledigt hast. So bleibt nachvollziehbar, wer welche Aktion ausgeführt hat
+                    (Art. 6 Abs. 1 lit. f, Art. 5 Abs. 2 DSGVO); danach ersetzen wir die ID durch „Gelöschte Person“. In
                     Sicherungskopien der Datenbank stehen gelöschte Daten noch, bis diese nach 30 Tagen
                     überschrieben werden. Aus den Backups einzelner Server nehmen wir sie beim Löschen heraus; sie
                     liegen dann getrennt, lassen sich nicht zurückladen und sind nach 30 Tagen endgültig gelöscht.

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { BLOCKS, blocks, dmLists, presetOf, scopeOf } from "../../shared/security.ts";
+import { BLOCKS, blocks, dmLists, presetOf, scopeOf, type IBlockedView } from "../../shared/security.ts";
+import { blockedToken } from "../routes/security-public.ts";
 import { decideLogin } from "../security/check.ts";
 import { banDmKind, banDmLook } from "../security/dm.ts";
 import { ipHashes, networkOf } from "../security/hash.ts";
@@ -119,6 +120,16 @@ export async function checkSecurity(): Promise<void> {
             assert.equal((await post("/api/security/bans/1/lift", {})).statusCode, 503);
             assert.equal((await post("/api/security/vpn/test", { ip: "<script>" })).statusCode, 400);
             assert.equal((await post("/api/security/vpn/test", { ip: "203.0.113.77" })).statusCode, 409);
+        });
+
+        await check("Sperrseite (W-0113): eigener Schlüssel, ein Sitzungs-Cookie oder ein anders versiegelter Wert gilt nicht als Link", async () => {
+            const blocked = (token: string) => app.inject({ method: "GET", url: `/public/shop/blocked?s=${encodeURIComponent(token)}` });
+            const view: IBlockedView = { kind: "ban", service: "shop", name: "nutzer1", avatar: null, scope: ["shop"], since: null, changedAt: null, checkedAt: new Date().toISOString() };
+
+            const own = await blocked(blockedToken(config, view));
+            assert.deepEqual([own.statusCode, own.json()], [200, view]);
+            assert.equal((await blocked(cookie.slice(SESSION_COOKIE.length + 1))).statusCode, 404, "Sitzung des Admin Dashboards");
+            assert.equal((await blocked(seal({ ...view, exp: Date.now() + 60_000 }, SECRET))).statusCode, 404, "gleicher Inhalt mit dem Schlüssel der Sitzung");
         });
     } finally {
         await app.close();

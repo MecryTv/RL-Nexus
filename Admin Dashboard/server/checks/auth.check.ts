@@ -242,6 +242,17 @@ export async function checkAuth(): Promise<void> {
             assert.equal(own.statusCode, 204);
             assert.match(cookieLine(own, SESSION_COOKIE), /Max-Age=0/);
         });
+
+        // Am Ende: Der Widerruf gilt für Person und Ablaufsekunde, eine zweite Anmeldung in derselben Sekunde wäre mit weg.
+        await check("W-0104: Nach dem Abmelden gilt eine vorher kopierte Kopie des Cookies nicht mehr", async () => {
+            const session = cookieFrom(await login(USERS.admin), SESSION_COOKIE);
+            assert.equal((await me(session)).statusCode, 200);
+
+            const logout = await app.inject({ method: "POST", url: "/api/auth/logout", headers: { origin: config.publicUrl, cookie: `${SESSION_COOKIE}=${session}` }, remoteAddress: from() });
+            assert.equal(logout.statusCode, 204);
+
+            assert.equal((await me(session)).statusCode, 401);
+        });
     } finally {
         await app.close();
     }

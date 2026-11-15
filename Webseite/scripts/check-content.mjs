@@ -54,7 +54,7 @@ check(`Alle ${details.length} Detailtexte gehen durch`, () => {
 
 check("Links nur als https-Adresse oder eigener Pfad", () => {
     for (const good of ["https://discord.gg/abc", "/module/teams"]) assert.ok(isSafeLink(good), good);
-    for (const bad of ["javascript:alert(1)", "http://nexus-emb.de", "//evil.example", "/\\evil", "data:text/html,x"]) assert.ok(!isSafeLink(bad), bad);
+    for (const bad of ["javascript:alert(1)", "http://nexus-emb.de", "//evil.example", "/\\evil", "/\t/evil.example", "/\n/evil.example", "data:text/html,x"]) assert.ok(!isSafeLink(bad), bad);
 
     assert.ok(!isBanner({ enabled: true, kind: "info", title: "", text: "Hallo", link: { href: "javascript:alert(1)", label: "Klick" } }));
 

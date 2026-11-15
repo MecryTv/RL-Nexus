@@ -7,6 +7,7 @@ import { accountByAddress } from "../mail/accounts.ts";
 import { buildSystemMail, type IFile } from "../mail/compose.ts";
 import { escapeHtml } from "../mail/render.ts";
 import { sendFrom } from "../mail/send.ts";
+import { INVOICE_NO } from "./cancel.ts";
 import { formatDay } from "./grants.ts";
 import { PROVIDER_LINE, legalPdf } from "./legal.ts";
 
@@ -324,6 +325,12 @@ export function endedMail(_config: IConfig, input: { readonly to: string; readon
     };
 }
 
+/**
+ * W-0110: Steht an Stelle von Name, Grund und Referenz, wenn die Bestätigung an eine nicht bestätigte Adresse geht.
+ * Sonst schickt jeder über /kuendigen eigenen Text von noreply@ an fremde Adressen. support@ bekommt weiter alles.
+ */
+const GIVEN = "wie im Formular angegeben, liegt uns vor";
+
 /** Eingangsbestätigung nach /kuendigen (§ 312k BGB). Geht immer raus, auch wenn nichts zugeordnet wurde. */
 export function cancelReceiptMail(
     _config: IConfig,
@@ -337,18 +344,22 @@ export function cancelReceiptMail(
         readonly matched: boolean;
         readonly title: string | null;
         readonly endsAt: Date | null;
+        /** W-0110: false, wenn die Adresse nicht bestätigt ist. Dann steht kein Freitext aus dem Formular in der Mail. */
+        readonly full: boolean;
     }
 ): IShopMail {
     const extraordinary = input.kind === "extraordinary";
+    const invoiceNo = input.reference.trim().toUpperCase();
+    const reference = input.full ? esc(input.reference) : INVOICE_NO.test(invoiceNo) ? esc(invoiceNo) : GIVEN;
     // § 312k Abs. 4 BGB: Inhalt der Kündigung, Datum und Uhrzeit des Eingangs, Zeitpunkt des Endes.
     const content =
         `<p><b>Art:</b> ${extraordinary ? "außerordentlich, aus wichtigem Grund" : "ordentlich, zum nächstmöglichen Zeitpunkt"}<br>` +
-        `<b>Name:</b> ${esc(input.name)}<br>` +
-        `<b>Discord-Name oder Bestellnummer:</b> ${esc(input.reference)}` +
-        (extraordinary ? `<br><b>Grund:</b> ${esc(input.reason.slice(0, 500))}` : "") +
+        `<b>Name:</b> ${input.full ? esc(input.name) : GIVEN}<br>` +
+        `<b>Discord-Name oder Bestellnummer:</b> ${reference}` +
+        (extraordinary ? `<br><b>Grund:</b> ${input.full ? esc(input.reason.slice(0, 500)) : GIVEN}` : "") +
         "</p>";
     const contract =
-        input.matched && input.endsAt
+        input.full && input.matched && input.endsAt
             ? `<p><b>Vertrag:</b> ${esc(input.title ?? "Abo")}<br><b>Vertragsende:</b> ${esc(formatDay(input.endsAt))}. Bis dahin bleibt dein Zugang, danach wird nichts mehr abgebucht.</p>`
             : "<p>Wir ordnen sie von Hand deinem Vertrag zu und melden uns, spätestens in zwei Werktagen. Der Vertrag endet zum nächstmöglichen Zeitpunkt.</p>";
 
@@ -378,9 +389,11 @@ export function withdrawReceiptMail(
         readonly invoiceNo: string;
         /** null: Die Nummer ließ sich keinem Kauf dieser Person zuordnen. */
         readonly order: { readonly title: string | null; readonly boughtAt: Date } | null;
+        /** Wie bei cancelReceiptMail: false heißt ohne Name und ohne Kauf. Die Rechnungsnummer ist geprüft (INVOICE_NO). */
+        readonly full: boolean;
     }
 ): IShopMail {
-    const order = input.order
+    const order = input.full && input.order
         ? `<p><b>Vertrag:</b> ${esc(input.order.title ?? "Kauf")}<br><b>Gekauft am:</b> ${esc(formatDay(input.order.boughtAt))}</p>`
         : "<p>Wir ordnen ihn von Hand deiner Bestellung zu.</p>";
 
@@ -390,7 +403,7 @@ export function withdrawReceiptMail(
         html:
             `<h2>Dein Widerruf ist eingegangen.</h2>` +
             `<p>Wir haben ihn am <b>${esc(TIME_FORMAT.format(input.receivedAt))} Uhr</b> erhalten. Das hast du uns geschickt:</p>` +
-            `<p><b>Name:</b> ${esc(input.name)}<br><b>Rechnungsnummer:</b> ${esc(input.invoiceNo)}</p>` +
+            `<p><b>Name:</b> ${input.full ? esc(input.name) : GIVEN}<br><b>Rechnungsnummer:</b> ${esc(input.invoiceNo)}</p>` +
             order +
             "<p>Wir prüfen den Widerruf und melden uns.</p>",
     };

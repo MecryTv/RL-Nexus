@@ -479,15 +479,25 @@ section("Shop: Kündigen");
 
     await check("Kündigungsbestätigung enthält, was § 312k verlangt: Inhalt, Eingang, Ende", () => {
         const base = { to: "m@x.de", receivedAt: new Date("2026-10-17T12:30:00Z"), name: "Connor <b>", reference: "RLN-2026-0042", reason: "" };
-        const matched = cancelReceiptMail(config, { ...base, kind: "ordinary", matched: true, title: "Monat", endsAt: new Date("2026-11-01T10:00:00Z") });
+        const matched = cancelReceiptMail(config, { ...base, kind: "ordinary", matched: true, title: "Monat", endsAt: new Date("2026-11-01T10:00:00Z"), full: true });
 
-        for (const part of ["17.10.2026", "14:30", "ordentlich, zum nächstmöglichen Zeitpunkt", "RLN-2026-0042", "Vertragsende", "01.11.2026"]) assert.match(matched.html, new RegExp(part), part);
+        for (const part of ["17.10.2026", "14:30", "ordentlich, zum nächstmöglichen Zeitpunkt", "RLN-2026-0042", "Vertragsende", "01.11.2026", "Connor &lt;b&gt;"]) assert.match(matched.html, new RegExp(part), part);
         assert.equal(matched.html.includes("Connor <b>"), false, "Name maskiert");
 
-        const extra = cancelReceiptMail(config, { ...base, kind: "extraordinary", reason: "Bot war weg", matched: false, title: null, endsAt: null });
+        const extra = cancelReceiptMail(config, { ...base, kind: "extraordinary", reason: "Bot war weg", matched: false, title: null, endsAt: null, full: true });
         assert.match(extra.html, /außerordentlich/);
         assert.match(extra.html, /Bot war weg/);
         assert.match(extra.html, /von Hand/);
+    });
+
+    await check("Kündigungsbestätigung an eine nicht bestätigte Adresse: kein Name, kein Grund, keine freie Angabe, Pflichtangaben bleiben (W-0110)", () => {
+        const base = { to: "fremd@x.de", receivedAt: new Date("2026-10-17T12:30:00Z"), name: "Werbung kaufen", kind: "extraordinary", reason: "Gewinnspiel unter boese.example", matched: false, title: null, endsAt: null, full: false } as const;
+        const foreign = cancelReceiptMail(config, { ...base, reference: "Klick hier boese.example" });
+
+        assert.doesNotMatch(foreign.html, /Werbung|Gewinnspiel|boese\.example|Klick/);
+        for (const part of ["17.10.2026", "14:30", "außerordentlich", "wie im Formular angegeben", "nächstmöglichen Zeitpunkt"]) assert.match(foreign.html, new RegExp(part), part);
+        assert.match(cancelReceiptMail(config, { ...base, reference: " rln-2026-0042 " }).html, /RLN-2026-0042/, "Rechnungsnummer darf rein");
+        assert.doesNotMatch(cancelReceiptMail(config, { ...base, reference: "Klick", matched: true, title: "Monat", endsAt: new Date("2026-11-01T10:00:00Z") }).html, /Monat|01\.11\.2026/);
     });
 
     await check("Kündigung prüfen: Mail nur angemeldet leer, außerordentlich nur mit Grund", () => {
@@ -543,17 +553,22 @@ section("Shop: Kündigen");
 
     await check("Widerrufsbestätigung: Eingang mit Uhrzeit, Rechnungsnummer, Produkt nur wenn zugeordnet, keine eigenen Fristen oder Beträge", () => {
         const base = { to: "m@x.de", receivedAt: new Date("2026-11-13T12:30:00Z"), name: "Connor <b>", invoiceNo: "RLN-2026-0042" };
-        const matched = withdrawReceiptMail(config, { ...base, order: { title: "Monat", boughtAt: new Date("2026-11-10T09:00:00Z") } });
+        const matched = withdrawReceiptMail(config, { ...base, order: { title: "Monat", boughtAt: new Date("2026-11-10T09:00:00Z") }, full: true });
 
         assert.equal(matched.subject, "Dein Widerruf ist eingegangen");
         for (const part of ["13.11.2026", "13:30", "RLN-2026-0042", "Monat", "10.11.2026", "Wir prüfen den Widerruf und melden uns."]) assert.match(matched.html, new RegExp(part), part);
         assert.equal(matched.html.includes("Connor <b>"), false, "Name maskiert");
 
-        const unmatched = withdrawReceiptMail(config, { ...base, order: null });
+        const unmatched = withdrawReceiptMail(config, { ...base, order: null, full: true });
         assert.match(unmatched.html, /von Hand/);
         assert.match(unmatched.html, /Wir prüfen den Widerruf und melden uns\./);
         assert.doesNotMatch(unmatched.html, /Monat|10\.11\.2026/);
         assert.doesNotMatch(matched.html + unmatched.html, /\d+ Tage|vierzehn|€|Euro/, "keine eigenen Fristen oder Beträge");
+
+        // W-0110: An eine nicht bestätigte Adresse ohne Name und ohne Kauf, Eingang und Rechnungsnummer bleiben.
+        const foreign = withdrawReceiptMail(config, { ...base, name: "Werbung kaufen", order: { title: "Monat", boughtAt: new Date("2026-11-10T09:00:00Z") }, full: false });
+        assert.doesNotMatch(foreign.html, /Werbung|Monat|10\.11\.2026/);
+        for (const part of ["13.11.2026", "13:30", "RLN-2026-0042", "wie im Formular angegeben"]) assert.match(foreign.html, new RegExp(part), part);
     });
 
     section("Shop: Discord");
@@ -1397,7 +1412,7 @@ section("Shop: Kündigen");
                 const response = await publicPost("/public/shop/withdraw", form, site, "");
                 assert.equal(response.statusCode, 200, response.body);
                 const receipt = response.json() as IWithdrawReceipt;
-                assert.deepEqual([receipt.matched, receipt.title, receipt.boughtAt, receipt.email, receipt.mailed], [false, null, null, maskEmail(form.email), true]);
+                assert.deepEqual(receipt, { receivedAt: receipt.receivedAt, matched: false, title: null, boughtAt: null, email: maskEmail(form.email) });
                 assert.equal(Number.isNaN(Date.parse(receipt.receivedAt)), false);
 
                 const support = mails.find((mail) => String(mail.to) === config.contactMail);

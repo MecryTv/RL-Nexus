@@ -151,17 +151,12 @@ export function CancelPage(): JSX.Element {
                                     wird nichts mehr abgebucht.
                                 </p>
                             ) : (
-                                <p className={styles.text}>Wir ordnen sie von Hand deinem Vertrag zu und melden uns, spätestens in zwei Werktagen.</p>
+                                <p className={styles.text}>Wann dein Vertrag endet, steht in der Bestätigung.</p>
                             )}
                             {input.kind === "extraordinary" && <p className={styles.text}>Deine außerordentliche Kündigung schauen wir uns an und melden uns dazu.</p>}
-                            {receipt.mailed ? (
-                                <p className={styles.note}>Die Bestätigung geht an {receipt.email}. Kommt keine Mail, schau im Spam-Ordner nach.</p>
-                            ) : (
-                                <p className={styles.problem}>
-                                    Die Bestätigung per Mail an {receipt.email} ging gerade nicht raus. Die Kündigung ist trotzdem eingegangen. Mach dir am besten ein
-                                    Bildschirmfoto von dieser Seite.
-                                </p>
-                            )}
+                            <p className={styles.note}>
+                                Die Bestätigung geht an {receipt.email}. Kommt keine Mail, auch nicht im Spam, mach ein Bildschirmfoto dieser Seite.
+                            </p>
                             <div className={styles.actions}>
                                 <Button to={me ? "/zugang" : "/"} variant="outline">
                                     {me ? "Zu Mein Zugang" : "Zur Startseite"}

@@ -86,6 +86,8 @@ const supportAll = makeLimiter(30, HOUR);
 const WITHDRAW_EVENTS = "widerruf";
 // /widerrufen zählt die Bestätigungen je Adresse für sich: Wer am selben Tag kündigt und widerruft, bekommt beide. Die übrigen Grenzen gelten gemeinsam.
 const withdrawReceiptPerAddress = makeLimiter(3, 24 * HOUR);
+// W-0110: Bestätigungen an die eigene Mail des zugeordneten Kunden, je Adresse und Art. Zählt getrennt von den Grenzen oben.
+const ownReceipts = makeLimiter(5, 24 * HOUR);
 
 const STAMP = new Intl.DateTimeFormat("de-DE", { dateStyle: "medium", timeStyle: "medium", timeZone: "Europe/Berlin" });
 
@@ -454,8 +456,11 @@ export async function publicShopRoutes(app: FastifyInstance, { config }: { confi
             }
         }
 
-        // Eine zugeordnete Kündigung geht an die eigene Mail des Kunden. Sonst zählen die Grenzen: höchstens drei je Adresse am Tag und 100 in der Stunde.
-        const allowed = receiptPerAddress(to.toLowerCase()) && (ownReceipt(match !== null, to, match?.email ?? null) || receiptsAll("all"));
+        // W-0110: Eine zugeordnete Kündigung an die eigene Mail des Kunden hat ihr eigenes Kontingent, Fremde können es nicht aufbrauchen.
+        // Sonst zählen die Grenzen: höchstens drei je Adresse am Tag und 100 in der Stunde.
+        const own = ownReceipt(match !== null, to, match?.email ?? null);
+        const mine = session !== null && match?.userId === session.id;
+        const allowed = own ? ownReceipts(`kuendigen|${to.toLowerCase()}`) : receiptPerAddress(to.toLowerCase()) && receiptsAll("all");
         const mailed =
             allowed &&
             (await sendShopMail(
@@ -470,11 +475,13 @@ export async function publicShopRoutes(app: FastifyInstance, { config }: { confi
                     matched: match !== null,
                     title,
                     endsAt: match?.endsAt ?? null,
+                    full: mine || own,
                 })
             ));
         if (!mailed && match) await logEvent(match.userId, "mail.failed", "Kündigungsbestätigung").catch(() => undefined);
 
-        return { receivedAt: receivedAt.toISOString(), matched: match !== null, title, endsAt: match?.endsAt?.toISOString() ?? null, email: maskEmail(to), mailed };
+        // Details nur für den angemeldeten Kunden selbst, sonst verriete die Antwort, ob Angabe und Mail zusammenpassen.
+        return { receivedAt: receivedAt.toISOString(), matched: mine, title: mine ? title : null, endsAt: mine ? (match?.endsAt?.toISOString() ?? null) : null, email: maskEmail(to) };
     });
 
     // W-0096: Widerrufen ohne Anmeldung. Nichts geht automatisch an Stripe: Der Support prüft und erstattet von Hand.
@@ -535,11 +542,14 @@ export async function publicShopRoutes(app: FastifyInstance, { config }: { confi
         }
 
         const bought = matched && order ? { title, boughtAt: order.createdAt } : null;
-        const allowed = withdrawReceiptPerAddress(to.toLowerCase()) && (ownReceipt(matched, to, owner?.email ?? null) || receiptsAll("all"));
-        const mailed = allowed && (await sendShopMail(config, withdrawReceiptMail(config, { to, receivedAt, name: input.name, invoiceNo: input.invoiceNo, order: bought })));
+        // W-0110: wie beim Kündigen. Eigenes Kontingent für die eigene Mail, Details nur für den angemeldeten Kunden selbst.
+        const own = ownReceipt(matched, to, owner?.email ?? null);
+        const mine = matched && session !== null && order?.userId === session.id;
+        const allowed = own ? ownReceipts(`widerruf|${to.toLowerCase()}`) : withdrawReceiptPerAddress(to.toLowerCase()) && receiptsAll("all");
+        const mailed = allowed && (await sendShopMail(config, withdrawReceiptMail(config, { to, receivedAt, name: input.name, invoiceNo: input.invoiceNo, order: bought, full: mine || own })));
         if (!mailed && matched && order) await logEvent(order.userId, "mail.failed", "Widerrufsbestätigung").catch(() => undefined);
 
-        return { receivedAt: receivedAt.toISOString(), matched, title: bought?.title ?? null, boughtAt: bought?.boughtAt.toISOString() ?? null, email: maskEmail(to), mailed };
+        return { receivedAt: receivedAt.toISOString(), matched: mine, title: mine ? (bought?.title ?? null) : null, boughtAt: mine ? (bought?.boughtAt.toISOString() ?? null) : null, email: maskEmail(to) };
     });
 
     // W-0096: Angemeldet wählt die Seite den Kauf aus einer Liste, statt die Nummer abtippen zu lassen. Nur eigene Käufe.

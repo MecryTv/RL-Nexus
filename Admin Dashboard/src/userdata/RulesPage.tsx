@@ -26,6 +26,9 @@ import { useToast } from "../toast/context";
 import { useTitle } from "../useTitle";
 import styles from "./userdata.module.scss";
 
+/** Bereiche, die immer bleiben (USERDATA_ALWAYS_KEPT), mit dem Hinweis am Schalter. */
+const ALWAYS: Partial<Record<string, string>> = { sicherheit: "immer, sonst wirkt keine Sperre", teamprotokoll: "immer, damit jede Aktion nachvollziehbar bleibt" };
+
 type Draft = Pick<IUserdataRuleView, "keep" | "note" | "basis" | "law" | "years">;
 
 const AREAS = new Map(USERDATA_AREAS.map((area) => [area.id, area]));
@@ -76,8 +79,8 @@ function KeepCard({ rule, onChange }: { readonly rule: IUserdataRuleView; readon
                 <span className={styles.cardCounts}>
                     {formatNumber(rule.people)} {rule.people === 1 ? "Person" : "Personen"} · {formatNumber(rule.rows)} Einträge
                 </span>
-                {/* W-0057: Eine Sperre bleibt, damit sie wirkt. Der Server lehnt „löschen“ hier ohnehin ab. */}
-                <Switch checked label="bleibt" disabled={rule.area === "sicherheit"} hint={rule.area === "sicherheit" ? "immer, sonst wirkt keine Sperre" : undefined} onChange={(on) => !on && onChange({ keep: false })} />
+                {/* W-0057, W-0119: Sperren und das Protokoll des Teams bleiben immer. Der Server lehnt „löschen“ hier ohnehin ab. */}
+                <Switch checked label="bleibt" disabled={ALWAYS[rule.area] !== undefined} hint={ALWAYS[rule.area]} onChange={(on) => !on && onChange({ keep: false })} />
             </div>
 
             <ul className={styles.inside} aria-label="Was drin ist">

@@ -8,7 +8,7 @@ import { GROUP_LABELS } from "./limits.ts";
  * der Tabelle - Code, nie Eingabe.
  */
 
-export const USERDATA_AREA_IDS = ["konto", "spieler", "level", "tickets", "bewerbungen", "moderation", "community", "teams", "shop", "beta", "kontakt", "sicherheit", "nachrichten", "protokoll", "team"] as const;
+export const USERDATA_AREA_IDS = ["konto", "spieler", "level", "tickets", "bewerbungen", "moderation", "community", "teams", "shop", "beta", "kontakt", "sicherheit", "nachrichten", "protokoll", "teamprotokoll", "team"] as const;
 export type UserdataArea = (typeof USERDATA_AREA_IDS)[number];
 
 export interface IUserdataSource {
@@ -242,12 +242,20 @@ export const USERDATA_AREAS: readonly IUserdataAreaDef[] = [
         sources: [{ table: "admin_audit", column: "target", role: "person", time: "created_at", label: "action" }],
     },
     {
+        // W-0119: Was jemand im Admin Dashboard getan hat, bleibt bei einer Löschung immer zugeordnet (USERDATA_ALWAYS_KEPT).
+        // Sonst ließe jemand aus dem Team die eigenen Spuren mit einer Löschung von sich verschwinden.
+        id: "teamprotokoll",
+        label: "Im Protokoll als Team",
+        inside: ["Was die Person im Admin Dashboard getan hat"],
+        icon: "list",
+        sources: [{ table: "admin_audit", column: "user_id", role: "team", time: "created_at", label: "action", name: "user_name" }],
+    },
+    {
         id: "team",
         label: "Als Team aktiv",
         inside: ["Was die Person als Team getan hat"],
         icon: "wrench",
         sources: [
-            { table: "admin_audit", column: "user_id", role: "team", time: "created_at", label: "action", name: "user_name" },
             { table: "apply_forms", column: "created_by", role: "team", guild: G, label: "CONCAT('Formular angelegt: ', name)" },
             { table: "apply_submissions", column: "decided_by", role: "team", guild: G, time: ms("decided_at"), label: "'Über eine Bewerbung entschieden'" },
             { table: "auto_responses", column: "created_by", role: "team", guild: G, label: "'Auto-Antwort angelegt'" },
@@ -330,6 +338,8 @@ export const USERDATA_IGNORED: Readonly<Record<string, string>> = {
     "auto_responses.*": "Inhalt und Einstellungen einer Auto-Antwort",
     "custom_messages.*": "Inhalt und Einstellungen einer Nachricht",
     "self_role_panels.*": "Text und Rollen eines Panels",
+    // W-0101: die vorhandene Nachricht, an der das Panel hängt.
+    "self_role_panels.target_id": "ID einer Discord-Nachricht, keine Person",
     "role_lists.*": "Einstellungen einer Rollenliste",
     "stream_notifiers.*": "Einstellungen einer Stream-Meldung",
     "voice_hubs.*": "Einstellungen eines Voice-Hubs",
@@ -405,7 +415,17 @@ export const USERDATA_DEFAULTS: Readonly<Partial<Record<UserdataArea, { readonly
     protokoll: { note: "Was das Team zu dir getan hat, bleibt drei Jahre als Nachweis im Protokoll.", basis: "pflicht", law: "Art. 5 Abs. 2 DSGVO", years: 3 },
     // W-0057: ohne feste Dauer, die Sperre ist dauerhaft.
     sicherheit: { note: "Eine Sperre bleibt, damit sie wirkt.", basis: "interesse", law: null, years: null },
+    // W-0119, Vorschlag des Nutzers: 12 Monate. Danach nimmt cleanup.ts ID und Name heraus, mit der Dauer aus dieser Regel.
+    teamprotokoll: {
+        note: "Was du im Admin Dashboard getan hast, bleibt 12 Monate mit deiner ID im Protokoll, damit jede Aktion nachvollziehbar bleibt. Danach steht dort „Gelöschte Person“.",
+        basis: "interesse",
+        law: "Art. 5 Abs. 2 DSGVO",
+        years: 1,
+    },
 };
+
+/** Bereiche, die bei jeder Löschung bleiben, egal was unter „Was bleibt“ gespeichert ist. Satz, Grundlage und Dauer bleiben änderbar. */
+export const USERDATA_ALWAYS_KEPT: readonly UserdataArea[] = ["sicherheit", "teamprotokoll"];
 
 /** „Art. 17 Abs. 3 lit. e DSGVO · 3 Jahre“: für Vorschau und Beleg. */
 export function basisText(rule: { readonly basis: UserdataBasis | null; readonly law: string | null; readonly years: number | null }): string {

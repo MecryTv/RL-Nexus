@@ -1,6 +1,7 @@
 import { inflateSync } from "node:zlib";
 import { AUDIT_LABELS } from "../../shared/limits.ts";
 import {
+    USERDATA_ALWAYS_KEPT,
     USERDATA_AREAS,
     USERDATA_DEFAULTS,
     germanLabel,
@@ -223,7 +224,7 @@ export async function personExport(id: string): Promise<Partial<Record<UserdataA
     return result;
 }
 
-/** Je Bereich löschen oder behalten. Ohne Zeile gilt die Vorgabe. */
+/** Je Bereich löschen oder behalten. Ohne Zeile gilt die Vorgabe, bei USERDATA_ALWAYS_KEPT auch statt einer Zeile mit „löschen“. */
 export async function userdataRules(): Promise<IUserdataRule[]> {
     const rows = await query<{ area: string; keep: number; note: string | null; basis: UserdataBasis | null; law: string | null; years: number | null }[]>("SELECT area, keep, note, basis, law, years FROM userdata_rules");
     const saved = new Map(rows.map((row) => [row.area, row]));
@@ -232,7 +233,9 @@ export async function userdataRules(): Promise<IUserdataRule[]> {
         const row = saved.get(area.id);
         const fallback = USERDATA_DEFAULTS[area.id];
 
-        if (row) return { area: area.id, label: area.label, keep: Boolean(row.keep), note: row.note, basis: row.basis, law: row.law, years: row.years === null ? null : Number(row.years) };
+        if (row && (row.keep || !USERDATA_ALWAYS_KEPT.includes(area.id))) {
+            return { area: area.id, label: area.label, keep: Boolean(row.keep), note: row.note, basis: row.basis, law: row.law, years: row.years === null ? null : Number(row.years) };
+        }
         if (fallback) return { area: area.id, label: area.label, keep: true, ...fallback };
 
         return { area: area.id, label: area.label, keep: false, note: null, basis: null, law: null, years: null };

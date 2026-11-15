@@ -5,6 +5,7 @@ import { DiscordUnavailable } from "../discord.ts";
 import { InvalidInput, PublicError, errorResponse } from "../errors.ts";
 import { id, link, oneOf, snowflake, text } from "../validate.ts";
 import { isSafeLink } from "../../shared/links.ts";
+import { toCsv } from "../database.ts";
 import { check, section } from "./harness.ts";
 
 const CONTACT = {
@@ -44,12 +45,21 @@ export async function checkInput(): Promise<void> {
     await check("Links nur als https-Adresse oder eigener Pfad, nie javascript:", () => {
         for (const good of ["https://nexus-emb.de/module", "/guild/123/uebersicht"]) assert.ok(isSafeLink(good), good);
 
-        for (const bad of ["javascript:alert(1)", "JAVASCRIPT:alert(1)", "http://nexus-emb.de", "//evil.example", "/\\evil.example", "data:text/html,x", "nexus-emb.de"]) {
+        for (const bad of ["javascript:alert(1)", "JAVASCRIPT:alert(1)", "http://nexus-emb.de", "//evil.example", "/\\evil.example", "/\t/evil.example", "/\r\n/evil.example", "data:text/html,x", "nexus-emb.de"]) {
             assert.ok(!isSafeLink(bad), bad);
         }
 
         assert.equal(link("", "Der Link", 190), null);
         assert.throws(() => link("javascript:alert(1)", "Der Link", 190), /https:\/\/ oder mit \//);
+    });
+
+    await check("CSV-Export: Formel-Zellen bekommen ein ' davor, Zahlen bleiben Zahlen (W-0114)", () => {
+        const values = ["=HYPERLINK(1)", "+1+1", "-2+3", "@SUM(A1)", "\tx", "\rx", "-12", "+3.5", "42", "a=b", ""];
+        const columns = [{ name: "v", type: "text", nullable: true, key: "", comment: "", masked: false }];
+        const csv = toCsv({ table: "t", columns, rows: values.map((v) => ({ v })), total: values.length, page: 1, pages: 1, pageSize: 50, sort: null, dir: "asc", search: "" });
+        const cells = csv.split("\r\n").slice(1, -1);
+
+        assert.deepEqual(cells, ['"\'=HYPERLINK(1)"', '"\'+1+1"', '"\'-2+3"', '"\'@SUM(A1)"', '"\'\tx"', '"\'\rx"', '"-12"', '"+3.5"', '"42"', '"a=b"', '""']);
     });
 
     await check("Das Kontaktformular gilt mit denselben Regeln wie auf der Webseite", () => {

@@ -107,6 +107,9 @@ function isListOf<T>(value: unknown, isItem: (item: unknown) => item is T): valu
 /** Nur `https://…` oder ein eigener Pfad mit `/` vorn. Alles andere, vor allem `javascript:`, liefe im `href` als Code. */
 export function isSafeLink(href: unknown): href is string {
     if (typeof href !== "string") return false;
+    // Steuerzeichen streicht der Browser aus der Adresse: Aus "/\t/evil" würde "//evil".
+    // oxlint-disable-next-line no-control-regex -- genau diese Zeichen sollen abgelehnt werden.
+    if (/[\u0000-\u001f\u007f]/.test(href)) return false;
     if (href.startsWith("/")) return !href.startsWith("//") && !href.includes("\\");
 
     return URL.canParse(href) && new URL(href).protocol === "https:";

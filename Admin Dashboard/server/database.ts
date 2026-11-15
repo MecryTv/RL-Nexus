@@ -298,7 +298,9 @@ export function pageNumber(value: unknown): number {
 /** Zeilen als CSV. Semikolon, weil Excel im deutschen Gebietsschema danach trennt. */
 export function toCsv(data: IDbRows): string {
     const names = data.columns.filter((column) => !column.masked).map((column) => column.name);
-    const escape = (value: string | null): string => (value === null ? "" : `"${value.replaceAll('"', '""')}"`);
+    // W-0114: Beginnt eine Zelle mit = + - @ Tab oder CR, rechnet Excel sie als Formel. Ein ' davor macht Text daraus, reine Zahlen bleiben Zahlen.
+    const neutral = (value: string): string => (/^[=+\-@\t\r]/.test(value) && !/^[-+]?\d+(\.\d+)?$/.test(value) ? `'${value}` : value);
+    const escape = (value: string | null): string => (value === null ? "" : `"${neutral(value).replaceAll('"', '""')}"`);
     const lines = [names.map((name) => escape(name)).join(";"), ...data.rows.map((row) => names.map((name) => escape(row[name] ?? null)).join(";"))];
 
     // BOM: Ohne es liest Excel die Datei als Latin-1, und jeder Umlaut ist kaputt.

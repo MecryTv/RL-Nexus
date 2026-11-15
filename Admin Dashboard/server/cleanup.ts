@@ -3,6 +3,7 @@ import { forgetOldMessages } from "./messages/store.ts";
 import { forgetOldBans, forgetOldLogins } from "./security/store.ts";
 import { activeGrant } from "./shop/store.ts";
 import { HISTORY_DAYS } from "./status/history.ts";
+import { userdataRules } from "./userdata/find.ts";
 
 const DAY = 24 * 60 * 60_000;
 
@@ -46,6 +47,19 @@ export async function cleanup(): Promise<void> {
                 AND NOT EXISTS (SELECT 1 FROM shop_orders o WHERE o.user_id = c.user_id AND o.status IN ('paid', 'pending', 'refunded'))
                 AND NOT EXISTS (SELECT 1 FROM shop_grants g WHERE g.user_id = c.user_id AND ${activeGrant("g")})`
         );
+        // W-0104: Widerrufene Sitzungen, die ohnehin abgelaufen sind.
+        await query("DELETE FROM admin_revoked_sessions WHERE expires_at <= UNIX_TIMESTAMP()");
+        // W-0119: Was eine gelöschte Person im Admin Dashboard getan hat, bleibt so lange zugeordnet, wie die Regel „Im Protokoll als Team“
+        // sagt (Vorgabe 1 Jahr), dann nur noch als „Gelöschte Person“. Ohne Dauer bis zu den 3 Jahren oben.
+        const years = (await userdataRules()).find((rule) => rule.area === "teamprotokoll")?.years ?? null;
+        if (years !== null) {
+            await query(
+                `UPDATE admin_audit a JOIN userdata_deletions d ON d.user_id = a.user_id AND d.state = 'geloescht'
+                    SET a.user_id = '0', a.user_name = 'Gelöschte Person'
+                  WHERE d.done_at < NOW() - INTERVAL ? YEAR AND a.created_at <= d.done_at`,
+                [years]
+            );
+        }
 
         if (contact.affectedRows + audit.affectedRows > 0) {
             console.log(`🧹 Aufgeräumt: ${contact.affectedRows} Kontaktnachricht(en), ${audit.affectedRows} Protokolleintrag/-einträge`);

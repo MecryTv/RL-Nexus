@@ -14,6 +14,7 @@ import assert from "node:assert/strict";
 import { copyFile, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import type { FastifyRequest } from "fastify";
 import type { Transporter } from "nodemailer";
 import type { Options } from "nodemailer/lib/mailer/index.js";
 import type { IAuditPage, IDbRows, IDbTable, IGroupList, IMailAllPage, IMailOverview, IOverview, ITech } from "../shared/api.ts";
@@ -23,13 +24,14 @@ import { forgetIndex, personIndex, rowsOf } from "./userdata/find.ts";
 import { cancelDeletion, claimDeletion, deletionCounts, deletionOf, dueDeletions, forgetOldDeletions, listDeletions, markCopy, openDeletionOf, planDeletion, stopDeletion } from "./userdata/deletions.ts";
 import { executeDeletion } from "./userdata/erase.ts";
 import { purgeQuarantine, quarantineTable } from "./userdata/backups.ts";
-import { packBackup, unpackBackup } from "./backups/data.ts";
+import { packBackup, unpackBackup, unpackServer } from "./backups/data.ts";
 import { backupDatabaseName, ensureBackupDatabase } from "./backups/store.ts";
 import { signToken } from "./bot.ts";
 import { forgetAllUsers, forgetUser, namesFilled } from "./users.ts";
 import { deletionRound } from "./userdata/clock.ts";
 import type { ICancelReceipt, ICheckoutStart, ICustomerDetail, ICustomerList, IShopProduct, IShopProductList, IShopSettingsView, IShopState, IUnlockProgress, IWithdrawOrder, IWithdrawReceipt } from "../shared/shop.ts";
 import type { IIncidentList, IPublicStatus, IStatusDetail } from "../shared/status.ts";
+import { loadRevoked, readSession, revokeSession } from "./access.ts";
 import { buildApp } from "./app.ts";
 import { checkBackupsDb } from "./checks/backups-db.check.ts";
 import { checkBetaDb } from "./checks/beta-db.check.ts";
@@ -415,6 +417,7 @@ try {
 
                 try {
                     contactSent.length = 0;
+                    sent.length = 0;
                     const form = { topic: "frage", name: "Check", email: "check@example.test", discord: "", subject: "Über das Postfach", message: "Geht diese Nachricht über das Postfach raus?", context: "", website: "" };
                     const response = await contactApp.inject({ method: "POST", url: "/public/contact", headers: { "content-type": "application/json" }, payload: JSON.stringify(form), remoteAddress: "10.4.0.1" });
 
@@ -479,6 +482,25 @@ try {
 
         const rows = await query<{ action: string }[]>("SELECT action FROM admin_audit WHERE action IN ('check.alt', 'check.jung')");
         assert.deepEqual(rows.map((row) => row.action), ["check.jung"]);
+    });
+
+    await check("W-0104: Abmeldungen stehen in der Datenbank und gelten nach dem Laden, abgelaufene räumt das Aufräumen weg", async () => {
+        const who = "9999999999999999970";
+        const now = Math.floor(Date.now() / 1000);
+        const sealed = (exp: number) => `${SESSION_COOKIE}=${seal({ id: who, name: "check", avatar: null, exp }, SECRET)}`;
+
+        await query("DELETE FROM admin_revoked_sessions WHERE session_key LIKE ?", [`${who}:%`]);
+        await query("INSERT INTO admin_revoked_sessions (session_key, expires_at) VALUES (?, ?), (?, ?)", [`${who}:${now + 700}`, now + 700, `${who}:${now - 10}`, now - 10]);
+        await loadRevoked();
+        assert.equal(readSession({ headers: { cookie: sealed(now + 700) } } as FastifyRequest, config), null, "wie nach einem Neustart");
+        assert.notEqual(readSession({ headers: { cookie: sealed(now + 800) } } as FastifyRequest, config), null, "eine andere Sitzung derselben Person gilt");
+
+        await revokeSession({ id: who, name: "check", avatar: null, exp: now + 600 });
+        await cleanup();
+
+        const rows = await query<{ session_key: string }[]>("SELECT session_key FROM admin_revoked_sessions WHERE session_key LIKE ? ORDER BY expires_at", [`${who}:%`]);
+        assert.deepEqual(rows.map((row) => row.session_key), [`${who}:${now + 600}`, `${who}:${now + 700}`]);
+        await query("DELETE FROM admin_revoked_sessions WHERE session_key LIKE ?", [`${who}:%`]);
     });
 
     await check("Statusprüfungen verschwinden nach 90 Tagen", async () => {
@@ -980,7 +1002,7 @@ try {
             try {
                 const profile = await profileOf(PERSON);
 
-                assert.deepEqual(profile.areas.find((area) => area.id === "team")?.first.includes("Gruppe vergeben"), true, JSON.stringify(profile.areas));
+                assert.deepEqual(profile.areas.find((area) => area.id === "teamprotokoll")?.first.includes("Gruppe vergeben"), true, JSON.stringify(profile.areas));
             } finally {
                 await query("DELETE FROM admin_audit WHERE user_id = ? AND target = ?", [PERSON, DECOY]);
             }
@@ -1051,6 +1073,8 @@ try {
                     // W-0057: Sperren bleiben, ohne feste Dauer.
                     ["sicherheit", "interesse", null],
                     ["protokoll", "pflicht", 3],
+                    // W-0119: Was das Team im Admin Dashboard tat, 12 Monate.
+                    ["teamprotokoll", "interesse", 1],
                 ]
             );
             assert.ok((rules.find((rule) => rule.area === "level")?.people ?? 0) >= 1, "Personen je Bereich");
@@ -1214,6 +1238,10 @@ try {
 
         await check("Löschung ausführen: eigene Zeilen weg, für andere nur die ID raus, „behalten“ bleibt mit Grundlage, Nachweis im Protokoll", async () => {
             await query("INSERT INTO userdata_rules (area, keep, note, basis, law, years) VALUES ('moderation', 1, 'check:db bleibt', 'ansprueche', NULL, 1) ON DUPLICATE KEY UPDATE keep = 1, note = VALUES(note), basis = VALUES(basis), law = NULL, years = 1");
+            // W-0119: Auch eine gespeicherte Regel „löschen“ hält das Protokoll des Teams nicht auf.
+            await query("INSERT INTO userdata_rules (area, keep) VALUES ('teamprotokoll', 0) ON DUPLICATE KEY UPDATE keep = 0");
+            await query("DELETE FROM admin_audit WHERE action = 'check.w0119'");
+            await query("INSERT INTO admin_audit (user_id, user_name, action) VALUES (?, 'check Weg', 'check.w0119')", [ERASED]);
             const planned = await planDeletion({ userId: ERASED, userName: "check Weg", dueAt: later(), reason: "check:db", by: { id: USERS.admin, name: "nutzer1" } });
             const result = await executeDeletion(config, planned.id);
 
@@ -1247,6 +1275,22 @@ try {
             assert.deepEqual(names.map((row) => row.user_name), [null, null], "auch die frühere, abgebrochene Löschung");
             const [audit] = await query<{ detail: string }[]>("SELECT detail FROM admin_audit WHERE id > ? AND action = 'userdata.delete' AND target = ?", [Number(eraseAuditBefore), ERASED]);
             assert.match(audit?.detail ?? "", /Bot nicht erreichbar/);
+
+            // W-0119: Was die Person im Admin Dashboard tat, bleibt zugeordnet, nach Ablauf der Regel (Vorgabe 1 Jahr) nur noch anonym.
+            const acted = async (): Promise<string[]> => (await query<{ user_id: string; user_name: string }[]>("SELECT user_id, user_name FROM admin_audit WHERE action = 'check.w0119'")).flatMap((row) => [row.user_id, row.user_name]);
+            assert.deepEqual(await acted(), [ERASED, "check Weg"], "bleibt zugeordnet");
+            assert.deepEqual(result.kept.filter((entry) => entry.area === "teamprotokoll").map((entry) => [entry.rows, entry.basis, entry.years]), [[1, "interesse", 1]]);
+
+            await query("UPDATE admin_audit SET created_at = NOW() - INTERVAL 12 MONTH WHERE action = 'check.w0119'");
+            await query("UPDATE userdata_deletions SET done_at = NOW() - INTERVAL 11 MONTH WHERE id = ?", [planned.id]);
+            await cleanup();
+            assert.deepEqual(await acted(), [ERASED, "check Weg"], "nach 11 Monaten noch zugeordnet");
+
+            await query("UPDATE admin_audit SET created_at = NOW() - INTERVAL 14 MONTH WHERE action = 'check.w0119'");
+            await query("UPDATE userdata_deletions SET done_at = NOW() - INTERVAL 13 MONTH WHERE id = ?", [planned.id]);
+            await cleanup();
+            assert.deepEqual(await acted(), ["0", "Gelöschte Person"], "nach 13 Monaten anonym");
+            await query("DELETE FROM admin_audit WHERE action = 'check.w0119'");
         });
 
         await check("Löschung ausführen: kollidiert das Entfernen der ID mit einem Schlüssel, fällt die doppelte Zeile weg statt die Löschung zu stoppen", async () => {
@@ -1288,6 +1332,20 @@ try {
                 ],
             });
             const made = await query<{ insertId: number }>(`INSERT INTO ${backups} (guild_id, guild_name, kind, bytes, counts, data) VALUES (?, 'check:db', 'hand', ?, '{}', ?)`, [ERASE_GUILD, data.length, data]);
+            // W-0119: ein Backup, in dem die Person nur im Discord-Teil steht (Mitglied mit Rolle, Bann mit Grund).
+            const server = {
+                counts: { roles: 1, channels: 0, members: 2, emojis: 0, stickers: 0, bans: 1 },
+                members: [{ id: BACKUPPER, roles: ["500000000000000001"] }, { id: BYSTANDER, roles: [] }],
+                bans: [{ id: BACKUPPER, reason: "check:db Grund" }],
+                channels: [],
+            };
+            const serverData = packBackup({}, server);
+            const serverOnly = await query<{ insertId: number }>(`INSERT INTO ${backups} (guild_id, guild_name, kind, parts, bytes, counts, server_counts, data) VALUES (?, 'check:db', 'hand', 'server', ?, '{}', ?, ?)`, [
+                ERASE_GUILD,
+                serverData.length,
+                JSON.stringify(server.counts),
+                serverData,
+            ]);
             await query("INSERT INTO levels (guild_id, user_id, xp, level, updated_at) VALUES (?, ?, 10, 1, ?)", [ERASE_GUILD, BACKUPPER, Date.now()]);
 
             try {
@@ -1298,15 +1356,21 @@ try {
                 assert.deepEqual(unpackBackup(row.data).levels.map((level) => level.user_id), [BYSTANDER]);
                 assert.equal((await deletionOf(planned.id))?.backupPending, false);
 
+                const [scrubbed] = await query<{ data: Buffer; server_counts: unknown }[]>(`SELECT data, server_counts FROM ${backups} WHERE id = ?`, [Number(serverOnly.insertId)]);
+                const part = unpackServer(scrubbed.data);
+                assert.deepEqual([part?.members, part?.bans], [[{ id: BYSTANDER, roles: [] }], []], "Discord-Teil ohne die Person");
+                const counts = typeof scrubbed.server_counts === "string" ? JSON.parse(scrubbed.server_counts) : scrubbed.server_counts;
+                assert.deepEqual([counts.members, counts.bans], [1, 0], "Zähler stimmen");
+
                 const kept = await query<{ n: number }[]>(`SELECT COUNT(*) AS n FROM ${quarantineTable()} WHERE user_id = ?`, [BACKUPPER]);
-                assert.equal(Number(kept[0].n), 1, "getrennt aufbewahrt");
+                assert.equal(Number(kept[0].n), 2, "getrennt aufbewahrt, je Backup");
 
                 await purgeQuarantine(Date.now() + 29 * 86_400_000);
-                assert.equal(Number((await query<{ n: number }[]>(`SELECT COUNT(*) AS n FROM ${quarantineTable()} WHERE user_id = ?`, [BACKUPPER]))[0].n), 1, "nach 29 Tagen noch da");
+                assert.equal(Number((await query<{ n: number }[]>(`SELECT COUNT(*) AS n FROM ${quarantineTable()} WHERE user_id = ?`, [BACKUPPER]))[0].n), 2, "nach 29 Tagen noch da");
                 await purgeQuarantine(Date.now() + 31 * 86_400_000);
                 assert.equal(Number((await query<{ n: number }[]>(`SELECT COUNT(*) AS n FROM ${quarantineTable()} WHERE user_id = ?`, [BACKUPPER]))[0].n), 0, "nach 31 Tagen weg");
             } finally {
-                await query(`DELETE FROM ${backups} WHERE id = ?`, [Number(made.insertId)]);
+                await query(`DELETE FROM ${backups} WHERE id IN (?, ?)`, [Number(made.insertId), Number(serverOnly.insertId)]);
                 await query(`DELETE FROM ${quarantineTable()} WHERE user_id = ?`, [BACKUPPER]).catch(() => undefined);
                 await query("DELETE FROM userdata_deletions WHERE user_id = ?", [BACKUPPER]);
             }
@@ -1332,7 +1396,8 @@ try {
                 const results = await Promise.all([executeDeletion(config, planned.id), executeDeletion(config, planned.id)]);
 
                 assert.equal(results.filter((entry) => entry !== null).length, 1);
-                assert.equal(forgotten.length, 1);
+                // W-0119: Beide Runden sagen dem Bot vor der Transaktion Bescheid, danach nur die, die gelöscht hat.
+                assert.equal(forgotten.length, 3);
                 assert.equal((await deletionOf(planned.id))?.forgetPending, false);
             } finally {
                 globalThis.fetch = real;
@@ -3719,28 +3784,39 @@ try {
             grantedBy: null,
         });
         const kuendigtCookie = shopSessionCookie(config, { id: KUENDIGT, name: "check", avatar: null, exp: Math.floor(Date.now() / 1000) + 600 }).split(";")[0];
-        const kuendigen = (payload: unknown) =>
-            app.inject({ method: "POST", url: "/public/shop/cancel", headers: { origin: SITE, "content-type": "application/json" }, payload: JSON.stringify(payload) });
+        let cancelIp = 0;
+        const kuendigen = (payload: unknown, cookie?: string) =>
+            app.inject({
+                method: "POST",
+                url: "/public/shop/cancel",
+                // Jede Anfrage von einer eigenen Adresse: Die Route lässt je Adresse nur fünf in der Minute durch.
+                remoteAddress: `198.51.101.${++cancelIp}`,
+                headers: { origin: SITE, "content-type": "application/json", ...(cookie ? { cookie } : {}) },
+                payload: JSON.stringify(payload),
+            });
         const form = { kind: "ordinary", reason: "", name: "Check Person", reference: cancelOrder.orderNo, email: `${KUENDIGT}@example.test` };
 
-        await check("Kündigen mit Bestellnummer und richtiger Mail: bei Stripe zum Ende, Bestätigung mit Vertragsende, zweimal nur ein Aufruf", async () => {
+        await check("Kündigen mit Bestellnummer und richtiger Mail: bei Stripe zum Ende, Bestätigung mit Vertragsende, Antwort ohne Details, zweimal nur ein Aufruf", async () => {
             kaufStripe.calls.length = 0;
             shopMails.length = 0;
 
             const first = await kuendigen(form);
             assert.equal(first.statusCode, 200, first.body);
             const receipt = first.json() as ICancelReceipt;
-            assert.equal(receipt.matched, true);
-            assert.equal(Math.abs(Date.parse(receipt.endsAt ?? "") - cancelEnd.getTime()) < 1000, true);
+            // W-0110: Ohne Anmeldung verrät die Antwort nicht, ob Angabe und Mail zusammenpassen. Das Vertragsende steht in der Mail.
+            assert.deepEqual([receipt.matched, receipt.title, receipt.endsAt, "mailed" in receipt], [false, null, null, false]);
             assert.equal(kaufStripe.calls.includes("kündigen sub_checkdb_kuendigen ende"), true);
             assert.equal((await records.grantBySubscription("sub_checkdb_kuendigen"))?.cancelAtPeriodEnd, true);
 
             const mail = shopMails.find((entry) => entry.subject === "Deine Kündigung ist eingegangen");
             assert.equal(String(mail?.to), form.email);
             assert.match(String(mail?.html), /Vertragsende/);
+            assert.match(String(mail?.html), /Check Person/, "an die eigene Mail mit Name");
 
-            const second = await kuendigen(form);
-            assert.equal((second.json() as ICancelReceipt).matched, true);
+            // Angemeldet als der Kunde: Die Antwort nennt Vertrag und Ende.
+            const mine = (await kuendigen(form, kuendigtCookie)).json() as ICancelReceipt;
+            assert.deepEqual([mine.matched, mine.title], [true, monthly.title]);
+            assert.equal(Math.abs(Date.parse(mine.endsAt ?? "") - cancelEnd.getTime()) < 1000, true);
             assert.equal(kaufStripe.calls.filter((call) => call.startsWith("kündigen")).length, 1);
         });
 
@@ -3764,7 +3840,7 @@ try {
             try {
                 const response = await kuendigen({ ...form, reference: id, email: `${id}@example.test` });
                 assert.equal(response.statusCode, 200, response.body);
-                assert.deepEqual([(response.json() as ICancelReceipt).matched, (response.json() as ICancelReceipt).mailed], [false, true]);
+                assert.equal((response.json() as ICancelReceipt).matched, false);
             } finally {
                 kaufStripe.fail = false;
             }
@@ -3784,6 +3860,23 @@ try {
             assert.deepEqual(kaufStripe.calls, [] as string[]);
             assert.equal(shopMails.some((entry) => String(entry.subject).includes("Kündigung") && String(entry.to) === config.contactMail), true);
             assert.equal(shopMails.some((entry) => entry.subject === "Deine Kündigung ist eingegangen" && String(entry.to) === "fremd@example.test"), true);
+        });
+
+        await check("Kündigen (W-0110): an fremde Adressen ohne Name und Grund, support@ bekommt alles, drei fremde Eingänge brauchen die eigene Bestätigung nicht auf", async () => {
+            kaufStripe.calls.length = 0;
+            shopMails.length = 0;
+            const receipts = () => shopMails.filter((entry) => entry.subject === "Deine Kündigung ist eingegangen" && String(entry.to) === form.email);
+            const foreign = { kind: "extraordinary", reason: "Gewinnspiel unter boese.example", name: "Werbung kaufen", reference: "kein-treffer-w0110", email: form.email };
+
+            for (let index = 0; index < 4; index++) assert.equal((await kuendigen(foreign)).statusCode, 200);
+            assert.equal(receipts().length, 3, "drei je Adresse und Tag");
+            for (const mail of receipts()) assert.doesNotMatch(String(mail.html), /Werbung|Gewinnspiel|boese\.example|kein-treffer/);
+            assert.match(String(shopMails.find((entry) => String(entry.to) === config.contactMail)?.html), /Werbung kaufen[\s\S]*kein-treffer-w0110/);
+
+            assert.equal((await kuendigen(form)).statusCode, 200);
+            assert.equal(receipts().length, 4, "die eigene Bestätigung geht trotzdem raus");
+            assert.match(String(receipts()[3]?.html), /Check Person[\s\S]*Vertragsende/);
+            assert.deepEqual(kaufStripe.calls, [] as string[], "schon zum Ende gekündigt");
         });
 
         // W-0096: Widerrufen mit Rechnungsnummer. Nichts geht automatisch an Stripe, die Rückzahlung macht der Support.
@@ -3811,8 +3904,8 @@ try {
             const response = await widerrufen(withdrawForm);
             assert.equal(response.statusCode, 200, response.body);
             const receipt = response.json() as IWithdrawReceipt;
-            assert.deepEqual([receipt.matched, receipt.title, receipt.mailed], [true, monthly.title, true]);
-            assert.equal(Math.abs(Date.parse(receipt.boughtAt ?? "") - cancelOrder.createdAt.getTime()) < 1000, true);
+            // W-0110: Ohne Anmeldung keine Details in der Antwort, Produkt und Kaufdatum stehen in der Mail an den Kunden.
+            assert.deepEqual([receipt.matched, receipt.title, receipt.boughtAt, "mailed" in receipt], [false, null, null, false]);
 
             assert.deepEqual(kaufStripe.calls, [] as string[], "keine Erstattung und keine Kündigung bei Stripe");
             assert.equal((await records.orderById(cancelOrder.id))?.status, "paid");
@@ -3822,7 +3915,7 @@ try {
             for (const part of [`Rechnungsnummer: ${cancelOrder.orderNo}`, `Mail für die Bestätigung: ${withdrawForm.email}`, "Angemeldet: nein", KUENDIGT, monthly.title]) {
                 assert.equal(String(supportMail()?.html).includes(part), true, part);
             }
-            assert.match(String(withdrawReceipt(withdrawForm.email)?.html), new RegExp(`${cancelOrder.orderNo}[\\s\\S]*${monthly.title}`));
+            assert.match(String(withdrawReceipt(withdrawForm.email)?.html), new RegExp(`Check Person[\\s\\S]*${cancelOrder.orderNo}[\\s\\S]*${monthly.title}`));
         });
 
         await check("Widerrufen mit unbekannter Rechnungsnummer: kein Fehler, nicht zugeordnet, Hinweis an support@ und Eingangsbestätigung", async () => {
@@ -3831,7 +3924,7 @@ try {
             const response = await widerrufen({ ...withdrawForm, invoiceNo: "RLN-2026-99999999", email: "widerruf@example.test" });
             assert.equal(response.statusCode, 200, response.body);
             const receipt = response.json() as IWithdrawReceipt;
-            assert.deepEqual([receipt.matched, receipt.title, receipt.boughtAt, receipt.mailed], [false, null, null, true]);
+            assert.deepEqual([receipt.matched, receipt.title, receipt.boughtAt], [false, null, null]);
             assert.match(String(supportMail()?.html), /Keine Bestellung mit dieser Nummer/);
             assert.notEqual(withdrawReceipt("widerruf@example.test"), undefined);
         });
@@ -3846,6 +3939,7 @@ try {
             assert.equal(await withdrawEvents(), events);
             assert.equal(String(supportMail()?.html).includes(KUENDIGT), true);
             assert.equal(String(withdrawReceipt("fremd@example.test")?.html).includes(monthly.title), false);
+            assert.equal(String(withdrawReceipt("fremd@example.test")?.html).includes("Check Person"), false, "kein Name an eine fremde Adresse (W-0110)");
         });
 
         await check("Widerrufen: falsche Rechnungsnummer 400, angemeldet ohne Mail geht die Bestätigung an die Discord-Mail", async () => {
@@ -3855,7 +3949,9 @@ try {
             shopMails.length = 0;
             const response = await widerrufen({ ...withdrawForm, email: "" }, kuendigtCookie);
             assert.equal(response.statusCode, 200, response.body);
-            assert.equal((response.json() as IWithdrawReceipt).matched, true);
+            const mine = response.json() as IWithdrawReceipt;
+            assert.deepEqual([mine.matched, mine.title], [true, monthly.title]);
+            assert.equal(Math.abs(Date.parse(mine.boughtAt ?? "") - cancelOrder.createdAt.getTime()) < 1000, true);
             assert.notEqual(withdrawReceipt(`${KUENDIGT}@example.test`), undefined);
         });
 

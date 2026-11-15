@@ -264,14 +264,12 @@ export interface ICancelInput {
 
 export interface ICancelReceipt {
     readonly receivedAt: string;
-    /** Einem laufenden Abo zugeordnet und bei Stripe zum Ende gekündigt. */
+    /** Einem laufenden Abo des angemeldeten Kunden zugeordnet und bei Stripe zum Ende gekündigt. Ohne Anmeldung immer false (W-0110), Details stehen dann nur in der Mail. */
     readonly matched: boolean;
     readonly title: string | null;
     readonly endsAt: string | null;
     /** Wohin die Bestätigung ging, gekürzt. */
     readonly email: string;
-    /** false: Die Mail ging nicht raus (Grenze erreicht oder Mailserver weg). Die Seite sagt es dann. */
-    readonly mailed: boolean;
 }
 
 /* --- Widerrufen mit Rechnungsnummer (W-0096) ------------------------------ */
@@ -295,12 +293,11 @@ export interface IWithdrawOrder {
 /** Wie ICancelReceipt, statt des Vertragsendes das Kaufdatum. */
 export interface IWithdrawReceipt {
     readonly receivedAt: string;
-    /** Die Rechnungsnummer gehört zu einem Kauf dieser Person. Erstattet wird von Hand. */
+    /** Die Rechnungsnummer gehört zu einem Kauf des angemeldeten Kunden. Ohne Anmeldung immer false (W-0110). Erstattet wird von Hand. */
     readonly matched: boolean;
     readonly title: string | null;
     readonly boughtAt: string | null;
     readonly email: string;
-    readonly mailed: boolean;
 }
 
 /* --- Rechtstexte -------------------------------------------------------- */

@@ -1,7 +1,7 @@
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import type { DenyReason } from "../../shared/api.ts";
-import { checkMember, forgetMember, readSession, safeReturn } from "../access.ts";
+import { checkMember, forgetMember, readSession, revokeSession, safeReturn } from "../access.ts";
 import { audit } from "../audit.ts";
 import type { IConfig } from "../config.ts";
 import { BotAuthorization, DiscordUnavailable, authorizeUrl, avatarUrl, displayName, exchangeCode, fetchMe, leaveGuild } from "../discord.ts";
@@ -114,7 +114,11 @@ export async function authRoutes(app: FastifyInstance, { config }: { config: ICo
 
     app.post("/api/auth/logout", { config: AUTH_LIMIT }, async (request, reply) => {
         const session = readSession(request, config);
-        if (session) forgetMember(session.id);
+        if (session) {
+            forgetMember(session.id);
+            // W-0104: Eine vorher kopierte Kopie des Cookies gilt danach nicht mehr.
+            await revokeSession(session);
+        }
 
         return reply.header("Set-Cookie", clearCookie(SESSION_COOKIE, "/", config.secureCookies)).code(204).send();
     });

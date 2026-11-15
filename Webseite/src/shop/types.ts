@@ -80,13 +80,12 @@ export interface ICancelInput {
 
 export interface ICancelReceipt {
     readonly receivedAt: string;
+    /** Nur angemeldet true (W-0110), sonst stehen die Details nur in der Mail. */
     readonly matched: boolean;
     readonly title: string | null;
     readonly endsAt: string | null;
     /** Wohin die Bestätigung ging, gekürzt. */
     readonly email: string;
-    /** false: Die Mail ging nicht raus (Grenze erreicht oder Mailserver weg). */
-    readonly mailed: boolean;
 }
 
 /* Widerrufen mit Rechnungsnummer (W-0096) */
@@ -109,13 +108,12 @@ export interface IWithdrawOrder {
 
 export interface IWithdrawReceipt {
     readonly receivedAt: string;
-    /** Die Nummer gehört zu einem Kauf dieser Person. Erstattet wird von Hand. */
+    /** Die Nummer gehört zu einem Kauf dieser Person, nur angemeldet (W-0110). Erstattet wird von Hand. */
     readonly matched: boolean;
     readonly title: string | null;
     readonly boughtAt: string | null;
     /** Wohin die Bestätigung ging, gekürzt. */
     readonly email: string;
-    readonly mailed: boolean;
 }
 
 /* Rechtstexte */

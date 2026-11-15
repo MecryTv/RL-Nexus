@@ -76,7 +76,7 @@ export function parseCancelInput(raw: unknown, loggedIn: boolean): ICancelInput 
 }
 
 /** RLN-2026-0042 (grants.ts, orderNo): Jahr, dann die laufende Nummer, ab 10.000 fünfstellig. Wie bei /public/shop/orders/:no. */
-const INVOICE_NO = /^RLN-\d{4}-\d{4,10}$/;
+export const INVOICE_NO = /^RLN-\d{4}-\d{4,10}$/;
 
 /** W-0096: Widerrufen auf /widerrufen. Die Rechnungsnummer ist Pflicht, damit der Support den Kauf gleich findet. */
 export function parseWithdrawInput(raw: unknown, loggedIn: boolean): IWithdrawInput {

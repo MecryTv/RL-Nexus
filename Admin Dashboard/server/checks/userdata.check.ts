@@ -7,8 +7,9 @@ import { postDirectMessage, removeButtons } from "../discord.ts";
 import { createCanvas } from "@napi-rs/canvas";
 import { registerFonts } from "../status/image.ts";
 import { DM_KINDS, deletionMessage, renderDeletionImage, tileLabel, type IDmInput } from "../userdata/dm.ts";
-import { eraseSql, eraseValues } from "../userdata/erase.ts";
-import { scrubTables } from "../userdata/backups.ts";
+import type { TransactionQuery } from "../db.ts";
+import { erasePerson, eraseSql, eraseValues } from "../userdata/erase.ts";
+import { scrubServer, scrubTables } from "../userdata/backups.ts";
 import { copyHtml } from "../userdata/copy.ts";
 import { matchSql, matchValue } from "../userdata/find.ts";
 import type { IDeletionRecord } from "../userdata/deletions.ts";
@@ -51,7 +52,12 @@ export async function checkUserdata(): Promise<void> {
     });
 
     await check("Vorgaben aus der Datenschutzerklärung: Shop und Protokoll bleiben 3 Jahre, Moderation wird gelöscht", () => {
-        assert.deepEqual(Object.keys(USERDATA_DEFAULTS).sort(), ["protokoll", "shop", "sicherheit"]);
+        assert.deepEqual(Object.keys(USERDATA_DEFAULTS).sort(), ["protokoll", "shop", "sicherheit", "teamprotokoll"]);
+        // W-0119: Was jemand als Team im Admin Dashboard tat, bleibt (Berechtigtes Interesse, Rechenschaft, 12 Monate).
+        assert.deepEqual([USERDATA_DEFAULTS.teamprotokoll?.basis, USERDATA_DEFAULTS.teamprotokoll?.law, USERDATA_DEFAULTS.teamprotokoll?.years], ["interesse", "Art. 5 Abs. 2 DSGVO", 1]);
+        assert.match(USERDATA_DEFAULTS.teamprotokoll?.note ?? "", /12 Monate/);
+        assert.deepEqual(sourcesOf().filter((source) => source.table === "admin_audit" && source.role === "team").length, 1);
+        assert.ok(USERDATA_AREAS.find((area) => area.id === "teamprotokoll")?.sources.some((source) => source.table === "admin_audit" && source.column === "user_id"));
         // W-0057: Eine Sperre bleibt, damit sie wirkt (Berechtigtes Interesse, ohne feste Dauer).
         assert.deepEqual([USERDATA_DEFAULTS.sicherheit?.basis, USERDATA_DEFAULTS.sicherheit?.years, USERDATA_DEFAULTS.sicherheit?.note], ["interesse", null, "Eine Sperre bleibt, damit sie wirkt."]);
         assert.deepEqual([USERDATA_DEFAULTS.shop?.basis, USERDATA_DEFAULTS.shop?.years], ["ansprueche", 3]);
@@ -148,6 +154,47 @@ export async function checkUserdata(): Promise<void> {
         assert.equal(result.count, 5);
         assert.deepEqual(result.removed.levels, [{ guild_id: "9", user_id: A, xp: 1 }]);
         assert.equal(result.removed.mod_cases?.[0].moderator_id, A, "Original in der Ablage");
+    });
+
+    await check("Backups (W-0119): auch aus dem Discord-Teil, Mitglied, Bann mit Grund und eigene Kanalrechte raus, Zähler stimmen", () => {
+        const A = "111111111111111111";
+        const B = "222222222222222222";
+        const server = {
+            counts: { roles: 1, channels: 1, members: 2, emojis: 0, stickers: 0, bans: 2 },
+            members: [{ id: A, roles: ["7"] }, { id: B, roles: [] }],
+            bans: [{ id: A, reason: "Spam" }, { id: B, reason: null }],
+            channels: [{ id: "5", overwrites: [{ id: A, type: 1, allow: "1", deny: "0" }, { id: A, type: 0, allow: "1", deny: "0" }] }],
+        };
+        const result = scrubServer(server, new Set([A]));
+
+        assert.equal(result.count, 3);
+        assert.deepEqual(result.server?.members, [{ id: B, roles: [] }]);
+        assert.deepEqual(result.server?.bans, [{ id: B, reason: null }]);
+        assert.deepEqual((result.server?.channels as { overwrites: unknown[] }[] | undefined)?.[0].overwrites, [{ id: A, type: 0, allow: "1", deny: "0" }], "eine Rolle mit derselben ID bleibt");
+        assert.deepEqual(result.server?.counts, { roles: 1, channels: 1, members: 1, emojis: 0, stickers: 0, bans: 1 });
+        assert.deepEqual(result.removed.bans, [{ id: A, reason: "Spam" }]);
+        assert.equal(scrubServer(server, new Set(["333333333333333333"])).server, server, "ohne Treffer unverändert");
+        assert.deepEqual(scrubServer({ ...server, members: null, counts: { ...server.counts, members: null } }, new Set([A])).server?.counts.members, null, "ohne Members Intent bleibt null");
+        assert.equal(scrubServer(null, new Set([A])).count, 0);
+    });
+
+    await check("Löschen (W-0119): das Protokoll des Teams bleibt, auch wenn die Regeln „löschen“ sagen", async () => {
+        const statements: string[] = [];
+        const run = (async (sql: string) => {
+            statements.push(sql);
+
+            return sql.startsWith("SELECT COUNT") ? [{ n: 2 }] : sql.startsWith("SELECT") ? [] : { affectedRows: 0 };
+        }) as TransactionQuery;
+        const rules = USERDATA_AREAS.map((area) => ({ area: area.id, label: area.label, keep: false, note: null, basis: null, law: null, years: null }));
+        const result = await erasePerson("111111111111111111", run, rules, new Map());
+
+        // Was das Team zur Person tat (target) darf mit „löschen“ weg, nur wer gehandelt hat (user_id) bleibt.
+        assert.equal(statements.some((sql) => /^(UPDATE|DELETE)\b.*\badmin_audit\b.*\bWHERE user_id = \?/.test(sql)), false, statements.filter((sql) => sql.includes("admin_audit")).join("\n"));
+        assert.ok(statements.some((sql) => sql === "DELETE FROM admin_audit WHERE target = ?"), "der Rest läuft wie sonst");
+        assert.deepEqual(
+            result.kept.filter((entry) => entry.area === "teamprotokoll").map((entry) => [entry.rows, entry.basis, entry.years]),
+            [[2, "interesse", 1]]
+        );
     });
 
     await check("Kopie als HTML: eine Datei mit allem, Texte aus der Datenbank sind entschärft", () => {
@@ -356,6 +403,25 @@ export async function checkUserdata(): Promise<void> {
             assert.equal((await post({ dueAt: soon(10), reason: "Anfrage", confirm: "123" })).statusCode, 400);
             assert.equal((await post({ dueAt: soon(4), reason: "Anfrage", confirm: "123456789012345678" })).statusCode, 400);
             assert.equal((await post({ dueAt: soon(10), reason: "", confirm: "123456789012345678" })).statusCode, 400);
+        });
+
+        await check("Löschung planen (W-0119): nicht für sich selbst und nicht für andere aus dem Team, sonst weiter zur Datenbank", async () => {
+            const plan = (id: string) =>
+                app.inject({
+                    method: "POST",
+                    url: `/api/userdata/${id}/loeschung`,
+                    headers: { cookie, origin: config.publicUrl, "content-type": "application/json" },
+                    payload: JSON.stringify({ dueAt: new Date(Date.now() + 10 * 60_000).toISOString(), reason: "Anfrage", confirm: id }),
+                });
+            const refused = "Daten von dir selbst oder von jemandem aus dem Team löscht hier niemand allein. Das erledigt ein Developer von Hand.";
+
+            for (const id of [USERS.admin, USERS.developer]) {
+                const answer = await plan(id);
+                assert.deepEqual([answer.statusCode, answer.json().error], [403, refused], id);
+            }
+
+            assert.equal((await plan(USERS.stranger)).statusCode, 503, "kein Mitglied: geht weiter, hier ohne Datenbank");
+            assert.equal((await plan(USERS.noRole)).statusCode, 503, "Mitglied ohne Rolle im Admin Dashboard");
         });
 
         await check("Knöpfe des Bots: ohne Token oder mit fremdem Scope 401", async () => {

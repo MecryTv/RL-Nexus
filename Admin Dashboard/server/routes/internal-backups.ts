@@ -8,6 +8,7 @@ import { backupData, backupServer, countHand, createBackup, deleteBackup, listBa
 import { botSnapshot, verifyToken } from "../bot.ts";
 import type { IConfig } from "../config.ts";
 import { PublicError } from "../errors.ts";
+import { deletedPeople, scrubServer } from "../userdata/backups.ts";
 import { body, id, snowflake } from "../validate.ts";
 import { needBackups, parseRestore } from "./backups.ts";
 
@@ -130,6 +131,11 @@ async function serverPart(config: IConfig, guildId: string, actor: IActor, parts
     return server;
 }
 
+/** W-0119: Der Server-Teil eines Backups ohne gelöschte Personen, auch wenn das Bereinigen der Backups noch aussteht. Sonst bekämen sie beim Laden ihre Rollen zurück. */
+async function serverOf(backupId: number, guildId: string): Promise<IServerPartJson | null> {
+    return scrubServer(await backupServer(backupId, guildId), await deletedPeople()).server;
+}
+
 /** Der Server-Teil ohne die Bilder - sie machen ihn um ein Vielfaches größer und braucht nur das Laden. */
 export function withoutImages(server: IServerPartJson): IServerPartJson {
     const strip = (list: unknown, key: string): unknown => (Array.isArray(list) ? list.map((entry: Record<string, unknown>) => ({ ...entry, [key]: null })) : list);
@@ -234,7 +240,7 @@ export async function internalBackupRoutes(app: FastifyInstance, { config }: { c
 
         if (!(await listBackups(guildId, "server")).some((entry) => entry.id === backupId)) throw new PublicError(404, "Dieses Backup gibt es nicht.");
 
-        const server = await backupServer(backupId, guildId);
+        const server = await serverOf(backupId, guildId);
         if (!server) throw new PublicError(404, "Dieses Backup hat keinen Discord-Server.");
         if ((request.query as { images?: string }).images === "1") return server;
 
@@ -255,7 +261,7 @@ export async function internalBackupRoutes(app: FastifyInstance, { config }: { c
         const found = (await listBackups(guildId, "server")).find((entry) => entry.id === backupId);
         if (!found) throw new PublicError(404, "Dieses Backup gibt es nicht.");
 
-        const server = await backupServer(backupId, guildId);
+        const server = await serverOf(backupId, guildId);
         if (!server) throw new PublicError(404, "Dieses Backup hat keinen Discord-Server.");
 
         const name = input.targetGuildId ? (header(request, "x-target-name") ?? target) : found.guildName;

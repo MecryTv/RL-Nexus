@@ -23,11 +23,12 @@ import {
     type IUserdataProfile,
     type IUserdataRuleView,
 } from "../../shared/userdata.ts";
-import { accessOf } from "../access.ts";
+import { accessOf, roleFrom } from "../access.ts";
 import { audit } from "../audit.ts";
 import { botOverview } from "../bot.ts";
 import type { IConfig } from "../config.ts";
 import { DatabaseUnavailable, databaseReady, query, withTransaction } from "../db.ts";
+import { fetchMember } from "../discord.ts";
 import { publish } from "../events.ts";
 import { PublicError } from "../errors.ts";
 import { fillNames, knownName, knownRefs, lookupUser, warmNames } from "../users.ts";
@@ -131,6 +132,8 @@ export async function userdataRoutes(app: FastifyInstance, { config }: { config:
             if (typeof body.keep !== "boolean") throw new PublicError(400, "Sag, ob der Bereich bleibt oder gelöscht wird.");
             // W-0057: Eine Sperre bleibt, damit sie wirkt. Sonst löschte die nächste Löschanfrage die Sperre still mit.
             if (!body.keep && area === "sicherheit") throw new PublicError(400, "Der Bereich Sicherheit bleibt immer: Eine Sperre bleibt, damit sie wirkt.");
+            // W-0119: Sonst ließen sich die eigenen Einträge im Protokoll mit einer Löschung entfernen.
+            if (!body.keep && area === "teamprotokoll") throw new PublicError(400, "Das Protokoll des Teams bleibt immer: Jede Aktion im Admin Dashboard soll nachvollziehbar bleiben.");
             if (!body.keep) return { area, keep: false, note: null, basis: null, law: null, years: null };
 
             const note = text(body.note, "Der Satz", { max: USERDATA_NOTE_MAX }) || null;
@@ -254,11 +257,18 @@ export async function userdataRoutes(app: FastifyInstance, { config }: { config:
 
         const reason = text(body.reason, "Der Grund", { min: 1, max: 200 });
         const dueAt = dueOf(body.dueAt);
+        const actor = accessOf(request);
+
+        // W-0119: Wer selbst im Team ist, plant hier keine Löschung von sich oder von anderen aus dem Team, sonst verschwänden eigene Spuren
+        // ohne zweite Person. Discord fällt aus: 503, also lieber nicht planen als ungeprüft.
+        // ponytail: ohne Freigabe durch eine zweite Person; braucht es die, ein Feld approved_by an userdata_deletions und ein zweiter Knopf.
+        if (id === actor.id || roleFrom((await fetchMember(config, id))?.roles ?? [], config) !== null) {
+            throw new PublicError(403, "Daten von dir selbst oder von jemandem aus dem Team löscht hier niemand allein. Das erledigt ein Developer von Hand.");
+        }
         requireDatabase();
 
         if ((await personRows(id)).length === 0) throw new PublicError(404, "Zu dieser ID gibt es bei RL Nexus keine Daten.");
 
-        const actor = accessOf(request);
         const halted = body.replace === true ? await openDeletionOf(id) : null;
         const stored = (await personIndex()).get(id)?.name ?? null;
         const input = await announcementInput(config, id, dueAt, stored);
