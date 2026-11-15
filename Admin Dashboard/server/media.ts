@@ -6,6 +6,7 @@ import { createCanvas, loadImage } from "@napi-rs/canvas";
 import { MEDIA_EDGE, MEDIA_MAX, MEDIA_TYPES, type IMedia, type IMediaFile } from "../shared/media.ts";
 import type { IConfig } from "./config.ts";
 import { InvalidInput } from "./errors.ts";
+import { IMAGE_MAX_PIXELS, IMAGE_MAX_SIDE, imageSize } from "./image-size.ts";
 
 /**
  * Bilder für Partner und News (W-0062): einmal gelesen, auf MEDIA_EDGE verkleinert
@@ -25,6 +26,14 @@ export async function saveImage(config: IConfig, input: { readonly mime: unknown
     const raw = Buffer.from(input.data, "base64");
 
     if (raw.length > MEDIA_MAX) throw new InvalidInput("Ein Bild darf höchstens 8 MB groß sein.");
+
+    // W-0118: Maße aus dem Dateikopf, bevor loadImage entpackt; sonst belegt ein kleines PNG mit riesigen Maßen Gigabytes.
+    const size = imageSize(raw);
+
+    if (!size) throw new InvalidInput("Das Bild lässt sich nicht lesen.");
+    if (size.width > IMAGE_MAX_SIDE || size.height > IMAGE_MAX_SIDE || size.width * size.height > IMAGE_MAX_PIXELS) {
+        throw new InvalidInput("Das Bild ist zu groß: höchstens 8000 Pixel pro Kante und 40 Megapixel.");
+    }
 
     let image: Awaited<ReturnType<typeof loadImage>>;
 
