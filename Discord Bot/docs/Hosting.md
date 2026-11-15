@@ -135,12 +135,17 @@ docker run -d \
   --name portainer \
   --restart=always \
   -p 127.0.0.1:9443:9443 \
+  --env-file /root/claude/portainer.env \
   -v /var/run/docker.sock:/var/run/docker.sock \
   -v portainer_data:/data \
-  portainer/portainer-ce:latest
+  portainer/portainer-ee:latest
 ```
 
-Der Port hängt an `127.0.0.1`, aus dem Netz ist Portainer damit nicht erreichbar. Der Weg dorthin führt über einen SSH-Tunnel, vom eigenen Rechner aus:
+Auf dem Server läuft die Business Edition (`portainer-ee`), ihr Lizenzschlüssel steht als `PORTAINER_LICENSE_KEY` in `/root/claude/portainer.env` (nur für root lesbar). Ohne Lizenz geht auch `portainer-ce` ohne `--env-file`.
+
+Der Port hängt an `127.0.0.1`, aus dem Netz ist Portainer damit nicht erreichbar. **Nie `-p 9443:9443` ohne Adresse schreiben:** Docker trägt veröffentlichte Ports an ufw vorbei in die Firewall ein, Portainer wäre dann aus dem ganzen Internet erreichbar (so war es bis zum 15.11.2026, W-0115). Port 8000 braucht nur der Edge-Agent und bleibt weg.
+
+Aus dem Tailnet ist Portainer über `https://rlnexus-vps.tail0fd142.ts.net:9445` erreichbar. Den Block dafür bringt `nginx/portainer-tailnet.conf` mit, nach demselben Muster wie Webmail auf 8444. Ohne Tailscale führt der Weg über einen SSH-Tunnel, vom eigenen Rechner aus:
 
 ```bash
 ssh -L 9443:127.0.0.1:9443 benutzer@dein-server
