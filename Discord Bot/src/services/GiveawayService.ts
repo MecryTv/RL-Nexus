@@ -1,7 +1,7 @@
 import { randomInt } from "node:crypto";
 import { ButtonInteraction, Guild, GuildMember, Message, MessageFlags } from "discord.js";
 import BotClient from "../client/BotClient";
-import { EntryCard, GiveawayCard, InfoCard, WinnerAnnouncement, WinnerDm } from "../builder/CommunityView";
+import { EntryCard, GiveawayCard, InfoCard, MayPing, PING_DENIED, WinnerAnnouncement, WinnerDm } from "../builder/CommunityView";
 import { DayOf } from "../constants/Activity";
 import {
     CLAIM_CHOICES,
@@ -177,7 +177,11 @@ export default class GiveawayService {
     async Create(guild: Guild, host: GuildMember, input: unknown): Promise<IGiveaway> {
         if (IsRecord(input)) await WarmLogTarget(guild, input.channelId);
 
-        const giveaway = await this.client.giveaways.Create(this.Clean(guild, host.id, input));
+        const clean = this.Clean(guild, host.id, input);
+
+        if (!MayPing(host, clean.settings.ping)) throw new GiveawayError(PING_DENIED);
+
+        const giveaway = await this.client.giveaways.Create(clean);
 
         logger.user(`🎉 Giveaway #${giveaway.number} auf ${guild.id} ${giveaway.status === "scheduled" ? "geplant" : "gestartet"} (von ${host.id})`);
 

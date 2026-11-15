@@ -121,7 +121,7 @@ export default class DashboardApiStreams extends Route {
                 return { ok: true, notifier: this.Out(await service.Add(guild, platform, body.input, actor.id)) };
 
             case "save": {
-                const saved = await service.Save(guild, id, body.config);
+                const saved = await service.Save(guild, id, body.config, member);
 
                 logger.user(`📡 ${platform} ${saved.accountName} auf ${guild.id} gespeichert (von ${actor.id})`);
 

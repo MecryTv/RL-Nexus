@@ -1,6 +1,6 @@
 import { ButtonInteraction, Guild, GuildMember, Message, MessageFlags } from "discord.js";
 import BotClient from "../client/BotClient";
-import { IPollTally, PollCard, VoteReply } from "../builder/CommunityView";
+import { IPollTally, MayPing, PING_DENIED, PollCard, VoteReply } from "../builder/CommunityView";
 import {
     DefaultPollSettings,
     MAX_OPTION_NATIVE,
@@ -116,6 +116,9 @@ export default class PollService {
         if (IsRecord(input)) await WarmLogTarget(guild, input.channelId);
 
         const clean = this.Clean(guild, input);
+
+        if (!MayPing(creator, clean.settings?.ping ?? null)) throw new PollError(PING_DENIED);
+
         // Discord rundet auf volle Stunden.
         const duration = clean.kind === "native" ? Math.round((clean.duration ?? 3_600) / 3_600) * 3_600 : clean.duration;
         const options: IPollOption[] = clean.options.map((option, index) => ({ id: String(index + 1), label: option.label, emoji: option.emoji ?? null }));

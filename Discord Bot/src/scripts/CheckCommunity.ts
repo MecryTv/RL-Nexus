@@ -16,12 +16,13 @@ process.env.DEV_CLIENT_SECRET ||= "check-secret";
 
 import { ChannelType, ChatInputCommandInteraction, Guild, GuildBasedChannel, GuildMember, PermissionFlagsBits, Role } from "discord.js";
 import BotClient from "../client/BotClient";
-import { GiveawayCard, PollCard, StreamCard, TwitchSummary, VoteReply, WinnerDm } from "../builder/CommunityView";
+import { GiveawayCard, MayPing, PING_DENIED, PollCard, StreamCard, TwitchSummary, VoteReply, WinnerDm } from "../builder/CommunityView";
 import { DefaultMessage, DefaultStreamConfig, TwitchLogin, YouTubeChannelId, YouTubeLookupUrl } from "../constants/Streams";
 import { Bar } from "../constants/Polls";
 import { CLAIM_CHOICES, MAX_BONUS_TICKETS } from "../constants/Giveaways";
 import { IGiveaway, IPoll, IStreamNotifier } from "../interfaces/services/community/ICommunity";
-import { BOOSTER, DrawWeighted } from "../services/GiveawayService";
+import { BOOSTER, DrawWeighted, GiveawayError } from "../services/GiveawayService";
+import { PollError } from "../services/PollService";
 import { StreamError } from "../services/StreamService";
 import { Decode, ParseFeed } from "../utils/youtube";
 import Giveaway from "../commands/admin/Giveaway";
@@ -627,6 +628,74 @@ async function checkActor(client: BotClient): Promise<void> {
     check("Entfernen geht immer", (await refused(() => service.SaveTwitchSettings(guild, { liveRoleId: null }, actor))) === "");
 }
 
+/**
+ * W-0109: @everyone/@here und Rollen-Pings nur, wenn der Verwalter selbst so
+ * pingen dürfte. Ohne Datenbank: abgelehnt wird vor dem ersten Schreiben, der
+ * Notifier ist eine Attrappe.
+ */
+async function checkPings(client: BotClient): Promise<void> {
+    console.log("\n  — W-0109: Pings nur mit eigenem Recht —");
+
+    const OWNER = "90071992547409977";
+    const guild = FakeGuild();
+
+    Object.assign(guild, { ownerId: OWNER });
+    Object.assign(guild.roles.cache.get(ROLE)!, { mentionable: false });
+    Object.assign(guild.roles.cache.get(TEAM)!, { mentionable: true });
+
+    const member = (everyone: boolean, id = USER) =>
+        ({ id, guild, permissions: { has: (flag: bigint) => everyone && flag === PermissionFlagsBits.MentionEveryone } }) as unknown as GuildMember;
+    const plain = member(false);
+    const refused = async (run: () => Promise<unknown>, type: new (...args: never[]) => Error): Promise<string> => {
+        try {
+            await run();
+
+            return "";
+        } catch (error) {
+            return error instanceof type ? error.message : `falscher Fehler: ${String(error)}`;
+        }
+    };
+
+    check("MayPing: ohne Ping immer", MayPing(plain, null));
+    check("MayPing: @everyone und @here ohne „Alle erwähnen“ nein", !MayPing(plain, "everyone") && !MayPing(plain, "here"));
+    check("MayPing: mit „Alle erwähnen“ ja", MayPing(member(true), "everyone") && MayPing(member(true), ROLE));
+    check("MayPing: der Owner immer", MayPing(member(false, OWNER), "here"));
+    check("MayPing: nicht erwähnbare Rolle ohne Recht nein", !MayPing(plain, ROLE));
+    check("MayPing: erwähnbare Rolle ja", MayPing(plain, TEAM));
+
+    // Nutzertext auf den Karten pingt nie mit: erlaubt ist nur der eingestellte Ping.
+    const pollCard = PollCard(SamplePoll({ question: `@everyone <@&${ROLE}> Welche?`, description: "@here" }), { counts: {}, voters: 0 }, false);
+    const giveawayCard = GiveawayCard(SampleGiveaway({ prize: `@everyone <@&${ROLE}>`, settings: { dm: true, claimHours: 24, ping: TEAM, accent: null } }), 0, [], []);
+
+    check("Umfrage-Karte mit @everyone im Text, ohne Ping: pingt niemanden", JSON.stringify(pollCard.allowedMentions) === JSON.stringify({ parse: [] }), JSON.stringify(pollCard.allowedMentions));
+    check("Giveaway-Karte mit Rollen im Preis: nur die eingestellte Rolle", JSON.stringify(giveawayCard.allowedMentions) === JSON.stringify({ roles: [TEAM] }), JSON.stringify(giveawayCard.allowedMentions));
+
+    check(
+        "Umfrage mit @everyone ohne Recht: abgelehnt",
+        (await refused(() => client.pollService.Create(guild, plain, { kind: "buttons", channelId: TEXT, question: "Welche Playlist?", options: ["Duo", "Standard"], settings: { ping: "everyone" } }), PollError)) === PING_DENIED
+    );
+    check(
+        "Giveaway (auch /giveaway ping:) mit nicht erwähnbarer Rolle: abgelehnt",
+        (await refused(() => client.giveawayService.Create(guild, plain, { prize: "Rocket Pass", channelId: TEXT, duration: 3_600, winners: 1, settings: { ping: ROLE } }), GiveawayError)) === PING_DENIED
+    );
+
+    const streams = client.streamNotifiers as unknown as Record<string, unknown>;
+    const saved = { Get: streams.Get, SaveConfig: streams.SaveConfig };
+    let stored = SampleNotifier({ config: { ...DefaultStreamConfig("twitch"), ping: "everyone" } });
+
+    streams.Get = async () => stored;
+    streams.SaveConfig = async (_id: number, config: IStreamNotifier["config"]) => void (stored = { ...stored, config });
+
+    try {
+        check("Stream: neuer @here ohne Recht abgelehnt", (await refused(() => client.streamService.Save(guild, 1, { ping: "here" }, plain), StreamError)) === PING_DENIED && stored.config.ping === "everyone");
+        check("Stream: gespeicherter @everyone bleibt, wenn sich der Ping nicht ändert", (await refused(() => client.streamService.Save(guild, 1, { update: false }, plain), StreamError)) === "");
+        check("Stream: erwähnbare Rolle geht", (await refused(() => client.streamService.Save(guild, 1, { ping: TEAM }, plain), StreamError)) === "" && stored.config.ping === TEAM);
+    } finally {
+        streams.Get = saved.Get;
+        streams.SaveConfig = saved.SaveConfig;
+    }
+}
+
 /** W-0120: /giveaway und /umfrage prüfen „Server verwalten“ selbst - die Standardrechte lassen sich in Discord ändern. */
 async function checkCommandRights(): Promise<void> {
     console.log("\n  — W-0120: /giveaway und /umfrage nur mit „Server verwalten“ —");
@@ -690,6 +759,7 @@ async function main(): Promise<void> {
     }
 
     await checkActor(client);
+    await checkPings(client);
 
     console.log(failures === 0 ? "\n✅ Alle Prüfungen bestanden.\n" : `\n❌ ${failures} Prüfung(en) fehlgeschlagen.\n`);
 

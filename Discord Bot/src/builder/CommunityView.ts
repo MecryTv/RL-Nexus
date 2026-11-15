@@ -1,4 +1,4 @@
-import { AttachmentBuilder, ContainerBuilder, escapeMarkdown, MessageMentionOptions } from "discord.js";
+import { AttachmentBuilder, ContainerBuilder, escapeMarkdown, GuildMember, MessageMentionOptions, PermissionFlagsBits } from "discord.js";
 import BotClient from "../client/BotClient";
 import ComponentV2Builder from "./ComponentV2Builder";
 import { RenderDoc } from "./MessageDoc";
@@ -33,6 +33,22 @@ export function Ping(ping: string | null): { text: string | null; mentions: Mess
     if (ping && /^\d{17,20}$/.test(ping)) return { text: `<@&${ping}>`, mentions: { roles: [ping] } };
 
     return { text: null, mentions: { parse: [] } };
+}
+
+/** W-0109: der Satz, wenn MayPing nein sagt. */
+export const PING_DENIED = "Diesen Ping darfst du nicht einstellen: Dafür brauchst du „@everyone, @here und alle Rollen erwähnen“, oder die Rolle muss erwähnbar sein.";
+
+/**
+ * W-0109: Darf member diesen Ping einstellen? Dieselbe Regel wie in Discord:
+ * @everyone/@here nur mit „Alle erwähnen“, eine Rolle mit dem Recht oder wenn
+ * sie erwähnbar ist. Der Owner immer. Mit Staff-Freigabe ist member der Bot.
+ */
+export function MayPing(member: GuildMember, ping: string | null): boolean {
+    if (!ping) return true;
+    if (member.id === member.guild.ownerId || member.permissions.has(PermissionFlagsBits.MentionEveryone)) return true;
+    if (ping === "everyone" || ping === "here") return false;
+
+    return member.guild.roles.cache.get(ping)?.mentionable === true;
 }
 
 /* ----------------------------------------------------------

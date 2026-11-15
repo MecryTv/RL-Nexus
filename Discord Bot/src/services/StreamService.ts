@@ -1,7 +1,7 @@
 import { ActivityType, Guild, GuildMember, MessageEditOptions, MessageFlags, PermissionFlagsBits, Presence } from "discord.js";
 import BotClient from "../client/BotClient";
 import { CleanDoc } from "../builder/MessageDoc";
-import { StreamCard, TwitchSummary } from "../builder/CommunityView";
+import { MayPing, PING_DENIED, StreamCard, TwitchSummary } from "../builder/CommunityView";
 import {
     DefaultMessage,
     DefaultStreamConfig,
@@ -171,12 +171,17 @@ export default class StreamService {
         };
     }
 
-    async Save(guild: Guild, id: number, input: unknown): Promise<IStreamNotifier> {
+    /** member: wer speichert - für den Ping (W-0109). Mit Staff-Freigabe der Bot. */
+    async Save(guild: Guild, id: number, input: unknown, member: GuildMember): Promise<IStreamNotifier> {
         const notifier = await this.Own(guild, id);
 
         if (IsRecord(input)) await WarmLogTarget(guild, input.channelId);
 
         const config = this.Clean(guild, notifier.platform, input, notifier.config);
+
+        // Nur ein neuer Ping wird geprüft - der gespeicherte bleibt gültig.
+        if (config.ping !== notifier.config.ping && !MayPing(member, config.ping)) throw new StreamError(PING_DENIED);
+
         const enabled = IsRecord(input) && typeof input.enabled === "boolean" ? input.enabled : notifier.enabled;
 
         await this.client.streamNotifiers.SaveConfig(id, config, enabled);

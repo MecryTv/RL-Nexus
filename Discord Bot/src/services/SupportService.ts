@@ -1,8 +1,9 @@
 import { ButtonInteraction, Guild, GuildMember, MessageFlags, PermissionFlagsBits, VoiceState } from "discord.js";
+import { LRUCache } from "lru-cache";
 import BotClient from "../client/BotClient";
 import { InfoCard } from "../builder/CommunityView";
 import { SupportCard, SupportState } from "../builder/ModerationView";
-import { SUPPORT_ACCENT } from "../constants/Moderation";
+import { SUPPORT_ACCENT, SUPPORT_PING_COOLDOWN_MS } from "../constants/Moderation";
 import { IModSupport, ISupportWait } from "../interfaces/services/moderation/IModeration";
 import logger from "../utils/logger";
 
@@ -17,6 +18,8 @@ export default class SupportService {
     private readonly client: BotClient;
     // Nach einem Neustart einmal nachsehen, wer im Warteraum sitzt, ohne gemeldet zu sein.
     private swept = false;
+    /** W-0109: wer das Team zuletzt gepingt hat (Server:User). ponytail: nur im Speicher, ein Neustart setzt die Sperrzeit zurück. */
+    private readonly pinged = new LRUCache<string, true>({ max: 5_000, ttl: SUPPORT_PING_COOLDOWN_MS });
 
     constructor(client: BotClient) {
         this.client = client;
@@ -75,10 +78,16 @@ export default class SupportService {
         if (!target?.isTextBased()) return;
 
         const since = Date.now();
-        const ping = support.roles.map((role) => `<@&${role}>`).join(" ");
+        // W-0109: Innerhalb der Sperrzeit kommt die Meldung trotzdem (Übernehmen braucht sie), nur ohne Ping.
+        const key = `${guild.id}:${member.id}`;
+        const loud = support.roles.length > 0 && !this.pinged.has(key);
+
+        if (loud) this.pinged.set(key, true);
+
+        const ping = loud ? support.roles.map((role) => `<@&${role}>`).join(" ") : "";
         const card = SupportCard({ userId: member.id, name: member.displayName, channelId: support.channelId!, since, claimedBy: null, state: "waiting", ping });
         const sent = await target
-            .send({ ...card, flags: MessageFlags.IsComponentsV2, allowedMentions: support.roles.length ? { roles: support.roles } : { parse: [] } })
+            .send({ ...card, flags: MessageFlags.IsComponentsV2, allowedMentions: loud ? { roles: support.roles } : { parse: [] } })
             .catch(() => null);
 
         if (!sent) logger.warn(`🔊 Warteraum-Meldung ging nicht raus (${guild.id} → ${support.notifyChannelId})`);

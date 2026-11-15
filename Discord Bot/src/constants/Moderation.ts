@@ -173,6 +173,9 @@ export const MAX_SUPPORT_REMIND = 120;
 
 export const SUPPORT_ACCENT = "#00afff";
 
+/** W-0109: Wer den Warteraum verlässt und wieder betritt, pingt das Team höchstens so oft. */
+export const SUPPORT_PING_COOLDOWN_MS = 5 * 60_000;
+
 export function DefaultModSupport(): IModSupport {
     return { channelId: null, notifyChannelId: null, roles: [], remindAfter: 10 };
 }

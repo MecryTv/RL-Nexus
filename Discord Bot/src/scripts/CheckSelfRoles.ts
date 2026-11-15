@@ -26,7 +26,7 @@ import {
 } from "discord.js";
 import BotClient from "../client/BotClient";
 import { PanelRows } from "../builder/SelfRoleView";
-import { CleanEmoji, DefaultBody, EmojiKey, MAX_REACTIONS, MAX_ROLES, SELF_ROLE_MODULE } from "../constants/SelfRoles";
+import { CleanEmoji, DefaultBody, EmojiKey, MAX_REACTIONS, MAX_ROLES, SELF_ROLE_MODULE, SELF_ROLE_PREFIX } from "../constants/SelfRoles";
 import { ISelfRolePanel } from "../interfaces/services/selfroles/ISelfRoles";
 import { IRawComponent, ReactionParam, SelfRoleError } from "../services/SelfRoleService";
 
@@ -658,6 +658,65 @@ async function checkFlows(client: BotClient): Promise<void> {
 
     await service.Reaction(data(car, { burst: true }), true);
     check("Super-Reaktionen zählen nicht", held.size === 0, [...held].join());
+
+    console.log("\n  — W-0109: Klicks nacheinander (Strix vuln-0010) —");
+
+    // Rollen schreiben dauert: dazwischen kommt der zweite Klick. Das Mitglied im Klick
+    // selbst ist der Stand von vor beiden Klicks - wie bei zwei gleichzeitigen Klicks in Discord.
+    const write = (ids: string | string[], add: boolean) =>
+        sleep(5).then(() => {
+            for (const id of ([] as string[]).concat(ids)) {
+                if (add) held.add(id);
+                else held.delete(id);
+            }
+        });
+    const roles = (cache: Map<string, unknown>) => ({ cache, add: (ids: string[]) => write(ids, true), remove: (ids: string[]) => write(ids, false) });
+    const stale = { id: USER, roles: roles(new Map()), user: { bot: false } };
+    const answers: string[] = [];
+
+    fetches.length = 0;
+    Object.assign(guild.members as object, {
+        fetch: async (options: { force?: boolean }) => {
+            fetches.push(options.force === true);
+
+            return { id: USER, roles: roles(new Map([...held].map((id) => [id, {}]))), user: { bot: false } };
+        },
+    });
+
+    const click = (roleId: string) => {
+        const interaction = {
+            customId: `${SELF_ROLE_PREFIX}:7:${roleId}`,
+            guild,
+            guildId: GUILD,
+            user: { id: USER },
+            member: stale,
+            deferred: false,
+            replied: false,
+            inCachedGuild: () => true,
+            deferReply: async () => void (interaction.deferred = true),
+            editReply: async (payload: unknown) => void answers.push(JSON.stringify(payload)),
+            reply: async (payload: unknown) => {
+                interaction.replied = true;
+                answers.push(JSON.stringify(payload));
+            },
+            followUp: async (payload: unknown) => void answers.push(JSON.stringify(payload)),
+        };
+
+        return service.Handle(interaction as never);
+    };
+
+    held.clear();
+    loose.selfRolePanels.Get = async () => Panel({ mode: "single", roles: Panel().roles.slice(0, 2) });
+    await Promise.all([click(ROLE_A), click(ROLE_B)]);
+    check('Zwei gleichzeitige Klicks bei "genau eine": nur eine Rolle', held.size === 1 && held.has(ROLE_B), [...held].join());
+    check("Klicks: das Mitglied kommt jedes Mal frisch", fetches.length === 2 && fetches.every(Boolean), fetches.join());
+    check("Klicks: beide bekommen eine Antwort", answers.length === 2, String(answers.length));
+
+    held.clear();
+    loose.selfRolePanels.Get = async () => Panel({ maxRoles: 1, roles: Panel().roles.slice(0, 2) });
+    await Promise.all([click(ROLE_A), click(ROLE_B)]);
+    check("Höchstzahl hält auch bei gleichzeitigen Klicks", held.size === 1 && held.has(ROLE_A), [...held].join());
+    check("Der zweite Klick bekommt die Höchstzahl gesagt", answers.some((answer) => answer.includes("höchstens 1")), answers.slice(-2).join(" | ").slice(0, 300));
 
     console.log("\n  — Nachziehen nach der Pause —");
 

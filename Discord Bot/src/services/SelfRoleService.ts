@@ -790,6 +790,14 @@ export default class SelfRoleService {
         if (parts[0] !== SELF_ROLE_PREFIX || !interaction.inCachedGuild()) return;
         if (!(await this.client.settings.Of(interaction.guildId)).modules.includes(SELF_ROLE_MODULE)) return;
 
+        // W-0109 (Strix vuln-0010): je Mitglied nacheinander wie bei den Reaktionen,
+        // sonst hebeln zwei gleichzeitige Klicks "genau eine" und die Höchstzahl aus.
+        // Erst quittieren: in der Schlange kann es länger als drei Sekunden dauern.
+        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+        await this.Queue(`${interaction.guildId}:${interaction.user.id}`, () => this.Click(interaction, parts));
+    }
+
+    private async Click(interaction: ButtonInteraction<"cached"> | StringSelectMenuInteraction<"cached">, parts: string[]): Promise<void> {
         const menu = parts[1] === "menu";
         const panelId = Number(menu ? parts[2] : parts[1]);
         const panel = await this.client.selfRolePanels.Get(panelId).catch(() => null);
@@ -800,7 +808,15 @@ export default class SelfRoleService {
             return;
         }
 
-        const member = interaction.member;
+        // Frisch geholt: die Rollen nach allen Klicks davor, nicht die aus dem Klick selbst.
+        const member = await interaction.guild.members.fetch({ user: interaction.user.id, force: true }).catch(() => null);
+
+        if (!member) {
+            await this.Answer(interaction, "Ich finde dich auf diesem Server nicht.");
+
+            return;
+        }
+
         const known = new Set(panel.roles.map((role) => role.roleId));
         const held = new Set(panel.roles.filter((role) => member.roles.cache.has(role.roleId)).map((role) => role.roleId));
 
@@ -821,7 +837,7 @@ export default class SelfRoleService {
             return;
         }
 
-        await this.Apply(interaction, panel, held, wanted);
+        await this.Apply(interaction, member, panel, held, wanted);
     }
 
     /** Ein Knopf: die Rolle an- oder abwählen, je nach Regel des Panels. */
@@ -851,11 +867,11 @@ export default class SelfRoleService {
 
     private async Apply(
         interaction: ButtonInteraction | StringSelectMenuInteraction,
+        member: GuildMember,
         panel: ISelfRolePanel,
         held: Set<string>,
         wanted: Set<string>
     ): Promise<void> {
-        const member = interaction.member as GuildMember;
         const locked = new Set(panel.roles.filter((role) => role.locked).map((role) => role.roleId));
 
         // Was gesperrt ist und schon da ist, bleibt - egal was ankommt.
@@ -895,7 +911,14 @@ export default class SelfRoleService {
 
     private async Answer(interaction: ButtonInteraction | StringSelectMenuInteraction, text: string): Promise<void> {
         const message = new ComponentV2Builder({ accentColor: "Blurple" }).text(text).toMessage({ ephemeral: true });
+        // Nach deferReply ersetzt die Antwort den Platzhalter - edit kennt kein Ephemeral, das steht schon.
+        const sent =
+            interaction.deferred && !interaction.replied
+                ? interaction.editReply({ components: message.components, flags: MessageFlags.IsComponentsV2 })
+                : interaction.replied
+                  ? interaction.followUp(message)
+                  : interaction.reply(message);
 
-        await (interaction.replied || interaction.deferred ? interaction.followUp(message) : interaction.reply(message)).catch(() => undefined);
+        await sent.catch(() => undefined);
     }
 }

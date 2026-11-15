@@ -21,6 +21,7 @@ import BotClient from "../client/BotClient";
 import { CaseView, DirectView, DoneView, EvidenceId, HistoryView, ReadEvidenceId, SaveEvidenceView, StatusText, SupportCard } from "../builder/ModerationView";
 import {
     DefaultModConfig,
+    DefaultModSupport,
     EVIDENCE_ROOT,
     FormatDuration,
     MAX_EVIDENCE,
@@ -33,7 +34,8 @@ import {
     ProofNeeded,
     StageFor,
 } from "../constants/Moderation";
-import { IModCase, IModEvidence } from "../interfaces/services/moderation/IModeration";
+import { IModCase, IModEvidence, IModSupport } from "../interfaces/services/moderation/IModeration";
+import SupportService from "../services/SupportService";
 import ModerationService, { AttachmentFault, ModerationError, ProofRefusal } from "../services/ModerationService";
 import CommandHandler from "../events/client/CommandHandler";
 import Command from "../structures/Command";
@@ -720,6 +722,40 @@ async function cleanup(client: BotClient): Promise<void> {
     check("Aufgeräumt", (await client.modCases.List(GUILD, {}, null, 10)).length === 0);
 }
 
+/** W-0109: Verlassen und wieder Betreten pingt das Team höchstens alle fünf Minuten - die Meldung kommt trotzdem. */
+async function checkSupportCooldown(): Promise<void> {
+    console.log("\n  — W-0109: Warteraum pingt mit Sperrzeit —");
+
+    const sent: { allowedMentions?: unknown }[] = [];
+    const starts: unknown[] = [];
+    const client = { supportWaits: { Get: async () => null, Start: async (wait: unknown) => void starts.push(wait) } } as unknown as BotClient;
+    const service = new SupportService(client);
+    const notify = {
+        id: TEXT,
+        isTextBased: () => true,
+        send: async (payload: { allowedMentions?: unknown }) => {
+            sent.push(payload);
+
+            return { id: `m${sent.length}` };
+        },
+    };
+    const guild = { id: GUILD, channels: { cache: new Map([[TEXT, notify]]) } } as unknown as Guild;
+    const support: IModSupport = { ...DefaultModSupport(), channelId: VOICE, notifyChannelId: TEXT, roles: [ROLE] };
+    const announce = (id: string) =>
+        (service as unknown as { Announce: (guild: Guild, member: GuildMember, support: IModSupport) => Promise<void> }).Announce(guild, { id, displayName: "Wartender" } as GuildMember, support);
+    const pinged = (index: number) => JSON.stringify(sent[index]?.allowedMentions) === JSON.stringify({ roles: [ROLE] }) && JSON.stringify(sent[index]).includes(`<@&${ROLE}>`);
+
+    await announce(USER);
+    // Raus und gleich wieder rein: Finish hat die Wartemeldung beendet, Get findet nichts mehr.
+    await announce(USER);
+    await announce(MOD);
+
+    check("Erstes Betreten: das Team wird gepingt", pinged(0), JSON.stringify(sent[0]?.allowedMentions));
+    check("Gleich wieder betreten: Meldung ohne Ping", sent.length === 3 && !JSON.stringify(sent[1]).includes(`<@&${ROLE}>`) && JSON.stringify(sent[1].allowedMentions) === JSON.stringify({ parse: [] }), JSON.stringify(sent[1]?.allowedMentions));
+    check("Die Wartemeldung startet trotzdem (Übernehmen braucht sie)", starts.length === 3, String(starts.length));
+    check("Jemand anderes pingt weiter", pinged(2), JSON.stringify(sent[2]?.allowedMentions));
+}
+
 /** W-0120: Vorschläge laufen durch dieselben Prüfungen wie der Befehl, /unban und /unwarn zeigen sie nur dem Team. */
 async function checkAutocomplete(): Promise<void> {
     console.log("\n  — W-0120: Vorschläge nur mit Recht —");
@@ -810,6 +846,7 @@ async function main(): Promise<void> {
     await checkProofGate(client);
     await checkCard();
     await checkAutocomplete();
+    await checkSupportCooldown();
 
     if (await client.databaseService.Connect()) {
         try {
