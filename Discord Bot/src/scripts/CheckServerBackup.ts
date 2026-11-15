@@ -25,7 +25,7 @@ import path from "node:path";
 import { SERVER_PART_IDS } from "../constants/ServerBackup";
 import { FilterIdMap, MapSnapshot, ResolveChains } from "../services/serverbackup/IdMap";
 import { ReadSnapshot } from "../services/serverbackup/Snapshot";
-import { AutocompleteInteraction, ButtonInteraction, ChatInputCommandInteraction, Guild, PermissionFlagsBits } from "discord.js";
+import { AutocompleteInteraction, ButtonInteraction, ChatInputCommandInteraction, Guild, GuildMember, PermissionFlagsBits } from "discord.js";
 import Backup from "../commands/admin/Backup";
 import fastify from "fastify";
 import RouteManager from "../handler/RouteManager";
@@ -487,6 +487,11 @@ function Job(ops: IRestoreOp[], done = 0): IRestoreJob {
     return { id: 1, guildId: GUILD, targetGuildId: GUILD, backupId: 7, safetyId: 8, mode: "repair", parts: [...SERVER_PART_IDS], areas: [], status: "running", phase: "server", ops, done, failed: [], report: null, actorId: USER, actorName: "Sarah", channelId: null, messageId: null, startedAt: 0, updatedAt: 0 };
 }
 
+/** W-0117: wer lädt. admin: mit „Administrator“, sonst nur „Server verwalten“. */
+function Member(admin = true, id = USER): GuildMember {
+    return { id, displayName: "Sarah", user: { id, username: "sarah" }, permissions: { has: (flag: bigint) => admin && flag === PermissionFlagsBits.Administrator } } as unknown as GuildMember;
+}
+
 /** Abhängigkeiten des Runners, mit Zuordnung im Speicher. stopAt: nach so vielen Schritten „abgebrochen“. */
 function Deps(map = new Map<string, string>(), stopAt = Infinity) {
     const saved: Partial<IRestoreJob>[] = [];
@@ -764,7 +769,7 @@ async function checkFlow(): Promise<void> {
     const { store, service } = ServiceWith(server, []);
     const calls = FakeAdmin(service);
     const actor = { id: USER, name: "Sarah" };
-    const input = { guild: server.guild, target: server.guild, actor, backupId: 7, mode: "repair" as const, parts: [...SERVER_PART_IDS], areas: ["level"] };
+    const input = { guild: server.guild, target: server.guild, actor, member: Member(), backupId: 7, mode: "repair" as const, parts: [...SERVER_PART_IDS], areas: ["level"] };
 
     const refused = await service.Start({ ...input, confirm: "Falsch" });
     check("Ohne richtigen Namen: kein Auftrag", typeof refused === "string" && refused.startsWith("Tipp den Namen") && store.size === 0, String(refused));
@@ -789,7 +794,7 @@ async function checkFlow(): Promise<void> {
     const shield = await service.Protect(server.guild);
     check("Schutz enthält Festgehaltene und Quarantäne", shield.members.has(HELD) && shield.roles.has(QROLE) && shield.channels.has(QCH) && shield.botTop === 10 && shield.botRoleId === BOTROLE);
 
-    const undo = await service.Undo(server.guild, actor, job.id, "Server");
+    const undo = await service.Undo(server.guild, actor, Member(), job.id, "Server");
     if (typeof undo !== "string") await service.Run(undo);
     check("Rückgängig: lädt vorher mit Genau", typeof undo !== "string" && undo.backupId === 8 && undo.mode === "exact" && undo.parts.join() === job.parts.join() && undo.areas.join() === "level", String(undo));
 
@@ -1020,7 +1025,7 @@ const STRANGER = "90071992547409979";
 const NO_ACCESS = "Für RL Nexus brauchst du einen Zugang aus dem Shop.";
 
 /** Eine Interaktion, die mitschreibt, was der Bot antwortet. */
-function Interaction(server: ReturnType<typeof LiveServer>, input: { user?: string; sub?: string; options?: Record<string, string>; customId?: string; modal?: string; focused?: string; manage?: boolean }) {
+function Interaction(server: ReturnType<typeof LiveServer>, input: { user?: string; sub?: string; options?: Record<string, string>; customId?: string; modal?: string; focused?: string; manage?: boolean; admin?: boolean }) {
     const out = { replies: [] as string[], modals: [] as string[], choices: [] as { name: string; value: string }[] };
     const record = async (payload: unknown) => void out.replies.push(Contents(Tree(payload as AnyMessage)));
     const interaction: Record<string, unknown> = {
@@ -1028,7 +1033,7 @@ function Interaction(server: ReturnType<typeof LiveServer>, input: { user?: stri
         guildId: GUILD,
         customId: input.customId ?? "",
         user: { id: input.user ?? USER, username: "sarah" },
-        member: { displayName: "Sarah" },
+        member: Member(input.admin !== false, input.user ?? USER),
         memberPermissions: { has: () => input.manage !== false },
         inCachedGuild: () => true,
         deferred: false,
@@ -1103,6 +1108,12 @@ async function checkCommand(): Promise<void> {
     if (job) await service.Run(job);
     check("laden mit Namen: läuft, Antwort sagt wo", store.size === 1 && job?.mode === "repair" && (right.replies.at(-1) ?? "").includes("Läuft"), right.replies.join());
 
+    const manageOnly = await run({ customId: "bk:confirm:7:repair", modal: "Server", admin: false });
+    check("W-0117: laden nur mit „Server verwalten“: abgelehnt mit Satz, kein Auftrag", store.size === 1 && (manageOnly.replies.at(-1) ?? "").includes("Administrator"), manageOnly.replies.join());
+
+    const undoOnly = await run({ customId: `bk:undoconfirm:${job?.id}`, modal: "Server", admin: false });
+    check("W-0117: Rückgängig nur mit „Server verwalten“: abgelehnt mit Satz", store.size === 1 && (undoOnly.replies.at(-1) ?? "").includes("Administrator"), undoOnly.replies.join());
+
     calls.length = 0;
     const made = await run({ sub: "neu", options: { notiz: "vor dem Turnier", was: "server" } });
     check("neu: legt mit den gewählten Teilen an", calls[0] === "create:server" && (made.replies.at(-1) ?? "").includes("💾 Backup angelegt"), `${calls.join()} ${made.replies.join()}`);
@@ -1124,7 +1135,7 @@ const API_COOKIE = "gueltig";
 const OTHER_GUILD = "90071992547409966";
 
 /** Der Server von oben hinter Fastify, mit Sitzung von Sarah. manage: welche Server sie verwalten darf. */
-function ApiWorld(manage: (guildId: string) => boolean = () => true) {
+function ApiWorld(manage: (guildId: string) => boolean = () => true, admin = true) {
     const server = LiveServer();
     const other = LiveServer({}, OTHER_GUILD);
     const world = ServiceWith(server, []);
@@ -1132,7 +1143,7 @@ function ApiWorld(manage: (guildId: string) => boolean = () => true) {
     const client = world.client as unknown as Record<string, unknown>;
 
     (client.guilds as { cache: Map<string, Guild> }).cache.set(OTHER_GUILD, other.guild);
-    (server.guild.members as unknown as Record<string, unknown>).cache = new Map([[USER, { id: USER, displayName: "Sarah", user: { id: USER, username: "sarah" } }]]);
+    (server.guild.members as unknown as Record<string, unknown>).cache = new Map([[USER, Member(admin)]]);
     // W-0011: ohne Staff-Freigabe.
     client.staffGrantService = { Active: () => null };
     Object.assign(client.dashboardService as object, {
@@ -1271,7 +1282,7 @@ async function checkReviewFixes(): Promise<void> {
     {
         const race = ServiceWith(LiveServer(), []);
         const calls = FakeAdmin(race.service);
-        const input = { guild: race.client.guilds.cache.get(GUILD)!, target: race.client.guilds.cache.get(GUILD)!, actor: { id: USER, name: "Sarah" }, backupId: 7, mode: "repair" as const, parts: [...SERVER_PART_IDS], areas: [], confirm: "Server" };
+        const input = { guild: race.client.guilds.cache.get(GUILD)!, target: race.client.guilds.cache.get(GUILD)!, actor: { id: USER, name: "Sarah" }, member: Member(), backupId: 7, mode: "repair" as const, parts: [...SERVER_PART_IDS], areas: [], confirm: "Server" };
         const results = await Promise.all([race.service.Start(input), race.service.Start(input)]);
         const jobs = results.filter((result): result is IRestoreJob => typeof result !== "string");
 
@@ -1346,7 +1357,7 @@ async function checkReviewFixes(): Promise<void> {
             throw new Error("Missing Access");
         };
         const guild = broken.client.guilds.cache.get(GUILD)!;
-        const result = await broken.service.Start({ guild, target: guild, actor: { id: USER, name: "Sarah" }, backupId: 7, mode: "repair", parts: [...SERVER_PART_IDS], areas: [], confirm: "Server" }).catch((error: unknown) => error);
+        const result = await broken.service.Start({ guild, target: guild, actor: { id: USER, name: "Sarah" }, member: Member(), backupId: 7, mode: "repair", parts: [...SERVER_PART_IDS], areas: [], confirm: "Server" }).catch((error: unknown) => error);
         check("I7: Kann der Bot den Server beim Start nicht lesen: ein Satz statt eines Absturzes", typeof result === "string", String(result));
     }
 
@@ -1444,7 +1455,7 @@ async function checkLeftovers(): Promise<void> {
 
             return inner(guild, who, call);
         };
-        await world.service.Start({ guild: guildOf(world), target: guildOf(world), actor, backupId: 7, mode: "repair", parts: [...SERVER_PART_IDS], areas: [], confirm: "Server" });
+        await world.service.Start({ guild: guildOf(world), target: guildOf(world), actor, member: Member(), backupId: 7, mode: "repair", parts: [...SERVER_PART_IDS], areas: [], confirm: "Server" });
         check("M7: Start wartet 130 s statt 120 s", waits[0] === 130_000, waits.join());
     }
 
@@ -1537,6 +1548,49 @@ async function checkLeftovers(): Promise<void> {
     }
 }
 
+/* ----------------------------------------------------------
+   W-0117: Laden und Rückgängig nur Owner oder Administrator
+   ---------------------------------------------------------- */
+async function checkOnlyAdmin(): Promise<void> {
+    console.log("\n  — W-0117: Laden nur Owner oder Administrator —");
+
+    const OWNER = "90071992547409978";
+    const server = LiveServer();
+    const { store, service } = ServiceWith(server, [{ ...Job([]), id: 40, status: "done" }]);
+    const calls = FakeAdmin(service);
+    const actor = { id: USER, name: "Sarah" };
+    const input = { guild: server.guild, target: server.guild, actor, backupId: 7, mode: "repair" as const, parts: [...SERVER_PART_IDS], areas: [], confirm: "Server" };
+
+    const refused = await service.Start({ ...input, member: Member(false) });
+    check("Nur „Server verwalten“: Laden abgelehnt, nichts gesichert, kein Auftrag", typeof refused === "string" && refused.includes("Administrator") && !calls.includes("server") && store.size === 1, String(refused));
+
+    const undo = await service.Undo(server.guild, actor, Member(false), 40, "Server");
+    check("Nur „Server verwalten“: Rückgängig abgelehnt", typeof undo === "string" && undo.includes("Administrator") && !calls.includes("server") && store.size === 1, String(undo));
+
+    const admin = await service.Start({ ...input, member: Member() });
+    if (typeof admin !== "string") await service.Run(admin);
+    check("Mit „Administrator“: Laden läuft", typeof admin !== "string" && store.size === 2, String(admin));
+
+    Object.assign(server.guild, { ownerId: OWNER });
+    const owner = await service.Undo(server.guild, actor, Member(false, OWNER), 40, "Server");
+    if (typeof owner !== "string") await service.Run(owner);
+    check("Owner ohne „Administrator“: Rückgängig läuft", typeof owner !== "string" && owner.mode === "exact" && store.size === 3, String(owner));
+
+    // Auf einen anderen Server zählt das Recht dort, nicht das auf der Quelle.
+    const other = LiveServer({}, OTHER_GUILD);
+    Object.assign(other.guild.members, { cache: new Map([[USER, Member(false)]]) });
+    const elsewhere = await service.Start({ ...input, target: other.guild, mode: "other", member: Member() });
+    check("Anderer Server: dort nur „Server verwalten“ reicht nicht", typeof elsewhere === "string" && elsewhere.includes("Administrator") && store.size === 3, String(elsewhere));
+
+    const api = ApiWorld(() => true, false);
+    const viaApi = await api.ask("POST", { action: "restore-server", backup: 7, mode: "repair", parts: ["roles"], areas: [], confirm: "Server" });
+    check("Dashboard: restore-server nur mit „Server verwalten“: 400 mit Satz, kein Auftrag", viaApi.statusCode === 400 && viaApi.body.includes("Administrator") && api.store.size === 0, viaApi.body.slice(0, 200));
+
+    api.store.set(41, { ...Job([]), id: 41, status: "done" });
+    const undoApi = await api.ask("POST", { action: "undo", job: 41, confirm: "Server" });
+    check("Dashboard: undo nur mit „Server verwalten“: 400 mit Satz", undoApi.statusCode === 400 && undoApi.body.includes("Administrator") && api.store.size === 1, undoApi.body.slice(0, 200));
+}
+
 async function main(): Promise<void> {
     console.log("\n💾  Backups für den Discord-Server\n");
 
@@ -1553,6 +1607,7 @@ async function main(): Promise<void> {
     await checkReviewFixes();
     await checkResumeAtStart();
     await checkLeftovers();
+    await checkOnlyAdmin();
 
     console.log(failures === 0 ? "\n✅ Alle Prüfungen bestanden.\n" : `\n❌ ${failures} Prüfung(en) fehlgeschlagen.\n`);
 

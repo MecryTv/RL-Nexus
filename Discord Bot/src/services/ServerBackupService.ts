@@ -4,6 +4,7 @@ import {
     ButtonInteraction,
     ChatInputCommandInteraction,
     Guild,
+    GuildMember,
     InteractionEditReplyOptions,
     InteractionReplyOptions,
     InteractionUpdateOptions,
@@ -46,6 +47,8 @@ export interface IStartInput {
     /** Bei „Auf einen anderen Server“ das Ziel, sonst gleich guild. */
     target: Guild;
     actor: Actor;
+    /** W-0117: wer lädt, als Mitglied von guild. Mit Staff-Freigabe der Bot (MemberOrStandIn). */
+    member: GuildMember;
     backupId: number;
     mode: RestoreMode;
     parts: ServerPart[];
@@ -61,6 +64,7 @@ const CARD_EVERY_MS = 5_000;
 /** So lange dauert ein Schritt im Mittel, für „noch etwa“. */
 const STEP_MS = 1_500;
 const UNREACHABLE = "Backups sind gerade nicht erreichbar. Versuch es gleich noch einmal.";
+const ONLY_ADMIN = "Den Discord-Server aus einem Backup laden und das Laden rückgängig machen darf nur der Owner oder wer „Administrator“ hat.";
 /** Was der Bot zum Laden braucht, mit dem Namen, den Discord zeigt. */
 const NEEDED: readonly (readonly [bigint, string])[] = [
     [PermissionFlagsBits.ManageRoles, "Rollen verwalten"],
@@ -293,10 +297,23 @@ export default class ServerBackupService {
         return this.PlanFor(input.target, server.body as IServerSnapshot, meta.body as IBackupInfo, input.mode, input.parts);
     }
 
+    /**
+     * W-0117: Laden setzt Rollenrechte, Rollen der Mitglieder, Löschungen und Banns mit den Rechten des Bots.
+     * Darum nur der Owner oder wer „Administrator“ hat, auf dem Server, der sich ändert.
+     */
+    private async MayLoad(input: IStartInput): Promise<boolean> {
+        const { target, member } = input;
+        const own = target.id === input.guild.id ? member : (target.members.cache.get(member.id) ?? (await target.members.fetch(member.id).catch(() => null)));
+
+        return own !== null && (own.id === target.ownerId || own.permissions.has(PermissionFlagsBits.Administrator));
+    }
+
     /** Laden beginnen. Gibt den Auftrag zurück oder einen Satz, warum nicht. Die Schritte laufen im Hintergrund. */
     async Start(input: IStartInput): Promise<IRestoreJob | string> {
         const { guild, target, actor } = input;
         const other = input.mode === "other";
+
+        if (!(await this.MayLoad(input))) return ONLY_ADMIN;
 
         const busy = "Gerade wird schon ein Backup geladen. Warte, bis es fertig ist.";
 
@@ -361,12 +378,12 @@ export default class ServerBackupService {
     }
 
     /** „Rückgängig machen“: das „vorher“ dieses Ladens mit „Genau wie im Backup“, dieselben Teile und Bereiche. */
-    async Undo(guild: Guild, actor: Actor, jobId: number, confirm: string): Promise<IRestoreJob | string> {
+    async Undo(guild: Guild, actor: Actor, member: GuildMember, jobId: number, confirm: string): Promise<IRestoreJob | string> {
         const job = await this.client.serverRestores.Get(jobId);
 
         if (!job || job.targetGuildId !== guild.id || job.safetyId === null) return "Dieses Laden lässt sich nicht rückgängig machen.";
 
-        return this.Start({ guild, target: guild, actor, backupId: job.safetyId, mode: "exact", parts: job.parts, areas: job.areas, confirm });
+        return this.Start({ guild, target: guild, actor, member, backupId: job.safetyId, mode: "exact", parts: job.parts, areas: job.areas, confirm });
     }
 
     /* ----------------------------------------------------------
@@ -632,7 +649,7 @@ export default class ServerBackupService {
        /backup und die Knöpfe (bk:…)
        ---------------------------------------------------------- */
     /** Server verwalten und Zugang zum Dashboard. Sonst eine Antwort mit dem Grund und null. */
-    private async Gate(interaction: ChatInputCommandInteraction | ButtonInteraction | ModalSubmitInteraction): Promise<{ guild: Guild; actor: Actor } | null> {
+    private async Gate(interaction: ChatInputCommandInteraction | ButtonInteraction | ModalSubmitInteraction): Promise<{ guild: Guild; actor: Actor; member: GuildMember } | null> {
         if (!interaction.inCachedGuild()) {
             await this.Say(interaction, "Das geht nur auf einem Server.");
             return null;
@@ -650,7 +667,7 @@ export default class ServerBackupService {
             return null;
         }
 
-        return { guild: interaction.guild, actor: { id: interaction.user.id, name: interaction.member.displayName || interaction.user.username } };
+        return { guild: interaction.guild, actor: { id: interaction.user.id, name: interaction.member.displayName || interaction.user.username }, member: interaction.member };
     }
 
     /** Antwort nur für den Fragenden: neu, oder die aufgeschobene ersetzen. */
@@ -819,7 +836,7 @@ export default class ServerBackupService {
 
         if (!gate) return;
 
-        const { guild, actor } = gate;
+        const { guild, actor, member } = gate;
         const update = async (view: Promise<MessageCreateOptions>) => {
             await interaction.deferUpdate();
             await interaction.editReply((await view) as InteractionEditReplyOptions);
@@ -864,12 +881,12 @@ export default class ServerBackupService {
         await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
         if (action === "confirm") {
-            const job = await this.Start({ guild, target: guild, actor, backupId: Number(first), mode: second === "exact" ? "exact" : "repair", parts: [...SERVER_PART_IDS], areas: [], confirm });
+            const job = await this.Start({ guild, target: guild, actor, member, backupId: Number(first), mode: second === "exact" ? "exact" : "repair", parts: [...SERVER_PART_IDS], areas: [], confirm });
 
             return this.Say(interaction, await this.Started(guild, job));
         }
 
-        if (action === "undoconfirm") return this.Say(interaction, await this.Started(guild, await this.Undo(guild, actor, Number(first), confirm)));
+        if (action === "undoconfirm") return this.Say(interaction, await this.Started(guild, await this.Undo(guild, actor, member, Number(first), confirm)));
     }
 
     /* ----------------------------------------------------------

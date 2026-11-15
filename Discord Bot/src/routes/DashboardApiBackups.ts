@@ -1,4 +1,4 @@
-import { Guild } from "discord.js";
+import { Guild, GuildMember } from "discord.js";
 import { FastifyReply, FastifyRequest } from "fastify";
 import { JobSummary } from "../builder/ServerBackupView";
 import { SNOWFLAKE } from "../constants/Discord";
@@ -178,7 +178,7 @@ export default class DashboardApiBackups extends Route {
         }
 
         if (writing) {
-            const own = await this.Server(request, access.guild, actor, body);
+            const own = await this.Server(request, access.guild, access.member, actor, body);
 
             if (own) return reply.code(own.status).send(own.body);
         }
@@ -201,8 +201,11 @@ export default class DashboardApiBackups extends Route {
         return reply.code(answer.status).send(answer.body);
     }
 
-    /** Plan 32: was der Bot mit dem Discord-Server selbst macht. null: keine solche Aktion, dann ans Admin Dashboard. */
-    private async Server(request: FastifyRequest, guild: Guild, actor: { id: string; name: string; staff?: boolean }, body: Record<string, unknown>): Promise<{ status: number; body: unknown } | null> {
+    /**
+     * Plan 32: was der Bot mit dem Discord-Server selbst macht. null: keine solche Aktion, dann ans Admin Dashboard.
+     * member: wer lädt, als Mitglied (W-0117). Mit Staff-Freigabe der Bot, wie bei ManageGate.
+     */
+    private async Server(request: FastifyRequest, guild: Guild, member: GuildMember, actor: { id: string; name: string; staff?: boolean }, body: Record<string, unknown>): Promise<{ status: number; body: unknown } | null> {
         const service = this.client.serverBackupService;
         const fail = (status: number, error: string) => ({ status, body: { error } });
         const backupId = Number(idOf(body.backup) ?? Number.NaN);
@@ -231,7 +234,7 @@ export default class DashboardApiBackups extends Route {
 
                 if ((await service.Lock(guild.id)) || (await service.Lock(target.id))) return fail(409, "Gerade wird schon ein Backup geladen. Warte, bis es fertig ist.");
 
-                const job = await service.Start({ guild, target, actor, backupId, mode: input.mode, parts: input.parts, areas: input.areas, confirm: typeof body.confirm === "string" ? body.confirm : "" });
+                const job = await service.Start({ guild, target, actor, member, backupId, mode: input.mode, parts: input.parts, areas: input.areas, confirm: typeof body.confirm === "string" ? body.confirm : "" });
 
                 return typeof job === "string" ? fail(400, job) : { status: 200, body: { job: JobSummary(job, guild.id) } };
             }
@@ -245,7 +248,7 @@ export default class DashboardApiBackups extends Route {
             case "undo": {
                 if (await service.Lock(guild.id)) return fail(409, "Gerade wird schon ein Backup geladen. Warte, bis es fertig ist.");
 
-                const job = await service.Undo(guild, actor, Number(body.job), typeof body.confirm === "string" ? body.confirm : "");
+                const job = await service.Undo(guild, actor, member, Number(body.job), typeof body.confirm === "string" ? body.confirm : "");
 
                 return typeof job === "string" ? fail(400, job) : { status: 200, body: { job: JobSummary(job, guild.id) } };
             }
