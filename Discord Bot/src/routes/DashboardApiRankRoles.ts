@@ -70,6 +70,6 @@ export default class DashboardApiRankRoles extends Route {
     private async Write(access: IManageAccess, body: IBody): Promise<unknown> {
         if (body.action !== "settings") throw new RankRoleError("Unbekannte Aktion.");
 
-        return { ok: true, settings: await this.client.rankRoleService.SaveSettings(access.guild, body.settings) };
+        return { ok: true, settings: await this.client.rankRoleService.SaveSettings(access.guild, body.settings, access.member) };
     }
 }

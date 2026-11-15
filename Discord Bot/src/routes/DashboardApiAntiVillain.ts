@@ -177,7 +177,7 @@ export default class DashboardApiAntiVillain extends Route {
             case "save": {
                 const before = (await service.Settings(guild.id)).bait;
 
-                await service.Save(guild, body.settings);
+                await service.Save(guild, body.settings, member);
 
                 // W-0063: Name, Thema, Platz und Warnung des Köder-Kanals nachziehen.
                 const problems = await service.ApplyBait(guild, before);

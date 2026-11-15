@@ -444,6 +444,40 @@ async function checkCard(client: BotClient): Promise<void> {
     check("Components V2 baut einen Container", (v2.components?.length ?? 0) === 1);
 }
 
+/** W-0116: Neue Auto-Rollen nur, wenn der Speichernde sie selbst vergeben dürfte. Ersetzt die Datenbank - darum zuletzt. */
+async function checkActor(client: BotClient): Promise<void> {
+    console.log("\n  — Auto-Rollen nur mit eigenem Recht —");
+
+    const guild = FakeGuild();
+    const service = client.welcomeService;
+    let stored = DefaultWelcomeConfig();
+    // Nur „Server verwalten“: kein „Rollen verwalten“.
+    const actor = { id: USER, guild, permissions: { has: () => false }, roles: { highest: guild.roles.cache.get(GUILD) } } as unknown as GuildMember;
+    const refused = async (input: object): Promise<string> => {
+        try {
+            await service.Save(guild, input, actor);
+
+            return "";
+        } catch (error) {
+            return error instanceof WelcomeError ? error.message : `kein WelcomeError: ${String(error)}`;
+        }
+    };
+
+    Object.assign(client.moduleSettings, {
+        Of: async () => structuredClone(stored),
+        Save: async (_guild: string, _module: string, config: typeof stored) => void (stored = config),
+    });
+
+    check("Ohne „Rollen verwalten“: neue Auto-Rolle abgelehnt", (await refused({ roles: [ROLE] })).includes("Du darfst @Mitglied nicht vergeben"));
+    check("Auch als Rolle für Bots", (await refused({ botRoles: [ROLE] })).includes("@Mitglied"));
+    check("Nichts gespeichert", stored.roles.length === 0 && stored.botRoles.length === 0);
+
+    stored = { ...DefaultWelcomeConfig(), roles: [ROLE] };
+
+    check("Schon gespeicherte Rolle bleibt gültig und editierbar", (await refused({ roles: [ROLE], join: { on: false } })) === "");
+    check("Entfernen geht immer", (await refused({ roles: [] })) === "" && stored.roles.length === 0);
+}
+
 async function main(): Promise<void> {
     console.log("\n👋 Welcome System\n");
 
@@ -460,6 +494,7 @@ async function main(): Promise<void> {
     checkStage();
     checkValues(client);
     await checkCard(client);
+    await checkActor(client);
 
     console.log(failures === 0 ? "\n✅ Alle Prüfungen bestanden.\n" : `\n❌ ${failures} Prüfung(en) fehlgeschlagen.\n`);
 

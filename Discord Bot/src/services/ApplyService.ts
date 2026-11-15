@@ -58,6 +58,7 @@ import {
 } from "../interfaces/services/apply/IApply";
 import logger from "../utils/logger";
 import { IsLogTarget, SendLog, WarmLogTarget } from "../utils/logtarget";
+import { NewRoleProblem } from "../utils/rolegate";
 import ApplyFlow from "./ApplyFlow";
 
 /**
@@ -346,6 +347,9 @@ export default class ApplyService {
         if ((await this.Forms(guild.id)).length >= MAX_FORMS) throw new ApplyError(`Mehr als ${MAX_FORMS} Formulare gehen nicht.`);
 
         const clean = this.CleanForm(guild, input);
+
+        this.CheckAcceptRole(member, clean.settings.acceptRole, null);
+
         const form = await this.client.applyForms.Create({ guildId: guild.id, createdBy: member.id, ...clean });
 
         logger.user(`📋 Bewerbungs-Formular "${form.name}" auf ${guild.id} angelegt (von ${member.id})`);
@@ -354,13 +358,22 @@ export default class ApplyService {
         return form;
     }
 
-    async SaveForm(guild: Guild, id: number, input: unknown): Promise<IApplyForm> {
+    async SaveForm(guild: Guild, id: number, input: unknown, member: GuildMember): Promise<IApplyForm> {
         const previous = await this.Form(guild.id, id);
+        const clean = this.CleanForm(guild, input, previous);
 
-        await this.client.applyForms.Save(id, this.CleanForm(guild, input, previous));
+        this.CheckAcceptRole(member, clean.settings.acceptRole, previous.settings.acceptRole);
+        await this.client.applyForms.Save(id, clean);
         await this.RefreshPanel(guild).catch(() => undefined);
 
         return this.Form(guild.id, id);
+    }
+
+    /** W-0116: Die Rolle bei Annahme vergibt der Bot - eine neue nur, wenn der Speichernde sie selbst vergeben dürfte. */
+    private CheckAcceptRole(member: GuildMember, role: string | null, before: string | null): void {
+        const problem = NewRoleProblem(member, [role], [before]);
+
+        if (problem) throw new ApplyError(problem);
     }
 
     /** Das Formular und alles, was darauf eingegangen ist. */

@@ -143,7 +143,7 @@ export default class DashboardApiLevels extends Route {
         switch (body.action) {
             case "save": {
                 const before = (await service.Settings(guild.id)).boardPost;
-                const settings = await service.Save(guild, body.settings);
+                const settings = await service.Save(guild, body.settings, member);
 
                 logger.user(`📈 Level-Einstellungen auf ${guild.id} gespeichert (von ${actor.id})`);
 

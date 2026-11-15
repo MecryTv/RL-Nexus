@@ -3,6 +3,7 @@ import {
     DiscordAPIError,
     Guild,
     GuildBasedChannel,
+    GuildMember,
     MessageFlags,
     OverwriteResolvable,
     OverwriteType,
@@ -93,6 +94,7 @@ import { APPLY_MODULE } from "../constants/Apply";
 import { Evaluate, FormulaError } from "../utils/formula";
 import { AbsenceSettingsOf } from "../constants/Absences";
 import logger from "../utils/logger";
+import { CanAssignRole, NewRoleProblem } from "../utils/rolegate";
 
 export class TeamError extends Error {}
 
@@ -857,9 +859,11 @@ export default class TeamService {
         return this.client.messageService.CleanBody(guild, input, previous, fallback.doc);
     }
 
-    async SaveSettings(guild: Guild, input: unknown): Promise<ITeamSettings> {
+    async SaveSettings(guild: Guild, input: unknown, actor: GuildMember): Promise<ITeamSettings> {
         const previous = await this.Settings(guild.id);
         const settings = this.CleanSettings(guild, input, previous);
+
+        this.CheckActor(actor, Object.values(settings.roles.positions), Object.values(previous.roles.positions));
 
         // Eigene Bilder werden erst Emojis, dann wird gespeichert - klappt eins nicht, bleibt alles beim alten.
         settings.badges = await this.SyncBadges(guild, previous.badges, settings.badges);
@@ -884,6 +888,13 @@ export default class TeamService {
         }
 
         return settings;
+    }
+
+    /** W-0116: Rollen im Kader vergibt der Bot - neue nur, wenn der Speichernde sie selbst vergeben dürfte. */
+    private CheckActor(actor: GuildMember, ids: (string | null | undefined)[], before: (string | null | undefined)[]): void {
+        const problem = NewRoleProblem(actor, ids, before);
+
+        if (problem) throw new TeamError(problem);
     }
 
     /** Kopf und Folgenachrichten des Hubs zusammen merken. */
@@ -1025,12 +1036,14 @@ export default class TeamService {
         return team;
     }
 
-    async CreateTeam(guild: Guild, input: unknown): Promise<ITeam> {
+    async CreateTeam(guild: Guild, input: unknown, actor: GuildMember): Promise<ITeam> {
         const [teams, settings] = await Promise.all([this.Teams(guild.id), this.Settings(guild.id)]);
 
         if (teams.length >= MAX_TEAMS) throw new TeamError(`Mehr als ${MAX_TEAMS} Teams gehen nicht.`);
 
         const clean = await this.CleanTeam(guild, input);
+
+        this.CheckActor(actor, [clean.roleId], []);
 
         const team = await this.client.teams.CreateFull(guild.id, { ...clean, position: teams.length });
 
@@ -1040,10 +1053,12 @@ export default class TeamService {
         return team;
     }
 
-    async SaveTeam(guild: Guild, id: number, input: unknown): Promise<ITeam> {
+    async SaveTeam(guild: Guild, id: number, input: unknown, actor: GuildMember): Promise<ITeam> {
         const previous = await this.Team(guild.id, id);
         const [teams, settings] = await Promise.all([this.Teams(guild.id), this.Settings(guild.id)]);
         const clean = await this.CleanTeam(guild, input, previous);
+
+        this.CheckActor(actor, [clean.roleId], [previous.roleId]);
 
         await this.client.teams.Save(id, clean);
 
@@ -1108,7 +1123,7 @@ export default class TeamService {
      * Teams -, nimmt der Bot das statt eines zweiten. Was er selbst anlegt,
      * merkt er sich in `created`; nur das bietet das Löschen zum Mitlöschen an.
      */
-    async SetupTeam(guild: Guild, id: number, input: unknown): Promise<{ team: ITeam; made: string[]; found: string[] }> {
+    async SetupTeam(guild: Guild, id: number, input: unknown, actor: GuildMember): Promise<{ team: ITeam; made: string[]; found: string[] }> {
         const raw = IsRecord(input) ? input : {};
         const want = { role: raw.role === true, category: raw.category === true, text: raw.text === true, voice: raw.voice === true };
         const rooms = want.category || want.text || want.voice;
@@ -1138,7 +1153,10 @@ export default class TeamService {
             // Die Rolle zuerst: ein privater Kanal braucht sie schon beim Anlegen.
             if (want.role && !roleId) {
                 const same = guild.roles.cache.find((role) => role.id !== guild.id && !role.managed && role.name.toLowerCase() === name.toLowerCase());
+                // W-0116: Eine vorhandene Rolle gleichen Namens wird Team-Rolle - nur, wenn der Handelnde sie selbst vergeben dürfte.
+                const problem = same ? CanAssignRole(actor, same) : null;
 
+                if (problem) throw new TeamError(problem);
                 if (same) found.push(`@${same.name}`);
                 else {
                     const role = await guild.roles.create({ name, ...(before.color ? { colors: { primaryColor: before.color as `#${string}` } } : {}), reason });

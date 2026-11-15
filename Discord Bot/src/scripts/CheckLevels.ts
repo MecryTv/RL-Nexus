@@ -294,7 +294,7 @@ async function checkDatabase(client: BotClient): Promise<void> {
     let refused = false;
 
     try {
-        await service.Save(guild, { announce: "channel", announceChannelId: null });
+        await service.Save(guild, { announce: "channel", announceChannelId: null }, member);
     } catch (error) {
         refused = error instanceof LevelError;
     }
@@ -722,14 +722,14 @@ async function checkAnnounce(): Promise<void> {
     check("Alte Wahl „DM“ wird beim Lesen zum festen Kanal", (await dm.service.Settings(GUILD)).announce === "channel");
     check("Alte Wahl „DM“ wird beim Speichern zum festen Kanal", dm.service.Clean(dm.guild, { announce: "dm" }, dm.settings).announce === "channel");
 
-    const noChannel = await World().service.Save(FakeGuild(), { announce: "current", announceChannelId: null }).catch((error: Error) => error);
-    const quiet = await World().service.Save(FakeGuild(), { announce: "off", announceChannelId: null }).catch((error: Error) => error);
+    const noChannel = await World().service.Save(FakeGuild(), { announce: "current", announceChannelId: null }, FakeMember(FakeGuild(), USER)).catch((error: Error) => error);
+    const quiet = await World().service.Save(FakeGuild(), { announce: "off", announceChannelId: null }, FakeMember(FakeGuild(), USER)).catch((error: Error) => error);
 
     check("Aufstieg an, aber kein Kanal: Speichern abgelehnt", noChannel instanceof LevelError, String(noChannel));
     check("Aufstieg aus: ohne Kanal gespeichert", !(quiet instanceof Error) && quiet.announce === "off", String(quiet));
 
     // Andere Seiten speichern nur ihren Teil (öffentlich, Rangliste im Kanal) - das scheitert nicht am fehlenden Aufstiegs-Kanal.
-    const elsewhere = await World().service.Save(FakeGuild(), { public: true }).catch((error: Error) => error);
+    const elsewhere = await World().service.Save(FakeGuild(), { public: true }, FakeMember(FakeGuild(), USER)).catch((error: Error) => error);
 
     check("Nur „öffentlich“ gespeichert: geht auch ohne Aufstiegs-Kanal", !(elsewhere instanceof Error) && elsewhere.public === true, String(elsewhere));
 
@@ -1039,7 +1039,7 @@ async function checkBoardPost(): Promise<void> {
     check("Bereinigung: echter Kanal und Zeitraum bleiben", right.channelId === TEXT && right.period === "7d", JSON.stringify(right));
     check("Ohne Angabe bleibt die Rangliste im Kanal, wie sie war", service.Clean(FakeGuild(), {}, { ...base, boardPost: right }).boardPost.channelId === TEXT);
 
-    const noChannel = await World().service.Save(FakeGuild(), { announceChannelId: TEXT, boardPost: { on: true, channelId: null } }).catch((error: Error) => error);
+    const noChannel = await World().service.Save(FakeGuild(), { announceChannelId: TEXT, boardPost: { on: true, channelId: null } }, FakeMember(FakeGuild(), USER)).catch((error: Error) => error);
 
     check("An ohne Kanal: Speichern abgelehnt", noChannel instanceof LevelError && noChannel.message.includes("Rangliste"), String(noChannel));
 
@@ -2135,7 +2135,7 @@ async function checkTop(): Promise<void> {
 
     check("Einstellungen: erfundener Kanal und @everyone fallen weg", cleaned.top.week.channelId === null && cleaned.top.week.roleId === null && cleaned.top.month.channelId === TEXT && cleaned.top.month.roleId === ROLE, JSON.stringify(cleaned.top));
 
-    const refused = await World().service.Save(FakeGuild(), { top: { week: { on: true, channelId: null, roleId: null } } }).catch((error: Error) => error);
+    const refused = await World().service.Save(FakeGuild(), { top: { week: { on: true, channelId: null, roleId: null } } }, FakeMember(FakeGuild(), USER)).catch((error: Error) => error);
 
     check("An ohne Kanal: wird nicht gespeichert", refused instanceof LevelError, String(refused));
 
@@ -2310,6 +2310,26 @@ async function checkBoardApi(): Promise<void> {
     }
 }
 
+/** W-0116: Belohnungen und Rollen der Aktivsten vergibt der Bot - neue nur, wenn der Speichernde sie selbst vergeben dürfte. */
+async function checkActor(): Promise<void> {
+    console.log("\n  — Belohnungsrollen nur mit eigenem Recht —");
+
+    const world = World({ rewards: [{ level: 3, roleId: ROLE }] });
+    // Nur „Server verwalten“: kein „Rollen verwalten“.
+    const actor = Object.assign(world.member(USER), { permissions: { has: () => false } });
+    const refused = async (input: object): Promise<string> => {
+        const result = await world.service.Save(world.guild, input, actor).catch((error: Error) => error);
+
+        return result instanceof LevelError ? result.message : result instanceof Error ? `kein LevelError: ${String(result)}` : "";
+    };
+
+    check("Ohne „Rollen verwalten“: neue Belohnungsrolle abgelehnt", (await refused({ rewards: [{ level: 3, roleId: ROLE }, { level: 5, roleId: REWARD }] })).includes("Du darfst @Level 5 nicht vergeben"));
+    check("Auch als Rolle der Aktivsten", (await refused({ top: { month: { on: false, channelId: TEXT, roleId: REWARD } } })).includes("@Level 5"));
+    check("Nichts gespeichert", world.settings.rewards.length === 1 && world.settings.top.month.roleId === null, JSON.stringify(world.settings.rewards));
+    check("Schon gespeicherte Rolle bleibt gültig und editierbar", (await refused({ rewards: [{ level: 7, roleId: ROLE }] })) === "" && world.settings.rewards[0]?.level === 7);
+    check("Entfernen geht immer", (await refused({ rewards: [] })) === "" && world.settings.rewards.length === 0);
+}
+
 async function main(): Promise<void> {
     console.log("\n📈 Level System\n");
 
@@ -2339,6 +2359,7 @@ async function main(): Promise<void> {
     await checkBoardApi();
     checkSettings(client);
     await checkCard();
+    await checkActor();
 
     if (await client.databaseService.Connect()) {
         try {

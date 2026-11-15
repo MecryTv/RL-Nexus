@@ -42,6 +42,7 @@ import { IBoardEntry, IBoardPage, ILevelBonus, ILevelEntry, ILevelLogEntry, ILev
 import { ILevelDaySum } from "../models/LevelDays";
 import { PeriodDays, PreviousWindow, RankOrder, Trend } from "./levels/Board";
 import logger from "../utils/logger";
+import { NewRoleProblem } from "../utils/rolegate";
 import { BlockedAt } from "../utils/security";
 
 export class LevelError extends Error {}
@@ -220,8 +221,14 @@ export default class LevelService {
         };
     }
 
-    async Save(guild: Guild, input: unknown): Promise<ILevelSettings> {
-        const settings = this.Clean(guild, input, await this.Settings(guild.id));
+    async Save(guild: Guild, input: unknown, actor: GuildMember): Promise<ILevelSettings> {
+        const previous = await this.Settings(guild.id);
+        const settings = this.Clean(guild, input, previous);
+        // W-0116: Belohnungen und die Rollen der Aktivsten vergibt der Bot - neue nur, wenn der Speichernde sie selbst vergeben dürfte.
+        const given = (entry: ILevelSettings) => [...entry.rewards.map((reward) => reward.roleId), entry.top?.week.roleId, entry.top?.month.roleId];
+        const problem = NewRoleProblem(actor, given(settings), given(previous));
+
+        if (problem) throw new LevelError(problem);
 
         // W-0043: Nur wer den Aufstieg selbst speichert, muss den Kanal wählen - „öffentlich“ oder die Rangliste im Kanal speichern nur ihren Teil.
         const touched = IsRecord(input) && (input.announce !== undefined || input.announceChannelId !== undefined);

@@ -497,6 +497,53 @@ async function checkAccess(client: BotClient): Promise<void> {
     check("Und „Anhängen“ prüft dasselbe", (await failure(() => service.CheckReader(hidden, member, { ...stored, targetId: MESSAGE }))).includes("lesen"));
 }
 
+/** W-0116: Rollen nur, wenn der Speichernde sie selbst vergeben dürfte - dieselbe Regel wie in Discord. */
+async function checkActor(client: BotClient): Promise<void> {
+    console.log("\n  — Nur Rollen, die der Speichernde selbst vergeben darf —");
+
+    const service = client.selfRoleService;
+    const loose = client as unknown as Loose;
+    const guild = FakeGuild();
+    const me = guild.members.me!;
+    // Plätze wie in Discord: Rocket League (3) unter der höchsten Rolle des Verwalters (5), Valorant gleich hoch, Ankündigungen darüber, der Bot ganz oben.
+    const place = (id: string, position: number) => Object.assign(guild.roles.cache.get(id)!, { position, comparePositionTo: (other: Role) => position - other.position });
+
+    place(ROLE_A, 3);
+    place(ROLE_B, 5);
+    place(ROLE_C, 7);
+    Object.assign(me.roles.highest, { position: 100 });
+
+    const highest = { id: "90071992547409963", position: 5 } as unknown as Role;
+    const actor = (id: string, manage: boolean) =>
+        ({ id, guild, permissions: { has: (flag: bigint) => manage && flag === PermissionFlagsBits.ManageRoles }, roles: { highest } }) as unknown as GuildMember;
+    const plain = actor(USER, false);
+    const manager = actor(USER, true);
+    const owner = actor(guild.ownerId, false);
+    const bot = { id: BOT, guild, permissions: me.permissions, roles: me.roles } as unknown as GuildMember;
+    const create = (member: GuildMember, roleId: string) => failure(() => service.Create(guild, member, { name: "Spiele", roles: [{ roleId }] }));
+
+    loose.selfRolePanels.OfGuild = async () => [];
+    loose.selfRolePanels.Create = async (row: object) => ({ ...Panel(), ...row });
+
+    check("Ohne „Rollen verwalten“: eine neue Rolle wird abgelehnt", (await create(plain, ROLE_A)).includes("Du darfst @Rocket League nicht vergeben"));
+    check("Mit „Rollen verwalten“, aber gleich hoch wie die eigene: abgelehnt", (await create(manager, ROLE_B)).includes("@Valorant"));
+    check("Über der eigenen höchsten Rolle: abgelehnt", (await create(manager, ROLE_C)).includes("@Ankündigungen"));
+    check("Unter der eigenen höchsten Rolle: geht", (await create(manager, ROLE_A)) === "");
+    check("Der Owner darf jede Rolle unter dem Bot", (await create(owner, ROLE_C)) === "");
+    check("Mit Staff-Freigabe handelt der Bot: was er vergeben kann, geht", (await create(bot, ROLE_C)) === "");
+
+    const stored = Panel({ id: 12, roles: [{ roleId: ROLE_C, label: "", description: "", emoji: null, style: "secondary", locked: false }] });
+
+    loose.selfRolePanels.Get = async () => stored;
+    loose.selfRolePanels.Save = async () => undefined;
+
+    const save = (roles: string[]) => failure(() => service.Save(guild, plain, 12, { roles: roles.map((roleId) => ({ roleId })) }));
+
+    check("Schon gespeicherte Rolle bleibt gültig und editierbar", (await save([ROLE_C])) === "");
+    check("Entfernen geht immer", (await save([])) === "");
+    check("Eine neue daneben wird abgelehnt", (await save([ROLE_C, ROLE_A])).includes("@Rocket League"));
+}
+
 async function checkFlows(client: BotClient): Promise<void> {
     console.log("\n  — Speichern, Lösen, Anhängen —");
 
@@ -666,6 +713,7 @@ async function main(): Promise<void> {
     await checkClash(client);
     checkPlan(client);
     await checkAccess(client);
+    await checkActor(client);
     // Zuletzt: ab hier sind Teile des Clients durch Attrappen ersetzt.
     await checkFlows(client);
 

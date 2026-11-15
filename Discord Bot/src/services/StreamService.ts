@@ -16,6 +16,7 @@ import {
 import { IMessageDoc } from "../interfaces/builder/IMessageDoc";
 import { IStreamConfig, IStreamNotifier, IStreamState, ITwitchSettings, IYouTubeSettings, StreamKind, StreamPlatform } from "../interfaces/services/community/ICommunity";
 import logger from "../utils/logger";
+import { NewRoleProblem } from "../utils/rolegate";
 import { IsLogTarget, SendLog, WarmLogTarget } from "../utils/logtarget";
 import TwitchApi, { ITwitchStream, Preview, TwitchError } from "../utils/twitch";
 import { Feed, IFeedEntry, IsShort, LiveStates, ResolveChannel } from "../utils/youtube";
@@ -548,10 +549,10 @@ export default class StreamService {
         return { liveRoleId: role(raw.liveRoleId), liveRoleFilter: role(raw.liveRoleFilter) };
     }
 
-    async SaveTwitchSettings(guild: Guild, input: unknown): Promise<ITwitchSettings> {
+    async SaveTwitchSettings(guild: Guild, input: unknown, actor: GuildMember): Promise<ITwitchSettings> {
         const settings = this.CleanTwitchSettings(guild, input);
 
-        this.CheckLiveRole(guild, settings.liveRoleId);
+        this.CheckLiveRole(guild, settings.liveRoleId, actor, (await this.TwitchSettings(guild.id)).liveRoleId);
         await this.client.moduleSettings.Save(guild.id, TWITCH_MODULE, settings);
 
         return settings;
@@ -563,17 +564,20 @@ export default class StreamService {
         return { liveRoleId: typeof raw.liveRoleId === "string" && guild.roles.cache.has(raw.liveRoleId) && raw.liveRoleId !== guild.id ? raw.liveRoleId : null };
     }
 
-    async SaveYouTubeSettings(guild: Guild, input: unknown): Promise<IYouTubeSettings> {
+    async SaveYouTubeSettings(guild: Guild, input: unknown, actor: GuildMember): Promise<IYouTubeSettings> {
         const settings = this.CleanYouTubeSettings(guild, input);
 
-        this.CheckLiveRole(guild, settings.liveRoleId);
+        this.CheckLiveRole(guild, settings.liveRoleId, actor, (await this.YouTubeSettings(guild.id)).liveRoleId);
         await this.client.moduleSettings.Save(guild.id, YOUTUBE_MODULE, settings);
 
         return settings;
     }
 
-    /** Kann der Bot diese Rolle überhaupt vergeben? Sonst sagt das Dashboard, woran es liegt. */
-    private CheckLiveRole(guild: Guild, roleId: string | null): void {
+    /**
+     * Kann der Bot diese Rolle überhaupt vergeben? Sonst sagt das Dashboard, woran es liegt.
+     * W-0116: Eine neue Live-Rolle nur, wenn der Speichernde sie selbst vergeben dürfte.
+     */
+    private CheckLiveRole(guild: Guild, roleId: string | null, actor: GuildMember, before: string | null): void {
         if (!roleId) return;
 
         const target = guild.roles.cache.get(roleId)!;
@@ -583,6 +587,10 @@ export default class StreamService {
         if (!me?.permissions.has(PermissionFlagsBits.ManageRoles) || target.comparePositionTo(me.roles.highest) >= 0) {
             throw new StreamError(`Die Live-Rolle @${target.name} muss unter der höchsten Rolle des Bots stehen, und er braucht „Rollen verwalten“.`);
         }
+
+        const problem = NewRoleProblem(actor, [roleId], [before]);
+
+        if (problem) throw new StreamError(problem);
     }
 
     /**

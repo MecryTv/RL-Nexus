@@ -82,7 +82,7 @@ export default class DashboardApiWelcome extends Route {
 
         switch (body.action) {
             case "save": {
-                const config = await service.Save(guild, body.config);
+                const config = await service.Save(guild, body.config, member);
 
                 logger.user(`👋 Welcome-Einstellungen auf ${guild.id} gespeichert (von ${actor.id})`);
 

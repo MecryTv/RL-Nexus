@@ -21,6 +21,7 @@ import { BaitMessage, ChannelNotice, DecidedCard, DeletedView, HoldCard, NukeCar
 import { BaitCount, RenderBait } from "../builder/BaitImage";
 import { SUPPORT_URL } from "../constants/Help";
 import { ModerationError } from "../services/ModerationService";
+import { AntiVillainError } from "../services/AntiVillainService";
 import { BaitChannelName, DefaultAntiVillainSettings, GUARDS, LEVELS } from "../constants/AntiVillain";
 import { IsModule } from "../constants/Modules";
 import { ScoreBook, Verdict } from "../services/antivillain/Score";
@@ -1712,6 +1713,38 @@ async function checkReview(): Promise<void> {
     }
 }
 
+/** W-0116: Die Quarantäne-Rolle gibt der Bot bei jedem Festhalten. Neu wählen nur mit eigenem Recht. Ersetzt die Datenbank - darum zuletzt. */
+async function checkQuarantineActor(client: BotClient): Promise<void> {
+    console.log("\n  — Quarantäne-Rolle nur mit eigenem Recht —");
+
+    const guild = Object.assign(FakeGuild(), { ownerId: "90071992547409999" }) as Guild;
+    const service = client.antiVillainService;
+    let stored = DefaultAntiVillainSettings();
+    // Nur „Server verwalten“: kein „Rollen verwalten“.
+    const actor = { id: "90071992547409900", guild, permissions: { has: () => false }, roles: { highest: guild.roles.cache.get(GUILD) } } as unknown as GuildMember;
+    const owner = { ...actor, id: guild.ownerId } as unknown as GuildMember;
+    const refused = async (input: object, who: GuildMember = actor): Promise<string> => {
+        try {
+            await service.Save(guild, input, who);
+
+            return "";
+        } catch (error) {
+            return error instanceof AntiVillainError ? error.message : `kein AntiVillainError: ${String(error)}`;
+        }
+    };
+
+    Object.assign(client.moduleSettings, {
+        Of: async () => structuredClone(stored),
+        Save: async (_guild: string, _module: string, config: typeof stored) => void (stored = config),
+    });
+
+    check("Ohne „Rollen verwalten“: neue Quarantäne-Rolle abgelehnt", (await refused({ quarantine: { roleId: ROLE } })).includes("Du darfst @Stammspieler nicht vergeben"));
+    check("Nichts gespeichert", stored.quarantine.roleId === null);
+    check("Der Owner darf", (await refused({ quarantine: { roleId: ROLE } }, owner)) === "" && stored.quarantine.roleId === ROLE);
+    check("Schon gespeicherte Rolle bleibt für andere editierbar", (await refused({ level: "streng" })) === "");
+    check("Entfernen geht immer", (await refused({ quarantine: { roleId: null } })) === "" && stored.quarantine.roleId === null);
+}
+
 async function main(): Promise<void> {
     console.log("\n🛡️  Anti Villain\n");
 
@@ -1737,6 +1770,7 @@ async function main(): Promise<void> {
     await checkPrune();
     await checkDebris();
     await checkReview();
+    await checkQuarantineActor(client);
 
     console.log(failures === 0 ? "\n✅ Alle Prüfungen bestanden.\n" : `\n❌ ${failures} Prüfung(en) fehlgeschlagen.\n`);
 

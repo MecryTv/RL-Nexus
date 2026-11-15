@@ -138,7 +138,7 @@ export default class DashboardApiApply extends Route {
             case "save":
                 onlyManage();
 
-                return { ok: true, form: await service.SaveForm(guild, id, body.form) };
+                return { ok: true, form: await service.SaveForm(guild, id, body.form, member) };
 
             case "delete":
                 onlyManage();

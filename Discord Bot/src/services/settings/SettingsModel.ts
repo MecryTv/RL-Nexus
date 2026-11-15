@@ -1,4 +1,4 @@
-import { ChannelType, Guild } from "discord.js";
+import { ChannelType, Guild, GuildMember } from "discord.js";
 import BotClient from "../../client/BotClient";
 import { ModuleId } from "../../constants/Modules";
 import { MAX_BAN, MAX_STAGES, MAX_TIMEOUT, MIN_DURATION, ParseDuration } from "../../constants/Moderation";
@@ -88,8 +88,8 @@ export interface IPanelModule<S> {
     /** Module ohne eigene Einstellungen (A1): ein Satz, warum, statt der Kacheln. */
     about?: string;
     load(client: BotClient, guild: Guild): Promise<S>;
-    /** Speichert über den Weg des Moduls. Gibt einen Hinweis zurück, wenn etwas so noch nicht greift. */
-    save(client: BotClient, guild: Guild, patch: Record<string, unknown>): Promise<string | null>;
+    /** Speichert über den Weg des Moduls. Gibt einen Hinweis zurück, wenn etwas so noch nicht greift. member: wer ändert (W-0116, Rollen). */
+    save(client: BotClient, guild: Guild, patch: Record<string, unknown>, member: GuildMember): Promise<string | null>;
 }
 
 /* ----------------------------------------------------------

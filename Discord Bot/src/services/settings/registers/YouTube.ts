@@ -22,9 +22,9 @@ export const YouTubePanel: IPanelModule<S> = {
     load(client, guild) {
         return client.streamService.YouTubeSettings(guild.id);
     },
-    async save(client, guild, patch) {
+    async save(client, guild, patch, member) {
         try {
-            await client.streamService.SaveYouTubeSettings(guild, patch);
+            await client.streamService.SaveYouTubeSettings(guild, patch, member);
         } catch (error) {
             if (error instanceof StreamError) throw new PanelError(error.message);
 

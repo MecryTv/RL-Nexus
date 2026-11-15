@@ -22,6 +22,7 @@ import { Bar } from "../constants/Polls";
 import { CLAIM_CHOICES, MAX_BONUS_TICKETS } from "../constants/Giveaways";
 import { IGiveaway, IPoll, IStreamNotifier } from "../interfaces/services/community/ICommunity";
 import { BOOSTER, DrawWeighted } from "../services/GiveawayService";
+import { StreamError } from "../services/StreamService";
 import { Decode, ParseFeed } from "../utils/youtube";
 
 // Erfundene Snowflakes - 17-stellig wie echte, aber es gibt sie bei Discord nicht.
@@ -589,6 +590,41 @@ async function cleanup(client: BotClient): Promise<void> {
     check("Aufgeräumt", (await client.polls.OfGuild(GUILD)).length === 0 && (await client.giveaways.OfGuild(GUILD)).length === 0 && (await client.streamNotifiers.OfGuild(GUILD, "twitch")).length === 0);
 }
 
+/** W-0116: Eine neue Live-Rolle nur, wenn der Speichernde sie selbst vergeben dürfte. Ersetzt die Datenbank - darum zuletzt. */
+async function checkActor(client: BotClient): Promise<void> {
+    console.log("\n  — Live-Rolle nur mit eigenem Recht —");
+
+    const guild = FakeGuild();
+    const service = client.streamService;
+    let twitch: { liveRoleId: string | null; liveRoleFilter: string | null } = { liveRoleId: null, liveRoleFilter: null };
+    // Nur „Server verwalten“: kein „Rollen verwalten“. Der Bot selbst könnte beide Rollen vergeben.
+    const actor = { id: USER, guild, permissions: { has: () => false }, roles: { highest: guild.roles.cache.get(GUILD) } } as unknown as GuildMember;
+    const refused = async (run: () => Promise<unknown>): Promise<string> => {
+        try {
+            await run();
+
+            return "";
+        } catch (error) {
+            return error instanceof StreamError ? error.message : `kein StreamError: ${String(error)}`;
+        }
+    };
+
+    for (const id of [ROLE, TEAM]) Object.assign(guild.roles.cache.get(id)!, { managed: false, comparePositionTo: () => -1 });
+    Object.assign(guild.members, { me: { permissions: { has: () => true }, roles: { highest: {} } } });
+    service.TwitchSettings = async () => twitch;
+    service.YouTubeSettings = async () => ({ liveRoleId: null });
+    Object.assign(client.moduleSettings, { Save: async () => undefined });
+
+    check("Ohne „Rollen verwalten“: neue Twitch-Live-Rolle abgelehnt", (await refused(() => service.SaveTwitchSettings(guild, { liveRoleId: ROLE }, actor))).includes("Du darfst @Stammgast nicht vergeben"));
+    check("Bei YouTube genauso", (await refused(() => service.SaveYouTubeSettings(guild, { liveRoleId: ROLE }, actor))).includes("@Stammgast"));
+    check("Nur die Filter-Rolle vergibt nichts: geht", (await refused(() => service.SaveTwitchSettings(guild, { liveRoleFilter: TEAM }, actor))) === "");
+
+    twitch = { liveRoleId: ROLE, liveRoleFilter: null };
+
+    check("Schon gespeicherte Live-Rolle bleibt gültig und editierbar", (await refused(() => service.SaveTwitchSettings(guild, { liveRoleId: ROLE, liveRoleFilter: TEAM }, actor))) === "");
+    check("Entfernen geht immer", (await refused(() => service.SaveTwitchSettings(guild, { liveRoleId: null }, actor))) === "");
+}
+
 async function main(): Promise<void> {
     console.log("\n📣 Notifier, Umfragen und Giveaways\n");
 
@@ -616,6 +652,8 @@ async function main(): Promise<void> {
     } else {
         console.log("\n  — Datenbank —\n  übersprungen: keine Verbindung (siehe Meldung oben)");
     }
+
+    await checkActor(client);
 
     console.log(failures === 0 ? "\n✅ Alle Prüfungen bestanden.\n" : `\n❌ ${failures} Prüfung(en) fehlgeschlagen.\n`);
 

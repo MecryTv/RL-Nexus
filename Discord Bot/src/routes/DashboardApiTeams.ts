@@ -207,13 +207,13 @@ export default class DashboardApiTeams extends Route {
     }
 
     private async Write(access: IManageAccess, body: IBody): Promise<unknown> {
-        const { guild, actor } = access;
+        const { guild, member, actor } = access;
         const service = this.client.teamService;
         const id = Number(body.id ?? 0);
 
         switch (body.action) {
             case "settings":
-                return { ok: true, settings: await service.SaveSettings(guild, body.settings) };
+                return { ok: true, settings: await service.SaveSettings(guild, body.settings, member) };
 
             case "hub.preview": {
                 // Der Hub mit dem ungespeicherten Entwurf - Einstellungen und Kategorien -, gerechnet und gepackt wie beim Senden.
@@ -274,10 +274,10 @@ export default class DashboardApiTeams extends Route {
                 return { ok: true };
 
             case "team.create":
-                return { ok: true, team: await service.CreateTeam(guild, body.team) };
+                return { ok: true, team: await service.CreateTeam(guild, body.team, member) };
 
             case "team.save":
-                return { ok: true, team: await service.SaveTeam(guild, id, body.team) };
+                return { ok: true, team: await service.SaveTeam(guild, id, body.team, member) };
 
             case "team.delete": {
                 const cleanup = typeof body.cleanup === "object" && body.cleanup !== null ? (body.cleanup as Record<string, unknown>) : {};
@@ -290,9 +290,9 @@ export default class DashboardApiTeams extends Route {
             // Rolle und Kanaele in Discord anlegen. Ein ungespeicherter Stand
             // kommt mit - sonst hiesse die neue Rolle noch wie vor dem Umbenennen.
             case "team.setup": {
-                if (body.team !== undefined) await service.SaveTeam(guild, id, body.team);
+                if (body.team !== undefined) await service.SaveTeam(guild, id, body.team, member);
 
-                const result = await service.SetupTeam(guild, id, body.setup);
+                const result = await service.SetupTeam(guild, id, body.setup, member);
 
                 logger.user(`🛡️ Team ${id} auf ${guild.id} eingerichtet (von ${actor.id})`);
 

@@ -1536,6 +1536,31 @@ async function checkEntryButton(client: BotClient, form: IApplyForm): Promise<vo
     }
 }
 
+/** W-0116: Die Rolle bei Annahme vergibt der Bot - eine neue nur, wenn der Speichernde sie selbst vergeben dürfte. */
+async function checkActor(): Promise<void> {
+    console.log("\n  — Rolle bei Annahme nur mit eigenem Recht —");
+
+    const client = new BotClient();
+    const loose = client as unknown as Record<string, Record<string, unknown>>;
+    const service = client.applyService;
+    const guild = FakeGuild();
+    // Nur „Server verwalten“: kein „Rollen verwalten“.
+    const actor = { id: USER, guild, permissions: { has: () => false }, roles: { highest: guild.roles.cache.get(GUILD) } } as unknown as GuildMember;
+    const form = (acceptRole: string | null) => ({ ...DefaultForm(), name: "Team", settings: { ...DefaultForm().settings, acceptRole } });
+    const stored = { ...form(ROLE), id: 4, guildId: GUILD } as unknown as IApplyForm;
+
+    loose.applyForms.OfGuild = async () => [];
+    loose.applyForms.Create = async (row: object) => ({ ...stored, ...row });
+    loose.applyForms.Get = async () => stored;
+    loose.applyForms.Save = async () => undefined;
+    (service as unknown as Record<string, unknown>).RefreshPanel = async () => undefined;
+
+    await rejects("Ohne „Rollen verwalten“: neue Rolle bei Annahme abgelehnt", () => service.CreateForm(guild, actor, form(ROLE)), (error) => error.message.includes("Du darfst @Team nicht vergeben"));
+    check("Ohne Rolle bei Annahme geht das Formular", (await service.CreateForm(guild, actor, form(null)).then(() => true).catch(() => false)));
+    check("Schon gespeicherte Rolle bleibt gültig und editierbar", (await service.SaveForm(guild, 4, { ...form(ROLE), name: "Team 2" }, actor).then(() => true).catch(() => false)));
+    check("Entfernen geht immer", (await service.SaveForm(guild, 4, form(null), actor).then(() => true).catch(() => false)));
+}
+
 async function main(): Promise<void> {
     console.log("\n📋  Apply System\n");
 
@@ -1574,6 +1599,7 @@ async function main(): Promise<void> {
     await checkDmClosed(client, form);
     await checkResetPanel(client, form);
     await checkRestorePanel(client);
+    await checkActor();
 
     console.log(failures === 0 ? "\n✅ Alle Prüfungen bestanden.\n" : `\n❌ ${failures} Prüfung(en) fehlgeschlagen.\n`);
 

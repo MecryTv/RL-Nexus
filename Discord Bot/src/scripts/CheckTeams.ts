@@ -14,7 +14,7 @@ process.env.DEV_CLIENT_SECRET ||= "check-secret";
 import path from "path";
 import { existsSync } from "fs";
 import { createCanvas, loadImage } from "@napi-rs/canvas";
-import { ChannelType, Guild, GuildBasedChannel, MessageFlags, PermissionFlagsBits, Role } from "discord.js";
+import { ChannelType, Collection, Guild, GuildBasedChannel, GuildMember, MessageFlags, PermissionFlagsBits, Role } from "discord.js";
 import BotClient from "../client/BotClient";
 import { HubDoc, ChannelsText, LeaguesText, LineupText, PLAYER_FIELDS, PlayerKey, PlayerValues, RoleValues, RosterText, StaffText, HubMessages, IHubMessage, TeamCardView, TeamOwnValues, TeamValues, Formats } from "../builder/TeamView";
 import { BestPeak, CardRank, ITeamCardData, ITeamCardImages, Lines, RenderTeamCard, TeamCardWidth, TeamPlaces } from "../builder/TeamCard";
@@ -2153,6 +2153,50 @@ async function checkCategories(client: BotClient): Promise<void> {
     check("Entwurf: der Name bleibt", drafted.name === "Vyrox Main" && drafted.description === "Neu");
 }
 
+/** W-0116: Rollen im Kader und Team-Rollen vergibt der Bot - neue nur, wenn der Speichernde sie selbst vergeben dürfte. */
+async function checkActor(): Promise<void> {
+    console.log("\n  — Rollen im Kader nur mit eigenem Recht —");
+
+    const client = new BotClient();
+    const service = client.teamService;
+    const guild = Object.assign(FakeGuild(), { members: { me: { id: "90071992547409957", permissions: { has: () => true } } } });
+
+    // „Rolle anlegen“ sucht mit find - das kann erst die Collection von discord.js.
+    Object.assign(guild.roles, { cache: new Collection(guild.roles.cache) });
+
+    // Nur „Server verwalten“: kein „Rollen verwalten“.
+    const actor = { id: "90071992547409958", guild, permissions: { has: () => false }, roles: { highest: guild.roles.cache.get(GUILD) } } as unknown as GuildMember;
+    // Heißt wie die Rolle @Team: „Rolle anlegen“ nähme sonst die vorhandene.
+    const team = FakeTeam([], { id: 1, groupId: null, name: "Team", roleId: null });
+    const defaults = DefaultTeamSettings();
+    let settings = defaults;
+    const refused = async (run: () => Promise<unknown>): Promise<string> => {
+        try {
+            await run();
+
+            return "";
+        } catch (error) {
+            return error instanceof TeamError ? error.message : `kein TeamError: ${String(error)}`;
+        }
+    };
+
+    service.Settings = async () => settings;
+    Object.assign(client.moduleSettings, { Save: async (_guild: string, _module: string, config: ITeamSettings) => void (settings = config) });
+    Object.assign(client.teams, { AllOfGuild: async () => [team], Full: async () => team, Save: async () => undefined });
+
+    check("Ohne „Rollen verwalten“: neue Rolle im Kader abgelehnt", (await refused(() => service.SaveSettings(guild, { roles: { positions: { captain: ROLE } } }, actor))).includes("Du darfst @Team nicht vergeben"));
+    check("Neues Team mit Rolle: abgelehnt", (await refused(() => service.CreateTeam(guild, { name: "Neu", roleId: ROLE }, actor))).includes("@Team"));
+    const saved = await refused(() => service.SaveTeam(guild, 1, { roleId: ROLE }, actor));
+
+    check("Team bekommt eine neue Rolle: abgelehnt", saved.includes("@Team"), saved);
+    check("„Rolle anlegen“ übernimmt keine vorhandene, die man nicht selbst vergeben darf", (await refused(() => service.SetupTeam(guild, 1, { role: true }, actor))).includes("@Team"));
+
+    settings = { ...defaults, roles: { sync: false, positions: { ...defaults.roles.positions, captain: ROLE } } };
+
+    check("Schon gespeicherte Rolle bleibt gültig und editierbar", (await refused(() => service.SaveSettings(guild, { roles: { positions: { captain: ROLE, coach: null } } }, actor))) === "");
+    check("Entfernen geht immer", (await refused(() => service.SaveSettings(guild, { roles: { positions: { captain: null } } }, actor))) === "" && settings.roles.positions.captain === null);
+}
+
 async function main(): Promise<void> {
     console.log("\n🛡️  RL Team-Übersicht\n");
 
@@ -2178,6 +2222,7 @@ async function main(): Promise<void> {
     await checkPlayers(client);
     await checkTeamRank(client);
     await checkRoleIcons(client);
+    await checkActor();
 
     if (await client.databaseService.Connect()) {
         try {

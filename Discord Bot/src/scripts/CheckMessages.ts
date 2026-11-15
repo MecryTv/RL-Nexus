@@ -11,11 +11,11 @@
 process.env.CLIENT_SECRET ||= "check-secret";
 process.env.DEV_CLIENT_SECRET ||= "check-secret";
 
-import { ChannelType, Guild, GuildBasedChannel, Role } from "discord.js";
+import { ChannelType, Guild, GuildBasedChannel, GuildMember, Role } from "discord.js";
 import BotClient from "../client/BotClient";
 import { CustomMessageView } from "../builder/CustomView";
 import { DefaultEmbed, DefaultMessageDoc, DefaultResponseDoc, MAX_BUTTONS, MAX_MENU_OPTIONS, MAX_MENUS, Matches, NextRun, WEEKDAYS } from "../constants/Messages";
-import { ISchedule } from "../interfaces/services/messages/IMessages";
+import { ICustomMessage, ISchedule } from "../interfaces/services/messages/IMessages";
 import { MessageError } from "../services/MessageService";
 import { PanelsOf } from "../utils/guildpanels";
 
@@ -394,6 +394,44 @@ async function checkDatabase(client: BotClient): Promise<void> {
     check("Löschen klappt", (await client.customMessages.OfGuild(GUILD)).length === 0 && (await client.autoResponses.OfGuild(GUILD)).length === 0);
 }
 
+/** W-0116: Rollen an Knöpfen und Menüs nur mit eigenem Recht. Ersetzt die Tabelle - darum nach der Datenbank. */
+async function checkActor(client: BotClient): Promise<void> {
+    console.log("\n  — Rollen-Knöpfe nur mit eigenem Recht —");
+
+    const guild = FakeGuild();
+    const service = client.messageService;
+    // Nur „Server verwalten“: kein „Rollen verwalten“.
+    const actor = { id: USER, guild, permissions: { has: () => false }, roles: { highest: guild.roles.cache.get(GUILD) } } as unknown as GuildMember;
+    const base = { name: "Regeln", doc: DefaultMessageDoc() };
+    const button = { buttons: [{ label: "Rolle", action: "role", roleId: ROLE }] };
+    const stored = { id: 5, guildId: GUILD, messageId: null, ...service.Clean(guild, { ...base, ...button }) } as unknown as ICustomMessage;
+    const refused = async (run: () => Promise<unknown>): Promise<string> => {
+        try {
+            await run();
+
+            return "";
+        } catch (error) {
+            return error instanceof MessageError ? error.message : `kein MessageError: ${String(error)}`;
+        }
+    };
+
+    Object.assign(client.customMessages, {
+        OfGuild: async () => [],
+        Create: async (row: object) => ({ ...stored, ...row }),
+        Get: async () => stored,
+        Save: async () => undefined,
+    });
+
+    check("Ohne „Rollen verwalten“: neuer Rollen-Knopf abgelehnt", (await refused(() => service.Create(guild, { ...base, ...button }, USER, actor))).includes("Du darfst @Stammgast nicht vergeben"));
+    check(
+        "Im Auswahlmenü genauso",
+        (await refused(() => service.Create(guild, { ...base, menus: [{ placeholder: "M", options: [{ label: "R", action: "role", roleId: ROLE }] }] }, USER, actor))).includes("@Stammgast")
+    );
+    check("Knöpfe ohne Rolle gehen weiter", (await refused(() => service.Create(guild, { ...base, buttons: [{ label: "Info", action: "text", text: "Hallo" }] }, USER, actor))) === "");
+    check("Schon gespeicherter Rollen-Knopf bleibt gültig und editierbar", (await refused(() => service.Save(guild, 5, { ...base, name: "Neu", ...button }, actor))) === "");
+    check("Entfernen geht immer", (await refused(() => service.Save(guild, 5, { ...base, buttons: [] }, actor))) === "");
+}
+
 async function cleanup(client: BotClient): Promise<void> {
     await client.databaseService.Write("DELETE FROM custom_messages WHERE guild_id = ?", [GUILD]);
     await client.databaseService.Write("DELETE FROM auto_responses WHERE guild_id = ?", [GUILD]);
@@ -428,6 +466,8 @@ async function main(): Promise<void> {
     } else {
         console.log("\n  — Datenbank —\n  übersprungen: keine Verbindung (siehe Meldung oben)");
     }
+
+    await checkActor(client);
 
     console.log(failures === 0 ? "\n✅ Alle Prüfungen bestanden.\n" : `\n❌ ${failures} Prüfung(en) fehlgeschlagen.\n`);
 

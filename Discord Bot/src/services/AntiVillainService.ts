@@ -27,6 +27,7 @@ import { ScoreBook, Verdict } from "./antivillain/Score";
 import { EveryoneAttempt, Fingerprints, HopTracker, IsSleeper, NameSimilarity, NormalizeName, ScamLinks } from "./antivillain/Guards";
 import { AVATAR_SAME, AvatarHash, HasQr, HashDistance } from "./antivillain/Images";
 import { SendLog } from "../utils/logtarget";
+import { NewRoleProblem } from "../utils/rolegate";
 import { AskAdmin, IBackupCall } from "../routes/DashboardApiBackups";
 import {
     ANTI_VILLAIN_MODULE,
@@ -885,10 +886,16 @@ export default class AntiVillainService {
         };
     }
 
-    async Save(guild: Guild, input: unknown): Promise<IAntiVillainSettings> {
+    async Save(guild: Guild, input: unknown, actor: GuildMember): Promise<IAntiVillainSettings> {
         if (IsRecord(input)) await WarmLogTarget(guild, input.logChannelId);
 
-        const settings = this.Clean(guild, input, await this.Settings(guild.id));
+        const previous = await this.Settings(guild.id);
+        const settings = this.Clean(guild, input, previous);
+
+        // W-0116: Die Quarantäne-Rolle gibt der Bot bei jedem Festhalten. Neu wählen darf sie nur, wer sie selbst vergeben dürfte.
+        const problem = NewRoleProblem(actor, [settings.quarantine.roleId], [previous.quarantine.roleId]);
+
+        if (problem) throw new AntiVillainError(problem);
 
         await this.client.moduleSettings.Save(guild.id, ANTI_VILLAIN_MODULE, settings);
 

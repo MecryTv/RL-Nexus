@@ -33,6 +33,7 @@ import {
 import { DefaultMessageDoc } from "../constants/Messages";
 import { IMessageInfo, IPanelBody, ISelfRole, ISelfRolePanel, PanelKind, PanelMode } from "../interfaces/services/selfroles/ISelfRoles";
 import logger from "../utils/logger";
+import { NewRoleProblem } from "../utils/rolegate";
 import { BlockedAt } from "../utils/security";
 
 export class SelfRoleError extends Error {}
@@ -229,6 +230,13 @@ export default class SelfRoleService {
         }
     }
 
+    /** W-0116: Neue Rollen nur, wenn der Speichernde sie selbst vergeben dürfte. */
+    private CheckActor(member: GuildMember, roles: ISelfRole[], before: ISelfRole[] = []): void {
+        const problem = NewRoleProblem(member, roles.map((role) => role.roleId), before.map((role) => role.roleId));
+
+        if (problem) throw new SelfRoleError(problem);
+    }
+
     /**
      * Bei Reaktionen braucht jede Rolle ihr eigenes Emoji. Eigene Emojis nur von
      * diesem Server: für fremde bräuchte der Bot im Kanal „Externe Emojis verwenden“.
@@ -276,6 +284,9 @@ export default class SelfRoleService {
         if ((await this.Panels(guild.id)).length >= MAX_PANELS) throw new SelfRoleError(`Mehr als ${MAX_PANELS} Panels gehen nicht.`);
 
         const clean = this.Clean(guild, input);
+
+        this.CheckActor(member, clean.roles);
+
         const panel = await this.client.selfRolePanels.Create({ guildId: guild.id, createdBy: member.id, ...clean });
 
         logger.user(`🎭 Self-Role-Panel "${panel.name}" auf ${guild.id} angelegt (von ${member.id})`);
@@ -290,6 +301,8 @@ export default class SelfRoleService {
     async Save(guild: Guild, member: GuildMember, id: number, input: unknown): Promise<{ panel: ISelfRolePanel; warning: string | null }> {
         const previous = await this.Panel(guild.id, id);
         const clean = this.Clean(guild, input, previous);
+
+        this.CheckActor(member, clean.roles, previous.roles);
 
         // Steht das Panel, würde ein Wechsel der Nachricht das alte zurücklassen.
         if (previous.messageId && (clean.attached !== previous.attached || clean.targetId !== previous.targetId || (previous.attached && clean.channelId !== previous.channelId))) {

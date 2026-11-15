@@ -137,7 +137,7 @@ export default class SettingsService {
         let warning: string | null;
 
         try {
-            warning = await panel.save(this.client, guild, field.set(value, settings));
+            warning = await panel.save(this.client, guild, field.set(value, settings), member);
         } catch (error) {
             if (MODULE_ERRORS.some((type) => error instanceof type)) throw new PanelError((error as Error).message);
 

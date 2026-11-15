@@ -8,6 +8,7 @@ import { CleanPositions, DefaultDoc, DefaultWelcomeConfig, FONT_LABELS, LAYOUT_L
 import { IWelcomeCard, IWelcomeConfig, IWelcomeMessage, IWelcomePositions, WelcomeFont, WelcomeKind, WelcomeLayout } from "../interfaces/services/welcome/IWelcome";
 import { ICustomEmbed } from "../interfaces/services/messages/IMessages";
 import logger from "../utils/logger";
+import { NewRoleProblem } from "../utils/rolegate";
 
 export class WelcomeError extends Error {}
 
@@ -139,10 +140,17 @@ export default class WelcomeService {
         return source ? ResolveImagePath(source) : null;
     }
 
-    async Save(guild: Guild, input: unknown): Promise<IWelcomeConfig> {
-        const config = this.Clean(guild, input, await this.Settings(guild.id));
+    async Save(guild: Guild, input: unknown, actor: GuildMember): Promise<IWelcomeConfig> {
+        const previous = await this.Settings(guild.id);
+        const config = this.Clean(guild, input, previous);
 
         this.CheckRoles(guild, [...config.roles, ...config.botRoles]);
+
+        // W-0116: Neue Auto-Rollen nur, wenn der Speichernde sie selbst vergeben dürfte.
+        const problem = NewRoleProblem(actor, [...config.roles, ...config.botRoles], [...previous.roles, ...previous.botRoles]);
+
+        if (problem) throw new WelcomeError(problem);
+
         await this.client.moduleSettings.Save(guild.id, WELCOME_MODULE, config);
 
         return config;

@@ -80,7 +80,7 @@ export const AntiVillainPanel: IPanelModule<S> = {
     async load(client, guild) {
         return { ...(await client.antiVillainService.Settings(guild.id)), intent: client.config.GUILD_MEMBER_INTENT === true };
     },
-    async save(client, guild, patch) {
+    async save(client, guild, patch, member) {
         const { raid, quarantine } = patch as Partial<S>;
 
         // Clean ließe den Schalter ohne Intent still aus, das Dashboard sperrt ihn: hier ein Satz.
@@ -93,7 +93,7 @@ export const AntiVillainPanel: IPanelModule<S> = {
 
         if (role?.managed) throw new PanelError(`@${role.name} gehört zu einer App oder zu Discord, die kann der Bot niemandem geben. Nimm eine andere Quarantäne-Rolle.`);
 
-        const { quarantine: saved, bait } = await client.antiVillainService.Save(guild, patch);
+        const { quarantine: saved, bait } = await client.antiVillainService.Save(guild, patch, member);
 
         // W-0063: Die Stufe steht im Bild der Warnung (festhalten oder nur melden).
         if ("level" in patch) await client.antiVillainService.UpdateBait(guild).catch(() => undefined);

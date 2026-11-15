@@ -94,16 +94,16 @@ export default class DashboardApiMessages extends Route {
     }
 
     private async Write(access: IManageAccess, body: IBody): Promise<unknown> {
-        const { guild, actor } = access;
+        const { guild, member, actor } = access;
         const service = this.client.messageService;
         const id = Number(body.id);
 
         switch (body.action) {
             case "create":
-                return { ok: true, message: this.Out(await service.Create(guild, body.message, actor.id), access) };
+                return { ok: true, message: this.Out(await service.Create(guild, body.message, actor.id, member), access) };
 
             case "save": {
-                const saved = await service.Save(guild, id, body.message);
+                const saved = await service.Save(guild, id, body.message, member);
 
                 logger.user(`✉️ Nachricht "${saved.name}" auf ${guild.id} gespeichert (von ${actor.id})`);
 

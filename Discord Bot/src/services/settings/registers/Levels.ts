@@ -89,9 +89,9 @@ export const LevelsPanel: IPanelModule<S> = {
     load(client, guild) {
         return client.levelService.Settings(guild.id);
     },
-    async save(client, guild, patch) {
+    async save(client, guild, patch, member) {
         const before = (await client.levelService.Settings(guild.id)).boardPost;
-        const settings = await client.levelService.Save(guild, patch);
+        const settings = await client.levelService.Save(guild, patch, member);
 
         // Wie im Dashboard: Rangliste an, aus oder in einem anderen Kanal ist gleich sichtbar, nicht erst nach 10 Minuten.
         if (JSON.stringify(before) !== JSON.stringify(settings.boardPost)) {

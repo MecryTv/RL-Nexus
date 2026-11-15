@@ -45,8 +45,8 @@ export const WelcomePanel: IPanelModule<S> = {
     load(client, guild) {
         return client.welcomeService.Settings(guild.id);
     },
-    async save(client, guild, patch) {
-        await client.welcomeService.Save(guild, patch);
+    async save(client, guild, patch, member) {
+        await client.welcomeService.Save(guild, patch, member);
 
         return null;
     },

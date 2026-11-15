@@ -50,6 +50,7 @@ import {
 } from "../interfaces/services/messages/IMessages";
 import { IMessageDoc } from "../interfaces/builder/IMessageDoc";
 import logger from "../utils/logger";
+import { NewRoleProblem } from "../utils/rolegate";
 
 export class MessageError extends Error {}
 
@@ -66,6 +67,11 @@ function Source(entry: { id: number; kind: MessageKind; content: string; embed: 
 
 /** Was ein Knopf und ein Menü-Eintrag gemeinsam haben (W-0091). */
 type Target = Pick<ICustomButton, "label" | "emoji" | "action" | "roleId" | "mode" | "url" | "text" | "messageId">;
+
+/** W-0116: Die Rollen, die Knöpfe und Menüs beim Klick vergeben. */
+function RoleIds(entry: { buttons?: ICustomButton[]; menus?: ICustomMenu[] } | undefined): (string | null)[] {
+    return [...(entry?.buttons ?? []), ...(entry?.menus ?? []).flatMap((menu) => menu.options)].map((target) => target.roleId);
+}
 
 /** Eine kurze ID, die so in der Custom-ID oder als Wert im Menü steht; doppelte bekommen ein x. */
 function UniqueId(value: unknown, seen: Set<string>, fallback: string): string {
@@ -313,19 +319,23 @@ export default class MessageService {
         return schedule;
     }
 
-    async Create(guild: Guild, input: unknown, userId: string): Promise<ICustomMessage> {
+    async Create(guild: Guild, input: unknown, userId: string, actor: GuildMember): Promise<ICustomMessage> {
         if ((await this.client.customMessages.OfGuild(guild.id)).length >= MAX_MESSAGES) {
             throw new MessageError(`Mehr als ${MAX_MESSAGES} Nachrichten gehen je Server nicht.`);
         }
 
         const clean = this.Clean(guild, input);
 
+        this.CheckRoles(actor, clean);
+
         return this.client.customMessages.Create({ guildId: guild.id, ...clean, createdBy: userId });
     }
 
-    async Save(guild: Guild, id: number, input: unknown): Promise<ICustomMessage> {
+    async Save(guild: Guild, id: number, input: unknown, actor: GuildMember): Promise<ICustomMessage> {
         const message = await this.Own(guild, id);
         const clean = this.Clean(guild, input, message);
+
+        this.CheckRoles(actor, clean, message);
 
         await this.client.customMessages.Save(id, clean);
 
@@ -335,6 +345,16 @@ export default class MessageService {
         if (saved.messageId) await this.Update(guild, saved).catch(() => undefined);
 
         return saved;
+    }
+
+    /**
+     * W-0116: Neue Rollen an Knöpfen und Menüs nur, wenn der Speichernde sie
+     * selbst vergeben dürfte. Beim Klick prüft dann nur noch der Bot.
+     */
+    private CheckRoles(actor: GuildMember, clean: { buttons: ICustomButton[]; menus: ICustomMenu[] }, previous?: ICustomMessage): void {
+        const problem = NewRoleProblem(actor, RoleIds(clean), RoleIds(previous));
+
+        if (problem) throw new MessageError(problem);
     }
 
     private async Own(guild: Guild, id: number): Promise<ICustomMessage> {

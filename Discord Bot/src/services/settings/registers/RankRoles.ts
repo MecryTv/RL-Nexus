@@ -35,9 +35,9 @@ export const RankRolesPanel: IPanelModule<S> = {
     load(client, guild) {
         return client.rankRoleService.Settings(guild.id);
     },
-    async save(client, guild, patch) {
+    async save(client, guild, patch, member) {
         try {
-            await client.rankRoleService.SaveSettings(guild, patch);
+            await client.rankRoleService.SaveSettings(guild, patch, member);
         } catch (error) {
             if (error instanceof RankRoleError) throw new PanelError(error.message);
 

@@ -57,10 +57,10 @@ export const TeamsPanel: IPanelModule<S> = {
     load(client, guild) {
         return client.teamService.Settings(guild.id);
     },
-    async save(client, guild, patch) {
+    async save(client, guild, patch, member) {
         // SaveSettings gibt die Rollen gleich an die Kader, wie im Dashboard.
         try {
-            await client.teamService.SaveSettings(guild, patch);
+            await client.teamService.SaveSettings(guild, patch, member);
         } catch (error) {
             if (error instanceof TeamError) throw new PanelError(error.message);
 

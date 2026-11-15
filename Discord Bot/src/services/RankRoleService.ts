@@ -4,6 +4,7 @@ import { DefaultRankRoleSettings, EmptyPlaylist, PLAYLISTS, RANK_ROLES_MODULE, S
 import { IPrimeProfile } from "../interfaces/services/prime/IPrimeService";
 import { IRankRoleChange, IRankRoleResult, IRankRoleSettings, Playlist } from "../interfaces/services/rankroles/IRankRoles";
 import logger from "../utils/logger";
+import { NewRoleProblem } from "../utils/rolegate";
 
 export class RankRoleError extends Error {}
 
@@ -69,8 +70,13 @@ export default class RankRoleService {
         };
     }
 
-    async SaveSettings(guild: Guild, input: unknown): Promise<IRankRoleSettings> {
-        const settings = this.CleanSettings(guild, input, await this.Settings(guild.id));
+    async SaveSettings(guild: Guild, input: unknown, actor: GuildMember): Promise<IRankRoleSettings> {
+        const previous = await this.Settings(guild.id);
+        const settings = this.CleanSettings(guild, input, previous);
+        // W-0116: Neue Rang-Rollen nur, wenn der Speichernde sie selbst vergeben dürfte.
+        const problem = NewRoleProblem(actor, this.Managed(settings), this.Managed(previous));
+
+        if (problem) throw new RankRoleError(problem);
 
         await this.client.moduleSettings.Save(guild.id, RANK_ROLES_MODULE, settings);
 

@@ -26,9 +26,9 @@ export const TwitchPanel: IPanelModule<S> = {
     load(client, guild) {
         return client.streamService.TwitchSettings(guild.id);
     },
-    async save(client, guild, patch) {
+    async save(client, guild, patch, member) {
         try {
-            await client.streamService.SaveTwitchSettings(guild, patch);
+            await client.streamService.SaveTwitchSettings(guild, patch, member);
         } catch (error) {
             if (error instanceof StreamError) throw new PanelError(error.message);
 

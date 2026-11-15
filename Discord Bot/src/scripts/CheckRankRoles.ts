@@ -329,6 +329,39 @@ async function checkApply(client: BotClient): Promise<void> {
     check("Kein verknüpftes Konto: /rank me bleibt still, ohne Fehler", (await service.AfterRankMe(FakeMember(FakeGuild(), []).member, shown)) === null);
 }
 
+/** W-0116: Neue Rang-Rollen nur, wenn der Speichernde sie selbst vergeben dürfte. */
+async function checkActor(client: BotClient): Promise<void> {
+    console.log("\n  — Rang-Rollen nur mit eigenem Recht —");
+
+    const guild = Object.assign(FakeGuild(), { ownerId: "1" });
+    const service = client.rankRoleService;
+    const empty = { on: false, roles: {} };
+    let stored = Settings({ playlists: { "1v1": empty, "2v2": empty, "3v3": empty } });
+    // Die höchste Rolle des Verwalters ist MID (4): LOW (3) liegt darunter, MID selbst nicht.
+    const actor = (id: string, manage: boolean) => ({ id, guild, permissions: { has: () => manage }, roles: { highest: guild.roles.cache.get(MID) } }) as unknown as GuildMember;
+    const refused = async (input: object, member: GuildMember): Promise<string> => {
+        try {
+            await service.SaveSettings(guild, input, member);
+
+            return "";
+        } catch (error) {
+            return error instanceof RankRoleError ? error.message : `kein RankRoleError: ${String(error)}`;
+        }
+    };
+    const one = (roleId: string) => ({ playlists: { "1v1": { on: true, roles: { t14: roleId } } } });
+
+    service.Settings = async () => stored;
+    Object.assign(client.moduleSettings, { Save: async () => undefined });
+
+    check("Ohne „Rollen verwalten“: neue Rang-Rolle abgelehnt", (await refused(one(LOW), actor("2", false))).includes("Du darfst @rolle-64 nicht vergeben"));
+    check("Gleich hoch wie die eigene höchste Rolle: abgelehnt", (await refused(one(MID), actor("2", true))).includes("@rolle-67"));
+    check("Darunter mit „Rollen verwalten“: geht", (await refused(one(LOW), actor("2", true))) === "");
+    check("Der Owner darf es ohne", (await refused(one(MID), actor("1", false))) === "");
+
+    stored = Settings();
+    check("Schon gespeicherte Rollen bleiben gültig und editierbar", (await refused({ playlists: { "3v3": { on: false, roles: { t14: LOW, t17: MID } } }, replace: true }, actor("2", false))) === "");
+}
+
 async function main(): Promise<void> {
     console.log("\n🎖️  Rank Roles\n");
 
@@ -337,6 +370,7 @@ async function main(): Promise<void> {
     checkSteps();
     checkClean(client);
     await checkApply(client);
+    await checkActor(client);
 
     console.log(failures === 0 ? "\n✅ Alle Prüfungen bestanden.\n" : `\n❌ ${failures} Prüfung(en) fehlgeschlagen.\n`);
 

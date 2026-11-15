@@ -112,7 +112,7 @@ export default class DashboardApiStreams extends Route {
     }
 
     private async Write(access: IManageAccess, platform: StreamPlatform, body: IBody): Promise<unknown> {
-        const { guild, actor } = access;
+        const { guild, member, actor } = access;
         const service = this.client.streamService;
         const id = Number(body.id);
 
@@ -144,7 +144,7 @@ export default class DashboardApiStreams extends Route {
             case "settings":
                 return {
                     ok: true,
-                    settings: platform === "twitch" ? await service.SaveTwitchSettings(guild, body.settings) : await service.SaveYouTubeSettings(guild, body.settings),
+                    settings: platform === "twitch" ? await service.SaveTwitchSettings(guild, body.settings, member) : await service.SaveYouTubeSettings(guild, body.settings, member),
                 };
 
             case "members": {
