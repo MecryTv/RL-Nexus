@@ -19,10 +19,11 @@ export default class Unban extends Command {
     }
 
     async AutoComplete(interaction: AutocompleteInteraction): Promise<void> {
+        // W-0120: Die Bannliste sieht nur, wer entbannen darf.
+        if (!interaction.inCachedGuild() || !(await this.client.moderationService.Allowed(interaction.member, "unban"))) return void (await interaction.respond([]).catch(() => undefined));
+
         const guild = interaction.guild;
         const typed = interaction.options.getFocused().trim().toLowerCase();
-
-        if (!guild) return;
 
         // Einmal holen, danach hält discord.js die Liste über die Ban-Events aktuell.
         if (guild.bans.cache.size === 0) await guild.bans.fetch({ limit: 1000 }).catch(() => null);

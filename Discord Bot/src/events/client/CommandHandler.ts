@@ -1,4 +1,4 @@
-import { Collection, Events, Interaction } from "discord.js";
+import { AutocompleteInteraction, Collection, Events, Interaction } from "discord.js";
 import BotClient from "../../client/BotClient";
 import Event from "../../structures/Event";
 import Command from "../../structures/Command";
@@ -20,7 +20,12 @@ export default class CommandHandler extends Event {
         if (interaction.isAutocomplete()) {
             const target = this.client.commands.get(interaction.commandName);
 
-            await target?.AutoComplete(interaction).catch((error) =>
+            if (!target) return;
+
+            // W-0120: Vorschläge zeigen Daten (Bannliste, Verwarnungen) - darum dieselben Prüfungen wie beim Ausführen.
+            if (!(await this.MaySuggest(interaction, target))) return void (await interaction.respond([]).catch(() => undefined));
+
+            await target.AutoComplete(interaction).catch((error) =>
                 logger.warn(`[CommandHandler] AutoComplete /${interaction.commandName} fehlgeschlagen: ${error}`)
             );
 
@@ -100,5 +105,15 @@ export default class CommandHandler extends Event {
             const normalized = error instanceof Error ? error : new Error(String(error));
             await this.client.guardian.ReportError(normalized, interaction, `Command Error: /${command.name}`);
         }
+    }
+
+    /** W-0120: Nur Entwickler bei Entwickler-Befehlen, Zugang zum Server, dazu die Standardrechte des Befehls. */
+    private async MaySuggest(interaction: AutocompleteInteraction, command: Command): Promise<boolean> {
+        if (command.developerOnly && !this.client.config.DEV_USER_IDs.includes(interaction.user.id)) return false;
+        if (interaction.inCachedGuild() && !command.developerOnly && !(await CommandsAllowed(this.client, interaction.guild, interaction.user.id))) return false;
+
+        const needed = command.data.default_member_permissions;
+
+        return !needed || interaction.memberPermissions?.has(BigInt(needed)) === true;
     }
 }

@@ -21,7 +21,10 @@ export default class Unwarn extends Command {
 
     /** Die aktiven Verwarnungen - die des gewählten Users, sonst die neuesten des Servers. */
     async AutoComplete(interaction: AutocompleteInteraction): Promise<void> {
-        if (!interaction.guildId || !this.client.databaseService.Ready) return;
+        // W-0120: Verwarnungen samt Grund sieht nur, wer sie zurücknehmen darf.
+        if (!interaction.inCachedGuild() || !this.client.databaseService.Ready || !(await this.client.moderationService.Allowed(interaction.member, "unwarn"))) {
+            return void (await interaction.respond([]).catch(() => undefined));
+        }
 
         const userId = interaction.options.get("user")?.value;
         const typed = String(interaction.options.getFocused()).replace("#", "");

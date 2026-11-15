@@ -87,6 +87,8 @@ export default class Poll extends Command {
                 : interaction.reply({ ...InfoCard(text, accent), flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral });
 
         if (!guild) return void (await say("Nur auf einem Server."));
+        // W-0120: Die Standardrechte des Befehls lassen sich in den Integrationen ändern - darum hier noch einmal.
+        if (interaction.user.id !== guild.ownerId && !interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) return void (await say("Dafür brauchst du „Server verwalten“.", "#ff4d5e"));
         if (!this.client.databaseService.Ready) return void (await say("Die Datenbank ist gerade nicht erreichbar.", "#ff4d5e"));
         if (!(await this.client.settings.Of(guild.id)).modules.includes(POLLS_MODULE)) {
             return void (await say("Das Modul Umfragen ist aus. Einschalten kannst du es im Dashboard oder mit `/module an modul:polls`.", "#ffc53d"));

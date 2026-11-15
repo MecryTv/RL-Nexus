@@ -14,7 +14,7 @@
 process.env.CLIENT_SECRET ||= "check-secret";
 process.env.DEV_CLIENT_SECRET ||= "check-secret";
 
-import { ChannelType, Guild, GuildBasedChannel, GuildMember, Role } from "discord.js";
+import { ChannelType, ChatInputCommandInteraction, Guild, GuildBasedChannel, GuildMember, PermissionFlagsBits, Role } from "discord.js";
 import BotClient from "../client/BotClient";
 import { GiveawayCard, PollCard, StreamCard, TwitchSummary, VoteReply, WinnerDm } from "../builder/CommunityView";
 import { DefaultMessage, DefaultStreamConfig, TwitchLogin, YouTubeChannelId, YouTubeLookupUrl } from "../constants/Streams";
@@ -24,6 +24,8 @@ import { IGiveaway, IPoll, IStreamNotifier } from "../interfaces/services/commun
 import { BOOSTER, DrawWeighted } from "../services/GiveawayService";
 import { StreamError } from "../services/StreamService";
 import { Decode, ParseFeed } from "../utils/youtube";
+import Giveaway from "../commands/admin/Giveaway";
+import Poll from "../commands/admin/Poll";
 
 // Erfundene Snowflakes - 17-stellig wie echte, aber es gibt sie bei Discord nicht.
 const GUILD = "90071992547409971";
@@ -625,6 +627,39 @@ async function checkActor(client: BotClient): Promise<void> {
     check("Entfernen geht immer", (await refused(() => service.SaveTwitchSettings(guild, { liveRoleId: null }, actor))) === "");
 }
 
+/** W-0120: /giveaway und /umfrage prüfen „Server verwalten“ selbst - die Standardrechte lassen sich in Discord ändern. */
+async function checkCommandRights(): Promise<void> {
+    console.log("\n  — W-0120: /giveaway und /umfrage nur mit „Server verwalten“ —");
+
+    const OWNER = "90071992547409977";
+    // Ohne Datenbank: Wer an den Rechten vorbeikommt, landet bei diesem Satz, und sonst passiert nichts.
+    const client = { databaseService: { Ready: false } } as unknown as BotClient;
+    const run = async (command: Giveaway | Poll, user: string, manage: boolean): Promise<string> => {
+        const replies: string[] = [];
+        const record = async (payload: unknown) => void replies.push(JSON.stringify(payload));
+
+        await command.Execute({
+            guild: { id: GUILD, ownerId: OWNER },
+            user: { id: user },
+            memberPermissions: { has: (flag: bigint) => manage && flag === PermissionFlagsBits.ManageGuild },
+            deferred: false,
+            replied: false,
+            reply: record,
+            editReply: record,
+        } as unknown as ChatInputCommandInteraction);
+
+        return replies.join(" ");
+    };
+
+    for (const command of [new Giveaway(client), new Poll(client)]) {
+        const refused = await run(command, USER, false);
+
+        check(`/${command.name} ohne „Server verwalten“: abgelehnt`, refused.includes("Server verwalten") && !refused.includes("Datenbank"), refused.slice(0, 200));
+        check(`/${command.name} mit „Server verwalten“: geht weiter`, (await run(command, USER, true)).includes("Datenbank"));
+        check(`/${command.name} als Owner: geht weiter`, (await run(command, OWNER, false)).includes("Datenbank"));
+    }
+}
+
 async function main(): Promise<void> {
     console.log("\n📣 Notifier, Umfragen und Giveaways\n");
 
@@ -639,6 +674,7 @@ async function main(): Promise<void> {
     await checkGiveaways(client);
     await checkDraw();
     await checkViews(client);
+    await checkCommandRights();
 
     if (await client.databaseService.Connect()) {
         try {

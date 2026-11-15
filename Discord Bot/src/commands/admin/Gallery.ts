@@ -22,7 +22,11 @@ export default class Gallery extends Command {
     }
 
     async Execute(interaction: ChatInputCommandInteraction): Promise<void> {
-        if (!interaction.guildId) return;
+        if (!interaction.guildId || !interaction.guild) return;
+        // W-0120: Die Standardrechte des Befehls lassen sich in den Integrationen ändern - darum hier noch einmal.
+        if (interaction.user.id !== interaction.guild.ownerId && !interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)) {
+            return void (await interaction.reply({ content: "Die Bild-Verwaltung ist nur für Administratoren.", flags: MessageFlags.Ephemeral }));
+        }
 
         const state = NewPanelState(interaction.guildId);
         const view = await RenderPanel(this.client, state);

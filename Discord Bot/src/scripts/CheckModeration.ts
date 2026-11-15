@@ -14,7 +14,7 @@ process.env.DEV_CLIENT_SECRET ||= "check-secret";
 
 import path from "path";
 import { readdir, rm } from "node:fs/promises";
-import { ChannelType, Guild, GuildBasedChannel, GuildMember, Message, Role } from "discord.js";
+import { ChannelType, Guild, GuildBasedChannel, GuildMember, Interaction, Message, PermissionFlagsBits, Role } from "discord.js";
 import { SetEmojiLoader } from "../builder/HelpImage";
 import { CaseBlocks, CaseCard, EvidenceView, ReadCaseId } from "../builder/ModerationCard";
 import BotClient from "../client/BotClient";
@@ -34,7 +34,12 @@ import {
     StageFor,
 } from "../constants/Moderation";
 import { IModCase, IModEvidence } from "../interfaces/services/moderation/IModeration";
-import { AttachmentFault, ModerationError, ProofRefusal } from "../services/ModerationService";
+import ModerationService, { AttachmentFault, ModerationError, ProofRefusal } from "../services/ModerationService";
+import CommandHandler from "../events/client/CommandHandler";
+import Command from "../structures/Command";
+import Unban from "../commands/moderation/Unban";
+import Unwarn from "../commands/moderation/Unwarn";
+import Giveaway from "../commands/admin/Giveaway";
 import { ActInput } from "../routes/DashboardApiModeration";
 import { IsLogTarget } from "../utils/logtarget";
 import { ReadDuration } from "../utils/modcommand";
@@ -715,6 +720,81 @@ async function cleanup(client: BotClient): Promise<void> {
     check("Aufgeräumt", (await client.modCases.List(GUILD, {}, null, 10)).length === 0);
 }
 
+/** W-0120: Vorschläge laufen durch dieselben Prüfungen wie der Befehl, /unban und /unwarn zeigen sie nur dem Team. */
+async function checkAutocomplete(): Promise<void> {
+    console.log("\n  — W-0120: Vorschläge nur mit Recht —");
+
+    const DEV = "90071992547409989";
+    // Ein eigener Server für „ohne Zugang“: CommandsAllowed merkt sich das Ergebnis je Server.
+    const LOCKED = "90071992547409980";
+    let paywall = false;
+    const commands = new Map<string, Command>();
+    const client = {
+        config: { DEV_USER_IDs: [DEV] },
+        commands,
+        databaseService: { Ready: true, One: async () => null },
+        settings: { Of: async () => ({ moderators: { users: [], roles: [] } }) },
+        dashboardService: { BetaMode: async () => false, Paywall: async () => paywall, ShopAccess: async () => ({ allowed: false }) },
+        staffGrantService: { Askees: async () => ({ users: [] }) },
+        modCases: { List: async () => [SampleCase({ number: 3, reason: "Spam im Chat" })] },
+    } as unknown as BotClient;
+
+    Object.assign(client, { moderationService: new ModerationService(client) });
+
+    for (const command of [new Unban(client), new Unwarn(client), new Giveaway(client), Object.assign(new Unban(client), { name: "dev-unban", developerOnly: true })]) commands.set(command.name, command);
+
+    const handler = new CommandHandler(client);
+    /** Was der Bot vorschlägt: je Antwort die Liste. */
+    const suggest = async (commandName: string, perms: bigint[] = [], who: { user?: string; guildId?: string } = {}) => {
+        const userId = who.user ?? MOD;
+        const has = (flag: bigint) => perms.includes(flag);
+        const guild = { id: who.guildId ?? GUILD, ownerId: "90071992547409990", members: { cache: new Map<string, unknown>() }, bans: { cache: new Map([[USER, { user: { id: USER, username: "spammer" } }]]), fetch: async () => null } };
+        const member = { id: userId, guild, displayName: "Mod", permissions: { has }, roles: { cache: new Map() } };
+        const out: { name: string; value: unknown }[][] = [];
+
+        guild.members.cache.set(userId, member);
+        await handler.Execute({
+            commandName,
+            isAutocomplete: () => true,
+            inCachedGuild: () => true,
+            guild,
+            guildId: guild.id,
+            member,
+            user: { id: userId },
+            memberPermissions: { has },
+            options: { getFocused: () => "", get: () => undefined },
+            respond: async (choices: { name: string; value: unknown }[]) => void out.push(choices),
+        } as unknown as Interaction);
+
+        return out;
+    };
+    const empty = (out: unknown[][]) => out.length === 1 && out[0]!.length === 0;
+
+    const unbanNone = await suggest("unban");
+    const unbanMod = await suggest("unban", [PermissionFlagsBits.BanMembers]);
+    check("/unban ohne Recht: keine Bannliste", empty(unbanNone), JSON.stringify(unbanNone));
+    check("/unban mit „Mitglieder bannen“: die Bannliste", unbanMod[0]?.[0]?.value === USER, JSON.stringify(unbanMod));
+
+    const unwarnNone = await suggest("unwarn");
+    const unwarnMod = await suggest("unwarn", [PermissionFlagsBits.ModerateMembers]);
+    check("/unwarn ohne Recht: keine Verwarnungen", empty(unwarnNone), JSON.stringify(unwarnNone));
+    check("/unwarn mit „Mitglieder moderieren“: die Verwarnungen mit Grund", unwarnMod[0]?.[0]?.name.includes("Spam im Chat") === true, JSON.stringify(unwarnMod));
+
+    const giveawayNone = await suggest("giveaway");
+    const giveawayManage = await suggest("giveaway", [PermissionFlagsBits.ManageGuild]);
+    check("Standardrechte des Befehls: /giveaway ohne „Server verwalten“ schlägt nichts vor", empty(giveawayNone), JSON.stringify(giveawayNone));
+    check("Standardrechte des Befehls: mit „Server verwalten“ die Vorschläge", (giveawayManage[0]?.length ?? 0) > 0, JSON.stringify(giveawayManage));
+
+    const devOther = await suggest("dev-unban", [PermissionFlagsBits.BanMembers]);
+    const devSelf = await suggest("dev-unban", [PermissionFlagsBits.BanMembers], { user: DEV });
+    check("Entwickler-Befehl: Vorschläge nur für Entwickler", empty(devOther) && (devSelf[0]?.length ?? 0) > 0, `${JSON.stringify(devOther)} ${JSON.stringify(devSelf)}`);
+
+    paywall = true;
+    const locked = await suggest("unban", [PermissionFlagsBits.BanMembers], { guildId: LOCKED });
+    paywall = false;
+    check("Server ohne Zugang: keine Vorschläge", empty(locked), JSON.stringify(locked));
+}
+
 async function main(): Promise<void> {
     console.log("\n🛡️ Moderation\n");
 
@@ -729,6 +809,7 @@ async function main(): Promise<void> {
     checkProof(client);
     await checkProofGate(client);
     await checkCard();
+    await checkAutocomplete();
 
     if (await client.databaseService.Connect()) {
         try {
