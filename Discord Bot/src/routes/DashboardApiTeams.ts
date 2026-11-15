@@ -344,6 +344,11 @@ export default class DashboardApiTeams extends Route {
                 if (!/^\d{17,20}$/.test(userId)) throw new TeamError("Das ist keine Mitglieds-ID.");
                 if (!this.client.databaseService.Ready) return { epicName: null };
 
+                // W-0121: Nur für Mitglieder dieses Servers - sonst dieselbe Antwort wie ohne verknüpftes Konto.
+                const member = guild.members.cache.get(userId) ?? (await guild.members.fetch(userId).catch(() => null));
+
+                if (!member) return { epicName: null };
+
                 const account = await this.client.accounts.On(userId, "epic");
 
                 return { epicName: account?.display_name ?? null };

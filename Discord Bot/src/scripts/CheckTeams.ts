@@ -46,7 +46,7 @@ import {
 import { IconImage, RANK_ICON_FILES, RANK_ICON_ROOT, RankIconImage, RankIconName, ROLE_ICON_COLORS, ROLE_ICON_FILES, ROLE_ICON_ROOT, RoleBadge, RoleIconImage, RoleIconName } from "../services/RankIconService";
 import { IsImageFile } from "../constants/Gallery";
 import { ITeam, ITeamGroup, ITeamPlayer, ITeamSettings, ITeamView, TeamRole } from "../interfaces/services/teams/ITeams";
-import { HubParts } from "../routes/DashboardApiTeams";
+import DashboardApiTeams, { HubParts } from "../routes/DashboardApiTeams";
 import { ApplyCategoryDraft, ParseCategoryDraft, EmojiId, NeedsResend, NormalizeTeamSettings, RolePlan, RoleTargets, SameMessage, TeamError, TeamOverwrites, TextName, ViewFacts } from "../services/TeamService";
 import { Evaluate, FormulaError } from "../utils/formula";
 
@@ -2197,6 +2197,38 @@ async function checkActor(): Promise<void> {
     check("Entfernen geht immer", (await refused(() => service.SaveSettings(guild, { roles: { positions: { captain: null } } }, actor))) === "" && settings.roles.positions.captain === null);
 }
 
+/** W-0121: Das verknüpfte Epic-Konto gibt es im Dashboard nur zu Mitgliedern dieses Servers. */
+async function checkEpic(): Promise<void> {
+    console.log("\n  — W-0121: Epic-Konto nur zu Mitgliedern —");
+
+    const FETCHED = "90071992547409971";
+    const CACHED = "90071992547409972";
+    const STRANGER = "90071992547409973";
+    const asked: string[] = [];
+    const client = {
+        databaseService: { Ready: true },
+        accounts: { On: async (userId: string) => (asked.push(userId), { display_name: `epic-${userId.slice(-2)}` }) },
+    } as unknown as BotClient;
+    const guild = Object.assign(FakeGuild(), {
+        members: {
+            cache: new Map([[CACHED, { id: CACHED }]]),
+            fetch: async (id: string) => {
+                if (id !== FETCHED) throw new Error("Unknown Member");
+
+                return { id };
+            },
+        },
+    });
+    const route = new DashboardApiTeams(client) as unknown as { Write: (access: unknown, body: unknown) => Promise<{ epicName: string | null }> };
+    const epic = (userId: string) => route.Write({ guild, member: {}, actor: {} }, { action: "epic", userId });
+
+    const stranger = await epic(STRANGER);
+
+    check("Nicht auf dem Server: dieselbe leere Antwort wie ohne Konto, nichts nachgeschlagen", JSON.stringify(stranger) === JSON.stringify({ epicName: null }) && !asked.includes(STRANGER), JSON.stringify(stranger));
+    check("Mitglied im Speicher: der Epic-Name", (await epic(CACHED)).epicName === "epic-72");
+    check("Mitglied, das erst geholt wird: der Epic-Name", (await epic(FETCHED)).epicName === "epic-71");
+}
+
 async function main(): Promise<void> {
     console.log("\n🛡️  RL Team-Übersicht\n");
 
@@ -2223,6 +2255,7 @@ async function main(): Promise<void> {
     await checkTeamRank(client);
     await checkRoleIcons(client);
     await checkActor();
+    await checkEpic();
 
     if (await client.databaseService.Connect()) {
         try {
