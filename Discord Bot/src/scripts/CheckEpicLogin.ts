@@ -249,9 +249,9 @@ async function checkPages(): Promise<void> {
 
     const hostile = EpicFailPage("<b>x</b>", "<script>alert(1)</script>", "a & b", { name: "<img onerror=1>", avatar: null });
 
-    check("Fehlerseite maskiert Titel, Text und Namen", !hostile.TITLE.includes("<b>") && !hostile.TEXT.includes("<script") && !hostile.WHO.includes("<img onerror"));
+    check("Fehlerseite maskiert Titel, Text und Namen", !hostile.TITLE.includes("<b>") && !hostile.TEXT.includes("<script") && !hostile.DISCORD.includes("<img onerror"));
 
-    const done = EpicDonePage(null, "<Nova>", ["3v3 Grand Champion II"], Date.UTC(2026, 10, 19, 12));
+    const done = EpicDonePage(null, "<Nova>", [{ mode: "3v3", tier: 20, name: "Grand Champion II" }], Date.UTC(2026, 10, 19, 12));
 
     check("Fertig-Seite maskiert den Epic-Namen", done.TEXT.includes("&lt;Nova&gt;") && !done.TEXT.includes("<Nova>"));
 

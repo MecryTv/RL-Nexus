@@ -135,7 +135,10 @@ export default class EpicCallback extends Route {
 
         logger.user(`🎮 Epic verknüpft (Login${keepChangedAt ? ", Korrektur" : ""}): ${userId} → ${adopted.name} (${epic.accountId})`);
 
-        const ranks = (adopted.profile?.ranks ?? []).filter((rank) => !rank.placement && rank.mmr > 0).map((rank) => `${rank.key} ${rank.tierName}`);
+        const ranks = (adopted.profile?.ranks ?? [])
+            .filter((rank) => !rank.placement && rank.mmr > 0)
+            // 1v1, 2v2, 3v3 kurz, Extra-Modi und Turniere mit ihrem Namen.
+            .map((rank) => ({ mode: /^\dv\d$/.test(rank.key) ? rank.key : rank.label, tier: rank.tier, name: rank.tierName }));
         // Ab hier gilt, was jetzt in der Zeile steht: neu verbunden, korrigiert oder dasselbe Konto bestätigt.
         const changed = current && (!swapped || keepChangedAt) ? new Date(current.changed_at).getTime() : Date.now();
         const fixUntil = changed + LINK_FIX > Date.now() ? changed + LINK_FIX : null;
