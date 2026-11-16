@@ -1,5 +1,6 @@
 import { Guild, GuildMember, PermissionFlagsBits } from "discord.js";
 import BotClient from "../client/BotClient";
+import { MIGRATIONS_TABLE } from "../constants/Database";
 import { DefaultRankRoleSettings, EmptyPlaylist, PLAYLISTS, RANK_ROLES_MODULE, StepOf, Steps } from "../constants/RankRoles";
 import { IPrimeProfile } from "../interfaces/services/prime/IPrimeService";
 import { IRankRoleChange, IRankRoleResult, IRankRoleSettings, Playlist } from "../interfaces/services/rankroles/IRankRoles";
@@ -7,6 +8,9 @@ import logger from "../utils/logger";
 import { NewRoleProblem } from "../utils/rolegate";
 
 export class RankRoleError extends Error {}
+
+/** Merker in schema_migrations: der einmalige Schnitt nach dem Epic-Login ist gelaufen. */
+const STRIP_UNVERIFIED = "job:058_strip_unverified_rank_roles";
 
 function IsRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -256,6 +260,67 @@ export default class RankRoleService {
         if (removed > 0) logger.user(`🎖️  Rank Roles: ${userId} -${removed} (Epic-Konto gewechselt oder getrennt)`);
 
         return removed;
+    }
+
+    /**
+     * W-0126: Einmal nach dem Start mit dem Epic-Login. Migration 057 hat alle
+     * per Namen angelegten Verknüpfungen gelöscht - die Rang-Rollen, die damit
+     * geholt wurden, stünden sonst weiter da, auch bei geliehenen Namen. Wer
+     * jetzt kein bestätigtes Epic-Konto hat, verliert die Rollen dieses Moduls;
+     * mit /rank link und /rank me kommen sie wieder.
+     *
+     * Läuft genau einmal je Datenbank: Der Merker steht in schema_migrations,
+     * erst nachdem alles durch ist - bricht der Lauf ab, kommt er beim nächsten
+     * Start noch einmal. Alle Mitglieder sieht der Bot nur mit dem Members-
+     * Intent; ohne ihn prüft er die, die er schon kennt, und sagt das im Log.
+     * Im Entwicklungsmodus nur auf dem Dev-Server.
+     */
+    async StripUnverifiedOnce(): Promise<void> {
+        if (!this.client.databaseService.Ready) return;
+
+        const done = await this.client.databaseService.Query<{ name: string }>(`SELECT name FROM ${MIGRATIONS_TABLE} WHERE name = ?`, [STRIP_UNVERIFIED]);
+
+        if (done.length > 0) return;
+
+        const intent = this.client.config.GUILD_MEMBER_INTENT === true;
+        let members = 0;
+        let roles = 0;
+
+        for (const guild of this.client.guilds.cache.values()) {
+            if (this.client.developerMode && guild.id !== this.client.config.DEV_GUILD_ID) continue;
+            if (!(await this.client.settings.Of(guild.id)).modules.includes(RANK_ROLES_MODULE)) continue;
+
+            const managed = [...this.Managed(await this.Settings(guild.id))];
+
+            if (managed.length === 0) continue;
+
+            if (intent) await guild.members.fetch().catch(() => undefined);
+
+            const holders = new Map<string, GuildMember>();
+
+            for (const id of managed) {
+                for (const member of guild.roles.cache.get(id)?.members.values() ?? []) holders.set(member.id, member);
+            }
+
+            for (const member of holders.values()) {
+                if (await this.client.accounts.On(member.id, "epic")) continue;
+
+                const drop = managed.filter((id) => member.roles.cache.has(id) && !this.Blocked(guild, id));
+
+                if (drop.length === 0) continue;
+
+                await member.roles.remove(drop, "Rank Roles: Epic-Konto nicht bestätigt (Epic-Login)").catch(() => undefined);
+                members += 1;
+                roles += drop.length;
+            }
+        }
+
+        await this.client.databaseService.Query(`INSERT INTO ${MIGRATIONS_TABLE} (name) VALUES (?)`, [STRIP_UNVERIFIED]);
+
+        logger.user(
+            `🎖️  Rank Roles: ${roles} Rolle(n) bei ${members} Mitglied(ern) ohne bestätigtes Epic-Konto entfernt` +
+                (intent ? "" : " - ohne Members-Intent nur bei Mitgliedern, die der Bot schon kannte")
+        );
     }
 
     /**
