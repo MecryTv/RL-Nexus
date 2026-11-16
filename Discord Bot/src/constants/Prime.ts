@@ -51,6 +51,28 @@ export const TRACKED_PLAYLISTS = [
 
 export type PlaylistKey = (typeof TRACKED_PLAYLISTS)[number]["key"];
 
+/**
+ * W-0129: Die Extra-Modi auf der Rang-Karte, in dieser Reihenfolge - so wie sie
+ * gerade gewertet werden. Fest im Code, ohne Einstellung (Wunsch des Nutzers).
+ *
+ * Heatseeker ist seit Season 21 (Dezember 2025) gewertet, 2v2. Die Playlist-ID
+ * steht nirgends dokumentiert; 61 ist die einzige, die Prime seither neu liefert
+ * (am 16.11.2026 an einem Konto nachgesehen). Liefert Prime sie nicht, zeigt die
+ * Kachel „noch kein Rang“.
+ */
+export const EXTRA_PLAYLISTS = [
+    { id: 61, key: "heatseeker", label: "Heatseeker" },
+    { id: 28, key: "rumble", label: "Rumble" },
+    { id: 27, key: "hoops", label: "Hoops" },
+    { id: 30, key: "snowday", label: "Snow Day" },
+    { id: 29, key: "dropshot", label: "Dropshot" },
+] as const;
+
+export type ExtraPlaylistKey = (typeof EXTRA_PLAYLISTS)[number]["key"];
+
+/** W-0129: Der Turnier-Rang im Kopf der Karte. */
+export const TOURNAMENT_PLAYLIST = { id: 34, key: "tournament", label: "Turniere" } as const;
+
 /** Playlist-Schlüssel zu ID, für die Datenbank. */
 export const PLAYLIST_IDS: Record<string, number> = Object.fromEntries(
     TRACKED_PLAYLISTS.map((entry) => [entry.key, entry.id])

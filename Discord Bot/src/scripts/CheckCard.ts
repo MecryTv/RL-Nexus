@@ -56,6 +56,16 @@ const PROFILE: IPrimeProfile = {
         // Gar keine Serie: dort steht ein Strich, keine Null.
         { key: "3v3", label: "3v3 Standard", mmr: 1180, tier: 16, tierName: "Champion I", division: 3, divisionName: "IV", matches: 95, streak: 0, placement: false, placementMatches: 10 },
     ],
+    // W-0129: Heatseeker fehlt absichtlich - so sieht die Kachel aus, wenn Prime
+    // den Modus nicht liefert. Hoops steckt in der Platzierung, Snow Day ist nie
+    // gespielt (Startwert ohne Spiele: Strich statt MMR).
+    extras: [
+        { key: "rumble", label: "Rumble", mmr: 1012, tier: 14, tierName: "Diamant II", division: 1, divisionName: "II", matches: 64, streak: 5, placement: false, placementMatches: 10 },
+        { key: "hoops", label: "Hoops", mmr: 640, tier: 9, tierName: "Gold III", division: 0, divisionName: "I", matches: 4, streak: -2, placement: true, placementMatches: 4 },
+        { key: "snowday", label: "Snow Day", mmr: 600, tier: 0, tierName: "Unranked", division: 0, divisionName: null, matches: 0, streak: 0, placement: true, placementMatches: 0 },
+        { key: "dropshot", label: "Dropshot", mmr: 1460, tier: 19, tierName: "Grand Champion I", division: 2, divisionName: "III", matches: 212, streak: 0, placement: false, placementMatches: 10 },
+    ],
+    tournament: { key: "tournament", label: "Turniere", mmr: 1395, tier: 18, tierName: "Champion III", division: 3, divisionName: "IV", matches: 31, streak: 0, placement: false, placementMatches: 10 },
     stats: CAREER_ORDER.map((key, index) => ({ key, label: key, value: (index + 1) * 1234 })),
     club: { id: 1, name: "Development Gang", tag: "DEV", ownerPlayerId: "Epic|pruefkonto|0", members: [], verified: false, createdAt: null, averageMMR: 1271 },
     fetchedAt: new Date().toISOString(),

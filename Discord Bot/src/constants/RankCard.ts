@@ -15,13 +15,24 @@ export const STAT_ICON_ROOT = path.join(CARD_ROOT, "default", "rocketleague", "r
 export const PLATFORM_ICON_ROOT = path.join(CARD_ROOT, "default", "rocketleague", "plattforms");
 
 /**
- * 3:2 wie die Vorlage.
+ * Seit W-0129 höher als die alte Vorlage (1536 × 1024): Unter Ranked kommen die
+ * Extra-Modi und die Karriere als eigener Punkt.
  *
  * Der Hintergrund ist gezeichnet und kein Bild mehr - er richtet sich also nach
  * diesen Maßen, statt umgekehrt beschnitten werden zu müssen.
  */
 export const CARD_WIDTH = 1536;
-export const CARD_HEIGHT = 1024;
+export const CARD_HEIGHT = 1678;
+
+/** W-0129: Höhen der Blöcke. Die Abstände dazwischen rechnet RenderRankCard. */
+export const HEADER_HEIGHT = 244;
+export const MAIN_CARD_HEIGHT = 450;
+export const EXTRA_CARD_HEIGHT = 340;
+export const CAREER_CARD_HEIGHT = 176;
+/** Von der Unterkante eines Blocks bis zur Grundlinie der nächsten Überschrift. */
+export const SECTION_GAP = 74;
+/** Von der Grundlinie der Überschrift bis zur Oberkante der Kacheln darunter. */
+export const SECTION_BODY = 52;
 
 export const COLORS = {
     base: "#050608",
@@ -35,7 +46,21 @@ export const COLORS = {
     textDim: "#a8b0bc",
     win: "#35e07f",
     loss: "#ff4d5e",
+    /** W-0129: Rahmen des Turnier-Rangs. */
+    gold: "#ffc53d",
 } as const;
+
+/**
+ * W-0129: Eine Farbe je Extra-Modus - die Leiste oben an der Kachel und das
+ * Symbol. So findet man den Modus auf einen Blick, der rote Rahmen bleibt.
+ */
+export const EXTRA_MODE_COLORS: Record<string, string> = {
+    heatseeker: "#ff8a3d",
+    rumble: "#b06bff",
+    hoops: "#ffc53d",
+    snowday: "#38c8ff",
+    dropshot: "#ff4fa3",
+};
 
 /** Ein Rahmen, an dem sich alle Blöcke ausrichten. */
 export const PAD = 34;

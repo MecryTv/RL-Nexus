@@ -20,9 +20,11 @@ import {
     PRIME_CACHE_MAX,
     PRIME_CACHE_TTL,
     PRIME_TIMEOUT,
+    EXTRA_PLAYLISTS,
     TierName,
     ToMMR,
     ToPlayerID,
+    TOURNAMENT_PLAYLIST,
     TRACKED_PLAYLISTS,
 } from "../constants/Prime";
 
@@ -296,6 +298,8 @@ export default class PrimeService implements IPrimeService {
             seasonLevel: profile.RewardLevels?.SeasonLevel ?? 0,
             seasonWins: profile.RewardLevels?.SeasonLevelWins ?? 0,
             ranks: this.Ranks(profile.Skills),
+            extras: this.Ranks(profile.Skills, EXTRA_PLAYLISTS),
+            tournament: this.Ranks(profile.Skills, [TOURNAMENT_PLAYLIST])[0] ?? null,
             stats: this.Career(profile.Leaderboards),
             club: await this.Club(profile.ClubDetails),
             fetchedAt: new Date().toISOString(),
@@ -378,13 +382,14 @@ export default class PrimeService implements IPrimeService {
     }
 
     /**
-     * Sicherer Umgang mit Skills (abfangen falls undefined)
+     * Sicherer Umgang mit Skills (abfangen falls undefined). Ohne Liste die drei
+     * Hauptmodi; W-0129 holt mit derselben Rechnung Extra-Modi und Turnier.
      */
-    private Ranks(skills: IRawSkill[] | undefined): IPrimeRank[] {
+    private Ranks(skills: IRawSkill[] | undefined, playlists: readonly { id: number; key: IPrimeRank["key"]; label: string }[] = TRACKED_PLAYLISTS): IPrimeRank[] {
         const ranks: IPrimeRank[] = [];
         const safeSkills = skills ?? [];
 
-        for (const playlist of TRACKED_PLAYLISTS) {
+        for (const playlist of playlists) {
             const skill = safeSkills.find((entry) => entry.Playlist === playlist.id);
 
             if (!skill) continue;
