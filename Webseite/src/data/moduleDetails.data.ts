@@ -408,7 +408,7 @@ export const MODULE_DETAILS: Readonly<Record<string, IModuleDetail>> = {
                 },
                 {
                     label: "Extra-Modi",
-                    text: "Heatseeker, Rumble, Hoops, Snow Day und Dropshot als eigener Punkt unter den Hauptmodi, jede Kachel mit Rang, MMR, Streak und Spielen. Auch ohne Spiel in dieser Season steht dort die errechnete MMR.",
+                    text: "Heatseeker, Rumble, Hoops, Snow Day und Dropshot auf einer zweiten Seite der Karte: der Knopf „Extra-Modi“ darunter wechselt hin und her. Jede Kachel mit Rang, MMR, Streak und Spielen. Auch ohne Spiel in dieser Season steht dort die errechnete MMR.",
                     color: "var(--c-mod-utility)",
                 },
                 {

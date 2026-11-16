@@ -1,6 +1,5 @@
 import {
     ActionRowBuilder,
-    AttachmentBuilder,
     ButtonBuilder,
     ButtonStyle,
     ChatInputCommandInteraction,
@@ -11,7 +10,7 @@ import BotClient from "../../client/BotClient";
 import Command from "../../structures/Command";
 import Category from "../../enums/Category";
 import { IPrimeProfile } from "../../interfaces/services/prime/IPrimeService";
-import { RenderRankCard } from "../../builder/RankCard";
+import { RankMessage } from "../../builder/RankView";
 import { LINK_COOLDOWN, LINK_COOLDOWN_DAYS, LINK_COOLDOWN_DEV } from "../../constants/Database";
 import { TrackerURL } from "../../constants/Prime";
 import { PrimeError } from "../../services/PrimeService";
@@ -170,7 +169,10 @@ export default class Rank extends Command {
         );
     }
 
-    /** Zeichnet die Karte und hängt sie an die Antwort. */
+    /**
+     * Zeichnet Seite 1 (Ranked) und hängt sie an die Antwort. Darunter der Knopf
+     * zu den Extra-Modi und der Tracker - siehe builder/RankView.ts.
+     */
     private async Send(
         interaction: ChatInputCommandInteraction,
         profile: IPrimeProfile,
@@ -178,13 +180,11 @@ export default class Rank extends Command {
         avatarURL: string | null
     ): Promise<void> {
         const started = Date.now();
-        const png = await RenderRankCard({ profile, discordName, avatarURL });
+        const message = await RankMessage({ profile, discordName, avatarURL, page: "ranked" }, interaction.user.id);
 
         logger.info(`🖼️  Rang-Karte für ${profile.name} in ${Date.now() - started} ms`);
 
-        const file = new AttachmentBuilder(png, { name: `rank-${profile.accountId}.png` });
-
-        await interaction.editReply({ files: [file], components: [this.TrackerRow(profile.name)] });
+        await interaction.editReply(message);
     }
 
     /* ------------------------------------------------------------------

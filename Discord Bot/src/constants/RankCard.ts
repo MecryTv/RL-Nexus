@@ -15,19 +15,21 @@ export const STAT_ICON_ROOT = path.join(CARD_ROOT, "default", "rocketleague", "r
 export const PLATFORM_ICON_ROOT = path.join(CARD_ROOT, "default", "rocketleague", "plattforms");
 
 /**
- * Seit W-0129 höher als die alte Vorlage (1536 × 1024): Unter Ranked kommen die
- * Extra-Modi und die Karriere als eigener Punkt.
+ * Seit W-0129 höher als die alte Vorlage (1536 × 1024): Karriere als eigener
+ * Punkt, dazu der Turnier-Rang im Kopf. Die Extra-Modi stehen auf einer zweiten
+ * Seite gleicher Größe statt darunter - eine noch höhere Karte zeigte Discord im
+ * Chat nur noch schmal.
  *
  * Der Hintergrund ist gezeichnet und kein Bild mehr - er richtet sich also nach
  * diesen Maßen, statt umgekehrt beschnitten werden zu müssen.
  */
 export const CARD_WIDTH = 1536;
-export const CARD_HEIGHT = 1678;
+export const CARD_HEIGHT = 1212;
 
 /** W-0129: Höhen der Blöcke. Die Abstände dazwischen rechnet RenderRankCard. */
 export const HEADER_HEIGHT = 244;
+/** Ranked-Kacheln auf Seite 1 und Extra-Kacheln auf Seite 2 - gleich hoch. */
 export const MAIN_CARD_HEIGHT = 450;
-export const EXTRA_CARD_HEIGHT = 340;
 export const CAREER_CARD_HEIGHT = 176;
 /** Von der Unterkante eines Blocks bis zur Grundlinie der nächsten Überschrift. */
 export const SECTION_GAP = 74;
@@ -48,6 +50,10 @@ export const COLORS = {
     loss: "#ff4d5e",
     /** W-0129: Rahmen des Turnier-Rangs. */
     gold: "#ffc53d",
+    /** W-0129: Controller bei „Spiele“ - blau wie die Rang-Kästen. */
+    games: "#38c8ff",
+    /** W-0129: Leere Flamme, wenn keine Serie läuft. */
+    idle: "#6f7884",
 } as const;
 
 /**

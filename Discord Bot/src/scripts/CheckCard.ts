@@ -121,6 +121,15 @@ async function main(): Promise<void> {
     check(`Sie entsteht schnell genug (${took} ms)`, took < 8000, "Discord wartet drei Sekunden - deshalb deferReply");
     check("Sie passt in eine Discord-Nachricht (< 8 MB)", png.length < 8 * 1024 * 1024);
 
+    // W-0129: Seite 2 mit den Extra-Modi - gleich groß, sonst springt die
+    // Nachricht beim Umschalten.
+    const extra = await RenderRankCard({ profile: PROFILE, discordName: "PruefName", avatarURL: null, page: "extra" });
+
+    await writeFile("card-check-extra.png", extra);
+
+    check(`Seite 2 (Extra-Modi) ist ebenfalls ${CARD_WIDTH}x${CARD_HEIGHT} gross`, await hasSize(extra, CARD_WIDTH, CARD_HEIGHT));
+    check("  und sieht anders aus als Seite 1", !extra.equals(png));
+
     // Ohne Club fehlt der Tag, ohne Discord-Namen die zweite Zeile: beides darf
     // die Karte nicht ins Stolpern bringen.
     const bare = await RenderRankCard({

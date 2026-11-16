@@ -21,21 +21,25 @@ import styles from "./RankCardPreview.module.scss";
  * gleich aussehen.
  *
  * Nachgebaut aus HTML statt als Bild eingebunden, weil ein Bild mit 1536 mal
- * 1678 Bildpunkten rund ein dreiviertel Megabyte kostet und beim Ändern einer
+ * 1212 Bildpunkten rund ein halbes Megabyte kostet und beim Ändern einer
  * Farbe neu gerendert werden müsste.
  *
- * `aria-hidden`, weil daneben im Fließtext steht, was die Karte zeigt. Ein
- * Bildschirmleser, der hier drei Dutzend Zahlen ohne Zusammenhang vorliest,
- * hilft niemandem.
+ * Zwei Seiten wie in Discord: Ranked und Extra-Modi. Der Knopf darunter
+ * wechselt, Kopf und Karriere bleiben stehen.
+ *
+ * Die Karte ist `aria-hidden`, weil daneben im Fließtext steht, was sie zeigt.
+ * Ein Bildschirmleser, der hier drei Dutzend Zahlen ohne Zusammenhang vorliest,
+ * hilft niemandem. Der Knopf zum Umschalten bleibt bedienbar.
  */
 export function RankCardPreview(): JSX.Element {
     const { player, handle, badge, reward, tournament, playlists, extras, career, freshness } = RANK_PREVIEW;
     const rewardMeta = RANK_META[reward.rank];
     const tourneyMeta = RANK_META[tournament.rank];
+    const [page, setPage] = useState<"ranked" | "extra">("ranked");
 
     return (
-        <div className={styles.frame} aria-hidden="true">
-            <div className={styles.card}>
+        <div className={styles.frame}>
+            <div className={styles.card} aria-hidden="true">
                 {/* Kopf: Spieler, Season Reward, Turnier-Rang */}
                 <header className={styles.head}>
                     <span className={styles.avatar}>
@@ -89,50 +93,58 @@ export function RankCardPreview(): JSX.Element {
                     </div>
                 </header>
 
-                <SectionHead icon="wins" title="Ranked" sub="Hauptmodi" />
-
-                <ul className={styles.main}>
-                    {playlists.map((entry) => (
-                        <li key={entry.playlist} className={styles.tile}>
-                            <span className={styles.mode}>{entry.playlist}</span>
-                            <span className={styles.modeSub}>{entry.subtitle}</span>
-                            <RankRow
-                                rank={entry.rank}
-                                division={entry.division}
-                                placement={entry.placement}
-                                max={315}
-                                size={34}
-                            />
-                            <span className={styles.mmrLabel}>MMR</span>
-                            <span className={styles.mmrValue}>{entry.mmr}</span>
-                            <Stats streak={entry.streak} games={entry.games} labels={["Aktuelle Streak", "Gespielte Spiele"]} />
-                        </li>
-                    ))}
-                </ul>
-
-                <SectionHead icon="grid" title="Extra-Modi" sub="Competitive" />
-
-                <ul className={styles.extras}>
-                    {extras.map((entry) => (
-                        <li key={entry.mode} className={[styles.tile, styles.extra].join(" ")} style={accent(entry.mode)}>
-                            <span className={styles.extraTop}>
-                                <ModeIcon mode={entry.mode} />
-                                {entry.label}
-                            </span>
-                            <RankRow
-                                rank={entry.rank}
-                                division={entry.division}
-                                placement={entry.placement}
-                                max={160}
-                                size={24}
-                                compact
-                            />
-                            <span className={styles.mmrLabel}>MMR</span>
-                            <span className={styles.mmrValue}>{entry.mmr}</span>
-                            <Stats streak={entry.streak} games={entry.games} labels={["Streak", "Spiele"]} />
-                        </li>
-                    ))}
-                </ul>
+                {/* Seite 1 Ranked, Seite 2 Extra-Modi. Nur dieser Teil wechselt -
+                    der key baut ihn neu auf, damit er weich einblendet. */}
+                <div key={page} className={styles.swap}>
+                    {page === "ranked" ? (
+                        <>
+                            <SectionHead icon="wins" title="Ranked" sub="Hauptmodi" />
+                            <ul className={styles.main}>
+                                {playlists.map((entry) => (
+                                    <li key={entry.playlist} className={styles.tile}>
+                                        <span className={styles.mode}>{entry.playlist}</span>
+                                        <span className={styles.modeSub}>{entry.subtitle}</span>
+                                        <RankRow
+                                            rank={entry.rank}
+                                            division={entry.division}
+                                            placement={entry.placement}
+                                            max={315}
+                                            size={34}
+                                        />
+                                        <span className={styles.mmrLabel}>MMR</span>
+                                        <span className={styles.mmrValue}>{entry.mmr}</span>
+                                        <Stats streak={entry.streak} games={entry.games} labels={["Aktuelle Streak", "Gespielte Spiele"]} />
+                                    </li>
+                                ))}
+                            </ul>
+                        </>
+                    ) : (
+                        <>
+                            <SectionHead icon="grid" title="Extra-Modi" sub="Competitive" />
+                            <ul className={styles.extras}>
+                                {extras.map((entry) => (
+                                    <li key={entry.mode} className={[styles.tile, styles.extra].join(" ")} style={accent(entry.mode)}>
+                                        <span className={styles.extraTop}>
+                                            <ModeIcon mode={entry.mode} />
+                                            {entry.label}
+                                        </span>
+                                        <RankRow
+                                            rank={entry.rank}
+                                            division={entry.division}
+                                            placement={entry.placement}
+                                            max={150}
+                                            size={24}
+                                            compact
+                                        />
+                                        <span className={styles.mmrLabel}>MMR</span>
+                                        <span className={styles.mmrValue}>{entry.mmr}</span>
+                                        <Stats streak={entry.streak} games={entry.games} labels={["Streak", "Spiele"]} />
+                                    </li>
+                                ))}
+                            </ul>
+                        </>
+                    )}
+                </div>
 
                 <SectionHead icon="shots" title="Karriere" sub="Statistik" />
 
@@ -152,13 +164,25 @@ export function RankCardPreview(): JSX.Element {
                 <p className={styles.freshness}>{freshness}</p>
             </div>
 
-            {/* Der Knopf, den der Bot unter jede Karte setzt */}
-            <span className={styles.trackerButton}>
-                <span className={styles.trackerEmoji}>🔗</span>
-                Beim Tracker ansehen
-            </span>
+            {/* Die Knöpfe, die der Bot unter jede Karte setzt: links die andere
+                Seite, rechts der Tracker (hier nur Bild, er führt nirgends hin). */}
+            <div className={styles.buttons}>
+                <button type="button" className={styles.dbtn} onClick={() => setPage(page === "ranked" ? "extra" : "ranked")}>
+                    <span className={styles.emoji} aria-hidden="true">
+                        {page === "ranked" ? "🎮" : "🏆"}
+                    </span>
+                    {page === "ranked" ? "Extra-Modi" : "Ranked"}
+                </button>
+                <span className={styles.dbtn} aria-hidden="true">
+                    <span className={styles.emoji}>🔗</span>
+                    Beim Tracker ansehen
+                    <svg className={styles.external} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                        <path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" />
+                    </svg>
+                </span>
+            </div>
 
-            <p className={styles.caption}>
+            <p className={styles.caption} aria-hidden="true">
                 <Icon name="discord" size={15} />
                 So sieht <code>/rank me</code> in deinem Server aus
             </p>
@@ -277,13 +301,13 @@ function Stats(props: { streak: number; games: number; labels: readonly [string,
     const { games, labels } = props;
     // Wie im Bot: ohne Spiel in dieser Season keine Serie.
     const streak = games > 0 ? props.streak : 0;
-    const tone = streak > 0 ? styles.win : streak < 0 ? styles.loss : styles.none;
+    const [symbol, tone] = streak > 0 ? (["fire", styles.win] as const) : streak < 0 ? (["down", styles.loss] as const) : (["fire-off", styles.none] as const);
 
     return (
         <span className={styles.stats}>
             <span className={styles.counter}>
                 <span className={[styles.counterValue, tone].join(" ")}>
-                    {streak !== 0 && <Flame />}
+                    <StatIcon name={symbol} />
                     {streak === 0 ? "—" : `${Math.abs(streak)}x`}
                 </span>
                 <span className={styles.counterLabel}>{labels[0]}</span>
@@ -291,7 +315,7 @@ function Stats(props: { streak: number; games: number; labels: readonly [string,
             <i className={styles.counterSep} />
             <span className={styles.counter}>
                 <span className={styles.counterValue}>
-                    <i className={[styles.mask, styles.counterIcon].join(" ")} style={icon("wins")} />
+                    <StatIcon name="pad" />
                     {games}
                 </span>
                 <span className={styles.counterLabel}>{labels[1]}</span>
@@ -300,14 +324,41 @@ function Stats(props: { streak: number; games: number; labels: readonly [string,
     );
 }
 
-/** Die Flamme aus `flame()` im Bot, als SVG. */
-function Flame(): JSX.Element {
-    return (
-        <svg className={styles.flame} viewBox="0 0 24 24">
-            <path fill="currentColor" d="M13 0C13 5 17 7 18.5 11C20.5 16 17.5 24 12 24C6.5 24 3.5 19.5 4.5 14.5C5.2 11 7.5 9.5 8 6.5C9.5 9 10.5 9.5 11 8C11.6 6 12.2 3 13 0Z" />
-            <path fill="rgb(255 255 255 / 45%)" d="M12.5 11C14.5 14 15.5 16 15.5 18.5C15.5 21.5 14 22.5 12 22.5C10 22.5 8.5 21 8.5 18.5C8.5 16 11 14.5 12.5 11Z" />
-        </svg>
-    );
+/**
+ * Die Symbole neben Streak und Spiele (Entwurf I2) - dieselben Pfade wie
+ * `STAT_SHAPES` im Bot: Flamme bei einer Siegesserie, leere Flamme ohne Serie,
+ * Pfeil nach unten bei Niederlagen, Controller für die Spiele.
+ */
+function StatIcon({ name }: { name: "fire" | "fire-off" | "down" | "pad" }): JSX.Element {
+    switch (name) {
+        case "fire":
+            return (
+                <svg className={styles.fire} viewBox="0 0 24 24">
+                    <path fill="currentColor" d="M13.2 1.5c.2 3.6 3.6 5.4 4.8 8.6 1.6 4.3-.9 11.4-6 11.4-4.6 0-7.2-3.8-6.3-8 .5-2.7 2.4-4 2.9-6.4 1.1 1.9 2 2.3 2.4 1.2.6-1.7.9-4.4 2.2-6.8z" />
+                    <path fill="rgb(255 255 255 / 55%)" d="M12.4 11.2c1.6 2.3 2.5 3.9 2.5 5.9 0 2.4-1.2 3.3-2.9 3.3s-2.9-1.2-2.9-3.3c0-2 2-3.3 3.3-5.9z" />
+                </svg>
+            );
+        case "fire-off":
+            return (
+                <svg className={styles.idle} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinejoin="round">
+                    <path d="M13.2 2.5c.2 3.4 3.4 5.1 4.5 8.1 1.5 4-.8 10.4-5.7 10.4-4.3 0-6.7-3.6-5.9-7.5.5-2.5 2.2-3.8 2.7-6 1 1.8 1.9 2.1 2.2 1.1.6-1.6.9-4 2.2-6.1z" />
+                </svg>
+            );
+        case "down":
+            return (
+                <svg className={styles.down} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 7l6.5 6.5 4-4L21 17M21 11v6h-6" />
+                </svg>
+            );
+        default:
+            return (
+                <svg className={styles.pad} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M7.2 6h9.6a4.6 4.6 0 0 1 4.5 5.5l-1 5.2a2.9 2.9 0 0 1-5 1.4L13.6 16h-3.2l-1.7 2.1a2.9 2.9 0 0 1-5-1.4l-1-5.2A4.6 4.6 0 0 1 7.2 6zM7 10.2v3M5.5 11.7h3" />
+                    <circle cx="15.6" cy="10.6" r=".9" fill="currentColor" stroke="none" />
+                    <circle cx="17.6" cy="12.8" r=".9" fill="currentColor" stroke="none" />
+                </svg>
+            );
+    }
 }
 
 /* --------------------------------------------------------------------------

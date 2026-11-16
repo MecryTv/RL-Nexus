@@ -10,6 +10,7 @@ atlas-credentials.env
 # Ergebnis von npm run check:card - nur zum Ansehen
 card-check.png
 card-check-stale.png
+card-check-extra.png
 # Galerie: Default- und Privacy-Bilder kommen mit, Guild-Uploads nicht
 /src/images/*
 !/src/images/default

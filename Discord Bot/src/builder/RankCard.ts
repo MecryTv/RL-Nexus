@@ -10,7 +10,6 @@ import {
     CAREER_LABELS,
     CAREER_ORDER,
     COLORS,
-    EXTRA_CARD_HEIGHT,
     EXTRA_MODE_COLORS,
     FONT_ROOT,
     GAP,
@@ -43,6 +42,9 @@ import logger from "../utils/logger";
  * font-Shorthand ("800 64px Oxanium").
  */
 
+/** W-0129: Die zwei Seiten der Karte. Nur der mittlere Punkt wechselt. */
+export type RankCardPage = "ranked" | "extra";
+
 /** Was auf der Karte steht. Alles Nutzerbezogene kommt von außen, nichts geraten. */
 export interface IRankCardData {
     profile: IPrimeProfile;
@@ -50,6 +52,8 @@ export interface IRankCardData {
     discordName: string | null;
     /** URL des Discord-Avatars. null heißt: Plattform-Symbol statt Bild. */
     avatarURL: string | null;
+    /** Ranked (Standard) oder die Extra-Modi. Kopf und Karriere sind auf beiden gleich. */
+    page?: RankCardPage;
 }
 
 /* ----------------------------------------------------------
@@ -318,37 +322,71 @@ function trackedWidth(ctx: SKRSContext2D, text: string, spacing: number): number
     return width;
 }
 
-/** Eine kleine Flamme für die Serie. Gezeichnet, weil Emoji hier nicht rendern. */
-function flame(ctx: SKRSContext2D, x: number, y: number, size: number, color: string): void {
-    ctx.save();
-    ctx.translate(x, y);
-    ctx.scale(size / 24, size / 24);
-    ctx.fillStyle = color;
+/**
+ * W-0129, Entwurf I2: die Symbole neben Streak und Spiele, im 24er-Raster wie
+ * SVG-Pfade. Dieselben Pfade stehen in RankCardPreview auf der Webseite.
+ *
+ *   fire      Siegesserie - gefüllte Flamme mit hellem Kern
+ *   fire-off  keine Serie - leere Flamme als Umriss
+ *   down      Niederlagenserie - Pfeil nach unten
+ *   pad       gespielte Spiele - Controller (die Trophäe hieß „Siege“)
+ */
+type StatIcon = "fire" | "fire-off" | "down" | "pad";
 
-    // Aussenflamme: eine Spitze oben, eine ausholende Zunge links, breite Basis.
-    ctx.beginPath();
-    ctx.moveTo(13, 0);
-    ctx.bezierCurveTo(13, 5, 17, 7, 18.5, 11);
-    ctx.bezierCurveTo(20.5, 16, 17.5, 24, 12, 24);
-    ctx.bezierCurveTo(6.5, 24, 3.5, 19.5, 4.5, 14.5);
-    ctx.bezierCurveTo(5.2, 11, 7.5, 9.5, 8, 6.5);
-    ctx.bezierCurveTo(9.5, 9, 10.5, 9.5, 11, 8);
-    ctx.bezierCurveTo(11.6, 6, 12.2, 3, 13, 0);
-    ctx.closePath();
-    ctx.fill();
+const STAT_SHAPES: Record<StatIcon, { fill?: string; core?: string; stroke?: string; width?: number; dots?: readonly [number, number][] }> = {
+    fire: {
+        fill: "M13.2 1.5c.2 3.6 3.6 5.4 4.8 8.6 1.6 4.3-.9 11.4-6 11.4-4.6 0-7.2-3.8-6.3-8 .5-2.7 2.4-4 2.9-6.4 1.1 1.9 2 2.3 2.4 1.2.6-1.7.9-4.4 2.2-6.8z",
+        core: "M12.4 11.2c1.6 2.3 2.5 3.9 2.5 5.9 0 2.4-1.2 3.3-2.9 3.3s-2.9-1.2-2.9-3.3c0-2 2-3.3 3.3-5.9z",
+    },
+    "fire-off": {
+        stroke: "M13.2 2.5c.2 3.4 3.4 5.1 4.5 8.1 1.5 4-.8 10.4-5.7 10.4-4.3 0-6.7-3.6-5.9-7.5.5-2.5 2.2-3.8 2.7-6 1 1.8 1.9 2.1 2.2 1.1.6-1.6.9-4 2.2-6.1z",
+        width: 1.8,
+    },
+    down: { stroke: "M3 7l6.5 6.5 4-4L21 17M21 11v6h-6", width: 2.4 },
+    pad: {
+        stroke: "M7.2 6h9.6a4.6 4.6 0 0 1 4.5 5.5l-1 5.2a2.9 2.9 0 0 1-5 1.4L13.6 16h-3.2l-1.7 2.1a2.9 2.9 0 0 1-5-1.4l-1-5.2A4.6 4.6 0 0 1 7.2 6zM7 10.2v3M5.5 11.7h3",
+        width: 1.9,
+        dots: [
+            [15.6, 10.6],
+            [17.6, 12.8],
+        ],
+    },
+};
 
-    // Der helle Kern - macht aus der Silhouette erst eine Flamme.
-    ctx.fillStyle = "rgba(255, 255, 255, 0.45)";
-    ctx.beginPath();
-    ctx.moveTo(12.5, 11);
-    ctx.bezierCurveTo(14.5, 14, 15.5, 16, 15.5, 18.5);
-    ctx.bezierCurveTo(15.5, 21.5, 14, 22.5, 12, 22.5);
-    ctx.bezierCurveTo(10, 22.5, 8.5, 21, 8.5, 18.5);
-    ctx.bezierCurveTo(8.5, 16, 11, 14.5, 12.5, 11);
-    ctx.closePath();
-    ctx.fill();
+function statIcon(ctx: SKRSContext2D, key: StatIcon, x: number, y: number, size: number, color: string, blur: number): void {
+    const shape = STAT_SHAPES[key];
 
-    ctx.restore();
+    glow(ctx, color, blur, () => {
+        ctx.translate(x, y);
+        ctx.scale(size / 24, size / 24);
+        ctx.fillStyle = color;
+        ctx.strokeStyle = color;
+
+        if (shape.fill) ctx.fill(new Path2D(shape.fill));
+
+        if (shape.stroke) {
+            ctx.lineWidth = shape.width ?? 2;
+            ctx.lineCap = "round";
+            ctx.lineJoin = "round";
+            ctx.stroke(new Path2D(shape.stroke));
+        }
+
+        for (const [cx, cy] of shape.dots ?? []) {
+            ctx.beginPath();
+            ctx.arc(cx, cy, 0.9, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    });
+
+    // Der helle Kern ohne Schein obendrauf - macht aus der Silhouette erst eine Flamme.
+    if (shape.core) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.scale(size / 24, size / 24);
+        ctx.fillStyle = "rgba(255, 255, 255, 0.55)";
+        ctx.fill(new Path2D(shape.core));
+        ctx.restore();
+    }
 }
 
 /* ----------------------------------------------------------
@@ -888,7 +926,7 @@ async function drawRankCard(
     const mmrLabelY = rowY + rowH + 38;
 
     drawCenteredMMR(ctx, x + w / 2, mmrLabelY, rank.mmr > 0 ? String(rank.mmr) : "—", 1);
-    await drawStatsRow(ctx, x + 24, w - 48, mmrLabelY + 82, rank, ["AKTUELLE STREAK", "GESPIELTE SPIELE"], 1);
+    drawStatsRow(ctx, x + 24, w - 48, mmrLabelY + 82, rank, ["AKTUELLE STREAK", "GESPIELTE SPIELE"], 1);
 }
 
 /**
@@ -923,10 +961,10 @@ function drawCenteredMMR(ctx: SKRSContext2D, cx: number, labelY: number, value: 
  * Muster wie beim Turnier-Rang. Symbol und Wert stehen als Paar mittig in ihrer
  * Hälfte, die Beschriftung mittig darunter.
  *
- * Jedes Symbol sitzt mit der Unterkante auf der Grundlinie seines Wertes, wie
- * ein Buchstabe ohne Unterlänge. Ohne Serie keine Flamme, nur der Strich.
+ * Symbole nach Entwurf I2: Flamme, leere Flamme oder Pfeil für die Streak,
+ * Controller für die Spiele. Jedes Symbol steht mittig zur Höhe der Ziffern.
  */
-async function drawStatsRow(ctx: SKRSContext2D, left: number, width: number, top: number, rank: IPrimeRank | null, labels: readonly [string, string], scale: number): Promise<void> {
+function drawStatsRow(ctx: SKRSContext2D, left: number, width: number, top: number, rank: IPrimeRank | null, labels: readonly [string, string], scale: number): void {
     const mid = left + width / 2;
 
     ctx.save();
@@ -943,48 +981,37 @@ async function drawStatsRow(ctx: SKRSContext2D, left: number, width: number, top
     ctx.stroke();
     ctx.restore();
 
+    const valueSize = Math.round(28 * scale);
     const valueY = top + 42 * scale;
     const labelY = top + 68 * scale;
     const halves = [left + width / 4, left + (width * 3) / 4] as const;
-    const iconSize = Math.round(26 * scale);
-    const space = 8 * scale;
+    const iconSize = Math.round(30 * scale);
+    const space = 9 * scale;
+    // Die Mitte der Ziffern liegt gut ein Drittel der Schriftgröße über der Grundlinie.
+    const iconY = valueY - valueSize * 0.36 - iconSize / 2;
     // Prime liefert die Serie aus der letzten Season mit. Ohne ein Spiel in
     // dieser Season stünde sonst „2x“ neben „0 Spiele“.
     const raw = rank && rank.matches > 0 ? rank.streak : 0;
     const streak = Math.abs(raw);
-    const streakColor = streak === 0 ? COLORS.textDim : raw > 0 ? COLORS.win : COLORS.loss;
 
-    ctx.textAlign = "left";
-    ctx.font = `700 ${Math.round(28 * scale)}px Oxanium`;
+    const pair = (cx: number, icon: StatIcon, iconColor: string, text: string, textColor: string): void => {
+        ctx.font = `700 ${valueSize}px Oxanium`;
 
-    // Streak
-    const streakText = streak === 0 ? "—" : `${streak}x`;
-    const streakWidth = ctx.measureText(streakText).width;
-    let sx = halves[0] - ((streak > 0 ? iconSize + space : 0) + streakWidth) / 2;
+        const start = cx - (iconSize + space + ctx.measureText(text).width) / 2;
 
-    if (streak > 0) {
-        flame(ctx, sx, valueY - iconSize, iconSize, streakColor);
-        sx += iconSize + space;
-    }
+        statIcon(ctx, icon, start, iconY, iconSize, iconColor, icon === "fire-off" ? 0 : 10 * scale);
 
-    ctx.fillStyle = streakColor;
-    ctx.fillText(streakText, sx, valueY);
+        ctx.font = `700 ${valueSize}px Oxanium`;
+        ctx.textAlign = "left";
+        ctx.fillStyle = textColor;
+        ctx.fillText(text, start + iconSize + space, valueY);
+    };
 
-    // Spiele
-    const gamesText = String(rank?.matches ?? 0);
-    const gamesWidth = ctx.measureText(gamesText).width;
-    const trophyFile = path.join(STAT_ICON_ROOT, "wins.png");
-    const trophy = await image(trophyFile);
-    let gx = halves[1] - ((trophy ? iconSize + space : 0) + gamesWidth) / 2;
+    if (streak === 0) pair(halves[0], "fire-off", COLORS.idle, "—", COLORS.textDim);
+    else if (raw > 0) pair(halves[0], "fire", COLORS.win, `${streak}x`, COLORS.win);
+    else pair(halves[0], "down", COLORS.loss, `${streak}x`, COLORS.loss);
 
-    if (trophy) {
-        ctx.drawImage(tinted(trophyFile, trophy, iconSize, COLORS.textDim), gx, valueY - iconSize);
-        gx += iconSize + space;
-    }
-
-    ctx.font = `700 ${Math.round(28 * scale)}px Oxanium`;
-    ctx.fillStyle = COLORS.text;
-    ctx.fillText(gamesText, gx, valueY);
+    pair(halves[1], "pad", COLORS.games, String(rank?.matches ?? 0), COLORS.text);
 
     // Beschriftungen
     ctx.font = `600 ${Math.round(18 * scale)}px Rajdhani`;
@@ -994,8 +1021,10 @@ async function drawStatsRow(ctx: SKRSContext2D, left: number, width: number, top
 }
 
 /**
- * W-0129: Eine Kachel der Extra-Modi. Wie die Hauptmodi, nur kleiner: Farbleiste
- * und Symbol des Modus oben, Rang mit Division, MMR mittig, Streak | Spiele.
+ * W-0129: Eine Kachel der Extra-Modi auf Seite 2. Nach Entwurf E1 so hoch wie
+ * eine Ranked-Kachel, damit beide Seiten gleich groß sind und die Nachricht beim
+ * Umschalten nicht springt. Farbleiste und Symbol des Modus oben, Rang mit
+ * Division, MMR mittig, Streak | Spiele.
  * Auch ohne Spiel in dieser Season steht die errechnete MMR da, wie bei den
  * Hauptmodi. Einen Strich gibt es nur, wenn Prime den Modus gar nicht liefert.
  */
@@ -1009,15 +1038,15 @@ async function drawExtraCard(ctx: SKRSContext2D, x: number, y: number, w: number
         ctx.fillRect(x + 22, y + 1, w - 44, 4);
     });
 
-    lineIcon(ctx, mode.key, x + 22, y + 24, 26, accent);
+    lineIcon(ctx, mode.key, x + 22, y + 24, 30, accent);
 
-    ctx.font = "700 24px Rajdhani";
+    ctx.font = "700 26px Rajdhani";
     ctx.fillStyle = COLORS.text;
-    tracked(ctx, mode.label.toUpperCase(), x + 58, y + 46, 2);
+    tracked(ctx, mode.label.toUpperCase(), x + 64, y + 48, 2);
 
     // --- Rang -----------------------------------------------------------
-    const rowY = y + 64;
-    const rowH = 92;
+    const rowY = y + 72;
+    const rowH = 112;
 
     panel(ctx, x + 14, rowY, w - 28, rowH, {
         cut: 12,
@@ -1033,12 +1062,12 @@ async function drawExtraCard(ctx: SKRSContext2D, x: number, y: number, w: number
     const icon = await image(file);
     const color = TierColor(tier);
 
-    if (icon) drawIcon(ctx, file, icon, x + 22, rowY + 16, 60);
+    if (icon) drawIcon(ctx, file, icon, x + 24, rowY + 22, 68);
 
     // Fünf Kacheln nebeneinander sind schmal. Passt der lange Name nicht mehr in
     // lesbarer Größe, kommt die Kurzform - wie im Entwurf („GRAND CHAMP I“).
-    const textX = x + 92;
-    const textMax = x + w - 24 - textX;
+    const textX = x + 104;
+    const textMax = x + w - 22 - textX;
     const full = !rank ? "UNRANKED" : rank.placement ? `PLATZIERUNG ${rank.placementMatches}/${PLACEMENT_MATCHES}` : rank.tierName.toUpperCase();
     const short = full.replace("GRAND CHAMPION", "GRAND CHAMP").replace("SUPERSONIC LEGEND", "SSL").replace("PLATZIERUNG", "PLATZ.");
     const text = fitText(ctx, full, textMax, 24, "700") >= 20 ? full : short;
@@ -1046,7 +1075,7 @@ async function drawExtraCard(ctx: SKRSContext2D, x: number, y: number, w: number
 
     ctx.font = `700 ${size}px Oxanium`;
     ctx.fillStyle = color;
-    glow(ctx, color, 10, () => ctx.fillText(text, textX, rowY + 44));
+    glow(ctx, color, 10, () => ctx.fillText(text, textX, rowY + 52));
 
     const sub = !rank
         ? "NOCH KEIN SPIEL"
@@ -1056,15 +1085,15 @@ async function drawExtraCard(ctx: SKRSContext2D, x: number, y: number, w: number
             ? `DIVISION ${rank.divisionName}`
             : "OHNE DIVISION";
 
-    ctx.font = "500 19px Rajdhani";
+    ctx.font = "500 20px Rajdhani";
     ctx.fillStyle = COLORS.textDim;
-    ctx.fillText(sub, textX, rowY + 72);
+    ctx.fillText(sub, textX, rowY + 84);
 
     // --- MMR und Streak | Spiele ------------------------------------------
-    const mmrLabelY = rowY + rowH + 36;
+    const mmrLabelY = rowY + rowH + 78;
 
-    drawCenteredMMR(ctx, x + w / 2, mmrLabelY, rank && rank.mmr > 0 ? String(rank.mmr) : "—", 0.72);
-    await drawStatsRow(ctx, x + 18, w - 36, mmrLabelY + 66, rank, ["STREAK", "SPIELE"], 0.8);
+    drawCenteredMMR(ctx, x + w / 2, mmrLabelY, rank && rank.mmr > 0 ? String(rank.mmr) : "—", 0.88);
+    drawStatsRow(ctx, x + 18, w - 36, mmrLabelY + 74, rank, ["STREAK", "SPIELE"], 1);
 }
 
 /**
@@ -1200,42 +1229,42 @@ export async function RenderRankCard(data: IRankCardData): Promise<Buffer> {
 
     const width = CARD_WIDTH - PAD * 2;
 
-    // --- Ranked: die drei Hauptmodi ---------------------------------------
-    const rankedY = PAD + HEADER_HEIGHT + SECTION_GAP;
+    // --- Seite 1: Ranked, Seite 2: Extra-Modi ------------------------------
+    // Beide Punkte haben dieselbe Höhe - die Karte ist auf beiden Seiten gleich
+    // groß, nur der Inhalt in der Mitte wechselt.
+    const sectionY = PAD + HEADER_HEIGHT + SECTION_GAP;
+    const bodyY = sectionY + SECTION_BODY;
 
-    await drawSectionHeading(ctx, rankedY, "RANKED", "HAUPTMODI", "trophy");
+    if (data.page === "extra") {
+        await drawSectionHeading(ctx, sectionY, "EXTRA-MODI", "COMPETITIVE", "grid");
 
-    const mainY = rankedY + SECTION_BODY;
-    const mainW = (width - GAP * 2) / 3;
+        // Immer alle fünf, auch ohne Daten: die Reihe soll nicht je Spieler
+        // anders aussehen. Ältere gespeicherte Stände haben noch keine extras.
+        const extraW = (width - GAP * (EXTRA_PLAYLISTS.length - 1)) / EXTRA_PLAYLISTS.length;
 
-    // Fehlt eine Playlist, bleibt ihr Platz frei statt die anderen zu verschieben -
-    // drei Spalten sind drei Spalten.
-    for (const [index, key] of (["1v1", "2v2", "3v3"] as const).entries()) {
-        const rank = data.profile.ranks.find((entry) => entry.key === key);
+        for (const [index, mode] of EXTRA_PLAYLISTS.entries()) {
+            const rank = data.profile.extras?.find((entry) => entry.key === mode.key) ?? null;
 
-        if (!rank) continue;
+            await drawExtraCard(ctx, PAD + (extraW + GAP) * index, bodyY, extraW, MAIN_CARD_HEIGHT, mode, rank);
+        }
+    } else {
+        await drawSectionHeading(ctx, sectionY, "RANKED", "HAUPTMODI", "trophy");
 
-        await drawRankCard(ctx, PAD + (mainW + GAP) * index, mainY, mainW, MAIN_CARD_HEIGHT, rank);
-    }
+        const mainW = (width - GAP * 2) / 3;
 
-    // --- Extra-Modi --------------------------------------------------------
-    // Immer alle fünf, auch ohne Daten: die Reihe soll nicht je Spieler anders
-    // aussehen. Ältere gespeicherte Stände haben noch keine extras.
-    const extraHeadY = mainY + MAIN_CARD_HEIGHT + SECTION_GAP;
+        // Fehlt eine Playlist, bleibt ihr Platz frei statt die anderen zu
+        // verschieben - drei Spalten sind drei Spalten.
+        for (const [index, key] of (["1v1", "2v2", "3v3"] as const).entries()) {
+            const rank = data.profile.ranks.find((entry) => entry.key === key);
 
-    await drawSectionHeading(ctx, extraHeadY, "EXTRA-MODI", "COMPETITIVE", "grid");
+            if (!rank) continue;
 
-    const extraY = extraHeadY + SECTION_BODY;
-    const extraW = (width - GAP * (EXTRA_PLAYLISTS.length - 1)) / EXTRA_PLAYLISTS.length;
-
-    for (const [index, mode] of EXTRA_PLAYLISTS.entries()) {
-        const rank = data.profile.extras?.find((entry) => entry.key === mode.key) ?? null;
-
-        await drawExtraCard(ctx, PAD + (extraW + GAP) * index, extraY, extraW, EXTRA_CARD_HEIGHT, mode, rank);
+            await drawRankCard(ctx, PAD + (mainW + GAP) * index, bodyY, mainW, MAIN_CARD_HEIGHT, rank);
+        }
     }
 
     // --- Karriere ------------------------------------------------------------
-    const careerHeadY = extraY + EXTRA_CARD_HEIGHT + SECTION_GAP;
+    const careerHeadY = bodyY + MAIN_CARD_HEIGHT + SECTION_GAP;
 
     await drawSectionHeading(ctx, careerHeadY, "KARRIERE", "STATISTIK", "target");
     await drawCareer(ctx, careerHeadY + SECTION_BODY, CAREER_CARD_HEIGHT, data.profile);

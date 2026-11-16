@@ -648,27 +648,46 @@
     right: 0;
     left: 0;
     display: flex;
-    align-items: flex-end;
+    align-items: flex-start;
     justify-content: center;
-    gap: b(8);
+    gap: b(9);
     color: var(--c-text);
     font-size: b(28);
     line-height: 1;
 
     @include oxanium(700);
 
-    /* Symbol mit der Unterkante auf der Grundlinie, wie ein Buchstabe ohne Unterlänge. */
-    svg,
-    .mask {
+    /* Das Symbol steht mittig zur Höhe der Ziffern: deren Mitte liegt 0,36 der
+       Schriftgröße über der Grundlinie, die Grundlinie 0,79 unter der Oberkante. */
+    svg {
         flex-shrink: 0;
-        width: b(26);
-        height: b(26);
-        margin-bottom: b(0.21 * 28);
+        width: b(30);
+        height: b(30);
+        margin-top: b(0.43 * 28 - 15);
     }
+}
 
-    .mask {
-        color: var(--c-text-dim);
-    }
+/* Symbole nach Entwurf I2 - Farben wie im Bot, Schein außer bei der leeren Flamme */
+.fire,
+.down,
+.pad {
+    filter: drop-shadow(0 0 b(10) currentcolor);
+}
+
+.fire {
+    color: var(--c-win);
+}
+
+.down {
+    color: var(--c-loss);
+}
+
+.idle {
+    color: #6f7884;
+}
+
+.pad {
+    color: #38c8ff;
 }
 
 .win {
@@ -692,7 +711,7 @@
 
 /* --- Extra-Modi (drawExtraCard) ------------------------------------------- */
 .extra {
-    height: b(340);
+    height: b(450);
 
     @include bot-panel(18, $fill: rgb(7 11 16 / 82%), $glow: 14);
 
@@ -708,89 +727,67 @@
         content: "";
     }
 
+    /* Seite 2 nach Entwurf E1: so hoch wie eine Ranked-Kachel, Inhalt größer */
     .rankRow {
-        top: b(64);
+        top: b(72);
         right: b(14);
         left: b(14);
-        height: b(92);
+        height: b(112);
 
         @include bot-panel(12, rgb(0 175 255 / 32%), rgb(10 16 24 / 72%), 1.5, 6);
     }
 
     .rankBadge {
-        top: b(16);
-        left: b(8);
-        width: b(60);
-        height: b(60);
+        top: b(22);
+        left: b(10);
+        width: b(68);
+        height: b(68);
     }
 
     .rankName {
         text-shadow: 0 0 b(10) var(--tier);
 
-        @include at-fit(78, 44);
+        @include at-fit(90, 52);
     }
 
     .rankDivision {
-        @include at(78, 72, 19);
+        @include at(90, 84, 20);
     }
 
+    /* drawCenteredMMR mit scale 0.88: Beschriftung 19, Zahl 56 */
     .mmrLabel {
-        @include center-at(192, 16, 3);
+        @include center-at(262, 19, 3);
     }
 
     .mmrValue {
-        @include center-at(235, 46);
+        @include center-at(315, 56);
     }
 
-    /* scale 0.8 im Bot: Werte 22, Symbole 21, Beschriftung 14 */
     .stats {
-        top: b(258);
+        top: b(336);
         right: b(18);
         left: b(18);
-        height: b(82);
-    }
-
-    .counterSep {
-        height: b(51.2);
-        margin-top: b(9.6);
-    }
-
-    .counterValue {
-        top: b(33.6 - 0.79 * 22);
-        gap: b(6.4);
-        font-size: b(22);
-
-        svg,
-        .mask {
-            width: b(21);
-            height: b(21);
-            margin-bottom: b(0.21 * 22);
-        }
-    }
-
-    .counterLabel {
-        @include center-at(54.4, 14, 1.6);
     }
 }
 
 .extraTop {
     display: flex;
     align-items: center;
-    gap: b(10);
+    gap: b(12);
     color: var(--c-text);
 
-    @include at(22, 46, 24);
+    @include at(22, 48, 26);
     @include rajdhani(700, 2);
 
-    /* Das Symbol steht im Bot 24 px unter der Oberkante, der Text auf 46. */
+    /* Das Symbol steht im Bot 24 px unter der Oberkante, der Text auf 48. */
     top: b(24);
-    height: b(26);
+    height: b(30);
 }
 
 .modeIcon {
     flex-shrink: 0;
-    width: b(26);
-    height: b(26);
+    width: b(30);
+    height: b(30);
     color: var(--accent);
     filter: drop-shadow(0 0 b(5) var(--accent));
 }
@@ -845,15 +842,42 @@
     font-family: var(--f-label);
     font-weight: 500;
 
-    @include at(38, 1648, 19);
+    @include at(38, 1182, 19);
 }
 
-/* --- Der Knopf unter der Karte, wie Discord ihn zeigt --------------------- */
-.trackerButton {
+/* --- Seitenwechsel -------------------------------------------------------- */
+/* Nur der mittlere Punkt blendet weich über, Kopf und Karriere stehen still. */
+.swap {
+    animation: swap 0.18s ease-out;
+
+    @media (prefers-reduced-motion: reduce) {
+        animation: none;
+    }
+}
+
+@keyframes swap {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+/* --- Die Knöpfe unter der Karte, wie Discord sie zeigt -------------------- */
+.buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.dbtn {
     display: inline-flex;
     align-items: center;
     gap: 6px;
     padding: 6px 14px;
+    border: 0;
     border-radius: 4px;
     background: #4e5058;
     color: #fff;
@@ -864,8 +888,40 @@
         sans-serif;
 }
 
-.trackerEmoji {
+button.dbtn {
+    cursor: pointer;
+    transition: background-color 0.15s;
+
+    &:hover {
+        background: #6d6f78;
+    }
+
+    &:focus-visible {
+        outline: 2px solid #00a8fc;
+        outline-offset: 2px;
+    }
+}
+
+.emoji {
     font-size: 15px;
+}
+
+.external {
+    width: 13px;
+    height: 13px;
+    opacity: 0.8;
+}
+
+/* Am Handy etwas höher, damit man die Knöpfe mit dem Daumen trifft - und
+   seitlich etwas knapper, damit beide auch bei 375 px in eine Reihe passen. */
+@container rankcard (width < 520px) {
+    .buttons {
+        gap: 6px;
+    }
+
+    .dbtn {
+        padding: 10px 12px;
+    }
 }
 
 /* --- Bildunterschrift ----------------------------------------------------- */
