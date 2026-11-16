@@ -132,16 +132,10 @@
     flex-direction: column;
     align-items: flex-start;
     gap: 10px;
-    /* Leicht gekippt, wie eine hingelegte Karte. Nicht mehr - eine schräge
-       Fläche voller Zahlen wird sonst mühsam zu lesen. */
-    transform: perspective(1800px) rotateY(-6deg) rotateX(1.5deg);
-    transform-style: preserve-3d;
 
-    /* Sobald die Karte unter dem Text steht statt daneben, hat die Neigung
-       keinen Bezug mehr - sie wirkt dann nur noch schief. */
-    @include below(1080px) {
-        transform: none;
-    }
+    /* Bewusst ohne 3D-Neigung: Mit perspective/rotateY rastert Chrome die Karte
+       als Bild und verzerrt es - die kleine Schrift wurde dabei unscharf. Gerade
+       stehend zeichnet der Browser jeden Buchstaben direkt auf die Pixel. */
 }
 
 /**
