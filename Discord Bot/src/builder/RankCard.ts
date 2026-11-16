@@ -298,6 +298,17 @@ function fitText(ctx: SKRSContext2D, text: string, max: number, size: number, we
     return current;
 }
 
+/** Kürzt einen Text mit „…“ auf die Breite max, in der gerade gesetzten Schrift. */
+function ellipsize(ctx: SKRSContext2D, text: string, max: number): string {
+    if (ctx.measureText(text).width <= max) return text;
+
+    let cut = text;
+
+    while (cut.length > 1 && ctx.measureText(`${cut}…`).width > max) cut = cut.slice(0, -1);
+
+    return `${cut}…`;
+}
+
 /**
  * Grossbuchstaben mit Sperrung - die HUD-Labels der Vorlage.
  *
@@ -656,7 +667,9 @@ async function drawHeader(ctx: SKRSContext2D, data: IRankCardData): Promise<void
     if (data.discordName) {
         ctx.font = "500 34px Rajdhani";
         ctx.fillStyle = COLORS.textDim;
-        ctx.fillText(`@${data.discordName}`, textX, nameY + 44);
+        // Discord-Namen sind bis zu 32 Zeichen lang - seit W-0129 steht rechts
+        // der Season-Reward-Kasten, also wie beim Epic-Namen auf dessen Kante kürzen.
+        ctx.fillText(ellipsize(ctx, `@${data.discordName}`, boxX - textX - 30), textX, nameY + 44);
     }
 
     // --- Season Reward --------------------------------------------------

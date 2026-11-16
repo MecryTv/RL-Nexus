@@ -256,7 +256,15 @@ export default class PrimeService implements IPrimeService {
 
         try {
             const profile = await this.Load(wanted);
-            this.cache.set(key, { value: profile, at: Date.now() });
+            const entry = { value: profile, at: Date.now() };
+
+            this.cache.set(key, entry);
+
+            // W-0129: auch unter der Konto-ID - der Knopf unter der Rang-Karte fragt
+            // über sie, /rank search über den Namen. So kostet der erste Klick nach
+            // einer Suche keine zweite Anfrage, und beide Seiten zeigen denselben Stand.
+            if (profile) this.cache.set(profile.accountId.toLowerCase(), entry);
+
             return profile;
         } catch (error) {
             if (!hit) throw error;
@@ -435,8 +443,21 @@ export default class PrimeService implements IPrimeService {
     }
 
     Forget(name?: string): void {
-        if (name) this.cache.delete(name.trim().toLowerCase());
-        else this.cache.clear();
+        if (!name) {
+            this.cache.clear();
+
+            return;
+        }
+
+        // Ein Profil steht unter Name und Konto-ID - vergessen heißt beide.
+        const key = name.trim().toLowerCase();
+        const account = this.cache.get(key)?.value?.accountId.toLowerCase() ?? key;
+
+        const doomed = [...this.cache.entries()]
+            .filter(([cached, entry]) => cached === key || cached === account || entry.value?.accountId.toLowerCase() === account)
+            .map(([cached]) => cached);
+
+        for (const cached of doomed) this.cache.delete(cached);
     }
 
     Close(): void {

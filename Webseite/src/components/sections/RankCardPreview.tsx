@@ -367,6 +367,9 @@ function StatIcon({ name }: { name: "fire" | "fire-off" | "down" | "pad" }): JSX
 
 let measureContext: CanvasRenderingContext2D | null = null;
 
+/** Messergebnisse von Fit, damit ein neu aufgebauter Text sofort richtig groß ist. */
+const FITTED = new Map<string, { text: string; size: number }>();
+
 /** Schriftgröße in Bot-Pixeln, bei der `text` in `max` passt. Gemessen wird in Oxanium, wie im Bot. */
 function fitSize(text: string, max: number, size: number, weight: number): number {
     measureContext ??= document.createElement("canvas").getContext("2d");
@@ -397,24 +400,33 @@ function fitSize(text: string, max: number, size: number, weight: number): numbe
  */
 function Fit(props: { className: string; text: string; short?: string; max: number; size: number; weight: number }): JSX.Element {
     const { className, text, short, max, size, weight } = props;
-    const [fitted, setFitted] = useState({ text, size });
+    const key = `${weight}|${size}|${max}|${short ?? ""}|${text}`;
+    // Schon einmal gemessen (etwa vor dem Umschalten der Seite): gleich mit dem
+    // Ergebnis starten, sonst blitzt der Text einen Frame lang zu groß auf.
+    const [fitted, setFitted] = useState(() => FITTED.get(key) ?? { text, size });
 
     useEffect(() => {
         let alive = true;
 
-        void document.fonts.load(`${weight} ${size}px Oxanium`, text).then(() => {
-            if (!alive) return;
+        document.fonts
+            .load(`${weight} ${size}px Oxanium`, text)
+            .then(() => {
+                if (!alive) return;
 
-            const full = fitSize(text, max, size, weight);
-            const shown = short && full < 20 ? short : text;
+                const full = fitSize(text, max, size, weight);
+                const shown = short && full < 20 ? short : text;
+                const result = { text: shown, size: shown === text ? full : fitSize(shown, max, size, weight) };
 
-            setFitted({ text: shown, size: shown === text ? full : fitSize(shown, max, size, weight) });
-        });
+                FITTED.set(key, result);
+                setFitted(result);
+            })
+            // Lädt die Schrift nicht, bleibt der Text ungemessen in Startgröße.
+            .catch(() => undefined);
 
         return () => {
             alive = false;
         };
-    }, [text, short, max, size, weight]);
+    }, [key, text, short, max, size, weight]);
 
     return (
         <span className={className} style={{ "--size": fitted.size } as CSSProperties}>
