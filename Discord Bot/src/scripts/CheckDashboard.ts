@@ -2258,6 +2258,24 @@ async function main(): Promise<void> {
         `Dashboard: ${switchable.join(", ")} | Bot: ${MODULE_IDS.join(", ")}`
     );
 
+    // W-0131: Das Admin Dashboard führt die Module für die Seite „Module“ selbst
+    // (shared/botModules.ts). Fehlt dort eins, lässt es sich nicht abschalten.
+    const adminList = await readFile(path.join(process.cwd(), "..", "Admin Dashboard", "shared", "botModules.ts"), "utf8").catch(() => "");
+    const listOf = (name: string): string[] => [...(new RegExp(`${name}[^=]*=\\s*\\[([^\\]]*)\\]`).exec(adminList)?.[1] ?? "").matchAll(/"([a-z0-9-]+)"/g)].map((match) => match[1]);
+    const adminIds = listOf("BOT_MODULE_IDS");
+    const adminPermanent = listOf("PERMANENT_BOT_MODULES");
+
+    check(
+        "Modul-Liste im Admin Dashboard ist die des Bots plus RL Tracking",
+        adminIds.length === MODULE_IDS.length + 1 && adminIds.includes("rl-tracking") && MODULE_IDS.every((known) => adminIds.includes(known)),
+        `Admin: ${adminIds.join(", ")}`
+    );
+    check(
+        "Feste Module im Admin Dashboard und im Bot gleich",
+        adminPermanent.length === PERMANENT_MODULES.size && adminPermanent.every((known) => PERMANENT_MODULES.has(known as never)),
+        `Admin: ${adminPermanent.join(", ")}`
+    );
+
     const ticketsApi = await fetch(`${BASE}${P}/api/guild/${id}/tickets`, MANUAL);
     check("Tickets ohne Sitzung ist 401", ticketsApi.status === 401, `${ticketsApi.status}`);
 
