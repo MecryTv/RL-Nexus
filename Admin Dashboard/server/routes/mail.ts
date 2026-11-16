@@ -10,7 +10,7 @@ import { InvalidInput, PublicError } from "../errors.ts";
 import { ACCOUNT_COLUMNS, accountRow, listAccounts, loginOf, parseAccount, probeLogin, sealPassword, toAccount, type IMailAccountRow } from "../mail/accounts.ts";
 import { mergeInboxes, type IInboxResult } from "../mail/all.ts";
 import { avatarOf, buildMail, cleanEditorHtml, htmlToText, previewHtml, rankOf, type IFile } from "../mail/compose.ts";
-import { attachment, folders, message, messages, moveTo, remove, setSeen } from "../mail/mailbox.ts";
+import { attachment, folders, message, messages, moveTo, remove, removeMany, setSeen } from "../mail/mailbox.ts";
 import { closeAccount, inFolder } from "../mail/pool.ts";
 import { sendFrom } from "../mail/send.ts";
 import { body, id, oneOf, text } from "../validate.ts";
@@ -268,6 +268,26 @@ export async function mailRoutes(app: FastifyInstance, { config }: { config: ICo
         publish("mail");
 
         return { result };
+    });
+
+    // W-0128: Im Papierkorb mehrere auf einmal endgültig löschen, höchstens eine Seite der Liste.
+    app.post("/api/mail/:account/trash/delete", async (request) => {
+        const actor = accessOf(request);
+        const row = await rowOf(request);
+        const input = body(request.body);
+        const folder = text(input.folder, "Der Ordner", { min: 1, max: 300 });
+        const raw = Array.isArray(input.uids) ? input.uids : [];
+
+        if (raw.length === 0 || raw.length > PAGE_SIZE) throw new InvalidInput(`Wähle 1 bis ${PAGE_SIZE} Mails aus.`);
+
+        const uids = [...new Set(raw.map((value) => id(String(value))))];
+
+        await removeMany(mail, row, folder, uids);
+        // Ohne Betreffs: Das Protokoll lebt länger als die Mails.
+        await audit(actor, "mail.delete", row.address, `${folder}, endgültig, ${uids.length === 1 ? "1 Mail" : `${uids.length} Mails`}`);
+        publish("mail");
+
+        return { deleted: uids.length };
     });
 
     app.get("/api/mail/:account/attachment", async (request, reply) => {

@@ -9,7 +9,7 @@ import { mergeInboxes } from "../mail/all.ts";
 import { openPassword, parseAccount, probeLogin, sealPassword, type IMailAccountRow } from "../mail/accounts.ts";
 import { buildMail, cleanEditorHtml, htmlToText, previewHtml, rankOf, type IDraft } from "../mail/compose.ts";
 import { setMailConnections } from "../mail/connect.ts";
-import { decodePart, folders, message, messages, moveTo, remove, setSeen } from "../mail/mailbox.ts";
+import { decodePart, folders, message, messages, moveTo, remove, removeMany, setSeen } from "../mail/mailbox.ts";
 import { closeAllMail } from "../mail/pool.ts";
 import { previewText, sanitizeMail, textToHtml } from "../mail/render.ts";
 import { sendFrom } from "../mail/send.ts";
@@ -401,6 +401,22 @@ export async function checkMail(): Promise<void> {
             assert.equal(await remove(mail, row, "INBOX", newer), "trash");
             const trashed = store.folder("Trash").messages[0].uid;
             assert.equal(await remove(mail, row, "Trash", trashed), "gone");
+            assert.equal(store.folder("Trash").messages.length, 0);
+        });
+
+        await check("Papierkorb: mehrere auf einmal endgültig löschen, anderswo nicht (W-0128)", async () => {
+            const meta = { subject: "Weg", from: "a@b.test", to: "support@nexus-emb.de", text: "", attachments: false, date: new Date() };
+            const uids = [1, 2, 3].map(() => store.store("Trash", Buffer.from("Subject: Weg\r\n\r\nweg"), [], meta));
+
+            await removeMany(mail, row, "Trash", [uids[0], uids[2]]);
+            assert.deepEqual(
+                store.folder("Trash").messages.map((entry) => entry.uid),
+                [uids[1]]
+            );
+
+            await assert.rejects(removeMany(mail, row, "INBOX", [uids[1]]), /nur im Papierkorb/);
+
+            await removeMany(mail, row, "Trash", [uids[1]]);
             assert.equal(store.folder("Trash").messages.length, 0);
         });
 

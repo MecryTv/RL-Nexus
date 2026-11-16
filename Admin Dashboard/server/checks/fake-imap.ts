@@ -215,12 +215,17 @@ export class FakeImap extends EventEmitter {
         return { path: destination };
     }
 
+    /** Wie imapflow: eine UID oder eine Liste „5,7,9“ (W-0128). */
     async messageDelete(uid: string): Promise<boolean> {
         const source = this.messagesIn(this.selected ?? "INBOX");
-        const index = source.findIndex((entry) => entry.uid === Number(uid));
-        if (index >= 0) source.splice(index, 1);
+        const wanted = new Set(uid.split(",").map(Number));
+        const before = source.length;
 
-        return index >= 0;
+        for (let index = source.length - 1; index >= 0; index--) {
+            if (wanted.has(source[index].uid)) source.splice(index, 1);
+        }
+
+        return source.length < before;
     }
 
     async append(path: string, content: Buffer, flags: string[] = []): Promise<{ destination: string; uid: number }> {

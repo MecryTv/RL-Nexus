@@ -436,6 +436,64 @@ $phone: 767px;
     color: var(--c-text-dim);
 }
 
+/* W-0128, Entwurf A: im Papierkorb mehrere auf einmal löschen. Erst „Auswählen“,
+   dann Kästchen und die rote Leiste, angehakte Zeilen rot getönt. */
+.pickStart {
+    margin-left: auto;
+}
+
+.pickBar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s-2);
+    padding: var(--s-2) var(--s-3);
+    border-bottom: 1px solid rgb(255 30 45 / 35%);
+    background: rgb(255 30 45 / 10%);
+}
+
+.pickCount {
+    @include label(0.8rem, 0.08em);
+
+    font-weight: 700;
+}
+
+.pickEnd {
+    display: flex;
+    gap: var(--s-1);
+    margin-left: auto;
+}
+
+.pickBox {
+    flex-shrink: 0;
+    width: 18px;
+    height: 18px;
+    margin: 3px 0 0;
+    accent-color: var(--c-red);
+    cursor: pointer;
+}
+
+.rowPick {
+    grid-template-columns: auto minmax(0, 1fr);
+    column-gap: var(--s-3);
+    align-items: start;
+    cursor: pointer;
+}
+
+.rowBody {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+}
+
+.rowPicked {
+    background: rgb(255 30 45 / 8%);
+
+    &:hover {
+        background: rgb(255 30 45 / 11%);
+    }
+}
+
 .listNotice {
     margin: var(--s-2) var(--s-3) 0;
     padding: var(--s-2) var(--s-3);

@@ -4,9 +4,11 @@ import type { IMailSummary } from "../../shared/api";
 import type { MailListFilter } from "../../shared/limits";
 import { displayName, listTime } from "../api/mail";
 import { Button } from "../components/Button";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import { Icon } from "../components/Icon";
 import { Failure, Loading } from "../components/Status";
 import type { IApiState } from "../api/useApi";
+import { useToast } from "../toast/context";
 import styles from "./mail.module.scss";
 
 const MAIL_FILTERS: readonly { readonly value: MailListFilter; readonly label: string }[] = [
@@ -68,6 +70,50 @@ interface IListData {
     readonly pageSize: number;
 }
 
+/** Absender, Zeit, Betreff und Vorschau einer Zeile - gleich, ob sie die Mail öffnet oder angehakt wird. */
+function RowContent({ entry, box }: { readonly entry: IListItem; readonly box: { readonly label: string; readonly color: string } | null }): JSX.Element {
+    return (
+        <>
+            <span className={styles.rowTop}>
+                <span className={styles.rowFrom}>
+                    {box && <span className={styles.rowDot} style={{ background: box.color }} title={box.label} aria-hidden="true" />}
+                    {!entry.seen && <span className="u-sr">Ungelesen: </span>}
+                    {displayName(entry.from)}
+                </span>
+                <time className={styles.rowTime} dateTime={entry.date}>
+                    {listTime(entry.date)}
+                </time>
+            </span>
+            <span className={styles.rowSubject}>
+                {entry.answered && (
+                    <>
+                        <Icon name="reply" size={14} />
+                        <span className="u-sr">Beantwortet: </span>
+                    </>
+                )}
+                <span>{entry.subject}</span>
+                {entry.attachments && (
+                    <>
+                        <Icon name="paperclip" size={14} />
+                        <span className="u-sr">, mit Anhang</span>
+                    </>
+                )}
+            </span>
+            {(box || entry.preview) && (
+                <span className={styles.rowPreview}>
+                    {box && <span className={styles.rowBox}>{box.label}</span>}
+                    {box && entry.preview ? " · " : ""}
+                    {entry.preview}
+                </span>
+            )}
+        </>
+    );
+}
+
+function messageOf(error: unknown): string {
+    return error instanceof Error ? error.message : String(error);
+}
+
 /** Mails eines Ordners oder aller Posteingänge: neueste zuerst, Ungelesenes mit blauem Rand. */
 export function MessageList({
     title,
@@ -80,6 +126,7 @@ export function MessageList({
     isSelected,
     boxOf,
     onChange,
+    onDeleteMany,
 }: {
     readonly title: string;
     readonly state: IApiState<IListData>;
@@ -94,10 +141,50 @@ export function MessageList({
     /** Name und Farbe des Postfachs für den Punkt vor dem Absender. */
     readonly boxOf?: (entry: IListItem) => { readonly label: string; readonly color: string } | null;
     readonly onChange: (next: { readonly filter?: MailListFilter; readonly query?: string; readonly page?: number }) => void;
+    /**
+     * W-0128, Entwurf A: Im Papierkorb mehrere Mails auf einmal endgültig löschen.
+     * Erst „Auswählen“, dann Kästchen; sonst bleibt die Liste, wie sie ist.
+     */
+    readonly onDeleteMany?: (uids: readonly number[]) => Promise<void>;
 }): JSX.Element {
     const { data, error, reload } = state;
+    const notify = useToast();
+    const [picking, setPicking] = useState(false);
+    const [picked, setPicked] = useState<ReadonlySet<number>>(new Set());
+    const [confirm, setConfirm] = useState(false);
+    const [busy, setBusy] = useState(false);
     const pages = data ? Math.max(1, Math.ceil(data.total / data.pageSize)) : 1;
     const search = new URLSearchParams({ ...(filter === "alle" ? {} : { filter }), ...(query ? { q: query } : {}), ...(page > 1 ? { seite: String(page) } : {}) }).toString();
+    // Gezählt und gelöscht wird nur, was auf dieser Seite angehakt ist.
+    const onPage = data?.messages.map((entry) => entry.uid) ?? [];
+    const chosen = onPage.filter((uid) => picked.has(uid));
+    const all = onPage.length > 0 && chosen.length === onPage.length;
+    const count = chosen.length === 1 ? "1 Mail" : `${chosen.length} Mails`;
+
+    const toggle = (uid: number): void => setPicked((current) => (current.has(uid) ? new Set([...current].filter((entry) => entry !== uid)) : new Set([...current, uid])));
+    const toggleAll = (): void => setPicked(all ? new Set() : new Set(onPage));
+    const stop = (): void => {
+        setPicking(false);
+        setPicked(new Set());
+    };
+
+    async function deleteChosen(): Promise<void> {
+        if (!onDeleteMany || chosen.length === 0) return;
+
+        setBusy(true);
+
+        try {
+            await onDeleteMany(chosen);
+            notify(`${count} endgültig gelöscht`);
+            stop();
+            reload();
+        } catch (failure) {
+            notify(messageOf(failure), "danger");
+        } finally {
+            setBusy(false);
+            setConfirm(false);
+        }
+    }
 
     return (
         <>
@@ -113,8 +200,42 @@ export function MessageList({
                             {entry.label}
                         </button>
                     ))}
+                    {onDeleteMany && !picking && onPage.length > 0 && (
+                        <span className={styles.pickStart}>
+                            <Button size="sm" icon="check" onClick={() => setPicking(true)}>
+                                Auswählen
+                            </Button>
+                        </span>
+                    )}
                 </div>
             </div>
+
+            {picking && (
+                <div className={styles.pickBar} role="toolbar" aria-label="Auswahl">
+                    <input
+                        type="checkbox"
+                        className={styles.pickBox}
+                        checked={all}
+                        ref={(element) => {
+                            if (element) element.indeterminate = chosen.length > 0 && !all;
+                        }}
+                        onChange={toggleAll}
+                        aria-label="Alle auf dieser Seite auswählen"
+                    />
+                    <span className={styles.pickCount}>{chosen.length} ausgewählt</span>
+                    <Button size="sm" variant="ghost" onClick={toggleAll}>
+                        {all ? "Keine" : `Alle ${onPage.length} auf der Seite`}
+                    </Button>
+                    <span className={styles.pickEnd}>
+                        <Button size="sm" variant="danger" icon="trash" disabled={chosen.length === 0 || busy} onClick={() => setConfirm(true)}>
+                            Endgültig löschen
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={stop}>
+                            Fertig
+                        </Button>
+                    </span>
+                </div>
+            )}
 
             <div className={styles.scroll}>
                 {notice && <p className={styles.listNotice}>{notice}</p>}
@@ -129,47 +250,27 @@ export function MessageList({
                         {data.messages.map((entry) => {
                             const on = isSelected(entry);
                             const box = boxOf?.(entry) ?? null;
+                            const ticked = picked.has(entry.uid);
 
                             return (
                                 <li key={`${entry.account ?? 0}-${entry.uid}`}>
-                                    <Link
-                                        to={`${linkOf(entry)}${search ? `?${search}` : ""}`}
-                                        className={[styles.row, !entry.seen && styles.rowUnread, on && styles.rowOn].filter(Boolean).join(" ")}
-                                        aria-current={on ? "page" : undefined}
-                                    >
-                                        <span className={styles.rowTop}>
-                                            <span className={styles.rowFrom}>
-                                                {box && <span className={styles.rowDot} style={{ background: box.color }} title={box.label} aria-hidden="true" />}
-                                                {!entry.seen && <span className="u-sr">Ungelesen: </span>}
-                                                {displayName(entry.from)}
+                                    {picking ? (
+                                        // Im Auswahl-Modus hakt ein Klick auf die Zeile an, statt die Mail zu öffnen.
+                                        <label className={[styles.row, styles.rowPick, !entry.seen && styles.rowUnread, ticked && styles.rowPicked].filter(Boolean).join(" ")}>
+                                            <input type="checkbox" className={styles.pickBox} checked={ticked} onChange={() => toggle(entry.uid)} />
+                                            <span className={styles.rowBody}>
+                                                <RowContent entry={entry} box={box} />
                                             </span>
-                                            <time className={styles.rowTime} dateTime={entry.date}>
-                                                {listTime(entry.date)}
-                                            </time>
-                                        </span>
-                                        <span className={styles.rowSubject}>
-                                            {entry.answered && (
-                                                <>
-                                                    <Icon name="reply" size={14} />
-                                                    <span className="u-sr">Beantwortet: </span>
-                                                </>
-                                            )}
-                                            <span>{entry.subject}</span>
-                                            {entry.attachments && (
-                                                <>
-                                                    <Icon name="paperclip" size={14} />
-                                                    <span className="u-sr">, mit Anhang</span>
-                                                </>
-                                            )}
-                                        </span>
-                                        {(box || entry.preview) && (
-                                            <span className={styles.rowPreview}>
-                                                {box && <span className={styles.rowBox}>{box.label}</span>}
-                                                {box && entry.preview ? " · " : ""}
-                                                {entry.preview}
-                                            </span>
-                                        )}
-                                    </Link>
+                                        </label>
+                                    ) : (
+                                        <Link
+                                            to={`${linkOf(entry)}${search ? `?${search}` : ""}`}
+                                            className={[styles.row, !entry.seen && styles.rowUnread, on && styles.rowOn].filter(Boolean).join(" ")}
+                                            aria-current={on ? "page" : undefined}
+                                        >
+                                            <RowContent entry={entry} box={box} />
+                                        </Link>
+                                    )}
                                 </li>
                             );
                         })}
@@ -178,6 +279,20 @@ export function MessageList({
             </div>
 
             <Pager page={page} pages={pages} onPage={(next) => onChange({ page: next })} />
+
+            <ConfirmDialog
+                open={confirm}
+                title="Endgültig löschen?"
+                confirmLabel="Löschen"
+                tone="danger"
+                busy={busy}
+                onConfirm={() => void deleteChosen()}
+                onCancel={() => setConfirm(false)}
+            >
+                <p>
+                    {chosen.length === 1 ? "1 Mail liegt" : `${chosen.length} Mails liegen`} im Papierkorb und {chosen.length === 1 ? "ist" : "sind"} danach weg, auch in Mailcow.
+                </p>
+            </ConfirmDialog>
         </>
     );
 }

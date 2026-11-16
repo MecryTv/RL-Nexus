@@ -317,6 +317,19 @@ export async function remove(mail: IMailConfig, row: IMailAccountRow, folder: st
     return "gone";
 }
 
+/**
+ * W-0128: Mehrere Mails auf einmal endgültig löschen - nur im Papierkorb. Anderswo
+ * hieße Löschen „in den Papierkorb“, und das geht weiter einzeln über remove().
+ * Ein IMAP-Befehl für alle, die UIDs als Liste.
+ */
+export async function removeMany(mail: IMailConfig, row: IMailAccountRow, folder: string, uids: readonly number[]): Promise<void> {
+    if ((await pathFor(mail, row, "trash")) !== folder) throw new PublicError(400, "Mehrere Mails auf einmal lassen sich nur im Papierkorb löschen.");
+
+    await inFolder(mail, row, folder, async (client) => {
+        await client.messageDelete(uids.join(","), { uid: true });
+    });
+}
+
 /** Eine verschickte Mail in „Gesendet“ ablegen, schon gelesen. */
 export async function appendSent(mail: IMailConfig, row: IMailAccountRow, raw: Buffer): Promise<void> {
     const sent = (await folders(mail, row)).find((entry) => entry.role === "sent")?.path ?? (await (await connection(mail, row)).mailboxCreate("Sent")).path;

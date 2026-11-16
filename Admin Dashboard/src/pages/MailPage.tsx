@@ -2,6 +2,7 @@ import { useEffect, useState, type JSX } from "react";
 import { Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type { IMailBox, IMailPage } from "../../shared/api";
 import { MAIL_LIST_FILTERS, type MailListFilter } from "../../shared/limits";
+import { api } from "../api/client";
 import { useLive } from "../api/live";
 import { boxColor, mailPath, unreadOf, useMailOverview } from "../api/mail";
 import { useApi } from "../api/useApi";
@@ -67,10 +68,21 @@ function useListParams(): {
 /** Die Liste eines Ordners. Eigene Komponente, damit sie nur lädt, wenn ein Ordner offen ist. */
 function FolderPane({ box, folder, uid }: { readonly box: IMailBox; readonly folder: string; readonly uid: number | null }): JSX.Element {
     const list = useListParams();
+    const navigate = useNavigate();
     const state = useApi<IMailPage>(`/api/mail/${box.id}/messages?folder=${encodeURIComponent(folder)}&${list.search}`);
-    const name = box.folders?.find((entry) => entry.path === folder)?.name ?? folder;
+    const current = box.folders?.find((entry) => entry.path === folder);
+    const name = current?.name ?? folder;
 
     useLive("mail", state.reload);
+
+    // W-0128: Mehrere auf einmal gibt es nur im Papierkorb. War die offene Mail dabei, schließt der Lesebereich.
+    const deleteMany =
+        current?.role === "trash"
+            ? async (uids: readonly number[]): Promise<void> => {
+                  await api(`/api/mail/${box.id}/trash/delete`, { method: "POST", body: { folder, uids } });
+                  if (uid !== null && uids.includes(uid)) navigate(mailPath(box.id, folder));
+              }
+            : undefined;
 
     return (
         <MessageList
@@ -82,6 +94,7 @@ function FolderPane({ box, folder, uid }: { readonly box: IMailBox; readonly fol
             linkOf={(entry) => mailPath(box.id, folder, entry.uid)}
             isSelected={(entry) => entry.uid === uid}
             onChange={list.onChange}
+            onDeleteMany={deleteMany}
         />
     );
 }
