@@ -306,7 +306,7 @@ export function renderGuild(data: IPayload): void {
         need<HTMLElement>("#noFacts").hidden =
             !need<HTMLElement>("#serverBlock").hidden || !need<HTMLElement>("#memberBlock").hidden;
 
-        loadModules(detail?.modules ?? null);
+        loadModules(detail?.modules ?? null, detail?.moduleNotices ?? {});
 
         // Ein Raid betrifft jede Modulseite - der Balken steht über allen (Anti Villain).
         if (!supportOnly && guild.canManage && (detail?.modules ?? guild.modules).includes("anti-villain")) watchRaid(guild.id);
@@ -504,7 +504,9 @@ const FAILED: Record<number, string> = {
  * einem Stand. Zurück kommt der Weg, den Stand aus der Datenbank nachzureichen;
  * null heißt, es gibt keinen, und die Schalter bleiben gesperrt.
  */
-function bindModules(guild: IGuild, only: Set<string> | null, side: INav): (modules: string[] | null) => void {
+type ModuleNotices = NonNullable<IGuildDetail["moduleNotices"]>;
+
+function bindModules(guild: IGuild, only: Set<string> | null, side: INav): (modules: string[] | null, notices?: ModuleNotices) => void {
     const nav = need<HTMLElement>("#setNav");
     const rail = need<HTMLElement>("#setRail");
     const cards = need<HTMLElement>("#moduleCards");
@@ -517,6 +519,8 @@ function bindModules(guild: IGuild, only: Set<string> | null, side: INav): (modu
     let saved = new Set(guild.modules);
     let shown = new Set(saved);
     let ready = false;
+    // W-0131: Hinweise und global geschlossene Module aus dem Admin Dashboard.
+    let notices: ModuleNotices = {};
     // Aus, aber noch gebraucht: Anti Villain mit Festgehaltenen bleibt in der Leiste, damit das Team freigeben kann.
     const pinned = new Set<string>();
 
@@ -633,9 +637,15 @@ function bindModules(guild: IGuild, only: Set<string> | null, side: INav): (modu
 
             for (const anchor of entry.links) anchor.hidden = !linked || (only !== null && !only.has(anchor.dataset.section ?? ""));
 
-            entry.input.checked = checked;
-            entry.input.disabled = entry.always || !ready || !guild.canManage;
-            entry.tile.classList.toggle("acct--on", checked);
+            const notice = notices[id];
+            const closed = notice?.open === false;
+
+            entry.input.checked = checked && !closed;
+            entry.input.disabled = entry.always || closed || !ready || !guild.canManage;
+            entry.tile.classList.toggle("acct--on", checked && !closed);
+            entry.tile.classList.toggle("acct--closed", closed);
+            showNotice(entry.tile.querySelector(".acct__text")!, "modnotice", notice, closed);
+            showNotice(document.getElementById(id), "modbanner", notice, closed, true);
         }
 
         // Bereiche ohne Modul verschwinden, die Zahlen folgen.
@@ -653,6 +663,25 @@ function bindModules(guild: IGuild, only: Set<string> | null, side: INav): (modu
 
         // Wer direkt auf /anti-villain kam, landete vor dem Nachfragen auf der Übersicht - jetzt die richtige Seite.
         if (held > 0 && route().section === "anti-villain") window.dispatchEvent(new PopStateEvent("popstate"));
+    }
+
+    /** Hinweis aus dem Admin Dashboard an der Kachel oder oben auf der Modulseite. Nur als Text, nie als HTML. */
+    function showNotice(into: HTMLElement | null, kind: string, notice: ModuleNotices[string] | undefined, closed: boolean, first = false): void {
+        if (!into) return;
+
+        let box = into.querySelector<HTMLElement>(`:scope > .${kind}`);
+        const text = notice ? (closed ? `Gerade abgeschaltet. ${notice.text ?? ""}`.trim() : notice.text) : null;
+
+        if (!text) return void box?.remove();
+
+        if (!box) {
+            box = document.createElement(first ? "p" : "span");
+            box.className = kind;
+            if (first) into.prepend(box);
+            else into.append(box);
+        }
+
+        box.textContent = text;
     }
 
     function warn(text: string | null): void {
@@ -794,7 +823,9 @@ function bindModules(guild: IGuild, only: Set<string> | null, side: INav): (modu
 
     paint();
 
-    return (modules) => {
+    return (modules, next = {}) => {
+        notices = next;
+
         if (modules === null) {
             warn("Module lassen sich gerade nicht schalten, der Bot erreicht seine Datenbank nicht.");
         } else {

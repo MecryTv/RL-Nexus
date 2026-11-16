@@ -1613,6 +1613,10 @@ body[data-page="guild"]{--shell:1440px}
 @media (pointer:coarse){.navfind__hit{min-height:44px}.navfind__foot{display:none}}
 /* Ein festes Modul: der Schalter steht da, laesst sich aber nicht bewegen. */
 .modlist .modalways{display:block;margin-top:4px;color:var(--text-2)}
+/* W-0131: Hinweis und Sperre aus dem Admin Dashboard (Bot → Module). */
+.modlist .modnotice{display:block;margin-top:6px;padding:6px 8px;border:1px solid rgb(255 197 61 / 40%);background:rgb(255 197 61 / 7%);color:var(--text-2);font-size:.85em;overflow-wrap:anywhere}
+.modlist .acct--closed{opacity:.8}
+.modbanner{margin:0 0 14px;padding:10px 12px;border:1px solid rgb(255 197 61 / 40%);background:rgb(255 197 61 / 7%);color:var(--text-2);overflow-wrap:anywhere}
 /* "Module": ein Raster aus Kacheln mit Schalter, ohne Kategorien. Die Kacheln
    sind die Konto-Zeilen der Einstellungen (.acct) - an ist, was rot markiert
    ist, wie dort. */

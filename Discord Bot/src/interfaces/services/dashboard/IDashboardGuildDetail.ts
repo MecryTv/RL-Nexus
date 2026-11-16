@@ -24,4 +24,6 @@ export default interface IDashboardGuildDetail {
     // Die eingeschalteten Module, frisch aus der Datenbank. null heißt: ohne
     // Datenbank lässt sich nichts schalten.
     modules: string[] | null;
+    // W-0131: je Modul mit Hinweis oder im Admin global geschlossen. Der Text ist roh.
+    moduleNotices: Record<string, { open: boolean; text: string | null }>;
 }

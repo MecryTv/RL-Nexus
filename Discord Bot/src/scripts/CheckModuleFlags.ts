@@ -9,8 +9,10 @@ process.env.CLIENT_SECRET ||= "check-secret";
 process.env.DEV_CLIENT_SECRET ||= "check-secret";
 
 import BotClient from "../client/BotClient";
+import CommandHandler from "../events/client/CommandHandler";
+import GuildSettings from "../models/GuildSettings";
 import AdminModulesReload from "../routes/AdminModulesReload";
-import { ActiveModules, ClosedText, CurrentLinkMode, LoadFlags, ModuleOpen, NoticeOf, OnFlagsLoaded, SetFlags } from "../utils/moduleFlags";
+import { ActiveModules, ClosedText, CurrentLinkMode, LoadFlags, ModuleNotices, ModuleOpen, NoticeOf, OnFlagsLoaded, SetFlags } from "../utils/moduleFlags";
 
 let failures = 0;
 
@@ -61,6 +63,92 @@ function Reply(): { statusCode: number; code: (status: number) => unknown; send:
     };
 
     return reply;
+}
+
+/** Ein Server mit gespeicherter Modulliste, ohne Datenbank darunter. Write merkt sich, was gespeichert würde. */
+function SettingsClient(stored: string[]): { client: BotClient; written: string[][] } {
+    const written: string[][] = [];
+    let modules = JSON.stringify(stored);
+    const row = () => ({ guild_id: "g1", modules, rank_roles: "{}", match_channel: null, queue_channel: null, moderators: "{}" });
+
+    const client = {
+        databaseService: {
+            Ready: true,
+            Cached: (_table: string, _key: string, load: () => unknown) => load(),
+            One: async () => row(),
+            Query: async () => [row()],
+            Write: async (_sql: string, values: unknown[]) => {
+                modules = String(values[1]);
+                written.push(JSON.parse(modules) as string[]);
+
+                return { affectedRows: 1, insertId: 0 };
+            },
+            Bump: () => undefined,
+        },
+    } as unknown as BotClient;
+
+    return { client, written };
+}
+
+async function checkGating(): Promise<void> {
+    console.log("\n  — Abschalten wirkt (W-0131) —");
+
+    const { client, written } = SettingsClient(["polls", "welcome"]);
+    const settings = new GuildSettings(client);
+
+    SetFlags([{ module: "polls", status: "off", notice: null }], [], []);
+    const off = (await settings.Of("g1")).modules;
+    check("Global aus: Modul fehlt in der Liste des Servers, gespeichert bleibt es", !off.includes("polls") && off.includes("welcome") && (await settings.RawModules("g1")).includes("polls"), off.join(","));
+
+    const many = await settings.ModulesOf(["g1"]);
+    check("Auch die Liste für mehrere Server lässt es weg", !(many.get("g1") ?? []).includes("polls"));
+
+    const toggled = await settings.Toggle("g1", "clips", true);
+    check("Ein anderes Modul schalten lässt das abgeschaltete in der Spalte", (written.at(-1) ?? []).includes("polls") && (written.at(-1) ?? []).includes("clips") && !toggled.includes("polls"), JSON.stringify(written.at(-1)));
+
+    SetFlags([], [], []);
+    check("Wieder an: der Server hat es ohne Zutun zurück", (await settings.Of("g1")).modules.includes("polls"));
+
+    // Befehle eines geschlossenen Moduls laufen nicht, der Bot antwortet mit dem Hinweis, ohne Ping.
+    SetFlags([{ module: "polls", status: "off", notice: "@everyone **Umbau**" }], [], []);
+    let ran = 0;
+    const replies: Record<string, unknown>[] = [];
+    const command = (module?: string) => ({ name: "umfrage", module, developerOnly: false, cooldown: 1, Execute: async () => void ran++ });
+    const handlerClient = (module?: string) =>
+        ({
+            commands: new Map([["umfrage", command(module)]]),
+            cooldowns: new Map(),
+            config: { DEV_USER_IDs: [] },
+        }) as unknown as BotClient;
+    const interaction = () => ({
+        commandName: "umfrage",
+        guildId: null,
+        user: { id: "u1" },
+        isAutocomplete: () => false,
+        isChatInputCommand: () => true,
+        isContextMenuCommand: () => false,
+        isUserContextMenuCommand: () => false,
+        isMessageContextMenuCommand: () => false,
+        inCachedGuild: () => false,
+        reply: async (message: Record<string, unknown>) => void replies.push(message),
+    });
+
+    await new CommandHandler(handlerClient("polls")).Execute(interaction() as never);
+    const answer = JSON.stringify(replies.at(-1) ?? {});
+    check("Befehl eines abgeschalteten Moduls läuft nicht", ran === 0);
+    check("Antwort mit dem Hinweis, nur für die Person, ohne Ping", answer.includes("Umbau") && answer.includes('"parse":[]') && (replies.at(-1)?.flags !== undefined || answer.includes("ephemeral") || answer.includes('"flags"')), answer.slice(0, 300));
+
+    await new CommandHandler(handlerClient(undefined)).Execute(interaction() as never);
+    check("Befehl ohne Modul läuft", ran === 1);
+
+    SetFlags([{ module: "polls", status: "off", notice: "<b>Umbau</b>" }, { module: "clips", status: "on", notice: "Neu" }], [], []);
+    const notices = ModuleNotices(["polls", "clips", "welcome"], "g1");
+    check(
+        "Dashboard: Hinweise und Sperren je Modul, Text roh (das Dashboard setzt ihn als Text)",
+        notices.polls?.open === false && notices.polls?.text === "<b>Umbau</b>" && notices.clips?.open === true && notices.clips?.text === "Neu" && !("welcome" in notices),
+        JSON.stringify(notices)
+    );
+    SetFlags([], [], []);
 }
 
 async function main(): Promise<void> {
@@ -126,6 +214,8 @@ async function main(): Promise<void> {
     const broken = Reply();
     await new AdminModulesReload(Client([], [], [], true)).Handle({ token: { scope: ["admin"] } } as never, broken as never);
     check("Tabelle nicht lesbar: 503", broken.statusCode === 503, String(broken.statusCode));
+
+    await checkGating();
 
     console.log(failures > 0 ? `\n  ${failures} Prüfung(en) fehlgeschlagen.\n` : "\n  Alles ok.\n");
     process.exit(failures > 0 ? 1 : 0);

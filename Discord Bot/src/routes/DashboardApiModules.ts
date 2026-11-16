@@ -9,6 +9,7 @@ import { IsModule, IsPermanent } from "../constants/Modules";
 import { WantsJSON } from "../utils/admin";
 import { SessionOf } from "../utils/dashboard";
 import logger from "../utils/logger";
+import { ClosedText, ModuleOpen } from "../utils/moduleFlags";
 
 interface IBody {
     module?: unknown;
@@ -56,6 +57,11 @@ export default class DashboardApiModules extends Route {
                 error: "Dieses Modul lässt sich nicht ausschalten.",
                 hint: "Die Galerie gehört fest zum Bot.",
             });
+        }
+
+        // W-0131: Im Admin Dashboard global abgeschaltet - einschalten geht erst, wenn es dort wieder an ist.
+        if (on && !ModuleOpen(moduleId, id)) {
+            return reply.code(409).send({ error: "Gerade abgeschaltet", hint: ClosedText(moduleId) });
         }
 
         if (!this.client.databaseService.Ready) {

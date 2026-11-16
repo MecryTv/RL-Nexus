@@ -2,6 +2,7 @@ import Model from "../structures/Model";
 import { OrNull, TABLES, TableName, Unpack } from "../constants/Database";
 import { ModuleId, PERMANENT_MODULES } from "../constants/Modules";
 import { ITicketModerators } from "../interfaces/services/tickets/ITicket";
+import { ActiveModules } from "../utils/moduleFlags";
 
 /** Eine Zeile aus guild_settings, so wie MariaDB sie liefert. */
 export interface IGuildSettingsRow {
@@ -75,11 +76,12 @@ export default class GuildSettings extends Model<IGuildSettingsRow> {
     async Of(guildId: string): Promise<IGuildSettings> {
         const row = await this.Find(guildId);
 
-        if (!row) return { guildId, ...DEFAULT_SETTINGS, modules: WithPermanent([]), moderators: { users: [], roles: [] } };
+        // W-0131: Was im Admin global aus ist, fehlt in der Liste. Gespeichert bleibt es (RawModules).
+        if (!row) return { guildId, ...DEFAULT_SETTINGS, modules: ActiveModules(guildId, WithPermanent([])), moderators: { users: [], roles: [] } };
 
         return {
             guildId: row.guild_id,
-            modules: WithPermanent(Unpack<string[]>(row.modules, [])),
+            modules: ActiveModules(guildId, WithPermanent(Unpack<string[]>(row.modules, []))),
             rankRoles: Unpack<Record<string, string>>(row.rank_roles, {}),
             matchChannel: row.match_channel,
             queueChannel: row.queue_channel,
@@ -114,7 +116,7 @@ export default class GuildSettings extends Model<IGuildSettingsRow> {
 
         await this.Save({ ...settings, modules: next });
 
-        return WithPermanent(next);
+        return ActiveModules(guildId, WithPermanent(next));
     }
 
     /**
@@ -135,13 +137,13 @@ export default class GuildSettings extends Model<IGuildSettingsRow> {
             )
         );
 
-        for (const row of rows) found.set(row.guild_id, WithPermanent(Unpack<string[]>(row.modules, [])));
+        for (const row of rows) found.set(row.guild_id, ActiveModules(row.guild_id, WithPermanent(Unpack<string[]>(row.modules, []))));
 
         // Auch ohne eigene Zeile bekommt jeder angefragte Server die festen
         // Module - sonst zeigt die Serverliste (die hier durchgeht) etwas
         // anderes als die Detailseite (die über Of() geht) für denselben Server.
         for (const guildId of guildIds) {
-            if (!found.has(guildId)) found.set(guildId, WithPermanent([]));
+            if (!found.has(guildId)) found.set(guildId, ActiveModules(guildId, WithPermanent([])));
         }
 
         return found;

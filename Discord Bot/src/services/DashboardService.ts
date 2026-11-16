@@ -31,7 +31,8 @@ import { TABLES } from "../constants/Database";
 import { Open, Seal } from "../utils/seal";
 import logger from "../utils/logger";
 import { BannedFor } from "../utils/security";
-import { ModuleId } from "../constants/Modules";
+import { MODULE_IDS, ModuleId } from "../constants/Modules";
+import { ModuleNotices } from "../utils/moduleFlags";
 import IDashboardActivity from "../interfaces/services/dashboard/IDashboardActivity";
 
 /** Länger als das wartet eine Seite nicht auf Discord - dann lieber der Fehler. */
@@ -1058,6 +1059,8 @@ export default class DashboardService implements IDashboardService {
             server,
             member: await this.Member(session, guildId),
             modules: await this.ModulesOn(guildId),
+            // W-0131: Hinweise und global geschlossene Module aus dem Admin Dashboard.
+            moduleNotices: ModuleNotices(MODULE_IDS, guildId),
         };
     }
 

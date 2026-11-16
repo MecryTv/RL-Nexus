@@ -152,3 +152,20 @@ export function ClosedText(module: string): string {
 export function CurrentLinkMode(): LinkMode {
     return linkMode;
 }
+
+/**
+ * Für das Bot-Dashboard: je Modul mit Hinweis oder global geschlossen, ob es
+ * offen ist und der Hinweis. Der Text bleibt roh, das Dashboard setzt ihn als Text.
+ */
+export function ModuleNotices(modules: readonly string[], guildId: string): Record<string, { open: boolean; text: string | null }> {
+    const found: Record<string, { open: boolean; text: string | null }> = {};
+
+    for (const module of modules) {
+        const open = ModuleOpen(module, guildId);
+        const text = NoticeOf(module);
+
+        if (!open || text) found[module] = { open, text };
+    }
+
+    return found;
+}

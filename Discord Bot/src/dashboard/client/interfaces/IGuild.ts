@@ -54,4 +54,6 @@ export interface IGuildDetail {
     member: IMemberFacts | null;
     /** Eingeschaltete Module, frisch aus der Datenbank. null: ohne Datenbank nicht schaltbar. */
     modules: string[] | null;
+    /** W-0131: je Modul mit Hinweis oder im Admin global geschlossen. Der Text ist roh, er kommt nur als Text auf die Seite. */
+    moduleNotices?: Record<string, { open: boolean; text: string | null }>;
 }
