@@ -24,7 +24,7 @@ async function databaseInfo(): Promise<ITech["database"]> {
 
     try {
         const migrations = (table: string) =>
-            query<{ name: string; applied_at: Date }[]>(`SELECT name, applied_at FROM ${table} ORDER BY name`)
+            query<{ name: string; applied_at: Date }[]>(`SELECT name, applied_at FROM ${table} WHERE name NOT LIKE 'job:%' ORDER BY name`)
                 .then((rows) => rows.map((row) => ({ name: row.name, appliedAt: row.applied_at.toISOString() })))
                 // Ohne Tabelle (Bot nie gestartet) eben keine Migrationen.
                 .catch(() => []);

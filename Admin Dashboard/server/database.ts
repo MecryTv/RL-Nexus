@@ -102,7 +102,7 @@ export async function databaseOverview(host: string | null = null): Promise<IDbO
     const [[server], status, migrations, tables] = await Promise.all([
         query<{ version: string; database: string | null; collation: string | null; max_connections: number }[]>("SELECT VERSION() AS version, DATABASE() AS `database`, @@collation_database AS collation, @@max_connections AS max_connections"),
         query<{ Variable_name: string; Value: string }[]>("SHOW GLOBAL STATUS WHERE Variable_name IN ('Uptime', 'Threads_connected')"),
-        Promise.all(["schema_migrations", "admin_migrations"].map((table) => query<{ n: number }[]>(`SELECT COUNT(*) AS n FROM ${table}`).then((rows) => Number(rows[0]?.n ?? 0)).catch(() => 0))),
+        Promise.all(["schema_migrations", "admin_migrations"].map((table) => query<{ n: number }[]>(`SELECT COUNT(*) AS n FROM ${table} WHERE name NOT LIKE 'job:%'`).then((rows) => Number(rows[0]?.n ?? 0)).catch(() => 0))),
         query<IInfoRow[]>(`${INFO_SQL} ORDER BY DATA_LENGTH + INDEX_LENGTH DESC`),
     ]);
     const value = (name: string): number | null => {

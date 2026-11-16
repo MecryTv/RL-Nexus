@@ -169,7 +169,13 @@ export function MessageList({
     };
 
     async function deleteChosen(): Promise<void> {
-        if (!onDeleteMany || chosen.length === 0) return;
+        if (!onDeleteMany || chosen.length === 0) {
+            setConfirm(false);
+            return;
+        }
+
+        // Ist danach die letzte Seite leer, eine Seite zurück statt leerer Liste ohne Pager.
+        const emptied = page > 1 && chosen.length === onPage.length;
 
         setBusy(true);
 
@@ -177,7 +183,8 @@ export function MessageList({
             await onDeleteMany(chosen);
             notify(`${count} endgültig gelöscht`);
             stop();
-            reload();
+            if (emptied) onChange({ page: page - 1 });
+            else reload();
         } catch (failure) {
             notify(messageOf(failure), "danger");
         } finally {
