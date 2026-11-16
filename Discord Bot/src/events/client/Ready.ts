@@ -2,6 +2,7 @@ import { Events } from "discord.js";
 import BotClient from "../../client/BotClient";
 import Event from "../../structures/Event";
 import logger from "../../utils/logger";
+import { StartFlags } from "../../utils/moduleFlags";
 import { StartBans } from "../../utils/security";
 import { WaitForDatabase } from "../../services/DatabaseService";
 
@@ -29,6 +30,9 @@ export default class Ready extends Event {
 
         // W-0057: die dauerhaften Sperren, danach alle 5 Minuten und auf Zuruf des Admin Dashboards neu.
         StartBans(this.client);
+
+        // W-0131: die Modul-Einstellungen aus dem Admin Dashboard, genauso nachgeladen.
+        StartFlags(this.client);
 
         // W-0104: Abmeldungen im Bot-Dashboard gelten auch nach dem Neustart.
         void WaitForDatabase(this.client.databaseService)

@@ -45,6 +45,7 @@
         "check:absences": "tsx src/scripts/CheckAbsences.ts",
         "check:epicname": "tsx src/scripts/CheckEpicName.ts",
         "check:epiclogin": "tsx src/scripts/CheckEpicLogin.ts",
+        "check:modulflags": "tsx src/scripts/CheckModuleFlags.ts",
         "check:selfroles": "tsx src/scripts/CheckSelfRoles.ts",
         "check:servers": "tsx src/scripts/CheckServers.ts",
         "check:security": "tsx src/scripts/CheckSecurity.ts",
