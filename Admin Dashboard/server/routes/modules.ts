@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { LINK_MODE_LABELS, MODULE_STATUS_LABELS, type IBotModuleSaved, type IBotModuleSetting, type IBotModulesView } from "../../shared/botModules.ts";
+import { BOT_MODULE_FALLBACK, LINK_MODE_LABELS, MODULE_STATUS_LABELS, type IBotModuleSaved, type IBotModuleSetting, type IBotModulesView } from "../../shared/botModules.ts";
 import { accessOf } from "../access.ts";
 import { audit } from "../audit.ts";
 import { botModulesReload } from "../bot.ts";
@@ -66,12 +66,13 @@ export async function moduleRoutes(app: FastifyInstance, { config }: { config: I
             botSyncedAt: syncedAt?.toISOString() ?? null,
             modules: settings.map((setting) => {
                 const entry = names.get(setting.module);
+                const fallback = BOT_MODULE_FALLBACK[setting.module];
 
                 return {
                     ...setting,
-                    name: entry?.name ?? setting.module,
-                    category: entry?.category ?? null,
-                    description: entry?.tagline ?? null,
+                    name: entry?.name ?? fallback?.name ?? setting.module,
+                    category: entry?.category ?? fallback?.category ?? null,
+                    description: entry?.tagline ?? fallback?.description ?? null,
                     servers: counts[setting.module] ?? 0,
                     history: history
                         .filter((row) => row.target === setting.module)

@@ -124,6 +124,9 @@ export async function checkModulesDb(config: IConfig, http: IHttp): Promise<void
 
             assert.equal(view.modules.length, 26);
             assert.ok(view.modules.every((entry) => typeof entry.servers === "number" && entry.name.length > 0));
+            // Auch Module, die der Webseiten-Katalog nicht führt, haben einen Namen und eine Kategorie.
+            const missing = view.modules.filter((entry) => entry.name === entry.module || !entry.category).map((entry) => entry.module);
+            assert.deepEqual(missing, [], missing.join(", "));
             assert.ok(polls && polls.history.length >= 2 && polls.history[0].detail.includes("Status: Aus → An"));
             assert.ok(view.botSyncedAt === null || typeof view.botSyncedAt === "string");
         });

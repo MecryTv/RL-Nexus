@@ -36,6 +36,18 @@ export const BOT_MODULE_IDS = [
     "rl-tracking",
 ] as const;
 
+/**
+ * Module, die der Webseiten-Katalog (modules.json) nicht führt. Namen und Texte
+ * wie im Bot-Dashboard (Discord Bot/src/dashboard/client/constants/Modules.ts),
+ * die Kategorie in der Einteilung der Webseite.
+ */
+export const BOT_MODULE_FALLBACK: Readonly<Record<string, { readonly name: string; readonly category: string; readonly description: string }>> = {
+    "rocket-roulette": { name: "Rocket Roulette", category: "competition", description: "Roulette-Abend mit privaten Matches, Teams jede Runde neu gemischt." },
+    "role-lists": { name: "Rollen-Listen", category: "community", description: "Listen, die zeigen, wer welche Rolle hat." },
+    "anti-villain": { name: "Anti Villain", category: "moderation", description: "Hält gekaperte Accounts, Raids und Nukes auf." },
+    backups: { name: "Backups", category: "utility", description: "Module, Einstellungen, Nachrichten und Daten sichern und zurückholen." },
+};
+
 /** Gehören fest zum Bot, wie PERMANENT_MODULES dort: nur der Hinweis ist einstellbar. */
 export const PERMANENT_BOT_MODULES = ["gallery", "backups", "levels"] as const;
 

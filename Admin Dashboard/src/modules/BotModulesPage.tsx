@@ -217,7 +217,7 @@ export function BotModulesPage(): JSX.Element {
     return (
         <>
             <UnsavedGuard dirty={dirty} />
-            <PageHeader title="Module" meta="Was für alle Server gilt, je Modul. Jede Änderung steht im Protokoll.">
+            <PageHeader title="Module" meta="Jede Änderung steht im Protokoll und wirkt im Bot sofort.">
                 <span className={`${styles.sync} ${botSyncedAt ? styles.synced : ""}`} role="status">
                     <i aria-hidden="true" />
                     {botSyncedAt ? `Bot hat den Stand von ${formatDateTime(botSyncedAt)} übernommen` : "Noch kein Bescheid vom Bot seit dem Start"}
