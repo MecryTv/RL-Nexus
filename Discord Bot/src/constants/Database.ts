@@ -121,8 +121,9 @@ export const LINK_COOLDOWN = LINK_COOLDOWN_DAYS * 24 * 60 * 60 * 1000;
 export const LINK_COOLDOWN_DEV = 10 * 1000;
 /**
  * W-0125: So lange nach dem Verbinden lässt sich das Epic-Konto ohne Sperrfrist
- * wechseln oder trennen - für den Fall, dass man bei Epic mit dem falschen Konto
- * angemeldet war. Ein Wechsel darin setzt die Frist nicht neu.
+ * wechseln - für den Fall, dass man bei Epic mit dem falschen Konto angemeldet
+ * war. Ein Wechsel darin setzt die Frist nicht neu. Trennen bleibt gesperrt,
+ * sonst holte Trennen und neu Verbinden immer wieder ein frisches Fenster.
  */
 export const LINK_FIX_MINUTES = 60;
 export const LINK_FIX = LINK_FIX_MINUTES * 60 * 1000;

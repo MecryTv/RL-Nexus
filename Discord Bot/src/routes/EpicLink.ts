@@ -10,11 +10,19 @@ import { SendPage } from "../utils/dashboard";
 /** W-0125: Nonce und Link-Token zwischen dem Weg zu Epic und dem Rückweg. */
 export const EPIC_STATE_COOKIE = `${COOKIE_PREFIX}rlnexus_epic_state`;
 
-/** Name und Profilbild zur Discord-ID, für die Seiten. Ohne Discord bleibt es beim neutralen Text. */
+/**
+ * Name, @Name und Profilbild zur Discord-ID, für die Seiten. Ohne Discord bleibt es beim neutralen Text.
+ * Der @Name gehört dazu (Review W-0125): Anzeigename und Bild kann jeder auf die eines anderen setzen,
+ * den @Namen nicht.
+ */
 export async function EpicWho(client: BotClient, userId: string): Promise<IEpicWho> {
     const user = await client.users.fetch(userId).catch(() => null);
 
-    return { name: user ? user.globalName?.trim() || user.username : "Dein Discord-Konto", avatar: user?.displayAvatarURL({ extension: "png", size: 64 }) ?? null };
+    return {
+        name: user ? user.globalName?.trim() || user.username : "Dein Discord-Konto",
+        handle: user?.username ?? null,
+        avatar: user?.displayAvatarURL({ extension: "png", size: 64 }) ?? null,
+    };
 }
 
 /**
@@ -25,6 +33,10 @@ export async function EpicWho(client: BotClient, userId: string): Promise<IEpicW
  *
  * Erst die Seite, dann Epic: Schickt jemand seinen Knopf an einen anderen Spieler,
  * sieht der vor der Anmeldung, dass sein Epic-Konto an ein fremdes Discord-Konto ginge.
+ * Deshalb gilt go=1 nur, wenn der Klick von dieser Seite selbst kommt
+ * (Sec-Fetch-Site: same-origin). Ein Link mit go=1 aus einer DM oder von einer
+ * fremden Seite käme sonst an der Bestätigung vorbei direkt zu Epic (Review W-0125).
+ * "none" zählt nicht: so öffnet auch die Discord-App einen Link.
  */
 export default class EpicLink extends Route {
     constructor(client: BotClient) {
@@ -60,7 +72,7 @@ export default class EpicLink extends Route {
             );
         }
 
-        if (query.go === "1") {
+        if (query.go === "1" && request.headers["sec-fetch-site"] === "same-origin") {
             const nonce = randomBytes(24).toString("base64url");
             const secure = this.client.dashboardService.Secure;
 

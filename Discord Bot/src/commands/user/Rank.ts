@@ -295,6 +295,9 @@ export default class Rank extends Command {
         }
 
         await this.client.accounts.Unlink(userId, "epic");
+        // Review W-0125: mit dem Konto gehen seine Ränge und die Rang-Rollen auf allen Servern.
+        await this.client.ranks.Clear(userId);
+        void this.client.rankRoleService.Strip(userId).catch(() => 0);
 
         logger.user(`🎮 Epic getrennt: ${userId} (war ${current.display_name ?? current.account_id})`);
 

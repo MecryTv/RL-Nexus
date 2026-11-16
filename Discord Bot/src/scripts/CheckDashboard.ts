@@ -1747,12 +1747,17 @@ async function main(): Promise<void> {
     // W-0086: Rechtsklick-Befehle ohne Beschreibung - die Liste fürs Admin Dashboard hat trotzdem einen Text.
     check("Befehle fürs Admin: Rechtsklick ohne Beschreibung bekommt einen leeren Text", JSON.stringify(CommandPaths({ name: "Hack melden" })) === JSON.stringify([{ path: "Hack melden", description: "" }]));
 
-    // RL Tracker, Administration und die Epic-Verknuepfung gibt es nicht mehr.
-    for (const gone of ["/admins", "/api/admin", "/user/1059621019947634739/tracking", "/api/tracking/1059621019947634739", "/link/epic"]) {
+    // RL Tracker und Administration gibt es nicht mehr.
+    for (const gone of ["/admins", "/api/admin", "/user/1059621019947634739/tracking", "/api/tracking/1059621019947634739"]) {
         const response = await fetch(`${BASE}${P}${gone}`, MANUAL);
 
         check(`${P}${gone} gibt es nicht mehr`, response.status === 404, `${response.status}`);
     }
+
+    // W-0125: /link/epic ist wieder da, jetzt als Epic-Login für /rank link. Ohne gültigen Knopf: „Link abgelaufen“
+    // (oder „nicht eingerichtet“ ohne EPIC_CLIENT_ID), nie die Verknüpfung von früher ohne Login.
+    const epic = await fetch(`${BASE}${P}/link/epic`, MANUAL);
+    check(`${P}/link/epic ohne Knopf: abgelaufen oder nicht eingerichtet`, epic.status === 410 || epic.status === 503, `${epic.status}`);
 
     const settings = await fetch(`${BASE}${P}/user/1059621019947634739/settings`, MANUAL);
     check("Einstellungen leiten ohne Sitzung zum Login", settings.status === 302, `${settings.status}`);

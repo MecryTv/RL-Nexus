@@ -54,17 +54,14 @@ export default class PlayerAccount extends Model<IPlayerAccountRow> {
         verified = false,
         changedAt = new Date()
     ): Promise<void> {
-        await this.Upsert(
-            {
-                user_id: userId,
-                platform,
-                account_id: accountId,
-                display_name: OrNull(displayName),
-                verified: verified ? 1 : 0,
-                changed_at: changedAt,
-            },
-            ["account_id", "display_name", "verified", "changed_at"]
-        );
+        const values = { account_id: accountId, display_name: OrNull(displayName), verified: verified ? 1 : 0, changed_at: changedAt };
+
+        // Review W-0125: kein Upsert. Seit Migration 057 gibt es zwei eindeutige
+        // Schlüssel; kollidiert beim ersten Verbinden nur uq_account, hätte
+        // ON DUPLICATE KEY still die Zeile des anderen Nutzers überschrieben.
+        // So wirft beides ER_DUP_ENTRY, und der Aufrufer kann absagen.
+        if (await this.On(userId, platform)) await this.Update([userId, platform], values);
+        else await this.Insert({ user_id: userId, platform, ...values });
     }
 
     /**

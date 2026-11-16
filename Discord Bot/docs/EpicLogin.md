@@ -10,8 +10,8 @@ Seit W-0125 verbindet `/rank link` ein Epic-Konto nur noch über die **Anmeldung
 ```
 
 1. `/rank link` antwortet nur dem Aufrufer, mit einem Knopf. Dahinter steckt ein versiegeltes Link-Token (AES-GCM mit `SERVER_JWT_SECRET`) mit Discord-ID und Ablaufzeit. Es ersetzt einen Discord-Login.
-2. `GET /link/epic?t=…` zeigt, **welches Discord-Konto** das Epic-Konto bekommt. Schickt jemand seinen Knopf an einen anderen Spieler, sieht der das vor der Anmeldung.
-3. `GET /link/epic?t=…&go=1` setzt das Cookie `rlnexus_epic_state` (Nonce und Token, 10 Minuten) und leitet zu `https://www.epicgames.com/id/authorize` weiter, Scope `basic_profile`.
+2. `GET /link/epic?t=…` zeigt, **welches Discord-Konto** das Epic-Konto bekommt, mit Anzeigename und eindeutigem @Namen (den Anzeigenamen kann jeder fälschen). Schickt jemand seinen Knopf an einen anderen Spieler, sieht der das vor der Anmeldung.
+3. `GET /link/epic?t=…&go=1` setzt das Cookie `rlnexus_epic_state` (Nonce und Token, 10 Minuten) und leitet zu `https://www.epicgames.com/id/authorize` weiter, Scope `basic_profile`. Nur mit `Sec-Fetch-Site: same-origin`, also nach einem Klick auf der Seite selbst; von außen (DM, fremde Seite, Discord-App) zeigt `go=1` wieder die Bestätigung. Sonst ließe sich die Bestätigung mit einem vorbereiteten Link überspringen.
 4. `GET /link/epic/callback?code=…&state=…` prüft den Nonce gegen das Cookie, tauscht den Code bei `https://api.epicgames.dev/epic/oauth/v2/token` (Basic-Auth mit Client-ID und Secret) und bekommt die **Epic-Konto-ID** direkt in der Antwort. Den Anzeigenamen holt er mit demselben Zugang von `/epic/id/v2/accounts`. Der Zugang wird danach verworfen, nicht gespeichert.
 5. Verknüpft wird über `EpicAdopt` (`utils/epic.ts`), danach holt Prime die Ränge über die Konto-ID.
 
@@ -26,6 +26,7 @@ Im Entwicklungsmodus (`--dev`) liegt alles unter `/dashboard`, also `/dashboard/
 | Anderes Epic-Konto nach der ersten Stunde, innerhalb der Sperrfrist (3 Tage) | Abgelehnt, `/rank link` nennt die Wartezeit |
 | Dasselbe Konto neu bestätigen | Geht immer, nur der Name wird aktualisiert, die Sperrfrist bleibt |
 | `/rank unlink` in der ersten Stunde | Bleibt gesperrt: Trennen und neu verbinden öffnete sonst immer wieder ein frisches Fenster. Zum Korrigieren gibt es den Wechsel |
+| Wechsel auf ein anderes Konto oder `/rank unlink` | Die gespeicherten Ränge und das Profil gehen (`PlayerRanks.Clear`), die Rang-Rollen des Moduls auf allen Servern ebenso (`RankRoleService.Strip`). Neue Rollen gibt es mit `/rank me` |
 | Knopf älter als 10 Minuten | Seite „Link abgelaufen“, neuer Knopf mit `/rank link` |
 | Bei Epic abgebrochen | Seite „Anmeldung abgebrochen“, nichts verbunden |
 | Prime fällt aus | Trotzdem verbunden, nur ohne Ränge |

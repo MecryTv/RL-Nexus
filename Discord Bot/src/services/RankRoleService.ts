@@ -230,6 +230,35 @@ export default class RankRoleService {
     }
 
     /**
+     * W-0125: Die Rang-Rollen dieses Moduls ab, auf jedem Server, auf dem es an
+     * ist - beim Wechsel auf ein anderes Epic-Konto und beim Trennen. Sonst
+     * blieben die Rollen eines geliehenen Kontos stehen. Neue gibt es danach mit
+     * /rank me. Gibt zurück, wie viele Rollen abgingen.
+     */
+    async Strip(userId: string): Promise<number> {
+        let removed = 0;
+
+        for (const guild of this.client.guilds.cache.values()) {
+            if (!(await this.client.settings.Of(guild.id)).modules.includes(RANK_ROLES_MODULE)) continue;
+
+            const member = guild.members.cache.get(userId) ?? (await guild.members.fetch(userId).catch(() => null));
+
+            if (!member) continue;
+
+            const roles = [...this.Managed(await this.Settings(guild.id))].filter((id) => member.roles.cache.has(id) && !this.Blocked(guild, id));
+
+            if (roles.length === 0) continue;
+
+            await member.roles.remove(roles, "Rank Roles: Epic-Konto gewechselt oder getrennt").catch(() => undefined);
+            removed += roles.length;
+        }
+
+        if (removed > 0) logger.user(`🎖️  Rank Roles: ${userId} -${removed} (Epic-Konto gewechselt oder getrennt)`);
+
+        return removed;
+    }
+
+    /**
      * Nach /rank me: die Rang-Rollen zum eben geholten Profil - der einzige Weg,
      * über den Mitglieder sie bekommen. Still - null heißt, hier passiert nichts
      * (Modul aus, keine Playlist, kein Konto).

@@ -27,7 +27,14 @@ const ICONS = {
 
 export interface IEpicWho {
     name: string;
+    /** Der eindeutige @Name. Den Anzeigenamen kann jeder auf den eines anderen setzen, den @Namen nicht. */
+    handle?: string | null;
     avatar: string | null;
+}
+
+/** „Joe (@mecrytv)“ - der @Name macht ein fremdes Konto mit gleichem Anzeigenamen erkennbar. */
+function label(person: IEpicWho): string {
+    return person.handle && person.handle !== person.name ? `${person.name} (@${person.handle})` : person.handle ? `@${person.handle}` : person.name;
 }
 
 type Values = Record<"TITLE" | "TEXT" | "TONE" | "ICON" | "FACTS" | "WHY" | "BUTTONS" | "WHO", string>;
@@ -44,19 +51,19 @@ function who(person: IEpicWho | null, suffix: string): string {
 
     const mark = person.avatar ? `<img src="${EscapeHtml(person.avatar)}" alt="">` : EscapeHtml((person.name.trim()[0] ?? "?").toUpperCase());
 
-    return `<span>${mark}</span>${EscapeHtml(person.name)} · ${EscapeHtml(suffix)}`;
+    return `<span>${mark}</span>${EscapeHtml(label(person))} · ${EscapeHtml(suffix)}`;
 }
 
 /** Vor dem Weg zu Epic: welches Discord-Konto das Epic-Konto bekommt. */
 export function EpicConfirmPage(person: IEpicWho, goURL: string, validUntil: number, siteURL: string): Values {
     return {
         TITLE: "Epic-Konto verbinden",
-        TEXT: `Du meldest dich gleich bei Epic Games an. Danach gehört dein Epic-Konto zum Discord-Konto <b>${EscapeHtml(person.name)}</b>.`,
+        TEXT: `Du meldest dich gleich bei Epic Games an. Danach gehört dein Epic-Konto zum Discord-Konto <b>${EscapeHtml(label(person))}</b>.`,
         TONE: "brand",
         ICON: ICONS.link,
-        FACTS: fact("Discord-Konto", person.name) + fact("Link gültig bis", time(validUntil)) + fact("Anmeldung bei", "Epic Games"),
+        FACTS: fact("Discord-Konto", label(person)) + fact("Link gültig bis", time(validUntil)) + fact("Anmeldung bei", "Epic Games"),
         WHY:
-            "Mach nur weiter, wenn das oben dein eigenes Discord-Konto ist. Hat dir jemand diesen Link geschickt, schließ die Seite: " +
+            "Mach nur weiter, wenn das oben dein eigenes Discord-Konto ist, achte auf den @Namen. Hat dir jemand diesen Link geschickt, schließ die Seite: " +
             "sonst hängt dein Epic-Konto an seinem Discord-Konto. RL Nexus sieht dein Epic-Passwort nie, nur Konto-ID und Namen.",
         BUTTONS: `<a class="b main" href="${EscapeHtml(goURL)}">Weiter zu Epic Games</a><a class="b" href="${EscapeHtml(siteURL)}">Abbrechen</a>`,
         WHO: who(person, "aus Discord"),

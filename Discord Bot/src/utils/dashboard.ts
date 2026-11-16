@@ -141,9 +141,8 @@ export async function SendPage(client: BotClient, reply: FastifyReply, name: str
     if (!encoding) return reply.send(body);
 
     // Im Betrieb ist die Seite fest - dann lohnt es, die gepackte Fassung zu
-    // merken. Mit eingesetzten Werten gehört der Merkzettel zu genau diesen:
-    // sonst bekäme ein 500er die Seite eines 404ers.
-    const key = extra ? `page|${name}|${Object.values(extra).join("|")}` : `page|${name}`;
-
-    return reply.header("Content-Encoding", encoding).send(Pack(body, encoding, DEVELOPER_MODE ? undefined : key));
+    // merken. Mit eingesetzten Werten nicht: Uhrzeiten, Namen und Link-Token
+    // (W-0125) machen fast jede Fassung zum Einzelstück, der Merkzettel füllte
+    // sich nur mit Seiten, die nie wieder kommen (Review W-0125).
+    return reply.header("Content-Encoding", encoding).send(Pack(body, encoding, DEVELOPER_MODE || extra ? undefined : `page|${name}`));
 }

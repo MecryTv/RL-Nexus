@@ -144,6 +144,19 @@ export default class PlayerRanks extends Model<IPlayerRankRow> {
         this.db.Bump(TABLES.profiles);
     }
 
+    /**
+     * W-0125: Ränge und Profil eines Spielers weg - beim Wechsel auf ein anderes
+     * Epic-Konto und beim Trennen. Sonst bliebe der Peak des alten Kontos stehen
+     * (Snapshot nimmt GREATEST) und flösse in Club-WTSI und Rang-Verteilung ein.
+     */
+    async Clear(userId: string): Promise<void> {
+        await this.db.Write(`DELETE FROM \`${TABLES.ranks}\` WHERE user_id = ?`, [userId]);
+        await this.db.Write(`DELETE FROM \`${TABLES.profiles}\` WHERE user_id = ?`, [userId]);
+
+        this.db.Bump(TABLES.ranks);
+        this.db.Bump(TABLES.profiles);
+    }
+
     /** Aus den gespeicherten Zeilen die Eingabe für die WTSI-Rechnung bauen. */
     static ToWTSI(rows: IPlayerRankRow[]): IWTSIInput {
         const two = rows.find((row) => row.playlist === PLAYLIST_IDS["2v2"]);

@@ -70,7 +70,9 @@ function Client(rows: IRow[] = [], extra: Record<string, unknown> = {}): BotClie
                 calls.push(`rename ${userId} ${name}`);
             },
         },
-        ranks: { Snapshot: async () => calls.push("snapshot"), SaveProfile: async () => calls.push("profile") },
+        ranks: { Snapshot: async () => calls.push("snapshot"), SaveProfile: async () => calls.push("profile"), Clear: async () => calls.push("clear") },
+        rankRoleService: { Strip: async () => (calls.push("strip"), 0) },
+        guilds: { cache: new Map() },
         ...extra,
     } as unknown as BotClient & { calls: string[]; rows: IRow[] };
 }
@@ -262,7 +264,7 @@ async function checkPages(): Promise<void> {
 
     const go = Reply();
 
-    await new EpicLink(client).Handle({ query: { t: sealed, go: "1" } } as never, go as never);
+    await new EpicLink(client).Handle({ query: { t: sealed, go: "1" }, headers: { "sec-fetch-site": "same-origin" } } as never, go as never);
     check("Weiter: Cookie gesetzt, ab zu Epic", go.statusCode === 302 && String(go.location).startsWith("https://www.epicgames.com/id/authorize?") && String(go.headers["set-cookie"]).startsWith(`${EPIC_STATE_COOKIE}=`));
 
     const expired = Reply();
@@ -360,7 +362,7 @@ async function checkSwap(): Promise<void> {
 
     const goSwap = Reply();
 
-    await new EpicLink(client).Handle({ query: { t: TokenOf(EpicLinkURL(client, USER, Date.now(), true)), go: "1" } } as never, goSwap as never);
+    await new EpicLink(client).Handle({ query: { t: TokenOf(EpicLinkURL(client, USER, Date.now(), true)), go: "1" }, headers: { "sec-fetch-site": "same-origin" } } as never, goSwap as never);
     check("Wechsel-Knopf: Epic fragt neu nach der Anmeldung", String(goSwap.location).includes("prompt=login"), String(goSwap.location));
 
     // Die Rechnung im Model
@@ -445,6 +447,61 @@ async function checkBack(): Promise<void> {
     check("Absage: ebenfalls zurück in den Kanal", cancelled.body.includes(`href="discord://-/channels/${GUILD}/${CHANNEL}"`));
 }
 
+/* ----------------------------------------------------------
+   Befunde aus dem Review von d4f1395
+   ---------------------------------------------------------- */
+async function checkReview(): Promise<void> {
+    console.log("\n  — Review —");
+
+    // 1: go=1 von außen springt nicht mehr an der Bestätigung vorbei.
+    const client = Client();
+    const sealed = TokenOf(EpicLinkURL(client, USER));
+
+    for (const site of ["cross-site", "none", "same-site", undefined]) {
+        const reply = Reply();
+
+        await new EpicLink(client).Handle({ query: { t: sealed, go: "1" }, headers: site ? { "sec-fetch-site": site } : {} } as never, reply as never);
+        check(`go=1 mit Sec-Fetch-Site ${site ?? "(fehlt)"}: Bestätigungsseite statt Epic`, reply.statusCode === 200 && reply.location === null && reply.body.includes("Weiter zu Epic Games"), `${reply.statusCode} ${reply.location}`);
+    }
+
+    // 2: Der @Name steht neben dem frei wählbaren Anzeigenamen.
+    const joe = Client([], { users: { fetch: async (id: string) => ({ id, username: "mecrytv", globalName: "Joe", displayAvatarURL: () => "https://cdn.discordapp.com/a.png" }) } });
+    const confirm = Reply();
+
+    await new EpicLink(joe).Handle({ query: { t: TokenOf(EpicLinkURL(joe, USER)) }, headers: {} } as never, confirm as never);
+    check("Bestätigung zeigt Anzeigename und @Name", confirm.body.includes("Joe (@mecrytv)"), confirm.body.slice(0, 300));
+
+    // 3: Link schreibt ohne Upsert - erstes Verbinden ist ein INSERT, das bei uq_account wirft.
+    const writes: string[] = [];
+    const fake = (row: object | null) =>
+        ({
+            On: async () => row,
+            Insert: async () => void writes.push("insert"),
+            Update: async () => void writes.push("update"),
+        }) as unknown as PlayerAccount;
+
+    await PlayerAccount.prototype.Link.call(fake(null), USER, "epic", ACCOUNT, "Neu", true);
+    await PlayerAccount.prototype.Link.call(fake({ user_id: USER }), USER, "epic", ACCOUNT, "Neu", true);
+    check("Link: neu ist INSERT, vorhanden ist UPDATE (kein ON DUPLICATE KEY)", writes.join(",") === "insert,update", writes.join(","));
+
+    // 4 und 5: Wechsel auf ein anderes Konto räumt Ränge und Rang-Rollen ab, dasselbe Konto nicht.
+    const OTHER_ACCOUNT = "cccccccccccccccccccccccccccccccc";
+    const swapped = Client([{ user_id: USER, account_id: ACCOUNT, display_name: "Alt", changed_at: new Date() }]);
+
+    await EpicAdopt(swapped, USER, { accountId: OTHER_ACCOUNT, displayName: "Neu" });
+    check("Anderes Konto: alte Ränge gelöscht, Rang-Rollen ab", swapped.calls.includes("clear") && swapped.calls.includes("strip"), swapped.calls.join(", "));
+
+    const same = Client([{ user_id: USER, account_id: ACCOUNT, display_name: "Alt", changed_at: new Date() }]);
+
+    await EpicAdopt(same, USER, { accountId: ACCOUNT, displayName: "Neu" });
+    check("Dasselbe Konto: Ränge und Rollen bleiben", !same.calls.includes("clear") && !same.calls.includes("strip"), same.calls.join(", "));
+
+    const first = Client();
+
+    await EpicAdopt(first, USER, { accountId: ACCOUNT, displayName: "Neu" });
+    check("Erstes Verbinden: nichts abzuräumen", !first.calls.includes("clear") && !first.calls.includes("strip"), first.calls.join(", "));
+}
+
 async function main(): Promise<void> {
     const original = globalThis.fetch;
 
@@ -456,6 +513,7 @@ async function main(): Promise<void> {
         await checkCallback();
         await checkSwap();
         await checkBack();
+        await checkReview();
     } finally {
         globalThis.fetch = original;
     }
