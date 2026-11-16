@@ -282,7 +282,7 @@ export default class EpicNameService {
     /** DM an den Spieler; kommt sie nicht an, sofort der Captain. */
     private async Ask(epicCase: IEpicCase): Promise<void> {
         const teams = await this.Teams(epicCase.userId, epicCase.oldName);
-        const link = await this.client.accounts.On(epicCase.userId, "epic").catch(() => null);
+        const link = await this.client.accounts.Linked(epicCase.userId, "epic", "card").catch(() => null);
         const linked = !!link && (epicCase.accountId ? link.account_id === epicCase.accountId : link.display_name?.toLowerCase() === epicCase.oldName.toLowerCase());
         const sent = await this.Send(epicCase.userId, AskDm({ caseId: epicCase.id, oldName: epicCase.oldName, places: this.Places(teams), linked, lastSeen: epicCase.lastSeen }));
 
@@ -296,7 +296,7 @@ export default class EpicNameService {
     private async LinkedAccount(discordId: string | null, name: string): Promise<string | null> {
         if (!discordId) return null;
 
-        const link = await this.client.accounts.On(discordId, "epic").catch(() => null);
+        const link = await this.client.accounts.Linked(discordId, "epic", "card").catch(() => null);
 
         return link && link.display_name?.toLowerCase() === name.toLowerCase() ? link.account_id : null;
     }

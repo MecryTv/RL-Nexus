@@ -1,5 +1,6 @@
 import Model from "../structures/Model";
 import { OrNull, Platform, TABLES, TableName } from "../constants/Database";
+import { CurrentLinkMode } from "../utils/moduleFlags";
 
 export interface IPlayerAccountRow {
     user_id: string;
@@ -21,6 +22,19 @@ export interface ICooldown {
     until: string | null;
     /** W-0125: Bis wann (ms) ein Wechsel als Korrektur gilt, sonst null. */
     fixUntil: number | null;
+}
+
+/**
+ * W-0131: Darf diese Verknüpfung hier zählen? card: Karte, /rank me, Name im
+ * Kader. trusted: Rang-Rollen, Giveaway-Bedingung, Anzeige als Besitzer. Per
+ * Login verbunden (verified 1) zählt immer, per Name je nach Art im Admin.
+ */
+export function LinkUsable(row: Pick<IPlayerAccountRow, "verified">, need: "card" | "trusted"): boolean {
+    if (Number(row.verified) === 1) return true;
+
+    const mode = CurrentLinkMode();
+
+    return need === "card" ? mode !== "login" : mode === "name";
 }
 
 /**
@@ -105,6 +119,20 @@ export default class PlayerAccount extends Model<IPlayerAccountRow> {
         if (waitMs <= 0) return open;
 
         return { open: false, waitMs, until: new Date(until).toISOString(), fixUntil: null };
+    }
+
+    /** W-0131: die Verknüpfung, wenn sie für need zählt (siehe LinkUsable). On bleibt roh, für Verbinden und Trennen. */
+    async Linked(userId: string, platform: Platform, need: "card" | "trusted"): Promise<IPlayerAccountRow | null> {
+        const row = await this.On(userId, platform);
+
+        return row && LinkUsable(row, need) ? row : null;
+    }
+
+    /** W-0131: der Besitzer zum Anzeigen - nur, wenn seine Verknüpfung als bestätigt zählt. */
+    async TrustedOwner(platform: Platform, accountId: string): Promise<string | null> {
+        const [row] = await this.Where({ platform, account_id: accountId });
+
+        return row && LinkUsable(row, "trusted") ? row.user_id : null;
     }
 
     /** Rückwärts: welcher Discord-Nutzer steckt hinter diesem Spielernamen? */

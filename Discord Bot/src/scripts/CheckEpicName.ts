@@ -270,7 +270,7 @@ function World(options: IWorldOptions) {
         [1, { id: 1, guildId: "1", name: "Vyrox Main", players: [{ ...nico(), role: options.nicoRole ?? "player" }, Player("Zen", ZEN, { snapshot: Snapshot({ name: "Zen", accountId: "acc-zen" }) }), ...(options.extraA ?? [])] } as unknown as ITeam],
         [2, { id: 2, guildId: "2", name: "Vyrox Academy", players: [nico(), Player("Kyro", null, { snapshot: Snapshot({ name: "Kyro", accountId: "acc-kyro" }) })] } as unknown as ITeam],
     ]);
-    const account = options.linked ? { user_id: NICO, platform: "epic", account_id: options.accountId ?? "acc-1", display_name: "Vyrox.Nico", changed_at: before } : null;
+    const account = options.linked ? { user_id: NICO, platform: "epic", account_id: options.accountId ?? "acc-1", display_name: "Vyrox.Nico", verified: 1, changed_at: before } : null;
     const settings = new Map<string, ITeamSettings>([
         ["1", { layout: "hub", channelId: "c1", messageId: options.recalled === "1" ? null : "h1", board: { kind: "text", content: "{vyroxnico.rank} führt", embed: null, doc: { blocks: [] } }, hubLine: "{team.name}" } as unknown as ITeamSettings],
         ["2", { layout: "hub", channelId: "c2", messageId: options.recalled === "2" ? null : "h2", board: { kind: "text", content: "{team.name}", embed: null, doc: { blocks: [] } }, hubLine: "{team.name}" } as unknown as ITeamSettings],
@@ -290,6 +290,8 @@ function World(options: IWorldOptions) {
         primeService: { IsConfigured: true, Profile: answer },
         accounts: {
             On: async (userId: string) => (account && userId === account.user_id ? { ...account } : null),
+            // W-0131: per Login verbunden (verified 1) zählt bei jeder Art wie On.
+            Linked: async (userId: string) => (account && userId === account.user_id ? { ...account } : null),
             Rename: async (_userId: string, _platform: string, name: string) => void (account!.display_name = name),
         },
         epicNameCases: cases.model,

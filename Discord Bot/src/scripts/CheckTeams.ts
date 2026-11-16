@@ -2217,7 +2217,8 @@ async function checkEpic(): Promise<void> {
     const asked: string[] = [];
     const client = {
         databaseService: { Ready: true },
-        accounts: { On: async (userId: string) => (asked.push(userId), { display_name: `epic-${userId.slice(-2)}` }) },
+        // W-0131: Der Kader liest über Linked (per Login verbunden zählt immer).
+        accounts: { Linked: async (userId: string) => (asked.push(userId), { display_name: `epic-${userId.slice(-2)}`, verified: 1 }) },
     } as unknown as BotClient;
     const guild = Object.assign(FakeGuild(), {
         members: {

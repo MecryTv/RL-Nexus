@@ -107,7 +107,7 @@ export default class RankButtons extends Event {
         // Wie bei /rank search: steht ein verknüpfter Discord-Nutzer hinter dem
         // Konto, zeigt die Karte seinen Namen und sein Bild. Fällt die Datenbank
         // aus, bleibt die Karte eben ohne Namen.
-        const owner = this.client.databaseService.Ready ? await this.client.accounts.Owner("epic", profile.accountId).catch(() => null) : null;
+        const owner = this.client.databaseService.Ready ? await this.client.accounts.TrustedOwner("epic", profile.accountId).catch(() => null) : null;
         const member = owner ? await this.client.users.fetch(owner).catch(() => null) : null;
 
         const message = await RankMessage(

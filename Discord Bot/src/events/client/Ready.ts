@@ -2,6 +2,7 @@ import { Events } from "discord.js";
 import BotClient from "../../client/BotClient";
 import Event from "../../structures/Event";
 import logger from "../../utils/logger";
+import { WatchLinkMode } from "../../utils/linkModeWatch";
 import { StartFlags } from "../../utils/moduleFlags";
 import { StartBans } from "../../utils/security";
 import { WaitForDatabase } from "../../services/DatabaseService";
@@ -32,6 +33,7 @@ export default class Ready extends Event {
         StartBans(this.client);
 
         // W-0131: die Modul-Einstellungen aus dem Admin Dashboard, genauso nachgeladen.
+        WatchLinkMode(this.client);
         StartFlags(this.client);
 
         // W-0104: Abmeldungen im Bot-Dashboard gelten auch nach dem Neustart.

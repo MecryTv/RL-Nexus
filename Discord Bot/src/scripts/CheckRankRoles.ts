@@ -127,7 +127,7 @@ function Stub(client: BotClient, settings: IRankRoleSettings, ranks: IPrimeRank[
     Object.defineProperty(client.databaseService, "Ready", { get: () => true, configurable: true });
 
     client.rankRoleService.Settings = async () => settings;
-    client.accounts.On = (async () => (epicName ? { display_name: epicName } : null)) as typeof client.accounts.On;
+    client.accounts.On = (async () => (epicName ? { display_name: epicName, verified: 1 } : null)) as typeof client.accounts.On;
     client.primeService.Profile = (async () => ({ name: epicName ?? "", ranks }) as unknown as IPrimeProfile) as typeof client.primeService.Profile;
 }
 

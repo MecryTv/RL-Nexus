@@ -11,6 +11,8 @@ process.env.DEV_CLIENT_SECRET ||= "check-secret";
 import BotClient from "../client/BotClient";
 import CommandHandler from "../events/client/CommandHandler";
 import GuildSettings from "../models/GuildSettings";
+import PlayerAccount from "../models/PlayerAccount";
+import { ApplyLinkMode } from "../utils/linkModeWatch";
 import AdminModulesReload from "../routes/AdminModulesReload";
 import { ActiveModules, ClosedText, CurrentLinkMode, LoadFlags, ModuleNotices, ModuleOpen, NoticeOf, OnFlagsLoaded, SetFlags } from "../utils/moduleFlags";
 
@@ -151,6 +153,54 @@ async function checkGating(): Promise<void> {
     SetFlags([], [], []);
 }
 
+/** W-0131: Was eine Verknüpfung per Name (verified 0) je Art darf, und das Entfernen der Rang-Rollen beim Verschärfen. */
+async function checkTrust(): Promise<void> {
+    console.log("\n  — Vertrauen je Verknüpfungsart (W-0131) —");
+
+    const byName = { user_id: "u1", account_id: "a1", display_name: "Nova", verified: 0 } as never;
+    const byLogin = { user_id: "u2", account_id: "a2", display_name: "Echt", verified: 1 } as never;
+    const model = (row: unknown) => ({ On: async () => row, Where: async () => (row ? [row] : []) }) as unknown as PlayerAccount;
+    const linked = (row: unknown, need: "card" | "trusted") => PlayerAccount.prototype.Linked.call(model(row), "u1", "epic", need);
+    const owner = (row: unknown) => PlayerAccount.prototype.TrustedOwner.call(model(row), "epic", "a1");
+    const mode = (linkMode: "login" | "name" | "both") => SetFlags([{ module: "rl-tracking", status: "on", notice: null, linkMode }], [], []);
+
+    mode("name");
+    check("Nur Name: Verknüpfung per Name zählt überall", !!(await linked(byName, "card")) && !!(await linked(byName, "trusted")) && (await owner(byName)) === "u1");
+
+    mode("both");
+    check("Beides: per Name für Karte ja, für Rollen, Giveaways und Besitzer nein", !!(await linked(byName, "card")) && (await linked(byName, "trusted")) === null && (await owner(byName)) === null);
+
+    mode("login");
+    check("Anmeldung: per Name gilt als nicht verbunden", (await linked(byName, "card")) === null && (await linked(byName, "trusted")) === null && (await owner(byName)) === null);
+    check("Per Login verbunden zählt immer", !!(await linked(byLogin, "card")) && !!(await linked(byLogin, "trusted")) && (await owner(byLogin)) === "u2");
+
+    // Merker in bot_state: zuletzt angewandte Art. Strenger geworden heißt: Rang-Rollen ohne Anmeldung weg.
+    const state = new Map<string, string>();
+    let strips = 0;
+    const client = {
+        databaseService: {
+            Ready: true,
+            Query: async (sql: string, values: string[] = []) => {
+                if (sql.startsWith("SELECT")) return state.has("link_mode_applied") ? [{ value: state.get("link_mode_applied") }] : [];
+
+                state.set(values[0]!, values[1]!);
+
+                return [];
+            },
+        },
+        rankRoleService: { StripUnverified: async () => void strips++ },
+    } as unknown as BotClient;
+
+    check("Ohne Merker gilt Anmeldung: nichts zu entfernen", !(await ApplyLinkMode(client, "login")) && strips === 0 && state.get("link_mode_applied") === "login");
+    check("Lockerer (Anmeldung → Name): nichts entfernt, Merker folgt", !(await ApplyLinkMode(client, "name")) && strips === 0 && state.get("link_mode_applied") === "name");
+    check("Strenger (Name → Anmeldung), auch nach Neustart: einmal entfernt", (await ApplyLinkMode(client, "login")) && strips === 1 && state.get("link_mode_applied") === "login");
+    check("Danach nicht noch einmal", !(await ApplyLinkMode(client, "login")) && strips === 1);
+    state.set("link_mode_applied", "name");
+    check("Name → Beides ist auch strenger", (await ApplyLinkMode(client, "both")) && strips === 2);
+
+    SetFlags([], [], []);
+}
+
 async function main(): Promise<void> {
     console.log("\n  — Modul-Einstellungen (W-0131) —");
 
@@ -216,6 +266,7 @@ async function main(): Promise<void> {
     check("Tabelle nicht lesbar: 503", broken.statusCode === 503, String(broken.statusCode));
 
     await checkGating();
+    await checkTrust();
 
     console.log(failures > 0 ? `\n  ${failures} Prüfung(en) fehlgeschlagen.\n` : "\n  Alles ok.\n");
     process.exit(failures > 0 ? 1 : 0);

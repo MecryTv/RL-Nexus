@@ -6,6 +6,7 @@ import { IPrimeProfile } from "../interfaces/services/prime/IPrimeService";
 import { IRankRoleChange, IRankRoleResult, IRankRoleSettings, Playlist } from "../interfaces/services/rankroles/IRankRoles";
 import logger from "../utils/logger";
 import { NewRoleProblem } from "../utils/rolegate";
+import { LinkUsable } from "../models/PlayerAccount";
 
 export class RankRoleError extends Error {}
 
@@ -159,9 +160,12 @@ export default class RankRoleService {
         if (!this.client.primeService.IsConfigured) throw new RankRoleError("Das Rang-Tracking ist auf diesem Bot nicht eingerichtet.");
         if (!this.client.databaseService.Ready) throw new RankRoleError("Ohne Datenbank weiß ich nicht, welches Epic-Konto dir gehört.");
 
-        const account = await this.client.accounts.On(member.id, "epic");
+        const raw = await this.client.accounts.On(member.id, "epic");
+        // W-0131: Per Name verbunden zählt für Rollen nur bei der Art „Nur Epic-Name“.
+        const account = raw && LinkUsable(raw, "trusted") ? raw : null;
         const epicName = account?.display_name?.trim();
 
+        if (raw && !account) throw new RankRoleError("Rang-Rollen gibt es nur mit Epic-Anmeldung: **/rank link** ohne Namen.");
         if (!account || !epicName) throw new RankRoleError("Verbinde erst dein Epic-Konto: **/rank link**.");
 
         // W-0125: über die Konto-ID, nicht den Namen. Ein alter Name kann inzwischen einem anderen Spieler gehören.
@@ -282,6 +286,23 @@ export default class RankRoleService {
 
         if (done.length > 0) return;
 
+        const { roles, members, intent } = await this.StripUnverified();
+
+        await this.client.databaseService.Query(`INSERT INTO ${MIGRATIONS_TABLE} (name) VALUES (?)`, [STRIP_UNVERIFIED]);
+
+        logger.user(
+            `🎖️  Rank Roles: ${roles} Rolle(n) bei ${members} Mitglied(ern) ohne bestätigtes Epic-Konto entfernt` +
+                (intent ? "" : " - ohne Members-Intent nur bei Mitgliedern, die der Bot schon kannte")
+        );
+    }
+
+    /**
+     * W-0131: Rang-Rollen von allen Mitgliedern, deren Epic-Verknüpfung für
+     * Rollen nicht zählt (keine, oder per Name bei einer strengeren Art).
+     * Ohne Merker - StripUnverifiedOnce und der Wechsel der Verknüpfungsart
+     * (utils/linkModeWatch.ts) rufen es auf.
+     */
+    async StripUnverified(): Promise<{ roles: number; members: number; intent: boolean }> {
         const intent = this.client.config.GUILD_MEMBER_INTENT === true;
         let members = 0;
         let roles = 0;
@@ -303,7 +324,7 @@ export default class RankRoleService {
             }
 
             for (const member of holders.values()) {
-                if (await this.client.accounts.On(member.id, "epic")) continue;
+                if (await this.client.accounts.Linked(member.id, "epic", "trusted")) continue;
 
                 const drop = managed.filter((id) => member.roles.cache.has(id) && !this.Blocked(guild, id));
 
@@ -315,12 +336,7 @@ export default class RankRoleService {
             }
         }
 
-        await this.client.databaseService.Query(`INSERT INTO ${MIGRATIONS_TABLE} (name) VALUES (?)`, [STRIP_UNVERIFIED]);
-
-        logger.user(
-            `🎖️  Rank Roles: ${roles} Rolle(n) bei ${members} Mitglied(ern) ohne bestätigtes Epic-Konto entfernt` +
-                (intent ? "" : " - ohne Members-Intent nur bei Mitgliedern, die der Bot schon kannte")
-        );
+        return { roles, members, intent };
     }
 
     /**

@@ -302,7 +302,7 @@ export default class Rank extends Command {
             return;
         }
 
-        const account = await this.client.accounts.On(interaction.user.id, "epic");
+        const account = await this.client.accounts.Linked(interaction.user.id, "epic", "card");
 
         if (!account) {
             await interaction.reply({
@@ -361,7 +361,7 @@ export default class Rank extends Command {
         // Steht hinter dem Epic-Konto ein Discord-Nutzer, der es hier verknüpft
         // hat, wird sein Name mitgezeigt - sonst bleibt die Karte anonym.
         const owner = this.client.databaseService.Ready
-            ? await this.client.accounts.Owner("epic", profile.accountId)
+            ? await this.client.accounts.TrustedOwner("epic", profile.accountId)
             : null;
 
         const member = owner ? await this.client.users.fetch(owner).catch(() => null) : null;
