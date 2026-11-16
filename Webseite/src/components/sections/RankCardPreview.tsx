@@ -128,7 +128,7 @@ export function RankCardPreview(): JSX.Element {
                                 compact
                             />
                             <span className={styles.mmrLabel}>MMR</span>
-                            <span className={styles.mmrValue}>{entry.mmr ?? "—"}</span>
+                            <span className={styles.mmrValue}>{entry.mmr}</span>
                             <Stats streak={entry.streak} games={entry.games} labels={["Streak", "Spiele"]} />
                         </li>
                     ))}

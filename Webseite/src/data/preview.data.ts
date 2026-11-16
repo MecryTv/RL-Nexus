@@ -48,13 +48,14 @@ export const RANK_PREVIEW: IRankPreview = {
             games: 95,
         },
     ],
-    // Dropshot steht noch vor dem ersten Spiel: so sieht die Kachel ohne MMR aus.
+    // Dropshot steht noch vor dem ersten Spiel: Platzierung, aber die errechnete
+    // MMR steht trotzdem da - wie im Bot.
     extras: [
         { mode: "heatseeker", label: "Heatseeker", rank: RLRank.Platin3, division: "Division I", mmr: 812, streak: 2, games: 23 },
         { mode: "rumble", label: "Rumble", rank: RLRank.Champion1, division: "Division I", mmr: 1105, streak: -1, games: 54 },
         { mode: "hoops", label: "Hoops", rank: RLRank.Diamond2, division: "Division III", mmr: 1012, streak: 5, games: 31 },
         { mode: "snowday", label: "Snow Day", rank: RLRank.Gold2, division: "Division II", mmr: 640, streak: 0, games: 18 },
-        { mode: "dropshot", label: "Dropshot", rank: RLRank.Unranked, division: "", mmr: null, streak: 0, games: 0, placement: { played: 0, needed: 10 } },
+        { mode: "dropshot", label: "Dropshot", rank: RLRank.Unranked, division: "", mmr: 787, streak: 0, games: 0, placement: { played: 0, needed: 10 } },
     ],
     career: [
         { label: "Shots", value: "13.184", color: "var(--c-mod-community)", icon: "shots" },

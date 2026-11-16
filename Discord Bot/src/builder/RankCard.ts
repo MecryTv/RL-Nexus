@@ -996,8 +996,8 @@ async function drawStatsRow(ctx: SKRSContext2D, left: number, width: number, top
 /**
  * W-0129: Eine Kachel der Extra-Modi. Wie die Hauptmodi, nur kleiner: Farbleiste
  * und Symbol des Modus oben, Rang mit Division, MMR mittig, Streak | Spiele.
- * Liefert Prime den Modus nicht oder ist noch nichts gespielt, steht die
- * Platzierung da und statt der MMR ein Strich.
+ * Auch ohne Spiel in dieser Season steht die errechnete MMR da, wie bei den
+ * Hauptmodi. Einen Strich gibt es nur, wenn Prime den Modus gar nicht liefert.
  */
 async function drawExtraCard(ctx: SKRSContext2D, x: number, y: number, w: number, h: number, mode: { key: string; label: string }, rank: IPrimeRank | null): Promise<void> {
     panel(ctx, x, y, w, h, { cut: 18, glow: 14, fill: "rgba(7, 11, 16, 0.82)" });
@@ -1061,12 +1061,9 @@ async function drawExtraCard(ctx: SKRSContext2D, x: number, y: number, w: number
     ctx.fillText(sub, textX, rowY + 72);
 
     // --- MMR und Streak | Spiele ------------------------------------------
-    // Nie gespielt: Prime liefert trotzdem einen Startwert. Der ist keine MMR des
-    // Spielers, deshalb ein Strich.
-    const played = !!rank && (rank.matches > 0 || rank.placementMatches > 0);
     const mmrLabelY = rowY + rowH + 36;
 
-    drawCenteredMMR(ctx, x + w / 2, mmrLabelY, played && rank.mmr > 0 ? String(rank.mmr) : "—", 0.72);
+    drawCenteredMMR(ctx, x + w / 2, mmrLabelY, rank && rank.mmr > 0 ? String(rank.mmr) : "—", 0.72);
     await drawStatsRow(ctx, x + 18, w - 36, mmrLabelY + 66, rank, ["STREAK", "SPIELE"], 0.8);
 }
 

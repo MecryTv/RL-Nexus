@@ -27,13 +27,12 @@ export interface IPlaylistPreview {
 export type ExtraModeKey = "heatseeker" | "rumble" | "hoops" | "snowday" | "dropshot";
 
 /**
- * Ein Extra-Modus. Wie eine Playlist, nur ohne Untertitel; die MMR fehlt, solange
- * nichts gespielt ist - dann zeigt die Karte einen Strich.
+ * Ein Extra-Modus. Wie eine Playlist, nur ohne Untertitel. Die MMR steht auch
+ * ohne Spiel in dieser Season da, wie bei den Hauptmodi.
  */
-export interface IExtraModePreview extends Omit<IPlaylistPreview, "playlist" | "subtitle" | "mmr"> {
+export interface IExtraModePreview extends Omit<IPlaylistPreview, "playlist" | "subtitle"> {
     readonly mode: ExtraModeKey;
     readonly label: string;
-    readonly mmr: number | null;
 }
 
 /** Der Turnier-Rang im Kopf, neben dem Season Reward. */

@@ -58,7 +58,7 @@ const PROFILE: IPrimeProfile = {
     ],
     // W-0129: Heatseeker fehlt absichtlich - so sieht die Kachel aus, wenn Prime
     // den Modus nicht liefert. Hoops steckt in der Platzierung, Snow Day ist nie
-    // gespielt (Startwert ohne Spiele: Strich statt MMR).
+    // gespielt (die errechnete MMR steht trotzdem da).
     extras: [
         { key: "rumble", label: "Rumble", mmr: 1012, tier: 14, tierName: "Diamant II", division: 1, divisionName: "II", matches: 64, streak: 5, placement: false, placementMatches: 10 },
         { key: "hoops", label: "Hoops", mmr: 640, tier: 9, tierName: "Gold III", division: 0, divisionName: "I", matches: 4, streak: -2, placement: true, placementMatches: 4 },
