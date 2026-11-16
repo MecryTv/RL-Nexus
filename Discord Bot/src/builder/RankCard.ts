@@ -199,35 +199,6 @@ function drawIcon(ctx: SKRSContext2D, key: string, source: Image, x: number, y: 
 }
 
 /**
- * Dasselbe, aber mit einem Schein in der Rangfarbe dahinter.
- *
- * Die Abzeichen sind dunkles Metall auf dunklem Grund und gingen darin unter.
- * Der Schein hebt sie ab, ohne sie einzufaerben - zweimal gezeichnet, damit er
- * dicht genug wird, um wirklich zu tragen.
- */
-function drawGlowingIcon(
-    ctx: SKRSContext2D,
-    key: string,
-    source: Image,
-    x: number,
-    y: number,
-    size: number,
-    color: string
-): void {
-    ctx.save();
-    ctx.shadowColor = color;
-    ctx.shadowBlur = size * 0.34;
-
-    drawIcon(ctx, key, source, x, y, size);
-    drawIcon(ctx, key, source, x, y, size);
-
-    ctx.restore();
-
-    // Ohne Schatten noch einmal obendrauf: sonst wirkt das Motiv selbst weich.
-    drawIcon(ctx, key, source, x, y, size);
-}
-
-/**
  * Ein Symbol in einer Farbe.
  *
  * Die Karriere-Symbole liegen als schwarze PNGs vor - auf dunklem Grund wären
@@ -664,7 +635,7 @@ async function drawHeader(ctx: SKRSContext2D, data: IRankCardData): Promise<void
     // Abzeichen zeigt.
     const rewardColor = TierColor(RewardTier(level));
 
-    if (rewardIcon) drawGlowingIcon(ctx, RewardIconFile(level), rewardIcon, boxX + 22, boxY + 52, 76, rewardColor);
+    if (rewardIcon) drawIcon(ctx, RewardIconFile(level), rewardIcon, boxX + 22, boxY + 52, 76);
     const rewardText = RewardName(level).toUpperCase();
     const rewardSize = fitText(ctx, rewardText, boxW - 130, 40, "700");
 
@@ -756,7 +727,7 @@ async function drawTournament(ctx: SKRSContext2D, x: number, y: number, w: numbe
     const icon = await image(file);
     const color = TierColor(tier);
 
-    if (icon) drawGlowingIcon(ctx, file, icon, x + 22, y + 50, 68, color);
+    if (icon) drawIcon(ctx, file, icon, x + 22, y + 50, 68);
 
     const text = ranked ? rank.tierName.toUpperCase() : "UNRANKED";
     const size = fitText(ctx, text, w - 128, 32, "700");
@@ -893,7 +864,7 @@ async function drawRankCard(
 
     const tierColor = TierColor(rank.placement ? 0 : rank.tier);
 
-    if (icon) drawGlowingIcon(ctx, RankIconFile(rank.tier, rank.placement), icon, inner - 2, rowY + 12, 92, tierColor);
+    if (icon) drawIcon(ctx, RankIconFile(rank.tier, rank.placement), icon, inner - 2, rowY + 12, 92);
     const tierText = rank.placement ? `PLATZIERUNG ${rank.placementMatches}/${PLACEMENT_MATCHES}` : rank.tierName.toUpperCase();
     const tierSize = fitText(ctx, tierText, w - 160, 34, "700");
 
@@ -1062,7 +1033,7 @@ async function drawExtraCard(ctx: SKRSContext2D, x: number, y: number, w: number
     const icon = await image(file);
     const color = TierColor(tier);
 
-    if (icon) drawGlowingIcon(ctx, file, icon, x + 22, rowY + 16, 60, color);
+    if (icon) drawIcon(ctx, file, icon, x + 22, rowY + 16, 60);
 
     // Fünf Kacheln nebeneinander sind schmal. Passt der lange Name nicht mehr in
     // lesbarer Größe, kommt die Kurzform - wie im Entwurf („GRAND CHAMP I“).
