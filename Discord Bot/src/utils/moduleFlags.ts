@@ -169,3 +169,14 @@ export function ModuleNotices(modules: readonly string[], guildId: string): Reco
 
     return found;
 }
+
+/**
+ * RL Tracking auf den Epic-Seiten (W-0131): Der Link merkt sich den Kanal als
+ * "guildId/channelId" (DM: "@me/..."). Mit Server zählt dessen Beta-Stand,
+ * sonst die Person.
+ */
+export function RankOpen(place: string | null, userId: string | undefined): boolean {
+    const guildId = place && !place.startsWith("@me") ? place.split("/")[0]! : null;
+
+    return ModuleOpen("rl-tracking", guildId, userId) || (guildId !== null && ModuleOpen("rl-tracking", null, userId));
+}

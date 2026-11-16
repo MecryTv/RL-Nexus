@@ -4,6 +4,7 @@ import Event from "../../structures/Event";
 import { RANK_PREFIX, RankMessage } from "../../builder/RankView";
 import { RankCardPage } from "../../builder/RankCard";
 import { IPrimeProfile } from "../../interfaces/services/prime/IPrimeService";
+import { ClosedText, ModuleOpen } from "../../utils/moduleFlags";
 
 /** Jeder Klick zeichnet die Karte neu (knapp eine Sekunde) - nicht öfter als alle drei Sekunden je Nutzer. */
 const COOLDOWN_MS = 3000;
@@ -54,6 +55,13 @@ export default class RankButtons extends Event {
 
         if (!match) {
             await interaction.reply({ content: "Dieser Knopf ist veraltet. Ruf `/rank` einfach neu auf.", flags: MessageFlags.Ephemeral });
+
+            return;
+        }
+
+        // W-0131: RL Tracking im Admin Dashboard abgeschaltet - auch alte Karten blättern nicht mehr.
+        if (!ModuleOpen("rl-tracking", interaction.guildId, interaction.user.id)) {
+            await interaction.reply({ content: ClosedText("rl-tracking"), flags: MessageFlags.Ephemeral, allowedMentions: { parse: [] } });
 
             return;
         }

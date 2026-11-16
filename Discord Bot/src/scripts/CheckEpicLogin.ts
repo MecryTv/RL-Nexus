@@ -18,6 +18,7 @@ import PlayerAccount from "../models/PlayerAccount";
 import { Seal } from "../utils/seal";
 import { DiscordBack, EpicAuthorizeURL, EpicExchange, EpicLinkToken, EpicLinkURL } from "../utils/epicLogin";
 import { EpicAdopt } from "../utils/epic";
+import { SetFlags } from "../utils/moduleFlags";
 import { EpicDonePage, EpicFailPage } from "../builder/EpicPage";
 import EpicCallback from "../routes/EpicCallback";
 import EpicLink, { EPIC_STATE_COOKIE } from "../routes/EpicLink";
@@ -502,6 +503,34 @@ async function checkReview(): Promise<void> {
     check("Erstes Verbinden: nichts abzuräumen", !first.calls.includes("clear") && !first.calls.includes("strip"), first.calls.join(", "));
 }
 
+/** W-0131: RL Tracking im Admin abgeschaltet - die Epic-Seiten sagen es, statt zu Epic zu führen. */
+async function checkClosed(): Promise<void> {
+    console.log("\n  — RL Tracking abgeschaltet (W-0131) —");
+
+    const client = Client();
+    const sealed = TokenOf(EpicLinkURL(client, USER));
+
+    SetFlags([{ module: "rl-tracking", status: "off", notice: "Umbau bis 21 Uhr" }], [], []);
+
+    const page = Reply();
+    await new EpicLink(client).Handle({ query: { t: sealed }, headers: {} } as never, page as never);
+    check("Gültiger Link bei RL Tracking aus: 503 mit Hinweis, kein Weg zu Epic", page.statusCode === 503 && page.body.includes("Gerade abgeschaltet") && page.body.includes("Umbau bis 21 Uhr") && page.location === null && page.headers["set-cookie"] === undefined, `${page.statusCode}`);
+
+    const go = Reply();
+    await new EpicLink(client).Handle({ query: { t: sealed, go: "1" }, headers: { "sec-fetch-site": "same-origin" } } as never, go as never);
+    check("Auch mit go=1 kein Cookie und keine Weiterleitung", go.statusCode === 503 && go.location === null && go.headers["set-cookie"] === undefined, `${go.statusCode} ${go.location}`);
+
+    const back = await Callback(client, { code: "c", state: "n1" }, `n1|${sealed}`);
+    check("Rückweg von Epic bei RL Tracking aus: 503, nichts verbunden", back.statusCode === 503 && back.body.includes("Gerade abgeschaltet") && client.calls.length === 0, `${back.statusCode} ${client.calls.join(", ")}`);
+
+    SetFlags([{ module: "rl-tracking", status: "beta", notice: null }], [USER], []);
+    const beta = Reply();
+    await new EpicLink(client).Handle({ query: { t: sealed }, headers: {} } as never, beta as never);
+    check("Nur Beta und die Person ist Beta-Tester: normale Bestätigung", beta.statusCode === 200 && beta.body.includes("Weiter zu Epic Games"), `${beta.statusCode}`);
+
+    SetFlags([], [], []);
+}
+
 async function main(): Promise<void> {
     const original = globalThis.fetch;
 
@@ -514,6 +543,7 @@ async function main(): Promise<void> {
         await checkSwap();
         await checkBack();
         await checkReview();
+        await checkClosed();
     } finally {
         globalThis.fetch = original;
     }

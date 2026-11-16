@@ -5,6 +5,7 @@ import Route from "../structures/Route";
 import { ClearCookie, ParseCookies, STATE_LIFETIME } from "../constants/Dashboard";
 import { LINK_COOLDOWN, LINK_COOLDOWN_DEV, LINK_FIX } from "../constants/Database";
 import { EpicDonePage, EpicFailPage, IEpicWho } from "../builder/EpicPage";
+import { ClosedText, RankOpen } from "../utils/moduleFlags";
 import { EpicAdopt } from "../utils/epic";
 import { EPIC_PATH, EpicExchange, EpicLinkToken, EpicLinkURL, EpicLoginReady } from "../utils/epicLogin";
 import { SendPage } from "../utils/dashboard";
@@ -62,6 +63,9 @@ export default class EpicCallback extends Route {
         if (!EpicLoginReady(this.client)) {
             return page(503, EpicFailPage("Nicht eingerichtet", "Das Verbinden über Epic Games ist auf diesem Bot noch nicht eingerichtet.", "Ränge ansehen geht trotzdem: /rank search mit einem Epic-Namen."));
         }
+
+        // W-0131: RL Tracking im Admin Dashboard abgeschaltet - nichts verbinden.
+        if (!RankOpen(token?.place ?? null, token?.userId)) return page(503, EpicFailPage("Gerade abgeschaltet", ClosedText("rl-tracking"), "Versuch es später noch einmal mit /rank link."));
 
         const who: IEpicWho | null = token ? await EpicWho(this.client, token.userId) : null;
         const place = token?.place ?? null;

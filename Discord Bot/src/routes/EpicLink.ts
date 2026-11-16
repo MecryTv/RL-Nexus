@@ -4,6 +4,7 @@ import BotClient from "../client/BotClient";
 import Route from "../structures/Route";
 import { COOKIE_PREFIX, SerializeCookie, STATE_LIFETIME } from "../constants/Dashboard";
 import { EpicConfirmPage, EpicFailPage, IEpicWho } from "../builder/EpicPage";
+import { ClosedText, RankOpen } from "../utils/moduleFlags";
 import { EPIC_LINK_MINUTES, EPIC_PATH, EpicAuthorizeURL, EpicLinkToken, EpicLoginReady } from "../utils/epicLogin";
 import { SendPage } from "../utils/dashboard";
 
@@ -60,6 +61,13 @@ export default class EpicLink extends Route {
         const query = request.query as { t?: unknown; go?: unknown };
         const sealed = typeof query.t === "string" ? query.t : "";
         const token = EpicLinkToken(this.client, sealed);
+
+        // W-0131: RL Tracking im Admin Dashboard abgeschaltet - kein Weg zu Epic, auch nicht mit einem alten Knopf.
+        if (!RankOpen(token?.place ?? null, token?.userId)) {
+            reply.code(503);
+
+            return SendPage(this.client, reply, "epic.html", EpicFailPage("Gerade abgeschaltet", ClosedText("rl-tracking"), "Versuch es später noch einmal mit /rank link."));
+        }
 
         if (!token) {
             reply.code(410);
