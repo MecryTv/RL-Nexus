@@ -521,7 +521,8 @@ export function BotModulesPage(): JSX.Element {
                     <p>
                         Das trifft sofort <b>{selected.module === "rl-tracking" ? total : selected.servers} Server</b>. Die Einstellungen der Server bleiben gespeichert und gelten beim
                         Einschalten wieder. Hinweis an die Server: <b>{notice || "keiner"}</b>
-                        {notice ? "" : `, Befehle antworten mit „${CLOSED_TEXT}“`}.
+                        {notice ? "" : `, Befehle antworten mit „${CLOSED_TEXT}“`}
+                        {/[.!?…“"]$/.test(notice) ? "" : "."}
                     </p>
                 )}
                 {draft.linkMode === "name" && selected.linkMode !== "name" && <p>Dann kann jeder einen fremden Epic-Namen eintragen und bekommt dessen Rang-Rollen.</p>}

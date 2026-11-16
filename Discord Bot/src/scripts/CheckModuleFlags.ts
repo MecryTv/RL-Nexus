@@ -12,6 +12,7 @@ import BotClient from "../client/BotClient";
 import CommandHandler from "../events/client/CommandHandler";
 import GuildSettings from "../models/GuildSettings";
 import PlayerAccount from "../models/PlayerAccount";
+import RankRoleService from "../services/RankRoleService";
 import { ApplyLinkMode } from "../utils/linkModeWatch";
 import AdminModulesReload from "../routes/AdminModulesReload";
 import { ActiveModules, ClosedText, CurrentLinkMode, LoadFlags, ModuleNotices, ModuleOpen, NoticeOf, OnFlagsLoaded, SetFlags } from "../utils/moduleFlags";
@@ -197,6 +198,24 @@ async function checkTrust(): Promise<void> {
     check("Danach nicht noch einmal", !(await ApplyLinkMode(client, "login")) && strips === 1);
     state.set("link_mode_applied", "name");
     check("Name → Beides ist auch strenger", (await ApplyLinkMode(client, "both")) && strips === 2);
+
+    // Review: Ist Rank Roles global aus, muss das Aufräumen trotzdem die gespeicherten Server erreichen.
+    SetFlags([{ module: "rank-roles", status: "off", notice: null }], [], []);
+    const removed: string[] = [];
+    const member = { id: "u1", roles: { cache: new Set(["r1"]), remove: async (roles: string[]) => void removed.push(...roles) } };
+    const guild = { id: "g1", members: { cache: new Map([["u1", member]]), fetch: async () => null } };
+    const service = new RankRoleService({
+        guilds: { cache: new Map([["g1", guild]]) },
+        settings: { Of: async () => ({ modules: ActiveModules("g1", ["rank-roles"]) }), RawModules: async () => ["rank-roles"] },
+        config: { GUILD_MEMBER_INTENT: false },
+    } as unknown as BotClient) as unknown as Record<string, unknown> & { Strip: (userId: string) => Promise<number> };
+
+    service.Settings = async () => ({});
+    service.Managed = () => new Set(["r1"]);
+    service.Blocked = () => null;
+
+    const count = await service.Strip("u1");
+    check("Rank Roles global aus: Trennen nimmt die Rollen trotzdem ab (gespeicherte Server zählen)", count === 1 && removed.includes("r1"), `${count} ${removed.join(",")}`);
 
     SetFlags([], [], []);
 }

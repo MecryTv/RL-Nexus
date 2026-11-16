@@ -620,6 +620,33 @@ async function checkNameLink(): Promise<void> {
     const confirmed = await Callback(same, { code: "c", state: "n1" }, cookieFor(same));
     check("Erst Name, dann Login desselben Kontos: jetzt bestätigt", confirmed.statusCode === 200 && same.calls.includes(`verify ${USER}`) && same.rows[0]?.verified === 1, `${confirmed.statusCode} ${same.calls.join(", ")}`);
 
+    // Review: Wechsel per Name im Korrektur-Fenster lässt die Frist laufen, statt sie neu zu starten.
+    mode("name");
+    const tenMinutes = new Date(Date.now() - 10 * 60_000);
+    const hopper = Client([{ user_id: USER, account_id: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", display_name: "Alt", changed_at: tenMinutes, verified: 0 }], { primeService: prime, developerMode: false });
+    await link(hopper, "Nova");
+    check("Per Name im Korrektur-Fenster gewechselt: Frist zählt weiter ab dem ersten Verbinden", hopper.rows[0]?.account_id === ACCOUNT && hopper.rows[0]?.changed_at.getTime() === tenMinutes.getTime(), `${hopper.rows[0]?.changed_at?.toISOString()}`);
+
+    // Review: „derselbe Name“ zählt nur, wenn es dasselbe Konto ist. Ein Name kann inzwischen einem anderen gehören.
+    const twoHours = new Date(Date.now() - 2 * 3_600_000);
+    const renamed = Client([{ user_id: USER, account_id: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", display_name: "Nova", changed_at: twoHours, verified: 0 }], { primeService: prime, developerMode: false });
+    const locked = await link(renamed, "Nova");
+    check("Gleicher Name, anderes Konto, Sperrfrist läuft: abgelehnt", !renamed.calls.some((call) => call.startsWith("link")) && text(locked).includes("Tage"), text(locked));
+
+    // Review: Bei „Beides“ zeigt /rank me eine Name-Verknüpfung ohne Discord-Namen und Bild.
+    mode("both");
+    const shown: (string | null)[] = [];
+    const me = new Rank(
+        Client([{ user_id: USER, account_id: ACCOUNT, display_name: "Nova", changed_at: new Date(0), verified: 0 }], {
+            primeService: { IsConfigured: true, Profile: async () => ({ name: "Nova", accountId: ACCOUNT, ranks: [] }) },
+            accounts: { Linked: async () => ({ user_id: USER, account_id: ACCOUNT, display_name: "Nova", verified: 0 }) },
+        })
+    ) as unknown as Record<string, unknown> & { Me: (interaction: unknown) => Promise<void> };
+
+    me.Send = async (_interaction: unknown, _profile: unknown, name: string | null, avatar: string | null) => void shown.push(name, avatar);
+    await me.Me({ ...LinkAsk(null), user: { id: USER, username: "user-1", displayAvatarURL: () => "https://cdn.discordapp.com/a.png" }, inCachedGuild: () => false });
+    check("Beides, per Name verbunden: Karte ohne Discord-Namen und Bild", shown.length === 2 && shown[0] === null && shown[1] === null, JSON.stringify(shown));
+
     SetFlags([], [], []);
 }
 

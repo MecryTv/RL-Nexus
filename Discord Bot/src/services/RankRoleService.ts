@@ -247,7 +247,8 @@ export default class RankRoleService {
         let removed = 0;
 
         for (const guild of this.client.guilds.cache.values()) {
-            if (!(await this.client.settings.Of(guild.id)).modules.includes(RANK_ROLES_MODULE)) continue;
+            // Aufräumen geht über die gespeicherte Auswahl, auch wenn Rank Roles im Admin gerade global aus ist (Review W-0131).
+            if (!(await this.client.settings.RawModules(guild.id)).includes(RANK_ROLES_MODULE)) continue;
 
             const member = guild.members.cache.get(userId) ?? (await guild.members.fetch(userId).catch(() => null));
 
@@ -309,7 +310,8 @@ export default class RankRoleService {
 
         for (const guild of this.client.guilds.cache.values()) {
             if (this.client.developerMode && guild.id !== this.client.config.DEV_GUILD_ID) continue;
-            if (!(await this.client.settings.Of(guild.id)).modules.includes(RANK_ROLES_MODULE)) continue;
+            // Aufräumen geht über die gespeicherte Auswahl, auch wenn Rank Roles im Admin gerade global aus ist (Review W-0131).
+            if (!(await this.client.settings.RawModules(guild.id)).includes(RANK_ROLES_MODULE)) continue;
 
             const managed = [...this.Managed(await this.Settings(guild.id))];
 

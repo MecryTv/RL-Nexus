@@ -16,6 +16,7 @@ import { PrimeError } from "../../services/PrimeService";
 import { EPIC_LINK_MINUTES, EpicLinkURL, EpicLoginReady } from "../../utils/epicLogin";
 import { EpicAdopt } from "../../utils/epic";
 import { CurrentLinkMode } from "../../utils/moduleFlags";
+import { LinkUsable } from "../../models/PlayerAccount";
 import logger from "../../utils/logger";
 
 const MAX_NAME = 64;
@@ -273,8 +274,15 @@ export default class Rank extends Command {
         const userId = interaction.user.id;
         const current = await this.client.accounts.On(userId, "epic");
         const cooldown = await this.client.accounts.Cooldown(userId, "epic", cooldownOf(this.client), LINK_FIX);
-        // Derselbe Name noch einmal ist keine Änderung - das darf die Sperre nicht treffen.
-        const same = current?.display_name?.toLowerCase() === name.toLowerCase();
+
+        // Erst prüfen, dann verknüpfen: einen Namen, den es nicht gibt, speichert der Bot gar nicht erst.
+        const profile = await this.Fetch(interaction, name);
+
+        if (!profile) return;
+
+        // Dasselbe Konto noch einmal ist keine Änderung - das darf die Sperre nicht treffen.
+        // Verglichen wird die Konto-ID: Ein Name kann inzwischen einem anderen Spieler gehören (Review W-0131).
+        const same = current?.account_id === profile.accountId;
 
         if (!cooldown.open && !same) {
             await interaction.editReply({ content: `Dein Epic-Konto lässt sich nur alle ${LINK_COOLDOWN_DAYS} Tage wechseln. Wieder möglich in **${waitLabel(cooldown.waitMs)}**.` });
@@ -282,10 +290,8 @@ export default class Rank extends Command {
             return;
         }
 
-        // Erst prüfen, dann verknüpfen: einen Namen, den es nicht gibt, speichert der Bot gar nicht erst.
-        const profile = await this.Fetch(interaction, name);
-
-        if (!profile) return;
+        // Korrektur im Fenster nach dem Verbinden: die Frist zählt weiter ab dem ersten Verbinden, wie beim Login.
+        const keepChangedAt = current && !same && cooldown.fixUntil !== null ? new Date(current.changed_at) : undefined;
 
         const owner = await this.client.accounts.Owner("epic", profile.accountId);
         const taken = "Dieses Epic-Konto ist schon mit einem anderen Discord-Konto verbunden. Ein Epic-Konto gehört genau einem Discord-Konto.";
@@ -293,7 +299,7 @@ export default class Rank extends Command {
         if (owner && owner !== userId) return void (await interaction.editReply({ content: taken }));
 
         try {
-            await EpicAdopt(this.client, userId, { accountId: profile.accountId, displayName: profile.name }, undefined, false);
+            await EpicAdopt(this.client, userId, { accountId: profile.accountId, displayName: profile.name }, keepChangedAt, false);
         } catch (error) {
             if ((error as { code?: string } | null)?.code !== "ER_DUP_ENTRY") throw error;
 
@@ -402,11 +408,14 @@ export default class Rank extends Command {
 
         if (!profile) return;
 
+        // W-0131 (Review): Per Name verbunden zeigt die Karte niemanden als Besitzer, außer bei „Nur Epic-Name“.
+        const owner = LinkUsable(account, "trusted");
+
         await this.Send(
             interaction,
             profile,
-            interaction.user.username,
-            interaction.user.displayAvatarURL({ extension: "png", size: 256 })
+            owner ? interaction.user.username : null,
+            owner ? interaction.user.displayAvatarURL({ extension: "png", size: 256 }) : null
         );
 
         // Mit Rank Roles: die Rang-Rollen zum eben gezeigten Rang. Neu dazu sieht nur, wer fragt.
