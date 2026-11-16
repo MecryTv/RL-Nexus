@@ -118,6 +118,11 @@ export default function LoadConfig(): IConfig {
         // Fehlt der Token, holen sie nichts - alles andere laeuft weiter.
         PRIME_API_TOKEN: Text("PRIME_API_TOKEN"),
 
+        // W-0125: Epic-Login für /rank link - siehe docs/EpicLogin.md.
+        EPIC_CLIENT_ID: Text("EPIC_CLIENT_ID"),
+        EPIC_CLIENT_SECRET: Text("EPIC_CLIENT_SECRET"),
+        EPIC_DEPLOYMENT_ID: Text("EPIC_DEPLOYMENT_ID"),
+
         // Twitch Notifier und YouTube-Livestreams - siehe docs/Notifiers.md.
         TWITCH_CLIENT_ID: Text("TWITCH_CLIENT_ID"),
         TWITCH_CLIENT_SECRET: Text("TWITCH_CLIENT_SECRET"),

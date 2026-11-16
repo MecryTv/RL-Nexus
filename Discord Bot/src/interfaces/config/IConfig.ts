@@ -56,6 +56,13 @@ export interface IConfig {
     /** Token fuer prime.rocketplanet.gg - ohne ihn holen /rank, Teams und Rank Roles keine Raenge. */
     PRIME_API_TOKEN: string;
 
+    // W-0125: Epic Account Services (dev.epicgames.com/portal) für /rank link.
+    // Ohne Client-ID und Secret lässt sich kein Epic-Konto verbinden; /rank search geht trotzdem.
+    EPIC_CLIENT_ID: string;
+    EPIC_CLIENT_SECRET: string;
+    /** Freiwillig: ein Deployment aus der Live-Sandbox. Leer: wird nicht mitgeschickt. */
+    EPIC_DEPLOYMENT_ID: string;
+
     // Twitch-App (dev.twitch.tv) für den Twitch Notifier. Ohne beide Werte
     // meldet er nichts, und das Dashboard sagt das.
     TWITCH_CLIENT_ID: string;

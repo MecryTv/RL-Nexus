@@ -12,10 +12,10 @@ import Command from "../../structures/Command";
 import Category from "../../enums/Category";
 import { IPrimeProfile } from "../../interfaces/services/prime/IPrimeService";
 import { RenderRankCard } from "../../builder/RankCard";
-import { LINK_COOLDOWN, LINK_COOLDOWN_DAYS, LINK_COOLDOWN_DEV } from "../../constants/Database";
+import { LINK_COOLDOWN, LINK_COOLDOWN_DAYS, LINK_COOLDOWN_DEV, LINK_FIX } from "../../constants/Database";
 import { TrackerURL } from "../../constants/Prime";
 import { PrimeError } from "../../services/PrimeService";
-import { EpicAdopt } from "../../utils/epic";
+import { EPIC_LINK_MINUTES, EpicLinkURL, EpicLoginReady } from "../../utils/epicLogin";
 import logger from "../../utils/logger";
 
 const MAX_NAME = 64;
@@ -41,7 +41,7 @@ function waitLabel(ms: number): string {
 /**
  * Rang-Karte als Discord-Command.
  *
- *   /rank link <name>    verbindet das Epic-Konto mit dem Discord-Konto
+ *   /rank link           Knopf zum Epic-Login, verbindet das Epic-Konto (W-0125)
  *   /rank unlink         trennt es wieder
  *   /rank me             die eigene Karte, über die Verknüpfung
  *   /rank search <name>  die Karte zu einem beliebigen Epic-Namen
@@ -68,18 +68,7 @@ export default class Rank extends Command {
         this.data = new SlashCommandBuilder()
             .setName(this.name)
             .setDescription(this.description)
-            .addSubcommand((sub) =>
-                sub
-                    .setName("link")
-                    .setDescription("Verbindet dein Epic-Konto mit deinem Discord-Konto")
-                    .addStringOption((option) =>
-                        option
-                            .setName("epicname")
-                            .setDescription("Dein Epic-Games-Name, genau wie im Spiel geschrieben")
-                            .setRequired(true)
-                            .setMaxLength(MAX_NAME)
-                    )
-            )
+            .addSubcommand((sub) => sub.setName("link").setDescription("Verbindet dein Epic-Konto über die Anmeldung bei Epic Games"))
             .addSubcommand((sub) =>
                 sub
                     .setName("unlink")
@@ -190,11 +179,18 @@ export default class Rank extends Command {
     /* ------------------------------------------------------------------
        /rank link
        ------------------------------------------------------------------ */
+    /**
+     * W-0125: Verbunden wird nur noch über den Epic-Login. Ein getippter Name
+     * bewies nichts - jeder konnte sich so das Konto eines anderen holen, samt
+     * dessen Rang-Rollen. Der Befehl schickt deshalb nur einen Knopf; was danach
+     * passiert, steht in routes/EpicCallback.ts.
+     */
     private async Link(interaction: ChatInputCommandInteraction): Promise<void> {
-        const name = (interaction.options.getString("epicname", true) ?? "").trim();
-
-        if (!name) {
-            await interaction.reply({ content: "Kein gültiger Epic-Name.", flags: MessageFlags.Ephemeral });
+        if (!EpicLoginReady(this.client)) {
+            await interaction.reply({
+                content: "Das Verbinden über Epic Games ist auf diesem Bot noch nicht eingerichtet. Ränge ansehen geht trotzdem mit `/rank search`.",
+                flags: MessageFlags.Ephemeral,
+            });
 
             return;
         }
@@ -208,52 +204,47 @@ export default class Rank extends Command {
             return;
         }
 
-        // Nur der Nutzer selbst soll sehen, welches Konto er verbindet.
+        // Nur der Nutzer selbst soll den Knopf sehen: er verbindet sein Discord-Konto.
         await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
         const userId = interaction.user.id;
-        const windowMs = cooldownOf(this.client);
         const current = await this.client.accounts.On(userId, "epic");
-        const cooldown = await this.client.accounts.Cooldown(userId, "epic", windowMs);
+        const cooldown = await this.client.accounts.Cooldown(userId, "epic", cooldownOf(this.client), LINK_FIX);
 
-        // Derselbe Name noch einmal ist keine Änderung - das darf die Sperre nicht treffen.
-        const same = current?.display_name?.toLowerCase() === name.toLowerCase();
-
-        if (!cooldown.open && !same) {
+        // Neu verbinden mit demselben Konto ginge zwar auch in der Frist, aber das
+        // ändert nichts. Gesperrt wird hier, damit niemand umsonst zu Epic läuft.
+        if (current && !cooldown.open) {
             await interaction.editReply({
                 content:
-                    `Dein Epic-Konto lässt sich nur alle ${LINK_COOLDOWN_DAYS} Tage wechseln. ` +
-                    `Wieder möglich in **${waitLabel(cooldown.waitMs)}**.`,
+                    `Verbunden ist **${current.display_name ?? current.account_id}**. ` +
+                    `Wechseln geht nur alle ${LINK_COOLDOWN_DAYS} Tage, wieder möglich in **${waitLabel(cooldown.waitMs)}**.`,
             });
 
             return;
         }
 
-        // Erst prüfen, dann verknüpfen: einen Namen, den es nicht gibt, speichert
-        // der Bot gar nicht erst.
-        const profile = await this.Fetch(interaction, name);
+        // Ist schon ein Konto verbunden, soll es ein anderes werden: Epic fragt dann neu
+        // nach der Anmeldung, statt still das schon angemeldete (falsche) Konto zu nehmen.
+        const button = new ButtonBuilder()
+            .setStyle(ButtonStyle.Link)
+            .setLabel(current ? "Anderes Epic-Konto verbinden" : "Mit Epic Games anmelden")
+            .setEmoji("🔐")
+            // Der Kanal geht mit: „Zurück zu Discord“ auf der Seite danach führt genau hierher.
+            .setURL(EpicLinkURL(this.client, userId, Date.now(), !!current, `${interaction.guildId ?? "@me"}/${interaction.channelId}`));
 
-        if (!profile) return;
-
-        await EpicAdopt(this.client, userId, profile);
-
-        logger.user(`🎮 Epic verknüpft: ${userId} → ${profile.name} (${profile.accountId})`);
-
-        // Was geprueft wurde, gehoert in die Antwort. Der Name geht gegen Rocket
-        // League, bevor irgendetwas gespeichert wird - aber wenn davon nichts zu
-        // sehen ist, bleibt fuer den Nutzer offen, ob er sich vertippt und
-        // trotzdem etwas verbunden hat.
-        const found = profile.ranks
-            .filter((rank) => !rank.placement && rank.mmr > 0)
-            .map((rank) => `${rank.key} ${rank.tierName} (${rank.mmr})`);
+        const name = current ? `**${current.display_name ?? current.account_id}**` : "";
+        const intro = !current
+            ? ""
+            : cooldown.fixUntil
+              ? `Verbunden ist gerade ${name}. Falsches Konto? Bis <t:${Math.floor(cooldown.fixUntil / 1000)}:t> kannst du ohne Wartezeit ein anderes verbinden, Epic fragt dafür neu nach der Anmeldung.\n`
+              : `Verbunden ist gerade ${name}. Mit dem Knopf verbindest du ein anderes Epic-Konto, Epic fragt dafür neu nach der Anmeldung.\n`;
 
         await interaction.editReply({
             content:
-                `**${profile.name}** ist jetzt mit deinem Discord-Konto verbunden.\n` +
-                `Bei Rocket League gefunden: ${found.length > 0 ? found.join(" · ") : "noch keine gewerteten Ränge"}\n` +
-                `Mit \`/rank me\` siehst du deine Karte.` +
-                (same ? "" : `\nEin Wechsel ist erst in ${LINK_COOLDOWN_DAYS} Tagen wieder möglich.`),
-            components: [this.TrackerRow(profile.name)],
+                intro +
+                (current ? "" : "Melde dich mit dem Knopf bei Epic Games an. Danach gehört dein Epic-Konto zu diesem Discord-Konto, und niemand sonst kann es verbinden.\n") +
+                `-# Der Knopf gilt ${EPIC_LINK_MINUTES} Minuten und nur für dich. Gib ihn nicht weiter.`,
+            components: [new ActionRowBuilder<ButtonBuilder>().addComponents(button)],
         });
     }
 
@@ -310,7 +301,7 @@ export default class Rank extends Command {
         await interaction.editReply({
             content:
                 `**${current.display_name ?? current.account_id}** ist nicht mehr mit deinem Discord-Konto verbunden. ` +
-                `Mit \`/rank link <EpicName>\` verbindest du ein anderes.`,
+                `Mit \`/rank link\` verbindest du ein anderes.`,
         });
     }
 
@@ -331,7 +322,7 @@ export default class Rank extends Command {
 
         if (!account) {
             await interaction.reply({
-                content: "Du hast noch kein Epic-Konto verbunden. Mach das einmal mit `/rank link <EpicName>`.",
+                content: "Du hast noch kein Epic-Konto verbunden. Mach das einmal mit `/rank link`.",
                 flags: MessageFlags.Ephemeral,
             });
 

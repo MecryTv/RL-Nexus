@@ -65,7 +65,7 @@ export const COMMAND_DETAILS: Readonly<Record<string, ICommandDetail>> = {
     /* --- RL Tracking ----------------------------------------------------- */
     "rank me": { description: "Zeigt deine eigenen Ränge und setzt mit Rank Roles deine Rang-Rollen" },
     "rank search": { description: "Zeigt die Ränge zu einem Epic-Namen", usage: "epicname" },
-    "rank link": { description: "Verbindet dein Epic-Konto mit deinem Discord-Konto", usage: "epicname" },
+    "rank link": { description: "Verbindet dein Epic-Konto über die Anmeldung bei Epic Games" },
     "rank unlink": { description: "Trennt dein Epic-Konto wieder, frühestens drei Tage nach dem Verbinden" },
 
     /* --- Rank Roles ------------------------------------------------------ */

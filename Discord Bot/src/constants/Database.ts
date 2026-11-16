@@ -119,6 +119,13 @@ export type Platform = (typeof PLATFORMS)[number];
 export const LINK_COOLDOWN_DAYS = 3;
 export const LINK_COOLDOWN = LINK_COOLDOWN_DAYS * 24 * 60 * 60 * 1000;
 export const LINK_COOLDOWN_DEV = 10 * 1000;
+/**
+ * W-0125: So lange nach dem Verbinden lässt sich das Epic-Konto ohne Sperrfrist
+ * wechseln oder trennen - für den Fall, dass man bei Epic mit dem falschen Konto
+ * angemeldet war. Ein Wechsel darin setzt die Frist nicht neu.
+ */
+export const LINK_FIX_MINUTES = 60;
+export const LINK_FIX = LINK_FIX_MINUTES * 60 * 1000;
 
 export const TEAM_ROLES = ["captain", "player", "substitute", "coach"] as const;
 

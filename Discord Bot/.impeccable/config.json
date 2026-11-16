@@ -74,6 +74,15 @@
         ],
         "createdAt": "2026-11-03T18:12:16.841Z",
         "reason": "Hinweisbalken Warum geprüft wird ist Teil des vom Nutzer gewählten Entwurfs V-A+"
+      },
+      {
+        "rule": "broken-image",
+        "value": "*",
+        "files": [
+          "src/scripts/CheckEpicLogin.ts"
+        ],
+        "createdAt": "2026-11-16T14:11:01.091Z",
+        "reason": "Claude: absichtlicher XSS-Testwert <img onerror=1> im Prüfskript, kein ausgeliefertes HTML"
       }
     ]
   }

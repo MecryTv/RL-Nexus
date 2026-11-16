@@ -1,19 +1,38 @@
 import BotClient from "../client/BotClient";
 import { IPrimeProfile } from "../interfaces/services/prime/IPrimeService";
+import { IEpicAccount } from "./epicLogin";
 
 /**
- * Alles, was nach einem erfolgreich aufgeloesten Epic-Konto passieren muss.
+ * Alles, was nach einem bestätigten Epic-Konto passieren muss.
  *
- * Der Weg hierher ist /rank link: der Epic-Name, den Prime aufloest.
+ * Der Weg hierher ist der Epic-Login aus /rank link (W-0125, routes/EpicCallback.ts):
+ * Konto-ID und Name kommen von Epic selbst. Ränge holt danach Prime, über die ID -
+ * fällt Prime aus, ist das Konto trotzdem verbunden, nur noch ohne Ränge.
  *
- * Verknuepft wird ausschliesslich Epic. Die Plattformen, die Prime am Konto
+ * Ist dasselbe Konto schon verbunden, ändert sich nur der Name. changed_at bleibt
+ * dann stehen, sonst setzte erneutes Bestätigen die Sperrfrist neu. Dasselbe mit
+ * keepChangedAt bei einem Wechsel im Korrektur-Fenster (LINK_FIX).
+ *
+ * Verknüpft wird ausschliesslich Epic. Die Plattformen, die Prime am Konto
  * haengen sieht, werden bewusst nicht mitgeschrieben: fuer PlayStation und
  * Nintendo gibt es keinen oeffentlichen Login, und die Raenge sind auf allen
  * Plattformen ohnehin dieselben - siehe Migration 007.
  */
-export async function EpicAdopt(client: BotClient, userId: string, profile: IPrimeProfile): Promise<void> {
-    await client.accounts.Link(userId, "epic", profile.accountId, profile.name, true);
+export async function EpicAdopt(client: BotClient, userId: string, epic: IEpicAccount, keepChangedAt?: Date): Promise<{ name: string; profile: IPrimeProfile | null }> {
+    const profile = client.primeService.IsConfigured ? await client.primeService.Profile(epic.accountId).catch(() => null) : null;
+    const name = epic.displayName ?? profile?.name ?? epic.accountId;
+    const current = await client.accounts.On(userId, "epic");
 
-    await client.ranks.Snapshot(userId, profile.ranks);
-    await client.ranks.SaveProfile(userId, profile.seasonLevel, profile.seasonWins, profile.stats, profile.club);
+    if (current?.account_id === epic.accountId) {
+        if (current.display_name !== name) await client.accounts.Rename(userId, "epic", name);
+    } else {
+        await client.accounts.Link(userId, "epic", epic.accountId, name, true, keepChangedAt);
+    }
+
+    if (profile) {
+        await client.ranks.Snapshot(userId, profile.ranks);
+        await client.ranks.SaveProfile(userId, profile.seasonLevel, profile.seasonWins, profile.stats, profile.club);
+    }
+
+    return { name, profile };
 }

@@ -10,7 +10,7 @@ Das Modul heißt `rank-roles` und wird unter *Module* eingeschaltet (oder `/modu
 
 Einen eigenen Befehl gibt es nicht (mehr): Ist das Modul an, setzt `/rank me` die Rang-Rollen (`RankRoleService.AfterRankMe`). Der Befehl nimmt dafür das Profil, das er für die Rangkarte ohnehin geholt hat; Prime wird kein zweites Mal gefragt. Kommen Rollen dazu, sieht nur der Fragende eine Zeile „🎖️ Neu dazu: …“, ohne Ping.
 
-Der Epic-Name kommt aus dem **verknüpften Konto** — verbunden wird es mit `/rank link epicname:DeinName`. `/rank search` mit fremdem Namen vergibt nie Rollen, sonst holte man sich Rollen mit dem Konto eines anderen.
+Der Rang kommt aus dem **verknüpften Konto**, abgefragt über die Epic-Konto-ID. Verbunden wird es mit `/rank link` über den Epic-Login ([EpicLogin.md](EpicLogin.md)), ein fremdes Konto lässt sich so nicht verbinden. `/rank search` mit fremdem Namen vergibt nie Rollen.
 
 | Woran es liegen kann | Was passiert |
 |---|---|

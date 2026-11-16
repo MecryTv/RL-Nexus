@@ -647,7 +647,10 @@ export default class ChronicleLogger implements ILogger {
                 : status >= 400
                   ? this.colors.red
                   : this.colors.blue;
-        this.log("http", `${method.padEnd(6)} ${url} → ${status}`, color, ...args);
+        // W-0125: Link-Token (t) und OAuth-Codes von Discord und Epic gehören nicht ins Log.
+        const safe = url.replace(/([?&](?:t|code|state)=)[^&#]*/g, "$1***");
+
+        this.log("http", `${method.padEnd(6)} ${safe} → ${status}`, color, ...args);
     }
 
     public trace(functionName: string, step: string, data?: unknown): void {

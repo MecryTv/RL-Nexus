@@ -459,7 +459,7 @@ export const MODULE_DETAILS: Readonly<Record<string, IModuleDetail>> = {
                 },
                 {
                     title: "Konto verknüpfen",
-                    text: "Einmal /rank link mit dem Epic-Namen, genau wie im Spiel geschrieben.",
+                    text: "Einmal /rank link und mit Epic Games anmelden. Ein fremdes Konto lässt sich so nicht verbinden.",
                 },
                 {
                     title: "Karte abrufen",
@@ -538,7 +538,7 @@ export const MODULE_DETAILS: Readonly<Record<string, IModuleDetail>> = {
                 },
                 {
                     title: "Mitglieder verknüpfen sich",
-                    text: "Einmal /rank link mit dem Epic-Namen, danach reicht /rank me.",
+                    text: "Einmal /rank link mit der Anmeldung bei Epic Games, danach reicht /rank me.",
                 },
             ],
         },

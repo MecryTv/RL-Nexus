@@ -571,8 +571,10 @@ const PRIVACY: readonly ILegalSection[] = [
                         <strong>
                             <code>/rank</code> und Rank Roles:
                         </strong>{" "}
-                        nur wenn du dein Epic-Konto selbst mit <code>/rank link</code> und deinem Epic-Namen verknüpfst.
-                        Dann speichern wir Konto-ID, Anzeigenamen und Zeitpunkt der Verknüpfung, dazu
+                        nur wenn du dein Epic-Konto selbst mit <code>/rank link</code> verknüpfst. Dafür meldest du dich
+                        bei Epic Games an, und Epic gibt uns die Konto-ID und den Anzeigenamen deines Epic-Kontos. Dein
+                        Epic-Passwort sehen wir dabei nie, und den Zugang von Epic verwerfen wir sofort wieder.
+                        Wir speichern Konto-ID, Anzeigenamen und Zeitpunkt der Verknüpfung, dazu
                         Ränge, MMR, Spiele, Karriere-Werte, die Season-Reward-Stufe und deinen Ingame-Club. Diese Werte
                         sind in Rocket League öffentlich. Der Bot holt sie höchstens alle zehn Minuten neu und
                         überschreibt die alten. Die Verknüpfung trennst du mit <code>/rank unlink</code>, sobald die
@@ -859,6 +861,12 @@ const PRIVACY: readonly ILegalSection[] = [
                         <External href="https://discord.com/privacy">Datenschutzerklärung von Discord</External>
                     </li>
                     <li>
+                        <strong>Epic Games:</strong> die Anmeldung bei <code>/rank link</code>. Sie läuft auf den Seiten
+                        von Epic Games; Epic sieht dabei deine IP-Adresse und erfährt, dass du dich bei RL Nexus
+                        anmeldest.{" "}
+                        <External href="https://www.epicgames.com/site/privacypolicy">Datenschutzerklärung von Epic Games</External>
+                    </li>
+                    <li>
                         <strong>Rocket League API:</strong> Ränge, Karriere-Werte und Club zu einem Epic-Konto.
                         Dafür geht der Name oder die Kennung des Kontos dorthin, auch bei einer Suche mit{" "}
                         <code>/rank search</code>.
@@ -893,7 +901,7 @@ const PRIVACY: readonly ILegalSection[] = [
                     </li>
                 </ul>
                 <p>
-                    Discord, Twitch, Google und Cloudflare verarbeiten Daten auch in den USA. Welche Garantien sie dafür
+                    Discord, Epic Games, Twitch, Google und Cloudflare verarbeiten Daten auch in den USA. Welche Garantien sie dafür
                     nutzen, etwa das EU-US Data Privacy Framework oder Standardvertragsklauseln der EU-Kommission,
                     steht in ihren Datenschutzerklärungen.
                 </p>

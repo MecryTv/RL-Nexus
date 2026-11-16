@@ -19,6 +19,8 @@ export interface ICooldown {
     waitMs: number;
     /** Wann es wieder geht - ISO-8601, null wenn es jetzt geht. */
     until: string | null;
+    /** W-0125: Bis wann (ms) ein Wechsel als Korrektur gilt, sonst null. */
+    fixUntil: number | null;
 }
 
 /**
@@ -41,14 +43,16 @@ export default class PlayerAccount extends Model<IPlayerAccountRow> {
 
     /**
      * Verknüpft ein Konto oder wechselt es. "changed_at" wird ausdrücklich
-     * mitgeschrieben - daran hängt die Sperrfrist.
+     * mitgeschrieben - daran hängt die Sperrfrist. Eine Korrektur im Fenster
+     * gibt den alten Zeitpunkt mit, damit die Frist nicht neu beginnt.
      */
     async Link(
         userId: string,
         platform: Platform,
         accountId: string,
         displayName?: string,
-        verified = false
+        verified = false,
+        changedAt = new Date()
     ): Promise<void> {
         await this.Upsert(
             {
@@ -57,7 +61,7 @@ export default class PlayerAccount extends Model<IPlayerAccountRow> {
                 account_id: accountId,
                 display_name: OrNull(displayName),
                 verified: verified ? 1 : 0,
-                changed_at: new Date(),
+                changed_at: changedAt,
             },
             ["account_id", "display_name", "verified", "changed_at"]
         );
@@ -82,9 +86,11 @@ export default class PlayerAccount extends Model<IPlayerAccountRow> {
      *
      * Gerechnet wird gegen changed_at. Gibt es noch keine Verknüpfung, ist der
      * Weg frei - die Sperre gilt dem Wechseln, nicht dem ersten Verbinden.
+     * Mit fixMs ist der Weg in dieser Zeit nach changed_at ebenfalls frei
+     * (W-0125: falsches Epic-Konto erwischt), fixUntil sagt dann bis wann.
      */
-    async Cooldown(userId: string, platform: Platform, windowMs: number): Promise<ICooldown> {
-        const open: ICooldown = { open: true, waitMs: 0, until: null };
+    async Cooldown(userId: string, platform: Platform, windowMs: number, fixMs = 0, now = Date.now()): Promise<ICooldown> {
+        const open: ICooldown = { open: true, waitMs: 0, until: null, fixUntil: null };
         const row = await this.On(userId, platform);
 
         if (!row) return open;
@@ -94,12 +100,14 @@ export default class PlayerAccount extends Model<IPlayerAccountRow> {
         // Ein unlesbarer Zeitstempel darf niemanden aussperren.
         if (Number.isNaN(changed)) return open;
 
+        if (now < changed + fixMs) return { ...open, fixUntil: changed + fixMs };
+
         const until = changed + windowMs;
-        const waitMs = until - Date.now();
+        const waitMs = until - now;
 
         if (waitMs <= 0) return open;
 
-        return { open: false, waitMs, until: new Date(until).toISOString() };
+        return { open: false, waitMs, until: new Date(until).toISOString(), fixUntil: null };
     }
 
     /** Rückwärts: welcher Discord-Nutzer steckt hinter diesem Spielernamen? */

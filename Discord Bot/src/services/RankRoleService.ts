@@ -158,9 +158,10 @@ export default class RankRoleService {
         const account = await this.client.accounts.On(member.id, "epic");
         const epicName = account?.display_name?.trim();
 
-        if (!epicName) throw new RankRoleError("Verbinde erst dein Epic-Konto: **/rank link epicname:DeinName**.");
+        if (!account || !epicName) throw new RankRoleError("Verbinde erst dein Epic-Konto: **/rank link**.");
 
-        const profile = known ?? (await this.client.primeService.Profile(epicName).catch(() => null));
+        // W-0125: über die Konto-ID, nicht den Namen. Ein alter Name kann inzwischen einem anderen Spieler gehören.
+        const profile = known ?? (await this.client.primeService.Profile(account.account_id).catch(() => null));
 
         if (!profile) throw new RankRoleError(`Prime kennt **${epicName}** gerade nicht. Versuch es später noch einmal.`);
 

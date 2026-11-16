@@ -63,7 +63,7 @@ Die **PlayerID** wird aus der Antwort von Schritt 1 zusammengesetzt: `<Plattform
 | `Nintendo` | `Switch` |
 | `Steam` | `Steam` |
 
-Aufgelöst wird immer über den **Epic-Namen** — jedes Rocket-League-Konto hängt an einem Epic-Konto, auch bei Steam, Xbox, PlayStation oder Switch. Genau deshalb fragt `/rank link` nach ihm.
+Aufgelöst wird über den **Epic-Namen** oder die **Epic-Konto-ID** — jedes Rocket-League-Konto hängt an einem Epic-Konto, auch bei Steam, Xbox, PlayStation oder Switch. Genau deshalb verbindet `/rank link` das Epic-Konto (über den Epic-Login, siehe [EpicLogin.md](EpicLogin.md)).
 
 ### Der Ingame-Club
 
@@ -125,7 +125,7 @@ Der erlaubte Bereich steht in der Fehlermeldung des Dienstes: `/^(?:[0-9A-Za-z]{
 Nachgemessen: `GetFullProfile` liefert für `Epic|<id>|0` und `Steam|<id>|0`
 desselben Spielers identische Werte, gleiche MMR und gleiche Karriere-Zahlen.
 
-Das ist der Grund, warum `/rank link` nach keiner Plattform fragt. Sie hätte an
+Das ist der Grund, warum `/rank link` nur das Epic-Konto verbindet. Sie hätte an
 keiner einzigen angezeigten Zahl etwas geändert.
 
 ### Playlists
@@ -187,10 +187,11 @@ Der Token liegt beim Bot und **nie im Browser**: mit Prime spricht nur der Bot.
 
 ## Das verknüpfte Konto
 
-Das Epic-Konto liegt **serverseitig** in `player_accounts`. Verbunden wird es mit `/rank link` (siehe unten); im Dashboard gibt es dafür keinen Weg mehr. Daraus folgt:
+Das Epic-Konto liegt **serverseitig** in `player_accounts`. Verbunden wird es mit `/rank link` über den **Epic-Login** (W-0125, [EpicLogin.md](EpicLogin.md)). Daraus folgt:
 
-* Beim **ersten** Verbinden prüft der Bot den Namen gegen Prime. Kennt Prime ihn nicht, wird nichts gespeichert.
-* Ein Wechsel ist erst nach **3 Tagen** wieder möglich (`LINK_COOLDOWN_DAYS`). Im Entwicklungsmodus sind es **10 Sekunden**, sonst ließe sich das nicht testen. Derselbe Name noch einmal gilt nicht als Wechsel.
+* Konto-ID und Name kommen von Epic selbst. Ein fremdes Konto lässt sich nicht verbinden; ein getippter Name reicht seit Migration 057 nicht mehr, alle älteren Verknüpfungen sind gelöscht.
+* **Ein Epic-Konto gehört genau einem Discord-Konto** (eindeutiger Schlüssel `uq_account (platform, account_id)`). Will ein zweites Discord-Konto dasselbe Epic-Konto, lehnt der Bot ab: erst dort `/rank unlink`.
+* Ein Wechsel ist erst nach **3 Tagen** wieder möglich (`LINK_COOLDOWN_DAYS`). Im Entwicklungsmodus sind es **10 Sekunden**, sonst ließe sich das nicht testen. Dasselbe Konto neu bestätigen gilt nicht als Wechsel.
 
 ### Platzierungsspiele
 
@@ -212,7 +213,7 @@ Dieselben Daten wie im Dashboard, nur als Bild. Drei Unterbefehle:
 
 | Befehl | Was er tut |
 |---|---|
-| `/rank link <epicname>` | Verbindet das Epic-Konto mit dem Discord-Konto. Prüft den Namen erst bei Rocket League, speichert ihn nur, wenn es ihn gibt. Antwort nur für den Aufrufer sichtbar |
+| `/rank link` | Schickt einen Knopf zum Epic-Login (10 Minuten gültig, nur für den Aufrufer sichtbar). Nach der Anmeldung bei Epic ist das Konto verbunden |
 | `/rank me` | Die eigene Karte. Sucht über die gespeicherte **Konto-ID**, nicht über den Namen — wer sich im Spiel umbenennt, bleibt derselbe Spieler |
 | `/rank unlink` | Trennt die Verknüpfung wieder. Danach lässt sich ein anderes Konto verbinden |
 | `/rank search <epicname>` | Die Karte zu einem beliebigen Epic-Namen. Hat jemand dieses Konto hier verknüpft, steht sein Discord-Name mit auf der Karte |
@@ -221,9 +222,9 @@ Unter jeder Antwort steht ein Knopf **Beim Tracker ansehen** (`TrackerURL()`), d
 
 Der Name gehört dabei kodiert in die Adresse: Epic-Namen dürfen Leerzeichen und Sonderzeichen enthalten, und ein Doppelkreuz würde die Adresse sonst stillschweigend abschneiden. `npm run check:prime` prüft genau das.
 
-**Der Name wird geprüft, bevor etwas gespeichert wird.** `/rank link` fragt zuerst bei Rocket League nach; einen Namen, den es dort nicht gibt, speichert der Bot gar nicht erst. Die Antwort zeigt seit Neuestem auch, *was* gefunden wurde (`2v2 Champion III (1350) · 3v3 Champion I (1180)`) — sonst bleibt für den Nutzer offen, ob er sich vertippt und trotzdem etwas verbunden hat.
+**Verbunden wird nur, was Epic bestätigt.** Der Rückweg vom Epic-Login (`routes/EpicCallback.ts`) speichert über `EpicAdopt` (`utils/epic.ts`): Konto-ID und Name von Epic, danach die Ränge über Prime. Fällt Prime aus, ist das Konto trotzdem verbunden. Die Seite danach zeigt, was gefunden wurde.
 
-`/rank link` speichert über `EpicAdopt` (`utils/epic.ts`) und hat eine Sperrfrist: **drei Tage** (`LINK_COOLDOWN_DAYS`), im Entwicklungsmodus zehn Sekunden. Derselbe Name noch einmal zählt nicht als Wechsel.
+`/rank link` hat eine Sperrfrist: **drei Tage** (`LINK_COOLDOWN_DAYS`), im Entwicklungsmodus zehn Sekunden. Dasselbe Konto neu bestätigen zählt nicht als Wechsel.
 
 **`/rank unlink` unterliegt derselben Frist**, und das ist kein Übereifer: `Cooldown()` rechnet gegen `changed_at` in der Kontozeile, und `Unlink()` löscht genau diese Zeile. Wäre Trennen frei, wäre trennen und neu verbinden ein Weg, die Wartezeit einfach zu überspringen.
 
