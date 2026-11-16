@@ -1,5 +1,5 @@
 import BotClient from "../../../client/BotClient";
-import { PlaylistKey } from "../../../constants/Prime";
+import { ExtraPlaylistKey, PlaylistKey, TOURNAMENT_PLAYLIST } from "../../../constants/Prime";
 
 /** Ein verknüpftes Konto auf einer anderen Plattform. */
 export interface IPrimeLinkedAccount {
@@ -10,7 +10,7 @@ export interface IPrimeLinkedAccount {
 
 /** Ein Rang in einer Playlist, fertig zum Anzeigen. */
 export interface IPrimeRank {
-    key: PlaylistKey;
+    key: PlaylistKey | ExtraPlaylistKey | typeof TOURNAMENT_PLAYLIST.key;
     label: string;
     /** Die Zahl, die im Spiel steht: interner Wert * 20 + 100. */
     mmr: number;
@@ -75,6 +75,14 @@ export interface IPrimeProfile {
     /** Siege auf dem aktuellen Reward-Level. Zehn braucht es je Stufe. */
     seasonWins: number;
     ranks: IPrimeRank[];
+    /**
+     * W-0129: Heatseeker, Rumble, Hoops, Snow Day, Dropshot - nur für die
+     * Rang-Karte. Getrennt von ranks, damit Rank Roles, Teams und die gespeicherten
+     * Stände weiter nur die drei Hauptmodi sehen. Fehlt bei älteren Ständen.
+     */
+    extras?: IPrimeRank[];
+    /** W-0129: Der Turnier-Rang. null, wenn Prime keinen liefert. */
+    tournament?: IPrimeRank | null;
     stats: IPrimeStat[];
     /** Der Ingame-Club. null heisst: der Spieler ist in keinem. */
     club: IPrimeClub | null;

@@ -1,6 +1,5 @@
 import {
     ActionRowBuilder,
-    AttachmentBuilder,
     ButtonBuilder,
     ButtonStyle,
     ChatInputCommandInteraction,
@@ -11,9 +10,8 @@ import BotClient from "../../client/BotClient";
 import Command from "../../structures/Command";
 import Category from "../../enums/Category";
 import { IPrimeProfile } from "../../interfaces/services/prime/IPrimeService";
-import { RenderRankCard } from "../../builder/RankCard";
+import { RankMessage } from "../../builder/RankView";
 import { LINK_COOLDOWN, LINK_COOLDOWN_DAYS, LINK_COOLDOWN_DEV, LINK_FIX } from "../../constants/Database";
-import { TrackerURL } from "../../constants/Prime";
 import { PrimeError } from "../../services/PrimeService";
 import { EPIC_LINK_MINUTES, EpicLinkURL, EpicLoginReady } from "../../utils/epicLogin";
 import logger from "../../utils/logger";
@@ -142,24 +140,9 @@ export default class Rank extends Command {
     }
 
     /**
-     * Der Knopf zum oeffentlichen Profil beim Tracker.
-     *
-     * Ein Link-Knopf, kein Klick-Ereignis: Discord oeffnet die Adresse selbst,
-     * der Bot bekommt davon nichts mit und muss auch nichts mitschreiben. Er
-     * bleibt deshalb gueltig, solange die Nachricht steht - auch nach einem
-     * Neustart.
+     * Zeichnet Seite 1 (Ranked) und hängt sie an die Antwort. Darunter der Knopf
+     * zu den Extra-Modi und der Tracker - siehe builder/RankView.ts.
      */
-    private TrackerRow(epicName: string): ActionRowBuilder<ButtonBuilder> {
-        return new ActionRowBuilder<ButtonBuilder>().addComponents(
-            new ButtonBuilder()
-                .setStyle(ButtonStyle.Link)
-                .setLabel("Beim Tracker ansehen")
-                .setEmoji("🔗")
-                .setURL(TrackerURL(epicName))
-        );
-    }
-
-    /** Zeichnet die Karte und hängt sie an die Antwort. */
     private async Send(
         interaction: ChatInputCommandInteraction,
         profile: IPrimeProfile,
@@ -167,13 +150,11 @@ export default class Rank extends Command {
         avatarURL: string | null
     ): Promise<void> {
         const started = Date.now();
-        const png = await RenderRankCard({ profile, discordName, avatarURL });
+        const message = await RankMessage({ profile, discordName, avatarURL, page: "ranked" }, interaction.user.id);
 
         logger.info(`🖼️  Rang-Karte für ${profile.name} in ${Date.now() - started} ms`);
 
-        const file = new AttachmentBuilder(png, { name: `rank-${profile.accountId}.png` });
-
-        await interaction.editReply({ files: [file], components: [this.TrackerRow(profile.name)] });
+        await interaction.editReply(message);
     }
 
     /* ------------------------------------------------------------------

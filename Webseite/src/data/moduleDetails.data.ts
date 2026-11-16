@@ -389,7 +389,7 @@ export const MODULE_DETAILS: Readonly<Record<string, IModuleDetail>> = {
         showcase: "rank-card",
         intro: [
             "Ein Rocket-League-Server ohne Rangdaten führt zwangsläufig eine Tabelle. Irgendwo liegt eine Liste mit Namen und Rängen, die einmal richtig war, und jeder Scrim beginnt mit der Frage, ob die Zahlen noch stimmen.",
-            "RL Tracking holt sie direkt aus dem Spiel. Ein Mitglied verknüpft einmal sein Epic-Konto, und ab da kennt der Bot Rang, MMR, Spielzahl und Serie für 1v1, 2v2 und 3v3, dazu den Fortschritt beim Season-Reward und die Karriere-Werte. Das Ergebnis ist die Rang-Karte, dieselbe, deren Farben diese ganze Seite trägt.",
+            "RL Tracking holt sie direkt aus dem Spiel. Ein Mitglied verknüpft einmal sein Epic-Konto, und ab da kennt der Bot Rang, MMR, Spielzahl und Serie für 1v1, 2v2 und 3v3 und für Heatseeker, Rumble, Hoops, Snow Day und Dropshot, dazu den Turnier-Rang, den Fortschritt beim Season-Reward und die Karriere-Werte. Das Ergebnis ist die Rang-Karte, dieselbe, deren Farben diese ganze Seite trägt.",
             "Auch ohne Verknüpfung durchsuchbar: Wer einen Gegner oder einen Bewerber einschätzen will, gibt den Epic-Namen ein und bekommt dieselbe Karte. Was der Bot nicht tut, ist raten. Gibt es den Namen nicht, sagt er genau das.",
         ],
         concepts: {
@@ -405,6 +405,16 @@ export const MODULE_DETAILS: Readonly<Record<string, IModuleDetail>> = {
                     label: "Playlists",
                     text: "1v1, 2v2 und 3v3 einzeln, jede mit Rang, Division und MMR. Die Farbe folgt der Rangstufe: Diamant blau, Champion violett, Grand Champion rot.",
                     color: "var(--c-blue)",
+                },
+                {
+                    label: "Extra-Modi",
+                    text: "Heatseeker, Rumble, Hoops, Snow Day und Dropshot auf einer zweiten Seite der Karte: der Knopf „Extra-Modi“ darunter wechselt hin und her. Jede Kachel mit Rang, MMR, Streak und Spielen. Auch ohne Spiel in dieser Season steht dort die errechnete MMR.",
+                    color: "var(--c-mod-utility)",
+                },
+                {
+                    label: "Turnier-Rang",
+                    text: "Im Kopf der Karte neben dem Season Reward, im goldenen Rahmen. Mit MMR und der Zahl der Turnierspiele.",
+                    color: "var(--c-mod-engagement)",
                 },
                 {
                     label: "Platzierung",

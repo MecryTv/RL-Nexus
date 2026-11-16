@@ -20,9 +20,11 @@ import {
     PRIME_CACHE_MAX,
     PRIME_CACHE_TTL,
     PRIME_TIMEOUT,
+    EXTRA_PLAYLISTS,
     TierName,
     ToMMR,
     ToPlayerID,
+    TOURNAMENT_PLAYLIST,
     TRACKED_PLAYLISTS,
 } from "../constants/Prime";
 
@@ -254,7 +256,15 @@ export default class PrimeService implements IPrimeService {
 
         try {
             const profile = await this.Load(wanted);
-            this.cache.set(key, { value: profile, at: Date.now() });
+            const entry = { value: profile, at: Date.now() };
+
+            this.cache.set(key, entry);
+
+            // W-0129: auch unter der Konto-ID - der Knopf unter der Rang-Karte fragt
+            // über sie, /rank search über den Namen. So kostet der erste Klick nach
+            // einer Suche keine zweite Anfrage, und beide Seiten zeigen denselben Stand.
+            if (profile) this.cache.set(profile.accountId.toLowerCase(), entry);
+
             return profile;
         } catch (error) {
             if (!hit) throw error;
@@ -296,6 +306,8 @@ export default class PrimeService implements IPrimeService {
             seasonLevel: profile.RewardLevels?.SeasonLevel ?? 0,
             seasonWins: profile.RewardLevels?.SeasonLevelWins ?? 0,
             ranks: this.Ranks(profile.Skills),
+            extras: this.Ranks(profile.Skills, EXTRA_PLAYLISTS),
+            tournament: this.Ranks(profile.Skills, [TOURNAMENT_PLAYLIST])[0] ?? null,
             stats: this.Career(profile.Leaderboards),
             club: await this.Club(profile.ClubDetails),
             fetchedAt: new Date().toISOString(),
@@ -378,13 +390,14 @@ export default class PrimeService implements IPrimeService {
     }
 
     /**
-     * Sicherer Umgang mit Skills (abfangen falls undefined)
+     * Sicherer Umgang mit Skills (abfangen falls undefined). Ohne Liste die drei
+     * Hauptmodi; W-0129 holt mit derselben Rechnung Extra-Modi und Turnier.
      */
-    private Ranks(skills: IRawSkill[] | undefined): IPrimeRank[] {
+    private Ranks(skills: IRawSkill[] | undefined, playlists: readonly { id: number; key: IPrimeRank["key"]; label: string }[] = TRACKED_PLAYLISTS): IPrimeRank[] {
         const ranks: IPrimeRank[] = [];
         const safeSkills = skills ?? [];
 
-        for (const playlist of TRACKED_PLAYLISTS) {
+        for (const playlist of playlists) {
             const skill = safeSkills.find((entry) => entry.Playlist === playlist.id);
 
             if (!skill) continue;
@@ -430,8 +443,21 @@ export default class PrimeService implements IPrimeService {
     }
 
     Forget(name?: string): void {
-        if (name) this.cache.delete(name.trim().toLowerCase());
-        else this.cache.clear();
+        if (!name) {
+            this.cache.clear();
+
+            return;
+        }
+
+        // Ein Profil steht unter Name und Konto-ID - vergessen heißt beide.
+        const key = name.trim().toLowerCase();
+        const account = this.cache.get(key)?.value?.accountId.toLowerCase() ?? key;
+
+        const doomed = [...this.cache.entries()]
+            .filter(([cached, entry]) => cached === key || cached === account || entry.value?.accountId.toLowerCase() === account)
+            .map(([cached]) => cached);
+
+        for (const cached of doomed) this.cache.delete(cached);
     }
 
     Close(): void {

@@ -168,6 +168,23 @@ async function checkCache(client: BotClient): Promise<void> {
     check("  und der alte Stand kommt zurueck", rescued?.name === "Spieler", String(rescued?.name));
     check("  als alt markiert", rescued?.stale === true, String(rescued?.stale));
 
+    // W-0129: Der Knopf unter der Rang-Karte fragt über die Konto-ID. Nach einer
+    // Suche über den Namen muss die ohne neue Anfrage kommen - und Vergessen
+    // muss beide Einträge treffen.
+    prime.down = false;
+    prime.Forget();
+    await prime.Profile("Spieler");
+
+    const loadsByName = prime.loads;
+    const byAccount = await prime.Profile("abc");
+
+    check("Nach der Suche kommt die Konto-ID aus dem Speicher", prime.loads === loadsByName && byAccount?.name === "Spieler", `${prime.loads - loadsByName} neue Ladevorgaenge`);
+
+    prime.Forget("Spieler");
+    await prime.Profile("abc");
+
+    check("  Vergessen über den Namen trifft auch die Konto-ID", prime.loads === loadsByName + 1, `${prime.loads - loadsByName} Ladevorgaenge`);
+
     prime.Close();
 }
 

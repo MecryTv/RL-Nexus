@@ -23,6 +23,26 @@ export interface IPlaylistPreview {
     readonly placement?: IPlacementPreview;
 }
 
+/** Die Extra-Modi auf der Karte, in der Reihenfolge des Bots (`EXTRA_PLAYLISTS`). */
+export type ExtraModeKey = "heatseeker" | "rumble" | "hoops" | "snowday" | "dropshot";
+
+/**
+ * Ein Extra-Modus. Wie eine Playlist, nur ohne Untertitel. Die MMR steht auch
+ * ohne Spiel in dieser Season da, wie bei den Hauptmodi.
+ */
+export interface IExtraModePreview extends Omit<IPlaylistPreview, "playlist" | "subtitle"> {
+    readonly mode: ExtraModeKey;
+    readonly label: string;
+}
+
+/** Der Turnier-Rang im Kopf, neben dem Season Reward. */
+export interface ITournamentPreview {
+    readonly rank: RLRank;
+    readonly division: string;
+    readonly mmr: number;
+    readonly games: number;
+}
+
 /** Ein Karriere-Wert unter den Rängen. */
 export interface ICareerPreview {
     readonly label: string;
@@ -49,7 +69,9 @@ export interface IRankPreview {
     /** Das Abzeichen über dem Namen, also Clubkürzel oder Rolle. */
     readonly badge: string;
     readonly reward: IRewardPreview;
+    readonly tournament: ITournamentPreview;
     readonly playlists: readonly IPlaylistPreview[];
+    readonly extras: readonly IExtraModePreview[];
     readonly career: readonly ICareerPreview[];
     /** Die Zeile ganz unten. */
     readonly freshness: string;

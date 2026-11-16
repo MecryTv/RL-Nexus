@@ -145,7 +145,8 @@ export const MODULE_DEFINITIONS: readonly IModuleDefinition[] = [
         featured: true,
         builtIn: true,
         highlights: [
-            "Ränge für 1v1, 2v2 und 3v3 mit MMR und Serie",
+            "Ränge für 1v1, 2v2, 3v3 und alle Extra-Modi mit MMR und Serie",
+            "Turnier-Rang neben dem Season Reward",
             "Karriere-Werte: Tore, Vorlagen, Paraden, MVPs",
             "Suche nach fremden Spielern ohne Verknüpfung",
             "Season-Reward-Fortschritt mit Balken",
