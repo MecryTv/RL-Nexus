@@ -70,3 +70,33 @@ export interface IBotModuleInput {
     readonly notice: string | null;
     readonly linkMode: LinkMode | null;
 }
+
+/** Ein Eintrag aus dem Protokoll zu einem Modul. */
+export interface IBotModuleHistory {
+    readonly at: string;
+    readonly by: string;
+    readonly detail: string;
+}
+
+/** Ein Modul, wie die Seite „Module“ es zeigt. Name, Kategorie und Text aus dem Webseiten-Katalog. */
+export interface IBotModuleView extends IBotModuleSetting {
+    readonly name: string;
+    readonly category: string | null;
+    readonly description: string | null;
+    /** Server, auf denen das Modul eingeschaltet ist; bei RL Tracking und festen Modulen alle. */
+    readonly servers: number;
+    /** Die letzten Änderungen, neueste zuerst. */
+    readonly history: readonly IBotModuleHistory[];
+}
+
+export interface IBotModulesView {
+    readonly modules: readonly IBotModuleView[];
+    /** Wann der Bot zuletzt einen Bescheid bestätigt hat, null seit dem Start des Admins noch nie. */
+    readonly botSyncedAt: string | null;
+}
+
+export interface IBotModuleSaved {
+    readonly setting: IBotModuleSetting;
+    /** true: Der Bot hat den Stand übernommen. false: nicht erreicht, er holt ihn in spätestens 5 Minuten. */
+    readonly bot: boolean;
+}

@@ -288,6 +288,17 @@ export async function botSecurityReload(config: IConfig, userId = "security"): P
     }
 }
 
+/* W-0131: Modul-Einstellungen. */
+
+/** Der Bot lädt die Modul-Einstellungen neu. false: nicht erreicht, dann holt er sie spätestens nach 5 Minuten selbst. */
+export async function botModulesReload(config: IConfig, userId: string): Promise<boolean> {
+    try {
+        return (await callBot(config, userId, "/admin/modules/reload", "POST", { body: {} })).ok;
+    } catch {
+        return false;
+    }
+}
+
 /** Eine Discord-Nachricht als Beleg, über den Bot gelesen. null: nicht gefunden oder nicht erreicht. */
 export async function botMessage(config: IConfig, channelId: string, messageId: string, userId: string): Promise<Record<string, unknown> | null> {
     return botJson<Record<string, unknown>>(config, userId, `/admin/security/message?channel=${channelId}&message=${messageId}`, 10_000);

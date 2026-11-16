@@ -4043,7 +4043,7 @@ try {
 
     await checkBackupsDb(config, { get, write, raw });
     await checkBetaDb(config, { get, write, raw });
-    await checkModulesDb();
+    await checkModulesDb(config, { get, write, raw });
     await checkServersDb(config);
     await checkSecurityDb(config);
     await checkMessagesDb(config, { get, write, raw });

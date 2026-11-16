@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
+import type { IBotModulesView } from "../../shared/botModules.ts";
+import type { IConfig } from "../config.ts";
 import { query } from "../db.ts";
 import { listSettings, saveSetting, serverCounts } from "../modules/store.ts";
+import type { IHttp } from "./backups-db.check.ts";
 import { check, section } from "./harness.ts";
 
 /**
@@ -10,13 +13,30 @@ import { check, section } from "./harness.ts";
  */
 const GUILDS = ["99999999999999999981", "99999999999999999982"];
 
-export async function checkModulesDb(): Promise<void> {
+export async function checkModulesDb(config: IConfig, http: IHttp): Promise<void> {
     section("Modul-Einstellungen (Datenbank)");
 
     const saved = await query<Record<string, unknown>[]>("SELECT * FROM bot_module_settings");
+    const real = globalThis.fetch;
+    let reloads = 0;
+    let botStatus = 204;
+
+    // Der Bescheid an den Bot geht ins Leere und wird gezählt, alles andere wie gehabt.
+    globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+        const href = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+
+        if (href.startsWith(config.botApiUrl) && new URL(href).pathname === "/dcapi/admin/modules/reload") {
+            reloads++;
+
+            return new Response(null, { status: botStatus });
+        }
+
+        return real(input, init);
+    }) as typeof fetch;
 
     await query("DELETE FROM bot_module_settings");
     await query("DELETE FROM guild_settings WHERE guild_id IN (?)", [GUILDS]);
+    await query("DELETE FROM admin_audit WHERE action = 'module.settings' AND user_name = 'nutzer1'");
 
     try {
         await check("Ohne Zeilen sind alle 26 Module an, ohne Hinweis, RL Tracking mit Anmeldung", async () => {
@@ -58,7 +78,58 @@ export async function checkModulesDb(): Promise<void> {
             assert.equal(counts["rl-tracking"], Number(before[0].n));
             assert.equal(counts.gallery, Number(before[0].n));
         });
+
+        await check("Speichern über die Route: Protokoll mit vorher und nachher, ein Bescheid an den Bot", async () => {
+            await query("DELETE FROM bot_module_settings");
+            reloads = 0;
+
+            const answer = await http.write("PUT", "/api/bot-modules/polls", { status: "off", notice: "check:db Umbau" });
+
+            assert.equal(answer.statusCode, 200, answer.body);
+            assert.equal(answer.json().bot, true);
+            assert.equal(answer.json().setting.status, "off");
+            assert.equal(reloads, 1);
+
+            const [entry] = await query<{ target: string; detail: string }[]>("SELECT target, detail FROM admin_audit WHERE action = 'module.settings' ORDER BY id DESC LIMIT 1");
+
+            assert.equal(entry.target, "polls");
+            assert.match(entry.detail, /Status: An → Aus/);
+            assert.match(entry.detail, /Hinweis: – → check:db Umbau/);
+        });
+
+        await check("Bot nicht erreichbar: trotzdem gespeichert, die Antwort sagt es", async () => {
+            botStatus = 503;
+
+            const answer = await http.write("PUT", "/api/bot-modules/polls", { status: "on", notice: "check:db Umbau" });
+
+            botStatus = 204;
+            assert.equal(answer.statusCode, 200, answer.body);
+            assert.equal(answer.json().bot, false);
+            assert.equal((await listSettings()).find((entry) => entry.module === "polls")?.status, "on");
+        });
+
+        await check("Feste Module lassen sich nicht abschalten, ohne Sitzung geht nichts", async () => {
+            assert.equal((await http.write("PUT", "/api/bot-modules/levels", { status: "off" })).statusCode, 400);
+            assert.equal((await http.write("PUT", "/api/bot-modules/dashboard", { status: "on" })).statusCode, 400);
+            assert.equal((await http.raw("PUT", "/api/bot-modules/polls", { "content-type": "application/json", origin: config.publicUrl }, { status: "off" })).statusCode, 401);
+        });
+
+        await check("Die Liste: 26 Module mit Namen, Serverzahl und Verlauf", async () => {
+            const answer = await http.get("/api/bot-modules");
+
+            assert.equal(answer.statusCode, 200, answer.body);
+
+            const view = answer.json() as IBotModulesView;
+            const polls = view.modules.find((entry) => entry.module === "polls");
+
+            assert.equal(view.modules.length, 26);
+            assert.ok(view.modules.every((entry) => typeof entry.servers === "number" && entry.name.length > 0));
+            assert.ok(polls && polls.history.length >= 2 && polls.history[0].detail.includes("Status: Aus → An"));
+            assert.ok(view.botSyncedAt === null || typeof view.botSyncedAt === "string");
+        });
     } finally {
+        globalThis.fetch = real;
+        await query("DELETE FROM admin_audit WHERE action = 'module.settings' AND user_name = 'nutzer1'");
         await query("DELETE FROM guild_settings WHERE guild_id IN (?)", [GUILDS]);
         await query("DELETE FROM bot_module_settings");
 
