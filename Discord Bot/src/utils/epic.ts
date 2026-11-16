@@ -18,15 +18,17 @@ import { IEpicAccount } from "./epicLogin";
  * Nintendo gibt es keinen oeffentlichen Login, und die Raenge sind auf allen
  * Plattformen ohnehin dieselben - siehe Migration 007.
  */
-export async function EpicAdopt(client: BotClient, userId: string, epic: IEpicAccount, keepChangedAt?: Date): Promise<{ name: string; profile: IPrimeProfile | null }> {
+export async function EpicAdopt(client: BotClient, userId: string, epic: IEpicAccount, keepChangedAt?: Date, verified = true): Promise<{ name: string; profile: IPrimeProfile | null }> {
     const profile = client.primeService.IsConfigured ? await client.primeService.Profile(epic.accountId).catch(() => null) : null;
     const name = epic.displayName ?? profile?.name ?? epic.accountId;
     const current = await client.accounts.On(userId, "epic");
 
     if (current?.account_id === epic.accountId) {
         if (current.display_name !== name) await client.accounts.Rename(userId, "epic", name);
+        // W-0131: erst per Name, jetzt per Login - die Verknüpfung ist ab jetzt bestätigt. Andersherum bleibt sie es.
+        if (verified && Number(current.verified) === 0) await client.accounts.SetVerified(userId, "epic");
     } else {
-        await client.accounts.Link(userId, "epic", epic.accountId, name, true, keepChangedAt);
+        await client.accounts.Link(userId, "epic", epic.accountId, name, verified, keepChangedAt);
     }
 
     // Review W-0125: Ein anderes Konto als vorher - Ränge und Rang-Rollen des alten gehen.

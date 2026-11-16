@@ -508,9 +508,12 @@ export const HELP_CATALOG: HelpCatalog = {
                 who: "alle",
                 whoText: "Alle Mitglieder",
                 when: "Einmal verbinden",
-                what: "Verbindet dein Epic-Konto mit deinem Discord-Konto. Du meldest dich dafür einmal bei Epic Games an, so kann niemand ein fremdes Konto verbinden. Falsches Konto erwischt? In der ersten Stunde kannst du ohne Wartezeit wechseln, danach nur alle 3 Tage.",
-                examples: [{ code: "/rank link", text: "Ein Knopf führt zur Anmeldung bei Epic" }],
-                fields: {},
+                what: "Verbindet dein Epic-Konto mit deinem Discord-Konto. Meist meldest du dich dafür einmal bei Epic Games an, so kann niemand ein fremdes Konto verbinden. Erlaubt RL Nexus das Verbinden per Name, reicht dein Epic-Name; Rang-Rollen gibt es dann je nach Einstellung erst mit Anmeldung. Falsches Konto erwischt? In der ersten Stunde kannst du ohne Wartezeit wechseln, danach nur alle 3 Tage.",
+                examples: [
+                    { code: "/rank link", text: "Ein Knopf führt zur Anmeldung bei Epic" },
+                    { code: "/rank link epicname:Nova", text: "Verbindet per Name, wenn das erlaubt ist" },
+                ],
+                fields: { epicname: "Dein Epic-Name, genau wie im Spiel. Zählt nur, wenn Verbinden per Name erlaubt ist, sonst führt der Knopf zur Anmeldung." },
                 after: ["Nur du siehst die Antwort", "Der Knopf gilt 10 Minuten"],
             },
             me: {

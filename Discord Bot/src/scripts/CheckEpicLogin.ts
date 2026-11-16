@@ -19,6 +19,7 @@ import { Seal } from "../utils/seal";
 import { DiscordBack, EpicAuthorizeURL, EpicExchange, EpicLinkToken, EpicLinkURL } from "../utils/epicLogin";
 import { EpicAdopt } from "../utils/epic";
 import { SetFlags } from "../utils/moduleFlags";
+import Rank from "../commands/user/Rank";
 import { EpicDonePage, EpicFailPage } from "../builder/EpicPage";
 import EpicCallback from "../routes/EpicCallback";
 import EpicLink, { EPIC_STATE_COOKIE } from "../routes/EpicLink";
@@ -41,6 +42,8 @@ interface IRow {
     account_id: string;
     display_name: string | null;
     changed_at: Date;
+    /** W-0131: 0 = per Name verbunden. Fehlt es, gilt die Zeile als per Login verbunden. */
+    verified?: number;
 }
 
 function Client(rows: IRow[] = [], extra: Record<string, unknown> = {}): BotClient & { calls: string[]; rows: IRow[] } {
@@ -63,9 +66,25 @@ function Client(rows: IRow[] = [], extra: Record<string, unknown> = {}): BotClie
             // Die echte Rechnung aus dem Model, nur ohne Datenbank darunter.
             Cooldown: (userId: string, platform: Platform, windowMs: number, fixMs?: number, now?: number) =>
                 PlayerAccount.prototype.Cooldown.call({ On } as unknown as PlayerAccount, userId, platform, windowMs, fixMs, now),
-            Link: async (userId: string, _platform: string, accountId: string, name: string, _verified?: boolean, changedAt = new Date()) => {
+            Link: async (userId: string, _platform: string, accountId: string, name: string, verified = false, changedAt = new Date()) => {
                 calls.push(`link ${userId} ${accountId} ${name}`);
-                rows.splice(0, rows.length, ...rows.filter((row) => row.user_id !== userId), { user_id: userId, account_id: accountId, display_name: name, changed_at: changedAt });
+                rows.splice(0, rows.length, ...rows.filter((row) => row.user_id !== userId), { user_id: userId, account_id: accountId, display_name: name, changed_at: changedAt, verified: verified ? 1 : 0 });
+            },
+            OwnerRow: async (_platform: string, accountId: string) => {
+                const row = rows.find((entry) => entry.account_id === accountId);
+
+                return row ? { userId: row.user_id, verified: row.verified !== 0 } : null;
+            },
+            SetVerified: async (userId: string) => {
+                calls.push(`verify ${userId}`);
+
+                for (const row of rows) if (row.user_id === userId) row.verified = 1;
+            },
+            Unlink: async (userId: string) => {
+                calls.push(`unlink ${userId}`);
+                rows.splice(0, rows.length, ...rows.filter((row) => row.user_id !== userId));
+
+                return true;
             },
             Rename: async (userId: string, _platform: string, name: string) => {
                 calls.push(`rename ${userId} ${name}`);
@@ -531,6 +550,79 @@ async function checkClosed(): Promise<void> {
     SetFlags([], [], []);
 }
 
+/** W-0131: /rank link per Name je nach Art, und wer sich per Epic anmeldet, übernimmt eine Name-Verknüpfung. */
+function LinkAsk(name: string | null): { replies: Record<string, unknown>[] } & Record<string, unknown> {
+    const replies: Record<string, unknown>[] = [];
+
+    return {
+        replies,
+        options: { getString: (key: string) => (key === "epicname" ? name : null), getSubcommand: () => "link" },
+        user: { id: USER, username: "user-1", globalName: null },
+        guildId: "1162553851187040326",
+        channelId: "1566198775415046234",
+        deferReply: async () => undefined,
+        editReply: async (message: Record<string, unknown>) => void replies.push(message),
+        reply: async (message: Record<string, unknown>) => void replies.push(message),
+    };
+}
+
+async function checkNameLink(): Promise<void> {
+    console.log("\n  — /rank link per Name (W-0131) —");
+
+    const prime = { IsConfigured: true, Profile: async (key: string) => (key === "Nova" ? { name: "Nova", accountId: ACCOUNT, ranks: [] } : null) };
+    const mode = (linkMode: "login" | "name" | "both") => SetFlags([{ module: "rl-tracking", status: "on", notice: null, linkMode }], [], []);
+    const text = (ask: { replies: Record<string, unknown>[] }) => JSON.stringify(ask.replies.at(-1) ?? {});
+    const link = async (client: BotClient, name: string | null) => {
+        const ask = LinkAsk(name);
+
+        await (new Rank(client) as unknown as { Link: (interaction: unknown) => Promise<void> }).Link(ask);
+
+        return ask;
+    };
+
+    mode("name");
+    const byName = Client([], { primeService: prime });
+    const done = await link(byName, "Nova");
+    check("Nur Name: verbunden per Name, unbestätigt", byName.calls.includes(`link ${USER} ${ACCOUNT} Nova`) && byName.rows[0]?.verified === 0 && text(done).includes("verbunden"), `${byName.calls.join(", ")} ${text(done)}`);
+
+    const empty = Client([], { primeService: prime });
+    const asked = await link(empty, null);
+    check("Nur Name ohne Name: fragt danach, verbindet nichts", empty.calls.length === 0 && text(asked).includes("epicname"), text(asked));
+
+    const taken = Client([{ user_id: OTHER, account_id: ACCOUNT, display_name: "Nova", changed_at: new Date(0), verified: 1 }], { primeService: prime });
+    const refused = await link(taken, "Nova");
+    check("Fremdes, schon verbundenes Konto per Name: abgelehnt, nichts geschrieben", !taken.calls.some((call) => call.startsWith("link")) && text(refused).includes("anderen Discord-Konto"), text(refused));
+
+    mode("both");
+    const button = await link(Client([], { primeService: prime }), null);
+    check("Beides ohne Name: Knopf zur Anmeldung", text(button).includes("epicgames") || text(button).includes("link/epic"), text(button).slice(0, 200));
+
+    mode("login");
+    const hint = await link(Client([], { primeService: prime }), "Nova");
+    check("Anmeldung mit Name: Name ignoriert, Hinweis und Knopf", text(hint).includes("nicht nötig") && text(hint).includes("link/epic"), text(hint).slice(0, 200));
+
+    // Login übernimmt, was ein anderer nur per Name verbunden hatte.
+    const okEpic = (): void => void FakeEpic({ body: { access_token: "at", account_id: ACCOUNT } }, { body: [{ accountId: ACCOUNT, displayName: "Nova Lukas" }] });
+    const cookieFor = (client: BotClient): string => `n1|${TokenOf(EpicLinkURL(client, USER))}`;
+    const squatted = Client([{ user_id: OTHER, account_id: ACCOUNT, display_name: "Nova", changed_at: new Date(0), verified: 0 }]);
+
+    okEpic();
+    const taken2 = await Callback(squatted, { code: "c", state: "n1" }, cookieFor(squatted));
+    check(
+        "Echter Besitzer meldet sich an: übernimmt, der andere verliert Konto, Ränge und Rollen",
+        taken2.statusCode === 200 && squatted.calls.includes(`unlink ${OTHER}`) && squatted.calls.includes("clear") && squatted.calls.includes("strip") && squatted.rows.every((row) => row.user_id === USER),
+        `${taken2.statusCode} ${squatted.calls.join(", ")}`
+    );
+
+    const same = Client([{ user_id: USER, account_id: ACCOUNT, display_name: "Nova", changed_at: new Date(0), verified: 0 }]);
+
+    okEpic();
+    const confirmed = await Callback(same, { code: "c", state: "n1" }, cookieFor(same));
+    check("Erst Name, dann Login desselben Kontos: jetzt bestätigt", confirmed.statusCode === 200 && same.calls.includes(`verify ${USER}`) && same.rows[0]?.verified === 1, `${confirmed.statusCode} ${same.calls.join(", ")}`);
+
+    SetFlags([], [], []);
+}
+
 async function main(): Promise<void> {
     const original = globalThis.fetch;
 
@@ -544,6 +636,7 @@ async function main(): Promise<void> {
         await checkBack();
         await checkReview();
         await checkClosed();
+        await checkNameLink();
     } finally {
         globalThis.fetch = original;
     }

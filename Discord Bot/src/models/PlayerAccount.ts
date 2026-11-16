@@ -135,6 +135,18 @@ export default class PlayerAccount extends Model<IPlayerAccountRow> {
         return row && LinkUsable(row, "trusted") ? row.user_id : null;
     }
 
+    /** W-0131: der Besitzer samt der Frage, ob per Login (verified 1) oder nur per Name verbunden. */
+    async OwnerRow(platform: Platform, accountId: string): Promise<{ userId: string; verified: boolean } | null> {
+        const [row] = await this.Where({ platform, account_id: accountId });
+
+        return row ? { userId: row.user_id, verified: Number(row.verified) === 1 } : null;
+    }
+
+    /** W-0131: Dasselbe Konto erst per Name, dann per Login verbunden - jetzt bestätigt. */
+    async SetVerified(userId: string, platform: Platform): Promise<void> {
+        await this.Update([userId, platform], { verified: 1 });
+    }
+
     /** Rückwärts: welcher Discord-Nutzer steckt hinter diesem Spielernamen? */
     async Owner(platform: Platform, accountId: string): Promise<string | null> {
         const rows = await this.Where({ platform, account_id: accountId });
