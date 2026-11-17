@@ -1617,22 +1617,12 @@ body[data-page="guild"]{--shell:1440px}
 .modlist .modnotice{display:block;margin-top:6px;padding:6px 8px;border:1px solid rgb(255 197 61 / 40%);background:rgb(255 197 61 / 7%);color:var(--text-2);font-size:.85em;overflow-wrap:anywhere}
 .modlist .acct--closed{opacity:.8}
 .modbanner{margin:0 0 14px;padding:10px 12px;border:1px solid rgb(255 197 61 / 40%);background:rgb(255 197 61 / 7%);color:var(--text-2);overflow-wrap:anywhere}
-/* W-0133, Entwurf M: Kasten „Grenzen von RL Nexus“ oben auf einer Modulseite, nur für Verwalter. */
-.modlimits{margin:0 0 14px;padding:12px 14px;border:1px solid rgb(255 197 61 / 35%);background:rgb(255 197 61 / 6%);color:var(--text-2)}
-.modlimits__head{margin:0 0 8px;font-family:var(--f-display);font-weight:800;color:var(--text)}
-.modlimits__head span{font-family:var(--f-label);font-weight:600;font-size:.82em;letter-spacing:.06em;color:var(--text-2)}
-.modlimits__list{display:grid;gap:4px;margin:0 0 8px;padding:0;list-style:none}
-.modlimits__list li{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px}
-.modlimits__list li span{flex:1 1 160px;min-width:0}
-.modlimits__list li b{font-variant-numeric:tabular-nums;color:var(--text)}
-.modlimits__list li em{padding:0 6px;border:1px solid var(--line-strong);font-style:normal;font-family:var(--f-label);font-size:.75em;letter-spacing:.1em;text-transform:uppercase}
-.modlimits__list li em.is-ask{border-color:rgb(255 197 61 / 45%);color:#ffc53d}
-.modlimits__list li em.is-granted{border-color:rgb(0 175 255 / 45%);color:#00afff}
-.modlimits__granted{margin:6px 0;padding:8px 10px;border:1px solid rgb(0 175 255 / 40%);background:rgb(0 175 255 / 6%);overflow-wrap:anywhere}
-.modlimits__lead{margin:8px 0 4px}
-.modlimits__request{display:block;padding:6px 8px;border:1px solid var(--line-strong);overflow-wrap:anywhere;white-space:normal}
-.modlimits__actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
-.modlimits__actions > *{flex:1 1 200px}
+/* W-0136: statt des Kastens (W-0133) eine Zeile unter der Beschreibung, die in den Reiter Grenzen springt. */
+.gzlink{display:inline-flex;align-items:center;gap:7px;min-height:44px;margin:0 0 12px;color:var(--text-2);font-size:14px;text-decoration:none}
+.gzlink svg{width:15px;height:15px;flex:none;color:var(--warn)}
+.gzlink span{color:var(--text);text-decoration:underline;text-underline-offset:3px}
+.gzlink:hover span{color:var(--warn)}
+.gzlink:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
 /* "Module": ein Raster aus Kacheln mit Schalter, ohne Kategorien. Die Kacheln
    sind die Konto-Zeilen der Einstellungen (.acct) - an ist, was rot markiert
    ist, wie dort. */

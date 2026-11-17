@@ -1855,6 +1855,11 @@ async function checkLimitsMarkup(): Promise<void> {
 
     check("Anfragetext mit Servername, ohne Server-ID", calls.length > 0 && calls.every((call) => call.startsWith("limitRequestText(guild.name") && !call.includes("guild.id")), `${calls.length} Aufruf(e)`);
     check("Anfrage: Support-Link und aufklappbar", page.includes("SUPPORT_DISCORD") && page.includes("aria-expanded"));
+
+    // Modulseiten: kein Kasten mehr, nur ein Verweis in den Reiter.
+    const guildPage = await readFile(path.join(pages, "Guild.ts"), "utf8");
+
+    check("Modulseiten ohne Kasten, mit Verweis in den Reiter", !guildPage.includes("modlimits") && guildPage.includes("limitsHref(") && !css.some((line) => line.includes(".modlimits")));
 }
 
 /**

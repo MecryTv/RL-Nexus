@@ -1,7 +1,6 @@
 /** Seite: Serverdetail. */
 
 import { IGuild, IGuildDetail, IModuleLimit } from "../interfaces/IGuild.js";
-import { SUPPORT_DISCORD } from "../layout/Report.js";
 import { setUploadLimit } from "../core/Gallery.js";
 import { IPayload } from "../interfaces/IUser.js";
 import { clone, icon, need, maybe } from "../core/Dom.js";
@@ -17,6 +16,7 @@ import { ActivityResult, fetchActivity, renderOverview } from "./GuildOverview.j
 import { bindNav, INav } from "./GuildNav.js";
 import { bindNavSearch } from "./GuildSearch.js";
 import { bindLimitsTab } from "./GuildLimits.js";
+import { limitsHref } from "../constants/Limits.js";
 
 // Was ein Supporter ohne "Server verwalten" sieht - die Teile des Ticket-Systems.
 const SUPPORT_SECTIONS = ["live-tickets", "transcriptions"];
@@ -463,7 +463,7 @@ function bindSections(guildId: string, fallback: string): (section: string) => v
 
     // Leiste und Reiter über der Seite führen gleich.
     document.addEventListener("click", (event) => {
-        const link = (event.target as HTMLElement).closest<HTMLAnchorElement>("#setSide a[data-section], #modTabs a[data-section]");
+        const link = (event.target as HTMLElement).closest<HTMLAnchorElement>("#setSide a[data-section], #modTabs a[data-section], a.gzlink");
 
         // Mit Strg, Shift oder Mittelklick will jemand einen neuen Tab - dann
         // gehört die Adresse dem Browser.
@@ -471,7 +471,9 @@ function bindSections(guildId: string, fallback: string): (section: string) => v
 
         event.preventDefault();
         history.pushState(null, "", link.href);
-        show(link.dataset.section ?? "uebersicht");
+        // W-0136: der Verweis einer Modulseite führt in den Reiter Grenzen.
+        show(link.classList.contains("gzlink") ? "module" : (link.dataset.section ?? "uebersicht"));
+        if (link.classList.contains("gzlink")) window.dispatchEvent(new Event("limits:open"));
         clickSound("primary");
     });
 
@@ -526,7 +528,7 @@ function bindModules(guild: IGuild, only: Set<string> | null, side: INav): (modu
     let ready = false;
     // W-0131: Hinweise und global geschlossene Module aus dem Admin Dashboard.
     let notices: ModuleNotices = {};
-    // W-0133: die Grenzen von RL Nexus je Modul, für den Kasten auf der Modulseite.
+    // W-0133: die Grenzen von RL Nexus je Modul (W-0136: Verweis auf der Modulseite).
     let limits: Record<string, IModuleLimit[]> = {};
     // Aus, aber noch gebraucht: Anti Villain mit Festgehaltenen bleibt in der Leiste, damit das Team freigeben kann.
     const pinned = new Set<string>();
@@ -693,95 +695,29 @@ function bindModules(guild: IGuild, only: Set<string> | null, side: INav): (modu
     }
 
     /**
-     * W-0133, Entwurf M: Kasten „Grenzen von RL Nexus“ oben auf der Modulseite,
-     * nur für alle, die den Server verwalten. Je Wert „auf Anfrage“, „fest“ oder
-     * „freigeschaltet“, darunter der fertige Anfragetext. Alles nur als Text.
+     * W-0136: Statt des Kastens (W-0133) steht unter Titel und Beschreibung nur
+     * eine Zeile; sie springt in den Reiter Grenzen auf der Seite Module,
+     * gefiltert auf dieses Modul. Nur für Verwalter (Aufruf in paint).
      */
     function showLimits(into: HTMLElement | null, id: string, list: IModuleLimit[] | undefined): void {
         if (!into) return;
 
-        into.querySelector(":scope > .modlimits")?.remove();
+        into.querySelector(":scope > .gzlink")?.remove();
 
         if (!list || list.length === 0) return;
 
-        const name = MODULES.find((entry) => entry.id === id)?.name ?? id;
-        const granted = list.filter((entry) => entry.granted);
-        const askable = list.filter((entry) => entry.askable && !entry.granted);
-        const text = (tag: string, content: string, className = ""): HTMLElement => {
-            const element = document.createElement(tag);
+        const link = document.createElement("a");
+        const more = document.createElement("span");
 
-            element.textContent = content;
-            if (className) element.className = className;
+        link.className = "gzlink";
+        link.href = limitsHref(BASE, guild.id, id);
+        more.textContent = "ansehen";
+        link.append(icon("#i-sliders"), `${list.length} ${list.length === 1 ? "Grenze" : "Grenzen"} von RL Nexus · `, more);
 
-            return element;
-        };
-        const amount = (entry: IModuleLimit, value: number): string => (entry.unit ? `${value} ${entry.unit}` : String(value));
-        const box = document.createElement("section");
-        const head = text("p", "Grenzen von RL Nexus", "modlimits__head");
-        const rows = document.createElement("ul");
-
-        box.className = "modlimits";
-        box.setAttribute("aria-label", "Grenzen von RL Nexus");
-        const raised = (entry: IModuleLimit): boolean => entry.granted && entry.value > entry.standard;
-
-        head.append(text("span", granted.length ? ` ${granted.length === 1 ? "1 Wert" : `${granted.length} Werte`} für euren Server ${granted.every(raised) ? "freigeschaltet" : "angepasst"}` : " gelten für alle Server"));
-        rows.className = "modlimits__list";
-
-        for (const entry of list) {
-            const row = document.createElement("li");
-
-            row.append(text("span", entry.label), text("b", amount(entry, entry.value)), text("em", entry.granted ? (raised(entry) ? "freigeschaltet" : "angepasst") : entry.askable ? "auf Anfrage" : "fest", entry.granted ? "is-granted" : entry.askable ? "is-ask" : ""));
-            rows.append(row);
-        }
-
-        box.append(head, rows);
-
-        for (const entry of granted) {
-            const since = entry.since ? new Date(entry.since).toLocaleDateString("de-DE") : null;
-
-            box.append(text("p", `✓ ${since ? `Seit ${since} gilt` : "Es gilt"} für euren Server ${entry.label}: ${amount(entry, entry.value)} statt ${amount(entry, entry.standard)}.`, "modlimits__granted"));
-        }
-
-        if (askable.length > 0 || granted.length > 0) {
-            const request = `Anfrage für Server ${guild.id}: ${name}, ${(askable[0] ?? granted[0]!).label} bis …, weil …`;
-            const actions = document.createElement("div");
-            const ask = document.createElement("a");
-            const copy = document.createElement("button");
-
-            ask.href = SUPPORT_DISCORD;
-            ask.target = "_blank";
-            ask.rel = "noopener";
-            ask.className = "btn btn--quiet";
-            ask.textContent = granted.length ? "Weitere Anfrage im Support" : "Anfrage im Support";
-            copy.type = "button";
-            copy.className = "btn btn--quiet";
-            copy.textContent = "Text kopieren";
-            copy.addEventListener("click", () => {
-                const done = (): void => void (copy.textContent = "Kopiert");
-                const fallback = (): void => {
-                    const area = document.createElement("textarea");
-
-                    area.value = request;
-                    document.body.append(area);
-                    area.select();
-                    document.execCommand("copy");
-                    area.remove();
-                    done();
-                };
-
-                if (navigator.clipboard) void navigator.clipboard.writeText(request).then(done, fallback);
-                else fallback();
-            });
-            actions.className = "modlimits__actions";
-            actions.append(ask, copy);
-            box.append(text("p", "Für euren Server reicht ein Wert nicht? RL Nexus kann ihn für euch anpassen.", "modlimits__lead"), text("code", request, "modlimits__request"), actions);
-        }
-
-        // Unter Titel und Beschreibung des Moduls (Entwurf M), sonst ganz oben.
         const lead = into.querySelector(":scope > .modlead") ?? into.querySelector(":scope > .modhead") ?? into.querySelector(":scope > .modbanner");
 
-        if (lead) lead.after(box);
-        else into.prepend(box);
+        if (lead) lead.after(link);
+        else into.prepend(link);
     }
 
     function warn(text: string | null): void {
