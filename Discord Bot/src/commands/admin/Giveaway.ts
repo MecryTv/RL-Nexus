@@ -13,9 +13,10 @@ import BotClient from "../../client/BotClient";
 import Command from "../../structures/Command";
 import Category from "../../enums/Category";
 import { InfoCard } from "../../builder/CommunityView";
-import { GIVEAWAY_ACCENT, MAX_PRIZE, MAX_WINNERS } from "../../constants/Giveaways";
+import { GIVEAWAY_ACCENT, GIVEAWAY_PREFIX, MAX_PRIZE } from "../../constants/Giveaways";
+import { IsServerAdmin, LimitReply } from "../../builder/LimitReply";
 import { FormatDuration, ParseDuration } from "../../constants/Moderation";
-import { GiveawayError, GIVEAWAYS_MODULE } from "../../services/GiveawayService";
+import { GiveawayError, GIVEAWAYS_MODULE, WINNERS_CAP } from "../../services/GiveawayService";
 import logger from "../../utils/logger";
 
 const PRESETS: [string, number][] = [
@@ -50,7 +51,7 @@ export default class Giveaway extends Command {
                     .setDescription("Startet ein Giveaway")
                     .addStringOption((option) => option.setName("preis").setDescription("Was gibt es zu gewinnen?").setRequired(true).setMaxLength(MAX_PRIZE))
                     .addStringOption((option) => option.setName("dauer").setDescription("Wie lange? Etwa 1h, 3d, 1w").setRequired(true).setAutocomplete(true))
-                    .addIntegerOption((option) => option.setName("gewinner").setDescription("Wie viele Gewinner? Standard: 1").setMinValue(1).setMaxValue(MAX_WINNERS))
+                    .addIntegerOption((option) => option.setName("gewinner").setDescription("Wie viele Gewinner? Standard: 1").setMinValue(1).setMaxValue(WINNERS_CAP))
                     .addChannelOption((option) =>
                         option.setName("kanal").setDescription("Wohin? Ohne Angabe hierher").addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement)
                     )
@@ -97,6 +98,7 @@ export default class Giveaway extends Command {
 
         const service = this.client.giveawayService;
         const sub = interaction.options.getSubcommand();
+        let input: Record<string, unknown> | null = null;
 
         try {
             if (sub === "start") {
@@ -108,7 +110,7 @@ export default class Giveaway extends Command {
                 const member = interaction.member instanceof GuildMember ? interaction.member : await guild.members.fetch(interaction.user.id);
                 const role = interaction.options.getRole("rolle");
                 const ping = interaction.options.getRole("ping");
-                const giveaway = await service.Create(guild, member, {
+                input = {
                     prize: interaction.options.getString("preis", true),
                     description: interaction.options.getString("beschreibung"),
                     channelId: interaction.options.getChannel("kanal")?.id ?? interaction.channelId,
@@ -116,7 +118,9 @@ export default class Giveaway extends Command {
                     duration: seconds,
                     requirements: role ? { roles: [role.id] } : {},
                     settings: { ping: ping?.id ?? null },
-                });
+                };
+
+                const giveaway = await service.Create(guild, member, input);
 
                 await say(`🎉 Giveaway #${giveaway.number} läuft in <#${giveaway.channelId}>, ausgelost wird <t:${Math.floor(giveaway.endsAt / 1000)}:R>.`);
 
@@ -143,6 +147,30 @@ export default class Giveaway extends Command {
                 await say(`Giveaway #${giveaway.number} ist abgebrochen.`, "#6b7683");
             }
         } catch (error) {
+            // W-0133, Entwurf M: Grenze erreicht - gelbe Karte, bei Gewinnern und Laufzeit mit dem erlaubten Wert zum Starten.
+            if (error instanceof GiveawayError && error.limit && input) {
+                const { limit } = error;
+                const winners = limit.key === "maxWinners";
+                const offer = winners || limit.key === "maxDays";
+                const card = LimitReply({
+                    module: limit.module,
+                    key: limit.key,
+                    guildId: guild.id,
+                    admin: IsServerAdmin(interaction.member),
+                    title: winners ? `Höchstens ${limit.allowed} Gewinner` : `Höchstens ${limit.allowed} Tage`,
+                    text: winners
+                        ? `Du hast **${limit.asked}** angegeben. Ein Giveaway auf diesem Server hat höchstens **${limit.allowed}** Gewinner.`
+                        : `Du hast **${limit.asked} Tage** angegeben. Ein Giveaway läuft auf diesem Server höchstens **${limit.allowed} Tage**.`,
+                    asked: limit.asked,
+                    fallback: offer
+                        ? { label: winners ? `Mit ${limit.allowed} Gewinnern starten` : `Mit ${limit.allowed} Tagen starten`, customId: `${GIVEAWAY_PREFIX}:limit:${service.Park(guild.id, interaction.user.id, input, limit)}` }
+                        : undefined,
+                });
+
+                await interaction.editReply({ components: card.components, flags: MessageFlags.IsComponentsV2, allowedMentions: { parse: [] } });
+
+                return;
+            }
             if (!(error instanceof GiveawayError)) logger.error(`🎉 /giveaway ${sub} fehlgeschlagen`, error);
 
             await say(error instanceof GiveawayError ? `❌ ${error.message}` : "❌ Da ging etwas schief.", "#ff4d5e");

@@ -4,7 +4,7 @@ import Command from "../../structures/Command";
 import Category from "../../enums/Category";
 import { IPrimeProfile } from "../../interfaces/services/prime/IPrimeService";
 import { RankMessage } from "../../builder/RankView";
-import { LINK_COOLDOWN, LINK_COOLDOWN_DAYS, LINK_COOLDOWN_DEV, LINK_FIX } from "../../constants/Database";
+import { LINK_COOLDOWN_DEV } from "../../constants/Database";
 import { PrimeError } from "../../services/PrimeService";
 import { EpicLinkURL, EpicLoginReady } from "../../utils/epicLogin";
 import { EpicAdopt } from "../../utils/epic";
@@ -17,8 +17,17 @@ import logger from "../../utils/logger";
 const MAX_NAME = 64;
 
 /** Im Entwicklungsmodus zehn Sekunden statt der vollen Frist - sonst nicht testbar. */
+/** W-0133: Sperrfrist und Korrektur-Fenster kommen aus dem Admin (für alle). */
+function switchDays(): number {
+    return ModuleValue("rl-tracking", "switchDays", null);
+}
+
+function fixMs(): number {
+    return ModuleValue("rl-tracking", "fixMinutes", null) * 60_000;
+}
+
 function cooldownOf(client: BotClient): number {
-    return client.developerMode ? LINK_COOLDOWN_DEV : LINK_COOLDOWN;
+    return client.developerMode ? LINK_COOLDOWN_DEV : switchDays() * 86_400_000;
 }
 
 /** "in 12 Tagen", "in 3 Stunden" - grob reicht, es geht um die Größenordnung. */
@@ -76,7 +85,7 @@ export default class Rank extends Command {
             .addSubcommand((sub) =>
                 sub
                     .setName("unlink")
-                    .setDescription(`Trennt dein Epic-Konto wieder, frühestens ${LINK_COOLDOWN_DAYS} Tage nach dem Verbinden`)
+                    .setDescription("Trennt dein Epic-Konto wieder, frühestens nach der Sperrfrist")
             )
             .addSubcommand((sub) => sub.setName("me").setDescription("Zeigt deine eigenen Ränge"))
             .addSubcommand((sub) =>
@@ -210,7 +219,7 @@ export default class Rank extends Command {
 
         const userId = interaction.user.id;
         const current = await this.client.accounts.On(userId, "epic");
-        const cooldown = await this.client.accounts.Cooldown(userId, "epic", cooldownOf(this.client), LINK_FIX);
+        const cooldown = await this.client.accounts.Cooldown(userId, "epic", cooldownOf(this.client), fixMs());
 
         // Neu verbinden mit demselben Konto ginge zwar auch in der Frist, aber das
         // ändert nichts. Gesperrt wird hier, damit niemand umsonst zu Epic läuft.
@@ -218,7 +227,7 @@ export default class Rank extends Command {
             await interaction.editReply({
                 content:
                     `Verbunden ist **${current.display_name ?? current.account_id}**. ` +
-                    `Wechseln geht nur alle ${LINK_COOLDOWN_DAYS} Tage, wieder möglich in **${waitLabel(cooldown.waitMs)}**.`,
+                    `Wechseln geht nur alle ${switchDays()} Tage, wieder möglich in **${waitLabel(cooldown.waitMs)}**.`,
             });
 
             return;
@@ -272,7 +281,7 @@ export default class Rank extends Command {
 
         const userId = interaction.user.id;
         const current = await this.client.accounts.On(userId, "epic");
-        const cooldown = await this.client.accounts.Cooldown(userId, "epic", cooldownOf(this.client), LINK_FIX);
+        const cooldown = await this.client.accounts.Cooldown(userId, "epic", cooldownOf(this.client), fixMs());
 
         // Erst prüfen, dann verknüpfen: einen Namen, den es nicht gibt, speichert der Bot gar nicht erst.
         const profile = await this.Fetch(interaction, name);
@@ -284,7 +293,7 @@ export default class Rank extends Command {
         const same = current?.account_id === profile.accountId;
 
         if (!cooldown.open && !same) {
-            await interaction.editReply({ content: `Dein Epic-Konto lässt sich nur alle ${LINK_COOLDOWN_DAYS} Tage wechseln. Wieder möglich in **${waitLabel(cooldown.waitMs)}**.` });
+            await interaction.editReply({ content: `Dein Epic-Konto lässt sich nur alle ${switchDays()} Tage wechseln. Wieder möglich in **${waitLabel(cooldown.waitMs)}**.` });
 
             return;
         }
@@ -311,7 +320,7 @@ export default class Rank extends Command {
             content:
                 `**${profile.name}** ist jetzt mit deinem Discord-Konto verbunden. Mit \`/rank me\` siehst du deine Karte.` +
                 (both ? "\nRang-Rollen gibt es erst mit Epic-Anmeldung: `/rank link` ohne Namen." : "") +
-                (same || !current ? "" : `\nEin Wechsel ist erst in ${LINK_COOLDOWN_DAYS} Tagen wieder möglich.`),
+                (same || !current ? "" : `\nEin Wechsel ist erst in ${switchDays()} Tagen wieder möglich.`),
         });
     }
 

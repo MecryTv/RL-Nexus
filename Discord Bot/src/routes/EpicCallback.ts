@@ -3,7 +3,8 @@ import { FastifyReply, FastifyRequest } from "fastify";
 import BotClient from "../client/BotClient";
 import Route from "../structures/Route";
 import { ClearCookie, ParseCookies, STATE_LIFETIME } from "../constants/Dashboard";
-import { LINK_COOLDOWN, LINK_COOLDOWN_DEV, LINK_FIX } from "../constants/Database";
+import { LINK_COOLDOWN_DEV } from "../constants/Database";
+import { ModuleValue } from "../utils/moduleFlags";
 import { EpicDonePage, EpicFailPage, IEpicWho } from "../builder/EpicPage";
 import { ClosedText, RankOpen } from "../utils/moduleFlags";
 import { EpicAdopt } from "../utils/epic";
@@ -117,9 +118,11 @@ export default class EpicCallback extends Route {
             );
         }
 
-        const windowMs = this.client.developerMode ? LINK_COOLDOWN_DEV : LINK_COOLDOWN;
+        // W-0133: Sperrfrist und Korrektur-Fenster aus dem Admin (für alle).
+        const windowMs = this.client.developerMode ? LINK_COOLDOWN_DEV : ModuleValue("rl-tracking", "switchDays", null) * 86_400_000;
+        const fixMs = ModuleValue("rl-tracking", "fixMinutes", null) * 60_000;
         const current = await this.client.accounts.On(userId, "epic");
-        const cooldown = await this.client.accounts.Cooldown(userId, "epic", windowMs, LINK_FIX);
+        const cooldown = await this.client.accounts.Cooldown(userId, "epic", windowMs, fixMs);
         const swapped = !!current && current.account_id !== epic.accountId;
 
         // In der Zeit seit dem Knopf kann woanders gewechselt worden sein. Dasselbe Konto neu bestätigen geht immer.
@@ -151,7 +154,7 @@ export default class EpicCallback extends Route {
             .map((rank) => ({ mode: /^\dv\d$/.test(rank.key) ? rank.key : rank.label, tier: rank.tier, name: rank.tierName }));
         // Ab hier gilt, was jetzt in der Zeile steht: neu verbunden, korrigiert oder dasselbe Konto bestätigt.
         const changed = current && (!swapped || keepChangedAt) ? new Date(current.changed_at).getTime() : Date.now();
-        const fixUntil = changed + LINK_FIX > Date.now() ? changed + LINK_FIX : null;
+        const fixUntil = changed + fixMs > Date.now() ? changed + fixMs : null;
         // Falsches Konto erwischt: ein frischer Knopf, mit dem Epic neu nach der Anmeldung fragt.
         const swapURL = fixUntil ? `${EpicLinkURL(this.client, userId, Date.now(), true, place)}&go=1` : null;
 

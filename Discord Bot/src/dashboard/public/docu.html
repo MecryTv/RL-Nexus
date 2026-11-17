@@ -697,7 +697,7 @@ WTSI   = TS_2s × Rel_2s + TS_3s × Rel_3s</code></pre>
 
   <h3>Für Mitglieder</h3>
   <ol class="doc__bullets doc__steps">
-    <li>Einmal das Epic-Konto verbinden: <code>/rank link</code> schickt einen Knopf, darüber meldet man sich bei Epic Games an. Ein fremdes Konto lässt sich so nicht verbinden, und jedes Epic-Konto gehört genau einem Discord-Konto. Wechseln oder trennen geht danach erst nach drei Tagen.</li>
+    <li>Einmal das Epic-Konto verbinden: <code>/rank link</code> schickt einen Knopf, darüber meldet man sich bei Epic Games an. Ein fremdes Konto lässt sich so nicht verbinden, und jedes Epic-Konto gehört genau einem Discord-Konto. Wechseln oder trennen geht danach erst nach der Sperrfrist (Standard drei Tage).</li>
     <li><code>/rank me</code> zeigt die eigenen Ränge als Karte und setzt dabei die Rollen zum aktuellen Rang. Neu dazugekommene Rollen sieht nur, wer fragt.</li>
   </ol>
   <p>
@@ -1079,8 +1079,8 @@ WTSI   = TS_2s × Rel_2s + TS_3s × Rel_3s</code></pre>
 
   <h3>Anlegen</h3>
   <p>
-    Im Dashboard unter <b>Neues Giveaway</b>: Preis, Beschreibung, Bild, Zahl der Gewinner (bis 50), Kanal, Ping,
-    Laufzeit (eine Minute bis 60 Tage) und Start, sofort oder geplant bis 90 Tage voraus. In Discord geht der
+    Im Dashboard unter <b>Neues Giveaway</b>: Preis, Beschreibung, Bild, Zahl der Gewinner (Standard bis 50), Kanal, Ping,
+    Laufzeit (eine Minute bis 60 Tage, Standard) und Start, sofort oder geplant bis 90 Tage voraus. Diese Grenzen legt RL Nexus fest, für euren Server lassen sie sich auf Anfrage ändern. In Discord geht der
     schnelle Weg mit <code>/giveaway start</code>. <code>/giveaway beenden</code> lost sofort aus,
     <code>/giveaway neu</code> lost neu, <code>/giveaway abbrechen</code> bricht ab.
   </p>
@@ -1394,7 +1394,7 @@ WTSI   = TS_2s × Rel_2s + TS_3s × Rel_3s</code></pre>
   <p class="doc__kicker">Inhalte &amp; Meldungen · Module <code>twitch-notifier</code> und <code>youtube-notifier</code></p>
   <p>Sagt Bescheid, wenn eure Streamer live gehen oder ein neues Video erscheint.</p>
   <ul class="doc__bullets">
-    <li><b>Eintragen:</b> Twitch über den Namen oder den Link zum Kanal, YouTube über Kanal-ID, <code>@handle</code> oder den Link. Bis zu 25 je Server und Plattform.</li>
+    <li><b>Eintragen:</b> Twitch über den Namen oder den Link zum Kanal, YouTube über Kanal-ID, <code>@handle</code> oder den Link. Standard sind bis zu 25 je Server und Plattform, auf Anfrage mehr.</li>
     <li><b>Was gemeldet wird:</b> bei Twitch der Start eines Streams, bei YouTube neue Videos, Shorts und Livestreams, jede Art mit eigener Nachricht.</li>
     <li><b>Wohin:</b> ein Textkanal oder ein Beitrag in einem Forum, je Streamer mit eigenem Ping (<code>@everyone</code>, <code>@here</code> oder eine Rolle). <b>Test senden</b> zeigt die Meldung sofort.</li>
     <li><b>Während des Streams</b> zieht der Bot Titel, Spiel und Zuschauer in der Karte nach. Danach wird sie zur Zusammenfassung, verschwindet oder bleibt stehen, je nach Einstellung.</li>

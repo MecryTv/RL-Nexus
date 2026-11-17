@@ -649,6 +649,21 @@ async function checkNameLink(): Promise<void> {
     await me.Me({ ...LinkAsk(null), user: { id: USER, username: "user-1", displayAvatarURL: () => "https://cdn.discordapp.com/a.png" }, inCachedGuild: () => false });
     check("Beides, per Name verbunden: Karte ohne Discord-Namen und Bild", shown.length === 2 && shown[0] === null && shown[1] === null, JSON.stringify(shown));
 
+    // W-0133: Sperrfrist und Korrektur-Fenster kommen aus dem Admin (Wert für alle).
+    SetFlags([{ module: "rl-tracking", status: "on", notice: null, linkMode: "login", values: { switchDays: 1, fixMinutes: 30 } }], [], []);
+    const windows: number[] = [];
+    const timed = Client([], { primeService: prime, developerMode: false });
+    const realCooldown = timed.accounts.Cooldown.bind(timed.accounts);
+
+    (timed.accounts as unknown as Record<string, unknown>).Cooldown = (userId: string, platform: Platform, windowMs: number, fixMs?: number) => {
+        windows.push(windowMs, fixMs ?? -1);
+
+        return realCooldown(userId, platform, windowMs, fixMs);
+    };
+    await link(timed, null);
+    check("Sperrfrist 1 Tag und Korrektur 30 Minuten aus dem Admin", windows[0] === 86_400_000 && windows[1] === 1_800_000, windows.join(","));
+    SetFlags([], [], []);
+
     // W-0133, Entwurf M: /rank link als Karte; den Anfrage-Knopf sehen nur Server-Admins.
     SetFlags([], [], []);
     const memberCard = await link(Client([], { primeService: prime }), null);

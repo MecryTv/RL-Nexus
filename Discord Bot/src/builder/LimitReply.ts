@@ -17,6 +17,24 @@ const ASK_BUTTON: ILinkButtonOptions = { url: SUPPORT_URL, label: "Anfrage im Su
 
 const LINK_LABELS: Readonly<Record<LinkMode, string>> = { login: "die Epic-Anmeldung", name: "den Epic-Namen", both: "Epic-Name oder Epic-Anmeldung" };
 
+/** Eine Grenze wurde überschritten: was gefragt war und was geht. */
+export interface ILimitHit {
+    readonly module: string;
+    readonly key: string;
+    readonly asked: number;
+    readonly allowed: number;
+}
+
+/** Für das Bot-Dashboard: der Satz zur Grenze und der Link zum Support, wenn sie auf Anfrage geht. */
+export function DashboardLimit(limit: ILimitHit, guildId: string, message: string): { error: string; ask: { url: string } | null } {
+    const askable = LimitInfo(limit.module, limit.key, guildId).askable;
+
+    return {
+        error: `${message} ${askable ? "Die Grenze legt RL Nexus fest, für euren Server lässt sie sich auf Anfrage ändern." : "Die Grenze legt RL Nexus fest."}`,
+        ask: askable ? { url: SUPPORT_URL } : null,
+    };
+}
+
 export interface IAskLine {
     readonly text: string;
     readonly button: ILinkButtonOptions | null;

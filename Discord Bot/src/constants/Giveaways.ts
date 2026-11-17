@@ -5,16 +5,11 @@ import { IGiveawayRequirements, IGiveawaySettings } from "../interfaces/services
 export const GIVEAWAY_PREFIX = "giveaway";
 export const GIVEAWAY_ACCENT = "#ffc53d";
 
-export const MAX_WINNERS = 50;
 export const MAX_PRIZE = 200;
 export const MAX_GIVEAWAY_DESCRIPTION = 1500;
-export const MAX_BONUS_ROLES = 10;
 export const MAX_BONUS_TICKETS = 10;
-/** Ein Giveaway läuft zwischen einer Minute und 60 Tagen. */
+/** Ein Giveaway läuft mindestens eine Minute. Gewinner, Laufzeit, Vorlauf und Bonus-Rollen kommen aus dem Admin (W-0133). */
 export const MIN_GIVEAWAY_SECONDS = 60;
-export const MAX_GIVEAWAY_SECONDS = 60 * 86_400;
-/** Geplant höchstens 90 Tage im Voraus. */
-export const MAX_SCHEDULE_AHEAD = 90 * 86_400_000;
 export const CLAIM_CHOICES = [0, 6, 12, 24, 48, 72, 168];
 
 export function DefaultRequirements(): IGiveawayRequirements {

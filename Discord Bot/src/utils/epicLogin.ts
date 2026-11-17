@@ -2,6 +2,7 @@ import BotClient from "../client/BotClient";
 import { DASHBOARD_PATH } from "../constants/Dashboard";
 import { Open, Seal } from "./seal";
 
+import { ModuleValue } from "./moduleFlags";
 /**
  * W-0125: „Mit Epic Games anmelden“ für /rank link (Epic Account Services, OAuth).
  *
@@ -25,8 +26,10 @@ export const EPIC_SCOPE = "basic_profile";
 /** Unter diesem Pfad liegen Bestätigung und Rückweg. Die Redirect URL im Epic-Client endet auf EPIC_PATH + "/callback". */
 export const EPIC_PATH = `${DASHBOARD_PATH}/link/epic`;
 
-export const EPIC_LINK_MINUTES = 10;
-const EPIC_LINK_LIFETIME = EPIC_LINK_MINUTES * 60_000;
+/** W-0133: wie lange der Knopf aus /rank link gilt, aus dem Admin (Standard 10 Minuten). */
+export function EpicLinkMinutes(): number {
+    return ModuleValue("rl-tracking", "linkMinutes", null);
+}
 const TIMEOUT = 10_000;
 
 /** Epic-Konto-IDs sind 32 Hex-Zeichen. Alles andere ist keine. */
@@ -77,7 +80,7 @@ export function EpicLinkURL(client: BotClient, userId: string, now = Date.now(),
     const token: ILinkToken = {
         kind: "epic-link",
         userId,
-        expiresAt: now + EPIC_LINK_LIFETIME,
+        expiresAt: now + EpicLinkMinutes() * 60_000,
         ...(swap ? { swap: true } : {}),
         ...(place && PLACE.test(place) ? { place } : {}),
     };

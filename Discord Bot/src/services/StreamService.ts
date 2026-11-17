@@ -6,23 +6,35 @@ import {
     DefaultMessage,
     DefaultStreamConfig,
     KIND_LABELS,
-    MAX_NOTIFIERS,
     SEEN_MAX,
     STREAM_KINDS,
-    TWITCH_CARD_EVERY,
     TwitchLogin,
-    YOUTUBE_EVERY,
 } from "../constants/Streams";
 import { IMessageDoc } from "../interfaces/builder/IMessageDoc";
 import { IStreamConfig, IStreamNotifier, IStreamState, ITwitchSettings, IYouTubeSettings, StreamKind, StreamPlatform } from "../interfaces/services/community/ICommunity";
 import logger from "../utils/logger";
+import { ILimitHit } from "../builder/LimitReply";
+import { ModuleValue } from "../utils/moduleFlags";
 import { NewRoleProblem } from "../utils/rolegate";
 import { IsLogTarget, SendLog, WarmLogTarget } from "../utils/logtarget";
 import TwitchApi, { ITwitchStream, Preview, TwitchError } from "../utils/twitch";
 import { Feed, IFeedEntry, IsShort, LiveStates, ResolveChannel } from "../utils/youtube";
 
 /** Was der Nutzer falsch eingegeben hat - das Dashboard zeigt den Satz. */
-export class StreamError extends Error {}
+/** limit: W-0133, eine Grenze aus dem Admin ist überschritten. */
+export class StreamError extends Error {
+    constructor(
+        message: string,
+        readonly limit?: ILimitHit
+    ) {
+        super(message);
+    }
+}
+
+/** Modul im Admin je Plattform, für die Werte. */
+export function StreamModule(platform: StreamPlatform): "twitch-notifier" | "youtube-notifier" {
+    return platform === "twitch" ? "twitch-notifier" : "youtube-notifier";
+}
 
 export const TWITCH_MODULE = "twitch-notifier";
 export const YOUTUBE_MODULE = "youtube-notifier";
@@ -66,9 +78,10 @@ export default class StreamService {
         const text = typeof input === "string" ? input.trim().slice(0, 200) : "";
 
         if (!text) throw new StreamError(platform === "twitch" ? "Gib einen Twitch-Namen oder Link an." : "Gib einen YouTube-Kanal an: Link, @Name oder Kanal-ID.");
-        if ((await this.client.streamNotifiers.OfGuild(guild.id, platform)).length >= MAX_NOTIFIERS) {
-            throw new StreamError(`Mehr als ${MAX_NOTIFIERS} geht je Server nicht.`);
-        }
+        const max = ModuleValue(StreamModule(platform), "maxNotifiers", guild.id);
+        const count = (await this.client.streamNotifiers.OfGuild(guild.id, platform)).length;
+
+        if (count >= max) throw new StreamError(`Mehr als ${max} Meldungen gehen je Server nicht.`, { module: StreamModule(platform), key: "maxNotifiers", asked: count + 1, allowed: max });
 
         const account = platform === "twitch" ? await this.TwitchAccount(text) : await this.YouTubeAccount(text);
 
@@ -292,7 +305,7 @@ export default class StreamService {
         try {
             if (this.twitch.Ready) await this.CheckTwitch();
 
-            if (Date.now() - this.lastYouTube >= YOUTUBE_EVERY) {
+            if (Date.now() - this.lastYouTube >= ModuleValue("youtube-notifier", "checkMinutes", null) * 60_000) {
                 this.lastYouTube = Date.now();
                 await this.CheckYouTube();
             }
@@ -387,7 +400,7 @@ export default class StreamService {
             };
 
             // Titel oder Spiel neu: gleich. Sonst höchstens alle fünf Minuten - Zuschauer und Bild.
-            if (notifier.config.update && state.live.messageId && (changed || now - state.live.renderedAt >= TWITCH_CARD_EVERY)) {
+            if (notifier.config.update && state.live.messageId && (changed || now - state.live.renderedAt >= ModuleValue("twitch-notifier", "cardMinutes", null) * 60_000)) {
                 const values = this.TwitchValues(guild, notifier, {
                     title: stream.title,
                     game: stream.game_name,

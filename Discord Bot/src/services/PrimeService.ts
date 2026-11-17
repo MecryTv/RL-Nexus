@@ -1,6 +1,7 @@
 import http2, { ClientHttp2Session } from "node:http2";
 import { LRUCache } from "lru-cache";
 import BotClient from "../client/BotClient";
+import { ModuleValue } from "../utils/moduleFlags";
 import logger from "../utils/logger";
 import IPrimeService, {
     IPrimeClub,
@@ -18,7 +19,6 @@ import {
     PRIME_BASE_URL,
     PRIME_CACHE_KEEP,
     PRIME_CACHE_MAX,
-    PRIME_CACHE_TTL,
     PRIME_TIMEOUT,
     EXTRA_PLAYLISTS,
     TierName,
@@ -252,7 +252,8 @@ export default class PrimeService implements IPrimeService {
         const key = wanted.toLowerCase();
         const hit = this.cache.get(key);
 
-        if (hit && Date.now() - hit.at < PRIME_CACHE_TTL) return hit.value;
+        // W-0133: wie lange Ränge gelten, kommt aus dem Admin (für alle).
+        if (hit && Date.now() - hit.at < ModuleValue("rl-tracking", "rankMaxAgeMinutes", null) * 60_000) return hit.value;
 
         try {
             const profile = await this.Load(wanted);

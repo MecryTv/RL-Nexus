@@ -84,6 +84,11 @@ export const MODULE_SETTINGS: Readonly<Record<string, readonly IModuleSettingDef
     gallery: [def("imageMegabytes", "Bild höchstens", "MB", 8, 1, 9, true, true)],
 };
 
+/** Eine Einstellung, etwa für die harte Obergrenze einer Slash-Option. */
+export function settingDef(module: string, key: string): IModuleSettingDef | undefined {
+    return MODULE_SETTINGS[module]?.find((entry) => entry.key === key);
+}
+
 /** Die Einstellungen eines Moduls, leer für Module ohne eigene Werte. */
 export function settingsOf(module: string): readonly IModuleSettingDef[] {
     return MODULE_SETTINGS[module] ?? [];
