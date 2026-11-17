@@ -1,6 +1,8 @@
 /** Seite: Serverdetail. */
 
-import { IGuild, IGuildDetail } from "../interfaces/IGuild.js";
+import { IGuild, IGuildDetail, IModuleLimit } from "../interfaces/IGuild.js";
+import { SUPPORT_DISCORD } from "../layout/Report.js";
+import { setUploadLimit } from "../core/Gallery.js";
 import { IPayload } from "../interfaces/IUser.js";
 import { clone, icon, need, maybe } from "../core/Dom.js";
 import { countMembers, paintCrest } from "../layout/GuildCard.js";
@@ -306,7 +308,7 @@ export function renderGuild(data: IPayload): void {
         need<HTMLElement>("#noFacts").hidden =
             !need<HTMLElement>("#serverBlock").hidden || !need<HTMLElement>("#memberBlock").hidden;
 
-        loadModules(detail?.modules ?? null, detail?.moduleNotices ?? {});
+        loadModules(detail?.modules ?? null, detail?.moduleNotices ?? {}, detail?.moduleLimits ?? {});
 
         // Ein Raid betrifft jede Modulseite - der Balken steht über allen (Anti Villain).
         if (!supportOnly && guild.canManage && (detail?.modules ?? guild.modules).includes("anti-villain")) watchRaid(guild.id);
@@ -506,7 +508,7 @@ const FAILED: Record<number, string> = {
  */
 type ModuleNotices = NonNullable<IGuildDetail["moduleNotices"]>;
 
-function bindModules(guild: IGuild, only: Set<string> | null, side: INav): (modules: string[] | null, notices?: ModuleNotices) => void {
+function bindModules(guild: IGuild, only: Set<string> | null, side: INav): (modules: string[] | null, notices?: ModuleNotices, limits?: Record<string, IModuleLimit[]>) => void {
     const nav = need<HTMLElement>("#setNav");
     const rail = need<HTMLElement>("#setRail");
     const cards = need<HTMLElement>("#moduleCards");
@@ -521,6 +523,8 @@ function bindModules(guild: IGuild, only: Set<string> | null, side: INav): (modu
     let ready = false;
     // W-0131: Hinweise und global geschlossene Module aus dem Admin Dashboard.
     let notices: ModuleNotices = {};
+    // W-0133: die Grenzen von RL Nexus je Modul, für den Kasten auf der Modulseite.
+    let limits: Record<string, IModuleLimit[]> = {};
     // Aus, aber noch gebraucht: Anti Villain mit Festgehaltenen bleibt in der Leiste, damit das Team freigeben kann.
     const pinned = new Set<string>();
 
@@ -646,6 +650,7 @@ function bindModules(guild: IGuild, only: Set<string> | null, side: INav): (modu
             entry.tile.classList.toggle("acct--closed", closed);
             showNotice(entry.tile.querySelector(".acct__text")!, "modnotice", notice, closed);
             showNotice(document.getElementById(id), "modbanner", notice, closed, true);
+            if (guild.canManage) showLimits(document.getElementById(id), id, limits[id]);
         }
 
         // Bereiche ohne Modul verschwinden, die Zahlen folgen.
@@ -682,6 +687,96 @@ function bindModules(guild: IGuild, only: Set<string> | null, side: INav): (modu
         }
 
         box.textContent = text;
+    }
+
+    /**
+     * W-0133, Entwurf M: Kasten „Grenzen von RL Nexus“ oben auf der Modulseite,
+     * nur für alle, die den Server verwalten. Je Wert „auf Anfrage“, „fest“ oder
+     * „freigeschaltet“, darunter der fertige Anfragetext. Alles nur als Text.
+     */
+    function showLimits(into: HTMLElement | null, id: string, list: IModuleLimit[] | undefined): void {
+        if (!into) return;
+
+        into.querySelector(":scope > .modlimits")?.remove();
+
+        if (!list || list.length === 0) return;
+
+        const name = MODULES.find((entry) => entry.id === id)?.name ?? id;
+        const granted = list.filter((entry) => entry.granted);
+        const askable = list.filter((entry) => entry.askable && !entry.granted);
+        const text = (tag: string, content: string, className = ""): HTMLElement => {
+            const element = document.createElement(tag);
+
+            element.textContent = content;
+            if (className) element.className = className;
+
+            return element;
+        };
+        const amount = (entry: IModuleLimit, value: number): string => (entry.unit ? `${value} ${entry.unit}` : String(value));
+        const box = document.createElement("section");
+        const head = text("p", "Grenzen von RL Nexus", "modlimits__head");
+        const rows = document.createElement("ul");
+
+        box.className = "modlimits";
+        box.setAttribute("aria-label", "Grenzen von RL Nexus");
+        head.append(text("span", granted.length ? ` ${granted.length === 1 ? "1 Wert" : `${granted.length} Werte`} für euren Server freigeschaltet` : " gelten für alle Server"));
+        rows.className = "modlimits__list";
+
+        for (const entry of list) {
+            const row = document.createElement("li");
+
+            row.append(text("span", entry.label), text("b", amount(entry, entry.value)), text("em", entry.granted ? "freigeschaltet" : entry.askable ? "auf Anfrage" : "fest", entry.granted ? "is-granted" : entry.askable ? "is-ask" : ""));
+            rows.append(row);
+        }
+
+        box.append(head, rows);
+
+        for (const entry of granted) {
+            const since = entry.since ? new Date(entry.since).toLocaleDateString("de-DE") : null;
+
+            box.append(text("p", `✓ ${since ? `Seit ${since} gilt` : "Es gilt"} für euren Server ${entry.label}: ${amount(entry, entry.value)} statt ${amount(entry, entry.standard)}.`, "modlimits__granted"));
+        }
+
+        if (askable.length > 0 || granted.length > 0) {
+            const request = `Anfrage für Server ${guild.id}: ${name}, ${(askable[0] ?? granted[0]!).label} bis …, weil …`;
+            const actions = document.createElement("div");
+            const ask = document.createElement("a");
+            const copy = document.createElement("button");
+
+            ask.href = SUPPORT_DISCORD;
+            ask.target = "_blank";
+            ask.rel = "noopener";
+            ask.className = "btn btn--quiet";
+            ask.textContent = granted.length ? "Weitere Anfrage im Support" : "Anfrage im Support";
+            copy.type = "button";
+            copy.className = "btn btn--quiet";
+            copy.textContent = "Text kopieren";
+            copy.addEventListener("click", () => {
+                const done = (): void => void (copy.textContent = "Kopiert");
+                const fallback = (): void => {
+                    const area = document.createElement("textarea");
+
+                    area.value = request;
+                    document.body.append(area);
+                    area.select();
+                    document.execCommand("copy");
+                    area.remove();
+                    done();
+                };
+
+                if (navigator.clipboard) void navigator.clipboard.writeText(request).then(done, fallback);
+                else fallback();
+            });
+            actions.className = "modlimits__actions";
+            actions.append(ask, copy);
+            box.append(text("p", "Für euren Server reicht ein Wert nicht? RL Nexus kann ihn für euch anpassen.", "modlimits__lead"), text("code", request, "modlimits__request"), actions);
+        }
+
+        // Unter Titel und Beschreibung des Moduls (Entwurf M), sonst ganz oben.
+        const lead = into.querySelector(":scope > .modlead") ?? into.querySelector(":scope > .modhead") ?? into.querySelector(":scope > .modbanner");
+
+        if (lead) lead.after(box);
+        else into.prepend(box);
     }
 
     function warn(text: string | null): void {
@@ -823,8 +918,13 @@ function bindModules(guild: IGuild, only: Set<string> | null, side: INav): (modu
 
     paint();
 
-    return (modules, next = {}) => {
+    return (modules, next = {}, nextLimits = {}) => {
         notices = next;
+        limits = nextLimits;
+        // W-0133: die Bild-Grenze der Galerie für Upload-Felder auf allen Seiten.
+        const image = nextLimits.gallery?.find((entry) => entry.key === "imageMegabytes");
+
+        if (image) setUploadLimit(image.value * 1048576);
 
         if (modules === null) {
             warn("Module lassen sich gerade nicht schalten, der Bot erreicht seine Datenbank nicht.");

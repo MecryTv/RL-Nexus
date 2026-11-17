@@ -1,6 +1,6 @@
 import { PermissionFlagsBits } from "discord.js";
 import BotClient from "../client/BotClient";
-import { IModuleSettingDef, settingsOf } from "../constants/ModuleSettings";
+import { IModuleSettingDef, MODULE_SETTINGS, settingsOf } from "../constants/ModuleSettings";
 import { PERMANENT_MODULES } from "../constants/Modules";
 import { WaitForDatabase } from "../services/DatabaseService";
 import logger from "./logger";
@@ -296,6 +296,37 @@ export function LimitInfo(module: string, key: string, guildId: string | null): 
 /** Der Wert, der hier gilt. */
 export function ModuleValue(module: string, key: string, guildId: string | null): number {
     return LimitInfo(module, key, guildId).value;
+}
+
+/** Ein Wert im Kasten „Grenzen von RL Nexus“ des Bot-Dashboards. since als ISO-Text. */
+export interface IModuleLimit {
+    readonly key: string;
+    readonly label: string;
+    readonly unit: string | null;
+    readonly value: number;
+    readonly standard: number;
+    readonly askable: boolean;
+    readonly granted: boolean;
+    readonly since: string | null;
+}
+
+/** W-0133: je Modul die Werte, die RL Nexus diesem Server setzt - nur die, die es je Server geben kann. */
+export function ModuleLimits(guildId: string): Record<string, IModuleLimit[]> {
+    const found: Record<string, IModuleLimit[]> = {};
+
+    for (const [module, defs] of Object.entries(MODULE_SETTINGS)) {
+        const list = defs
+            .filter((def) => def.server)
+            .map((def) => {
+                const info = LimitInfo(module, def.key, guildId);
+
+                return { key: def.key, label: def.label, unit: def.unit, value: info.value, standard: info.standard, askable: info.askable, granted: info.granted, since: info.since?.toISOString() ?? null };
+            });
+
+        if (list.length > 0) found[module] = list;
+    }
+
+    return found;
 }
 
 /** Server, auf denen Beta-Module laufen (Inhaber oder Verwalter ist Beta-Tester). */

@@ -27,6 +27,7 @@ import {
     IModuleOverrideRow,
     LimitInfo,
     LoadFlags,
+    ModuleLimits,
     ModuleNotices,
     ModuleOpen,
     ModuleValue,
@@ -386,6 +387,15 @@ async function checkValues(): Promise<void> {
 
     await Promise.all([slow, fast]);
     check("Zwei Ladevorgänge überlappen: der neuere gewinnt", CurrentLinkMode() === "both", CurrentLinkMode());
+
+    // W-0133: der Kasten „Grenzen von RL Nexus“ im Bot-Dashboard.
+    SetFlags([], [], []);
+    const plainLimits = ModuleLimits("g1").giveaways ?? [];
+    check("Grenzen: Giveaways mit vier Werten, ohne Server-Wert ist alles der Wert für alle", plainLimits.length === 4 && plainLimits.every((entry) => entry.value === entry.standard && !entry.granted && entry.since === null), JSON.stringify(plainLimits));
+    check("Grenzen: nur Werte, die je Server gehen (keine Sperrfrist von RL Tracking)", !(ModuleLimits("g1")["rl-tracking"] ?? []).some((entry) => entry.key === "switchDays"));
+    SetFlags([], [], [], [over("giveaways", "g1", { values: { maxWinners: 100 }, updatedAt: at })]);
+    const grantedLimit = (ModuleLimits("g1").giveaways ?? []).find((entry) => entry.key === "maxWinners");
+    check("Grenzen: freigeschaltet mit Datum", grantedLimit?.granted === true && grantedLimit.value === 100 && grantedLimit.standard === 50 && grantedLimit.since === at.toISOString(), JSON.stringify(grantedLimit));
 
     // Zustand für das Admin: Beta-Server.
     SetFlags([], [], ["g1", "g2", "g3"]);

@@ -1,3 +1,4 @@
+import { IModuleLimit } from "../../../utils/moduleFlags";
 import IDashboardGuild from "./IDashboardGuild";
 
 // Was der Bot selbst über den Server weiß. Nur gefüllt, wenn er dort drauf ist -
@@ -26,4 +27,6 @@ export default interface IDashboardGuildDetail {
     modules: string[] | null;
     // W-0131: je Modul mit Hinweis oder im Admin global geschlossen. Der Text ist roh.
     moduleNotices: Record<string, { open: boolean; text: string | null }>;
+    // W-0133: je Modul die Grenzen, die RL Nexus diesem Server setzt (Kasten „Grenzen von RL Nexus“).
+    moduleLimits: Record<string, IModuleLimit[]>;
 }

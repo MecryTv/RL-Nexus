@@ -56,4 +56,20 @@ export interface IGuildDetail {
     modules: string[] | null;
     /** W-0131: je Modul mit Hinweis oder im Admin global geschlossen. Der Text ist roh, er kommt nur als Text auf die Seite. */
     moduleNotices?: Record<string, { open: boolean; text: string | null }>;
+    /** W-0133: je Modul die Grenzen, die RL Nexus diesem Server setzt. Fehlt bei einem älteren Bot. */
+    moduleLimits?: Record<string, IModuleLimit[]>;
+}
+
+export interface IModuleLimit {
+    key: string;
+    label: string;
+    unit: string | null;
+    value: number;
+    /** Der Wert für alle Server. */
+    standard: number;
+    /** Lässt sich auf Anfrage für diesen Server ändern. */
+    askable: boolean;
+    /** Für diesen Server freigeschaltet (eigener Wert). */
+    granted: boolean;
+    since: string | null;
 }
