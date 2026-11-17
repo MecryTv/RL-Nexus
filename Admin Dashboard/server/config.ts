@@ -105,6 +105,8 @@ export interface IConfig {
     readonly dumpsDir: string | null;
     readonly siteDir: string;
     readonly flagsDir: string;
+    /** W-0138: eigenes nginx-Protokoll der drei Seiten (access.log), nur lesen. */
+    readonly accessLogDir: string;
     readonly port: number;
     /**
      * Wohin das Kontaktformular geht, Standard support@nexus-emb.de. Verschickt
@@ -278,6 +280,7 @@ export function loadConfig(env: Env = process.env, argv: readonly string[] = pro
         dumpsDir: raw("DB_DUMPS_DIR") || null,
         siteDir: raw("SITE_DIR") || "./data/site",
         flagsDir: raw("FLAGS_DIR") || "./data/flags",
+        accessLogDir: raw("ACCESS_LOG_DIR") || "./data/access",
         port,
         contactMail: (raw("CONTACT_MAIL") || "support@nexus-emb.de").toLowerCase(),
         smtp: smtpOf(raw),

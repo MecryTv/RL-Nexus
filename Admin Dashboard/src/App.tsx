@@ -53,6 +53,7 @@ const router = createBrowserRouter(
                 }
             >
                 <Route index lazy={page(() => import("./pages/OverviewPage"), "OverviewPage")} />
+                <Route path="aktivitaet" lazy={page(() => import("./activity/ActivityPage"), "ActivityPage")} />
                 <Route path="server" lazy={page(() => import("./pages/ServersPage"), "ServersPage")} />
                 <Route path="gruppen" lazy={page(() => import("./pages/GroupsPage"), "GroupsPage")} />
                 <Route path="backups" lazy={page(() => import("./backups/BackupsPage"), "BackupsPage")} />

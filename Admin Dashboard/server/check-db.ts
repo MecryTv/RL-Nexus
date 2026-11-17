@@ -33,6 +33,7 @@ import type { ICancelReceipt, ICheckoutStart, ICustomerDetail, ICustomerList, IS
 import type { IIncidentList, IPublicStatus, IStatusDetail } from "../shared/status.ts";
 import { loadRevoked, readSession, revokeSession } from "./access.ts";
 import { buildApp } from "./app.ts";
+import { checkActivityDb } from "./checks/activity-db.check.ts";
 import { checkBackupsDb } from "./checks/backups-db.check.ts";
 import { checkBetaDb } from "./checks/beta-db.check.ts";
 import { checkModulesDb } from "./checks/modules-db.check.ts";
@@ -4069,6 +4070,7 @@ try {
     await checkNewsDb(config, http());
     await checkDatabaseDb();
     await checkDumpsDb(config);
+    await checkActivityDb(config, http());
 } finally {
     stopStatusPost();
     setShopMailer(null);

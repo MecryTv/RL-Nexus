@@ -1,0 +1,433 @@
+@use "mixins" as *;
+
+/* W-0138: Seite Aktivität nach Entwurf D. Dienstfarben kommen aus
+   shared/activityChart.ts, Schrift in Graphen in Textfarben, nie in Dienstfarbe. */
+
+.note {
+    max-width: 72ch;
+    margin: calc(var(--s-2) * -1) 0 var(--s-4);
+    color: var(--c-text-dim);
+    font-size: 0.875rem;
+}
+
+.muted {
+    color: var(--c-text-dim);
+    font-size: 0.8125rem;
+}
+
+.sr {
+    @include sr;
+}
+
+.empty {
+    padding: var(--s-5);
+
+    h2 {
+        margin: 0 0 var(--s-2);
+        font-size: 1.125rem;
+    }
+
+    p {
+        margin: 0;
+        color: var(--c-text-dim);
+    }
+}
+
+/* Kacheln je Dienst */
+.tiles {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--s-3);
+    margin-bottom: var(--s-3);
+}
+
+.tile {
+    display: grid;
+    gap: 2px;
+    padding: 14px 16px 10px;
+    min-width: 0;
+}
+
+.tileName {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    margin: 0;
+    color: var(--c-text-dim);
+    font: 600 0.875rem var(--f-label);
+
+    i {
+        width: 10px;
+        height: 10px;
+        border-radius: 2px;
+        flex: none;
+    }
+}
+
+.tileValue {
+    font: 800 1.875rem/1.1 var(--f-display);
+    font-variant-numeric: tabular-nums;
+}
+
+.tileChange {
+    color: var(--c-text-dim);
+    font-size: 0.8125rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.spark {
+    width: 100%;
+    height: 34px;
+    margin-top: var(--s-1);
+}
+
+/* Felder mit Kopf */
+.card {
+    padding: 14px 16px;
+    min-width: 0;
+}
+
+.cardHead {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: var(--s-2) var(--s-3);
+    margin-bottom: var(--s-2);
+
+    h2 {
+        margin: 0;
+        font: 800 1rem var(--f-display);
+    }
+}
+
+.legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+
+    span {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        color: var(--c-text-dim);
+        font-size: 0.8125rem;
+    }
+
+    i {
+        width: 10px;
+        height: 10px;
+        border-radius: 2px;
+    }
+}
+
+/* Graphen */
+.chartBox {
+    position: relative;
+    min-width: 0;
+}
+
+.chart {
+    display: block;
+    max-width: 100%;
+    overflow: visible;
+    touch-action: pan-y;
+}
+
+.grid {
+    stroke: rgb(255 255 255 / 7%);
+}
+
+.tick {
+    fill: var(--c-text-dim);
+    font: 600 12px var(--f-label);
+}
+
+.endLabel {
+    fill: var(--c-text-dim);
+    font: 600 13px var(--f-label);
+}
+
+.cross {
+    stroke: rgb(255 255 255 / 28%);
+    stroke-dasharray: 3 3;
+}
+
+.dot {
+    stroke: var(--c-panel-solid);
+    stroke-width: 2;
+    pointer-events: none;
+}
+
+.tip {
+    position: absolute;
+    top: 8px;
+    display: grid;
+    gap: 4px;
+    min-width: 170px;
+    padding: 8px 12px;
+    border: 1px solid rgb(255 255 255 / 18%);
+    background: #111821;
+    font-size: 0.8125rem;
+    pointer-events: none;
+
+    > b {
+        font: 700 0.8125rem var(--f-display);
+    }
+
+    span {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        color: var(--c-text-dim);
+    }
+
+    span b {
+        margin-left: auto;
+        padding-left: var(--s-3);
+        color: var(--c-text);
+        font: 700 0.8125rem var(--f-display);
+    }
+
+    i {
+        width: 8px;
+        height: 8px;
+    }
+}
+
+.hoverLine {
+    min-height: 1.3em;
+    margin: 0 0 var(--s-1);
+    color: var(--c-text-dim);
+    font-size: 0.8125rem;
+}
+
+.heatOn {
+    stroke: var(--c-text);
+    stroke-width: 1.5;
+}
+
+.scale {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    margin-top: var(--s-2);
+    color: var(--c-text-dim);
+    font-size: 0.75rem;
+
+    i {
+        width: 18px;
+        height: 8px;
+        border-radius: 2px;
+    }
+
+    span {
+        margin: 0 4px;
+    }
+}
+
+/* Filter „Details für“: echte Radio-Knöpfe als Chips */
+.filter {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s-2);
+    margin: var(--s-4) 0 var(--s-3);
+    padding: 0;
+    border: 0;
+
+    legend {
+        float: left;
+        margin-right: var(--s-1);
+        @include label(0.75rem, 0.12em);
+        color: var(--c-text-dim);
+    }
+}
+
+.chip {
+    --chip: var(--c-text-dim);
+
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 44px;
+    padding: 0 14px;
+    border: 1px solid var(--c-line-strong);
+    color: var(--c-text-dim);
+    cursor: pointer;
+    @include label(0.75rem, 0.1em);
+
+    input {
+        @include sr;
+    }
+
+    i {
+        width: 10px;
+        height: 10px;
+        border-radius: 2px;
+        background: var(--chip);
+    }
+
+    &:hover {
+        color: var(--c-text);
+    }
+
+    &:has(input:checked) {
+        border-color: var(--c-red);
+        background: rgb(255 30 45 / 12%);
+        color: var(--c-text);
+    }
+
+    &:has(input:focus-visible) {
+        @include focus-ring;
+    }
+}
+
+/* Details: Heatmap und Woher breit, Geräte und Fehler schmal */
+.details {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--s-3);
+}
+
+.wide {
+    grid-column: span 2;
+}
+
+.bars {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+
+    th {
+        width: 96px;
+        padding: 5px var(--s-2) 5px 0;
+        color: var(--c-text-dim);
+        font-weight: 500;
+        text-align: left;
+        white-space: nowrap;
+    }
+
+    td {
+        padding: 5px 0;
+    }
+}
+
+.track {
+    width: 100%;
+
+    i {
+        display: block;
+        height: 10px;
+        min-width: 2px;
+        border-radius: 0 4px 4px 0;
+    }
+}
+
+.value {
+    padding-left: var(--s-3) !important;
+    font: 700 0.875rem var(--f-display);
+    text-align: right;
+    white-space: nowrap;
+
+    small {
+        margin-left: 6px;
+        color: var(--c-text-dim);
+        font: 500 0.75rem var(--f-label);
+    }
+}
+
+.errors {
+    display: grid;
+    gap: var(--s-3);
+    margin-bottom: var(--s-3);
+}
+
+.errOk,
+.errHigh {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+
+    svg {
+        flex: none;
+        margin-top: 4px;
+    }
+
+    b {
+        display: block;
+        font: 800 1.25rem/1.1 var(--f-display);
+    }
+
+    span {
+        color: var(--c-text-dim);
+        font-size: 0.8125rem;
+    }
+}
+
+.errOk svg {
+    color: var(--c-win);
+}
+
+.errHigh svg {
+    color: var(--c-mod-engagement);
+}
+
+@include below(1100px) {
+    .details {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .wide {
+        grid-column: auto;
+    }
+}
+
+@include below(640px) {
+    .tiles {
+        gap: 6px;
+    }
+
+    .tile {
+        padding: 8px 10px 6px;
+    }
+
+    .tileValue {
+        font-size: 1.25rem;
+    }
+
+    .tileName,
+    .tileChange {
+        font-size: 0.75rem;
+    }
+
+    /* Am Handy nur „−2 %“; der Zeitraum steht oben im Umschalter. */
+    .wideOnly {
+        display: none;
+    }
+
+    .card {
+        padding: 12px;
+    }
+}
+
+/* Übersicht: die ganze Kachel ist ein Link zur Seite */
+.tileLink {
+    display: block;
+    min-width: 0;
+    color: inherit;
+    text-decoration: none;
+
+    &:hover .tileValue {
+        color: var(--c-text);
+        text-decoration: underline;
+        text-decoration-thickness: 2px;
+        text-underline-offset: 4px;
+    }
+
+    &:focus-visible {
+        @include focus-ring;
+    }
+}

@@ -22,6 +22,7 @@ import { formatBytes, formatDateTime, formatDuration, formatNumber, formatPercen
 import { useMe } from "../session/context";
 import { sparkline } from "../sparkline";
 import { useTitle } from "../useTitle";
+import { ActivityOverview } from "../activity/ActivityOverview";
 import styles from "./OverviewPage.module.scss";
 
 /** So oft fragt die Übersicht nach, solange der Tab sichtbar ist. */
@@ -324,6 +325,10 @@ export function OverviewPage(): JSX.Element {
                     ))}
                 </div>
                 {data && status === null && <p className={styles.small}>Die erste Prüfung nach dem Start läuft noch.</p>}
+            </Section>
+
+            <Section id="aktivitaet" title="Aktivität" className={styles.spaced} action={<More to="/aktivitaet">Zur Aktivität</More>}>
+                <ActivityOverview />
             </Section>
 
             <div className={styles.split}>

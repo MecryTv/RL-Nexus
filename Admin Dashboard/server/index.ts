@@ -17,6 +17,7 @@ import { scheduleShopExpiry } from "./shop/expiry.ts";
 import { schedulePartnerRoles } from "./partners/role.ts";
 import { scheduleNews } from "./news/clock.ts";
 import { schedulePartnerLive } from "./partners/live.ts";
+import { scheduleActivity } from "./activity/clock.ts";
 import { scheduleStatusPost } from "./status-post.ts";
 
 /**
@@ -58,6 +59,8 @@ scheduleShopExpiry(config);
 schedulePartnerRoles(config);
 scheduleNews(config);
 schedulePartnerLive(config);
+// W-0138: Aufrufe aus dem eigenen nginx-Protokoll, jede Minute.
+scheduleActivity(config);
 
 const app = await buildApp(config);
 await app.listen({ port: config.port, host: "0.0.0.0" });

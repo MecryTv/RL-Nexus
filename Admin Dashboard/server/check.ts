@@ -8,6 +8,7 @@
  * 1, sobald etwas nicht stimmt.
  */
 import { checkAccess } from "./checks/access.check.ts";
+import { checkActivity } from "./checks/activity.check.ts";
 import { checkAuth } from "./checks/auth.check.ts";
 import { checkBackups } from "./checks/backups.check.ts";
 import { checkBeta } from "./checks/beta.check.ts";
@@ -83,5 +84,6 @@ await checkWartungPage();
 await checkStudio();
 await checkPartnerStudio();
 await checkNewsStudio();
+await checkActivity();
 
 finish();

@@ -143,8 +143,8 @@ export async function checkNav(): Promise<void> {
 
         const entries = navEntries("admin");
 
-        // W-0064: Server-Freigaben kam dazu, W-0057 der Bereich Sicherheit mit drei Seiten, W-0058 Nachrichten, W-0062 News und Partner/Sponsorings, W-0131 Module.
-        assert.equal(entries.length, 25);
+        // W-0064: Server-Freigaben kam dazu, W-0057 der Bereich Sicherheit mit drei Seiten, W-0058 Nachrichten, W-0062 News und Partner/Sponsorings, W-0131 Module, W-0138 Aktivität.
+        assert.equal(entries.length, 26);
         assert.ok(entries.every((hit) => !hit.href.startsWith("/dev")));
     });
 
