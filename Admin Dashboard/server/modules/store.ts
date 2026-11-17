@@ -227,7 +227,11 @@ export async function listOverrides(filter: { module?: string; guildId?: string 
 }
 
 async function writeSettingRow(module: string, setting: Pick<IBotModuleSetting, "status" | "notice" | "linkMode" | "values" | "askable">, by: string): Promise<void> {
-    const config = JSON.stringify({ ...(setting.linkMode ? { linkMode: setting.linkMode } : {}), values: setting.values, askable: setting.askable });
+    // Nur was vom Standard abweicht: So gilt ein späterer Standard im Verzeichnis auch für schon gespeicherte Module.
+    const defs = settingsOf(module);
+    const values = Object.fromEntries(Object.entries(setting.values).filter(([key, value]) => defs.find((def) => def.key === key)?.standard !== value));
+    const askable = Object.fromEntries(Object.entries(setting.askable).filter(([key, value]) => defs.find((def) => def.key === key)?.askable !== value));
+    const config = JSON.stringify({ ...(setting.linkMode ? { linkMode: setting.linkMode } : {}), values, askable });
 
     await query(
         `INSERT INTO bot_module_settings (module, status, notice, config, updated_by) VALUES (?, ?, ?, ?, ?)
@@ -432,6 +436,33 @@ export async function undoChange(id: number, actor: IActor): Promise<{ module: s
     const base = (await settingFor(change.module)).values;
 
     return { module: change.module, guildId: change.guildId, ...(await recordChange(change.module, change.guildId, current, after, describeChange(change.module, current, after, true, base), note, actor, id)) };
+}
+
+/**
+ * Review W-0133: Wie viele Server liegen gerade über einer Grenze, die für alle
+ * sinken soll? Nur wo es sich zählen lässt (Teams, Kategorien, Kader, Boosts),
+ * sonst null. Server mit eigenem Wert für diesen Schlüssel behalten ihn und
+ * zählen nicht mit.
+ */
+const ABOVE: Readonly<Record<string, string>> = {
+    "teams.maxTeams": "SELECT guild_id FROM teams WHERE active = 1 GROUP BY guild_id HAVING COUNT(*) > ?",
+    "teams.maxGroups": "SELECT guild_id FROM team_groups GROUP BY guild_id HAVING COUNT(*) > ?",
+    "teams.maxPlayers": "SELECT DISTINCT guild_id FROM teams WHERE JSON_LENGTH(players) > ?",
+    "levels.maxBoosts": "SELECT guild_id FROM module_settings WHERE module = 'levels' AND JSON_LENGTH(config, '$.boosts') > ?",
+};
+
+export async function serversAbove(module: string, key: string, value: number): Promise<number | null> {
+    const sql = ABOVE[`${module}.${key}`];
+
+    if (!sql) return null;
+
+    const [row] = await query<{ n: number }[]>(
+        `SELECT COUNT(*) AS n FROM (${sql}) above
+         WHERE above.guild_id NOT IN (SELECT guild_id FROM bot_module_overrides WHERE module = ? AND JSON_EXTRACT(config, ?) IS NOT NULL)`,
+        [value, module, `$.values.${key}`]
+    );
+
+    return Number(row?.n ?? 0);
 }
 
 /** Ob der Bot den Bescheid zu dieser Änderung bestätigt hat. */

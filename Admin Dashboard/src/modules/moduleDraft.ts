@@ -31,6 +31,8 @@ export interface IServerDraft {
 export type Draft = IAllDraft | IServerDraft;
 
 export interface IChange {
+    /** Nur bei Werten aus dem Verzeichnis. */
+    readonly key?: string;
     readonly label: string;
     readonly before: string;
     readonly after: string;
@@ -154,7 +156,7 @@ export function bodyOf(saved: IBotModuleView, draft: Draft, server: string | nul
 export function lowered(saved: IBotModuleView, draft: IAllDraft): IChange[] {
     return settingsOf(saved.module)
         .filter((def) => Number(draft.values[def.key]) < saved.values[def.key])
-        .map((def) => ({ label: def.label, before: withUnit(def, saved.values[def.key]), after: withUnit(def, draft.values[def.key]) }));
+        .map((def) => ({ key: def.key, label: def.label, before: withUnit(def, saved.values[def.key]), after: withUnit(def, draft.values[def.key]) }));
 }
 
 /** „Gewinner höchstens 100 (alle: 50)“ je eigenem Wert eines Servers. */

@@ -10,6 +10,7 @@
 process.env.CLIENT_SECRET ||= "check-secret";
 process.env.DEV_CLIENT_SECRET ||= "check-secret";
 
+import { NormalizeTeamSettings } from "../services/TeamService";
 import { AbsenceSettingsOf, AbsenceShown, AddDays, DayInput, DayLabel, DaysBetween, DefaultAbsenceSettings, ParseDay, ShortDay, Today } from "../constants/Absences";
 import { AbsenceStatus, CheckAbsence, MergeAbsence, ReturnPlan, WarningText } from "../services/teams/Absences";
 import { AddedReply } from "../builder/AbsenceView";
@@ -88,6 +89,8 @@ function checkSettings(): void {
     check("Ab Werk sehen Captain, Co-Captain, Manager und Coach die Gründe", defaults.viewers.join() === "captain,cocaptain,manager,coach", defaults.viewers.join());
     check("Ab Werk 60 Tage lang, 90 Tage im Voraus", defaults.maxDays === 60 && defaults.aheadDays === 90);
     check("Ohne Eingabe bleibt der alte Stand", JSON.stringify(AbsenceSettingsOf(undefined, defaults)) === JSON.stringify(defaults));
+    // Review W-0133: Beim Lesen bleibt ein gespeicherter Wert über 365, wenn RL Nexus ihn erlaubt hat.
+    check("Gespeichert 500 Tage: beim Lesen bleibt es 500", NormalizeTeamSettings({ absences: { ...defaults, maxDays: 500 } }).absences.maxDays === 500);
 
     const cleaned = AbsenceSettingsOf(
         {

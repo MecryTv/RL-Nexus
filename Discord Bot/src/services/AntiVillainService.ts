@@ -105,6 +105,9 @@ function OneOf<T extends string | number>(value: unknown, options: readonly T[],
  * Raids und Nukes. Die reine Logik liegt in services/antivillain/, hier hängt sie
  * an Discord, Datenbank und Karten. Siehe docs/AntiVillain.md.
  */
+/** Melder zählen erst ab diesem Kontoalter, fest (Review W-0133): „Neues Konto bis“ im Admin betrifft nur den Treffer. */
+const REPORTER_MIN_AGE_MS = 7 * 86_400_000;
+
 export default class AntiVillainService {
     private readonly client: BotClient;
     /** W-0063: So lange wartet das Speichern auf das Umbenennen des Köder-Kanals, danach läuft es im Hintergrund weiter. */
@@ -465,7 +468,7 @@ export default class AntiVillainService {
         if (now - (await this.client.avReports.Last(guild.id, target.id, reporter.id)) < REPORT_COOLDOWN_MS) return "again";
         // Melder jünger als 7 Tage zählen nicht: sonst hielten drei Zweit-Accounts jeden fest. Dieselbe Antwort,
         // damit niemand herausfindet, ab wann eine Meldung zählt.
-        if (now - reporter.user.createdTimestamp < ModuleValue("anti-villain", "freshDays", guild.id) * 86_400_000) return "counted";
+        if (now - reporter.user.createdTimestamp < REPORTER_MIN_AGE_MS) return "counted";
 
         await this.client.avReports.Note(guild.id, target.id, reporter.id, now);
 

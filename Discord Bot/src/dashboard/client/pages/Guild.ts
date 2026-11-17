@@ -719,13 +719,15 @@ function bindModules(guild: IGuild, only: Set<string> | null, side: INav): (modu
 
         box.className = "modlimits";
         box.setAttribute("aria-label", "Grenzen von RL Nexus");
-        head.append(text("span", granted.length ? ` ${granted.length === 1 ? "1 Wert" : `${granted.length} Werte`} für euren Server freigeschaltet` : " gelten für alle Server"));
+        const raised = (entry: IModuleLimit): boolean => entry.granted && entry.value > entry.standard;
+
+        head.append(text("span", granted.length ? ` ${granted.length === 1 ? "1 Wert" : `${granted.length} Werte`} für euren Server ${granted.every(raised) ? "freigeschaltet" : "angepasst"}` : " gelten für alle Server"));
         rows.className = "modlimits__list";
 
         for (const entry of list) {
             const row = document.createElement("li");
 
-            row.append(text("span", entry.label), text("b", amount(entry, entry.value)), text("em", entry.granted ? "freigeschaltet" : entry.askable ? "auf Anfrage" : "fest", entry.granted ? "is-granted" : entry.askable ? "is-ask" : ""));
+            row.append(text("span", entry.label), text("b", amount(entry, entry.value)), text("em", entry.granted ? (raised(entry) ? "freigeschaltet" : "angepasst") : entry.askable ? "auf Anfrage" : "fest", entry.granted ? "is-granted" : entry.askable ? "is-ask" : ""));
             rows.append(row);
         }
 

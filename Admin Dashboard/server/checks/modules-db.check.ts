@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import type { IBotModulesView } from "../../shared/botModules.ts";
 import type { IConfig } from "../config.ts";
 import { query } from "../db.ts";
-import { deleteOverride, listChanges, listOverrides, listSettings, saveOverride, saveSetting, serverCounts, undoChange } from "../modules/store.ts";
+import { deleteOverride, listChanges, listOverrides, listSettings, saveOverride, saveSetting, serverCounts, serversAbove, undoChange } from "../modules/store.ts";
 import type { IHttp } from "./backups-db.check.ts";
 import { check, section } from "./harness.ts";
 
@@ -97,6 +97,13 @@ export async function checkModulesDb(config: IConfig, http: IHttp): Promise<void
             assert.equal(saved2.after.values.maxDays, 60);
             assert.equal(saved2.after.askable.maxWinners, false);
             assert.ok(saved2.changeId > 0);
+
+            // Review W-0133: gespeichert wird nur, was vom Standard abweicht.
+            const [raw] = await query<{ config: string | Record<string, unknown> }[]>("SELECT config FROM bot_module_settings WHERE module = 'giveaways'");
+            const config = (typeof raw.config === "string" ? JSON.parse(raw.config) : raw.config) as { values: Record<string, number>; askable: Record<string, boolean> };
+
+            assert.deepEqual(config.values, { maxWinners: 30 });
+            assert.deepEqual(config.askable, { maxWinners: false });
         });
 
         await check("Werte je Server: setzen, ohne Abweichung verschwindet die Zeile", async () => {
@@ -136,6 +143,25 @@ export async function checkModulesDb(config: IConfig, http: IHttp): Promise<void
             const [row] = await query<{ undo_of: number }[]>("SELECT undo_of FROM bot_module_changes WHERE id = ?", [undone.changeId]);
 
             assert.equal(row.undo_of, removed.changeId);
+        });
+
+        await check("Grenze senken: zählt Server darüber, Server mit eigenem Wert zählen nicht", async () => {
+            await query("DELETE FROM teams WHERE guild_id IN (?)", [GUILDS]);
+            await query("INSERT INTO teams (guild_id, name) VALUES (?, 'check:db A'), (?, 'check:db B'), (?, 'check:db C')", [GUILDS[0], GUILDS[0], GUILDS[0]]);
+
+            try {
+                const before = (await serversAbove("teams", "maxTeams", 2)) ?? -1;
+
+                assert.ok(before >= 1, String(before));
+                await saveOverride("teams", GUILDS[0], { status: null, notice: null, linkMode: null, values: { maxTeams: 5 }, note: null }, ACTOR);
+                assert.equal(await serversAbove("teams", "maxTeams", 2), before - 1);
+                assert.equal(await serversAbove("giveaways", "maxWinners", 2), null);
+                assert.equal((await http.get("/api/bot-modules/teams/above?key=maxTeams&value=2")).json().count, before - 1);
+                assert.equal((await http.get("/api/bot-modules/teams/above?key=maxTeams&value=999")).statusCode, 400);
+            } finally {
+                await query("DELETE FROM teams WHERE guild_id IN (?)", [GUILDS]);
+                await query("DELETE FROM bot_module_overrides WHERE module = 'teams' AND guild_id IN (?)", [GUILDS]);
+            }
         });
 
         await check("Serverzahlen: je Modul die Server, die es eingeschaltet haben", async () => {

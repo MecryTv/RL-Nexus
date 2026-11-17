@@ -110,6 +110,7 @@ export class TeamError extends Error {
 /** Harte Obergrenzen aus dem Verzeichnis; was ein Server darf, liegt darunter (ModuleValue). */
 const TEAMS_CAP = settingDef("teams", "maxTeams")?.max ?? 200;
 const PLAYERS_CAP = settingDef("teams", "maxPlayers")?.max ?? 50;
+const ABSENCE_CAP = settingDef("teams", "maxAbsenceDays")?.max ?? 730;
 
 /** Fehler mit dem Satz „legt RL Nexus fest“ - nur Server-Admins stellen Teams ein. */
 function LimitError(key: string, guildId: string | null, asked: number, allowed: number, text: string): TeamError {
@@ -507,7 +508,8 @@ export function NormalizeTeamSettings(stored: unknown | null): ITeamSettings {
         hubButton: IsRecord(raw.hubButton) ? HubButtonOf(raw.hubButton) : { ...DefaultHubButton(), on: typeof hubApply === "boolean" ? hubApply : true },
         hubLine: HubLine(raw.hubLine),
         moreIds: Array.isArray(raw.moreIds) ? raw.moreIds.filter((id): id is string => typeof id === "string" && /^\d{1,20}$/.test(id)) : [],
-        absences: AbsenceSettingsOf(raw.absences, defaults.absences),
+        // Beim Lesen nur an der harten Obergrenze kappen; was der Server darf, prüft das Speichern (Review W-0133).
+        absences: AbsenceSettingsOf(raw.absences, defaults.absences, ABSENCE_CAP),
     };
 }
 

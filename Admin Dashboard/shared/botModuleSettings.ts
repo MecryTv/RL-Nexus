@@ -35,7 +35,7 @@ export const MODULE_SETTINGS: Readonly<Record<string, readonly IModuleSettingDef
         def("switchDays", "Wechsel-Sperre", "Tage", 3, 0, 30, false, true),
         def("fixMinutes", "Korrektur-Fenster", "Min.", 60, 0, 1440, false, false),
         def("linkMinutes", "Link gültig", "Min.", 10, 2, 60, false, false),
-        def("rankMaxAgeMinutes", "Ränge neu holen nach", "Min.", 10, 2, 120, false, false),
+        def("rankMaxAgeMinutes", "Ränge neu holen nach", "Min.", 10, 10, 120, false, false),
     ],
     teams: [
         def("maxGroups", "Gruppen höchstens", null, 12, 1, 50, true, true),
@@ -60,7 +60,7 @@ export const MODULE_SETTINGS: Readonly<Record<string, readonly IModuleSettingDef
         def("maxXpPerAction", "XP je Aktion höchstens", null, 500, 1, 5000, true, true),
         def("maxBoosts", "Boosts höchstens", null, 10, 1, 50, true, true),
         def("maxBoostFactor", "Boost-Faktor höchstens", null, 3, 1, 10, true, true),
-        def("logKeepDays", "Protokoll aufbewahren", "Tage", 180, 7, 730, false, false),
+        def("logKeepDays", "Protokoll aufbewahren", "Tage", 180, 7, 180, false, false),
     ],
     giveaways: [
         def("maxWinners", "Gewinner höchstens", null, 50, 1, 500, true, true),

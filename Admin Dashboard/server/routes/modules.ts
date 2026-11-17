@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { BOT_MODULE_FALLBACK, BOT_MODULE_IDS, type IBotModuleChangePage, type IBotModuleSaved, type IBotModulesView, type IBotModuleWritten } from "../../shared/botModules.ts";
+import { settingsOf } from "../../shared/botModuleSettings.ts";
 import type { ICommandsContent } from "../../shared/content.ts";
 import { accessOf } from "../access.ts";
 import { audit, type IActor } from "../audit.ts";
@@ -21,6 +22,7 @@ import {
     saveOverride,
     saveSetting,
     serverCounts,
+    serversAbove,
     undoChange,
 } from "../modules/store.ts";
 import { body, id, oneOf, snowflake } from "../validate.ts";
@@ -186,6 +188,23 @@ export async function moduleRoutes(app: FastifyInstance, { config }: { config: I
         await audit(actor, "module.settings", module, `Server ${guildId}: ${removed.summary}`);
 
         return { changeId: removed.changeId, bot: await notifyBot(config, actor, removed.changeId) };
+    });
+
+    // Review W-0133: vor dem Senken einer Grenze, wie viele Server gerade darüber liegen.
+    app.get("/api/bot-modules/:id/above", async (request): Promise<{ count: number | null }> => {
+        requireDatabase();
+
+        const module = knownModule((request.params as { id: string }).id);
+        const raw = request.query as { key?: string; value?: string };
+        const def = settingsOf(module).find((entry) => entry.key === raw.key);
+
+        if (!def) throw new InvalidInput("Diesen Wert gibt es bei diesem Modul nicht.");
+
+        const value = Number(raw.value);
+
+        if (!Number.isInteger(value) || value < def.min || value > def.max) throw new InvalidInput(`„${def.label}“ geht von ${def.min} bis ${def.max}.`);
+
+        return { count: await serversAbove(module, def.key, value) };
     });
 
     app.get("/api/bot-modules/history", async (request): Promise<IBotModuleChangePage> => {

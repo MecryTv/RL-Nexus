@@ -279,9 +279,11 @@ function DefOf(module: string, key: string): IModuleSettingDef {
 export function LimitInfo(module: string, key: string, guildId: string | null): ILimitInfo {
     const def = DefOf(module, key);
     const global = flags.get(module);
-    const standard = global?.values?.[key] ?? def.standard;
+    // Review W-0133: Was in der Datenbank steht, gilt nur innerhalb der harten Grenzen (Discord-Grenzen, Datenschutz).
+    const clamp = (raw: number | undefined): number | undefined => (raw === undefined ? undefined : Math.min(def.max, Math.max(def.min, Math.round(raw))));
+    const standard = clamp(global?.values?.[key]) ?? def.standard;
     const own = def.server && guildId ? overrides.get(module)?.get(guildId) : undefined;
-    const value = own?.values[key];
+    const value = clamp(own?.values[key]);
 
     return {
         value: value ?? standard,

@@ -518,7 +518,7 @@ export const HELP_CATALOG: HelpCatalog = {
                     { code: "/rank link epicname:Nova", text: "Verbindet per Name, wenn das erlaubt ist" },
                 ],
                 fields: { epicname: "Dein Epic-Name, genau wie im Spiel. Zählt nur, wenn Verbinden per Name erlaubt ist, sonst führt der Knopf zur Anmeldung." },
-                after: ["Nur du siehst die Antwort", "Der Knopf gilt 10 Minuten"],
+                after: ["Nur du siehst die Antwort", "Der Knopf gilt nur kurz, die Zeit steht darunter"],
                 tip: "Wie verbunden wird, legt RL Nexus fest; für euren Server lässt sich die Art auf Anfrage ändern.",
             },
             me: {

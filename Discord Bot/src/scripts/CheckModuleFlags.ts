@@ -350,6 +350,10 @@ async function checkValues(): Promise<void> {
     SetFlags([], [], ["g1", "g2"]);
     check("Beta-Server werden gezählt", BetaGuildCount() === 2);
 
+    // Review W-0133: Werte aus der Datenbank gelten nur innerhalb der harten Grenzen.
+    SetFlags([{ module: "tickets", status: "on", notice: null, values: { maxOpenPerUser: 99 } }], [], [], [over("giveaways", "g1", { values: { maxWinners: 9999 } })]);
+    check("Harte Grenzen: zu große Werte aus der Datenbank werden geklemmt", ModuleValue("tickets", "maxOpenPerUser", "g1") === 24 && ModuleValue("giveaways", "maxWinners", "g1") === 500);
+
     // Laden: Werte, Anfrage-Schalter und Server-Werte aus der Datenbank.
     const states: string[] = [];
     OnFlagsLoaded((state) => states.push(`${state.linkModes.get(null)}|${state.linkModes.get("g7") ?? "-"}`));

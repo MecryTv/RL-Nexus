@@ -179,6 +179,7 @@ interface IPayload {
     formula: { keys: string[]; hints: Record<string, string>; presets: { name: string; formula: string; hint: string }[] };
     bodyKinds: Record<string, string>;
     limits: {
+        absenceDays?: number;
         groups: number;
         teams: number;
         players: number;
@@ -1413,13 +1414,14 @@ function mount(guildId: string, view: "teams" | "board"): void {
 
             input.type = "number";
             input.min = "1";
-            input.max = "365";
+            // W-0133: so viele Tage, wie RL Nexus diesem Server erlaubt.
+            input.max = String(data!.limits.absenceDays ?? 365);
             input.value = String(value);
             input.setAttribute("aria-label", label);
             input.addEventListener("input", () => {
                 const number = Math.round(Number(input.value));
 
-                if (Number.isFinite(number) && number >= 1 && number <= 365) {
+                if (Number.isFinite(number) && number >= 1 && number <= (data!.limits.absenceDays ?? 365)) {
                     set(number);
                     touch();
                 }

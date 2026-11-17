@@ -96,6 +96,8 @@ export function BotModulesPage(): JSX.Element {
     const [drafts, setDrafts] = useState<Record<string, Draft>>({});
     const [busy, setBusy] = useState(false);
     const [confirming, setConfirming] = useState(false);
+    // Review W-0133: je gesenktem Wert, wie viele Server gerade darüber liegen (null: nicht zählbar).
+    const [above, setAbove] = useState<Record<string, number | null>>({});
     const [leaving, setLeaving] = useState<Record<string, string | null> | null>(null);
     const searchRef = useRef<HTMLInputElement>(null);
 
@@ -188,8 +190,23 @@ export function BotModulesPage(): JSX.Element {
         const error = firstError(selected.module, draft);
 
         if (error) notify(error, "danger");
-        else if (risky) setConfirming(true);
+        else if (risky) void openConfirm();
         else void save();
+    };
+
+    const openConfirm = async (): Promise<void> => {
+        if (!selected || draft?.kind !== "all") return setConfirming(true);
+
+        const counts = await Promise.all(
+            lowered(selected, draft).map(async (change) => {
+                const answer = await api<{ count: number | null }>(`/api/bot-modules/${selected.module}/above?key=${change.key}&value=${draft.values[change.key ?? ""]}`).catch(() => ({ count: null }));
+
+                return [change.key ?? "", answer.count] as const;
+            })
+        );
+
+        setAbove(Object.fromEntries(counts));
+        setConfirming(true);
     };
 
     // Strg+S speichert, „/“ springt in die Suche, Pfeiltasten wechseln Kategorie und Modul.
@@ -233,7 +250,7 @@ export function BotModulesPage(): JSX.Element {
     const botSyncedAt = view.data?.botSyncedAt ?? null;
     const header = (
         <>
-            <PageHeader title="Module" meta="Was RL Nexus für alle Server festlegt, und Ausnahmen je Server.">
+            <PageHeader title="Module" meta="Jede Änderung steht im Verlauf und wirkt im Bot sofort.">
                 <span className={`${styles.sync} ${botSyncedAt ? styles.synced : ""}`} role="status">
                     <i aria-hidden="true" />
                     {botSyncedAt ? `Bot hat den Stand von ${formatDateTime(botSyncedAt)} übernommen` : "Kein bestätigter Bescheid vom Bot seit dem Start"}
@@ -682,7 +699,14 @@ export function BotModulesPage(): JSX.Element {
                 )}
                 {lowerList.length > 0 && (
                     <p>
-                        {lowerList.map((change) => `${change.label}: ${change.before} → ${change.after}`).join(" · ")}. Was es schon gibt, bleibt; nur Neues über der Grenze wird abgelehnt.
+                        {lowerList
+                            .map((change) => {
+                                const count = above[change.key ?? ""];
+
+                                return `${change.label}: ${change.before} → ${change.after}${count ? ` (${count === 1 ? "1 Server liegt" : `${count} Server liegen`} gerade darüber)` : count === 0 ? " (kein Server liegt darüber)" : ""}`;
+                            })
+                            .join(" · ")}
+                        . Was es schon gibt, bleibt; nur Neues über der Grenze wird abgelehnt.
                         {others.length > 0 && ` ${others.length === 1 ? "Ein Server behält" : `${others.length} Server behalten`} den eigenen Wert.`}
                     </p>
                 )}

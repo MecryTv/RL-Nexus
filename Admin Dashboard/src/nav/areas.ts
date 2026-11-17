@@ -51,7 +51,7 @@ export const AREAS: readonly INavArea[] = [
         icon: "bot",
         pages: [
             { to: "/server", label: "Server", icon: "server", description: "Alle Server, auf denen der Bot ist." },
-            { to: "/module", label: "Module", icon: "puzzle", description: "Was für alle Server gilt, je Modul: Status, Hinweis, Epic-Verknüpfung." },
+            { to: "/module", label: "Module", icon: "puzzle", description: "Was RL Nexus für alle Server festlegt, und Ausnahmen je Server." },
             { to: "/backups", label: "Backups", icon: "archive", description: "Sicherungen je Server, ansehen und zurückladen." },
             { to: "/gruppen", label: "Gruppen", icon: "shield-check", description: "Wer im Bot-Dashboard welche Gruppe hat." },
             { to: "/freigaben", label: "Server-Freigaben", icon: "lock", description: "Ein Server pro Person: Anfragen, Freigaben mit Signatur und laufende Wahlen." },
