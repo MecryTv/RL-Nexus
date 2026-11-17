@@ -15,6 +15,8 @@ process.env.CLIENT_SECRET ||= "check-secret";
 process.env.DEV_CLIENT_SECRET ||= "check-secret";
 
 import { ChannelType, Collection, Guild, GuildMember, Interaction, Message, User } from "discord.js";
+import { SetFlags } from "../utils/moduleFlags";
+import { NewSetupState, SetupView } from "../builder/TicketSetupPanel";
 import BotClient from "../client/BotClient";
 import { CleanDoc, IsImageSource } from "../builder/MessageDoc";
 import { InfoView, IsImageFile, IsPanelMessage, ITicketView, MenuOptions, PanelView, RELAY_MARK, RelayView } from "../builder/TicketPanel";
@@ -900,6 +902,35 @@ async function cleanup(client: BotClient): Promise<void> {
     check("Aufgeräumt", (await client.tickets.OpenOf(GUILD, USER)).length === 0);
 }
 
+/** W-0133: offene Tickets je Person aus dem Admin, Auswahl im Setup und der Hinweis beim Einstellen. */
+async function checkLimits(client: BotClient): Promise<void> {
+    console.log("\n  — Grenzen aus dem Admin (W-0133) —");
+
+    const guild = FakeGuild();
+    const config = { ...DefaultConfig(), limit: 3 };
+    const over = (values: Record<string, number>) => SetFlags([], [], [], [{ module: "tickets", guildId: guild.id, status: null, notice: null, linkMode: null, values, updatedAt: null }]);
+
+    over({ maxOpenPerUser: 24 });
+    const view = await SetupView({ ...client, ticketSettings: { Of: async () => config } } as unknown as BotClient, guild, NewSetupState(guild.id));
+    const json = JSON.stringify(view.components);
+    const select = JSON.parse(json).flatMap(function walk(node: { components?: unknown[]; custom_id?: string; options?: unknown[] }): { custom_id?: string; options?: unknown[] }[] {
+        return [node, ...(node.components ?? []).flatMap((child) => walk(child as never))];
+    }).find((node: { custom_id?: string }) => node.custom_id === "ticketsetup:limit");
+    check("Setup mit 24 je Person: 25 Auswahlpunkte (mit „Ohne Grenze“)", select?.options?.length === 25, String(select?.options?.length));
+
+    SetFlags([], [], []);
+    let message = "";
+
+    try {
+        client.ticketService.Clean(guild, { limit: 12 }, config);
+    } catch (error) {
+        message = error instanceof TicketError ? error.message : String(error);
+    }
+    check("Mehr als der Server darf: abgelehnt mit „legt RL Nexus fest“ (nur beim Einstellen)", message.includes("10") && message.includes("RL Nexus"), message);
+    check("0 heißt ohne Grenze und geht immer", client.ticketService.Clean(guild, { limit: 0 }, config).limit === 0);
+    check("Ein gespeicherter Wert über der Grenze bleibt", client.ticketService.Clean(guild, { limit: 12 }, { ...config, limit: 12 }).limit === 12);
+}
+
 async function main(): Promise<void> {
     console.log("\n🎫 Ticket-System\n");
 
@@ -911,6 +942,7 @@ async function main(): Promise<void> {
     checkPlaceholders();
     checkDocs();
     checkClean(client);
+    await checkLimits(client);
     checkMenu(client);
     await checkPanel(client);
     await checkTranscripts(client);

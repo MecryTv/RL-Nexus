@@ -41,17 +41,14 @@ import {
     HUB_ROWS,
     MAX_DESCRIPTION,
     MAX_FORMULA,
-    MAX_GROUPS,
     MAX_LINK_LABEL,
     MAX_LINKS,
     MAX_MENU_TEAMS,
     MAX_NAME,
-    MAX_PLAYERS,
     MAX_REGION,
     MAX_HUB_LINE,
     MAX_TAG,
     MAX_TEAM_CHANNELS,
-    MAX_TEAMS,
     PLAIN_FORMATS,
     PLAYING_ROLES,
     PLAYLISTS,
@@ -93,11 +90,31 @@ import { CleanEmoji } from "../constants/SelfRoles";
 import { Unpack } from "../constants/Database";
 import { APPLY_MODULE } from "../constants/Apply";
 import { Evaluate, FormulaError } from "../utils/formula";
+import { ILimitHit, LimitSentence } from "../builder/LimitReply";
+import { settingDef } from "../constants/ModuleSettings";
+import { ModuleValue } from "../utils/moduleFlags";
 import { AbsenceSettingsOf } from "../constants/Absences";
 import logger from "../utils/logger";
 import { CanAssignRole, NewRoleProblem } from "../utils/rolegate";
 
-export class TeamError extends Error {}
+/** limit: W-0133, eine Grenze aus dem Admin ist überschritten. */
+export class TeamError extends Error {
+    constructor(
+        message: string,
+        readonly limit?: ILimitHit
+    ) {
+        super(message);
+    }
+}
+
+/** Harte Obergrenzen aus dem Verzeichnis; was ein Server darf, liegt darunter (ModuleValue). */
+const TEAMS_CAP = settingDef("teams", "maxTeams")?.max ?? 200;
+const PLAYERS_CAP = settingDef("teams", "maxPlayers")?.max ?? 50;
+
+/** Fehler mit dem Satz „legt RL Nexus fest“ - nur Server-Admins stellen Teams ein. */
+function LimitError(key: string, guildId: string | null, asked: number, allowed: number, text: string): TeamError {
+    return new TeamError(`${text} ${LimitSentence("teams", key, guildId)}`, { module: "teams", key, asked, allowed });
+}
 
 /** Der Name des App-Emojis für ein eigenes Bild-Abzeichen: je Server, Aufgabe und Bild ein eigener. */
 function BadgeName(guildId: string, role: TeamRole, image: string): string {
@@ -372,12 +389,13 @@ export interface ICategoryDraft {
     teams: Record<string, number | null>;
 }
 
-export function ParseCategoryDraft(input: unknown): ICategoryDraft | null {
+/** max: Kategorien dieses Servers (W-0133). Gibt es schon mehr (existing), dürfen es so viele bleiben, nur nicht mehr werden. */
+export function ParseCategoryDraft(input: unknown, max = ModuleValue("teams", "maxGroups", null), existing = 0, guildId: string | null = null): ICategoryDraft | null {
     if (!IsRecord(input)) return null;
 
     const list = Array.isArray(input.categories) ? input.categories : [];
 
-    if (list.length > MAX_GROUPS) throw new TeamError(`Mehr als ${MAX_GROUPS} Kategorien gehen nicht.`);
+    if (list.length > max && list.length > existing) throw LimitError("maxGroups", guildId, list.length, max, `Mehr als ${max} Kategorien gehen nicht.`);
 
     const seen = new Set<number>();
     const categories = list.flatMap((entry, index) => {
@@ -705,7 +723,7 @@ export default class TeamService {
             hubLine: raw.hubLine === undefined ? previous.hubLine : HubLine(raw.hubLine),
             // Die weiteren Nachrichten im Kanal führt der Bot selbst, der Browser kennt sie nicht.
             moreIds: previous.moreIds,
-            absences: AbsenceSettingsOf(raw.absences, previous.absences),
+            absences: AbsenceSettingsOf(raw.absences, previous.absences, ModuleValue("teams", "maxAbsenceDays", guild.id)),
         };
     }
 
@@ -812,7 +830,7 @@ export default class TeamService {
 
         const ids = (value: unknown, fallback: number[], skip: number[] = []): number[] =>
             Array.isArray(value)
-                ? [...new Set(value.filter((id): id is number => Number.isInteger(id) && id > 0 && !skip.includes(id)))].slice(0, MAX_TEAMS)
+                ? [...new Set(value.filter((id): id is number => Number.isInteger(id) && id > 0 && !skip.includes(id)))].slice(0, TEAMS_CAP)
                 : fallback.filter((id) => !skip.includes(id));
         const pinned = ids(input.pinned, before.pinned);
 
@@ -918,7 +936,9 @@ export default class TeamService {
     async CreateGroup(guildId: string, input: unknown): Promise<ITeamGroup> {
         const groups = await this.Groups(guildId);
 
-        if (groups.length >= MAX_GROUPS) throw new TeamError(`Mehr als ${MAX_GROUPS} Kategorien gehen nicht.`);
+        const maxGroups = ModuleValue("teams", "maxGroups", guildId);
+
+        if (groups.length >= maxGroups) throw LimitError("maxGroups", guildId, groups.length + 1, maxGroups, `Mehr als ${maxGroups} Kategorien gehen nicht.`);
 
         const name = Text(IsRecord(input) ? input.name : input, MAX_NAME);
 
@@ -953,11 +973,10 @@ export default class TeamService {
      */
     /** publish false: im selben Speichern folgt noch ein Team, dessen Speichern den Hub schickt - sonst ginge er zweimal raus (W-0026). */
     async SaveCategories(guild: Guild, input: unknown, publish = true): Promise<ITeamGroup[]> {
-        const draft = ParseCategoryDraft(input);
+        const [groups, teams, settings] = await Promise.all([this.Groups(guild.id), this.Teams(guild.id), this.Settings(guild.id)]);
+        const draft = ParseCategoryDraft(input, ModuleValue("teams", "maxGroups", guild.id), groups.length, guild.id);
 
         if (!draft) throw new TeamError("Es kamen keine Kategorien mit.");
-
-        const [groups, teams, settings] = await Promise.all([this.Groups(guild.id), this.Teams(guild.id), this.Settings(guild.id)]);
         const ids = new Map<number, number>();
         let changed = false;
 
@@ -1043,7 +1062,9 @@ export default class TeamService {
     async CreateTeam(guild: Guild, input: unknown, actor: GuildMember): Promise<ITeam> {
         const [teams, settings] = await Promise.all([this.Teams(guild.id), this.Settings(guild.id)]);
 
-        if (teams.length >= MAX_TEAMS) throw new TeamError(`Mehr als ${MAX_TEAMS} Teams gehen nicht.`);
+        const maxTeams = ModuleValue("teams", "maxTeams", guild.id);
+
+        if (teams.length >= maxTeams) throw LimitError("maxTeams", guild.id, teams.length + 1, maxTeams, `Mehr als ${maxTeams} Teams gehen nicht.`);
 
         const clean = await this.CleanTeam(guild, input);
 
@@ -1435,7 +1456,7 @@ export default class TeamService {
             roleId: raw.roleId === undefined ? (previous?.roleId ?? null) : RoleOf(guild, raw.roleId),
             channels: this.CleanChannels(guild, raw.channels, previous?.channels ?? EmptyChannels()),
             links: raw.links === undefined ? (previous?.links ?? []) : this.CleanLinks(raw.links),
-            players: raw.players === undefined ? (previous?.players ?? []) : this.CleanPlayers(raw.players, previous?.players ?? []),
+            players: raw.players === undefined ? (previous?.players ?? []) : this.CleanPlayers(raw.players, previous?.players ?? [], guild.id),
             position: raw.position === undefined ? (previous?.position ?? 0) : Math.max(0, Math.round(Number(raw.position)) || 0),
         };
     }
@@ -1516,7 +1537,7 @@ export default class TeamService {
      * wird verworfen und der gespeicherte Stand weitergefuehrt - sonst koennte
      * die Seite MMR-Zahlen erfinden.
      */
-    private CleanPlayers(input: unknown, previous: ITeamPlayer[]): ITeamPlayer[] {
+    private CleanPlayers(input: unknown, previous: ITeamPlayer[], guildId: string): ITeamPlayer[] {
         if (!Array.isArray(input)) return previous;
 
         const roles = Object.keys(ROLE_LABELS) as TeamRole[];
@@ -1525,7 +1546,7 @@ export default class TeamService {
         const seen = new Set<string>();
         const players: ITeamPlayer[] = [];
 
-        for (const entry of input.slice(0, MAX_PLAYERS)) {
+        for (const entry of input.slice(0, PLAYERS_CAP)) {
             if (!IsRecord(entry)) continue;
 
             const id = Text(entry.id, 20) || `p${players.length + 1}`;
@@ -1556,6 +1577,13 @@ export default class TeamService {
                 peaks,
                 ...(keep ? { snapshot: keep } : {}),
             });
+        }
+
+        // W-0133: Ein Kader über der Grenze darf so bleiben oder kürzer werden, nur nicht wachsen.
+        const maxPlayers = ModuleValue("teams", "maxPlayers", guildId);
+
+        if (players.length > maxPlayers && players.length > previous.length) {
+            throw LimitError("maxPlayers", guildId, players.length, maxPlayers, `Ein Team hat auf diesem Server höchstens ${maxPlayers} Spieler.`);
         }
 
         return players;

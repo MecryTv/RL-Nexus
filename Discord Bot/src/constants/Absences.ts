@@ -158,14 +158,19 @@ function Flag(value: unknown, fallback: boolean): boolean {
     return typeof value === "boolean" ? value : fallback;
 }
 
-function Days(value: unknown, fallback: number): number {
+/** W-0133: höchstens max; ein gespeicherter Wert über max darf so bleiben. */
+function Days(value: unknown, fallback: number, max: number): number {
     const number = Number(value);
 
-    return Number.isFinite(number) && value !== null && value !== "" ? Math.min(MAX_ABSENCE_DAYS, Math.max(1, Math.round(number))) : fallback;
+    if (!Number.isFinite(number) || value === null || value === "") return fallback;
+
+    const days = Math.max(1, Math.round(number));
+
+    return days === fallback ? fallback : Math.min(max, days);
 }
 
-/** Bereinigt, was aus dem Dashboard oder der Datenbank kommt. Fehlt etwas, gilt previous. */
-export function AbsenceSettingsOf(input: unknown, previous: IAbsenceSettings): IAbsenceSettings {
+/** Bereinigt, was aus dem Dashboard oder der Datenbank kommt. Fehlt etwas, gilt previous. maxDays: Grenze aus dem Admin. */
+export function AbsenceSettingsOf(input: unknown, previous: IAbsenceSettings, maxDays = MAX_ABSENCE_DAYS): IAbsenceSettings {
     if (input === null || typeof input !== "object" || Array.isArray(input)) return previous;
 
     const raw = input as Partial<Record<keyof IAbsenceSettings, unknown>>;
@@ -191,8 +196,8 @@ export function AbsenceSettingsOf(input: unknown, previous: IAbsenceSettings): I
         viewers: viewers as TeamRole[],
         reasonRequired: Flag(raw.reasonRequired, previous.reasonRequired),
         reasons,
-        maxDays: raw.maxDays === undefined ? previous.maxDays : Days(raw.maxDays, previous.maxDays),
-        aheadDays: raw.aheadDays === undefined ? previous.aheadDays : Days(raw.aheadDays, previous.aheadDays),
+        maxDays: raw.maxDays === undefined ? previous.maxDays : Days(raw.maxDays, previous.maxDays, maxDays),
+        aheadDays: raw.aheadDays === undefined ? previous.aheadDays : Days(raw.aheadDays, previous.aheadDays, maxDays),
         panel: Flag(raw.panel, previous.panel),
         card: Flag(raw.card, previous.card),
         matchupWarning: Flag(raw.matchupWarning, previous.matchupWarning),

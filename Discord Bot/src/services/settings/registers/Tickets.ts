@@ -1,7 +1,11 @@
 import { ChannelType } from "discord.js";
-import { CONTACTS, CONTACT_LABELS, DELETE_AFTER_HOURS, DELETE_NOW, MAX_LIMIT, PANEL_STYLES, STYLE_LABELS, SURFACES, SURFACE_LABELS } from "../../../constants/Tickets";
+import { CONTACTS, CONTACT_LABELS, DELETE_AFTER_HOURS, DELETE_NOW, PANEL_STYLES, STYLE_LABELS, SURFACES, SURFACE_LABELS } from "../../../constants/Tickets";
 import { ITicketConfig } from "../../../interfaces/services/tickets/ITicket";
 import { IPanelModule } from "../SettingsModel";
+import { settingDef } from "../../../constants/ModuleSettings";
+
+/** Die harte Obergrenze; was der Server darf, prüft TicketService (W-0133). */
+const OPEN_CAP = settingDef("tickets", "maxOpenPerUser")?.max ?? 24;
 import { F, LOG, MODERATORS, ModeratorsField, PANEL, SaveModerators, TEXT, TeamRoles } from "./Shared";
 
 type S = ITicketConfig & { teamRoles: string[] };
@@ -31,7 +35,7 @@ export const TicketsPanel: IPanelModule<S> = {
         {
             title: "Grenzen",
             fields: [
-                F<S>("number", "limit", "Offen je User", "So viele offene Tickets darf jemand gleichzeitig haben. 0 heißt ohne Grenze.", (s) => s.limit, (value: number) => ({ limit: value }), { min: 0, max: MAX_LIMIT }),
+                F<S>("number", "limit", "Offen je User", "So viele offene Tickets darf jemand gleichzeitig haben. 0 heißt ohne Grenze.", (s) => s.limit, (value: number) => ({ limit: value }), { min: 0, max: OPEN_CAP }),
                 F<S>("choice", "deleteAfter", "Löschen nach", "So lange bleibt ein geschlossenes Ticket stehen.", (s) => String(s.deleteAfter), (value: string) => ({ deleteAfter: Number(value) }), {
                     choices: DELETE_AFTER_HOURS.map((hours): [string, string] => [String(hours), DELETE_LABEL(hours)]),
                 }),

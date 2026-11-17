@@ -6,6 +6,7 @@ import { DefaultBoostMessage, DefaultLevelMessage, LEVEL_PLACEHOLDER_KEYS, Level
 import { BOARD_PLACEHOLDERS, CARD_TEMPLATES, DESIGN_FONTS, DESIGN_PLACEHOLDERS, DESIGN_SIZE, DefaultBoardStyle, MAX_ELEMENTS, UP_TEMPLATES } from "../constants/LevelDesign";
 import { DesignKind } from "../interfaces/services/levels/ILevelDesign";
 import { ILevelRank } from "../interfaces/services/levels/ILevels";
+import { ModuleValue } from "../utils/moduleFlags";
 import { LevelError, LEVELS_MODULE } from "../services/LevelService";
 import { IsPeriod } from "../services/levels/BoardMessage";
 import { PostBoard } from "../services/levels/BoardPost";
@@ -113,7 +114,17 @@ export default class DashboardApiLevels extends Route {
             // Plan 43: die bisherigen Sätze als Vorlage für eigene Boost-Nachrichten.
             defaultBoostMessages: { start: DefaultBoostMessage("start"), end: DefaultBoostMessage("end") },
             placeholders: LEVEL_PLACEHOLDER_KEYS,
-            limits: { rewards: MAX_REWARDS, bonus: MAX_BONUS, excluded: MAX_EXCLUDED, elements: MAX_ELEMENTS, upLine: MAX_UP_LINE },
+            limits: {
+                rewards: MAX_REWARDS,
+                bonus: MAX_BONUS,
+                excluded: MAX_EXCLUDED,
+                elements: MAX_ELEMENTS,
+                upLine: MAX_UP_LINE,
+                // W-0133: aus dem Admin, je Server.
+                xp: ModuleValue("levels", "maxXpPerAction", guild.id),
+                boosts: ModuleValue("levels", "maxBoosts", guild.id),
+                boostFactor: ModuleValue("levels", "maxBoostFactor", guild.id),
+            },
             // Plan 35: der Designer.
             upMode: UpMode(settings),
             // W-0050: board ist nur noch der Kopf der offenen Seite.

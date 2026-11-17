@@ -106,7 +106,6 @@ const WEEKDAYS: [string, string][] = [
     ["6", "Samstag"],
     ["0", "Sonntag"],
 ];
-const MAX_BOOSTS = 10;
 
 interface IRank {
     id: string;
@@ -127,7 +126,7 @@ interface IPayload {
     defaultMessage: IMessageDoc;
     /** Plan 43: die bisherigen Sätze als Vorlage, wenn jemand Beginn oder Ende selbst gestaltet. */
     defaultBoostMessages: { start: IMessageDoc; end: IMessageDoc };
-    limits: { rewards: number; bonus: number; excluded: number; upLine: number };
+    limits: { rewards: number; bonus: number; excluded: number; upLine: number; xp: number; boosts: number; boostFactor: number };
     /** Plan 35: was gilt, auch wenn noch nichts gespeichert ist. */
     upMode: "image" | "text";
     page: number;
@@ -198,9 +197,9 @@ export function renderLevels(guildId: string, view: LevelView = "levels"): void 
         const chatRange = el(
             "div",
             "lvrange",
-            num(settings.chat.min, 0, 500, (value) => (settings.chat.min = value), "Punkte mindestens"),
+            num(settings.chat.min, 0, data!.limits.xp, (value) => (settings.chat.min = value), "Punkte mindestens"),
             el("span", "lvrange__to", "bis"),
-            num(settings.chat.max, 0, 500, (value) => (settings.chat.max = value), "Punkte höchstens")
+            num(settings.chat.max, 0, data!.limits.xp, (value) => (settings.chat.max = value), "Punkte höchstens")
         );
 
         return card(
@@ -224,7 +223,7 @@ export function renderLevels(guildId: string, view: LevelView = "levels"): void 
                     touch();
                 }), el("span", "", "an"))
             ),
-            row("Punkte je Minute", "0 schaltet sie faktisch ab", num(settings.voice.xp, 0, 500, (value) => (settings.voice.xp = value), "Punkte je Minute")),
+            row("Punkte je Minute", "0 schaltet sie faktisch ab", num(settings.voice.xp, 0, data!.limits.xp, (value) => (settings.voice.xp = value), "Punkte je Minute")),
             row(
                 "Auch allein",
                 "Sonst gibt es Punkte nur, wenn jemand anderes dabei ist",
@@ -672,12 +671,12 @@ export function renderLevels(guildId: string, view: LevelView = "levels"): void 
 
                 factor.type = "number";
                 factor.min = "1.1";
-                factor.max = "3";
+                factor.max = String(data!.limits.boostFactor);
                 factor.step = "0.1";
                 factor.value = String(boost.factor);
                 factor.setAttribute("aria-label", "Faktor");
                 factor.addEventListener("input", () => {
-                    boost.factor = Math.max(1.1, Math.min(3, Number(factor.value) || 2));
+                    boost.factor = Math.max(1.1, Math.min(data!.limits.boostFactor, Number(factor.value) || 2));
                     touch();
                 });
                 remove.title = "Entfernen";
@@ -707,7 +706,7 @@ export function renderLevels(guildId: string, view: LevelView = "levels"): void 
 
             const add = button("btn btn--quiet", icon("#i-plus"), "Fenster hinzufügen");
 
-            add.disabled = settings.boosts.length >= MAX_BOOSTS;
+            add.disabled = settings.boosts.length >= data!.limits.boosts;
             add.addEventListener("click", () => {
                 settings.boosts.push({ id: Math.random().toString(36).slice(2, 10), kind: "weekly", factor: 2, start: null, end: null, weekday: 5, from: "18:00", to: "23:00", announce: false });
                 touch();
@@ -773,7 +772,7 @@ export function renderLevels(guildId: string, view: LevelView = "levels"): void 
         return card(
             "Doppelte Punkte",
             "Zu festen Zeiten bringen Nachrichten und Voice-Minuten mehr, zusätzlich zu den Boni. Überschneiden sich zwei Fenster, gilt das höhere. Wöchentliche Zeiten sind deutsche Zeit, 22:00 bis 02:00 geht über Mitternacht.",
-            row("Zeitfenster", `Bis ${MAX_BOOSTS} Stück, Faktor 1,1 bis 3`, box),
+            row("Zeitfenster", `Bis ${data!.limits.boosts} Stück, Faktor 1,1 bis ${String(data!.limits.boostFactor).replace(".", ",")}`, box),
             row("Ankündigen in", "Für Fenster mit „ankündigen“: Beginn und Ende. Ohne Kanal sagt der Bot nichts", channel),
             ...announcement("start", "Nachricht zum Beginn", "Ab jetzt: 2× XP bis Freitag 23:00."),
             ...announcement("end", "Nachricht zum Ende", "Die 2× XP sind vorbei."),

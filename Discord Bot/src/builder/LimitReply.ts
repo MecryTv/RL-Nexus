@@ -25,6 +25,13 @@ export interface ILimitHit {
     readonly allowed: number;
 }
 
+/** Der Satz hinter einer Fehlermeldung beim Einstellen (Dashboard, /einstellungen): nur Server-Admins sehen ihn. */
+export function LimitSentence(module: string, key: string, guildId: string | null): string {
+    return LimitInfo(module, key, guildId).askable
+        ? "Die Grenze legt RL Nexus fest, für euren Server lässt sie sich auf Anfrage ändern."
+        : "Die Grenze legt RL Nexus fest.";
+}
+
 /** Für das Bot-Dashboard: der Satz zur Grenze und der Link zum Support, wenn sie auf Anfrage geht. */
 export function DashboardLimit(limit: ILimitHit, guildId: string, message: string): { error: string; ask: { url: string } | null } {
     const askable = LimitInfo(limit.module, limit.key, guildId).askable;

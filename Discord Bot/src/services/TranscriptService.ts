@@ -21,9 +21,7 @@ import {
     AttachmentKey,
     INLINE_TYPES,
     MAX_DISCORD_UPLOAD,
-    MAX_TRANSCRIPT_BYTES,
     MAX_TRANSCRIPT_FILE,
-    MAX_TRANSCRIPT_MESSAGES,
     STORED_FILE,
     TRANSCRIPT_INLINE_BYTES,
     TRANSCRIPT_ROOT,
@@ -32,6 +30,7 @@ import { ITicket, ITicketConfig } from "../interfaces/services/tickets/ITicket";
 import { ITranscript, ITranscriptMessage, ITranscriptUser } from "../interfaces/services/tickets/ITranscript";
 import { ITranscriptEntry } from "../models/TicketTranscripts";
 import { ITicketContext } from "./TicketService";
+import { ModuleValue } from "../utils/moduleFlags";
 import logger from "../utils/logger";
 import { SendLog } from "../utils/logtarget";
 
@@ -227,12 +226,13 @@ export default class TranscriptService {
         return { transcript, file: html.length <= MAX_DISCORD_UPLOAD ? html : null };
     }
 
-    /** Bis zu MAX_TRANSCRIPT_MESSAGES Nachrichten eines Kanals, die älteste zuerst. */
+    /** Bis zu „Transkript höchstens … Nachrichten“ (Admin, je Server) eines Kanals, die älteste zuerst. */
     private async Read(channel: GuildTextBasedChannel): Promise<{ messages: Message[]; truncated: boolean }> {
+        const limit = ModuleValue("tickets", "transcriptMessages", channel.guildId);
         const fetched: Message[] = [];
         let before: string | undefined;
 
-        while (fetched.length < MAX_TRANSCRIPT_MESSAGES) {
+        while (fetched.length < limit) {
             const batch = await channel.messages.fetch({ limit: 100, before, cache: false });
 
             if (batch.size === 0) break;
@@ -243,7 +243,7 @@ export default class TranscriptService {
             if (batch.size < 100) break;
         }
 
-        return { messages: fetched.slice(0, MAX_TRANSCRIPT_MESSAGES).reverse(), truncated: fetched.length >= MAX_TRANSCRIPT_MESSAGES };
+        return { messages: fetched.slice(0, limit).reverse(), truncated: fetched.length >= limit };
     }
 
     /** Bild-Anhänge als data:-URI, zusammen höchstens TRANSCRIPT_INLINE_BYTES. Schlüssel wie in media. */
@@ -476,11 +476,12 @@ export default class TranscriptService {
 
         let used = 0;
         let index = 0;
+        const budget = ModuleValue("tickets", "transcriptMegabytes", guildId) * 1024 * 1024;
 
         for (const [key, url] of wanted) {
-            if (used >= MAX_TRANSCRIPT_BYTES) break;
+            if (used >= budget) break;
 
-            const saved = await this.Download(url, directory, index++, Math.min(MAX_TRANSCRIPT_FILE, MAX_TRANSCRIPT_BYTES - used));
+            const saved = await this.Download(url, directory, index++, Math.min(MAX_TRANSCRIPT_FILE, budget - used));
 
             if (!saved) continue;
 
