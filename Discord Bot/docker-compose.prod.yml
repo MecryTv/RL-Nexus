@@ -110,12 +110,17 @@ services:
             FLAGS_DIR: /data/flags
             # W-0067: die nächtlichen Sicherungen der Datenbank, nur lesen (Dev → Datenbank → Sicherungen).
             DB_DUMPS_DIR: /backups/database
+            # W-0138: das eigene nginx-Protokoll der drei Seiten, nur lesen (Start → Aktivität).
+            ACCESS_LOG_DIR: /data/access
             PORT: "3001"
             TZ: Europe/Berlin
         # Die Sicherungen gehören root:rlnexus-sicherung (GID 2067, scripts/sicherung-einrichten.sh).
         # Mit der Gruppe darf node im Container sie lesen, aber nicht ändern.
         group_add:
             - "2067"
+            # W-0138: adm (GID 4 unter Debian/Ubuntu) darf das Protokoll in
+            # /var/log/nginx/rlnexus-aktivitaet lesen (logrotate: create 0640 www-data adm).
+            - "4"
         # nginx auf dem Host reicht admin.nexus-emb.de hierher, die Container von
         # Hauptseite und Statusseite /api/contact und /public/status (über das
         # Docker-Netz als admin:3001).
@@ -138,6 +143,8 @@ services:
             - ./data/flags:/data/flags
             - ${WEBSITE_DIR:-/var/www/nexus-emb.de}:/website:ro
             - /home/backups/database:/backups/database:ro
+            # W-0138: nur dieser Ordner, nicht /var/log/nginx: kein error.log, keine anderen Domains.
+            - /var/log/nginx/rlnexus-aktivitaet:/data/access:ro
             # Die Oberfläche, auf dem Server mit npm run build gebaut. Ein neuer
             # Build ist sofort zu sehen, ohne Neustart.
             - ${ADMIN_DIR:-/var/www/admin.nexus-emb.de}/dist:/app/dist:ro

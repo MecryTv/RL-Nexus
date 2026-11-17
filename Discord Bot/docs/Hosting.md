@@ -359,6 +359,8 @@ sudo rm -rf /var/www/html
 cd /home/rlnexus/nginx
 sudo mkdir -p /var/www/ersatzseite && sudo cp ersatzseite/* /var/www/ersatzseite/
 sudo cp snippets/rlnexus-ersatzseite.conf /etc/nginx/snippets/
+# W-0138: Ordner für das Protokoll der Aktivität, sonst bricht nginx -t ab.
+sudo install -d -o www-data -g adm -m 0750 /var/log/nginx/rlnexus-aktivitaet
 for site in ersatzseite nexus-emb.de dashboard.nexus-emb.de admin.nexus-emb.de status.nexus-emb.de db.nexus-emb.de mail.nexus-emb.de webmail.nexus-emb.de; do
   sudo cp "$site.conf" "/etc/nginx/sites-available/$site"
   sudo ln -sf "/etc/nginx/sites-available/$site" "/etc/nginx/sites-enabled/$site"
@@ -411,9 +413,61 @@ In Cloudflare unter *SSL/TLS → Ursprungsserver → Zertifikat erstellen* „Ei
   * Notweg ohne Admin Dashboard: `touch data/flags/wartung-webseite` (bzw. `-dashboard`) schaltet die Wartung ein, dann ohne Zeitstrahl („Gleich wieder da.“). Löschen schaltet sie aus. Lief sie mit Zeitstrahl, auch `data/flags/wartung.json` löschen, sonst zeigt das Admin Dashboard sie weiter als laufend. Offene Wartungsseiten laden trotzdem neu: Sie fragen alle 30 Sekunden ihre eigene Adresse und merken, wenn kein 503 mehr kommt.
   * Lokal ohne nginx spiegeln der Bot (`npm run dev`) und die Webseite (`npm run dev`) dasselbe. Sie lesen `../Admin Dashboard/data/flags`, abweichend per `FLAGS_DIR`.
 * **Cloudflare:** Die echte Adresse der Besucher kommt aus `CF-Connecting-IP`, aber nur bei Anfragen aus den Netzen von Cloudflare. Die Liste steht in jeder der sieben Dateien unter `/etc/nginx/sites-available/` und ändert sich selten. Neue Netze stehen unter <https://www.cloudflare.com/ips/>.
-* **Datenschutz:** Im Zugriffsprotokoll steht die IP gekürzt (bei IPv4 ohne das letzte Stück, bei IPv6 nur die ersten drei Blöcke). Debian löscht die Protokolle nach 14 Tagen (`/etc/logrotate.d/nginx`). So steht es in der Datenschutzerklärung der Hauptseite. Die Container schreiben kein Zugriffsprotokoll und sehen die Adressen der Besucher gar nicht, nur die des Docker-Netzes.
+* **Datenschutz:** Im Zugriffsprotokoll steht die IP gekürzt (bei IPv4 ohne das letzte Stück, bei IPv6 nur die ersten drei Blöcke). Debian löscht die Protokolle nach 14 Tagen (`/etc/logrotate.d/nginx`), die Kopie für die Aktivität ebenso (`/etc/logrotate.d/rlnexus-aktivitaet`). So steht es in der Datenschutzerklärung der Hauptseite. Die Container schreiben kein Zugriffsprotokoll und sehen die Adressen der Besucher gar nicht, nur die des Docker-Netzes.
 
 nginx setzt `X-Forwarded-For` und `X-Forwarded-Proto` (`/etc/nginx/proxy_params`), die Container von Hauptseite und Statusseite reichen beides weiter. Bot und Admin Dashboard lesen daraus die echte IP des Aufrufers, die Rate Limits zählen also weiter jede IP für sich.
+
+### Aktivität im Admin Dashboard
+
+Unter *Start → Aktivität* zählt das Admin Dashboard Aufrufe von Hauptseite, Statusseite und Bot-Dashboard (W-0138). Die Zahlen kommen aus dem Zugriffsprotokoll von nginx, gespeichert werden nur Summen je Stunde in MariaDB, keine IP, kein User-Agent, kein Pfad.
+
+* **Eigener Ordner:** Die Vorlagen `nexus-emb.de.conf`, `status.nexus-emb.de.conf` und `dashboard.nexus-emb.de.conf` haben eine zweite Zeile `access_log /var/log/nginx/rlnexus-aktivitaet/access.log …` im selben gekürzten Format. Nur diesen Ordner hängt Compose in den Container `rlnexus-admin` ein, schreibgeschützt als `/data/access` (`ACCESS_LOG_DIR`). `error.log` und die übrigen Domains sieht der Container nicht.
+* **Lesen:** Der Container läuft als `node` und bekommt die Gruppe `adm` dazu (`group_add: "4"`). Unter Debian und Ubuntu hat `adm` die GID 4; prüfen mit `getent group adm`. Steht dort eine andere Zahl, in `docker-compose.prod.yml` anpassen.
+* **Drehen:** Debians Regel `/etc/logrotate.d/nginx` gilt nur für `/var/log/nginx/*.log`, nicht für den Unterordner. Deshalb eine eigene Regel, ebenfalls 14 Tage. `delaycompress` lässt die gestrige Datei als `access.log.1` ungepackt liegen; das Admin Dashboard liest dort nach einer Drehung den Rest, dann die neue Datei.
+
+```bash
+sudo tee /etc/logrotate.d/rlnexus-aktivitaet >/dev/null <<'EOF'
+/var/log/nginx/rlnexus-aktivitaet/access.log {
+    daily
+    rotate 14
+    missingok
+    notifempty
+    compress
+    delaycompress
+    create 0640 www-data adm
+    sharedscripts
+    postrotate
+        invoke-rc.d nginx rotate >/dev/null 2>&1
+    endscript
+}
+EOF
+sudo logrotate -d /etc/logrotate.d/rlnexus-aktivitaet
+```
+
+**Auf einem laufenden Server nachziehen:** Die Vorlagen nicht über die Live-Dateien kopieren, dort stehen die Zeilen von certbot. Stattdessen in den drei Dateien unter `/etc/nginx/sites-available/` die zweite `access_log`-Zeile gezielt unter die vorhandene setzen:
+
+```bash
+sudo install -d -o www-data -g adm -m 0750 /var/log/nginx/rlnexus-aktivitaet
+for site in nexus-emb.de status.nexus-emb.de dashboard.nexus-emb.de; do
+  sudo cp "/etc/nginx/sites-available/$site" "/etc/nginx/sites-available/$site.vor-aktivitaet"
+  sudo sed -i -E 's#^( *)access_log /var/log/nginx/access\.log (rlnexus_[a-z]+);#&\n\1access_log /var/log/nginx/rlnexus-aktivitaet/access.log \2;#' "/etc/nginx/sites-available/$site"
+  grep -n "access_log" "/etc/nginx/sites-available/$site"
+done
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+Je Datei müssen danach genau zwei `access_log`-Zeilen stehen. Geht `nginx -t` schief, die Sicherung `….vor-aktivitaet` zurückkopieren. Danach den Admin neu bauen (`docker compose -f docker-compose.prod.yml up -d --build admin`), er liest ab jetzt jede Minute.
+
+**Die ersten 14 Tage nachlesen (einmal):** Erst wenn der Admin ein paar Minuten gelaufen ist, kennt er die erste Zeile seines eigenen Protokolls. Bis dahin zählt das Nachlesen alles davor aus dem bisherigen Protokoll (`access.log`, `.1`, `.2.gz` bis `.14.gz`), nur für die drei Seiten. Ein kurzlebiger Container sieht `/var/log/nginx` dafür einmal schreibgeschützt; der laufende Admin bekommt den Ordner nicht:
+
+```bash
+cd /home/rlnexus
+docker compose -f docker-compose.prod.yml run --rm -v /var/log/nginx:/import:ro admin node server/activity-import.ts /import
+```
+
+Meldet er „Das eigene Protokoll wurde noch nicht gelesen“, ein paar Minuten warten. Ein zweiter Lauf sagt „Schon nachgelesen“ und zählt nichts doppelt. Bis zum Nachlesen zeigt die Seite „Zählung seit …“ mit dem Zeitpunkt der ersten Zeile.
+
+Lokal gibt es kein nginx: `npm run activity:sample` im Ordner `Admin Dashboard` schreibt 14 Tage nachgebaute Zeilen nach `data/access/access.log`, die der Admin dann wie im Betrieb liest.
 
 ### Firewall
 
