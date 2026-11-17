@@ -117,6 +117,11 @@ async function checkGroups(client: BotClient): Promise<void> {
     client.config.DEV_USER_IDs = [USER_B];
 
     try {
+        // Gezählt wird relativ zum Bestand: Auf einem Dev-System stehen echte
+        // Gruppen in der Tabelle, die mit dem Prüflauf nichts zu tun haben.
+        const baseRows = (await model.All()).length;
+        const baseCounts = await model.Counts();
+
         check("Ohne Eintrag gibt es keine Gruppe", (await model.Of(USER_A)) === null);
         check("Ohne Eintrag ist man in der Testphase", (await service.GroupOf(USER_A)) === "testphase");
 
@@ -141,7 +146,7 @@ async function checkGroups(client: BotClient): Promise<void> {
         check("Administrator sticht Developer", (await service.GroupOf(USER_B)) === "administrator");
 
         const alle = await model.All();
-        check("Übersicht listet beide", alle.length === 2, `${alle.length}`);
+        check("Übersicht listet beide", alle.length === baseRows + 2, `${baseRows} → ${alle.length}`);
         check("Vergeber wird vermerkt", alle.some((row) => row.granted_by === USER_B));
 
         // Der Wechsel oben kam ohne Notiz - die alte muss trotzdem noch da sein.
@@ -155,7 +160,11 @@ async function checkGroups(client: BotClient): Promise<void> {
         check("Leere Notiz löscht sie", (await model.Find(USER_A))?.note === null);
 
         const counts = await model.Counts();
-        check("Zählung je Gruppe stimmt", counts.administrator === 2 && counts.premium === 0, JSON.stringify(counts));
+        check(
+            "Zählung je Gruppe stimmt",
+            counts.administrator === (baseCounts.administrator ?? 0) + 2 && counts.premium === (baseCounts.premium ?? 0),
+            `${JSON.stringify(baseCounts)} → ${JSON.stringify(counts)}`
+        );
 
         check("Entzug meldet Erfolg", await model.Revoke(USER_A));
         check("Danach wieder Testphase", (await service.GroupOf(USER_A)) === "testphase");

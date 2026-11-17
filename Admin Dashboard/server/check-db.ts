@@ -4037,21 +4037,36 @@ try {
         await setAccessMode(modeBefore, USERS.admin, new Date());
     }
 
-    // Ohne Sitzung und ohne Origin, wie der Bot die interne Schnittstelle ruft.
-    const raw = (method: "GET" | "PUT" | "POST" | "DELETE", url: string, headers: Record<string, string>, payload?: unknown) =>
-        app.inject({ method, url, headers: { ...headers, ...(payload === undefined ? {} : { "content-type": "application/json" }) }, payload: payload === undefined ? undefined : JSON.stringify(payload) });
+    // Jeder ausgelagerte Abschnitt fragt von einer eigenen Adresse. Das Limit von
+    // 300 Anfragen je Minute und Adresse (app.ts) zählte sonst über alle Abschnitte
+    // zusammen, und seit den Modul-Prüfungen (W-0131/W-0133) bekamen die späteren 429.
+    let lastOctet = 10;
+    const http = () => {
+        const remoteAddress = `127.0.0.${lastOctet++}`;
+        const body = (payload: unknown) => (payload === undefined ? undefined : JSON.stringify(payload));
+        const json = (payload: unknown): Record<string, string> => (payload === undefined ? {} : { "content-type": "application/json" });
 
-    await checkBackupsDb(config, { get, write, raw });
-    await checkBetaDb(config, { get, write, raw });
-    await checkModulesDb(config, { get, write, raw });
+        return {
+            get: (url: string) => app.inject({ method: "GET", url, headers: { cookie }, remoteAddress }),
+            write: (method: "PUT" | "POST" | "PATCH" | "DELETE", url: string, payload?: unknown) =>
+                app.inject({ method, url, headers: { cookie, origin: config.publicUrl, ...json(payload) }, payload: body(payload), remoteAddress }),
+            // Ohne Sitzung und ohne Origin, wie der Bot die interne Schnittstelle ruft.
+            raw: (method: "GET" | "PUT" | "POST" | "DELETE", url: string, headers: Record<string, string>, payload?: unknown) =>
+                app.inject({ method, url, headers: { ...headers, ...json(payload) }, payload: body(payload), remoteAddress }),
+        };
+    };
+
+    await checkBackupsDb(config, http());
+    await checkBetaDb(config, http());
+    await checkModulesDb(config, http());
     await checkServersDb(config);
     await checkSecurityDb(config);
-    await checkMessagesDb(config, { get, write, raw });
-    await checkChangelogDb(config, { get, write, raw });
+    await checkMessagesDb(config, http());
+    await checkChangelogDb(config, http());
     await checkPartnersDb(config);
     await checkPartnerRoleDb(config);
-    await checkPartnerRoutesDb(config, { get, write, raw });
-    await checkNewsDb(config, { get, write, raw });
+    await checkPartnerRoutesDb(config, http());
+    await checkNewsDb(config, http());
     await checkDatabaseDb();
     await checkDumpsDb(config);
 } finally {
