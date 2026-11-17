@@ -33,6 +33,8 @@ import IDashboardSession from "../interfaces/services/dashboard/IDashboardSessio
 import DashboardService, { AccessEnds, BETA_ERRORS, BetaErrorText, BetaGate, DisplayGroup, LockPlaceholders, MfaRequired, ShopDecision, ShopStatusLines, type IShopGrantRow, type IShopStatusRow } from "../services/DashboardService";
 import { AccessText } from "../dashboard/client/constants/Access";
 import { applyCatalog, CATEGORIES, MODULES } from "../dashboard/client/constants/Modules";
+import { askableCount, limitCards, limitCounts, limitName, limitRequestText, limitsHref, limitStatus, limitStatusText, limitTabs, parseLimitsQuery, wishProblem } from "../dashboard/client/constants/Limits";
+import { IModuleLimit } from "../dashboard/client/interfaces/IGuild";
 import CatalogService, { Catalog } from "../services/CatalogService";
 import { CommandPaths } from "../routes/AdminCommands";
 import { ApplyHelpCatalog } from "../constants/Help";
@@ -1735,6 +1737,82 @@ async function checkRouletteModerators(client: BotClient): Promise<void> {
 }
 
 /**
+ * W-0136: die Logik hinter dem Reiter „Grenzen“ auf der Seite Module - Status,
+ * Zahlen, Filter, Anfragetext mit Servername, Adresse.
+ */
+function checkLimitsLogic(): void {
+    console.log("\n— Grenzen: Logik —");
+
+    const L = (key: string, label: string, value: number, standard: number, askable: boolean, granted = false, since: string | null = null, unit: string | null = null): IModuleLimit => ({ key, label, unit, value, standard, askable, granted, since });
+    const limits: Record<string, IModuleLimit[]> = {
+        levels: [L("maxXpPerAction", "XP je Aktion höchstens", 500, 500, true), L("maxBoosts", "Boosts höchstens", 20, 10, true, true, "2026-11-12T10:00:00Z"), L("logKeepDays", "Protokoll aufbewahren", 180, 180, false, false, null, "Tage")],
+        giveaways: [L("maxWinners", "Gewinner höchstens", 50, 50, true), L("maxDays", "Laufzeit höchstens", 60, 60, true, false, null, "Tage"), L("maxBonusRoles", "Bonus-Rollen höchstens", 10, 10, false)],
+    };
+    const [xp, boosts, log] = limits.levels!;
+    const same = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b);
+
+    check("Status: auf Anfrage, für euch, fest", limitStatus(xp!) === "ask" && limitStatus(boosts!) === "granted" && limitStatus(log!) === "fixed");
+    check("Status als Text", limitStatusText(xp!) === "auf Anfrage" && limitStatusText(boosts!) === "für euch seit 12.11." && limitStatusText(log!) === "fest", `${limitStatusText(xp!)} | ${limitStatusText(boosts!)} | ${limitStatusText(log!)}`);
+    check("Namen ohne „höchstens“", limitName("XP je Aktion höchstens") === "XP je Aktion" && limitName("Protokoll aufbewahren") === "Protokoll aufbewahren");
+
+    const all = limitCounts(limits, null);
+    const levels = limitCounts(limits, "levels");
+
+    check("Zahlen für die Filter", same(all, { all: 6, ask: 3, granted: 1, fixed: 2 }) && same(levels, { all: 3, ask: 1, granted: 1, fixed: 1 }), `${JSON.stringify(all)} ${JSON.stringify(levels)}`);
+    check("Zahl am Reiter: nur „auf Anfrage“", askableCount(limits) === 3 && askableCount({}) === 0);
+
+    const order = MODULES.map((entry) => entry.id).filter((id) => id in limits);
+    const cards = limitCards(limits, { filter: "all", search: "", module: null });
+
+    check("Karten in der Reihenfolge der Module", same(cards.map((card) => card.id), order), cards.map((card) => card.id).join(","));
+    check("Karte zählt Grenzen und Anfragen", cards.find((card) => card.id === "levels")?.total === 3 && cards.find((card) => card.id === "levels")?.askable === 1);
+    check("Filter „fest“ lässt nur feste Zeilen", limitCards(limits, { filter: "fixed", search: "", module: null }).every((card) => card.rows.every((row) => limitStatus(row) === "fixed")));
+
+    const winners = limitCards(limits, { filter: "all", search: "GEWINNER", module: null });
+    const level = limitCards(limits, { filter: "all", search: "level", module: null });
+
+    check("Suche nach einer Grenze", winners.length === 1 && winners[0]!.id === "giveaways" && winners[0]!.rows.length === 1);
+    check("Suche nach dem Modul zeigt alle Zeilen", level.length === 1 && level[0]!.id === "levels" && level[0]!.rows.length === 3);
+    check("Modulfilter", same(limitCards(limits, { filter: "all", search: "", module: "levels" }).map((card) => card.id), ["levels"]));
+    check("Unbekanntes Modul filtert nicht", limitCards(limits, { filter: "all", search: "", module: "gibtsnicht" }).length === 2);
+    check("Ohne Grenzen keine Karten", limitCards({}, { filter: "all", search: "", module: null }).length === 0);
+
+    const odd = 'Dev <b>"Server"</b> 🚀';
+
+    check(
+        "Anfragetext mit Servername, wörtlich",
+        limitRequestText(odd, "Level System", { label: "XP je Aktion höchstens", unit: null }, 1000, "Event") === `Anfrage für „${odd}“: Level System, XP je Aktion höchstens bis 1000, weil Event`,
+        limitRequestText(odd, "Level System", { label: "XP je Aktion höchstens", unit: null }, 1000, "Event")
+    );
+    check("Anfragetext mit Einheit und ohne Grund", limitRequestText("Dev", "Giveaways", { label: "Laufzeit höchstens", unit: "Tage" }, 90, "  ").endsWith("Laufzeit höchstens bis 90 Tage, weil …"));
+    check("Anfragetext ohne Zahl", limitRequestText("Dev", "Giveaways", { label: "Gewinner höchstens", unit: null }, Number.NaN, "x").includes("bis …"));
+
+    check(
+        "Wunschwert prüfen",
+        wishProblem({ value: 500, unit: null }, 500) === "Mehr als 500" &&
+            wishProblem({ value: 500, unit: null }, 1000) === null &&
+            wishProblem({ value: 500, unit: null }, Number.NaN) === "Zahl eintragen" &&
+            wishProblem({ value: 500, unit: null }, 10.5) === "Ganze Zahl eintragen" &&
+            wishProblem({ value: 60, unit: "Tage" }, 0) === "Mehr als 60 Tage"
+    );
+
+    check("Adresse des Reiters", limitsHref("/dashboard", "123") === "/dashboard/guild/123/module?reiter=grenzen" && limitsHref("/dashboard", "123", "levels") === "/dashboard/guild/123/module?reiter=grenzen&modul=levels");
+    check(
+        "Adresse lesen, Unsinn fällt auf „Module“ zurück",
+        same(parseLimitsQuery("?reiter=grenzen&modul=levels"), { tab: "grenzen", module: "levels" }) &&
+            same(parseLimitsQuery(""), { tab: "module", module: null }) &&
+            same(parseLimitsQuery("?reiter=x&modul=<b>"), { tab: "module", module: null })
+    );
+
+    const none = limitTabs(false, 3);
+    const zero = limitTabs(true, 0);
+    const many = limitTabs(true, 14);
+
+    check("Reiter nur für Verwalter", none.length === 0);
+    check("Reiter ohne Zahl bei 0, mit Zahl bei 14", zero.length === 2 && zero.every((tab) => tab.count === null) && many.find((tab) => tab.id === "grenzen")?.count === 14);
+}
+
+/**
  * W-0134: Das Raster der Rank Roles stand in einer einzigen Reihe, weil Rocket
  * Roulette dieselbe Klasse (.rrsteps) für seine Rundenleiste nutzte und sie
  * später im Stylesheet überschrieb. Die Klassen der Rank Roles gehören deshalb
@@ -2442,6 +2520,7 @@ async function main(): Promise<void> {
     await checkBerlinAt();
     await checkHubTemplates();
     await checkRankRolesStyles();
+    checkLimitsLogic();
 
     await client.server.Stop();
 
