@@ -39,7 +39,7 @@ export function ApplyLinkMode(client: BotClient, mode: LinkMode): Promise<boolea
 
 /** Hängt sich an das Laden der Modul-Einstellungen. Vor StartFlags aufrufen, damit schon das erste Laden zählt. */
 export function WatchLinkMode(client: BotClient): void {
-    OnFlagsLoaded((_previous, next) => {
-        void ApplyLinkMode(client, next).catch((error) => logger.warn(`🎖️  Verknüpfungsart nicht angewandt: ${String(error)}`));
+    OnFlagsLoaded((state) => {
+        void ApplyLinkMode(client, state.linkModes.get(null) ?? "login").catch((error) => logger.warn(`🎖️  Verknüpfungsart nicht angewandt: ${String(error)}`));
     });
 }

@@ -15,7 +15,22 @@ import PlayerAccount from "../models/PlayerAccount";
 import RankRoleService from "../services/RankRoleService";
 import { ApplyLinkMode } from "../utils/linkModeWatch";
 import AdminModulesReload from "../routes/AdminModulesReload";
-import { ActiveModules, ClosedText, CurrentLinkMode, LoadFlags, ModuleNotices, ModuleOpen, NoticeOf, OnFlagsLoaded, SetFlags } from "../utils/moduleFlags";
+import AdminModulesState from "../routes/AdminModulesState";
+import {
+    ActiveModules,
+    BetaGuildCount,
+    ClosedText,
+    CurrentLinkMode,
+    IModuleOverrideRow,
+    LimitInfo,
+    LoadFlags,
+    ModuleNotices,
+    ModuleOpen,
+    ModuleValue,
+    NoticeOf,
+    OnFlagsLoaded,
+    SetFlags,
+} from "../utils/moduleFlags";
 
 let failures = 0;
 
@@ -36,13 +51,14 @@ function Guild(id: string, ownerId: string, managers: string[] = []): IFakeGuild
     return { id, ownerId, members: { cache: new Map(managers.map((userId) => [userId, { permissions: { has: () => true } }])) } };
 }
 
-function Client(settings: Record<string, unknown>[], beta: string[], guilds: IFakeGuild[], fail = false): BotClient {
+function Client(settings: Record<string, unknown>[], beta: string[], guilds: IFakeGuild[], fail = false, overrides: Record<string, unknown>[] = []): BotClient {
     return {
         databaseService: {
             Ready: true,
             Query: async (sql: string) => {
                 if (fail) throw new Error("Tabelle fehlt");
                 if (sql.includes("bot_module_settings")) return settings;
+                if (sql.includes("bot_module_overrides")) return overrides;
                 if (sql.includes("beta_members")) return beta.map((user_id) => ({ user_id }));
 
                 return [];
@@ -220,6 +236,117 @@ async function checkTrust(): Promise<void> {
     SetFlags([], [], []);
 }
 
+/** W-0133: Werte je Modul, Werte je Server, Status und Hinweis je Server, Laden und die Zustands-Route. */
+async function checkValues(): Promise<void> {
+    console.log("\n  — Werte je Modul und Server (W-0133) —");
+
+    const at = new Date("2026-11-16T21:05:00.000Z");
+    const over = (module: string, guildId: string, extra: Record<string, unknown>): IModuleOverrideRow =>
+        ({ module, guildId, status: null, notice: null, linkMode: null, values: {}, updatedAt: null, ...extra }) as IModuleOverrideRow;
+
+    SetFlags([], [], []);
+    check("Ohne Zeilen gilt der Standard aus dem Verzeichnis", ModuleValue("giveaways", "maxWinners", "g1") === 50 && ModuleValue("rl-tracking", "switchDays", null) === 3);
+
+    SetFlags([{ module: "giveaways", status: "on", notice: null, values: { maxWinners: 30 } }], [], []);
+    check("Wert für alle, fehlende Schlüssel mit Standard", ModuleValue("giveaways", "maxWinners", "g1") === 30 && ModuleValue("giveaways", "maxDays", "g1") === 60);
+
+    SetFlags(
+        [
+            { module: "giveaways", status: "on", notice: null, values: { maxWinners: 30 } },
+            { module: "rl-tracking", status: "on", notice: null, values: { switchDays: 5 } },
+        ],
+        [],
+        [],
+        [over("giveaways", "g1", { values: { maxWinners: 100 }, updatedAt: at }), over("rl-tracking", "g1", { values: { switchDays: 9 } })]
+    );
+    check("Server-Wert schlägt den für alle, nur auf diesem Server", ModuleValue("giveaways", "maxWinners", "g1") === 100 && ModuleValue("giveaways", "maxWinners", "g2") === 30);
+    check("„Nur alle“-Schlüssel übergehen Server-Werte", ModuleValue("rl-tracking", "switchDays", "g1") === 5);
+
+    const granted = LimitInfo("giveaways", "maxWinners", "g1");
+    const plain = LimitInfo("giveaways", "maxWinners", "g2");
+    check(
+        "LimitInfo: freigeschaltet nur mit Server-Wert, standard ist der Wert für alle",
+        granted.granted && granted.value === 100 && granted.standard === 30 && granted.since?.getTime() === at.getTime() && !plain.granted && plain.value === 30 && plain.since === null,
+        JSON.stringify({ granted, plain })
+    );
+    check("Auf Anfrage: Voreinstellung aus dem Verzeichnis", granted.askable && !LimitInfo("giveaways", "scheduleDays", "g1").askable && granted.def.label === "Gewinner höchstens");
+
+    SetFlags([{ module: "giveaways", status: "on", notice: null, askable: { maxWinners: false } }], [], []);
+    check("Auf Anfrage: gespeicherter Schalter gilt", !LimitInfo("giveaways", "maxWinners", "g1").askable);
+
+    SetFlags([{ module: "polls", status: "on", notice: "Für alle" }], [], [], [over("polls", "g1", { status: "off", notice: "Nur hier" })]);
+    check("Server-Status aus schließt nur diesen Server", !ModuleOpen("polls", "g1") && ModuleOpen("polls", "g2") && ModuleOpen("polls", null, "u1"));
+    check("Server-Hinweis vor dem für alle", NoticeOf("polls", "g1") === "Nur hier" && NoticeOf("polls", "g2") === "Für alle" && ClosedText("polls", "g1") === "Nur hier");
+
+    SetFlags([{ module: "polls", status: "off", notice: null }], [], [], [over("polls", "g1", { status: "on" })]);
+    check("Server-Status an öffnet trotz Aus für alle", ModuleOpen("polls", "g1") && !ModuleOpen("polls", "g2"));
+    check("Modulliste des Servers folgt dem Server-Status", ActiveModules("g1", ["polls"]).includes("polls") && !ActiveModules("g2", ["polls"]).includes("polls"));
+
+    // Review Focus 2: Server-Wert entfernt, beim nächsten Stand gilt sofort wieder der Wert für alle.
+    SetFlags([{ module: "giveaways", status: "on", notice: null, values: { maxWinners: 30 } }], [], [], [over("giveaways", "g1", { values: { maxWinners: 100 } })]);
+    SetFlags([{ module: "giveaways", status: "on", notice: null, values: { maxWinners: 30 } }], [], []);
+    check("Server-Wert entfernt: sofort wieder der Wert für alle", ModuleValue("giveaways", "maxWinners", "g1") === 30 && !LimitInfo("giveaways", "maxWinners", "g1").granted);
+
+    SetFlags([{ module: "rl-tracking", status: "on", notice: null, linkMode: "login" }], [], [], [over("rl-tracking", "g1", { linkMode: "both" })]);
+    check("Verknüpfungsart: Server-Wert vor dem für alle", CurrentLinkMode("g1") === "both" && CurrentLinkMode("g2") === "login" && CurrentLinkMode() === "login");
+
+    SetFlags([], [], ["g1", "g2"]);
+    check("Beta-Server werden gezählt", BetaGuildCount() === 2);
+
+    // Laden: Werte, Anfrage-Schalter und Server-Werte aus der Datenbank.
+    const states: string[] = [];
+    OnFlagsLoaded((state) => states.push(`${state.linkModes.get(null)}|${state.linkModes.get("g7") ?? "-"}`));
+    const loaded = await LoadFlags(
+        Client(
+            [{ module: "giveaways", status: "on", notice: null, config: JSON.stringify({ values: { maxWinners: 40 }, askable: { maxWinners: false } }) }],
+            [],
+            [],
+            false,
+            [
+                { module: "giveaways", guild_id: "g7", status: null, notice: null, config: JSON.stringify({ values: { maxWinners: 120 } }), updated_at: at },
+                { module: "rl-tracking", guild_id: "g7", status: null, notice: null, config: JSON.stringify({ linkMode: "name", values: {} }), updated_at: at },
+            ]
+        )
+    );
+    check(
+        "Laden liest Werte, Anfrage-Schalter und Server-Werte",
+        loaded && ModuleValue("giveaways", "maxWinners", "g7") === 120 && ModuleValue("giveaways", "maxWinners", "g1") === 40 && !LimitInfo("giveaways", "maxWinners", "g1").askable && CurrentLinkMode("g7") === "name"
+    );
+    check("Nach dem Laden bekommen Zuhörer die Arten je Bereich", states.at(-1) === "login|name", states.join(","));
+
+    // W-0131-Rest: Ein älterer, langsamer Ladevorgang überschreibt keinen neueren.
+    const delayed = (linkMode: string, ms: number): BotClient =>
+        ({
+            databaseService: {
+                Ready: true,
+                Query: async (sql: string) => {
+                    await new Promise((resolve) => setTimeout(resolve, ms));
+
+                    return sql.includes("bot_module_settings") ? [{ module: "rl-tracking", status: "on", notice: null, config: JSON.stringify({ linkMode }) }] : [];
+                },
+            },
+            guilds: { cache: new Map() },
+        }) as unknown as BotClient;
+    const slow = LoadFlags(delayed("name", 60));
+    const fast = LoadFlags(delayed("both", 5));
+
+    await Promise.all([slow, fast]);
+    check("Zwei Ladevorgänge überlappen: der neuere gewinnt", CurrentLinkMode() === "both", CurrentLinkMode());
+
+    // Zustand für das Admin: Beta-Server.
+    SetFlags([], [], ["g1", "g2", "g3"]);
+    const route = new AdminModulesState(Client([], [], []));
+    const denied = Reply();
+    await route.Handle({ token: { scope: ["dashboard"] } } as never, denied as never);
+    check("Zustand ohne Admin-Recht: 403", denied.statusCode === 403, String(denied.statusCode));
+
+    const allowed = Reply();
+    const body = (await route.Handle({ token: { scope: ["admin"] } } as never, allowed as never)) as { betaServers?: number };
+    check("Zustand mit Admin-Recht: Zahl der Beta-Server", allowed.statusCode === 200 && body?.betaServers === 3, JSON.stringify(body));
+
+    SetFlags([], [], []);
+}
+
 async function main(): Promise<void> {
     console.log("\n  — Modul-Einstellungen (W-0131) —");
 
@@ -251,7 +378,7 @@ async function main(): Promise<void> {
     // Laden: Beta-Server aus Inhabern und Verwaltern, die Beta-Tester sind.
     SetFlags([], [], []);
     const seen: string[] = [];
-    OnFlagsLoaded((previous, next) => seen.push(`${previous}>${next}`));
+    OnFlagsLoaded((state) => seen.push(state.linkModes.get(null) ?? "-"));
 
     const loaded = await LoadFlags(
         Client(
@@ -265,7 +392,7 @@ async function main(): Promise<void> {
     );
     check("Laden liest Status und Art", loaded && CurrentLinkMode() === "name" && !ModuleOpen("clips", "g5"));
     check("Beta-Server: Inhaber oder Verwalter ist Beta-Tester", ModuleOpen("clips", "g3") && ModuleOpen("clips", "g4"));
-    check("Nach dem Laden erfahren Zuhörer die Art vorher und nachher", seen.join(",") === "login>name", seen.join(","));
+    check("Nach dem Laden erfahren Zuhörer die Art", seen.join(",") === "name", seen.join(","));
 
     const failed = await LoadFlags(Client([], [], [], true));
     check("Scheitert das Laden, bleibt der alte Stand", !failed && CurrentLinkMode() === "name" && ModuleOpen("clips", "g3"));
@@ -286,6 +413,7 @@ async function main(): Promise<void> {
 
     await checkGating();
     await checkTrust();
+    await checkValues();
 
     console.log(failures > 0 ? `\n  ${failures} Prüfung(en) fehlgeschlagen.\n` : "\n  Alles ok.\n");
     process.exit(failures > 0 ? 1 : 0);

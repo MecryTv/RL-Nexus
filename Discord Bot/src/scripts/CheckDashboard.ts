@@ -20,6 +20,7 @@ import { MAX_IMAGE_BYTES } from "../constants/Gallery";
 import { PLACEHOLDER_KEYS } from "../constants/Placeholders";
 import { ErrorInfo, SendError, WantsPage } from "../utils/errorpage";
 import { MODULE_IDS, PERMANENT_MODULES } from "../constants/Modules";
+import { MODULE_SETTINGS } from "../constants/ModuleSettings";
 import { DefaultRouletteSettings } from "../constants/RocketRoulette";
 import { AdminStatus, AskAdmin, BackupCall } from "../routes/DashboardApiBackups";
 import { DASHBOARD_HOME, DASHBOARD_PATH, DEVELOPER_MODE, DISCORD_EPOCH, OAUTH_SCOPES, SESSION_COOKIE } from "../constants/Dashboard";
@@ -670,6 +671,20 @@ async function checkLiveLists(): Promise<void> {
 
     diff.settle(known, fresh);
     check("Danach: Gelöschtes ist vergessen, Neues bekannt", !known.has("3") && known.has("4") && known.get("2")?.name === "highlights");
+}
+
+/** W-0133: Das Verzeichnis der Modul-Einstellungen steht im Bot und im Admin gleich. */
+async function checkModuleSettingsSame(): Promise<void> {
+    console.log("\n  — Modul-Einstellungen: Verzeichnis gleich im Admin —");
+
+    const { pathToFileURL } = await import("node:url");
+    const file = path.join(process.cwd(), "..", "Admin Dashboard", "shared", "botModuleSettings.ts");
+
+    if (!existsSync(file)) return check("Admin Dashboard/shared/botModuleSettings.ts ist da", false, file);
+
+    const admin = (await import(pathToFileURL(file).href)) as { MODULE_SETTINGS: unknown };
+
+    check("Bot und Admin führen dieselben Werte mit denselben Grenzen", JSON.stringify(admin.MODULE_SETTINGS) === JSON.stringify(MODULE_SETTINGS));
 }
 
 /** Das Modul Backups reicht an die interne Schnittstelle des Admin Dashboards weiter. */
@@ -2397,6 +2412,7 @@ async function main(): Promise<void> {
     await checkLiveLists();
     await checkBackups();
     await checkModuleState();
+    await checkModuleSettingsSame();
     await checkNavSearch();
     await checkBerlinAt();
     await checkHubTemplates();
