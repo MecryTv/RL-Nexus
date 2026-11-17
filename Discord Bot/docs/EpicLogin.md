@@ -36,6 +36,23 @@ Migration `057_epic_login.sql` hat alle alten, per Name angelegten Verknüpfunge
 
 Im HTTP-Log stehen `t`, `code` und `state` als `***` (`ChronicleLogger.http`).
 
+## Verknüpfungsart (W-0131)
+
+Im Admin Dashboard unter Bot → Module → RL Tracking steht, wie Mitglieder verbinden:
+
+| Art | `/rank link` | Rang-Rollen, Giveaway-Bedingung, Besitzer bei `/rank search` |
+|---|---|---|
+| Epic-Anmeldung (Standard) | nur der Knopf, ein Name wird ignoriert | nur per Login verbunden |
+| Nur Epic-Name | `/rank link epicname:<Name>`, wie vor W-0125 | auch per Name verbunden |
+| Beides | mit Name per Name, ohne Name der Knopf | nur per Login verbunden |
+
+Per Name verbunden heißt `verified = 0`. Bei „Epic-Anmeldung“ gilt so eine
+Verknüpfung als nicht verbunden, bleibt aber gespeichert. Meldet sich jemand
+per Epic an und das Konto hängt per Name an einem anderen Discord-Konto,
+verliert das andere Konto die Verknüpfung samt Rängen und Rang-Rollen. Wird die
+Art strenger, entfernt der Bot die Rang-Rollen ohne bestätigte Verknüpfung; den
+zuletzt angewandten Stand merkt er sich in `bot_state` (`utils/linkModeWatch.ts`).
+
 ## Einrichten im Epic Developer Portal
 
 Alles unter <https://dev.epicgames.com/portal>, kostenlos.

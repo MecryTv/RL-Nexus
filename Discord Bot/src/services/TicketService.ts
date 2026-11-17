@@ -48,8 +48,6 @@ import {
     DELETE_NOW_DELAY,
     HOUR_MS,
     AssignCodes,
-    MAX_LIMIT,
-    MAX_MODERATORS,
     MAX_NOTE,
     MAX_OPTIONS,
     MESSAGE_KEYS,
@@ -67,7 +65,13 @@ import {
 import { SNOWFLAKE } from "../constants/Discord";
 import { ITicket, ITicketConfig, ITicketModerators, ITicketOption } from "../interfaces/services/tickets/ITicket";
 import { TicketPatch } from "../models/Tickets";
+import { LimitSentence } from "../builder/LimitReply";
+import { settingDef } from "../constants/ModuleSettings";
+import { ModuleValue } from "../utils/moduleFlags";
 import logger from "../utils/logger";
+
+/** Harte Obergrenze offener Tickets je Person: 24 Auswahlpunkte plus „ohne Grenze“ (Discord: 25). */
+const OPEN_CAP = settingDef("tickets", "maxOpenPerUser")?.max ?? 24;
 import { IsLogTarget, WarmLogTarget } from "../utils/logtarget";
 
 /** Ein Grund, den der Nutzer lesen soll - kein Programmfehler. */
@@ -368,7 +372,7 @@ export default class TicketService {
             style: pick(input.style, PANEL_STYLES, previous.style),
             supportRoleId: input.supportRoleId === undefined ? previous.supportRoleId : role(input.supportRoleId),
             forumId: input.forumId === undefined ? previous.forumId : channelOf(input.forumId, ChannelType.GuildForum),
-            limit: Number.isInteger(limit) && limit >= 0 && limit <= MAX_LIMIT ? limit : previous.limit,
+            limit: this.OpenLimit(guild.id, limit, previous.limit),
             deleteAfter: (DELETE_AFTER_HOURS as readonly number[]).includes(deleteAfter) ? deleteAfter : previous.deleteAfter,
             actions,
             options,
@@ -381,17 +385,32 @@ export default class TicketService {
         };
     }
 
-    /** Moderatoren aus dem Dashboard: nur echte IDs, Rollen nur, wenn es sie auf dem Server gibt. */
-    CleanModerators(guild: Guild, input: unknown): ITicketModerators {
+    /**
+     * W-0133: offene Tickets je Person. 0 heißt ohne Grenze und geht immer; sonst
+     * höchstens der Wert aus dem Admin, ein gespeicherter Wert darüber darf bleiben.
+     */
+    private OpenLimit(guildId: string, value: number, previous: number): number {
+        if (!Number.isInteger(value) || value < 0 || value > OPEN_CAP) return previous;
+
+        const max = ModuleValue("tickets", "maxOpenPerUser", guildId);
+
+        if (value !== 0 && value > max && value !== previous) throw new TicketError(`Höchstens ${max} offene Tickets je Person. ${LimitSentence("tickets", "maxOpenPerUser", guildId)}`);
+
+        return value;
+    }
+
+    /** Moderatoren aus dem Dashboard: nur echte IDs, Rollen nur, wenn es sie auf dem Server gibt. previous: eine längere Liste darf bleiben. */
+    CleanModerators(guild: Guild, input: unknown, previous?: ITicketModerators): ITicketModerators {
+        const max = ModuleValue("tickets", "maxModerators", guild.id);
         const raw = IsRecord(input) ? input : {};
-        const ids = (value: unknown, keep: (id: string) => boolean): string[] =>
+        const ids = (value: unknown, keep: (id: string) => boolean, cap: number): string[] =>
             Array.isArray(value)
-                ? [...new Set(value.filter((id): id is string => typeof id === "string" && SNOWFLAKE.test(id) && keep(id)))].slice(0, MAX_MODERATORS)
+                ? [...new Set(value.filter((id): id is string => typeof id === "string" && SNOWFLAKE.test(id) && keep(id)))].slice(0, cap)
                 : [];
 
         return {
-            users: ids(raw.users, (id) => id !== this.client.user?.id),
-            roles: ids(raw.roles, (id) => id !== guild.id && guild.roles.cache.has(id)),
+            users: ids(raw.users, (id) => id !== this.client.user?.id, Math.max(max, previous?.users.length ?? 0)),
+            roles: ids(raw.roles, (id) => id !== guild.id && guild.roles.cache.has(id), Math.max(max, previous?.roles.length ?? 0)),
         };
     }
 

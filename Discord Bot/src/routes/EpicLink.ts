@@ -4,7 +4,8 @@ import BotClient from "../client/BotClient";
 import Route from "../structures/Route";
 import { COOKIE_PREFIX, SerializeCookie, STATE_LIFETIME } from "../constants/Dashboard";
 import { EpicConfirmPage, EpicFailPage, IEpicWho } from "../builder/EpicPage";
-import { EPIC_LINK_MINUTES, EPIC_PATH, EpicAuthorizeURL, EpicLinkToken, EpicLoginReady } from "../utils/epicLogin";
+import { ClosedText, RankOpen } from "../utils/moduleFlags";
+import { EpicLinkMinutes, EPIC_PATH, EpicAuthorizeURL, EpicLinkToken, EpicLoginReady } from "../utils/epicLogin";
 import { SendPage } from "../utils/dashboard";
 
 /** W-0125: Nonce und Link-Token zwischen dem Weg zu Epic und dem Rückweg. */
@@ -61,6 +62,13 @@ export default class EpicLink extends Route {
         const sealed = typeof query.t === "string" ? query.t : "";
         const token = EpicLinkToken(this.client, sealed);
 
+        // W-0131: RL Tracking im Admin Dashboard abgeschaltet - kein Weg zu Epic, auch nicht mit einem alten Knopf.
+        if (!RankOpen(token?.place ?? null, token?.userId)) {
+            reply.code(503);
+
+            return SendPage(this.client, reply, "epic.html", EpicFailPage("Gerade abgeschaltet", ClosedText("rl-tracking"), "Versuch es später noch einmal mit /rank link."));
+        }
+
         if (!token) {
             reply.code(410);
 
@@ -68,7 +76,7 @@ export default class EpicLink extends Route {
                 this.client,
                 reply,
                 "epic.html",
-                EpicFailPage("Link abgelaufen", `Der Knopf aus /rank link gilt ${EPIC_LINK_MINUTES} Minuten und ist nicht mehr gültig.`, "Gib in Discord noch einmal /rank link ein, dann bekommst du einen neuen Knopf.")
+                EpicFailPage("Link abgelaufen", `Der Knopf aus /rank link gilt ${EpicLinkMinutes()} Minuten und ist nicht mehr gültig.`, "Gib in Discord noch einmal /rank link ein, dann bekommst du einen neuen Knopf.")
             );
         }
 

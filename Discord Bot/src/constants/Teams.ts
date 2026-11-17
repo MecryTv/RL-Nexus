@@ -322,7 +322,8 @@ export function DefaultPlayer(id: string): ITeamPlayer {
 export function NextPlayerId(players: ITeamPlayer[]): string {
     const taken = new Set(players.map((player) => player.id));
 
-    for (let index = 1; index <= MAX_PLAYERS + 1; index++) {
+    // Bis zur harten Obergrenze aus dem Admin-Verzeichnis (50), danach eine Zeit-ID.
+    for (let index = 1; index <= 51; index++) {
         if (!taken.has(`p${index}`)) return `p${index}`;
     }
 

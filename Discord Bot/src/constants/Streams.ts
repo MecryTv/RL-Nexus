@@ -11,13 +11,7 @@ import { IStreamConfig, StreamKind, StreamPlatform } from "../interfaces/service
 export const TWITCH_PURPLE = "#9146ff";
 export const YOUTUBE_RED = "#ff0033";
 
-/** Je Server und Plattform - mehr wird unübersichtlich und kostet Abfragen. */
-export const MAX_NOTIFIERS = 25;
-
-/** Twitch wird jede Minute gefragt (100 Streamer je Abfrage), die Live-Karte zieht höchstens alle fünf Minuten nach. */
-export const TWITCH_CARD_EVERY = 5 * 60_000;
-/** Die Feeds der YouTube-Kanäle alle fünf Minuten. */
-export const YOUTUBE_EVERY = 5 * 60_000;
+/* W-0133: Meldungen je Server, Takt der Live-Karte und der YouTube-Feeds kommen aus dem Admin (constants/ModuleSettings.ts). */
 /** So viele Video-IDs merkt sich der Bot je Kanal - der Feed zeigt die letzten 15. */
 export const SEEN_MAX = 60;
 

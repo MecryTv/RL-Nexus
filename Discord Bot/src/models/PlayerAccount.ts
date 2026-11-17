@@ -1,5 +1,6 @@
 import Model from "../structures/Model";
 import { OrNull, Platform, TABLES, TableName } from "../constants/Database";
+import { CurrentLinkMode } from "../utils/moduleFlags";
 
 export interface IPlayerAccountRow {
     user_id: string;
@@ -21,6 +22,20 @@ export interface ICooldown {
     until: string | null;
     /** W-0125: Bis wann (ms) ein Wechsel als Korrektur gilt, sonst null. */
     fixUntil: number | null;
+}
+
+/**
+ * W-0131: Darf diese Verknüpfung hier zählen? card: Karte, /rank me, Name im
+ * Kader. trusted: Rang-Rollen, Giveaway-Bedingung, Anzeige als Besitzer. Per
+ * Login verbunden (verified 1) zählt immer, per Name je nach Art im Admin.
+ */
+export function LinkUsable(row: Pick<IPlayerAccountRow, "verified">, need: "card" | "trusted", guildId?: string | null): boolean {
+    if (Number(row.verified) === 1) return true;
+
+    // W-0133: mit Server dessen eigene Art, sonst die für alle.
+    const mode = CurrentLinkMode(guildId);
+
+    return need === "card" ? mode !== "login" : mode === "name";
 }
 
 /**
@@ -105,6 +120,32 @@ export default class PlayerAccount extends Model<IPlayerAccountRow> {
         if (waitMs <= 0) return open;
 
         return { open: false, waitMs, until: new Date(until).toISOString(), fixUntil: null };
+    }
+
+    /** W-0131: die Verknüpfung, wenn sie für need zählt (siehe LinkUsable). On bleibt roh, für Verbinden und Trennen. */
+    async Linked(userId: string, platform: Platform, need: "card" | "trusted", guildId?: string | null): Promise<IPlayerAccountRow | null> {
+        const row = await this.On(userId, platform);
+
+        return row && LinkUsable(row, need, guildId) ? row : null;
+    }
+
+    /** W-0131: der Besitzer zum Anzeigen - nur, wenn seine Verknüpfung als bestätigt zählt. */
+    async TrustedOwner(platform: Platform, accountId: string, guildId?: string | null): Promise<string | null> {
+        const [row] = await this.Where({ platform, account_id: accountId });
+
+        return row && LinkUsable(row, "trusted", guildId) ? row.user_id : null;
+    }
+
+    /** W-0131: der Besitzer samt der Frage, ob per Login (verified 1) oder nur per Name verbunden. */
+    async OwnerRow(platform: Platform, accountId: string): Promise<{ userId: string; verified: boolean } | null> {
+        const [row] = await this.Where({ platform, account_id: accountId });
+
+        return row ? { userId: row.user_id, verified: Number(row.verified) === 1 } : null;
+    }
+
+    /** W-0131: Dasselbe Konto erst per Name, dann per Login verbunden - jetzt bestätigt. */
+    async SetVerified(userId: string, platform: Platform): Promise<void> {
+        await this.Update([userId, platform], { verified: 1 });
     }
 
     /** Rückwärts: welcher Discord-Nutzer steckt hinter diesem Spielernamen? */

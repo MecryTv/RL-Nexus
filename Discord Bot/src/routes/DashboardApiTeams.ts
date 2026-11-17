@@ -16,14 +16,11 @@ import {
     HUB_BUTTON_LABELS,
     MAX_DESCRIPTION,
     MAX_FORMULA,
-    MAX_GROUPS,
     MAX_LINK_LABEL,
     MAX_LINKS,
     MAX_MENU_TEAMS,
     MAX_NAME,
-    MAX_PLAYERS,
     MAX_TAG,
-    MAX_TEAMS,
     MMR_LABELS,
     PLAIN_FORMATS,
     PLAYLISTS,
@@ -32,6 +29,7 @@ import {
     ROLE_ORDER,
     TEAMS_MODULE,
 } from "../constants/Teams";
+import { ModuleValue } from "../utils/moduleFlags";
 import { ApplyCategoryDraft, ParseCategoryDraft, TeamError, ViewFacts } from "../services/TeamService";
 import { Formats, HubMessages, RoleValues } from "../builder/TeamView";
 import { OrderTeams } from "../constants/TeamOrder";
@@ -192,7 +190,11 @@ export default class DashboardApiTeams extends Route {
             playlists: PLAYLISTS,
             formula: { keys: FORMULA_KEYS, hints: FORMULA_HINTS, presets: FORMULA_PRESETS },
             bodyKinds: BODY_KINDS,
-            limits: { groups: MAX_GROUPS, teams: MAX_TEAMS, players: MAX_PLAYERS, name: MAX_NAME, tag: MAX_TAG, description: MAX_DESCRIPTION, formula: MAX_FORMULA, menu: MAX_MENU_TEAMS, links: MAX_LINKS, linkLabel: MAX_LINK_LABEL },
+            limits: {
+                groups: ModuleValue("teams", "maxGroups", guild.id),
+                teams: ModuleValue("teams", "maxTeams", guild.id),
+                players: ModuleValue("teams", "maxPlayers", guild.id),
+                absenceDays: ModuleValue("teams", "maxAbsenceDays", guild.id), name: MAX_NAME, tag: MAX_TAG, description: MAX_DESCRIPTION, formula: MAX_FORMULA, menu: MAX_MENU_TEAMS, links: MAX_LINKS, linkLabel: MAX_LINK_LABEL },
             guild: {
                 name: guild.name,
                 icon: guild.iconURL({ size: 128 }),
@@ -349,7 +351,7 @@ export default class DashboardApiTeams extends Route {
 
                 if (!member) return { epicName: null };
 
-                const account = await this.client.accounts.On(userId, "epic");
+                const account = await this.client.accounts.Linked(userId, "epic", "card", guild.id);
 
                 return { epicName: account?.display_name ?? null };
             }
@@ -363,7 +365,7 @@ export default class DashboardApiTeams extends Route {
     private async Drafted(access: IManageAccess, body: IBody): Promise<{ groups: ITeamGroup[]; teams: ITeam[] }> {
         const { views, groups } = await this.client.teamService.Views(access.guild, false);
         const teams = views.map((view) => view.team);
-        const draft = ParseCategoryDraft(body.categories);
+        const draft = ParseCategoryDraft(body.categories, ModuleValue("teams", "maxGroups", access.guild.id), groups.length, access.guild.id);
 
         return draft ? ApplyCategoryDraft(access.guild.id, groups, teams, draft) : { groups, teams };
     }

@@ -12,6 +12,7 @@ process.env.DEV_CLIENT_SECRET ||= "check-secret";
 import { PRIVATE_HINT } from "../constants/StaffGrant";
 import { AuditLogEvent, ButtonInteraction, ChannelType, Guild, GuildBasedChannel, GuildMember, GuildAuditLogsEntry, Message, PermissionFlagsBits, Role, StringSelectMenuInteraction, UserContextMenuCommandInteraction } from "discord.js";
 import HackReport from "../commands/user/HackReport";
+import { SetFlags } from "../utils/moduleFlags";
 import BotClient from "../client/BotClient";
 import { IAntiVillainSettings, IAvCase, IDebris, INukeState, IRaidState } from "../interfaces/services/antivillain/IAntiVillain";
 import { IDebrisRow } from "../interfaces/services/serverbackup/IServerBackup";
@@ -1002,6 +1003,18 @@ async function checkRaid(): Promise<void> {
 
     await join("90071992547410010", t + 60_000);
     check("Wer bis zum Ende noch kommt, wird auch festgehalten", world.holds.length === 11 && raid.Active(GUILD)!.members.length === 11);
+
+    // W-0133: Zeitfenster je Server. 60 s erkennt zehn Beitritte über 45 s, 30 s nicht.
+    const slow = RaidWorld();
+    const wide = RaidWorld();
+
+    SetFlags([], [], [], [{ module: "anti-villain", guildId: GUILD, status: null, notice: null, linkMode: null, values: { raidWindowSeconds: 60, raidSlowmodeSeconds: 0 }, updatedAt: null }]);
+    for (let index = 0; index < 10; index++) await wide.join(`9007199254742${String(index).padStart(4, "0")}`, t + index * 5_000);
+    check("Fenster 60 s: zehn Beitritte über 45 s sind ein Raid", wide.world.client.antiVillainService.raid.Active(GUILD) !== null);
+    check("Slowmode 0: kein Slowmode", wide.spy.slow[C1] === 5, JSON.stringify(wide.spy.slow));
+    SetFlags([], [], []);
+    for (let index = 0; index < 10; index++) await slow.join(`9007199254743${String(index).padStart(4, "0")}`, t + index * 5_000);
+    check("Fenster 30 s: dieselben Beitritte sind kein Raid", slow.world.client.antiVillainService.raid.Active(GUILD) === null);
 
     await raid.CheckEnd(GUILD, t + 60_000 + 14 * 60_000);
     check("Vor 15 Minuten läuft er noch", raid.Active(GUILD) !== null);

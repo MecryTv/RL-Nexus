@@ -83,7 +83,7 @@ export default class DashboardApiModerators extends Route {
         if (body.action !== "save") return reply.code(400).send({ error: "Unbekannte Aktion." });
 
         const before = (await this.client.settings.Of(guild.id)).moderators;
-        const after = this.client.ticketService.CleanModerators(guild, body.moderators);
+        const after = this.client.ticketService.CleanModerators(guild, body.moderators, before);
 
         await this.client.settings.SaveModerators(guild.id, after);
 

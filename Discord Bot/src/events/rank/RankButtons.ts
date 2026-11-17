@@ -4,6 +4,7 @@ import Event from "../../structures/Event";
 import { RANK_PREFIX, RankMessage } from "../../builder/RankView";
 import { RankCardPage } from "../../builder/RankCard";
 import { IPrimeProfile } from "../../interfaces/services/prime/IPrimeService";
+import { ClosedText, ModuleOpen } from "../../utils/moduleFlags";
 
 /** Jeder Klick zeichnet die Karte neu (knapp eine Sekunde) - nicht öfter als alle drei Sekunden je Nutzer. */
 const COOLDOWN_MS = 3000;
@@ -58,6 +59,13 @@ export default class RankButtons extends Event {
             return;
         }
 
+        // W-0131: RL Tracking im Admin Dashboard abgeschaltet - auch alte Karten blättern nicht mehr.
+        if (!ModuleOpen("rl-tracking", interaction.guildId, interaction.user.id)) {
+            await interaction.reply({ content: ClosedText("rl-tracking"), flags: MessageFlags.Ephemeral, allowedMentions: { parse: [] } });
+
+            return;
+        }
+
         const page = match[1] as RankCardPage;
         const accountId = match[2] as string;
         const mine = interaction.user.id === match[3];
@@ -99,7 +107,7 @@ export default class RankButtons extends Event {
         // Wie bei /rank search: steht ein verknüpfter Discord-Nutzer hinter dem
         // Konto, zeigt die Karte seinen Namen und sein Bild. Fällt die Datenbank
         // aus, bleibt die Karte eben ohne Namen.
-        const owner = this.client.databaseService.Ready ? await this.client.accounts.Owner("epic", profile.accountId).catch(() => null) : null;
+        const owner = this.client.databaseService.Ready ? await this.client.accounts.TrustedOwner("epic", profile.accountId, interaction.guildId).catch(() => null) : null;
         const member = owner ? await this.client.users.fetch(owner).catch(() => null) : null;
 
         const message = await RankMessage(

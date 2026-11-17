@@ -32,7 +32,6 @@ import { AskAdmin, IBackupCall } from "../routes/DashboardApiBackups";
 import {
     ANTI_VILLAIN_MODULE,
     DECAY_MS,
-    FRESH_MS,
     HOP_CHANNELS,
     NAME_SIMILAR,
     NOTICE_MS,
@@ -46,7 +45,6 @@ import {
     QR_MAX_IMAGES,
     QR_MAX_SIDE,
     TEAM_ONLY,
-    TRUST_MS,
     CLEANUP_OPTIONS,
     DefaultAntiVillainSettings,
     GUARD_IDS,
@@ -64,6 +62,7 @@ import {
 } from "../constants/AntiVillain";
 import { CleanupMinutes, GuardId, IAntiVillainSettings, IAvCase, IHit, SafetyResult, ShieldLevel } from "../interfaces/services/antivillain/IAntiVillain";
 import { IsLogTarget, WarmLogTarget } from "../utils/logtarget";
+import { ModuleValue } from "../utils/moduleFlags";
 import { SNAPSHOT_WAIT_MS } from "../constants/ServerBackup";
 
 export class AntiVillainError extends Error {}
@@ -106,6 +105,9 @@ function OneOf<T extends string | number>(value: unknown, options: readonly T[],
  * Raids und Nukes. Die reine Logik liegt in services/antivillain/, hier hängt sie
  * an Discord, Datenbank und Karten. Siehe docs/AntiVillain.md.
  */
+/** Melder zählen erst ab diesem Kontoalter, fest (Review W-0133): „Neues Konto bis“ im Admin betrifft nur den Treffer. */
+const REPORTER_MIN_AGE_MS = 7 * 86_400_000;
+
 export default class AntiVillainService {
     private readonly client: BotClient;
     /** W-0063: So lange wartet das Speichern auf das Umbenennen des Köder-Kanals, danach läuft es im Hintergrund weiter. */
@@ -231,7 +233,8 @@ export default class AntiVillainService {
         }
 
         if (hits.length === 0) return;
-        if (on("fresh") && now - member.user.createdTimestamp < FRESH_MS) hits.push({ guard: "fresh", detail: `Account ${Math.max(1, Math.floor((now - member.user.createdTimestamp) / 86_400_000))} Tage alt` });
+        // W-0133: „Neues Konto bis“ aus dem Admin, 0 heißt: kein Konto gilt als neu.
+        if (on("fresh") && now - member.user.createdTimestamp < ModuleValue("anti-villain", "freshDays", guild.id) * 86_400_000) hits.push({ guard: "fresh", detail: `Account ${Math.max(1, Math.floor((now - member.user.createdTimestamp) / 86_400_000))} Tage alt` });
 
         await this.Score(guild, member, hits, now);
     }
@@ -465,7 +468,7 @@ export default class AntiVillainService {
         if (now - (await this.client.avReports.Last(guild.id, target.id, reporter.id)) < REPORT_COOLDOWN_MS) return "again";
         // Melder jünger als 7 Tage zählen nicht: sonst hielten drei Zweit-Accounts jeden fest. Dieselbe Antwort,
         // damit niemand herausfindet, ab wann eine Meldung zählt.
-        if (now - reporter.user.createdTimestamp < FRESH_MS) return "counted";
+        if (now - reporter.user.createdTimestamp < REPORTER_MIN_AGE_MS) return "counted";
 
         await this.client.avReports.Note(guild.id, target.id, reporter.id, now);
 
@@ -682,9 +685,11 @@ export default class AntiVillainService {
                 const target = await guild.members.fetch(id).catch(() => null);
 
                 if (action === "trustu") {
-                    await this.client.avTrust.Set(guild.id, id, Date.now() + TRUST_MS);
+                    const days = ModuleValue("anti-villain", "trustDays", guild.id);
+
+                    await this.client.avTrust.Set(guild.id, id, Date.now() + days * 86_400_000);
                     this.scores.Clear(`${guild.id}:${id}`);
-                    return void (await say("Vermerkt: 30 Tage vertraut."));
+                    return void (await say(`Vermerkt: ${days} Tage vertraut.`));
                 }
 
                 if (!target) return void (await say("Die Person ist nicht mehr auf dem Server."));

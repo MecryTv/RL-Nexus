@@ -16,7 +16,6 @@ import {
     MAX_LEVEL,
     MAX_REWARDS,
     MAX_UP_LINE,
-    MAX_XP_PER_ACTION,
     LEVEL_PERIODS,
     LEVEL_PULSE_MS,
     MAX_REASON,
@@ -41,7 +40,13 @@ import { IMessageDoc } from "../interfaces/builder/IMessageDoc";
 import { IBoardEntry, IBoardPage, ILevelBonus, ILevelEntry, ILevelLogEntry, ILevelSettings, ITopPost, LevelAdjustMode, LevelPeriod } from "../interfaces/services/levels/ILevels";
 import { ILevelDaySum } from "../models/LevelDays";
 import { PeriodDays, PreviousWindow, RankOrder, Trend } from "./levels/Board";
+import { LimitSentence } from "../builder/LimitReply";
+import { settingDef } from "../constants/ModuleSettings";
+import { ModuleValue } from "../utils/moduleFlags";
 import logger from "../utils/logger";
+
+/** Harte Obergrenze für Punkte je Aktion; was der Server darf, kommt aus dem Admin (W-0133). */
+const XP_CAP = settingDef("levels", "maxXpPerAction")?.max ?? 5000;
 import { NewRoleProblem } from "../utils/rolegate";
 import { BlockedAt } from "../utils/security";
 
@@ -146,8 +151,17 @@ export default class LevelService {
             return list.slice(0, MAX_BONUS);
         };
 
-        const min = Int(chat.min, 0, MAX_XP_PER_ACTION, previous.chat.min);
-        const max = Int(chat.max, 0, MAX_XP_PER_ACTION, previous.chat.max);
+        // W-0133: Punkte je Aktion höchstens der Wert aus dem Admin; ein gespeicherter Wert darüber darf bleiben.
+        const xpCap = ModuleValue("levels", "maxXpPerAction", guild.id);
+        const xp = (value: unknown, before: number): number => {
+            const wanted = Int(value, 0, XP_CAP, before);
+
+            if (wanted > xpCap && wanted !== before) throw new LevelError(`Höchstens ${xpCap} Punkte je Aktion. ${LimitSentence("levels", "maxXpPerAction", guild.id)}`);
+
+            return wanted;
+        };
+        const min = xp(chat.min, previous.chat.min);
+        const max = xp(chat.max, previous.chat.max);
         const rewards = (Array.isArray(raw.rewards) ? raw.rewards : [])
             .filter((entry): entry is { level: unknown; roleId: string } => IsRecord(entry) && typeof entry.roleId === "string" && role(entry.roleId))
             .map((entry) => ({ level: Int(entry.level, 1, MAX_LEVEL, 1), roleId: entry.roleId }))
@@ -196,7 +210,7 @@ export default class LevelService {
             },
             voice: {
                 on: typeof voice.on === "boolean" ? voice.on : previous.voice.on,
-                xp: Int(voice.xp, 0, MAX_XP_PER_ACTION, previous.voice.xp),
+                xp: xp(voice.xp, previous.voice.xp),
                 alone: typeof voice.alone === "boolean" ? voice.alone : previous.voice.alone,
                 muted: typeof voice.muted === "boolean" ? voice.muted : previous.voice.muted,
             },
@@ -221,7 +235,7 @@ export default class LevelService {
             boardStyle: previous.boardStyle ?? DefaultBoardStyle(),
             boardDesign: previous.boardDesign ?? null,
             // Plan 37: doppelte Punkte.
-            boosts: raw.boosts === undefined ? (previous.boosts ?? []) : CleanBoosts(raw.boosts, Date.now()),
+            boosts: raw.boosts === undefined ? (previous.boosts ?? []) : CleanBoosts(raw.boosts, Date.now(), { count: ModuleValue("levels", "maxBoosts", guild.id), factor: ModuleValue("levels", "maxBoostFactor", guild.id) }, previous.boosts ?? []),
             boostChannelId: raw.boostChannelId === undefined ? (previous.boostChannelId ?? null) : boostChannel?.isTextBased() ? boostChannel.id : null,
             // Plan 37: Aktivste der Woche und des Monats.
             top: { week: post(top.week, topBefore.week), month: post(top.month, topBefore.month) },

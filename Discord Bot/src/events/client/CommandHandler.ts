@@ -6,6 +6,7 @@ import ComponentV2Builder from "../../builder/ComponentV2Builder";
 import logger from "../../utils/logger";
 import { CommandsAllowed } from "../../utils/invitepass";
 import { NoAccessReply } from "../../utils/servers";
+import { ClosedText, ModuleOpen } from "../../utils/moduleFlags";
 
 export default class CommandHandler extends Event {
     constructor(client: BotClient) {
@@ -61,6 +62,18 @@ export default class CommandHandler extends Event {
             return;
         }
 
+        // W-0131: Im Admin Dashboard global abgeschaltet (oder nur für Beta-Server). Antwort mit dem Hinweis, ohne Ping.
+        if (command.module && !ModuleOpen(command.module, interaction.guildId, interaction.user.id)) {
+            await interaction
+                .reply({
+                    ...new ComponentV2Builder({ accentColor: "Yellow" }).title("⏸️ | Gerade abgeschaltet").separator().text(ClosedText(command.module)).toMessage({ ephemeral: true }),
+                    allowedMentions: { parse: [] },
+                })
+                .catch((error: unknown) => logger.warn(`[CommandHandler] Hinweis zu /${command.name} (Modul aus) nicht gesendet: ${String(error)}`));
+
+            return;
+        }
+
         // W-0064, Punkt 5: Hat auf dem Server niemand Zugang, laufen keine Commands. Developer-Befehle bleiben.
         if (interaction.inCachedGuild() && !command.developerOnly && !(await CommandsAllowed(this.client, interaction.guild, interaction.user.id))) {
             const accessUrl = `${this.client.config.SITE_PUBLIC_URL.replace(/[/]+$/, "")}/preise`;
@@ -110,6 +123,7 @@ export default class CommandHandler extends Event {
     /** W-0120: Nur Entwickler bei Entwickler-Befehlen, Zugang zum Server, dazu die Standardrechte des Befehls. */
     private async MaySuggest(interaction: AutocompleteInteraction, command: Command): Promise<boolean> {
         if (command.developerOnly && !this.client.config.DEV_USER_IDs.includes(interaction.user.id)) return false;
+        if (command.module && !ModuleOpen(command.module, interaction.guildId, interaction.user.id)) return false;
         if (interaction.inCachedGuild() && !command.developerOnly && !(await CommandsAllowed(this.client, interaction.guild, interaction.user.id))) return false;
 
         const needed = command.data.default_member_permissions;

@@ -9,7 +9,7 @@
 
 import { BASE } from "../core/Base.js";
 import { icon } from "../core/Dom.js";
-import { failureText, MAX_UPLOAD_BYTES, megabytes, uploadImage } from "../core/Gallery.js";
+import { failureText, megabytes, uploadImage, uploadLimit } from "../core/Gallery.js";
 import { IMAGE_PLACEHOLDERS } from "../constants/Placeholders.js";
 
 export interface IGalleryFolder {
@@ -285,7 +285,7 @@ function UploadPane(): HTMLElement {
     const hint = document.createElement("p");
 
     hint.className = "hintline";
-    hint.textContent = `Das Bild landet im Album „${CUSTOM_ALBUM}“ deines Servers, wird auf 1920 px verkleinert und als WebP gespeichert. Höchstens ${megabytes(MAX_UPLOAD_BYTES)}.`;
+    hint.textContent = `Das Bild landet im Album „${CUSTOM_ALBUM}“ deines Servers, wird auf 1920 px verkleinert und als WebP gespeichert. Höchstens ${megabytes(uploadLimit())}.`;
 
     const file = document.createElement("input");
 
@@ -478,8 +478,8 @@ async function upload(box: HTMLElement, file: File, status: HTMLElement, drop: H
 
     if (!guildId) return;
 
-    if (file.size > MAX_UPLOAD_BYTES) {
-        status.textContent = `Zu groß: ${megabytes(file.size)}, höchstens ${megabytes(MAX_UPLOAD_BYTES)}.`;
+    if (file.size > uploadLimit()) {
+        status.textContent = `Zu groß: ${megabytes(file.size)}, höchstens ${megabytes(uploadLimit())}.`;
 
         return;
     }

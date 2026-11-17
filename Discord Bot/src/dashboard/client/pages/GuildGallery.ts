@@ -2,7 +2,7 @@
 
 import { icon, need } from "../core/Dom.js";
 import { BASE } from "../core/Base.js";
-import { failureText, MAX_UPLOAD_BYTES, megabytes, uploadImage } from "../core/Gallery.js";
+import { failureText, megabytes, uploadImage, uploadLimit } from "../core/Gallery.js";
 import { clickSound } from "../core/Sound.js";
 import { toast } from "../core/Toast.js";
 
@@ -769,9 +769,9 @@ export function renderGallery(guildId: string, canManage: boolean): void {
 
             // Was die Route ohnehin ablehnt, scheitert sofort auf der Kachel,
             // statt erst Megabytes durchs Netz zu schicken.
-            if (picked.size > MAX_UPLOAD_BYTES) {
+            if (picked.size > uploadLimit()) {
                 entry.phase = "failed";
-                entry.error = `Zu groß: ${megabytes(picked.size)}, höchstens ${megabytes(MAX_UPLOAD_BYTES)}.`;
+                entry.error = `Zu groß: ${megabytes(picked.size)}, höchstens ${megabytes(uploadLimit())}.`;
             } else if (!accepted.includes(picked.type)) {
                 entry.phase = "failed";
                 entry.error = "Nur PNG, JPG, GIF oder WebP.";

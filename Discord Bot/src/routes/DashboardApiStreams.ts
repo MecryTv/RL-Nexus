@@ -2,9 +2,11 @@ import { FastifyReply, FastifyRequest } from "fastify";
 import BotClient from "../client/BotClient";
 import Route from "../structures/Route";
 import { DASHBOARD_PATH } from "../constants/Dashboard";
-import { DefaultMessage, MAX_NOTIFIERS, STREAM_KINDS } from "../constants/Streams";
+import { DefaultMessage, STREAM_KINDS } from "../constants/Streams";
+import { DashboardLimit } from "../builder/LimitReply";
+import { ModuleValue } from "../utils/moduleFlags";
 import { IStreamNotifier, StreamKind, StreamPlatform } from "../interfaces/services/community/ICommunity";
-import { StreamError, TWITCH_MODULE, YOUTUBE_MODULE } from "../services/StreamService";
+import { StreamError, StreamModule, TWITCH_MODULE, YOUTUBE_MODULE } from "../services/StreamService";
 import { WantsJSON } from "../utils/admin";
 import { PersonOf, SearchMembers } from "../utils/dashboard";
 import logger from "../utils/logger";
@@ -60,6 +62,7 @@ export default class DashboardApiStreams extends Route {
 
             return reply.send(await this.Write(access, platform, (request.body ?? {}) as IBody));
         } catch (error) {
+            if (error instanceof StreamError && error.limit) return reply.code(400).send(DashboardLimit(error.limit, access.guild.id, error.message));
             if (error instanceof StreamError || error instanceof LogTargetError) return reply.code(400).send({ error: error.message });
 
             throw error;
@@ -98,7 +101,7 @@ export default class DashboardApiStreams extends Route {
 
         return {
             notifiers: notifiers.map((notifier) => this.Out(notifier)),
-            max: MAX_NOTIFIERS,
+            max: ModuleValue(StreamModule(platform), "maxNotifiers", guild.id),
             // Was fehlt, sagt die Seite oben - statt dass still nichts ankommt.
             ready: {
                 twitch: this.client.streamService.twitch.Ready,

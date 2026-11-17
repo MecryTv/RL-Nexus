@@ -1,4 +1,4 @@
-import { randomInt } from "node:crypto";
+import { randomBytes, randomInt } from "node:crypto";
 import { ButtonInteraction, Guild, GuildMember, Message, MessageFlags } from "discord.js";
 import BotClient from "../client/BotClient";
 import { EntryCard, GiveawayCard, InfoCard, MayPing, PING_DENIED, WinnerAnnouncement, WinnerDm } from "../builder/CommunityView";
@@ -8,21 +8,33 @@ import {
     DefaultGiveawaySettings,
     DefaultRequirements,
     GIVEAWAY_ACCENT,
-    MAX_BONUS_ROLES,
     MAX_BONUS_TICKETS,
     MAX_GIVEAWAY_DESCRIPTION,
-    MAX_GIVEAWAY_SECONDS,
     MAX_PRIZE,
-    MAX_SCHEDULE_AHEAD,
-    MAX_WINNERS,
     MIN_GIVEAWAY_SECONDS,
 } from "../constants/Giveaways";
+import { ILimitHit } from "../builder/LimitReply";
+import { settingDef } from "../constants/ModuleSettings";
+import { ModuleValue } from "../utils/moduleFlags";
 import { IGiveaway, IGiveawayBonus, IGiveawayRequirements, IGiveawaySettings, IGiveawayWinner } from "../interfaces/services/community/ICommunity";
 import { NewGiveaway } from "../models/Giveaways";
 import logger from "../utils/logger";
 import { IsLogTarget, WarmLogTarget } from "../utils/logtarget";
 
-export class GiveawayError extends Error {}
+/** limit: W-0133, eine Grenze aus dem Admin ist überschritten. */
+export class GiveawayError extends Error {
+    constructor(
+        message: string,
+        readonly limit?: ILimitHit
+    ) {
+        super(message);
+    }
+}
+
+/** Harte Obergrenze der Slash-Option, der Wert je Server liegt darunter. */
+export const WINNERS_CAP = settingDef("giveaways", "maxWinners")?.max ?? 500;
+/** So lange gilt der Knopf „Mit … starten“. */
+const PARKED_MS = 10 * 60_000;
 
 export const GIVEAWAYS_MODULE = "giveaways";
 /** Die Pseudo-Rolle für Server-Booster bei den Bonus-Losen - Discords Booster-Rolle ist verwaltet und nicht wählbar. */
@@ -118,7 +130,14 @@ export default class GiveawayService {
             bonus.push({ roleId: raw.roleId, tickets: Int(raw.tickets, 1, MAX_BONUS_TICKETS, 1) });
         }
 
-        return bonus.slice(0, MAX_BONUS_ROLES);
+        // W-0133: über der Grenze abgelehnt statt still gekürzt.
+        const max = ModuleValue("giveaways", "maxBonusRoles", guild.id);
+
+        if (bonus.length > max) {
+            throw new GiveawayError(`Höchstens ${max} Bonus-Rollen.`, { module: "giveaways", key: "maxBonusRoles", asked: bonus.length, allowed: max });
+        }
+
+        return bonus;
     }
 
     CleanSettings(guild: Guild, input: unknown): IGiveawaySettings {
@@ -147,11 +166,27 @@ export default class GiveawayService {
         if (!prize) throw new GiveawayError("Was gibt es zu gewinnen? Der Preis fehlt.");
         if (prize.length > MAX_PRIZE) throw new GiveawayError(`Der Preis darf höchstens ${MAX_PRIZE} Zeichen haben.`);
         if (!IsLogTarget(guild.channels.cache.get(channelId))) throw new GiveawayError("Wähle einen Kanal für das Giveaway.");
-        if (!Number.isFinite(startsAt) || startsAt < now - 60_000 || startsAt > now + MAX_SCHEDULE_AHEAD) {
-            throw new GiveawayError("Der Start liegt in der Vergangenheit oder mehr als 90 Tage entfernt.");
+        if (!Number.isFinite(startsAt) || startsAt < now - 60_000) throw new GiveawayError("Der Start liegt in der Vergangenheit.");
+
+        // W-0133: Vorlauf, Laufzeit und Gewinner kommen aus dem Admin, je Server.
+        const ahead = ModuleValue("giveaways", "scheduleDays", guild.id);
+
+        if (startsAt > now + ahead * DAY) {
+            throw new GiveawayError(`Planen geht höchstens ${ahead} Tage im Voraus.`, { module: "giveaways", key: "scheduleDays", asked: Math.ceil((startsAt - now) / DAY), allowed: ahead });
         }
-        if (!Number.isFinite(duration) || duration < MIN_GIVEAWAY_SECONDS || duration > MAX_GIVEAWAY_SECONDS) {
-            throw new GiveawayError("Ein Giveaway läuft mindestens eine Minute und höchstens 60 Tage.");
+        if (!Number.isFinite(duration) || duration < MIN_GIVEAWAY_SECONDS) throw new GiveawayError("Ein Giveaway läuft mindestens eine Minute.");
+
+        const maxDays = ModuleValue("giveaways", "maxDays", guild.id);
+
+        if (duration > maxDays * 86_400) {
+            throw new GiveawayError(`Ein Giveaway läuft auf diesem Server höchstens ${maxDays} Tage.`, { module: "giveaways", key: "maxDays", asked: Math.ceil(duration / 86_400), allowed: maxDays });
+        }
+
+        const winners = Int(input.winners, 1, WINNERS_CAP, 1);
+        const maxWinners = ModuleValue("giveaways", "maxWinners", guild.id);
+
+        if (winners > maxWinners) {
+            throw new GiveawayError(`Ein Giveaway auf diesem Server hat höchstens ${maxWinners} Gewinner.`, { module: "giveaways", key: "maxWinners", asked: winners, allowed: maxWinners });
         }
 
         const image = typeof input.image === "string" && input.image.startsWith("https://") && URL.canParse(input.image) ? input.image.slice(0, 512) : null;
@@ -163,7 +198,7 @@ export default class GiveawayService {
             prize,
             description: typeof input.description === "string" ? input.description.trim().slice(0, MAX_GIVEAWAY_DESCRIPTION) || null : null,
             image,
-            winners: Int(input.winners, 1, MAX_WINNERS, 1),
+            winners,
             hostId,
             status: scheduled ? "scheduled" : "running",
             startsAt: scheduled ? startsAt : now,
@@ -172,6 +207,50 @@ export default class GiveawayService {
             bonus: this.CleanBonus(guild, input.bonus),
             settings: this.CleanSettings(guild, input.settings),
         };
+    }
+
+    private parked = new Map<string, { guildId: string; userId: string; input: Record<string, unknown>; limit: ILimitHit; until: number }>();
+
+    /** W-0133: merkt sich eine Eingabe über der Grenze für den Knopf „Mit … starten“. Gibt das Kennzeichen zurück. */
+    Park(guildId: string, userId: string, input: Record<string, unknown>, limit: ILimitHit): string {
+        const now = Date.now();
+
+        for (const [token, entry] of this.parked) if (entry.until < now) this.parked.delete(token);
+
+        const token = randomBytes(6).toString("hex");
+
+        this.parked.set(token, { guildId, userId, input, limit, until: now + PARKED_MS });
+
+        return token;
+    }
+
+    /** Der Knopf unter der Karte „Höchstens … Gewinner“: mit dem erlaubten Wert starten oder abbrechen. */
+    async LimitChoice(interaction: ButtonInteraction, token: string, cancel: boolean): Promise<void> {
+        const parked = this.parked.get(token);
+
+        if (!parked || parked.until < Date.now() || parked.userId !== interaction.user.id || parked.guildId !== interaction.guildId) {
+            await interaction.reply({ content: "Dieser Knopf gilt nicht mehr. Starte das Giveaway noch einmal mit `/giveaway start`.", flags: MessageFlags.Ephemeral });
+
+            return;
+        }
+
+        this.parked.delete(token);
+
+        if (cancel) return void (await interaction.update({ ...InfoCard("Nicht gestartet.", "#6b7683") }));
+
+        const guild = interaction.guild!;
+        const member = interaction.member instanceof GuildMember ? interaction.member : await guild.members.fetch(interaction.user.id);
+        const input = { ...parked.input, ...(parked.limit.key === "maxWinners" ? { winners: parked.limit.allowed } : { duration: parked.limit.allowed * 86_400 }) };
+
+        try {
+            const giveaway = await this.Create(guild, member, input);
+
+            await interaction.update({ ...InfoCard(`🎉 Giveaway #${giveaway.number} läuft in <#${giveaway.channelId}>, ausgelost wird <t:${Math.floor(giveaway.endsAt / 1000)}:R>.`, GIVEAWAY_ACCENT) });
+        } catch (error) {
+            if (!(error instanceof GiveawayError)) throw error;
+
+            await interaction.update({ ...InfoCard(`❌ ${error.message}`, "#ff4d5e") });
+        }
     }
 
     async Create(guild: Guild, host: GuildMember, input: unknown): Promise<IGiveaway> {
@@ -277,7 +356,7 @@ export default class GiveawayService {
             if (written < requirements.messages) missing.push(`Du brauchst ${requirements.messages} Nachrichten in den letzten 14 Tagen, bisher sind es ${written}.`);
         }
 
-        if (requirements.linked && !(await this.client.accounts.On(member.id, "epic").catch(() => null))) {
+        if (requirements.linked && !(await this.client.accounts.Linked(member.id, "epic", "trusted", member.guild.id).catch(() => null))) {
             missing.push("Verknüpfe zuerst dein Rocket-League-Konto im Dashboard unter Einstellungen.");
         }
 

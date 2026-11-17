@@ -22,6 +22,7 @@ import IDashboardActivity, {
     IActivityRanks,
 } from "../interfaces/services/dashboard/IDashboardActivity";
 import { IChannelCount, IHourCount, IMemberCount } from "../models/Activity";
+import { LinkUsable } from "../models/PlayerAccount";
 import logger from "../utils/logger";
 
 interface IVoiceSession {
@@ -438,6 +439,8 @@ export default class ActivityService {
 
         for (const row of await this.client.accounts.Where({ platform: "epic" })) {
             if (!guild.members.cache.has(row.user_id) || seen.has(row.account_id)) continue;
+            // W-0131/W-0133: Per Name verbunden zählt nur, wo die Art des Servers es für die Karte erlaubt.
+            if (!LinkUsable(row, "card", guild.id)) continue;
 
             seen.add(row.account_id);
             linked.push(row.user_id);

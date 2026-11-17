@@ -640,7 +640,7 @@ const PRIVACY: readonly ILegalSection[] = [
                         Voice-Zeit auch ohne Anmeldung. Meldest du dich dort mit Discord an, siehst nur du zusätzlich
                         deinen eigenen Platz. Ändert jemand mit dem Recht „Server verwalten“ deine Punkte von Hand,
                         speichert der Bot, wer das wann getan hat, wie viel, deinen Stand davor und danach und den
-                        Grund, gelöscht nach 180 Tagen. Gehörst du in einer Woche oder einem Monat zu den zehn
+                        Grund, gelöscht spätestens nach 180 Tagen. Gehörst du in einer Woche oder einem Monat zu den zehn
                         Aktivsten, zeigt der Bot dich auf Wunsch des Servers in einem Kanal mit Name, Profilbild,
                         Level, Punkten, Nachrichten und Voice-Zeit. Die ersten drei bekommen auf Wunsch eine Rolle,
                         bis die nächsten drei sie bekommen.

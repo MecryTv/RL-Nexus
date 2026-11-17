@@ -2,7 +2,8 @@ import BotClient from "../client/BotClient";
 import Runnable from "../structures/Runnable";
 import TaskTypes from "../enums/TaskTypes";
 import logger from "../utils/logger";
-import { LEVEL_DAYS_KEEP, LEVEL_LOG_KEEP_DAYS, Today } from "../constants/Levels";
+import { LEVEL_DAYS_KEEP, Today } from "../constants/Levels";
+import { ModuleValue } from "../utils/moduleFlags";
 import { LOG_KEEP_DAYS } from "../constants/StaffGrant";
 
 export default class ActivityPrune extends Runnable {
@@ -21,7 +22,7 @@ export default class ActivityPrune extends Runnable {
         const removed =
             (await this.client.activityService.Prune()) +
             (await this.client.levelDays.Prune(Today() - LEVEL_DAYS_KEEP)) +
-            (await this.client.levelLog.Prune(Date.now() - LEVEL_LOG_KEEP_DAYS * 86_400_000)) +
+            (await this.client.levelLog.Prune(Date.now() - ModuleValue("levels", "logKeepDays", null) * 86_400_000)) +
             // W-0041 M11: abgeschlossene Ladeaufträge der Backups nach 30 Tagen.
             (await this.client.serverRestores.Prune(Date.now() - 30 * 86_400_000)) +
             // W-0011: Staff-Freigaben und ihr Protokoll.

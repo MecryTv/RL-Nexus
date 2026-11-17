@@ -43,7 +43,7 @@ export async function TeamRoles(client: BotClient, guildId: string): Promise<str
 /** Wie die Seite Moderatoren im Dashboard: nur die Rollen ändern, einzelne User bleiben. */
 export async function SaveModerators(client: BotClient, guild: Guild, roles: unknown): Promise<void> {
     const before = (await client.settings.Of(guild.id)).moderators;
-    const after = client.ticketService.CleanModerators(guild, { users: before.users, roles });
+    const after = client.ticketService.CleanModerators(guild, { users: before.users, roles }, before);
 
     await client.settings.SaveModerators(guild.id, after);
     void client.ticketService.SyncModerators(guild, before, after);

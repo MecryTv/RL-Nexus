@@ -6,6 +6,7 @@ import { IPrimeProfile } from "../interfaces/services/prime/IPrimeService";
 import { IRankRoleChange, IRankRoleResult, IRankRoleSettings, Playlist } from "../interfaces/services/rankroles/IRankRoles";
 import logger from "../utils/logger";
 import { NewRoleProblem } from "../utils/rolegate";
+import { LinkUsable } from "../models/PlayerAccount";
 
 export class RankRoleError extends Error {}
 
@@ -23,6 +24,9 @@ function IsRecord(value: unknown): value is Record<string, unknown> {
  * eingibt. Der Epic-Name kommt aus dem verknüpften Konto, die Ränge aus Prime.
  * Siehe docs/RankRoles.md.
  */
+/** W-0131: per Name verbunden, und die Art des Servers gibt dafür keine Rang-Rollen. */
+export const LOGIN_ONLY = "Rang-Rollen gibt es nur mit Epic-Anmeldung: **/rank link** ohne Namen.";
+
 export default class RankRoleService {
     private readonly client: BotClient;
 
@@ -159,9 +163,12 @@ export default class RankRoleService {
         if (!this.client.primeService.IsConfigured) throw new RankRoleError("Das Rang-Tracking ist auf diesem Bot nicht eingerichtet.");
         if (!this.client.databaseService.Ready) throw new RankRoleError("Ohne Datenbank weiß ich nicht, welches Epic-Konto dir gehört.");
 
-        const account = await this.client.accounts.On(member.id, "epic");
+        const raw = await this.client.accounts.On(member.id, "epic");
+        // W-0131: Per Name verbunden zählt für Rollen nur bei der Art „Nur Epic-Name“.
+        const account = raw && LinkUsable(raw, "trusted", member.guild.id) ? raw : null;
         const epicName = account?.display_name?.trim();
 
+        if (raw && !account) throw new RankRoleError(LOGIN_ONLY);
         if (!account || !epicName) throw new RankRoleError("Verbinde erst dein Epic-Konto: **/rank link**.");
 
         // W-0125: über die Konto-ID, nicht den Namen. Ein alter Name kann inzwischen einem anderen Spieler gehören.
@@ -243,7 +250,8 @@ export default class RankRoleService {
         let removed = 0;
 
         for (const guild of this.client.guilds.cache.values()) {
-            if (!(await this.client.settings.Of(guild.id)).modules.includes(RANK_ROLES_MODULE)) continue;
+            // Aufräumen geht über die gespeicherte Auswahl, auch wenn Rank Roles im Admin gerade global aus ist (Review W-0131).
+            if (!(await this.client.settings.RawModules(guild.id)).includes(RANK_ROLES_MODULE)) continue;
 
             const member = guild.members.cache.get(userId) ?? (await guild.members.fetch(userId).catch(() => null));
 
@@ -282,13 +290,33 @@ export default class RankRoleService {
 
         if (done.length > 0) return;
 
+        const { roles, members, intent } = await this.StripUnverified();
+
+        await this.client.databaseService.Query(`INSERT INTO ${MIGRATIONS_TABLE} (name) VALUES (?)`, [STRIP_UNVERIFIED]);
+
+        logger.user(
+            `🎖️  Rank Roles: ${roles} Rolle(n) bei ${members} Mitglied(ern) ohne bestätigtes Epic-Konto entfernt` +
+                (intent ? "" : " - ohne Members-Intent nur bei Mitgliedern, die der Bot schon kannte")
+        );
+    }
+
+    /**
+     * W-0131: Rang-Rollen von allen Mitgliedern, deren Epic-Verknüpfung für
+     * Rollen nicht zählt (keine, oder per Name bei einer strengeren Art).
+     * Ohne Merker - StripUnverifiedOnce und der Wechsel der Verknüpfungsart
+     * (utils/linkModeWatch.ts) rufen es auf. W-0133: mit guildId nur dieser
+     * Server; ob eine Verknüpfung zählt, entscheidet die Art des Servers.
+     */
+    async StripUnverified(guildId?: string): Promise<{ roles: number; members: number; intent: boolean }> {
         const intent = this.client.config.GUILD_MEMBER_INTENT === true;
         let members = 0;
         let roles = 0;
 
         for (const guild of this.client.guilds.cache.values()) {
+            if (guildId && guild.id !== guildId) continue;
             if (this.client.developerMode && guild.id !== this.client.config.DEV_GUILD_ID) continue;
-            if (!(await this.client.settings.Of(guild.id)).modules.includes(RANK_ROLES_MODULE)) continue;
+            // Aufräumen geht über die gespeicherte Auswahl, auch wenn Rank Roles im Admin gerade global aus ist (Review W-0131).
+            if (!(await this.client.settings.RawModules(guild.id)).includes(RANK_ROLES_MODULE)) continue;
 
             const managed = [...this.Managed(await this.Settings(guild.id))];
 
@@ -303,7 +331,7 @@ export default class RankRoleService {
             }
 
             for (const member of holders.values()) {
-                if (await this.client.accounts.On(member.id, "epic")) continue;
+                if (await this.client.accounts.Linked(member.id, "epic", "trusted", guild.id)) continue;
 
                 const drop = managed.filter((id) => member.roles.cache.has(id) && !this.Blocked(guild, id));
 
@@ -315,12 +343,7 @@ export default class RankRoleService {
             }
         }
 
-        await this.client.databaseService.Query(`INSERT INTO ${MIGRATIONS_TABLE} (name) VALUES (?)`, [STRIP_UNVERIFIED]);
-
-        logger.user(
-            `🎖️  Rank Roles: ${roles} Rolle(n) bei ${members} Mitglied(ern) ohne bestätigtes Epic-Konto entfernt` +
-                (intent ? "" : " - ohne Members-Intent nur bei Mitgliedern, die der Bot schon kannte")
-        );
+        return { roles, members, intent };
     }
 
     /**
@@ -328,10 +351,12 @@ export default class RankRoleService {
      * über den Mitglieder sie bekommen. Still - null heißt, hier passiert nichts
      * (Modul aus, keine Playlist, kein Konto).
      */
-    async AfterRankMe(member: GuildMember, profile: IPrimeProfile): Promise<IRankRoleResult | null> {
+    async AfterRankMe(member: GuildMember, profile: IPrimeProfile): Promise<IRankRoleResult | { notice: string } | null> {
         if (!(await this.client.settings.Of(member.guild.id)).modules.includes(RANK_ROLES_MODULE)) return null;
 
         return this.Apply(member, profile).catch((error) => {
+            // W-0131-Rest: per Name verbunden - das sagt /rank me der Person, statt still keine Rollen zu geben.
+            if (error instanceof RankRoleError && error.message === LOGIN_ONLY) return { notice: LOGIN_ONLY };
             if (error instanceof RankRoleError) return null;
 
             throw error;

@@ -4,6 +4,7 @@ import BotClient from "../client/BotClient";
 import Route from "../structures/Route";
 import { StaffWrite } from "../utils/managegate";
 import { SessionExpired } from "../services/DashboardService";
+import { ModuleValue } from "../utils/moduleFlags";
 import { TicketError } from "../services/TicketService";
 import { ActionEntries } from "../builder/TicketPanel";
 import { ClearCookie, DASHBOARD_PATH, SESSION_COOKIE } from "../constants/Dashboard";
@@ -126,6 +127,8 @@ export default class DashboardApiTickets extends Route {
 
         return {
             config,
+            // W-0133: offene Tickets je Person höchstens so viele, wie RL Nexus diesem Server erlaubt.
+            limits: { open: ModuleValue("tickets", "maxOpenPerUser", guild.id) },
             // Wo das Panel wirklich steht - null, wenn die Nachricht weg ist.
             panel: await this.client.ticketService.PanelStatus(guild, config),
             // Dazu die Forum-Beiträge: der Log-Kanal darf auch einer davon sein.

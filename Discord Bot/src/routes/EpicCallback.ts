@@ -3,8 +3,10 @@ import { FastifyReply, FastifyRequest } from "fastify";
 import BotClient from "../client/BotClient";
 import Route from "../structures/Route";
 import { ClearCookie, ParseCookies, STATE_LIFETIME } from "../constants/Dashboard";
-import { LINK_COOLDOWN, LINK_COOLDOWN_DEV, LINK_FIX } from "../constants/Database";
+import { LINK_COOLDOWN_DEV } from "../constants/Database";
+import { ModuleValue } from "../utils/moduleFlags";
 import { EpicDonePage, EpicFailPage, IEpicWho } from "../builder/EpicPage";
+import { ClosedText, RankOpen } from "../utils/moduleFlags";
 import { EpicAdopt } from "../utils/epic";
 import { EPIC_PATH, EpicExchange, EpicLinkToken, EpicLinkURL, EpicLoginReady } from "../utils/epicLogin";
 import { SendPage } from "../utils/dashboard";
@@ -63,6 +65,9 @@ export default class EpicCallback extends Route {
             return page(503, EpicFailPage("Nicht eingerichtet", "Das Verbinden über Epic Games ist auf diesem Bot noch nicht eingerichtet.", "Ränge ansehen geht trotzdem: /rank search mit einem Epic-Namen."));
         }
 
+        // W-0131: RL Tracking im Admin Dashboard abgeschaltet - nichts verbinden.
+        if (!RankOpen(token?.place ?? null, token?.userId)) return page(503, EpicFailPage("Gerade abgeschaltet", ClosedText("rl-tracking"), "Versuch es später noch einmal mit /rank link."));
+
         const who: IEpicWho | null = token ? await EpicWho(this.client, token.userId) : null;
         const place = token?.place ?? null;
         // Jede Absage führt mit „Zurück zu Discord“ in den Kanal, in dem /rank link lief.
@@ -92,9 +97,9 @@ export default class EpicCallback extends Route {
         }
 
         const userId = token.userId;
-        const owner = await this.client.accounts.Owner("epic", epic.accountId);
+        const owner = await this.client.accounts.OwnerRow("epic", epic.accountId);
 
-        if (owner && owner !== userId) {
+        if (owner && owner.userId !== userId && owner.verified) {
             logger.warn(`🎮 Epic-Login abgelehnt: ${epic.accountId} gehört schon einem anderen Discord-Konto (Anfrage von ${userId})`);
 
             return page(
@@ -107,9 +112,11 @@ export default class EpicCallback extends Route {
             );
         }
 
-        const windowMs = this.client.developerMode ? LINK_COOLDOWN_DEV : LINK_COOLDOWN;
+        // W-0133: Sperrfrist und Korrektur-Fenster aus dem Admin (für alle).
+        const windowMs = this.client.developerMode ? LINK_COOLDOWN_DEV : ModuleValue("rl-tracking", "switchDays", null) * 86_400_000;
+        const fixMs = ModuleValue("rl-tracking", "fixMinutes", null) * 60_000;
         const current = await this.client.accounts.On(userId, "epic");
-        const cooldown = await this.client.accounts.Cooldown(userId, "epic", windowMs, LINK_FIX);
+        const cooldown = await this.client.accounts.Cooldown(userId, "epic", windowMs, fixMs);
         const swapped = !!current && current.account_id !== epic.accountId;
 
         // In der Zeit seit dem Knopf kann woanders gewechselt worden sein. Dasselbe Konto neu bestätigen geht immer.
@@ -118,6 +125,15 @@ export default class EpicCallback extends Route {
                 409,
                 fail("Wechsel noch gesperrt", `Mit deinem Discord-Konto ist schon ${current.display_name ?? "ein Epic-Konto"} verbunden. Wechseln geht nur alle paar Tage.`, "Wann es wieder geht, sagt dir /rank link in Discord.")
             );
+        }
+
+        // W-0131: Hing das Konto nur per Name an jemand anderem, gehört es jetzt dem, der sich angemeldet hat -
+        // erst hier, nach der eigenen Sperrfrist, damit eine Ablehnung dem anderen nichts wegnimmt (W-0131-Rest).
+        if (owner && owner.userId !== userId && !owner.verified) {
+            logger.warn(`🎮 Epic-Login übernimmt ${epic.accountId}: per Name bei ${owner.userId}, jetzt per Login bei ${userId}`);
+            await this.client.accounts.Unlink(owner.userId, "epic");
+            await this.client.ranks.Clear(owner.userId);
+            void this.client.rankRoleService.Strip(owner.userId).catch(() => 0);
         }
 
         // Korrektur im Fenster nach dem Verbinden: das falsche Konto weicht, die Frist zählt weiter ab dem ersten Verbinden.
@@ -141,7 +157,7 @@ export default class EpicCallback extends Route {
             .map((rank) => ({ mode: /^\dv\d$/.test(rank.key) ? rank.key : rank.label, tier: rank.tier, name: rank.tierName }));
         // Ab hier gilt, was jetzt in der Zeile steht: neu verbunden, korrigiert oder dasselbe Konto bestätigt.
         const changed = current && (!swapped || keepChangedAt) ? new Date(current.changed_at).getTime() : Date.now();
-        const fixUntil = changed + LINK_FIX > Date.now() ? changed + LINK_FIX : null;
+        const fixUntil = changed + fixMs > Date.now() ? changed + fixMs : null;
         // Falsches Konto erwischt: ein frischer Knopf, mit dem Epic neu nach der Anmeldung fragt.
         const swapURL = fixUntil ? `${EpicLinkURL(this.client, userId, Date.now(), true, place)}&go=1` : null;
 

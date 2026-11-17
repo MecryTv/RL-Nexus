@@ -15,6 +15,7 @@ import path from "path";
 import { existsSync } from "fs";
 import { createCanvas, loadImage } from "@napi-rs/canvas";
 import { ChannelType, Collection, Guild, GuildBasedChannel, GuildMember, MessageFlags, PermissionFlagsBits, Role } from "discord.js";
+import { SetFlags } from "../utils/moduleFlags";
 import BotClient from "../client/BotClient";
 import { HubDoc, ChannelsText, LeaguesText, LineupText, PLAYER_FIELDS, PlayerKey, PlayerValues, RoleValues, RosterText, StaffText, HubMessages, IHubMessage, TeamCardView, TeamOwnValues, TeamValues, Formats } from "../builder/TeamView";
 import { BestPeak, CardRank, ITeamCardData, ITeamCardImages, Lines, RenderTeamCard, TeamCardWidth, TeamPlaces } from "../builder/TeamCard";
@@ -736,9 +737,19 @@ function checkClean(client: BotClient): void {
     check("Eine kaputte Adresse auch", refused);
 
     const many = Array.from({ length: MAX_PLAYERS + 5 }, (_, index) => ({ id: `n${index}`, name: `Spieler ${index}`, epicName: "", role: "player", peaks: {} }));
-    const capped = (service as unknown as { CleanPlayers: (input: unknown, previous: ITeamPlayer[]) => ITeamPlayer[] }).CleanPlayers.call(service, many, []);
+    const players = (input: unknown) => (service as unknown as { CleanPlayers: (input: unknown, previous: ITeamPlayer[]) => ITeamPlayer[] }).CleanPlayers.call(service, input, []);
+    let tooMany = false;
 
-    check("Der Kader ist gedeckelt", capped.length === MAX_PLAYERS, String(capped.length));
+    try {
+        players(many);
+    } catch (error) {
+        tooMany = error instanceof TeamError;
+    }
+
+    const capped = players(many.slice(0, MAX_PLAYERS));
+
+    // W-0133: über der Grenze abgelehnt statt still gekürzt.
+    check("Ein Kader über der Grenze wird abgelehnt, bis zur Grenze geht", tooMany && capped.length === MAX_PLAYERS, String(capped.length));
     check("Die nächste Spieler-ID ist frei", !capped.some((player) => player.id === NextPlayerId(capped)));
 }
 
@@ -2217,7 +2228,8 @@ async function checkEpic(): Promise<void> {
     const asked: string[] = [];
     const client = {
         databaseService: { Ready: true },
-        accounts: { On: async (userId: string) => (asked.push(userId), { display_name: `epic-${userId.slice(-2)}` }) },
+        // W-0131: Der Kader liest über Linked (per Login verbunden zählt immer).
+        accounts: { Linked: async (userId: string) => (asked.push(userId), { display_name: `epic-${userId.slice(-2)}`, verified: 1 }) },
     } as unknown as BotClient;
     const guild = Object.assign(FakeGuild(), {
         members: {
@@ -2239,6 +2251,58 @@ async function checkEpic(): Promise<void> {
     check("Mitglied, das erst geholt wird: der Epic-Name", (await epic(FETCHED)).epicName === "epic-71");
 }
 
+/** W-0133: Grenzen aus dem Admin. Gesenkt heißt: Bestehendes bleibt, nur Neues geht nicht. */
+async function checkLimits(client: BotClient): Promise<void> {
+    console.log("\n  — Grenzen aus dem Admin (W-0133) —");
+
+    const service = client.teamService;
+    const guild = FakeGuild();
+    const over = (values: Record<string, number>) => SetFlags([], [], [], [{ module: "teams", guildId: guild.id, status: null, notice: null, linkMode: null, values, updatedAt: null }]);
+    const refused = async (run: () => unknown): Promise<string> => {
+        try {
+            await run();
+
+            return "";
+        } catch (error) {
+            return error instanceof TeamError ? error.message : `kein TeamError: ${String(error)}`;
+        }
+    };
+
+    over({ maxTeams: 30 });
+    const order = service.CleanOrder({ pinned: Array.from({ length: 40 }, (_, index) => index + 1) }, undefined);
+    check("40 Teams, Grenze 30: Reihenfolge speichern behält alle 40 (Review Focus 1)", order.pinned.length === 40, String(order.pinned.length));
+
+    const forty = Array.from({ length: 40 }, (_, index) => FakeTeam([], { id: index + 1 }));
+    const fake = Object.create(service) as typeof service & Record<string, unknown>;
+
+    fake.Teams = (async () => forty) as never;
+    fake.Settings = (async () => ({})) as never;
+    const newTeam = await refused(() => fake.CreateTeam(guild, { name: "Neu" }, { id: "1" } as never));
+    check("Neues Team über der Grenze: abgelehnt mit „legt RL Nexus fest“", newTeam.includes("30") && newTeam.includes("RL Nexus"), newTeam);
+
+    over({ maxPlayers: 10 });
+    const clean = (input: unknown, previous: ITeamPlayer[]) =>
+        (service as unknown as { CleanPlayers: (input: unknown, previous: ITeamPlayer[], guildId: string) => ITeamPlayer[] }).CleanPlayers.call(service, input, previous, guild.id);
+    const twelve = Array.from({ length: 12 }, (_, index) => Player(`p${index + 1}`, "player", null, null));
+    const asInput = (players: ITeamPlayer[]) => players.map((player) => ({ id: player.id, name: `Spieler ${player.id}`, epicName: `epic-${player.id}`, role: player.role, peaks: {} }));
+
+    check("Kader mit 12, Grenze 10: unverändert speichern geht", clean(asInput(twelve), twelve).length === 12);
+    check(
+        "Kader mit 12, Grenze 10: Hinzufügen geht nicht",
+        (await refused(() => clean([...asInput(twelve), { id: "p13", name: "Neu", epicName: "epic-p13", role: "player", peaks: {} }], twelve))).includes("10")
+    );
+    check("Kader mit 12, Grenze 10: Kürzen geht", clean(asInput(twelve.slice(0, 11)), twelve).length === 11);
+
+    over({ maxGroups: 2 });
+    check(
+        "Kategorien über der Grenze: so viele wie bisher dürfen bleiben, mehr nicht",
+        ParseCategoryDraft({ categories: [{ id: 1, name: "A" }, { id: 2, name: "B" }, { id: 3, name: "C" }], teams: {} }, 2, 3, guild.id) !== null &&
+            (await refused(() => ParseCategoryDraft({ categories: [{ id: 1, name: "A" }, { id: 2, name: "B" }, { id: -1, name: "C" }], teams: {} }, 2, 2, guild.id))).includes("2")
+    );
+
+    SetFlags([], [], []);
+}
+
 async function main(): Promise<void> {
     console.log("\n🛡️  RL Team-Übersicht\n");
 
@@ -2254,6 +2318,7 @@ async function main(): Promise<void> {
     await checkOrder(client);
     checkView(client);
     checkClean(client);
+    await checkLimits(client);
     checkRoles(client);
     await checkRights(client);
     await checkCardOrder(client);

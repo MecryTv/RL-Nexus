@@ -11,13 +11,17 @@
 process.env.CLIENT_SECRET ||= "check-secret";
 process.env.DEV_CLIENT_SECRET ||= "check-secret";
 
+import { PermissionFlagsBits, PermissionsBitField } from "discord.js";
 import BotClient from "../client/BotClient";
+import { SUPPORT_URL } from "../constants/Help";
 import { DASHBOARD_PATH } from "../constants/Dashboard";
 import { LINK_COOLDOWN, LINK_FIX, Platform } from "../constants/Database";
 import PlayerAccount from "../models/PlayerAccount";
 import { Seal } from "../utils/seal";
 import { DiscordBack, EpicAuthorizeURL, EpicExchange, EpicLinkToken, EpicLinkURL } from "../utils/epicLogin";
 import { EpicAdopt } from "../utils/epic";
+import { SetFlags } from "../utils/moduleFlags";
+import Rank from "../commands/user/Rank";
 import { EpicDonePage, EpicFailPage } from "../builder/EpicPage";
 import EpicCallback from "../routes/EpicCallback";
 import EpicLink, { EPIC_STATE_COOKIE } from "../routes/EpicLink";
@@ -40,6 +44,8 @@ interface IRow {
     account_id: string;
     display_name: string | null;
     changed_at: Date;
+    /** W-0131: 0 = per Name verbunden. Fehlt es, gilt die Zeile als per Login verbunden. */
+    verified?: number;
 }
 
 function Client(rows: IRow[] = [], extra: Record<string, unknown> = {}): BotClient & { calls: string[]; rows: IRow[] } {
@@ -62,9 +68,25 @@ function Client(rows: IRow[] = [], extra: Record<string, unknown> = {}): BotClie
             // Die echte Rechnung aus dem Model, nur ohne Datenbank darunter.
             Cooldown: (userId: string, platform: Platform, windowMs: number, fixMs?: number, now?: number) =>
                 PlayerAccount.prototype.Cooldown.call({ On } as unknown as PlayerAccount, userId, platform, windowMs, fixMs, now),
-            Link: async (userId: string, _platform: string, accountId: string, name: string, _verified?: boolean, changedAt = new Date()) => {
+            Link: async (userId: string, _platform: string, accountId: string, name: string, verified = false, changedAt = new Date()) => {
                 calls.push(`link ${userId} ${accountId} ${name}`);
-                rows.splice(0, rows.length, ...rows.filter((row) => row.user_id !== userId), { user_id: userId, account_id: accountId, display_name: name, changed_at: changedAt });
+                rows.splice(0, rows.length, ...rows.filter((row) => row.user_id !== userId), { user_id: userId, account_id: accountId, display_name: name, changed_at: changedAt, verified: verified ? 1 : 0 });
+            },
+            OwnerRow: async (_platform: string, accountId: string) => {
+                const row = rows.find((entry) => entry.account_id === accountId);
+
+                return row ? { userId: row.user_id, verified: row.verified !== 0 } : null;
+            },
+            SetVerified: async (userId: string) => {
+                calls.push(`verify ${userId}`);
+
+                for (const row of rows) if (row.user_id === userId) row.verified = 1;
+            },
+            Unlink: async (userId: string) => {
+                calls.push(`unlink ${userId}`);
+                rows.splice(0, rows.length, ...rows.filter((row) => row.user_id !== userId));
+
+                return true;
             },
             Rename: async (userId: string, _platform: string, name: string) => {
                 calls.push(`rename ${userId} ${name}`);
@@ -502,6 +524,196 @@ async function checkReview(): Promise<void> {
     check("Erstes Verbinden: nichts abzuräumen", !first.calls.includes("clear") && !first.calls.includes("strip"), first.calls.join(", "));
 }
 
+/** W-0131: RL Tracking im Admin abgeschaltet - die Epic-Seiten sagen es, statt zu Epic zu führen. */
+async function checkClosed(): Promise<void> {
+    console.log("\n  — RL Tracking abgeschaltet (W-0131) —");
+
+    const client = Client();
+    const sealed = TokenOf(EpicLinkURL(client, USER));
+
+    SetFlags([{ module: "rl-tracking", status: "off", notice: "Umbau bis 21 Uhr" }], [], []);
+
+    const page = Reply();
+    await new EpicLink(client).Handle({ query: { t: sealed }, headers: {} } as never, page as never);
+    check("Gültiger Link bei RL Tracking aus: 503 mit Hinweis, kein Weg zu Epic", page.statusCode === 503 && page.body.includes("Gerade abgeschaltet") && page.body.includes("Umbau bis 21 Uhr") && page.location === null && page.headers["set-cookie"] === undefined, `${page.statusCode}`);
+
+    const go = Reply();
+    await new EpicLink(client).Handle({ query: { t: sealed, go: "1" }, headers: { "sec-fetch-site": "same-origin" } } as never, go as never);
+    check("Auch mit go=1 kein Cookie und keine Weiterleitung", go.statusCode === 503 && go.location === null && go.headers["set-cookie"] === undefined, `${go.statusCode} ${go.location}`);
+
+    const back = await Callback(client, { code: "c", state: "n1" }, `n1|${sealed}`);
+    check("Rückweg von Epic bei RL Tracking aus: 503, nichts verbunden", back.statusCode === 503 && back.body.includes("Gerade abgeschaltet") && client.calls.length === 0, `${back.statusCode} ${client.calls.join(", ")}`);
+
+    SetFlags([{ module: "rl-tracking", status: "beta", notice: null }], [USER], []);
+    const beta = Reply();
+    await new EpicLink(client).Handle({ query: { t: sealed }, headers: {} } as never, beta as never);
+    check("Nur Beta und die Person ist Beta-Tester: normale Bestätigung", beta.statusCode === 200 && beta.body.includes("Weiter zu Epic Games"), `${beta.statusCode}`);
+
+    SetFlags([], [], []);
+}
+
+/** W-0131: /rank link per Name je nach Art, und wer sich per Epic anmeldet, übernimmt eine Name-Verknüpfung. */
+function LinkAsk(name: string | null): { replies: Record<string, unknown>[] } & Record<string, unknown> {
+    const replies: Record<string, unknown>[] = [];
+
+    return {
+        replies,
+        options: { getString: (key: string) => (key === "epicname" ? name : null), getSubcommand: () => "link" },
+        user: { id: USER, username: "user-1", globalName: null },
+        guildId: "1162553851187040326",
+        channelId: "1566198775415046234",
+        deferReply: async () => undefined,
+        editReply: async (message: Record<string, unknown>) => void replies.push(message),
+        reply: async (message: Record<string, unknown>) => void replies.push(message),
+    };
+}
+
+async function checkNameLink(): Promise<void> {
+    console.log("\n  — /rank link per Name (W-0131) —");
+
+    const prime = { IsConfigured: true, Profile: async (key: string) => (key === "Nova" ? { name: "Nova", accountId: ACCOUNT, ranks: [] } : null) };
+    const mode = (linkMode: "login" | "name" | "both") => SetFlags([{ module: "rl-tracking", status: "on", notice: null, linkMode }], [], []);
+    const text = (ask: { replies: Record<string, unknown>[] }) => JSON.stringify(ask.replies.at(-1) ?? {});
+    const link = async (client: BotClient, name: string | null) => {
+        const ask = LinkAsk(name);
+
+        await (new Rank(client) as unknown as { Link: (interaction: unknown) => Promise<void> }).Link(ask);
+
+        return ask;
+    };
+
+    mode("name");
+    const byName = Client([], { primeService: prime });
+    const done = await link(byName, "Nova");
+    check("Nur Name: verbunden per Name, unbestätigt", byName.calls.includes(`link ${USER} ${ACCOUNT} Nova`) && byName.rows[0]?.verified === 0 && text(done).includes("verbunden"), `${byName.calls.join(", ")} ${text(done)}`);
+
+    const empty = Client([], { primeService: prime });
+    const asked = await link(empty, null);
+    check("Nur Name ohne Name: fragt danach, verbindet nichts", empty.calls.length === 0 && text(asked).includes("epicname"), text(asked));
+
+    const taken = Client([{ user_id: OTHER, account_id: ACCOUNT, display_name: "Nova", changed_at: new Date(0), verified: 1 }], { primeService: prime });
+    const refused = await link(taken, "Nova");
+    check("Fremdes, schon verbundenes Konto per Name: abgelehnt, nichts geschrieben", !taken.calls.some((call) => call.startsWith("link")) && text(refused).includes("anderen Discord-Konto"), text(refused));
+
+    mode("both");
+    const button = await link(Client([], { primeService: prime }), null);
+    check("Beides ohne Name: Knopf zur Anmeldung", text(button).includes("epicgames") || text(button).includes("link/epic"), text(button).slice(0, 200));
+
+    mode("login");
+    const hint = await link(Client([], { primeService: prime }), "Nova");
+    check("Anmeldung mit Name: Name ignoriert, Hinweis und Knopf", text(hint).includes("nicht nötig") && text(hint).includes("link/epic"), text(hint).slice(0, 200));
+
+    // Login übernimmt, was ein anderer nur per Name verbunden hatte.
+    const okEpic = (): void => void FakeEpic({ body: { access_token: "at", account_id: ACCOUNT } }, { body: [{ accountId: ACCOUNT, displayName: "Nova Lukas" }] });
+    const cookieFor = (client: BotClient): string => `n1|${TokenOf(EpicLinkURL(client, USER))}`;
+    const squatted = Client([{ user_id: OTHER, account_id: ACCOUNT, display_name: "Nova", changed_at: new Date(0), verified: 0 }]);
+
+    okEpic();
+    const taken2 = await Callback(squatted, { code: "c", state: "n1" }, cookieFor(squatted));
+    check(
+        "Echter Besitzer meldet sich an: übernimmt, der andere verliert Konto, Ränge und Rollen",
+        taken2.statusCode === 200 && squatted.calls.includes(`unlink ${OTHER}`) && squatted.calls.includes("clear") && squatted.calls.includes("strip") && squatted.rows.every((row) => row.user_id === USER),
+        `${taken2.statusCode} ${squatted.calls.join(", ")}`
+    );
+
+    // W-0131-Rest: Login eines Kontos, das ein anderer nur per Name hat - aber die eigene Sperrfrist läuft noch.
+    // Dann wird abgelehnt, und dem anderen bleibt seine Verknüpfung.
+    const lockedSwap = Client(
+        [
+            { user_id: OTHER, account_id: ACCOUNT, display_name: "Nova", changed_at: new Date(0), verified: 0 },
+            { user_id: USER, account_id: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", display_name: "Alt", changed_at: new Date(Date.now() - 2 * 3_600_000) },
+        ],
+        { developerMode: false }
+    );
+
+    okEpic();
+    const refusedSwap = await Callback(lockedSwap, { code: "c", state: "n1" }, cookieFor(lockedSwap));
+    check(
+        "Eigene Sperrfrist läuft: abgelehnt, der andere behält seine Verknüpfung",
+        refusedSwap.statusCode === 409 && !lockedSwap.calls.includes(`unlink ${OTHER}`) && lockedSwap.rows.some((row) => row.user_id === OTHER),
+        `${refusedSwap.statusCode} ${lockedSwap.calls.join(", ")}`
+    );
+
+    const same = Client([{ user_id: USER, account_id: ACCOUNT, display_name: "Nova", changed_at: new Date(0), verified: 0 }]);
+
+    okEpic();
+    const confirmed = await Callback(same, { code: "c", state: "n1" }, cookieFor(same));
+    check("Erst Name, dann Login desselben Kontos: jetzt bestätigt", confirmed.statusCode === 200 && same.calls.includes(`verify ${USER}`) && same.rows[0]?.verified === 1, `${confirmed.statusCode} ${same.calls.join(", ")}`);
+
+    // Review: Wechsel per Name im Korrektur-Fenster lässt die Frist laufen, statt sie neu zu starten.
+    mode("name");
+    const tenMinutes = new Date(Date.now() - 10 * 60_000);
+    const hopper = Client([{ user_id: USER, account_id: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", display_name: "Alt", changed_at: tenMinutes, verified: 0 }], { primeService: prime, developerMode: false });
+    await link(hopper, "Nova");
+    check("Per Name im Korrektur-Fenster gewechselt: Frist zählt weiter ab dem ersten Verbinden", hopper.rows[0]?.account_id === ACCOUNT && hopper.rows[0]?.changed_at.getTime() === tenMinutes.getTime(), `${hopper.rows[0]?.changed_at?.toISOString()}`);
+
+    // Review: „derselbe Name“ zählt nur, wenn es dasselbe Konto ist. Ein Name kann inzwischen einem anderen gehören.
+    const twoHours = new Date(Date.now() - 2 * 3_600_000);
+    const renamed = Client([{ user_id: USER, account_id: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", display_name: "Nova", changed_at: twoHours, verified: 0 }], { primeService: prime, developerMode: false });
+    const locked = await link(renamed, "Nova");
+    check("Gleicher Name, anderes Konto, Sperrfrist läuft: abgelehnt", !renamed.calls.some((call) => call.startsWith("link")) && text(locked).includes("Tage"), text(locked));
+
+    // Review: Bei „Beides“ zeigt /rank me eine Name-Verknüpfung ohne Discord-Namen und Bild.
+    mode("both");
+    const shown: (string | null)[] = [];
+    const me = new Rank(
+        Client([{ user_id: USER, account_id: ACCOUNT, display_name: "Nova", changed_at: new Date(0), verified: 0 }], {
+            primeService: { IsConfigured: true, Profile: async () => ({ name: "Nova", accountId: ACCOUNT, ranks: [] }) },
+            accounts: { Linked: async () => ({ user_id: USER, account_id: ACCOUNT, display_name: "Nova", verified: 0 }) },
+        })
+    ) as unknown as Record<string, unknown> & { Me: (interaction: unknown) => Promise<void> };
+
+    me.Send = async (_interaction: unknown, _profile: unknown, name: string | null, avatar: string | null) => void shown.push(name, avatar);
+    await me.Me({ ...LinkAsk(null), user: { id: USER, username: "user-1", displayAvatarURL: () => "https://cdn.discordapp.com/a.png" }, inCachedGuild: () => false });
+    check("Beides, per Name verbunden: Karte ohne Discord-Namen und Bild", shown.length === 2 && shown[0] === null && shown[1] === null, JSON.stringify(shown));
+
+    // W-0133: Sperrfrist und Korrektur-Fenster kommen aus dem Admin (Wert für alle).
+    SetFlags([{ module: "rl-tracking", status: "on", notice: null, linkMode: "login", values: { switchDays: 1, fixMinutes: 30 } }], [], []);
+    const windows: number[] = [];
+    const timed = Client([], { primeService: prime, developerMode: false });
+    const realCooldown = timed.accounts.Cooldown.bind(timed.accounts);
+
+    (timed.accounts as unknown as Record<string, unknown>).Cooldown = (userId: string, platform: Platform, windowMs: number, fixMs?: number) => {
+        windows.push(windowMs, fixMs ?? -1);
+
+        return realCooldown(userId, platform, windowMs, fixMs);
+    };
+    await link(timed, null);
+    check("Sperrfrist 1 Tag und Korrektur 30 Minuten aus dem Admin", windows[0] === 86_400_000 && windows[1] === 1_800_000, windows.join(","));
+    SetFlags([], [], []);
+
+    // W-0133, Entwurf M: /rank link als Karte; den Anfrage-Knopf sehen nur Server-Admins.
+    SetFlags([], [], []);
+    const memberCard = await link(Client([], { primeService: prime }), null);
+    check(
+        "/rank link als Karte: Titel und Login-Knopf, für Mitglieder ohne Anfrage-Knopf und Server-ID",
+        text(memberCard).includes("Epic-Konto verbinden") && text(memberCard).includes("link/epic") && !text(memberCard).includes(SUPPORT_URL) && !text(memberCard).includes("1162553851187040326"),
+        text(memberCard).slice(0, 300)
+    );
+
+    const adminAsk = { ...LinkAsk(null), member: { permissions: new PermissionsBitField(PermissionFlagsBits.ManageGuild) } };
+    await (new Rank(Client([], { primeService: prime })) as unknown as { Link: (interaction: unknown) => Promise<void> }).Link(adminAsk);
+    check("/rank link für Server-Admins: Anfrage-Knopf und Server-ID", text(adminAsk).includes(SUPPORT_URL) && text(adminAsk).includes("1162553851187040326"), text(adminAsk).slice(0, 300));
+
+    // W-0133: Art je Server. Der Testserver weicht von der Art für alle ab.
+    const guildMode = (global: "login" | "name" | "both", own: "login" | "name" | "both") =>
+        SetFlags([{ module: "rl-tracking", status: "on", notice: null, linkMode: global }], [], [], [
+            { module: "rl-tracking", guildId: "1162553851187040326", status: null, notice: null, linkMode: own, values: {}, updatedAt: null },
+        ]);
+
+    guildMode("login", "name");
+    const ownName = Client([], { primeService: prime });
+    await link(ownName, "Nova");
+    check("Server mit „Nur Name“, für alle Anmeldung: verbindet per Name", ownName.calls.includes(`link ${USER} ${ACCOUNT} Nova`), ownName.calls.join(", "));
+
+    guildMode("name", "login");
+    const ownLogin = Client([], { primeService: prime });
+    const loginOnly = await link(ownLogin, "Nova");
+    check("Server mit Anmeldung, für alle Nur Name: Knopf statt Verbinden", !ownLogin.calls.some((call) => call.startsWith("link")) && text(loginOnly).includes("link/epic"), text(loginOnly).slice(0, 200));
+
+    SetFlags([], [], []);
+}
+
 async function main(): Promise<void> {
     const original = globalThis.fetch;
 
@@ -514,6 +726,8 @@ async function main(): Promise<void> {
         await checkSwap();
         await checkBack();
         await checkReview();
+        await checkClosed();
+        await checkNameLink();
     } finally {
         globalThis.fetch = original;
     }

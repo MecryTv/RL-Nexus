@@ -26,6 +26,7 @@ import { publicShopRoutes } from "./routes/shop-public.ts";
 import { internalBackupRoutes } from "./routes/internal-backups.ts";
 import { backupRoutes } from "./routes/backups.ts";
 import { betaRoutes, internalBetaRoutes } from "./routes/beta.ts";
+import { moduleRoutes } from "./routes/modules.ts";
 import { searchRoutes } from "./routes/search.ts";
 import { userdataRoutes } from "./routes/userdata.ts";
 import { internalUserdataRoutes } from "./routes/internal-userdata.ts";
@@ -103,6 +104,7 @@ export async function buildApp(config: IConfig): Promise<FastifyInstance> {
         await api.register(shopCustomerRoutes, { config });
         await api.register(backupRoutes, { config });
         await api.register(betaRoutes, { config });
+        await api.register(moduleRoutes, { config });
         await api.register(searchRoutes, { config });
         await api.register(userdataRoutes, { config });
         await api.register(serverRoutes, { config });

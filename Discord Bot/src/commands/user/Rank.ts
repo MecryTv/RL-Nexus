@@ -1,26 +1,33 @@
-import {
-    ActionRowBuilder,
-    ButtonBuilder,
-    ButtonStyle,
-    ChatInputCommandInteraction,
-    MessageFlags,
-    SlashCommandBuilder,
-} from "discord.js";
+import { ChatInputCommandInteraction, MessageFlags, SlashCommandBuilder } from "discord.js";
 import BotClient from "../../client/BotClient";
 import Command from "../../structures/Command";
 import Category from "../../enums/Category";
 import { IPrimeProfile } from "../../interfaces/services/prime/IPrimeService";
 import { RankMessage } from "../../builder/RankView";
-import { LINK_COOLDOWN, LINK_COOLDOWN_DAYS, LINK_COOLDOWN_DEV, LINK_FIX } from "../../constants/Database";
+import { LINK_COOLDOWN_DEV } from "../../constants/Database";
 import { PrimeError } from "../../services/PrimeService";
-import { EPIC_LINK_MINUTES, EpicLinkURL, EpicLoginReady } from "../../utils/epicLogin";
+import { EpicLinkURL, EpicLoginReady } from "../../utils/epicLogin";
+import { EpicAdopt } from "../../utils/epic";
+import { CurrentLinkMode, ModuleValue } from "../../utils/moduleFlags";
+import { AskLine, IsServerAdmin } from "../../builder/LimitReply";
+import ComponentV2Builder from "../../builder/ComponentV2Builder";
+import { LinkUsable } from "../../models/PlayerAccount";
 import logger from "../../utils/logger";
 
 const MAX_NAME = 64;
 
 /** Im Entwicklungsmodus zehn Sekunden statt der vollen Frist - sonst nicht testbar. */
+/** W-0133: Sperrfrist und Korrektur-Fenster kommen aus dem Admin (für alle). */
+function switchDays(): number {
+    return ModuleValue("rl-tracking", "switchDays", null);
+}
+
+function fixMs(): number {
+    return ModuleValue("rl-tracking", "fixMinutes", null) * 60_000;
+}
+
 function cooldownOf(client: BotClient): number {
-    return client.developerMode ? LINK_COOLDOWN_DEV : LINK_COOLDOWN;
+    return client.developerMode ? LINK_COOLDOWN_DEV : switchDays() * 86_400_000;
 }
 
 /** "in 12 Tagen", "in 3 Stunden" - grob reicht, es geht um die Größenordnung. */
@@ -66,11 +73,19 @@ export default class Rank extends Command {
         this.data = new SlashCommandBuilder()
             .setName(this.name)
             .setDescription(this.description)
-            .addSubcommand((sub) => sub.setName("link").setDescription("Verbindet dein Epic-Konto über die Anmeldung bei Epic Games"))
+            .addSubcommand((sub) =>
+                sub
+                    .setName("link")
+                    .setDescription("Verbindet dein Epic-Konto mit Discord")
+                    // W-0131: Ob der Name zählt, stellt das Admin Dashboard ein (Bot → Module → RL Tracking).
+                    .addStringOption((option) =>
+                        option.setName("epicname").setDescription("Dein Epic-Name, falls Verbinden per Name erlaubt ist").setRequired(false).setMaxLength(MAX_NAME)
+                    )
+            )
             .addSubcommand((sub) =>
                 sub
                     .setName("unlink")
-                    .setDescription(`Trennt dein Epic-Konto wieder, frühestens ${LINK_COOLDOWN_DAYS} Tage nach dem Verbinden`)
+                    .setDescription("Trennt dein Epic-Konto wieder, frühestens nach der Sperrfrist")
             )
             .addSubcommand((sub) => sub.setName("me").setDescription("Zeigt deine eigenen Ränge"))
             .addSubcommand((sub) =>
@@ -167,6 +182,20 @@ export default class Rank extends Command {
      * passiert, steht in routes/EpicCallback.ts.
      */
     private async Link(interaction: ChatInputCommandInteraction): Promise<void> {
+        // W-0131: Die Verknüpfungsart kommt aus dem Admin Dashboard.
+        const typed = (interaction.options.getString("epicname") ?? "").trim();
+        const mode = CurrentLinkMode(interaction.guildId);
+
+        if (mode === "name" && !typed) {
+            await interaction.reply({ content: "Gib deinen Epic-Namen an: `/rank link epicname:<Name>`, genau wie im Spiel geschrieben.", flags: MessageFlags.Ephemeral });
+
+            return;
+        }
+
+        if (typed && mode !== "login") return this.LinkByName(interaction, typed, mode === "both");
+
+        const ignored = typed ? "Der Name ist nicht nötig, die Anmeldung läuft über Epic.\n" : "";
+
         if (!EpicLoginReady(this.client)) {
             await interaction.reply({
                 content: "Das Verbinden über Epic Games ist auf diesem Bot noch nicht eingerichtet. Ränge ansehen geht trotzdem mit `/rank search`.",
@@ -190,7 +219,7 @@ export default class Rank extends Command {
 
         const userId = interaction.user.id;
         const current = await this.client.accounts.On(userId, "epic");
-        const cooldown = await this.client.accounts.Cooldown(userId, "epic", cooldownOf(this.client), LINK_FIX);
+        const cooldown = await this.client.accounts.Cooldown(userId, "epic", cooldownOf(this.client), fixMs());
 
         // Neu verbinden mit demselben Konto ginge zwar auch in der Frist, aber das
         // ändert nichts. Gesperrt wird hier, damit niemand umsonst zu Epic läuft.
@@ -198,7 +227,7 @@ export default class Rank extends Command {
             await interaction.editReply({
                 content:
                     `Verbunden ist **${current.display_name ?? current.account_id}**. ` +
-                    `Wechseln geht nur alle ${LINK_COOLDOWN_DAYS} Tage, wieder möglich in **${waitLabel(cooldown.waitMs)}**.`,
+                    `Wechseln geht nur alle ${switchDays()} Tage, wieder möglich in **${waitLabel(cooldown.waitMs)}**.`,
             });
 
             return;
@@ -206,26 +235,92 @@ export default class Rank extends Command {
 
         // Ist schon ein Konto verbunden, soll es ein anderes werden: Epic fragt dann neu
         // nach der Anmeldung, statt still das schon angemeldete (falsche) Konto zu nehmen.
-        const button = new ButtonBuilder()
-            .setStyle(ButtonStyle.Link)
-            .setLabel(current ? "Anderes Epic-Konto verbinden" : "Mit Epic Games anmelden")
-            .setEmoji("🔐")
-            // Der Kanal geht mit: „Zurück zu Discord“ auf der Seite danach führt genau hierher.
-            .setURL(EpicLinkURL(this.client, userId, Date.now(), !!current, `${interaction.guildId ?? "@me"}/${interaction.channelId}`));
+        // Der Kanal geht mit: „Zurück zu Discord“ auf der Seite danach führt genau hierher.
+        const url = EpicLinkURL(this.client, userId, Date.now(), !!current, `${interaction.guildId ?? "@me"}/${interaction.channelId}`);
 
         const name = current ? `**${current.display_name ?? current.account_id}**` : "";
         const intro = !current
-            ? ""
+            ? "Melde dich bei Epic Games an. Danach gehört dein Epic-Konto zu diesem Discord-Konto, und niemand sonst kann es verbinden."
             : cooldown.fixUntil
-              ? `Verbunden ist gerade ${name}. Falsches Konto? Bis <t:${Math.floor(cooldown.fixUntil / 1000)}:t> kannst du ohne Wartezeit ein anderes verbinden, Epic fragt dafür neu nach der Anmeldung.\n`
-              : `Verbunden ist gerade ${name}. Mit dem Knopf verbindest du ein anderes Epic-Konto, Epic fragt dafür neu nach der Anmeldung.\n`;
+              ? `Verbunden ist gerade ${name}. Falsches Konto? Bis <t:${Math.floor(cooldown.fixUntil / 1000)}:t> kannst du ohne Wartezeit ein anderes verbinden, Epic fragt dafür neu nach der Anmeldung.`
+              : `Verbunden ist gerade ${name}. Mit dem Knopf verbindest du ein anderes Epic-Konto, Epic fragt dafür neu nach der Anmeldung.`;
+
+        // W-0133, Entwurf M: Karte mit Titel und Knopf, darunter klein Gültigkeit und die Art.
+        const card = new ComponentV2Builder({ accentColor: 0xff1e2d })
+            .text("### 🔗 Epic-Konto verbinden")
+            .text(ignored + intro)
+            .buttons({ url, label: current ? "Anderes Epic-Konto verbinden" : "Mit Epic Games anmelden", emoji: "🔐" })
+            .separator()
+            .subtext(`Der Knopf gilt ${ModuleValue("rl-tracking", "linkMinutes", null)} Minuten und nur für dich. Gib ihn nicht weiter.`);
+
+        if (interaction.guildId) {
+            const ask = AskLine({ module: "rl-tracking", key: "linkMode", guildId: interaction.guildId, admin: IsServerAdmin(interaction.member) });
+
+            card.subtext(ask.text);
+            if (ask.button) card.buttons(ask.button);
+        }
+
+        await interaction.editReply({ components: [card.build()], flags: MessageFlags.IsComponentsV2, allowedMentions: { parse: [] } });
+    }
+
+    /**
+     * W-0131: Verbinden per Name, wie vor W-0125 - nur wenn das Admin Dashboard
+     * es erlaubt (Nur Epic-Name oder Beides). Die Verknüpfung ist unbestätigt
+     * (verified 0): bei Beides gibt es dafür keine Rang-Rollen, und wer sich
+     * später per Epic anmeldet, übernimmt das Konto (routes/EpicCallback.ts).
+     */
+    private async LinkByName(interaction: ChatInputCommandInteraction, name: string, both: boolean): Promise<void> {
+        if (!this.client.databaseService.Ready) {
+            await interaction.reply({ content: "Ohne Datenbank lässt sich nichts verknüpfen, denn die Verknüpfung steht dort.", flags: MessageFlags.Ephemeral });
+
+            return;
+        }
+
+        // Nur der Nutzer selbst soll sehen, welches Konto er verbindet.
+        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+        const userId = interaction.user.id;
+        const current = await this.client.accounts.On(userId, "epic");
+        const cooldown = await this.client.accounts.Cooldown(userId, "epic", cooldownOf(this.client), fixMs());
+
+        // Erst prüfen, dann verknüpfen: einen Namen, den es nicht gibt, speichert der Bot gar nicht erst.
+        const profile = await this.Fetch(interaction, name);
+
+        if (!profile) return;
+
+        // Dasselbe Konto noch einmal ist keine Änderung - das darf die Sperre nicht treffen.
+        // Verglichen wird die Konto-ID: Ein Name kann inzwischen einem anderen Spieler gehören (Review W-0131).
+        const same = current?.account_id === profile.accountId;
+
+        if (!cooldown.open && !same) {
+            await interaction.editReply({ content: `Dein Epic-Konto lässt sich nur alle ${switchDays()} Tage wechseln. Wieder möglich in **${waitLabel(cooldown.waitMs)}**.` });
+
+            return;
+        }
+
+        // Korrektur im Fenster nach dem Verbinden: die Frist zählt weiter ab dem ersten Verbinden, wie beim Login.
+        const keepChangedAt = current && !same && cooldown.fixUntil !== null ? new Date(current.changed_at) : undefined;
+
+        const owner = await this.client.accounts.Owner("epic", profile.accountId);
+        const taken = "Dieses Epic-Konto ist schon mit einem anderen Discord-Konto verbunden. Ein Epic-Konto gehört genau einem Discord-Konto.";
+
+        if (owner && owner !== userId) return void (await interaction.editReply({ content: taken }));
+
+        try {
+            await EpicAdopt(this.client, userId, { accountId: profile.accountId, displayName: profile.name }, keepChangedAt, false);
+        } catch (error) {
+            if ((error as { code?: string } | null)?.code !== "ER_DUP_ENTRY") throw error;
+
+            return void (await interaction.editReply({ content: taken }));
+        }
+
+        logger.user(`🎮 Epic verknüpft (Name): ${userId} → ${profile.name} (${profile.accountId})`);
 
         await interaction.editReply({
             content:
-                intro +
-                (current ? "" : "Melde dich mit dem Knopf bei Epic Games an. Danach gehört dein Epic-Konto zu diesem Discord-Konto, und niemand sonst kann es verbinden.\n") +
-                `-# Der Knopf gilt ${EPIC_LINK_MINUTES} Minuten und nur für dich. Gib ihn nicht weiter.`,
-            components: [new ActionRowBuilder<ButtonBuilder>().addComponents(button)],
+                `**${profile.name}** ist jetzt mit deinem Discord-Konto verbunden. Mit \`/rank me\` siehst du deine Karte.` +
+                (both ? "\nRang-Rollen gibt es erst mit Epic-Anmeldung: `/rank link` ohne Namen." : "") +
+                (same || !current ? "" : `\nEin Wechsel ist erst in ${switchDays()} Tagen wieder möglich.`),
         });
     }
 
@@ -302,7 +397,7 @@ export default class Rank extends Command {
             return;
         }
 
-        const account = await this.client.accounts.On(interaction.user.id, "epic");
+        const account = await this.client.accounts.Linked(interaction.user.id, "epic", "card", interaction.guildId);
 
         if (!account) {
             await interaction.reply({
@@ -321,17 +416,26 @@ export default class Rank extends Command {
 
         if (!profile) return;
 
+        // W-0131 (Review): Per Name verbunden zeigt die Karte niemanden als Besitzer, außer bei „Nur Epic-Name“.
+        const owner = LinkUsable(account, "trusted", interaction.guildId);
+
         await this.Send(
             interaction,
             profile,
-            interaction.user.username,
-            interaction.user.displayAvatarURL({ extension: "png", size: 256 })
+            owner ? interaction.user.username : null,
+            owner ? interaction.user.displayAvatarURL({ extension: "png", size: 256 }) : null
         );
 
         // Mit Rank Roles: die Rang-Rollen zum eben gezeigten Rang. Neu dazu sieht nur, wer fragt.
         if (!interaction.inCachedGuild()) return;
 
         const result = await this.client.rankRoleService.AfterRankMe(interaction.member, profile).catch(() => null);
+
+        if (result && "notice" in result) {
+            await interaction.followUp({ content: `🎖️ ${result.notice}`, flags: MessageFlags.Ephemeral, allowedMentions: { parse: [] } }).catch(() => undefined);
+
+            return;
+        }
 
         if (result?.added.length) {
             await interaction
@@ -361,7 +465,7 @@ export default class Rank extends Command {
         // Steht hinter dem Epic-Konto ein Discord-Nutzer, der es hier verknüpft
         // hat, wird sein Name mitgezeigt - sonst bleibt die Karte anonym.
         const owner = this.client.databaseService.Ready
-            ? await this.client.accounts.Owner("epic", profile.accountId)
+            ? await this.client.accounts.TrustedOwner("epic", profile.accountId, interaction.guildId)
             : null;
 
         const member = owner ? await this.client.users.fetch(owner).catch(() => null) : null;

@@ -43,6 +43,7 @@ import { readdir, readFile, rm, stat } from "node:fs/promises";
 import { createCanvas } from "@napi-rs/canvas";
 import axios, { InternalAxiosRequestConfig } from "axios";
 import fastify from "fastify";
+import { SetFlags } from "../utils/moduleFlags";
 import GalleryService from "../services/GalleryService";
 import { IMAGE_TOO_LARGE } from "../utils/image";
 import BotClient from "../client/BotClient";
@@ -997,6 +998,18 @@ async function main(): Promise<void> {
         const gross = Sample(3000, 1000);
 
         const erstes = await service.AddUpload(bilder, gross, "image/png", "foto.png");
+
+        // W-0133: „Bild höchstens“ aus dem Admin, je Server.
+        SetFlags([], [], [], [{ module: "gallery", guildId: GUILD, status: null, notice: null, linkMode: null, values: { imageMegabytes: 1 }, updatedAt: null }]);
+        let zuGross = "";
+
+        try {
+            await service.AddUpload(bilder, Buffer.alloc(2 * 1024 * 1024), "image/png", "riesig.png");
+        } catch (error) {
+            zuGross = error instanceof Error ? error.message : String(error);
+        }
+        SetFlags([], [], []);
+        check("Bild über dem Wert des Servers: abgelehnt mit „legt RL Nexus fest“", zuGross.includes("1 MB") && zuGross.includes("RL Nexus"), zuGross);
 
         check("Grosses PNG landet als .webp", erstes.file.endsWith(".webp"), erstes.file);
 

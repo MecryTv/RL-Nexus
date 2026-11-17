@@ -74,7 +74,7 @@ interface IPayload {
     /** Nur Textkanäle taugen als Köder. */
     baitChannels: string[];
     nukeActions: { id: string; label: string; icon: string; limit: number }[];
-    limits: { nuke: [number, number]; joins: [number, number]; end: [number, number]; cleanup: number[]; trusted: number };
+    limits: { nuke: [number, number]; joins: [number, number]; end: [number, number]; cleanup: number[]; trusted: number; raidSeconds?: number; slowmode?: number; nukeMinutes?: number; trustDays?: number };
     targets: ILogTargets;
     guild: { roles: IRole[]; channels: { id: string; name: string }[] };
     bots: { id: string; name: string }[];
@@ -375,7 +375,7 @@ export function renderAntiVillain(guildId: string): void {
         const acts = el("div", "avcase__acts", release);
 
         release.addEventListener("click", () => void act("release", "Freigegeben"));
-        trust.addEventListener("click", () => void act("trust", "Freigegeben und 30 Tage vertraut"));
+        trust.addEventListener("click", () => void act("trust", `Freigegeben und ${data!.limits.trustDays ?? 30} Tage vertraut`));
 
         if (entry.deleted) {
             const look = button("btn btn--quiet", icon("#i-eye"), `Gelöschte ansehen (${entry.deleted})`);
@@ -518,7 +518,7 @@ export function renderAntiVillain(guildId: string): void {
 
         return [
             cases,
-            el("p", "avwhy", el("b", "", "„War kein Hack“ "), "gibt frei und merkt sich das: Die Person zählt dann 30 Tage als vertraut, damit derselbe Fehlalarm nicht gleich wieder kommt."),
+            el("p", "avwhy", el("b", "", "„War kein Hack“ "), `gibt frei und merkt sich das: Die Person zählt dann ${data!.limits.trustDays ?? 30} Tage als vertraut, damit derselbe Fehlalarm nicht gleich wieder kommt.`),
             holdCard(),
             reportsCard(),
         ];
@@ -808,7 +808,7 @@ export function renderAntiVillain(guildId: string): void {
                 "avlimit",
                 icon(action.icon),
                 el("span", "", action.label),
-                numberField(nuke.limits[action.id] ?? action.limit, data!.limits.nuke, `${action.label}: höchstens so oft in 10 Minuten`, (value) => {
+                numberField(nuke.limits[action.id] ?? action.limit, data!.limits.nuke, `${action.label}: höchstens so oft in ${data!.limits.nukeMinutes ?? 10} Minuten`, (value) => {
                     nuke.limits[action.id] = value;
                     touch();
                 })
@@ -823,7 +823,7 @@ export function renderAntiVillain(guildId: string): void {
                     ? []
                     : [el("div", "notice snnotice", icon("#i-warn"), el("span", "", "Dem Bot fehlt das Members-Intent (GUILD_MEMBER_INTENT). Ohne das Intent sieht er niemanden beitreten, Raid-Schutz geht dann nicht. Es muss im Discord Developer Portal und in der .env an sein."))]),
                 row("Raid-Schutz", "Erkennt Wellen von Beitritten", power),
-                row("Welle", "Ab so vielen Beitritten in 30 Sekunden", numberField(raid.joins, data!.limits.joins, "Beitritte in 30 Sekunden", (value) => {
+                row("Welle", `Ab so vielen Beitritten in ${data!.limits.raidSeconds ?? 30} Sekunden`, numberField(raid.joins, data!.limits.joins, `Beitritte in ${data!.limits.raidSeconds ?? 30} Sekunden`, (value) => {
                     raid.joins = value;
                     touch();
                 })),
@@ -834,7 +834,7 @@ export function renderAntiVillain(guildId: string): void {
                         "div",
                         "avchips",
                         chip("invites", "#i-lock", "Einladungen pausieren"),
-                        chip("slowmode", "#i-clock", "Slowmode 30 s"),
+                        chip("slowmode", "#i-clock", `Slowmode ${data!.limits.slowmode ?? 30} s`),
                         chip("hold", "#i-user-x", "Welle festhalten"),
                         chip("ping", "#i-bell", "Team anpingen"),
                         chip("verification", "#i-shield", "Verifizierung hochsetzen")
@@ -848,7 +848,7 @@ export function renderAntiVillain(guildId: string): void {
             ),
             card(
                 "Anti-Nuke",
-                "Der teuerste Hack ist ein gekaperter Team-Account: Er löscht Kanäle, bannt alle oder lädt einen fremden Bot ein. Wer eine Grenze in 10 Minuten überschreitet, verliert sofort alle Rollen und wird festgehalten, egal wer es ist. Nur der Server-Besitzer ist ausgenommen.",
+                "Der teuerste Hack ist ein gekaperter Team-Account: Er löscht Kanäle, bannt alle oder lädt einen fremden Bot ein. Wer eine Grenze in ${data!.limits.nukeMinutes ?? 10} Minuten überschreitet, verliert sofort alle Rollen und wird festgehalten, egal wer es ist. Nur der Server-Besitzer ist ausgenommen.",
                 row("Anti-Nuke", "Zählt gefährliche Aktionen im Audit-Log", switchLabel(nuke.on, "Anti-Nuke anschalten", (on) => {
                     nuke.on = on;
                     touch();

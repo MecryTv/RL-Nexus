@@ -10,6 +10,7 @@ import Command from "../../structures/Command";
 import Category from "../../enums/Category";
 import ComponentV2Builder from "../../builder/ComponentV2Builder";
 import { IsModule, IsPermanent, MODULE_IDS } from "../../constants/Modules";
+import { ClosedText, ModuleOpen } from "../../utils/moduleFlags";
 
 /**
  * Module an- und ausschalten, ohne das Dashboard. Dieselbe Liste, dieselbe
@@ -102,6 +103,13 @@ export default class Module extends Command {
                 "Gehört fest dazu",
                 `\`${moduleId}\` lässt sich nicht ausschalten, das Modul gehört fest zum Bot.`
             );
+
+            return;
+        }
+
+        // W-0131-Rest: Im Admin abgeschaltet - einschalten geht erst, wenn es dort wieder an ist (wie im Dashboard).
+        if (on && !ModuleOpen(moduleId, guildId)) {
+            await this.Reply(interaction, "Yellow", "Gerade abgeschaltet", `\`${moduleId}\` hat RL Nexus gerade abgeschaltet. ${ClosedText(moduleId, guildId)}`);
 
             return;
         }

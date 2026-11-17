@@ -104,8 +104,12 @@ export function BoostText(active: IActiveBoost | null, now: number): string {
  * eine Stelle, Uhrzeiten als HH:MM, einmalige mit Ende nach Beginn. Unsinn und
  * einmalige, die schon vorbei sind, fallen weg; höchstens MAX_BOOSTS.
  */
-export function CleanBoosts(value: unknown, now: number): ILevelBoost[] {
+export function CleanBoosts(value: unknown, now: number, limits: { count: number; factor: number } = { count: MAX_BOOSTS, factor: MAX_BOOST }, previous: ILevelBoost[] = []): ILevelBoost[] {
     if (!Array.isArray(value)) return [];
+
+    // W-0133: Grenzen aus dem Admin. Was schon gespeichert ist, darf bleiben, auch über der Grenze.
+    const count = Math.max(limits.count, previous.length);
+    const known = new Map(previous.map((boost) => [boost.id, boost.factor]));
 
     const ids = new Set<string>();
     const list: ILevelBoost[] = [];
@@ -122,7 +126,8 @@ export function CleanBoosts(value: unknown, now: number): ILevelBoost[] {
 
         while (ids.has(id)) id = randomUUID().slice(0, 8);
 
-        const base = { id, factor: Math.min(MAX_BOOST, Math.max(MIN_BOOST, Math.round(factor * 10) / 10)), announce: entry.announce === true };
+        const rounded = Math.max(MIN_BOOST, Math.round(factor * 10) / 10);
+        const base = { id, factor: known.get(id) === rounded ? rounded : Math.min(limits.factor, rounded), announce: entry.announce === true };
 
         if (entry.kind === "once") {
             // Review: ein geleertes Feld (null, "") wäre als Zahl 0 - der 1.1.1970, also sofort aktiv.
@@ -147,7 +152,7 @@ export function CleanBoosts(value: unknown, now: number): ILevelBoost[] {
 
         ids.add(id);
 
-        if (list.length === MAX_BOOSTS) break;
+        if (list.length === count) break;
     }
 
     return list;

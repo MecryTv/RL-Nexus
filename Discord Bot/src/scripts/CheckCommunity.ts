@@ -14,7 +14,7 @@
 process.env.CLIENT_SECRET ||= "check-secret";
 process.env.DEV_CLIENT_SECRET ||= "check-secret";
 
-import { ChannelType, ChatInputCommandInteraction, Guild, GuildBasedChannel, GuildMember, PermissionFlagsBits, Role } from "discord.js";
+import { ChannelType, ChatInputCommandInteraction, Guild, GuildBasedChannel, GuildMember, PermissionFlagsBits, PermissionsBitField, Role } from "discord.js";
 import BotClient from "../client/BotClient";
 import { GiveawayCard, MayPing, PING_DENIED, PollCard, StreamCard, TwitchSummary, VoteReply, WinnerDm } from "../builder/CommunityView";
 import { DefaultMessage, DefaultStreamConfig, TwitchLogin, YouTubeChannelId, YouTubeLookupUrl } from "../constants/Streams";
@@ -23,7 +23,8 @@ import { CLAIM_CHOICES, MAX_BONUS_TICKETS } from "../constants/Giveaways";
 import { IGiveaway, IPoll, IStreamNotifier } from "../interfaces/services/community/ICommunity";
 import { BOOSTER, DrawWeighted, GiveawayError } from "../services/GiveawayService";
 import { PollError } from "../services/PollService";
-import { StreamError } from "../services/StreamService";
+import StreamService, { StreamError } from "../services/StreamService";
+import { SetFlags } from "../utils/moduleFlags";
 import { Decode, ParseFeed } from "../utils/youtube";
 import Giveaway from "../commands/admin/Giveaway";
 import Poll from "../commands/admin/Poll";
@@ -304,16 +305,15 @@ async function checkGiveaways(client: BotClient): Promise<void> {
     fails("Ohne Preis geht nichts", { prize: " " }, "Preis fehlt");
     fails("Ohne Kanal geht nichts", { channelId: VOICE }, "Kanal");
     fails("Unter einer Minute", { duration: 30 }, "Minute");
-    fails("Über 60 Tage", { duration: 61 * 86_400 }, "Minute");
+    fails("Über 60 Tage", { duration: 61 * 86_400 }, "60 Tage");
     fails("Start in der Vergangenheit", { startsAt: Date.now() - 600_000 }, "Vergangenheit");
-    fails("Start in zwei Jahren", { startsAt: Date.now() + 700 * DAY }, "Vergangenheit");
+    fails("Start in zwei Jahren", { startsAt: Date.now() + 700 * DAY }, "90 Tage");
 
     const planned = service.Clean(guild, USER, { ...valid, startsAt: Date.now() + 2 * DAY });
 
     check("Geplant heißt geplant", planned.status === "scheduled");
     check("Die Laufzeit zählt ab dem Start", planned.endsAt - planned.startsAt === 3_600_000);
     check("Sofort heißt laufend", service.Clean(guild, USER, valid).status === "running");
-    check("Mehr Gewinner als erlaubt werden gedeckelt", service.Clean(guild, USER, { ...valid, winners: 999 }).winners === 50);
     check("Ein Bild muss https sein", service.Clean(guild, USER, { ...valid, image: "javascript:alert(1)" }).image === null);
 
     const requirements = service.CleanRequirements(guild, { roles: [ROLE, "999", ROLE], forbidden: [TEAM], booster: "quatsch", serverDays: 9_999, accountDays: -5, messages: 25, linked: "ja" });
@@ -729,6 +729,98 @@ async function checkCommandRights(): Promise<void> {
     }
 }
 
+/* ----------------------------------------------------------
+   W-0133: Grenzen aus dem Admin
+   ---------------------------------------------------------- */
+async function checkLimits(client: BotClient): Promise<void> {
+    console.log("\n  — Grenzen aus dem Admin (W-0133) —");
+
+    const guild = FakeGuild();
+    const service = client.giveawayService;
+    const valid = { prize: "Rocket Pass", channelId: TEXT, duration: 3_600, winners: 2 };
+    const limitOf = (run: () => unknown): { message: string; limit: unknown } | null => {
+        try {
+            run();
+
+            return null;
+        } catch (error) {
+            return error instanceof GiveawayError ? { message: error.message, limit: error.limit ?? null } : { message: String(error), limit: null };
+        }
+    };
+
+    SetFlags([], [], []);
+    const capped = limitOf(() => service.Clean(guild, USER, { ...valid, winners: 80 }));
+    check(
+        "Mehr Gewinner als erlaubt: Fehler mit Grenze statt still gekürzt",
+        !!capped && JSON.stringify(capped.limit) === JSON.stringify({ module: "giveaways", key: "maxWinners", asked: 80, allowed: 50 }),
+        JSON.stringify(capped)
+    );
+
+    SetFlags([], [], [], [{ module: "giveaways", guildId: GUILD, status: null, notice: null, linkMode: null, values: { maxWinners: 100 }, updatedAt: null }]);
+    check("Server mit 100 Gewinnern freigeschaltet: 100 geht (Review Focus 5)", service.Clean(guild, USER, { ...valid, winners: 100 }).winners === 100);
+    SetFlags([], [], []);
+
+    const longer = limitOf(() => service.Clean(guild, USER, { ...valid, duration: 61 * 86_400 }));
+    check("Laufzeit über dem Wert: Grenze in Tagen", JSON.stringify(longer?.limit) === JSON.stringify({ module: "giveaways", key: "maxDays", asked: 61, allowed: 60 }), JSON.stringify(longer));
+
+    const ahead = limitOf(() => service.Clean(guild, USER, { ...valid, startsAt: Date.now() + 100 * DAY }));
+    check("Zu weit im Voraus geplant: Grenze in Tagen", (ahead?.limit as { key?: string } | null)?.key === "scheduleDays", JSON.stringify(ahead));
+
+    SetFlags([{ module: "giveaways", status: "on", notice: null, values: { maxBonusRoles: 1 } }], [], []);
+    const bonus = limitOf(() => service.CleanBonus(guild, [{ roleId: ROLE, tickets: 2 }, { roleId: BOOSTER, tickets: 2 }]));
+    check("Mehr Bonus-Rollen als erlaubt: Fehler statt gekürzt", (bonus?.limit as { key?: string } | null)?.key === "maxBonusRoles", JSON.stringify(bonus));
+    SetFlags([], [], []);
+
+    // Der Slash-Befehl: bei 80 Gewinnern die gelbe Karte mit „Mit 50 Gewinnern starten“.
+    const replies: Record<string, unknown>[] = [];
+    const interaction = {
+        guild: { ...guild, ownerId: USER, members: { ...guild.members, fetch: async () => ({ id: USER }) } },
+        user: { id: USER },
+        channelId: TEXT,
+        member: { permissions: new PermissionsBitField(PermissionFlagsBits.ManageGuild) },
+        memberPermissions: new PermissionsBitField(PermissionFlagsBits.ManageGuild),
+        deferred: false,
+        replied: false,
+        deferReply: async () => void (interaction.deferred = true),
+        editReply: async (message: Record<string, unknown>) => void replies.push(message),
+        reply: async (message: Record<string, unknown>) => void replies.push(message),
+        options: {
+            getSubcommand: () => "start",
+            getString: (name: string) => (name === "dauer" ? "1d" : name === "preis" ? "Rocket Pass" : null),
+            getInteger: (name: string) => (name === "gewinner" ? 80 : null),
+            getChannel: () => null,
+            getRole: () => null,
+        },
+    };
+    const command = new Giveaway({
+        ...client,
+        databaseService: { Ready: true },
+        settings: { Of: async () => ({ modules: ["giveaways"] }) },
+        giveawayService: service,
+    } as unknown as BotClient);
+
+    await command.Execute(interaction as unknown as ChatInputCommandInteraction);
+    const card = JSON.stringify(replies.at(-1) ?? {});
+    check("/giveaway mit 80 Gewinnern: Karte mit „Mit 50 Gewinnern starten“ und Abbrechen", card.includes("Mit 50 Gewinnern starten") && card.includes("Abbrechen") && card.includes("giveaway:limit:"), card.slice(0, 400));
+
+    // Streams: Meldungen je Server.
+    SetFlags([], [], [], [{ module: "twitch-notifier", guildId: GUILD, status: null, notice: null, linkMode: null, values: { maxNotifiers: 2 }, updatedAt: null }]);
+    const full = { client: { streamNotifiers: { OfGuild: async () => [SampleNotifier(), SampleNotifier({ id: 2 })] } } };
+    let refused: unknown = null;
+
+    try {
+        await StreamService.prototype.Add.call(full as never, guild, "twitch", "mecrytv", USER);
+    } catch (error) {
+        refused = error;
+    }
+    check(
+        "Twitch mit 2 Meldungen erlaubt: die dritte wird abgelehnt, mit Grenze",
+        refused instanceof StreamError && (refused as StreamError).limit?.key === "maxNotifiers" && (refused as StreamError).message.includes("2"),
+        String(refused)
+    );
+    SetFlags([], [], []);
+}
+
 async function main(): Promise<void> {
     console.log("\n📣 Notifier, Umfragen und Giveaways\n");
 
@@ -741,6 +833,7 @@ async function main(): Promise<void> {
     checkStreamConfig(client);
     checkPolls(client);
     await checkGiveaways(client);
+    await checkLimits(client);
     await checkDraw();
     await checkViews(client);
     await checkCommandRights();

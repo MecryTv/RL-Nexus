@@ -1,4 +1,8 @@
-import { ANNOUNCE_DELETE, MAX_COOLDOWN, MAX_EXCLUDED, MAX_XP_PER_ACTION } from "../../../constants/Levels";
+import { ANNOUNCE_DELETE, MAX_COOLDOWN, MAX_EXCLUDED } from "../../../constants/Levels";
+import { settingDef } from "../../../constants/ModuleSettings";
+
+/** Die harte Obergrenze; was der Server darf, prüft LevelService (W-0133). */
+const MAX_XP_PER_ACTION = settingDef("levels", "maxXpPerAction")?.max ?? 5000;
 import { ILevelSettings } from "../../../interfaces/services/levels/ILevels";
 import logger from "../../../utils/logger";
 import { PostBoard } from "../../levels/BoardPost";

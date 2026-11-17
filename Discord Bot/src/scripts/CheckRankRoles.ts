@@ -127,7 +127,7 @@ function Stub(client: BotClient, settings: IRankRoleSettings, ranks: IPrimeRank[
     Object.defineProperty(client.databaseService, "Ready", { get: () => true, configurable: true });
 
     client.rankRoleService.Settings = async () => settings;
-    client.accounts.On = (async () => (epicName ? { display_name: epicName } : null)) as typeof client.accounts.On;
+    client.accounts.On = (async () => (epicName ? { display_name: epicName, verified: 1 } : null)) as typeof client.accounts.On;
     client.primeService.Profile = (async () => ({ name: epicName ?? "", ranks }) as unknown as IPrimeProfile) as typeof client.primeService.Profile;
 }
 
@@ -312,7 +312,7 @@ async function checkApply(client: BotClient): Promise<void> {
     const ranked = FakeMember(FakeGuild(), []);
     const after = await service.AfterRankMe(ranked.member, shown);
 
-    check("/rank me vergibt die Rang-Rollen", ranked.added.length === 2 && after?.added.length === 2, ranked.added.join(","));
+    check("/rank me vergibt die Rang-Rollen", ranked.added.length === 2 && !!after && "added" in after && after.added.length === 2, ranked.added.join(","));
     check("…mit dem schon geholten Profil, ohne Prime ein zweites Mal zu fragen", lookups === 0, String(lookups));
 
     modules(false);

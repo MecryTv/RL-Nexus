@@ -37,6 +37,8 @@ export default class CommunityButtons extends Event {
             if (prefix === GIVEAWAY_PREFIX && action === "join") return await this.client.giveawayService.Join(interaction, Number(id));
             if (prefix === GIVEAWAY_PREFIX && action === "leave") return await this.client.giveawayService.Leave(interaction, Number(id));
             if (prefix === GIVEAWAY_PREFIX && action === "claim") return await this.client.giveawayService.Claim(interaction, Number(id));
+            // W-0133: „Mit 50 Gewinnern starten“ oder „Abbrechen“ unter der Karte zur Grenze.
+            if (prefix === GIVEAWAY_PREFIX && action === "limit") return await this.client.giveawayService.LimitChoice(interaction, id ?? "", option === "abbrechen");
         } catch (error) {
             logger.warn(`🎛️ ${interaction.customId} fehlgeschlagen - ${String(error)}`);
 

@@ -158,7 +158,7 @@ function checkSettings(client: BotClient): void {
         guild,
         {
             chat: { min: 40, max: 10, cooldown: 99_999 },
-            voice: { xp: 900 },
+            voice: { xp: 400 },
             base: 5,
             roleBonus: [{ id: ROLE, factor: 99 }, { id: "123", factor: 2 }, { id: ROLE, factor: 3 }],
             channelBonus: [{ id: TEXT, factor: 0.5 }],
@@ -172,7 +172,17 @@ function checkSettings(client: BotClient): void {
 
     check("Vertauschte Werte werden getauscht", clean.chat.min === 10 && clean.chat.max === 40, `${clean.chat.min}-${clean.chat.max}`);
     check("Die Sperre wird gedeckelt", clean.chat.cooldown === 3600, String(clean.chat.cooldown));
-    check("Voice-Punkte werden gedeckelt", clean.voice.xp === 500, String(clean.voice.xp));
+    check("Voice-Punkte bis zur Grenze bleiben", clean.voice.xp === 400, String(clean.voice.xp));
+
+    // W-0133: über der Grenze aus dem Admin abgelehnt, mit dem Satz für Server-Admins.
+    let refused = "";
+
+    try {
+        service.Clean(guild, { voice: { xp: 900 } }, base);
+    } catch (error) {
+        refused = error instanceof Error ? error.message : String(error);
+    }
+    check("Voice-Punkte über der Grenze: abgelehnt mit „legt RL Nexus fest“", refused.includes("500") && refused.includes("RL Nexus"), refused);
     check("Die Kurve hat eine Untergrenze", clean.base === 10, String(clean.base));
     check("Unbekannte Rollen fallen weg, doppelte auch", clean.roleBonus.length === 1);
     check("Der Faktor wird gedeckelt", clean.roleBonus[0].factor === MAX_FACTOR, String(clean.roleBonus[0].factor));
@@ -2348,6 +2358,23 @@ async function checkActor(): Promise<void> {
     check("Entfernen geht immer", (await refused({ rewards: [] })) === "" && world.settings.rewards.length === 0);
 }
 
+/** W-0133: Boosts und Punkte je Aktion aus dem Admin; gespeicherte Werte über der Grenze bleiben. */
+function checkLimits(): void {
+    console.log("\n  — Grenzen aus dem Admin (W-0133) —");
+
+    const now = Date.now();
+    const weekly = (id: string, factor = 2) => ({ id, kind: "weekly", factor, weekday: 5, from: "18:00", to: "23:00", announce: false });
+    const ten = CleanBoosts(Array.from({ length: 10 }, (_, index) => weekly(`b${index}`)), now, { count: 10, factor: 3 });
+
+    check("Zehn Boosts, Grenze auf 5 gesenkt: alle zehn bleiben", CleanBoosts(ten, now, { count: 5, factor: 3 }, ten).length === 10);
+    check("Ein elfter kommt nicht dazu", CleanBoosts([...ten, weekly("neu")], now, { count: 5, factor: 3 }, ten).length === 10);
+    check("Ohne gespeicherte: höchstens die Grenze", CleanBoosts(ten, now, { count: 5, factor: 3 }).length === 5);
+
+    const strong = CleanBoosts([weekly("x1", 3)], now, { count: 10, factor: 3 });
+    check("Faktor über der neuen Grenze bleibt beim gespeicherten Boost", CleanBoosts(strong, now, { count: 10, factor: 2 }, strong)[0].factor === 3);
+    check("Ein neuer Boost über der Grenze wird gekappt", CleanBoosts([weekly("x2", 3)], now, { count: 10, factor: 2 })[0].factor === 2);
+}
+
 async function main(): Promise<void> {
     console.log("\n📈 Level System\n");
 
@@ -2370,6 +2397,7 @@ async function main(): Promise<void> {
     await checkDesignApi();
     await checkLivePulse();
     await checkBoosts();
+    checkLimits();
     await checkManual();
     await checkTop();
     await checkBoardBot();

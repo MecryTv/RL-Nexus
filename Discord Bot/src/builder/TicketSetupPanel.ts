@@ -1,6 +1,7 @@
 import { ChannelType, Guild } from "discord.js";
 import { LRUCache } from "lru-cache";
 import BotClient from "../client/BotClient";
+import { ModuleValue } from "../utils/moduleFlags";
 import ComponentV2Builder from "./ComponentV2Builder";
 import { ActionEntries, ITicketView } from "./TicketPanel";
 import {
@@ -8,7 +9,6 @@ import {
     CORE_ACTIONS,
     DELETE_AFTER_HOURS,
     DeleteLabel,
-    MAX_LIMIT,
     MESSAGE_KEYS,
     MESSAGE_LABELS,
     SETUP_PREFIX,
@@ -62,7 +62,7 @@ function Summary(config: ITicketConfig): string {
     ].join(" · ");
 }
 
-function Start(builder: ComponentV2Builder, config: ITicketConfig): void {
+function Start(builder: ComponentV2Builder, config: ITicketConfig, guildId: string): void {
     builder
         .text(
             [
@@ -95,7 +95,8 @@ function Start(builder: ComponentV2Builder, config: ITicketConfig): void {
         .select({
             customId: `${SETUP_PREFIX}:limit`,
             placeholder: "Offene Tickets je User …",
-            options: Array.from({ length: MAX_LIMIT + 1 }, (_, value) => ({
+            // W-0133: so viele, wie der Server darf (höchstens 24), plus „Ohne Grenze“.
+            options: Array.from({ length: ModuleValue("tickets", "maxOpenPerUser", guildId) + 1 }, (_, value) => ({
                 label: value === 0 ? "Ohne Grenze" : `${value} offene(s) Ticket(s)`,
                 value: String(value),
                 default: config.limit === value,
@@ -310,7 +311,7 @@ export async function SetupView(client: BotClient, guild: Guild, state: ISetupSt
         })
         .separator({ divider: false });
 
-    if (state.page === "start") Start(builder, config);
+    if (state.page === "start") Start(builder, config, state.guildId);
     else if (state.page === "options") Options(builder, config, state);
     else if (state.page === "actions") Actions(builder, client, config);
     else if (state.page === "messages") Messages(builder, config);

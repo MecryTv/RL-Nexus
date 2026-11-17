@@ -2,7 +2,9 @@ import { FastifyReply, FastifyRequest } from "fastify";
 import BotClient from "../client/BotClient";
 import Route from "../structures/Route";
 import { DASHBOARD_PATH } from "../constants/Dashboard";
-import { CLAIM_CHOICES, MAX_BONUS_ROLES, MAX_BONUS_TICKETS, MAX_WINNERS } from "../constants/Giveaways";
+import { CLAIM_CHOICES, MAX_BONUS_TICKETS } from "../constants/Giveaways";
+import { DashboardLimit } from "../builder/LimitReply";
+import { ModuleValue } from "../utils/moduleFlags";
 import { IGiveaway } from "../interfaces/services/community/ICommunity";
 import { BOOSTER, GiveawayError, GIVEAWAYS_MODULE } from "../services/GiveawayService";
 import { WantsJSON } from "../utils/admin";
@@ -50,6 +52,8 @@ export default class DashboardApiGiveaways extends Route {
 
             return reply.send(await this.Write(access, (request.body ?? {}) as IBody));
         } catch (error) {
+            // W-0133: bei einer Grenze aus dem Admin der Satz dazu und der Link zum Support.
+            if (error instanceof GiveawayError && error.limit) return reply.code(400).send(DashboardLimit(error.limit, access.guild.id, error.message));
             if (error instanceof GiveawayError || error instanceof LogTargetError) return reply.code(400).send({ error: error.message });
 
             throw error;
@@ -108,7 +112,12 @@ export default class DashboardApiGiveaways extends Route {
 
         return {
             giveaways: giveaways.map((giveaway) => this.Out(access, giveaway, counts.get(giveaway.id) ?? 0)),
-            limits: { winners: MAX_WINNERS, bonusRoles: MAX_BONUS_ROLES, bonusTickets: MAX_BONUS_TICKETS, claim: CLAIM_CHOICES },
+            limits: {
+                winners: ModuleValue("giveaways", "maxWinners", guild.id),
+                bonusRoles: ModuleValue("giveaways", "maxBonusRoles", guild.id),
+                bonusTickets: MAX_BONUS_TICKETS,
+                claim: CLAIM_CHOICES,
+            },
             booster: BOOSTER,
             guild: { name: guild.name, boostRole: guild.roles.premiumSubscriberRole?.name ?? null, ...GuildResources(guild) },
             targets: await LogTargets(guild, []),

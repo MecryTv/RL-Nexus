@@ -84,6 +84,8 @@ interface IBlocked {
 
 interface IPayload {
     config: IConfig;
+    /** W-0133: Grenzen, die RL Nexus diesem Server setzt. */
+    limits?: { open: number };
     /** Wo das Panel wirklich steht - null, wenn die Nachricht weg ist. */
     panel: { channelId: string; url: string } | null;
     guild: IResources;
@@ -646,7 +648,8 @@ export function renderTickets(guildId: string, canManage: boolean, user: ITicket
         // Die 0 ("ohne Grenze", "nie") ist in beiden Menüs der leere erste
         // Eintrag von select() - stünde sie zusätzlich in der Liste, käme sie doppelt.
         const limit = select(
-            Array.from({ length: 10 }, (_, index) => ({ value: String(index + 1), label: String(index + 1) })),
+            // W-0133: so viele, wie RL Nexus diesem Server erlaubt.
+            Array.from({ length: data!.limits?.open ?? 10 }, (_, index) => ({ value: String(index + 1), label: String(index + 1) })),
             cfg.limit === 0 ? null : String(cfg.limit),
             (value) => {
                 cfg.limit = Number(value ?? 0);

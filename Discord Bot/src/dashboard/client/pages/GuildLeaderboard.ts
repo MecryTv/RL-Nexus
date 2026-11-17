@@ -564,7 +564,7 @@ export function renderLeaderboard(guildId: string): void {
 
         return card(
             "Protokoll",
-            "Jede Änderung von Hand, hier und mit /level punkte. Die Einträge bleiben 180 Tage, zu sehen sind die letzten 50.",
+            "Jede Änderung von Hand, hier und mit /level punkte. Die Einträge bleiben bis zu 180 Tage, zu sehen sind die letzten 50.",
             ...(rows.length ? [el("div", "lvlog", ...rows)] : [el("p", "hintline", "Noch hat niemand Punkte von Hand geändert.")])
         );
     }
