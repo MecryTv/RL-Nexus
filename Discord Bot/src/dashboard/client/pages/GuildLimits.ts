@@ -48,7 +48,9 @@ export function bindLimitsTab(guild: IGuild, section: HTMLElement): (limits: Rec
 
     if (tabs.length === 0) return () => undefined;
 
-    let limits: Record<string, IModuleLimit[]> = {};
+    // null: noch nicht geladen. Leer heißt „Abruf gescheitert“ - Standards
+    // schickt der Bot für jeden Server mit (ModuleLimits).
+    let limits: Record<string, IModuleLimit[]> | null = null;
     let tab: Tab = "module";
     let module: string | null = null;
     let filter: LimitFilter = "all";
@@ -138,7 +140,7 @@ export function bindLimitsTab(guild: IGuild, section: HTMLElement): (limits: Rec
     }
 
     function paint(): void {
-        const counted = limitTabs(true, askableCount(limits));
+        const counted = limitTabs(true, askableCount(limits ?? {}));
 
         for (const entry of counted) {
             const tabButton = buttons.get(entry.id)!;
@@ -157,14 +159,15 @@ export function bindLimitsTab(guild: IGuild, section: HTMLElement): (limits: Rec
     }
 
     function paintBody(): void {
-        const counts = limitCounts(limits, module);
+        const all = limits ?? {};
+        const counts = limitCounts(all, module);
         const focused = (document.activeElement as HTMLElement | null)?.dataset.gzfilter;
 
-        head.hidden = Object.keys(limits).length === 0;
+        head.hidden = Object.keys(all).length === 0;
 
         // Ein Modulfilter aus der Adresse steht als eigener Filter vorn - aber
         // nur für ein Modul, das es in den Grenzen gibt.
-        const named = module && limits[module]?.length ? (MODULES.find((entry) => entry.id === module)?.name ?? module) : null;
+        const named = module && all[module]?.length ? (MODULES.find((entry) => entry.id === module)?.name ?? module) : null;
         const list: HTMLButtonElement[] = [];
 
         if (named) {
@@ -197,15 +200,16 @@ export function bindLimitsTab(guild: IGuild, section: HTMLElement): (limits: Rec
 
         if (focused) chips.querySelector<HTMLElement>(`[data-gzfilter="${focused}"]`)?.focus();
 
-        const cards = limitCards(limits, { filter, search, module });
+        const cards = limitCards(all, { filter, search, module });
 
-        if (Object.keys(limits).length === 0) body.replaceChildren(el("p", "gzempty", "Für diesen Server gelten gerade keine Grenzen."));
+        if (limits === null) body.replaceChildren(el("p", "gzempty", "Grenzen werden geladen …"));
+        else if (Object.keys(limits).length === 0) body.replaceChildren(el("p", "gzempty", "Die Grenzen lassen sich gerade nicht laden. Lade die Seite gleich noch einmal."));
         else if (cards.length === 0) body.replaceChildren(empty());
         else body.replaceChildren(el("div", "gzcards", ...cards.map(card)));
     }
 
     function empty(): HTMLElement {
-        const reset = button("btn", icon("#i-refresh"), "Filter zurücksetzen");
+        const reset = button("btn btn--quiet", icon("#i-refresh"), "Filter zurücksetzen");
         const term = search.trim();
 
         reset.addEventListener("click", () => {
@@ -227,9 +231,9 @@ export function bindLimitsTab(guild: IGuild, section: HTMLElement): (limits: Rec
         const header = el("header", "gzcard__head", icon(part?.icon ?? "#i-puzzle"), el("div", "gzcard__text", el("h3", "gzcard__title", entry.name), el("span", "gzcard__meta", meta)));
         // Grenzen kommen für alle Module; ins Modul führt der Link nur, wenn es
         // eingeschaltet ist - sonst landete er auf der Übersicht.
-        const open = document.querySelector<HTMLAnchorElement>(`#setSide a[data-section="${entry.id}"]`);
+        const side = document.querySelector<HTMLAnchorElement>(`#setSide a[data-section="${entry.id}"]`);
 
-        if (open && !open.hidden) {
+        if (side && !side.hidden) {
             const go = el("a", "gzcard__go", "Einstellungen", icon("#i-arrow"));
 
             go.href = `${BASE}/guild/${guild.id}/${entry.id}`;
@@ -240,6 +244,8 @@ export function bindLimitsTab(guild: IGuild, section: HTMLElement): (limits: Rec
                 event.preventDefault();
                 history.pushState(null, "", go.href);
                 window.dispatchEvent(new PopStateEvent("popstate"));
+                // Der Link selbst ist jetzt verborgen; der Fokus bleibt beim Modul.
+                side.focus();
             });
             header.append(go);
         }
@@ -309,10 +315,13 @@ export function bindLimitsTab(guild: IGuild, section: HTMLElement): (limits: Rec
         // Der Text zeigt „…“, solange der Wunsch nicht passt - nie eine falsche Zahl.
         const update = (): void => {
             const wanted = draft.wish === "" ? Number.NaN : Number(draft.wish);
-            const problem = wishProblem(entry, wanted);
+            // Was der Browser nicht als Zahl lesen kann („1000,5“), kommt leer an.
+            const typed = draft.wish !== "" || wish.validity.badInput;
+            const problem = typed ? wishProblem(entry, wanted) : null;
 
-            hint.textContent = draft.wish === "" ? `Mehr als ${amount(entry.value)}${unit}` : (problem ?? "");
-            hint.classList.toggle("is-bad", draft.wish !== "" && problem !== null);
+            hint.textContent = typed ? (problem ?? "") : `Heute ${amount(entry.value)}${unit}`;
+            hint.classList.toggle("is-bad", problem !== null);
+            wish.setAttribute("aria-invalid", String(problem !== null));
             text.textContent = limitRequestText(guild.name, card.name, entry, problem ? Number.NaN : wanted, draft.reason);
         };
 
@@ -376,6 +385,8 @@ export function bindLimitsTab(guild: IGuild, section: HTMLElement): (limits: Rec
         input.value = "";
         read();
         paint();
+        // Der Verweis auf der Modulseite ist jetzt verborgen; weiter geht es am Reiter.
+        buttons.get("grenzen")?.focus();
     });
 
     read();

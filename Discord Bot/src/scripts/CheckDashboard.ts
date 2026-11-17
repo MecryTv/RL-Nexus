@@ -1860,6 +1860,17 @@ async function checkLimitsMarkup(): Promise<void> {
     const guildPage = await readFile(path.join(pages, "Guild.ts"), "utf8");
 
     check("Modulseiten ohne Kasten, mit Verweis in den Reiter", !guildPage.includes("modlimits") && guildPage.includes("limitsHref(") && !css.some((line) => line.includes(".modlimits")));
+
+    // Abschluss-Review W-0136: Grenzen gibt es für jeden Server (Standards),
+    // ein leeres Ergebnis heißt „nicht geladen“, nicht „keine Grenzen“.
+    const rule = (name: string): string => css.find((line) => line.startsWith(`.${name}{`)) ?? "";
+
+    check("Review: ohne geladene Grenzen kein falscher Satz", page.includes("lassen sich gerade nicht laden") && !page.includes("gelten gerade keine Grenzen"));
+    check("Review: „Filter zurücksetzen“ ist ein sichtbarer Knopf", page.includes('button("btn btn--quiet", icon("#i-refresh")'));
+    check("Review: langer Suchbegriff bricht um", rule("gzempty p").includes("overflow-wrap:anywhere"));
+    check("Review: ungültiger Wunsch nicht nur über Farbe", page.includes("aria-invalid") && page.includes("badInput"));
+    check("Review: Fokus nach dem Sprung", /"limits:open"[\s\S]{0,300}buttons\.get\("grenzen"\)\?\.focus\(\)/.test(page) && page.includes("side.focus()"));
+    check("Review: Name der Grenze bricht nicht mitten im Wort", rule("gzrow").includes("minmax(6.5em,1fr)") && rule("gzrow__val").includes("flex-wrap:wrap") && !rule("gzrow__name").includes("anywhere"));
 }
 
 /**
