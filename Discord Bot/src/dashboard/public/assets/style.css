@@ -5760,7 +5760,7 @@ body.sg-locked{overflow:hidden}
   .gzcards{grid-template-columns:1fr}
   .gzcard__head{padding:10px 12px}
   .gzrow{grid-template-columns:minmax(0,1fr) auto;padding:10px 12px}
-  .gzrow__act{grid-column:1 / -1;grid-row:auto;justify-self:start}
+  .gzrow__act{grid-column:1 / -1;grid-row:3;justify-self:start}
   .gzrow.is-fixed .gzrow__act{display:none}
   .gzbar .search{max-width:none;flex:1 1 100%}
   .gzform{padding:4px 12px 12px}
