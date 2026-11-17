@@ -1,11 +1,4 @@
-import {
-    ActionRowBuilder,
-    ButtonBuilder,
-    ButtonStyle,
-    ChatInputCommandInteraction,
-    MessageFlags,
-    SlashCommandBuilder,
-} from "discord.js";
+import { ChatInputCommandInteraction, MessageFlags, SlashCommandBuilder } from "discord.js";
 import BotClient from "../../client/BotClient";
 import Command from "../../structures/Command";
 import Category from "../../enums/Category";
@@ -13,9 +6,11 @@ import { IPrimeProfile } from "../../interfaces/services/prime/IPrimeService";
 import { RankMessage } from "../../builder/RankView";
 import { LINK_COOLDOWN, LINK_COOLDOWN_DAYS, LINK_COOLDOWN_DEV, LINK_FIX } from "../../constants/Database";
 import { PrimeError } from "../../services/PrimeService";
-import { EPIC_LINK_MINUTES, EpicLinkURL, EpicLoginReady } from "../../utils/epicLogin";
+import { EpicLinkURL, EpicLoginReady } from "../../utils/epicLogin";
 import { EpicAdopt } from "../../utils/epic";
-import { CurrentLinkMode } from "../../utils/moduleFlags";
+import { CurrentLinkMode, ModuleValue } from "../../utils/moduleFlags";
+import { AskLine, IsServerAdmin } from "../../builder/LimitReply";
+import ComponentV2Builder from "../../builder/ComponentV2Builder";
 import { LinkUsable } from "../../models/PlayerAccount";
 import logger from "../../utils/logger";
 
@@ -231,28 +226,32 @@ export default class Rank extends Command {
 
         // Ist schon ein Konto verbunden, soll es ein anderes werden: Epic fragt dann neu
         // nach der Anmeldung, statt still das schon angemeldete (falsche) Konto zu nehmen.
-        const button = new ButtonBuilder()
-            .setStyle(ButtonStyle.Link)
-            .setLabel(current ? "Anderes Epic-Konto verbinden" : "Mit Epic Games anmelden")
-            .setEmoji("🔐")
-            // Der Kanal geht mit: „Zurück zu Discord“ auf der Seite danach führt genau hierher.
-            .setURL(EpicLinkURL(this.client, userId, Date.now(), !!current, `${interaction.guildId ?? "@me"}/${interaction.channelId}`));
+        // Der Kanal geht mit: „Zurück zu Discord“ auf der Seite danach führt genau hierher.
+        const url = EpicLinkURL(this.client, userId, Date.now(), !!current, `${interaction.guildId ?? "@me"}/${interaction.channelId}`);
 
         const name = current ? `**${current.display_name ?? current.account_id}**` : "";
         const intro = !current
-            ? ""
+            ? "Melde dich bei Epic Games an. Danach gehört dein Epic-Konto zu diesem Discord-Konto, und niemand sonst kann es verbinden."
             : cooldown.fixUntil
-              ? `Verbunden ist gerade ${name}. Falsches Konto? Bis <t:${Math.floor(cooldown.fixUntil / 1000)}:t> kannst du ohne Wartezeit ein anderes verbinden, Epic fragt dafür neu nach der Anmeldung.\n`
-              : `Verbunden ist gerade ${name}. Mit dem Knopf verbindest du ein anderes Epic-Konto, Epic fragt dafür neu nach der Anmeldung.\n`;
+              ? `Verbunden ist gerade ${name}. Falsches Konto? Bis <t:${Math.floor(cooldown.fixUntil / 1000)}:t> kannst du ohne Wartezeit ein anderes verbinden, Epic fragt dafür neu nach der Anmeldung.`
+              : `Verbunden ist gerade ${name}. Mit dem Knopf verbindest du ein anderes Epic-Konto, Epic fragt dafür neu nach der Anmeldung.`;
 
-        await interaction.editReply({
-            content:
-                ignored +
-                intro +
-                (current ? "" : "Melde dich mit dem Knopf bei Epic Games an. Danach gehört dein Epic-Konto zu diesem Discord-Konto, und niemand sonst kann es verbinden.\n") +
-                `-# Der Knopf gilt ${EPIC_LINK_MINUTES} Minuten und nur für dich. Gib ihn nicht weiter.`,
-            components: [new ActionRowBuilder<ButtonBuilder>().addComponents(button)],
-        });
+        // W-0133, Entwurf M: Karte mit Titel und Knopf, darunter klein Gültigkeit und die Art.
+        const card = new ComponentV2Builder({ accentColor: 0xff1e2d })
+            .text("### 🔗 Epic-Konto verbinden")
+            .text(ignored + intro)
+            .buttons({ url, label: current ? "Anderes Epic-Konto verbinden" : "Mit Epic Games anmelden", emoji: "🔐" })
+            .separator()
+            .subtext(`Der Knopf gilt ${ModuleValue("rl-tracking", "linkMinutes", null)} Minuten und nur für dich. Gib ihn nicht weiter.`);
+
+        if (interaction.guildId) {
+            const ask = AskLine({ module: "rl-tracking", key: "linkMode", guildId: interaction.guildId, admin: IsServerAdmin(interaction.member) });
+
+            card.subtext(ask.text);
+            if (ask.button) card.buttons(ask.button);
+        }
+
+        await interaction.editReply({ components: [card.build()], flags: MessageFlags.IsComponentsV2, allowedMentions: { parse: [] } });
     }
 
     /**

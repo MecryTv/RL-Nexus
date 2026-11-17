@@ -11,7 +11,9 @@
 process.env.CLIENT_SECRET ||= "check-secret";
 process.env.DEV_CLIENT_SECRET ||= "check-secret";
 
+import { PermissionFlagsBits, PermissionsBitField } from "discord.js";
 import BotClient from "../client/BotClient";
+import { SUPPORT_URL } from "../constants/Help";
 import { DASHBOARD_PATH } from "../constants/Dashboard";
 import { LINK_COOLDOWN, LINK_FIX, Platform } from "../constants/Database";
 import PlayerAccount from "../models/PlayerAccount";
@@ -646,6 +648,19 @@ async function checkNameLink(): Promise<void> {
     me.Send = async (_interaction: unknown, _profile: unknown, name: string | null, avatar: string | null) => void shown.push(name, avatar);
     await me.Me({ ...LinkAsk(null), user: { id: USER, username: "user-1", displayAvatarURL: () => "https://cdn.discordapp.com/a.png" }, inCachedGuild: () => false });
     check("Beides, per Name verbunden: Karte ohne Discord-Namen und Bild", shown.length === 2 && shown[0] === null && shown[1] === null, JSON.stringify(shown));
+
+    // W-0133, Entwurf M: /rank link als Karte; den Anfrage-Knopf sehen nur Server-Admins.
+    SetFlags([], [], []);
+    const memberCard = await link(Client([], { primeService: prime }), null);
+    check(
+        "/rank link als Karte: Titel und Login-Knopf, für Mitglieder ohne Anfrage-Knopf und Server-ID",
+        text(memberCard).includes("Epic-Konto verbinden") && text(memberCard).includes("link/epic") && !text(memberCard).includes(SUPPORT_URL) && !text(memberCard).includes("1162553851187040326"),
+        text(memberCard).slice(0, 300)
+    );
+
+    const adminAsk = { ...LinkAsk(null), member: { permissions: new PermissionsBitField(PermissionFlagsBits.ManageGuild) } };
+    await (new Rank(Client([], { primeService: prime })) as unknown as { Link: (interaction: unknown) => Promise<void> }).Link(adminAsk);
+    check("/rank link für Server-Admins: Anfrage-Knopf und Server-ID", text(adminAsk).includes(SUPPORT_URL) && text(adminAsk).includes("1162553851187040326"), text(adminAsk).slice(0, 300));
 
     // W-0133: Art je Server. Der Testserver weicht von der Art für alle ab.
     const guildMode = (global: "login" | "name" | "both", own: "login" | "name" | "both") =>

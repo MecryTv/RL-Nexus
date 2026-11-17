@@ -8,6 +8,8 @@ import { HelpCatalog, IHelpText } from "./Help";
 
 const MOD = "Moderations-Team: Moderatoren-Liste im Dashboard oder das passende Discord-Recht";
 const MANAGE = "Wer „Server verwalten“ hat";
+/** W-0133: Satz bei Befehlen, deren Grenzen RL Nexus festlegt und auf Anfrage je Server ändert. */
+const LIMITS = "Grenzen legt RL Nexus fest, auf Anfrage für euren Server änderbar.";
 
 /** Gemeinsame Teile der Strafen (/warn, /timeout, /kick, /ban). */
 const PUNISH_AFTER = [
@@ -190,6 +192,7 @@ export const HELP_CATALOG: HelpCatalog = {
         area: "support",
         module: "tickets",
         what: "Richtet das Ticket-System in Discord ein. Dasselbe geht im Dashboard, beide speichern an derselben Stelle.",
+        tip: `Offene Tickets je Person und die Größe der Transkripte: ${LIMITS}`,
         subs: {
             setup: {
                 emoji: "🧰",
@@ -290,7 +293,7 @@ export const HELP_CATALOG: HelpCatalog = {
         area: "community",
         module: "giveaways",
         what: "Verlosungen starten und verwalten. Gewinner müssen sich melden, wer die Frist verpasst, wird ersetzt. Bonus-Lose, mehrere Bedingungen und geplanter Start gehen im Dashboard.",
-        tip: "Die Nummer (#) steht am Giveaway im Kanal.",
+        tip: `Die Nummer (#) steht am Giveaway im Kanal. Höchstzahl der Gewinner und Laufzeit: ${LIMITS}`,
         subs: {
             start: {
                 emoji: "🎁",
@@ -360,6 +363,7 @@ export const HELP_CATALOG: HelpCatalog = {
         area: "always",
         module: "levels",
         what: "Punkte und Level für Nachrichten und Zeit im Sprachkanal, dazu die Rangliste des Servers.",
+        tip: `Punkte je Aktion und Boosts: ${LIMITS}`,
         subs: {
             rang: {
                 emoji: "🪪",
@@ -515,6 +519,7 @@ export const HELP_CATALOG: HelpCatalog = {
                 ],
                 fields: { epicname: "Dein Epic-Name, genau wie im Spiel. Zählt nur, wenn Verbinden per Name erlaubt ist, sonst führt der Knopf zur Anmeldung." },
                 after: ["Nur du siehst die Antwort", "Der Knopf gilt 10 Minuten"],
+                tip: "Wie verbunden wird, legt RL Nexus fest; für euren Server lässt sich die Art auf Anfrage ändern.",
             },
             me: {
                 emoji: "🏅",

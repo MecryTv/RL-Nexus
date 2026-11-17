@@ -8,7 +8,10 @@
 process.env.CLIENT_SECRET ||= "check-secret";
 process.env.DEV_CLIENT_SECRET ||= "check-secret";
 
+import { MessageFlags, PermissionFlagsBits, PermissionsBitField } from "discord.js";
 import BotClient from "../client/BotClient";
+import { AskLine, IsServerAdmin, LimitReply } from "../builder/LimitReply";
+import { SUPPORT_URL } from "../constants/Help";
 import CommandHandler from "../events/client/CommandHandler";
 import GuildSettings from "../models/GuildSettings";
 import PlayerAccount, { LinkUsable } from "../models/PlayerAccount";
@@ -398,6 +401,47 @@ async function checkValues(): Promise<void> {
     SetFlags([], [], []);
 }
 
+/** W-0133, Entwurf M: Satz und Knopf „auf Anfrage“, Karte bei erreichter Grenze. */
+async function checkAsk(): Promise<void> {
+    console.log("\n  — Meldungen „auf Anfrage“ (W-0133) —");
+
+    const guildId = "1162553851187040326";
+
+    SetFlags([], [], []);
+    const admin = AskLine({ module: "giveaways", key: "maxWinners", guildId, admin: true, asked: 80 });
+    check("Admin, auf Anfrage: Satz mit Server-ID und Wunsch, Knopf zum Support", admin.text.includes(guildId) && admin.text.includes("80") && admin.button?.url === SUPPORT_URL, admin.text);
+
+    const member = AskLine({ module: "giveaways", key: "maxWinners", guildId, admin: false, asked: 80 });
+    check("Mitglied: kein Knopf, keine Server-ID (Review Focus 3)", member.button === null && !member.text.includes(guildId) && member.text.includes("Server-Admin"), member.text);
+
+    const fixed = AskLine({ module: "giveaways", key: "scheduleDays", guildId, admin: true });
+    check("Auf Anfrage aus: nur der kurze Satz", fixed.button === null && fixed.text === "ℹ️ Die Grenze legt RL Nexus fest.", fixed.text);
+
+    const link = AskLine({ module: "rl-tracking", key: "linkMode", guildId, admin: false });
+    check("Verknüpfungsart für Mitglieder: nennt die Art, keine Server-ID", link.text.includes("Epic-Anmeldung") && !link.text.includes(guildId) && link.button === null, link.text);
+
+    const reply = LimitReply({
+        module: "giveaways",
+        key: "maxWinners",
+        guildId,
+        admin: true,
+        title: "Höchstens 50 Gewinner",
+        text: "Du hast **80** angegeben.",
+        asked: 80,
+        fallback: { label: "Mit 50 Gewinnern starten", customId: "gw:limit:abc" },
+    });
+    const json = JSON.stringify(reply.components);
+    check(
+        "LimitReply: Ersatz und Abbrechen, Anfrage-Knopf, nur für die Person, ohne Pings",
+        json.includes('"gw:limit:abc"') && json.includes("gw:limit:abc:abbrechen") && json.includes(SUPPORT_URL) && (reply.flags & MessageFlags.Ephemeral) !== 0 && reply.allowedMentions.parse.length === 0,
+        json.slice(0, 300)
+    );
+    check(
+        "IsServerAdmin: nur mit „Server verwalten“",
+        IsServerAdmin({ permissions: new PermissionsBitField(PermissionFlagsBits.ManageGuild) } as never) && !IsServerAdmin({ permissions: "0" } as never) && !IsServerAdmin(null)
+    );
+}
+
 async function main(): Promise<void> {
     console.log("\n  — Modul-Einstellungen (W-0131) —");
 
@@ -465,6 +509,7 @@ async function main(): Promise<void> {
     await checkGating();
     await checkTrust();
     await checkValues();
+    await checkAsk();
 
     console.log(failures > 0 ? `\n  ${failures} Prüfung(en) fehlgeschlagen.\n` : "\n  Alles ok.\n");
     process.exit(failures > 0 ? 1 : 0);
