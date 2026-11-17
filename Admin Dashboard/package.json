@@ -15,6 +15,7 @@
         "build": "tsc -b && vite build",
         "check": "node server/check.ts",
         "check:db": "node --env-file=.env server/check-db.ts",
+        "activity:import": "node --env-file-if-exists=.env server/activity-import.ts",
         "lint": "oxlint",
         "typecheck": "tsc -b"
     },

@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { gzipSync } from "node:zlib";
 import type { ActivityDevice, ActivityService, ActivitySource, StatusClass } from "../../shared/activity.ts";
 import type { IHit } from "../activity/parse.ts";
+import { importHistory } from "../activity/import.ts";
 import { addHits, pruneActivity, readActivity, readerState, saveReaderState } from "../activity/store.ts";
 import type { IConfig } from "../config.ts";
 import { query } from "../db.ts";
@@ -14,6 +19,7 @@ import { check, section } from "./harness.ts";
  */
 const BEFORE = "2002-01-01 00:00:00";
 const READER = "check:db";
+const AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36";
 
 function testHit(at: string, service: ActivityService, extra: Partial<IHit> = {}): IHit {
     const hour = new Date(at);
@@ -141,6 +147,40 @@ export async function checkActivityDb(_config: IConfig): Promise<void> {
 
             assert.deepEqual(loaded, { inode: "123456789012345678902", offset: 10, firstLineAt: new Date("2026-10-25T00:30:00Z") });
             await query("DELETE FROM activity_reader WHERE name = ?", [READER]);
+        });
+
+        await check("Nachlesen: nur die drei Seiten und nur Zeilen vor dem eigenen Protokoll, auch aus .gz", async () => {
+            const names = { live: "check:db live", import: "check:db import" };
+            const dir = await mkdtemp(path.join(tmpdir(), "rlnexus-nachlesen-"));
+            const row = (host: string, time: string, page: string) => `${host} 203.0.113.0 [${time}] "GET ${page} HTTP/2.0" 200 512 "-" "${AGENT}"`;
+
+            await query("DELETE FROM activity_reader WHERE name IN (?, ?)", [names.live, names.import]);
+
+            try {
+                // Das eigene Protokoll beginnt am 29.10.1999 um 12:00 UTC. Davor zählen nur die drei Seiten,
+                // auch aus der gepackten Datei; die Zeile um 12:30 UTC zählte schon das laufende Lesen.
+                const after = row("nexus-emb.de", "29/Oct/1999:14:30:00 +0200", "/spaet");
+
+                await writeFile(path.join(dir, "access.log"), [row("status.nexus-emb.de", "29/Oct/1999:12:00:00 +0200", "/"), row("nexus-emb.de", "29/Oct/1999:13:30:00 +0200", "/module"), after].join("\n") + "\n");
+                await writeFile(path.join(dir, "access.log.1"), [row("nexus-emb.de", "27/Oct/1999:09:00:00 +0200", "/"), row("mail.nexus-emb.de", "27/Oct/1999:09:00:00 +0200", "/")].join("\n") + "\n");
+                await writeFile(path.join(dir, "access.log.2.gz"), gzipSync(row("dashboard.nexus-emb.de", "26/Oct/1999:10:00:00 +0200", "/guild/1/levels") + "\n"));
+
+                assert.equal(await importHistory(dir, new Date("1999-10-30T10:00:00Z"), names), "no-live-yet");
+
+                await saveReaderState(names.live, { inode: "1", offset: 0, firstLineAt: new Date("1999-10-29T12:00:00Z") });
+
+                const first = await importHistory(dir, new Date("1999-10-30T10:00:00Z"), names);
+
+                assert.deepEqual(first, { lines: 5, hits: 4 });
+                assert.equal(await importHistory(dir, new Date("1999-10-30T10:00:00Z"), names), "already");
+
+                const [counted] = await query<{ n: number }[]>("SELECT CAST(SUM(views) AS SIGNED) AS n FROM activity_views WHERE hour >= ? AND hour < ?", ["1999-10-26 00:00:00", "1999-10-31 00:00:00"]);
+
+                assert.equal(Number(counted!.n), 4);
+            } finally {
+                await query("DELETE FROM activity_reader WHERE name IN (?, ?)", [names.live, names.import]);
+                await rm(dir, { recursive: true, force: true });
+            }
         });
 
         await check("Älter als 13 Monate wird gelöscht, Jüngeres bleibt", async () => {
