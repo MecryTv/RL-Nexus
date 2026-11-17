@@ -16,6 +16,7 @@
         "check": "node server/check.ts",
         "check:db": "node --env-file=.env server/check-db.ts",
         "activity:import": "node --env-file-if-exists=.env server/activity-import.ts",
+        "activity:sample": "node --env-file-if-exists=.env server/activity-sample.ts",
         "lint": "oxlint",
         "typecheck": "tsc -b"
     },

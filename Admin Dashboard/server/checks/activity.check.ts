@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
-import { appendFile, mkdtemp, rename, rm, writeFile } from "node:fs/promises";
+import { appendFile, mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { classify, parseAccessLine, type IAccessLine } from "../activity/parse.ts";
 import { readOnce, type IReaderState } from "../activity/reader.ts";
+import { changeText, heatStep, linePath, niceMax } from "../../shared/activityChart.ts";
+import { AREAS } from "../../src/nav/areas.ts";
 import { check, section } from "./harness.ts";
 
 /**
@@ -139,6 +141,44 @@ export async function checkActivity(): Promise<void> {
 
         assert.equal(result.hour.toISOString(), "2026-10-25T00:00:00.000Z");
         assert.equal(parsed(line("nexus-emb.de", "GET / HTTP/2.0", 200, "-", WINDOWS, "25/Oct/2026:02:30:00 +0100")).at.toISOString(), "2026-10-25T01:30:00.000Z");
+    });
+
+    section("Aktivität: Graphen und Navigation");
+
+    await check("Achse in runden Schritten, nie 0", () => {
+        assert.equal(niceMax(236), 250);
+        assert.equal(niceMax(0), 50);
+        assert.equal(niceMax(7), 10);
+        // Sichtprüfung: Spitze bei 105 ließ mit 50er-Schritten die halbe Fläche leer.
+        assert.equal(niceMax(105), 125);
+        assert.equal(niceMax(12), 15);
+    });
+
+    await check("Heatmap-Stufen 0 bis 5", () => {
+        assert.equal(heatStep(0, 0), 0);
+        assert.equal(heatStep(46, 46), 5);
+        assert.equal(heatStep(1, 46), 1);
+    });
+
+    await check("Veränderung als Text, ohne Vergleich ein Strich", () => {
+        assert.equal(changeText(0.18), "+18 %");
+        assert.equal(changeText(-0.04), "−4 %");
+        assert.equal(changeText(0), "±0 %");
+        assert.equal(changeText(null), "—");
+    });
+
+    await check("Linie beginnt unten links", () => {
+        assert.ok(linePath([0, 10], 100, 50, 10).startsWith("M0,50"));
+        assert.equal(linePath([0, 10], 100, 50, 10), "M0,50 L100,0");
+    });
+
+    await check("Aktivität steht unter Start, App kennt die Seite", async () => {
+        const start = AREAS.find((area) => area.id === "start")!;
+        const app = await readFile(path.join(process.cwd(), "src", "App.tsx"), "utf8");
+
+        assert.deepEqual(start.pages.map((page) => page.to), ["/", "/aktivitaet", "/post"]);
+        assert.equal(start.pages[1]!.icon, "pulse");
+        assert.ok(app.includes('path="aktivitaet"'));
     });
 
     section("Aktivität: Lesen");
