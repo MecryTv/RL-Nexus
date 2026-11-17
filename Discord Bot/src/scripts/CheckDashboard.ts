@@ -1839,6 +1839,22 @@ async function checkLimitsMarkup(): Promise<void> {
 
     check("Klassen gz…: je genau eine Grundregel", defined.size > 0 && wrong.length === 0, wrong.join(", "));
     check("Klassen gz… nur auf der Seite Grenzen", foreign.length === 0, foreign.join(", "));
+
+    // Anfrage am Wert: der Text nennt den Server beim Namen, nie bei der ID.
+    const calls = [...page.matchAll(/limitRequestText\(/g)].map((match) => {
+        let depth = 0;
+        let end = match.index!;
+
+        for (; end < page.length; end++) {
+            if (page[end] === "(") depth++;
+            if (page[end] === ")" && --depth === 0) break;
+        }
+
+        return page.slice(match.index!, end + 1);
+    });
+
+    check("Anfragetext mit Servername, ohne Server-ID", calls.length > 0 && calls.every((call) => call.startsWith("limitRequestText(guild.name") && !call.includes("guild.id")), `${calls.length} Aufruf(e)`);
+    check("Anfrage: Support-Link und aufklappbar", page.includes("SUPPORT_DISCORD") && page.includes("aria-expanded"));
 }
 
 /**

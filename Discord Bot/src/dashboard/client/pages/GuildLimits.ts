@@ -11,8 +11,9 @@ import { BASE } from "../core/Base.js";
 import { icon } from "../core/Dom.js";
 import { button, el } from "../core/Ui.js";
 import { MODULES } from "../constants/Modules.js";
-import { askableCount, ILimitCard, LimitFilter, limitCards, limitCounts, limitName, limitsHref, limitStatus, limitStatusText, limitTabs, parseLimitsQuery } from "../constants/Limits.js";
+import { askableCount, ILimitCard, LimitFilter, limitCards, limitCounts, limitName, limitRequestText, limitsHref, limitStatus, limitStatusText, limitTabs, parseLimitsQuery, wishProblem } from "../constants/Limits.js";
 import { IGuild, IModuleLimit } from "../interfaces/IGuild.js";
+import { SUPPORT_DISCORD } from "../layout/Report.js";
 
 type Tab = "module" | "grenzen";
 
@@ -27,6 +28,21 @@ const STATE_ICONS = { ask: "#i-message", granted: "#i-check", fixed: "#i-lock" }
 
 const amount = (value: number): string => value.toLocaleString("de-DE");
 
+/** Zwischenablage, sonst der alte Weg über ein Textfeld (wie früher im Kasten). */
+function copyText(text: string): Promise<void> {
+    const fallback = (): void => {
+        const area = document.createElement("textarea");
+
+        area.value = text;
+        document.body.append(area);
+        area.select();
+        document.execCommand("copy");
+        area.remove();
+    };
+
+    return navigator.clipboard ? navigator.clipboard.writeText(text).catch(fallback) : Promise.resolve(fallback());
+}
+
 export function bindLimitsTab(guild: IGuild, section: HTMLElement): (limits: Record<string, IModuleLimit[]>) => void {
     const tabs = limitTabs(guild.canManage, 0);
 
@@ -37,6 +53,8 @@ export function bindLimitsTab(guild: IGuild, section: HTMLElement): (limits: Rec
     let module: string | null = null;
     let filter: LimitFilter = "all";
     let search = "";
+    // Höchstens eine Anfrage ist offen; ihre Eingaben überleben Suche und Filter.
+    let open: { card: string; key: string; wish: string; reason: string } | null = null;
 
     // Die Schalter (und ihr Hinweis) wandern in ein eigenes Panel, damit der
     // Reiter Module sie zeigen und verbergen kann.
@@ -226,13 +244,12 @@ export function bindLimitsTab(guild: IGuild, section: HTMLElement): (limits: Rec
             header.append(go);
         }
 
-        return el("section", "gzcard", header, ...entry.rows.map(row));
+        return el("section", "gzcard", header, ...entry.rows.flatMap((limit) => row(entry, limit)));
     }
 
-    function row(entry: IModuleLimit): HTMLElement {
+    function row(card: ILimitCard, entry: IModuleLimit): HTMLElement[] {
         const status = limitStatus(entry);
         const value = el("span", "gzrow__val");
-        const act = el("span", "gzrow__act", "—");
 
         if (status === "granted" && entry.value !== entry.standard) value.append(el("s", "", amount(entry.standard)), " ");
 
@@ -240,13 +257,107 @@ export function bindLimitsTab(guild: IGuild, section: HTMLElement): (limits: Rec
 
         if (entry.unit) value.append(el("small", "", entry.unit));
 
-        act.setAttribute("aria-hidden", "true");
+        const state = el("span", "gzrow__state", icon(STATE_ICONS[status]), limitStatusText(entry));
+        const name = el("span", "gzrow__name", limitName(entry.label));
 
-        const line = el("div", `gzrow is-${status}`, el("span", "gzrow__name", limitName(entry.label)), value, act, el("span", "gzrow__state", icon(STATE_ICONS[status]), limitStatusText(entry)));
+        // Feste Werte lassen sich nicht anfragen: dort steht nur ein Strich.
+        if (status === "fixed") {
+            const none = el("span", "gzrow__act", "—");
 
-        line.dataset.key = entry.key;
+            none.setAttribute("aria-hidden", "true");
 
-        return line;
+            return [el("div", "gzrow is-fixed", name, value, none, state)];
+        }
+
+        const id = `gzform-${card.id}-${entry.key}`;
+        const isOpen = open?.card === card.id && open.key === entry.key;
+        const act = button("gzrow__act", icon("#i-down"), "Anfragen");
+        const line = el("div", `gzrow is-${status}${isOpen ? " is-open" : ""}`, name, value, act, state);
+
+        act.setAttribute("aria-expanded", String(isOpen));
+        act.setAttribute("aria-controls", id);
+        act.setAttribute("aria-label", `${limitName(entry.label)} anfragen`);
+        act.addEventListener("click", () => {
+            open = isOpen ? null : { card: card.id, key: entry.key, wish: "", reason: "" };
+            paintBody();
+
+            if (open) document.getElementById(id)?.querySelector("input")?.focus();
+            else document.querySelector<HTMLElement>(`[aria-controls="${id}"]`)?.focus();
+        });
+
+        return isOpen ? [line, form(card, entry, id)] : [line];
+    }
+
+    function form(card: ILimitCard, entry: IModuleLimit, id: string): HTMLElement {
+        const draft = open!;
+        const wish = el("input", "text");
+        const reason = el("input", "text");
+        const hint = el("small", "gzform__hint");
+        const text = el("code", "gzform__text");
+        const support = el("a", "btn gzform__ask", icon("#i-external"), "Anfrage im Support");
+        const copy = button("btn btn--quiet", icon("#i-copy"), "Text kopieren");
+        const close = button("gzform__close", "Schließen");
+        const box = el(
+            "div",
+            "gzform",
+            el("div", "gzform__fields", el("label", "gzform__field", el("span", "", "Gewünscht"), wish, hint), el("label", "gzform__field", el("span", "", "Weil"), reason)),
+            text,
+            el("div", "gzform__acts", support, copy, close)
+        );
+        const unit = entry.unit ? ` ${entry.unit}` : "";
+
+        // Der Text zeigt „…“, solange der Wunsch nicht passt - nie eine falsche Zahl.
+        const update = (): void => {
+            const wanted = draft.wish === "" ? Number.NaN : Number(draft.wish);
+            const problem = wishProblem(entry, wanted);
+
+            hint.textContent = draft.wish === "" ? `Mehr als ${amount(entry.value)}${unit}` : (problem ?? "");
+            hint.classList.toggle("is-bad", draft.wish !== "" && problem !== null);
+            text.textContent = limitRequestText(guild.name, card.name, entry, problem ? Number.NaN : wanted, draft.reason);
+        };
+
+        box.id = id;
+        wish.type = "number";
+        wish.min = String(entry.value + 1);
+        wish.step = "1";
+        wish.inputMode = "numeric";
+        wish.value = draft.wish;
+        wish.addEventListener("input", () => {
+            draft.wish = wish.value;
+            update();
+        });
+        hint.setAttribute("aria-live", "polite");
+        reason.type = "text";
+        reason.maxLength = 200;
+        reason.value = draft.reason;
+        reason.placeholder = "z. B. Turnier mit 64 Teams";
+        reason.addEventListener("input", () => {
+            draft.reason = reason.value;
+            update();
+        });
+        support.href = SUPPORT_DISCORD;
+        support.target = "_blank";
+        support.rel = "noopener";
+        copy.addEventListener("click", () => {
+            void copyText(text.textContent ?? "").then(() => {
+                copy.replaceChildren(icon("#i-check"), "Kopiert");
+                setTimeout(() => copy.replaceChildren(icon("#i-copy"), "Text kopieren"), 2000);
+            });
+        });
+        close.addEventListener("click", shut);
+        box.addEventListener("keydown", (event) => {
+            if (event.key === "Escape") shut();
+        });
+
+        function shut(): void {
+            open = null;
+            paintBody();
+            document.querySelector<HTMLElement>(`[aria-controls="${id}"]`)?.focus();
+        }
+
+        update();
+
+        return box;
     }
 
     // Auf die Seite Module kommt man über die Leiste, Zurück/Vorwärts oder den
@@ -261,6 +372,7 @@ export function bindLimitsTab(guild: IGuild, section: HTMLElement): (limits: Rec
     window.addEventListener("limits:open", () => {
         filter = "all";
         search = "";
+        open = null;
         input.value = "";
         read();
         paint();
