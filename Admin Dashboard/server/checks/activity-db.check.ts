@@ -3,11 +3,12 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { gzipSync } from "node:zlib";
-import type { ActivityDevice, ActivityService, ActivitySource, StatusClass } from "../../shared/activity.ts";
+import type { ActivityDevice, ActivityService, ActivitySource, IActivityView, StatusClass } from "../../shared/activity.ts";
 import type { IHit } from "../activity/parse.ts";
 import { importHistory } from "../activity/import.ts";
 import { addHits, pruneActivity, readActivity, readerState, saveReaderState } from "../activity/store.ts";
 import type { IConfig } from "../config.ts";
+import type { IHttp } from "./backups-db.check.ts";
 import { query } from "../db.ts";
 import { check, section } from "./harness.ts";
 
@@ -45,7 +46,7 @@ async function tidy(): Promise<void> {
     await query("DELETE FROM activity_status WHERE hour < ?", [BEFORE]);
 }
 
-export async function checkActivityDb(_config: IConfig): Promise<void> {
+export async function checkActivityDb(_config: IConfig, http: IHttp): Promise<void> {
     section("Aktivität (Datenbank)");
 
     await tidy();
@@ -181,6 +182,26 @@ export async function checkActivityDb(_config: IConfig): Promise<void> {
                 await query("DELETE FROM activity_reader WHERE name IN (?, ?)", [names.live, names.import]);
                 await rm(dir, { recursive: true, force: true });
             }
+        });
+
+        await check("Schnittstelle: ohne Sitzung 401, falsche Werte 400", async () => {
+            assert.equal((await http.raw("GET", "/api/activity?range=7d&service=all", {})).statusCode, 401);
+            assert.equal((await http.get("/api/activity?range=1y&service=all")).statusCode, 400);
+            assert.equal((await http.get("/api/activity?range=7d&service=mail")).statusCode, 400);
+        });
+
+        await check("Schnittstelle: 200 mit Kacheln, Verlauf, Heatmap, Geräten, Herkunft und Fehlern", async () => {
+            const response = await http.get("/api/activity?range=7d&service=website");
+            const body = response.json() as IActivityView;
+
+            assert.equal(response.statusCode, 200);
+            assert.equal(body.range, "7d");
+            assert.equal(body.service, "website");
+            assert.deepEqual(body.tiles.map((entry) => entry.service), ["website", "dashboard", "status"]);
+            assert.equal(body.series[0]!.points.length, 7);
+            assert.equal(body.heatmap.length, 7);
+            assert.deepEqual(Object.keys(body.devices).sort(), ["desktop", "mobile", "tablet"]);
+            assert.deepEqual(Object.keys(body.errors).sort(), ["client", "server"]);
         });
 
         await check("Älter als 13 Monate wird gelöscht, Jüngeres bleibt", async () => {

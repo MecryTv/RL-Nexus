@@ -4070,7 +4070,7 @@ try {
     await checkNewsDb(config, http());
     await checkDatabaseDb();
     await checkDumpsDb(config);
-    await checkActivityDb(config);
+    await checkActivityDb(config, http());
 } finally {
     stopStatusPost();
     setShopMailer(null);

@@ -20,6 +20,7 @@ import { mailRoutes } from "./routes/mail.ts";
 import { notificationRoutes } from "./routes/notifications.ts";
 import { operationRoutes } from "./routes/operations.ts";
 import { overviewRoutes } from "./routes/overview.ts";
+import { activityRoutes } from "./routes/activity.ts";
 import { shopCustomerRoutes } from "./routes/shop-customers.ts";
 import { shopRoutes } from "./routes/shop.ts";
 import { publicShopRoutes } from "./routes/shop-public.ts";
@@ -94,6 +95,7 @@ export async function buildApp(config: IConfig): Promise<FastifyInstance> {
             subscribe(reply);
         });
         await api.register(overviewRoutes, { config });
+        await api.register(activityRoutes, { config });
         await api.register(userRoutes, { config });
         await api.register(groupRoutes, { config });
         await api.register(notificationRoutes);
