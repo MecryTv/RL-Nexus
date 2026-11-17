@@ -1,6 +1,7 @@
 import { ACTIVITY_DEVICES, ACTIVITY_SERVICES, ACTIVITY_SOURCES, type ActivityDevice, type ActivityRange, type ActivityService, type ActivitySource, type IActivityView } from "../../shared/activity.ts";
 import { query } from "../db.ts";
 import type { IHit } from "./parse.ts";
+import type { IReaderState } from "./reader.ts";
 
 /**
  * W-0138: Summen je Stunde speichern und für die Seite auswerten.
@@ -200,4 +201,22 @@ export async function pruneActivity(now: Date): Promise<number> {
     const statuses = await query<{ affectedRows: number }>("DELETE FROM activity_status WHERE hour < ?", [utc(cutoff)]);
 
     return Number(views.affectedRows) + Number(statuses.affectedRows);
+}
+
+/** Stand eines Lesers (`live`, `import`). Ohne Zeile: noch nie gelesen. */
+export async function readerState(name: string): Promise<IReaderState> {
+    const [row] = await query<{ inode: string | null; read_offset: number; first: string | null }[]>(
+        "SELECT inode, read_offset, DATE_FORMAT(first_line_at, '%Y-%m-%d %H:%i:%s') AS first FROM activity_reader WHERE name = ?",
+        [name]
+    );
+
+    return row ? { inode: row.inode, offset: Number(row.read_offset), firstLineAt: row.first ? fromDb(row.first) : null } : { inode: null, offset: 0, firstLineAt: null };
+}
+
+/** Sichert den Stand. Die erste Zeit bleibt, einmal gesetzt, für immer. */
+export async function saveReaderState(name: string, state: IReaderState): Promise<void> {
+    await query(
+        "INSERT INTO activity_reader (name, inode, read_offset, first_line_at) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE inode = VALUES(inode), read_offset = VALUES(read_offset), first_line_at = COALESCE(first_line_at, VALUES(first_line_at))",
+        [name, state.inode, state.offset, state.firstLineAt ? utc(state.firstLineAt) : null]
+    );
 }

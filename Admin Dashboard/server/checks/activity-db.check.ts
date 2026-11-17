@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import type { ActivityDevice, ActivityService, ActivitySource, StatusClass } from "../../shared/activity.ts";
 import type { IHit } from "../activity/parse.ts";
-import { addHits, pruneActivity, readActivity } from "../activity/store.ts";
+import { addHits, pruneActivity, readActivity, readerState, saveReaderState } from "../activity/store.ts";
 import type { IConfig } from "../config.ts";
 import { query } from "../db.ts";
 import { check, section } from "./harness.ts";
@@ -13,6 +13,7 @@ import { check, section } from "./harness.ts";
  * es in Berlin zweimal.
  */
 const BEFORE = "2002-01-01 00:00:00";
+const READER = "check:db";
 
 function testHit(at: string, service: ActivityService, extra: Partial<IHit> = {}): IHit {
     const hour = new Date(at);
@@ -126,6 +127,20 @@ export async function checkActivityDb(_config: IConfig): Promise<void> {
 
             assert.ok(empty.tiles.every((entry) => entry.views === 0 && entry.previous === 0 && entry.change === null));
             assert.deepEqual(empty.errors, { client: 0, server: 0 });
+        });
+
+        await check("Stand des Lesers sichern und laden, erste Zeit bleibt", async () => {
+            await query("DELETE FROM activity_reader WHERE name = ?", [READER]);
+
+            assert.deepEqual(await readerState(READER), { inode: null, offset: 0, firstLineAt: null });
+
+            await saveReaderState(READER, { inode: "123456789012345678901", offset: 4096, firstLineAt: new Date("2026-10-25T00:30:00Z") });
+            await saveReaderState(READER, { inode: "123456789012345678902", offset: 10, firstLineAt: new Date("2026-11-01T00:00:00Z") });
+
+            const loaded = await readerState(READER);
+
+            assert.deepEqual(loaded, { inode: "123456789012345678902", offset: 10, firstLineAt: new Date("2026-10-25T00:30:00Z") });
+            await query("DELETE FROM activity_reader WHERE name = ?", [READER]);
         });
 
         await check("Älter als 13 Monate wird gelöscht, Jüngeres bleibt", async () => {

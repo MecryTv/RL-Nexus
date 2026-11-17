@@ -1,5 +1,9 @@
 import assert from "node:assert/strict";
+import { appendFile, mkdtemp, rename, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { classify, parseAccessLine, type IAccessLine } from "../activity/parse.ts";
+import { readOnce, type IReaderState } from "../activity/reader.ts";
 import { check, section } from "./harness.ts";
 
 /**
@@ -136,4 +140,72 @@ export async function checkActivity(): Promise<void> {
         assert.equal(result.hour.toISOString(), "2026-10-25T00:00:00.000Z");
         assert.equal(parsed(line("nexus-emb.de", "GET / HTTP/2.0", 200, "-", WINDOWS, "25/Oct/2026:02:30:00 +0100")).at.toISOString(), "2026-10-25T01:30:00.000Z");
     });
+
+    section("Aktivität: Lesen");
+
+    const dir = await mkdtemp(path.join(tmpdir(), "rlnexus-aktivitaet-"));
+    const file = path.join(dir, "access.log");
+    const at = (minute: number) => `17/Nov/2026:14:${String(minute).padStart(2, "0")}:00 +0100`;
+    const row = (minute: number) => line("nexus-emb.de", `GET /seite-${minute} HTTP/2.0`, 200, "-", WINDOWS, at(minute)) + "\n";
+    let state: IReaderState = { inode: null, offset: 0, firstLineAt: null };
+    let got: string[] = [];
+    const read = async () => {
+        got = [];
+        state = await readOnce(dir, state, async (lines) => void got.push(...lines));
+    };
+
+    try {
+        await check("Drei Zeilen geschrieben, drei gelesen, erste Zeit gemerkt", async () => {
+            await writeFile(file, row(1) + row(2) + row(3));
+            await read();
+
+            assert.equal(got.length, 3);
+            assert.ok(got[0]!.includes("/seite-1"));
+            assert.equal(state.firstLineAt?.toISOString(), "2026-11-17T13:01:00.000Z");
+        });
+
+        await check("Halbe Zeile wartet, bis sie vollständig ist", async () => {
+            const half = row(4);
+
+            await appendFile(file, half.slice(0, 30));
+            await read();
+            assert.equal(got.length, 0);
+
+            await appendFile(file, half.slice(30));
+            await read();
+            assert.deepEqual(got.map((entry) => entry.includes("/seite-4")), [true]);
+        });
+
+        await check("Drehung: erst der Rest von access.log.1, dann die neue Datei, nichts doppelt", async () => {
+            await appendFile(file, row(5));
+            await rename(file, path.join(dir, "access.log.1"));
+            await writeFile(file, row(6) + row(7));
+            await read();
+
+            assert.deepEqual(got.map((entry) => /seite-(\d+)/.exec(entry)![1]), ["5", "6", "7"]);
+
+            await read();
+            assert.equal(got.length, 0);
+            assert.equal(state.firstLineAt?.toISOString(), "2026-11-17T13:01:00.000Z");
+        });
+
+        await check("Gekürzte Datei wird von vorn gelesen", async () => {
+            await writeFile(file, row(8));
+            await read();
+
+            assert.deepEqual(got.map((entry) => entry.includes("/seite-8")), [true]);
+        });
+
+        await check("Fehlender Ordner: keine Zeilen, kein Fehler, Stand bleibt", async () => {
+            const before = state;
+
+            got = [];
+            const after = await readOnce(path.join(dir, "gibt-es-nicht"), before, async (lines) => void got.push(...lines));
+
+            assert.equal(got.length, 0);
+            assert.deepEqual(after, before);
+        });
+    } finally {
+        await rm(dir, { recursive: true, force: true });
+    }
 }
