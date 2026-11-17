@@ -1,4 +1,8 @@
-import { MAX_PER_USER, NOTICE_LABELS } from "../../../constants/Clips";
+import { NOTICE_LABELS } from "../../../constants/Clips";
+import { settingDef } from "../../../constants/ModuleSettings";
+
+/** Die harte Obergrenze; was der Server darf, prüft ClipService (W-0133). */
+const MAX_PER_USER = settingDef("clips", "maxPerUser")?.max ?? 50;
 import { ClipNotice, IClipSettings } from "../../../interfaces/services/clips/IClips";
 import { ClipError } from "../../ClipService";
 import { IPanelModule, PanelError } from "../SettingsModel";

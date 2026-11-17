@@ -1,18 +1,16 @@
 import { FastifyReply, FastifyRequest } from "fastify";
+import { ModuleValue } from "../utils/moduleFlags";
 import BotClient from "../client/BotClient";
 import Route from "../structures/Route";
 import { DASHBOARD_PATH } from "../constants/Dashboard";
 import {
     CLIPS_MODULE,
     MAX_BLOCK_REASON,
-    MAX_CLIP_FILE,
     MAX_PENALTY_COUNT,
     MAX_PENALTY_DAYS,
-    MAX_PER_USER,
     MAX_PRIZE,
     NOTICE_LABELS,
     PENALTY_LABELS,
-    PLACES,
     REPEAT_LABELS,
 } from "../constants/Clips";
 import { KIND_LABELS as BODY_KINDS } from "../constants/Messages";
@@ -104,13 +102,14 @@ export default class DashboardApiClips extends Route {
             labels: { repeat: REPEAT_LABELS, notices: NOTICE_LABELS, penalties: PENALTY_LABELS },
             bodyKinds: BODY_KINDS,
             limits: {
-                perUser: MAX_PER_USER,
+                // W-0133: aus dem Admin, je Server.
+                perUser: ModuleValue("clips", "maxPerUser", guild.id),
                 prize: MAX_PRIZE,
-                places: PLACES,
+                places: ModuleValue("clips", "places", guild.id),
                 penaltyCount: MAX_PENALTY_COUNT,
                 penaltyDays: MAX_PENALTY_DAYS,
                 reason: MAX_BLOCK_REASON,
-                fileMegabytes: Math.round(MAX_CLIP_FILE / 1024 / 1024),
+                fileMegabytes: ModuleValue("clips", "fileMegabytes", guild.id),
             },
             warnDays: (await this.client.modSettings.Of(guild.id)).warnDays,
             guild: { name: guild.name, icon: guild.iconURL({ extension: "png", size: 128 }), ...GuildResources(guild) },

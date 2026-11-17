@@ -1,7 +1,8 @@
 import { ChannelType, Guild, GuildBasedChannel, GuildMember, OverwriteResolvable, PermissionFlagsBits, Role } from "discord.js";
 import BotClient from "../../client/BotClient";
 import { DecidedCard, HoldCard, PersonCard } from "../../builder/AntiVillainView";
-import { ANTI_VILLAIN_MODULE, AUTO_RELEASE_MS, GUARDS, MAX_DELETED, MAX_DELETED_TEXT, TEAM_ONLY, TRUST_MS } from "../../constants/AntiVillain";
+import { ANTI_VILLAIN_MODULE, AUTO_RELEASE_MS, GUARDS, MAX_DELETED, MAX_DELETED_TEXT, TEAM_ONLY } from "../../constants/AntiVillain";
+import { ModuleValue } from "../../utils/moduleFlags";
 import { IAvCase, IHit } from "../../interfaces/services/antivillain/IAntiVillain";
 import { ModerationError } from "../ModerationService";
 import { SendLog } from "../../utils/logtarget";
@@ -315,7 +316,7 @@ export default class Quarantine {
         };
 
         await this.client.avCases.Save(found.id, patch);
-        if (trusted) await this.client.avTrust.Set(guild.id, found.userId, now + TRUST_MS);
+        if (trusted) await this.client.avTrust.Set(guild.id, found.userId, now + ModuleValue("anti-villain", "trustDays", guild.id) * 86_400_000);
         this.av.scores.Clear(`${guild.id}:${found.userId}`);
 
         const closed = { ...found, ...patch } as IAvCase;

@@ -14,6 +14,7 @@ process.env.DEV_CLIENT_SECRET ||= "check-secret";
 import path from "path";
 import { existsSync } from "node:fs";
 import { ChannelType, Guild, GuildBasedChannel } from "discord.js";
+import { SetFlags } from "../utils/moduleFlags";
 import BotClient from "../client/BotClient";
 import { ClipNoticeView, ClipValues, PrizeText, WinnerText } from "../builder/ClipView";
 import {
@@ -24,10 +25,8 @@ import {
     DefaultMessages,
     LegacySchedule,
     MAX_PENALTY_COUNT,
-    MAX_PER_USER,
     NextSchedule,
     PenaltyText,
-    PLACES,
     ShiftDate,
     VideoExtension,
     WINNER_KEYS,
@@ -163,7 +162,7 @@ function checkSettings(client: BotClient): void {
         {
             channelId: TEXT,
             announceChannelId: VOICE,
-            maxPerUser: 999,
+            maxPerUser: 8,
             prizes: ["  Nitro  ", "Rolle", "x".repeat(500), "zu viel"],
             publicBoard: false,
             emoji: "👍",
@@ -174,8 +173,18 @@ function checkSettings(client: BotClient): void {
 
     check("Der Clip-Kanal kommt an", clean.channelId === TEXT);
     check("Ein Sprachkanal taugt nicht für Ansagen", clean.announceChannelId === null);
-    check("Clips je Person sind gedeckelt", clean.maxPerUser === MAX_PER_USER, String(clean.maxPerUser));
-    check("Preise: drei Plätze, gekürzt", clean.prizes.length === PLACES && clean.prizes[0] === "Nitro" && clean.prizes[2]!.length <= 100);
+    check("Clips je Person bis zur Grenze bleiben", clean.maxPerUser === 8, String(clean.maxPerUser));
+    check("Preise: getrimmt und gekürzt, gespeichert bis zur harten Obergrenze", clean.prizes.length === 10 && clean.prizes[0] === "Nitro" && clean.prizes[2]!.length <= 100 && clean.prizes[4] === "");
+
+    // W-0133: über der Grenze aus dem Admin abgelehnt, mit dem Satz für Server-Admins.
+    let tooMany = "";
+
+    try {
+        client.clipService.CleanSettings(FakeGuild(), { maxPerUser: 999 }, previous);
+    } catch (error) {
+        tooMany = error instanceof Error ? error.message : String(error);
+    }
+    check("Clips je Person über der Grenze: abgelehnt mit „legt RL Nexus fest“", tooMany.includes("10") && tooMany.includes("RL Nexus"), tooMany);
     check("Die öffentliche Seite lässt sich abschalten", clean.publicBoard === false);
     check("Ein normales Emoji geht", clean.emoji === "👍");
     check("Strafen: Schwellen gedeckelt, Unsinn wird 0 oder bleibt", clean.penalties.warn === MAX_PENALTY_COUNT && clean.penalties.timeout === 1 && clean.penalties.kick === 0 && clean.penalties.ban === 0, JSON.stringify(clean.penalties));
@@ -230,6 +239,15 @@ function checkRank(client: BotClient): void {
     check("Ohne Stimme gibt es keinen Platz", !winners.some((winner) => winner.entryId === 4));
     check("Die Preise hängen am Platz", winners[0]?.prize === "Nitro" && winners[1]?.prize === "Rolle");
     check("Keine Stimmen: keine Gewinner", service.Rank(entries, new Map(), [], GUILD).length === 0);
+
+    // W-0133: Plätze aus dem Admin. Fünf Plätze heißt fünf Gewinner, wenn genug Stimmen da sind.
+    const many = Array.from({ length: 6 }, (_, index) => Entry(10 + index, `9007199254741${String(index).padStart(4, "0")}`, 100 + index));
+    const votes = new Map(many.map((entry, index) => [entry.id, 10 - index]));
+
+    SetFlags([], [], [], [{ module: "clips", guildId: GUILD, status: null, notice: null, linkMode: null, values: { places: 5 }, updatedAt: null }]);
+    check("Fünf Plätze freigeschaltet: fünf Gewinner", service.Rank(many, votes, [], GUILD).length === 5);
+    SetFlags([], [], []);
+    check("Ohne Freischaltung: drei", service.Rank(many, votes, [], GUILD).length === 3);
 
     check("Emoji-Schlüssel: Server-Emoji über die ID", EmojiKey(`<a:gg:${EMOJI}>`) === EMOJI);
     check("Emoji-Schlüssel: mit und ohne Variantenzeichen gleich", EmojiKey(`❤${String.fromCodePoint(0xfe0f)}`) === EmojiKey("❤"));

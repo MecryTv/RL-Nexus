@@ -9,12 +9,8 @@ export const CLIPS_MODULE = "clips";
 export const CLIPS_ACCENT = "#ff1e2d";
 export const WINNERS_ACCENT = "#ffc53d";
 
-export const MAX_PER_USER = 10;
 export const MAX_PRIZE = 100;
-/** So viele Plätze werden gekürt. */
-export const PLACES = 3;
-/** Größer nimmt der Bot ein Video nicht an: jeder Clip wird gesichert, und der Platz auf dem Server ist endlich. */
-export const MAX_CLIP_FILE = 100 * 1024 * 1024;
+/* W-0133: Clips je Person, Plätze und die Größe eines Videos kommen aus dem Admin (constants/ModuleSettings.ts). */
 export const MAX_BLOCKED = 200;
 export const MAX_BLOCK_REASON = 200;
 export const DEFAULT_VOTE_EMOJI = "🔥";

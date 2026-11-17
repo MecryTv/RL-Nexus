@@ -1,5 +1,6 @@
 import { FastifyReply, FastifyRequest } from "fastify";
 import { ChannelType, Guild, PermissionFlagsBits } from "discord.js";
+import { ModuleValue } from "../utils/moduleFlags";
 import BotClient from "../client/BotClient";
 import Route from "../structures/Route";
 import { PRIVATE_HINT } from "../constants/StaffGrant";
@@ -157,7 +158,18 @@ export default class DashboardApiAntiVillain extends Route {
             // Der Köder muss ein Textkanal sein (Clean), Ankündigungskanäle fallen raus.
             baitChannels: [...guild.channels.cache.values()].filter((channel) => channel.type === ChannelType.GuildText).map((channel) => channel.id),
             nukeActions: NUKE_ACTIONS,
-            limits: { nuke: NUKE_LIMIT_RANGE, joins: RAID_JOINS_RANGE, end: RAID_END_RANGE, cleanup: CLEANUP_OPTIONS, trusted: MAX_TRUSTED },
+            limits: {
+                nuke: NUKE_LIMIT_RANGE,
+                joins: RAID_JOINS_RANGE,
+                end: RAID_END_RANGE,
+                cleanup: CLEANUP_OPTIONS,
+                trusted: MAX_TRUSTED,
+                // W-0133: Zeiten aus dem Admin, je Server.
+                raidSeconds: ModuleValue("anti-villain", "raidWindowSeconds", guild.id),
+                slowmode: ModuleValue("anti-villain", "raidSlowmodeSeconds", guild.id),
+                nukeMinutes: ModuleValue("anti-villain", "nukeWindowMinutes", guild.id),
+                trustDays: ModuleValue("anti-villain", "trustDays", guild.id),
+            },
             targets: await LogTargets(guild, [settings.logChannelId]),
             guild: GuildResources(guild),
             // Für „vertraute Bots“ beim Anti-Nuke: nur, wer im Speicher ist - Bots sind das immer.

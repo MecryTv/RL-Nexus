@@ -1,7 +1,8 @@
 import { ChannelType, Guild, GuildMember, GuildVerificationLevel, Message, PermissionFlagsBits } from "discord.js";
 import BotClient from "../../client/BotClient";
 import { RaidCard } from "../../builder/AntiVillainView";
-import { INVITE_PAUSE_MAX_MS, RAID_SLOWMODE, RAID_WINDOW_MS, TEAM_ONLY } from "../../constants/AntiVillain";
+import { INVITE_PAUSE_MAX_MS, TEAM_ONLY } from "../../constants/AntiVillain";
+import { ModuleValue } from "../../utils/moduleFlags";
 import { IRaidState } from "../../interfaces/services/antivillain/IAntiVillain";
 import { ModerationError } from "../ModerationService";
 import { QuarantineError } from "./Quarantine";
@@ -59,7 +60,9 @@ export default class Raid {
             return;
         }
 
-        const window = [...(this.joins.get(guild.id) ?? []).filter((entry) => now - entry.at <= RAID_WINDOW_MS), { id: member.id, at: now }];
+        // W-0133: Zeitfenster und Slowmode aus dem Admin, je Server.
+        const windowMs = ModuleValue("anti-villain", "raidWindowSeconds", guild.id) * 1000;
+        const window = [...(this.joins.get(guild.id) ?? []).filter((entry) => now - entry.at <= windowMs), { id: member.id, at: now }];
 
         this.joins.set(guild.id, window);
         if (window.length >= settings.raid.joins) {
@@ -94,17 +97,20 @@ export default class Raid {
         if (settings.raid.slowmode) {
             let count = 0;
 
-            for (const channel of guild.channels.cache.values()) {
+            const slowmode = ModuleValue("anti-villain", "raidSlowmodeSeconds", guild.id);
+
+            // 0 Sekunden heißt: bei einem Raid kein Slowmode.
+            for (const channel of slowmode > 0 ? guild.channels.cache.values() : []) {
                 if (channel.type !== ChannelType.GuildText || !channel.permissionsFor(guild.roles.everyone)?.has(PermissionFlagsBits.ViewChannel)) continue;
 
                 state.restore.slowmode[channel.id] = channel.rateLimitPerUser ?? 0;
                 await channel
-                    .setRateLimitPerUser(RAID_SLOWMODE, "Anti Villain: Raid")
+                    .setRateLimitPerUser(slowmode, "Anti Villain: Raid")
                     .then(() => void count++)
                     .catch(() => delete state.restore.slowmode[channel.id]);
             }
 
-            if (count) actions.push(`Slowmode ${RAID_SLOWMODE} s in ${count} ${count === 1 ? "Kanal" : "Kanälen"}`);
+            if (count) actions.push(`Slowmode ${slowmode} s in ${count} ${count === 1 ? "Kanal" : "Kanälen"}`);
         }
 
         if (settings.raid.verification) {

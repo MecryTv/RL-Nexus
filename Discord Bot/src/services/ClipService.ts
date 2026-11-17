@@ -17,10 +17,8 @@ import {
     LegacySchedule,
     MAX_BLOCK_REASON,
     MAX_BLOCKED,
-    MAX_CLIP_FILE,
     MAX_PENALTY_COUNT,
     MAX_PENALTY_DAYS,
-    MAX_PER_USER,
     MAX_PRIZE,
     MessageUrl,
     NextSchedule,
@@ -29,7 +27,6 @@ import {
     PenaltyAction,
     PenaltyText,
     Planned,
-    PLACES,
     VideoExtension,
 } from "../constants/Clips";
 import { DASHBOARD_PATH } from "../constants/Dashboard";
@@ -46,9 +43,24 @@ import {
     IClipSettings,
     IClipWinner,
 } from "../interfaces/services/clips/IClips";
+import { AskLine, LimitSentence } from "../builder/LimitReply";
+import { settingDef } from "../constants/ModuleSettings";
+import { ModuleValue } from "../utils/moduleFlags";
 import logger from "../utils/logger";
 
 export class ClipError extends Error {}
+
+/** Harte Obergrenzen aus dem Verzeichnis; was ein Server darf, liegt darunter (W-0133). */
+const PER_USER_CAP = settingDef("clips", "maxPerUser")?.max ?? 50;
+const PLACES_CAP = settingDef("clips", "places")?.max ?? 10;
+
+function Places(guildId: string): number {
+    return ModuleValue("clips", "places", guildId);
+}
+
+function FileBytes(guildId: string): number {
+    return ModuleValue("clips", "fileMegabytes", guildId) * 1024 * 1024;
+}
 
 type ClipChannel = TextChannel | NewsChannel;
 
@@ -159,17 +171,27 @@ export default class ClipService {
         return {
             channelId: typeof stored.channelId === "string" ? stored.channelId : null,
             announceChannelId: typeof stored.announceChannelId === "string" ? stored.announceChannelId : null,
-            maxPerUser: Int(stored.maxPerUser, 1, MAX_PER_USER, fallback.maxPerUser),
+            maxPerUser: Int(stored.maxPerUser, 1, PER_USER_CAP, fallback.maxPerUser),
             emoji: typeof stored.emoji === "string" && stored.emoji ? stored.emoji : fallback.emoji,
             auto: typeof stored.auto === "boolean" ? stored.auto : fallback.auto,
             schedule,
-            prizes: Array.from({ length: PLACES }, (_, index) => (Array.isArray(stored.prizes) && typeof stored.prizes[index] === "string" ? stored.prizes[index] : "")),
+            prizes: Array.from({ length: PLACES_CAP }, (_, index) => (Array.isArray(stored.prizes) && typeof stored.prizes[index] === "string" ? stored.prizes[index] : "")),
             publicBoard: typeof stored.publicBoard === "boolean" ? stored.publicBoard : fallback.publicBoard,
             notify: Object.fromEntries(NOTICES.map((notice) => [notice, typeof notify[notice] === "boolean" ? notify[notice] : fallback.notify[notice]])) as Record<ClipNotice, boolean>,
             messages: Object.fromEntries(NOTICES.map((notice) => [notice, BodyOf(messages[notice]) ?? fallback.messages[notice]])) as Record<ClipNotice, IClipBody>,
             penalties: PenaltiesOf(stored.penalties, fallback.penalties),
             blocked: Array.isArray(stored.blocked) ? stored.blocked.filter(IsBlock).slice(0, MAX_BLOCKED) : [],
         };
+    }
+
+    /** W-0133: Clips je Person höchstens der Wert aus dem Admin; ein gespeicherter Wert darüber darf bleiben. */
+    private PerUser(guildId: string, value: unknown, previous: number): number {
+        const wanted = Int(value, 1, PER_USER_CAP, previous);
+        const max = ModuleValue("clips", "maxPerUser", guildId);
+
+        if (wanted > max && wanted !== previous) throw new ClipError(`Höchstens ${max} Clips je Person. ${LimitSentence("clips", "maxPerUser", guildId)}`);
+
+        return wanted;
     }
 
     CleanSettings(guild: Guild, input: unknown, previous: IClipSettings): IClipSettings {
@@ -187,11 +209,11 @@ export default class ClipService {
         return {
             channelId: channel(raw.channelId, previous.channelId),
             announceChannelId: channel(raw.announceChannelId, previous.announceChannelId),
-            maxPerUser: Int(raw.maxPerUser, 1, MAX_PER_USER, previous.maxPerUser),
+            maxPerUser: this.PerUser(guild.id, raw.maxPerUser, previous.maxPerUser),
             emoji,
             auto: typeof raw.auto === "boolean" ? raw.auto : previous.auto,
             schedule: raw.schedule === undefined ? previous.schedule : this.CleanSchedule(raw.schedule),
-            prizes: prizes ? Array.from({ length: PLACES }, (_, index) => (typeof prizes[index] === "string" ? (prizes[index] as string).trim().slice(0, MAX_PRIZE) : "")) : previous.prizes,
+            prizes: prizes ? Array.from({ length: PLACES_CAP }, (_, index) => (typeof prizes[index] === "string" ? (prizes[index] as string).trim().slice(0, MAX_PRIZE) : "")) : previous.prizes,
             publicBoard: typeof raw.publicBoard === "boolean" ? raw.publicBoard : previous.publicBoard,
             notify: Object.fromEntries(NOTICES.map((notice) => [notice, typeof notify[notice] === "boolean" ? notify[notice] : previous.notify[notice]])) as Record<ClipNotice, boolean>,
             messages: Object.fromEntries(NOTICES.map((notice) => [notice, this.CleanBody(guild, notice, messages[notice], previous.messages[notice])])) as Record<ClipNotice, IClipBody>,
@@ -423,7 +445,7 @@ export default class ClipService {
             throw new ClipError("Für diese Runde fehlen die Termine. Lege in den Einstellungen fest, bis wann eingereicht und abgestimmt wird.");
         }
 
-        const round = await this.client.clipRounds.Open(guild.id, schedule.closeAt, schedule.endAt, settings.prizes.slice(0, PLACES));
+        const round = await this.client.clipRounds.Open(guild.id, schedule.closeAt, schedule.endAt, settings.prizes.slice(0, Places(guild.id)));
 
         await this.Lock(channel, false);
         await this.Announce(guild, settings, "open", round, 0);
@@ -477,11 +499,12 @@ export default class ClipService {
     Rank(entries: IClipEntry[], counts: Map<number, number>, prizes: string[], guildId: string): IClipWinner[] {
         const ranked = [...entries].sort((a, b) => (counts.get(b.id) ?? 0) - (counts.get(a.id) ?? 0) || a.createdAt - b.createdAt || a.id - b.id);
         const winners: IClipWinner[] = [];
+        const places = Places(guildId);
 
         for (const entry of ranked) {
             const votes = counts.get(entry.id) ?? 0;
 
-            if (winners.length >= PLACES || votes <= 0) break;
+            if (winners.length >= places || votes <= 0) break;
             if (winners.some((winner) => winner.userId === entry.userId)) continue;
 
             winners.push({
@@ -716,7 +739,12 @@ export default class ClipService {
         if (!video) return this.Reject(message, "hier zählen nur Videos. Lade deinen Clip als Datei hoch.");
         if (videos.length > 1) return this.Reject(message, "bitte nur einen Clip pro Nachricht.");
         if (!VideoExtension(video.name, video.contentType)) return this.Reject(message, "dieses Format spielt kein Browser ab. Nimm MP4, WebM oder MOV.");
-        if (video.size > MAX_CLIP_FILE) return this.Reject(message, `das Video ist größer als ${Math.round(MAX_CLIP_FILE / 1024 / 1024)} MB.`);
+        // W-0133: die Größe kommt aus dem Admin. Die Meldung steht öffentlich im Kanal, also nur der Satz für Mitglieder.
+        if (video.size > FileBytes(message.guild.id)) {
+            const ask = AskLine({ module: "clips", key: "fileMegabytes", guildId: message.guild.id, admin: false });
+
+            return this.Reject(message, `das Video ist größer als ${ModuleValue("clips", "fileMegabytes", message.guild.id)} MB.\n-# ${ask.text}`);
+        }
 
         const key = `${round.id}:${message.author.id}`;
 
@@ -766,7 +794,7 @@ export default class ClipService {
 
     /**
      * Sichert ein Video nach clips/<server>/<datum>_runde-<id>/<clip>.<endung>.
-     * Nur von Discords CDN, höchstens MAX_CLIP_FILE, gestreamt statt im Speicher.
+     * Nur von Discords CDN, höchstens „Clip-Datei höchstens“ des Servers, gestreamt statt im Speicher.
      */
     private async SaveCopy(guild: Guild, round: IClipRound, entry: IClipEntry, attachment?: { url: string; name: string; contentType: string | null; size: number }): Promise<void> {
         let source = attachment;
@@ -780,7 +808,9 @@ export default class ClipService {
 
         const ext = source ? VideoExtension(source.name, source.contentType) : null;
 
-        if (!source || !ext || !AttachmentKey(source.url) || source.size > MAX_CLIP_FILE) return;
+        const maxBytes = FileBytes(guild.id);
+
+        if (!source || !ext || !AttachmentKey(source.url) || source.size > maxBytes) return;
 
         const directory = this.Folder(guild.id, round);
         const name = `${entry.id}.${ext}`;
@@ -798,7 +828,7 @@ export default class ClipService {
             const limit = new Transform({
                 transform(chunk: Buffer, _encoding, done) {
                     size += chunk.length;
-                    done(size > MAX_CLIP_FILE ? new Error("zu groß") : null, chunk);
+                    done(size > maxBytes ? new Error("zu groß") : null, chunk);
                 },
             });
 

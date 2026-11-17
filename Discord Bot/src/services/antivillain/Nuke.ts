@@ -2,7 +2,13 @@ import { AuditLogEvent, Guild, GuildAuditLogsEntry, GuildBasedChannel, Permissio
 import { LRUCache } from "lru-cache";
 import BotClient from "../../client/BotClient";
 import { NukeCard } from "../../builder/AntiVillainView";
-import { DEBRIS_KEEP_MS, NUKE_ACTIONS, NUKE_WINDOW_MS, SAFETY_DEBOUNCE_MS } from "../../constants/AntiVillain";
+import { DEBRIS_KEEP_MS, NUKE_ACTIONS, SAFETY_DEBOUNCE_MS } from "../../constants/AntiVillain";
+import { ModuleValue } from "../../utils/moduleFlags";
+
+/** W-0133: das Zeitfenster für Anti-Nuke aus dem Admin, je Server. */
+function NukeWindow(guildId: string): number {
+    return ModuleValue("anti-villain", "nukeWindowMinutes", guildId) * 60_000;
+}
 import { DASHBOARD_PATH } from "../../constants/Dashboard";
 import { IDebris, INukeState, NukeAction, SafetyResult } from "../../interfaces/services/antivillain/IAntiVillain";
 import { SendLog } from "../../utils/logtarget";
@@ -171,7 +177,7 @@ export default class Nuke {
         }
 
         const old = action === "everyonePerms" ? String(entry.changes.find((part) => part.key === "permissions")?.old ?? "0") : undefined;
-        const list = [...(this.tracks.get(key) ?? []).filter((track) => now - track.at <= NUKE_WINDOW_MS), { at: now, action, targetId: entry.targetId ?? "", old }];
+        const list = [...(this.tracks.get(key) ?? []).filter((track) => now - track.at <= NukeWindow(guild.id)), { at: now, action, targetId: entry.targetId ?? "", old }];
 
         this.tracks.set(key, list);
 
@@ -198,7 +204,7 @@ export default class Nuke {
 
         const count = list.filter((track) => track.action === action).length;
 
-        if (count > settings.nuke.limits[action] && now - (this.stopped.get(key) ?? 0) > NUKE_WINDOW_MS) {
+        if (count > settings.nuke.limits[action] && now - (this.stopped.get(key) ?? 0) > NukeWindow(guild.id)) {
             this.stopped.set(key, now);
             await this.Stop(guild, executorId, action, count, list);
         }
@@ -225,7 +231,7 @@ export default class Nuke {
         const run = this.backups.get(guildId);
 
         // Nur aus diesem Vorfall: Ein Backup von vor Tagen gehört nicht auf die Karte.
-        if (!run || now - run.at > NUKE_WINDOW_MS) return null;
+        if (!run || now - run.at > NukeWindow(guildId)) return null;
         if (!run.done) await Promise.race([run.pending, new Promise((resolve) => setTimeout(resolve, this.backupWaitMs).unref())]);
 
         return run;

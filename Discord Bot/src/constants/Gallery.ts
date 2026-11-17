@@ -22,7 +22,8 @@ export type ImageExtension = keyof typeof IMAGE_TYPES;
  * Die Obergrenze fuer ein Bild - fuer den Download aus dem Netz wie fuer den
  * Upload aus dem Dashboard. Die Zahl steht hier und nur hier.
  */
-export const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+/** Harte Obergrenze (Admin-Verzeichnis „Bild höchstens“ bis 9 MB); was ein Server darf, liest GalleryService je Server. */
+export const MAX_IMAGE_BYTES = 9 * 1024 * 1024;
 
 /**
  * Die Typen, die ein Upload tragen darf - ohne Dubletten.
