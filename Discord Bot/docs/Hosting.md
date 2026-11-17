@@ -449,9 +449,13 @@ sudo logrotate -d /etc/logrotate.d/rlnexus-aktivitaet
 ```bash
 sudo install -d -o www-data -g adm -m 0750 /var/log/nginx/rlnexus-aktivitaet
 for site in nexus-emb.de status.nexus-emb.de dashboard.nexus-emb.de; do
-  sudo cp "/etc/nginx/sites-available/$site" "/etc/nginx/sites-available/$site.vor-aktivitaet"
-  sudo sed -i -E 's#^( *)access_log /var/log/nginx/access\.log (rlnexus_[a-z]+);#&\n\1access_log /var/log/nginx/rlnexus-aktivitaet/access.log \2;#' "/etc/nginx/sites-available/$site"
-  grep -n "access_log" "/etc/nginx/sites-available/$site"
+  f="/etc/nginx/sites-available/$site"
+  # Wiederholbar: steht die Zeile schon drin, bleiben Datei und Sicherung unberührt.
+  if ! grep -q rlnexus-aktivitaet "$f"; then
+    sudo cp "$f" "$f.vor-aktivitaet"
+    sudo sed -i -E 's#^( *)access_log /var/log/nginx/access\.log (rlnexus_[a-z]+);#&\n\1access_log /var/log/nginx/rlnexus-aktivitaet/access.log \2;#' "$f"
+  fi
+  grep -n "access_log" "$f"
 done
 sudo nginx -t && sudo systemctl reload nginx
 ```
@@ -465,7 +469,7 @@ cd /home/rlnexus
 docker compose -f docker-compose.prod.yml run --rm -v /var/log/nginx:/import:ro admin node server/activity-import.ts /import
 ```
 
-Meldet er „Das eigene Protokoll wurde noch nicht gelesen“, ein paar Minuten warten. Ein zweiter Lauf sagt „Schon nachgelesen“ und zählt nichts doppelt. Bis zum Nachlesen zeigt die Seite „Zählung seit …“ mit dem Zeitpunkt der ersten Zeile.
+Nicht zwischen 0 und 1 Uhr starten: Dann dreht logrotate die Dateien, und eine umbenannte Datei könnte doppelt oder gar nicht gelesen werden. Meldet er „Das eigene Protokoll wurde noch nicht gelesen“, ein paar Minuten warten. Ein zweiter Lauf sagt „Schon nachgelesen“ und zählt nichts doppelt. Bis zum Nachlesen zeigt die Seite „Zählung seit …“ mit dem Zeitpunkt der ersten Zeile.
 
 Lokal gibt es kein nginx: `npm run activity:sample` im Ordner `Admin Dashboard` schreibt 14 Tage nachgebaute Zeilen nach `data/access/access.log`, die der Admin dann wie im Betrieb liest.
 

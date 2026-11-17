@@ -91,7 +91,11 @@ export function ActivityPage(): JSX.Element {
         );
     };
 
-    const detailColor = service === "all" ? NEUTRAL : SERVICE_COLORS[service];
+    // Gezeichnet wird, was die Antwort sagt, nicht was die Adresse schon will: bis die
+    // neue Antwort da ist (oder wenn sie scheitert), stünden sonst alte Daten unter neuer Beschriftung.
+    const shown = data?.range ?? range;
+    const detail = data?.service ?? service;
+    const detailColor = detail === "all" ? NEUTRAL : SERVICE_COLORS[detail];
     const meta = data?.since ? `Zählung seit ${formatDateTime(data.since)}` : undefined;
 
     return (
@@ -108,10 +112,10 @@ export function ActivityPage(): JSX.Element {
                     onChange={(value) => set("zeitraum", value, "7d")}
                 />
             </PageHeader>
-            <p className={styles.note}>Gezählt wird jeder Seitenaufruf, der beim Server ankommt: der erste Aufruf und jedes Neuladen. Wechsel innerhalb von Webseite und Statusseite zählen nicht.</p>
+            <p className={styles.note}>Gezählt wird jeder Seitenaufruf, der beim Server ankommt: der erste Aufruf und jedes Neuladen. Wechsel innerhalb einer Seite zählen nicht, etwa zwischen Unterseiten der Webseite oder Bereichen im Bot-Dashboard.</p>
 
             {loading && !data && <Loading label="Aktivität lädt" />}
-            {error && !data && <Failure message={error.message} onRetry={reload} />}
+            {error && <Failure message={error.message} onRetry={reload} />}
 
             {data && data.since === null && (
                 <Panel className={styles.empty}>
@@ -126,7 +130,7 @@ export function ActivityPage(): JSX.Element {
 
                     <Panel as="section" className={styles.card}>
                         <header className={styles.cardHead}>
-                            <h2>{range === "24h" ? "Aufrufe je Stunde" : "Aufrufe je Tag"}</h2>
+                            <h2>{shown === "24h" ? "Aufrufe je Stunde" : "Aufrufe je Tag"}</h2>
                             <div className={styles.legend} aria-hidden="true">
                                 {ACTIVITY_SERVICES.map((entry) => (
                                     <span key={entry}>
@@ -136,7 +140,7 @@ export function ActivityPage(): JSX.Element {
                                 ))}
                             </div>
                         </header>
-                        <LineChart series={data.series} range={range} title={`Aufrufe je ${range === "24h" ? "Stunde" : "Tag"}, ${RANGE_LABELS[range]}`} />
+                        <LineChart series={data.series} range={shown} title={`Aufrufe je ${shown === "24h" ? "Stunde" : "Tag"}, ${RANGE_LABELS[shown]}`} />
                     </Panel>
 
                     <fieldset className={styles.filter}>

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type JSX, type PointerEvent, type RefObject } from "react";
 import { Link } from "react-router-dom";
 import type { ActivityRange, ActivityService, IActivitySeries, IActivityView } from "../../shared/activity";
-import { HEAT_RAMP, SERVICE_COLORS, SERVICE_LABELS, changeText, heatStep, linePath, niceMax } from "../../shared/activityChart";
+import { HEAT_RAMP, SERVICE_COLORS, SERVICE_LABELS, changeText, heatStep, linePath, niceMax, spreadLabels } from "../../shared/activityChart";
 import { Panel } from "../components/Panel";
 import { formatNumber } from "../format";
 import { sparkline } from "../sparkline";
@@ -119,6 +119,15 @@ export function LineChart({ series, range, title }: { readonly series: readonly 
     const every = count > 12 ? Math.ceil(count / (wide ? 8 : 5)) : wide ? 1 : 2;
     const ticks = Array.from({ length: 6 }, (_, index) => (max / 5) * index);
     const points = series[0]?.points ?? [];
+    // Eine Beschriftung, die „heute“ näher als 48 px käme, fällt weg (Review W-0138).
+    const labelled = (index: number): boolean => index === count - 1 || (index % every === 0 && x(count - 1) - x(index) >= 48);
+    // Namen am Linienende: liegen die letzten Werte dicht beieinander, schieben sie sich auseinander.
+    const ends = spreadLabels(
+        series.map((entry) => y(entry.points.at(-1)?.views ?? 0) + 4),
+        14,
+        pad.top + 8,
+        pad.top + inner.height + 4,
+    );
 
     const move = (event: PointerEvent<SVGRectElement>): void => {
         const box = event.currentTarget.getBoundingClientRect();
@@ -140,7 +149,7 @@ export function LineChart({ series, range, title }: { readonly series: readonly 
                         </g>
                     ))}
                     {points.map((point, index) =>
-                        index % every === 0 || index === count - 1 ? (
+                        labelled(index) ? (
                             <text key={point.at} className={styles.tick} x={x(index)} y={height - 8} textAnchor="middle">
                                 {/* Der letzte Punkt ist angefangen; „heute“ sagt, warum er niedriger liegt. */}
                                 {index === count - 1 ? (range === "24h" ? "jetzt" : "heute") : pointLabel(point.at, range)}
@@ -148,7 +157,7 @@ export function LineChart({ series, range, title }: { readonly series: readonly 
                         ) : null,
                     )}
                     {hover !== null && <line className={styles.cross} x1={x(hover)} x2={x(hover)} y1={pad.top} y2={pad.top + inner.height} />}
-                    {series.map((entry) => {
+                    {series.map((entry, position) => {
                         const values = entry.points.map((point) => point.views);
                         const last = values.at(-1) ?? 0;
 
@@ -166,7 +175,7 @@ export function LineChart({ series, range, title }: { readonly series: readonly 
                                 <circle cx={x(count - 1)} cy={y(last)} r="4" fill={SERVICE_COLORS[entry.service]} className={styles.dot} />
                                 {hover !== null && <circle cx={x(hover)} cy={y(values[hover] ?? 0)} r="4" fill={SERVICE_COLORS[entry.service]} className={styles.dot} />}
                                 {wide && (
-                                    <text className={styles.endLabel} x={x(count - 1) + 10} y={y(last) + 4}>
+                                    <text className={styles.endLabel} x={x(count - 1) + 10} y={ends[position]}>
                                         {SERVICE_LABELS[entry.service]}
                                     </text>
                                 )}

@@ -92,6 +92,8 @@ interface IWindow {
     start: Date;
     end: Date;
     previousStart: Date;
+    /** Zeitraum davor gleich lang wie der laufende, der ja erst bis zur jetzigen Stunde reicht (Review W-0138). */
+    previousEnd: Date;
     /** Schlüssel der Punkte in Reihenfolge. */
     buckets: string[];
     bucketOf: (hour: Date) => string;
@@ -108,6 +110,7 @@ function windowOf(range: ActivityRange, now: Date): IWindow {
             start,
             end,
             previousStart: new Date(start.getTime() - 24 * HOUR),
+            previousEnd: start,
             buckets: Array.from({ length: 24 }, (_, index) => new Date(start.getTime() + index * HOUR).toISOString()),
             bucketOf: (at) => at.toISOString(),
         };
@@ -121,6 +124,8 @@ function windowOf(range: ActivityRange, now: Date): IWindow {
         start: berlinMidnight(first),
         end,
         previousStart: berlinMidnight(shiftDate(today, -(2 * days - 1))),
+        // Bis zur selben Uhrzeit am selben Wochentag davor: sonst verglich ein angefangener Tag mit sieben vollen.
+        previousEnd: new Date(berlinMidnight(shiftDate(today, -days)).getTime() + (end.getTime() - berlinMidnight(today).getTime())),
         buckets: Array.from({ length: days }, (_, index) => shiftDate(first, index)),
         bucketOf: (at) => berlin(at).date,
     };
@@ -151,7 +156,9 @@ export async function readActivity(range: ActivityRange, service: ActivityServic
         const at = fromDb(row.h);
         const views = Number(row.views);
 
-        if (at < window.start) previous.set(row.service, previous.get(row.service)! + views);
+        if (at < window.start) {
+            if (at < window.previousEnd) previous.set(row.service, previous.get(row.service)! + views);
+        }
         else {
             const position = index.get(window.bucketOf(at));
 

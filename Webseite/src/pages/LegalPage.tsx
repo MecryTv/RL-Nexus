@@ -398,8 +398,9 @@ const PRIVACY: readonly ILegalSection[] = [
                 </p>
                 <p>
                     Aus dem Protokoll von Website, Dashboard und Statusseite bilden wir außerdem eine Statistik, wie oft
-                    die Seiten aufgerufen werden. Gespeichert werden dafür nur anonyme Summen je Stunde: welche Seite,
-                    welcher Gerätetyp (Handy, Desktop, Tablet) und grob, woher der Aufruf kam (etwa Discord oder Google).
+                    die Seiten aufgerufen werden. Gespeichert werden dafür nur anonyme Summen je Stunde: welcher unserer
+                    Dienste (Website, Dashboard oder Statusseite), welcher Gerätetyp (Handy, Desktop, Tablet) und grob,
+                    woher der Aufruf kam (etwa Discord oder Google).
                     IP-Adressen, Browserkennungen und aufgerufene Adressen kommen nicht in die Statistik, Cookies setzen
                     wir dafür keine. Die Summen löschen wir nach 13 Monaten. Rechtsgrundlage ist auch hier Art. 6 Abs. 1
                     lit. f DSGVO; unser berechtigtes Interesse ist zu sehen, welche unserer Seiten genutzt werden.

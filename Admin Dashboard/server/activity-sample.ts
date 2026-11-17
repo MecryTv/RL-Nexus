@@ -92,6 +92,11 @@ for (let start = end - 14 * 24 * hour; start <= end; start += hour) {
 
             lines.push(line(host, at, `GET ${page} HTTP/2.0`, status, pick(REFERERS), agent));
             lines.push(line(host, new Date(at.getTime() + 300), "GET /assets/app.js HTTP/2.0", 200, `https://${host}${page}`, agent));
+
+            // Ein offener Tab der Statusseite fragt jede Minute nach: kein Aufruf (Review W-0138).
+            if (host === "status.nexus-emb.de") {
+                for (let minute = 1; minute <= 5; minute++) lines.push(line(host, new Date(at.getTime() + minute * 60_000), "GET /public/status HTTP/2.0", 200, `https://${host}/`, agent));
+            }
         }
 
         if (random() < 0.3) lines.push(line(host, new Date(start + 600_000), "GET / HTTP/1.1", 200, "-", "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)"));

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { gzipSync } from "node:zlib";
@@ -204,6 +204,26 @@ export async function checkActivityDb(_config: IConfig, http: IHttp): Promise<vo
             assert.deepEqual(Object.keys(body.errors).sort(), ["client", "server"]);
         });
 
+        await check("Review: Lesefehler an einer gepackten Datei bricht sauber ab und gibt die Belegung frei", async () => {
+            const names = { live: "check:db live2", import: "check:db import2" };
+            const dir = await mkdtemp(path.join(tmpdir(), "rlnexus-nachlesen-"));
+
+            await query("DELETE FROM activity_reader WHERE name IN (?, ?)", [names.live, names.import]);
+
+            try {
+                // Ein Ordner statt einer Datei: access() klappt, Lesen nicht (wie eine Datei, die logrotate gerade wegnimmt).
+                await mkdir(path.join(dir, "access.log.3.gz"));
+                await saveReaderState(names.live, { inode: "1", offset: 0, firstLineAt: new Date("1999-10-29T12:00:00Z") });
+
+                await assert.rejects(importHistory(dir, new Date("1999-10-30T10:00:00Z"), names));
+                await rm(path.join(dir, "access.log.3.gz"), { recursive: true });
+                assert.deepEqual(await importHistory(dir, new Date("1999-10-30T10:00:00Z"), names), { lines: 0, hits: 0 });
+            } finally {
+                await query("DELETE FROM activity_reader WHERE name IN (?, ?)", [names.live, names.import]);
+                await rm(dir, { recursive: true, force: true });
+            }
+        });
+
         await check("Älter als 13 Monate wird gelöscht, Jüngeres bleibt", async () => {
             await addHits([testHit("2000-01-01T05:00:00Z", "website")], () => false);
 
@@ -213,6 +233,23 @@ export async function checkActivityDb(_config: IConfig, http: IHttp): Promise<vo
             assert.ok(deleted >= 1);
             // Fünf Schlüssel aus 2001: zwei Webseite (28.10.), zwei Dashboard, eine Statusseite.
             assert.equal(left!.n, 5);
+        });
+        await check("Review: Gleicher Verkehr ergibt ±0 %, auch mitten am Tag", async () => {
+            await tidy();
+
+            // Eine Aufruf je Stunde vom 25.10. bis 14.11.2001, 12 Uhr UTC (keine Zeitumstellung dazwischen ab 29.10.).
+            const hits: IHit[] = [];
+
+            for (let at = Date.UTC(2001, 9, 29, 0); at <= Date.UTC(2001, 10, 14, 12); at += 3_600_000) hits.push(testHit(new Date(at).toISOString(), "website"));
+
+            await addHits(hits, () => false);
+
+            const noon = new Date("2001-11-14T12:30:00Z");
+            const week = (await readActivity("7d", "all", noon)).tiles.find((entry) => entry.service === "website")!;
+            const day = (await readActivity("24h", "all", noon)).tiles.find((entry) => entry.service === "website")!;
+
+            assert.deepEqual([week.views, week.previous, week.change], [158, 158, 0]);
+            assert.deepEqual([day.views, day.previous, day.change], [24, 24, 0]);
         });
     } finally {
         await tidy();

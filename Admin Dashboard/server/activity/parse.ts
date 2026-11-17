@@ -47,7 +47,8 @@ const HOSTS: Record<string, ActivityService> = {
     "dashboard.nexus-emb.de": "dashboard",
 };
 
-const BOT = /bot|crawl|spider|slurp|preview|facebookexternalhit|curl|wget|python|headlesschrome/i;
+// W-0138 Review: dazu Linkvorschauen (WhatsApp) und Skript-Clients (Go, axios).
+const BOT = /bot|crawl|spider|slurp|preview|facebookexternalhit|whatsapp|curl|wget|python|go-http-client|axios|headlesschrome/i;
 const SCANNER = /^\/(wp-|\.env|\.git|xmlrpc)|\.php$/i;
 
 function parseTime(text: string): Date | null {
@@ -93,7 +94,8 @@ export function parseAccessLine(line: string): IAccessLine | null {
 }
 
 function isPage(path: string): boolean {
-    if (/^\/(assets|api|_ersatz)\//.test(path) || path.includes("favicon")) return false;
+    // /public/: die Statusseite fragt dort jede Minute nach (Review W-0138), das ist kein Aufruf.
+    if (/^\/(assets|api|_ersatz|public)\//.test(path) || path.includes("favicon")) return false;
 
     // Eine Dateiendung im letzten Abschnitt heißt: Datei, keine Seite.
     return !/\.[a-z0-9]+$/i.test(path.slice(path.lastIndexOf("/") + 1));

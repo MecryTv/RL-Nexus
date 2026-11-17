@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { classify, parseAccessLine, type IAccessLine } from "../activity/parse.ts";
 import { readOnce, type IReaderState } from "../activity/reader.ts";
-import { changeText, heatStep, linePath, niceMax } from "../../shared/activityChart.ts";
+import { changeText, heatStep, linePath, niceMax, spreadLabels } from "../../shared/activityChart.ts";
 import { AREAS } from "../../src/nav/areas.ts";
 import { check, section } from "./harness.ts";
 
@@ -97,6 +97,26 @@ export async function checkActivity(): Promise<void> {
         assert.equal(hit(line("nexus-emb.de", "GET /.git/config HTTP/1.1", 404)).scanner, true);
         assert.equal(hit(line("nexus-emb.de", "POST /xmlrpc HTTP/1.1", 404)).scanner, true);
         assert.equal(hit(line("nexus-emb.de", "GET /module HTTP/2.0", 200)).scanner, false);
+    });
+
+    await check("Review: Die Statusseite fragt /public/status jede Minute ab, das ist kein Aufruf", () => {
+        const poll = hit(line("status.nexus-emb.de", "GET /public/status HTTP/2.0", 200, "https://status.nexus-emb.de/", IPHONE));
+
+        assert.equal(poll.page, false);
+        assert.equal(poll.view, false);
+        assert.equal(hit(line("status.nexus-emb.de", "GET / HTTP/2.0", 200)).view, true);
+    });
+
+    await check("Review: Linkvorschau und Skript-Clients sind Bots", () => {
+        assert.equal(hit(line("nexus-emb.de", "GET / HTTP/2.0", 200, "-", "WhatsApp/2.23.20.0 A")).bot, true);
+        assert.equal(hit(line("nexus-emb.de", "GET / HTTP/2.0", 200, "-", "Go-http-client/1.1")).bot, true);
+        assert.equal(hit(line("nexus-emb.de", "GET / HTTP/2.0", 200, "-", "axios/1.7.2")).bot, true);
+    });
+
+    await check("Review: Beschriftungen am Linienende schieben sich auseinander", () => {
+        assert.deepEqual(spreadLabels([100, 102, 101], 14, 0, 200), [100, 128, 114]);
+        assert.deepEqual(spreadLabels([10, 50], 14, 0, 200), [10, 50]);
+        assert.deepEqual(spreadLabels([195, 196], 14, 0, 200), [186, 200]);
     });
 
     await check("Fremder Host wird nicht eingeordnet", () => {

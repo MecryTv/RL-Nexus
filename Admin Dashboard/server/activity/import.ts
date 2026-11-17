@@ -64,7 +64,16 @@ export async function importHistory(dir: string, now: Date, names = { live: "liv
             if (!(await exists(file))) continue;
 
             const input = createReadStream(file);
-            const stream = name.endsWith(".gz") ? input.pipe(createGunzip()) : input;
+            let stream: NodeJS.ReadableStream = input;
+
+            if (name.endsWith(".gz")) {
+                const gunzip = createGunzip();
+
+                // pipe() reicht Lesefehler der Datei nicht weiter; ohne das stürzte
+                // der Lauf ab und die Belegung blieb stehen (Review W-0138).
+                input.on("error", (error) => gunzip.destroy(error));
+                stream = input.pipe(gunzip);
+            }
 
             for await (const line of createInterface({ input: stream, crlfDelay: Infinity })) {
                 const parsed = parseAccessLine(line);

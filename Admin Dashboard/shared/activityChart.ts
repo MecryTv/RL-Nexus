@@ -54,3 +54,22 @@ export function linePath(values: readonly number[], width: number, height: numbe
 
     return values.map((value, index) => `${index === 0 ? "M" : "L"}${round(index * step)},${round(height - (value / top) * height)}`).join(" ");
 }
+
+/**
+ * Höhen der Namen am Linienende, damit keiner auf dem anderen liegt: von oben
+ * nach unten mindestens `gap` Abstand, am unteren Rand wieder nach oben
+ * geschoben. Die Reihenfolge der Eingabe bleibt.
+ */
+export function spreadLabels(ys: readonly number[], gap: number, min: number, max: number): number[] {
+    const order = ys.map((y, index) => ({ y, index })).sort((a, b) => a.y - b.y);
+
+    for (let k = 1; k < order.length; k++) order[k]!.y = Math.max(order[k]!.y, order[k - 1]!.y + gap);
+
+    for (let k = order.length - 1; k >= 0; k--) order[k]!.y = Math.max(min, Math.min(order[k]!.y, k === order.length - 1 ? max : order[k + 1]!.y - gap));
+
+    const out = [...ys];
+
+    for (const entry of order) out[entry.index] = entry.y;
+
+    return out;
+}
