@@ -1138,7 +1138,7 @@ async function drawExtraCard(ctx: SKRSContext2D, x: number, y: number, w: number
 
     // --- MMR und Streak | Spiele ------------------------------------------
     // Streak | Spiele auf derselben Höhe wie in den Ranked-Kacheln.
-    const mmrLabelY = rowY + rowH + 72;
+    const mmrLabelY = rowY + rowH + 70;
 
     drawCenteredMMR(ctx, x + w / 2, mmrLabelY, rank && rank.mmr > 0 ? String(rank.mmr) : "—", 0.88);
     drawStatsRow(ctx, x + 18, w - 36, mmrLabelY + 76, rank, ["STREAK", "SPIELE"], 1);

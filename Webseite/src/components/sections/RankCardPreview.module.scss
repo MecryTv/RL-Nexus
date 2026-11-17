@@ -1,7 +1,8 @@
 @use "mixins" as *;
 
 /*
- * Die Rang-Karte, Maß für Maß wie `builder/RankCard.ts` im Bot (W-0129).
+ * Die Rang-Karte, Maß für Maß wie `builder/RankCard.ts` im Bot (W-0129,
+ * seit W-0132 wieder 1536 × 1024).
  *
  * Jede Zahl hier ist ein Bot-Pixel. `b()` rechnet sie auf die Breite der Karte
  * um: bei 1536 px Breite ist ein Bot-Pixel ein CSS-Pixel, bei 536 px gut ein
@@ -139,7 +140,9 @@
 }
 
 /**
- * Die Karte selbst, 1536 Bot-Pixel breit und 1678 hoch.
+ * Die Karte selbst, 1536 Bot-Pixel breit und 1024 hoch (W-0132). Die Höhe
+ * ergibt sich aus den Blöcken: 34 Rand, Kopf 196, je Überschrift 24 + 62,
+ * Kacheln 404, Karriere 124 und 94 Rand unten mit der Stand-Zeile.
  *
  * Der Grund folgt `drawBackground()` im Bot: Verlauf, zwei weiche Lichter,
  * Raster, Vignette.
@@ -152,7 +155,7 @@
     isolation: isolate;
     flex-direction: column;
     width: 100%;
-    padding: b(34) b(34) b(56);
+    padding: b(34) b(34) b(94);
     background: linear-gradient(155deg, rgb(255 30 45 / 60%), rgb(255 255 255 / 9%) 45%, rgb(0 175 255 / 26%));
     color: var(--c-text);
     filter: drop-shadow(0 30px 60px rgb(0 0 0 / 62%));
@@ -195,19 +198,19 @@
     display: flex;
     align-items: center;
     gap: b(22);
-    height: b(244);
-    padding: 0 b(22) 0 b(34);
+    height: b(196);
+    padding: 0 b(22) 0 b(44);
 
     @include bot-panel(26, $glow: 22);
 }
 
-/* Rund, mit rotem Ring bei Radius 78 - wie der Avatar auf der Karte. */
+/* Rund, Radius 64, mit rotem Ring bei Radius 68 - wie der Avatar auf der Karte. */
 .avatar {
     display: grid;
     flex-shrink: 0;
     overflow: hidden;
-    width: b(148);
-    height: b(148);
+    width: b(128);
+    height: b(128);
     margin-right: b(22);
     border-radius: 50%;
     background: rgb(8 13 18 / 90%);
@@ -235,7 +238,7 @@
     color: var(--c-red);
     text-shadow: 0 0 b(16) var(--c-red);
 
-    @include at(0, 70, 34);
+    @include at(0, 56, 30);
     @include oxanium(700);
 }
 
@@ -243,7 +246,7 @@
     color: var(--c-text);
     text-shadow: 0 0 b(18) rgb(255 60 70 / 55%);
 
-    @include at-fit(0, 136);
+    @include at-fit(0, 122);
     @include oxanium(800);
 }
 
@@ -252,7 +255,7 @@
     font-family: var(--f-label);
     font-weight: 500;
 
-    @include at(0, 180, 34);
+    @include at(0, 160, 30);
 }
 
 /* Season Reward und Turnier-Rang: zwei gleich hohe Kästen nebeneinander. */
@@ -260,11 +263,11 @@
 .tourney {
     position: relative;
     flex-shrink: 0;
-    height: b(172);
+    height: b(150);
 }
 
 .reward {
-    width: b(360);
+    width: b(350);
 
     @include bot-panel(18, $fill: rgb(5 8 12 / 82%), $glow: 16);
 }
@@ -272,7 +275,7 @@
 .boxLabel {
     color: var(--c-text);
 
-    @include at(26, 38, 21);
+    @include at(26, 36, 21);
     @include rajdhani(600, 2.4);
 }
 
@@ -283,10 +286,10 @@
 
 .rewardBadge {
     position: absolute;
-    top: b(52);
+    top: b(48);
     left: b(22);
-    width: b(76);
-    height: b(76);
+    width: b(70);
+    height: b(70);
     object-fit: contain;
 }
 
@@ -294,7 +297,7 @@
     color: var(--tier);
     text-shadow: 0 0 b(14) var(--tier);
 
-    @include at-fit(108, 96);
+    @include at-fit(104, 86);
     @include oxanium(700);
 }
 
@@ -302,12 +305,13 @@
     display: contents;
 }
 
-/* Fortschritt zur nächsten Stufe - im Bot immer blau, nicht in Rangfarbe. */
+/* Fortschritt zur nächsten Stufe - im Bot immer blau, nicht in Rangfarbe.
+   Breite wie RewardBarLayout(350) im Bot: Platz für „100%“ daneben. */
 .bar {
     position: absolute;
-    top: b(116);
-    left: b(108);
-    width: b(160);
+    top: b(104);
+    left: b(104);
+    width: b(129.35);
     height: b(16);
     background: rgb(255 255 255 / 10%);
 
@@ -329,12 +333,12 @@
     font-family: var(--f-accent);
     font-weight: 700;
 
-    @include at(284, 131, 26, 0.88);
+    @include at(249.35, 119, 26, 0.88);
 }
 
 /* Der Turnier-Rang: goldener Rahmen, ein Hauch Gold von oben links. */
 .tourney {
-    width: b(404);
+    width: b(410);
 
     @include bot-panel(18, var(--c-gold, #ffc53d), rgb(12 10 6 / 86%), $glow: 16);
 
@@ -361,7 +365,7 @@
     .mask {
         width: b(22);
         height: b(22);
-        margin-top: b(20 - (38 - 0.79 * 21));
+        margin-top: b(18 - (36 - 0.79 * 21));
     }
 }
 
@@ -371,10 +375,10 @@
 
 .tourneyBadge {
     position: absolute;
-    top: b(50);
-    left: b(22);
-    width: b(68);
-    height: b(68);
+    top: b(44);
+    left: b(24);
+    width: b(58);
+    height: b(58);
     object-fit: contain;
 }
 
@@ -382,7 +386,7 @@
     color: var(--tier);
     text-shadow: 0 0 b(12) var(--tier);
 
-    @include at-fit(104, 84);
+    @include at-fit(96, 74);
     @include oxanium(700);
 }
 
@@ -392,27 +396,27 @@
     font-weight: 500;
     text-transform: uppercase;
 
-    @include at(104, 112, 21);
+    @include at(96, 98, 20);
 }
 
 /* Linie, darunter MMR | Spiele mit Trenner. */
 .tourneyMeta {
     position: absolute;
-    top: b(128);
+    top: b(110);
     right: b(24);
     left: b(24);
     display: grid;
     align-items: center;
-    height: b(44);
+    height: b(40);
     border-top: b(1.5) solid rgb(255 197 61 / 28%);
     color: var(--c-text-dim);
     grid-template-columns: 1fr b(1.5) 1fr;
 
     align-items: start;
 
-    /* Grundlinie 31 unter der Linie, wie labelValue() im Bot. */
+    /* Grundlinie 29 unter der Linie, wie labelValue() im Bot. */
     > span {
-        padding-top: b(31 - 0.79 * 26);
+        padding-top: b(29 - 0.79 * 26);
         font-size: b(26);
         line-height: 1;
         text-align: center;
@@ -430,7 +434,7 @@
 
     > i {
         height: b(24);
-        margin-top: b(10);
+        margin-top: b(8);
         background: rgb(255 197 61 / 42%);
     }
 
@@ -449,15 +453,15 @@
 }
 
 /* --- Überschrift eines Punkts (drawSectionHeading) ----------------------- */
-/* 74 Bot-Pixel von der Unterkante des Blocks davor bis zur Grundlinie des
-   Titels, 52 von dort bis zu den Kacheln. Das Symbol beginnt 36 über der
-   Grundlinie - dort fängt dieser Block an. */
+/* W-0132: einzeilig. 60 Bot-Pixel von der Unterkante des Blocks davor bis zur
+   Grundlinie des Titels, 26 von dort bis zu den Kacheln. Das Symbol beginnt 36
+   über der Grundlinie - dort fängt dieser Block an. */
 .sectionHead {
     position: relative;
     display: flex;
     align-items: flex-start;
-    height: b(88);
-    margin-top: b(38);
+    height: b(62);
+    margin-top: b(24);
     padding-left: b(68);
 }
 
@@ -479,11 +483,11 @@
     color: var(--c-text);
 }
 
-/* Im Fluss, damit die Linie danach dort beginnt, wo der Titel endet. */
+/* Im Fluss, damit Untertitel und Linie dort beginnen, wo der Titel endet. */
 .sectionText {
-    position: relative;
-    min-width: b(220);
-    height: 100%;
+    display: flex;
+    align-items: flex-start;
+    gap: b(30);
 }
 
 .sectionTitle {
@@ -499,19 +503,22 @@
     @include oxanium(800);
 }
 
+/* Neben dem Titel, Grundlinie 3 Bot-Pixel höher als seine. */
 .sectionSub {
-    position: absolute;
+    margin-top: b(33 - 0.79 * 22);
     color: var(--c-text-dim);
+    font-size: b(22);
+    line-height: 1;
+    white-space: nowrap;
 
-    @include at(2, 66, 24);
-    @include rajdhani(500, 5.5);
+    @include rajdhani(500, 6);
 }
 
-/* Die Linie vom Titel bis zum Rand, 12 über der Grundlinie. */
+/* Die Linie vom Untertitel bis zum Rand, 12 über der Grundlinie. */
 .sectionRule {
     flex: 1;
     height: b(2);
-    margin: b(23) b(10) 0 b(12);
+    margin: b(23) b(10) 0 b(30);
     background: rgb(255 30 45 / 55%);
     box-shadow: 0 0 b(10) var(--c-red);
 }
@@ -538,7 +545,7 @@
 
 .tile {
     position: relative;
-    height: b(450);
+    height: b(404);
 
     @include bot-panel(22, $fill: rgb(7 11 16 / 82%), $glow: 18);
 }
@@ -561,20 +568,20 @@
 .rankRow {
     position: absolute;
     display: block;
-    top: b(118);
+    top: b(106);
     right: b(18);
     left: b(18);
-    height: b(116);
+    height: b(104);
 
     @include bot-panel(14, rgb(0 175 255 / 32%), rgb(10 16 24 / 72%), 1.5, 8);
 }
 
 .rankBadge {
     position: absolute;
-    top: b(12);
+    top: b(10);
     left: b(10);
-    width: b(92);
-    height: b(92);
+    width: b(84);
+    height: b(84);
     object-fit: contain;
 }
 
@@ -586,7 +593,7 @@
     color: var(--tier);
     text-shadow: 0 0 b(12) var(--tier);
 
-    @include at-fit(112, 58);
+    @include at-fit(104, 50);
     @include oxanium(700);
 }
 
@@ -596,13 +603,13 @@
     font-weight: 500;
     text-transform: uppercase;
 
-    @include at(112, 90, 24);
+    @include at(104, 80, 22);
 }
 
 .mmrLabel {
     color: var(--c-text-dim);
 
-    @include center-at(272, 22, 3);
+    @include center-at(244, 22, 3);
     @include rajdhani(700, 3);
 }
 
@@ -610,18 +617,18 @@
     color: var(--c-text);
     text-shadow: 0 0 b(12) rgb(255 255 255 / 25%);
 
-    @include center-at(332, 64);
+    @include center-at(304, 64);
     @include oxanium(800);
 }
 
 /* Linie, darunter Streak | Spiele mit Trenner (drawStatsRow). */
 .stats {
     position: absolute;
-    top: b(354);
+    top: b(320);
     right: b(24);
     left: b(24);
     display: grid;
-    height: b(96);
+    height: b(84);
     border-top: b(1.5) solid rgb(255 255 255 / 12%);
     grid-template-columns: 1fr b(1.5) 1fr;
 }
@@ -705,7 +712,7 @@
 
 /* --- Extra-Modi (drawExtraCard) ------------------------------------------- */
 .extra {
-    height: b(450);
+    height: b(404);
 
     @include bot-panel(18, $fill: rgb(7 11 16 / 82%), $glow: 14);
 
@@ -723,16 +730,16 @@
 
     /* Seite 2 nach Entwurf E1: so hoch wie eine Ranked-Kachel, Inhalt größer */
     .rankRow {
-        top: b(72);
+        top: b(70);
         right: b(14);
         left: b(14);
-        height: b(112);
+        height: b(104);
 
         @include bot-panel(12, rgb(0 175 255 / 32%), rgb(10 16 24 / 72%), 1.5, 6);
     }
 
     .rankBadge {
-        top: b(22);
+        top: b(18);
         left: b(10);
         width: b(68);
         height: b(68);
@@ -741,24 +748,24 @@
     .rankName {
         text-shadow: 0 0 b(10) var(--tier);
 
-        @include at-fit(90, 52);
+        @include at-fit(90, 48);
     }
 
     .rankDivision {
-        @include at(90, 84, 20);
+        @include at(90, 78, 20);
     }
 
     /* drawCenteredMMR mit scale 0.88: Beschriftung 19, Zahl 56 */
     .mmrLabel {
-        @include center-at(262, 19, 3);
+        @include center-at(244, 19, 3);
     }
 
     .mmrValue {
-        @include center-at(315, 56);
+        @include center-at(297, 56);
     }
 
     .stats {
-        top: b(336);
+        top: b(320);
         right: b(18);
         left: b(18);
     }
@@ -794,21 +801,22 @@
 
 .stat {
     position: relative;
-    height: b(176);
+    height: b(124);
 
     @include bot-panel(16, $fill: rgb(6 10 15 / 84%), $glow: 12);
 }
 
 /**
  * Das Symbol eines Karriere-Werts: die schwarzen Striche als Maske über der
- * Farbe des Werts, mit Schein - wie `tinted()` und `glow()` im Bot.
+ * Farbe des Werts, mit Schein - wie `tinted()` und `glow()` im Bot. Seit W-0132
+ * links in der quer liegenden Kachel, Bezeichnung und Wert rechts daneben.
  */
 .statIcon {
     position: absolute;
-    top: b(22);
-    left: calc(50% - #{b(26)});
-    width: b(52);
-    height: b(52);
+    top: b(34);
+    left: b(22);
+    width: b(56);
+    height: b(56);
     background: var(--stat);
     filter: drop-shadow(0 0 b(8) var(--stat));
     mask: var(--icon) center / contain no-repeat;
@@ -817,7 +825,7 @@
 .statLabel {
     color: var(--c-text-dim);
 
-    @include center-at(110, 20, 3);
+    @include at(92, 50, 18);
     @include rajdhani(600, 3);
 }
 
@@ -825,7 +833,7 @@
     color: var(--c-text);
     text-shadow: 0 0 b(10) rgb(255 255 255 / 18%);
 
-    @include center-at(154, 40);
+    @include at-fit(92, 96);
     @include oxanium(800);
 }
 
@@ -836,7 +844,7 @@
     font-family: var(--f-label);
     font-weight: 500;
 
-    @include at(38, 1182, 19);
+    @include at(38, 994, 19);
 }
 
 /* --- Seitenwechsel -------------------------------------------------------- */

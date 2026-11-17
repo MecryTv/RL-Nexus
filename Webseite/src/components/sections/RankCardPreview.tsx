@@ -15,13 +15,14 @@ import styles from "./RankCardPreview.module.scss";
  * die Statistiksymbole sind dieselben Dateien, die auch der Bot beim Zeichnen
  * verwendet.
  *
- * Seit W-0129 Maß für Maß wie `builder/RankCard.ts`: Jede Größe im Stylesheet
+ * Seit W-0129 Maß für Maß wie `builder/RankCard.ts` (seit W-0132 wieder
+ * 1536 × 1024): Jede Größe im Stylesheet
  * ist ein Bot-Pixel, umgerechnet auf die Breite der Karte. Ändert sich die
  * Karte im Bot, ändert sie sich hier mit denselben Zahlen - beide sollen exakt
  * gleich aussehen.
  *
  * Nachgebaut aus HTML statt als Bild eingebunden, weil ein Bild mit 1536 mal
- * 1212 Bildpunkten rund ein halbes Megabyte kostet und beim Ändern einer
+ * 1024 Bildpunkten rund ein halbes Megabyte kostet und beim Ändern einer
  * Farbe neu gerendert werden müsste.
  *
  * Zwei Seiten wie in Discord: Ranked und Extra-Modi. Der Knopf darunter
@@ -47,7 +48,7 @@ export function RankCardPreview(): JSX.Element {
                     </span>
                     <span className={styles.who}>
                         <span className={styles.tag}>[{badge}]</span>
-                        <Fit className={styles.player} text={player} max={404} size={76} weight={800} />
+                        <Fit className={styles.player} text={player} max={418} size={64} weight={800} />
                         <span className={styles.handle}>{handle}</span>
                     </span>
 
@@ -56,7 +57,7 @@ export function RankCardPreview(): JSX.Element {
                         <span className={styles.rewardRow}>
                             <img className={styles.rewardBadge} src={rankBadge(reward.rank)} alt="" loading="lazy" />
                             <span className={styles.rewardSide}>
-                                <Fit className={styles.rewardName} text={reward.label.toUpperCase()} max={230} size={40} weight={700} />
+                                <Fit className={styles.rewardName} text={reward.label.toUpperCase()} max={224} size={38} weight={700} />
                                 <span className={styles.rewardBar}>
                                     <span className={styles.bar}>
                                         <span className={styles.fill} style={{ width: `${reward.progress * 100}%` }} />
@@ -75,7 +76,7 @@ export function RankCardPreview(): JSX.Element {
                         <span className={styles.tourneyRow}>
                             <img className={styles.tourneyBadge} src={rankBadge(tournament.rank)} alt="" loading="lazy" />
                             <span className={styles.rankText}>
-                                <Fit className={styles.tourneyName} text={tourneyMeta.label.toUpperCase()} max={276} size={32} weight={700} />
+                                <Fit className={styles.tourneyName} text={tourneyMeta.label.toUpperCase()} max={290} size={30} weight={700} />
                                 <span className={styles.tourneyDivision}>{tournament.division}</span>
                             </span>
                         </span>
@@ -108,7 +109,7 @@ export function RankCardPreview(): JSX.Element {
                                             rank={entry.rank}
                                             division={entry.division}
                                             placement={entry.placement}
-                                            max={315}
+                                            max={323}
                                             size={34}
                                         />
                                         <span className={styles.mmrLabel}>MMR</span>
@@ -156,7 +157,8 @@ export function RankCardPreview(): JSX.Element {
                                 genau wie beim Zeichnen im Bot. */}
                             <i className={styles.statIcon} style={icon(stat.icon)} />
                             <span className={styles.statLabel}>{stat.label}</span>
-                            <span className={styles.statValue}>{stat.value}</span>
+                            {/* Große Zahlen werden kleiner, wie im Bot (Kachel 229,67 breit, Wert ab 92). */}
+                            <Fit className={styles.statValue} text={stat.value} max={120} size={38} weight={800} />
                         </li>
                     ))}
                 </ul>
