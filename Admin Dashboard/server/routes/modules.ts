@@ -120,6 +120,7 @@ export async function moduleRoutes(app: FastifyInstance, { config }: { config: I
         return {
             botSyncedAt: syncedAt?.toISOString() ?? null,
             betaServers: state?.betaServers ?? null,
+            overrides,
             server: server ? { ...server, overrides: overrides.filter((entry) => entry.guildId === server.id) } : null,
             modules: settings.map((setting) => {
                 const entry = names.get(setting.module);

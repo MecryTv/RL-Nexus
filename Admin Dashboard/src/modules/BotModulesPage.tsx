@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type JSX } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import type { IGuildList } from "../../shared/api";
 import {
     CLOSED_TEXT,
     LINK_MODE_LABELS,
@@ -7,7 +8,6 @@ import {
     NOTICE_MAX,
     PERMANENT_BOT_MODULES,
     type IBotModuleSaved,
-    type IBotModuleView,
     type IBotModulesView,
     type LinkMode,
     type ModuleStatus,
@@ -21,43 +21,39 @@ import { Icon } from "../components/Icon";
 import { PageHeader } from "../components/PageHeader";
 import { Panel } from "../components/Panel";
 import { Failure, Loading } from "../components/Status";
+import { Switch } from "../components/Switch";
 import { UnsavedGuard } from "../editor/UnsavedGuard";
-import { formatDateTime } from "../format";
+import { formatDateTime, formatNumber } from "../format";
 import { useToast } from "../toast/context";
 import { useTitle } from "../useTitle";
 import styles from "./botModules.module.scss";
+import { ModuleList } from "./ModuleList";
+import { ModuleValues } from "./ModuleValues";
+import {
+    allChanges,
+    allDraftOf,
+    bodyOf,
+    CATEGORIES,
+    categoryOf,
+    color,
+    firstError,
+    lowered,
+    overrideSummary,
+    ownCount,
+    serverChanges,
+    serverDraftOf,
+    visibleModules,
+    type Draft,
+    type Filter,
+} from "./moduleDraft";
+import { GuildIcon, ServerScope } from "./ServerScope";
 
 /**
- * W-0131, Bot → Module (Entwurf A2): Was für alle Server gilt, je Modul.
- * Links die Liste mit Status, rechts Status, Hinweis und bei RL Tracking die
- * Verknüpfungsart. Speichern gibt dem Bot Bescheid.
+ * W-0131/W-0133, Bot → Module (Entwurf A2): links Suche, Kategorie-Raster und
+ * die Module einer Kategorie, rechts Status, Hinweis, Verknüpfungsart und die
+ * Grenzen. Oben der Bereich: alle Server oder einer. Adresse:
+ * /module?m=<id>&server=<guildId>&cat=<kategorie>.
  */
-type Filter = "all" | ModuleStatus | "notice";
-
-interface IDraft {
-    readonly status: ModuleStatus;
-    readonly notice: string;
-    readonly linkMode: LinkMode | null;
-}
-
-const CATEGORIES: readonly { readonly id: string | null; readonly label: string }[] = [
-    { id: "competition", label: "Competition" },
-    { id: "community", label: "Community" },
-    { id: "moderation", label: "Moderation" },
-    { id: "engagement", label: "Engagement" },
-    { id: "content", label: "Content" },
-    { id: "utility", label: "Utility" },
-    { id: null, label: "Sonstige" },
-];
-
-const FILTERS: readonly { readonly id: Filter; readonly label: string }[] = [
-    { id: "all", label: "Alle" },
-    { id: "on", label: "An" },
-    { id: "beta", label: "Beta" },
-    { id: "off", label: "Aus" },
-    { id: "notice", label: "Mit Hinweis" },
-];
-
 const STATUS_TEXT: Readonly<Record<ModuleStatus, string>> = {
     on: "Überall, wo Server es eingeschaltet haben.",
     beta: "Nur wo Inhaber oder ein Server-Verwalter Beta-Tester ist.",
@@ -71,6 +67,7 @@ const LINK_TEXT: Readonly<Record<LinkMode, { readonly text: string; readonly plu
 };
 
 const COMMAND_FORM: Readonly<Record<LinkMode, string>> = { login: "/rank link", name: "/rank link <Name>", both: "/rank link [Name]" };
+const NONE_CATEGORY = "sonstige";
 
 function messageOf(error: unknown): string {
     return error instanceof Error ? error.message : String(error);
@@ -80,98 +77,100 @@ function isPermanent(module: string): boolean {
     return (PERMANENT_BOT_MODULES as readonly string[]).includes(module);
 }
 
-function draftOf(module: IBotModuleView): IDraft {
-    return { status: module.status, notice: module.notice ?? "", linkMode: module.linkMode };
-}
-
-function matches(module: IBotModuleView, filter: Filter, search: string): boolean {
-    if (search && !`${module.name} ${module.module}`.toLowerCase().includes(search.toLowerCase())) return false;
-    if (filter === "notice") return module.notice !== null;
-
-    return filter === "all" || module.status === filter;
-}
-
-/** „Status: An → Aus“ je geändertem Feld, für die Speicherleiste. */
-function changes(saved: IBotModuleView, draft: IDraft): { readonly label: string; readonly before: string; readonly after: string }[] {
-    const list: { label: string; before: string; after: string }[] = [];
-    const notice = draft.notice.trim();
-
-    if (draft.status !== saved.status) list.push({ label: "Status", before: MODULE_STATUS_LABELS[saved.status], after: MODULE_STATUS_LABELS[draft.status] });
-    if (notice !== (saved.notice ?? "")) list.push({ label: "Hinweis", before: saved.notice ? "gesetzt" : "leer", after: notice ? "neu" : "leer" });
-    if (draft.linkMode !== saved.linkMode && saved.linkMode && draft.linkMode) {
-        list.push({ label: "Epic-Konto verbinden", before: LINK_MODE_LABELS[saved.linkMode], after: LINK_MODE_LABELS[draft.linkMode] });
-    }
-
-    return list;
-}
-
-function StatusBadge({ status, changed }: { readonly status: ModuleStatus; readonly changed?: boolean }): JSX.Element {
-    if (changed) return <span className={`${styles.badge} ${styles.changed}`}>Geändert</span>;
-
-    return <span className={`${styles.badge} ${styles[status]}`}>{status === "beta" ? "Beta" : MODULE_STATUS_LABELS[status]}</span>;
+function typing(target: EventTarget | null): boolean {
+    return target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement;
 }
 
 export function BotModulesPage(): JSX.Element {
     useTitle("Module");
     const notify = useToast();
-    const view = useApi<IBotModulesView>("/api/bot-modules");
     const [params, setParams] = useSearchParams();
+    const server = params.get("server");
+    const view = useApi<IBotModulesView>(server ? `/api/bot-modules?server=${server}` : "/api/bot-modules");
+    const guilds = useApi<IGuildList>("/api/guilds");
     const [filter, setFilter] = useState<Filter>("all");
     const [search, setSearch] = useState("");
-    const [drafts, setDrafts] = useState<Record<string, IDraft>>({});
+    const [drafts, setDrafts] = useState<Record<string, Draft>>({});
     const [busy, setBusy] = useState(false);
     const [confirming, setConfirming] = useState(false);
-    const [leaving, setLeaving] = useState<string | null>(null);
+    const [leaving, setLeaving] = useState<Record<string, string | null> | null>(null);
     const searchRef = useRef<HTMLInputElement>(null);
 
     useLive("modules", view.reload);
 
-    const modules = useMemo(() => view.data?.modules ?? [], [view.data]);
+    // Solange die Antwort zum alten Bereich gehört, nichts davon zeigen.
+    const data = view.data && (view.data.server?.id ?? null) === server ? view.data : null;
+    const modules = useMemo(() => data?.modules ?? [], [data]);
+    const serverOverrides = useMemo(() => (data?.server ? new Map(data.server.overrides.map((entry) => [entry.module, entry])) : null), [data]);
+    const guildList = guilds.data?.guilds ?? [];
+    const guildOf = (id: string): (typeof guildList)[number] | undefined => guildList.find((entry) => entry.id === id);
+    const serverName = server ? (guildOf(server)?.name ?? data?.server?.name ?? server) : null;
+
     const chosenId = params.get("m");
-    const selected = modules.find((entry) => entry.module === chosenId) ?? modules[0] ?? null;
-    const draft = selected ? (drafts[selected.module] ?? draftOf(selected)) : null;
-    const pending = selected && draft ? changes(selected, draft) : [];
+    const chosen = modules.find((entry) => entry.module === chosenId);
+    const catParam = params.get("cat");
+    const category = catParam ? (catParam === NONE_CATEGORY ? null : catParam) : chosen ? categoryOf(chosen) : "competition";
+    const selected = chosen ?? modules.find((entry) => categoryOf(entry) === category) ?? modules[0] ?? null;
+    const key = selected ? `${server ?? "all"}:${selected.module}` : "";
+    const savedOverride = selected ? serverOverrides?.get(selected.module) : undefined;
+    const draft: Draft | null = selected ? (drafts[key] ?? (server ? serverDraftOf(savedOverride) : allDraftOf(selected))) : null;
+    const pending = selected && draft ? (draft.kind === "all" ? allChanges(selected, draft) : serverChanges(selected, savedOverride, draft)) : [];
     const dirty = pending.length > 0;
 
-    const setDraft = (next: Partial<IDraft>): void => {
-        if (!selected || !draft) return;
-        setDrafts((current) => ({ ...current, [selected.module]: { ...draft, ...next } }));
+    const update = (next: Record<string, string | null>): void => {
+        setParams((current) => {
+            const merged = new URLSearchParams(current);
+
+            for (const [name, value] of Object.entries(next)) {
+                if (value === null) merged.delete(name);
+                else merged.set(name, value);
+            }
+
+            return merged;
+        });
     };
 
-    const choose = (id: string): void => {
-        if (dirty && id !== selected?.module) {
-            setLeaving(id);
+    const go = (next: Record<string, string | null>): void => {
+        const moves = ("m" in next && next.m !== selected?.module) || ("server" in next && next.server !== server);
 
-            return;
-        }
-        setParams({ m: id });
+        if (dirty && moves) setLeaving(next);
+        else update(next);
+    };
+
+    const setDraft = (next: Partial<Draft>): void => {
+        if (!draft) return;
+        setDrafts((current) => ({ ...current, [key]: { ...draft, ...next } as Draft }));
     };
 
     const discard = (): void => {
-        if (!selected) return;
         setDrafts((current) => {
-            const { [selected.module]: _gone, ...rest } = current;
+            const { [key]: _gone, ...rest } = current;
 
             return rest;
         });
     };
 
-    // Strenger heißt: weniger Server oder fremde Namen erlaubt. Dann erst fragen.
-    const risky = selected && draft ? (draft.status !== selected.status && draft.status !== "on") || (draft.linkMode === "name" && selected.linkMode !== "name") : false;
+    const lowerList = selected && draft?.kind === "all" ? lowered(selected, draft) : [];
+    const serverOff = draft?.kind === "server" && draft.status === "off" && savedOverride?.status !== "off";
+    // Strenger heißt: weniger Server, fremde Namen erlaubt oder eine Grenze sinkt. Dann erst fragen.
+    const risky =
+        selected && draft
+            ? draft.kind === "all"
+                ? (draft.status !== selected.status && draft.status !== "on") || (draft.linkMode === "name" && selected.linkMode !== "name") || lowerList.length > 0
+                : serverOff || (draft.linkMode === "name" && (savedOverride?.linkMode ?? selected.linkMode) !== "name")
+            : false;
 
     const save = async (): Promise<void> => {
         if (!selected || !draft) return;
         setBusy(true);
 
         try {
-            const answer = await api<IBotModuleSaved>(`/api/bot-modules/${selected.module}`, {
-                method: "PUT",
-                body: { status: draft.status, notice: draft.notice, ...(draft.linkMode ? { linkMode: draft.linkMode } : {}) },
-            });
+            const answer = await api<IBotModuleSaved>(`/api/bot-modules/${selected.module}`, { method: "PUT", body: bodyOf(selected, draft, server) });
+            const where = server ? `Für ${serverName} gespeichert` : "Gespeichert";
 
             discard();
             setConfirming(false);
-            notify(answer.bot ? "Gespeichert, Bot hat es übernommen." : "Gespeichert, Bot gerade nicht erreichbar. Er übernimmt es in spätestens 5 Minuten.");
+            notify(answer.bot ? `${where}, Bot hat es übernommen.` : `${where}, Bot gerade nicht erreichbar. Er übernimmt es in spätestens 5 Minuten.`);
             view.reload();
         } catch (failure) {
             notify(messageOf(failure), "danger");
@@ -181,20 +180,44 @@ export function BotModulesPage(): JSX.Element {
     };
 
     const requestSave = (): void => {
-        if (!dirty || busy) return;
-        if (risky) setConfirming(true);
+        if (!dirty || busy || !selected || !draft) return;
+
+        const error = firstError(selected.module, draft);
+
+        if (error) notify(error, "danger");
+        else if (risky) setConfirming(true);
         else void save();
     };
 
-    // Strg+S speichert, „/“ springt in die Suche.
+    // Strg+S speichert, „/“ springt in die Suche, Pfeiltasten wechseln Kategorie und Modul.
     useEffect(() => {
         const onKey = (event: KeyboardEvent): void => {
             if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
                 event.preventDefault();
                 requestSave();
-            } else if (event.key === "/" && !(event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement)) {
+
+                return;
+            }
+            if (typing(event.target) || event.ctrlKey || event.metaKey || event.altKey || !selected) return;
+
+            if (event.key === "/") {
                 event.preventDefault();
                 searchRef.current?.focus();
+            } else if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+                const ids = CATEGORIES.filter((entry) => entry.id !== null || modules.some((item) => categoryOf(item) === null)).map((entry) => entry.id);
+                const next = ids[(ids.indexOf(category) + (event.key === "ArrowLeft" ? ids.length - 1 : 1)) % ids.length];
+
+                event.preventDefault();
+                setFilter("all");
+                setSearch("");
+                update({ cat: next ?? NONE_CATEGORY });
+            } else if (event.key === "ArrowUp" || event.key === "ArrowDown") {
+                const shown = visibleModules(modules, { serverOverrides, category, filter, search });
+                const index = shown.findIndex((entry) => entry.module === selected.module);
+                const next = shown[index < 0 ? 0 : Math.min(shown.length - 1, Math.max(0, index + (event.key === "ArrowUp" ? -1 : 1)))];
+
+                event.preventDefault();
+                if (next) go({ m: next.module });
             }
         };
 
@@ -204,123 +227,111 @@ export function BotModulesPage(): JSX.Element {
     });
 
     if (view.error && !view.data) return <Failure message={view.error.message} onRetry={view.reload} />;
-    if (!view.data || !selected || !draft) return <Loading label="Module werden geladen" />;
+    if (!data || !selected || !draft) return <Loading label="Module werden geladen" />;
 
-    const { botSyncedAt } = view.data;
-    const count = (status: ModuleStatus): number => modules.filter((entry) => entry.status === status).length;
-    const shown = modules.filter((entry) => matches(entry, filter, search));
+    const { botSyncedAt, betaServers } = data;
     const permanent = isPermanent(selected.module);
-    const notice = draft.notice.trim();
     const total = modules.find((entry) => entry.module === "rl-tracking")?.servers ?? 0;
-    const color = (category: string | null): string => (category ? `var(--c-mod-${category})` : "var(--c-text-faint)");
+    const reach = selected.module === "rl-tracking" ? total : selected.servers;
+    const guild = server ? guildOf(server) : undefined;
+    const ownTotal = data.server?.overrides.reduce((sum, entry) => sum + ownCount(entry), 0) ?? 0;
+    const effectiveStatus: ModuleStatus = draft.kind === "all" ? draft.status : (draft.status ?? selected.status);
+    const noticeText = draft.kind === "all" ? draft.notice.trim() : draft.notice === null ? (selected.notice ?? "") : draft.notice.trim();
+    const effectiveLink = draft.linkMode ?? selected.linkMode;
+    const others = data.overrides.filter((entry) => entry.module === selected.module);
+    const sections = 2 + (selected.linkMode ? 1 : 0);
+    const changed = (module: string): boolean => {
+        const entry = drafts[`${server ?? "all"}:${module}`];
+        const saved = modules.find((item) => item.module === module);
+
+        if (!entry || !saved) return false;
+
+        return (entry.kind === "all" ? allChanges(saved, entry) : serverChanges(saved, serverOverrides?.get(module), entry)).length > 0;
+    };
 
     return (
         <>
             <UnsavedGuard dirty={dirty} />
-            <PageHeader title="Module" meta="Jede Änderung steht im Protokoll und wirkt im Bot sofort.">
+            <PageHeader title="Module" meta="Was RL Nexus für alle Server festlegt, und Ausnahmen je Server.">
                 <span className={`${styles.sync} ${botSyncedAt ? styles.synced : ""}`} role="status">
                     <i aria-hidden="true" />
-                    {botSyncedAt ? `Bot hat den Stand von ${formatDateTime(botSyncedAt)} übernommen` : "Noch kein Bescheid vom Bot seit dem Start"}
+                    {botSyncedAt ? `Bot hat den Stand von ${formatDateTime(botSyncedAt)} übernommen` : "Kein bestätigter Bescheid vom Bot seit dem Start"}
                 </span>
             </PageHeader>
 
-            <div className={styles.stats}>
-                <div className={styles.stat}>
-                    <span>Module</span>
-                    <b>{modules.length}</b>
-                    <small>{modules.length - 1} Server-Module und RL Tracking</small>
-                </div>
-                <div className={`${styles.stat} ${styles.on}`}>
-                    <span>An</span>
-                    <b>{count("on")}</b>
-                    <small>auf allen Servern</small>
-                </div>
-                <div className={`${styles.stat} ${styles.beta}`}>
-                    <span>Nur Beta</span>
-                    <b>{count("beta")}</b>
-                    <small>nur auf Beta-Servern</small>
-                </div>
-                <div className={`${styles.stat} ${styles.off}`}>
-                    <span>Aus</span>
-                    <b>{count("off")}</b>
-                    <small>{modules.filter((entry) => entry.status === "off").map((entry) => entry.name).join(", ") || "keins"}</small>
-                </div>
-            </div>
+            <ServerScope
+                guilds={guildList}
+                guildsFailed={!!guilds.error}
+                server={server}
+                serverName={data.server?.name ?? null}
+                own={ownTotal}
+                onChange={(next) => go({ server: next })}
+            />
 
             <div className={`${styles.layout} ${chosenId ? styles.showDetail : ""}`}>
-                <Panel className={styles.list}>
-                    <label className={styles.search}>
-                        <Icon name="search" size={16} aria-hidden="true" />
-                        <span className={styles.sr}>Modul suchen</span>
-                        <input ref={searchRef} type="search" placeholder="Modul suchen" value={search} onChange={(event) => setSearch(event.target.value)} />
-                        <kbd aria-hidden="true">/</kbd>
-                    </label>
-                    <div className={styles.filters} role="group" aria-label="Filter">
-                        {FILTERS.map((entry) => (
-                            <button key={entry.id} type="button" className={styles.chip} aria-pressed={filter === entry.id} onClick={() => setFilter(entry.id)}>
-                                {entry.label} {entry.id === "all" ? modules.length : entry.id === "notice" ? modules.filter((item) => item.notice).length : count(entry.id)}
-                            </button>
-                        ))}
-                    </div>
-                    {CATEGORIES.map((category) => {
-                        const items = shown.filter((entry) => entry.category === category.id || (category.id === null && !CATEGORIES.some((known) => known.id && known.id === entry.category)));
-
-                        if (items.length === 0) return null;
-
-                        return (
-                            <div key={category.label} className={styles.group}>
-                                <p className={styles.cat}>
-                                    <span className={styles.dot} style={{ background: color(category.id) }} aria-hidden="true" />
-                                    {category.label}
-                                    <em>{items.length}</em>
-                                </p>
-                                {items.map((entry) => {
-                                    const changed = !!drafts[entry.module] && changes(entry, drafts[entry.module]).length > 0;
-
-                                    return (
-                                        <button
-                                            key={entry.module}
-                                            type="button"
-                                            className={styles.row}
-                                            aria-current={entry.module === selected.module ? "true" : undefined}
-                                            onClick={() => choose(entry.module)}
-                                            style={{ ["--mod" as string]: color(entry.category) }}
-                                        >
-                                            <span className={styles.rowIcon} aria-hidden="true">
-                                                <Icon name="puzzle" size={15} />
-                                            </span>
-                                            <b>{entry.name}</b>
-                                            <small>
-                                                {entry.notice && <Icon name="bell" size={12} aria-label="Hinweis gesetzt" />}
-                                                {isPermanent(entry.module) ? "immer an" : entry.module === "rl-tracking" ? "alle Server" : `${entry.servers} Server`}
-                                            </small>
-                                            <StatusBadge status={entry.status} changed={changed} />
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                        );
-                    })}
-                    {shown.length === 0 && <p className={styles.empty}>Kein Modul passt zu Suche und Filter.</p>}
-                </Panel>
+                <ModuleList
+                    modules={modules}
+                    selected={selected}
+                    serverOverrides={serverOverrides}
+                    category={category}
+                    filter={filter}
+                    search={search}
+                    searchRef={searchRef}
+                    changed={changed}
+                    onChoose={(module) => go({ m: module })}
+                    onCategory={(next) => {
+                        setFilter("all");
+                        setSearch("");
+                        update({ cat: next ?? NONE_CATEGORY });
+                    }}
+                    onFilter={setFilter}
+                    onSearch={setSearch}
+                />
 
                 <Panel className={styles.detail}>
-                    <Link className={styles.back} to="/module">
+                    <Link className={styles.back} to={server ? `/module?server=${server}` : "/module"}>
                         <Icon name="chevron-left" size={16} aria-hidden="true" /> Alle Module
                     </Link>
-                    <header className={styles.head} style={{ ["--mod" as string]: color(selected.category) }}>
+                    <header className={styles.head} style={{ ["--mod" as string]: color(categoryOf(selected)) }}>
                         <span className={styles.headIcon} aria-hidden="true">
                             <Icon name="puzzle" size={22} />
                         </span>
                         <div>
                             <h2>
-                                {selected.name} <StatusBadge status={selected.status} />
+                                {selected.name}
+                                {draft.kind === "server" && savedOverride ? (
+                                    <span className={`${styles.badge} ${styles.own}`}>{ownCount(savedOverride) === 1 ? "1 eigener" : `${ownCount(savedOverride)} eigene`}</span>
+                                ) : (
+                                    <span className={`${styles.badge} ${styles[effectiveStatus]}`}>{effectiveStatus === "beta" ? "Beta" : MODULE_STATUS_LABELS[effectiveStatus]}</span>
+                                )}
                             </h2>
                             {selected.description && <p>{selected.description}</p>}
+                            {selected.commands.length > 0 && (
+                                <p className={styles.commands}>
+                                    {selected.commands.map((command) => (
+                                        <code key={command}>{command}</code>
+                                    ))}
+                                </p>
+                            )}
                         </div>
                         <div className={styles.reach}>
-                            <b>{permanent || selected.module === "rl-tracking" ? `alle ${total}` : selected.servers}</b>
-                            <span>{selected.module === "rl-tracking" ? "Server, kein Schalter je Server" : permanent ? "Server, gehört fest zum Bot" : "Server haben es eingeschaltet"}</span>
+                            {server ? (
+                                <>
+                                    <b>{permanent || selected.module === "rl-tracking" ? "fest" : guild?.modules.includes(selected.module) ? "an" : guild ? "aus" : "–"}</b>
+                                    <span>
+                                        {permanent || selected.module === "rl-tracking"
+                                            ? "gehört auf jedem Server dazu"
+                                            : guild
+                                              ? `auf ${serverName} ${guild.modules.includes(selected.module) ? "eingeschaltet" : "nicht eingeschaltet"}`
+                                              : "Stand des Servers unbekannt"}
+                                    </span>
+                                </>
+                            ) : (
+                                <>
+                                    <b>{permanent || selected.module === "rl-tracking" ? `alle ${total}` : selected.servers}</b>
+                                    <span>{selected.module === "rl-tracking" ? "Server, kein Schalter je Server" : permanent ? "Server, gehört fest zum Bot" : "Server haben es eingeschaltet"}</span>
+                                </>
+                            )}
                         </div>
                     </header>
 
@@ -330,9 +341,9 @@ export function BotModulesPage(): JSX.Element {
                         </h3>
                         {permanent ? (
                             <p className={styles.note}>Gehört fest zum Bot und bleibt immer an. Einstellbar ist nur der Hinweis.</p>
-                        ) : (
+                        ) : draft.kind === "all" ? (
                             <>
-                                <p className={styles.note}>Gilt für alle Server. Die Auswahl der Server bleibt gespeichert und kommt beim Einschalten zurück.</p>
+                                <p className={styles.note}>Gilt für alle Server ohne eigenen Wert. Die Auswahl der Server bleibt gespeichert und kommt beim Einschalten zurück.</p>
                                 <div className={styles.states} role="radiogroup" aria-label="Status">
                                     {(["on", "beta", "off"] as const).map((status) => (
                                         <button
@@ -344,7 +355,10 @@ export function BotModulesPage(): JSX.Element {
                                             onClick={() => setDraft({ status })}
                                         >
                                             <b>{MODULE_STATUS_LABELS[status]}</b>
-                                            <small>{STATUS_TEXT[status]}</small>
+                                            <small>
+                                                {STATUS_TEXT[status]}
+                                                {status === "beta" && betaServers !== null && ` Heute ${betaServers} Server.`}
+                                            </small>
                                         </button>
                                     ))}
                                 </div>
@@ -352,12 +366,37 @@ export function BotModulesPage(): JSX.Element {
                                     <p className={styles.impact}>
                                         <Icon name="server" size={15} aria-hidden="true" />
                                         {draft.status === "off"
-                                            ? `Betrifft ${selected.module === "rl-tracking" ? total : selected.servers} Server: Dort ist das Modul dann aus.`
+                                            ? `Betrifft ${reach} Server: Dort ist das Modul dann aus.`
                                             : draft.status === "beta"
-                                              ? "Bleibt nur auf Servern, deren Inhaber oder Server-Verwalter Beta-Tester sind."
-                                              : `Wieder an auf ${selected.module === "rl-tracking" ? total : selected.servers} Servern.`}
+                                              ? `Bleibt nur auf Servern, deren Inhaber oder Server-Verwalter Beta-Tester sind${betaServers !== null ? ` (heute ${betaServers})` : ""}.`
+                                              : `Wieder an auf ${reach} Servern.`}
                                     </p>
                                 )}
+                            </>
+                        ) : (
+                            <>
+                                <p className={styles.note}>Nur für {serverName}. „Wie alle“ übernimmt den Status von „Alle Server“.</p>
+                                <div className={styles.states} role="radiogroup" aria-label="Status für diesen Server">
+                                    {([null, "on", "off"] as const).map((status) => (
+                                        <button
+                                            key={status ?? "inherit"}
+                                            type="button"
+                                            role="radio"
+                                            aria-checked={draft.status === status}
+                                            className={`${styles.state} ${status ? styles[status] : styles.inherit}`}
+                                            onClick={() => setDraft({ status })}
+                                        >
+                                            <b>{status ? MODULE_STATUS_LABELS[status] : "Wie alle"}</b>
+                                            <small>
+                                                {status === null
+                                                    ? `Für alle gilt: ${MODULE_STATUS_LABELS[selected.status]}.`
+                                                    : status === "on"
+                                                      ? "An, auch wenn es für alle aus ist oder nur für Beta gilt."
+                                                      : "Aus nur hier, Befehle antworten mit dem Hinweis."}
+                                            </small>
+                                        </button>
+                                    ))}
+                                </div>
                             </>
                         )}
                     </section>
@@ -366,104 +405,172 @@ export function BotModulesPage(): JSX.Element {
                         <h3>
                             <span>02</span>Hinweis
                         </h3>
-                        <p className={styles.note}>Optional. Steht im Bot-Dashboard beim Modul und ist die Antwort, solange es aus ist.</p>
-                        <div className={styles.noticeGrid}>
-                            <div>
-                                <label className={styles.sr} htmlFor="modul-hinweis">
-                                    Hinweis
-                                </label>
-                                <textarea
-                                    id="modul-hinweis"
-                                    className={styles.textarea}
-                                    value={draft.notice}
-                                    maxLength={NOTICE_MAX}
-                                    placeholder="Leer lassen, dann steht dort nichts. Zum Beispiel: „Wird gerade überarbeitet, ab 21 Uhr wieder da.“"
-                                    onChange={(event) => setDraft({ notice: event.target.value })}
-                                />
-                                <p className={styles.count}>
-                                    <span>{notice ? "Wird so übernommen" : "Kein Hinweis gesetzt"}</span>
-                                    <span>
-                                        {notice.length} / {NOTICE_MAX}
-                                    </span>
-                                </p>
-                            </div>
-                            <div className={styles.previews}>
-                                <div className={styles.preview}>
-                                    <p>Bot-Dashboard</p>
-                                    {notice ? (
-                                        <div className={styles.dashBanner}>
-                                            <Icon name="bell" size={16} aria-hidden="true" />
+                        {draft.kind === "server" && (
+                            <Switch
+                                checked={draft.notice !== null}
+                                label={draft.notice === null ? `Wie alle${selected.notice ? `: „${selected.notice}“` : ", kein Hinweis"}` : "Eigener Hinweis für diesen Server"}
+                                onChange={(checked) => setDraft({ notice: checked ? (selected.notice ?? "") : null })}
+                            />
+                        )}
+                        {(draft.kind === "all" || draft.notice !== null) && (
+                            <>
+                                <p className={styles.note}>Optional. Steht im Bot-Dashboard beim Modul und ist die Antwort, solange es aus ist.</p>
+                                <div className={styles.noticeGrid}>
+                                    <div>
+                                        <label className={styles.sr} htmlFor="modul-hinweis">
+                                            Hinweis
+                                        </label>
+                                        <textarea
+                                            id="modul-hinweis"
+                                            className={styles.textarea}
+                                            value={draft.notice ?? ""}
+                                            maxLength={NOTICE_MAX}
+                                            placeholder="Leer lassen, dann steht dort nichts. Zum Beispiel: „Wird gerade überarbeitet, ab 21 Uhr wieder da.“"
+                                            onChange={(event) => setDraft({ notice: event.target.value })}
+                                        />
+                                        <p className={styles.count}>
+                                            <span>{noticeText ? "Wird so übernommen" : "Kein Hinweis gesetzt"}</span>
                                             <span>
-                                                {draft.status === "off" && <b>Vorübergehend abgeschaltet. </b>}
-                                                {notice}
+                                                {noticeText.length} / {NOTICE_MAX}
                                             </span>
-                                        </div>
-                                    ) : (
-                                        <span className={styles.muted}>Ohne Hinweis steht dort nichts.</span>
-                                    )}
-                                </div>
-                                {draft.status !== "on" && (
-                                    <div className={styles.preview}>
-                                        <p>Antwort in Discord</p>
-                                        <div className={styles.discord}>
-                                            <span className={styles.avatar} aria-hidden="true">
-                                                N
-                                            </span>
-                                            <b>RL Nexus</b>
-                                            <span>{notice || CLOSED_TEXT}</span>
-                                            <small>Nur du kannst das sehen</small>
-                                        </div>
+                                        </p>
                                     </div>
-                                )}
-                            </div>
-                        </div>
+                                    <div className={styles.previews}>
+                                        <div className={styles.preview}>
+                                            <p>Bot-Dashboard</p>
+                                            {noticeText ? (
+                                                <div className={styles.dashBanner}>
+                                                    <Icon name="bell" size={16} aria-hidden="true" />
+                                                    <span>
+                                                        {effectiveStatus === "off" && <b>Vorübergehend abgeschaltet. </b>}
+                                                        {noticeText}
+                                                    </span>
+                                                </div>
+                                            ) : (
+                                                <span className={styles.muted}>Ohne Hinweis steht dort nichts.</span>
+                                            )}
+                                        </div>
+                                        {effectiveStatus !== "on" && (
+                                            <div className={styles.preview}>
+                                                <p>Antwort in Discord</p>
+                                                <div className={styles.discord}>
+                                                    <span className={styles.avatar} aria-hidden="true">
+                                                        N
+                                                    </span>
+                                                    <b>RL Nexus</b>
+                                                    <span>{noticeText || CLOSED_TEXT}</span>
+                                                    <small>Nur du kannst das sehen</small>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </>
+                        )}
                     </section>
 
-                    {selected.linkMode && draft.linkMode && (
+                    {selected.linkMode && (
                         <section className={styles.section}>
                             <h3>
                                 <span>03</span>Epic-Konto verbinden
                             </h3>
-                            <p className={styles.note}>Wie Mitglieder ihr Epic-Konto mit Discord verbinden. Gilt nur für RL Tracking.</p>
-                            <div className={styles.choices} role="radiogroup" aria-label="Epic-Konto verbinden">
-                                {(["login", "name", "both"] as const).map((mode) => (
-                                    <button
-                                        key={mode}
-                                        type="button"
-                                        role="radio"
-                                        aria-checked={draft.linkMode === mode}
-                                        className={`${styles.choice} ${selected.linkMode === mode && draft.linkMode !== mode ? styles.was : ""}`}
-                                        onClick={() => setDraft({ linkMode: mode })}
-                                    >
-                                        <b>
-                                            {LINK_MODE_LABELS[mode]}
-                                            {selected.linkMode === mode && draft.linkMode !== mode && <span className={styles.tagOld}>bisher</span>}
-                                            {mode === "both" && <span className={styles.tagGood}>empfohlen</span>}
-                                        </b>
-                                        <small>{LINK_TEXT[mode].text}</small>
-                                        <span className={styles.plus}>
-                                            <Icon name="check" size={13} aria-hidden="true" />
-                                            {LINK_TEXT[mode].plus}
-                                        </span>
-                                        <span className={mode === "name" ? styles.warn : styles.minus}>
-                                            <Icon name={mode === "name" ? "alert" : "minus"} size={13} aria-hidden="true" />
-                                            {LINK_TEXT[mode].minus}
-                                        </span>
-                                    </button>
-                                ))}
-                            </div>
-                            <p className={styles.impact}>
-                                <Icon name="discord" size={15} aria-hidden="true" />
-                                Befehl: <code>{COMMAND_FORM[draft.linkMode]}</code>
-                                {draft.linkMode !== "name" && selected.linkMode === "name" && " · Rang-Rollen ohne bestätigte Verknüpfung werden entfernt."}
+                            <p className={styles.note}>
+                                {draft.kind === "all" ? "Wie Mitglieder ihr Epic-Konto mit Discord verbinden. Gilt nur für RL Tracking." : `Nur für ${serverName}. „Wie alle“ übernimmt die Art von „Alle Server“.`}
                             </p>
+                            <div className={styles.choices} role="radiogroup" aria-label="Epic-Konto verbinden">
+                                {draft.kind === "server" && (
+                                    <button type="button" role="radio" aria-checked={draft.linkMode === null} className={`${styles.choice} ${styles.inherit}`} onClick={() => setDraft({ linkMode: null })}>
+                                        <b>Wie alle</b>
+                                        <small>Für alle gilt: {LINK_MODE_LABELS[selected.linkMode]}.</small>
+                                    </button>
+                                )}
+                                {(["login", "name", "both"] as const).map((mode) => {
+                                    const was = draft.kind === "all" ? selected.linkMode : (savedOverride?.linkMode ?? null);
+
+                                    return (
+                                        <button
+                                            key={mode}
+                                            type="button"
+                                            role="radio"
+                                            aria-checked={draft.linkMode === mode}
+                                            className={`${styles.choice} ${was === mode && draft.linkMode !== mode ? styles.was : ""}`}
+                                            onClick={() => setDraft({ linkMode: mode })}
+                                        >
+                                            <b>
+                                                {LINK_MODE_LABELS[mode]}
+                                                {was === mode && draft.linkMode !== mode && <span className={styles.tagOld}>bisher</span>}
+                                                {mode === "both" && <span className={styles.tagGood}>empfohlen</span>}
+                                            </b>
+                                            <small>{LINK_TEXT[mode].text}</small>
+                                            <span className={styles.plus}>
+                                                <Icon name="check" size={13} aria-hidden="true" />
+                                                {LINK_TEXT[mode].plus}
+                                            </span>
+                                            <span className={mode === "name" ? styles.warn : styles.minus}>
+                                                <Icon name={mode === "name" ? "alert" : "minus"} size={13} aria-hidden="true" />
+                                                {LINK_TEXT[mode].minus}
+                                            </span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                            {effectiveLink && (
+                                <p className={styles.impact}>
+                                    <Icon name="discord" size={15} aria-hidden="true" />
+                                    Befehl: <code>{COMMAND_FORM[effectiveLink]}</code>
+                                    {draft.kind === "all" && draft.linkMode !== "name" && selected.linkMode === "name" && " · Rang-Rollen ohne bestätigte Verknüpfung werden entfernt."}
+                                </p>
+                            )}
+                            {selected.links && (
+                                <p className={styles.impact}>
+                                    <Icon name="link" size={15} aria-hidden="true" />
+                                    {formatNumber(selected.links.total)} Epic-Verknüpfungen, davon {formatNumber(selected.links.byName)} nur per Name.
+                                </p>
+                            )}
                         </section>
                     )}
 
-                    {selected.history.length > 0 && (
+                    <ModuleValues
+                        module={selected}
+                        draft={draft}
+                        number={String(sections + 1).padStart(2, "0")}
+                        serverName={serverName}
+                        onValues={(values) => setDraft({ values })}
+                        onAskable={(askable) => setDraft({ askable })}
+                    />
+
+                    {draft.kind === "all" && others.length > 0 && (
                         <section className={styles.section}>
                             <h3>
-                                <span>{selected.linkMode ? "04" : "03"}</span>Verlauf
+                                <span>{String(sections + 2).padStart(2, "0")}</span>Server mit eigenem Wert
+                            </h3>
+                            <p className={styles.note}>Ein Server-Wert gilt vor dem Wert für alle. Stellst du hier etwas um, behalten diese Server ihren.</p>
+                            <ul className={styles.others}>
+                                {others.map((entry) => {
+                                    const name = guildOf(entry.guildId)?.name ?? entry.guildId;
+
+                                    return (
+                                        <li key={entry.guildId}>
+                                            <GuildIcon guild={guildOf(entry.guildId)} name={name} />
+                                            <div>
+                                                <b>{name}</b>
+                                                <small>{overrideSummary(selected, entry)}</small>
+                                                {entry.note && <small className={styles.why}>Warum: {entry.note}</small>}
+                                            </div>
+                                            <Button variant="ghost" onClick={() => go({ server: entry.guildId })}>
+                                                Öffnen
+                                            </Button>
+                                        </li>
+                                    );
+                                })}
+                            </ul>
+                        </section>
+                    )}
+
+                    {draft.kind === "all" && selected.history.length > 0 && (
+                        <section className={styles.section}>
+                            <h3>
+                                <span>{String(sections + (others.length > 0 ? 3 : 2)).padStart(2, "0")}</span>Letzte Änderungen
                             </h3>
                             <ol className={styles.history}>
                                 {selected.history.map((entry) => (
@@ -475,14 +582,23 @@ export function BotModulesPage(): JSX.Element {
                                     </li>
                                 ))}
                             </ol>
-                            <Link className={styles.allLog} to="/dev/protokoll">
-                                Ganzes Protokoll
-                            </Link>
                         </section>
                     )}
 
                     {dirty && (
                         <div className={styles.save} role="region" aria-label="Ungespeicherte Änderungen">
+                            {draft.kind === "server" && (
+                                <label className={styles.whyField}>
+                                    <b>Warum eigener Wert?</b>
+                                    <input
+                                        value={draft.note}
+                                        maxLength={300}
+                                        placeholder="Zum Beispiel: Anfrage im Support-Ticket #214, Turnier mit 100 Plätzen"
+                                        onChange={(event) => setDraft({ note: event.target.value })}
+                                    />
+                                    <span>Steht im Verlauf und bei „Server mit eigenem Wert“.</span>
+                                </label>
+                            )}
                             <div className={styles.what}>
                                 <b>{pending.length === 1 ? "1 Änderung nicht gespeichert" : `${pending.length} Änderungen nicht gespeichert`}</b>
                                 <span>
@@ -492,6 +608,7 @@ export function BotModulesPage(): JSX.Element {
                                             {change.label}: <s>{change.before}</s> → {change.after}
                                         </span>
                                     ))}
+                                    {server && ` · für ${serverName}`}
                                 </span>
                             </div>
                             <div className={styles.saveActions}>
@@ -499,7 +616,7 @@ export function BotModulesPage(): JSX.Element {
                                     Verwerfen
                                 </Button>
                                 <Button variant="primary" onClick={requestSave} busy={busy}>
-                                    Speichern
+                                    {server ? `Für ${serverName} speichern` : "Speichern"}
                                 </Button>
                                 <kbd aria-hidden="true">Strg+S</kbd>
                             </div>
@@ -510,22 +627,43 @@ export function BotModulesPage(): JSX.Element {
 
             <ConfirmDialog
                 open={confirming}
-                title={draft.linkMode === "name" && selected.linkMode !== "name" ? "Verbinden nur per Name erlauben?" : `${selected.name} ${draft.status === "off" ? "überall abschalten" : "auf Beta-Server begrenzen"}?`}
-                confirmLabel={draft.status === "off" ? `Für ${selected.module === "rl-tracking" ? total : selected.servers} Server abschalten` : "Speichern"}
+                title={
+                    draft.kind === "server"
+                        ? serverOff
+                            ? `${selected.name} auf ${serverName} abschalten?`
+                            : "Verbinden nur per Name erlauben?"
+                        : draft.linkMode === "name" && selected.linkMode !== "name"
+                          ? "Verbinden nur per Name erlauben?"
+                          : draft.status !== selected.status && draft.status !== "on"
+                            ? `${selected.name} ${draft.status === "off" ? "überall abschalten" : "auf Beta-Server begrenzen"}?`
+                            : lowerList.length === 1
+                              ? "Grenze senken?"
+                              : "Grenzen senken?"
+                }
+                confirmLabel={draft.kind === "all" && draft.status === "off" && selected.status !== "off" ? `Für ${reach} Server abschalten` : "Speichern"}
                 tone="danger"
                 busy={busy}
                 onConfirm={() => void save()}
                 onCancel={() => setConfirming(false)}
             >
-                {draft.status !== selected.status && draft.status !== "on" && (
+                {draft.kind === "all" && draft.status !== selected.status && draft.status !== "on" && (
                     <p>
-                        Das trifft sofort <b>{selected.module === "rl-tracking" ? total : selected.servers} Server</b>. Die Einstellungen der Server bleiben gespeichert und gelten beim
-                        Einschalten wieder. Hinweis an die Server: <b>{notice || "keiner"}</b>
-                        {notice ? "" : `, Befehle antworten mit „${CLOSED_TEXT}“`}
-                        {/[.!?…“"]$/.test(notice) ? "" : "."}
+                        Das trifft sofort <b>{reach} Server</b>. Die Einstellungen der Server bleiben gespeichert und gelten beim Einschalten wieder. Hinweis an die Server:{" "}
+                        <b>{noticeText || "keiner"}</b>
+                        {noticeText ? "" : `, Befehle antworten mit „${CLOSED_TEXT}“`}
+                        {/[.!?…“"]$/.test(noticeText) ? "" : "."}
                     </p>
                 )}
-                {draft.linkMode === "name" && selected.linkMode !== "name" && <p>Dann kann jeder einen fremden Epic-Namen eintragen und bekommt dessen Rang-Rollen.</p>}
+                {lowerList.length > 0 && (
+                    <p>
+                        {lowerList.map((change) => `${change.label}: ${change.before} → ${change.after}`).join(" · ")}. Was es schon gibt, bleibt; nur Neues über der Grenze wird abgelehnt.
+                        {others.length > 0 && ` ${others.length === 1 ? "Ein Server behält" : `${others.length} Server behalten`} den eigenen Wert.`}
+                    </p>
+                )}
+                {serverOff && <p>Auf {serverName} antworten die Befehle dann mit dem Hinweis. Alle anderen Server bleiben, wie sie sind.</p>}
+                {draft.linkMode === "name" && (draft.kind === "all" ? selected.linkMode : (savedOverride?.linkMode ?? selected.linkMode)) !== "name" && (
+                    <p>Dann kann jeder einen fremden Epic-Namen eintragen und bekommt dessen Rang-Rollen.</p>
+                )}
             </ConfirmDialog>
 
             <ConfirmDialog
@@ -535,12 +673,15 @@ export function BotModulesPage(): JSX.Element {
                 tone="danger"
                 onConfirm={() => {
                     discard();
-                    if (leaving) setParams({ m: leaving });
+                    if (leaving) update(leaving);
                     setLeaving(null);
                 }}
                 onCancel={() => setLeaving(null)}
             >
-                <p>Bei {selected.name} ist etwas geändert und noch nicht gespeichert.</p>
+                <p>
+                    Bei {selected.name}
+                    {server ? ` für ${serverName}` : ""} ist etwas geändert und noch nicht gespeichert.
+                </p>
             </ConfirmDialog>
         </>
     );

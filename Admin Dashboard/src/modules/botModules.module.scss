@@ -34,57 +34,6 @@ $beta: #ffc53d;
     }
 }
 
-.stats {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: var(--s-3);
-    margin-bottom: var(--s-4);
-
-    @include below(700px) {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-}
-
-.stat {
-    display: grid;
-    gap: 2px;
-    padding: var(--s-3) var(--s-4);
-    border: 1px solid var(--c-line-strong);
-    background: var(--c-panel);
-
-    span {
-        color: var(--c-text-faint);
-
-        @include label(0.72rem, 0.14em);
-    }
-
-    b {
-        font-family: var(--f-display);
-        font-size: 1.4rem;
-        font-variant-numeric: tabular-nums;
-    }
-
-    small {
-        overflow: hidden;
-        color: var(--c-text-faint);
-        font-size: 0.8rem;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-    }
-
-    &.on b {
-        color: var(--c-win);
-    }
-
-    &.beta b {
-        color: $beta;
-    }
-
-    &.off b {
-        color: var(--c-loss);
-    }
-}
-
 .layout {
     display: grid;
     grid-template-columns: 300px minmax(0, 1fr);
@@ -112,6 +61,12 @@ $beta: #ffc53d;
 
 .list {
     padding: var(--s-3) 0 var(--s-2);
+
+    /* W-0133: Die Liste bleibt stehen, während das Formular scrollt. */
+    @include from(900px) {
+        position: sticky;
+        top: var(--s-3);
+    }
 }
 
 .search {
@@ -152,7 +107,14 @@ $beta: #ffc53d;
     display: flex;
     flex-wrap: wrap;
     gap: var(--s-1);
+    align-items: center;
     margin: 0 var(--s-3) var(--s-2);
+
+    > span {
+        margin-right: 2px;
+        color: var(--c-text-faint);
+        font-size: 0.78rem;
+    }
 }
 
 .chip {
@@ -174,32 +136,6 @@ $beta: #ffc53d;
     &:focus-visible {
         @include focus-ring;
     }
-}
-
-.group {
-    margin-top: var(--s-2);
-}
-
-.cat {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin: var(--s-2) var(--s-4) 2px;
-    color: var(--c-text-faint);
-
-    @include label(0.7rem, 0.16em);
-
-    em {
-        margin-left: auto;
-        font-style: normal;
-    }
-}
-
-.dot {
-    width: 8px;
-    height: 8px;
-    flex: none;
-    border-radius: 50%;
 }
 
 .row {
@@ -233,8 +169,14 @@ $beta: #ffc53d;
         color: var(--c-text-faint);
         font-size: 0.75rem;
 
-        svg {
+        em {
+            color: var(--c-blue);
+            font-style: normal;
+        }
+
+        strong {
             color: $beta;
+            font-weight: 500;
         }
     }
 
@@ -312,7 +254,8 @@ $beta: #ffc53d;
         color: var(--c-loss);
     }
 
-    &.changed {
+    &.changed,
+    &.own {
         border-color: rgb(0 175 255 / 45%);
         color: var(--c-blue);
 
@@ -492,6 +435,10 @@ $beta: #ffc53d;
 
     &.off {
         --tone: var(--c-loss);
+    }
+
+    &.inherit {
+        --tone: var(--c-text-dim);
     }
 
     &[aria-checked="true"] {
@@ -721,13 +668,6 @@ $beta: #ffc53d;
     }
 }
 
-.allLog {
-    display: inline-block;
-    margin-top: var(--s-2);
-    color: var(--c-text-dim);
-    font-size: 0.82rem;
-}
-
 .save {
     position: sticky;
     bottom: 0;
@@ -778,5 +718,460 @@ $beta: #ffc53d;
         @include below(700px) {
             display: none;
         }
+    }
+}
+
+.choices {
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+}
+
+/* W-0133: Bereich „Alle Server“ / „Ein Server“. */
+.scope {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-2) var(--s-3);
+    align-items: center;
+    margin-bottom: var(--s-4);
+    padding: var(--s-2) var(--s-3);
+    border: 1px solid rgb(0 175 255 / 30%);
+    background: rgb(0 175 255 / 5%);
+}
+
+.seg {
+    display: inline-flex;
+    border: 1px solid var(--c-line-strong);
+
+    button {
+        min-height: 36px;
+        padding: 0 var(--s-3);
+        border: 0;
+        background: transparent;
+        color: var(--c-text-dim);
+        cursor: pointer;
+
+        @include label(0.75rem, 0.1em);
+
+        &[aria-checked="true"] {
+            background: rgb(0 175 255 / 14%);
+            box-shadow: inset 0 -2px 0 var(--c-blue);
+            color: var(--c-text);
+        }
+
+        &:focus-visible {
+            @include focus-inset;
+        }
+    }
+}
+
+.serverChip {
+    display: inline-flex;
+    gap: var(--s-2);
+    align-items: center;
+    max-width: 100%;
+    min-height: 36px;
+    padding: 0 var(--s-3);
+    border: 1px solid var(--c-blue);
+    background: var(--c-panel-solid);
+    color: var(--c-text);
+    font: inherit;
+    font-size: 0.875rem;
+    cursor: pointer;
+
+    small {
+        overflow: hidden;
+        color: var(--c-text-faint);
+        font-size: 0.78rem;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    &:focus-visible {
+        @include focus-ring;
+    }
+}
+
+.guildIcon {
+    display: grid;
+    flex: none;
+    width: 22px;
+    height: 22px;
+    place-items: center;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--c-mod-competition), var(--c-mod-moderation));
+    color: #fff;
+    font-family: var(--f-display);
+    font-size: 0.65rem;
+    font-style: normal;
+    font-weight: 800;
+    object-fit: cover;
+}
+
+.scopeHint {
+    color: var(--c-text-dim);
+    font-size: 0.82rem;
+
+    b {
+        color: var(--c-blue);
+        font-weight: 600;
+    }
+}
+
+.picker {
+    flex: 1 1 320px;
+    min-width: 0;
+
+    .search {
+        margin: 0;
+        background: var(--c-panel-solid);
+    }
+}
+
+.pickList {
+    margin: 4px 0 0;
+    padding: 0;
+    border: 1px solid var(--c-line-strong);
+    background: var(--c-panel-solid);
+    list-style: none;
+
+    button {
+        display: grid;
+        grid-template-columns: 22px minmax(0, 1fr);
+        gap: 0 var(--s-2);
+        align-items: center;
+        width: 100%;
+        min-height: 44px;
+        padding: 4px var(--s-3);
+        border: 0;
+        background: transparent;
+        color: var(--c-text);
+        font: inherit;
+        text-align: left;
+        cursor: pointer;
+
+        > :first-child {
+            grid-row: span 2;
+        }
+
+        b {
+            overflow: hidden;
+            font-size: 0.875rem;
+            font-weight: 500;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        small {
+            grid-column: 2;
+            color: var(--c-text-faint);
+            font-size: 0.75rem;
+        }
+
+        &:hover {
+            background: rgb(255 255 255 / 4%);
+        }
+
+        &:focus-visible {
+            @include focus-inset;
+        }
+    }
+}
+
+.pickEmpty {
+    padding: var(--s-3);
+    color: var(--c-text-faint);
+    font-size: 0.85rem;
+}
+
+/* W-0133: Kategorie-Raster 3×2. */
+.cats {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 3px;
+    margin: 0 var(--s-3) var(--s-2);
+}
+
+.catTile {
+    display: grid;
+    gap: 1px;
+    min-height: 44px;
+    padding: 5px 8px;
+    border: 1px solid var(--c-line-strong);
+    background: var(--c-panel-solid);
+    color: var(--c-text-dim);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+
+    b {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+
+        @include label(0.7rem, 0.08em);
+    }
+
+    small {
+        display: flex;
+        gap: 5px;
+        align-items: center;
+        color: var(--c-text-faint);
+        font-size: 0.72rem;
+    }
+
+    &[aria-pressed="true"] {
+        border-color: var(--c);
+        background: color-mix(in srgb, var(--c) 11%, var(--c-panel-solid));
+        color: var(--c-text);
+    }
+
+    &:focus-visible {
+        @include focus-ring;
+    }
+}
+
+.dotOff,
+.dotBeta,
+.dotOwn {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+}
+
+.dotOff {
+    background: var(--c-loss);
+}
+
+.dotBeta {
+    background: $beta;
+}
+
+.dotOwn {
+    border-radius: 0;
+    background: var(--c-blue);
+}
+
+.keys {
+    margin: var(--s-2) var(--s-4) 0;
+    color: var(--c-text-faint);
+    font-size: 0.75rem;
+
+    kbd {
+        padding: 0 4px;
+        border: 1px solid var(--c-line-strong);
+        color: var(--c-text-dim);
+        font-family: var(--f-label);
+        font-size: 0.7rem;
+    }
+
+    @include below(900px) {
+        display: none;
+    }
+}
+
+.head p.commands {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 6px;
+
+    code {
+        padding: 0 6px;
+        border: 1px solid var(--c-line-strong);
+        color: var(--c-text-dim);
+        font-size: 0.75rem;
+    }
+}
+
+/* W-0133: Grenzen und Werte. */
+.fields {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--s-3) var(--s-4);
+
+    @include below(700px) {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+.field {
+    display: grid;
+    gap: 6px;
+    align-content: start;
+    min-width: 0;
+
+    label {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        align-items: center;
+        color: var(--c-text-dim);
+
+        @include label(0.72rem, 0.12em);
+    }
+}
+
+.tag {
+    padding: 0 5px;
+    border: 1px solid var(--c-line-strong);
+    color: var(--c-text-faint);
+    white-space: nowrap;
+
+    @include label(0.65rem, 0.1em);
+}
+
+.tagOwn {
+    border-color: rgb(0 175 255 / 45%);
+    color: var(--c-blue);
+}
+
+.inp {
+    display: flex;
+    gap: var(--s-2);
+    align-items: center;
+    min-height: 40px;
+    padding: 0 var(--s-3);
+    border: 1px solid var(--c-line-strong);
+    background: var(--c-panel-solid);
+
+    input {
+        width: 100%;
+        min-width: 0;
+        min-height: 38px;
+        border: 0;
+        outline: 0;
+        background: transparent;
+        color: var(--c-text);
+        font: inherit;
+        font-variant-numeric: tabular-nums;
+    }
+
+    span {
+        flex: none;
+        color: var(--c-text-faint);
+        font-size: 0.78rem;
+        white-space: nowrap;
+    }
+
+    &:focus-within {
+        @include focus-ring;
+    }
+}
+
+.inpOwn {
+    border-color: var(--c-blue);
+}
+
+.inpInherit {
+    border-style: dashed;
+
+    input {
+        color: var(--c-text-faint);
+    }
+}
+
+.inpLocked {
+    opacity: 0.6;
+}
+
+.inpError {
+    border-color: var(--c-loss);
+}
+
+.fieldError {
+    margin: 0;
+    color: var(--c-loss);
+    font-size: 0.78rem;
+}
+
+.fieldNote {
+    margin: 0;
+    color: var(--c-text-faint);
+    font-size: 0.78rem;
+}
+
+.linkBtn {
+    justify-self: start;
+    min-height: 32px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--c-blue);
+    font: inherit;
+    font-size: 0.8rem;
+    cursor: pointer;
+
+    &:focus-visible {
+        @include focus-ring;
+    }
+}
+
+/* W-0133: Server mit eigenem Wert. */
+.others {
+    display: grid;
+    gap: var(--s-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+
+    li {
+        display: grid;
+        grid-template-columns: 22px minmax(0, 1fr) auto;
+        gap: var(--s-3);
+        align-items: center;
+        padding: var(--s-2) var(--s-3);
+        border: 1px solid var(--c-line-strong);
+        background: var(--c-panel-solid);
+    }
+
+    div {
+        display: grid;
+        gap: 1px;
+        min-width: 0;
+    }
+
+    b {
+        font-size: 0.875rem;
+        font-weight: 600;
+    }
+
+    small {
+        color: var(--c-text-dim);
+        font-size: 0.78rem;
+    }
+
+    small.why {
+        color: var(--c-text-faint);
+    }
+}
+
+.whyField {
+    display: grid;
+    flex: 1 1 100%;
+    gap: 4px;
+
+    b {
+        color: var(--c-text);
+
+        @include label(0.72rem, 0.1em);
+    }
+
+    input {
+        min-height: 38px;
+        padding: 0 var(--s-3);
+        border: 1px solid var(--c-line-strong);
+        background: var(--c-panel-solid);
+        color: var(--c-text);
+        font: inherit;
+        font-size: 0.875rem;
+
+        &:focus-visible {
+            @include focus-ring;
+        }
+    }
+
+    span {
+        color: var(--c-text-faint);
+        font-size: 0.75rem;
     }
 }

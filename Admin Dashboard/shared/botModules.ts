@@ -152,6 +152,8 @@ export interface IBotModulesView {
     readonly botSyncedAt: string | null;
     /** W-0133: Server mit Beta-Zugang laut Bot, null wenn er nicht antwortet. */
     readonly betaServers: number | null;
+    /** W-0133: alle Server-Werte, für „Server mit eigenem Wert“. */
+    readonly overrides: readonly IBotModuleOverride[];
     /** W-0133: der gewählte Server (?server=), sonst null. */
     readonly server: { readonly id: string; readonly name: string; readonly icon: string | null; readonly overrides: readonly IBotModuleOverride[] } | null;
 }
