@@ -33,6 +33,8 @@ import IDashboardSession from "../interfaces/services/dashboard/IDashboardSessio
 import DashboardService, { AccessEnds, BETA_ERRORS, BetaErrorText, BetaGate, DisplayGroup, LockPlaceholders, MfaRequired, ShopDecision, ShopStatusLines, type IShopGrantRow, type IShopStatusRow } from "../services/DashboardService";
 import { AccessText } from "../dashboard/client/constants/Access";
 import { applyCatalog, CATEGORIES, MODULES } from "../dashboard/client/constants/Modules";
+import { askableCount, limitCards, limitCounts, limitName, limitRequestText, limitsHref, limitStatus, limitStatusText, limitTabs, parseLimitsQuery, wishProblem } from "../dashboard/client/constants/Limits";
+import { IModuleLimit } from "../dashboard/client/interfaces/IGuild";
 import CatalogService, { Catalog } from "../services/CatalogService";
 import { CommandPaths } from "../routes/AdminCommands";
 import { ApplyHelpCatalog } from "../constants/Help";
@@ -1735,6 +1737,143 @@ async function checkRouletteModerators(client: BotClient): Promise<void> {
 }
 
 /**
+ * W-0136: die Logik hinter dem Reiter „Grenzen“ auf der Seite Module - Status,
+ * Zahlen, Filter, Anfragetext mit Servername, Adresse.
+ */
+function checkLimitsLogic(): void {
+    console.log("\n— Grenzen: Logik —");
+
+    const L = (key: string, label: string, value: number, standard: number, askable: boolean, granted = false, since: string | null = null, unit: string | null = null): IModuleLimit => ({ key, label, unit, value, standard, askable, granted, since });
+    const limits: Record<string, IModuleLimit[]> = {
+        levels: [L("maxXpPerAction", "XP je Aktion höchstens", 500, 500, true), L("maxBoosts", "Boosts höchstens", 20, 10, true, true, "2026-11-12T10:00:00Z"), L("logKeepDays", "Protokoll aufbewahren", 180, 180, false, false, null, "Tage")],
+        giveaways: [L("maxWinners", "Gewinner höchstens", 50, 50, true), L("maxDays", "Laufzeit höchstens", 60, 60, true, false, null, "Tage"), L("maxBonusRoles", "Bonus-Rollen höchstens", 10, 10, false)],
+    };
+    const [xp, boosts, log] = limits.levels!;
+    const same = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b);
+
+    check("Status: auf Anfrage, für euch, fest", limitStatus(xp!) === "ask" && limitStatus(boosts!) === "granted" && limitStatus(log!) === "fixed");
+    check("Status als Text", limitStatusText(xp!) === "auf Anfrage" && limitStatusText(boosts!) === "für euch seit 12.11." && limitStatusText(log!) === "fest", `${limitStatusText(xp!)} | ${limitStatusText(boosts!)} | ${limitStatusText(log!)}`);
+    check("Namen ohne „höchstens“", limitName("XP je Aktion höchstens") === "XP je Aktion" && limitName("Protokoll aufbewahren") === "Protokoll aufbewahren");
+
+    const all = limitCounts(limits, null);
+    const levels = limitCounts(limits, "levels");
+
+    check("Zahlen für die Filter", same(all, { all: 6, ask: 3, granted: 1, fixed: 2 }) && same(levels, { all: 3, ask: 1, granted: 1, fixed: 1 }), `${JSON.stringify(all)} ${JSON.stringify(levels)}`);
+    check("Zahl am Reiter: nur „auf Anfrage“", askableCount(limits) === 3 && askableCount({}) === 0);
+
+    const order = MODULES.map((entry) => entry.id).filter((id) => id in limits);
+    const cards = limitCards(limits, { filter: "all", search: "", module: null });
+
+    check("Karten in der Reihenfolge der Module", same(cards.map((card) => card.id), order), cards.map((card) => card.id).join(","));
+    check("Karte zählt Grenzen und Anfragen", cards.find((card) => card.id === "levels")?.total === 3 && cards.find((card) => card.id === "levels")?.askable === 1);
+    check("Filter „fest“ lässt nur feste Zeilen", limitCards(limits, { filter: "fixed", search: "", module: null }).every((card) => card.rows.every((row) => limitStatus(row) === "fixed")));
+
+    const winners = limitCards(limits, { filter: "all", search: "GEWINNER", module: null });
+    const level = limitCards(limits, { filter: "all", search: "level", module: null });
+
+    check("Suche nach einer Grenze", winners.length === 1 && winners[0]!.id === "giveaways" && winners[0]!.rows.length === 1);
+    check("Suche nach dem Modul zeigt alle Zeilen", level.length === 1 && level[0]!.id === "levels" && level[0]!.rows.length === 3);
+    check("Modulfilter", same(limitCards(limits, { filter: "all", search: "", module: "levels" }).map((card) => card.id), ["levels"]));
+    check("Unbekanntes Modul filtert nicht", limitCards(limits, { filter: "all", search: "", module: "gibtsnicht" }).length === 2);
+    check("Ohne Grenzen keine Karten", limitCards({}, { filter: "all", search: "", module: null }).length === 0);
+
+    const odd = 'Dev <b>"Server"</b> 🚀';
+
+    check(
+        "Anfragetext mit Servername, wörtlich",
+        limitRequestText(odd, "Level System", { label: "XP je Aktion höchstens", unit: null }, 1000, "Event") === `Anfrage für „${odd}“: Level System, XP je Aktion höchstens bis 1000, weil Event`,
+        limitRequestText(odd, "Level System", { label: "XP je Aktion höchstens", unit: null }, 1000, "Event")
+    );
+    check("Anfragetext mit Einheit und ohne Grund", limitRequestText("Dev", "Giveaways", { label: "Laufzeit höchstens", unit: "Tage" }, 90, "  ").endsWith("Laufzeit höchstens bis 90 Tage, weil …"));
+    check("Anfragetext ohne Zahl", limitRequestText("Dev", "Giveaways", { label: "Gewinner höchstens", unit: null }, Number.NaN, "x").includes("bis …"));
+
+    check(
+        "Wunschwert prüfen",
+        wishProblem({ value: 500, unit: null }, 500) === "Mehr als 500" &&
+            wishProblem({ value: 500, unit: null }, 1000) === null &&
+            wishProblem({ value: 500, unit: null }, Number.NaN) === "Zahl eintragen" &&
+            wishProblem({ value: 500, unit: null }, 10.5) === "Ganze Zahl eintragen" &&
+            wishProblem({ value: 60, unit: "Tage" }, 0) === "Mehr als 60 Tage"
+    );
+
+    check("Adresse des Reiters", limitsHref("/dashboard", "123") === "/dashboard/guild/123/module?reiter=grenzen" && limitsHref("/dashboard", "123", "levels") === "/dashboard/guild/123/module?reiter=grenzen&modul=levels");
+    check(
+        "Adresse lesen, Unsinn fällt auf „Module“ zurück",
+        same(parseLimitsQuery("?reiter=grenzen&modul=levels"), { tab: "grenzen", module: "levels" }) &&
+            same(parseLimitsQuery(""), { tab: "module", module: null }) &&
+            same(parseLimitsQuery("?reiter=x&modul=<b>"), { tab: "module", module: null })
+    );
+
+    const none = limitTabs(false, 3);
+    const zero = limitTabs(true, 0);
+    const many = limitTabs(true, 14);
+
+    check("Reiter nur für Verwalter", none.length === 0);
+    check("Reiter ohne Zahl bei 0, mit Zahl bei 14", zero.length === 2 && zero.every((tab) => tab.count === null) && many.find((tab) => tab.id === "grenzen")?.count === 14);
+}
+
+/**
+ * W-0136: der Reiter selbst. Er baut nur über textContent (der Servername ist
+ * Eingabe von außen), und seine Klassen mit dem Kürzel gz gehören nur ihm -
+ * die Lehre aus W-0134.
+ */
+async function checkLimitsMarkup(): Promise<void> {
+    console.log("\n— Grenzen: Seite —");
+
+    const root = path.join(process.cwd(), "src", "dashboard");
+    const pages = path.join(root, "client", "pages");
+    const page = await readFile(path.join(pages, "GuildLimits.ts"), "utf8").catch(() => "");
+    const css = (await readFile(path.join(root, "public", "assets", "style.css"), "utf8")).split(/\r?\n/);
+    const foreign = [];
+
+    for (const file of await readdir(pages)) {
+        if (file === "GuildLimits.ts" || file === "Guild.ts" || !file.endsWith(".ts")) continue;
+        if ((await readFile(path.join(pages, file), "utf8")).includes('"gz')) foreign.push(file);
+    }
+
+    check("GuildLimits.ts zeichnet Reiter und Karten", page.includes("limitTabs(") && page.includes("limitCards("), page ? "" : "Datei fehlt");
+    check("GuildLimits.ts ohne innerHTML", page !== "" && !page.includes("innerHTML"));
+
+    const defined = new Set(css.flatMap((line) => [...line.matchAll(/\.(gz[a-z0-9_-]+)/g)].map((match) => match[1]!)));
+    const wrong = [...defined].filter((name) => css.filter((line) => line.startsWith(`.${name}{`)).length !== 1);
+
+    check("Klassen gz…: je genau eine Grundregel", defined.size > 0 && wrong.length === 0, wrong.join(", "));
+    check("Klassen gz… nur auf der Seite Grenzen", foreign.length === 0, foreign.join(", "));
+
+    // Anfrage am Wert: der Text nennt den Server beim Namen, nie bei der ID.
+    const calls = [...page.matchAll(/limitRequestText\(/g)].map((match) => {
+        let depth = 0;
+        let end = match.index!;
+
+        for (; end < page.length; end++) {
+            if (page[end] === "(") depth++;
+            if (page[end] === ")" && --depth === 0) break;
+        }
+
+        return page.slice(match.index!, end + 1);
+    });
+
+    check("Anfragetext mit Servername, ohne Server-ID", calls.length > 0 && calls.every((call) => call.startsWith("limitRequestText(guild.name") && !call.includes("guild.id")), `${calls.length} Aufruf(e)`);
+    check("Anfrage: Support-Link und aufklappbar", page.includes("SUPPORT_DISCORD") && page.includes("aria-expanded"));
+
+    // Modulseiten: kein Kasten mehr, nur ein Verweis in den Reiter.
+    const guildPage = await readFile(path.join(pages, "Guild.ts"), "utf8");
+
+    check("Modulseiten ohne Kasten, mit Verweis in den Reiter", !guildPage.includes("modlimits") && guildPage.includes("limitsHref(") && !css.some((line) => line.includes(".modlimits")));
+
+    // Abschluss-Review W-0136: Grenzen gibt es für jeden Server (Standards),
+    // ein leeres Ergebnis heißt „nicht geladen“, nicht „keine Grenzen“.
+    const rule = (name: string): string => css.find((line) => line.startsWith(`.${name}{`)) ?? "";
+
+    check("Review: ohne geladene Grenzen kein falscher Satz", page.includes("lassen sich gerade nicht laden") && !page.includes("gelten gerade keine Grenzen"));
+    check("Review: „Filter zurücksetzen“ ist ein sichtbarer Knopf", page.includes('button("btn btn--quiet", icon("#i-refresh")'));
+    check("Review: langer Suchbegriff bricht um", rule("gzempty p").includes("overflow-wrap:anywhere"));
+    check("Review: ungültiger Wunsch nicht nur über Farbe", page.includes("aria-invalid") && page.includes("badInput"));
+    check("Review: Fokus nach dem Sprung", /"limits:open"[\s\S]{0,300}buttons\.get\("grenzen"\)\?\.focus\(\)/.test(page) && page.includes("side.focus()"));
+    check("Review: Name der Grenze bricht nicht mitten im Wort", rule("gzrow").includes("minmax(6.5em,1fr)") && rule("gzrow__val").includes("flex-wrap:wrap") && !rule("gzrow__name").includes("anywhere"));
+}
+
+/**
  * W-0134: Das Raster der Rank Roles stand in einer einzigen Reihe, weil Rocket
  * Roulette dieselbe Klasse (.rrsteps) für seine Rundenleiste nutzte und sie
  * später im Stylesheet überschrieb. Die Klassen der Rank Roles gehören deshalb
@@ -2442,6 +2581,8 @@ async function main(): Promise<void> {
     await checkBerlinAt();
     await checkHubTemplates();
     await checkRankRolesStyles();
+    checkLimitsLogic();
+    await checkLimitsMarkup();
 
     await client.server.Stop();
 
