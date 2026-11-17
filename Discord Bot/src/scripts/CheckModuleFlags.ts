@@ -15,7 +15,8 @@ import { SUPPORT_URL } from "../constants/Help";
 import CommandHandler from "../events/client/CommandHandler";
 import GuildSettings from "../models/GuildSettings";
 import PlayerAccount, { LinkUsable } from "../models/PlayerAccount";
-import RankRoleService from "../services/RankRoleService";
+import RankRoleService, { LOGIN_ONLY, RankRoleError } from "../services/RankRoleService";
+import Module from "../commands/admin/Module";
 import { ApplyLinkMode, SyncLinkModes } from "../utils/linkModeWatch";
 import AdminModulesReload from "../routes/AdminModulesReload";
 import AdminModulesState from "../routes/AdminModulesState";
@@ -32,6 +33,7 @@ import {
     ModuleOpen,
     ModuleValue,
     NoticeOf,
+    RankOpen,
     OnFlagsLoaded,
     SetFlags,
 } from "../utils/moduleFlags";
@@ -452,6 +454,45 @@ async function checkAsk(): Promise<void> {
     );
 }
 
+/** W-0133: Reste aus dem Review von W-0131. */
+async function checkLeftovers(): Promise<void> {
+    console.log("\n  — Reste aus W-0131 —");
+
+    SetFlags([{ module: "rl-tracking", status: "beta", notice: null }], [], []);
+    check("Abgelaufener Knopf bei Beta: nicht als abgeschaltet behandelt", RankOpen(null, undefined));
+    SetFlags([{ module: "rl-tracking", status: "off", notice: null }], [], []);
+    check("Bei Aus bleibt es abgeschaltet", !RankOpen(null, undefined));
+
+    // /module an X, wenn RL Nexus das Modul abgeschaltet hat.
+    SetFlags([{ module: "polls", status: "off", notice: "Umbau bis Freitag" }], [], []);
+    const replies: Record<string, unknown>[] = [];
+    let toggled = false;
+    const command = new Module({
+        databaseService: { Ready: true },
+        settings: { Toggle: async () => ((toggled = true), ["polls"]) },
+    } as unknown as BotClient);
+
+    await command.Execute({
+        guildId: "g1",
+        memberPermissions: { has: () => true },
+        options: { getSubcommand: () => "an", getString: () => "polls" },
+        reply: async (message: Record<string, unknown>) => void replies.push(message),
+    } as never);
+    const text = JSON.stringify(replies.at(-1) ?? {});
+    check("/module an bei abgeschaltetem Modul: Hinweis, nichts geschaltet", !toggled && text.includes("abgeschaltet") && text.includes("Umbau bis Freitag"), text.slice(0, 300));
+
+    // /rank me: per Name verbunden, Rang-Rollen nur mit Anmeldung - der Satz kommt an.
+    const service = new RankRoleService({ settings: { Of: async () => ({ modules: ["rank-roles"] }) } } as unknown as BotClient) as unknown as RankRoleService & Record<string, unknown>;
+
+    service.Apply = async () => {
+        throw new RankRoleError(LOGIN_ONLY);
+    };
+    const notice = await service.AfterRankMe({ guild: { id: "g1" } } as never, {} as never);
+    check("/rank me per Name: Hinweis „nur mit Anmeldung“ statt Schweigen", !!notice && "notice" in notice && notice.notice === LOGIN_ONLY, JSON.stringify(notice));
+
+    SetFlags([], [], []);
+}
+
 async function main(): Promise<void> {
     console.log("\n  — Modul-Einstellungen (W-0131) —");
 
@@ -520,6 +561,7 @@ async function main(): Promise<void> {
     await checkTrust();
     await checkValues();
     await checkAsk();
+    await checkLeftovers();
 
     console.log(failures > 0 ? `\n  ${failures} Prüfung(en) fehlgeschlagen.\n` : "\n  Alles ok.\n");
     process.exit(failures > 0 ? 1 : 0);

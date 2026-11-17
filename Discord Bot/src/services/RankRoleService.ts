@@ -24,6 +24,9 @@ function IsRecord(value: unknown): value is Record<string, unknown> {
  * eingibt. Der Epic-Name kommt aus dem verknüpften Konto, die Ränge aus Prime.
  * Siehe docs/RankRoles.md.
  */
+/** W-0131: per Name verbunden, und die Art des Servers gibt dafür keine Rang-Rollen. */
+export const LOGIN_ONLY = "Rang-Rollen gibt es nur mit Epic-Anmeldung: **/rank link** ohne Namen.";
+
 export default class RankRoleService {
     private readonly client: BotClient;
 
@@ -165,7 +168,7 @@ export default class RankRoleService {
         const account = raw && LinkUsable(raw, "trusted", member.guild.id) ? raw : null;
         const epicName = account?.display_name?.trim();
 
-        if (raw && !account) throw new RankRoleError("Rang-Rollen gibt es nur mit Epic-Anmeldung: **/rank link** ohne Namen.");
+        if (raw && !account) throw new RankRoleError(LOGIN_ONLY);
         if (!account || !epicName) throw new RankRoleError("Verbinde erst dein Epic-Konto: **/rank link**.");
 
         // W-0125: über die Konto-ID, nicht den Namen. Ein alter Name kann inzwischen einem anderen Spieler gehören.
@@ -348,10 +351,12 @@ export default class RankRoleService {
      * über den Mitglieder sie bekommen. Still - null heißt, hier passiert nichts
      * (Modul aus, keine Playlist, kein Konto).
      */
-    async AfterRankMe(member: GuildMember, profile: IPrimeProfile): Promise<IRankRoleResult | null> {
+    async AfterRankMe(member: GuildMember, profile: IPrimeProfile): Promise<IRankRoleResult | { notice: string } | null> {
         if (!(await this.client.settings.Of(member.guild.id)).modules.includes(RANK_ROLES_MODULE)) return null;
 
         return this.Apply(member, profile).catch((error) => {
+            // W-0131-Rest: per Name verbunden - das sagt /rank me der Person, statt still keine Rollen zu geben.
+            if (error instanceof RankRoleError && error.message === LOGIN_ONLY) return { notice: LOGIN_ONLY };
             if (error instanceof RankRoleError) return null;
 
             throw error;

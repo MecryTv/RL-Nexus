@@ -357,6 +357,9 @@ export function ModuleNotices(modules: readonly string[], guildId: string): Reco
  * sonst die Person.
  */
 export function RankOpen(place: string | null, userId: string | undefined): boolean {
+    // W-0131-Rest: Ohne gültigen Knopf weiß niemand, wer fragt - bei Beta dann „Link abgelaufen“ statt „abgeschaltet“.
+    if (!place && !userId) return (flags.get("rl-tracking")?.status ?? "on") !== "off";
+
     const guildId = place && !place.startsWith("@me") ? place.split("/")[0]! : null;
 
     return ModuleOpen("rl-tracking", guildId, userId) || (guildId !== null && ModuleOpen("rl-tracking", null, userId));

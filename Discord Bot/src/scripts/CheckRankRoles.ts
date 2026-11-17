@@ -312,7 +312,7 @@ async function checkApply(client: BotClient): Promise<void> {
     const ranked = FakeMember(FakeGuild(), []);
     const after = await service.AfterRankMe(ranked.member, shown);
 
-    check("/rank me vergibt die Rang-Rollen", ranked.added.length === 2 && after?.added.length === 2, ranked.added.join(","));
+    check("/rank me vergibt die Rang-Rollen", ranked.added.length === 2 && !!after && "added" in after && after.added.length === 2, ranked.added.join(","));
     check("…mit dem schon geholten Profil, ohne Prime ein zweites Mal zu fragen", lookups === 0, String(lookups));
 
     modules(false);

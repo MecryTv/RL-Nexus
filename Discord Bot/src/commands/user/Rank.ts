@@ -431,6 +431,12 @@ export default class Rank extends Command {
 
         const result = await this.client.rankRoleService.AfterRankMe(interaction.member, profile).catch(() => null);
 
+        if (result && "notice" in result) {
+            await interaction.followUp({ content: `🎖️ ${result.notice}`, flags: MessageFlags.Ephemeral, allowedMentions: { parse: [] } }).catch(() => undefined);
+
+            return;
+        }
+
         if (result?.added.length) {
             await interaction
                 .followUp({ content: `🎖️ Neu dazu: ${result.added.map((id) => `<@&${id}>`).join(", ")}`, flags: MessageFlags.Ephemeral, allowedMentions: { parse: [] } })

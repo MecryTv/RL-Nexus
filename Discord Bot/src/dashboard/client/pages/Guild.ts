@@ -833,13 +833,16 @@ function bindModules(guild: IGuild, only: Set<string> | null, side: INav): (modu
                 headers: { "Content-Type": "application/json", Accept: "application/json" },
                 body: JSON.stringify({ module: id, on }),
             });
-            const data = (await response.json().catch(() => ({}))) as { modules?: string[] };
+            const data = (await response.json().catch(() => ({}))) as { modules?: string[]; hint?: string };
 
             if (response.ok && Array.isArray(data.modules)) {
                 saved = new Set(data.modules);
 
                 return null;
             }
+
+            // W-0131-Rest: Im Admin abgeschaltet - der Hinweis von dort statt des allgemeinen Satzes.
+            if (response.status === 409 && typeof data.hint === "string" && data.hint) return `Gerade abgeschaltet: ${data.hint}`;
 
             return FAILED[response.status] ?? `Der Bot hat abgelehnt (${response.status}).`;
         } catch {

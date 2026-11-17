@@ -616,6 +616,24 @@ async function checkNameLink(): Promise<void> {
         `${taken2.statusCode} ${squatted.calls.join(", ")}`
     );
 
+    // W-0131-Rest: Login eines Kontos, das ein anderer nur per Name hat - aber die eigene Sperrfrist läuft noch.
+    // Dann wird abgelehnt, und dem anderen bleibt seine Verknüpfung.
+    const lockedSwap = Client(
+        [
+            { user_id: OTHER, account_id: ACCOUNT, display_name: "Nova", changed_at: new Date(0), verified: 0 },
+            { user_id: USER, account_id: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", display_name: "Alt", changed_at: new Date(Date.now() - 2 * 3_600_000) },
+        ],
+        { developerMode: false }
+    );
+
+    okEpic();
+    const refusedSwap = await Callback(lockedSwap, { code: "c", state: "n1" }, cookieFor(lockedSwap));
+    check(
+        "Eigene Sperrfrist läuft: abgelehnt, der andere behält seine Verknüpfung",
+        refusedSwap.statusCode === 409 && !lockedSwap.calls.includes(`unlink ${OTHER}`) && lockedSwap.rows.some((row) => row.user_id === OTHER),
+        `${refusedSwap.statusCode} ${lockedSwap.calls.join(", ")}`
+    );
+
     const same = Client([{ user_id: USER, account_id: ACCOUNT, display_name: "Nova", changed_at: new Date(0), verified: 0 }]);
 
     okEpic();

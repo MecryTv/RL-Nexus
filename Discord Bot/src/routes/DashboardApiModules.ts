@@ -61,7 +61,7 @@ export default class DashboardApiModules extends Route {
 
         // W-0131: Im Admin Dashboard global abgeschaltet - einschalten geht erst, wenn es dort wieder an ist.
         if (on && !ModuleOpen(moduleId, id)) {
-            return reply.code(409).send({ error: "Gerade abgeschaltet", hint: ClosedText(moduleId) });
+            return reply.code(409).send({ error: "Gerade abgeschaltet", hint: ClosedText(moduleId, id) });
         }
 
         if (!this.client.databaseService.Ready) {

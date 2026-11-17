@@ -99,13 +99,7 @@ export default class EpicCallback extends Route {
         const userId = token.userId;
         const owner = await this.client.accounts.OwnerRow("epic", epic.accountId);
 
-        // W-0131: Hing das Konto nur per Name an jemand anderem, gehört es jetzt dem, der sich angemeldet hat.
-        if (owner && owner.userId !== userId && !owner.verified) {
-            logger.warn(`🎮 Epic-Login übernimmt ${epic.accountId}: per Name bei ${owner.userId}, jetzt per Login bei ${userId}`);
-            await this.client.accounts.Unlink(owner.userId, "epic");
-            await this.client.ranks.Clear(owner.userId);
-            void this.client.rankRoleService.Strip(owner.userId).catch(() => 0);
-        } else if (owner && owner.userId !== userId) {
+        if (owner && owner.userId !== userId && owner.verified) {
             logger.warn(`🎮 Epic-Login abgelehnt: ${epic.accountId} gehört schon einem anderen Discord-Konto (Anfrage von ${userId})`);
 
             return page(
@@ -131,6 +125,15 @@ export default class EpicCallback extends Route {
                 409,
                 fail("Wechsel noch gesperrt", `Mit deinem Discord-Konto ist schon ${current.display_name ?? "ein Epic-Konto"} verbunden. Wechseln geht nur alle paar Tage.`, "Wann es wieder geht, sagt dir /rank link in Discord.")
             );
+        }
+
+        // W-0131: Hing das Konto nur per Name an jemand anderem, gehört es jetzt dem, der sich angemeldet hat -
+        // erst hier, nach der eigenen Sperrfrist, damit eine Ablehnung dem anderen nichts wegnimmt (W-0131-Rest).
+        if (owner && owner.userId !== userId && !owner.verified) {
+            logger.warn(`🎮 Epic-Login übernimmt ${epic.accountId}: per Name bei ${owner.userId}, jetzt per Login bei ${userId}`);
+            await this.client.accounts.Unlink(owner.userId, "epic");
+            await this.client.ranks.Clear(owner.userId);
+            void this.client.rankRoleService.Strip(owner.userId).catch(() => 0);
         }
 
         // Korrektur im Fenster nach dem Verbinden: das falsche Konto weicht, die Frist zählt weiter ab dem ersten Verbinden.
