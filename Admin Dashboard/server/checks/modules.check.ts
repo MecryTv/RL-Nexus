@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
-import { BOT_MODULE_IDS, PERMANENT_BOT_MODULES } from "../../shared/botModules.ts";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+import { BOT_MODULE_CATEGORIES, BOT_MODULE_FALLBACK, BOT_MODULE_IDS, PERMANENT_BOT_MODULES } from "../../shared/botModules.ts";
 import { MODULE_SETTINGS } from "../../shared/botModuleSettings.ts";
 import { parseOverrideInput, parseSettingInput } from "../modules/store.ts";
 import { check, section } from "./harness.ts";
@@ -13,6 +15,26 @@ export async function checkModules(): Promise<void> {
         assert.ok(BOT_MODULE_IDS.includes("rl-tracking"));
         assert.ok(!(BOT_MODULE_IDS as readonly string[]).includes("dashboard"));
         assert.deepEqual([...PERMANENT_BOT_MODULES], ["gallery", "backups", "levels"]);
+    });
+
+    // W-0135: Die Seite Module ordnete nach eigenen Kategorien, die Webseite nach
+    // anderen. Live landeten 12 von 26 Modulen unter „Sonstige“.
+    await check("Kategorien wie auf der Webseite, jedes Modul hat eine", async () => {
+        const site = async (file: string): Promise<Record<string, unknown>> => {
+            const body = JSON.parse(await readFile(path.join(process.cwd(), "..", "Webseite", "public", "content-default", file), "utf8")) as Record<string, unknown>;
+
+            return (body.data as Record<string, unknown> | undefined) ?? body;
+        };
+        const categories = (await site("categories.json")).categories as { id: string; label: string; color: string }[];
+        const catalog = new Map(((await site("modules.json")).modules as { id: string; category?: string }[]).map((entry) => [entry.id, entry.category]));
+        const known = new Set<string>(BOT_MODULE_CATEGORIES.map((entry) => entry.id));
+
+        assert.deepEqual(
+            BOT_MODULE_CATEGORIES.map((entry) => [entry.id, entry.label, `var(--c-mod-${entry.color})`]),
+            categories.map((entry) => [entry.id, entry.label, entry.color])
+        );
+        assert.deepEqual(BOT_MODULE_IDS.filter((id) => !known.has(catalog.get(id) ?? BOT_MODULE_FALLBACK[id]?.category ?? "")), []);
+        assert.deepEqual(Object.entries(BOT_MODULE_FALLBACK).filter(([, entry]) => !known.has(entry.category)).map(([id]) => id), []);
     });
 
     await check("Status und Hinweis werden gelesen, der Hinweis getrimmt, leer ist null", () => {

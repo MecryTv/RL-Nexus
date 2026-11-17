@@ -114,7 +114,7 @@ export function BotModulesPage(): JSX.Element {
     const chosenId = params.get("m");
     const chosen = modules.find((entry) => entry.module === chosenId);
     const catParam = params.get("cat");
-    const category = catParam ? (catParam === NONE_CATEGORY ? null : catParam) : chosen ? categoryOf(chosen) : "competition";
+    const category = catParam ? (catParam === NONE_CATEGORY ? null : catParam) : chosen ? categoryOf(chosen) : "rocket-league";
     const selected = chosen ?? modules.find((entry) => categoryOf(entry) === category) ?? modules[0] ?? null;
     const key = selected ? `${server ?? "all"}:${selected.module}` : "";
     const savedOverride = selected ? serverOverrides?.get(selected.module) : undefined;

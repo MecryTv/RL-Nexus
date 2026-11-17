@@ -1,4 +1,4 @@
-import { LINK_MODE_LABELS, MODULE_STATUS_LABELS, type IBotModuleOverride, type IBotModuleView, type LinkMode, type ModuleStatus } from "../../shared/botModules";
+import { BOT_MODULE_CATEGORIES, LINK_MODE_LABELS, MODULE_STATUS_LABELS, type IBotModuleOverride, type IBotModuleView, type LinkMode, type ModuleStatus } from "../../shared/botModules";
 import { settingsOf, type IModuleSettingDef } from "../../shared/botModuleSettings";
 
 /**
@@ -186,21 +186,18 @@ export function ownCount(override: IBotModuleOverride | undefined): number {
 /* Liste: Kategorien und Filter. */
 export type Filter = "all" | "off" | "beta" | "own";
 
-export const CATEGORIES: readonly { readonly id: string | null; readonly label: string }[] = [
-    { id: "competition", label: "Competition" },
-    { id: "community", label: "Community" },
-    { id: "moderation", label: "Moderation" },
-    { id: "engagement", label: "Engagement" },
-    { id: "content", label: "Content" },
-    { id: "utility", label: "Utility" },
-    { id: null, label: "Sonstige" },
-];
+/** Die Kategorien der Webseite (W-0135), dahinter „Sonstige“ für Module ohne Kategorie. */
+export const CATEGORIES: readonly { readonly id: string | null; readonly label: string }[] = [...BOT_MODULE_CATEGORIES, { id: null, label: "Sonstige" }];
 
 export function categoryOf(module: IBotModuleView): string | null {
     return CATEGORIES.some((entry) => entry.id !== null && entry.id === module.category) ? module.category : null;
 }
 
-export const color = (category: string | null): string => (category ? `var(--c-mod-${category})` : "var(--c-text-faint)");
+export function color(category: string | null): string {
+    const entry = BOT_MODULE_CATEGORIES.find((candidate) => candidate.id === category);
+
+    return entry ? `var(--c-mod-${entry.color})` : "var(--c-text-faint)";
+}
 
 /** Was die Liste zeigt. Mit Suche oder Filter alle Kategorien, sonst nur die gewählte. */
 export function visibleModules(

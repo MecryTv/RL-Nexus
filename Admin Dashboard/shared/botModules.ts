@@ -37,15 +37,29 @@ export const BOT_MODULE_IDS = [
 ] as const;
 
 /**
+ * W-0135: Die Kategorien der Seite Module, dieselben wie auf der Webseite
+ * (content-default/categories.json) und in derselben Reihenfolge. color ist der
+ * Name der Farbe aus --c-mod-*, wie dort.
+ */
+export const BOT_MODULE_CATEGORIES = [
+    { id: "always", label: "Immer dabei", color: "engagement" },
+    { id: "rocket-league", label: "Rocket League", color: "competition" },
+    { id: "community", label: "Community", color: "community" },
+    { id: "support", label: "Support", color: "utility" },
+    { id: "moderation", label: "Moderation", color: "moderation" },
+    { id: "content", label: "Inhalte & Meldungen", color: "content" },
+] as const;
+
+/**
  * Module, die der Webseiten-Katalog (modules.json) nicht führt. Namen und Texte
  * wie im Bot-Dashboard (Discord Bot/src/dashboard/client/constants/Modules.ts),
  * die Kategorie in der Einteilung der Webseite.
  */
 export const BOT_MODULE_FALLBACK: Readonly<Record<string, { readonly name: string; readonly category: string; readonly description: string }>> = {
-    "rocket-roulette": { name: "Rocket Roulette", category: "competition", description: "Roulette-Abend mit privaten Matches, Teams jede Runde neu gemischt." },
+    "rocket-roulette": { name: "Rocket Roulette", category: "rocket-league", description: "Roulette-Abend mit privaten Matches, Teams jede Runde neu gemischt." },
     "role-lists": { name: "Rollen-Listen", category: "community", description: "Listen, die zeigen, wer welche Rolle hat." },
     "anti-villain": { name: "Anti Villain", category: "moderation", description: "Hält gekaperte Accounts, Raids und Nukes auf." },
-    backups: { name: "Backups", category: "utility", description: "Module, Einstellungen, Nachrichten und Daten sichern und zurückholen." },
+    backups: { name: "Backups", category: "always", description: "Module, Einstellungen, Nachrichten und Daten sichern und zurückholen." },
 };
 
 /** Gehören fest zum Bot, wie PERMANENT_MODULES dort: nur der Hinweis ist einstellbar. */
