@@ -161,9 +161,9 @@ export function renderRankRoles(guildId: string): void {
 
         const grid = el(
             "div",
-            "rrsteps",
+            "rkrsteps",
             ...steps().map((step) => {
-                const dot = el("span", "rrdot");
+                const dot = el("span", "rkrdot");
 
                 dot.style.background = step.color;
 
@@ -172,7 +172,7 @@ export function renderRankRoles(guildId: string): void {
                     touch();
                 }, `Rolle für ${step.name} in ${data!.playlistLabels[playlist]}`);
 
-                return el("label", "rrstep", dot, el("span", "rrstep__name", step.name), picker);
+                return el("label", "rkrstep", dot, el("span", "rkrstep__name", step.name), picker);
             })
         );
 

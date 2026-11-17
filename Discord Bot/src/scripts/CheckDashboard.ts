@@ -1734,6 +1734,31 @@ async function checkRouletteModerators(client: BotClient): Promise<void> {
     }
 }
 
+/**
+ * W-0134: Das Raster der Rank Roles stand in einer einzigen Reihe, weil Rocket
+ * Roulette dieselbe Klasse (.rrsteps) für seine Rundenleiste nutzte und sie
+ * später im Stylesheet überschrieb. Die Klassen der Rank Roles gehören deshalb
+ * nur dieser Seite und haben je genau eine Grundregel.
+ */
+async function checkRankRolesStyles(): Promise<void> {
+    console.log("\n— Rank Roles: eigene Klassen für das Raster —");
+
+    const root = path.join(process.cwd(), "src", "dashboard");
+    const css = (await readFile(path.join(root, "public", "assets", "style.css"), "utf8")).split(/\r?\n/);
+    const pages = path.join(root, "client", "pages");
+    const page = await readFile(path.join(pages, "GuildRankRoles.ts"), "utf8");
+    const others = await Promise.all(
+        (await readdir(pages)).filter((file) => file !== "GuildRankRoles.ts").map((file) => readFile(path.join(pages, file), "utf8"))
+    );
+
+    for (const name of ["rkrsteps", "rkrstep", "rkrdot", "rkrstep__name"]) {
+        const rules = css.filter((line) => line.startsWith(`.${name}{`)).length;
+        const foreign = others.some((source) => new RegExp(`["\\s]${name}["\\s]`).test(source));
+
+        check(`.${name}: von GuildRankRoles genutzt, genau eine Grundregel, keine andere Seite`, page.includes(`"${name}"`) && rules === 1 && !foreign, `${rules} Regel(n)${foreign ? ", fremd genutzt" : ""}`);
+    }
+}
+
 async function main(): Promise<void> {
     const client = new BotClient();
 
@@ -2416,6 +2441,7 @@ async function main(): Promise<void> {
     await checkNavSearch();
     await checkBerlinAt();
     await checkHubTemplates();
+    await checkRankRolesStyles();
 
     await client.server.Stop();
 
