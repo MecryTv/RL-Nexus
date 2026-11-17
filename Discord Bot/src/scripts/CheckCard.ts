@@ -15,12 +15,14 @@ import { existsSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
 import path from "path";
 import { createCanvas, loadImage } from "@napi-rs/canvas";
-import { RegisterFonts, RenderRankCard } from "../builder/RankCard";
+import { RegisterFonts, RenderRankCard, RewardBarLayout, TierTextSize } from "../builder/RankCard";
 import { IPrimeProfile } from "../interfaces/services/prime/IPrimeService";
 import {
     CARD_HEIGHT,
     CARD_WIDTH,
     CAREER_ORDER,
+    GAP,
+    PAD,
     RANK_ICONS,
     RankCardLayout,
     RankIconFile,
@@ -183,6 +185,65 @@ async function main(): Promise<void> {
 
     check("Ein alter Stand wird gezeichnet", stale.length > 0);
     check("  und sieht anders aus als ein frischer", !stale.equals(fresh), "sonst fehlt die Warnung");
+
+    console.log("\n— Grenzfälle —");
+
+    // W-0132: Die Karte ist enger geworden. Was dort zuerst überläuft: ein
+    // langer Name mit Club-Tag, lange Rang-Namen, große Karriere-Zahlen.
+    const long: IPrimeProfile = {
+        ...PROFILE,
+        name: "SupersonicLegendDerMitDemSehrLangenNamen",
+        club: PROFILE.club ? { ...PROFILE.club, tag: "LONGTAG" } : null,
+        ranks: [
+            { key: "1v1", label: "1v1 Duell", mmr: 912, tier: 12, tierName: "Platin III", division: 1, divisionName: "II", matches: 9, streak: 2, placement: true, placementMatches: 9 },
+            { key: "2v2", label: "2v2 Doppel", mmr: 1888, tier: 22, tierName: "Supersonic Legend", division: 0, divisionName: null, matches: 1234, streak: 12, placement: false, placementMatches: 10 },
+            { key: "3v3", label: "3v3 Standard", mmr: 1702, tier: 21, tierName: "Grand Champion III", division: 3, divisionName: "IV", matches: 987, streak: -11, placement: false, placementMatches: 10 },
+        ],
+        extras: [
+            { key: "heatseeker", label: "Heatseeker", mmr: 1555, tier: 22, tierName: "Supersonic Legend", division: 0, divisionName: null, matches: 1999, streak: 10, placement: false, placementMatches: 10 },
+            { key: "rumble", label: "Rumble", mmr: 1499, tier: 21, tierName: "Grand Champion III", division: 3, divisionName: "IV", matches: 876, streak: -9, placement: false, placementMatches: 10 },
+            { key: "hoops", label: "Hoops", mmr: 700, tier: 9, tierName: "Gold III", division: 0, divisionName: "I", matches: 9, streak: 1, placement: true, placementMatches: 9 },
+            { key: "snowday", label: "Snow Day", mmr: 1450, tier: 20, tierName: "Grand Champion II", division: 2, divisionName: "III", matches: 400, streak: 0, placement: false, placementMatches: 10 },
+            { key: "dropshot", label: "Dropshot", mmr: 1460, tier: 19, tierName: "Grand Champion I", division: 2, divisionName: "III", matches: 212, streak: 3, placement: false, placementMatches: 10 },
+        ],
+        tournament: { key: "tournament", label: "Turniere", mmr: 1777, tier: 21, tierName: "Grand Champion III", division: 3, divisionName: "IV", matches: 321, streak: 0, placement: false, placementMatches: 10 },
+        stats: CAREER_ORDER.map((key) => ({ key, label: key, value: 12_345_678 })),
+        seasonLevel: 8,
+        seasonWins: 10,
+    };
+    const edges: [string, Buffer][] = [
+        ["card-check-long.png", await RenderRankCard({ profile: long, discordName: "EinSehrLangerDiscordNameMit32Zei", avatarURL: null })],
+        [
+            "card-check-bare.png",
+            await RenderRankCard({
+                profile: { ...PROFILE, club: null, tournament: null, ranks: [], extras: [], stats: [], seasonLevel: 0, seasonWins: 0 },
+                discordName: null,
+                avatarURL: null,
+            }),
+        ],
+        ["card-check-extra-long.png", await RenderRankCard({ profile: long, discordName: "EinSehrLangerDiscordNameMit32Zei", avatarURL: null, page: "extra" })],
+    ];
+
+    for (const [file, buffer] of edges) {
+        await writeFile(file, buffer);
+        check(`${file} entsteht in ${CARD_WIDTH}x${CARD_HEIGHT}`, buffer.length > 0 && (await hasSize(buffer, CARD_WIDTH, CARD_HEIGHT)));
+    }
+
+    // Der Rang-Kasten einer Ranked-Kachel: lange Rang-Namen bleiben lesbar groß.
+    const mainW = (CARD_WIDTH - PAD * 2 - GAP * 2) / 3;
+
+    for (const text of ["SUPERSONIC LEGEND", "GRAND CHAMPION III", "PLATZIERUNG 9/10"]) {
+        const size = TierTextSize(text, mainW);
+
+        check(`„${text}“ passt in den Rang-Kasten mit mindestens 24 px (${size} px)`, size >= 24);
+    }
+
+    // Bei voller Stufe steht „100%“ neben dem Balken - auch das muss vor der
+    // abgeschrägten Ecke des 350 breiten Season-Kastens enden.
+    const bar = RewardBarLayout(350);
+
+    check(`„100%“ endet im Season-Kasten (${Math.round(bar.percentEnd)} von 350)`, bar.percentEnd <= 350 - 18);
+    check(`  und der Balken bleibt breit genug (${Math.round(bar.w)} px)`, bar.w >= 120);
 
     if (failed > 0) {
         console.log(`\n\x1b[31m❌ ${failed} Prüfung(en) fehlgeschlagen.\x1b[0m\n`);

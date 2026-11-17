@@ -604,7 +604,7 @@ async function drawHeader(ctx: SKRSContext2D, data: IRankCardData): Promise<void
     // --- Avatar ---------------------------------------------------------
     const cx = PAD + 108;
     const cy = top + height / 2;
-    const radius = 74;
+    const radius = 64;
 
     const avatar = data.avatarURL ? await image(data.avatarURL) : null;
 
@@ -622,7 +622,7 @@ async function drawHeader(ctx: SKRSContext2D, data: IRankCardData): Promise<void
         const file = path.join(PLATFORM_ICON_ROOT, "epicgames.png");
         const platform = await image(file);
 
-        if (platform) ctx.drawImage(tinted(file, platform, 92, COLORS.text), cx - 46, cy - 46);
+        if (platform) ctx.drawImage(tinted(file, platform, 80, COLORS.text), cx - 40, cy - 40);
     }
 
     ctx.restore();
@@ -636,37 +636,37 @@ async function drawHeader(ctx: SKRSContext2D, data: IRankCardData): Promise<void
     });
 
     // --- Rechts nebeneinander: Season Reward, dann Turnier-Rang (W-0129) --
-    const boxH = 172;
+    const boxH = 150;
     const boxY = top + (height - boxH) / 2;
-    const tourW = 404;
+    const tourW = 410;
     const tourX = CARD_WIDTH - PAD - 22 - tourW;
-    const boxW = 360;
+    const boxW = 350;
     const boxX = tourX - 22 - boxW;
 
     // --- Name und Club --------------------------------------------------
     const textX = cx + radius + 44;
-    let nameY = cy + 14;
+    // Club-Tag, Name und @Handle stehen als Block mittig zum Ring - fehlt eine
+    // Zeile, rückt der Rest zusammen, statt oben zu kleben.
+    const nameY = cy + 4 + (profile.club ? 20 : 0) + (data.discordName ? 0 : 18);
 
     if (profile.club) {
         ctx.fillStyle = COLORS.red;
-        ctx.font = "700 34px Oxanium";
+        ctx.font = "700 30px Oxanium";
         ctx.textBaseline = "alphabetic";
-        glow(ctx, COLORS.red, 16, () => ctx.fillText(`[${profile.club?.tag}]`, textX, cy - 52));
-    } else {
-        nameY = cy - 4;
+        glow(ctx, COLORS.red, 16, () => ctx.fillText(`[${profile.club?.tag}]`, textX, nameY - 66));
     }
 
-    const nameSize = fitText(ctx, profile.name, boxX - textX - 30, 76, "800");
+    const nameSize = fitText(ctx, profile.name, boxX - textX - 30, 64, "800");
     ctx.font = `800 ${nameSize}px Oxanium`;
     ctx.fillStyle = COLORS.text;
     glow(ctx, "rgba(255, 60, 70, 0.55)", 18, () => ctx.fillText(profile.name, textX, nameY));
 
     if (data.discordName) {
-        ctx.font = "500 34px Rajdhani";
+        ctx.font = "500 30px Rajdhani";
         ctx.fillStyle = COLORS.textDim;
         // Discord-Namen sind bis zu 32 Zeichen lang - seit W-0129 steht rechts
         // der Season-Reward-Kasten, also wie beim Epic-Namen auf dessen Kante kürzen.
-        ctx.fillText(ellipsize(ctx, `@${data.discordName}`, boxX - textX - 30), textX, nameY + 44);
+        ctx.fillText(ellipsize(ctx, `@${data.discordName}`, boxX - textX - 30), textX, nameY + 38);
     }
 
     // --- Season Reward --------------------------------------------------
@@ -674,7 +674,7 @@ async function drawHeader(ctx: SKRSContext2D, data: IRankCardData): Promise<void
 
     ctx.font = "600 21px Rajdhani";
     ctx.fillStyle = COLORS.text;
-    tracked(ctx, "SEASON REWARD LEVEL", boxX + 26, boxY + 38, 2.4);
+    tracked(ctx, "SEASON REWARD LEVEL", boxX + 26, boxY + 36, 2.4);
 
     const level = profile.seasonLevel;
     const rewardIcon = await image(RewardIconFile(level));
@@ -683,20 +683,21 @@ async function drawHeader(ctx: SKRSContext2D, data: IRankCardData): Promise<void
     // Abzeichen zeigt.
     const rewardColor = TierColor(RewardTier(level));
 
-    if (rewardIcon) drawIcon(ctx, RewardIconFile(level), rewardIcon, boxX + 22, boxY + 52, 76);
+    if (rewardIcon) drawIcon(ctx, RewardIconFile(level), rewardIcon, boxX + 22, boxY + 48, 70);
     const rewardText = RewardName(level).toUpperCase();
-    const rewardSize = fitText(ctx, rewardText, boxW - 130, 40, "700");
+    const rewardSize = fitText(ctx, rewardText, boxW - 126, 38, "700");
 
     ctx.font = `700 ${rewardSize}px Oxanium`;
     ctx.fillStyle = rewardColor;
-    glow(ctx, rewardColor, 14, () => ctx.fillText(rewardText, boxX + 108, boxY + 96));
+    glow(ctx, rewardColor, 14, () => ctx.fillText(rewardText, boxX + 104, boxY + 86));
 
     // --- Fortschritt zur nächsten Stufe ---------------------------------
     const wins = Math.min(profile.seasonWins, REWARD_WINS_PER_LEVEL);
     const ratio = level > 0 ? wins / REWARD_WINS_PER_LEVEL : 0;
-    const barX = boxX + 108;
-    const barY = boxY + 116;
-    const barW = boxW - 108 - 92;
+    const bar = RewardBarLayout(boxW);
+    const barX = boxX + bar.x;
+    const barY = boxY + 104;
+    const barW = bar.w;
 
     ctx.fillStyle = "rgba(255, 255, 255, 0.1)";
     bevelPath(ctx, barX, barY, barW, 16, 5);
@@ -716,10 +717,29 @@ async function drawHeader(ctx: SKRSContext2D, data: IRankCardData): Promise<void
 
     ctx.font = "700 26px Orbitron";
     ctx.fillStyle = COLORS.text;
-    ctx.fillText(`${Math.round(ratio * 100)}%`, barX + barW + 16, barY + 15);
+    ctx.fillText(`${Math.round(ratio * 100)}%`, boxX + bar.percentX, barY + 15);
 
     await drawTournament(ctx, tourX, boxY, tourW, boxH, profile.tournament ?? null);
 }
+
+/**
+ * W-0132: Balken und Prozentzahl im Season-Kasten der Breite boxW, ab dessen
+ * linker Kante. Der Balken lässt Platz für die breiteste Zahl („100%“), damit
+ * sie bei voller Stufe nicht über die abgeschrägte Ecke läuft.
+ */
+export function RewardBarLayout(boxW: number): { x: number; w: number; percentX: number; percentEnd: number } {
+    measureCtx ??= createCanvas(1, 1).getContext("2d");
+    measureCtx.font = "700 26px Orbitron";
+
+    const x = 104;
+    const percentW = measureCtx.measureText("100%").width;
+    const w = boxW - x - 16 - percentW - 22;
+
+    return { x, w, percentX: x + w + 16, percentEnd: x + w + 16 + percentW };
+}
+
+/** Eine kleine Leinwand nur zum Messen, für TierTextSize und RewardBarLayout. */
+let measureCtx: SKRSContext2D | null = null;
 
 /** Beschriftung und Wert nebeneinander, als Paar mittig um cx - „MMR 1452“. */
 function labelValue(ctx: SKRSContext2D, cx: number, baseline: number, label: string, value: string): void {
@@ -763,11 +783,11 @@ async function drawTournament(ctx: SKRSContext2D, x: number, y: number, w: numbe
     const trophyFile = path.join(STAT_ICON_ROOT, "wins.png");
     const trophy = await image(trophyFile);
 
-    if (trophy) ctx.drawImage(tinted(trophyFile, trophy, 22, COLORS.gold), x + 24, y + 20);
+    if (trophy) ctx.drawImage(tinted(trophyFile, trophy, 22, COLORS.gold), x + 24, y + 18);
 
     ctx.font = "600 21px Rajdhani";
     ctx.fillStyle = COLORS.gold;
-    tracked(ctx, "TURNIER-RANG", x + 54, y + 38, 2.4);
+    tracked(ctx, "TURNIER-RANG", x + 54, y + 36, 2.4);
 
     const ranked = !!rank && rank.tier > 0;
     const tier = ranked ? rank.tier : 0;
@@ -775,20 +795,20 @@ async function drawTournament(ctx: SKRSContext2D, x: number, y: number, w: numbe
     const icon = await image(file);
     const color = TierColor(tier);
 
-    if (icon) drawIcon(ctx, file, icon, x + 22, y + 50, 68);
+    if (icon) drawIcon(ctx, file, icon, x + 24, y + 44, 58);
 
     const text = ranked ? rank.tierName.toUpperCase() : "UNRANKED";
-    const size = fitText(ctx, text, w - 128, 32, "700");
+    const size = fitText(ctx, text, w - 120, 30, "700");
 
     ctx.font = `700 ${size}px Oxanium`;
     ctx.fillStyle = color;
-    glow(ctx, color, 12, () => ctx.fillText(text, x + 104, y + 84));
+    glow(ctx, color, 12, () => ctx.fillText(text, x + 96, y + 74));
 
-    ctx.font = "500 21px Rajdhani";
+    ctx.font = "500 20px Rajdhani";
     ctx.fillStyle = COLORS.textDim;
-    ctx.fillText(ranked && rank.divisionName ? `DIVISION ${rank.divisionName}` : "NOCH KEIN TURNIER-RANG", x + 104, y + 112);
+    ctx.fillText(ranked && rank.divisionName ? `DIVISION ${rank.divisionName}` : "NOCH KEIN TURNIER-RANG", x + 96, y + 98);
 
-    const lineY = y + 128;
+    const lineY = y + 110;
     const mid = x + w / 2;
 
     ctx.save();
@@ -800,13 +820,13 @@ async function drawTournament(ctx: SKRSContext2D, x: number, y: number, w: numbe
     ctx.stroke();
     ctx.strokeStyle = "rgba(255, 197, 61, 0.42)";
     ctx.beginPath();
-    ctx.moveTo(mid, lineY + 10);
-    ctx.lineTo(mid, lineY + 34);
+    ctx.moveTo(mid, lineY + 8);
+    ctx.lineTo(mid, lineY + 32);
     ctx.stroke();
     ctx.restore();
 
-    labelValue(ctx, x + w * 0.25 + 6, lineY + 31, "MMR", ranked && rank.mmr > 0 ? String(rank.mmr) : "—");
-    labelValue(ctx, x + w * 0.75 - 6, lineY + 31, "SPIELE", String(rank?.matches ?? 0));
+    labelValue(ctx, x + w * 0.25 + 6, lineY + 29, "MMR", ranked && rank.mmr > 0 ? String(rank.mmr) : "—");
+    labelValue(ctx, x + w * 0.75 - 6, lineY + 29, "SPIELE", String(rank?.matches ?? 0));
 }
 
 /**
@@ -838,7 +858,10 @@ function lineIcon(ctx: SKRSContext2D, key: string, x: number, y: number, size: n
     });
 }
 
-/** Die Überschrift eines Punkts: Symbol, Titel, Untertitel und eine Linie bis zum Rand. */
+/**
+ * Die Überschrift eines Punkts, seit W-0132 in einer Zeile: Symbol, Titel,
+ * Untertitel daneben und eine Linie bis zum Rand.
+ */
 async function drawSectionHeading(ctx: SKRSContext2D, y: number, title: string, subtitle: string, icon: "trophy" | "grid" | "target"): Promise<void> {
     if (icon === "grid") {
         lineIcon(ctx, "grid", PAD + 10, y - 34, 42, COLORS.text, 0);
@@ -856,13 +879,17 @@ async function drawSectionHeading(ctx: SKRSContext2D, y: number, title: string, 
 
     glow(ctx, "rgba(255,60,70,0.5)", 16, () => ctx.fillText(title, PAD + 68, y));
 
-    ctx.font = "500 24px Rajdhani";
-    ctx.fillStyle = COLORS.textDim;
-    const width = trackedWidth(ctx, subtitle, 5.5);
-    tracked(ctx, subtitle, PAD + 70, y + 30, 5.5);
+    // Der Untertitel steht auf derselben Grundlinie, ein wenig angehoben -
+    // kleinere Schrift wirkt neben dem großen Titel sonst zu tief.
+    const subX = PAD + 68 + titleWidth + 30;
 
-    // Eine dünne Linie, die vom Titel bis zum rechten Rand läuft.
-    const lineX = PAD + 80 + Math.max(width, titleWidth, 220);
+    ctx.font = "500 22px Rajdhani";
+    ctx.fillStyle = COLORS.textDim;
+    const width = trackedWidth(ctx, subtitle, 6);
+    tracked(ctx, subtitle, subX, y - 3, 6);
+
+    // Eine dünne Linie, die vom Untertitel bis zum rechten Rand läuft.
+    const lineX = subX + width + 30;
 
     glow(ctx, COLORS.red, 10, () => {
         ctx.beginPath();
@@ -897,8 +924,8 @@ async function drawRankCard(
     tracked(ctx, PLAYLIST_SUBTITLES[rank.key] ?? "", inner + 2, y + 92, 4);
 
     // --- Rang -----------------------------------------------------------
-    const rowY = y + 118;
-    const rowH = 116;
+    const rowY = y + 106;
+    const rowH = 104;
 
     panel(ctx, inner - 12, rowY, w - 36, rowH, {
         cut: 14,
@@ -912,13 +939,12 @@ async function drawRankCard(
 
     const tierColor = TierColor(rank.placement ? 0 : rank.tier);
 
-    if (icon) drawIcon(ctx, RankIconFile(rank.tier, rank.placement), icon, inner - 2, rowY + 12, 92);
+    if (icon) drawIcon(ctx, RankIconFile(rank.tier, rank.placement), icon, inner - 2, rowY + 10, 84);
     const tierText = rank.placement ? `PLATZIERUNG ${rank.placementMatches}/${PLACEMENT_MATCHES}` : rank.tierName.toUpperCase();
-    const tierSize = fitText(ctx, tierText, w - 160, 34, "700");
 
-    ctx.font = `700 ${tierSize}px Oxanium`;
+    ctx.font = `700 ${TierTextSize(tierText, w)}px Oxanium`;
     ctx.fillStyle = tierColor;
-    glow(ctx, tierColor, 12, () => ctx.fillText(tierText, inner + 100, rowY + 58));
+    glow(ctx, tierColor, 12, () => ctx.fillText(tierText, inner + 92, rowY + 50));
 
     // Solange die Platzierungsspiele laufen, steht noch keine Division fest -
     // Prime liefert zwar eine, aber das Spiel zeigt sie selbst nicht.
@@ -928,15 +954,26 @@ async function drawRankCard(
           ? `DIVISION ${rank.divisionName}`
           : "OHNE DIVISION";
 
-    ctx.font = "500 24px Rajdhani";
+    ctx.font = "500 22px Rajdhani";
     ctx.fillStyle = COLORS.textDim;
-    ctx.fillText(division, inner + 100, rowY + 90);
+    ctx.fillText(division, inner + 92, rowY + 80);
 
     // --- MMR mittig, darunter Streak | Spiele (W-0129) ------------------
-    const mmrLabelY = rowY + rowH + 38;
+    const mmrLabelY = rowY + rowH + 34;
 
     drawCenteredMMR(ctx, x + w / 2, mmrLabelY, rank.mmr > 0 ? String(rank.mmr) : "—", 1);
-    drawStatsRow(ctx, x + 24, w - 48, mmrLabelY + 82, rank, ["AKTUELLE STREAK", "GESPIELTE SPIELE"], 1);
+    drawStatsRow(ctx, x + 24, w - 48, mmrLabelY + 76, rank, ["AKTUELLE STREAK", "GESPIELTE SPIELE"], 1);
+}
+
+/**
+ * W-0132: Schriftgröße des Rang-Namens im Rang-Kasten einer Ranked-Kachel der
+ * Breite tileW. Der Text beginnt rechts vom Abzeichen und endet 12 px vor dem
+ * Rand des Kastens; lange Namen werden kleiner statt überzulaufen.
+ */
+export function TierTextSize(text: string, tileW: number): number {
+    measureCtx ??= createCanvas(1, 1).getContext("2d");
+
+    return fitText(measureCtx, text, tileW - 152, 34, "700");
 }
 
 /**
@@ -1055,8 +1092,8 @@ async function drawExtraCard(ctx: SKRSContext2D, x: number, y: number, w: number
     tracked(ctx, mode.label.toUpperCase(), x + 64, y + 48, 2);
 
     // --- Rang -----------------------------------------------------------
-    const rowY = y + 72;
-    const rowH = 112;
+    const rowY = y + 70;
+    const rowH = 104;
 
     panel(ctx, x + 14, rowY, w - 28, rowH, {
         cut: 12,
@@ -1072,7 +1109,7 @@ async function drawExtraCard(ctx: SKRSContext2D, x: number, y: number, w: number
     const icon = await image(file);
     const color = TierColor(tier);
 
-    if (icon) drawIcon(ctx, file, icon, x + 24, rowY + 22, 68);
+    if (icon) drawIcon(ctx, file, icon, x + 24, rowY + 18, 68);
 
     // Fünf Kacheln nebeneinander sind schmal. Passt der lange Name nicht mehr in
     // lesbarer Größe, kommt die Kurzform - wie im Entwurf („GRAND CHAMP I“).
@@ -1085,7 +1122,7 @@ async function drawExtraCard(ctx: SKRSContext2D, x: number, y: number, w: number
 
     ctx.font = `700 ${size}px Oxanium`;
     ctx.fillStyle = color;
-    glow(ctx, color, 10, () => ctx.fillText(text, textX, rowY + 52));
+    glow(ctx, color, 10, () => ctx.fillText(text, textX, rowY + 48));
 
     const sub = !rank
         ? "NOCH KEIN SPIEL"
@@ -1097,18 +1134,20 @@ async function drawExtraCard(ctx: SKRSContext2D, x: number, y: number, w: number
 
     ctx.font = "500 20px Rajdhani";
     ctx.fillStyle = COLORS.textDim;
-    ctx.fillText(sub, textX, rowY + 84);
+    ctx.fillText(sub, textX, rowY + 78);
 
     // --- MMR und Streak | Spiele ------------------------------------------
-    const mmrLabelY = rowY + rowH + 78;
+    // Streak | Spiele auf derselben Höhe wie in den Ranked-Kacheln.
+    const mmrLabelY = rowY + rowH + 72;
 
     drawCenteredMMR(ctx, x + w / 2, mmrLabelY, rank && rank.mmr > 0 ? String(rank.mmr) : "—", 0.88);
-    drawStatsRow(ctx, x + 18, w - 36, mmrLabelY + 74, rank, ["STREAK", "SPIELE"], 1);
+    drawStatsRow(ctx, x + 18, w - 36, mmrLabelY + 76, rank, ["STREAK", "SPIELE"], 1);
 }
 
 /**
- * W-0129: Die Karriere als eigener Punkt - sechs Kacheln, je Wert eine. Das
- * Symbol in der Farbe des Werts mit Schein, darunter Beschriftung und Zahl.
+ * W-0129: Die Karriere als eigener Punkt - sechs Kacheln, je Wert eine. Seit
+ * W-0132 quer: das Symbol in der Farbe des Werts mit Schein links, rechts
+ * daneben Beschriftung und Zahl.
  */
 async function drawCareer(ctx: SKRSContext2D, y: number, height: number, profile: IPrimeProfile): Promise<void> {
     // Die Werte liegen bei Prime unter ihrem Schlüssel - fehlt einer, steht dort
@@ -1119,7 +1158,6 @@ async function drawCareer(ctx: SKRSContext2D, y: number, height: number, profile
 
     for (const [index, key] of CAREER_ORDER.entries()) {
         const x = PAD + (tileW + gap) * index;
-        const cx = x + tileW / 2;
         const file = path.join(STAT_ICON_ROOT, `${key}.png`);
         const icon = await image(file);
         const color = CAREER_COLORS[key] ?? COLORS.text;
@@ -1127,22 +1165,24 @@ async function drawCareer(ctx: SKRSContext2D, y: number, height: number, profile
         panel(ctx, x, y, tileW, height, { cut: 16, glow: 12, fill: "rgba(6, 10, 15, 0.84)" });
 
         if (icon) {
-            const stamp = tinted(file, icon, 52, color);
+            const stamp = tinted(file, icon, 56, color);
+            const iconY = y + (height - 56) / 2;
 
-            glow(ctx, color, 16, () => ctx.drawImage(stamp, cx - 26, y + 22));
-            ctx.drawImage(stamp, cx - 26, y + 22);
+            glow(ctx, color, 16, () => ctx.drawImage(stamp, x + 22, iconY));
+            ctx.drawImage(stamp, x + 22, iconY);
         }
 
-        ctx.font = "600 20px Rajdhani";
+        ctx.font = "600 18px Rajdhani";
         ctx.fillStyle = COLORS.textDim;
-        centered(ctx, CAREER_LABELS[key] ?? key.toUpperCase(), cx, y + 110, 3);
+        tracked(ctx, CAREER_LABELS[key] ?? key.toUpperCase(), x + 92, y + 50, 3);
 
-        ctx.save();
-        ctx.textAlign = "center";
-        ctx.font = "800 40px Oxanium";
+        // Große Zahlen („12.345.678“) werden kleiner statt über die Kachel zu laufen.
+        const value = new Intl.NumberFormat("de-DE").format(values.get(key) ?? 0);
+        const size = fitText(ctx, value, tileW - 110, 38, "800");
+
+        ctx.font = `800 ${size}px Oxanium`;
         ctx.fillStyle = COLORS.text;
-        glow(ctx, "rgba(255,255,255,0.18)", 10, () => ctx.fillText(new Intl.NumberFormat("de-DE").format(values.get(key) ?? 0), cx, y + 154));
-        ctx.restore();
+        glow(ctx, "rgba(255,255,255,0.18)", 10, () => ctx.fillText(value, x + 92, y + 96));
     }
 }
 
