@@ -73,6 +73,10 @@ export interface IBotModuleSetting {
     readonly notice: string | null;
     /** Nur bei rl-tracking gesetzt. */
     readonly linkMode: LinkMode | null;
+    /** W-0133: alle Werte aus MODULE_SETTINGS, fehlende mit Standard. */
+    readonly values: Readonly<Record<string, number>>;
+    /** W-0133: je Wert, ob Server „auf Anfrage änderbar“ sehen. */
+    readonly askable: Readonly<Record<string, boolean>>;
     readonly updatedAt: string | null;
     readonly updatedBy: string | null;
 }
@@ -80,7 +84,42 @@ export interface IBotModuleSetting {
 export interface IBotModuleInput {
     readonly status: ModuleStatus;
     readonly notice: string | null;
+    /** null: die gespeicherte Art bleibt. */
     readonly linkMode: LinkMode | null;
+    /** Nur die übergebenen Schlüssel, der Rest bleibt. */
+    readonly values: Readonly<Record<string, number>>;
+    readonly askable: Readonly<Record<string, boolean>>;
+}
+
+/** W-0133: Abweichung eines Servers. null heißt jeweils: wie für alle. */
+export interface IBotModuleOverride {
+    readonly module: string;
+    readonly guildId: string;
+    readonly status: "on" | "off" | null;
+    readonly notice: string | null;
+    readonly linkMode: LinkMode | null;
+    readonly values: Readonly<Record<string, number>>;
+    readonly note: string | null;
+    readonly updatedAt: string | null;
+    readonly updatedBy: string | null;
+}
+
+export type IBotModuleOverrideInput = Pick<IBotModuleOverride, "status" | "notice" | "linkMode" | "values" | "note">;
+
+/** W-0133: ein Eintrag im Verlauf. before/after: ganzer Stand des Bereichs (IBotModuleSetting oder IBotModuleOverride | null). */
+export interface IBotModuleChange {
+    readonly id: number;
+    readonly module: string;
+    readonly guildId: string | null;
+    readonly before: unknown;
+    readonly after: unknown;
+    readonly kinds: readonly ("status" | "notice" | "values")[];
+    readonly summary: string;
+    readonly note: string | null;
+    readonly userName: string;
+    readonly botOk: boolean | null;
+    readonly undoOf: number | null;
+    readonly createdAt: string;
 }
 
 /** Ein Eintrag aus dem Protokoll zu einem Modul. */

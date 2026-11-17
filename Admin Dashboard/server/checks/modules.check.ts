@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { BOT_MODULE_IDS, PERMANENT_BOT_MODULES } from "../../shared/botModules.ts";
-import { parseSettingInput } from "../modules/store.ts";
+import { MODULE_SETTINGS } from "../../shared/botModuleSettings.ts";
+import { parseOverrideInput, parseSettingInput } from "../modules/store.ts";
 import { check, section } from "./harness.ts";
 
 /** W-0131: Modul-Einstellungen ohne Datenbank, die Eingabeprüfung. */
@@ -15,7 +16,7 @@ export async function checkModules(): Promise<void> {
     });
 
     await check("Status und Hinweis werden gelesen, der Hinweis getrimmt, leer ist null", () => {
-        assert.deepEqual(parseSettingInput("polls", { status: "off", notice: "  Umbau  " }), { status: "off", notice: "Umbau", linkMode: null });
+        assert.deepEqual(parseSettingInput("polls", { status: "off", notice: "  Umbau  " }), { status: "off", notice: "Umbau", linkMode: null, values: {}, askable: {} });
         assert.equal(parseSettingInput("polls", { status: "on", notice: "   " }).notice, null);
         assert.equal(parseSettingInput("polls", { status: "beta" }).notice, null);
     });
@@ -34,10 +35,38 @@ export async function checkModules(): Promise<void> {
         assert.equal(parseSettingInput("backups", { status: "on", notice: "Wartung" }).notice, "Wartung");
     });
 
-    await check("Die Verknüpfungsart gibt es nur bei RL Tracking, Standard ist die Anmeldung", () => {
+    await check("Die Verknüpfungsart gibt es nur bei RL Tracking, ohne Angabe bleibt die gespeicherte", () => {
         assert.equal(parseSettingInput("rl-tracking", { status: "on", linkMode: "both" }).linkMode, "both");
-        assert.equal(parseSettingInput("rl-tracking", { status: "on" }).linkMode, "login");
+        assert.equal(parseSettingInput("rl-tracking", { status: "on" }).linkMode, null);
         assert.throws(() => parseSettingInput("rl-tracking", { status: "on", linkMode: "xyz" }), /Verknüpfungsart/);
         assert.equal(parseSettingInput("polls", { status: "on", linkMode: "name" }).linkMode, null);
+    });
+
+    // W-0133: Verzeichnis der Einstellungen und Werte je Server.
+    await check("Verzeichnis: 33 Werte in 10 Modulen, jeder Standard liegt in seinen Grenzen", () => {
+        const all = Object.values(MODULE_SETTINGS).flat();
+
+        assert.equal(Object.keys(MODULE_SETTINGS).length, 10);
+        assert.equal(all.length, 33);
+        assert.ok(all.every((def) => def.min <= def.standard && def.standard <= def.max), all.filter((def) => def.standard > def.max || def.standard < def.min).map((def) => def.key).join(","));
+        assert.equal(MODULE_SETTINGS.tickets.find((def) => def.key === "maxOpenPerUser")?.max, 24);
+        assert.equal(MODULE_SETTINGS.gallery.find((def) => def.key === "imageMegabytes")?.max, 9);
+    });
+
+    await check("Werte für alle: nur bekannte Schlüssel, ganze Zahlen in den Grenzen", () => {
+        assert.deepEqual(parseSettingInput("giveaways", { status: "on", values: { maxWinners: 100 } }).values, { maxWinners: 100 });
+        assert.throws(() => parseSettingInput("giveaways", { status: "on", values: { maxWinners: 501 } }), /500/);
+        assert.throws(() => parseSettingInput("giveaways", { status: "on", values: { maxWinners: 2.5 } }), /ganze Zahl/);
+        assert.throws(() => parseSettingInput("giveaways", { status: "on", values: { gibtsNicht: 1 } }), /Wert/);
+        assert.deepEqual(parseSettingInput("giveaways", { status: "on", askable: { maxWinners: false } }).askable, { maxWinners: false });
+    });
+
+    await check("Werte je Server: „nur alle“ und harte Grenzen werden abgelehnt", () => {
+        assert.throws(() => parseOverrideInput("rl-tracking", { values: { switchDays: 5 } }), /nur für alle/);
+        assert.throws(() => parseOverrideInput("tickets", { values: { maxOpenPerUser: 25 } }), /24/);
+        assert.throws(() => parseOverrideInput("gallery", { status: "off" }), /immer an/);
+        assert.throws(() => parseOverrideInput("polls", { status: "beta" }), /Status/);
+        assert.deepEqual(parseOverrideInput("giveaways", { values: { maxWinners: 100 }, note: "  Ticket #214 " }), { status: null, notice: null, linkMode: null, values: { maxWinners: 100 }, note: "Ticket #214" });
+        assert.equal(parseOverrideInput("rl-tracking", { linkMode: "name" }).linkMode, "name");
     });
 }

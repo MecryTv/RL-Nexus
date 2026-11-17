@@ -141,7 +141,8 @@ export const AREAS: readonly IArea[] = [
 // staff_grants, staff_grant_log (W-0090): Protokoll der Staff-Zugriffe. Ein Zurückladen darf es nie überschreiben.
 // server_*: Zuordnung alter zu neuer IDs und laufende Ladevorgänge (Plan 32), ebenfalls Live-Zustand;
 // dazu die Einladungen, Anfragen und Sperren von „ein Server pro Person“ (W-0064), die das Team führt.
-export const EXCLUDED_TABLES = ["temp_voices", "support_waits", "av_cases", "av_trust", "av_reports", "av_incidents", "av_events", "av_debris", "server_id_map", "server_restores", "server_invites", "server_requests", "server_blocks", "invite_passes", "staff_grants", "staff_grant_log"] as const;
+// bot_module_overrides, bot_module_changes (W-0133): Werte und Verlauf, die das Team im Admin setzt, kein Stand des Servers.
+export const EXCLUDED_TABLES = ["temp_voices", "support_waits", "av_cases", "av_trust", "av_reports", "av_incidents", "av_events", "av_debris", "server_id_map", "server_restores", "server_invites", "server_requests", "server_blocks", "invite_passes", "staff_grants", "staff_grant_log", "bot_module_overrides", "bot_module_changes"] as const;
 
 export interface IBackupMeta {
     readonly id: number;

@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { BOT_MODULE_FALLBACK, LINK_MODE_LABELS, MODULE_STATUS_LABELS, type IBotModuleSaved, type IBotModuleSetting, type IBotModulesView } from "../../shared/botModules.ts";
+import { BOT_MODULE_FALLBACK, type IBotModuleSaved, type IBotModulesView } from "../../shared/botModules.ts";
 import { accessOf } from "../access.ts";
 import { audit } from "../audit.ts";
 import { botModulesReload } from "../bot.ts";
@@ -7,7 +7,7 @@ import type { IConfig } from "../config.ts";
 import { readContent } from "../content.ts";
 import { DatabaseUnavailable, databaseReady, query } from "../db.ts";
 import { publish } from "../events.ts";
-import { listSettings, parseSettingInput, saveSetting, serverCounts } from "../modules/store.ts";
+import { describeChange, listSettings, markBotOk, parseSettingInput, saveSetting, serverCounts } from "../modules/store.ts";
 
 /**
  * W-0131: Bot → Module. Was für alle Server gilt, je Modul: Status, Hinweis
@@ -35,18 +35,6 @@ async function catalog(config: IConfig): Promise<Map<string, ICatalogEntry>> {
     const modules = (envelope?.data as { modules?: ICatalogEntry[] } | undefined)?.modules ?? [];
 
     return new Map(modules.map((entry) => [entry.id, entry]));
-}
-
-/** „Status: An → Aus; Hinweis: – → Umbau“, nur was sich geändert hat. */
-export function changeLine(before: IBotModuleSetting, after: IBotModuleSetting): string {
-    const parts: string[] = [];
-    const show = (value: string | null): string => value ?? "–";
-
-    if (before.status !== after.status) parts.push(`Status: ${MODULE_STATUS_LABELS[before.status]} → ${MODULE_STATUS_LABELS[after.status]}`);
-    if (before.notice !== after.notice) parts.push(`Hinweis: ${show(before.notice)} → ${show(after.notice)}`);
-    if (before.linkMode !== after.linkMode) parts.push(`Epic-Konto verbinden: ${show(before.linkMode && LINK_MODE_LABELS[before.linkMode])} → ${show(after.linkMode && LINK_MODE_LABELS[after.linkMode])}`);
-
-    return parts.length > 0 ? parts.join("; ") : "keine Änderung";
 }
 
 export async function moduleRoutes(app: FastifyInstance, { config }: { config: IConfig }): Promise<void> {
@@ -89,13 +77,14 @@ export async function moduleRoutes(app: FastifyInstance, { config }: { config: I
         const module = (request.params as { id: string }).id;
         const input = parseSettingInput(module, request.body);
         const actor = accessOf(request);
-        const { before, after } = await saveSetting(module, input, actor.id);
+        const { before, after, changeId } = await saveSetting(module, input, actor);
 
-        await audit(actor, "module.settings", module, changeLine(before, after));
+        await audit(actor, "module.settings", module, describeChange(module, before, after, false).summary);
         publish("modules");
 
         const bot = await botModulesReload(config, actor.id);
 
+        await markBotOk(changeId, bot);
         if (bot) syncedAt = new Date();
 
         return { setting: after, bot };

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import type { IBotModulesView } from "../../shared/botModules.ts";
 import type { IConfig } from "../config.ts";
 import { query } from "../db.ts";
-import { listSettings, saveSetting, serverCounts } from "../modules/store.ts";
+import { deleteOverride, listChanges, listOverrides, listSettings, saveOverride, saveSetting, serverCounts, undoChange } from "../modules/store.ts";
 import type { IHttp } from "./backups-db.check.ts";
 import { check, section } from "./harness.ts";
 
@@ -12,6 +12,7 @@ import { check, section } from "./harness.ts";
  * vorher kurz beiseite und kommen am Ende unverändert zurück.
  */
 const GUILDS = ["99999999999999999981", "99999999999999999982"];
+const ACTOR = { id: "99999999999999999983", name: "check:db Module" };
 
 export async function checkModulesDb(config: IConfig, http: IHttp): Promise<void> {
     section("Modul-Einstellungen (Datenbank)");
@@ -34,9 +35,15 @@ export async function checkModulesDb(config: IConfig, http: IHttp): Promise<void
         return real(input, init);
     }) as typeof fetch;
 
+    const tidy = async (): Promise<void> => {
+        await query("DELETE FROM bot_module_overrides WHERE guild_id IN (?)", [GUILDS]);
+        await query("DELETE FROM bot_module_changes WHERE user_id = ? OR user_name = 'nutzer1'", [ACTOR.id]);
+    };
+
     await query("DELETE FROM bot_module_settings");
     await query("DELETE FROM guild_settings WHERE guild_id IN (?)", [GUILDS]);
     await query("DELETE FROM admin_audit WHERE action = 'module.settings' AND user_name = 'nutzer1'");
+    await tidy();
 
     try {
         await check("Ohne Zeilen sind alle 26 Module an, ohne Hinweis, RL Tracking mit Anmeldung", async () => {
@@ -49,22 +56,82 @@ export async function checkModulesDb(config: IConfig, http: IHttp): Promise<void
         });
 
         await check("Speichern gibt vorher und nachher zurück und merkt sich, wer", async () => {
-            const first = await saveSetting("polls", { status: "off", notice: "Umbau", linkMode: null }, "check-1");
+            const first = await saveSetting("polls", { status: "off", notice: "Umbau", linkMode: null, values: {}, askable: {} }, ACTOR);
 
             assert.equal(first.before.status, "on");
             assert.equal(first.after.status, "off");
             assert.equal(first.after.notice, "Umbau");
-            assert.equal(first.after.updatedBy, "check-1");
+            assert.equal(first.after.updatedBy, ACTOR.id);
 
-            const second = await saveSetting("polls", { status: "on", notice: null, linkMode: null }, "check-2");
+            const second = await saveSetting("polls", { status: "on", notice: null, linkMode: null, values: {}, askable: {} }, ACTOR);
 
             assert.equal(second.before.status, "off");
             assert.equal(second.after.notice, null);
 
-            const rl = await saveSetting("rl-tracking", { status: "on", notice: null, linkMode: "both" }, "check-1");
+            const rl = await saveSetting("rl-tracking", { status: "on", notice: null, linkMode: "both", values: {}, askable: {} }, ACTOR);
 
             assert.equal(rl.after.linkMode, "both");
             assert.equal((await listSettings()).find((entry) => entry.module === "rl-tracking")?.linkMode, "both");
+
+            // W-0131-Rest: ohne Angabe bleibt die Verknüpfungsart stehen.
+            const kept = await saveSetting("rl-tracking", { status: "on", notice: null, linkMode: null, values: {}, askable: {} }, ACTOR);
+
+            assert.equal(kept.after.linkMode, "both");
+        });
+
+        // W-0133: Werte für alle, Werte je Server, Verlauf und Zurücknehmen.
+        await check("Werte für alle: Standard ohne Zeile, gespeicherte Werte und Anfrage-Schalter", async () => {
+            const plain = (await listSettings()).find((entry) => entry.module === "giveaways");
+
+            assert.equal(plain?.values.maxWinners, 50);
+            assert.equal(plain?.askable.maxWinners, true);
+            assert.equal(plain?.askable.scheduleDays, false);
+
+            const saved2 = await saveSetting("giveaways", { status: "on", notice: null, linkMode: null, values: { maxWinners: 30 }, askable: { maxWinners: false } }, ACTOR);
+
+            assert.equal(saved2.after.values.maxWinners, 30);
+            assert.equal(saved2.after.values.maxDays, 60);
+            assert.equal(saved2.after.askable.maxWinners, false);
+            assert.ok(saved2.changeId > 0);
+        });
+
+        await check("Werte je Server: setzen, ohne Abweichung verschwindet die Zeile", async () => {
+            const set = await saveOverride("giveaways", GUILDS[0], { status: null, notice: null, linkMode: null, values: { maxWinners: 100 }, note: "check:db Ticket" }, ACTOR);
+
+            assert.equal(set.before, null);
+            assert.equal(set.after?.values.maxWinners, 100);
+            assert.equal((await listOverrides({ guildId: GUILDS[0] })).length, 1);
+
+            const empty = await saveOverride("giveaways", GUILDS[0], { status: null, notice: null, linkMode: null, values: {}, note: "nur Notiz" }, ACTOR);
+
+            assert.equal(empty.after, null);
+            assert.equal((await listOverrides({ guildId: GUILDS[0] })).length, 0);
+        });
+
+        await check("Verlauf: neueste zuerst, Filter nach Server", async () => {
+            const page = await listChanges({ guildId: GUILDS[0] }, 1);
+
+            assert.equal(page.total, 2);
+            assert.ok(page.entries[0].id > page.entries[1].id);
+            assert.match(page.entries[1].summary, /Gewinner höchstens: 30 → 100/);
+            assert.equal((await listChanges({ module: "giveaways", guildId: "all" }, 1)).entries[0].guildId, null);
+        });
+
+        await check("Zurücknehmen: nur die neueste Änderung eines Bereichs, entfernter Server-Wert kommt zurück", async () => {
+            const set = await saveOverride("giveaways", GUILDS[1], { status: "off", notice: null, linkMode: null, values: {}, note: null }, ACTOR);
+            const removed = await deleteOverride("giveaways", GUILDS[1], ACTOR);
+
+            await assert.rejects(() => undoChange(set.changeId, ACTOR), /Seitdem geändert/);
+
+            const undone = await undoChange(removed.changeId, ACTOR);
+            const back = await listOverrides({ guildId: GUILDS[1] });
+
+            assert.equal(back.length, 1);
+            assert.equal(back[0].status, "off");
+
+            const [row] = await query<{ undo_of: number }[]>("SELECT undo_of FROM bot_module_changes WHERE id = ?", [undone.changeId]);
+
+            assert.equal(row.undo_of, removed.changeId);
         });
 
         await check("Serverzahlen: je Modul die Server, die es eingeschaltet haben", async () => {
@@ -135,6 +202,7 @@ export async function checkModulesDb(config: IConfig, http: IHttp): Promise<void
         await query("DELETE FROM admin_audit WHERE action = 'module.settings' AND user_name = 'nutzer1'");
         await query("DELETE FROM guild_settings WHERE guild_id IN (?)", [GUILDS]);
         await query("DELETE FROM bot_module_settings");
+        await tidy();
 
         for (const row of saved) await query("INSERT INTO bot_module_settings SET ?", [row]);
     }
