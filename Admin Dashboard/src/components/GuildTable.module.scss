@@ -122,6 +122,21 @@
     gap: var(--s-2);
 }
 
+.moduleLink {
+    display: inline-flex;
+    gap: 6px;
+    align-items: center;
+    min-height: 32px;
+    margin-top: var(--s-2);
+    color: var(--c-blue);
+    font-size: 0.85rem;
+    text-decoration: none;
+
+    &:hover {
+        text-decoration: underline;
+    }
+}
+
 .empty {
     padding: var(--s-4) 0;
     color: var(--c-text-dim);

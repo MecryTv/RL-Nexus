@@ -19,6 +19,7 @@ import { Button } from "../components/Button";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { Icon } from "../components/Icon";
 import { PageHeader } from "../components/PageHeader";
+import { PageTabs } from "../components/PageTabs";
 import { Panel } from "../components/Panel";
 import { Failure, Loading } from "../components/Status";
 import { Switch } from "../components/Switch";
@@ -27,6 +28,7 @@ import { formatDateTime, formatNumber } from "../format";
 import { useToast } from "../toast/context";
 import { useTitle } from "../useTitle";
 import styles from "./botModules.module.scss";
+import { ModuleHistory } from "./ModuleHistory";
 import { ModuleList } from "./ModuleList";
 import { ModuleValues } from "./ModuleValues";
 import {
@@ -86,6 +88,7 @@ export function BotModulesPage(): JSX.Element {
     const notify = useToast();
     const [params, setParams] = useSearchParams();
     const server = params.get("server");
+    const tab = params.get("tab") === "verlauf" ? "verlauf" : "module";
     const view = useApi<IBotModulesView>(server ? `/api/bot-modules?server=${server}` : "/api/bot-modules");
     const guilds = useApi<IGuildList>("/api/guilds");
     const [filter, setFilter] = useState<Filter>("all");
@@ -192,6 +195,7 @@ export function BotModulesPage(): JSX.Element {
     // Strg+S speichert, „/“ springt in die Suche, Pfeiltasten wechseln Kategorie und Modul.
     useEffect(() => {
         const onKey = (event: KeyboardEvent): void => {
+            if (tab === "verlauf") return;
             if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
                 event.preventDefault();
                 requestSave();
@@ -226,10 +230,37 @@ export function BotModulesPage(): JSX.Element {
         return () => window.removeEventListener("keydown", onKey);
     });
 
+    const botSyncedAt = view.data?.botSyncedAt ?? null;
+    const header = (
+        <>
+            <PageHeader title="Module" meta="Was RL Nexus für alle Server festlegt, und Ausnahmen je Server.">
+                <span className={`${styles.sync} ${botSyncedAt ? styles.synced : ""}`} role="status">
+                    <i aria-hidden="true" />
+                    {botSyncedAt ? `Bot hat den Stand von ${formatDateTime(botSyncedAt)} übernommen` : "Kein bestätigter Bescheid vom Bot seit dem Start"}
+                </span>
+            </PageHeader>
+            <PageTabs
+                label="Module"
+                tabs={[
+                    { to: server ? `/module?server=${server}` : "/module", label: "Module", icon: "puzzle", active: tab === "module" },
+                    { to: "/module?tab=verlauf", label: "Verlauf", icon: "history", active: tab === "verlauf" },
+                ]}
+            />
+        </>
+    );
+
+    if (tab === "verlauf") {
+        return (
+            <>
+                {header}
+                <ModuleHistory modules={view.data?.modules ?? []} guilds={guildList} />
+            </>
+        );
+    }
     if (view.error && !view.data) return <Failure message={view.error.message} onRetry={view.reload} />;
     if (!data || !selected || !draft) return <Loading label="Module werden geladen" />;
 
-    const { botSyncedAt, betaServers } = data;
+    const { betaServers } = data;
     const permanent = isPermanent(selected.module);
     const total = modules.find((entry) => entry.module === "rl-tracking")?.servers ?? 0;
     const reach = selected.module === "rl-tracking" ? total : selected.servers;
@@ -252,12 +283,7 @@ export function BotModulesPage(): JSX.Element {
     return (
         <>
             <UnsavedGuard dirty={dirty} />
-            <PageHeader title="Module" meta="Was RL Nexus für alle Server festlegt, und Ausnahmen je Server.">
-                <span className={`${styles.sync} ${botSyncedAt ? styles.synced : ""}`} role="status">
-                    <i aria-hidden="true" />
-                    {botSyncedAt ? `Bot hat den Stand von ${formatDateTime(botSyncedAt)} übernommen` : "Kein bestätigter Bescheid vom Bot seit dem Start"}
-                </span>
-            </PageHeader>
+            {header}
 
             <ServerScope
                 guilds={guildList}

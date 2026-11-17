@@ -59,6 +59,7 @@ interface IChangeRow {
     readonly kinds: string;
     readonly summary: string;
     readonly note: string | null;
+    readonly user_id: string;
     readonly user_name: string;
     readonly bot_ok: number | null;
     readonly undo_of: number | null;
@@ -366,6 +367,7 @@ function changeOf(row: IChangeRow): IBotModuleChange {
         kinds: row.kinds ? (row.kinds.split(",") as ("status" | "notice" | "values")[]) : [],
         summary: row.summary,
         note: row.note,
+        userId: row.user_id,
         userName: row.user_name,
         botOk: row.bot_ok === null ? null : Number(row.bot_ok) === 1,
         undoOf: row.undo_of === null ? null : Number(row.undo_of),

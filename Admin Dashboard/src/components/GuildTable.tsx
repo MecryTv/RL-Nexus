@@ -1,4 +1,5 @@
 import { Fragment, useState, type JSX } from "react";
+import { Link } from "react-router-dom";
 import type { IGuildRow } from "../../shared/api";
 import { formatDate, formatMonth, formatNumber } from "../format";
 import { Badge } from "./Badge";
@@ -110,6 +111,10 @@ export function GuildTable({ guilds, empty, expandable = false }: IGuildTablePro
                                                         ) : (
                                                             "Keine eingeschaltet"
                                                         )}
+                                                        {/* W-0133: Werte dieses Servers auf der Seite „Module“. */}
+                                                        <Link className={styles.moduleLink} to={`/module?server=${guild.id}`}>
+                                                            <Icon name="sliders" size={14} aria-hidden="true" /> Module dieses Servers
+                                                        </Link>
                                                     </dd>
                                                 </div>
                                             </dl>

@@ -1175,3 +1175,137 @@ $beta: #ffc53d;
         font-size: 0.75rem;
     }
 }
+
+/* W-0133: Reiter „Verlauf“. */
+.historyPanel {
+    padding: var(--s-3) var(--s-4) var(--s-4);
+}
+
+.historyFilters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-2) var(--s-3);
+    align-items: end;
+    padding-bottom: var(--s-3);
+    border-bottom: 1px solid var(--c-line);
+
+    label {
+        display: grid;
+        flex: 1 1 160px;
+        gap: 4px;
+        min-width: 0;
+
+        span {
+            color: var(--c-text-faint);
+
+            @include label(0.68rem, 0.12em);
+        }
+    }
+
+    select {
+        min-height: 38px;
+        padding: 0 var(--s-2);
+        border: 1px solid var(--c-line-strong);
+        background: var(--c-panel-solid);
+        color: var(--c-text);
+        font: inherit;
+        font-size: 0.875rem;
+
+        &:focus-visible {
+            @include focus-ring;
+        }
+    }
+}
+
+.historyTotal {
+    align-self: center;
+    margin-left: auto;
+    color: var(--c-text-faint);
+    font-size: 0.8rem;
+    white-space: nowrap;
+}
+
+.day {
+    margin-top: var(--s-4);
+
+    h3 {
+        margin: 0 0 var(--s-2);
+        color: var(--c-text-faint);
+
+        @include label(0.72rem, 0.14em);
+    }
+}
+
+.changes {
+    display: grid;
+    gap: 2px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+
+    li {
+        display: grid;
+        grid-template-columns: 48px minmax(0, 1fr) auto;
+        gap: var(--s-3);
+        align-items: center;
+        padding: var(--s-2) var(--s-3);
+        border-left: 2px solid var(--c-line-strong);
+        background: var(--c-panel-solid);
+
+        @include below(600px) {
+            grid-template-columns: minmax(0, 1fr);
+            gap: 4px;
+        }
+    }
+
+    time {
+        color: var(--c-text-dim);
+        font-variant-numeric: tabular-nums;
+        font-size: 0.85rem;
+    }
+
+    div {
+        display: grid;
+        gap: 2px;
+        min-width: 0;
+    }
+
+    p {
+        margin: 0;
+        font-size: 0.875rem;
+        overflow-wrap: anywhere;
+    }
+
+    small {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px 6px;
+        align-items: center;
+        color: var(--c-text-faint);
+        font-size: 0.78rem;
+    }
+}
+
+.scopeAll,
+.scopeServer {
+    padding: 0 6px;
+    border: 1px solid var(--c-line-strong);
+    color: var(--c-text-dim);
+
+    @include label(0.65rem, 0.08em);
+}
+
+.scopeServer {
+    border-color: rgb(0 175 255 / 45%);
+    color: var(--c-blue);
+}
+
+.changeNote {
+    color: var(--c-text-dim) !important;
+}
+
+.moreRow {
+    display: flex;
+    justify-content: center;
+    margin-top: var(--s-3);
+}

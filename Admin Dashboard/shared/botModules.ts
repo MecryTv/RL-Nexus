@@ -116,6 +116,7 @@ export interface IBotModuleChange {
     readonly kinds: readonly ("status" | "notice" | "values")[];
     readonly summary: string;
     readonly note: string | null;
+    readonly userId: string;
     readonly userName: string;
     readonly botOk: boolean | null;
     readonly undoOf: number | null;
