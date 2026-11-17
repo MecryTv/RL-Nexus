@@ -5,7 +5,6 @@ import { IPrimeProfile, IPrimeRank } from "../interfaces/services/prime/IPrimeSe
 import {
     CARD_HEIGHT,
     CARD_WIDTH,
-    CAREER_CARD_HEIGHT,
     CAREER_COLORS,
     CAREER_LABELS,
     CAREER_ORDER,
@@ -14,15 +13,13 @@ import {
     FONT_ROOT,
     GAP,
     HEADER_HEIGHT,
-    MAIN_CARD_HEIGHT,
     PAD,
     PLATFORM_ICON_ROOT,
     PLAYLIST_SUBTITLES,
+    RankCardLayout,
     RankIconFile,
     RewardIconFile,
     RewardTier,
-    SECTION_BODY,
-    SECTION_GAP,
     STAT_ICON_ROOT,
     TierColor,
 } from "../constants/RankCard";
@@ -1192,7 +1189,7 @@ function drawFreshness(ctx: SKRSContext2D, profile: IPrimeProfile): void {
     //
     // Die Grundlinie sitzt mittig im freien Band zwischen Karriere-Leiste und
     // Kartenrand, statt am Rand zu kleben.
-    const baseline = CARD_HEIGHT - 30;
+    const baseline = RankCardLayout().freshnessY;
     let x = PAD + 4;
 
     ctx.save();
@@ -1245,8 +1242,7 @@ export async function RenderRankCard(data: IRankCardData): Promise<Buffer> {
     // --- Seite 1: Ranked, Seite 2: Extra-Modi ------------------------------
     // Beide Punkte haben dieselbe Höhe - die Karte ist auf beiden Seiten gleich
     // groß, nur der Inhalt in der Mitte wechselt.
-    const sectionY = PAD + HEADER_HEIGHT + SECTION_GAP;
-    const bodyY = sectionY + SECTION_BODY;
+    const { sectionY, body, careerHeadY, career } = RankCardLayout();
 
     if (data.page === "extra") {
         await drawSectionHeading(ctx, sectionY, "EXTRA-MODI", "COMPETITIVE", "grid");
@@ -1258,7 +1254,7 @@ export async function RenderRankCard(data: IRankCardData): Promise<Buffer> {
         for (const [index, mode] of EXTRA_PLAYLISTS.entries()) {
             const rank = data.profile.extras?.find((entry) => entry.key === mode.key) ?? null;
 
-            await drawExtraCard(ctx, PAD + (extraW + GAP) * index, bodyY, extraW, MAIN_CARD_HEIGHT, mode, rank);
+            await drawExtraCard(ctx, PAD + (extraW + GAP) * index, body.y, extraW, body.h, mode, rank);
         }
     } else {
         await drawSectionHeading(ctx, sectionY, "RANKED", "HAUPTMODI", "trophy");
@@ -1272,15 +1268,13 @@ export async function RenderRankCard(data: IRankCardData): Promise<Buffer> {
 
             if (!rank) continue;
 
-            await drawRankCard(ctx, PAD + (mainW + GAP) * index, bodyY, mainW, MAIN_CARD_HEIGHT, rank);
+            await drawRankCard(ctx, PAD + (mainW + GAP) * index, body.y, mainW, body.h, rank);
         }
     }
 
     // --- Karriere ------------------------------------------------------------
-    const careerHeadY = bodyY + MAIN_CARD_HEIGHT + SECTION_GAP;
-
     await drawSectionHeading(ctx, careerHeadY, "KARRIERE", "STATISTIK", "target");
-    await drawCareer(ctx, careerHeadY + SECTION_BODY, CAREER_CARD_HEIGHT, data.profile);
+    await drawCareer(ctx, career.y, career.h, data.profile);
 
     drawFreshness(ctx, data.profile);
 

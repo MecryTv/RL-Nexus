@@ -22,6 +22,7 @@ import {
     CARD_WIDTH,
     CAREER_ORDER,
     RANK_ICONS,
+    RankCardLayout,
     RankIconFile,
     RewardIconFile,
     STAT_ICON_ROOT,
@@ -72,6 +73,29 @@ const PROFILE: IPrimeProfile = {
 };
 
 async function main(): Promise<void> {
+    console.log("\n— Lage der Blöcke —");
+
+    // W-0132: Die Karte ist wieder 1536 × 1024. Die Lage jedes Blocks steht an
+    // einer Stelle; hier wird sie gegen die Maße aus Entwurf A gehalten.
+    const layout = RankCardLayout();
+
+    check(`Die Karte ist 1024 hoch (${CARD_HEIGHT})`, CARD_HEIGHT === 1024);
+    check(
+        "Kopf, Überschriften, Kacheln, Karriere und Stand-Zeile liegen wie im Entwurf",
+        layout.header.y === 34 &&
+            layout.header.h === 196 &&
+            layout.sectionY === 290 &&
+            layout.body.y === 316 &&
+            layout.body.h === 404 &&
+            layout.careerHeadY === 780 &&
+            layout.career.y === 806 &&
+            layout.career.h === 124 &&
+            layout.freshnessY === 994,
+        JSON.stringify(layout)
+    );
+    check("Die Überschrift beginnt unter dem Kopf", layout.sectionY - 36 > layout.header.y + layout.header.h);
+    check("Die Karriere endet über der Stand-Zeile", layout.career.y + layout.career.h <= layout.freshnessY - 40);
+
     console.log("\n— Bilder —");
 
     const missingRanks = RANK_ICONS.map((_, tier) => RankIconFile(tier)).filter((file) => !existsSync(file));

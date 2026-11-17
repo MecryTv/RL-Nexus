@@ -15,26 +15,27 @@ export const STAT_ICON_ROOT = path.join(CARD_ROOT, "default", "rocketleague", "r
 export const PLATFORM_ICON_ROOT = path.join(CARD_ROOT, "default", "rocketleague", "plattforms");
 
 /**
- * Seit W-0129 höher als die alte Vorlage (1536 × 1024): Karriere als eigener
- * Punkt, dazu der Turnier-Rang im Kopf. Die Extra-Modi stehen auf einer zweiten
- * Seite gleicher Größe statt darunter - eine noch höhere Karte zeigte Discord im
- * Chat nur noch schmal.
+ * W-0132: wieder 1536 × 1024 wie die alte Vorlage. Discord gibt einem Bild im
+ * Chat nur begrenzt Höhe; die 1212 hohe Karte aus W-0129 wirkte deshalb kleiner.
+ * Der Inhalt bleibt derselbe (Karriere, Turnier-Rang, Extra-Modi auf Seite 2),
+ * nur enger gesetzt.
  *
  * Der Hintergrund ist gezeichnet und kein Bild mehr - er richtet sich also nach
  * diesen Maßen, statt umgekehrt beschnitten werden zu müssen.
  */
 export const CARD_WIDTH = 1536;
-export const CARD_HEIGHT = 1212;
+export const CARD_HEIGHT = 1024;
 
-/** W-0129: Höhen der Blöcke. Die Abstände dazwischen rechnet RenderRankCard. */
-export const HEADER_HEIGHT = 244;
+/** Höhen der Blöcke (W-0132). Wo sie liegen, rechnet RankCardLayout. */
+export const HEADER_HEIGHT = 196;
 /** Ranked-Kacheln auf Seite 1 und Extra-Kacheln auf Seite 2 - gleich hoch. */
-export const MAIN_CARD_HEIGHT = 450;
-export const CAREER_CARD_HEIGHT = 176;
+export const MAIN_CARD_HEIGHT = 404;
+/** Karriere-Kacheln, quer: Symbol links, Bezeichnung und Wert rechts. */
+export const CAREER_CARD_HEIGHT = 124;
 /** Von der Unterkante eines Blocks bis zur Grundlinie der nächsten Überschrift. */
-export const SECTION_GAP = 74;
+export const HEADING_GAP = 60;
 /** Von der Grundlinie der Überschrift bis zur Oberkante der Kacheln darunter. */
-export const SECTION_BODY = 52;
+export const HEADING_BODY = 26;
 
 export const COLORS = {
     base: "#050608",
@@ -71,6 +72,38 @@ export const EXTRA_MODE_COLORS: Record<string, string> = {
 /** Ein Rahmen, an dem sich alle Blöcke ausrichten. */
 export const PAD = 34;
 export const GAP = 22;
+
+export interface IRankCardLayout {
+    header: { y: number; h: number };
+    /** Grundlinie der Überschrift „RANKED“ bzw. „EXTRA-MODI“. */
+    sectionY: number;
+    /** Die Ranked- bzw. Extra-Kacheln. */
+    body: { y: number; h: number };
+    /** Grundlinie der Überschrift „KARRIERE“. */
+    careerHeadY: number;
+    career: { y: number; h: number };
+    /** Grundlinie der Stand-Zeile unten links. */
+    freshnessY: number;
+}
+
+/**
+ * W-0132: Die Lage jedes Blocks an einer Stelle. Die Webseite (RankCardPreview)
+ * übernimmt dieselben Zahlen in Bot-Pixeln.
+ */
+export function RankCardLayout(): IRankCardLayout {
+    const sectionY = PAD + HEADER_HEIGHT + HEADING_GAP;
+    const bodyY = sectionY + HEADING_BODY;
+    const careerHeadY = bodyY + MAIN_CARD_HEIGHT + HEADING_GAP;
+
+    return {
+        header: { y: PAD, h: HEADER_HEIGHT },
+        sectionY,
+        body: { y: bodyY, h: MAIN_CARD_HEIGHT },
+        careerHeadY,
+        career: { y: careerHeadY + HEADING_BODY, h: CAREER_CARD_HEIGHT },
+        freshnessY: CARD_HEIGHT - 30,
+    };
+}
 
 /**
  * Die Dateinamen der Rang-Abzeichen, Index ist die Rangstufe von Prime.
