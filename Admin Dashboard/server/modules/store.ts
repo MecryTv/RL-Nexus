@@ -307,18 +307,18 @@ export function describeChange(module: string, before: Scope, after: Scope, serv
     return { summary: parts.length > 0 ? parts.join("; ") : "keine Änderung", kinds: [...kinds] };
 }
 
-async function recordChange(module: string, guildId: string | null, before: unknown, after: unknown, described: { summary: string; kinds: string[] }, note: string | null, actor: IActor, undoOf: number | null = null): Promise<number> {
+async function recordChange(module: string, guildId: string | null, before: unknown, after: unknown, described: { summary: string; kinds: string[] }, note: string | null, actor: IActor, undoOf: number | null = null): Promise<{ changeId: number; summary: string }> {
     const result = await query<{ insertId: number }>(
         `INSERT INTO bot_module_changes (module, guild_id, before_state, after_state, kinds, summary, note, user_id, user_name, undo_of)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [module, guildId, before === null ? null : JSON.stringify(before), after === null ? null : JSON.stringify(after), described.kinds.join(","), described.summary.slice(0, 500), note, actor.id, actor.name.slice(0, 64), undoOf]
     );
 
-    return Number(result.insertId);
+    return { changeId: Number(result.insertId), summary: described.summary };
 }
 
 /** Schreibt den Wert für alle und vermerkt die Änderung. */
-export async function saveSetting(module: string, input: IBotModuleInput, actor: IActor): Promise<{ before: IBotModuleSetting; after: IBotModuleSetting; changeId: number }> {
+export async function saveSetting(module: string, input: IBotModuleInput, actor: IActor): Promise<{ before: IBotModuleSetting; after: IBotModuleSetting; changeId: number; summary: string }> {
     const before = await settingFor(module);
 
     await writeSettingRow(
@@ -334,32 +334,26 @@ export async function saveSetting(module: string, input: IBotModuleInput, actor:
     );
 
     const after = await settingFor(module);
-    const changeId = await recordChange(module, null, before, after, describeChange(module, before, after, false), null, actor);
-
-    return { before, after, changeId };
+    return { before, after, ...(await recordChange(module, null, before, after, describeChange(module, before, after, false), null, actor)) };
 }
 
 /** Setzt die Abweichung eines Servers. Ohne Abweichung verschwindet die Zeile (after null). */
-export async function saveOverride(module: string, guildId: string, input: IBotModuleOverrideInput, actor: IActor): Promise<{ before: IBotModuleOverride | null; after: IBotModuleOverride | null; changeId: number }> {
+export async function saveOverride(module: string, guildId: string, input: IBotModuleOverrideInput, actor: IActor): Promise<{ before: IBotModuleOverride | null; after: IBotModuleOverride | null; changeId: number; summary: string }> {
     const before = await overrideFor(module, guildId);
 
     await writeOverrideRow(module, guildId, input, actor.id);
 
     const after = await overrideFor(module, guildId);
     const base = (await settingFor(module)).values;
-    const changeId = await recordChange(module, guildId, before, after, describeChange(module, before, after, true, base), input.note, actor);
-
-    return { before, after, changeId };
+    return { before, after, ...(await recordChange(module, guildId, before, after, describeChange(module, before, after, true, base), input.note, actor)) };
 }
 
-export async function deleteOverride(module: string, guildId: string, actor: IActor): Promise<{ before: IBotModuleOverride | null; changeId: number }> {
+export async function deleteOverride(module: string, guildId: string, actor: IActor): Promise<{ before: IBotModuleOverride | null; changeId: number; summary: string }> {
     const before = await overrideFor(module, guildId);
 
     await query("DELETE FROM bot_module_overrides WHERE module = ? AND guild_id = ?", [module, guildId]);
 
-    const changeId = await recordChange(module, guildId, before, null, describeChange(module, before, null, true), null, actor);
-
-    return { before, changeId };
+    return { before, ...(await recordChange(module, guildId, before, null, describeChange(module, before, null, true), null, actor)) };
 }
 
 function changeOf(row: IChangeRow): IBotModuleChange {
@@ -404,7 +398,7 @@ export async function listChanges(
  * Stellt den Stand vor einer Änderung wieder her. Nur die neueste Änderung eines
  * Bereichs (Modul für alle oder Modul je Server) lässt sich zurücknehmen.
  */
-export async function undoChange(id: number, actor: IActor): Promise<{ changeId: number }> {
+export async function undoChange(id: number, actor: IActor): Promise<{ module: string; guildId: string | null; changeId: number; summary: string }> {
     const [row] = await query<IChangeRow[]>("SELECT * FROM bot_module_changes WHERE id = ?", [id]);
 
     if (!row) throw new PublicError(404, "Diese Änderung gibt es nicht.");
@@ -424,7 +418,7 @@ export async function undoChange(id: number, actor: IActor): Promise<{ changeId:
 
         const after = await settingFor(change.module);
 
-        return { changeId: await recordChange(change.module, null, current, after, describeChange(change.module, current, after, false), note, actor, id) };
+        return { module: change.module, guildId: null, ...(await recordChange(change.module, null, current, after, describeChange(change.module, current, after, false), note, actor, id)) };
     }
 
     const current = await overrideFor(change.module, change.guildId);
@@ -435,7 +429,7 @@ export async function undoChange(id: number, actor: IActor): Promise<{ changeId:
     const after = await overrideFor(change.module, change.guildId);
     const base = (await settingFor(change.module)).values;
 
-    return { changeId: await recordChange(change.module, change.guildId, current, after, describeChange(change.module, current, after, true, base), note, actor, id) };
+    return { module: change.module, guildId: change.guildId, ...(await recordChange(change.module, change.guildId, current, after, describeChange(change.module, current, after, true, base), note, actor, id)) };
 }
 
 /** Ob der Bot den Bescheid zu dieser Änderung bestätigt hat. */

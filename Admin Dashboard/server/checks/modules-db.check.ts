@@ -21,6 +21,7 @@ export async function checkModulesDb(config: IConfig, http: IHttp): Promise<void
     const real = globalThis.fetch;
     let reloads = 0;
     let botStatus = 204;
+    let stateStatus = 200;
 
     // Der Bescheid an den Bot geht ins Leere und wird gezählt, alles andere wie gehabt.
     globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
@@ -30,6 +31,9 @@ export async function checkModulesDb(config: IConfig, http: IHttp): Promise<void
             reloads++;
 
             return new Response(null, { status: botStatus });
+        }
+        if (href.startsWith(config.botApiUrl) && new URL(href).pathname === "/dcapi/admin/modules/state") {
+            return stateStatus === 200 ? Response.json({ betaServers: 3 }) : new Response(null, { status: stateStatus });
         }
 
         return real(input, init);
@@ -196,6 +200,62 @@ export async function checkModulesDb(config: IConfig, http: IHttp): Promise<void
             assert.deepEqual(missing, [], missing.join(", "));
             assert.ok(polls && polls.history.length >= 2 && polls.history[0].detail.includes("Status: Aus → An"));
             assert.ok(view.botSyncedAt === null || typeof view.botSyncedAt === "string");
+        });
+
+        // W-0133: Routen für Werte je Server, Verlauf und Zurücknehmen.
+        await check("Route: Server-Wert setzen, der Bot bekommt Bescheid, die Liste mit Server zeigt ihn", async () => {
+            reloads = 0;
+
+            const answer = await http.write("PUT", "/api/bot-modules/giveaways", { server: GUILDS[0], values: { maxWinners: 100 }, note: "check:db Route" });
+
+            assert.equal(answer.statusCode, 200, answer.body);
+            assert.equal(answer.json().bot, true);
+            assert.equal(answer.json().override.values.maxWinners, 100);
+            assert.equal(reloads, 1);
+
+            const view = (await http.get(`/api/bot-modules?server=${GUILDS[0]}`)).json() as IBotModulesView;
+
+            assert.equal(view.server?.id, GUILDS[0]);
+            assert.equal(view.server?.overrides.length, 1);
+            assert.ok((view.modules.find((entry) => entry.module === "giveaways")?.overrides ?? 0) >= 1);
+            assert.equal(view.betaServers, 3);
+            assert.ok(view.modules.every((entry) => Array.isArray(entry.commands)));
+            assert.equal(typeof view.modules.find((entry) => entry.module === "rl-tracking")?.links?.byName, "number");
+        });
+
+        await check("Route: Werte außerhalb der Grenzen und fremde Server-IDs geben 400", async () => {
+            assert.equal((await http.write("PUT", "/api/bot-modules/giveaways", { status: "on", values: { maxWinners: 501 } })).statusCode, 400);
+            assert.equal((await http.write("PUT", "/api/bot-modules/giveaways", { server: "abc", values: { maxWinners: 10 } })).statusCode, 400);
+            assert.equal((await http.write("PUT", "/api/bot-modules/rl-tracking", { server: GUILDS[0], values: { switchDays: 5 } })).statusCode, 400);
+        });
+
+        await check("Route: Verlauf nach Server, ältere Änderung zurücknehmen gibt 409", async () => {
+            const first = (await http.get(`/api/bot-modules/history?server=${GUILDS[0]}`)).json() as { entries: { id: number; guildId: string | null }[]; total: number };
+
+            assert.ok(first.total >= 1);
+            assert.ok(first.entries.every((entry) => entry.guildId === GUILDS[0]));
+
+            await http.write("PUT", "/api/bot-modules/giveaways", { server: GUILDS[0], values: { maxWinners: 120 }, note: null });
+
+            const older = await http.write("POST", `/api/bot-modules/history/${first.entries[0].id}/undo`, {});
+
+            assert.equal(older.statusCode, 409, older.body);
+            assert.match(older.json().error, /Seitdem geändert/);
+        });
+
+        await check("Route: Server-Wert löschen, ohne Antwort des Bots ist betaServers null", async () => {
+            const removed = await http.write("DELETE", `/api/bot-modules/giveaways/servers/${GUILDS[0]}`);
+
+            assert.equal(removed.statusCode, 200, removed.body);
+            assert.equal((await listOverrides({ guildId: GUILDS[0] })).length, 0);
+
+            stateStatus = 503;
+
+            const view = (await http.get("/api/bot-modules")).json() as IBotModulesView;
+
+            stateStatus = 200;
+            assert.equal(view.betaServers, null);
+            assert.equal(view.server, null);
         });
     } finally {
         globalThis.fetch = real;

@@ -299,6 +299,11 @@ export async function botModulesReload(config: IConfig, userId: string): Promise
     }
 }
 
+/** W-0133: Stand im Bot, den das Admin nicht selbst zählen kann. null: nicht erreicht. */
+export function botModulesState(config: IConfig, userId: string): Promise<{ readonly betaServers: number } | null> {
+    return botJson<{ betaServers: number }>(config, userId, "/admin/modules/state");
+}
+
 /** Eine Discord-Nachricht als Beleg, über den Bot gelesen. null: nicht gefunden oder nicht erreicht. */
 export async function botMessage(config: IConfig, channelId: string, messageId: string, userId: string): Promise<Record<string, unknown> | null> {
     return botJson<Record<string, unknown>>(config, userId, `/admin/security/message?channel=${channelId}&message=${messageId}`, 10_000);

@@ -138,16 +138,41 @@ export interface IBotModuleView extends IBotModuleSetting {
     readonly servers: number;
     /** Die letzten Änderungen, neueste zuerst. */
     readonly history: readonly IBotModuleHistory[];
+    /** W-0133: Server mit eigenem Wert bei diesem Modul. */
+    readonly overrides: number;
+    /** W-0133: Slash-Befehle des Moduls, etwa „/giveaway start“. */
+    readonly commands: readonly string[];
+    /** W-0133: nur bei RL Tracking: Epic-Verknüpfungen, davon nur per Name. */
+    readonly links?: { readonly total: number; readonly byName: number };
 }
 
 export interface IBotModulesView {
     readonly modules: readonly IBotModuleView[];
-    /** Wann der Bot zuletzt einen Bescheid bestätigt hat, null seit dem Start des Admins noch nie. */
+    /** Wann der Bot den letzten Bescheid bestätigt hat. null: noch nie seit dem Start des Admins, oder der letzte kam nicht an. */
     readonly botSyncedAt: string | null;
+    /** W-0133: Server mit Beta-Zugang laut Bot, null wenn er nicht antwortet. */
+    readonly betaServers: number | null;
+    /** W-0133: der gewählte Server (?server=), sonst null. */
+    readonly server: { readonly id: string; readonly name: string; readonly icon: string | null; readonly overrides: readonly IBotModuleOverride[] } | null;
 }
 
 export interface IBotModuleSaved {
+    /** Der Wert für alle nach dem Speichern. */
     readonly setting: IBotModuleSetting;
+    /** W-0133: nur beim Speichern für einen Server: dessen Stand, null wenn keine Abweichung mehr bleibt. */
+    readonly override?: IBotModuleOverride | null;
+    readonly changeId: number;
     /** true: Der Bot hat den Stand übernommen. false: nicht erreicht, er holt ihn in spätestens 5 Minuten. */
     readonly bot: boolean;
+}
+
+/** W-0133: Antwort auf Löschen eines Server-Werts und auf Zurücknehmen. */
+export interface IBotModuleWritten {
+    readonly changeId: number;
+    readonly bot: boolean;
+}
+
+export interface IBotModuleChangePage {
+    readonly entries: readonly IBotModuleChange[];
+    readonly total: number;
 }
