@@ -1813,6 +1813,35 @@ function checkLimitsLogic(): void {
 }
 
 /**
+ * W-0136: der Reiter selbst. Er baut nur über textContent (der Servername ist
+ * Eingabe von außen), und seine Klassen mit dem Kürzel gz gehören nur ihm -
+ * die Lehre aus W-0134.
+ */
+async function checkLimitsMarkup(): Promise<void> {
+    console.log("\n— Grenzen: Seite —");
+
+    const root = path.join(process.cwd(), "src", "dashboard");
+    const pages = path.join(root, "client", "pages");
+    const page = await readFile(path.join(pages, "GuildLimits.ts"), "utf8").catch(() => "");
+    const css = (await readFile(path.join(root, "public", "assets", "style.css"), "utf8")).split(/\r?\n/);
+    const foreign = [];
+
+    for (const file of await readdir(pages)) {
+        if (file === "GuildLimits.ts" || file === "Guild.ts" || !file.endsWith(".ts")) continue;
+        if ((await readFile(path.join(pages, file), "utf8")).includes('"gz')) foreign.push(file);
+    }
+
+    check("GuildLimits.ts zeichnet Reiter und Karten", page.includes("limitTabs(") && page.includes("limitCards("), page ? "" : "Datei fehlt");
+    check("GuildLimits.ts ohne innerHTML", page !== "" && !page.includes("innerHTML"));
+
+    const defined = new Set(css.flatMap((line) => [...line.matchAll(/\.(gz[a-z0-9_-]+)/g)].map((match) => match[1]!)));
+    const wrong = [...defined].filter((name) => css.filter((line) => line.startsWith(`.${name}{`)).length !== 1);
+
+    check("Klassen gz…: je genau eine Grundregel", defined.size > 0 && wrong.length === 0, wrong.join(", "));
+    check("Klassen gz… nur auf der Seite Grenzen", foreign.length === 0, foreign.join(", "));
+}
+
+/**
  * W-0134: Das Raster der Rank Roles stand in einer einzigen Reihe, weil Rocket
  * Roulette dieselbe Klasse (.rrsteps) für seine Rundenleiste nutzte und sie
  * später im Stylesheet überschrieb. Die Klassen der Rank Roles gehören deshalb
@@ -2521,6 +2550,7 @@ async function main(): Promise<void> {
     await checkHubTemplates();
     await checkRankRolesStyles();
     checkLimitsLogic();
+    await checkLimitsMarkup();
 
     await client.server.Stop();
 

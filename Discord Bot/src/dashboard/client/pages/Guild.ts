@@ -16,6 +16,7 @@ import { debounce, onPulse } from "../core/Pulse.js";
 import { ActivityResult, fetchActivity, renderOverview } from "./GuildOverview.js";
 import { bindNav, INav } from "./GuildNav.js";
 import { bindNavSearch } from "./GuildSearch.js";
+import { bindLimitsTab } from "./GuildLimits.js";
 
 // Was ein Supporter ohne "Server verwalten" sieht - die Teile des Ticket-Systems.
 const SUPPORT_SECTIONS = ["live-tickets", "transcriptions"];
@@ -514,6 +515,8 @@ function bindModules(guild: IGuild, only: Set<string> | null, side: INav): (modu
     const cards = need<HTMLElement>("#moduleCards");
     const list = need<HTMLElement>("#moduleList");
     const note = need<HTMLElement>("#moduleNote");
+    // W-0136: Reiter „Module“ und „Grenzen“ über der Seite Module.
+    const paintLimits = bindLimitsTab(guild, need<HTMLElement>("#module"));
 
     // Bis der Stand aus der Datenbank da ist, zeigt die Leiste den aus /api/me,
     // und die Schalter bleiben gesperrt - vorher ist nicht klar, ob es überhaupt
@@ -940,6 +943,7 @@ function bindModules(guild: IGuild, only: Set<string> | null, side: INav): (modu
         }
 
         paint();
+        paintLimits(nextLimits);
         void pinHeld();
         void loadRoleLists();
     };

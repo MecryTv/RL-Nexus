@@ -5705,3 +5705,51 @@ body.sg-locked{overflow:hidden}
 
 /* W-0095: Zahlenfelder der Abmeldungen */
 .tmnumber { max-width: 110px; }
+
+/* W-0136: Reiter „Grenzen“ auf der Seite Module (Entwurf C3). Eigenes Kürzel
+   gz, das sonst niemand nutzt (Lehre aus W-0134). Kleine Schrift in #8f98a5,
+   Status nie nur über Farbe: Symbol und Text stehen in GuildLimits.ts. */
+.gzpanel{display:grid;gap:14px}
+.gzlead{margin:0;max-width:72ch;color:var(--text-2)}
+.gzlead b{color:var(--text);overflow-wrap:anywhere}
+.gzbar{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center;justify-content:space-between}
+.gzchips{display:flex;flex-wrap:wrap;gap:6px}
+.gzchip{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 12px;border:1px solid var(--line-strong);background:none;color:var(--text-2);font:700 13px/1 var(--f-label);letter-spacing:.1em;text-transform:uppercase;cursor:pointer}
+.gzchip b{font:700 13px/1 var(--f-display);letter-spacing:0;color:var(--text)}
+.gzchip:hover{color:var(--text)}
+.gzchip[aria-pressed="true"]{border-color:var(--brand);background:rgb(255 30 45 / 12%);color:var(--text)}
+.gzchip:focus-visible{outline:2px solid var(--blue);outline-offset:-2px}
+.gzchip--mod{border-color:rgb(0 175 255 / 55%);color:var(--text)}
+.gzchip--mod svg{width:12px;height:12px;color:var(--text-2)}
+.gzcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(330px,100%),1fr));gap:14px;align-items:start}
+.gzcard{border:1px solid var(--line-strong);background:rgba(255,255,255,.018);clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px)}
+.gzcard__head{display:flex;align-items:center;gap:10px;padding:12px 16px 10px;border-bottom:1px solid var(--line)}
+.gzcard__head > svg{width:17px;height:17px;flex:none;color:var(--brand)}
+.gzcard__text{flex:1;min-width:0}
+.gzcard__title{margin:0;font:800 16px/1.25 var(--f-display);color:var(--text)}
+.gzcard__meta{display:block;font-size:13px;color:#8f98a5}
+.gzcard__go{display:inline-flex;align-items:center;gap:4px;min-height:44px;color:var(--text-2);font:600 13px/1 var(--f-label);letter-spacing:.06em;text-decoration:none;white-space:nowrap}
+.gzcard__go:hover{color:var(--text)}
+.gzcard__go svg{width:13px;height:13px}
+.gzrow{display:grid;grid-template-columns:minmax(0,1fr) auto 104px;gap:4px 14px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--line)}
+.gzrow:last-child{border-bottom:0}
+.gzrow__name{font-size:15px;color:var(--text);overflow-wrap:anywhere}
+.gzrow__val{grid-column:2;grid-row:1 / span 2;text-align:right;font:800 22px/1 var(--f-display);font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--text)}
+.gzrow__val small{margin-left:3px;font:600 13px var(--f-label);color:#8f98a5}
+.gzrow__val s{margin-right:6px;font:600 14px var(--f-display);color:#8f98a5}
+.gzrow__act{grid-column:3;grid-row:1 / span 2;justify-self:end;color:#8f98a5}
+.gzrow__state{grid-column:1;display:inline-flex;align-items:center;gap:5px;font-size:13px;color:#8f98a5}
+.gzrow__state svg{width:13px;height:13px;flex:none}
+.gzrow.is-ask .gzrow__state{color:var(--warn)}
+.gzrow.is-granted .gzrow__state,.gzrow.is-granted .gzrow__val{color:var(--live)}
+.gzempty{display:grid;justify-items:center;gap:12px;margin:0;padding:18px 14px;border:1px dashed var(--line-strong);color:var(--text-2);text-align:center}
+.gzempty p{margin:0}
+.gzempty .btn{flex:0 0 auto}
+@media (max-width:620px){
+  .gzcards{grid-template-columns:1fr}
+  .gzcard__head{padding:10px 12px}
+  .gzrow{grid-template-columns:minmax(0,1fr) auto;padding:10px 12px}
+  .gzrow__act{grid-column:1 / -1;grid-row:auto;justify-self:start}
+  .gzrow.is-fixed .gzrow__act{display:none}
+  .gzbar .search{max-width:none;flex:1 1 100%}
+}
