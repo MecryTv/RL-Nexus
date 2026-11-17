@@ -156,11 +156,19 @@ ins Repo. Die Bot-Liste wird beim Ausrollen an den ersten echten Summen
 - Zweite `access_log`-Zeile in den drei Live-Konfigurationen gezielt ergänzen
   (Sicherung, `nginx -t`, `systemctl reload nginx`), Verzeichnis anlegen,
   logrotate-Regel dazu, Leserechte so, dass der Admin-Container lesen darf.
+- Danach einmal die ersten 14 Tage nachlesen (siehe oben).
 
-## Offen (Nutzer)
+### Die ersten 14 Tage (Nutzer, 17.11.2026: „Ja, 14 Tage nachlesen“)
 
-- Beim ersten Start die vorhandenen 14 Tage aus dem bisherigen Protokoll einmal
-  nachlesen, oder ab dem Ausrollen zählen? (Builder-Check 3)
+- Beim Ausrollen liest ein einmaliger Befehl die vorhandenen Dateien des
+  bisherigen Protokolls (`/var/log/nginx/access.log`, `.1`, `.2.gz` bis
+  `.14.gz`) nach denselben Regeln ein, in einem kurzlebigen Container, der
+  `/var/log/nginx` nur für diesen Lauf schreibgeschützt sieht. Der laufende
+  Admin-Container bekommt das Verzeichnis nicht.
+- Gezählt werden dabei nur die drei Hosts und nur Zeilen **vor** der ersten
+  Zeile im neuen eigenen Protokoll, damit nichts doppelt zählt. Ein Vermerk in
+  der Datenbank verhindert einen zweiten Lauf.
+- Bis das Nachlesen gelaufen ist, zeigt die Seite „Zählung seit <Datum>“.
 
 ## Prüfen
 
