@@ -11,9 +11,9 @@ process.env.DEV_CLIENT_SECRET ||= "check-secret";
 import BotClient from "../client/BotClient";
 import CommandHandler from "../events/client/CommandHandler";
 import GuildSettings from "../models/GuildSettings";
-import PlayerAccount from "../models/PlayerAccount";
+import PlayerAccount, { LinkUsable } from "../models/PlayerAccount";
 import RankRoleService from "../services/RankRoleService";
-import { ApplyLinkMode } from "../utils/linkModeWatch";
+import { ApplyLinkMode, SyncLinkModes } from "../utils/linkModeWatch";
 import AdminModulesReload from "../routes/AdminModulesReload";
 import AdminModulesState from "../routes/AdminModulesState";
 import {
@@ -214,6 +214,57 @@ async function checkTrust(): Promise<void> {
     check("Danach nicht noch einmal", !(await ApplyLinkMode(client, "login")) && strips === 1);
     state.set("link_mode_applied", "name");
     check("Name → Beides ist auch strenger", (await ApplyLinkMode(client, "both")) && strips === 2);
+
+    // W-0133: Art je Server. Alle mit Anmeldung, Server A mit Beides.
+    const perServer = (global: "login" | "name" | "both", guildId: string, linkMode: "login" | "name" | "both") =>
+        SetFlags([{ module: "rl-tracking", status: "on", notice: null, linkMode: global }], [], [], [{ module: "rl-tracking", guildId, status: null, notice: null, linkMode, values: {}, updatedAt: null }]);
+
+    perServer("login", "A", "both");
+    check("Art je Server: per Name zählt für die Karte auf A, nicht auf B", LinkUsable(byName, "card", "A") && !LinkUsable(byName, "card", "B"));
+    check("Art je Server: Rang-Rollen auf A mit Beides nicht per Name", !LinkUsable(byName, "trusted", "A"));
+    check(
+        "Art je Server: Linked und TrustedOwner fragen den Server",
+        !!(await PlayerAccount.prototype.Linked.call(model(byName), "u1", "epic", "card", "A")) &&
+            (await PlayerAccount.prototype.Linked.call(model(byName), "u1", "epic", "card", "B")) === null &&
+            (await PlayerAccount.prototype.TrustedOwner.call(model(byName), "epic", "a1", "A")) === null
+    );
+
+    // Merker je Server: link_mode_applied für alle, link_mode_applied:<Server> je Server.
+    const markers = new Map<string, string>([["link_mode_applied", "name"]]);
+    const stripped: string[] = [];
+    const linkClient = {
+        databaseService: {
+            Ready: true,
+            Query: async (sql: string, values: string[] = []) => {
+                if (sql.startsWith("SELECT value")) return markers.has(values[0]!) ? [{ value: markers.get(values[0]!) }] : [];
+                if (sql.startsWith("SELECT name")) return [...markers].filter(([name]) => name.startsWith("link_mode_applied:")).map(([name, value]) => ({ name, value }));
+                if (sql.startsWith("DELETE")) {
+                    markers.delete(values[0]!);
+
+                    return [];
+                }
+
+                markers.set(values[0]!, values[1]!);
+
+                return [];
+            },
+        },
+        rankRoleService: { StripUnverified: async (guildId?: string) => void stripped.push(guildId ?? "alle") },
+    } as unknown as BotClient;
+
+    check(
+        "Server A von Nur Name auf Anmeldung: Rollen nur auf A weg, Merker nur für A",
+        (await ApplyLinkMode(linkClient, "login", "A")) && stripped.join(",") === "A" && markers.get("link_mode_applied:A") === "login" && markers.get("link_mode_applied") === "name",
+        `${stripped.join(",")} ${JSON.stringify([...markers])}`
+    );
+    check("Server B ohne eigenen Merker folgt dem für alle: Nur Name bleibt, nichts weg", !(await ApplyLinkMode(linkClient, "name", "B")) && stripped.join(",") === "A");
+
+    // Eigene Art von A wieder entfernt: A folgt der Art für alle, der Merker von A verschwindet.
+    await SyncLinkModes(linkClient, new Map([[null, "name"]]));
+    check("Eigene Art entfernt: Merker des Servers weg, nichts entfernt", !markers.has("link_mode_applied:A") && stripped.join(",") === "A", JSON.stringify([...markers]));
+
+    await SyncLinkModes(linkClient, new Map<string | null, "login" | "name" | "both">([[null, "name"], ["A", "both"]]));
+    check("Später wieder strenger für A: wird erneut angewandt", stripped.join(",") === "A,A" && markers.get("link_mode_applied:A") === "both", stripped.join(","));
 
     // Review: Ist Rank Roles global aus, muss das Aufräumen trotzdem die gespeicherten Server erreichen.
     SetFlags([{ module: "rank-roles", status: "off", notice: null }], [], []);

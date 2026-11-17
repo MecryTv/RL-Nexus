@@ -349,7 +349,7 @@ export default class DashboardApiTeams extends Route {
 
                 if (!member) return { epicName: null };
 
-                const account = await this.client.accounts.Linked(userId, "epic", "card");
+                const account = await this.client.accounts.Linked(userId, "epic", "card", guild.id);
 
                 return { epicName: account?.display_name ?? null };
             }

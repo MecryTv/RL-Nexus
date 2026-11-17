@@ -647,6 +647,22 @@ async function checkNameLink(): Promise<void> {
     await me.Me({ ...LinkAsk(null), user: { id: USER, username: "user-1", displayAvatarURL: () => "https://cdn.discordapp.com/a.png" }, inCachedGuild: () => false });
     check("Beides, per Name verbunden: Karte ohne Discord-Namen und Bild", shown.length === 2 && shown[0] === null && shown[1] === null, JSON.stringify(shown));
 
+    // W-0133: Art je Server. Der Testserver weicht von der Art für alle ab.
+    const guildMode = (global: "login" | "name" | "both", own: "login" | "name" | "both") =>
+        SetFlags([{ module: "rl-tracking", status: "on", notice: null, linkMode: global }], [], [], [
+            { module: "rl-tracking", guildId: "1162553851187040326", status: null, notice: null, linkMode: own, values: {}, updatedAt: null },
+        ]);
+
+    guildMode("login", "name");
+    const ownName = Client([], { primeService: prime });
+    await link(ownName, "Nova");
+    check("Server mit „Nur Name“, für alle Anmeldung: verbindet per Name", ownName.calls.includes(`link ${USER} ${ACCOUNT} Nova`), ownName.calls.join(", "));
+
+    guildMode("name", "login");
+    const ownLogin = Client([], { primeService: prime });
+    const loginOnly = await link(ownLogin, "Nova");
+    check("Server mit Anmeldung, für alle Nur Name: Knopf statt Verbinden", !ownLogin.calls.some((call) => call.startsWith("link")) && text(loginOnly).includes("link/epic"), text(loginOnly).slice(0, 200));
+
     SetFlags([], [], []);
 }
 

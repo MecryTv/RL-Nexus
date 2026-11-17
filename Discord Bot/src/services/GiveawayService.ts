@@ -277,7 +277,7 @@ export default class GiveawayService {
             if (written < requirements.messages) missing.push(`Du brauchst ${requirements.messages} Nachrichten in den letzten 14 Tagen, bisher sind es ${written}.`);
         }
 
-        if (requirements.linked && !(await this.client.accounts.Linked(member.id, "epic", "trusted").catch(() => null))) {
+        if (requirements.linked && !(await this.client.accounts.Linked(member.id, "epic", "trusted", member.guild.id).catch(() => null))) {
             missing.push("Verknüpfe zuerst dein Rocket-League-Konto im Dashboard unter Einstellungen.");
         }
 

@@ -180,7 +180,7 @@ export default class Rank extends Command {
     private async Link(interaction: ChatInputCommandInteraction): Promise<void> {
         // W-0131: Die Verknüpfungsart kommt aus dem Admin Dashboard.
         const typed = (interaction.options.getString("epicname") ?? "").trim();
-        const mode = CurrentLinkMode();
+        const mode = CurrentLinkMode(interaction.guildId);
 
         if (mode === "name" && !typed) {
             await interaction.reply({ content: "Gib deinen Epic-Namen an: `/rank link epicname:<Name>`, genau wie im Spiel geschrieben.", flags: MessageFlags.Ephemeral });
@@ -389,7 +389,7 @@ export default class Rank extends Command {
             return;
         }
 
-        const account = await this.client.accounts.Linked(interaction.user.id, "epic", "card");
+        const account = await this.client.accounts.Linked(interaction.user.id, "epic", "card", interaction.guildId);
 
         if (!account) {
             await interaction.reply({
@@ -409,7 +409,7 @@ export default class Rank extends Command {
         if (!profile) return;
 
         // W-0131 (Review): Per Name verbunden zeigt die Karte niemanden als Besitzer, außer bei „Nur Epic-Name“.
-        const owner = LinkUsable(account, "trusted");
+        const owner = LinkUsable(account, "trusted", interaction.guildId);
 
         await this.Send(
             interaction,
@@ -451,7 +451,7 @@ export default class Rank extends Command {
         // Steht hinter dem Epic-Konto ein Discord-Nutzer, der es hier verknüpft
         // hat, wird sein Name mitgezeigt - sonst bleibt die Karte anonym.
         const owner = this.client.databaseService.Ready
-            ? await this.client.accounts.TrustedOwner("epic", profile.accountId)
+            ? await this.client.accounts.TrustedOwner("epic", profile.accountId, interaction.guildId)
             : null;
 
         const member = owner ? await this.client.users.fetch(owner).catch(() => null) : null;

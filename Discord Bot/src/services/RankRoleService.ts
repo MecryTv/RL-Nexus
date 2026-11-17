@@ -162,7 +162,7 @@ export default class RankRoleService {
 
         const raw = await this.client.accounts.On(member.id, "epic");
         // W-0131: Per Name verbunden zählt für Rollen nur bei der Art „Nur Epic-Name“.
-        const account = raw && LinkUsable(raw, "trusted") ? raw : null;
+        const account = raw && LinkUsable(raw, "trusted", member.guild.id) ? raw : null;
         const epicName = account?.display_name?.trim();
 
         if (raw && !account) throw new RankRoleError("Rang-Rollen gibt es nur mit Epic-Anmeldung: **/rank link** ohne Namen.");
@@ -301,14 +301,16 @@ export default class RankRoleService {
      * W-0131: Rang-Rollen von allen Mitgliedern, deren Epic-Verknüpfung für
      * Rollen nicht zählt (keine, oder per Name bei einer strengeren Art).
      * Ohne Merker - StripUnverifiedOnce und der Wechsel der Verknüpfungsart
-     * (utils/linkModeWatch.ts) rufen es auf.
+     * (utils/linkModeWatch.ts) rufen es auf. W-0133: mit guildId nur dieser
+     * Server; ob eine Verknüpfung zählt, entscheidet die Art des Servers.
      */
-    async StripUnverified(): Promise<{ roles: number; members: number; intent: boolean }> {
+    async StripUnverified(guildId?: string): Promise<{ roles: number; members: number; intent: boolean }> {
         const intent = this.client.config.GUILD_MEMBER_INTENT === true;
         let members = 0;
         let roles = 0;
 
         for (const guild of this.client.guilds.cache.values()) {
+            if (guildId && guild.id !== guildId) continue;
             if (this.client.developerMode && guild.id !== this.client.config.DEV_GUILD_ID) continue;
             // Aufräumen geht über die gespeicherte Auswahl, auch wenn Rank Roles im Admin gerade global aus ist (Review W-0131).
             if (!(await this.client.settings.RawModules(guild.id)).includes(RANK_ROLES_MODULE)) continue;
@@ -326,7 +328,7 @@ export default class RankRoleService {
             }
 
             for (const member of holders.values()) {
-                if (await this.client.accounts.Linked(member.id, "epic", "trusted")) continue;
+                if (await this.client.accounts.Linked(member.id, "epic", "trusted", guild.id)) continue;
 
                 const drop = managed.filter((id) => member.roles.cache.has(id) && !this.Blocked(guild, id));
 
