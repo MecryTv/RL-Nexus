@@ -1,16 +1,16 @@
 import type { CSSProperties, JSX } from "react";
 import { useSearchParams } from "react-router-dom";
 import { ACTIVITY_RANGES, ACTIVITY_SERVICES, type ActivityDevice, type ActivityRange, type ActivityService, type ActivitySource, type IActivityView } from "../../shared/activity";
-import { NEUTRAL, SERVICE_COLORS, SERVICE_LABELS, changeText } from "../../shared/activityChart";
+import { NEUTRAL, SERVICE_COLORS, SERVICE_LABELS } from "../../shared/activityChart";
 import { useApi } from "../api/useApi";
 import { Icon } from "../components/Icon";
 import { PageHeader } from "../components/PageHeader";
 import { Panel } from "../components/Panel";
 import { Segmented } from "../components/Segmented";
 import { Failure, Loading } from "../components/Status";
-import { formatDateTime, formatNumber } from "../format";
+import { formatDateTime } from "../format";
 import { useTitle } from "../useTitle";
-import { Bars, Heatmap, LineChart, Spark } from "./ActivityCharts";
+import { Bars, Heatmap, LineChart, Tiles } from "./ActivityCharts";
 import styles from "./activity.module.scss";
 
 /**
@@ -23,10 +23,23 @@ import styles from "./activity.module.scss";
 /** Die Seite fragt jede Minute nach, so oft liest der Server das Protokoll. */
 const REFRESH = 60_000;
 
-const RANGE_LABELS: Readonly<Record<ActivityRange, string>> = { "24h": "24 Std.", "7d": "7 Tage", "30d": "30 Tage" };
-const BEFORE_LABELS: Readonly<Record<ActivityRange, string>> = { "24h": "zu den 24 Std. davor", "7d": "zur Vorwoche", "30d": "zu den 30 Tagen davor" };
-const DEVICE_LABELS: Readonly<Record<ActivityDevice, string>> = { mobile: "Handy", desktop: "Desktop", tablet: "Tablet" };
-const SOURCE_LABELS: Readonly<Record<ActivitySource, string>> = { discord: "Discord", direct: "Direkt", google: "Google", topgg: "top.gg", other: "Sonstige" };
+const RANGE_LABELS: Readonly<Record<ActivityRange, string>> = {
+    "24h": "24 Std.",
+    "7d": "7 Tage",
+    "30d": "30 Tage",
+};
+const DEVICE_LABELS: Readonly<Record<ActivityDevice, string>> = {
+    mobile: "Handy",
+    desktop: "Desktop",
+    tablet: "Tablet",
+};
+const SOURCE_LABELS: Readonly<Record<ActivitySource, string>> = {
+    discord: "Discord",
+    direct: "Direkt",
+    google: "Google",
+    topgg: "top.gg",
+    other: "Sonstige",
+};
 /** Ampel: grün bis 2 % (4xx) und 0,5 % (5xx), darüber gelb mit Warnzeichen. */
 const LIMITS = { client: 0.02, server: 0.005 } as const;
 
@@ -38,26 +51,6 @@ function rangeOf(value: string | null): ActivityRange {
 
 function serviceOf(value: string | null): ActivityService | "all" {
     return ACTIVITY_SERVICES.includes(value as ActivityService) ? (value as ActivityService) : "all";
-}
-
-function Tiles({ view }: { readonly view: IActivityView }): JSX.Element {
-    return (
-        <div className={styles.tiles}>
-            {view.tiles.map((tile) => (
-                <Panel key={tile.service} as="section" className={styles.tile} cut="sm">
-                    <h2 className={styles.tileName}>
-                        <i style={{ background: SERVICE_COLORS[tile.service] }} />
-                        {SERVICE_LABELS[tile.service]}
-                    </h2>
-                    <b className={styles.tileValue}>{formatNumber(tile.views)}</b>
-                    <span className={styles.tileChange}>
-                        {changeText(tile.change)} <span className={styles.wideOnly}>{tile.change === null ? "kein Vergleich" : BEFORE_LABELS[view.range]}</span>
-                    </span>
-                    <Spark values={tile.series} service={tile.service} />
-                </Panel>
-            ))}
-        </div>
-    );
 }
 
 function ErrorRow({ share, limit, label }: { readonly share: number; readonly limit: number; readonly label: string }): JSX.Element {
@@ -94,7 +87,7 @@ export function ActivityPage(): JSX.Element {
 
                 return next;
             },
-            { replace: true }
+            { replace: true },
         );
     };
 
@@ -104,7 +97,16 @@ export function ActivityPage(): JSX.Element {
     return (
         <>
             <PageHeader title="Aktivität" meta={meta}>
-                <Segmented name="zeitraum" legend="Zeitraum" options={ACTIVITY_RANGES.map((value) => ({ value, label: RANGE_LABELS[value] }))} value={range} onChange={(value) => set("zeitraum", value, "7d")} />
+                <Segmented
+                    name="zeitraum"
+                    legend="Zeitraum"
+                    options={ACTIVITY_RANGES.map((value) => ({
+                        value,
+                        label: RANGE_LABELS[value],
+                    }))}
+                    value={range}
+                    onChange={(value) => set("zeitraum", value, "7d")}
+                />
             </PageHeader>
             <p className={styles.note}>Gezählt wird jeder Seitenaufruf, der beim Server ankommt: der erste Aufruf und jedes Neuladen. Wechsel innerhalb von Webseite und Statusseite zählen nicht.</p>
 
@@ -120,7 +122,7 @@ export function ActivityPage(): JSX.Element {
 
             {data && data.since !== null && (
                 <>
-                    <Tiles view={data} />
+                    <Tiles view={data} heading="h2" />
 
                     <Panel as="section" className={styles.card}>
                         <header className={styles.cardHead}>
@@ -140,7 +142,15 @@ export function ActivityPage(): JSX.Element {
                     <fieldset className={styles.filter}>
                         <legend>Details für</legend>
                         {(["all", ...ACTIVITY_SERVICES] as const).map((entry) => (
-                            <label key={entry} className={styles.chip} style={{ "--chip": entry === "all" ? NEUTRAL : SERVICE_COLORS[entry] } as CSSProperties}>
+                            <label
+                                key={entry}
+                                className={styles.chip}
+                                style={
+                                    {
+                                        "--chip": entry === "all" ? NEUTRAL : SERVICE_COLORS[entry],
+                                    } as CSSProperties
+                                }
+                            >
                                 <input type="radio" name="dienst" value={entry} checked={service === entry} onChange={() => set("dienst", entry, "all")} />
                                 {entry !== "all" && <i aria-hidden="true" />}
                                 {entry === "all" ? "Alle drei" : SERVICE_LABELS[entry]}
@@ -161,14 +171,28 @@ export function ActivityPage(): JSX.Element {
                             <header className={styles.cardHead}>
                                 <h2>Geräte</h2>
                             </header>
-                            <Bars rows={(Object.keys(DEVICE_LABELS) as ActivityDevice[]).map((key) => ({ label: DEVICE_LABELS[key], value: data.devices[key] }))} color={detailColor} caption="Aufrufe nach Gerät" />
+                            <Bars
+                                rows={(Object.keys(DEVICE_LABELS) as ActivityDevice[]).map((key) => ({
+                                    label: DEVICE_LABELS[key],
+                                    value: data.devices[key],
+                                }))}
+                                color={detailColor}
+                                caption="Aufrufe nach Gerät"
+                            />
                         </Panel>
 
                         <Panel as="section" className={`${styles.card} ${styles.wide}`}>
                             <header className={styles.cardHead}>
                                 <h2>Woher die Besucher kommen</h2>
                             </header>
-                            <Bars rows={(Object.keys(SOURCE_LABELS) as ActivitySource[]).map((key) => ({ label: SOURCE_LABELS[key], value: data.sources[key] }))} color={detailColor} caption="Aufrufe nach Herkunft" />
+                            <Bars
+                                rows={(Object.keys(SOURCE_LABELS) as ActivitySource[]).map((key) => ({
+                                    label: SOURCE_LABELS[key],
+                                    value: data.sources[key],
+                                }))}
+                                color={detailColor}
+                                caption="Aufrufe nach Herkunft"
+                            />
                         </Panel>
 
                         <Panel as="section" className={styles.card}>

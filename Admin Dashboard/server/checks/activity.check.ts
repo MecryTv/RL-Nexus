@@ -181,6 +181,13 @@ export async function checkActivity(): Promise<void> {
         assert.ok(app.includes('path="aktivitaet"'));
     });
 
+    await check("Übersicht hat den Abschnitt Aktivität mit Link zur Seite", async () => {
+        const overview = await readFile(path.join(process.cwd(), "src", "pages", "OverviewPage.tsx"), "utf8");
+
+        assert.ok(overview.includes('id="aktivitaet"'));
+        assert.ok(overview.includes('to="/aktivitaet"'));
+    });
+
     section("Aktivität: Lesen");
 
     const dir = await mkdtemp(path.join(tmpdir(), "rlnexus-aktivitaet-"));
