@@ -219,6 +219,10 @@ async function main(): Promise<void> {
         JSON.stringify(noted.entries)
     );
 
+    // Review W-0141: Warten auf eine freie Verbindung zählt nicht als langsames SQL, steht aber dabei.
+    NoteQuery("SELECT 3", 20, 450);
+    check("Warten auf den Pool getrennt von der Abfrage", SlowReport().entries[0].ms === 20 && SlowReport().entries[0].waitMs === 450, JSON.stringify(SlowReport().entries[0]));
+
     for (let index = 0; index < 250; index++) NoteQuery("SELECT 2", 300);
     check("Höchstens 200 gemerkt", SlowReport().entries.length === 200, String(SlowReport().entries.length));
 

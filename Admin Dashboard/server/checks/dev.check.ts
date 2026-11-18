@@ -463,6 +463,11 @@ export async function checkDev(): Promise<void> {
                 ]
             );
 
+            // Review W-0141: Warten auf eine freie Verbindung zählt nicht als langsames SQL, steht aber dabei.
+            noteQuery("SELECT 3", 20, 450);
+            assert.deepEqual([slowReport().entries[0].ms, slowReport().entries[0].waitMs], [20, 450]);
+            assert.equal(slowReport().entries.find((entry) => entry.what === "SELECT * FROM users WHERE id = ? AND name = ? AND guild = ?")?.waitMs, 0);
+
             for (let index = 0; index < 250; index++) noteQuery("SELECT 2", 300);
             assert.equal(slowReport().entries.length, 200);
             forgetSlow();

@@ -16,6 +16,8 @@ export interface ISlowEntry {
     ms: number;
     what: string;
     status: number | null;
+    /** Review W-0141: bei SQL das Warten auf eine freie Verbindung, nicht in ms enthalten. Bei Anfragen null. */
+    waitMs: number | null;
 }
 
 let since = Date.now();
@@ -42,15 +44,16 @@ export function NoteRequest(method: string, route: string, status: number, ms: n
     if (ms < SLOW_REQUEST_MS) return;
 
     counts.slowRequests++;
-    Keep({ kind: "request", at: new Date(now).toISOString(), ms: Math.round(ms), what: `${method} ${route}`, status });
+    Keep({ kind: "request", at: new Date(now).toISOString(), ms: Math.round(ms), what: `${method} ${route}`, status, waitMs: null });
 }
 
-export function NoteQuery(sql: string, ms: number, now = Date.now()): void {
+/** Review W-0141: ms ist die Abfrage selbst, waitMs das Warten auf eine freie Verbindung davor. Gemerkt wird, wenn eins davon über der Schwelle liegt. */
+export function NoteQuery(sql: string, ms: number, waitMs = 0, now = Date.now()): void {
     counts.queries++;
-    if (ms < SLOW_SQL_MS) return;
+    if (ms < SLOW_SQL_MS && waitMs < SLOW_SQL_MS) return;
 
     counts.slowQueries++;
-    Keep({ kind: "sql", at: new Date(now).toISOString(), ms: Math.round(ms), what: SqlShape(sql), status: null });
+    Keep({ kind: "sql", at: new Date(now).toISOString(), ms: Math.round(ms), what: SqlShape(sql), status: null, waitMs: Math.round(waitMs) });
 }
 
 export function SlowReport() {

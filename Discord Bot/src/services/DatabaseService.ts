@@ -208,19 +208,26 @@ export default class DatabaseService implements IDatabaseService {
         return this.pool;
     }
 
-    /** W-0141: Dauer jeder Abfrage, Langsames merkt utils/slow.ts (ohne die Werte). */
-    private async Timed<T>(sql: string, run: () => Promise<T>): Promise<T> {
+    /**
+     * W-0141: Dauer jeder Abfrage, Langsames merkt utils/slow.ts (ohne die Werte).
+     * Review: Das Warten auf eine freie Verbindung steht getrennt, sonst sähe ein
+     * voller Pool aus wie langsames SQL.
+     */
+    private async Timed(sql: string, params: unknown[]): Promise<unknown> {
+        const asked = performance.now();
+        const connection = await this.Pool().getConnection();
         const started = performance.now();
 
         try {
-            return await run();
+            return await connection.query(sql, params);
         } finally {
-            NoteQuery(sql, performance.now() - started);
+            await connection.release();
+            NoteQuery(sql, performance.now() - started, started - asked);
         }
     }
 
     async Query<T>(sql: string, params: unknown[] = []): Promise<T[]> {
-        const rows = await this.Timed(sql, () => this.Pool().query(sql, params));
+        const rows = await this.Timed(sql, params);
 
         // Der Treiber hängt an jedem Ergebnis noch "meta" - das gehört nicht in
         // die Zeilen, die weitergereicht werden.
@@ -234,7 +241,7 @@ export default class DatabaseService implements IDatabaseService {
     }
 
     async Write(sql: string, params: unknown[] = []): Promise<IWriteResult> {
-        const result = (await this.Timed(sql, () => this.Pool().query(sql, params))) as { affectedRows?: number; insertId?: number };
+        const result = (await this.Timed(sql, params)) as { affectedRows?: number; insertId?: number };
 
         return { affectedRows: result.affectedRows ?? 0, insertId: Number(result.insertId ?? 0) };
     }

@@ -726,6 +726,8 @@ export interface ISlowEntry {
     readonly what: string;
     /** HTTP-Status, bei SQL null. */
     readonly status: number | null;
+    /** Review W-0141: bei SQL das Warten auf eine freie Verbindung, nicht in ms enthalten. Bei Anfragen null. */
+    readonly waitMs: number | null;
 }
 
 /** W-0141: was ein Prozess seit seinem Start gemessen hat. Die Liste hält die letzten 200 Ausreißer, neueste zuerst. */

@@ -34,15 +34,16 @@ export function noteRequest(method: string, route: string, status: number, ms: n
     if (ms < SLOW_REQUEST_MS) return;
 
     counts.slowRequests++;
-    keep({ kind: "request", at: new Date(now).toISOString(), ms: Math.round(ms), what: `${method} ${route}`, status });
+    keep({ kind: "request", at: new Date(now).toISOString(), ms: Math.round(ms), what: `${method} ${route}`, status, waitMs: null });
 }
 
-export function noteQuery(sql: string, ms: number, now = Date.now()): void {
+/** Review W-0141: ms ist die Abfrage selbst, waitMs das Warten auf eine freie Verbindung davor. Gemerkt wird, wenn eins davon über der Schwelle liegt. */
+export function noteQuery(sql: string, ms: number, waitMs = 0, now = Date.now()): void {
     counts.queries++;
-    if (ms < SLOW_SQL_MS) return;
+    if (ms < SLOW_SQL_MS && waitMs < SLOW_SQL_MS) return;
 
     counts.slowQueries++;
-    keep({ kind: "sql", at: new Date(now).toISOString(), ms: Math.round(ms), what: sqlShape(sql), status: null });
+    keep({ kind: "sql", at: new Date(now).toISOString(), ms: Math.round(ms), what: sqlShape(sql), status: null, waitMs: Math.round(waitMs) });
 }
 
 export function slowReport(): ISlowSide {

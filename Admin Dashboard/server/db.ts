@@ -111,13 +111,17 @@ async function migrate(database: IDatabaseConfig): Promise<void> {
 export async function query<T>(sql: string, values: readonly unknown[] = []): Promise<T> {
     if (!pool) throw new DatabaseUnavailable();
 
-    // W-0141: Dauer messen, Langsames merkt server/slow.ts (ohne die Werte).
+    // W-0141: Dauer messen, Langsames merkt server/slow.ts (ohne die Werte). Review: Das Warten auf eine
+    // freie Verbindung steht getrennt, sonst sähe ein voller Pool aus wie langsames SQL.
+    const asked = performance.now();
+    const connection = await pool.getConnection();
     const started = performance.now();
 
     try {
-        return (await pool.query(sql, values)) as T;
+        return (await connection.query(sql, values)) as T;
     } finally {
-        noteQuery(sql, performance.now() - started);
+        await connection.release();
+        noteQuery(sql, performance.now() - started, started - asked);
     }
 }
 

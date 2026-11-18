@@ -44,15 +44,15 @@ export async function checkPerformance(): Promise<void> {
     await check("Langsame Anfragen je Route zusammen: Anzahl, Median, Max, zuletzt; oft Langsames zuerst; Filter nach Quelle", () => {
         const report: ISlowReport = {
             admin: side([
-                { kind: "request", at: "2026-11-18T13:41:00.000Z", ms: 1240, what: "GET /api/userdata/:id", status: 200 },
-                { kind: "request", at: "2026-11-18T12:00:00.000Z", ms: 900, what: "GET /api/userdata/:id", status: 200 },
-                { kind: "sql", at: "2026-11-18T11:00:00.000Z", ms: 540, what: "SELECT 1", status: null },
+                { kind: "request", at: "2026-11-18T13:41:00.000Z", ms: 1240, what: "GET /api/userdata/:id", status: 200, waitMs: null },
+                { kind: "request", at: "2026-11-18T12:00:00.000Z", ms: 900, what: "GET /api/userdata/:id", status: 200, waitMs: null },
+                { kind: "sql", at: "2026-11-18T11:00:00.000Z", ms: 540, what: "SELECT 1", status: null, waitMs: 0 },
             ]),
             bot: side([
-                { kind: "request", at: "2026-11-18T14:02:00.000Z", ms: 640, what: "GET /api/guilds/:id/polls", status: 200 },
-                { kind: "request", at: "2026-11-18T13:00:00.000Z", ms: 600, what: "GET /api/guilds/:id/polls", status: 200 },
-                { kind: "request", at: "2026-11-18T10:00:00.000Z", ms: 700, what: "GET /api/guilds/:id/polls", status: 500 },
-                { kind: "sql", at: "2026-11-18T09:00:00.000Z", ms: 700, what: "GET /api/guilds/:id/polls", status: null },
+                { kind: "request", at: "2026-11-18T14:02:00.000Z", ms: 640, what: "GET /api/guilds/:id/polls", status: 200, waitMs: null },
+                { kind: "request", at: "2026-11-18T13:00:00.000Z", ms: 600, what: "GET /api/guilds/:id/polls", status: 200, waitMs: null },
+                { kind: "request", at: "2026-11-18T10:00:00.000Z", ms: 700, what: "GET /api/guilds/:id/polls", status: 500, waitMs: null },
+                { kind: "sql", at: "2026-11-18T09:00:00.000Z", ms: 700, what: "GET /api/guilds/:id/polls", status: null, waitMs: 0 },
             ]),
         };
         const groups = groupSlow(report, "all");

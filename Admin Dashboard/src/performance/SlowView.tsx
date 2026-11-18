@@ -76,6 +76,7 @@ function Group({ group }: { readonly group: ISlowGroup }): JSX.Element {
                             <b>{formatNumber(entry.ms)} ms</b>
                             <span>{formatDateTime(entry.at)}</span>
                             {entry.status !== null && <span className={styles.dim}>Status {entry.status}</span>}
+                            {entry.waitMs !== null && entry.waitMs > 0 && <span className={styles.dim}>dazu {formatNumber(entry.waitMs)} ms auf eine freie Verbindung gewartet</span>}
                         </li>
                     ))}
                 </ul>
@@ -141,7 +142,10 @@ export function SlowView(): JSX.Element {
                         </ul>
                     </>
                 )}
-                <p className={styles.dim}>Gelb ab der Schwelle, rot ab einer Sekunde. Routen als Muster (:id), SQL ohne Werte. Nach einem Neustart ist die Liste leer.</p>
+                <p className={styles.dim}>
+                    Gelb ab der Schwelle, rot ab einer Sekunde. Routen als Muster (:id), SQL ohne Werte. Bei SQL zählt die Abfrage selbst; wie lange sie auf eine freie
+                    Verbindung warten musste, steht beim Fall dabei. Abfragen in Transaktionen misst der Admin-Server nicht. Nach einem Neustart ist die Liste leer.
+                </p>
             </Panel>
         </>
     );
