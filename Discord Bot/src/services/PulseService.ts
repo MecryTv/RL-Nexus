@@ -145,6 +145,11 @@ export default class PulseService {
         return (this.subscribers.get(`${USER_KEY}${userId}`)?.size ?? 0) > 0;
     }
 
+    /** W-0143: Hat gerade jemand das Dashboard dieses Servers offen? Spart Abfragen, deren Meldung niemand liest. */
+    Watching(guildId: string): boolean {
+        return Boolean(this.subscribers.get(guildId)?.size);
+    }
+
     /**
      * Sagt allen offenen Fenstern eines Servers Bescheid. Kostet nichts, wenn
      * niemand zusieht - deshalb darf jeder Dienst das einfach aufrufen, ohne

@@ -237,6 +237,13 @@ export default class VoiceService {
         }
 
         if (before.channelId && before.channelId !== after.channelId) await this.Cleanup(guild, before.channelId, before.member?.id ?? null);
+
+        // W-0143: Wer kommt, geht oder Stumm, Taub, Stream, Kamera umschaltet - das offene Fenster im Dashboard zieht nach.
+        if (!this.client.pulseService.Watching(guild.id)) return;
+
+        for (const channelId of new Set([before.channelId, after.channelId])) {
+            if (channelId && (await this.client.tempVoices.Get(channelId).catch(() => null))) this.client.pulseService.Emit(guild.id, "voice", { channelId, changed: true });
+        }
     }
 
     /** Ein eigener Kanal: Vorgaben des Hubs, dann das Standard-Preset des Users. */
@@ -316,6 +323,8 @@ export default class VoiceService {
 
         if (!channel || !channel.isVoiceBased()) {
             await this.client.tempVoices.Remove(channelId);
+            // Review W-0143: in Discord gelöscht - ein offenes Fenster zeigt sonst weiter die alten Leute.
+            this.client.pulseService.Emit(guild.id, "voice", { channelId, open: false });
 
             return;
         }
@@ -423,6 +432,8 @@ export default class VoiceService {
         });
 
         await this.client.tempVoices.Save(temp.channelId, settings);
+        // Review W-0143: Sperren, Limit, Name, Vertraute ändern keinen Sprachzustand - das Fenster soll es trotzdem sehen.
+        this.client.pulseService.Emit(channel.guild.id, "voice", { channelId: temp.channelId, changed: true });
     }
 
     /* ----------------------------------------------------------
@@ -578,6 +589,7 @@ export default class VoiceService {
 
                 await this.client.tempVoices.Save(channel.id, settings, target.id);
                 await channel.permissionOverwrites.set(this.Overwrites(channel.guild, target.id, settings)).catch(() => undefined);
+                this.client.pulseService.Emit(channel.guild.id, "voice", { channelId: channel.id, changed: true });
 
                 return `🔄 Der Kanal gehört jetzt ${named}.`;
             }

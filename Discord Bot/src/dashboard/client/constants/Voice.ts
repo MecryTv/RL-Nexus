@@ -30,3 +30,33 @@ export function openGroups<T extends { hubId: number | null }>(open: T[], hubs: 
 
     return groups.map((group) => ({ hubId: group.hubId, title: groups.length > 1 || hubs.length > 1 ? `${group.name} · ${group.items.length} offen` : null, items: group.items }));
 }
+
+/** W-0143: die Kachel „Im Kanal“ - mit Limit „3 von 5“, ohne Limit (0) „3 drin“. */
+export function seatsText(count: number, limit: number): { value: string; sub: string } {
+    if (limit <= 0) return { value: `${count} drin`, sub: "ohne Limit" };
+
+    const free = limit - count;
+
+    return { value: `${count} von ${limit}`, sub: free > 0 ? `${free} frei` : "voll" };
+}
+
+export type PersonState = "stream" | "video" | "mute" | "deaf";
+
+const STATES: [PersonState, string][] = [
+    ["stream", "streamt"],
+    ["video", "Kamera"],
+    ["mute", "stumm"],
+    ["deaf", "taub"],
+];
+
+/** Was eine Person im Kanal gerade tut, immer in derselben Reihenfolge und mit Wort - nie nur als Farbe. */
+export function personStates(person: Record<PersonState, boolean>): [PersonState, string][] {
+    return STATES.filter(([key]) => person[key]);
+}
+
+/** Name der Region aus der Liste der Seite; ohne Region wählt Discord selbst. */
+export function regionName(region: string | null, regions: [string, string][]): string {
+    if (!region) return "Automatisch";
+
+    return regions.find(([id]) => id === region)?.[1] ?? region;
+}

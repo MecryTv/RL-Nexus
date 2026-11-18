@@ -35,7 +35,7 @@ import DashboardService, { AccessEnds, BETA_ERRORS, BetaErrorText, BetaGate, Dis
 import { AccessText } from "../dashboard/client/constants/Access";
 import { applyCatalog, CATEGORIES, MODULES } from "../dashboard/client/constants/Modules";
 import { askableCount, limitCards, limitCounts, limitName, limitRequestText, limitsHref, limitStatus, limitStatusText, limitTabs, parseLimitsQuery, wishProblem } from "../dashboard/client/constants/Limits";
-import { IOpenGroup, openGroups, parseVoiceTab, voiceTabHref } from "../dashboard/client/constants/Voice";
+import { IOpenGroup, openGroups, parseVoiceTab, personStates, regionName, seatsText, voiceTabHref } from "../dashboard/client/constants/Voice";
 import { IModuleLimit } from "../dashboard/client/interfaces/IGuild";
 import CatalogService, { Catalog } from "../services/CatalogService";
 import { CommandPaths } from "../routes/AdminCommands";
@@ -1919,6 +1919,15 @@ function checkVoiceTabs(): void {
     check("Voice: nichts offen, keine Gruppe", openGroups([], [{ id: 1, channelName: "Temp Voice" }]).length === 0);
     // Review W-0140 / Spec: ab zwei Hubs mit Überschrift, auch wenn nur einer Kanäle offen hat.
     check("Voice: zwei Hubs, offen nur in einem: mit Überschrift", titles(openGroups([{ hubId: 2 }], [{ id: 1, channelName: "Temp Voice" }, { id: 2, channelName: "Support-Hub" }])) === '[["Support-Hub · 1 offen",1]]');
+    // W-0143: Texte im Fenster eines offenen Kanals.
+    check("Voice: Plätze mit Limit", JSON.stringify(seatsText(3, 5)) === '{"value":"3 von 5","sub":"2 frei"}' && seatsText(5, 5).sub === "voll" && seatsText(6, 5).sub === "voll");
+    check("Voice: Plätze ohne Limit", JSON.stringify(seatsText(3, 0)) === '{"value":"3 drin","sub":"ohne Limit"}');
+    check(
+        "Voice: Status in fester Reihenfolge",
+        JSON.stringify(personStates({ deaf: true, mute: true, stream: true, video: false })) === '[["stream","streamt"],["mute","stumm"],["deaf","taub"]]' &&
+            personStates({ stream: false, video: false, mute: false, deaf: false }).length === 0
+    );
+    check("Voice: Region", regionName("rotterdam", [["", "Automatisch"], ["rotterdam", "Rotterdam"]]) === "Rotterdam" && regionName(null, []) === "Automatisch" && regionName("", []) === "Automatisch" && regionName("mars", []) === "mars");
 }
 
 async function main(): Promise<void> {
