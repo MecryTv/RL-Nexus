@@ -3,6 +3,7 @@ import path from "node:path";
 import { createConnection, createPool, type Pool } from "mariadb";
 import type { IConfig, IDatabaseConfig } from "./config.ts";
 import { PublicError } from "./errors.ts";
+import { noteQuery } from "./slow.ts";
 
 /**
  * Die Datenbank des Bots, mit eigenem Pool.
@@ -110,7 +111,14 @@ async function migrate(database: IDatabaseConfig): Promise<void> {
 export async function query<T>(sql: string, values: readonly unknown[] = []): Promise<T> {
     if (!pool) throw new DatabaseUnavailable();
 
-    return (await pool.query(sql, values)) as T;
+    // W-0141: Dauer messen, Langsames merkt server/slow.ts (ohne die Werte).
+    const started = performance.now();
+
+    try {
+        return (await pool.query(sql, values)) as T;
+    } finally {
+        noteQuery(sql, performance.now() - started);
+    }
 }
 
 /** Eine Abfrage innerhalb einer Transaktion. */

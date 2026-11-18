@@ -14,6 +14,7 @@ import {
     TableName,
 } from "../constants/Database";
 import logger from "../utils/logger";
+import { NoteQuery } from "../utils/slow";
 
 // Wird geworfen, wenn jemand ohne Datenbank abfragt. Ein eigener Typ, damit
 // Aufrufer den Fall von einem echten SQL-Fehler unterscheiden können - das
@@ -207,8 +208,19 @@ export default class DatabaseService implements IDatabaseService {
         return this.pool;
     }
 
+    /** W-0141: Dauer jeder Abfrage, Langsames merkt utils/slow.ts (ohne die Werte). */
+    private async Timed<T>(sql: string, run: () => Promise<T>): Promise<T> {
+        const started = performance.now();
+
+        try {
+            return await run();
+        } finally {
+            NoteQuery(sql, performance.now() - started);
+        }
+    }
+
     async Query<T>(sql: string, params: unknown[] = []): Promise<T[]> {
-        const rows = await this.Pool().query(sql, params);
+        const rows = await this.Timed(sql, () => this.Pool().query(sql, params));
 
         // Der Treiber hängt an jedem Ergebnis noch "meta" - das gehört nicht in
         // die Zeilen, die weitergereicht werden.
@@ -222,7 +234,7 @@ export default class DatabaseService implements IDatabaseService {
     }
 
     async Write(sql: string, params: unknown[] = []): Promise<IWriteResult> {
-        const result = (await this.Pool().query(sql, params)) as { affectedRows?: number; insertId?: number };
+        const result = (await this.Timed(sql, () => this.Pool().query(sql, params))) as { affectedRows?: number; insertId?: number };
 
         return { affectedRows: result.affectedRows ?? 0, insertId: Number(result.insertId ?? 0) };
     }

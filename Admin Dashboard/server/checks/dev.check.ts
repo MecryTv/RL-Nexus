@@ -3,11 +3,12 @@ import { existsSync, readFileSync } from "node:fs";
 import { appendFile, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import type { ILogFeed, ILogSearch, ILogSessionPage, ILogView, IMaintenancePlan, IMaintenanceState } from "../../shared/api.ts";
+import type { ILogFeed, ILogSearch, ILogSessionPage, ILogView, IMaintenancePlan, IMaintenanceState, ISlowReport } from "../../shared/api.ts";
 import { LOG_PAGE_ENTRIES, LOG_SEARCH } from "../../shared/limits.ts";
 import { buildApp } from "../app.ts";
 import { loadConfig } from "../config.ts";
 import { SESSION_COOKIE, seal } from "../session.ts";
+import { SLOW_REQUEST_MS, SLOW_SQL_MS, forgetSlow, noteQuery, noteRequest, slowReport } from "../slow.ts";
 import { USERS, fake } from "./fakes.ts";
 import { ENV, SECRET, check, section } from "./harness.ts";
 
@@ -440,6 +441,73 @@ export async function checkDev(): Promise<void> {
             // Welche Application angemeldet hat, steht da, aber niemals ein Geheimnis.
             assert.deepEqual([tech.admin.developerMode, tech.admin.clientId], [false, config.clientId]);
             assert.ok(!JSON.stringify(tech).includes(config.clientSecret) && !JSON.stringify(tech).includes(config.botToken));
+        });
+
+        await check("W-0141: Langsames landet mit Muster im Ringpuffer, Schnelles nur in der Zählung, höchstens 200", () => {
+            forgetSlow();
+            noteRequest("GET", "/api/users/:id", 200, 30);
+            noteRequest("GET", "/api/users/:id", 200, 812);
+            noteQuery("SELECT *  FROM   users\n  WHERE id = ? AND name = 'Max' AND guild = 123456789012345678", 250);
+            noteQuery("SELECT 1", 3);
+
+            const report = slowReport();
+
+            assert.deepEqual([report.requests, report.slowRequests, report.queries, report.slowQueries], [2, 1, 2, 1]);
+            assert.deepEqual(
+                report.entries.map((entry) => [entry.kind, entry.what, entry.status, entry.ms]),
+                [
+                    ["sql", "SELECT * FROM users WHERE id = ? AND name = ? AND guild = ?", null, 250],
+                    ["request", "GET /api/users/:id", 200, 812],
+                ]
+            );
+
+            for (let index = 0; index < 250; index++) noteQuery("SELECT 2", 300);
+            assert.equal(slowReport().entries.length, 200);
+            forgetSlow();
+        });
+
+        await check("W-0141: Der Hook misst echte Anfragen mit dem Routenmuster, EventSource-Leitungen nicht", async () => {
+            const probe = await buildApp(config);
+
+            probe.get("/probe/:id", async () => {
+                await new Promise((resolve) => setTimeout(resolve, SLOW_REQUEST_MS + 30));
+
+                return { ok: true };
+            });
+
+            try {
+                forgetSlow();
+                await probe.inject({ method: "GET", url: "/probe/123456789012345678" });
+                await probe.inject({ method: "GET", url: "/probe/7", headers: { accept: "text/event-stream" } });
+
+                const report = slowReport();
+
+                assert.deepEqual([report.requests, report.slowRequests], [1, 1]);
+                assert.deepEqual([report.entries[0].what, report.entries[0].status], ["GET /probe/:id", 200]);
+                assert.ok(report.entries[0].ms >= SLOW_REQUEST_MS, String(report.entries[0].ms));
+            } finally {
+                forgetSlow();
+                await probe.close();
+            }
+        });
+
+        await check("W-0141: /api/dev/slow nur für Developer, mit Admin-Server und Bot; Bot weg heißt null", async () => {
+            assert.equal((await get("/api/dev/slow", admin)).statusCode, 403);
+
+            const response = await get("/api/dev/slow");
+            const report = response.json() as ISlowReport;
+
+            assert.equal(response.statusCode, 200);
+            assert.deepEqual([report.admin.requestMs, report.admin.sqlMs], [SLOW_REQUEST_MS, SLOW_SQL_MS]);
+            assert.equal(report.bot?.entries[0].what, "GET /dashboard/api/guilds/:id/levels");
+
+            fake.botDown = true;
+
+            try {
+                assert.equal(((await get("/api/dev/slow")).json() as ISlowReport).bot, null);
+            } finally {
+                fake.botDown = false;
+            }
         });
     } finally {
         await app.close();

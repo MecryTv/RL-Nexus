@@ -43,6 +43,7 @@ import { newsRoutes } from "./routes/news.ts";
 import { changelogRoutes } from "./routes/changelog.ts";
 import { publicStatusRoutes, statusRoutes } from "./routes/status.ts";
 import { userRoutes } from "./routes/users.ts";
+import { noteRequest } from "./slow.ts";
 
 /** Der Build der Oberfläche (npm run build). Fehlt er, liefert der Server nur die API. */
 const DIST = path.join(import.meta.dirname, "..", "dist");
@@ -64,6 +65,15 @@ export async function buildApp(config: IConfig): Promise<FastifyInstance> {
         if (log) console.error(`❌ ${request.method} ${request.url.split("?")[0]}: ${thrown instanceof Error ? thrown.message : String(thrown)}`);
 
         return reply.code(status).send({ error: message });
+    });
+
+    // W-0141: Dauer jeder Antwort mit dem Muster der Route. Langsames landet im
+    // Ringpuffer (server/slow.ts), zu sehen unter Developer. EventSource-Leitungen
+    // bleiben absichtlich lange offen und zählen nicht.
+    app.addHook("onResponse", async (request, reply) => {
+        if (request.headers.accept?.includes("text/event-stream")) return;
+
+        noteRequest(request.method, request.routeOptions.url ?? "(ohne Route)", reply.statusCode, reply.elapsedTime);
     });
 
     await app.register(rateLimit, { global: true, max: 300, timeWindow: "1 minute" });

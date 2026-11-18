@@ -14,6 +14,7 @@ import { UPLOAD_TYPES } from "./constants/Gallery";
 import { DASHBOARD_HOME, DASHBOARD_PATH, DEVELOPER_MODE } from "./constants/Dashboard";
 
 import { EncodingOf, MIN_COMPRESS, Pack } from "./utils/compress";
+import { NoteRequest } from "./utils/slow";
 const DEFAULT_HOST = "0.0.0.0";
 const MAX_PORT = 65535;
 
@@ -161,6 +162,15 @@ export default class Server implements IServer {
         instance.addContentTypeParser("application/octet-stream", { parseAs: "buffer" }, (_request, body, done) =>
             done(null, body)
         );
+
+        // W-0141: Dauer jeder Antwort mit dem Muster der Route. Langsames landet im
+        // Ringpuffer (utils/slow.ts), das Admin Dashboard zeigt es unter Developer.
+        // EventSource-Leitungen (Puls, Live Tickets) bleiben absichtlich offen und zählen nicht.
+        instance.addHook("onResponse", async (request, reply) => {
+            if (request.headers.accept?.includes("text/event-stream")) return;
+
+            NoteRequest(request.method, request.routeOptions.url ?? "(ohne Route)", reply.statusCode, reply.elapsedTime);
+        });
 
         // JSON-Antworten gepackt: Listen wie Transcripts oder Live Tickets sind
         // sonst ein Vielfaches groesser. Dateien und Seiten packen SendFile und

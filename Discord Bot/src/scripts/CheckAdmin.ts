@@ -19,6 +19,7 @@ import { MODULE_IDS } from "../constants/Modules";
 import Command from "../structures/Command";
 import { ApplyPanelRef, FetchState, PanelDiff } from "../utils/guildpanels";
 import { CreateToken } from "../utils/jwt";
+import { ForgetSlow, NoteQuery, NoteRequest, SLOW_REQUEST_MS, SlowReport } from "../utils/slow";
 
 const PORT = 3998;
 const BASE = `http://127.0.0.1:${PORT}`;
@@ -200,6 +201,37 @@ async function main(): Promise<void> {
         JSON.stringify(byName("solo"))
     );
     check("Commands ohne Modul kommen mit module null", byName("intern")?.module === null, JSON.stringify(byName("intern")));
+
+    console.log("\n  — W-0141: langsame Anfragen —");
+
+    ForgetSlow();
+    NoteRequest("GET", "/dashboard/api/guilds/:id/levels", 200, 40);
+    NoteRequest("GET", "/dashboard/api/guilds/:id/levels", 200, 640);
+    NoteQuery("SELECT * FROM levels\n   WHERE guild_id = '123456789012345678' AND xp > 0", 260);
+    NoteQuery("SELECT 1", 2);
+
+    const noted = SlowReport();
+
+    check("Schnelles nur gezählt, Langsames gemerkt", [noted.requests, noted.slowRequests, noted.queries, noted.slowQueries].join() === "2,1,2,1", JSON.stringify(noted));
+    check(
+        "Muster statt Adresse, SQL ohne Werte, neueste zuerst",
+        noted.entries.map((entry) => `${entry.kind}|${entry.what}|${entry.status}`).join(" / ") === "sql|SELECT * FROM levels WHERE guild_id = ? AND xp > 0|null / request|GET /dashboard/api/guilds/:id/levels|200",
+        JSON.stringify(noted.entries)
+    );
+
+    for (let index = 0; index < 250; index++) NoteQuery("SELECT 2", 300);
+    check("Höchstens 200 gemerkt", SlowReport().entries.length === 200, String(SlowReport().entries.length));
+
+    ForgetSlow();
+    await fetch(`${BASE}/dcapi/admin/overview`, { headers: bearer(admin) });
+
+    const slowNone = await fetch(`${BASE}/dcapi/admin/dev/slow`);
+    const slowForeign = await fetch(`${BASE}/dcapi/admin/dev/slow`, { headers: bearer(plugin) });
+    const slowOk = await fetch(`${BASE}/dcapi/admin/dev/slow`, { headers: bearer(admin) });
+    const slowBody = (await slowOk.json()) as { requests?: number; requestMs?: number; entries?: unknown[] };
+
+    check("/admin/dev/slow ohne Token: 401, fremder Token: 403", slowNone.status === 401 && slowForeign.status === 403, `${slowNone.status} ${slowForeign.status}`);
+    check("/admin/dev/slow mit Admin-Token: Zählung läuft über den Server-Hook", slowOk.status === 200 && (slowBody.requests ?? 0) >= 1 && slowBody.requestMs === SLOW_REQUEST_MS && Array.isArray(slowBody.entries), JSON.stringify(slowBody));
 
     console.log("\n  — Jeder Command hat ein Modul —");
 
