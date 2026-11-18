@@ -254,3 +254,19 @@ Ohne SSH-Freigabe nicht geprüft. Wer nachsieht, braucht nur lesende Befehle:
 - Bot-`.env`: Wert von `DATABASE_POOL_LIMIT` (nur ob gesetzt und welche Zahl).
 - nginx auf dem Host: `nginx -T 2>/dev/null | grep -E "gzip|brotli"` (komprimiert der Host zwischen Container und Cloudflare?).
 - Cloudflare: Caching → Configuration → „Browser Cache TTL“ (steht vermutlich auf 4 Stunden statt „Respect Existing Headers“).
+
+## Nachtrag 18.11.2026: Zahlen vom VPS
+
+Die lesenden Abfragen hat die Hauptsitzung mit Freigabe des Nutzers ausgeführt (diese Prüfung blieb ohne SSH).
+
+- MariaDB läuft auf dem Host: `slow_query_log=ON`, `long_query_time=0.5`, `max_connections=151`, `Max_used_connections=11` (Uptime rund 17,5 Tage), `Threads_connected=9`, `innodb_buffer_pool_size=128 MB`. Bot `DATABASE_POOL_LIMIT=5`. nginx: `gzip on`, kein Brotli-Modul (Brotli liefert Cloudflare).
+- Indizes: `admin_audit` hat nur `PRIMARY(id)` und `idx_audit_created(created_at)`; `status_checks` hat `PRIMARY(id)`, `idx_checked(checked_at, service)`, `idx_down(state, checked_at)`.
+- Größen: `rlnexus_backups.guild_backups` 37 Zeilen / 32,1 MB, `status_checks` rund 109 700 Zeilen / 9,5 MB, `level_days` 1 928 Zeilen / 0,6 MB, `guild_activity` 1 500, `member_activity` 1 136, `channel_activity` 676, alles andere unter 0,2 MB.
+- Slow-Log (40 Einträge in rund 17 Tagen): 35× mysqldump der nächtlichen Sicherung auf `guild_backups` (1,8 bis 1,9 s, kein App-Pfad); 2× Upsert in `levels` (0,55 s) und 1× in `level_days` (0,59 s); 2× die Stundenauswertung der Statusseite über 90 Tage (0,52 bis 0,55 s, rund 106 000 Zeilen gelesen, Tmp-Tabellen).
+
+Was das geändert hat:
+
+- **Punkt 10:** Keine Index-Migration. Alle Tabellen mit Lücken (`admin_audit`, `custom_messages`, `av_cases`, `sixmans_rounds`) liegen unter 0,2 MB, ein voller Durchlauf kostet dort Millisekunden. Die einzige langsame App-Abfrage hat ihren Index schon (`idx_checked`), sie liest fast alle Zeilen. Abhilfe ist deshalb ein Zwischenspeicher: `loadHistory` (alle 2 Minuten im Hintergrund, `Admin Dashboard/server/status-post.ts:33`) merkt sich fertige Stunden und liest nur ab der vorletzten Stunde neu, ganz neu einmal am Tag.
+- **Punkt 5/9:** Die Upserts in `levels` und `level_days` aus dem Slow-Log sind der XP-Pfad je Nachricht; er macht jetzt 2 statt 4 Runden, die beiden Upserts laufen gleichzeitig.
+- **Punkt 14:** Mit `max_connections=151` und höchstens 11 benutzten Verbindungen ist Platz: Admin-Pool von 3 auf 5. Der Bot bleibt bei 5.
+- **Punkt 11:** Das Slow-Log von MariaDB läuft schon (ab 0,5 s). Die neue Messung im Prozess schaut ab 200 ms für SQL und 500 ms für Anfragen und braucht keinen Zugriff auf den Server.
