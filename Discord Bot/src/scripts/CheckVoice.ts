@@ -504,6 +504,86 @@ async function checkRouteHub(client: BotClient): Promise<void> {
     }
 }
 
+/** W-0143: Die Route liefert je offenem Kanal die Leute mit Status, Live-Werte und Einstellungen - auch wenn der Kanal oder Mitglieder fehlen. */
+async function checkRouteInfo(client: BotClient): Promise<void> {
+    console.log("\n  — Route: Infos je offenem Kanal (W-0143) —");
+
+    const KRAKEN = "90071992547409991";
+    const LUMI = "90071992547409992";
+    const GONE = "90071992547409993";
+    const STRANGER = "90071992547409999";
+    const route = new DashboardApiVoice(client) as unknown as { Read(access: unknown): Promise<Record<string, any>> };
+    const original = { hubs: client.voiceHubs.OfGuild, temps: client.tempVoices.OfGuild, settings: client.voiceService.Settings };
+    type Flags = Partial<Record<"selfMute" | "serverMute" | "selfDeaf" | "serverDeaf" | "streaming" | "selfVideo", boolean>>;
+    const member = (id: string, name: string, flags: Flags = {}) => ({
+        id,
+        displayName: name,
+        user: { username: name.toLowerCase() },
+        displayAvatarURL: () => `${id}.webp`,
+        voice: { selfMute: false, serverMute: false, selfDeaf: false, serverDeaf: false, streaming: false, selfVideo: false, ...flags },
+    });
+    const joe = member(USER, "Joe", { streaming: true });
+    const kraken = member(KRAKEN, "Kraken", { selfVideo: true, selfDeaf: true });
+    const lumi = member(LUMI, "Lumi", { serverMute: true });
+    const inside = (list: ReturnType<typeof member>[]) => ({
+        id: TEMP,
+        name: "Joes Kanal",
+        isVoiceBased: () => true,
+        members: new Collection(list.map((entry) => [entry.id, entry] as const)),
+        userLimit: 5,
+        bitrate: 64000,
+        rtcRegion: "rotterdam",
+        parent: { name: "Temp Voice" },
+    });
+    const channels = new Collection<string, unknown>([[TEMP, inside([lumi, kraken, joe])]]);
+    const members = new Collection<string, unknown>([
+        [USER, joe],
+        [LUMI, lumi],
+        [KRAKEN, kraken],
+    ]);
+    const guild = { id: GUILD, name: "Dev Server", channels: { cache: channels }, roles: { cache: new Collection() }, emojis: { cache: new Collection() }, members: { cache: members } };
+    const settings = { ...DefaultVoiceSettings(), trusted: [LUMI, STRANGER] };
+
+    client.voiceHubs.OfGuild = (async () => []) as unknown as typeof client.voiceHubs.OfGuild;
+    client.tempVoices.OfGuild = (async () => [
+        { channelId: TEMP, guildId: GUILD, hubId: 7, ownerId: USER, settings, support: false, createdAt: Date.now() },
+        { channelId: GONE, guildId: GUILD, hubId: 7, ownerId: USER, settings: DefaultVoiceSettings(), support: false, createdAt: Date.now() },
+    ]) as unknown as typeof client.tempVoices.OfGuild;
+    client.voiceService.Settings = (async () => ({ panel: "voice", panelChannelId: null, panelMessageId: null })) as unknown as typeof client.voiceService.Settings;
+
+    try {
+        const read = await route.Read({ guild });
+        const [open, gone] = read.open as Record<string, any>[];
+        const people = (open?.people ?? []) as Record<string, any>[];
+
+        check("Leute: Besitzer zuerst, dann nach Name", people.map((entry) => entry.name).join() === "Joe,Kraken,Lumi", people.map((entry) => entry.name).join());
+        check("Nur der Besitzer trägt die Krone", people.filter((entry) => entry.owner).length === 1 && people[0]?.owner === true);
+        check("Vom Server stumm geschaltet zählt als stumm", people[2]?.mute === true && people[2]?.deaf === false, JSON.stringify(people[2]));
+        check("Stream und Kamera kommen an, taub auch", people[0]?.stream === true && people[1]?.video === true && people[1]?.deaf === true);
+        check("Name, Nutzername und Avatar je Person", people[0]?.username === "joe" && people[0]?.avatar === `${USER}.webp`);
+        check(
+            "Live-Werte des Kanals",
+            open?.limit === 5 && open?.bitrate === 64 && open?.region === "rotterdam" && open?.category === "Temp Voice" && open?.support === false && open?.stealth === false && open?.ownerId === USER,
+            JSON.stringify({ limit: open?.limit, bitrate: open?.bitrate, region: open?.region, category: open?.category })
+        );
+        check("Vertraute aus dem Cache mit Namen", JSON.stringify(open?.trusted?.[0]) === `{"id":"${LUMI}","name":"Lumi","avatar":"${LUMI}.webp"}`, JSON.stringify(open?.trusted?.[0]));
+        check("Vertraute ohne Cache: ID als Name, kein Avatar", JSON.stringify(open?.trusted?.[1]) === `{"id":"${STRANGER}","name":"${STRANGER}","avatar":null}`, JSON.stringify(open?.trusted?.[1]));
+        check("Niemand gesperrt: leere Liste", Array.isArray(open?.blocked) && open.blocked.length === 0);
+        check("Kanal nicht im Cache: leer statt Fehler", gone?.people?.length === 0 && gone?.bitrate === 0 && gone?.category === null && gone?.limit === 0, JSON.stringify(gone));
+
+        // Review Focus: der Besitzer ist gerade nicht im Kanal.
+        channels.set(TEMP, inside([lumi, kraken]));
+
+        const without = (((await route.Read({ guild })).open as Record<string, any>[])[0]?.people ?? []) as Record<string, any>[];
+
+        check("Besitzer nicht drin: keine Krone, nach Name", without.map((entry) => entry.name).join() === "Kraken,Lumi" && without.every((entry) => !entry.owner), without.map((entry) => entry.name).join());
+    } finally {
+        Object.assign(client.voiceHubs, { OfGuild: original.hubs });
+        Object.assign(client.tempVoices, { OfGuild: original.temps });
+        Object.assign(client.voiceService, { Settings: original.settings });
+    }
+}
+
 async function main(): Promise<void> {
     console.log("\n🔊 Temp Voice\n");
 
@@ -517,6 +597,7 @@ async function main(): Promise<void> {
     await checkW137(client);
     await checkSweep(client);
     await checkRouteHub(client);
+    await checkRouteInfo(client);
 
     if (await client.databaseService.Connect()) {
         try {
