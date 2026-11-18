@@ -793,6 +793,15 @@ export async function checkBackupsDb(config: IConfig, http: IHttp): Promise<void
 
                 await override({ maxHand: 99 });
                 assert.equal(await moduleValue("backups", "maxHand", GUILD), 25, "über dem Höchstwert: gekappt");
+
+                // Review W-0137: gerundet wie im Bot.
+                await override({ maxHand: 11.6 });
+                assert.equal(await moduleValue("backups", "maxHand", GUILD), 12, "Kommazahl: gerundet wie im Bot");
+
+                // Review W-0137: Senkt RL Nexus die Aufbewahrung unter den gespeicherten Plan, zeigt die Seite, was wirklich gilt.
+                await override(null);
+                const lowered = (await http.raw("GET", internal, botHeaders())).json() as IServerBackups;
+                assert.deepEqual([lowered.keepMax, lowered.plan.plan.keep], [14, 14], "gespeichert 20, es gelten 14");
             } finally {
                 await override(null);
                 for (const id of made) await query(`DELETE FROM \`${backupDatabaseName()}\`.guild_backups WHERE id = ?`, [id]);

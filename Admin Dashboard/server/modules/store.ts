@@ -218,9 +218,10 @@ export async function moduleValue(module: string, key: string, guildId: string):
     if (!def) throw new Error(`${module}.${key} steht nicht im Verzeichnis.`);
 
     const [all, own] = await Promise.all([settingFor(module), overrideFor(module, guildId)]);
-    const value = own?.values[key] ?? all.values[key];
+    // Review W-0137: wie LimitInfo im Bot - je Quelle gerundet und in den Grenzen, Ausnahme nur bei Werten je Server.
+    const clamp = (raw: unknown): number | undefined => (typeof raw === "number" && Number.isFinite(raw) ? Math.min(def.max, Math.max(def.min, Math.round(raw))) : undefined);
 
-    return Math.min(def.max, Math.max(def.min, typeof value === "number" && Number.isFinite(value) ? value : def.standard));
+    return clamp(def.server ? own?.values[key] : undefined) ?? clamp(all.values[key]) ?? def.standard;
 }
 
 async function overrideFor(module: string, guildId: string): Promise<IBotModuleOverride | null> {

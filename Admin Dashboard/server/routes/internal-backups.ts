@@ -162,12 +162,16 @@ export async function internalBackupRoutes(app: FastifyInstance, { config }: { c
 
         const guildId = guildOf(request);
 
+        const keepMax = await moduleValue("backups", "maxPlanKeep", guildId);
+        const state = planState(await readPlan(guildId));
+
         return {
             guildId,
-            plan: planState(await readPlan(guildId)),
+            // Review W-0137: Senkt RL Nexus die Aufbewahrung, gilt beim Kürzen das Kleinere - die Seite zeigt genau das.
+            plan: { ...state, plan: { ...state.plan, keep: Math.min(state.plan.keep, keepMax) } },
             backups: await listBackups(guildId, "server"),
             hand: { used: await countHand(guildId, "server"), max: await moduleValue("backups", "maxHand", guildId) },
-            keepMax: await moduleValue("backups", "maxPlanKeep", guildId),
+            keepMax,
         };
     });
 

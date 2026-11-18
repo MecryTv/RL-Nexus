@@ -85,7 +85,7 @@ weil Discord die Obergrenze vorgibt. „neu“ = heute ohne Obergrenze.
 | custom-message | maxMessages | Nachrichten höchstens | 50 | 1–200 | auf Anfrage | MAX_MESSAGES |
 | custom-message | maxResponses | Stichwörter höchstens | 50 | 1–200 | auf Anfrage | MAX_RESPONSES |
 | backups | maxHand | Backups von Hand höchstens | 10 | 1–25 | auf Anfrage | SERVER_HAND_MAX (Admin) |
-| backups | maxPlanKeep | Automatische behalten höchstens | 14 | 1–30 | fest | PLAN_KEEP_MAX (Admin) |
+| backups | maxPlanKeep | Automatische Backups behalten höchstens | 14 | 1–30 | fest | PLAN_KEEP_MAX (Admin) |
 
 Die Bezeichnungen enden auf „höchstens“, wie in W-0133; der Reiter Grenzen
 schneidet das Wort für die Anzeige ab (`limitName`).
