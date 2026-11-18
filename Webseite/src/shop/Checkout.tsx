@@ -82,9 +82,8 @@ export function Checkout({ product, me, stripeKey, onPaid, onClose }: ICheckoutP
         setError(null);
 
         try {
-            const start = await startCheckout(product.id);
-            const { loadStripe } = await import("@stripe/stripe-js");
-            const stripe = await loadStripe(stripeKey);
+            // W-0141: Kasse anlegen und Stripe laden gleichzeitig, nicht nacheinander.
+            const [start, stripe] = await Promise.all([startCheckout(product.id), import("@stripe/stripe-js").then(({ loadStripe }) => loadStripe(stripeKey))]);
             if (!stripe || !mount.current) throw new ShopError("Stripe ließ sich nicht laden. Blockiert ein Werbeblocker js.stripe.com?", 0);
 
             const sdk = stripe.initCheckoutElementsSdk({ clientSecret: start.clientSecret, elementsOptions: { appearance: APPEARANCE } });

@@ -207,11 +207,11 @@ export async function publicShopRoutes(app: FastifyInstance, { config }: { confi
     });
 
     app.get("/public/shop/state", async (request, reply): Promise<IShopState> => {
-        const settings = await readSettings();
-        const products = (await listProducts()).filter((product) => product.visible).map(publicProduct);
         let session = readShopSession(request, config);
         let me: IShopMe | null = null;
-        const ban = session ? await bannedFor(session.id) : null;
+        // W-0141: Einstellungen, Produkte und Sperre gleichzeitig; die Produktliste reicht auch für den Titel unten.
+        const [settings, all, ban] = await Promise.all([readSettings(), listProducts(), session ? bannedFor(session.id) : null]);
+        const products = all.filter((product) => product.visible).map(publicProduct);
 
         // W-0057: Webseite und Shop gesperrt beendet die Sitzung; die nächste Anmeldung zeigt die Sperrseite.
         // Nur die Webseite: Die Sitzung bleibt für den Shop, die Seite Zugang leitet zur Sperrseite.
@@ -221,16 +221,15 @@ export async function publicShopRoutes(app: FastifyInstance, { config }: { confi
         }
 
         if (session) {
-            const customer = await customerOf(session.id);
+            const [customer, grants, paid] = await Promise.all([customerOf(session.id), grantsOf(session.id), paidByGrant(session.id)]);
 
             if (customer) {
                 const now = new Date();
-                const grants = await grantsOf(session.id);
                 const access = accessOf(grants, now);
                 const banned = customer.bannedAt !== null || ban?.shop === true;
                 const lock = ban?.ban && (ban.website || ban.shop) ? ban.ban : null;
                 const running = access.grant;
-                const title = running === null ? null : running.source === "trial" ? "Test" : ((await findProduct(running.productId ?? 0))?.title ?? null);
+                const title = running === null ? null : running.source === "trial" ? "Test" : (all.find((product) => product.id === running.productId)?.title ?? null);
                 // Dieselbe Regel wie beim Checkout: Die Seite sieht nur den längsten Zugang, der Server alle.
                 const blocked = Object.fromEntries(
                     products.flatMap((product) => {
@@ -238,8 +237,6 @@ export async function publicShopRoutes(app: FastifyInstance, { config }: { confi
                         return problem === null ? [] : [[String(product.id), problem]];
                     })
                 );
-                const paid = await paidByGrant(session.id);
-
                 me = {
                     id: session.id,
                     name: session.name,
