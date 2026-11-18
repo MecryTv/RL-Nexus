@@ -489,6 +489,66 @@ async function checkW137(client: BotClient): Promise<void> {
     SetFlags([], [], []);
 }
 
+/** W-0137 Review: Resume startet die am längsten Wartenden zuerst, verliert bei einem Fehler niemanden, und wer an der Grenze wartet, fliegt nicht wegen Leerlauf raus. */
+async function checkW137Review(client: BotClient): Promise<void> {
+    console.log("\n  — W-0137 Review: Warten an der Grenze —");
+
+    const service = client.sixMansService;
+    const guild = FakeGuild();
+    const settings = { ...DefaultSixSettings(), idleMinutes: 30, modes: Object.fromEntries(MODES.map((mode) => [mode, true])) as Record<ManMode, boolean> };
+    const old = Date.now() - 2 * 3_600_000;
+    const people = (prefix: string, count: number, since: number): ISixWaiting[] => Array.from({ length: count }, (_, index) => ({ userId: `${prefix}${index}`, name: `${prefix}${index}`, mmr: 600, since }));
+    const set = (mode: ManMode, queue: ISixWaiting[]) => (service as unknown as { Set(guildId: string, mode: ManMode, queue: ISixWaiting[]): void }).Set(GUILD, mode, queue);
+    const rounds = (count: number) => Array.from({ length: count }, (_, index) => FakeRound({ id: 500 + index, blue: [], orange: [] }));
+    const started: ManMode[] = [];
+    let running = rounds(9);
+    let failMode: ManMode | null = null;
+
+    client.guilds.cache.set(GUILD, guild);
+    client.sixRounds.Running = async () => running;
+    client.sixRounds.Cleanable = async () => [];
+    service.Settings = async () => settings;
+    service.Panel = async () => undefined;
+    (service as unknown as { Start: (guild: Guild, settings: unknown, mode: ManMode) => Promise<ISixRound> }).Start = async (_guild, _settings, mode) => {
+        if (mode === failMode) throw new Error("Datenbank weg");
+
+        started.push(mode);
+
+        return FakeRound({ mode });
+    };
+
+    for (const mode of MODES) set(mode, []);
+
+    // Ein freier Platz, zwei volle Schlangen: wer länger wartet, fängt an.
+    set(2, people("neu", 2, Date.now() - 60_000));
+    set(4, people("alt", 4, old));
+
+    const first = await service.Resume(guild);
+
+    check("Ein freier Platz: die am längsten Wartenden zuerst", first.length === 1 && started.join() === "4" && service.Queue(GUILD, 2).length === 2, `${started.join()} | ${service.Queue(GUILD, 2).length}`);
+
+    // Alles belegt: die volle Schlange wartet auf einen Platz und bleibt, eine halbe alte Schlange darf gehen.
+    running = rounds(10);
+    set(2, people("neu", 2, old));
+    set(6, people("halb", 3, old));
+    await service.Sweep();
+    check("Leerlauf: wer an der Grenze wartet, bleibt", service.Queue(GUILD, 2).length === 2, String(service.Queue(GUILD, 2).length));
+    check("…eine halbe, alte Schlange wird geleert", service.Queue(GUILD, 6).length === 0, String(service.Queue(GUILD, 6).length));
+
+    // Zwei freie Plätze, der Start des ersten Modus scheitert: niemand geht verloren, der zweite läuft trotzdem.
+    running = rounds(8);
+    failMode = 2;
+    set(4, people("vier", 4, old + 1_000));
+
+    let thrown = false;
+    const result = await service.Resume(guild).catch(() => ((thrown = true), []));
+
+    check("Scheitert ein Start, stehen alle wieder an", !thrown && service.Queue(GUILD, 2).map((entry) => entry.userId).join() === "neu0,neu1", `${thrown} | ${service.Queue(GUILD, 2).map((entry) => entry.userId).join()}`);
+    check("…und die anderen Modi starten trotzdem", result.length === 1 && started.at(-1) === 4, `${result.length} | ${started.join()}`);
+
+    client.guilds.cache.delete(GUILD);
+}
+
 async function main(): Promise<void> {
     console.log("\n🎮 2, 4 & 6 Mans\n");
 
@@ -501,6 +561,7 @@ async function main(): Promise<void> {
     await checkViews(client);
     await checkLists();
     await checkW137(client);
+    await checkW137Review(client);
 
     console.log(failures === 0 ? "\n✅ Alle Prüfungen bestanden.\n" : `\n❌ ${failures} Prüfung(en) fehlgeschlagen.\n`);
 

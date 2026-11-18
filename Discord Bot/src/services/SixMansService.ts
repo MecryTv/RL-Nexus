@@ -303,7 +303,14 @@ export default class SixMansService {
             if (rest.length !== waiting.length) this.Set(guildId, other, rest);
         }
 
-        return this.Start(guild, settings, mode, playing);
+        try {
+            return await this.Start(guild, settings, mode, playing);
+        } catch (error) {
+            // Review W-0137: Scheitert das Anlegen, stehen die Spieler wieder vorne an - sonst wären sie still weg.
+            this.Set(guildId, mode, [...playing, ...this.Queue(guildId, mode).filter((entry) => !playing.some((one) => one.userId === entry.userId))]);
+
+            throw error;
+        }
     }
 
     /** W-0137: Ist eine Runde vorbei, starten die Warteschlangen, die wegen maxRunning warten mussten. */
@@ -312,12 +319,19 @@ export default class SixMansService {
         const max = SixMansLimits(guild.id).running;
         const started: ISixRound[] = [];
         let running = Counting(await this.client.sixRounds.Running(guild.id));
+        // Review W-0137: wer am längsten wartet, fängt an - sonst kommt bei knappen Plätzen immer derselbe Modus zuerst.
+        const since = (mode: ManMode): number => this.Queue(guild.id, mode)[0]?.since ?? Number.MAX_SAFE_INTEGER;
 
-        for (const mode of MODES) {
+        for (const mode of [...MODES].sort((a, b) => since(a) - since(b))) {
             if (running >= max || !settings.modes[mode] || this.Queue(guild.id, mode).length < mode) continue;
 
-            started.push(await this.Launch(guild, settings, mode));
-            running++;
+            // Ein gescheiterter Start hält die anderen Modi nicht auf; Launch stellt die Spieler wieder an.
+            try {
+                started.push(await this.Launch(guild, settings, mode));
+                running++;
+            } catch (error) {
+                logger.warn(`🎮 ${MODE_LABELS[mode]} auf ${guild.id} nicht gestartet: ${String(error)}`);
+            }
         }
 
         if (started.length) await this.Panel(guild, settings).catch(() => undefined);
@@ -575,7 +589,7 @@ export default class SixMansService {
 
         await this.Refresh(guild, settings, done).catch(() => undefined);
         await this.Panel(guild, settings).catch(() => undefined);
-        await this.Resume(guild).catch(() => undefined);
+        await this.Resume(guild).catch((error) => logger.warn(`🎮 Warteschlangen auf ${guild.id} nicht fortgesetzt: ${String(error)}`));
 
         this.client.pulseService.Emit(guild.id, "sixmans", { round: round.id, done: true });
         logger.user(`🎮 ${MODE_LABELS[round.mode]} Runde #${round.id} auf ${guild.id}: ${TEAM_LABELS[winner]} gewinnt (±${change})`);
@@ -602,7 +616,7 @@ export default class SixMansService {
         const settings = await this.Settings(guild.id);
 
         await this.Refresh(guild, settings, done, "✖️ **Abgebrochen.** Die MMR bleibt, wie sie war.").catch(() => undefined);
-        await this.Resume(guild).catch(() => undefined);
+        await this.Resume(guild).catch((error) => logger.warn(`🎮 Warteschlangen auf ${guild.id} nicht fortgesetzt: ${String(error)}`));
 
         this.client.pulseService.Emit(guild.id, "sixmans", { round: roundId, done: true });
 
@@ -755,7 +769,8 @@ export default class SixMansService {
 
             const settings = await this.Settings(guildId);
 
-            if (!settings.idleMinutes) continue;
+            // Review W-0137: Eine volle Schlange wartet auf einen freien Platz (maxRunning) - ihr wurde „Ihr bleibt“ versprochen.
+            if (!settings.idleMinutes || queue.length >= mode) continue;
 
             const fresh = queue.filter((entry) => Date.now() - entry.since < settings.idleMinutes * MINUTE);
 
