@@ -54,6 +54,13 @@ export function SelfRoleLimits(guildId: string): { panels: number; roles: number
     };
 }
 
+/** Review W-0137: Ab Discords Grenze sagt die Meldung das, ohne Grenze von RL Nexus - darunter ist es eine von RL Nexus. */
+export function ReactionLimit(count: number, allowed: number): SelfRoleError {
+    return allowed >= DISCORD_REACTIONS
+        ? new SelfRoleError(`Discord erlaubt höchstens ${DISCORD_REACTIONS} verschiedene Reaktionen an einer Nachricht.`)
+        : new SelfRoleError(`Höchstens ${allowed} verschiedene Reaktionen an einer Nachricht.`, { module: SELF_ROLE_MODULE, key: "maxReactions", asked: count, allowed });
+}
+
 /** Eine Komponente als JSON, so weit Self Roles hineinschaut. */
 export interface IRawComponent {
     type: number;
@@ -64,6 +71,8 @@ export interface IRawComponent {
 
 /** Discord: fünf Reihen an einer klassischen Nachricht, 40 Komponenten (mit allem darin) in Components V2. */
 const MAX_ROWS = 5;
+/** Mehr verschiedene Reaktionen nimmt Discord an einer Nachricht nicht. */
+const DISCORD_REACTIONS = 20;
 const MAX_V2 = 40;
 /** Frühestens so lange nach dem letzten Nachziehen wird eine angehängte Reihe wieder angehängt. */
 const REATTACH_PAUSE = 5_000;
@@ -260,9 +269,7 @@ export default class SelfRoleService {
     private CheckReactions(guild: Guild, roles: ISelfRole[]): void {
         const reactions = SelfRoleLimits(guild.id).reactions;
 
-        if (roles.length > reactions) {
-            throw new SelfRoleError(`Höchstens ${reactions} verschiedene Reaktionen an einer Nachricht.`, { module: SELF_ROLE_MODULE, key: "maxReactions", asked: roles.length, allowed: reactions });
-        }
+        if (roles.length > reactions) throw ReactionLimit(roles.length, reactions);
 
         const seen = new Set<string>();
 
@@ -523,7 +530,7 @@ export default class SelfRoleService {
 
         for (const emoji of plan.add) {
             await message.react(emoji).catch(() => {
-                throw new SelfRoleError(`${emoji} ging nicht an die Nachricht. Braucht der Bot „Reaktionen hinzufügen“, oder hängen dort schon 20 verschiedene (mehr erlaubt Discord nicht)?`);
+                throw new SelfRoleError(`${emoji} ging nicht an die Nachricht. Braucht der Bot „Reaktionen hinzufügen“, oder hängen dort schon ${DISCORD_REACTIONS} verschiedene (mehr erlaubt Discord nicht)?`);
             });
         }
     }

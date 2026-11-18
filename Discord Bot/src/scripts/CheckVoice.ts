@@ -353,7 +353,7 @@ async function checkW137(client: BotClient): Promise<void> {
     let created = 0;
     const base = FakeGuild();
     const guild = { ...base, channels: { ...base.channels, create: async () => (created++, { id: TEMP, name: "Laras Kanal", send: async () => undefined }) } } as unknown as Guild;
-    const member = { ...FakeMember(guild, USER, null), send: async (text: string) => void sent.push(text) } as unknown as GuildMember;
+    const member = { ...FakeMember(guild, USER, null), permissions: { has: () => false }, send: async (text: string) => void sent.push(text) } as unknown as GuildMember;
     const hub = { id: 1, guildId: GUILD, channelId: HUB, config: { ...DefaultHubConfig(), presets: false }, createdBy: USER };
     const create = (service as unknown as { Create(hub: unknown, member: GuildMember): Promise<void> }).Create.bind(service);
     const original = { temps: client.tempVoices.OfGuild, tempCreate: client.tempVoices.Create, hubs: client.voiceHubs.OfGuild, settings: service.Settings };
@@ -370,6 +370,10 @@ async function checkW137(client: BotClient): Promise<void> {
         await create(hub, member);
         check("Bei 50 Temp-Kanälen wird kein weiterer angelegt", created === 0, String(created));
         check("Die Person bekommt Bescheid", sent.length === 1 && sent[0].includes("50"), sent.join(" | "));
+        // Review W-0137: mit dem Satz zur Grenze - und nicht bei jedem Betreten des Hubs eine neue DM.
+        check("…mit dem Satz, dass RL Nexus die Grenze festlegt", sent[0]?.includes("RL Nexus") === true, sent[0]);
+        await create(hub, member);
+        check("…und ein zweites Betreten gleich danach schreibt nicht noch einmal", sent.length === 1, String(sent.length));
 
         let hit: unknown = null;
 

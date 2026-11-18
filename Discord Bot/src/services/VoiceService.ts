@@ -11,7 +11,7 @@ import {
     VoiceState,
 } from "discord.js";
 import BotClient from "../client/BotClient";
-import { ILimitHit } from "../builder/LimitReply";
+import { AskLine, ILimitHit, IsServerAdmin } from "../builder/LimitReply";
 import { ModuleValue } from "../utils/moduleFlags";
 import { InfoCard } from "../builder/CommunityView";
 import { VoicePanel } from "../builder/VoiceView";
@@ -50,6 +50,8 @@ export function VoiceLimits(guildId: string | null): { hubs: number; temp: numbe
 }
 
 export const VOICE_MODULE = "voice-hub";
+/** So lange bekommt jemand an der Grenze der Temp-Kanäle keine zweite DM. */
+const TOLD_MS = 10 * 60_000;
 
 function IsRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -70,6 +72,9 @@ export default class VoiceService {
     // Wer gerade einen Kanal bekommt: zwei Beitritte in derselben Sekunde
     // dürfen nicht zwei Kanäle ergeben.
     private readonly creating = new Set<string>();
+    // Review W-0137: wann jemand zuletzt die DM zur Grenze bekam, je Server und Person - nicht bei jedem Betreten neu.
+    // ponytail: wächst mit den Leuten, die an die Grenze stoßen; leeren, falls das je viele werden.
+    private readonly told = new Map<string, number>();
 
     constructor(client: BotClient) {
         this.client = client;
@@ -246,7 +251,14 @@ export default class VoiceService {
 
             // W-0137: Bei der Grenze bleibt die Person im Hub und bekommt kurz Bescheid.
             if (all.length >= max) {
-                await member.send(`Auf **${guild.name}** gibt es gerade ${all.length} temporäre Sprachkanäle, mehr gehen dort nicht. Versuch es gleich noch einmal.`).catch(() => undefined);
+                const key = `${guild.id}:${member.id}`;
+
+                if (Date.now() - (this.told.get(key) ?? 0) < TOLD_MS) return;
+
+                const ask = AskLine({ module: VOICE_MODULE, key: "maxTempChannels", guildId: guild.id, admin: IsServerAdmin(member) });
+
+                this.told.set(key, Date.now());
+                await member.send(`Auf **${guild.name}** gibt es gerade ${all.length} temporäre Sprachkanäle, mehr gehen dort nicht. Versuch es gleich noch einmal.\n-# ${ask.text}`).catch(() => undefined);
 
                 return;
             }

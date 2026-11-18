@@ -28,7 +28,7 @@ import BotClient from "../client/BotClient";
 import { PanelRows } from "../builder/SelfRoleView";
 import { CleanEmoji, DefaultBody, EmojiKey, MAX_REACTIONS, MAX_ROLES, SELF_ROLE_MODULE, SELF_ROLE_PREFIX } from "../constants/SelfRoles";
 import { ISelfRolePanel } from "../interfaces/services/selfroles/ISelfRoles";
-import { IRawComponent, ReactionParam, SelfRoleError, SelfRoleLimits } from "../services/SelfRoleService";
+import { IRawComponent, ReactionLimit, ReactionParam, SelfRoleError, SelfRoleLimits } from "../services/SelfRoleService";
 import { SetFlags } from "../utils/moduleFlags";
 
 const GUILD = "90071992547409931";
@@ -154,6 +154,13 @@ async function checkClean(client: BotClient): Promise<void> {
     }
 
     check("W-0137: Server-Wert 1 bei Reaktionen, mit Grenze im Fehler", reaction.includes("1") && reaction.endsWith("|maxReactions"), reaction);
+
+    // Review W-0137: 20 verschiedene Reaktionen ist Discords Grenze - dann sagt die Meldung das, ohne Grenze von RL Nexus.
+    const discord = ReactionLimit(21, 20);
+    const ours = ReactionLimit(6, 5);
+
+    check("Bei 20 Reaktionen: Discords Grenze, keine von RL Nexus", discord.message.startsWith("Discord erlaubt höchstens 20") && discord.limit === undefined, `${discord.message}|${discord.limit?.key}`);
+    check("Darunter: Grenze von RL Nexus mit Wert", ours.message.startsWith("Höchstens 5 verschiedene") && ours.limit?.key === "maxReactions" && ours.limit.allowed === 5, `${ours.message}|${ours.limit?.key}`);
 
     const panels = service as unknown as { Panels: (guildId: string) => Promise<unknown[]> };
     const original = panels.Panels;
