@@ -85,9 +85,15 @@ export default class Matchups extends Model<IMatchupRow> {
         return (await this.Get(Number(result.insertId)))!;
     }
 
-    /** W-0137: offene Partien eines Servers - gespielte und abgesagte zählen nicht. */
-    async CountPlanned(guildId: string): Promise<number> {
-        const row = await this.db.One<{ total: number | string }>(`SELECT COUNT(*) AS total FROM \`${this.Table}\` WHERE guild_id = ? AND status = 'planned'`, [guildId]);
+    /**
+     * W-0137: offene Partien eines Servers - gespielte und abgesagte zählen nicht,
+     * eine ohne Ergebnis nur bis UPCOMING_GRACE_HOURS nach Anpfiff (Review W-0137).
+     */
+    async CountPlanned(guildId: string, now = Date.now()): Promise<number> {
+        const row = await this.db.One<{ total: number | string }>(`SELECT COUNT(*) AS total FROM \`${this.Table}\` WHERE guild_id = ? AND status = 'planned' AND at > ?`, [
+            guildId,
+            now - UPCOMING_GRACE_HOURS * 3_600_000,
+        ]);
 
         return Number(row?.total ?? 0);
     }

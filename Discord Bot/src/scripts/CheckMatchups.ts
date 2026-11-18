@@ -25,6 +25,7 @@ import {
     KickoffSuggestions,
     KICKOFF_HELP,
     LIVE_HOURS,
+    UPCOMING_GRACE_HOURS,
     LegacyAnnounce,
     LegacyRemind,
     LegacyResult,
@@ -1223,7 +1224,11 @@ async function checkW137(client: BotClient): Promise<void> {
     const queries: { sql: string; params: unknown[] }[] = [];
     const model = new MatchupsModel({ databaseService: { One: async (sql: string, params: unknown[]) => (queries.push({ sql, params }), { total: "7" }) } } as unknown as BotClient);
 
-    check("Offen heißt geplant: gespielte und abgesagte zählen nicht", (await model.CountPlanned(GUILD)) === 7 && /status = 'planned'/.test(queries[0]?.sql ?? "") && queries[0]?.params[0] === GUILD, JSON.stringify(queries[0]));
+    const stamp = 1_800_000_000_000;
+
+    check("Offen heißt geplant: gespielte und abgesagte zählen nicht", (await model.CountPlanned(GUILD, stamp)) === 7 && /status = 'planned'/.test(queries[0]?.sql ?? "") && queries[0]?.params[0] === GUILD, JSON.stringify(queries[0]));
+    // Review W-0137: Eine Partie ohne Ergebnis ist 6 Stunden nach Anpfiff nicht mehr offen - sie zählt nicht ewig gegen die Grenze.
+    check("Alte Partien ohne Ergebnis zählen nicht mehr", /at > \?/.test(queries[0]?.sql ?? "") && queries[0]?.params.includes(stamp - UPCOMING_GRACE_HOURS * HOUR) === true, JSON.stringify(queries[0]));
 }
 
 async function main(): Promise<void> {
