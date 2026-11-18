@@ -2006,6 +2006,9 @@ async function main(): Promise<void> {
     const source = (...parts: string[]) => readFile(path.join(process.cwd(), "src", ...parts), "utf8");
     const pointers = [await source("dashboard", "client", "constants", "Ranks.ts"), await source("builder", "EpicPage.ts"), await source("dashboard", "client", "layout", "RoleListImageEditor.ts")].join("\n");
 
+    const vitals = await source("dashboard", "client", "core", "Vitals.ts");
+
+    check("Ladezeiten ohne Cookies und ohne Referer (Review W-0141)", vitals.includes('credentials: "omit"') && vitals.includes('referrerPolicy: "no-referrer"'));
     check("Client und Epic-Seite zeigen auf die WebP-Dateien", !/rlranks\/small\/[^`]*\.png|Banner\.png/.test(pointers) && pointers.includes("Banner.webp"));
 
     // W-0141: echte Ladezeiten gehen ans Admin Dashboard, mit eigenem Token; der Browser bekommt immer 204.

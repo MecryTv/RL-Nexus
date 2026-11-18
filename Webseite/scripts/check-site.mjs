@@ -158,6 +158,14 @@ check("Kontakt: Thema Sponsoring und Vorauswahl über ?thema=", () => {
     assert.match(source("../src/components/sections/ContactForm.tsx"), /thema/);
 });
 
+check("W-0141 Review: Ladezeiten ohne Cookies und ohne Referer, auch beim Schließen", () => {
+    const vitals = source("../src/services/vitals.ts");
+
+    assert.match(vitals, /credentials: "omit"/);
+    assert.match(vitals, /referrerPolicy: "no-referrer"/);
+    assert.match(vitals, /keepalive: true/);
+});
+
 check("Datenschutz nennt den neuen Eintrag im Browser", () => {
     assert.match(source("../src/pages/LegalPage.tsx"), /rlnexus\.news\.besuch/);
 });

@@ -35,6 +35,8 @@ export function startVitals(endpoint: string): void {
             method: "POST",
             keepalive: true,
             credentials: "omit",
+            // Review W-0141: Sonst stünde die Adresse der Seite als Referer im Zugriffsprotokoll.
+            referrerPolicy: "no-referrer",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ device: window.matchMedia("(max-width: 767px)").matches ? "mobile" : "desktop", metrics: values }),
         }).catch(() => undefined);
