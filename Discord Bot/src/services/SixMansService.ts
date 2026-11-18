@@ -233,9 +233,9 @@ export default class SixMansService {
 
         if (!settings.modes[mode]) throw new SixMansError(`${MODE_LABELS[mode]} ist auf diesem Server gerade aus.`);
 
-        const queue = [...this.Queue(guildId, mode)];
+        const already = `Du stehst schon in der Warteschlange für ${MODE_LABELS[mode]}.`;
 
-        if (queue.some((entry) => entry.userId === member.id)) throw new SixMansError(`Du stehst schon in der Warteschlange für ${MODE_LABELS[mode]}.`);
+        if (this.Queue(guildId, mode).some((entry) => entry.userId === member.id)) throw new SixMansError(already);
 
         const running = await this.client.sixRounds.Running(guildId);
 
@@ -244,6 +244,10 @@ export default class SixMansService {
         }
 
         const player = await this.client.sixPlayers.Ensure(guildId, mode, member.id, member.displayName, settings.start);
+        // Erst nach dem Warten kopieren: Resume() kann inzwischen Leute gestartet und aus der Schlange genommen haben (Review W-0137).
+        const queue = [...this.Queue(guildId, mode)];
+
+        if (queue.some((entry) => entry.userId === member.id)) throw new SixMansError(already);
 
         queue.push({ userId: member.id, name: member.displayName, mmr: player.mmr, since: Date.now() });
         this.Set(guildId, mode, queue);
@@ -255,7 +259,8 @@ export default class SixMansService {
         }
 
         const max = SixMansLimits(guildId).running;
-        const counted = Counting(running);
+        // Frisch gezählt: während des Wartens kann eine Runde geendet oder begonnen haben.
+        const counted = Counting(await this.client.sixRounds.Running(guildId));
 
         // W-0137: Laufen schon so viele Runden, wie der Server darf, warten alle weiter - Resume() startet sie, sobald eine endet.
         if (counted >= max) {

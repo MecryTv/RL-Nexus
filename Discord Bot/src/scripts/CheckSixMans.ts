@@ -446,6 +446,36 @@ async function checkW137(client: BotClient): Promise<void> {
 
     check("Zehn liegengebliebene Runden (7 h alt) zählen nicht: es geht los", started.join(",") === "6,6" && service.Queue(GUILD, 6).length === 0, started.join(","));
 
+    // W-0137 Review: Endet während eines Beitritts eine Runde, startet Resume() die Wartenden - der Beitritt holt sie nicht zurück.
+    running = Array.from({ length: 10 }, (_, index) => FakeRound({ id: 400 + index, blue: [], orange: [] }));
+    await service.Join(member(0), 2);
+    await service.Join(member(1), 2).catch(() => undefined);
+
+    const ensure = client.sixPlayers.Ensure;
+    let raced: unknown = null;
+
+    client.sixPlayers.Ensure = (async (...args: Parameters<typeof ensure>) => {
+        if (args[2] === players[2].userId) {
+            running = running.slice(1);
+            await service.Resume(guild);
+        }
+
+        return { mmr: 600 };
+    }) as typeof ensure;
+
+    try {
+        await service.Join(member(2), 2);
+    } catch (error) {
+        raced = error;
+    }
+
+    client.sixPlayers.Ensure = ensure;
+    check(
+        "Beitritt während Resume: die Gestarteten stehen nicht wieder an, nur der Neue wartet",
+        raced === null && started.join(",") === "6,6,2" && service.Queue(GUILD, 2).map((entry) => entry.userId).join() === players[2].userId,
+        `${String(raced)} | ${started.join(",")} | ${service.Queue(GUILD, 2).map((entry) => entry.name).join()}`
+    );
+
     const route = new DashboardApiSixMans(client) as unknown as { Read(access: unknown, query: unknown): Promise<Record<string, any>> };
 
     service.Rounds = (async () => ({ rows: [], total: 0 })) as unknown as typeof service.Rounds;
