@@ -9,14 +9,10 @@ export const SELF_ROLE_MODULE = "reaction-roles";
 /** Der Anfang jeder Custom-ID: selfrole:<panel>:<rolle> bzw. selfrole:menu:<panel>. */
 export const SELF_ROLE_PREFIX = "selfrole";
 
-export const MAX_PANELS = 25;
-/** Discord: fünf Knöpfe je Reihe, fünf Reihen - und 25 Einträge je Menü. */
-export const MAX_ROLES = 25;
+// W-0137: Panels, Rollen je Panel und Reaktionen sind Grenzen von RL Nexus (MODULE_SETTINGS, SelfRoleLimits).
 export const MAX_NAME = 80;
 export const MAX_LABEL = 80;
 export const MAX_DESCRIPTION = 100;
-/** Discord: höchstens 20 verschiedene Reaktionen an einer Nachricht. */
-export const MAX_REACTIONS = 20;
 
 export const KIND_LABELS: Record<string, string> = {
     buttons: "Knöpfe",

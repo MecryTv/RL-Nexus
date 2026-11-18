@@ -26,7 +26,12 @@ import {
 } from "discord.js";
 import BotClient from "../client/BotClient";
 import { PanelRows } from "../builder/SelfRoleView";
-import { CleanEmoji, DefaultBody, EmojiKey, MAX_REACTIONS, MAX_ROLES, SELF_ROLE_MODULE, SELF_ROLE_PREFIX } from "../constants/SelfRoles";
+import { CleanEmoji, DefaultBody, EmojiKey, SELF_ROLE_MODULE, SELF_ROLE_PREFIX } from "../constants/SelfRoles";
+import { settingDef } from "../constants/ModuleSettings";
+
+/** Ohne Server-Wert: die Standards aus dem Verzeichnis (W-0137). */
+const MAX_ROLES = settingDef("reaction-roles", "maxRoles")!.standard;
+const MAX_REACTIONS = settingDef("reaction-roles", "maxReactions")!.standard;
 import { ISelfRolePanel } from "../interfaces/services/selfroles/ISelfRoles";
 import { IRawComponent, ReactionLimit, ReactionParam, SelfRoleError, SelfRoleLimits } from "../services/SelfRoleService";
 import { SetFlags } from "../utils/moduleFlags";

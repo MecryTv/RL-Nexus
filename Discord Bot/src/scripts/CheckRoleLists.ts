@@ -14,7 +14,11 @@ import path from "path";
 import { readFileSync } from "fs";
 import { ChannelType, Guild, GuildBasedChannel, Role } from "discord.js";
 import BotClient from "../client/BotClient";
-import { IMAGE_PRESETS, ImagePreset, DefaultListSettings, MAX_IMAGE_PEOPLE, MAX_ROLES, MAX_TITLE, MAX_TITLES } from "../constants/RoleLists";
+import { IMAGE_PRESETS, ImagePreset, DefaultListSettings, MAX_IMAGE_PEOPLE, MAX_TITLE, MAX_TITLES } from "../constants/RoleLists";
+import { settingDef } from "../constants/ModuleSettings";
+
+/** Rollen je Liste ohne Server-Wert: der Standard aus dem Verzeichnis (W-0137). */
+const MAX_ROLES = settingDef("role-lists", "maxRoles")!.standard;
 import { CleanImage, GroupMembers, RoleListError, TwemojiUrl } from "../services/RoleListService";
 import { RoleListPanels } from "../utils/guildpanels";
 import DashboardApiRoleLists from "../routes/DashboardApiRoleLists";
