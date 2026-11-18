@@ -35,7 +35,7 @@ export function Reader({
     folders,
     onChanged,
     onGone,
-    onPending,
+    pending,
 }: {
     readonly account: IMailAccount;
     readonly accounts: readonly IMailAccount[];
@@ -44,8 +44,8 @@ export function Reader({
     readonly folders: readonly IMailFolder[];
     readonly onChanged: () => void;
     readonly onGone: () => void;
-    /** W-0141: Was die Liste sofort zeigen soll, null nimmt es zurück. */
-    readonly onPending: (uid: number, pending: MailPending | null) => void;
+    /** W-0141: Was die Liste sofort zeigt (mail/pending.ts). start ist false, solange auf diese Mail schon eine Aktion läuft. */
+    readonly pending: { readonly start: (uid: number, kind: MailPending) => boolean; readonly done: (uid: number) => void; readonly failed: (uid: number) => void };
 }): JSX.Element {
     const notify = useToast();
     const [images, setImages] = useState(false);
@@ -77,16 +77,19 @@ export function Reader({
      * Lesebereich schließt. Scheitert es, steht die Mail wieder da und der
      * Grund kommt als Meldung. Löschen wartet weiter auf den Server.
      */
-    async function rightAway(action: () => Promise<unknown>, done: string, pending: MailPending): Promise<void> {
-        onPending(uid, pending);
+    async function rightAway(action: () => Promise<unknown>, done: string, kind: MailPending): Promise<void> {
+        // Läuft auf diese Mail schon eine Aktion (Doppelklick), geht keine zweite Anfrage raus.
+        if (!pending.start(uid, kind)) return;
+
         onGone();
 
         try {
             await action();
+            pending.done(uid);
             notify(done);
             onChanged();
         } catch (failure) {
-            onPending(uid, null);
+            pending.failed(uid);
             notify(messageOf(failure), "danger");
         }
     }
