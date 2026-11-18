@@ -12,11 +12,11 @@ export type Rating = "good" | "mid" | "poor";
 
 export const RATING_WORD: Readonly<Record<Rating, string>> = { good: "gut", mid: "mittel", poor: "schlecht" };
 
-export const METRIC_TEXT: Readonly<Record<VitalMetric, { readonly name: string; readonly hint: string }>> = {
-    LCP: { name: "Seite steht", hint: "wann der größte Inhalt zu sehen ist" },
-    INP: { name: "Reaktion auf Klicks", hint: "wie schnell die Seite auf Eingaben reagiert" },
-    CLS: { name: "Springt das Layout", hint: "wie sehr Inhalte beim Laden verrutschen" },
-    TTFB: { name: "Erste Antwort", hint: "wann das erste Byte vom Server kam" },
+export const METRIC_TEXT: Readonly<Record<VitalMetric, { readonly name: string }>> = {
+    LCP: { name: "Seite steht" },
+    INP: { name: "Reaktion auf Klicks" },
+    CLS: { name: "Springt das Layout" },
+    TTFB: { name: "Erste Antwort" },
 };
 
 /** Wo die Skala endet: anderthalbmal die Grenze zu schlecht, gerundet. Millisekunden, CLS mal 1000. */

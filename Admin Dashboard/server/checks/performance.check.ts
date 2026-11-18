@@ -6,7 +6,7 @@ import { inLanes } from "../lanes.ts";
 import { check, section } from "./harness.ts";
 
 const side = (entries: ISlowSide["entries"]): ISlowSide => ({ since: "2026-11-18T06:00:00.000Z", requestMs: 500, sqlMs: 200, requests: 100, slowRequests: 3, queries: 900, slowQueries: 1, entries });
-const stat = (metric: IVitalStat["metric"], p75: number | null): IVitalStat => ({ metric, samples: p75 === null ? 0 : 10, p75, mean: p75, good: null, poor: null });
+const stat = (metric: IVitalStat["metric"], p75: number | null): IVitalStat => ({ metric, samples: p75 === null ? 0 : 10, p75, good: null, poor: null });
 
 /** W-0141: Seite Developer → Leistung, die reine Logik (src/performance/performance.ts). */
 export async function checkPerformance(): Promise<void> {

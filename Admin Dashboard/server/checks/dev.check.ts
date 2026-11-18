@@ -538,9 +538,9 @@ export async function checkDev(): Promise<void> {
 
             // 75 % fallen in die Stufe 2000-2500: 15 von 30 hinein, also die Mitte.
             assert.deepEqual([stat.samples, stat.p75, stat.good, stat.poor], [100, 2250, 0.9, 0.1]);
-            assert.equal(stat.mean, Math.round((60 * 1200 + 30 * 2300 + 10 * 12_000) / 100));
+            assert.equal("mean" in stat, false, "kein Mittel mehr: die Seite zeigt es nicht (Review)");
             assert.equal(p75Of("LCP", [{ metric: "LCP", bin: 9, samples: 4, total: 4 * 15_000 }]), 15_000);
-            assert.deepEqual(statOf("INP", rows), { metric: "INP", samples: 0, p75: null, mean: null, good: null, poor: null });
+            assert.deepEqual(statOf("INP", rows), { metric: "INP", samples: 0, p75: null, good: null, poor: null });
         });
 
         await check("W-0141: /public/vitals ohne Sitzung (204, Unsinn 400), /internal/vitals nur mit Token, /api/dev/vitals nur für Developer", async () => {

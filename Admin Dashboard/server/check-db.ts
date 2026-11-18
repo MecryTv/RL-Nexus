@@ -584,7 +584,10 @@ try {
             const website = report.services.find((entry) => entry.service === "website");
 
             assert.ok((website?.all.find((stat) => stat.metric === "LCP")?.samples ?? 0) >= 2);
-            assert.ok((website?.days.length ?? 0) >= 1);
+            // Review: kein Tagesverlauf mehr (19-B verworfen), die Zahlen kommen in SQL zusammengefasst.
+            assert.equal(website !== undefined && "days" in website, false);
+            // Ein Wert 20 in der Stufe 10 bis 25: p75 liegt bei drei Vierteln der Stufe.
+            assert.equal(website?.all.find((stat) => stat.metric === "CLS")?.p75, 21);
 
             await cleanup();
             assert.equal((await query<unknown[]>("SELECT 1 FROM web_vitals_hours WHERE hour = ?", [hour(old)])).length, 0, "älter als 90 Tage");

@@ -28,21 +28,13 @@ export interface IVitalsBeacon {
     readonly metrics: Partial<Readonly<Record<VitalMetric, number>>>;
 }
 
-/** Ein Messwert zusammengefasst. p75 und mean in Millisekunden, CLS mal 1000. good und poor als Anteil 0 bis 1. */
+/** Ein Messwert zusammengefasst. p75 in Millisekunden, CLS mal 1000. good und poor als Anteil 0 bis 1. */
 export interface IVitalStat {
     readonly metric: VitalMetric;
     readonly samples: number;
     readonly p75: number | null;
-    readonly mean: number | null;
     readonly good: number | null;
     readonly poor: number | null;
-}
-
-/** Ein Tag (Berliner Datum) mit p75 je Messwert, für einen Verlauf. */
-export interface IVitalDay {
-    readonly day: string;
-    readonly p75: Partial<Readonly<Record<VitalMetric, number | null>>>;
-    readonly samples: number;
 }
 
 export interface IVitalServiceReport {
@@ -50,7 +42,6 @@ export interface IVitalServiceReport {
     /** Alle Geräte zusammen. */
     readonly all: readonly IVitalStat[];
     readonly devices: Readonly<Record<VitalDevice, readonly IVitalStat[]>>;
-    readonly days: readonly IVitalDay[];
 }
 
 /** GET /api/dev/vitals?days=7|30|90 */

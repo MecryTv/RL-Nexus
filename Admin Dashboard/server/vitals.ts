@@ -1,4 +1,4 @@
-import { VITAL_DEVICES, VITAL_LIMITS, VITAL_METRICS, VITAL_SERVICES, type IVitalDay, type IVitalStat, type IVitalsReport, type VitalDevice, type VitalMetric, type VitalService } from "../shared/vitals.ts";
+import { VITAL_DEVICES, VITAL_LIMITS, VITAL_METRICS, VITAL_SERVICES, type IVitalStat, type IVitalsReport, type VitalDevice, type VitalMetric, type VitalService } from "../shared/vitals.ts";
 import { query } from "./db.ts";
 import { InvalidInput } from "./errors.ts";
 
@@ -122,7 +122,7 @@ export function statOf(metric: VitalMetric, rows: readonly IVitalRow[]): IVitalS
     const mine = rows.filter((row) => row.metric === metric);
     const samples = mine.reduce((sum, row) => sum + row.samples, 0);
 
-    if (samples === 0) return { metric, samples: 0, p75: null, mean: null, good: null, poor: null };
+    if (samples === 0) return { metric, samples: 0, p75: null, good: null, poor: null };
 
     const bins = VITAL_BINS[metric];
     const goodUpTo = bins.indexOf(VITAL_LIMITS[metric].good);
@@ -133,16 +133,12 @@ export function statOf(metric: VitalMetric, rows: readonly IVitalRow[]): IVitalS
         metric,
         samples,
         p75: p75Of(metric, mine),
-        mean: Math.round(mine.reduce((sum, row) => sum + row.total, 0) / samples),
         good: share((bin) => bin <= goodUpTo),
         poor: share((bin) => bin >= poorFrom),
     };
 }
 
-const BERLIN = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Berlin", year: "numeric", month: "2-digit", day: "2-digit" });
-
 interface IStoredRow {
-    readonly hour: string | Date;
     readonly service: VitalService;
     readonly device: VitalDevice;
     readonly metric: VitalMetric;
@@ -151,40 +147,28 @@ interface IStoredRow {
     readonly total: number | string;
 }
 
-/** Die letzten `days` Tage: je Dienst alle Geräte, je Gerät und ein Verlauf je Tag (Berliner Datum). */
+/**
+ * Die letzten `days` Tage: je Dienst alle Geräte und je Gerät. Review W-0141:
+ * MariaDB fasst die Stunden zusammen (höchstens 2 × 2 × 4 × 10 Zeilen), statt
+ * bei 90 Tagen Hunderttausende Rohzeilen in den Server zu holen.
+ */
 export async function vitalsReport(days: number, now = new Date()): Promise<IVitalsReport> {
     const since = new Date(now.getTime() - days * 24 * 3_600_000);
-    const rows = (await query<IStoredRow[]>("SELECT hour, service, device, metric, bin, samples, total FROM web_vitals_hours WHERE hour >= ?", [hourOf(since)])).map((row) => ({
-        at: row.hour instanceof Date ? row.hour : new Date(`${String(row.hour).replace(" ", "T")}Z`),
-        service: row.service,
-        device: row.device,
-        metric: row.metric,
-        bin: Number(row.bin),
-        samples: Number(row.samples),
-        total: Number(row.total),
-    }));
+    const rows = (
+        await query<IStoredRow[]>(
+            `SELECT service, device, metric, bin, SUM(samples) AS samples, SUM(total) AS total
+               FROM web_vitals_hours WHERE hour >= ? GROUP BY service, device, metric, bin`,
+            [hourOf(since)]
+        )
+    ).map((row) => ({ service: row.service, device: row.device, metric: row.metric, bin: Number(row.bin), samples: Number(row.samples), total: Number(row.total) }));
 
     return {
         days,
         services: VITAL_SERVICES.map((service) => {
             const mine = rows.filter((row) => row.service === service);
-            const byDay = new Map<string, typeof mine>();
-
-            for (const row of mine) {
-                const day = BERLIN.format(row.at);
-                byDay.set(day, [...(byDay.get(day) ?? []), row]);
-            }
-
-            const list: IVitalDay[] = [...byDay.entries()]
-                .sort(([a], [b]) => a.localeCompare(b))
-                .map(([day, entries]) => ({
-                    day,
-                    p75: Object.fromEntries(VITAL_METRICS.map((metric) => [metric, p75Of(metric, entries)])),
-                    samples: entries.filter((row) => row.metric === "LCP").reduce((sum, row) => sum + row.samples, 0),
-                }));
             const devices = Object.fromEntries(VITAL_DEVICES.map((device) => [device, VITAL_METRICS.map((metric) => statOf(metric, mine.filter((row) => row.device === device)))]));
 
-            return { service, all: VITAL_METRICS.map((metric) => statOf(metric, mine)), devices: devices as Record<VitalDevice, IVitalStat[]>, days: list };
+            return { service, all: VITAL_METRICS.map((metric) => statOf(metric, mine)), devices: devices as Record<VitalDevice, IVitalStat[]> };
         }),
     };
 }
