@@ -707,6 +707,21 @@ async function checkAnnounce(): Promise<void> {
     // W-0043: Aufstiege nie mehr per DM.
     check("Voice ohne festen Kanal: keine Nachricht, keine DM", voice.sent.length === 0, JSON.stringify(voice.sent));
 
+    // W-0141: eine Gutschrift liest den Stand einmal und schreibt Gesamt- und Tageswert gleichzeitig.
+    const lean = World();
+    const leanLevels = lean.client.levels as unknown as Record<"Of" | "Add", (...args: unknown[]) => Promise<unknown>>;
+    const leanDays = lean.client.levelDays as unknown as Record<"Add", (...args: unknown[]) => Promise<unknown>>;
+    const steps: string[] = [];
+    const [of, add, addDay] = [leanLevels.Of, leanLevels.Add, leanDays.Add];
+
+    leanLevels.Of = async (...args) => (steps.push("lesen"), of(...args));
+    leanLevels.Add = async (...args) => (steps.push("gesamt"), await Promise.resolve(), add(...args).then(() => void steps.push("gesamt fertig")));
+    leanDays.Add = async (...args) => (steps.push("tag"), await Promise.resolve(), addDay(...args).then(() => void steps.push("tag fertig")));
+    await lean.service.Credit(lean.member(OTHER), XpForLevel(2, lean.settings.base), { messages: 1 }, lean.settings, TEXT);
+    check("Gutschrift: Stand nur einmal gelesen", steps.filter((step) => step === "lesen").length === 1, steps.join(", "));
+    check("Gutschrift: Gesamt und Tag gleichzeitig geschrieben", steps.indexOf("tag") < steps.indexOf("gesamt fertig"), steps.join(", "));
+    check("Gutschrift mit Aufstieg 0 → 2: Level gesetzt, eine Nachricht", lean.entry(OTHER).level === 2 && lean.sent.length === 1, JSON.stringify({ entry: lean.entry(OTHER), sent: lean.sent.length }));
+
     const gone = World({ announce: "channel", announceChannelId: "999" });
 
     await gone.service.Credit(gone.member(OTHER), XpForLevel(1, gone.settings.base), { messages: 1 }, gone.settings, TEXT);

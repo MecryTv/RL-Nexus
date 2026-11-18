@@ -451,16 +451,19 @@ export default class LevelService {
         channelId: string | null
     ): Promise<void> {
         const points = Math.max(0, xp);
-        const before = points > 0 ? ((await this.client.levels.Of(member.guild.id, member.id))?.level ?? 0) : 0;
 
         // W-0119: gerade gelöscht (Admin Dashboard) - direkt vor dem Schreiben nichts mehr anlegen.
         if (this.client.activityService?.Forgotten(member.id)) return;
 
-        await this.client.levels.Add(member.guild.id, member.id, points, extra);
-        await this.client.levelDays.Add(member.guild.id, member.id, Today(), { xp: points, messages: extra.messages, voiceMinutes: extra.voiceMinutes });
+        // W-0141: Gesamt und Tag hängen nicht voneinander ab - gleichzeitig statt nacheinander.
+        await Promise.all([
+            this.client.levels.Add(member.guild.id, member.id, points, extra),
+            this.client.levelDays.Add(member.guild.id, member.id, Today(), { xp: points, messages: extra.messages, voiceMinutes: extra.voiceMinutes }),
+        ]);
         this.Changed(member.guild.id);
 
-        if (points > 0) await this.Promote(member, settings, before, channelId);
+        // Das alte Level ist die gespeicherte Spalte level: Add ändert sie nicht, ein eigenes Lesen davor spart W-0141.
+        if (points > 0) await this.Promote(member, settings, null, channelId);
     }
 
     /**
@@ -484,23 +487,25 @@ export default class LevelService {
     /**
      * Nach einer Gutschrift: Level neu rechnen und bei einem Aufstieg Rollen und
      * genau eine Nachricht für den ganzen Sprung. true: aufgestiegen. Der
-     * Nachtrag schreibt selbst und ruft nur das hier.
+     * Nachtrag schreibt selbst und ruft nur das hier. before null: das
+     * gespeicherte Level vor dieser Rechnung.
      */
-    async Promote(member: GuildMember, settings: ILevelSettings, before: number, channelId: string | null): Promise<boolean> {
+    async Promote(member: GuildMember, settings: ILevelSettings, before: number | null, channelId: string | null): Promise<boolean> {
         const entry = await this.client.levels.Of(member.guild.id, member.id);
 
         if (!entry) return false;
 
         const level = LevelFromXp(entry.xp, settings.base);
+        const from = before ?? entry.level;
 
         if (level === entry.level) return false;
 
         await this.client.levels.SetLevel(member.guild.id, member.id, level);
 
-        if (level <= before) return false;
+        if (level <= from) return false;
 
         await this.Rewards(member, level, settings);
-        await this.Announce(member, level, before, entry, settings, channelId).catch((error) => logger.warn(`📈 Aufstieg für ${member.id} auf ${member.guild.id} nicht gemeldet - ${String(error)}`));
+        await this.Announce(member, level, from, entry, settings, channelId).catch((error) => logger.warn(`📈 Aufstieg für ${member.id} auf ${member.guild.id} nicht gemeldet - ${String(error)}`));
 
         return true;
     }
