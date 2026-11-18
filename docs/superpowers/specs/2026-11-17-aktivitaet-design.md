@@ -113,8 +113,14 @@ Das nginx-Protokoll liegt schon vor und braucht keins von beidem.
   bei uns. Andere 4xx und 404 ohne eigenen Referer sind Rauschen und zählen wie
   Scanner gar nicht. 5xx zählen weiter alle. Der Scanner-Filter erkennt `.env`,
   `.git` und Co. an jeder Stelle, Verwaltungspfade (`/cgi-bin`, `/phpmyadmin`,
-  `/vendor/`) und Endungen wie `.asp`, `.bak`, `.sql`. Schon gespeicherte Stunden
-  bleiben, wie sie sind.
+  `/vendor/`) und Endungen, die es bei uns nie gibt (`.php`, `.asp(x)`, `.jsp`,
+  `.cgi`; keine `.log`/`.yml`/`.sql`, weil Ticket-Anhänge ihre Endung behalten).
+  Rauschen zählt weder in der Basis der Fehlerquote noch als Aufruf; die Basis
+  ist damit kleiner, die 5xx-Quote bei gleich vielen Serverfehlern etwas höher.
+  Webseite und Statusseite sind SPAs: unbekannte Unterseiten antworten mit 200,
+  als 404 fallen dort nur fehlende Dateien und Schnittstellen auf. Schon
+  gespeicherte Stunden bleiben, wie sie sind; 7- und 30-Tage-Ansicht mischen
+  bis zu 30 Tage lang alte und neue Stunden.
 - **Speicherung:** eine Tabelle mit Summen je Stunde (Europe/Berlin) × Dienst ×
   Gerät × Herkunft, dazu Summen je Stunde × Dienst × Statusklasse. Migration 031.
   Aufbewahrung 13 Monate, dann gelöscht.

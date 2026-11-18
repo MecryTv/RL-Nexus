@@ -91,41 +91,47 @@ export async function checkActivity(): Promise<void> {
     await check("Scanner: /wp-login.php mit 404", () => {
         const result = hit(line("nexus-emb.de", "GET /wp-login.php HTTP/1.1", 404));
 
-        assert.equal(result.scanner, true);
+        assert.equal(result.noise, true);
         assert.equal(result.statusClass, "4xx");
-        assert.equal(hit(line("nexus-emb.de", "GET /.env HTTP/1.1", 404)).scanner, true);
-        assert.equal(hit(line("nexus-emb.de", "GET /.git/config HTTP/1.1", 404)).scanner, true);
-        assert.equal(hit(line("nexus-emb.de", "POST /xmlrpc HTTP/1.1", 404)).scanner, true);
-        assert.equal(hit(line("nexus-emb.de", "GET /module HTTP/2.0", 200)).scanner, false);
+        // Review W-0139: mit 200 (SPA-Fallback der Webseite) - nur so prüft der Fall den Filter selbst.
+        assert.equal(hit(line("nexus-emb.de", "GET /.env HTTP/1.1", 200)).noise, true);
+        assert.equal(hit(line("nexus-emb.de", "GET /.git/config HTTP/1.1", 200)).noise, true);
+        assert.equal(hit(line("nexus-emb.de", "POST /xmlrpc HTTP/1.1", 200)).noise, true);
+        assert.equal(hit(line("nexus-emb.de", "GET /module HTTP/2.0", 200)).noise, false);
     });
 
-    // W-0139: Scanner tasten mit wechselnden Pfaden - .env und .git an jeder Stelle, weitere Endungen.
+    // W-0139: Scanner tasten mit wechselnden Pfaden - .env und .git an jeder Stelle, Verwaltungspfade, fremde Endungen.
     await check("W-0139: breiterer Scanner-Filter, eigene Dateien bleiben echt", () => {
-        for (const path of ["/backend/.env", "/app/.git/HEAD", "/.aws/credentials", "/cgi-bin/luci", "/index.asp", "/config.bak", "/dump.sql", "/phpmyadmin/", "/vendor/phpunit/x"]) {
-            assert.equal(hit(line("dashboard.nexus-emb.de", `GET ${path} HTTP/1.1`, 404)).scanner, true, path);
+        for (const path of ["/backend/.env", "/app/.git/HEAD", "/.aws/credentials", "/cgi-bin/luci", "/index.asp", "/shop.aspx", "/login.jsp", "/x.php", "/phpmyadmin/", "/vendor/phpunit/x"]) {
+            assert.equal(hit(line("nexus-emb.de", `GET ${path} HTTP/1.1`, 200)).noise, true, path);
         }
 
-        for (const path of ["/assets/app.js", "/assets/style.css", "/public/status.json", "/dashboard/guild/1/module", "/environment"]) {
-            assert.equal(hit(line("dashboard.nexus-emb.de", `GET ${path} HTTP/2.0`, 200)).scanner, false, path);
+        // Review W-0139: Ticket-Anhänge behalten ihre Endung (.log, .yml, .sql …) - echte Downloads, kein Scanner.
+        for (const path of ["/assets/app.js", "/assets/style.css", "/public/status.json", "/dashboard/guild/1/module", "/environment", "/transcript/12/3.log", "/transcript/12/4.yml", "/transcript/12/5.sql"]) {
+            assert.equal(hit(line("dashboard.nexus-emb.de", `GET ${path} HTTP/2.0`, 200)).noise, false, path);
         }
     });
 
-    // W-0139 (Nutzer, 18.11.2026): Als 4xx-Fehler zählt nur „Seite nicht gefunden“ von einer eigenen Seite.
     await check("W-0139: 4xx zählt nur als 404 von einer eigenen Seite, 5xx alle", () => {
         const own = "https://dashboard.nexus-emb.de/dashboard/guild/1/module";
         const counted = hit(line("dashboard.nexus-emb.de", "GET /assets/fehlt.js HTTP/2.0", 404, own));
         const broken = hit(line("dashboard.nexus-emb.de", "GET /api/stats HTTP/2.0", 500));
 
         assert.equal(counted.statusClass, "4xx");
-        assert.equal(counted.scanner, false, "404 von einer eigenen Seite zählt");
-        assert.equal(hit(line("nexus-emb.de", "GET /alte-seite HTTP/2.0", 404, "https://nexus-emb.de/")).scanner, false, "Webseite mit eigenem Referer");
-        assert.equal(hit(line("dashboard.nexus-emb.de", "GET /irgendwas HTTP/1.1", 404)).scanner, true, "ohne Referer");
-        assert.equal(hit(line("dashboard.nexus-emb.de", "GET /irgendwas HTTP/1.1", 404, "https://example.com/")).scanner, true, "fremder Referer");
-        assert.equal(hit(line("nexus-emb.de", "GET /irgendwas HTTP/1.1", 404, "https://evil-nexus-emb.de/")).scanner, true, "fremde Domain mit ähnlichem Namen");
-        assert.equal(hit(line("dashboard.nexus-emb.de", "GET /api/me HTTP/2.0", 401, own)).scanner, true, "401 mit eigenem Referer");
-        assert.equal(hit(line("dashboard.nexus-emb.de", "POST /api/x HTTP/2.0", 403, own)).scanner, true, "403 mit eigenem Referer");
+        assert.equal(counted.noise, false, "404 von einer eigenen Seite zählt");
+        assert.equal(hit(line("nexus-emb.de", "GET /alte-seite HTTP/2.0", 404, "https://nexus-emb.de/")).noise, false, "Webseite mit eigenem Referer");
+        assert.equal(hit(line("dashboard.nexus-emb.de", "GET /irgendwas HTTP/1.1", 404)).noise, true, "ohne Referer");
+        assert.equal(hit(line("dashboard.nexus-emb.de", "GET /irgendwas HTTP/1.1", 404, "https://example.com/")).noise, true, "fremder Referer");
+        assert.equal(hit(line("nexus-emb.de", "GET /irgendwas HTTP/1.1", 404, "https://evil-nexus-emb.de/")).noise, true, "fremde Domain mit ähnlichem Namen");
+        assert.equal(hit(line("dashboard.nexus-emb.de", "GET /api/me HTTP/2.0", 401, own)).noise, true, "401 mit eigenem Referer");
+        assert.equal(hit(line("dashboard.nexus-emb.de", "POST /api/x HTTP/2.0", 403, own)).noise, true, "403 mit eigenem Referer");
+        // Review W-0139: Domains, die nur so heißen, über Subdomains hinweg, Port und Großschreibung, Scanner-Pfad zuerst.
+        assert.equal(hit(line("nexus-emb.de", "GET /irgendwas HTTP/1.1", 404, "https://nexus-emb.de.evil.com/")).noise, true, "nexus-emb.de.evil.com");
+        assert.equal(hit(line("dashboard.nexus-emb.de", "GET /assets/alt.js HTTP/2.0", 404, "https://nexus-emb.de/news")).noise, false, "Webseite verlinkt ins Dashboard");
+        assert.equal(hit(line("dashboard.nexus-emb.de", "GET /assets/alt.js HTTP/2.0", 404, "https://Dashboard.NEXUS-EMB.de:443/x")).noise, false, "Port und Großschreibung");
+        assert.equal(hit(line("dashboard.nexus-emb.de", "GET /.env HTTP/1.1", 404, own)).noise, true, "Scanner-Pfad bleibt Scanner, auch mit eigenem Referer");
         assert.equal(broken.statusClass, "5xx");
-        assert.equal(broken.scanner, false, "5xx zählen weiter alle");
+        assert.equal(broken.noise, false, "5xx zählen weiter alle");
     });
 
     await check("Review: Die Statusseite fragt /public/status jede Minute ab, das ist kein Aufruf", () => {

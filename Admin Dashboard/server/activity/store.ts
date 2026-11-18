@@ -70,8 +70,9 @@ async function upsert(table: string, columns: string, counter: string, rows: Map
 }
 
 /**
- * Zählt Aufrufe (ohne Bots) und Anfragen je Statusklasse (ohne Bots, Scanner
- * und was `excluded` sagt, etwa Zeiten mit Wartung). Ein Zeilenwert je Schlüssel.
+ * Zählt Aufrufe (ohne Bots und Rauschen) und Anfragen je Statusklasse (ohne
+ * Bots, Rauschen - Scanner und 4xx, die kein echter Fehler sind, W-0139 - und
+ * was `excluded` sagt, etwa Zeiten mit Wartung). Ein Zeilenwert je Schlüssel.
  */
 export async function addHits(hits: readonly IHit[], excluded: (hit: IHit) => boolean): Promise<void> {
     const views = new Map<string, number>();
@@ -80,8 +81,9 @@ export async function addHits(hits: readonly IHit[], excluded: (hit: IHit) => bo
     for (const hit of hits) {
         const hour = utc(hit.hour);
 
-        if (hit.view && !hit.bot) bump(views, [hour, hit.service, hit.device, hit.source].join("|"));
-        if (!hit.bot && !hit.scanner && !excluded(hit)) bump(statuses, [hour, hit.service, hit.statusClass].join("|"));
+        // Review W-0139: Scanner mit Browser-Kennung bekommen vom SPA-Fallback 200 - kein Aufruf.
+        if (hit.view && !hit.bot && !hit.noise) bump(views, [hour, hit.service, hit.device, hit.source].join("|"));
+        if (!hit.bot && !hit.noise && !excluded(hit)) bump(statuses, [hour, hit.service, hit.statusClass].join("|"));
     }
 
     await upsert("activity_views", "hour, service, device, source, views", "views", views);

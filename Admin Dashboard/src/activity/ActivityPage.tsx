@@ -202,13 +202,13 @@ export function ActivityPage(): JSX.Element {
                         <Panel as="section" className={styles.card}>
                             <header className={styles.cardHead}>
                                 <h2>Fehler</h2>
-                                <span className={styles.muted}>Anteil aller Anfragen</span>
+                                <span className={styles.muted}>Anteil der gezählten Anfragen</span>
                             </header>
                             <div className={styles.errors}>
                                 <ErrorRow share={data.errors.client} limit={LIMITS.client} label="Seite nicht gefunden (404)" />
                                 <ErrorRow share={data.errors.server} limit={LIMITS.server} label="Serverfehler (5xx)" />
                             </div>
-                            <p className={styles.muted}>In Ordnung bis 2 % (404) und 0,5 % (5xx). Als 404 zählen nur kaputte Links und fehlende Dateien auf unseren Seiten; Bots, Scanner und Wartungszeiten zählen nicht mit.</p>
+                            <p className={styles.muted}>In Ordnung bis 2 % (404) und 0,5 % (5xx). Als 404 zählen nur Anfragen unserer eigenen Seiten, die ins Leere gehen (fehlende Dateien, Bilder, Schnittstellen); unbekannte Unterseiten von Webseite und Statusseite antworten mit 200 und fallen hier nicht auf. Bots, Scanner, andere 4xx und Wartungszeiten zählen gar nicht mit.</p>
                         </Panel>
                     </div>
                 </>

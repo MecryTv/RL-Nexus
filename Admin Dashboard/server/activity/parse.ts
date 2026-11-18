@@ -26,8 +26,8 @@ export interface IHit {
     hour: Date;
     page: boolean;
     bot: boolean;
-    /** Rauschen: Scanner-Pfade und 4xx, die kein echter Fehler sind (W-0139) - zählt nicht in der Fehlerquote. */
-    scanner: boolean;
+    /** Rauschen: Scanner-Pfade und 4xx, die kein echter Fehler sind (W-0139) - zählt weder als Aufruf noch in der Fehlerquote. */
+    noise: boolean;
     device: ActivityDevice;
     source: ActivitySource;
     statusClass: StatusClass;
@@ -50,8 +50,9 @@ const HOSTS: Record<string, ActivityService> = {
 
 // W-0138 Review: dazu Linkvorschauen (WhatsApp) und Skript-Clients (Go, axios).
 const BOT = /bot|crawl|spider|slurp|preview|facebookexternalhit|whatsapp|curl|wget|python|go-http-client|axios|headlesschrome/i;
-// W-0139: .env, .git und Co. an jeder Stelle, Verwaltungspfade und Endungen, die es bei uns nicht gibt.
-const SCANNER = /(^|\/)\.(env|git|aws|ssh|svn|hg|vscode|DS_Store)|^\/(wp-|xmlrpc|cgi-bin|phpmyadmin|vendor\/|boaform)|\.(php\d?|asp|aspx|jsp|cgi|bak|sql|old|swp|ini|ya?ml|log)$/i;
+// W-0139: .env, .git und Co. an jeder Stelle, Verwaltungspfade und Endungen, die es bei uns nie gibt.
+// Keine .log/.yml/.sql: Ticket-Anhänge unter /transcript/ behalten ihre Endung (Review W-0139).
+const SCANNER = /(^|\/)\.(env|git|aws|ssh|svn|hg|vscode|DS_Store)|^\/(wp-|xmlrpc|cgi-bin|phpmyadmin|vendor\/|boaform)|\.(php\d?|asp|aspx|jsp|cgi)$/i;
 
 function parseTime(text: string): Date | null {
     const match = TIME.exec(text);
@@ -124,17 +125,19 @@ function sourceOf(referer: string): ActivitySource {
     if (host === "discord.com" || host.endsWith(".discord.com") || host.includes("discordapp")) return "discord";
     if (/(^|\.)google\./.test(host)) return "google";
     if (host === "top.gg" || host.endsWith(".top.gg")) return "topgg";
-    if (host === "nexus-emb.de" || host.endsWith(".nexus-emb.de")) return "direct";
+    if (isOwnHost(host)) return "direct";
 
     return "other";
 }
 
-/** W-0139: Kam der Aufruf von einer eigenen Seite? Dann ist ein 404 ein kaputter Link oder eine fehlende Datei bei uns. */
+function isOwnHost(host: string): boolean {
+    return host === "nexus-emb.de" || host.endsWith(".nexus-emb.de");
+}
+
+/** W-0139: Kam der Aufruf von einer eigenen Seite? Dann ist ein 404 eine fehlende Datei oder Adresse, die unsere Seiten selbst anfragen. */
 function fromOwnPage(referer: string): boolean {
     try {
-        const host = new URL(referer).hostname.toLowerCase();
-
-        return host === "nexus-emb.de" || host.endsWith(".nexus-emb.de");
+        return isOwnHost(new URL(referer).hostname.toLowerCase());
     } catch {
         return false;
     }
@@ -153,14 +156,14 @@ export function classify(line: IAccessLine): IHit | null {
     hour.setUTCMinutes(0, 0, 0);
 
     // W-0139 (Nutzer, 18.11.2026): Als 4xx-Fehler zählt nur „Seite nicht gefunden“ von einer eigenen Seite, der Rest ist Rauschen.
-    const noise = line.status >= 400 && line.status < 500 && !(line.status === 404 && fromOwnPage(line.referer));
+    const stray = line.status >= 400 && line.status < 500 && !(line.status === 404 && fromOwnPage(line.referer));
 
     return {
         service,
         hour,
         page,
         bot,
-        scanner: SCANNER.test(line.path) || noise,
+        noise: SCANNER.test(line.path) || stray,
         device: deviceOf(agent),
         source: sourceOf(line.referer),
         statusClass: line.status >= 500 ? "5xx" : line.status >= 400 ? "4xx" : line.status >= 300 ? "3xx" : "2xx",
