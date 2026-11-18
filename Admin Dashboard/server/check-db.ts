@@ -67,7 +67,7 @@ import { shopSessionCookie } from "./shop/session.ts";
 import { setStripeGateway } from "./shop/stripe.ts";
 import { STATE_KEYS, lastStatusPost, refreshNow, stateKey, stopStatusPost, updateStatusPost } from "./status-post.ts";
 import { STATUS_IMAGES } from "./status/image.ts";
-import { publicStatus, refreshStatus, statusSnapshot } from "./status/snapshot.ts";
+import { historyData, publicStatus, refreshStatus, statusSnapshot } from "./status/snapshot.ts";
 
 const CHANNEL = "900000000000000009";
 
@@ -533,6 +533,22 @@ try {
         assert.ok(database?.uptime.day !== null);
         assert.equal(snapshot.measured.database.online, true);
         assert.ok(snapshot.measured.database.tables > 0);
+    });
+
+    await check("W-0141: Der gemerkte Verlauf (nur ab der vorletzten Stunde gelesen) gleicht einer vollen Auswertung", async () => {
+        await refreshStatus(config);
+        const snapshot = await refreshStatus(config);
+        const oldest = Math.floor((snapshot.measured.at.getTime() - 90 * 24 * 3_600_000) / 3_600_000) + 1;
+        const full = await query<{ service: string; hour: number | string; checks: number | string; down: number | string | null }[]>(
+            `SELECT service, FLOOR(UNIX_TIMESTAMP(checked_at) / 3600) AS hour, COUNT(*) AS checks, SUM(state = 'down') AS down
+             FROM status_checks WHERE checked_at >= NOW() - INTERVAL 90 DAY GROUP BY service, hour`
+        );
+        const key = (service: string, hour: number, checks: number, down: number) => `${service}:${hour}:${checks}:${down}`;
+        const expected = full.filter((row) => Number(row.hour) > oldest).map((row) => key(row.service, Number(row.hour), Number(row.checks), Number(row.down ?? 0))).sort();
+        const kept = (historyData()?.hours ?? []).filter((row) => row.hour > oldest).map((row) => key(row.service, row.hour, row.checks, row.down)).sort();
+
+        assert.ok(expected.length > 0, "keine Stunden in status_checks");
+        assert.deepEqual(kept, expected);
     });
 
     await check("Detail aus echten Zeilen und /public/status mit points und series", async () => {
