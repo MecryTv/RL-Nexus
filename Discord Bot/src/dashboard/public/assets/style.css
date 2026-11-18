@@ -4993,6 +4993,10 @@ details.tkcard > summary .tkcard__title{margin:0}
 .avnav button:focus-visible{outline:2px solid var(--blue);outline-offset:-2px}
 .avnav__count{min-width:22px;padding:3px 6px;font:700 12px/1 var(--f-display);color:#1a1300;background:var(--warn);text-align:center}
 .avnav__live{width:8px;height:8px;border-radius:50%;background:var(--loss)}
+/* W-0140: Zahl an den Reitern der Voice-Seite - grau, grün mit Punkt, sobald ein Kanal offen ist. */
+.vcnav__count{color:var(--text-2);background:none;border:1px solid var(--line-strong)}
+.vcnav__count.is-live{display:inline-flex;align-items:center;gap:5px;color:var(--live);border-color:color-mix(in srgb,var(--live) 55%,transparent)}
+.vcnav__count.is-live::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--live)}
 .avpane{display:grid;gap:14px}
 
 /* Quarantäne: Fallakten statt Zeilen */

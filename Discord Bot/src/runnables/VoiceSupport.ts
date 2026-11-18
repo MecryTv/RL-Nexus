@@ -6,7 +6,8 @@ import logger from "../utils/logger";
 /**
  * Sieht im Minutentakt nach, ob jemand zu lange im Support-Warteraum sitzt, und
  * fasst einmal nach. Der Lauf selbst merkt sich nichts - was schon erinnert
- * wurde, steht in support_waits.
+ * wurde, steht in support_waits. Der erste Lauf nach dem Start räumt auch leere
+ * Temp-Kanäle weg (W-0140).
  */
 export default class VoiceSupport extends Runnable {
     constructor(client: BotClient) {
@@ -19,6 +20,8 @@ export default class VoiceSupport extends Runnable {
     }
 
     async Execute(): Promise<void> {
+        await this.client.voiceService.SweepOnce();
+
         const sent = await this.client.supportService.Tick();
 
         if (sent) logger.tasks(`🔊 ${sent} Erinnerung(en) für den Support-Warteraum`);

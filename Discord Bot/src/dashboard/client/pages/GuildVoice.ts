@@ -13,6 +13,9 @@ import { ago } from "../core/Format.js";
 import { clickSound } from "../core/Sound.js";
 import { toast } from "../core/Toast.js";
 import { api, button, card, confirmButton, el, IRole, loading, row, select, stat, toggle } from "../core/Ui.js";
+import { openGroups, parseVoiceTab, VoiceTab, voiceTabHref } from "../constants/Voice.js";
+
+const TABS: VoiceTab[] = ["hubs", "offen"];
 
 interface ISettings {
     name: string | null;
@@ -43,6 +46,8 @@ interface IHub {
 
 interface IOpen {
     channelId: string;
+    /** Null bei alten Zeilen ohne Hub (temp_voices.hub_id). */
+    hubId: number | null;
     name: string;
     owner: string;
     members: number;
@@ -76,6 +81,10 @@ export function renderVoice(guildId: string): void {
     let open: number | null = null;
     let headNode: HTMLElement = el("div");
     let openNode: HTMLElement = el("div");
+    // W-0140: Reiter Hubs | Gerade offen; die Adresse merkt sich den Reiter.
+    let tab: VoiceTab = parseVoiceTab(window.location.search);
+    let navNode: HTMLElement = el("div");
+    const panes: Record<VoiceTab, HTMLElement> = { hubs: el("div"), offen: el("div") };
     const drafts = new Map<number, { config: IHubConfig; dirty: boolean }>();
 
     function draftOf(hub: IHub): { config: IHubConfig; dirty: boolean } {
@@ -403,34 +412,102 @@ export function renderVoice(guildId: string): void {
         );
     }
 
+    /** W-0140: Inhalt des Reiters Gerade offen - ab zwei Hubs nach Hub gruppiert. */
     function openList(): HTMLElement {
         if (!data!.open.length) {
-            return card(
-                "Gerade offen",
-                "Keine Kanäle offen. Sobald jemand einen Hub betritt, steht er hier.",
-                el("div", "tkempty", icon("#i-mic"), el("span", "", "Noch ruhig."))
+            const toHubs = button("btn btn--quiet", icon("#i-mic"), "Zum Reiter Hubs");
+
+            toHubs.addEventListener("click", () => {
+                choose("hubs");
+                // Der Knopf verschwindet mit dem Reiter - der Fokus geht auf den Reiter Hubs, nicht auf die Seite.
+                navNode.querySelector<HTMLElement>("#vctab-hubs")?.focus();
+            });
+
+            return el(
+                "div",
+                "tkempty tkempty--big",
+                icon("#i-mic"),
+                el("b", "", "Noch ruhig."),
+                el("span", "", "Keine Kanäle offen. Sobald jemand einen Hub betritt, steht er hier."),
+                ...(data!.hubs.length ? [] : [toHubs])
             );
         }
 
-        const list = el(
-            "div",
-            "pllist",
-            ...data!.open.map((entry) =>
+        const openRow = (entry: IOpen): HTMLElement =>
+            el(
+                "div",
+                "plrow vcrow",
+                el("div", "snitem__face vcface", icon("#i-mic")),
                 el(
                     "div",
-                    "plrow vcrow",
-                    el("div", "snitem__face vcface", icon("#i-mic")),
-                    el(
-                        "div",
-                        "plrow__main",
-                        el("div", "plrow__top", el("b", "", entry.name), el("span", `chip ${entry.privacy === "private" ? "chip--warn" : ""}`, entry.privacy === "private" ? "privat" : "offen")),
-                        el("span", "gwrow__facts", `${entry.owner} · ${entry.members} drin · seit ${ago(entry.createdAt)}`)
-                    )
+                    "plrow__main",
+                    el("div", "plrow__top", el("b", "", entry.name), el("span", `chip ${entry.privacy === "private" ? "chip--warn" : ""}`, entry.privacy === "private" ? "privat" : "offen")),
+                    el("span", "gwrow__facts", `${entry.owner} · ${entry.members} drin · seit ${ago(entry.createdAt)}`)
                 )
-            )
-        );
+            );
 
-        return card("Gerade offen", `${data!.open.length} Kanal${data!.open.length === 1 ? "" : "e"}. Sie verschwinden, sobald der letzte rausgeht.`, list);
+        return el(
+            "div",
+            "",
+            el("p", "hintline", `${data!.open.length} ${data!.open.length === 1 ? "Kanal" : "Kanäle"} offen. Sie verschwinden, sobald der Letzte rausgeht.`),
+            ...openGroups(data!.open, data!.hubs).flatMap((group) => [...(group.title ? [el("h4", "srhead", group.title)] : []), el("div", "pllist", ...group.items.map(openRow))])
+        );
+    }
+
+    /** W-0140: Reiterleiste wie bei Anti Villain - Zahl am Reiter, Pfeiltasten, Pos1 und Ende. */
+    function nav(): HTMLElement {
+        const bar = el("div", "avnav");
+        const entries: [VoiceTab, string, string, number][] = [
+            ["hubs", "Hubs", "#i-mic", data!.hubs.length],
+            ["offen", "Gerade offen", "#i-users", data!.open.length],
+        ];
+
+        bar.setAttribute("role", "tablist");
+        bar.setAttribute("aria-label", "Temp Voice");
+
+        for (const [id, label, symbol, count] of entries) {
+            // Grau, solange nichts offen ist; grün mit Punkt, sobald ein Kanal läuft.
+            const tabButton = button("", icon(symbol), label, el("span", `avnav__count vcnav__count${id === "offen" && count ? " is-live" : ""}`, String(count)));
+
+            tabButton.id = `vctab-${id}`;
+            tabButton.setAttribute("role", "tab");
+            tabButton.setAttribute("aria-controls", `vcpane-${id}`);
+            tabButton.addEventListener("click", () => choose(id));
+            bar.append(tabButton);
+        }
+
+        bar.addEventListener("keydown", (event) => {
+            const index = TABS.indexOf(tab);
+            const next = { ArrowRight: index + 1, ArrowLeft: index - 1, Home: 0, End: TABS.length - 1 }[event.key];
+
+            if (next === undefined) return;
+
+            event.preventDefault();
+            choose(TABS[(next + TABS.length) % TABS.length]!);
+            bar.querySelector<HTMLElement>(`#vctab-${tab}`)?.focus();
+        });
+
+        return bar;
+    }
+
+    function choose(next: VoiceTab): void {
+        tab = next;
+        history.replaceState(null, "", voiceTabHref(BASE, guildId, tab));
+        show();
+    }
+
+    /** Nur ein- und ausblenden, nichts neu bauen: ein offener Hub-Editor behält seine Eingaben. */
+    function show(): void {
+        for (const id of TABS) {
+            const tabButton = navNode.querySelector<HTMLButtonElement>(`#vctab-${id}`);
+
+            if (tabButton) {
+                tabButton.setAttribute("aria-selected", String(tab === id));
+                tabButton.tabIndex = tab === id ? 0 : -1;
+            }
+
+            panes[id].hidden = tab !== id;
+        }
     }
 
     /* ------------------------------------------------------------
@@ -456,9 +533,19 @@ export function renderVoice(guildId: string): void {
         );
 
         headNode = head();
+        navNode = nav();
         openNode = openList();
+        panes.hubs = el("div", "", addBar(), hubs, panelCard());
+        panes.offen = el("div", "", openNode);
 
-        host.replaceChildren(headNode, addBar(), hubs, panelCard(), openNode);
+        for (const id of TABS) {
+            panes[id].id = `vcpane-${id}`;
+            panes[id].setAttribute("role", "tabpanel");
+            panes[id].setAttribute("aria-labelledby", `vctab-${id}`);
+        }
+
+        host.replaceChildren(headNode, navNode, panes.hubs, panes.offen);
+        show();
     }
 
     /**
@@ -474,16 +561,32 @@ export function renderVoice(guildId: string): void {
         data = answer;
 
         const fresh = head();
+        const freshNav = nav();
         const list = openList();
+        const focused = navNode.contains(document.activeElement);
 
         headNode.replaceWith(fresh);
+        navNode.replaceWith(freshNav);
         openNode.replaceWith(list);
         headNode = fresh;
+        navNode = freshNav;
         openNode = list;
+        show();
+
+        // Wer gerade mit den Pfeiltasten durch die Reiter ging, bleibt dort.
+        if (focused) navNode.querySelector<HTMLElement>(`#vctab-${tab}`)?.focus();
     }
 
     loading(host, 4);
     onPulse(guildId, ["voice"], debounce(() => void pulse()));
+
+    // Review W-0140: Wer über die Leiste zurückkommt, landet auf /voice-hub ohne ?reiter - der Reiter folgt der Adresse, wie bei Grenzen.
+    window.addEventListener("guild:shown", (event) => {
+        if ((event as CustomEvent<string>).detail !== "voice-hub" || !data) return;
+
+        tab = parseVoiceTab(window.location.search);
+        show();
+    });
 
     void call<IPayload>("").then((answer) => {
         if (!answer) return;

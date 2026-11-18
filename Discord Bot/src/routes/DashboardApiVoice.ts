@@ -87,6 +87,8 @@ export default class DashboardApiVoice extends Route {
 
                 return {
                     channelId: temp.channelId,
+                    // W-0140: die Seite gruppiert offene Kanäle nach Hub.
+                    hubId: temp.hubId,
                     name: channel?.name ?? "(weg)",
                     owner: owner?.displayName ?? temp.ownerId,
                     members: channel?.isVoiceBased() ? channel.members.size : 0,

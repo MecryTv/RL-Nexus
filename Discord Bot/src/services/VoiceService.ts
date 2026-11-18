@@ -7,6 +7,7 @@ import {
     MessageFlags,
     OverwriteResolvable,
     PermissionFlagsBits,
+    RESTJSONErrorCodes,
     VoiceBasedChannel,
     VoiceState,
 } from "discord.js";
@@ -75,6 +76,8 @@ export default class VoiceService {
     // Review W-0137: wann jemand zuletzt die DM zur Grenze bekam, je Server und Person - nicht bei jedem Betreten neu.
     // ponytail: wächst mit den Leuten, die an die Grenze stoßen; leeren, falls das je viele werden.
     private readonly told = new Map<string, number>();
+    // W-0140: Sweep() läuft einmal nach dem Start, nicht bei jedem Lauf.
+    private swept = false;
 
     constructor(client: BotClient) {
         this.client = client;
@@ -340,23 +343,46 @@ export default class VoiceService {
         }
     }
 
+    /**
+     * W-0140: Der erste Lauf nach dem Start (runnables/VoiceSupport.ts) - dann
+     * sind die Server samt Sprachkanälen im Cache. Später räumt Cleanup bei
+     * jedem Wechsel im Sprachkanal auf.
+     */
+    async SweepOnce(): Promise<void> {
+        // Review W-0140: erst wenn der Bot ganz bereit ist - sonst wäre der eine Lauf bei langsamem Login verbraucht.
+        if (this.swept || !this.client.databaseService.Ready || !this.client.isReady()) return;
+
+        this.swept = true;
+        await this.Sweep().catch((error) => logger.warn(`🔊 Temp Voice beim Start nicht aufgeräumt: ${String(error)}`));
+    }
+
     /** Beim Start: was den Neustart nicht überlebt hat, kommt weg. */
     async Sweep(): Promise<void> {
         if (!this.client.databaseService.Ready) return;
 
         for (const temp of await this.client.tempVoices.All()) {
             const guild = this.client.guilds.cache.get(temp.guildId);
-            const channel = guild?.channels.cache.get(temp.channelId);
 
-            if (!channel || !channel.isVoiceBased()) {
-                await this.client.tempVoices.Remove(temp.channelId);
-                continue;
+            // Ein Server, den der Bot nicht sieht oder der gerade ausgefallen ist (dann ohne Kanäle im Cache):
+            // Kanal und Zeile bleiben - sonst stünde der Kanal ohne Zeile da (Review W-0140).
+            if (!guild?.available) continue;
+
+            const channel = guild.channels.cache.get(temp.channelId);
+
+            if (channel?.isVoiceBased() && channel.members.filter((member) => !member.user.bot).size > 0) continue;
+
+            if (channel?.isVoiceBased()) {
+                // Nur wenn der Kanal wirklich weg ist, geht auch die Zeile - sonst versucht es der nächste Start wieder.
+                const gone = await channel.delete("Temp Voice war beim Start leer").then(
+                    () => true,
+                    (error: unknown) => (error as { code?: unknown }).code === RESTJSONErrorCodes.UnknownChannel
+                );
+
+                if (!gone) continue;
             }
 
-            if (channel.members.filter((member) => !member.user.bot).size === 0) {
-                await channel.delete("Temp Voice war beim Start leer").catch(() => undefined);
-                await this.client.tempVoices.Remove(temp.channelId);
-            }
+            await this.client.tempVoices.Remove(temp.channelId);
+            this.client.pulseService.Emit(guild.id, "voice", { channelId: temp.channelId, open: false });
         }
     }
 
