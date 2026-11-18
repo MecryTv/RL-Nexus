@@ -323,6 +323,8 @@ export default class VoiceService {
 
         if (!channel || !channel.isVoiceBased()) {
             await this.client.tempVoices.Remove(channelId);
+            // Review W-0143: in Discord gelöscht - ein offenes Fenster zeigt sonst weiter die alten Leute.
+            this.client.pulseService.Emit(guild.id, "voice", { channelId, open: false });
 
             return;
         }
@@ -430,6 +432,8 @@ export default class VoiceService {
         });
 
         await this.client.tempVoices.Save(temp.channelId, settings);
+        // Review W-0143: Sperren, Limit, Name, Vertraute ändern keinen Sprachzustand - das Fenster soll es trotzdem sehen.
+        this.client.pulseService.Emit(channel.guild.id, "voice", { channelId: temp.channelId, changed: true });
     }
 
     /* ----------------------------------------------------------
@@ -585,6 +589,7 @@ export default class VoiceService {
 
                 await this.client.tempVoices.Save(channel.id, settings, target.id);
                 await channel.permissionOverwrites.set(this.Overwrites(channel.guild, target.id, settings)).catch(() => undefined);
+                this.client.pulseService.Emit(channel.guild.id, "voice", { channelId: channel.id, changed: true });
 
                 return `🔄 Der Kanal gehört jetzt ${named}.`;
             }

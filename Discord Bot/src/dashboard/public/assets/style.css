@@ -3822,6 +3822,8 @@ body.no-motion .hero__field .run{display:none}
 .vcview__foot a{display:inline-flex;align-items:center;gap:5px;color:var(--blue-soft);font:600 12px/1 var(--f-label);letter-spacing:.1em;text-transform:uppercase}
 .vcview__foot a svg{width:12px;height:12px}
 @media (max-width:620px){
+  .vcrow{grid-template-columns:auto minmax(0,1fr) auto}
+  .vcrow__go{font-size:0;gap:0}
   .vcview{width:100vw}
   .vcview__tiles{grid-template-columns:repeat(2,minmax(0,1fr))}
   .vcperson{flex-wrap:wrap}

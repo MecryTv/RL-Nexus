@@ -8,7 +8,7 @@
 
 import { BASE } from "../core/Base.js";
 import { icon, need } from "../core/Dom.js";
-import { debounce, onPulse } from "../core/Pulse.js";
+import { onPulse } from "../core/Pulse.js";
 import { ago } from "../core/Format.js";
 import { clickSound } from "../core/Sound.js";
 import { toast } from "../core/Toast.js";
@@ -20,9 +20,31 @@ const TABS: VoiceTab[] = ["hubs", "offen"];
 // W-0143: Symbol je Status im Fenster eines offenen Kanals - immer mit Wort daneben.
 const STATE_ICONS: Record<PersonState, string> = { stream: "#i-monitor", video: "#i-video", mute: "#i-mic-off", deaf: "#i-headphones-off" };
 const CLOCK = new Intl.DateTimeFormat("de-DE", { hour: "2-digit", minute: "2-digit" });
+
+/**
+ * Review W-0143: höchstens alle 1,5 s neu laden, auch wenn Meldungen ohne Pause kommen (Entprellen
+ * würde dann nie feuern). Die letzte Meldung geht nie verloren: der geplante Lauf lädt danach.
+ */
+function throttle(run: () => void, wait = 1500): () => void {
+    let timer: number | null = null;
+    let last = 0;
+
+    return () => {
+        if (timer !== null) return;
+
+        timer = window.setTimeout(
+            () => {
+                timer = null;
+                last = Date.now();
+                run();
+            },
+            Math.max(0, last + wait - Date.now())
+        );
+    };
+}
 const DAY = new Intl.DateTimeFormat("de-DE", { day: "2-digit", month: "2-digit" });
 
-/** „19:31 Uhr“, nach einem Tag mit Datum davor. */
+/** „19:31 Uhr“; ab 20 Stunden mit Datum davor, sonst sähe gestern 21:00 aus wie heute. */
 function clock(at: number): string {
     return `${Date.now() - at > 20 * 3_600_000 ? `${DAY.format(at)} ` : ""}${CLOCK.format(at)} Uhr`;
 }
@@ -121,6 +143,9 @@ export function renderVoice(guildId: string): void {
     const call = api(`${BASE}/api/guild/${encodeURIComponent(guildId)}/voice`, note);
 
     let data: IPayload | null = null;
+    // Review W-0143: Meldungen, während der Abschnitt versteckt war; Zähler gegen Antworten in falscher Reihenfolge.
+    let stale = false;
+    let pulseSeq = 0;
     let open: number | null = null;
     let headNode: HTMLElement = el("div");
     let openNode: HTMLElement = el("div");
@@ -568,7 +593,9 @@ export function renderVoice(guildId: string): void {
     const viewTitle = el("h2", "", "");
     const viewSub = el("p", "");
     const viewBody = el("div", "modal__body mcview__body vcview__body");
-    const viewFoot = el("div", "vcview__foot");
+    const viewId = el("span", "");
+    const viewLink = el("a", "", icon("#i-external"), "In Discord öffnen");
+    const viewFoot = el("div", "vcview__foot", viewId, viewLink);
     const closeView = button("iconbtn modal__x", icon("#i-x"));
     const dialog = el(
         "dialog",
@@ -578,7 +605,11 @@ export function renderVoice(guildId: string): void {
         viewFoot
     );
     let shownId: string | null = null;
+    // Review W-0143: Wer die Kanal-ID markiert und außerhalb loslässt, soll das Fenster nicht schließen.
+    let downOutside = false;
 
+    viewLink.target = "_blank";
+    viewLink.rel = "noopener";
     viewTitle.id = "vcViewTitle";
     dialog.setAttribute("aria-labelledby", "vcViewTitle");
     closeView.autofocus = true;
@@ -592,12 +623,16 @@ export function renderVoice(guildId: string): void {
         shownId = null;
 
         if (dialog.open) dialog.close();
-        if (id) openNode.querySelector<HTMLElement>(`[data-channel="${id}"]`)?.focus();
+        // Ist die Zeile inzwischen weg (Kanal zu), landet der Fokus auf dem Reiter.
+        if (id) (openNode.querySelector<HTMLElement>(`[data-channel="${id}"]`) ?? navNode.querySelector<HTMLElement>("#vctab-offen"))?.focus();
     }
 
     closeView.addEventListener("click", hideOpen);
+    dialog.addEventListener("pointerdown", (event) => {
+        downOutside = event.target === dialog;
+    });
     dialog.addEventListener("click", (event) => {
-        if (event.target === dialog) hideOpen();
+        if (event.target === dialog && downOutside) hideOpen();
     });
     dialog.addEventListener("keydown", (event) => {
         if (event.key !== "Escape") return;
@@ -654,7 +689,7 @@ export function renderVoice(guildId: string): void {
         // Zu, während das Fenster offen war: der Kopf behält den Namen, der Rumpf sagt es.
         if (!entry) {
             viewSub.textContent = "geschlossen";
-            viewBody.replaceChildren(el("div", "tkempty tkempty--big vcview__gone", icon("#i-mic"), el("b", "", "Dieser Kanal ist inzwischen zu."), el("span", "", "Er verschwindet, sobald der Letzte rausgeht.")));
+            viewBody.replaceChildren(el("div", "tkempty tkempty--big vcview__gone", icon("#i-mic"), el("b", "", "Dieser Kanal ist inzwischen zu.")));
             viewFoot.hidden = true;
 
             return;
@@ -664,7 +699,6 @@ export function renderVoice(guildId: string): void {
         const seats = seatsText(entry.members, entry.limit);
         const fill = el("i");
         const facts = el("dl", "mcfacts");
-        const link = el("a", "", icon("#i-external"), "In Discord öffnen");
         const rows: [string, string][] = [
             ["Besitzer", entry.owner],
             ["Sichtbar", entry.stealth ? "versteckt" : "für alle"],
@@ -704,11 +738,10 @@ export function renderVoice(guildId: string): void {
             )
         );
 
-        link.href = `https://discord.com/channels/${encodeURIComponent(guildId)}/${encodeURIComponent(entry.channelId)}`;
-        link.target = "_blank";
-        link.rel = "noopener";
+        // Review W-0143: Fuß nur auffrischen, nicht neu bauen - ein Fokus auf dem Link bleibt.
+        viewLink.href = `https://discord.com/channels/${encodeURIComponent(guildId)}/${encodeURIComponent(entry.channelId)}`;
+        viewId.textContent = `Kanal-ID ${entry.channelId}`;
         viewFoot.hidden = false;
-        viewFoot.replaceChildren(el("span", "", `Kanal-ID ${entry.channelId}`), link);
     }
 
     /* ------------------------------------------------------------
@@ -755,9 +788,20 @@ export function renderVoice(guildId: string): void {
      * schreibt, verliert dabei nichts.
      */
     async function pulse(): Promise<void> {
+        // Review W-0143: Abschnitt versteckt und kein Fenster offen - nichts laden, beim Zurückkommen nachholen.
+        if (host.closest("[hidden]") && !dialog.open) {
+            stale = true;
+
+            return;
+        }
+
+        stale = false;
+
+        const seq = ++pulseSeq;
         const answer = await call<IPayload>("");
 
-        if (!answer || !data) return;
+        // Eine ältere, langsamere Antwort darf einen schon geschlossenen Kanal nicht zurückholen.
+        if (!answer || !data || seq !== pulseSeq) return;
 
         data = answer;
 
@@ -765,6 +809,7 @@ export function renderVoice(guildId: string): void {
         const freshNav = nav();
         const list = openList();
         const focused = navNode.contains(document.activeElement);
+        const focusedRow = openNode.contains(document.activeElement) ? (document.activeElement as HTMLElement).dataset.channel : undefined;
 
         headNode.replaceWith(fresh);
         navNode.replaceWith(freshNav);
@@ -779,10 +824,12 @@ export function renderVoice(guildId: string): void {
 
         // Wer gerade mit den Pfeiltasten durch die Reiter ging, bleibt dort.
         if (focused) navNode.querySelector<HTMLElement>(`#vctab-${tab}`)?.focus();
+        // Review W-0143: Wer mit Tab auf einer Zeile stand, bleibt dort (sonst springt der Fokus bei jedem Stumm-Klick weg).
+        if (focusedRow) (openNode.querySelector<HTMLElement>(`[data-channel="${focusedRow}"]`) ?? navNode.querySelector<HTMLElement>("#vctab-offen"))?.focus();
     }
 
     loading(host, 4);
-    onPulse(guildId, ["voice"], debounce(() => void pulse()));
+    onPulse(guildId, ["voice"], throttle(() => void pulse()));
 
     // Review W-0140: Wer über die Leiste zurückkommt, landet auf /voice-hub ohne ?reiter - der Reiter folgt der Adresse, wie bei Grenzen.
     window.addEventListener("guild:shown", (event) => {
@@ -790,6 +837,8 @@ export function renderVoice(guildId: string): void {
 
         tab = parseVoiceTab(window.location.search);
         show();
+
+        if (stale) void pulse();
     });
 
     void call<IPayload>("").then((answer) => {

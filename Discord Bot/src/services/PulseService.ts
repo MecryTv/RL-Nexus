@@ -145,16 +145,16 @@ export default class PulseService {
         return (this.subscribers.get(`${USER_KEY}${userId}`)?.size ?? 0) > 0;
     }
 
-    /**
-     * Sagt allen offenen Fenstern eines Servers Bescheid. Kostet nichts, wenn
-     * niemand zusieht - deshalb darf jeder Dienst das einfach aufrufen, ohne
-     * vorher nachzusehen.
-     */
     /** W-0143: Hat gerade jemand das Dashboard dieses Servers offen? Spart Abfragen, deren Meldung niemand liest. */
     Watching(guildId: string): boolean {
         return Boolean(this.subscribers.get(guildId)?.size);
     }
 
+    /**
+     * Sagt allen offenen Fenstern eines Servers Bescheid. Kostet nichts, wenn
+     * niemand zusieht - deshalb darf jeder Dienst das einfach aufrufen, ohne
+     * vorher nachzusehen.
+     */
     Emit(guildId: string, kind: PulseKind, data: Record<string, unknown> = {}): void {
         const set = this.subscribers.get(guildId);
 

@@ -31,7 +31,8 @@ export default class DashboardApiVoice extends Route {
             description: "Temp-Voice-Hubs eines Servers",
             prefixed: false,
             requiresAuth: false,
-            rateLimit: { max: 60, timeWindow: "1 minute" },
+            // Review W-0143: Das Fenster lädt bei jedem Sprachwechsel neu; GET und POST teilen sich den Zähler.
+            rateLimit: { max: 120, timeWindow: "1 minute" },
         });
     }
 

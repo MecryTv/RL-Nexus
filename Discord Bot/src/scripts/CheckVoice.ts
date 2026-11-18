@@ -637,6 +637,46 @@ async function checkPulse(client: BotClient): Promise<void> {
     }
 }
 
+/** Review W-0143: Meldungen, die das offene Fenster sonst verpasst, und genug Spielraum für die vielen Neuladungen. */
+async function checkReviewPulse(client: BotClient): Promise<void> {
+    console.log("\n  — Review W-0143: Meldungen und Rate-Limit —");
+
+    const route = new DashboardApiVoice(client);
+
+    check("Route verträgt 120 Abrufe je Minute (GET und POST teilen sich den Zähler)", (route.rateLimit?.max ?? 0) >= 120, String(route.rateLimit?.max));
+
+    const service = client.voiceService as unknown as {
+        Cleanup(guild: unknown, channelId: string, leftId: string | null): Promise<void>;
+        Apply(channel: unknown, temp: unknown, settings: unknown): Promise<void>;
+        Overwrites: unknown;
+    };
+    const sent: { kind: string; data: Record<string, unknown> }[] = [];
+    const removed: string[] = [];
+    const original = { get: client.tempVoices.Get, remove: client.tempVoices.Remove, save: client.tempVoices.Save, overwrites: service.Overwrites };
+    const row = { channelId: TEMP, guildId: GUILD, hubId: 7, ownerId: USER, settings: DefaultVoiceSettings(), support: false, createdAt: Date.now() };
+    const stop = client.pulseService.Subscribe(GUILD, USER, (kind, data) => void sent.push({ kind, data: data as Record<string, unknown> }), () => undefined);
+
+    client.tempVoices.Get = (async () => row) as unknown as typeof client.tempVoices.Get;
+    client.tempVoices.Remove = (async (channelId: string) => void removed.push(channelId)) as unknown as typeof client.tempVoices.Remove;
+    client.tempVoices.Save = (async () => undefined) as unknown as typeof client.tempVoices.Save;
+    service.Overwrites = () => [];
+
+    try {
+        // Ein Mod löscht den Kanal in Discord, bevor die Leute rausfallen: die Zeile geht, das Fenster muss es erfahren.
+        await service.Cleanup({ id: GUILD, channels: { cache: new Collection() } }, TEMP, OTHER);
+        check("Kanal in Discord gelöscht: Zeile weg und Meldung open:false", removed.join() === TEMP && sent.length === 1 && sent[0]?.data.open === false && sent[0]?.data.channelId === TEMP, JSON.stringify(sent));
+
+        // Änderungen über das Panel (sperren, Limit, umbenennen, vertrauen) ändern keinen Sprachzustand.
+        sent.length = 0;
+        await service.Apply({ name: "Joes Kanal", guild: { id: GUILD }, edit: async () => undefined }, row, { ...DefaultVoiceSettings(), privacy: "private" });
+        check("Panel-Änderung: eine Meldung voice für den Kanal", sent.length === 1 && sent[0]?.kind === "voice" && sent[0]?.data.channelId === TEMP, JSON.stringify(sent));
+    } finally {
+        stop?.();
+        Object.assign(client.tempVoices, { Get: original.get, Remove: original.remove, Save: original.save });
+        service.Overwrites = original.overwrites;
+    }
+}
+
 async function main(): Promise<void> {
     console.log("\n🔊 Temp Voice\n");
 
@@ -652,6 +692,7 @@ async function main(): Promise<void> {
     await checkRouteHub(client);
     await checkRouteInfo(client);
     await checkPulse(client);
+    await checkReviewPulse(client);
 
     if (await client.databaseService.Connect()) {
         try {
