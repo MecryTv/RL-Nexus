@@ -11,19 +11,17 @@ import {
     LFT_MODULE,
     MAX_ANSWER,
     MAX_CHOICES,
-    MAX_EXPIRE,
     MAX_HINT,
     MAX_LABEL,
     MAX_MANAGERS,
     MAX_PINGS,
-    MAX_QUESTIONS,
     MAX_TAG_NAME,
     MAX_TITLE,
     PAGE_SIZE,
     QUESTION_LABELS,
     STATUS_LABELS,
 } from "../constants/Lft";
-import { LftError } from "../services/LookingForService";
+import { LftError, LftLimits } from "../services/LookingForService";
 import { LftKind, LftStatus } from "../interfaces/services/lft/ILft";
 import { WantsJSON } from "../utils/admin";
 import logger from "../utils/logger";
@@ -108,7 +106,7 @@ export default class DashboardApiLft extends Route {
             bodyKinds: BODY_KINDS,
             closedTag: CLOSED_TAG,
             limits: {
-                questions: MAX_QUESTIONS,
+                questions: LftLimits(guild.id).questions,
                 choices: MAX_CHOICES,
                 label: MAX_LABEL,
                 hint: MAX_HINT,
@@ -117,7 +115,7 @@ export default class DashboardApiLft extends Route {
                 tag: MAX_TAG_NAME,
                 managers: MAX_MANAGERS,
                 pings: MAX_PINGS,
-                expire: MAX_EXPIRE,
+                expire: LftLimits(guild.id).expireDays,
                 page: PAGE_SIZE,
             },
             guild: {

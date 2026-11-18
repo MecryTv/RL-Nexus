@@ -1,5 +1,6 @@
 import { ChannelType } from "discord.js";
-import { KIND_LABELS, MAX_EXPIRE, MAX_MANAGERS, MAX_PINGS } from "../../../constants/Lft";
+import { KIND_LABELS, LFT_MODULE, MAX_MANAGERS, MAX_PINGS } from "../../../constants/Lft";
+import { settingDef } from "../../../constants/ModuleSettings";
 import { ILftSettings, LftKind } from "../../../interfaces/services/lft/ILft";
 import { LftError } from "../../LookingForService";
 import { IPanelField, IPanelModule, PanelError } from "../SettingsModel";
@@ -52,7 +53,7 @@ export const LookingForPanel: IPanelModule<S> = {
                         ["modal", "Im Fenster"],
                     ],
                 }),
-                F<S>("number", "expire", "Schließen nach", "Nach so vielen Tagen schließt der Bot eine Suche. 0 heißt nie.", (s) => s.expireDays, (value: number) => ({ expireDays: value }), { min: 0, max: MAX_EXPIRE, unit: "Tage" }),
+                F<S>("number", "expire", "Schließen nach", "Nach so vielen Tagen schließt der Bot eine Suche. 0 heißt nie.", (s) => s.expireDays, (value: number) => ({ expireDays: value }), { min: 0, max: settingDef(LFT_MODULE, "maxExpireDays")!.standard, unit: "Tage" }),
                 F<S>("roles", "managers", "Dürfen beenden", "Diese Rollen dürfen fremde Suchen beenden und Beiträge löschen.", (s) => s.manageRoles, (value: string[]) => ({ manageRoles: value }), { max: MAX_MANAGERS }),
             ],
         },

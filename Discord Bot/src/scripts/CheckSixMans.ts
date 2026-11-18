@@ -12,7 +12,7 @@ process.env.DEV_CLIENT_SECRET ||= "check-secret";
 
 import path from "path";
 import { existsSync } from "fs";
-import { ChannelType, Guild, GuildBasedChannel, Role } from "discord.js";
+import { ChannelType, Guild, GuildBasedChannel, GuildMember, Role } from "discord.js";
 import BotClient from "../client/BotClient";
 import { PanelRow, PanelValues, RoundRow, RoundValues, SixRender } from "../builder/SixMansView";
 import { Fill } from "../constants/Placeholders";
@@ -36,6 +36,9 @@ import {
     TeamSize,
 } from "../constants/SixMans";
 import { IManRank, ISixRound, ISixWaiting, ManMode } from "../interfaces/services/sixmans/ISixMans";
+import DashboardApiSixMans from "../routes/DashboardApiSixMans";
+import { SixMansError, SixMansLimits } from "../services/SixMansService";
+import { SetFlags } from "../utils/moduleFlags";
 
 const GUILD = "90071992547409961";
 const TEXT = "90071992547409962";
@@ -202,7 +205,7 @@ function checkRanks(client: BotClient): void {
         { min: 600, name: "Mittelfeld", emoji: "⚽", color: "#00afff" },
         { min: 600, name: "Noch eine bei 600", emoji: "", color: "#000000" },
         { min: 100, name: "", emoji: "🙈", color: "#123456" },
-    ]);
+    ], GUILD);
 
     check("Sie kommen sortiert zurück", own.map((rank) => rank.min).join(",") === "0,600,900", own.map((rank) => rank.min).join(","));
     check("Die unterste steht immer bei 0", own[0].min === 0 && own[0].name === "Frischling");
@@ -215,10 +218,10 @@ function checkRanks(client: BotClient): void {
 
     check("Die eigene Leiter greift", RankOf(650, own).name === "Mittelfeld", RankOf(650, own).name);
     check("Und ganz oben auch", RankOf(5000, own).name === "Legende");
-    check("Nichts Brauchbares heißt: Vorgabe", service.CleanRanks([{ name: "" }]).length === 0 && service.CleanRanks("nein").length === 0);
+    check("Nichts Brauchbares heißt: Vorgabe", service.CleanRanks([{ name: "" }], GUILD).length === 0 && service.CleanRanks("nein", GUILD).length === 0);
     check("Leer heißt Vorgabe", RankOf(600, []).name === RankOf(600).name);
 
-    const many = service.CleanRanks(Array.from({ length: 30 }, (_, index) => ({ min: index * 50, name: `Stufe ${index}`, color: "#00afff" })));
+    const many = service.CleanRanks(Array.from({ length: 30 }, (_, index) => ({ min: index * 50, name: `Stufe ${index}`, color: "#00afff" })), GUILD);
 
     check("Mehr als zwölf Stufen gehen nicht", many.length <= 12, String(many.length));
 
@@ -380,6 +383,75 @@ async function checkLists(): Promise<void> {
     }
 }
 
+/** W-0137: ein Server-Wert für die Grenzen von rl-6mans. */
+function Limits(values: Record<string, number>) {
+    return { module: "rl-6mans", guildId: GUILD, status: null, notice: null, linkMode: null, values, updatedAt: null };
+}
+
+/** W-0137: Stufen und laufende Runden sind Grenzen von RL Nexus, je Server änderbar. Läuft zuletzt: ersetzt Dienst-Methoden. */
+async function checkW137(client: BotClient): Promise<void> {
+    console.log("\n  — W-0137: Grenzen —");
+
+    const service = client.sixMansService;
+    const guild = FakeGuild();
+    const many = Array.from({ length: 30 }, (_, index) => ({ min: index * 50, name: `Stufe ${index}`, color: "#00afff" }));
+    const settings = { ...DefaultSixSettings(), modes: Object.fromEntries(MODES.map((mode) => [mode, true])) as Record<ManMode, boolean> };
+    const players = Waiting([600, 600, 600, 600, 600, 600]);
+    const member = (index: number) => ({ id: players[index].userId, displayName: players[index].name, guild }) as unknown as GuildMember;
+    const started: ManMode[] = [];
+    let running = Array.from({ length: 10 }, (_, index) => FakeRound({ id: 200 + index, blue: [], orange: [] }));
+
+    check("Standard: 12 Stufen, 10 laufende Runden", JSON.stringify(SixMansLimits(GUILD)) === JSON.stringify({ ranks: 12, running: 10 }), JSON.stringify(SixMansLimits(GUILD)));
+    SetFlags([], [], [], [Limits({ maxRanks: 20 })]);
+    check("Server-Wert 20 lässt 20 Stufen", service.CleanRanks(many, GUILD).length === 20, String(service.CleanRanks(many, GUILD).length));
+    SetFlags([], [], []);
+
+    Object.defineProperty(client.databaseService, "Ready", { get: () => true, configurable: true });
+    client.sixRounds.Running = async () => running;
+    client.sixPlayers.Ensure = (async () => ({ mmr: 600 })) as unknown as typeof client.sixPlayers.Ensure;
+    service.Settings = async () => settings;
+    service.Panel = async () => undefined;
+    (service as unknown as { Start: (guild: Guild, settings: unknown, mode: ManMode) => Promise<ISixRound> }).Start = async (_guild, _settings, mode) => {
+        started.push(mode);
+
+        return FakeRound({ mode });
+    };
+
+    for (let index = 0; index < 5; index++) await service.Join(member(index), 6);
+
+    let hit: unknown = null;
+
+    try {
+        await service.Join(member(5), 6);
+    } catch (error) {
+        hit = error;
+    }
+
+    const limit = hit instanceof SixMansError ? hit.limit : undefined;
+
+    check("Bei 10 laufenden Runden scheitert der Start der 11. (maxRunning)", limit?.key === "maxRunning" && limit.asked === 11 && limit.allowed === 10, JSON.stringify(limit));
+    check("Die Meldung sagt, dass sie warten", hit instanceof Error && hit.message.includes("Warteschlange"), hit instanceof Error ? hit.message : String(hit));
+    check("Die sechs bleiben in der Warteschlange", service.Queue(GUILD, 6).length === 6 && started.length === 0, `${service.Queue(GUILD, 6).length}/${started.length}`);
+
+    running = running.slice(1);
+
+    const resumed = await service.Resume(guild);
+
+    check("Ist eine Runde fertig, geht es von selbst los", resumed.length === 1 && started.join(",") === "6" && service.Queue(GUILD, 6).length === 0, `${resumed.length}/${started.join(",")}`);
+
+    const route = new DashboardApiSixMans(client) as unknown as { Read(access: unknown, query: unknown): Promise<Record<string, any>> };
+
+    service.Rounds = (async () => ({ rows: [], total: 0 })) as unknown as typeof service.Rounds;
+    service.Running = (async () => []) as unknown as typeof service.Running;
+    service.Boards = (async () => ({})) as unknown as typeof service.Boards;
+    SetFlags([], [], [], [Limits({ maxRanks: 20, maxRunning: 15 })]);
+
+    const read = await route.Read({ guild: { id: GUILD, name: "Dev Server", channels: { cache: new Map() }, roles: { cache: new Map() }, emojis: { cache: new Map() }, members: { cache: new Map() } } }, {});
+
+    check("Route gibt den Server-Wert an die Seite", read.limits?.ranks === 20 && read.limits?.running === 15, JSON.stringify(read.limits));
+    SetFlags([], [], []);
+}
+
 async function main(): Promise<void> {
     console.log("\n🎮 2, 4 & 6 Mans\n");
 
@@ -391,6 +463,7 @@ async function main(): Promise<void> {
     checkChange(client);
     await checkViews(client);
     await checkLists();
+    await checkW137(client);
 
     console.log(failures === 0 ? "\n✅ Alle Prüfungen bestanden.\n" : `\n❌ ${failures} Prüfung(en) fehlgeschlagen.\n`);
 

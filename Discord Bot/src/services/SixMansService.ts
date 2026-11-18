@@ -1,5 +1,6 @@
 import { ButtonInteraction, ChannelType, Guild, GuildMember, MessageEditOptions, MessageFlags, PermissionFlagsBits, VoiceChannel } from "discord.js";
 import BotClient from "../client/BotClient";
+import { ILimitHit } from "../builder/LimitReply";
 import { PanelRow, PanelValues, RoundRow, RoundValues, SixRender } from "../builder/SixMansView";
 import {
     BOARD_SIZE,
@@ -7,7 +8,6 @@ import {
     DEFAULT_RANKS,
     DefaultSixSettings,
     IsMode,
-    MAX_RANKS,
     MAX_RANK_MIN,
     MAX_RANK_NAME,
     LobbyName,
@@ -27,8 +27,22 @@ import {
 } from "../constants/SixMans";
 import { IManRank, IMansSettings, ISixBody, ISixRank, ISixRound, ISixWaiting, ManMode, RoundStatus, SixTeam } from "../interfaces/services/sixmans/ISixMans";
 import logger from "../utils/logger";
+import { ModuleValue } from "../utils/moduleFlags";
 
-export class SixMansError extends Error {}
+export class SixMansError extends Error {
+    /** limit: welche Grenze von RL Nexus gegriffen hat (W-0137), für den Satz und die Anfrage im Dashboard. */
+    constructor(
+        message: string,
+        readonly limit?: ILimitHit
+    ) {
+        super(message);
+    }
+}
+
+/** W-0137: eigene Stufen und gleichzeitig laufende Runden, Grenzen von RL Nexus je Server. */
+export function SixMansLimits(guildId: string): { ranks: number; running: number } {
+    return { ranks: ModuleValue(SIXMANS_MODULE, "maxRanks", guildId), running: ModuleValue(SIXMANS_MODULE, "maxRunning", guildId) };
+}
 
 function IsRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -100,7 +114,7 @@ export default class SixMansService {
             k: Int(raw.k, MIN_K, MAX_K, previous.k),
             idleMinutes: Int(raw.idleMinutes, 0, MAX_IDLE, previous.idleMinutes),
             board: IsRecord(raw.board) ? { open: typeof raw.board.open === "boolean" ? raw.board.open : previous.board.open } : previous.board,
-            ranks: raw.ranks === undefined ? previous.ranks : this.CleanRanks(raw.ranks),
+            ranks: raw.ranks === undefined ? previous.ranks : this.CleanRanks(raw.ranks, guild.id),
             // Die ID der Panel-Nachricht gehört dem Bot.
             panelMessageId: previous.panelMessageId,
             panel: this.CleanBody(guild, "Panel", raw.panel, previous.panel),
@@ -115,12 +129,12 @@ export default class SixMansService {
      * bei 0 - sonst faende eine kleine MMR keine Stufe. Eine leere Liste heisst
      * „Vorgabe", und genau so kommt sie auch wieder heraus.
      */
-    CleanRanks(input: unknown): IManRank[] {
+    CleanRanks(input: unknown, guildId: string): IManRank[] {
         if (!Array.isArray(input)) return [];
 
         const ranks: IManRank[] = [];
 
-        for (const entry of input.slice(0, MAX_RANKS)) {
+        for (const entry of input.slice(0, SixMansLimits(guildId).ranks)) {
             if (!IsRecord(entry)) continue;
 
             const name = typeof entry.name === "string" ? entry.name.trim().slice(0, MAX_RANK_NAME) : "";
@@ -234,6 +248,31 @@ export default class SixMansService {
             return { queue, started: null };
         }
 
+        const max = SixMansLimits(guildId).running;
+
+        // W-0137: Laufen schon so viele Runden, wie der Server darf, warten alle weiter - Resume() startet sie, sobald eine endet.
+        if (running.length >= max) {
+            await this.Panel(member.guild, settings).catch(() => undefined);
+
+            throw new SixMansError(`Gerade laufen ${running.length} Runden, mehr gehen hier nicht gleichzeitig. Ihr bleibt in der Warteschlange: sobald eine Runde fertig ist, geht es los.`, {
+                module: SIXMANS_MODULE,
+                key: "maxRunning",
+                asked: running.length + 1,
+                allowed: max,
+            });
+        }
+
+        const round = await this.Launch(member.guild, settings, mode);
+
+        await this.Panel(member.guild, await this.Settings(guildId)).catch(() => undefined);
+
+        return { queue: this.Queue(guildId, mode), started: round };
+    }
+
+    /** Nimmt die Ersten aus der Warteschlange und startet ihre Runde. */
+    private async Launch(guild: Guild, settings: IMansSettings, mode: ManMode): Promise<ISixRound> {
+        const guildId = guild.id;
+        const queue = this.Queue(guildId, mode);
         // Erst aus der Warteschlange nehmen, dann starten: Start() wartet auf
         // Discord, und in der Zeit darf niemand dieselben Leute noch einmal
         // erwischen.
@@ -252,11 +291,26 @@ export default class SixMansService {
             if (rest.length !== waiting.length) this.Set(guildId, other, rest);
         }
 
-        const round = await this.Start(member.guild, settings, mode, playing);
+        return this.Start(guild, settings, mode, playing);
+    }
 
-        await this.Panel(member.guild, await this.Settings(guildId)).catch(() => undefined);
+    /** W-0137: Ist eine Runde vorbei, starten die Warteschlangen, die wegen maxRunning warten mussten. */
+    async Resume(guild: Guild): Promise<ISixRound[]> {
+        const settings = await this.Settings(guild.id);
+        const max = SixMansLimits(guild.id).running;
+        const started: ISixRound[] = [];
+        let running = (await this.client.sixRounds.Running(guild.id)).length;
 
-        return { queue: this.Queue(guildId, mode), started: round };
+        for (const mode of MODES) {
+            if (running >= max || !settings.modes[mode] || this.Queue(guild.id, mode).length < mode) continue;
+
+            started.push(await this.Launch(guild, settings, mode));
+            running++;
+        }
+
+        if (started.length) await this.Panel(guild, settings).catch(() => undefined);
+
+        return started;
     }
 
     /** Wieder raus - aus einem Modus oder überall. */
@@ -509,6 +563,7 @@ export default class SixMansService {
 
         await this.Refresh(guild, settings, done).catch(() => undefined);
         await this.Panel(guild, settings).catch(() => undefined);
+        await this.Resume(guild).catch(() => undefined);
 
         this.client.pulseService.Emit(guild.id, "sixmans", { round: round.id, done: true });
         logger.user(`🎮 ${MODE_LABELS[round.mode]} Runde #${round.id} auf ${guild.id}: ${TEAM_LABELS[winner]} gewinnt (±${change})`);
@@ -535,6 +590,7 @@ export default class SixMansService {
         const settings = await this.Settings(guild.id);
 
         await this.Refresh(guild, settings, done, "✖️ **Abgebrochen.** Die MMR bleibt, wie sie war.").catch(() => undefined);
+        await this.Resume(guild).catch(() => undefined);
 
         this.client.pulseService.Emit(guild.id, "sixmans", { round: roundId, done: true });
 

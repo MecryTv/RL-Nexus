@@ -71,7 +71,6 @@ export const STATUS_LABELS = { running: "Läuft", done: "Fertig", cancelled: "Ab
  * anfängt, steht mit 600 mitten in „Boost-Jäger": nach oben und nach unten ist
  * von Anfang an Luft.
  */
-export const MAX_RANKS = 12;
 export const MAX_RANK_NAME = 32;
 /** Höher geht keine Grenze - darüber wird niemand mehr eingeordnet. */
 export const MAX_RANK_MIN = 50_000;
