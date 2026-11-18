@@ -53,6 +53,8 @@ export default class VoiceService {
     // Wer gerade einen Kanal bekommt: zwei Beitritte in derselben Sekunde
     // dürfen nicht zwei Kanäle ergeben.
     private readonly creating = new Set<string>();
+    // W-0140: Sweep() läuft einmal nach dem Start, nicht bei jedem Lauf.
+    private swept = false;
 
     constructor(client: BotClient) {
         this.client = client;
@@ -298,13 +300,29 @@ export default class VoiceService {
         }
     }
 
+    /**
+     * W-0140: Der erste Lauf nach dem Start (runnables/VoiceSupport.ts) - dann
+     * sind die Server samt Sprachkanälen im Cache. Später räumt Cleanup bei
+     * jedem Wechsel im Sprachkanal auf.
+     */
+    async SweepOnce(): Promise<void> {
+        if (this.swept || !this.client.databaseService.Ready) return;
+
+        this.swept = true;
+        await this.Sweep().catch((error) => logger.warn(`🔊 Temp Voice beim Start nicht aufgeräumt: ${String(error)}`));
+    }
+
     /** Beim Start: was den Neustart nicht überlebt hat, kommt weg. */
     async Sweep(): Promise<void> {
         if (!this.client.databaseService.Ready) return;
 
         for (const temp of await this.client.tempVoices.All()) {
             const guild = this.client.guilds.cache.get(temp.guildId);
-            const channel = guild?.channels.cache.get(temp.channelId);
+
+            // Ein Server, den der Bot (noch) nicht sieht: Kanal und Zeile bleiben - sonst stünde der Kanal ohne Zeile da.
+            if (!guild) continue;
+
+            const channel = guild.channels.cache.get(temp.channelId);
 
             if (!channel || !channel.isVoiceBased()) {
                 await this.client.tempVoices.Remove(temp.channelId);

@@ -12,12 +12,13 @@
 process.env.CLIENT_SECRET ||= "check-secret";
 process.env.DEV_CLIENT_SECRET ||= "check-secret";
 
-import { ChannelType, Guild, GuildBasedChannel, GuildMember, Role, VoiceBasedChannel } from "discord.js";
+import { ChannelType, Collection, Guild, GuildBasedChannel, GuildMember, Role, VoiceBasedChannel } from "discord.js";
 import BotClient from "../client/BotClient";
 import { VoicePanel, VoicePresetList, VoiceState } from "../builder/VoiceView";
 import { DefaultHubConfig, DefaultVoiceSettings, FormatVoiceName, MAX_LIMIT, MAX_PRESETS, VOICE_ACTIONS } from "../constants/Voice";
 import { IVoiceSettings } from "../interfaces/services/voice/IVoice";
 import { VoiceError } from "../services/VoiceService";
+import VoiceSupport from "../runnables/VoiceSupport";
 
 const GUILD = "90071992547409961";
 const USER = "90071992547409962";
@@ -338,6 +339,50 @@ function checkSupport(client: BotClient): void {
     check("Nur ein echter Wahrheitswert zählt", service.CleanConfig(guild, { support: "ja" }, config).support === false);
 }
 
+/** W-0140: Nach dem Start räumt der erste Lauf leere Temp-Kanäle weg - einmal, und nur auf Servern, die der Bot kennt. */
+async function checkSweep(client: BotClient): Promise<void> {
+    console.log("\n  — Aufräumen nach dem Start (W-0140) —");
+
+    const EMPTY = "90071992547409981";
+    const FULL = "90071992547409982";
+    const GONE = "90071992547409983";
+    const ELSEWHERE = "90071992547409984";
+    const deleted: string[] = [];
+    const removed: string[] = [];
+    const voice = (id: string, humans: number) =>
+        ({
+            id,
+            isVoiceBased: () => true,
+            members: new Collection(Array.from({ length: humans }, (_, index) => [`m${index}`, { user: { bot: false } }] as const)),
+            delete: async () => void deleted.push(id),
+        }) as unknown as GuildBasedChannel;
+    const guild = { id: GUILD, channels: { cache: new Map([[EMPTY, voice(EMPTY, 0)], [FULL, voice(FULL, 1)]]) } } as unknown as Guild;
+    const original = { all: client.tempVoices.All, remove: client.tempVoices.Remove, tick: client.supportService.Tick };
+    const runnable = new VoiceSupport(client);
+
+    client.guilds.cache.set(GUILD, guild);
+    Object.defineProperty(client.databaseService, "Ready", { get: () => true, configurable: true });
+    client.tempVoices.All = (async () => [EMPTY, FULL, GONE].map((channelId) => ({ channelId, guildId: GUILD })).concat({ channelId: ELSEWHERE, guildId: "90071992547409989" })) as unknown as typeof client.tempVoices.All;
+    client.tempVoices.Remove = (async (channelId: string) => void removed.push(channelId)) as unknown as typeof client.tempVoices.Remove;
+    client.supportService.Tick = async () => 0;
+
+    try {
+        await runnable.Execute();
+        check("Der erste Lauf löscht den leeren Kanal", deleted.join() === EMPTY, deleted.join());
+        check("…und die Zeilen von leeren und verschwundenen Kanälen", removed.sort().join() === [EMPTY, GONE].sort().join(), removed.join());
+        check("Besetzte Kanäle bleiben", !deleted.includes(FULL) && !removed.includes(FULL));
+        check("Ein Server, den der Bot (noch) nicht kennt, bleibt unberührt", !removed.includes(ELSEWHERE));
+
+        await runnable.Execute();
+        check("Der zweite Lauf räumt nicht noch einmal auf", deleted.length === 1 && removed.length === 2, `${deleted.length}/${removed.length}`);
+    } finally {
+        Object.assign(client.tempVoices, { All: original.all, Remove: original.remove });
+        client.supportService.Tick = original.tick;
+        delete (client.databaseService as unknown as Record<string, unknown>).Ready;
+        client.guilds.cache.delete(GUILD);
+    }
+}
+
 async function main(): Promise<void> {
     console.log("\n🔊 Temp Voice\n");
 
@@ -348,6 +393,7 @@ async function main(): Promise<void> {
     checkConfig(client);
     checkViews();
     checkSupport(client);
+    await checkSweep(client);
 
     if (await client.databaseService.Connect()) {
         try {
