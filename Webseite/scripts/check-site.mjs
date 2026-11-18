@@ -4,7 +4,7 @@
  */
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { isNewsPreview, isPartnerPreview, isSiteChangelog, isSiteLive, isSiteNews, isSiteNewsPost, isSitePartners } from "../src/services/Content.ts";
+import { isNewsPreview, isPartnerPreview, isSiteChangelog, isSiteLive, isSiteNews, isSiteNewsPost, isSitePartners, loadContent } from "../src/services/Content.ts";
 import { parseMarkdown } from "../src/services/markdown.ts";
 import { categoryCounts, isNew, pinned, shares, timeline, upcoming } from "../src/services/news.ts";
 import { navigationFor } from "../src/services/navigation.ts";
@@ -301,6 +301,42 @@ const pairs = [["partners.json", isSitePartners], ["partners-live.json", isSiteL
 check(`Lokale Dateien aus dem Admin Dashboard gehen durch (${pairs.length} gefunden)`, () => {
     for (const [file, isValid] of pairs) assert.ok(isValid(stored(file)), file);
 });
+
+// W-0141: Header und Seite fragen gleichzeitig nach changelog.json - das geht nur einmal über die Leitung.
+{
+    const realFetch = globalThis.fetch;
+    const asked = [];
+    let broken = false;
+
+    globalThis.fetch = async (url) => {
+        asked.push(String(url));
+        await new Promise((resolve) => setTimeout(resolve, 5));
+
+        return broken ? new Response("weg", { status: 500 }) : Response.json({ revision: 3, data: { ok: true } });
+    };
+
+    try {
+        const valid = (data) => data?.ok === true;
+        const [first, second] = await Promise.all([loadContent("changelog.json", valid), loadContent("changelog.json", valid)]);
+        const later = await loadContent("changelog.json", valid);
+
+        check("Gleiche Datei gleichzeitig und kurz danach: ein Abruf, gleiches Ergebnis", () => {
+            assert.deepEqual(asked, ["/content/changelog.json"]);
+            assert.equal(first?.revision, 3);
+            assert.deepEqual(second, first);
+            assert.deepEqual(later, first);
+        });
+
+        broken = true;
+        asked.length = 0;
+        await loadContent("news.json", valid);
+        await loadContent("news.json", valid);
+
+        check("Ein Fehler wird nicht gemerkt: der nächste Aufruf fragt neu", () => assert.deepEqual(asked, ["/content/news.json", "/content/news.json"]));
+    } finally {
+        globalThis.fetch = realFetch;
+    }
+}
 
 if (failures > 0) {
     console.log(`\n  ${failures} Prüfung(en) fehlgeschlagen.`);
