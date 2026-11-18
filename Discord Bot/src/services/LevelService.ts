@@ -536,9 +536,9 @@ export default class LevelService {
         const from = before ?? entry.level;
 
         if (level === entry.level) return false;
-
-        await this.client.levels.SetLevel(member.guild.id, member.id, level);
-
+        // Review W-0141: nur wenn der Stand noch der gelesene ist. Kam eine zweite Gutschrift dazwischen, hat sie schon
+        // aufgestiegen und gemeldet; ein älterer Stand setzt nie ein höheres Level zurück.
+        if (!(await this.client.levels.ChangeLevel(member.guild.id, member.id, entry.level, level))) return false;
         if (level <= from) return false;
 
         await this.Rewards(member, level, settings);

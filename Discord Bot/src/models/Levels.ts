@@ -92,6 +92,19 @@ export default class Levels extends Model<ILevelRow> {
         );
     }
 
+    /**
+     * Review W-0141: Level nur ändern, wenn es noch `from` ist (Compare-and-Set).
+     * Laufen Chat und Voice gleichzeitig über eine Stufe, gewinnt genau einer;
+     * nur der belohnt und meldet. true: dieser Aufruf hat geschrieben.
+     */
+    async ChangeLevel(guildId: string, userId: string, from: number, to: number): Promise<boolean> {
+        const result = await this.db.Write(`UPDATE \`${this.Table}\` SET level = ?, updated_at = ? WHERE guild_id = ? AND user_id = ? AND level = ?`, [to, Date.now(), guildId, userId, from]);
+
+        this.db.Bump(this.Table);
+
+        return result.affectedRows === 1;
+    }
+
     async SetLevel(guildId: string, userId: string, level: number): Promise<void> {
         await this.Update([guildId, userId], { level, updated_at: Date.now() } as Partial<ILevelRow>);
     }

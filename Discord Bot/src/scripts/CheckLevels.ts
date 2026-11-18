@@ -280,6 +280,8 @@ async function checkDatabase(client: BotClient): Promise<void> {
     await client.levels.SetLevel(GUILD, USER, 2);
 
     check("Das Level lässt sich setzen", (await client.levels.Of(GUILD, USER))?.level === 2);
+    check("Level nur ändern, wenn es noch das alte ist (Review W-0141)", (await client.levels.ChangeLevel(GUILD, USER, 1, 5)) === false && (await client.levels.ChangeLevel(GUILD, USER, 2, 3)) === true && (await client.levels.Of(GUILD, USER))?.level === 3);
+    await client.levels.SetLevel(GUILD, USER, 2);
 
     const top = await client.levels.Top(GUILD, 10);
 
@@ -536,6 +538,17 @@ function World(extra: Partial<ILevelSettings> = {}, env: IWorldEnv = {}): IWorld
                 if (entry) entry.xp = Math.max(0, entry.xp - Math.round(xp));
             },
             SetLevel: async (guildId: string, userId: string, level: number) => void (levels.get(key(guildId, userId))!.level = level),
+            // Wie in MariaDB: nur, wenn das Level noch das erwartete ist (Review W-0141).
+            ChangeLevel: async (guildId: string, userId: string, from: number, to: number) => {
+                await Promise.resolve();
+                const entry = levels.get(key(guildId, userId));
+
+                if (!entry || entry.level !== from) return false;
+
+                entry.level = to;
+
+                return true;
+            },
             AddMany: async (guildId: string, rows: { userId: string; xp: number; voiceMinutes: number }[]) => {
                 for (const row of rows) {
                     const entry = levels.get(key(guildId, row.userId)) ?? empty(guildId, row.userId);
@@ -758,6 +771,17 @@ async function checkAnnounce(): Promise<void> {
 
     // W-0043: Aufstiege nie mehr per DM.
     check("Voice ohne festen Kanal: keine Nachricht, keine DM", voice.sent.length === 0, JSON.stringify(voice.sent));
+
+    // Review W-0141: zwei Gutschriften gleichzeitig (Chat und Voice) über dieselbe Stufe: ein Aufstieg, eine Nachricht.
+    const race = World();
+    const racer = race.member(OTHER);
+
+    await Promise.all([
+        race.service.Credit(racer, XpForLevel(1, race.settings.base), { messages: 1 }, race.settings, TEXT),
+        race.service.Credit(racer, XpForLevel(1, race.settings.base), { messages: 1 }, race.settings, TEXT),
+    ]);
+    check("Zwei Gutschriften gleichzeitig über eine Stufe: genau eine Nachricht", race.sent.length === 1, String(race.sent.length));
+    check("Zwei Gutschriften gleichzeitig: das Level stimmt", race.entry(OTHER).level === LevelFromXp(race.entry(OTHER).xp, race.settings.base), JSON.stringify(race.entry(OTHER)));
 
     // W-0141: eine Gutschrift liest den Stand einmal und schreibt Gesamt- und Tageswert gleichzeitig.
     const lean = World();
