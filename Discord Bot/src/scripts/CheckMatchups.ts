@@ -838,6 +838,12 @@ async function checkCommand(client: BotClient): Promise<void> {
     await run("neu", CAPTAIN, { team: "vyrox main", gegner: "Ascension", anpfiff: "morgen 21:00" });
     check("neu mit getipptem Teamnamen: das Team", made[made.length - 1]?.teamId === 7, JSON.stringify(made[made.length - 1]));
 
+    // W-0137 Review: an der Grenze die gelbe Karte, für Server-Admins mit Anfrage-Knopf.
+    client.matchups.CountPlanned = async () => 100;
+    await run("neu", CAPTAIN, { team: "7", gegner: "Ascension", anpfiff: "morgen 21:00" }, undefined, true);
+    check("neu an der Grenze maxOpen: gelbe Karte mit Satz und Anfrage", JSON.stringify(last()).includes("Mehr als 100 offene Partien") && JSON.stringify(last()).includes("Anfrage im Support"), JSON.stringify(last()).slice(0, 300));
+    client.matchups.CountPlanned = async () => 0;
+
     const askedFor: (number | undefined)[] = [];
     const realListView = service.ListView.bind(service);
 

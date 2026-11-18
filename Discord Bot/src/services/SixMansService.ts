@@ -1,6 +1,6 @@
 import { ButtonInteraction, ChannelType, Guild, GuildMember, MessageEditOptions, MessageFlags, PermissionFlagsBits, VoiceChannel } from "discord.js";
 import BotClient from "../client/BotClient";
-import { ILimitHit } from "../builder/LimitReply";
+import { ILimitHit, ReplyLimit } from "../builder/LimitReply";
 import { PanelRow, PanelValues, RoundRow, RoundValues, SixRender } from "../builder/SixMansView";
 import {
     BOARD_SIZE,
@@ -692,6 +692,7 @@ export default class SixMansService {
             }
         } catch (error) {
             if (!(error instanceof SixMansError)) throw error;
+            if (await ReplyLimit(interaction, error).catch(() => false)) return;
 
             await say(error.message).catch(() => undefined);
         }

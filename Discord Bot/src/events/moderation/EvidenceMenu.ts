@@ -1,5 +1,6 @@
 import { Events, Guild, Interaction, LabelBuilder, Message, MessageFlags, ModalBuilder, TextInputBuilder, TextInputStyle } from "discord.js";
 import BotClient from "../../client/BotClient";
+import { ReplyLimit } from "../../builder/LimitReply";
 import Event from "../../structures/Event";
 import { DetailView, DoneView, EvidenceId, IModView, ModErrorView, ReadEvidenceId, WithProblems } from "../../builder/ModerationView";
 import { MAX_REASON } from "../../constants/Moderation";
@@ -73,6 +74,7 @@ export default class EvidenceMenu extends Event {
             }
         } catch (error) {
             if (!(error instanceof ModerationError)) logger.error(`🛡️ Als Beweis sichern (${interaction.customId}) fehlgeschlagen`, error);
+            if (await ReplyLimit(interaction, error).catch(() => false)) return;
 
             const view = show(ModErrorView(error instanceof ModerationError ? error.message : "Da ging etwas schief. Versuch es gleich nochmal."));
 

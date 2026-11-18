@@ -10,7 +10,7 @@ process.env.DEV_CLIENT_SECRET ||= "check-secret";
 
 import { MessageFlags, PermissionFlagsBits, PermissionsBitField } from "discord.js";
 import BotClient from "../client/BotClient";
-import { AskLine, IsServerAdmin, LimitReply } from "../builder/LimitReply";
+import { AskLine, IsServerAdmin, LimitReply, ReplyLimit } from "../builder/LimitReply";
 import { SUPPORT_URL } from "../constants/Help";
 import CommandHandler from "../events/client/CommandHandler";
 import GuildSettings from "../models/GuildSettings";
@@ -577,6 +577,37 @@ async function checkLeftovers(): Promise<void> {
     SetFlags([], [], []);
 }
 
+/** W-0137 Review: Fehler mit Grenze werden in Discord die gelbe Karte. */
+async function checkReplyLimit(): Promise<void> {
+    console.log("\n— Grenze in Discord als gelbe Karte (W-0137) —");
+
+    const sent: { kind: string; payload: { components?: unknown; flags?: number } }[] = [];
+    const fake = (deferred: boolean, manage: boolean) =>
+        ({
+            guildId: "1162553851187040326",
+            deferred,
+            replied: false,
+            member: { permissions: new PermissionsBitField(manage ? PermissionFlagsBits.ManageGuild : 0n) },
+            reply: async (payload: never) => void sent.push({ kind: "reply", payload }),
+            editReply: async (payload: never) => void sent.push({ kind: "edit", payload }),
+        }) as never;
+    const hit = Object.assign(new Error("Mehr als 100 offene Partien gehen hier nicht."), { limit: { module: "matchups", key: "maxOpen", asked: 101, allowed: 100 } });
+    const text = (index: number) => JSON.stringify(sent[index]?.payload.components ?? null);
+
+    SetFlags([], [], []);
+    check("Ohne Grenze: nichts gesendet, die Stelle antwortet selbst", !(await ReplyLimit(fake(true, true), new Error("kaputt"))) && sent.length === 0);
+    check(
+        "Zurückgestellt: editReply mit Satz und Anfrage-Knopf für Server-Admins",
+        (await ReplyLimit(fake(true, true), hit)) && sent[0]?.kind === "edit" && text(0).includes("Mehr als 100 offene Partien") && text(0).includes(SUPPORT_URL) && ((sent[0]?.payload.flags ?? 0) & MessageFlags.Ephemeral) === 0,
+        text(0).slice(0, 200)
+    );
+    check(
+        "Sofort: reply nur für die Person, ein Mitglied ohne Knopf",
+        (await ReplyLimit(fake(false, false), hit)) && sent[1]?.kind === "reply" && ((sent[1]?.payload.flags ?? 0) & MessageFlags.Ephemeral) !== 0 && !text(1).includes(SUPPORT_URL),
+        text(1).slice(0, 200)
+    );
+}
+
 async function main(): Promise<void> {
     console.log("\n  — Modul-Einstellungen (W-0131) —");
 
@@ -647,6 +678,7 @@ async function main(): Promise<void> {
     await checkAsk();
     await checkLeftovers();
     checkAllModules();
+    await checkReplyLimit();
 
     console.log(failures > 0 ? `\n  ${failures} Prüfung(en) fehlgeschlagen.\n` : "\n  Alles ok.\n");
     process.exit(failures > 0 ? 1 : 0);

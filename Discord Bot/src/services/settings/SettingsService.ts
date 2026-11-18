@@ -7,6 +7,7 @@ import { LogTargetError, WarmLogTarget } from "../../utils/logtarget";
 import { ApplyError } from "../ApplyService";
 import { LevelError } from "../LevelService";
 import { ModerationError, ModerationLimits } from "../ModerationService";
+import { ILimitHit, LimitSentence } from "../../builder/LimitReply";
 import { TicketError } from "../TicketService";
 import { WelcomeError } from "../WelcomeService";
 import { IsPanelModule, PANEL_MODULES } from "./registers";
@@ -139,7 +140,12 @@ export default class SettingsService {
         try {
             warning = await panel.save(this.client, guild, field.set(value, settings), member);
         } catch (error) {
-            if (MODULE_ERRORS.some((type) => error instanceof type)) throw new PanelError((error as Error).message);
+            if (MODULE_ERRORS.some((type) => error instanceof type)) {
+                const limit = (error as Error & { limit?: ILimitHit }).limit;
+
+                // W-0137: Im Panel kein Knopf - der Satz zur Grenze hängt am Text.
+                throw new PanelError(limit ? `${(error as Error).message} ${LimitSentence(limit.module, limit.key, guild.id)}` : (error as Error).message);
+            }
 
             throw error;
         }

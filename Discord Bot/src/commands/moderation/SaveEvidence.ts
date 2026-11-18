@@ -1,5 +1,6 @@
 import { ApplicationCommandType, ChatInputCommandInteraction, ContextMenuCommandBuilder, InteractionContextType, Message, MessageContextMenuCommandInteraction, MessageFlags } from "discord.js";
 import BotClient from "../../client/BotClient";
+import { ReplyLimit } from "../../builder/LimitReply";
 import Command from "../../structures/Command";
 import Category from "../../enums/Category";
 import { IEvidencePreview, IModView, ModErrorView, SaveEvidenceView } from "../../builder/ModerationView";
@@ -48,6 +49,7 @@ export default class SaveEvidence extends Command {
             await say(SaveEvidenceView(PreviewOf(message), cases));
         } catch (error) {
             if (!(error instanceof ModerationError)) logger.error("🛡️ Als Beweis sichern fehlgeschlagen", error);
+            if (await ReplyLimit(interaction, error).catch(() => false)) return;
 
             await say(ModErrorView(error instanceof ModerationError ? error.message : "Da ging etwas schief. Versuch es gleich nochmal.")).catch(() => undefined);
         }

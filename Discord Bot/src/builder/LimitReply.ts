@@ -1,4 +1,4 @@
-import { APIInteractionGuildMember, GuildMember, MessageFlags, PermissionFlagsBits, PermissionsBitField } from "discord.js";
+import { APIInteractionGuildMember, GuildMember, MessageFlags, PermissionFlagsBits, PermissionsBitField, RepliableInteraction } from "discord.js";
 import { SUPPORT_URL } from "../constants/Help";
 import { MODULES } from "../dashboard/client/constants/Modules";
 import { ILinkButtonOptions } from "../interfaces/builder/IComponentV2Builder";
@@ -115,4 +115,23 @@ export function LimitReply(input: {
     if (ask.button) card.buttons(ask.button);
 
     return { components: [card.build()], flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral, allowedMentions: { parse: [] } } as const;
+}
+
+/**
+ * W-0137: Ein Fehler mit Grenze von RL Nexus als gelbe Karte, nur für die
+ * Person - für Slash-Befehle, Knöpfe und Menüs. Ohne Grenze false: die Stelle
+ * antwortet wie bisher mit ihrem Satz.
+ */
+export async function ReplyLimit(interaction: RepliableInteraction, error: unknown, title = "Grenze erreicht"): Promise<boolean> {
+    const limit = error instanceof Error ? (error as Error & { limit?: ILimitHit }).limit : undefined;
+
+    if (!limit || !interaction.guildId) return false;
+
+    const card = LimitReply({ module: limit.module, key: limit.key, guildId: interaction.guildId, admin: IsServerAdmin(interaction.member), title, text: (error as Error).message, asked: limit.asked });
+
+    // Zurückgestellt ist die Antwort schon nur für die Person, beim Bearbeiten nimmt Discord kein Ephemeral.
+    if (interaction.deferred || interaction.replied) await interaction.editReply({ components: card.components, flags: MessageFlags.IsComponentsV2, allowedMentions: { parse: [] } });
+    else await interaction.reply({ components: card.components, flags: card.flags, allowedMentions: { parse: [] } });
+
+    return true;
 }
