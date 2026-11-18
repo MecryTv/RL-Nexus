@@ -237,6 +237,13 @@ export default class VoiceService {
         }
 
         if (before.channelId && before.channelId !== after.channelId) await this.Cleanup(guild, before.channelId, before.member?.id ?? null);
+
+        // W-0143: Wer kommt, geht oder Stumm, Taub, Stream, Kamera umschaltet - das offene Fenster im Dashboard zieht nach.
+        if (!this.client.pulseService.Watching(guild.id)) return;
+
+        for (const channelId of new Set([before.channelId, after.channelId])) {
+            if (channelId && (await this.client.tempVoices.Get(channelId).catch(() => null))) this.client.pulseService.Emit(guild.id, "voice", { channelId, changed: true });
+        }
     }
 
     /** Ein eigener Kanal: Vorgaben des Hubs, dann das Standard-Preset des Users. */

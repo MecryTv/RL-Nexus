@@ -17,7 +17,7 @@ import BotClient from "../client/BotClient";
 import { VoicePanel, VoicePresetList, VoiceState } from "../builder/VoiceView";
 import { DefaultHubConfig, DefaultVoiceSettings, FormatVoiceName, MAX_LIMIT, MAX_PRESETS, VOICE_ACTIONS } from "../constants/Voice";
 import { IVoiceSettings } from "../interfaces/services/voice/IVoice";
-import { VoiceError, VoiceLimits } from "../services/VoiceService";
+import { VoiceError, VoiceLimits, VOICE_MODULE } from "../services/VoiceService";
 import { SetFlags } from "../utils/moduleFlags";
 import VoiceSupport from "../runnables/VoiceSupport";
 import DashboardApiVoice from "../routes/DashboardApiVoice";
@@ -584,6 +584,59 @@ async function checkRouteInfo(client: BotClient): Promise<void> {
     }
 }
 
+/** W-0143: Ein Sprachwechsel in einem Temp-Kanal meldet die Voice-Seite - nur wenn jemand zuschaut, fremde Kanäle nie. */
+async function checkPulse(client: BotClient): Promise<void> {
+    console.log("\n  — Meldung bei Wechseln im Temp-Kanal (W-0143) —");
+
+    const ELSEWHERE = "90071992547409994";
+    const sent: { kind: string; data: Record<string, unknown> }[] = [];
+    let gets = 0;
+    const channel = { id: TEMP, isVoiceBased: () => true, members: new Collection([[USER, { id: USER, user: { bot: false } }] as const]) };
+    const guild = { id: GUILD, ownerId: USER, channels: { cache: new Collection<string, unknown>([[TEMP, channel]]) } };
+    const member = { id: OTHER, user: { bot: false } };
+    const state = (channelId: string | null) => ({ channelId, guild, member }) as unknown as import("discord.js").VoiceState;
+    const original = { get: client.tempVoices.Get, hub: client.voiceHubs.ByChannel, of: client.settings.Of };
+
+    Object.defineProperty(client.databaseService, "Ready", { get: () => true, configurable: true });
+    client.settings.Of = (async () => ({ modules: [VOICE_MODULE] })) as unknown as typeof client.settings.Of;
+    client.voiceHubs.ByChannel = (async () => null) as unknown as typeof client.voiceHubs.ByChannel;
+    client.tempVoices.Get = (async (channelId: string) => {
+        gets++;
+
+        return channelId === TEMP ? { channelId: TEMP, guildId: GUILD, hubId: 7, ownerId: USER, settings: DefaultVoiceSettings(), support: false, createdAt: Date.now() } : null;
+    }) as unknown as typeof client.tempVoices.Get;
+
+    const stop = client.pulseService.Subscribe(GUILD, USER, (kind, data) => void sent.push({ kind, data: data as Record<string, unknown> }), () => undefined);
+
+    try {
+        await client.voiceService.Voice(state(TEMP), state(TEMP));
+        check("Stumm im Temp-Kanal: eine Meldung voice", sent.length === 1 && sent[0]?.kind === "voice" && sent[0]?.data.channelId === TEMP, JSON.stringify(sent));
+
+        sent.length = 0;
+        await client.voiceService.Voice(state(ELSEWHERE), state(ELSEWHERE));
+        check("Wechsel in einem fremden Kanal: keine Meldung", sent.length === 0, JSON.stringify(sent));
+
+        sent.length = 0;
+        await client.voiceService.Voice(state(TEMP), state(ELSEWHERE));
+        check("Von TEMP woanders hin: eine Meldung für TEMP", sent.length === 1 && sent[0]?.data.channelId === TEMP, JSON.stringify(sent));
+
+        sent.length = 0;
+        await client.voiceService.Voice(state(null), state(TEMP));
+        check("Jemand kommt in TEMP: eine Meldung", sent.length === 1 && sent[0]?.data.channelId === TEMP, JSON.stringify(sent));
+
+        stop?.();
+        gets = 0;
+        await client.voiceService.Voice(state(TEMP), state(TEMP));
+        check("Niemand schaut zu: keine Datenbank-Abfrage", gets === 0, String(gets));
+    } finally {
+        stop?.();
+        Object.assign(client.tempVoices, { Get: original.get });
+        Object.assign(client.voiceHubs, { ByChannel: original.hub });
+        Object.assign(client.settings, { Of: original.of });
+        delete (client.databaseService as unknown as Record<string, unknown>).Ready;
+    }
+}
+
 async function main(): Promise<void> {
     console.log("\n🔊 Temp Voice\n");
 
@@ -598,6 +651,7 @@ async function main(): Promise<void> {
     await checkSweep(client);
     await checkRouteHub(client);
     await checkRouteInfo(client);
+    await checkPulse(client);
 
     if (await client.databaseService.Connect()) {
         try {

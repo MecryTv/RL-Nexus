@@ -150,6 +150,11 @@ export default class PulseService {
      * niemand zusieht - deshalb darf jeder Dienst das einfach aufrufen, ohne
      * vorher nachzusehen.
      */
+    /** W-0143: Hat gerade jemand das Dashboard dieses Servers offen? Spart Abfragen, deren Meldung niemand liest. */
+    Watching(guildId: string): boolean {
+        return Boolean(this.subscribers.get(guildId)?.size);
+    }
+
     Emit(guildId: string, kind: PulseKind, data: Record<string, unknown> = {}): void {
         const set = this.subscribers.get(guildId);
 
