@@ -63,6 +63,8 @@ import {
 } from "../interfaces/services/lft/ILft";
 import logger from "../utils/logger";
 import { ModuleValue } from "../utils/moduleFlags";
+import { LimitSentence } from "../builder/LimitReply";
+import { settingDef } from "../constants/ModuleSettings";
 
 export class LftError extends Error {}
 
@@ -164,6 +166,11 @@ export default class LookingForService {
 
     CleanSettings(guild: Guild, input: unknown, previous: ILftSettings): ILftSettings {
         const raw = IsRecord(input) ? input : {};
+        const maxExpire = LftLimits(guild.id).expireDays;
+        const expireDays = Int(raw.expireDays, 0, settingDef(LFT_MODULE, "maxExpireDays")!.max, previous.expireDays);
+
+        // Review W-0137, Muster aus W-0133: über dem Wert des Servers ablehnen statt still kürzen; ein gespeicherter Wert darf bleiben.
+        if (expireDays > maxExpire && expireDays !== previous.expireDays) throw new LftError(`Höchstens ${maxExpire} Tage. ${LimitSentence(LFT_MODULE, "maxExpireDays", guild.id)}`);
 
         return {
             player: this.CleanSide(guild, "player", raw.player, previous.player),
@@ -172,7 +179,7 @@ export default class LookingForService {
             dm: this.CleanDm(guild, raw.dm, previous.dm),
             ask: LFT_ASKS.includes(raw.ask as LftAsk) ? (raw.ask as LftAsk) : previous.ask,
             panel: this.CleanPanel(guild, raw.panel, previous.panel),
-            expireDays: Int(raw.expireDays, 0, LftLimits(guild.id).expireDays, previous.expireDays),
+            expireDays,
             manageRoles: this.Roles(guild, raw.manageRoles, previous.manageRoles, MAX_MANAGERS),
         };
     }

@@ -203,13 +203,27 @@ function checkClean(client: BotClient): void {
 
     const rest = service.CleanSettings(
         guild,
-        { notice: { channelId: VOICE, roles: [ROLE, GUILD, ROLE, "123"] }, expireDays: 9999, manageRoles: [ROLE, ROLE, GUILD] },
+        { notice: { channelId: VOICE, roles: [ROLE, GUILD, ROLE, "123"] }, expireDays: 100, manageRoles: [ROLE, ROLE, GUILD] },
         base
     );
 
     check("Die Meldung braucht einen Textkanal", rest.notice.channelId === null);
     check("@everyone wird nicht gepingt", !rest.notice.roles.includes(GUILD) && rest.notice.roles.join(",") === ROLE);
-    check("Die Laufzeit wird geklemmt", rest.expireDays === 180, String(rest.expireDays));
+    check("Die Laufzeit kommt an", rest.expireDays === 100, String(rest.expireDays));
+    // Review W-0137, Muster aus W-0133: über dem Wert des Servers ablehnen statt still kürzen, mit dem Satz zur Grenze.
+    refuses("Mehr Tage als der Server darf: abgelehnt", () => service.CleanSettings(guild, { expireDays: 300 }, base));
+
+    let sentence = "";
+
+    try {
+        service.CleanSettings(guild, { expireDays: 9999 }, base);
+    } catch (error) {
+        sentence = error instanceof Error ? error.message : String(error);
+    }
+
+    check("…mit dem Satz zur Grenze", sentence.startsWith("Höchstens 180 Tage.") && sentence.includes("RL Nexus"), sentence);
+    check("Ein schon gespeicherter höherer Wert darf bleiben", service.CleanSettings(guild, { expireDays: 300 }, { ...base, expireDays: 300 }).expireDays === 300);
+    check("0 heißt weiter: nie schließen", service.CleanSettings(guild, { expireDays: 0 }, base).expireDays === 0);
     check("Doppelte Rollen fallen weg", rest.manageRoles.join(",") === ROLE);
 
     const text = service.CleanSettings(guild, { notice: { channelId: TEXT } }, base);

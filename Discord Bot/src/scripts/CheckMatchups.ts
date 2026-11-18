@@ -173,12 +173,24 @@ function checkClean(client: BotClient): void {
     const guild = FakeGuild();
     const service = client.matchupService;
     const base = DefaultMatchupSettings();
-    const clean = service.CleanSettings(guild, { channelId: TEXT, pingRoles: [ROLE, GUILD, ROLE], remindMinutes: 45, maxAhead: 9999, leagues: ["Liga", "Liga", " "] }, base);
+    const clean = service.CleanSettings(guild, { channelId: TEXT, pingRoles: [ROLE, GUILD, ROLE], remindMinutes: 45, maxAhead: 90, leagues: ["Liga", "Liga", " "] }, base);
 
     check("Der Kanal kommt an", clean.channelId === TEXT);
     check("@everyone wird nicht gepingt", clean.pingRoles.join(",") === ROLE);
     check("Die Erinnerung kommt an", clean.remindMinutes === 45);
-    check("Die Vorausschau wird gedeckelt", clean.maxAhead === 180, String(clean.maxAhead));
+    check("Die Vorausschau kommt an", clean.maxAhead === 90, String(clean.maxAhead));
+
+    // Review W-0137, Muster aus W-0133: über dem Wert des Servers ablehnen statt still kürzen.
+    let ahead = "";
+
+    try {
+        service.CleanSettings(guild, { maxAhead: 9999 }, base);
+    } catch (error) {
+        ahead = error instanceof MatchupError ? error.message : String(error);
+    }
+
+    check("Mehr Tage im Voraus als der Server darf: abgelehnt mit Satz", ahead.startsWith("Höchstens 180 Tage im Voraus.") && ahead.includes("RL Nexus"), ahead);
+    check("Ein schon gespeicherter höherer Wert darf bleiben", service.CleanSettings(guild, { maxAhead: 300 }, { ...base, maxAhead: 300 }).maxAhead === 300);
     check("Doppelte und leere Ligen fallen weg", clean.leagues.join(",") === "Liga");
 
     const wrong = service.CleanSettings(guild, { channelId: VOICE, remindMinutes: 99_999 }, base);

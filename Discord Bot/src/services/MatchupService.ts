@@ -1,6 +1,7 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, Guild, GuildMember, InteractionReplyOptions, MessageEditOptions, MessageFlags, PermissionFlagsBits, StringSelectMenuBuilder } from "discord.js";
 import BotClient from "../client/BotClient";
-import { ILimitHit } from "../builder/LimitReply";
+import { ILimitHit, LimitSentence } from "../builder/LimitReply";
+import { settingDef } from "../constants/ModuleSettings";
 import { LinkRows, MatchupAccent, MatchupHead, MatchupLine, MatchupRows, MatchupValues, MatchupView, ReportButton, ResultAsk } from "../builder/MatchupView";
 import { NeedsResend } from "./TeamService";
 import { ICustomView } from "../builder/CustomView";
@@ -146,6 +147,11 @@ export default class MatchupService {
 
     CleanSettings(guild: Guild, input: unknown, previous: IMatchupSettings): IMatchupSettings {
         const raw = IsRecord(input) ? input : {};
+        const maxAhead = MatchupLimits(guild.id).aheadDays;
+        const ahead = Int(raw.maxAhead, 1, settingDef(MATCHUPS_MODULE, "maxAheadDays")!.max, previous.maxAhead);
+
+        // Review W-0137, Muster aus W-0133: über dem Wert des Servers ablehnen statt still kürzen; ein gespeicherter Wert darf bleiben.
+        if (ahead > maxAhead && ahead !== previous.maxAhead) throw new MatchupError(`Höchstens ${maxAhead} Tage im Voraus. ${LimitSentence(MATCHUPS_MODULE, "maxAheadDays", guild.id)}`);
         const channel = typeof raw.channelId === "string" ? guild.channels.cache.get(raw.channelId) : null;
 
         return {
@@ -162,7 +168,7 @@ export default class MatchupService {
             discordResults: typeof raw.discordResults === "boolean" ? raw.discordResults : previous.discordResults,
             resultRemindHours: Int(raw.resultRemindHours, 0, MAX_RESULT_REMIND, previous.resultRemindHours),
             colorByStatus: typeof raw.colorByStatus === "boolean" ? raw.colorByStatus : previous.colorByStatus,
-            maxAhead: Int(raw.maxAhead, 1, MatchupLimits(guild.id).aheadDays, previous.maxAhead),
+            maxAhead: ahead,
             leagues:
                 raw.leagues === undefined
                     ? previous.leagues
