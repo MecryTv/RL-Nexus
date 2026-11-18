@@ -53,8 +53,6 @@ function initialOf(name: string | null): string {
 
 /** Die laufende oder angehaltene Löschung als Leiste unter dem Kopf, nach dem Löschen der Beleg. Abgebrochene stehen nur im Protokoll. */
 function DeletionBox({ deletion, onChanged }: { readonly deletion: IDeletion; readonly onChanged: () => void }): JSX.Element | null {
-    const now = useNow(1000);
-
     if (deletion.state === "abgebrochen") return null;
 
     return (
@@ -63,7 +61,7 @@ function DeletionBox({ deletion, onChanged }: { readonly deletion: IDeletion; re
                 <StateBadge state={deletion.state} />
                 <Steps deletion={deletion} />
             </div>
-            <Due deletion={deletion} now={now} />
+            <Due deletion={deletion} />
             <DeletionActions deletion={deletion} onChanged={onChanged} />
         </section>
     );

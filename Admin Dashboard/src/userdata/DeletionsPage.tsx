@@ -9,10 +9,9 @@ import { Metric } from "../components/Metric";
 import { PageHeader } from "../components/PageHeader";
 import { Failure, Loading } from "../components/Status";
 import { formatNumber } from "../format";
-import { useNow } from "../useNow";
 import { useTitle } from "../useTitle";
-import { DeletionActions, Due, StateBadge, Steps } from "./DeletionParts";
-import { personName, remaining } from "./plan.ts";
+import { DeletionActions, Due, Remaining, StateBadge, Steps } from "./DeletionParts";
+import { personName } from "./plan.ts";
 import styles from "./userdata.module.scss";
 
 interface IDeletionList {
@@ -29,7 +28,7 @@ function listPath(filter: DeletionFilter, q: string): string {
 }
 
 /** Eine Zeile, auf dem Handy eine Karte. Angehalten gelb, laufend blau markiert. */
-function Row({ deletion, now, onChanged }: { readonly deletion: IDeletion; readonly now: number; readonly onChanged: () => void }): JSX.Element {
+function Row({ deletion, onChanged }: { readonly deletion: IDeletion; readonly onChanged: () => void }): JSX.Element {
     const name = personName(deletion);
     const mark = deletion.state === "angehalten" ? styles.halt : deletion.state === "geplant" ? styles.run : undefined;
 
@@ -51,7 +50,7 @@ function Row({ deletion, now, onChanged }: { readonly deletion: IDeletion; reado
                 <Steps deletion={deletion} />
             </td>
             <td className={styles.cellDue}>
-                <Due deletion={deletion} now={now} />
+                <Due deletion={deletion} />
             </td>
             <td className={styles.cellBy}>
                 {deletion.plannedName} · {deletion.reason}
@@ -63,7 +62,7 @@ function Row({ deletion, now, onChanged }: { readonly deletion: IDeletion; reado
     );
 }
 
-function Table({ deletions, now, onChanged }: { readonly deletions: readonly IDeletion[]; readonly now: number; readonly onChanged: () => void }): JSX.Element {
+function Table({ deletions, onChanged }: { readonly deletions: readonly IDeletion[]; readonly onChanged: () => void }): JSX.Element {
     return (
         <table className={styles.deletions}>
             <thead>
@@ -87,7 +86,7 @@ function Table({ deletions, now, onChanged }: { readonly deletions: readonly IDe
             </thead>
             <tbody>
                 {deletions.map((deletion) => (
-                    <Row key={deletion.id} deletion={deletion} now={now} onChanged={onChanged} />
+                    <Row key={deletion.id} deletion={deletion} onChanged={onChanged} />
                 ))}
             </tbody>
         </table>
@@ -95,7 +94,7 @@ function Table({ deletions, now, onChanged }: { readonly deletions: readonly IDe
 }
 
 /** Unter den offenen: die letzten erledigten und abgebrochenen, gekürzt. */
-function RecentDone({ q, now, onAll }: { readonly q: string; readonly now: number; readonly onAll: () => void }): JSX.Element | null {
+function RecentDone({ q, onAll }: { readonly q: string; readonly onAll: () => void }): JSX.Element | null {
     const list = useApi<IDeletionList>(listPath("alle", q));
 
     useLive("userdata", list.reload);
@@ -113,7 +112,7 @@ function RecentDone({ q, now, onAll }: { readonly q: string; readonly now: numbe
                     </button>
                 )}
             </div>
-            <Table deletions={done.slice(0, RECENT)} now={now} onChanged={list.reload} />
+            <Table deletions={done.slice(0, RECENT)} onChanged={list.reload} />
         </section>
     );
 }
@@ -122,7 +121,6 @@ function RecentDone({ q, now, onAll }: { readonly q: string; readonly now: numbe
 export function DeletionsPage(): JSX.Element {
     useTitle("Löschungen");
 
-    const now = useNow(1000);
     const [filter, setFilter] = useState<DeletionFilter>("offen");
     const [search, setSearch] = useState("");
     const [wanted, setWanted] = useState("");
@@ -151,7 +149,7 @@ export function DeletionsPage(): JSX.Element {
                         counts && (
                             <>
                                 {formatNumber(counts.running)}
-                                <small className={styles.metricSub}>{counts.nextDueAt ? `nächste in ${remaining(counts.nextDueAt, now)}` : "keine geplant"}</small>
+                                <small className={styles.metricSub}>{counts.nextDueAt ? <>nächste in <Remaining at={counts.nextDueAt} /></> : "keine geplant"}</small>
                             </>
                         )
                     }
@@ -218,12 +216,12 @@ export function DeletionsPage(): JSX.Element {
                     {data.deletions.length === 0 ? (
                         <p className={styles.empty}>{wanted ? "Keine Löschung passt zur Suche." : filter === "offen" ? "Gerade läuft keine Löschung." : "Hier steht noch nichts."}</p>
                     ) : (
-                        <Table deletions={data.deletions} now={now} onChanged={list.reload} />
+                        <Table deletions={data.deletions} onChanged={list.reload} />
                     )}
                 </section>
             )}
 
-            {filter === "offen" && <RecentDone q={wanted} now={now} onAll={() => setFilter("alle")} />}
+            {filter === "offen" && <RecentDone q={wanted} onAll={() => setFilter("alle")} />}
         </>
     );
 }

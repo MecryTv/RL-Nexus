@@ -46,8 +46,8 @@ function tomorrow(): string {
 }
 
 /** Was die Webseite mit diesem Stand zeigt, als ein Satz. */
-function StateLine({ banner, now }: { readonly banner: IBanner; readonly now: number }): JSX.Element {
-    const state = bannerState(banner, now);
+function StateLine({ banner }: { readonly banner: IBanner }): JSX.Element {
+    const state = bannerState(banner, useNow(1000));
     const tones: Readonly<Record<typeof state, BadgeTone>> = { sichtbar: "ok", geplant: "info", abgelaufen: "neutral", aus: "neutral" };
 
     let text = "Die Webseite zeigt kein Banner.";
@@ -66,8 +66,12 @@ function StateLine({ banner, now }: { readonly banner: IBanner; readonly now: nu
     );
 }
 
-/** Die Leiste, wie die Webseite sie zeigt. Schmal bricht sie wie dort auf zwei Zeilen um. */
-function Preview({ banner, now }: { readonly banner: IBanner; readonly now: number }): JSX.Element {
+/**
+ * Die Leiste, wie die Webseite sie zeigt. Schmal bricht sie wie dort auf zwei Zeilen um.
+ * W-0141: Vorschau und StateLine haben ihre eigene Uhr, das Formular rendert nicht mehr jede Sekunde.
+ */
+function Preview({ banner }: { readonly banner: IBanner }): JSX.Element {
+    const now = useNow(1000);
     const look = KIND_LOOK[banner.kind];
     const left = banner.countdownTo === undefined ? null : Date.parse(banner.countdownTo) - now;
 
@@ -97,7 +101,6 @@ export function BannerPage(): JSX.Element {
 
     const doc = useContentDoc<IBanner>("/api/content/banner");
     const banner = doc.draft;
-    const now = useNow(1000);
     const [width, setWidth] = useState<"desktop" | "handy">("desktop");
 
     /** Beschriftung und Adresse gehören zusammen. Beide leer heißt: kein Link. */
@@ -158,9 +161,9 @@ export function BannerPage(): JSX.Element {
                             />
                         </div>
                         <div className={[styles.stage, width === "handy" && styles.phone, !banner.enabled && styles.off].filter(Boolean).join(" ")}>
-                            <Preview banner={banner} now={now} />
+                            <Preview banner={banner} />
                         </div>
-                        <StateLine banner={banner} now={now} />
+                        <StateLine banner={banner} />
                     </section>
 
                     <Panel className={styles.formPanel}>
