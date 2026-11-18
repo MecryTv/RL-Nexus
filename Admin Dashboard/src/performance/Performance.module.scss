@@ -1,0 +1,382 @@
+@use "mixins" as *;
+
+/* W-0141: Developer → Leistung, Entwürfe 19-A (Ladezeiten) und 11-B (Langsame Anfragen). */
+
+.bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: var(--s-3) var(--s-4);
+    margin-bottom: var(--s-4);
+}
+
+.lead {
+    margin: 2px 0 0;
+    color: var(--c-text-dim);
+}
+
+.controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-4);
+}
+
+.dim {
+    margin: 0;
+    color: var(--c-text-faint);
+    font-size: 0.875rem;
+}
+
+.empty {
+    margin: var(--s-4) 0;
+    color: var(--c-text-dim);
+}
+
+/* --- Ladezeiten ------------------------------------------------------ */
+
+.services {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--s-4);
+
+    @include below(900px) {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+.service,
+.process,
+.slow {
+    padding: var(--s-4) var(--s-5) var(--s-5);
+
+    @include below(560px) {
+        padding: var(--s-4);
+    }
+}
+
+.serviceHead {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-2) var(--s-3);
+    margin-bottom: var(--s-1);
+}
+
+.serviceTitle {
+    margin: 0;
+    font-family: var(--f-display);
+    font-size: 1.2rem;
+    font-weight: 700;
+}
+
+.vital {
+    margin-top: var(--s-3);
+    padding-top: var(--s-3);
+    border-top: 1px solid var(--c-line);
+}
+
+.vitalHead {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--s-3);
+}
+
+.vitalName {
+    margin: 0;
+    font-weight: 700;
+
+    small {
+        display: block;
+        color: var(--c-text-faint);
+        font-size: 0.875rem;
+        font-weight: 500;
+    }
+}
+
+.vitalValue {
+    margin: 0;
+    font-family: var(--f-display);
+    font-size: 1.4rem;
+    font-weight: 800;
+    white-space: nowrap;
+
+    small {
+        margin-left: var(--s-2);
+        color: var(--c-text-dim);
+        font-family: var(--f-label);
+        font-size: 0.85rem;
+        font-weight: 600;
+    }
+}
+
+.good {
+    color: var(--c-win);
+}
+
+.mid {
+    color: var(--c-mod-engagement);
+}
+
+.poor {
+    color: var(--c-loss);
+}
+
+.scale {
+    position: relative;
+    display: flex;
+    height: 12px;
+    margin: var(--s-3) 0 var(--s-1);
+}
+
+.zoneGood,
+.zoneMid,
+.zonePoor {
+    display: inline-block;
+    height: 100%;
+}
+
+.zoneGood {
+    background: color-mix(in srgb, var(--c-win) 30%, transparent);
+}
+
+.zoneMid {
+    background: color-mix(in srgb, var(--c-mod-engagement) 28%, transparent);
+}
+
+.zonePoor {
+    background: color-mix(in srgb, var(--c-loss) 28%, transparent);
+}
+
+.mark {
+    position: absolute;
+    top: -5px;
+    width: 3px;
+    height: 22px;
+    margin-left: -1px;
+    background: var(--c-text);
+    box-shadow: 0 0 0 2px var(--c-base);
+}
+
+.ticks {
+    position: relative;
+    height: 1.2rem;
+    color: var(--c-text-faint);
+    font-size: 0.8rem;
+
+    span {
+        position: absolute;
+        transform: translateX(-50%);
+        white-space: nowrap;
+    }
+
+    /* Die äußeren Beschriftungen nach innen, sonst ragen sie aus der Karte. */
+    span:first-child {
+        transform: none;
+    }
+
+    span:last-child {
+        transform: translateX(-100%);
+    }
+}
+
+.shares {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-1) var(--s-4);
+    margin: var(--s-1) 0 0;
+    color: var(--c-text-dim);
+    font-size: 0.875rem;
+
+    b {
+        color: var(--c-text);
+    }
+}
+
+.legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-2) var(--s-4);
+    margin: var(--s-4) 0 var(--s-2);
+    color: var(--c-text-dim);
+    font-size: 0.875rem;
+
+    i {
+        width: 12px;
+        height: 12px;
+        margin-right: var(--s-2);
+        vertical-align: -1px;
+    }
+}
+
+/* --- Langsame Anfragen ------------------------------------------------ */
+
+.processes {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--s-4);
+    margin-bottom: var(--s-4);
+
+    @include below(900px) {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+.counts {
+    display: grid;
+    gap: var(--s-2);
+    margin: var(--s-2) 0 0;
+
+    div {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        gap: var(--s-1) var(--s-3);
+    }
+
+    dt {
+        color: var(--c-text-dim);
+    }
+
+    dd {
+        margin: 0;
+        font-family: var(--f-display);
+        font-weight: 700;
+    }
+}
+
+.groups {
+    margin: 0 0 var(--s-3);
+    padding: 0;
+    list-style: none;
+}
+
+.group {
+    border-top: 1px solid var(--c-line);
+
+    details[open] .chevron {
+        transform: rotate(90deg);
+    }
+}
+
+.groupRow {
+    display: grid;
+    grid-template-columns: 74px minmax(0, 1fr) 64px 92px 92px 140px 18px;
+    gap: var(--s-3);
+    align-items: center;
+    padding: var(--s-3) var(--s-1);
+
+    @include below(900px) {
+        grid-template-columns: 64px minmax(0, 1fr) 56px 18px;
+    }
+}
+
+summary.groupRow {
+    cursor: pointer;
+    list-style: none;
+
+    &::-webkit-details-marker {
+        display: none;
+    }
+
+    &:hover {
+        background: rgb(255 255 255 / 2.5%);
+    }
+
+    &:focus-visible {
+        @include focus-ring;
+    }
+}
+
+.groupCols {
+    padding-block: 0 var(--s-2);
+    color: var(--c-text-faint);
+
+    @include label(0.72rem, 0.12em);
+
+    span:nth-child(n + 3) {
+        text-align: right;
+    }
+
+    @include below(900px) {
+        display: none;
+    }
+}
+
+.wide {
+    text-align: right;
+
+    @include below(900px) {
+        display: none;
+    }
+}
+
+.what {
+    overflow: hidden;
+    color: var(--c-text);
+    font-size: 0.85rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.count,
+.ms {
+    font-family: var(--f-display);
+    font-weight: 700;
+    text-align: right;
+    white-space: nowrap;
+
+    small {
+        display: block;
+        color: var(--c-text-faint);
+
+        @include label(0.65rem, 0.1em);
+    }
+}
+
+.when {
+    color: var(--c-text-dim);
+    font-size: 0.875rem;
+}
+
+.chevron {
+    color: var(--c-text-faint);
+
+    @include motion {
+        transition: transform var(--t-fast);
+    }
+}
+
+.events {
+    margin: 0 0 var(--s-3) 86px;
+    padding: 0 0 0 var(--s-3);
+    border-left: 2px solid var(--c-line-strong);
+    list-style: none;
+
+    li {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--s-1) var(--s-4);
+        padding: 2px 0;
+        color: var(--c-text-dim);
+        font-size: 0.875rem;
+    }
+
+    .full code {
+        color: var(--c-text);
+        font-size: 0.8rem;
+        overflow-wrap: anywhere;
+    }
+
+    b {
+        min-width: 70px;
+        color: var(--c-text);
+        font-family: var(--f-display);
+    }
+
+    @include below(900px) {
+        margin-left: var(--s-3);
+    }
+}

@@ -117,6 +117,7 @@ export const AREAS: readonly INavArea[] = [
             { to: "/dev/logs", label: "Logs", icon: "file-text", developer: true, description: "Sessions und Logdateien des Bots." },
             { to: "/dev/datenbank", label: "Datenbank", icon: "database", developer: true, also: ["/dev/redis", "/dev/sicherungen"], description: "Tabellen von MariaDB, der Cache in Redis und die nächtlichen Sicherungen." },
             { to: "/dev/technik", label: "Technik", icon: "cpu", developer: true, description: "Bot und Datenbank: Ping, Speicher, Versionen, Migrationen." },
+            { to: "/dev/leistung", label: "Leistung", icon: "pulse", developer: true, description: "Echte Ladezeiten von Webseite und Bot-Dashboard, langsame Anfragen von Admin-Server und Bot." },
             { to: "/dev/wartung", label: "Wartung", icon: "wrench", developer: true, description: "Wartung planen, ankündigen und beenden." },
             { to: "/dev/protokoll", label: "Protokoll", icon: "history", developer: true, description: "Wer im Admin Dashboard was geändert hat." },
             { to: "/dev/changelog", label: "Changelog", icon: "tag", developer: true, description: "Was sich bei RL Nexus geändert hat, je Version, und der Post in Discord." },
