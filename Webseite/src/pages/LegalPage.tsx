@@ -24,7 +24,7 @@ interface IFact {
 }
 
 /** Stand der Datenschutzerklärung. Bei jeder inhaltlichen Änderung nachziehen. */
-const UPDATED = "17. November 2026";
+const UPDATED = "18. November 2026";
 
 /**
  * Impressum und Datenschutzerklärung.
@@ -404,6 +404,16 @@ const PRIVACY: readonly ILegalSection[] = [
                     IP-Adressen, Browserkennungen und aufgerufene Adressen kommen nicht in die Statistik, Cookies setzen
                     wir dafür keine. Die Summen löschen wir nach 13 Monaten. Rechtsgrundlage ist auch hier Art. 6 Abs. 1
                     lit. f DSGVO; unser berechtigtes Interesse ist zu sehen, welche unserer Seiten genutzt werden.
+                </p>
+                <p>
+                    Ladezeiten: Wenn du eine Seite der Website oder des Dashboards verlässt, schickt dein Browser einmal
+                    vier Messwerte an unseren eigenen Server: wie schnell die Seite stand und auf Klicks reagierte, wie
+                    stark sie beim Laden sprang und wann die erste Antwort kam, dazu, ob du an einem schmalen Bildschirm
+                    oder am Computer warst. Dafür setzen wir keine Cookies und binden keine fremden Dienste ein. Wie jeder
+                    Aufruf steht die Anfrage mit gekürzter IP-Adresse im Zugriffsprotokoll. Gespeichert werden nur Summen
+                    je Stunde, ohne IP-Adresse, ohne Browser-Kennung und ohne die aufgerufene Seite; einzelne Besuche
+                    lassen sich daraus nicht erkennen. Die Summen löschen wir nach 90 Tagen. Rechtsgrundlage ist unser
+                    berechtigtes Interesse an schnell ladenden Seiten (Art. 6 Abs. 1 lit. f DSGVO).
                 </p>
             </>
         ),
