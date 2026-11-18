@@ -43,6 +43,7 @@ interface IHub {
 
 interface IOpen {
     channelId: string;
+    hubId: number;
     name: string;
     owner: string;
     members: number;

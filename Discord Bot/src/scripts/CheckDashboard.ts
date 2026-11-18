@@ -34,6 +34,7 @@ import DashboardService, { AccessEnds, BETA_ERRORS, BetaErrorText, BetaGate, Dis
 import { AccessText } from "../dashboard/client/constants/Access";
 import { applyCatalog, CATEGORIES, MODULES } from "../dashboard/client/constants/Modules";
 import { askableCount, limitCards, limitCounts, limitName, limitRequestText, limitsHref, limitStatus, limitStatusText, limitTabs, parseLimitsQuery, wishProblem } from "../dashboard/client/constants/Limits";
+import { IOpenGroup, openGroups, parseVoiceTab, voiceTabHref } from "../dashboard/client/constants/Voice";
 import { IModuleLimit } from "../dashboard/client/interfaces/IGuild";
 import CatalogService, { Catalog } from "../services/CatalogService";
 import { CommandPaths } from "../routes/AdminCommands";
@@ -1898,6 +1899,25 @@ async function checkRankRolesStyles(): Promise<void> {
     }
 }
 
+/** W-0140: Reiter Hubs | Gerade offen auf der Voice-Seite. */
+function checkVoiceTabs(): void {
+    console.log("\n— Voice: Reiter Hubs | Gerade offen (W-0140) —");
+
+    const titles = <T extends { hubId: number | null }>(groups: IOpenGroup<T>[]) => JSON.stringify(groups.map((group) => [group.title, group.items.length]));
+
+    check("Voice: Reiter aus der Adresse", parseVoiceTab("?reiter=offen") === "offen" && parseVoiceTab("") === "hubs" && parseVoiceTab("?reiter=OFFEN") === "hubs" && parseVoiceTab("?reiter=offen&x=<b>") === "offen");
+    check("Voice: Adresse des Reiters", voiceTabHref("/dashboard", "123", "offen") === "/dashboard/guild/123/voice-hub?reiter=offen" && voiceTabHref("/dashboard", "123", "hubs") === "/dashboard/guild/123/voice-hub");
+    check("Voice: ein Hub ohne Überschrift", titles(openGroups([{ hubId: 1 }, { hubId: 1 }], [{ id: 1, channelName: "Temp Voice" }])) === "[[null,2]]");
+    check(
+        "Voice: zwei Hubs gruppiert, leere Hubs fehlen",
+        titles(openGroups([{ hubId: 2 }, { hubId: 1 }, { hubId: 1 }], [{ id: 1, channelName: "Temp Voice" }, { id: 2, channelName: "Support-Hub" }, { id: 3, channelName: "Leer" }])) ===
+            '[["Temp Voice · 2 offen",2],["Support-Hub · 1 offen",1]]'
+    );
+    check("Voice: Kanal ohne Hub geht nicht verloren", titles(openGroups([{ hubId: 9 }, { hubId: 1 }], [{ id: 1, channelName: "Temp Voice" }])) === '[["Temp Voice · 1 offen",1],["Ohne Hub · 1 offen",1]]');
+    check("Voice: Hub ohne Kanalnamen heißt Hub", titles(openGroups([{ hubId: 1 }, { hubId: 2 }], [{ id: 1, channelName: null }, { id: 2, channelName: "B" }])) === '[["Hub · 1 offen",1],["B · 1 offen",1]]');
+    check("Voice: nichts offen, keine Gruppe", openGroups([], [{ id: 1, channelName: "Temp Voice" }]).length === 0);
+}
+
 async function main(): Promise<void> {
     const client = new BotClient();
 
@@ -2582,6 +2602,7 @@ async function main(): Promise<void> {
     await checkHubTemplates();
     await checkRankRolesStyles();
     checkLimitsLogic();
+    checkVoiceTabs();
     await checkLimitsMarkup();
 
     await client.server.Stop();

@@ -19,6 +19,7 @@ import { DefaultHubConfig, DefaultVoiceSettings, FormatVoiceName, MAX_LIMIT, MAX
 import { IVoiceSettings } from "../interfaces/services/voice/IVoice";
 import { VoiceError } from "../services/VoiceService";
 import VoiceSupport from "../runnables/VoiceSupport";
+import DashboardApiVoice from "../routes/DashboardApiVoice";
 
 const GUILD = "90071992547409961";
 const USER = "90071992547409962";
@@ -383,6 +384,29 @@ async function checkSweep(client: BotClient): Promise<void> {
     }
 }
 
+/** W-0140: Die Route nennt je offenem Kanal den Hub - die Seite gruppiert danach. */
+async function checkRouteHub(client: BotClient): Promise<void> {
+    console.log("\n  — Route: offene Kanäle mit Hub (W-0140) —");
+
+    const route = new DashboardApiVoice(client) as unknown as { Read(access: unknown): Promise<Record<string, any>> };
+    const original = { hubs: client.voiceHubs.OfGuild, temps: client.tempVoices.OfGuild, settings: client.voiceService.Settings };
+    const guild = { id: GUILD, name: "Dev Server", channels: { cache: new Collection() }, roles: { cache: new Collection() }, emojis: { cache: new Collection() }, members: { cache: new Collection() } };
+
+    client.voiceHubs.OfGuild = (async () => [{ id: 7, guildId: GUILD, channelId: HUB, config: DefaultHubConfig(), createdBy: USER }]) as unknown as typeof client.voiceHubs.OfGuild;
+    client.tempVoices.OfGuild = (async () => [{ channelId: TEMP, guildId: GUILD, hubId: 7, ownerId: USER, settings: DefaultVoiceSettings(), createdAt: Date.now() }]) as unknown as typeof client.tempVoices.OfGuild;
+    client.voiceService.Settings = (async () => ({ panel: "voice", panelChannelId: null, panelMessageId: null })) as unknown as typeof client.voiceService.Settings;
+
+    try {
+        const read = await route.Read({ guild });
+
+        check("Jeder offene Kanal nennt seinen Hub", read.open?.[0]?.hubId === 7, JSON.stringify(read.open?.[0]));
+    } finally {
+        Object.assign(client.voiceHubs, { OfGuild: original.hubs });
+        Object.assign(client.tempVoices, { OfGuild: original.temps });
+        Object.assign(client.voiceService, { Settings: original.settings });
+    }
+}
+
 async function main(): Promise<void> {
     console.log("\n🔊 Temp Voice\n");
 
@@ -394,6 +418,7 @@ async function main(): Promise<void> {
     checkViews();
     checkSupport(client);
     await checkSweep(client);
+    await checkRouteHub(client);
 
     if (await client.databaseService.Connect()) {
         try {
