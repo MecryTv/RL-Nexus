@@ -283,6 +283,18 @@ export async function checkModulesDb(config: IConfig, http: IHttp): Promise<void
             assert.equal(view.betaServers, null);
             assert.equal(view.server, null);
         });
+        await check("W-0137: tote Schlüssel alter Ausnahmen fallen beim Lesen weg, Speichern geht weiter", async () => {
+            await query("INSERT INTO bot_module_overrides (module, guild_id, config) VALUES ('tickets', ?, ?)", [GUILDS[1], JSON.stringify({ values: { transcriptMegabytes: 20, maxOpenPerUser: 3 } })]);
+
+            const [row] = await listOverrides({ module: "tickets", guildId: GUILDS[1] });
+
+            assert.deepEqual(row?.values, { maxOpenPerUser: 3 });
+
+            const saved = await saveOverride("tickets", GUILDS[1], { status: null, notice: "Nur ein Hinweis", linkMode: null, values: row.values, note: null }, ACTOR);
+
+            assert.equal(saved.after?.notice, "Nur ein Hinweis");
+            assert.deepEqual(saved.after?.values, { maxOpenPerUser: 3 });
+        });
     } finally {
         globalThis.fetch = real;
         await query("DELETE FROM admin_audit WHERE action = 'module.settings' AND user_name = 'nutzer1'");

@@ -180,6 +180,9 @@ function settingOf(module: string, row: ISettingRow | undefined): IBotModuleSett
 
 function overrideOf(row: IOverrideRow): IBotModuleOverride {
     const config = json(row.config);
+    const stored = json(config.values);
+    // W-0137: nur Schlüssel aus dem Verzeichnis - alte Ausnahmen mit entfernten Grenzen ließen sich sonst nicht mehr speichern.
+    const values = Object.fromEntries(settingsOf(row.module).filter((def) => typeof stored[def.key] === "number").map((def) => [def.key, stored[def.key] as number]));
 
     return {
         module: row.module,
@@ -187,7 +190,7 @@ function overrideOf(row: IOverrideRow): IBotModuleOverride {
         status: row.status,
         notice: row.notice,
         linkMode: (LINK_MODES as readonly unknown[]).includes(config.linkMode) ? (config.linkMode as LinkMode) : null,
-        values: json(config.values) as Record<string, number>,
+        values,
         note: row.note,
         updatedAt: row.updated_at ? new Date(row.updated_at).toISOString() : null,
         updatedBy: row.updated_by,
