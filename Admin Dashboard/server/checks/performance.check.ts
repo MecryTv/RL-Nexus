@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import type { ISlowReport, ISlowSide } from "../../shared/api.ts";
 import type { IVitalStat } from "../../shared/vitals.ts";
 import { formatVital, groupSlow, positionOf, ratingOf, shareOf, verdictOf } from "../../src/performance/performance.ts";
+import { inLanes } from "../lanes.ts";
 import { check, section } from "./harness.ts";
 
 const side = (entries: ISlowSide["entries"]): ISlowSide => ({ since: "2026-11-18T06:00:00.000Z", requestMs: 500, sqlMs: 200, requests: 100, slowRequests: 3, queries: 900, slowQueries: 1, entries });
@@ -74,5 +75,34 @@ export async function checkPerformance(): Promise<void> {
             ["admin", "admin"]
         );
         assert.deepEqual(groupSlow({ ...report, bot: null }, "bot"), []);
+    });
+
+    await check("W-0141: Abfragen in Spuren: höchstens so viele gleichzeitig, Ergebnis in der Reihenfolge der Einträge, ein Fehler bricht ab", async () => {
+        let running = 0;
+        let most = 0;
+        const done = await inLanes([30, 5, 20, 1, 10, 2], 3, async (wait, index) => {
+            running++;
+            most = Math.max(most, running);
+            await new Promise((resolve) => setTimeout(resolve, wait));
+            running--;
+
+            return index * 10;
+        });
+
+        assert.deepEqual(done, [0, 10, 20, 30, 40, 50]);
+        assert.equal(most, 3);
+        assert.deepEqual(await inLanes([], 3, async () => 1), []);
+
+        let started = 0;
+        await assert.rejects(
+            inLanes([1, 2, 3, 4, 5, 6], 2, async (item) => {
+                started++;
+                if (item === 2) throw new Error("kaputt");
+                await new Promise((resolve) => setTimeout(resolve, 5));
+            }),
+            /kaputt/
+        );
+        await new Promise((resolve) => setTimeout(resolve, 30));
+        assert.ok(started < 6, `nach dem Fehler nicht weitergemacht: ${started}`);
     });
 }
