@@ -86,6 +86,23 @@ function Ids(value: unknown, has: (id: string) => boolean, max: number): string[
  * Level System: Punkte für Nachrichten und Zeit im Sprachkanal, Rollen ab
  * einem Level und eine Rangliste. Siehe docs/Levels.md.
  */
+/**
+ * Review W-0141: Ein Deadlock (1213) oder ein Lock-Timeout (1205) rollt die
+ * Anweisung zurück. Bei den Mehrzeilen-Upserts der Voice-Runde hinge sonst die
+ * Minute aller Leute eines Servers daran: einmal neu versuchen.
+ */
+async function OnceMoreOnLock<T>(work: () => Promise<T>): Promise<T> {
+    try {
+        return await work();
+    } catch (error) {
+        const errno = (error as { errno?: number }).errno;
+
+        if (errno !== 1213 && errno !== 1205) throw error;
+
+        return work();
+    }
+}
+
 export default class LevelService {
     private readonly client: BotClient;
     // Wer wann zuletzt Punkte bekam - spart je Nachricht eine Abfrage.
@@ -399,9 +416,10 @@ export default class LevelService {
 
         const day = Today();
 
+        // Jede Anweisung für sich neu versuchen: Die andere kann schon geschrieben haben.
         await Promise.all([
-            this.client.levels.AddMany(guildId, kept.map(({ member, xp }) => ({ userId: member.id, xp: Math.max(0, xp), voiceMinutes: minutes }))),
-            this.client.levelDays.AddMany(kept.map(({ member, xp }) => ({ guildId, userId: member.id, day, xp: Math.max(0, xp), messages: 0, voiceMinutes: minutes }))),
+            OnceMoreOnLock(() => this.client.levels.AddMany(guildId, kept.map(({ member, xp }) => ({ userId: member.id, xp: Math.max(0, xp), voiceMinutes: minutes })))),
+            OnceMoreOnLock(() => this.client.levelDays.AddMany(kept.map(({ member, xp }) => ({ guildId, userId: member.id, day, xp: Math.max(0, xp), messages: 0, voiceMinutes: minutes })))),
         ]);
         this.Changed(guildId);
 

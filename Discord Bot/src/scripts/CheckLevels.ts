@@ -722,6 +722,28 @@ async function checkCounting(): Promise<void> {
     check("Voice für drei: je Server einmal schreiben (gesamt, Tag) und einmal lesen", calls.sort().join() === "levels.AddMany,levels.OfMany,tag.AddMany", calls.join());
     check("Voice für drei: alle bekommen Minute und Punkte, Level 1 gesetzt", people.every((person) => crowd.entry(person.id).voiceMinutes === 1 && crowd.entry(person.id).xp > 0 && crowd.entry(person.id).level === 1) && people.every((person) => crowd.day(person.id)?.voiceMinutes === 1), JSON.stringify(people.map((person) => crowd.entry(person.id))));
 
+    // Review W-0141: Ein Deadlock im Mehrzeilen-Upsert kostet nicht die Minute aller, die Anweisung läuft einmal neu.
+    const locked = World({ voice: { ...DefaultLevelSettings().voice, on: true, xp: 5, muted: true, alone: true } });
+    const lockedPeople = ["90071992547409980", "90071992547409981"].map((id) => locked.member(id));
+    const lockedRoom = { id: VOICE, parentId: null, members: new Collection(lockedPeople.map((person) => [person.id, person])) };
+    const lockedLevels = locked.client.levels as unknown as Record<string, (...args: unknown[]) => Promise<unknown>>;
+    const realAddMany = lockedLevels.AddMany;
+    let tries = 0;
+
+    lockedLevels.AddMany = async (...args: unknown[]) => {
+        tries++;
+        if (tries === 1) throw Object.assign(new Error("Deadlock found when trying to get lock"), { errno: 1213 });
+
+        return realAddMany(...args);
+    };
+
+    for (const person of lockedPeople) {
+        (locked.guild as unknown as { voiceStates: { cache: Map<string, unknown> } }).voiceStates.cache.set(person.id, { member: person, channel: lockedRoom, channelId: VOICE, selfMute: false, selfDeaf: false, mute: false, deaf: false });
+    }
+
+    await locked.service.Voice();
+    check("Deadlock bei Voice-XP: einmal neu versucht, alle haben ihre Minute", tries === 2 && lockedPeople.every((person) => locked.entry(person.id).voiceMinutes === 1 && locked.day(person.id)?.voiceMinutes === 1), JSON.stringify({ tries, entries: lockedPeople.map((person) => locked.entry(person.id)) }));
+
     const spam = free.member("90071992547409963");
     const after = free.message(spam, "das wird geloescht", "a1");
 
