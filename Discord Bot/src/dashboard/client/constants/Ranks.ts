@@ -44,7 +44,7 @@ export const RANK_IMAGES = [
 export function rankIcon(tier: number, placement = false): string {
     const file = placement ? RANK_IMAGES[0] : (RANK_IMAGES[tier] ?? RANK_IMAGES[0]);
 
-    return `${BASE}/assets/images/rocketleague/rlranks/small/${encodeURIComponent(file)}.png`;
+    return `${BASE}/assets/images/rocketleague/rlranks/small/${encodeURIComponent(file)}.webp`;
 }
 
 // Farbe je Rangstufe - dieselbe Staffelung wie im Spiel.

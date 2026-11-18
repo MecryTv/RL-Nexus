@@ -1985,6 +1985,19 @@ async function main(): Promise<void> {
     // 1,4 MB, die niemand liest: ohne Abbruch bleibt die Antwort im Server stecken und Stop() wartet ewig.
     await logo.body?.cancel();
 
+    // W-0141: Rang-Abzeichen und der Banner im Rollenlisten-Editor als WebP, klein.
+    for (const image of ["rocketleague/rlranks/small/Champion%203.webp", "RL%20Nexus%20Banner.webp"]) {
+        const response = await fetch(`${BASE}${P}/assets/images/${image}`);
+        const bytes = (await response.arrayBuffer()).byteLength;
+
+        check(`WebP ausgeliefert und unter 150 KB: ${decodeURIComponent(image)}`, response.status === 200 && response.headers.get("content-type") === "image/webp" && bytes < 150 * 1024, `${response.status} ${response.headers.get("content-type")} ${bytes}`);
+    }
+
+    const source = (...parts: string[]) => readFile(path.join(process.cwd(), "src", ...parts), "utf8");
+    const pointers = [await source("dashboard", "client", "constants", "Ranks.ts"), await source("builder", "EpicPage.ts"), await source("dashboard", "client", "layout", "RoleListImageEditor.ts")].join("\n");
+
+    check("Client und Epic-Seite zeigen auf die WebP-Dateien", !/rlranks\/small\/[^`]*\.png|Banner\.png/.test(pointers) && pointers.includes("Banner.webp"));
+
     // W-0114: Galerie-Bilder nur als das, was sie sind - der Browser rät nicht.
     const galleryImage = await fetch(`${BASE}/images/default/rocketleague/plattforms/steam.png`);
     check("Galerie-Bild mit nosniff", galleryImage.status === 200 && galleryImage.headers.get("x-content-type-options") === "nosniff", `${galleryImage.status} ${galleryImage.headers.get("x-content-type-options")}`);
