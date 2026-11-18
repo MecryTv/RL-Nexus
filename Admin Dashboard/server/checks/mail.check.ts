@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { simpleParser } from "mailparser";
 import MailComposer from "nodemailer/lib/mail-composer/index.js";
 import { createTransport, type Transporter } from "nodemailer";
+import { withPending } from "../../src/mail/pending.ts";
 import { buildApp } from "../app.ts";
 import { loadConfig, type IMailServer } from "../config.ts";
 import { InvalidInput } from "../errors.ts";
@@ -30,6 +31,21 @@ const MAIL_ENV = {
 
 export async function checkMail(): Promise<void> {
     section("Postfach");
+
+    await check("W-0141: Verschieben und „ungelesen“ wirken in der Liste sofort: weg bzw. fett, der Rest bleibt, wie er ist", () => {
+        const mail = (uid: number, seen = true) => ({ uid, from: null, to: [], subject: `Mail ${uid}`, date: "2026-11-18T10:00:00.000Z", preview: "", seen, flagged: false, answered: false, attachments: false });
+        const list = [mail(1), mail(2), mail(3, false)];
+        const shown = withPending(list, new Map([[1, "gone"], [2, "unread"]] as const));
+
+        assert.deepEqual(
+            shown.map((entry) => [entry.uid, entry.seen]),
+            [
+                [2, false],
+                [3, false],
+            ]
+        );
+        assert.equal(withPending(list, new Map()), list, "ohne Auftrag dieselbe Liste");
+    });
 
     const config = loadConfig(MAIL_ENV, []);
     const mail = config.mail;

@@ -1,4 +1,4 @@
-import { useEffect, useState, type JSX } from "react";
+import { useCallback, useEffect, useMemo, useState, type JSX } from "react";
 import { Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type { IMailBox, IMailPage } from "../../shared/api";
 import { MAIL_LIST_FILTERS, type MailListFilter } from "../../shared/limits";
@@ -17,6 +17,7 @@ import { FolderSelect, Folders } from "../mail/Folders";
 import { LazyComposer } from "../mail/LazyComposer";
 import { MessageList } from "../mail/MessageList";
 import { Reader } from "../mail/Reader";
+import { withPending, type MailPending } from "../mail/pending.ts";
 import { inboxOf, inboxUnread, legacyAllPath, startPath } from "../mail/route.ts";
 import styles from "../mail/mail.module.scss";
 import { useMe } from "../session/context";
@@ -66,7 +67,7 @@ function useListParams(): {
 }
 
 /** Die Liste eines Ordners. Eigene Komponente, damit sie nur lädt, wenn ein Ordner offen ist. */
-function FolderPane({ box, folder, uid }: { readonly box: IMailBox; readonly folder: string; readonly uid: number | null }): JSX.Element {
+function FolderPane({ box, folder, uid, pending }: { readonly box: IMailBox; readonly folder: string; readonly uid: number | null; readonly pending: ReadonlyMap<number, MailPending> }): JSX.Element {
     const list = useListParams();
     const navigate = useNavigate();
     const state = useApi<IMailPage>(`/api/mail/${box.id}/messages?folder=${encodeURIComponent(folder)}&${list.search}`);
@@ -74,6 +75,9 @@ function FolderPane({ box, folder, uid }: { readonly box: IMailBox; readonly fol
     const name = current?.name ?? folder;
 
     useLive("mail", state.reload);
+
+    // W-0141: was gerade verschoben oder als ungelesen markiert wird, zeigt die Liste schon so.
+    const shown = useMemo(() => (state.data ? { ...state, data: { ...state.data, messages: withPending(state.data.messages, pending) } } : state), [state, pending]);
 
     // W-0128: Mehrere auf einmal gibt es nur im Papierkorb. War die offene Mail dabei, schließt der Lesebereich.
     const deleteMany =
@@ -87,7 +91,7 @@ function FolderPane({ box, folder, uid }: { readonly box: IMailBox; readonly fol
     return (
         <MessageList
             title={`${name} · ${box.label}`}
-            state={state}
+            state={shown}
             filter={list.filter}
             query={list.query}
             page={list.page}
@@ -139,6 +143,28 @@ export function MailPage(): JSX.Element {
     const unread = unreadOf(overview.data);
     const listPath = box !== null && folder !== null ? `${mailPath(box.id, folder)}${listSearch}` : "/post";
 
+    // W-0141: was die Liste schon zeigt, bevor der Server antwortet (mail/pending.ts), je Ordner.
+    // Ist eine Mail wieder offen, gilt ihr eigener Stand.
+    const here = box !== null && folder !== null ? `${box.id}-${folder}` : "";
+    const [pending, setPending] = useState<{ readonly key: string; readonly map: ReadonlyMap<number, MailPending> }>({ key: "", map: new Map() });
+    const pendingHere = useMemo(() => {
+        const map = pending.key === here ? pending.map : new Map<number, MailPending>();
+
+        return uid !== null && map.has(uid) ? new Map([...map].filter(([entry]) => entry !== uid)) : map;
+    }, [pending, here, uid]);
+    const setPendingFor = useCallback(
+        (entry: number, kind: MailPending | null) =>
+            setPending((current) => {
+                const map = new Map(current.key === here ? current.map : []);
+
+                if (kind) map.set(entry, kind);
+                else map.delete(entry);
+
+                return { key: here, map };
+            }),
+        [here]
+    );
+
     function closeReader(): void {
         navigate(listPath);
     }
@@ -185,7 +211,7 @@ export function MailPage(): JSX.Element {
                             <>
                                 <FolderSelect box={box} folder={folder} />
                                 {/* Eigener key je Ordner: Beim Wechsel lädt die Liste frisch, statt kurz die des alten Ordners zu zeigen. */}
-                                <FolderPane key={`${box.id}-${folder}`} box={box} folder={folder} uid={uid} />
+                                <FolderPane key={`${box.id}-${folder}`} box={box} folder={folder} uid={uid} pending={pendingHere} />
                             </>
                         )}
                     </section>
@@ -205,6 +231,7 @@ export function MailPage(): JSX.Element {
                                     folders={box.folders ?? []}
                                     onChanged={overview.reload}
                                     onGone={() => navigate(listPath)}
+                                    onPending={setPendingFor}
                                 />
                             ) : (
                                 <div className={styles.pick}>

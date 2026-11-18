@@ -74,6 +74,15 @@ export function PartnersPage(): JSX.Element {
     const [creating, setCreating] = useState(false);
     const [supporting, setSupporting] = useState(false);
     const [dragOrder, setDragOrder] = useState<readonly IEntry[] | null>(null);
+    // W-0141: gespeichert, warten auf den neuen Stand; kommt er, hat die gezogene Reihenfolge ausgedient.
+    const settling = useRef(false);
+
+    useEffect(() => {
+        if (!settling.current) return;
+
+        settling.current = false;
+        setDragOrder(null);
+    }, [list.data]);
     const [dragged, setDragged] = useState<number | null>(null);
 
     useLive("partners", list.reload);
@@ -98,13 +107,18 @@ export function PartnersPage(): JSX.Element {
     // Ziehen geht nur, wenn die ganze Art zu sehen ist.
     const sortable = tab !== "versteckt" && !missingOnly && !needle;
 
+    // W-0141: Die neue Reihenfolge steht sofort da und bleibt, bis der Stand vom Server kommt; vorher blitzte kurz die alte auf.
+    // Scheitert das Speichern, springt sie zurück.
     const saveOrder = async (order: readonly IEntry[]): Promise<void> => {
+        setDragOrder(order);
+
         try {
             await api("/api/partners/order", { method: "PUT", body: { kind: tab, ids: order.map((entry) => entry.id) } });
+            settling.current = true;
         } catch (error) {
+            setDragOrder(null);
             notify(error instanceof ApiError ? error.message : "Die Reihenfolge ließ sich nicht speichern.", "danger");
         } finally {
-            setDragOrder(null);
             list.reload();
         }
     };

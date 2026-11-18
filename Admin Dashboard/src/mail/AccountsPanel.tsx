@@ -1,4 +1,4 @@
-import { useState, type FormEvent, type JSX } from "react";
+import { useEffect, useRef, useState, type FormEvent, type JSX } from "react";
 import type { IMailAccount, IMailAccountList, IMailServerInfo } from "../../shared/api";
 import { MAIL_LIMITS } from "../../shared/limits";
 import { api } from "../api/client";
@@ -153,6 +153,16 @@ export function AccountsPanel({ open, onClose, onChanged }: { readonly open: boo
     const [error, setError] = useState<string | null>(null);
     const [editing, setEditing] = useState<number | null>(null);
     const [removing, setRemoving] = useState<IMailAccount | null>(null);
+    // W-0141: Reihenfolge, die schon zu sehen ist, bis der neue Stand vom Server kommt.
+    const [order, setOrder] = useState<readonly number[] | null>(null);
+    const settling = useRef(false);
+
+    useEffect(() => {
+        if (!settling.current) return;
+
+        settling.current = false;
+        setOrder(null);
+    }, [list.data]);
 
     function changed(): void {
         list.reload();
@@ -179,14 +189,18 @@ export function AccountsPanel({ open, onClose, onChanged }: { readonly open: boo
         }
     }
 
+    /** W-0141: Die neue Reihenfolge steht sofort da; scheitert das Speichern, springt sie zurück. */
     async function move(accounts: readonly IMailAccount[], index: number, step: -1 | 1): Promise<void> {
         const order = accounts.map((entry) => entry.id);
         [order[index], order[index + step]] = [order[index + step], order[index]];
+        setOrder(order);
 
         try {
             await api("/api/mail/accounts/order", { method: "PUT", body: { ids: order } });
+            settling.current = true;
             changed();
         } catch (failure) {
+            setOrder(null);
             notify(messageOf(failure), "danger");
         }
     }
@@ -203,7 +217,8 @@ export function AccountsPanel({ open, onClose, onChanged }: { readonly open: boo
         }
     }
 
-    const accounts = list.data?.accounts ?? [];
+    const loaded = list.data?.accounts ?? [];
+    const accounts = order ? [...loaded].sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id)) : loaded;
     // Vorschlag wie auf dem Server: aus der Umgebung, sonst mail.<Domain der Adresse>.
     const domain = address.includes("@") ? address.split("@")[1].trim().toLowerCase() : "";
     const defaults = list.data?.defaults;
