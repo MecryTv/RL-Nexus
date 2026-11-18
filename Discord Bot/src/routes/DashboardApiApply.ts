@@ -79,15 +79,15 @@ export default class DashboardApiApply extends Route {
         const status = ["open", "accepted", "declined"].includes(query.status) ? (query.status as ApplyStatus) : undefined;
         const formId = Number(query.form) || undefined;
         const page = Math.max(1, Number(query.page) || 1);
-        const list = await this.client.applySubmissions.Page(guild.id, { status, formId, page });
-        const settings = await service.Settings(guild.id);
+        // W-0141: Seite, Einstellungen und Formulare gleichzeitig statt nacheinander.
+        const [list, settings, forms] = await Promise.all([this.client.applySubmissions.Page(guild.id, { status, formId, page }), service.Settings(guild.id), service.Forms(guild.id)]);
 
         return {
             manage,
             settings,
             // W-0083: Für den Transcript-Kanal auch Forum-Beiträge, wie bei den Log-Kanälen.
             targets: await LogTargets(guild, [settings.transcriptChannelId]),
-            forms: await service.Forms(guild.id),
+            forms,
             // W-0073: Behält die Person die Rolle über eine andere Annahme, sagt der Hinweis vor dem Entfernen das.
             submissions: await Promise.all(list.rows.map(async (row) => ({ ...row, keepsRole: row.status === "accepted" && (await service.RoleKept(guild.id, row)) }))),
             total: list.total,
