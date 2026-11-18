@@ -346,7 +346,7 @@ Jede Datei steht für sich und lässt sich einzeln an- und abschalten. Die gemei
 Vor phpMyAdmin fragt nginx nach Name und Passwort. `DEINNAME` ersetzen, `openssl` fragt das Passwort zweimal. Nimm ein anderes als `DATABASE_PASSWORD`:
 
 ```bash
-sudo apt install -y nginx certbot python3-certbot-nginx
+sudo apt install -y nginx certbot python3-certbot-nginx logrotate
 printf 'DEINNAME:%s\n' "$(openssl passwd -6)" | sudo tee /etc/nginx/db.nexus-emb.de.htpasswd >/dev/null
 sudo chown root:www-data /etc/nginx/db.nexus-emb.de.htpasswd && sudo chmod 640 /etc/nginx/db.nexus-emb.de.htpasswd
 ```
@@ -413,7 +413,7 @@ In Cloudflare unter *SSL/TLS → Ursprungsserver → Zertifikat erstellen* „Ei
   * Notweg ohne Admin Dashboard: `touch data/flags/wartung-webseite` (bzw. `-dashboard`) schaltet die Wartung ein, dann ohne Zeitstrahl („Gleich wieder da.“). Löschen schaltet sie aus. Lief sie mit Zeitstrahl, auch `data/flags/wartung.json` löschen, sonst zeigt das Admin Dashboard sie weiter als laufend. Offene Wartungsseiten laden trotzdem neu: Sie fragen alle 30 Sekunden ihre eigene Adresse und merken, wenn kein 503 mehr kommt.
   * Lokal ohne nginx spiegeln der Bot (`npm run dev`) und die Webseite (`npm run dev`) dasselbe. Sie lesen `../Admin Dashboard/data/flags`, abweichend per `FLAGS_DIR`.
 * **Cloudflare:** Die echte Adresse der Besucher kommt aus `CF-Connecting-IP`, aber nur bei Anfragen aus den Netzen von Cloudflare. Die Liste steht in jeder der sieben Dateien unter `/etc/nginx/sites-available/` und ändert sich selten. Neue Netze stehen unter <https://www.cloudflare.com/ips/>.
-* **Datenschutz:** Im Zugriffsprotokoll steht die IP gekürzt (bei IPv4 ohne das letzte Stück, bei IPv6 nur die ersten drei Blöcke). Debian löscht die Protokolle nach 14 Tagen (`/etc/logrotate.d/nginx`), die Kopie für die Aktivität ebenso (`/etc/logrotate.d/rlnexus-aktivitaet`). So steht es in der Datenschutzerklärung der Hauptseite. Die Container schreiben kein Zugriffsprotokoll und sehen die Adressen der Besucher gar nicht, nur die des Docker-Netzes.
+* **Datenschutz:** Im Zugriffsprotokoll steht die IP gekürzt (bei IPv4 ohne das letzte Stück, bei IPv6 nur die ersten drei Blöcke). Debian löscht die Protokolle nach 14 Tagen (`/etc/logrotate.d/nginx`), die Kopie für die Aktivität ebenso (`/etc/logrotate.d/rlnexus-aktivitaet`). Dafür muss das Paket `logrotate` installiert sein (`apt install logrotate`, prüfen mit `systemctl list-timers logrotate.timer`); bis 18.11.2026 fehlte es auf dem VPS, und `access.log` wurde nie gedreht. So steht es in der Datenschutzerklärung der Hauptseite. Die Container schreiben kein Zugriffsprotokoll und sehen die Adressen der Besucher gar nicht, nur die des Docker-Netzes.
 
 nginx setzt `X-Forwarded-For` und `X-Forwarded-Proto` (`/etc/nginx/proxy_params`), die Container von Hauptseite und Statusseite reichen beides weiter. Bot und Admin Dashboard lesen daraus die echte IP des Aufrufers, die Rate Limits zählen also weiter jede IP für sich.
 
