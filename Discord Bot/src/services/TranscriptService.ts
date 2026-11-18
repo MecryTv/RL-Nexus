@@ -16,7 +16,7 @@ import ComponentV2Builder from "../builder/ComponentV2Builder";
 import { IsModerator, OptionOf, RELAY_MARK, SupportRoleOf } from "../builder/TicketPanel";
 import { Duration, RenderTranscript } from "../builder/TranscriptHtml";
 import { DASHBOARD_PATH } from "../constants/Dashboard";
-import { TicketNumber } from "../constants/Tickets";
+import { TicketNumber, TRANSCRIPT_MAX_MB } from "../constants/Tickets";
 import {
     AttachmentKey,
     INLINE_TYPES,
@@ -476,7 +476,7 @@ export default class TranscriptService {
 
         let used = 0;
         let index = 0;
-        const budget = ModuleValue("tickets", "transcriptMegabytes", guildId) * 1024 * 1024;
+        const budget = TRANSCRIPT_MAX_MB * 1024 * 1024;
 
         for (const [key, url] of wanted) {
             if (used >= budget) break;

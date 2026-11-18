@@ -21,13 +21,12 @@ import {
     IsImageFile,
     IsScope,
     LookupPublic,
+    MAX_IMAGE_BYTES,
     ParseSource,
     PRIVATE_SCOPE,
     SanitizeName,
 } from "../constants/Gallery";
 import { Shrink } from "../utils/image";
-import { LimitSentence } from "../builder/LimitReply";
-import { ModuleValue } from "../utils/moduleFlags";
 import logger from "../utils/logger";
 
 const DOWNLOAD_TIMEOUT = 15_000;
@@ -188,7 +187,7 @@ export default class GalleryService implements IGalleryService {
             responseType: "arraybuffer",
             timeout: DOWNLOAD_TIMEOUT,
             maxRedirects: 3,
-            maxContentLength: ModuleValue("gallery", "imageMegabytes", target.guildId ?? null) * 1024 * 1024,
+            maxContentLength: MAX_IMAGE_BYTES,
             validateStatus: (status) => status === 200,
             // httpsAgent und beforeRedirect kennt nur der Node-Adapter; der fetch-Adapter
             // uebergeht beide still - und mit ihnen die Sperre. Also fest dieser.
@@ -219,11 +218,9 @@ export default class GalleryService implements IGalleryService {
         mime: string,
         fileName: string
     ): Promise<IGalleryEntry> {
-        // W-0133: „Bild höchstens“ aus dem Admin, je Server.
-        const megabytes = ModuleValue("gallery", "imageMegabytes", target.guildId ?? null);
-
-        if (buffer.length > megabytes * 1024 * 1024) {
-            throw new Error(`Bild ist größer als ${megabytes} MB. ${LimitSentence("gallery", "imageMegabytes", target.guildId ?? null)}`);
+        // W-0137: feste Obergrenze für alle Server (MAX_IMAGE_BYTES).
+        if (buffer.length > MAX_IMAGE_BYTES) {
+            throw new Error(`Bild ist größer als ${MAX_IMAGE_BYTES / 1024 / 1024} MB.`);
         }
 
         if (!EXTENSION_BY_MIME.has(mime)) throw new Error(`Nicht unterstützter Dateityp: ${mime || "unbekannt"}`);

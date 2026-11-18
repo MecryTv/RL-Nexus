@@ -1,7 +1,6 @@
 /** Seite: Serverdetail. */
 
 import { IGuild, IGuildDetail, IModuleLimit } from "../interfaces/IGuild.js";
-import { setUploadLimit } from "../core/Gallery.js";
 import { IPayload } from "../interfaces/IUser.js";
 import { clone, icon, need, maybe } from "../core/Dom.js";
 import { countMembers, paintCrest } from "../layout/GuildCard.js";
@@ -865,11 +864,6 @@ function bindModules(guild: IGuild, only: Set<string> | null, side: INav): (modu
     return (modules, next = {}, nextLimits = {}) => {
         notices = next;
         limits = nextLimits;
-        // W-0133: die Bild-Grenze der Galerie für Upload-Felder auf allen Seiten.
-        const image = nextLimits.gallery?.find((entry) => entry.key === "imageMegabytes");
-
-        if (image) setUploadLimit(image.value * 1048576);
-
         if (modules === null) {
             warn("Module lassen sich gerade nicht schalten, der Bot erreicht seine Datenbank nicht.");
         } else {
