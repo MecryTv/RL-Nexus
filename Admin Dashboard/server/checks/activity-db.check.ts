@@ -32,7 +32,7 @@ function testHit(at: string, service: ActivityService, extra: Partial<IHit> = {}
         hour,
         page: true,
         bot: false,
-        scanner: false,
+        noise: false,
         device: "desktop" as ActivityDevice,
         source: "direct" as ActivitySource,
         statusClass: "2xx" as StatusClass,
@@ -66,7 +66,9 @@ export async function checkActivityDb(_config: IConfig, http: IHttp): Promise<vo
                 testHit("2001-10-20T12:00:00Z", "status"),
                 // Zählen nicht als Aufruf: Bot; für Fehler nicht: Bot, Scanner, Wartung.
                 testHit("2001-10-29T13:00:00Z", "website", { bot: true, view: false }),
-                testHit("2001-10-29T13:00:00Z", "website", { scanner: true, view: false, page: false, statusClass: "4xx" }),
+                testHit("2001-10-29T13:00:00Z", "website", { noise: true, view: false, page: false, statusClass: "4xx" }),
+                // Review W-0139: Ein Scanner mit Browser-Kennung bekommt vom SPA-Fallback 200 - das ist kein Aufruf.
+                testHit("2001-10-29T13:30:00Z", "website", { noise: true, page: true, view: true }),
                 testHit("2001-10-29T14:00:00Z", "website", { view: false, statusClass: "4xx" }),
                 testHit("2001-10-29T15:00:00Z", "website", { view: false, statusClass: "5xx" }),
                 failed,

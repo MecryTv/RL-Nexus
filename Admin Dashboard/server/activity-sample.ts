@@ -103,6 +103,8 @@ for (let start = end - 14 * 24 * hour; start <= end; start += hour) {
     }
 
     if (random() < 0.1) lines.push(line("nexus-emb.de", new Date(start + 1_200_000), "GET /wp-login.php HTTP/1.1", 404, "-", "Mozilla/5.0"));
+    // W-0139: ab und zu eine fehlende Datei, die eine eigene Seite anfragt - nur so zählt die Ampel etwas.
+    if (random() < 0.25) lines.push(line("dashboard.nexus-emb.de", new Date(start + 2_400_000), "GET /assets/alt-banner.webp HTTP/2.0", 404, "https://dashboard.nexus-emb.de/guild/1162553851187040326/levels", AGENTS[0][0]));
     if (random() < 0.2) lines.push(line("mail.nexus-emb.de", new Date(start + 1_800_000), "GET / HTTP/2.0", 200, "-", AGENTS[2][0]));
 }
 
