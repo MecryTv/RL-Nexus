@@ -9,6 +9,7 @@ import { icon, need } from "../core/Dom.js";
 import { failureText } from "../core/Gallery.js";
 import { clickSound } from "../core/Sound.js";
 import { toast } from "../core/Toast.js";
+import { face } from "../core/Ui.js";
 
 interface IPerson {
     id: string;
@@ -49,15 +50,6 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, className = "", ...ch
     element.append(...children);
 
     return element;
-}
-
-function face(person: IPerson): HTMLElement {
-    const box = el("span", "travatar");
-
-    if (person.avatar?.startsWith("https://")) box.style.backgroundImage = `url("${person.avatar.replace(/["\\]/g, "")}")`;
-    else box.textContent = person.name.trim().slice(0, 1).toUpperCase() || "?";
-
-    return box;
 }
 
 export function renderTeam(guildId: string): void {

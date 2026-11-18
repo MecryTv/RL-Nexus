@@ -3155,6 +3155,8 @@ body.no-motion .hero__field .run{display:none}
   flex:none;display:grid;place-items:center;width:22px;height:22px;border-radius:50%;
   font-size:11px;font-weight:700;color:#fff;background:#5865f2 center/cover no-repeat;
 }
+/* W-0141: Avatare als <img loading="lazy"> (face() in core/Ui.ts), füllen ihren runden Rahmen wie vorher das Hintergrundbild. */
+.face__img{display:block;width:100%;height:100%;border-radius:inherit;object-fit:cover}
 .trmore{flex:none;display:flex;margin:12px auto 0}
 .trrow--skel{min-height:76px}
 .trskel__num{width:74px;height:30px}

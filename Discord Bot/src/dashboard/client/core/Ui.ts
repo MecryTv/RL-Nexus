@@ -32,11 +32,33 @@ export function button(className: string, ...children: (Node | string)[]): HTMLB
     return element;
 }
 
+/**
+ * Rundes Bild einer Person, ohne Bild der erste Buchstabe. W-0141: als
+ * <img loading="lazy"> statt als Hintergrund - so lädt der Browser nur, was
+ * zu sehen ist (lange Ranglisten, Live Tickets). Scheitert das Bild, bleibt
+ * der Buchstabe.
+ */
 export function face(person: { name: string; avatar: string | null }, className = "travatar"): HTMLElement {
     const box = el("span", className);
+    const initial = person.name.trim().slice(0, 1).toUpperCase() || "?";
 
-    if (person.avatar?.startsWith("https://")) box.style.backgroundImage = `url("${person.avatar.replace(/["\\]/g, "")}")`;
-    else box.textContent = person.name.trim().slice(0, 1).toUpperCase() || "?";
+    if (!person.avatar?.startsWith("https://")) {
+        box.textContent = initial;
+
+        return box;
+    }
+
+    const image = el("img", "face__img");
+
+    image.alt = "";
+    image.loading = "lazy";
+    image.decoding = "async";
+    image.addEventListener("error", () => {
+        image.remove();
+        box.textContent = initial;
+    });
+    image.src = person.avatar;
+    box.append(image);
 
     return box;
 }

@@ -15,6 +15,7 @@ import { BASE } from "../core/Base.js";
 import { icon, need } from "../core/Dom.js";
 import { failureText } from "../core/Gallery.js";
 import { toast } from "../core/Toast.js";
+import { face } from "../core/Ui.js";
 
 interface IPerson {
     id: string;
@@ -88,12 +89,8 @@ function duration(ms: number): string {
 const WHEN = new Intl.DateTimeFormat("de-DE", { dateStyle: "medium", timeStyle: "short" });
 
 function avatar(person: IPerson): HTMLElement {
-    const box = el("span", "travatar");
-
-    if (person.avatar && person.avatar.startsWith("https://")) box.style.backgroundImage = `url("${person.avatar.replace(/["\\]/g, "")}")`;
-    else box.textContent = person.name.trim().slice(0, 1).toUpperCase() || "?";
-
-    return box;
+    // W-0141: dasselbe Bild wie überall, als <img loading="lazy"> (core/Ui.ts).
+    return face(person);
 }
 
 function tickets(count: number): string {

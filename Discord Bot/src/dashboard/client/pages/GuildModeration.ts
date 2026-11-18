@@ -19,7 +19,7 @@ import { debounce, onPulse } from "../core/Pulse.js";
 import { trackAnswer } from "../core/Resources.js";
 import { clickSound } from "../core/Sound.js";
 import { toast } from "../core/Toast.js";
-import { IRole, rolePicker, select } from "../core/Ui.js";
+import { face, IRole, rolePicker, select } from "../core/Ui.js";
 
 type Action = "ban" | "unban" | "kick" | "timeout" | "untimeout" | "warn" | "unwarn" | "purge";
 type Tab = "history" | "act" | "hidden" | "settings";
@@ -236,15 +236,6 @@ function button(className: string, ...children: (Node | string)[]): HTMLButtonEl
     element.type = "button";
 
     return element;
-}
-
-function face(person: { name: string; avatar: string | null }, className = "travatar"): HTMLElement {
-    const box = el("span", className);
-
-    if (person.avatar?.startsWith("https://")) box.style.backgroundImage = `url("${person.avatar.replace(/["\\]/g, "")}")`;
-    else box.textContent = person.name.trim().slice(0, 1).toUpperCase() || "?";
-
-    return box;
 }
 
 function badge(action: Action): HTMLElement {
