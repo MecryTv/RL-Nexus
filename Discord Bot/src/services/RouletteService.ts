@@ -11,9 +11,11 @@ import {
     UserSelectMenuInteraction,
 } from "discord.js";
 import BotClient from "../client/BotClient";
+import { ILimitHit } from "../builder/LimitReply";
+import { ModuleValue } from "../utils/moduleFlags";
 import ComponentV2Builder from "../builder/ComponentV2Builder";
 import { DASHBOARD_PATH } from "../constants/Dashboard";
-import { DefaultRouletteSettings, HOST_WAIT_WARN_MS, IMAGE_THROTTLE_MS, KEEP_MS, LobbyCode, LobbyLabel, MAX_FIXED_CHANNELS, MAX_LOBBY_NAME, MAX_PASSWORD, ROULETTE_MODULE, StartTime } from "../constants/RocketRoulette";
+import { DefaultRouletteSettings, HOST_WAIT_WARN_MS, IMAGE_THROTTLE_MS, KEEP_MS, LobbyCode, LobbyLabel, MAX_LOBBY_NAME, MAX_PASSWORD, ROULETTE_MODULE, StartTime } from "../constants/RocketRoulette";
 import { IAvatar, IMessageRef, IRouletteEvening, IRouletteLobby, IRouletteRound, IRouletteSettings, RouletteTeamSize } from "../interfaces/services/roulette/IRoulette";
 import { Draw, IDrawLobby, IDrawResult, PairKey, WithFiller } from "./roulette/Draw";
 import { AvatarMap, IAnnounceView, IControlView, RenderAnnouncement, RenderControl, RenderLobbyCard, RenderRound } from "../builder/RouletteImages";
@@ -36,7 +38,31 @@ import {
 import logger from "../utils/logger";
 
 /** Ein Fehler, den der Nutzer lesen soll: die Meldung geht so in Discord oder ins Dashboard. */
-export class RouletteError extends Error {}
+export class RouletteError extends Error {
+    /** limit: welche Grenze von RL Nexus gegriffen hat (W-0137), für den Satz und die Anfrage im Dashboard. */
+    constructor(
+        message: string,
+        readonly limit?: ILimitHit
+    ) {
+        super(message);
+    }
+}
+
+/** W-0137: feste Team-Kanäle, Lobbys je Runde und geplante Abende, Grenzen von RL Nexus je Server. */
+export function RouletteLimits(guildId: string): { fixed: number; lobbies: number; planned: number } {
+    return {
+        fixed: ModuleValue(ROULETTE_MODULE, "maxFixedChannels", guildId),
+        lobbies: ModuleValue(ROULETTE_MODULE, "maxLobbies", guildId),
+        planned: ModuleValue(ROULETTE_MODULE, "maxPlanned", guildId),
+    };
+}
+
+/** Wie viele Lobbys eine Auslosung höchstens bildet: die Grenze, bei festen Kanälen zwei Kanäle je Lobby. */
+export function LobbyCap(settings: Pick<IRouletteSettings, "teamChannels" | "fixedChannelIds">, guildId: string): number {
+    const max = RouletteLimits(guildId).lobbies;
+
+    return settings.teamChannels === "fixed" ? Math.min(max, Math.floor(settings.fixedChannelIds.length / 2)) : max;
+}
 
 /** Wer etwas auslöst. Aus dem Dashboard ohne Mitglied: die Route hat die Rechte schon geprüft. */
 export interface IRouletteActor {
@@ -117,7 +143,7 @@ export default class RouletteService {
             moderatorRoleId: pick("moderatorRoleId", (value) => (typeof value === "string" && value !== guild.id && guild.roles.cache.has(value) ? value : null)),
             teamChannels: pick("teamChannels", (value) => (value === "fixed" ? "fixed" : "auto")),
             fixedChannelIds: pick("fixedChannelIds", (value) =>
-                Array.isArray(value) ? [...new Set(value.map((id) => kind(id, ChannelType.GuildVoice)).filter((id): id is string => id !== null))].slice(0, MAX_FIXED_CHANNELS) : []
+                Array.isArray(value) ? [...new Set(value.map((id) => kind(id, ChannelType.GuildVoice)).filter((id): id is string => id !== null))].slice(0, RouletteLimits(guild.id).fixed) : []
             ),
             teamSize: pick("teamSize", (value) => (value === 1 || value === 2 || value === 3 ? (value as RouletteTeamSize) : 3)),
             lobbyName: pick("lobbyName", (value) => {
@@ -174,6 +200,13 @@ export default class RouletteService {
         const settings = this.Need(await this.Settings(guild.id));
 
         await this.Allow(actor);
+
+        const planned = await this.client.rouletteEvenings.CountOpen(guild.id);
+        const max = RouletteLimits(guild.id).planned;
+
+        if (planned >= max) {
+            throw new RouletteError(`Mehr als ${max} geplante Abende gehen nicht. Beendet erst einen.`, { module: ROULETTE_MODULE, key: "maxPlanned", asked: planned + 1, allowed: max });
+        }
 
         const created = await this.client.rouletteEvenings.Create({ guildId: guild.id, startsAt, createdBy: actor.id });
         const announce = await this.Send(guild, settings.infoChannelId, await AnnouncementMessage(this.AnnounceView(guild, settings, created), created.id));
@@ -246,7 +279,7 @@ export default class RouletteService {
                 wishes: evening.wishes,
                 history: evening.history,
                 teamSize: settings.teamSize,
-                maxLobbies: settings.teamChannels === "fixed" ? Math.floor(settings.fixedChannelIds.length / 2) : null,
+                maxLobbies: LobbyCap(settings, guild.id),
             });
 
             if (!result.lobbies.length) {

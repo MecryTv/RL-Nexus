@@ -12,11 +12,8 @@ export const MATCHUPS_ACCENT = "#ff1e2d";
 export const MAX_OPPONENT = 80;
 export const MAX_LEAGUE = 60;
 export const MAX_NOTE = 500;
-export const MAX_LEAGUES = 12;
 export const MAX_PINGS = 5;
 export const MAX_SCORE = 99;
-/** So weit im Voraus darf höchstens eingetragen werden. */
-export const MAX_AHEAD = 180;
 /** So lange vorher darf höchstens erinnert werden (Minuten). */
 export const MAX_REMIND = 1440;
 /** Wie viele Partien eine Liste auf einmal zeigt. */

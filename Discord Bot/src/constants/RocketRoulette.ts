@@ -18,7 +18,6 @@ export const HOST_WAIT_WARN_MS = 3 * 60_000;
 /** So lange bleiben beendete Abende gespeichert. */
 export const KEEP_MS = 30 * 24 * 3_600_000;
 
-export const MAX_FIXED_CHANNELS = 40;
 export const MAX_LOBBY_NAME = 20;
 export const MAX_PASSWORD = 16;
 

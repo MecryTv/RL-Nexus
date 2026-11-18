@@ -1,5 +1,6 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, Guild, GuildMember, InteractionReplyOptions, MessageEditOptions, MessageFlags, PermissionFlagsBits, StringSelectMenuBuilder } from "discord.js";
 import BotClient from "../client/BotClient";
+import { ILimitHit } from "../builder/LimitReply";
 import { LinkRows, MatchupAccent, MatchupHead, MatchupLine, MatchupRows, MatchupValues, MatchupView, ReportButton, ResultAsk } from "../builder/MatchupView";
 import { NeedsResend } from "./TeamService";
 import { ICustomView } from "../builder/CustomView";
@@ -8,9 +9,7 @@ import { AnyPlaceholderValues } from "../constants/Placeholders";
 import {
     ENTRY_ROLES,
     MATCHUPS_MODULE,
-    MAX_AHEAD,
     MAX_LEAGUE,
-    MAX_LEAGUES,
     MAX_NOTE,
     MAX_OPPONENT,
     MAX_PINGS,
@@ -32,6 +31,7 @@ import {
 import { IMatchup, IMatchupBody, IMatchupSettings, IMatchupTeam, MatchupMode, MatchupStatus } from "../interfaces/services/matchups/IMatchups";
 import { ITeam } from "../interfaces/services/teams/ITeams";
 import logger from "../utils/logger";
+import { ModuleValue } from "../utils/moduleFlags";
 import { DefaultAnnounce, DefaultRemind, DefaultResult, LegacyAnnounce, LegacyRemind, LegacyResult, MAX_RESULT_REMIND } from "../constants/Matchups";
 
 /**
@@ -71,7 +71,24 @@ export function NormalizeMatchupSettings(stored: Partial<IMatchupSettings>): IMa
     };
 }
 
-export class MatchupError extends Error {}
+export class MatchupError extends Error {
+    /** limit: welche Grenze von RL Nexus gegriffen hat (W-0137), für den Satz und die Anfrage im Dashboard. */
+    constructor(
+        message: string,
+        readonly limit?: ILimitHit
+    ) {
+        super(message);
+    }
+}
+
+/** W-0137: Ligen, Tage im Voraus und offene Partien, Grenzen von RL Nexus je Server. */
+export function MatchupLimits(guildId: string): { leagues: number; aheadDays: number; open: number } {
+    return {
+        leagues: ModuleValue(MATCHUPS_MODULE, "maxLeagues", guildId),
+        aheadDays: ModuleValue(MATCHUPS_MODULE, "maxAheadDays", guildId),
+        open: ModuleValue(MATCHUPS_MODULE, "maxOpen", guildId),
+    };
+}
 
 function IsRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -145,12 +162,12 @@ export default class MatchupService {
             discordResults: typeof raw.discordResults === "boolean" ? raw.discordResults : previous.discordResults,
             resultRemindHours: Int(raw.resultRemindHours, 0, MAX_RESULT_REMIND, previous.resultRemindHours),
             colorByStatus: typeof raw.colorByStatus === "boolean" ? raw.colorByStatus : previous.colorByStatus,
-            maxAhead: Int(raw.maxAhead, 1, MAX_AHEAD, previous.maxAhead),
+            maxAhead: Int(raw.maxAhead, 1, MatchupLimits(guild.id).aheadDays, previous.maxAhead),
             leagues:
                 raw.leagues === undefined
                     ? previous.leagues
                     : Array.isArray(raw.leagues)
-                      ? [...new Set(raw.leagues.map((entry) => Text(entry, MAX_LEAGUE)).filter(Boolean))].slice(0, MAX_LEAGUES)
+                      ? [...new Set(raw.leagues.map((entry) => Text(entry, MAX_LEAGUE)).filter(Boolean))].slice(0, MatchupLimits(guild.id).leagues)
                       : [],
             announce: this.CleanBody(guild, "Ankündigung", raw.announce, previous.announce),
             remind: this.CleanBody(guild, "Erinnerung", raw.remind, previous.remind),
@@ -290,6 +307,18 @@ export default class MatchupService {
         const access = await this.Access(guild, member);
         const team = this.Pick(access, input);
         const clean = this.Clean(input, settings);
+        const open = await this.client.matchups.CountPlanned(guild.id);
+        const max = MatchupLimits(guild.id).open;
+
+        if (open >= max) {
+            throw new MatchupError(`Mehr als ${max} offene Partien gehen hier nicht. Tragt erst Ergebnisse ein oder sagt alte Partien ab.`, {
+                module: MATCHUPS_MODULE,
+                key: "maxOpen",
+                asked: open + 1,
+                allowed: max,
+            });
+        }
+
         const matchup = await this.client.matchups.Create({
             ...clean,
             guildId: guild.id,

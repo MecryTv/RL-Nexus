@@ -8,9 +8,7 @@ import {
     ENTRY_ROLES,
     MATCHUPS_MODULE,
     MATCHUP_KEYS,
-    MAX_AHEAD,
     MAX_LEAGUE,
-    MAX_LEAGUES,
     MAX_NOTE,
     MAX_OPPONENT,
     MAX_PINGS,
@@ -22,7 +20,8 @@ import {
     STATUS_LABELS,
 } from "../constants/Matchups";
 import { ROLE_LABELS } from "../constants/Teams";
-import { MatchupError } from "../services/MatchupService";
+import { MatchupError, MatchupLimits } from "../services/MatchupService";
+import { DashboardLimit } from "../builder/LimitReply";
 import { MatchupStatus } from "../interfaces/services/matchups/IMatchups";
 import { WantsJSON } from "../utils/admin";
 import logger from "../utils/logger";
@@ -71,7 +70,7 @@ export default class DashboardApiMatchups extends Route {
 
             return reply.send(await this.Write(access, (request.body ?? {}) as IBody));
         } catch (error) {
-            if (error instanceof MatchupError) return reply.code(400).send({ error: error.message });
+            if (error instanceof MatchupError) return reply.code(400).send(error.limit ? DashboardLimit(error.limit, access.guild.id, error.message) : { error: error.message });
 
             throw error;
         }
@@ -101,7 +100,7 @@ export default class DashboardApiMatchups extends Route {
             entryRoles: ENTRY_ROLES.map((role) => ROLE_LABELS[role]),
             keys: MATCHUP_KEYS,
             bodyKinds: BODY_KINDS,
-            limits: { opponent: MAX_OPPONENT, league: MAX_LEAGUE, note: MAX_NOTE, leagues: MAX_LEAGUES, pings: MAX_PINGS, remind: MAX_REMIND, resultRemind: MAX_RESULT_REMIND, ahead: MAX_AHEAD, page: PAGE_SIZE },
+            limits: { opponent: MAX_OPPONENT, league: MAX_LEAGUE, note: MAX_NOTE, leagues: MatchupLimits(guild.id).leagues, pings: MAX_PINGS, remind: MAX_REMIND, resultRemind: MAX_RESULT_REMIND, ahead: MatchupLimits(guild.id).aheadDays, page: PAGE_SIZE },
             guild: { name: guild.name, ...GuildResources(guild) },
         };
     }

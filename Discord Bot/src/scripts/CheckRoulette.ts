@@ -14,7 +14,10 @@ import { ButtonInteraction, ChannelType, Guild, GuildBasedChannel, GuildMember, 
 import BotClient from "../client/BotClient";
 import { DefaultRouletteSettings, LobbyCode, LobbyLabel, StartTime } from "../constants/RocketRoulette";
 import { ZonedDate } from "../services/RunnableService";
-import RouletteService, { IRouletteActor, RouletteError } from "../services/RouletteService";
+import RouletteService, { IRouletteActor, LobbyCap, RouletteError, RouletteLimits } from "../services/RouletteService";
+import DashboardApiRoulette from "../routes/DashboardApiRoulette";
+import RouletteEveningsModel from "../models/RouletteEvenings";
+import { SetFlags } from "../utils/moduleFlags";
 import { Draw, IDrawInput, IDrawResult, PairKey, WithFiller } from "../services/roulette/Draw";
 import { loadImage } from "@napi-rs/canvas";
 import { IRouletteEvening, IRouletteLobby, IRouletteRound, IRouletteSettings } from "../interfaces/services/roulette/IRoulette";
@@ -1011,6 +1014,70 @@ async function cleanup(client: BotClient): Promise<void> {
     client.rouletteRounds.Forget();
 }
 
+/** W-0137: ein Server-Wert für die Grenzen von rocket-roulette. */
+function Limits(values: Record<string, number>) {
+    return { module: "rocket-roulette", guildId: GUILD, status: null, notice: null, linkMode: null, values, updatedAt: null };
+}
+
+/** W-0137: feste Kanäle, Lobbys und geplante Abende sind Grenzen von RL Nexus, je Server änderbar. Ohne Datenbank, die Stubs kommen wieder weg. */
+async function checkW137(client: BotClient): Promise<void> {
+    console.log("\n  — W-0137: Grenzen —");
+
+    const guild = FakeGuild();
+    const service = client.rouletteService;
+    const evenings = client.rouletteEvenings;
+    const ready = { ...DefaultRouletteSettings(), infoChannelId: TEXT, controlChannelId: TEXT2, waitingRoomId: VOICE1, mainVoiceId: VOICE2 };
+    const original = { settings: service.Settings, open: evenings.CountOpen, create: evenings.Create, snapshot: service.Snapshot };
+    const route = new DashboardApiRoulette(client) as unknown as { Read(access: unknown): Promise<Record<string, any>> };
+    let planned = 10;
+
+    check("Standard: 40 feste Kanäle, 20 Lobbys, 10 geplante Abende", JSON.stringify(RouletteLimits(GUILD)) === JSON.stringify({ fixed: 40, lobbies: 20, planned: 10 }), JSON.stringify(RouletteLimits(GUILD)));
+    check("Auto-Modus: höchstens 20 Lobbys", LobbyCap(DefaultRouletteSettings(), GUILD) === 20);
+    check("Feste Kanäle: zwei je Lobby", LobbyCap({ ...DefaultRouletteSettings(), teamChannels: "fixed", fixedChannelIds: [VOICE1, VOICE2, VOICE3] }, GUILD) === 1);
+
+    service.Settings = async () => ready;
+    evenings.CountOpen = async () => planned;
+    evenings.Create = async () => {
+        throw new RouletteError("angelegt");
+    };
+    service.Snapshot = (async () => ({})) as unknown as typeof service.Snapshot;
+
+    try {
+        let hit: unknown = null;
+
+        try {
+            await service.Plan(guild, { id: "m1", member: null } as unknown as IRouletteActor, Date.now() + 3_600_000);
+        } catch (error) {
+            hit = error;
+        }
+
+        const limit = hit instanceof RouletteError ? hit.limit : undefined;
+
+        check("Bei 10 geplanten Abenden scheitert der 11. (maxPlanned)", limit?.key === "maxPlanned" && limit.asked === 11 && limit.allowed === 10, JSON.stringify(limit));
+        planned = 9;
+        check("Bei 9 geht der nächste", (await service.Plan(guild, { id: "m1", member: null } as unknown as IRouletteActor, Date.now() + 3_600_000).catch((error: Error) => error.message)) === "angelegt");
+
+        SetFlags([], [], [], [Limits({ maxFixedChannels: 2, maxLobbies: 3, maxPlanned: 12 })]);
+        planned = 11;
+
+        const draw = Draw(Input(Players(30), { maxLobbies: LobbyCap(DefaultRouletteSettings(), GUILD) }));
+
+        check("Server-Wert 2 kürzt die festen Kanäle", service.Clean(guild, { fixedChannelIds: [VOICE1, VOICE2, VOICE3] }, DefaultRouletteSettings()).fixedChannelIds.length === 2);
+        check("Server-Wert 3: Auto-Modus lost höchstens 3 Lobbys aus, der Rest wartet", draw.lobbies.length === 3 && draw.sitOut.length === 30 - 18, `${draw.lobbies.length}/${draw.sitOut.length}`);
+        check("Server-Wert 12: der 12. Abend geht", (await service.Plan(guild, { id: "m1", member: null } as unknown as IRouletteActor, Date.now() + 3_600_000).catch((error: Error) => error.message)) === "angelegt");
+        check("Route gibt den Server-Wert an die Seite", (await route.Read({ guild: { id: GUILD, name: "Dev Server", channels: { cache: new Map() }, roles: { cache: new Map() }, emojis: { cache: new Map() }, members: { cache: new Map() } }, manage: true })).limits?.fixed === 2);
+        SetFlags([], [], []);
+    } finally {
+        Object.assign(service, { Settings: original.settings, Snapshot: original.snapshot });
+        Object.assign(evenings, { CountOpen: original.open, Create: original.create });
+    }
+
+    const queries: { sql: string; params: unknown[] }[] = [];
+    const model = new RouletteEveningsModel({ databaseService: { One: async (sql: string, params: unknown[]) => (queries.push({ sql, params }), { total: "4" }) } } as unknown as BotClient);
+
+    check("Geplant heißt geplant oder laufend, beendete zählen nicht", (await model.CountOpen(GUILD)) === 4 && /status IN \('planned', 'running'\)/.test(queries[0]?.sql ?? "") && queries[0]?.params[0] === GUILD, JSON.stringify(queries[0]));
+}
+
 async function main(): Promise<void> {
     console.log("\n🎰 Rocket Roulette\n");
 
@@ -1021,6 +1088,7 @@ async function main(): Promise<void> {
     checkStartTime();
     await checkImages();
     await checkMessages();
+    await checkW137(client);
 
     await client.configService.Initialize();
 
