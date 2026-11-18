@@ -1,5 +1,5 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
-import { AREA_IDS, AREAS, BACKUP_NOTE_MAX, BACKUP_PARTS, DEFAULT_PLAN, PLAN_EVERY, PLAN_KEEP_MAX, RESTORE_MODES, SERVER_HAND_MAX, SERVER_PART_IDS, type AreaId, type BackupPart, type RestoreMode, type ServerPartId, type IBackupDetail, type IBackupMeta, type IBackupPlan, type IPlanState, type IRestoreResult, type IServerBackups, type IServerPartJson, type PlanEvery } from "../../shared/backups.ts";
+import { AREA_IDS, AREAS, BACKUP_NOTE_MAX, BACKUP_PARTS, DEFAULT_PLAN, PLAN_EVERY, PLAN_KEEP_MAX, RESTORE_MODES, SERVER_PART_IDS, type AreaId, type BackupPart, type RestoreMode, type ServerPartId, type IBackupDetail, type IBackupMeta, type IBackupPlan, type IPlanState, type IRestoreResult, type IServerBackups, type IServerPartJson, type PlanEvery } from "../../shared/backups.ts";
 import { audit, type IActor } from "../audit.ts";
 import { planState } from "../backups/plan.ts";
 import { remapGuild } from "../backups/remap.ts";
@@ -11,6 +11,7 @@ import { PublicError } from "../errors.ts";
 import { deletedPeople, scrubServer } from "../userdata/backups.ts";
 import { body, id, snowflake } from "../validate.ts";
 import { needBackups, parseRestore } from "./backups.ts";
+import { moduleValue } from "../modules/store.ts";
 
 /**
  * Die Backups eines Servers für das Bot-Dashboard (Spec Backup-Modul). Nur der
@@ -66,14 +67,14 @@ function whole(value: unknown, min: number, max: number): boolean {
 }
 
 /** Die Einstellung aus dem Bot-Dashboard, mit einem Satz für alles, was nicht passt. */
-export function parsePlan(raw: unknown): IBackupPlan {
+export function parsePlan(raw: unknown, maxKeep = PLAN_KEEP_MAX): IBackupPlan {
     const input = body(raw);
 
     if (typeof input.enabled !== "boolean") throw new PublicError(400, "Sag, ob automatische Backups an sein sollen.");
     if (typeof input.every !== "string" || !(PLAN_EVERY as readonly string[]).includes(input.every)) throw new PublicError(400, "Diesen Rhythmus gibt es nicht.");
     if (!whole(input.weekday, 0, 6)) throw new PublicError(400, "Der Wochentag geht von 0 (Montag) bis 6 (Sonntag).");
     if (!whole(input.hour, 0, 23)) throw new PublicError(400, "Die Uhrzeit ist eine volle Stunde von 0 bis 23.");
-    if (!whole(input.keep, 1, PLAN_KEEP_MAX)) throw new PublicError(400, `Behalten geht von 1 bis ${PLAN_KEEP_MAX}.`);
+    if (!whole(input.keep, 1, maxKeep)) throw new PublicError(400, `Behalten geht von 1 bis ${maxKeep}.`);
     // Plan 32: Ein älteres Bot-Dashboard schickt die beiden Schalter nicht - dann gelten die Vorgaben.
     if (input.discord !== undefined && typeof input.discord !== "boolean") throw new PublicError(400, "Sag, ob der Discord-Server mitgesichert werden soll.");
     if (input.risky !== undefined && typeof input.risky !== "boolean") throw new PublicError(400, "Sag, ob vor riskanten Änderungen gesichert werden soll.");
@@ -165,7 +166,7 @@ export async function internalBackupRoutes(app: FastifyInstance, { config }: { c
             guildId,
             plan: planState(await readPlan(guildId)),
             backups: await listBackups(guildId, "server"),
-            hand: { used: await countHand(guildId, "server"), max: SERVER_HAND_MAX },
+            hand: { used: await countHand(guildId, "server"), max: await moduleValue("backups", "maxHand", guildId) },
         };
     });
 
@@ -202,7 +203,9 @@ export async function internalBackupRoutes(app: FastifyInstance, { config }: { c
         let meta: IBackupMeta;
 
         try {
-            if ((await countHand(guildId, "server")) >= SERVER_HAND_MAX) throw new PublicError(409, `Alle ${SERVER_HAND_MAX} Plätze sind belegt. Lösch erst ein altes Backup.`);
+            const max = await moduleValue("backups", "maxHand", guildId);
+
+            if ((await countHand(guildId, "server")) >= max) throw new PublicError(409, `Alle ${max} Plätze sind belegt. Lösch erst ein altes Backup.`);
 
             const server = await serverPart(config, guildId, actor, parts);
 
@@ -219,7 +222,7 @@ export async function internalBackupRoutes(app: FastifyInstance, { config }: { c
     app.put("/internal/backups/:guildId/plan", async (request): Promise<IPlanState> => {
         const actor = botActor(config, request);
         const guildId = guildOf(request);
-        const plan = parsePlan(request.body);
+        const plan = parsePlan(request.body, await moduleValue("backups", "maxPlanKeep", guildId));
 
         await needBackups(config);
 

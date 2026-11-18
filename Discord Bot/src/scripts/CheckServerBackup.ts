@@ -966,7 +966,7 @@ async function checkCards(): Promise<void> {
         notice: SafetyNotice({ at: now, who: "Tim", why: "Kanäle löschen", compareUrl: url }),
         failed: AutoFailedCard({ at: now, reason: "Beim Discord-Server fehlen Emojis: Dem Bot fehlt das Recht „Ausdrücke verwalten“.", dashboardUrl: url }),
         created: CreatedReply(meta(9, "hand", 0, { note: "vor dem Turnier" }), 5, 10, url),
-        list: ListReply({ backups, page: 0, strip, now }),
+        list: ListReply({ backups, page: 0, strip, now, max: 12 }),
         one: BackupReply(meta(2, "plan", 17.6), now),
         compare: CompareReply(DiffSnapshots(Before(), Now()), "heute 00:00", 7),
         confirm: LoadConfirm(exact, "heute 00:00", "exact", 7),
@@ -994,6 +994,8 @@ async function checkCards(): Promise<void> {
         ["failed", "⚠️ Backup nur halb"],
         ["created", "💾 Backup angelegt"],
         ["created", "5 von 10 Plätzen von Hand belegt"],
+        // W-0137: die Plätze von Hand kommen als Server-Wert vom Admin.
+        ["list", "2 von 12 von Hand"],
         ["created", "42 Kanäle · 18 Rollen"],
     ];
     const missing = wanted.filter(([name, part]) => !text(name).includes(part)).map(([name, part]) => `${name}: ${part}`);

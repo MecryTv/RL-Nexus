@@ -708,7 +708,7 @@ export default class ServerBackupService {
     private async ListView(guild: Guild, actor: Actor, page: number): Promise<MessageCreateOptions> {
         const list = await this.List(guild, actor);
 
-        return typeof list === "string" ? Note(list) : ListReply({ backups: list.backups, page, strip: Strip(list.backups) });
+        return typeof list === "string" ? Note(list) : ListReply({ backups: list.backups, page, strip: Strip(list.backups), max: list.hand.max });
     }
 
     private async OpenView(guild: Guild, actor: Actor, backupId: number): Promise<MessageCreateOptions> {

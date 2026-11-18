@@ -138,6 +138,11 @@ export const MODULE_SETTINGS: Readonly<Record<string, readonly IModuleSettingDef
         def("maxMessages", "Nachrichten höchstens", null, 50, 1, 200, true, true),
         def("maxResponses", "Stichwörter höchstens", null, 50, 1, 200, true, true),
     ],
+    // W-0137: Backups laufen im Admin Dashboard, die Werte liest dort moduleValue().
+    backups: [
+        def("maxHand", "Backups von Hand höchstens", null, 10, 1, 25, true, true),
+        def("maxPlanKeep", "Automatische Backups behalten höchstens", null, 14, 1, 30, true, false),
+    ],
 };
 
 /** Eine Einstellung, etwa für die harte Obergrenze einer Slash-Option. */

@@ -208,6 +208,18 @@ async function settingFor(module: string): Promise<IBotModuleSetting> {
     return settingOf(module, row);
 }
 
+/** W-0137: der Wert, der für einen Server gilt - Ausnahme, sonst Wert für alle, sonst Standard; immer in den Grenzen des Verzeichnisses. */
+export async function moduleValue(module: string, key: string, guildId: string): Promise<number> {
+    const def = settingsOf(module).find((entry) => entry.key === key);
+
+    if (!def) throw new Error(`${module}.${key} steht nicht im Verzeichnis.`);
+
+    const [all, own] = await Promise.all([settingFor(module), overrideFor(module, guildId)]);
+    const value = own?.values[key] ?? all.values[key];
+
+    return Math.min(def.max, Math.max(def.min, typeof value === "number" && Number.isFinite(value) ? value : def.standard));
+}
+
 async function overrideFor(module: string, guildId: string): Promise<IBotModuleOverride | null> {
     const [row] = await query<IOverrideRow[]>("SELECT * FROM bot_module_overrides WHERE module = ? AND guild_id = ?", [module, guildId]);
 

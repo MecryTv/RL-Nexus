@@ -2,6 +2,7 @@ import { AREAS, BACKUP_PARTS, type AreaId, type BackupKind, type BackupOrigin, t
 import type { IConfig } from "../config.ts";
 import { databaseReady, query, withTransaction } from "../db.ts";
 import { countAreas, packBackup, unpackBackup, unpackServer } from "./data.ts";
+import { moduleValue } from "../modules/store.ts";
 
 /**
  * Die Backup-Datenbank: eine zweite Datenbank auf demselben MariaDB-Server
@@ -446,7 +447,8 @@ export async function markPlan(guildId: string, result: { ok: true; at: Date } |
 /** Löscht die ältesten automatischen Backups (Art plan) über keep. Von Hand und vor dem Zurückladen bleiben. */
 export async function trimPlan(guildId: string, keep: number): Promise<number> {
     const rows = await query<{ id: number }[]>(`SELECT id FROM ${table("guild_backups")} WHERE guild_id = ? AND kind = 'plan' ORDER BY created_at DESC, id DESC`, [guildId]);
-    const old = rows.slice(keep).map((row) => row.id);
+    // W-0137: Senkt RL Nexus die Grenze unter das, was der Server eingestellt hat, gilt die Grenze.
+    const old = rows.slice(Math.min(keep, await moduleValue("backups", "maxPlanKeep", guildId))).map((row) => row.id);
     if (old.length === 0) return 0;
 
     await query(`DELETE FROM ${table("guild_backups")} WHERE id IN (?)`, [old]);

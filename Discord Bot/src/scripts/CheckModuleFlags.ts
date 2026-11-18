@@ -502,6 +502,8 @@ function checkAllModules(): void {
         ["voice-hub", "maxTrusted", 25, 1, 25, false],
         ["custom-message", "maxMessages", 50, 1, 200, true],
         ["custom-message", "maxResponses", 50, 1, 200, true],
+        ["backups", "maxHand", 10, 1, 25, true],
+        ["backups", "maxPlanKeep", 14, 1, 30, false],
     ];
     const wrong = expected.filter(([module, key, standard, min, max, askable]) => {
         const def = settingDef(module, key);
