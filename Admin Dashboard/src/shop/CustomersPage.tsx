@@ -1,4 +1,4 @@
-import { useState, type JSX } from "react";
+import { useDeferredValue, useMemo, useState, type JSX } from "react";
 import { useQueryParam } from "../nav/useQueryParam.ts";
 import { CUSTOMER_FILTERS, customerMatches, formatPrice, type CustomerFilter, type ICustomerList, type IShopProductList } from "../../shared/shop";
 import { useLive } from "../api/live";
@@ -9,6 +9,8 @@ import { Metric } from "../components/Metric";
 import { PageHeader } from "../components/PageHeader";
 import { SidePanel } from "../components/SidePanel";
 import { Failure, Loading } from "../components/Status";
+import { pageOfRows } from "../../shared/limits";
+import { Pager } from "../components/Pager";
 import { useTitle } from "../useTitle";
 import { STATUS, shortId, untilText } from "./customer";
 import { CustomerPanel } from "./CustomerPanel";
@@ -43,8 +45,14 @@ export function CustomersPage(): JSX.Element {
     // Für Resttage und Monatsnamen reicht der Stand beim Öffnen der Seite.
     const [now] = useState(() => Date.now());
 
-    const customers = list.data?.customers ?? [];
-    const rows = customers.filter((row) => customerMatches(row, filter, search));
+    const [page, setPage] = useState(1);
+    // W-0141: Bis zu 5000 Zeilen. Gefiltert wird mit dem zurückgestellten Suchtext, gezeigt werden 50 je Seite;
+    // Tippen bleibt flüssig, und nicht jede Taste baut die ganze Tabelle neu.
+    const deferred = useDeferredValue(search);
+    const customers = useMemo(() => list.data?.customers ?? [], [list.data]);
+    const rows = useMemo(() => customers.filter((row) => customerMatches(row, filter, deferred)), [customers, filter, deferred]);
+    const counts = useMemo(() => new Map(CUSTOMER_FILTERS.map((entry) => [entry, customers.filter((row) => customerMatches(row, entry, "")).length])), [customers]);
+    const shown = pageOfRows(rows, page);
     const opened = customers.find((row) => row.id === openId) ?? null;
     const stats = list.data?.stats;
 
@@ -93,9 +101,18 @@ export function CustomersPage(): JSX.Element {
                     <div className={styles.toolbar}>
                         <div className={styles.chips} role="group" aria-label="Nach Status filtern">
                             {CUSTOMER_FILTERS.map((entry) => (
-                                <button key={entry} type="button" className={styles.chip} aria-pressed={filter === entry} onClick={() => setFilter(entry)}>
+                                <button
+                                    key={entry}
+                                    type="button"
+                                    className={styles.chip}
+                                    aria-pressed={filter === entry}
+                                    onClick={() => {
+                                        setFilter(entry);
+                                        setPage(1);
+                                    }}
+                                >
                                     {FILTER_LABELS[entry]}
-                                    <span className={styles.chipCount}>{customers.filter((row) => customerMatches(row, entry, "")).length}</span>
+                                    <span className={styles.chipCount}>{counts.get(entry) ?? 0}</span>
                                 </button>
                             ))}
                         </div>
@@ -105,7 +122,10 @@ export function CustomersPage(): JSX.Element {
                                     id="kunden-suche"
                                     type="search"
                                     value={search}
-                                    onChange={(event) => setSearch(event.target.value)}
+                                    onChange={(event) => {
+                                        setSearch(event.target.value);
+                                        setPage(1);
+                                    }}
                                     placeholder="Name, ID oder Mail …"
                                     autoComplete="off"
                                 />
@@ -131,7 +151,7 @@ export function CustomersPage(): JSX.Element {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {rows.map((row) => {
+                                    {shown.rows.map((row) => {
                                         const until = untilText(row, now);
 
                                         return (
@@ -163,6 +183,7 @@ export function CustomersPage(): JSX.Element {
                             </table>
                         </div>
                     )}
+                    <Pager page={shown.page} pages={shown.pages} onPage={setPage} />
                 </>
             )}
 
