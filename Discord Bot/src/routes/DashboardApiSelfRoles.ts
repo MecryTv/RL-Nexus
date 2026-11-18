@@ -3,8 +3,9 @@ import BotClient from "../client/BotClient";
 import Route from "../structures/Route";
 import { DASHBOARD_PATH } from "../constants/Dashboard";
 import { KIND_LABELS as BODY_KINDS } from "../constants/Messages";
-import { DefaultBody, KIND_LABELS, MAX_DESCRIPTION, MAX_LABEL, MAX_NAME, MAX_PANELS, MAX_REACTIONS, MAX_ROLES, MODE_LABELS, SELF_ROLE_MODULE, TONE_LABELS } from "../constants/SelfRoles";
-import { SelfRoleError } from "../services/SelfRoleService";
+import { DefaultBody, KIND_LABELS, MAX_DESCRIPTION, MAX_LABEL, MAX_NAME, MODE_LABELS, SELF_ROLE_MODULE, TONE_LABELS } from "../constants/SelfRoles";
+import { SelfRoleError, SelfRoleLimits } from "../services/SelfRoleService";
+import { DashboardLimit } from "../builder/LimitReply";
 import { WantsJSON } from "../utils/admin";
 import logger from "../utils/logger";
 import { GuildResources, IManageAccess, ManageGate } from "../utils/managegate";
@@ -49,7 +50,7 @@ export default class DashboardApiSelfRoles extends Route {
 
             return reply.send(await this.Write(access, (request.body ?? {}) as IBody));
         } catch (error) {
-            if (error instanceof SelfRoleError) return reply.code(400).send({ error: error.message });
+            if (error instanceof SelfRoleError) return reply.code(400).send(error.limit ? DashboardLimit(error.limit, access.guild.id, error.message) : { error: error.message });
 
             throw error;
         }
@@ -65,7 +66,7 @@ export default class DashboardApiSelfRoles extends Route {
             modes: MODE_LABELS,
             tones: TONE_LABELS,
             bodyKinds: BODY_KINDS,
-            limits: { panels: MAX_PANELS, roles: MAX_ROLES, reactions: MAX_REACTIONS, name: MAX_NAME, label: MAX_LABEL, description: MAX_DESCRIPTION },
+            limits: { ...SelfRoleLimits(guild.id), name: MAX_NAME, label: MAX_LABEL, description: MAX_DESCRIPTION },
             guild: { name: guild.name, ...GuildResources(guild) },
         };
     }

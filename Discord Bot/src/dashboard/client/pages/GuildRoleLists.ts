@@ -662,6 +662,7 @@ export async function renderRoleLists(guildId: string): Promise<void> {
             heading: list.settings.heading,
             imagePresets: d.imagePresets,
             presets: d.presets,
+            maxPresets: d.limits.presets,
             motifs: d.motifs,
             gallery: (id) => gallery.get(id) ?? null,
             onHeading: (value) => {

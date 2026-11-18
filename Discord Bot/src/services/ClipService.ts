@@ -28,6 +28,7 @@ import {
     PenaltyText,
     Planned,
     VideoExtension,
+    CLIP_MAX_MB,
 } from "../constants/Clips";
 import { DASHBOARD_PATH } from "../constants/Dashboard";
 import { AttachmentKey } from "../constants/Transcripts";
@@ -43,7 +44,7 @@ import {
     IClipSettings,
     IClipWinner,
 } from "../interfaces/services/clips/IClips";
-import { AskLine, LimitSentence } from "../builder/LimitReply";
+import { LimitSentence } from "../builder/LimitReply";
 import { settingDef } from "../constants/ModuleSettings";
 import { ModuleValue } from "../utils/moduleFlags";
 import logger from "../utils/logger";
@@ -58,9 +59,7 @@ function Places(guildId: string): number {
     return ModuleValue("clips", "places", guildId);
 }
 
-function FileBytes(guildId: string): number {
-    return ModuleValue("clips", "fileMegabytes", guildId) * 1024 * 1024;
-}
+const FILE_BYTES = CLIP_MAX_MB * 1024 * 1024;
 
 type ClipChannel = TextChannel | NewsChannel;
 
@@ -739,12 +738,7 @@ export default class ClipService {
         if (!video) return this.Reject(message, "hier zählen nur Videos. Lade deinen Clip als Datei hoch.");
         if (videos.length > 1) return this.Reject(message, "bitte nur einen Clip pro Nachricht.");
         if (!VideoExtension(video.name, video.contentType)) return this.Reject(message, "dieses Format spielt kein Browser ab. Nimm MP4, WebM oder MOV.");
-        // W-0133: die Größe kommt aus dem Admin. Die Meldung steht öffentlich im Kanal, also nur der Satz für Mitglieder.
-        if (video.size > FileBytes(message.guild.id)) {
-            const ask = AskLine({ module: "clips", key: "fileMegabytes", guildId: message.guild.id, admin: false });
-
-            return this.Reject(message, `das Video ist größer als ${ModuleValue("clips", "fileMegabytes", message.guild.id)} MB.\n-# ${ask.text}`);
-        }
+        if (video.size > FILE_BYTES) return this.Reject(message, `das Video ist größer als ${CLIP_MAX_MB} MB.`);
 
         const key = `${round.id}:${message.author.id}`;
 
@@ -808,9 +802,7 @@ export default class ClipService {
 
         const ext = source ? VideoExtension(source.name, source.contentType) : null;
 
-        const maxBytes = FileBytes(guild.id);
-
-        if (!source || !ext || !AttachmentKey(source.url) || source.size > maxBytes) return;
+        if (!source || !ext || !AttachmentKey(source.url) || source.size > FILE_BYTES) return;
 
         const directory = this.Folder(guild.id, round);
         const name = `${entry.id}.${ext}`;
@@ -828,7 +820,7 @@ export default class ClipService {
             const limit = new Transform({
                 transform(chunk: Buffer, _encoding, done) {
                     size += chunk.length;
-                    done(size > maxBytes ? new Error("zu groß") : null, chunk);
+                    done(size > FILE_BYTES ? new Error("zu groß") : null, chunk);
                 },
             });
 

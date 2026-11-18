@@ -12,7 +12,6 @@ const BLUE = 0x5865f2;
 const GREEN = 0x57f287;
 const YELLOW = 0xfee75c;
 const GRAY = 0x4f545c;
-const HAND_MAX = 10;
 const PER_PAGE = 3;
 const DAY_MS = 86_400_000;
 /** Text-Bausteine dürfen 4000 Zeichen haben, mit etwas Luft. */
@@ -279,13 +278,14 @@ export function CreatedReply(meta: IBackupMeta, used: number, max: number, dashb
     return Message(card);
 }
 
-export function ListReply(input: { backups: readonly IBackupMeta[]; page: number; strip: string; now?: number }): MessageCreateOptions {
+/** max: Plätze von Hand, der Server-Wert aus dem Admin (W-0137). */
+export function ListReply(input: { backups: readonly IBackupMeta[]; page: number; strip: string; max: number; now?: number }): MessageCreateOptions {
     const now = input.now ?? Date.now();
     const pages = Math.max(1, Math.ceil(input.backups.length / PER_PAGE));
     const page = Math.min(Math.max(0, input.page), pages - 1);
     const hand = input.backups.filter((meta) => meta.kind === "hand").length;
     const card = new ComponentV2Builder({ accentColor: BLUE })
-        .title("💾 Backups", `${Count(input.backups.length, "Backup", "Backups")} · ${hand} von ${HAND_MAX} von Hand`)
+        .title("💾 Backups", `${Count(input.backups.length, "Backup", "Backups")} · ${hand} von ${input.max} von Hand`)
         .text(input.strip)
         .subtext("letzte 14 Tage · 🟦 automatisch · 🟩 von Hand · 🟥 Sicherheit · ⬛ keins")
         .separator();

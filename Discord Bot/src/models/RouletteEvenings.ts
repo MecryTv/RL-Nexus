@@ -89,6 +89,13 @@ export default class RouletteEvenings extends Model<IEveningRow> {
         return row ? ToEvening(row) : null;
     }
 
+    /** W-0137: geplante und laufende Abende eines Servers - beendete zählen nicht. */
+    async CountOpen(guildId: string): Promise<number> {
+        const row = await this.db.One<{ total: number | string }>(`SELECT COUNT(*) AS total FROM \`${this.Table}\` WHERE guild_id = ? AND status IN ('planned', 'running')`, [guildId]);
+
+        return Number(row?.total ?? 0);
+    }
+
     /** Der geplante oder laufende Abend eines Servers. */
     async ActiveOf(guildId: string): Promise<IRouletteEvening | null> {
         const row = await this.db.One<IEveningRow>(`SELECT * FROM \`${this.Table}\` WHERE guild_id = ? AND status IN ('planned', 'running') ORDER BY id DESC LIMIT 1`, [guildId]);

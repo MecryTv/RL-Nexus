@@ -966,7 +966,7 @@ async function checkCards(): Promise<void> {
         notice: SafetyNotice({ at: now, who: "Tim", why: "Kanäle löschen", compareUrl: url }),
         failed: AutoFailedCard({ at: now, reason: "Beim Discord-Server fehlen Emojis: Dem Bot fehlt das Recht „Ausdrücke verwalten“.", dashboardUrl: url }),
         created: CreatedReply(meta(9, "hand", 0, { note: "vor dem Turnier" }), 5, 10, url),
-        list: ListReply({ backups, page: 0, strip, now }),
+        list: ListReply({ backups, page: 0, strip, now, max: 12 }),
         one: BackupReply(meta(2, "plan", 17.6), now),
         compare: CompareReply(DiffSnapshots(Before(), Now()), "heute 00:00", 7),
         confirm: LoadConfirm(exact, "heute 00:00", "exact", 7),
@@ -994,6 +994,8 @@ async function checkCards(): Promise<void> {
         ["failed", "⚠️ Backup nur halb"],
         ["created", "💾 Backup angelegt"],
         ["created", "5 von 10 Plätzen von Hand belegt"],
+        // W-0137: die Plätze von Hand kommen als Server-Wert vom Admin.
+        ["list", "2 von 12 von Hand"],
         ["created", "42 Kanäle · 18 Rollen"],
     ];
     const missing = wanted.filter(([name, part]) => !text(name).includes(part)).map(([name, part]) => `${name}: ${part}`);
@@ -1116,6 +1118,21 @@ async function checkCommand(): Promise<void> {
 
     calls.length = 0;
     const made = await run({ sub: "neu", options: { notiz: "vor dem Turnier", was: "server" } });
+    // W-0137 Review: Alle Plätze belegt - der Admin sagt 409, Discord zeigt die gelbe Karte mit Anfrage.
+    const fakes = service as unknown as Record<string, unknown>;
+    const realAsk = fakes.AskBackups as (guild: Guild, actor: unknown, call: IBackupCall) => Promise<{ status: number; body: unknown }>;
+
+    fakes.AskBackups = async (guild: Guild, actor: unknown, call: IBackupCall) => {
+        if (call.method === "POST" && call.path === "") return { status: 409, body: { error: "Alle 10 Plätze sind belegt. Lösch erst ein altes Backup." } };
+        if (call.method === "GET" && call.path === "") return { status: 200, body: { guildId: GUILD, plan: { plan: null, next: null, lastOk: null, lastError: null }, backups: [], hand: { used: 10, max: 10 } } };
+
+        return realAsk(guild, actor, call);
+    };
+
+    const full = await run({ sub: "neu", options: { notiz: "voll", was: "bot" } });
+
+    check("neu bei vollen Plätzen: gelbe Karte mit Grenze und Anfrage", (full.replies.at(-1) ?? "").includes("Alle 10 Plätze") && (full.replies.at(-1) ?? "").includes("Die Grenze legt RL Nexus fest"), full.replies.join(" | ").slice(0, 300));
+    fakes.AskBackups = realAsk;
     check("neu: legt mit den gewählten Teilen an", calls[0] === "create:server" && (made.replies.at(-1) ?? "").includes("💾 Backup angelegt"), `${calls.join()} ${made.replies.join()}`);
 
     const toggled = await run({ customId: "bk:auto:discord" });

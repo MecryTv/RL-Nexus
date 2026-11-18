@@ -1,7 +1,8 @@
 import { ChannelType, Guild, GuildMember } from "discord.js";
 import BotClient from "../../client/BotClient";
 import { ModuleId } from "../../constants/Modules";
-import { MAX_BAN, MAX_STAGES, MAX_TIMEOUT, MIN_DURATION, ParseDuration } from "../../constants/Moderation";
+import { MAX_BAN, MAX_TIMEOUT, MIN_DURATION, MODERATION_MODULE, ParseDuration } from "../../constants/Moderation";
+import { ModuleValue } from "../../utils/moduleFlags";
 import { IModStage } from "../../interfaces/services/moderation/IModeration";
 import { Cut } from "../../utils/cut";
 
@@ -120,8 +121,8 @@ export function ReadPanelId(id: string): { step: PanelStep; module: string | nul
 /* ----------------------------------------------------------
    Stufen der Moderation als Text: eine Zeile je Stufe
    ---------------------------------------------------------- */
-/** "3 timeout 1h", "5 kick", "7 ban 7d", "9 ban" (dauerhaft). */
-export function ParseStages(text: string): IModStage[] {
+/** "3 timeout 1h", "5 kick", "7 ban 7d", "9 ban" (dauerhaft). max: Stufen höchstens, ohne Server der Standard (W-0137). */
+export function ParseStages(text: string, max = ModuleValue(MODERATION_MODULE, "maxStages", null)): IModStage[] {
     const lines = text.split("\n").map((line) => line.trim());
     const stages: IModStage[] = [];
 
@@ -147,7 +148,7 @@ export function ParseStages(text: string): IModStage[] {
         stages.push({ warns, action: kind as IModStage["action"], duration });
     });
 
-    if (stages.length > MAX_STAGES) throw new PanelError(`Höchstens ${MAX_STAGES} Stufen.`);
+    if (stages.length > max) throw new PanelError(`Höchstens ${max} Stufen.`);
 
     return stages.sort((a, b) => a.warns - b.warns);
 }

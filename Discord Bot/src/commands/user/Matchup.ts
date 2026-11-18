@@ -1,5 +1,6 @@
 import { ActionRowBuilder, AutocompleteInteraction, ButtonBuilder, ButtonStyle, ChatInputCommandInteraction, MessageFlags, SlashCommandBuilder } from "discord.js";
 import BotClient from "../../client/BotClient";
+import { ReplyLimit } from "../../builder/LimitReply";
 import Command from "../../structures/Command";
 import Category from "../../enums/Category";
 import { BEST_OF, KICKOFF_HELP, KickoffSuggestions, MATCHUPS_MODULE, MATCHUPS_PREFIX, MAX_LEAGUE, MAX_NOTE, MAX_OPPONENT, MODE_LABELS, MODES, ParseKickoff } from "../../constants/Matchups";
@@ -104,6 +105,7 @@ export default class Matchup extends Command {
             await this.Create(interaction);
         } catch (error) {
             if (!(error instanceof MatchupError)) throw error;
+            if (await ReplyLimit(interaction, error)) return;
 
             await this.Say(interaction, error.message);
         }

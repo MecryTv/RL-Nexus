@@ -6,9 +6,7 @@
 
 export const ROLE_LISTS_MODULE = "role-lists";
 
-export const MAX_LISTS = 10;
-export const MAX_ROLES = 20;
-export const MAX_PRESETS = 10;
+// W-0137: Listen, Rollen je Liste und Bild-Vorlagen sind Grenzen von RL Nexus (MODULE_SETTINGS, RoleListLimits).
 export const MAX_TITLE = 40;
 /** Titel je Liste: 20 Rollen mit vielen Leuten, aber nicht beliebig viele. */
 export const MAX_TITLES = 500;

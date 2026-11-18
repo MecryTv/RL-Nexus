@@ -101,6 +101,8 @@ interface IPayload {
     plan: IPlanState;
     backups: IBackup[];
     hand: { used: number; max: number };
+    /** W-0137: Behalten höchstens, der Server-Wert aus dem Admin. */
+    keepMax?: number;
     server: IServerInfo;
     job: IJob | null;
 }
@@ -174,7 +176,8 @@ const EVERY: [Every, string][] = [
     ["monat", "Jeden Monat (am 1.)"],
 ];
 const WEEKDAYS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
-const KEEP_MAX = 14;
+/** Behalten höchstens, wenn der Admin noch keinen Server-Wert schickt (W-0137). */
+const KEEP_STANDARD = 14;
 /** Alle 3 Sekunden: Die Route lässt 30 Anfragen je Minute zu, daneben soll noch Abbrechen gehen. */
 const POLL_MS = 3_000;
 const DAY = new Intl.DateTimeFormat("de-DE", { weekday: "long", day: "numeric", month: "short" });
@@ -533,9 +536,9 @@ export function renderBackups(guildId: string): void {
             ),
             row(
                 "Wie viele behalten",
-                `1 bis ${KEEP_MAX}`,
+                `1 bis ${data!.keepMax ?? KEEP_STANDARD}`,
                 select(
-                    Array.from({ length: KEEP_MAX }, (_, index): [string, string] => [String(index + 1), String(index + 1)]),
+                    Array.from({ length: data!.keepMax ?? KEEP_STANDARD }, (_, index): [string, string] => [String(index + 1), String(index + 1)]),
                     String(plan.keep),
                     (value) => {
                         plan.keep = Number(value);

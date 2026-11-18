@@ -10,8 +10,7 @@ import logger from "../utils/logger";
 export const MESSAGE_PREFIX = "cm";
 export const MESSAGE_ACCENT = "#00afff";
 
-export const MAX_MESSAGES = 50;
-export const MAX_RESPONSES = 50;
+// W-0137: Nachrichten und Stichwörter sind Grenzen von RL Nexus (MODULE_SETTINGS, MessageLimits).
 export const MAX_BUTTONS = 10;
 /** W-0091: Knöpfe belegen höchstens zwei Reihen, Discord erlaubt fünf. */
 export const MAX_MENUS = 3;

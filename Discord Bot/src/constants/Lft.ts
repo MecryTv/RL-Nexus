@@ -30,7 +30,6 @@ export const LFT_DRAFT_TTL = 30 * 60_000;
 
 export const LFT_ACCENT = "#00afff";
 
-export const MAX_QUESTIONS = 15;
 export const MAX_CHOICES = 10;
 export const MAX_LABEL = 200;
 export const MAX_HINT = 200;
@@ -39,8 +38,6 @@ export const MAX_TITLE = 100;
 export const MAX_TAG_NAME = 20;
 export const MAX_MANAGERS = 5;
 export const MAX_PINGS = 5;
-/** Höchste Laufzeit einer Suche in Tagen. */
-export const MAX_EXPIRE = 180;
 
 /** Wie viele Anfragen eine Liste im Dashboard auf einmal zeigt. */
 export const PAGE_SIZE = 20;
@@ -323,7 +320,7 @@ export const CLOSED_TAG = { name: "Beendet", emoji: "🔒" } as const;
 export function NextQuestionId(questions: ILftQuestion[]): string {
     const taken = new Set(questions.map((question) => question.id));
 
-    for (let index = 1; index <= MAX_QUESTIONS + 1; index++) {
+    for (let index = 1; index <= questions.length + 1; index++) {
         if (!taken.has(`q${index}`)) return `q${index}`;
     }
 

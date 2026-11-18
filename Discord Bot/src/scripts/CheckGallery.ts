@@ -999,17 +999,18 @@ async function main(): Promise<void> {
 
         const erstes = await service.AddUpload(bilder, gross, "image/png", "foto.png");
 
-        // W-0133: „Bild höchstens“ aus dem Admin, je Server.
-        SetFlags([], [], [], [{ module: "gallery", guildId: GUILD, status: null, notice: null, linkMode: null, values: { imageMegabytes: 1 }, updatedAt: null }]);
+        // W-0137: Kein Wert je Server mehr, nur die feste Obergrenze von 8 MB; ein
+        // gespeicherter alter Wert (hier 20 MB) ändert daran nichts.
+        SetFlags([], [], [], [{ module: "gallery", guildId: GUILD, status: null, notice: null, linkMode: null, values: { imageMegabytes: 20 }, updatedAt: null }]);
         let zuGross = "";
 
         try {
-            await service.AddUpload(bilder, Buffer.alloc(2 * 1024 * 1024), "image/png", "riesig.png");
+            await service.AddUpload(bilder, Buffer.alloc(9 * 1024 * 1024), "image/png", "riesig.png");
         } catch (error) {
             zuGross = error instanceof Error ? error.message : String(error);
         }
         SetFlags([], [], []);
-        check("Bild über dem Wert des Servers: abgelehnt mit „legt RL Nexus fest“", zuGross.includes("1 MB") && zuGross.includes("RL Nexus"), zuGross);
+        check("Bild über 8 MB: abgelehnt, auch mit altem Server-Wert, ohne „RL Nexus“", zuGross.includes("8 MB") && !zuGross.includes("RL Nexus"), zuGross);
 
         check("Grosses PNG landet als .webp", erstes.file.endsWith(".webp"), erstes.file);
 

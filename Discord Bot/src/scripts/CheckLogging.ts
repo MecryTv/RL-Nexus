@@ -11,7 +11,9 @@ process.env.DEV_CLIENT_SECRET ||= "check-secret";
 
 import { ChannelType, Guild, GuildBasedChannel, GuildMember, MessageCreateOptions, Role } from "discord.js";
 import BotClient from "../client/BotClient";
-import { DefaultLogSettings, LOG_CATEGORIES, LOG_EVENTS, MAX_IGNORE } from "../constants/Logging";
+import { DefaultLogSettings, LOG_CATEGORIES, LOG_EVENTS } from "../constants/Logging";
+import DashboardApiLogging from "../routes/DashboardApiLogging";
+import { SetFlags } from "../utils/moduleFlags";
 import { ILogSettings } from "../interfaces/services/logging/ILogging";
 import { SendLog } from "../utils/logtarget";
 
@@ -106,7 +108,7 @@ function checkClean(client: BotClient): ILogSettings {
 
     const many = service.Clean(guild, { ignoreChannels: Array.from({ length: 40 }, () => TEXT) }, DefaultLogSettings());
 
-    check("Die Liste ist gedeckelt", many.ignoreChannels.length <= MAX_IGNORE);
+    check("Die Liste ist gedeckelt", many.ignoreChannels.length <= 25);
 
     return clean;
 }
@@ -152,6 +154,32 @@ async function checkMentions(): Promise<void> {
     check("Gewollte Pings bleiben", JSON.stringify(sent[1]?.allowedMentions) === JSON.stringify({ roles: [ROLE] }), JSON.stringify(sent[1]?.allowedMentions));
 }
 
+/** W-0137: ein Server-Wert für die Grenzen von logging. */
+function Limits(values: Record<string, number>) {
+    return { module: "logging", guildId: GUILD, status: null, notice: null, linkMode: null, values, updatedAt: null };
+}
+
+/** W-0137: Ausnahmen sind eine Grenze von RL Nexus, je Server änderbar. */
+async function checkW137(client: BotClient): Promise<void> {
+    console.log("\n  — W-0137: Grenzen —");
+
+    const service = client.logService;
+    const guild = FakeGuild();
+    const ignore = { ignoreChannels: [TEXT, CATEGORY] };
+    // Die Route liest Kanäle, Threads, Rollen und Emojis - ein leerer Server reicht für die Grenzen.
+    const bare = { id: GUILD, channels: { cache: new Map(), fetchActiveThreads: async () => null }, roles: { cache: new Map() }, emojis: { cache: new Map() }, members: { me: null } };
+    const route = new DashboardApiLogging(client) as unknown as { Read(access: unknown): Promise<Record<string, any>> };
+
+    service.Settings = async () => DefaultLogSettings();
+
+    check("Standard: 2 Ausnahmen bleiben", service.Clean(guild, ignore, DefaultLogSettings()).ignoreChannels.length === 2);
+    check("Route: Grenze ohne Server-Wert wie bisher", (await route.Read({ guild: bare })).limits?.ignore === 25);
+    SetFlags([], [], [], [Limits({ maxIgnore: 1 })]);
+    check("Server-Wert 1 kürzt die Ausnahmen", service.Clean(guild, ignore, DefaultLogSettings()).ignoreChannels.length === 1);
+    check("Route gibt den Server-Wert an die Seite", (await route.Read({ guild: bare })).limits?.ignore === 1);
+    SetFlags([], [], []);
+}
+
 async function main(): Promise<void> {
     console.log("\n📜 Logging System\n");
 
@@ -164,6 +192,7 @@ async function main(): Promise<void> {
     checkRouting(client, settings);
 
     await checkMentions();
+    await checkW137(client);
 
     console.log(failures === 0 ? "\n✅ Alle Prüfungen bestanden.\n" : `\n❌ ${failures} Prüfung(en) fehlgeschlagen.\n`);
 

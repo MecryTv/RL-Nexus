@@ -8,20 +8,14 @@
 import { BASE } from "./Base.js";
 
 /**
- * MAX_IMAGE_BYTES aus src/constants/Gallery.ts (9 MiB, die harte Obergrenze). Der
+ * MAX_IMAGE_BYTES aus src/constants/Gallery.ts (8 MiB, fest seit W-0137). Der
  * Client kann von dort nicht importieren; check:dashboard vergleicht beide Zahlen.
  */
-export const MAX_UPLOAD_BYTES = 9437184;
+export const MAX_UPLOAD_BYTES = 8388608;
 
-/** W-0133: was dieser Server darf (Standard 8 MB). Die Server-Seite setzt es aus „Grenzen von RL Nexus“. */
-let serverLimit = 8 * 1048576;
-
+/** W-0137: für alle Server gleich, keine Grenze von RL Nexus mehr. */
 export function uploadLimit(): number {
-    return Math.min(serverLimit, MAX_UPLOAD_BYTES);
-}
-
-export function setUploadLimit(bytes: number): void {
-    if (Number.isFinite(bytes) && bytes > 0) serverLimit = bytes;
+    return MAX_UPLOAD_BYTES;
 }
 
 export function megabytes(bytes: number): string {

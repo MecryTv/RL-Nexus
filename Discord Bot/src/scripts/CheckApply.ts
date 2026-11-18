@@ -14,13 +14,15 @@ import ApplyCommand from "../commands/user/Apply";
 import ComponentV2Builder from "../builder/ComponentV2Builder";
 import { ApplyCard, ApplyPanelView, ApplyTranscriptCard, DmQuestionView, DmSummaryView, IsApplyPanel } from "../builder/ApplyView";
 import BotClient from "../client/BotClient";
-import { APPLY_FLOW_PREFIX, ApplyLink, ChannelName, CooldownText, OpenText, DEFAULT_CHANNEL_NAME, DefaultApplySettings, DefaultForm, DRAFT_TTL, MAX_CHOICES, MAX_QUESTIONS, MAX_REVIEWERS, NextQuestionId, RECEIVED, STAFF_ONLY } from "../constants/Apply";
+import { APPLY_FLOW_PREFIX, ApplyLink, ChannelName, CooldownText, OpenText, DEFAULT_CHANNEL_NAME, DefaultApplySettings, DefaultForm, DRAFT_TTL, MAX_CHOICES, NextQuestionId, RECEIVED, STAFF_ONLY } from "../constants/Apply";
 import { DASHBOARD_PATH } from "../constants/Dashboard";
 import { IApplyForm, IApplyQuestion, IApplySettings, IApplySubmission } from "../interfaces/services/apply/IApply";
 import { CheckDmText, DmRealign, DmStep, EntryOf, FieldText, ModalParts, ModalTitle, RestartHint, SUMMARY } from "../services/ApplyFlow";
 import { AfterRestore } from "../utils/guildpanels";
 import ModuleSettings from "../models/ModuleSettings";
-import { ApplyChannelOverwrites, ApplyError } from "../services/ApplyService";
+import { ApplyChannelOverwrites, ApplyError, ApplyLimits } from "../services/ApplyService";
+import DashboardApiApply from "../routes/DashboardApiApply";
+import { SetFlags } from "../utils/moduleFlags";
 
 const GUILD = "90071992547409941";
 const TEXT = "90071992547409942";
@@ -231,10 +233,10 @@ function checkForm(client: BotClient): IApplyForm {
 
     const many = service.CleanForm(guild, {
         name: "Viele",
-        questions: Array.from({ length: MAX_QUESTIONS + 10 }, (_, index) => ({ id: `f${index}`, label: `Frage ${index}`, kind: "short" })),
+        questions: Array.from({ length: 30 }, (_, index) => ({ id: `f${index}`, label: `Frage ${index}`, kind: "short" })),
     });
 
-    check("Die Zahl der Fragen ist gedeckelt", many.questions.length === MAX_QUESTIONS, String(many.questions.length));
+    check("Die Zahl der Fragen ist gedeckelt", many.questions.length === 20, String(many.questions.length));
 
     const choices = service.CleanForm(guild, {
         name: "Auswahl",
@@ -354,11 +356,11 @@ function checkSettings(client: BotClient): void {
 
     const many = service.CleanSettings(
         guild,
-        { reviewUsers: Array.from({ length: MAX_REVIEWERS + 10 }, (_, index) => (100000000000000000n + BigInt(index)).toString()) },
+        { reviewUsers: Array.from({ length: 25 }, (_, index) => (100000000000000000n + BigInt(index)).toString()) },
         DefaultApplySettings()
     );
 
-    check("Die Prüfer-Liste ist gedeckelt", many.reviewUsers.length === MAX_REVIEWERS, String(many.reviewUsers.length));
+    check("Die Prüfer-Liste ist gedeckelt", many.reviewUsers.length === 15, String(many.reviewUsers.length));
 
     // Plan 24: wo man sich bewirbt.
     const defaults = DefaultApplySettings();
@@ -1561,6 +1563,56 @@ async function checkActor(): Promise<void> {
     check("Entfernen geht immer", (await service.SaveForm(guild, 4, form(null), actor).then(() => true).catch(() => false)));
 }
 
+/** W-0137: ein Server-Wert für die Grenzen von apply. */
+function Limits(values: Record<string, number>) {
+    return { module: "apply", guildId: GUILD, status: null, notice: null, linkMode: null, values, updatedAt: null };
+}
+
+/** W-0137: Formulare, Fragen und Prüfer sind Grenzen von RL Nexus, je Server änderbar. Die Stubs kommen wieder weg. */
+async function checkW137(client: BotClient): Promise<void> {
+    console.log("\n  — W-0137: Grenzen —");
+
+    const service = client.applyService;
+    const guild = FakeGuild();
+    const many = { name: "Viele Fragen", questions: Array.from({ length: 40 }, (_, index) => ({ id: `f${index}`, label: `Frage ${index}`, kind: "short" })) };
+    const reviewers = { reviewUsers: Array.from({ length: 30 }, (_, index) => (100000000000000000n + BigInt(index)).toString()) };
+    const route = new DashboardApiApply(client) as unknown as { Read(access: unknown, query: unknown): Promise<Record<string, any>> };
+    const original = { forms: service.Forms, settings: service.Settings, page: client.applySubmissions.Page, open: client.applySubmissions.Open };
+
+    check("Standard: 15 Formulare, 20 Fragen, 15 Prüfer", JSON.stringify(ApplyLimits(GUILD)) === JSON.stringify({ forms: 15, questions: 20, reviewers: 15 }), JSON.stringify(ApplyLimits(GUILD)));
+
+    service.Forms = async () => Array.from({ length: 15 }, () => DefaultForm() as unknown as IApplyForm);
+    service.Settings = async () => DefaultApplySettings();
+    client.applySubmissions.Page = (async () => ({ rows: [], total: 0 })) as unknown as typeof client.applySubmissions.Page;
+    client.applySubmissions.Open = (async () => 0) as unknown as typeof client.applySubmissions.Open;
+
+    try {
+        let hit: unknown = null;
+
+        try {
+            await service.CreateForm(guild, FakeMember(), { name: "Sechzehn" });
+        } catch (error) {
+            hit = error;
+        }
+
+        const limit = hit instanceof ApplyError ? hit.limit : undefined;
+
+        check("Bei 15 Formularen scheitert das 16. (maxForms)", limit?.key === "maxForms" && limit.asked === 16 && limit.allowed === 15, JSON.stringify(limit));
+        check("Standard: Fragen still auf 20 gekürzt", service.CleanForm(guild, many).questions.length === 20);
+        SetFlags([], [], [], [Limits({ maxForms: 20, maxQuestions: 30, maxReviewers: 20 })]);
+        check("Server-Wert 30: still auf 30 gekürzt", service.CleanForm(guild, many).questions.length === 30, String(service.CleanForm(guild, many).questions.length));
+        check("Server-Wert 20 Prüfer", service.CleanSettings(guild, reviewers, DefaultApplySettings()).reviewUsers.length === 20);
+
+        const read = await route.Read({ guild: { id: GUILD, name: "Dev Server", channels: { cache: new Map(), fetchActiveThreads: async () => null }, roles: { cache: new Map() }, emojis: { cache: new Map() }, members: { cache: new Map() } }, manage: true }, {});
+
+        check("Route gibt den Server-Wert an die Seite", read.limits?.forms === 20 && read.limits?.questions === 30 && read.limits?.reviewers === 20, JSON.stringify(read.limits));
+        SetFlags([], [], []);
+    } finally {
+        Object.assign(service, { Forms: original.forms, Settings: original.settings });
+        Object.assign(client.applySubmissions, { Page: original.page, Open: original.open });
+    }
+}
+
 async function main(): Promise<void> {
     console.log("\n📋  Apply System\n");
 
@@ -1600,6 +1652,7 @@ async function main(): Promise<void> {
     await checkResetPanel(client, form);
     await checkRestorePanel(client);
     await checkActor();
+    await checkW137(client);
 
     console.log(failures === 0 ? "\n✅ Alle Prüfungen bestanden.\n" : `\n❌ ${failures} Prüfung(en) fehlgeschlagen.\n`);
 

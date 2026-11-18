@@ -8,6 +8,7 @@ import { runRound } from "../backups/round.ts";
 import { runPlans } from "../backups/plan.ts";
 import { backupData, backupDatabaseName, backupsReason, countHand, createBackup, deleteBackup, ensureBackupDatabase, listBackups, pruneBackups, readPlan, savePlan } from "../backups/store.ts";
 import { forgetBotOverview, signToken } from "../bot.ts";
+import { moduleValue } from "../modules/store.ts";
 import { gzipSync } from "node:zlib";
 import type { IBackupMeta, IPlanState, IRestoreResult, IServerBackups, IServerPartJson } from "../../shared/backups.ts";
 import { fake } from "./fakes.ts";
@@ -754,6 +755,57 @@ export async function checkBackupsDb(config: IConfig, http: IHttp): Promise<void
             const audit = await query<{ action: string; detail: string }[]>("SELECT action, detail FROM admin_audit WHERE target = ? ORDER BY id DESC LIMIT 1", [GUILD]);
             assert.equal(audit[0]?.action, "backups.restore");
             assert.match(audit[0]?.detail ?? "", /Level und Aktivität/);
+        });
+        await check("W-0137: Hand-Plätze und Aufbewahrung gelten je Server, Ausnahme vor Standard", async () => {
+            const override = (values: Record<string, number> | null) =>
+                values
+                    ? query("INSERT INTO bot_module_overrides (module, guild_id, config, updated_by) VALUES ('backups', ?, ?, NULL) ON DUPLICATE KEY UPDATE config = VALUES(config)", [GUILD, JSON.stringify({ values })])
+                    : query("DELETE FROM bot_module_overrides WHERE module = 'backups' AND guild_id = ?", [GUILD]);
+            const made: number[] = [];
+            const plan = { enabled: true, every: "tag", weekday: 0, hour: 3, keep: 20, discord: false, risky: false };
+
+            try {
+                await override(null);
+                assert.equal(await moduleValue("backups", "maxHand", GUILD), 10, "Standard");
+
+                while ((await countHand(GUILD, "server")) < 10) {
+                    made.push((await createBackup({ guildId: GUILD, guildName: "check:db Server", kind: "hand", note: null, byName: null, origin: "server" })).id);
+                }
+
+                const full = await http.raw("POST", internal, botHeaders(), { note: "elftes" });
+                assert.equal(full.statusCode, 409, full.body);
+                const standard = (await http.raw("GET", internal, botHeaders())).json() as IServerBackups;
+                assert.equal(standard.hand.max, 10);
+                assert.equal(standard.keepMax, 14, "Behalten höchstens: Standard");
+                assert.equal((await http.raw("PUT", `${internal}/plan`, botHeaders(), plan)).statusCode, 400, "20 behalten ohne Ausnahme");
+
+                await override({ maxHand: 12, maxPlanKeep: 20 });
+
+                const eleventh = await http.raw("POST", internal, botHeaders(), { note: "elftes" });
+                assert.equal(eleventh.statusCode, 200, eleventh.body);
+                made.push((eleventh.json() as IBackupMeta).id);
+                const own = (await http.raw("GET", internal, botHeaders())).json() as IServerBackups;
+                assert.equal(own.hand.max, 12, "Antwort zeigt den Server-Wert");
+                assert.equal(own.keepMax, 20, "Behalten höchstens: Server-Wert für die Seite");
+
+                const saved = await http.raw("PUT", `${internal}/plan`, botHeaders(), plan);
+                assert.equal(saved.statusCode, 200, saved.body);
+
+                await override({ maxHand: 99 });
+                assert.equal(await moduleValue("backups", "maxHand", GUILD), 25, "über dem Höchstwert: gekappt");
+
+                // Review W-0137: gerundet wie im Bot.
+                await override({ maxHand: 11.6 });
+                assert.equal(await moduleValue("backups", "maxHand", GUILD), 12, "Kommazahl: gerundet wie im Bot");
+
+                // Review W-0137: Senkt RL Nexus die Aufbewahrung unter den gespeicherten Plan, zeigt die Seite, was wirklich gilt.
+                await override(null);
+                const lowered = (await http.raw("GET", internal, botHeaders())).json() as IServerBackups;
+                assert.deepEqual([lowered.keepMax, lowered.plan.plan.keep], [14, 14], "gespeichert 20, es gelten 14");
+            } finally {
+                await override(null);
+                for (const id of made) await query(`DELETE FROM \`${backupDatabaseName()}\`.guild_backups WHERE id = ?`, [id]);
+            }
         });
     } finally {
         await tidyBackups(config);

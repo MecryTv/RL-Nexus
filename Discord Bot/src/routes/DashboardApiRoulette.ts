@@ -2,8 +2,9 @@ import { FastifyReply, FastifyRequest } from "fastify";
 import BotClient from "../client/BotClient";
 import Route from "../structures/Route";
 import { DASHBOARD_PATH } from "../constants/Dashboard";
-import { MAX_FIXED_CHANNELS, MAX_LOBBY_NAME, MAX_PASSWORD, PASSWORD_ALPHABET } from "../constants/RocketRoulette";
-import { RouletteError } from "../services/RouletteService";
+import { MAX_LOBBY_NAME, MAX_PASSWORD, PASSWORD_ALPHABET } from "../constants/RocketRoulette";
+import { RouletteError, RouletteLimits } from "../services/RouletteService";
+import { DashboardLimit } from "../builder/LimitReply";
 import { RouletteTeamSize } from "../interfaces/services/roulette/IRoulette";
 import { SNOWFLAKE } from "../constants/Discord";
 import { WantsJSON } from "../utils/admin";
@@ -66,7 +67,7 @@ export default class DashboardApiRoulette extends Route {
 
             return reply.sent ? reply : reply.send(answer);
         } catch (error) {
-            if (error instanceof RouletteError) return reply.code(400).send({ error: error.message });
+            if (error instanceof RouletteError) return reply.code(400).send(error.limit ? DashboardLimit(error.limit, access.guild.id, error.message) : { error: error.message });
 
             throw error;
         }
@@ -78,7 +79,7 @@ export default class DashboardApiRoulette extends Route {
         return {
             ...(await this.client.rouletteService.Snapshot(guild)),
             manage,
-            limits: { lobbyName: MAX_LOBBY_NAME, password: MAX_PASSWORD, fixed: MAX_FIXED_CHANNELS, alphabet: PASSWORD_ALPHABET },
+            limits: { lobbyName: MAX_LOBBY_NAME, password: MAX_PASSWORD, fixed: RouletteLimits(guild.id).fixed, alphabet: PASSWORD_ALPHABET },
             guild: { name: guild.name, ...GuildResources(guild) },
         };
     }

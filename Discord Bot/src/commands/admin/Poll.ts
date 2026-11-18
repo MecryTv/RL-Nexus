@@ -9,6 +9,7 @@ import {
     SlashCommandBuilder,
 } from "discord.js";
 import BotClient from "../../client/BotClient";
+import { ReplyLimit } from "../../builder/LimitReply";
 import Command from "../../structures/Command";
 import Category from "../../enums/Category";
 import { InfoCard } from "../../builder/CommunityView";
@@ -132,6 +133,7 @@ export default class Poll extends Command {
             await say(`📊 Umfrage #${poll.number} läuft in <#${poll.channelId}>.`);
         } catch (error) {
             if (!(error instanceof PollError)) logger.error("📊 /umfrage fehlgeschlagen", error);
+            if (await ReplyLimit(interaction, error).catch(() => false)) return;
 
             await say(error instanceof PollError ? `❌ ${error.message}` : "❌ Da ging etwas schief.", "#ff4d5e");
         }

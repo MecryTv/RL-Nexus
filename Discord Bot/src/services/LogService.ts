@@ -30,6 +30,7 @@ import {
     VoiceState,
 } from "discord.js";
 import BotClient from "../client/BotClient";
+import { ModuleValue } from "../utils/moduleFlags";
 import ComponentV2Builder from "../builder/ComponentV2Builder";
 import {
     CategoryOf,
@@ -39,7 +40,6 @@ import {
     LOG_EVENTS,
     LOG_EVENT_KEYS,
     LOG_TONES,
-    MAX_IGNORE,
     Shorten,
 } from "../constants/Logging";
 import { ILogSettings, LogCategoryId, LogTone } from "../interfaces/services/logging/ILogging";
@@ -84,6 +84,11 @@ function Stamp(value: number | null | undefined, style = "f"): string {
  * jeder wäre eine eigene Datei mit drei Zeilen Inhalt. Dasselbe macht der
  * LiveService.
  */
+/** W-0137: Ausnahmen je Liste, eine Grenze von RL Nexus je Server. */
+export function LogLimits(guildId: string): { ignore: number } {
+    return { ignore: ModuleValue(LOGGING_MODULE, "maxIgnore", guildId) };
+}
+
 export default class LogService {
     private readonly client: BotClient;
 
@@ -142,7 +147,7 @@ export default class LogService {
             value === undefined
                 ? fallback
                 : Array.isArray(value)
-                  ? [...new Set(value.filter((id): id is string => typeof id === "string" && known(id)))].slice(0, MAX_IGNORE)
+                  ? [...new Set(value.filter((id): id is string => typeof id === "string" && known(id)))].slice(0, LogLimits(guild.id).ignore)
                   : [];
 
         return {

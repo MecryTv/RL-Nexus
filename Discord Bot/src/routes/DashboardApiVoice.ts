@@ -3,9 +3,10 @@ import { FastifyReply, FastifyRequest } from "fastify";
 import BotClient from "../client/BotClient";
 import Route from "../structures/Route";
 import { DASHBOARD_PATH } from "../constants/Dashboard";
-import { MAX_HUBS, MAX_PRESETS, VOICE_ACTIONS, VOICE_REGIONS } from "../constants/Voice";
+import { MAX_PRESETS, VOICE_ACTIONS, VOICE_REGIONS } from "../constants/Voice";
 import { IVoiceHub } from "../interfaces/services/voice/IVoice";
-import { VoiceError, VOICE_MODULE } from "../services/VoiceService";
+import { VoiceError, VoiceLimits, VOICE_MODULE } from "../services/VoiceService";
+import { DashboardLimit } from "../builder/LimitReply";
 import { WantsJSON } from "../utils/admin";
 import logger from "../utils/logger";
 import { GuildResources, IManageAccess, ManageGate } from "../utils/managegate";
@@ -50,7 +51,7 @@ export default class DashboardApiVoice extends Route {
 
             return reply.send(await this.Write(access, (request.body ?? {}) as IBody));
         } catch (error) {
-            if (error instanceof VoiceError) return reply.code(400).send({ error: error.message });
+            if (error instanceof VoiceError) return reply.code(400).send(error.limit ? DashboardLimit(error.limit, access.guild.id, error.message) : { error: error.message });
 
             throw error;
         }
@@ -75,7 +76,7 @@ export default class DashboardApiVoice extends Route {
 
         return {
             hubs: hubs.map((hub) => this.Out(hub, guild)),
-            max: MAX_HUBS,
+            max: VoiceLimits(guild.id).hubs,
             maxPresets: MAX_PRESETS,
             settings: await this.client.voiceService.Settings(guild.id),
             actions: VOICE_ACTIONS,

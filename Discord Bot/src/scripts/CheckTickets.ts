@@ -34,7 +34,10 @@ import {
     TicketNumber,
     AssignCodes,
     TICKET_PREFIX,
+    TRANSCRIPT_MAX_MB,
 } from "../constants/Tickets";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import TicketHandler from "../events/tickets/TicketHandler";
 import { AttachmentKey } from "../constants/Transcripts";
 import { ITicket, ITicketConfig } from "../interfaces/services/tickets/ITicket";
@@ -937,6 +940,11 @@ async function main(): Promise<void> {
     const client = new BotClient();
 
     await client.configService.Initialize();
+
+    // W-0137: Die Transkript-Größe ist keine Grenze von RL Nexus mehr, nur eine feste technische Obergrenze.
+    const transcriptSource = readFileSync(path.join(process.cwd(), "src", "services", "TranscriptService.ts"), "utf8");
+
+    check("Transkript: feste Obergrenze 100 MB, kein Wert je Server", TRANSCRIPT_MAX_MB === 100 && !transcriptSource.includes("transcriptMegabytes") && transcriptSource.includes("TRANSCRIPT_MAX_MB"));
 
     checkConfig(client);
     checkPlaceholders();

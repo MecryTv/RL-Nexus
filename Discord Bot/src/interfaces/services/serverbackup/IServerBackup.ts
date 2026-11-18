@@ -242,6 +242,8 @@ export interface IServerBackupList {
     /** Neueste zuerst. */
     backups: IBackupMeta[];
     hand: { used: number; max: number };
+    /** W-0137: so viele automatische Backups darf der Server behalten. Fehlt bei einem älteren Admin. */
+    keepMax?: number;
 }
 
 /** Automatisch sichern, wie das Admin Dashboard es zurückgibt (IPlanState dort). */

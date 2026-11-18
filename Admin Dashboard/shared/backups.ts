@@ -18,9 +18,6 @@ export const BACKUP_ORIGINS = ["admin", "server"] as const;
 /** admin: Admin Dashboard und System, server: über das Bot-Dashboard. Das Bot-Dashboard sieht nur server. */
 export type BackupOrigin = (typeof BACKUP_ORIGINS)[number];
 
-/** So viele Backups von Hand darf ein Server im Bot-Dashboard anlegen. Die des Teams zählen nicht mit. */
-export const SERVER_HAND_MAX = 10;
-
 export const PLAN_EVERY = ["tag", "3tage", "woche", "monat"] as const;
 export type PlanEvery = (typeof PLAN_EVERY)[number];
 
@@ -232,6 +229,8 @@ export interface IServerBackups {
     /** Neueste zuerst. */
     readonly backups: readonly IBackupMeta[];
     readonly hand: { readonly used: number; readonly max: number };
+    /** W-0137: so viele automatische Backups darf der Server behalten (maxPlanKeep). */
+    readonly keepMax: number;
 }
 
 /** Höchstlänge der Notiz bei einem Backup von Hand. */

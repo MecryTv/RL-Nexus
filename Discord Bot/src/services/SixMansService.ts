@@ -1,5 +1,6 @@
 import { ButtonInteraction, ChannelType, Guild, GuildMember, MessageEditOptions, MessageFlags, PermissionFlagsBits, VoiceChannel } from "discord.js";
 import BotClient from "../client/BotClient";
+import { ILimitHit, ReplyLimit } from "../builder/LimitReply";
 import { PanelRow, PanelValues, RoundRow, RoundValues, SixRender } from "../builder/SixMansView";
 import {
     BOARD_SIZE,
@@ -7,7 +8,6 @@ import {
     DEFAULT_RANKS,
     DefaultSixSettings,
     IsMode,
-    MAX_RANKS,
     MAX_RANK_MIN,
     MAX_RANK_NAME,
     LobbyName,
@@ -20,6 +20,7 @@ import {
     MODES,
     MODE_LABELS,
     RankOf,
+    RUNNING_COUNTS_MS,
     SIXMANS_MODULE,
     TEAM_EMOJI,
     TEAM_LABELS,
@@ -27,8 +28,27 @@ import {
 } from "../constants/SixMans";
 import { IManRank, IMansSettings, ISixBody, ISixRank, ISixRound, ISixWaiting, ManMode, RoundStatus, SixTeam } from "../interfaces/services/sixmans/ISixMans";
 import logger from "../utils/logger";
+import { ModuleValue } from "../utils/moduleFlags";
 
-export class SixMansError extends Error {}
+export class SixMansError extends Error {
+    /** limit: welche Grenze von RL Nexus gegriffen hat (W-0137), für den Satz und die Anfrage im Dashboard. */
+    constructor(
+        message: string,
+        readonly limit?: ILimitHit
+    ) {
+        super(message);
+    }
+}
+
+/** W-0137: Wie viele Runden für maxRunning zählen - nur die der letzten Stunden. */
+function Counting(rounds: ISixRound[], now = Date.now()): number {
+    return rounds.filter((round) => round.createdAt > now - RUNNING_COUNTS_MS).length;
+}
+
+/** W-0137: eigene Stufen und gleichzeitig laufende Runden, Grenzen von RL Nexus je Server. */
+export function SixMansLimits(guildId: string): { ranks: number; running: number } {
+    return { ranks: ModuleValue(SIXMANS_MODULE, "maxRanks", guildId), running: ModuleValue(SIXMANS_MODULE, "maxRunning", guildId) };
+}
 
 function IsRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -100,7 +120,7 @@ export default class SixMansService {
             k: Int(raw.k, MIN_K, MAX_K, previous.k),
             idleMinutes: Int(raw.idleMinutes, 0, MAX_IDLE, previous.idleMinutes),
             board: IsRecord(raw.board) ? { open: typeof raw.board.open === "boolean" ? raw.board.open : previous.board.open } : previous.board,
-            ranks: raw.ranks === undefined ? previous.ranks : this.CleanRanks(raw.ranks),
+            ranks: raw.ranks === undefined ? previous.ranks : this.CleanRanks(raw.ranks, guild.id),
             // Die ID der Panel-Nachricht gehört dem Bot.
             panelMessageId: previous.panelMessageId,
             panel: this.CleanBody(guild, "Panel", raw.panel, previous.panel),
@@ -115,12 +135,12 @@ export default class SixMansService {
      * bei 0 - sonst faende eine kleine MMR keine Stufe. Eine leere Liste heisst
      * „Vorgabe", und genau so kommt sie auch wieder heraus.
      */
-    CleanRanks(input: unknown): IManRank[] {
+    CleanRanks(input: unknown, guildId: string): IManRank[] {
         if (!Array.isArray(input)) return [];
 
         const ranks: IManRank[] = [];
 
-        for (const entry of input.slice(0, MAX_RANKS)) {
+        for (const entry of input.slice(0, SixMansLimits(guildId).ranks)) {
             if (!IsRecord(entry)) continue;
 
             const name = typeof entry.name === "string" ? entry.name.trim().slice(0, MAX_RANK_NAME) : "";
@@ -213,9 +233,9 @@ export default class SixMansService {
 
         if (!settings.modes[mode]) throw new SixMansError(`${MODE_LABELS[mode]} ist auf diesem Server gerade aus.`);
 
-        const queue = [...this.Queue(guildId, mode)];
+        const already = `Du stehst schon in der Warteschlange für ${MODE_LABELS[mode]}.`;
 
-        if (queue.some((entry) => entry.userId === member.id)) throw new SixMansError(`Du stehst schon in der Warteschlange für ${MODE_LABELS[mode]}.`);
+        if (this.Queue(guildId, mode).some((entry) => entry.userId === member.id)) throw new SixMansError(already);
 
         const running = await this.client.sixRounds.Running(guildId);
 
@@ -224,6 +244,10 @@ export default class SixMansService {
         }
 
         const player = await this.client.sixPlayers.Ensure(guildId, mode, member.id, member.displayName, settings.start);
+        // Erst nach dem Warten kopieren: Resume() kann inzwischen Leute gestartet und aus der Schlange genommen haben (Review W-0137).
+        const queue = [...this.Queue(guildId, mode)];
+
+        if (queue.some((entry) => entry.userId === member.id)) throw new SixMansError(already);
 
         queue.push({ userId: member.id, name: member.displayName, mmr: player.mmr, since: Date.now() });
         this.Set(guildId, mode, queue);
@@ -234,6 +258,33 @@ export default class SixMansService {
             return { queue, started: null };
         }
 
+        const max = SixMansLimits(guildId).running;
+        // Frisch gezählt: während des Wartens kann eine Runde geendet oder begonnen haben.
+        const counted = Counting(await this.client.sixRounds.Running(guildId));
+
+        // W-0137: Laufen schon so viele Runden, wie der Server darf, warten alle weiter - Resume() startet sie, sobald eine endet.
+        if (counted >= max) {
+            await this.Panel(member.guild, settings).catch(() => undefined);
+
+            throw new SixMansError(`Gerade laufen ${counted} Runden, mehr gehen hier nicht gleichzeitig. Ihr bleibt in der Warteschlange: sobald eine Runde fertig ist, geht es los.`, {
+                module: SIXMANS_MODULE,
+                key: "maxRunning",
+                asked: counted + 1,
+                allowed: max,
+            });
+        }
+
+        const round = await this.Launch(member.guild, settings, mode);
+
+        await this.Panel(member.guild, await this.Settings(guildId)).catch(() => undefined);
+
+        return { queue: this.Queue(guildId, mode), started: round };
+    }
+
+    /** Nimmt die Ersten aus der Warteschlange und startet ihre Runde. */
+    private async Launch(guild: Guild, settings: IMansSettings, mode: ManMode): Promise<ISixRound> {
+        const guildId = guild.id;
+        const queue = this.Queue(guildId, mode);
         // Erst aus der Warteschlange nehmen, dann starten: Start() wartet auf
         // Discord, und in der Zeit darf niemand dieselben Leute noch einmal
         // erwischen.
@@ -252,11 +303,40 @@ export default class SixMansService {
             if (rest.length !== waiting.length) this.Set(guildId, other, rest);
         }
 
-        const round = await this.Start(member.guild, settings, mode, playing);
+        try {
+            return await this.Start(guild, settings, mode, playing);
+        } catch (error) {
+            // Review W-0137: Scheitert das Anlegen, stehen die Spieler wieder vorne an - sonst wären sie still weg.
+            this.Set(guildId, mode, [...playing, ...this.Queue(guildId, mode).filter((entry) => !playing.some((one) => one.userId === entry.userId))]);
 
-        await this.Panel(member.guild, await this.Settings(guildId)).catch(() => undefined);
+            throw error;
+        }
+    }
 
-        return { queue: this.Queue(guildId, mode), started: round };
+    /** W-0137: Ist eine Runde vorbei, starten die Warteschlangen, die wegen maxRunning warten mussten. */
+    async Resume(guild: Guild): Promise<ISixRound[]> {
+        const settings = await this.Settings(guild.id);
+        const max = SixMansLimits(guild.id).running;
+        const started: ISixRound[] = [];
+        let running = Counting(await this.client.sixRounds.Running(guild.id));
+        // Review W-0137: wer am längsten wartet, fängt an - sonst kommt bei knappen Plätzen immer derselbe Modus zuerst.
+        const since = (mode: ManMode): number => this.Queue(guild.id, mode)[0]?.since ?? Number.MAX_SAFE_INTEGER;
+
+        for (const mode of [...MODES].sort((a, b) => since(a) - since(b))) {
+            if (running >= max || !settings.modes[mode] || this.Queue(guild.id, mode).length < mode) continue;
+
+            // Ein gescheiterter Start hält die anderen Modi nicht auf; Launch stellt die Spieler wieder an.
+            try {
+                started.push(await this.Launch(guild, settings, mode));
+                running++;
+            } catch (error) {
+                logger.warn(`🎮 ${MODE_LABELS[mode]} auf ${guild.id} nicht gestartet: ${String(error)}`);
+            }
+        }
+
+        if (started.length) await this.Panel(guild, settings).catch(() => undefined);
+
+        return started;
     }
 
     /** Wieder raus - aus einem Modus oder überall. */
@@ -509,6 +589,7 @@ export default class SixMansService {
 
         await this.Refresh(guild, settings, done).catch(() => undefined);
         await this.Panel(guild, settings).catch(() => undefined);
+        await this.Resume(guild).catch((error) => logger.warn(`🎮 Warteschlangen auf ${guild.id} nicht fortgesetzt: ${String(error)}`));
 
         this.client.pulseService.Emit(guild.id, "sixmans", { round: round.id, done: true });
         logger.user(`🎮 ${MODE_LABELS[round.mode]} Runde #${round.id} auf ${guild.id}: ${TEAM_LABELS[winner]} gewinnt (±${change})`);
@@ -535,6 +616,7 @@ export default class SixMansService {
         const settings = await this.Settings(guild.id);
 
         await this.Refresh(guild, settings, done, "✖️ **Abgebrochen.** Die MMR bleibt, wie sie war.").catch(() => undefined);
+        await this.Resume(guild).catch((error) => logger.warn(`🎮 Warteschlangen auf ${guild.id} nicht fortgesetzt: ${String(error)}`));
 
         this.client.pulseService.Emit(guild.id, "sixmans", { round: roundId, done: true });
 
@@ -636,6 +718,7 @@ export default class SixMansService {
             }
         } catch (error) {
             if (!(error instanceof SixMansError)) throw error;
+            if (await ReplyLimit(interaction, error).catch(() => false)) return;
 
             await say(error.message).catch(() => undefined);
         }
@@ -686,7 +769,8 @@ export default class SixMansService {
 
             const settings = await this.Settings(guildId);
 
-            if (!settings.idleMinutes) continue;
+            // Review W-0137: Eine volle Schlange wartet auf einen freien Platz (maxRunning) - ihr wurde „Ihr bleibt“ versprochen.
+            if (!settings.idleMinutes || queue.length >= mode) continue;
 
             const fresh = queue.filter((entry) => Date.now() - entry.since < settings.idleMinutes * MINUTE);
 

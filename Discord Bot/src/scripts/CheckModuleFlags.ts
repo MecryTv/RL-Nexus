@@ -10,7 +10,7 @@ process.env.DEV_CLIENT_SECRET ||= "check-secret";
 
 import { MessageFlags, PermissionFlagsBits, PermissionsBitField } from "discord.js";
 import BotClient from "../client/BotClient";
-import { AskLine, IsServerAdmin, LimitReply } from "../builder/LimitReply";
+import { AskLine, IsServerAdmin, LimitReply, ReplyLimit } from "../builder/LimitReply";
 import { SUPPORT_URL } from "../constants/Help";
 import CommandHandler from "../events/client/CommandHandler";
 import GuildSettings from "../models/GuildSettings";
@@ -37,6 +37,7 @@ import {
     OnFlagsLoaded,
     SetFlags,
 } from "../utils/moduleFlags";
+import { settingDef, settingsOf } from "../constants/ModuleSettings";
 
 let failures = 0;
 
@@ -458,6 +459,85 @@ async function checkAsk(): Promise<void> {
     );
 }
 
+/**
+ * W-0137: Grenzen für alle Module, wie am 18.11.2026 freigegeben
+ * (docs/superpowers/specs/2026-11-18-grenzen-alle-module-design.md). Standard =
+ * heutige Konstante, alle je Server änderbar; backups kommt mit Task 7.
+ */
+function checkAllModules(): void {
+    console.log("\n— Grenzen für alle Module (W-0137) —");
+
+    // Modul, Schlüssel, Standard, min, max, auf Anfrage
+    const expected: [string, string, number, number, number, boolean][] = [
+        ["rl-6mans", "maxRanks", 12, 1, 25, true],
+        ["rl-6mans", "maxRunning", 10, 1, 50, true],
+        ["lft", "maxQuestions", 15, 1, 25, true],
+        ["lft", "maxExpireDays", 180, 1, 365, false],
+        ["matchups", "maxLeagues", 12, 1, 25, true],
+        ["matchups", "maxAheadDays", 180, 30, 365, false],
+        ["matchups", "maxOpen", 100, 10, 500, true],
+        ["rocket-roulette", "maxFixedChannels", 40, 2, 50, true],
+        ["rocket-roulette", "maxLobbies", 20, 1, 24, false],
+        ["rocket-roulette", "maxPlanned", 10, 1, 30, false],
+        ["role-lists", "maxLists", 10, 1, 25, true],
+        ["role-lists", "maxRoles", 20, 1, 25, true],
+        ["role-lists", "maxPresets", 10, 1, 25, false],
+        ["moderation", "maxStages", 10, 1, 20, false],
+        ["moderation", "maxEvidence", 20, 1, 50, true],
+        ["automod", "maxWords", 200, 10, 1000, true],
+        ["automod", "maxIgnore", 25, 1, 25, false],
+        ["logging", "maxIgnore", 25, 1, 25, false],
+        ["welcome", "maxRoles", 10, 1, 25, true],
+        ["apply", "maxForms", 15, 1, 25, true],
+        ["apply", "maxQuestions", 20, 1, 50, true],
+        ["apply", "maxReviewers", 15, 1, 25, false],
+        ["reaction-roles", "maxPanels", 25, 1, 50, true],
+        ["reaction-roles", "maxRoles", 25, 1, 25, false],
+        ["reaction-roles", "maxReactions", 20, 1, 20, false],
+        ["polls", "maxOptions", 10, 2, 10, false],
+        ["polls", "maxOpen", 25, 1, 100, true],
+        ["voice-hub", "maxHubs", 10, 1, 25, true],
+        ["voice-hub", "maxTempChannels", 50, 5, 200, true],
+        ["voice-hub", "maxTrusted", 25, 1, 25, false],
+        ["custom-message", "maxMessages", 50, 1, 200, true],
+        ["custom-message", "maxResponses", 50, 1, 200, true],
+        ["backups", "maxHand", 10, 1, 25, true],
+        ["backups", "maxPlanKeep", 14, 1, 30, false],
+    ];
+    const wrong = expected.filter(([module, key, standard, min, max, askable]) => {
+        const def = settingDef(module, key);
+
+        return !def || def.standard !== standard || def.min !== min || def.max !== max || def.askable !== askable || !def.server || !def.label.endsWith("höchstens");
+    });
+
+    check("Neue Grenzen im Verzeichnis wie freigegeben", wrong.length === 0, wrong.map(([module, key]) => `${module}.${key}`).join(", "));
+    check(
+        "Galerie, Transkript, Clip-Datei und Beweisbild sind keine Grenzen mehr (Nutzer, 18.11.)",
+        !settingDef("gallery", "imageMegabytes") &&
+            settingsOf("gallery").length === 0 &&
+            !settingDef("tickets", "transcriptMegabytes") &&
+            !settingDef("tickets", "transcriptMessages") &&
+            !settingDef("clips", "fileMegabytes") &&
+            !settingDef("moderation", "evidenceMegabytes")
+    );
+    check("Rank Roles bleibt ohne Grenze (Ausnahme des Nutzers)", settingsOf("rank-roles").length === 0);
+
+    // Gespeicherte Werte der entfernten Schlüssel dürfen nichts stören.
+    SetFlags([], [], [], [
+        { module: "gallery", guildId: "g9", status: null, notice: null, linkMode: null, values: { imageMegabytes: 20 }, updatedAt: null },
+        { module: "tickets", guildId: "g9", status: null, notice: null, linkMode: null, values: { transcriptMegabytes: 300, maxOpenPerUser: 12 }, updatedAt: null },
+    ] as IModuleOverrideRow[]);
+
+    const limits = ModuleLimits("g9");
+
+    check(
+        "Alte Werte stören nicht: kein Galerie-Eintrag, keine Transkript-Größe, andere Werte gelten",
+        !("gallery" in limits) && (limits.tickets ?? []).every((entry) => entry.key !== "transcriptMegabytes") && ModuleValue("tickets", "maxOpenPerUser", "g9") === 12
+    );
+    check("Reiter Grenzen kennt die neuen Module", ["role-lists", "voice-hub", "polls", "rl-6mans", "custom-message"].every((module) => (limits[module] ?? []).length > 0), Object.keys(limits).join(","));
+    SetFlags([], [], []);
+}
+
 /** W-0133: Reste aus dem Review von W-0131. */
 async function checkLeftovers(): Promise<void> {
     console.log("\n  — Reste aus W-0131 —");
@@ -495,6 +575,37 @@ async function checkLeftovers(): Promise<void> {
     check("/rank me per Name: Hinweis „nur mit Anmeldung“ statt Schweigen", !!notice && "notice" in notice && notice.notice === LOGIN_ONLY, JSON.stringify(notice));
 
     SetFlags([], [], []);
+}
+
+/** W-0137 Review: Fehler mit Grenze werden in Discord die gelbe Karte. */
+async function checkReplyLimit(): Promise<void> {
+    console.log("\n— Grenze in Discord als gelbe Karte (W-0137) —");
+
+    const sent: { kind: string; payload: { components?: unknown; flags?: number } }[] = [];
+    const fake = (deferred: boolean, manage: boolean) =>
+        ({
+            guildId: "1162553851187040326",
+            deferred,
+            replied: false,
+            member: { permissions: new PermissionsBitField(manage ? PermissionFlagsBits.ManageGuild : 0n) },
+            reply: async (payload: never) => void sent.push({ kind: "reply", payload }),
+            editReply: async (payload: never) => void sent.push({ kind: "edit", payload }),
+        }) as never;
+    const hit = Object.assign(new Error("Mehr als 100 offene Partien gehen hier nicht."), { limit: { module: "matchups", key: "maxOpen", asked: 101, allowed: 100 } });
+    const text = (index: number) => JSON.stringify(sent[index]?.payload.components ?? null);
+
+    SetFlags([], [], []);
+    check("Ohne Grenze: nichts gesendet, die Stelle antwortet selbst", !(await ReplyLimit(fake(true, true), new Error("kaputt"))) && sent.length === 0);
+    check(
+        "Zurückgestellt: editReply mit Satz und Anfrage-Knopf für Server-Admins",
+        (await ReplyLimit(fake(true, true), hit)) && sent[0]?.kind === "edit" && text(0).includes("Mehr als 100 offene Partien") && text(0).includes(SUPPORT_URL) && ((sent[0]?.payload.flags ?? 0) & MessageFlags.Ephemeral) === 0,
+        text(0).slice(0, 200)
+    );
+    check(
+        "Sofort: reply nur für die Person, ein Mitglied ohne Knopf",
+        (await ReplyLimit(fake(false, false), hit)) && sent[1]?.kind === "reply" && ((sent[1]?.payload.flags ?? 0) & MessageFlags.Ephemeral) !== 0 && !text(1).includes(SUPPORT_URL),
+        text(1).slice(0, 200)
+    );
 }
 
 async function main(): Promise<void> {
@@ -566,6 +677,8 @@ async function main(): Promise<void> {
     await checkValues();
     await checkAsk();
     await checkLeftovers();
+    checkAllModules();
+    await checkReplyLimit();
 
     console.log(failures > 0 ? `\n  ${failures} Prüfung(en) fehlgeschlagen.\n` : "\n  Alles ok.\n");
     process.exit(failures > 0 ? 1 : 0);

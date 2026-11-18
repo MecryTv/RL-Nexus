@@ -5,9 +5,10 @@ import Route from "../structures/Route";
 import { PRIVATE_HINT } from "../constants/StaffGrant";
 import { DASHBOARD_PATH } from "../constants/Dashboard";
 import { SNOWFLAKE } from "../constants/Discord";
-import { DURATION_PRESETS, DELETE_CHOICES, MOD_ACTIONS, PROOF_TIMEOUT_CHOICES } from "../constants/Moderation";
+import { DURATION_PRESETS, DELETE_CHOICES, EVIDENCE_MAX_MB, MOD_ACTIONS, PROOF_TIMEOUT_CHOICES } from "../constants/Moderation";
 import { IModCase, ModAction } from "../interfaces/services/moderation/IModeration";
-import { IModActor, IModProof, IModRequest, ModerationError } from "../services/ModerationService";
+import { IModActor, IModProof, IModRequest, ModerationError, ModerationLimits } from "../services/ModerationService";
+import { DashboardLimit } from "../builder/LimitReply";
 import { WantsJSON } from "../utils/admin";
 import { PersonOf, SearchMembers } from "../utils/dashboard";
 import logger from "../utils/logger";
@@ -115,6 +116,7 @@ export default class DashboardApiModeration extends Route {
             return reply.send(await this.Write(access, (request.body ?? {}) as IBody));
         } catch (error) {
             // Was der Dienst ablehnt, sagt er in einem Satz - alles andere geht als 500 ins Log.
+            if (error instanceof ModerationError && error.limit) return reply.code(400).send(DashboardLimit(error.limit, access.guild.id, error.message));
             if (error instanceof ModerationError || error instanceof LogTargetError) return reply.code(400).send({ error: error.message });
 
             throw error;
@@ -177,6 +179,7 @@ export default class DashboardApiModeration extends Route {
             result.me = { id: access.actor.id, name: access.actor.name, manage, actions: await this.client.moderationService.AllowedActions(member) };
             result.config = config;
             result.presets = { durations: DURATION_PRESETS, deletes: DELETE_CHOICES, proof: PROOF_TIMEOUT_CHOICES };
+            result.limits = { ...ModerationLimits(guild.id), evidenceMegabytes: EVIDENCE_MAX_MB };
             // Für "Nachrichten löschen": wo der Bot und das Mitglied lesen können.
             result.channels = [...guild.channels.cache.values()]
                 .filter(

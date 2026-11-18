@@ -60,8 +60,8 @@ export const HIDE_REASON_MAX = 500;
 export const MAX_REASON = 500;
 export const MAX_NOTE = 1000;
 export const MAX_NOTES = 50;
-export const MAX_EVIDENCE = 20;
-export const MAX_STAGES = 10;
+/** W-0137: Stufen und Beweise je Fall sind Grenzen von RL Nexus (ModerationLimits). */
+export const MODERATION_MODULE = "moderation";
 export const MAX_PURGE = 100;
 /** Länger geht ein Timeout bei Discord nicht. */
 export const MAX_TIMEOUT = 28 * 86_400;
@@ -99,7 +99,8 @@ export const DURATION_PRESETS: [string, number][] = [
 /** Beweisbilder: evidence/<server>/<fall-id>/<nr>.<endung>. Nicht im Repo (.gitignore). */
 export const EVIDENCE_ROOT = path.join(process.cwd(), "evidence");
 export const STORED_EVIDENCE = /^\d{1,3}\.(png|jpe?g|gif|webp)$/;
-export const MAX_EVIDENCE_BYTES = 8 * 1024 * 1024;
+/** So groß darf ein Beweisbild sein - fest, keine Grenze von RL Nexus mehr (Nutzer, 18.11.). */
+export const EVIDENCE_MAX_MB = 8;
 
 export function DefaultModConfig(): IModConfig {
     return {

@@ -12,6 +12,7 @@ import {
     NOTICE_LABELS,
     PENALTY_LABELS,
     REPEAT_LABELS,
+    CLIP_MAX_MB,
 } from "../constants/Clips";
 import { KIND_LABELS as BODY_KINDS } from "../constants/Messages";
 import { ClipError } from "../services/ClipService";
@@ -109,7 +110,7 @@ export default class DashboardApiClips extends Route {
                 penaltyCount: MAX_PENALTY_COUNT,
                 penaltyDays: MAX_PENALTY_DAYS,
                 reason: MAX_BLOCK_REASON,
-                fileMegabytes: ModuleValue("clips", "fileMegabytes", guild.id),
+                fileMegabytes: CLIP_MAX_MB,
             },
             warnDays: (await this.client.modSettings.Of(guild.id)).warnDays,
             guild: { name: guild.name, icon: guild.iconURL({ extension: "png", size: 128 }), ...GuildResources(guild) },

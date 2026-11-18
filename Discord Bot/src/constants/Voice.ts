@@ -7,10 +7,8 @@ import { IHubConfig, IVoiceSettings, VoiceAction } from "../interfaces/services/
 export const VOICE_PREFIX = "voice";
 export const VOICE_ACCENT = "#5865f2";
 
-export const MAX_HUBS = 10;
 export const MAX_PRESETS = 5;
 export const MAX_VOICE_NAME = 90;
-export const MAX_TRUSTED = 25;
 export const MAX_LIMIT = 99;
 
 /** Die Auswahl im Panel - Reihenfolge, Text und Symbol wie hier. */

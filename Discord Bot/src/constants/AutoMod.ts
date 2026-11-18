@@ -8,8 +8,8 @@ import { AutoAction, FilterId, IAutoModSettings, IFilterInfo, IFilterSettings } 
 
 export const AUTOMOD_MODULE = "automod";
 
+/** Discords Auswahl im Panel nimmt höchstens 25. Die Grenze des Servers (maxIgnore, W-0137) kürzt Clean. */
 export const MAX_IGNORE = 25;
-export const MAX_WORDS = 200;
 export const MAX_WORD_LENGTH = 60;
 export const MAX_NOTICE = 200;
 

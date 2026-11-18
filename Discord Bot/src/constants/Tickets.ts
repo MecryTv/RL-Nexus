@@ -3,6 +3,11 @@ import { ITicketConfig } from "../interfaces/services/tickets/ITicket";
 
 /** Präfix aller customIds des Ticket-Systems. Der Assistent hat sein eigenes. */
 export const TICKET_PREFIX = "ticket";
+
+/** W-0137: Obergrenze für Anhänge eines Transkripts, fest (keine Grenze von RL Nexus mehr, Wunsch des Nutzers). */
+export const TRANSCRIPT_MAX_MB = 100;
+/** So viele Nachrichten liest ein Transkript höchstens - fest, keine Grenze von RL Nexus mehr (Nutzer, 18.11.). */
+export const TRANSCRIPT_MAX_MESSAGES = 5000;
 export const SETUP_PREFIX = "ticketsetup";
 
 /** Wie der User mit dem Team spricht: im Ticket selbst oder per DM an den Bot. */

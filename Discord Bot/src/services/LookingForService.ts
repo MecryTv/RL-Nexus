@@ -37,12 +37,10 @@ import {
     LFT_MODULE,
     MAX_ANSWER,
     MAX_CHOICES,
-    MAX_EXPIRE,
     MAX_HINT,
     MAX_LABEL,
     MAX_MANAGERS,
     MAX_PINGS,
-    MAX_QUESTIONS,
     MAX_RETRIES,
     MAX_TAG_NAME,
     MAX_TITLE,
@@ -64,8 +62,16 @@ import {
     LftStatus,
 } from "../interfaces/services/lft/ILft";
 import logger from "../utils/logger";
+import { ModuleValue } from "../utils/moduleFlags";
+import { LimitSentence } from "../builder/LimitReply";
+import { settingDef } from "../constants/ModuleSettings";
 
 export class LftError extends Error {}
+
+/** W-0137: Fragen je Suche und Laufzeit in Tagen, Grenzen von RL Nexus je Server. */
+export function LftLimits(guildId: string): { questions: number; expireDays: number } {
+    return { questions: ModuleValue(LFT_MODULE, "maxQuestions", guildId), expireDays: ModuleValue(LFT_MODULE, "maxExpireDays", guildId) };
+}
 
 function IsRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -160,6 +166,11 @@ export default class LookingForService {
 
     CleanSettings(guild: Guild, input: unknown, previous: ILftSettings): ILftSettings {
         const raw = IsRecord(input) ? input : {};
+        const maxExpire = LftLimits(guild.id).expireDays;
+        const expireDays = Int(raw.expireDays, 0, settingDef(LFT_MODULE, "maxExpireDays")!.max, previous.expireDays);
+
+        // Review W-0137, Muster aus W-0133: über dem Wert des Servers ablehnen statt still kürzen; ein gespeicherter Wert darf bleiben.
+        if (expireDays > maxExpire && expireDays !== previous.expireDays) throw new LftError(`Höchstens ${maxExpire} Tage. ${LimitSentence(LFT_MODULE, "maxExpireDays", guild.id)}`);
 
         return {
             player: this.CleanSide(guild, "player", raw.player, previous.player),
@@ -168,7 +179,7 @@ export default class LookingForService {
             dm: this.CleanDm(guild, raw.dm, previous.dm),
             ask: LFT_ASKS.includes(raw.ask as LftAsk) ? (raw.ask as LftAsk) : previous.ask,
             panel: this.CleanPanel(guild, raw.panel, previous.panel),
-            expireDays: Int(raw.expireDays, 0, MAX_EXPIRE, previous.expireDays),
+            expireDays,
             manageRoles: this.Roles(guild, raw.manageRoles, previous.manageRoles, MAX_MANAGERS),
         };
     }
@@ -200,7 +211,7 @@ export default class LookingForService {
         const raw = IsRecord(input) ? input : {};
         const forum = typeof raw.forumId === "string" ? guild.channels.cache.get(raw.forumId) : null;
         const label = KIND_LABELS[kind];
-        const questions = raw.questions === undefined ? previous.questions : this.CleanQuestions(raw.questions);
+        const questions = raw.questions === undefined ? previous.questions : this.CleanQuestions(raw.questions, guild.id);
         const tag = IsRecord(raw.tag) ? raw.tag : {};
 
         if (!questions.length) throw new LftError(`${label}: Ohne Fragen gibt es nichts zu beantworten.`);
@@ -227,13 +238,13 @@ export default class LookingForService {
         };
     }
 
-    private CleanQuestions(input: unknown): ILftQuestion[] {
+    private CleanQuestions(input: unknown, guildId: string): ILftQuestion[] {
         if (!Array.isArray(input)) return [];
 
         const seen = new Set<string>();
         const questions: ILftQuestion[] = [];
 
-        for (const entry of input.slice(0, MAX_QUESTIONS)) {
+        for (const entry of input.slice(0, LftLimits(guildId).questions)) {
             if (!IsRecord(entry)) continue;
 
             const label = Text(entry.label, MAX_LABEL);

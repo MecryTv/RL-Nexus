@@ -4,6 +4,7 @@ import { DoneView, IModView, ModErrorView } from "../builder/ModerationView";
 import { DURATION_PRESETS, FormatDuration, ParseDuration } from "../constants/Moderation";
 import { IModActor, IModRequest, ModerationError } from "../services/ModerationService";
 import logger from "./logger";
+import { ReplyLimit } from "../builder/LimitReply";
 
 /**
  * Was alle Moderations-Befehle teilen: Antwort nur für den Moderator, Fehler
@@ -49,8 +50,10 @@ export async function ModSay(interaction: ChatInputCommandInteraction, view: IMo
     else await interaction.reply({ ...message, flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral }).catch(() => undefined);
 }
 
-export function Fail(interaction: ChatInputCommandInteraction, error: unknown, what: string): Promise<void> {
+export async function Fail(interaction: ChatInputCommandInteraction, error: unknown, what: string): Promise<void> {
     if (!(error instanceof ModerationError)) logger.error(`🛡️ /${interaction.commandName} (${what}) fehlgeschlagen`, error);
+    // W-0137: Beweise je Fall ist eine Grenze von RL Nexus - dann die gelbe Karte.
+    if (await ReplyLimit(interaction, error).catch(() => false)) return;
 
     return ModSay(interaction, ModErrorView(error instanceof ModerationError ? error.message : "Da ging etwas schief. Versuch es gleich nochmal."));
 }

@@ -1,5 +1,6 @@
 import { ChatInputCommandInteraction, MessageFlags, SlashCommandBuilder } from "discord.js";
 import BotClient from "../../client/BotClient";
+import { ReplyLimit } from "../../builder/LimitReply";
 import Command from "../../structures/Command";
 import Category from "../../enums/Category";
 import { ROULETTE_MODULE, StartTime } from "../../constants/RocketRoulette";
@@ -79,6 +80,7 @@ export default class Roulette extends Command {
             await this.Say(interaction, "Der Abend ist beendet. Die Übersicht steht im Moderator-Kanal.");
         } catch (error) {
             if (!(error instanceof RouletteError)) throw error;
+            if (await ReplyLimit(interaction, error)) return;
 
             await this.Say(interaction, error.message);
         }

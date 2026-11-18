@@ -5,6 +5,8 @@ import { RoleListText } from "../builder/RoleListView";
 import { IRoleListCardData, RenderRoleListCard } from "../builder/RoleListCard";
 import logger from "../utils/logger";
 import { FetchState } from "../utils/guildpanels";
+import { ILimitHit } from "../builder/LimitReply";
+import { ModuleValue } from "../utils/moduleFlags";
 import {
     IMAGE_CHOICES,
     IMAGE_COLORS,
@@ -15,8 +17,6 @@ import {
     LIST_TEMPLATES,
     ListTemplateKey,
     MAX_IMAGE_PEOPLE,
-    MAX_LISTS,
-    MAX_PRESETS,
     REFRESH_DELAY_MS,
     ROLE_LISTS_MODULE,
     RoleListDesign,
@@ -28,7 +28,6 @@ import {
     MAX_LABEL,
     MAX_LEAD,
     MAX_NAME,
-    MAX_ROLES,
     MAX_SUB,
     MAX_TITLE,
     MAX_TITLES,
@@ -42,7 +41,24 @@ import { IRoleList, IRoleListGroup, IRoleListMember, IRoleListRole } from "../in
  * sendet die Liste und zieht sie gebündelt nach. Siehe docs/RoleLists.md.
  */
 
-export class RoleListError extends Error {}
+/** limit: welche Grenze von RL Nexus gegriffen hat (W-0137), für den Satz und die Anfrage im Dashboard. */
+export class RoleListError extends Error {
+    constructor(
+        message: string,
+        readonly limit?: ILimitHit
+    ) {
+        super(message);
+    }
+}
+
+/** W-0137: die Grenzen der Rollenlisten für einen Server. */
+export function RoleListLimits(guildId: string): { lists: number; roles: number; presets: number } {
+    return {
+        lists: ModuleValue(ROLE_LISTS_MODULE, "maxLists", guildId),
+        roles: ModuleValue(ROLE_LISTS_MODULE, "maxRoles", guildId),
+        presets: ModuleValue(ROLE_LISTS_MODULE, "maxPresets", guildId),
+    };
+}
 
 function IsRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -234,7 +250,7 @@ export default class RoleListService {
             seen.add(role.id);
             roles.push({ roleId: role.id, label: Text(entry.label, MAX_LABEL) || role.name.slice(0, MAX_LABEL), icon: this.CleanIcon(guild, entry.icon) });
 
-            if (roles.length >= MAX_ROLES) break;
+            if (roles.length >= RoleListLimits(guild.id).roles) break;
         }
 
         return roles;
@@ -306,8 +322,11 @@ export default class RoleListService {
     /** Eine neue Liste - aus einer Vorlage, die Rollen des Servers über den Namen sucht. */
     async Create(guild: Guild, input: { name: unknown; template: unknown }): Promise<IRoleList> {
         const count = await this.client.roleLists.CountOf(guild.id);
+        const limits = RoleListLimits(guild.id);
 
-        if (count >= MAX_LISTS) throw new RoleListError(`Höchstens ${MAX_LISTS} Listen. Lösch eine, bevor du eine neue anlegst.`);
+        if (count >= limits.lists) {
+            throw new RoleListError(`Höchstens ${limits.lists} Listen. Lösch eine, bevor du eine neue anlegst.`, { module: ROLE_LISTS_MODULE, key: "maxLists", asked: count + 1, allowed: limits.lists });
+        }
 
         const key: ListTemplateKey = Object.keys(LIST_TEMPLATES).includes(String(input.template)) ? (input.template as ListTemplateKey) : "empty";
         const template = LIST_TEMPLATES[key];
@@ -321,13 +340,13 @@ export default class RoleListService {
                 used.add(role.id);
                 entries.push({ roleId: role.id, label: (rule.label ?? role.name).slice(0, MAX_LABEL), icon: { kind: "emoji", value: rule.emoji } });
 
-                if (rule.label !== null || entries.length >= MAX_ROLES) break;
+                if (rule.label !== null || entries.length >= limits.roles) break;
             }
         }
 
         const settings: IRoleListSettings = {
             ...DefaultListSettings(),
-            roles: entries.slice(0, MAX_ROLES),
+            roles: entries.slice(0, limits.roles),
             heading: template.heading,
             lead: template.lead,
             button: { on: false, label: template.button, to: "channel", channelId: null, url: null },
@@ -797,7 +816,11 @@ export default class RoleListService {
     async SavePreset(guildId: string, name: unknown, image: unknown): Promise<IRoleListPreset[]> {
         const presets = await this.Presets(guildId);
 
-        if (presets.length >= MAX_PRESETS) throw new RoleListError(`Höchstens ${MAX_PRESETS} eigene Vorlagen. Lösch eine, bevor du eine neue speicherst.`);
+        const max = RoleListLimits(guildId).presets;
+
+        if (presets.length >= max) {
+            throw new RoleListError(`Höchstens ${max} eigene Vorlagen. Lösch eine, bevor du eine neue speicherst.`, { module: ROLE_LISTS_MODULE, key: "maxPresets", asked: presets.length + 1, allowed: max });
+        }
 
         const preset: IRoleListPreset = { id: `own-${Date.now().toString(36)}${presets.length}`, name: CleanPresetName(name), image: CleanImage(image, DefaultListSettings().image) };
 

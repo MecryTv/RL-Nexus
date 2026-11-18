@@ -25,12 +25,12 @@ import {
     KickoffSuggestions,
     KICKOFF_HELP,
     LIVE_HOURS,
+    UPCOMING_GRACE_HOURS,
     LegacyAnnounce,
     LegacyRemind,
     LegacyResult,
     MATCHUP_KEYS,
     MATCHUP_IMAGES,
-    MAX_AHEAD,
     MAX_REMIND,
     MODE_LABELS,
     MatchupLink,
@@ -42,7 +42,9 @@ import {
 } from "../constants/Matchups";
 import { IMatchup, IMatchupSettings } from "../interfaces/services/matchups/IMatchups";
 import { ITeam, ITeamPlayer, TeamRole } from "../interfaces/services/teams/ITeams";
-import { MatchupError, NormalizeMatchupSettings } from "../services/MatchupService";
+import { MatchupError, MatchupLimits, NormalizeMatchupSettings } from "../services/MatchupService";
+import DashboardApiMatchups from "../routes/DashboardApiMatchups";
+import { SetFlags } from "../utils/moduleFlags";
 import MatchupButtons from "../events/matchups/MatchupButtons";
 import MatchupCommand from "../commands/user/Matchup";
 import DashboardApiMatchupsPublic from "../routes/DashboardApiMatchupsPublic";
@@ -171,12 +173,24 @@ function checkClean(client: BotClient): void {
     const guild = FakeGuild();
     const service = client.matchupService;
     const base = DefaultMatchupSettings();
-    const clean = service.CleanSettings(guild, { channelId: TEXT, pingRoles: [ROLE, GUILD, ROLE], remindMinutes: 45, maxAhead: 9999, leagues: ["Liga", "Liga", " "] }, base);
+    const clean = service.CleanSettings(guild, { channelId: TEXT, pingRoles: [ROLE, GUILD, ROLE], remindMinutes: 45, maxAhead: 90, leagues: ["Liga", "Liga", " "] }, base);
 
     check("Der Kanal kommt an", clean.channelId === TEXT);
     check("@everyone wird nicht gepingt", clean.pingRoles.join(",") === ROLE);
     check("Die Erinnerung kommt an", clean.remindMinutes === 45);
-    check("Die Vorausschau wird gedeckelt", clean.maxAhead === MAX_AHEAD, String(clean.maxAhead));
+    check("Die Vorausschau kommt an", clean.maxAhead === 90, String(clean.maxAhead));
+
+    // Review W-0137, Muster aus W-0133: über dem Wert des Servers ablehnen statt still kürzen.
+    let ahead = "";
+
+    try {
+        service.CleanSettings(guild, { maxAhead: 9999 }, base);
+    } catch (error) {
+        ahead = error instanceof MatchupError ? error.message : String(error);
+    }
+
+    check("Mehr Tage im Voraus als der Server darf: abgelehnt mit Satz", ahead.startsWith("Höchstens 180 Tage im Voraus.") && ahead.includes("RL Nexus"), ahead);
+    check("Ein schon gespeicherter höherer Wert darf bleiben", service.CleanSettings(guild, { maxAhead: 300 }, { ...base, maxAhead: 300 }).maxAhead === 300);
     check("Doppelte und leere Ligen fallen weg", clean.leagues.join(",") === "Liga");
 
     const wrong = service.CleanSettings(guild, { channelId: VOICE, remindMinutes: 99_999 }, base);
@@ -837,6 +851,12 @@ async function checkCommand(client: BotClient): Promise<void> {
     await run("neu", CAPTAIN, { team: "vyrox main", gegner: "Ascension", anpfiff: "morgen 21:00" });
     check("neu mit getipptem Teamnamen: das Team", made[made.length - 1]?.teamId === 7, JSON.stringify(made[made.length - 1]));
 
+    // W-0137 Review: an der Grenze die gelbe Karte, für Server-Admins mit Anfrage-Knopf.
+    client.matchups.CountPlanned = async () => 100;
+    await run("neu", CAPTAIN, { team: "7", gegner: "Ascension", anpfiff: "morgen 21:00" }, undefined, true);
+    check("neu an der Grenze maxOpen: gelbe Karte mit Satz und Anfrage", JSON.stringify(last()).includes("Mehr als 100 offene Partien") && JSON.stringify(last()).includes("Anfrage im Support"), JSON.stringify(last()).slice(0, 300));
+    client.matchups.CountPlanned = async () => 0;
+
     const askedFor: (number | undefined)[] = [];
     const realListView = service.ListView.bind(service);
 
@@ -1160,10 +1180,76 @@ async function checkSmallService(): Promise<void> {
     check("Link offen bleibt gleich: keine Ankündigung wird angefasst", refreshed.length === 0, JSON.stringify(refreshed));
 }
 
+/** W-0137: ein Server-Wert für die Grenzen von matchups. */
+function Limits(values: Record<string, number>) {
+    return { module: "matchups", guildId: GUILD, status: null, notice: null, linkMode: null, values, updatedAt: null };
+}
+
+/** W-0137: Ligen, Vorausschau und offene Partien sind Grenzen von RL Nexus, je Server änderbar. Läuft zuletzt: ersetzt Dienst-Methoden. */
+async function checkW137(client: BotClient): Promise<void> {
+    console.log("\n  — W-0137: Grenzen —");
+
+    const guild = FakeGuild();
+    const service = client.matchupService;
+    const member = FakeMember(guild, CAPTAIN);
+    const good = { teamId: 7, opponent: "Ascension", league: "Liga", mode: "2v2", bestOf: 5, at: Date.now() + DAY, stream: "", note: "" };
+    const leagues = Array.from({ length: 30 }, (_, index) => `Liga ${index}`);
+    const route = new DashboardApiMatchups(client) as unknown as { Read(access: unknown, query: unknown): Promise<Record<string, any>> };
+    let open = 100;
+
+    client.teams.AllOfGuild = (async () => [FakeTeam()]) as typeof client.teams.AllOfGuild;
+    client.matchups.CountPlanned = async () => open;
+    client.matchups.Create = (async (input: Partial<IMatchup>) => FakeMatchup(input)) as typeof client.matchups.Create;
+    service.Settings = async () => ({ ...DefaultMatchupSettings(), channelId: null });
+    service.List = (async () => ({ rows: [], total: 0, planned: 0 })) as unknown as typeof service.List;
+
+    check("Standard: 12 Ligen, 180 Tage, 100 offene Partien", JSON.stringify(MatchupLimits(GUILD)) === JSON.stringify({ leagues: 12, aheadDays: 180, open: 100 }), JSON.stringify(MatchupLimits(GUILD)));
+    check("Standard: höchstens 12 Ligen", service.CleanSettings(guild, { leagues }, DefaultMatchupSettings()).leagues.length === 12);
+
+    let hit: unknown = null;
+
+    try {
+        await service.Create(guild, member, good);
+    } catch (error) {
+        hit = error;
+    }
+
+    const limit = hit instanceof MatchupError ? hit.limit : undefined;
+
+    check("Bei 100 offenen Partien scheitert die 101. (maxOpen)", limit?.key === "maxOpen" && limit.asked === 101 && limit.allowed === 100, JSON.stringify(limit));
+    open = 99;
+    check("Bei 99 offenen geht die nächste", (await service.Create(guild, member, good)).opponent === "Ascension");
+
+    SetFlags([], [], [], [Limits({ maxLeagues: 20, maxAheadDays: 365, maxOpen: 200 })]);
+    open = 150;
+
+    const own = service.CleanSettings(guild, { leagues, maxAhead: 300 }, DefaultMatchupSettings());
+
+    check("Server-Werte: 20 Ligen und 300 Tage im Voraus", own.leagues.length === 20 && own.maxAhead === 300, `${own.leagues.length}/${own.maxAhead}`);
+    check("Server-Wert 200: die 151. offene geht", (await service.Create(guild, member, good)).opponent === "Ascension");
+
+    const read = await route.Read({ guild: { id: GUILD, name: "Dev Server", channels: { cache: new Map() }, roles: { cache: new Map() }, emojis: { cache: new Map() }, members: { cache: new Map() } }, member }, {});
+
+    check("Route gibt den Server-Wert an die Seite", read.limits?.leagues === 20 && read.limits?.ahead === 365, JSON.stringify(read.limits));
+    SetFlags([], [], []);
+
+    const queries: { sql: string; params: unknown[] }[] = [];
+    const model = new MatchupsModel({ databaseService: { One: async (sql: string, params: unknown[]) => (queries.push({ sql, params }), { total: "7" }) } } as unknown as BotClient);
+
+    const stamp = 1_800_000_000_000;
+
+    check("Offen heißt geplant: gespielte und abgesagte zählen nicht", (await model.CountPlanned(GUILD, stamp)) === 7 && /status = 'planned'/.test(queries[0]?.sql ?? "") && queries[0]?.params[0] === GUILD, JSON.stringify(queries[0]));
+    // Review W-0137: Eine Partie ohne Ergebnis ist 6 Stunden nach Anpfiff nicht mehr offen - sie zählt nicht ewig gegen die Grenze.
+    check("Alte Partien ohne Ergebnis zählen nicht mehr", /at > \?/.test(queries[0]?.sql ?? "") && queries[0]?.params.includes(stamp - UPCOMING_GRACE_HOURS * HOUR) === true, JSON.stringify(queries[0]));
+}
+
 async function main(): Promise<void> {
     console.log("\n⚔️  Matchups\n");
 
     const client = new BotClient();
+
+    // W-0137: Create zählt offene Partien - ohne Datenbank sind es keine.
+    client.matchups.CountPlanned = async () => 0;
 
     checkClean(client);
     await checkAccess(client);
@@ -1181,6 +1267,7 @@ async function main(): Promise<void> {
     await checkReview(client, rows);
     await checkSmallViews(client);
     await checkSmallService();
+    await checkW137(client);
 
     console.log(failures === 0 ? "\n✅ Alle Prüfungen bestanden.\n" : `\n❌ ${failures} Prüfung(en) fehlgeschlagen.\n`);
 

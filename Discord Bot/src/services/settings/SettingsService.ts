@@ -6,7 +6,8 @@ import logger from "../../utils/logger";
 import { LogTargetError, WarmLogTarget } from "../../utils/logtarget";
 import { ApplyError } from "../ApplyService";
 import { LevelError } from "../LevelService";
-import { ModerationError } from "../ModerationService";
+import { ModerationError, ModerationLimits } from "../ModerationService";
+import { ILimitHit, LimitSentence } from "../../builder/LimitReply";
 import { TicketError } from "../TicketService";
 import { WelcomeError } from "../WelcomeService";
 import { IsPanelModule, PANEL_MODULES } from "./registers";
@@ -87,7 +88,7 @@ export default class SettingsService {
     }
 
     /** Die Eingabe aus Menü, Knopf oder Fenster als Wert des Felds - oder ein Satz, was nicht passt. */
-    private Value(field: IPanelField<unknown>, raw: unknown): unknown {
+    private Value(field: IPanelField<unknown>, raw: unknown, guildId: string): unknown {
         switch (field.kind) {
             case "toggle":
                 return raw === true || raw === "on";
@@ -121,7 +122,7 @@ export default class SettingsService {
                 return value;
             }
             case "stages":
-                return Array.isArray(raw) ? raw : ParseStages(String(raw ?? ""));
+                return Array.isArray(raw) ? raw : ParseStages(String(raw ?? ""), ModerationLimits(guildId).stages);
         }
     }
 
@@ -131,7 +132,7 @@ export default class SettingsService {
 
         const panel = this.Panel(id);
         const field = this.Field(id, key);
-        const value = this.Value(field, raw);
+        const value = this.Value(field, raw, guild.id);
         const settings = await panel.load(this.client, guild);
         const previous = field.get(settings);
         let warning: string | null;
@@ -139,7 +140,12 @@ export default class SettingsService {
         try {
             warning = await panel.save(this.client, guild, field.set(value, settings), member);
         } catch (error) {
-            if (MODULE_ERRORS.some((type) => error instanceof type)) throw new PanelError((error as Error).message);
+            if (MODULE_ERRORS.some((type) => error instanceof type)) {
+                const limit = (error as Error & { limit?: ILimitHit }).limit;
+
+                // W-0137: Im Panel kein Knopf - der Satz zur Grenze hängt am Text.
+                throw new PanelError(limit ? `${(error as Error).message} ${LimitSentence(limit.module, limit.key, guild.id)}` : (error as Error).message);
+            }
 
             throw error;
         }

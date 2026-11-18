@@ -12,7 +12,7 @@ process.env.DEV_CLIENT_SECRET ||= "check-secret";
 
 import path from "path";
 import { existsSync } from "fs";
-import { ChannelType, Guild, GuildBasedChannel, Role } from "discord.js";
+import { ChannelType, Guild, GuildBasedChannel, GuildMember, Role } from "discord.js";
 import BotClient from "../client/BotClient";
 import { PanelRow, PanelValues, RoundRow, RoundValues, SixRender } from "../builder/SixMansView";
 import { Fill } from "../constants/Placeholders";
@@ -36,6 +36,9 @@ import {
     TeamSize,
 } from "../constants/SixMans";
 import { IManRank, ISixRound, ISixWaiting, ManMode } from "../interfaces/services/sixmans/ISixMans";
+import DashboardApiSixMans from "../routes/DashboardApiSixMans";
+import { SixMansError, SixMansLimits } from "../services/SixMansService";
+import { SetFlags } from "../utils/moduleFlags";
 
 const GUILD = "90071992547409961";
 const TEXT = "90071992547409962";
@@ -202,7 +205,7 @@ function checkRanks(client: BotClient): void {
         { min: 600, name: "Mittelfeld", emoji: "⚽", color: "#00afff" },
         { min: 600, name: "Noch eine bei 600", emoji: "", color: "#000000" },
         { min: 100, name: "", emoji: "🙈", color: "#123456" },
-    ]);
+    ], GUILD);
 
     check("Sie kommen sortiert zurück", own.map((rank) => rank.min).join(",") === "0,600,900", own.map((rank) => rank.min).join(","));
     check("Die unterste steht immer bei 0", own[0].min === 0 && own[0].name === "Frischling");
@@ -215,10 +218,10 @@ function checkRanks(client: BotClient): void {
 
     check("Die eigene Leiter greift", RankOf(650, own).name === "Mittelfeld", RankOf(650, own).name);
     check("Und ganz oben auch", RankOf(5000, own).name === "Legende");
-    check("Nichts Brauchbares heißt: Vorgabe", service.CleanRanks([{ name: "" }]).length === 0 && service.CleanRanks("nein").length === 0);
+    check("Nichts Brauchbares heißt: Vorgabe", service.CleanRanks([{ name: "" }], GUILD).length === 0 && service.CleanRanks("nein", GUILD).length === 0);
     check("Leer heißt Vorgabe", RankOf(600, []).name === RankOf(600).name);
 
-    const many = service.CleanRanks(Array.from({ length: 30 }, (_, index) => ({ min: index * 50, name: `Stufe ${index}`, color: "#00afff" })));
+    const many = service.CleanRanks(Array.from({ length: 30 }, (_, index) => ({ min: index * 50, name: `Stufe ${index}`, color: "#00afff" })), GUILD);
 
     check("Mehr als zwölf Stufen gehen nicht", many.length <= 12, String(many.length));
 
@@ -380,6 +383,172 @@ async function checkLists(): Promise<void> {
     }
 }
 
+/** W-0137: ein Server-Wert für die Grenzen von rl-6mans. */
+function Limits(values: Record<string, number>) {
+    return { module: "rl-6mans", guildId: GUILD, status: null, notice: null, linkMode: null, values, updatedAt: null };
+}
+
+/** W-0137: Stufen und laufende Runden sind Grenzen von RL Nexus, je Server änderbar. Läuft zuletzt: ersetzt Dienst-Methoden. */
+async function checkW137(client: BotClient): Promise<void> {
+    console.log("\n  — W-0137: Grenzen —");
+
+    const service = client.sixMansService;
+    const guild = FakeGuild();
+    const many = Array.from({ length: 30 }, (_, index) => ({ min: index * 50, name: `Stufe ${index}`, color: "#00afff" }));
+    const settings = { ...DefaultSixSettings(), modes: Object.fromEntries(MODES.map((mode) => [mode, true])) as Record<ManMode, boolean> };
+    const players = Waiting([600, 600, 600, 600, 600, 600]);
+    const member = (index: number) => ({ id: players[index].userId, displayName: players[index].name, guild }) as unknown as GuildMember;
+    const started: ManMode[] = [];
+    let running = Array.from({ length: 10 }, (_, index) => FakeRound({ id: 200 + index, blue: [], orange: [] }));
+
+    check("Standard: 12 Stufen, 10 laufende Runden", JSON.stringify(SixMansLimits(GUILD)) === JSON.stringify({ ranks: 12, running: 10 }), JSON.stringify(SixMansLimits(GUILD)));
+    SetFlags([], [], [], [Limits({ maxRanks: 20 })]);
+    check("Server-Wert 20 lässt 20 Stufen", service.CleanRanks(many, GUILD).length === 20, String(service.CleanRanks(many, GUILD).length));
+    SetFlags([], [], []);
+
+    Object.defineProperty(client.databaseService, "Ready", { get: () => true, configurable: true });
+    client.sixRounds.Running = async () => running;
+    client.sixPlayers.Ensure = (async () => ({ mmr: 600 })) as unknown as typeof client.sixPlayers.Ensure;
+    service.Settings = async () => settings;
+    service.Panel = async () => undefined;
+    (service as unknown as { Start: (guild: Guild, settings: unknown, mode: ManMode) => Promise<ISixRound> }).Start = async (_guild, _settings, mode) => {
+        started.push(mode);
+
+        return FakeRound({ mode });
+    };
+
+    for (let index = 0; index < 5; index++) await service.Join(member(index), 6);
+
+    let hit: unknown = null;
+
+    try {
+        await service.Join(member(5), 6);
+    } catch (error) {
+        hit = error;
+    }
+
+    const limit = hit instanceof SixMansError ? hit.limit : undefined;
+
+    check("Bei 10 laufenden Runden scheitert der Start der 11. (maxRunning)", limit?.key === "maxRunning" && limit.asked === 11 && limit.allowed === 10, JSON.stringify(limit));
+    check("Die Meldung sagt, dass sie warten", hit instanceof Error && hit.message.includes("Warteschlange"), hit instanceof Error ? hit.message : String(hit));
+    check("Die sechs bleiben in der Warteschlange", service.Queue(GUILD, 6).length === 6 && started.length === 0, `${service.Queue(GUILD, 6).length}/${started.length}`);
+
+    running = running.slice(1);
+
+    const resumed = await service.Resume(guild);
+
+    check("Ist eine Runde fertig, geht es von selbst los", resumed.length === 1 && started.join(",") === "6" && service.Queue(GUILD, 6).length === 0, `${resumed.length}/${started.join(",")}`);
+
+    // W-0137 Review: Runden, die seit Stunden „laufen“, weil nie jemand gemeldet hat, sperren den Server nicht.
+    running = Array.from({ length: 10 }, (_, index) => FakeRound({ id: 300 + index, blue: [], orange: [], createdAt: Date.now() - 7 * 3_600_000 }));
+
+    for (let index = 0; index < 6; index++) await service.Join(member(index), 6);
+
+    check("Zehn liegengebliebene Runden (7 h alt) zählen nicht: es geht los", started.join(",") === "6,6" && service.Queue(GUILD, 6).length === 0, started.join(","));
+
+    // W-0137 Review: Endet während eines Beitritts eine Runde, startet Resume() die Wartenden - der Beitritt holt sie nicht zurück.
+    running = Array.from({ length: 10 }, (_, index) => FakeRound({ id: 400 + index, blue: [], orange: [] }));
+    await service.Join(member(0), 2);
+    await service.Join(member(1), 2).catch(() => undefined);
+
+    const ensure = client.sixPlayers.Ensure;
+    let raced: unknown = null;
+
+    client.sixPlayers.Ensure = (async (...args: Parameters<typeof ensure>) => {
+        if (args[2] === players[2].userId) {
+            running = running.slice(1);
+            await service.Resume(guild);
+        }
+
+        return { mmr: 600 };
+    }) as typeof ensure;
+
+    try {
+        await service.Join(member(2), 2);
+    } catch (error) {
+        raced = error;
+    }
+
+    client.sixPlayers.Ensure = ensure;
+    check(
+        "Beitritt während Resume: die Gestarteten stehen nicht wieder an, nur der Neue wartet",
+        raced === null && started.join(",") === "6,6,2" && service.Queue(GUILD, 2).map((entry) => entry.userId).join() === players[2].userId,
+        `${String(raced)} | ${started.join(",")} | ${service.Queue(GUILD, 2).map((entry) => entry.name).join()}`
+    );
+
+    const route = new DashboardApiSixMans(client) as unknown as { Read(access: unknown, query: unknown): Promise<Record<string, any>> };
+
+    service.Rounds = (async () => ({ rows: [], total: 0 })) as unknown as typeof service.Rounds;
+    service.Running = (async () => []) as unknown as typeof service.Running;
+    service.Boards = (async () => ({})) as unknown as typeof service.Boards;
+    SetFlags([], [], [], [Limits({ maxRanks: 20, maxRunning: 15 })]);
+
+    const read = await route.Read({ guild: { id: GUILD, name: "Dev Server", channels: { cache: new Map() }, roles: { cache: new Map() }, emojis: { cache: new Map() }, members: { cache: new Map() } } }, {});
+
+    check("Route gibt den Server-Wert an die Seite", read.limits?.ranks === 20 && read.limits?.running === 15, JSON.stringify(read.limits));
+    SetFlags([], [], []);
+}
+
+/** W-0137 Review: Resume startet die am längsten Wartenden zuerst, verliert bei einem Fehler niemanden, und wer an der Grenze wartet, fliegt nicht wegen Leerlauf raus. */
+async function checkW137Review(client: BotClient): Promise<void> {
+    console.log("\n  — W-0137 Review: Warten an der Grenze —");
+
+    const service = client.sixMansService;
+    const guild = FakeGuild();
+    const settings = { ...DefaultSixSettings(), idleMinutes: 30, modes: Object.fromEntries(MODES.map((mode) => [mode, true])) as Record<ManMode, boolean> };
+    const old = Date.now() - 2 * 3_600_000;
+    const people = (prefix: string, count: number, since: number): ISixWaiting[] => Array.from({ length: count }, (_, index) => ({ userId: `${prefix}${index}`, name: `${prefix}${index}`, mmr: 600, since }));
+    const set = (mode: ManMode, queue: ISixWaiting[]) => (service as unknown as { Set(guildId: string, mode: ManMode, queue: ISixWaiting[]): void }).Set(GUILD, mode, queue);
+    const rounds = (count: number) => Array.from({ length: count }, (_, index) => FakeRound({ id: 500 + index, blue: [], orange: [] }));
+    const started: ManMode[] = [];
+    let running = rounds(9);
+    let failMode: ManMode | null = null;
+
+    client.guilds.cache.set(GUILD, guild);
+    client.sixRounds.Running = async () => running;
+    client.sixRounds.Cleanable = async () => [];
+    service.Settings = async () => settings;
+    service.Panel = async () => undefined;
+    (service as unknown as { Start: (guild: Guild, settings: unknown, mode: ManMode) => Promise<ISixRound> }).Start = async (_guild, _settings, mode) => {
+        if (mode === failMode) throw new Error("Datenbank weg");
+
+        started.push(mode);
+
+        return FakeRound({ mode });
+    };
+
+    for (const mode of MODES) set(mode, []);
+
+    // Ein freier Platz, zwei volle Schlangen: wer länger wartet, fängt an.
+    set(2, people("neu", 2, Date.now() - 60_000));
+    set(4, people("alt", 4, old));
+
+    const first = await service.Resume(guild);
+
+    check("Ein freier Platz: die am längsten Wartenden zuerst", first.length === 1 && started.join() === "4" && service.Queue(GUILD, 2).length === 2, `${started.join()} | ${service.Queue(GUILD, 2).length}`);
+
+    // Alles belegt: die volle Schlange wartet auf einen Platz und bleibt, eine halbe alte Schlange darf gehen.
+    running = rounds(10);
+    set(2, people("neu", 2, old));
+    set(6, people("halb", 3, old));
+    await service.Sweep();
+    check("Leerlauf: wer an der Grenze wartet, bleibt", service.Queue(GUILD, 2).length === 2, String(service.Queue(GUILD, 2).length));
+    check("…eine halbe, alte Schlange wird geleert", service.Queue(GUILD, 6).length === 0, String(service.Queue(GUILD, 6).length));
+
+    // Zwei freie Plätze, der Start des ersten Modus scheitert: niemand geht verloren, der zweite läuft trotzdem.
+    running = rounds(8);
+    failMode = 2;
+    set(4, people("vier", 4, old + 1_000));
+
+    let thrown = false;
+    const result = await service.Resume(guild).catch(() => ((thrown = true), []));
+
+    check("Scheitert ein Start, stehen alle wieder an", !thrown && service.Queue(GUILD, 2).map((entry) => entry.userId).join() === "neu0,neu1", `${thrown} | ${service.Queue(GUILD, 2).map((entry) => entry.userId).join()}`);
+    check("…und die anderen Modi starten trotzdem", result.length === 1 && started.at(-1) === 4, `${result.length} | ${started.join()}`);
+
+    client.guilds.cache.delete(GUILD);
+}
+
 async function main(): Promise<void> {
     console.log("\n🎮 2, 4 & 6 Mans\n");
 
@@ -391,6 +560,8 @@ async function main(): Promise<void> {
     checkChange(client);
     await checkViews(client);
     await checkLists();
+    await checkW137(client);
+    await checkW137Review(client);
 
     console.log(failures === 0 ? "\n✅ Alle Prüfungen bestanden.\n" : `\n❌ ${failures} Prüfung(en) fehlgeschlagen.\n`);
 

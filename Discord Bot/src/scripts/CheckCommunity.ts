@@ -22,7 +22,7 @@ import { Bar } from "../constants/Polls";
 import { CLAIM_CHOICES, MAX_BONUS_TICKETS } from "../constants/Giveaways";
 import { IGiveaway, IPoll, IStreamNotifier } from "../interfaces/services/community/ICommunity";
 import { BOOSTER, DrawWeighted, GiveawayError } from "../services/GiveawayService";
-import { PollError } from "../services/PollService";
+import { PollError, PollLimits } from "../services/PollService";
 import StreamService, { StreamError } from "../services/StreamService";
 import { SetFlags } from "../utils/moduleFlags";
 import { Decode, ParseFeed } from "../utils/youtube";
@@ -525,6 +525,7 @@ async function checkDatabase(client: BotClient): Promise<void> {
 
     check("Umfragen zählen hoch", second.number === poll.number + 1, `${poll.number} → ${second.number}`);
     check("Die Umfrage steht beim Server", (await client.polls.OfGuild(GUILD)).length === 2);
+    check("W-0137: zwei offene Umfragen gezählt", (await client.polls.CountOpen(GUILD)) === 2);
 
     await client.polls.SetVotes(poll.id, USER, ["1"]);
     await client.polls.SetVotes(poll.id, USER, ["2"]);
@@ -543,6 +544,7 @@ async function checkDatabase(client: BotClient): Promise<void> {
     await client.polls.Finish(poll.id, { "2": 1 });
 
     check("Beendet heißt beendet", (await client.polls.Get(poll.id))?.status === "ended");
+    check("W-0137: beendete zählen nicht mehr als offen", (await client.polls.CountOpen(GUILD)) === 1);
     check("Das Ergebnis bleibt stehen", (await client.polls.Get(poll.id))?.results?.["2"] === 1);
 
     const giveaway = await client.giveaways.Create(client.giveawayService.Clean(FakeGuild(), USER, { prize: "Rocket Pass", channelId: TEXT, duration: 3_600, winners: 1 }));
@@ -821,6 +823,56 @@ async function checkLimits(client: BotClient): Promise<void> {
     SetFlags([], [], []);
 }
 
+/** W-0137: Antworten und offene Umfragen sind Grenzen von RL Nexus, je Server änderbar. Ohne Datenbank, die Stubs kommen wieder weg. */
+async function checkW137Polls(client: BotClient): Promise<void> {
+    console.log("\n  — W-0137: Grenzen der Umfragen —");
+
+    const service = client.pollService;
+    const guild = FakeGuild();
+    const creator = { id: USER, guild } as unknown as GuildMember;
+    const valid = { kind: "buttons", channelId: TEXT, question: "Welche Playlist?", options: ["Duo", "Standard", "Hoops", "Rumble"], duration: 3_600 };
+    const original = { count: client.polls.CountOpen, create: client.polls.Create };
+    let open = 25;
+
+    check("Standard: 10 Antworten, 25 offene Umfragen", JSON.stringify(PollLimits(GUILD)) === JSON.stringify({ options: 10, open: 25 }), JSON.stringify(PollLimits(GUILD)));
+
+    client.polls.CountOpen = async () => open;
+    client.polls.Create = async () => {
+        throw new PollError("angelegt");
+    };
+
+    try {
+        let hit: unknown = null;
+
+        try {
+            await service.Create(guild, creator, valid);
+        } catch (error) {
+            hit = error;
+        }
+
+        const limit = hit instanceof PollError ? hit.limit : undefined;
+
+        check("Bei 25 offenen Umfragen scheitert die 26. (maxOpen)", limit?.key === "maxOpen" && limit.asked === 26 && limit.allowed === 25, JSON.stringify(limit));
+        open = 24;
+        check("Bei 24 offenen geht die nächste", (await service.Create(guild, creator, valid).catch((error: Error) => error.message)) === "angelegt");
+
+        SetFlags([], [], [], [{ module: "polls", guildId: GUILD, status: null, notice: null, linkMode: null, values: { maxOptions: 3 }, updatedAt: null }]);
+
+        let many = "";
+
+        try {
+            service.Clean(guild, valid);
+        } catch (error) {
+            many = error instanceof Error ? error.message : String(error);
+        }
+
+        check("Server-Wert 3: vier Antworten sind zu viele", many === "Mehr als 3 Antworten gehen nicht.", many);
+        SetFlags([], [], []);
+    } finally {
+        Object.assign(client.polls, { CountOpen: original.count, Create: original.create });
+    }
+}
+
 async function main(): Promise<void> {
     console.log("\n📣 Notifier, Umfragen und Giveaways\n");
 
@@ -832,6 +884,7 @@ async function main(): Promise<void> {
     checkFeed();
     checkStreamConfig(client);
     checkPolls(client);
+    await checkW137Polls(client);
     await checkGiveaways(client);
     await checkLimits(client);
     await checkDraw();

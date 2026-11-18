@@ -34,6 +34,13 @@
       "runtimeArgs": ["--prefix", "Admin Dashboard", "run", "dev"],
       "port": 5174,
       "url": "http://localhost:5174"
+    },
+    {
+      "name": "admin-ui-check",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "Admin Dashboard", "run", "dev", "--", "--port", "5180"],
+      "port": 5180,
+      "url": "http://localhost:5180"
     }
   ]
 }

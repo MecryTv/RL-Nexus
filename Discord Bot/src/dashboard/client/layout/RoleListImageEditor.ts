@@ -8,7 +8,7 @@
 import { BASE } from "../core/Base.js";
 import { icon } from "../core/Dom.js";
 import { button, el, row, select, toggle } from "../core/Ui.js";
-import { IMAGE_RANGES, IRoleListImage, MAX_HEADING, MAX_PRESETS, MAX_SUB, RoleListMotif } from "../../../constants/RoleLists.js";
+import { IMAGE_RANGES, IRoleListImage, MAX_HEADING, MAX_SUB, RoleListMotif } from "../../../constants/RoleLists.js";
 import { ISettingsStudio, settingsStudio } from "./SettingsStudio.js";
 
 export interface IImagePreset {
@@ -22,6 +22,8 @@ export interface IImageEditorOptions {
     heading: string;
     imagePresets: Record<string, { label: string; image: IRoleListImage }>;
     presets: IImagePreset[];
+    /** W-0137: eigene Vorlagen höchstens, Grenze von RL Nexus je Server (limits.presets der Route). */
+    maxPresets: number;
     motifs: Record<string, string>;
     /** Galerie-ID → Adresse, für das Vorschaubild des Hintergrunds. */
     gallery: (id: string) => string | null;
@@ -157,8 +159,8 @@ export function renderImageEditor(host: HTMLElement, options: IImageEditorOption
         const actions: HTMLElement[] = [name, save, reset];
 
         name.placeholder = `Eigene ${presets.length + 1}`;
-        save.disabled = presets.length >= MAX_PRESETS;
-        save.title = save.disabled ? `Höchstens ${MAX_PRESETS} eigene Vorlagen` : "";
+        save.disabled = presets.length >= options.maxPresets;
+        save.title = save.disabled ? `Höchstens ${options.maxPresets} eigene Vorlagen` : "";
         save.addEventListener("click", async () => {
             save.disabled = true;
 

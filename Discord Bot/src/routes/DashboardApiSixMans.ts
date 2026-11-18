@@ -7,7 +7,6 @@ import {
     BoardLink,
     DEFAULT_RANKS,
     IsMode,
-    MAX_RANKS,
     MAX_RANK_MIN,
     MAX_RANK_NAME,
     MAX_IDLE,
@@ -23,7 +22,8 @@ import {
     STATUS_LABELS,
     TEAM_LABELS,
 } from "../constants/SixMans";
-import { SixMansError } from "../services/SixMansService";
+import { SixMansError, SixMansLimits } from "../services/SixMansService";
+import { DashboardLimit } from "../builder/LimitReply";
 import { ManMode, RoundStatus } from "../interfaces/services/sixmans/ISixMans";
 import { WantsJSON } from "../utils/admin";
 import logger from "../utils/logger";
@@ -72,7 +72,7 @@ export default class DashboardApiSixMans extends Route {
 
             return reply.send(await this.Write(access, (request.body ?? {}) as IBody));
         } catch (error) {
-            if (error instanceof SixMansError) return reply.code(400).send({ error: error.message });
+            if (error instanceof SixMansError) return reply.code(400).send(error.limit ? DashboardLimit(error.limit, access.guild.id, error.message) : { error: error.message });
 
             throw error;
         }
@@ -117,7 +117,7 @@ export default class DashboardApiSixMans extends Route {
             teams: TEAM_LABELS,
             statuses: STATUS_LABELS,
             bodyKinds: BODY_KINDS,
-            limits: { start: [MIN_START, MAX_START], k: [MIN_K, MAX_K], idle: MAX_IDLE, page: PAGE_SIZE, ranks: MAX_RANKS, rankName: MAX_RANK_NAME, rankMin: MAX_RANK_MIN },
+            limits: { start: [MIN_START, MAX_START], k: [MIN_K, MAX_K], idle: MAX_IDLE, page: PAGE_SIZE, ...SixMansLimits(guild.id), rankName: MAX_RANK_NAME, rankMin: MAX_RANK_MIN },
             guild: { name: guild.name, ...GuildResources(guild) },
         };
     }

@@ -180,6 +180,9 @@ function settingOf(module: string, row: ISettingRow | undefined): IBotModuleSett
 
 function overrideOf(row: IOverrideRow): IBotModuleOverride {
     const config = json(row.config);
+    const stored = json(config.values);
+    // W-0137: nur Schlüssel aus dem Verzeichnis - alte Ausnahmen mit entfernten Grenzen ließen sich sonst nicht mehr speichern.
+    const values = Object.fromEntries(settingsOf(row.module).filter((def) => typeof stored[def.key] === "number").map((def) => [def.key, stored[def.key] as number]));
 
     return {
         module: row.module,
@@ -187,7 +190,7 @@ function overrideOf(row: IOverrideRow): IBotModuleOverride {
         status: row.status,
         notice: row.notice,
         linkMode: (LINK_MODES as readonly unknown[]).includes(config.linkMode) ? (config.linkMode as LinkMode) : null,
-        values: json(config.values) as Record<string, number>,
+        values,
         note: row.note,
         updatedAt: row.updated_at ? new Date(row.updated_at).toISOString() : null,
         updatedBy: row.updated_by,
@@ -206,6 +209,19 @@ async function settingFor(module: string): Promise<IBotModuleSetting> {
     const [row] = await query<ISettingRow[]>("SELECT module, status, notice, config, updated_at, updated_by FROM bot_module_settings WHERE module = ?", [module]);
 
     return settingOf(module, row);
+}
+
+/** W-0137: der Wert, der für einen Server gilt - Ausnahme, sonst Wert für alle, sonst Standard; immer in den Grenzen des Verzeichnisses. */
+export async function moduleValue(module: string, key: string, guildId: string): Promise<number> {
+    const def = settingsOf(module).find((entry) => entry.key === key);
+
+    if (!def) throw new Error(`${module}.${key} steht nicht im Verzeichnis.`);
+
+    const [all, own] = await Promise.all([settingFor(module), overrideFor(module, guildId)]);
+    // Review W-0137: wie LimitInfo im Bot - je Quelle gerundet und in den Grenzen, Ausnahme nur bei Werten je Server.
+    const clamp = (raw: unknown): number | undefined => (typeof raw === "number" && Number.isFinite(raw) ? Math.min(def.max, Math.max(def.min, Math.round(raw))) : undefined);
+
+    return clamp(def.server ? own?.values[key] : undefined) ?? clamp(all.values[key]) ?? def.standard;
 }
 
 async function overrideFor(module: string, guildId: string): Promise<IBotModuleOverride | null> {

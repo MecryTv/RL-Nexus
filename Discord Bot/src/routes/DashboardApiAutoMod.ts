@@ -2,8 +2,8 @@ import { FastifyReply, FastifyRequest } from "fastify";
 import BotClient from "../client/BotClient";
 import Route from "../structures/Route";
 import { DASHBOARD_PATH } from "../constants/Dashboard";
-import { ACTION_LABELS, AUTOMOD_MODULE, FILTERS, MAX_IGNORE, MAX_NOTICE, MAX_WORDS } from "../constants/AutoMod";
-import { AutoModError } from "../services/AutoModService";
+import { ACTION_LABELS, AUTOMOD_MODULE, FILTERS, MAX_NOTICE } from "../constants/AutoMod";
+import { AutoModError, AutoModLimits } from "../services/AutoModService";
 import { CreateLogThread, LogTargetError, LogTargets } from "../utils/logtarget";
 import { WantsJSON } from "../utils/admin";
 import logger from "../utils/logger";
@@ -62,7 +62,7 @@ export default class DashboardApiAutoMod extends Route {
             settings,
             filters: FILTERS,
             actions: ACTION_LABELS,
-            limits: { ignore: MAX_IGNORE, words: MAX_WORDS, notice: MAX_NOTICE },
+            limits: { ...AutoModLimits(guild.id), notice: MAX_NOTICE },
             targets: await LogTargets(guild, [settings.logChannelId]),
             // Verwarnen, Timeout, Kick und Bann legen einen Fall an - dafür muss
             // die Moderation an sein.

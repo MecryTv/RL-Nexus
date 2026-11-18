@@ -65,14 +65,16 @@ export async function checkModules(): Promise<void> {
     });
 
     // W-0133: Verzeichnis der Einstellungen und Werte je Server.
-    await check("Verzeichnis: 33 Werte in 10 Modulen, jeder Standard liegt in seinen Grenzen", () => {
+    await check("Verzeichnis: 63 Werte in 24 Modulen (W-0137), jeder Standard liegt in seinen Grenzen", () => {
         const all = Object.values(MODULE_SETTINGS).flat();
 
-        assert.equal(Object.keys(MODULE_SETTINGS).length, 10);
-        assert.equal(all.length, 33);
+        assert.equal(Object.keys(MODULE_SETTINGS).length, 24);
+        assert.equal(all.length, 63);
         assert.ok(all.every((def) => def.min <= def.standard && def.standard <= def.max), all.filter((def) => def.standard > def.max || def.standard < def.min).map((def) => def.key).join(","));
         assert.equal(MODULE_SETTINGS.tickets.find((def) => def.key === "maxOpenPerUser")?.max, 24);
-        assert.equal(MODULE_SETTINGS.gallery.find((def) => def.key === "imageMegabytes")?.max, 9);
+        // W-0137: Galerie und Transkript-Größe sind keine Grenzen mehr.
+        assert.equal(MODULE_SETTINGS.gallery, undefined);
+        assert.equal(MODULE_SETTINGS.tickets.some((def) => def.key === "transcriptMegabytes"), false);
     });
 
     await check("Werte für alle: nur bekannte Schlüssel, ganze Zahlen in den Grenzen", () => {

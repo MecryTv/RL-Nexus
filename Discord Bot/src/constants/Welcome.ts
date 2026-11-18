@@ -8,7 +8,7 @@ import { IMessageDoc } from "../interfaces/builder/IMessageDoc";
 export const WELCOME_ACCENT = "#00afff";
 export const LEAVE_ACCENT = "#6b7683";
 
-export const MAX_ROLES = 10;
+// W-0137: Auto-Rollen sind eine Grenze von RL Nexus (MODULE_SETTINGS, WelcomeRoleLimit).
 export const MAX_LINE = 120;
 export const MIN_TITLE_SIZE = 28;
 export const MAX_TITLE_SIZE = 72;

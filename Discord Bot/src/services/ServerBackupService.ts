@@ -20,6 +20,7 @@ import {
     TextInputStyle,
 } from "discord.js";
 import BotClient from "../client/BotClient";
+import { LimitReply } from "../builder/LimitReply";
 import { AutoFailedCard, AutomaticReply, BackupLabel, BackupReply, ChoiceLabel, CompareReply, CreatedReply, DayLabel, DoneCard, ListReply, LoadConfirm, Note, RunningCard, SafetyNotice, Strip } from "../builder/ServerBackupView";
 import { DASHBOARD_PATH } from "../constants/Dashboard";
 import { BACKUPS_MODULE, DEBRIS_WINDOW_MS, DefaultBackupSettings, IBackupSettings, SERVER_PART_IDS, SNAPSHOT_WAIT_MS } from "../constants/ServerBackup";
@@ -696,6 +697,17 @@ export default class ServerBackupService {
         const parts = what === "bot" ? ["bot"] : what === "server" ? ["server"] : ["bot", "server"];
         const made = await this.AskBackups(guild, actor, { method: "POST", path: "", body: { note, parts }, timeout: SNAPSHOT_WAIT_MS });
 
+        if (made.status === 409) {
+            // W-0137: Alle Plätze belegt ist eine Grenze von RL Nexus (maxHand) - dann die gelbe Karte mit Anfrage.
+            const full = await this.List(guild, actor);
+
+            if (typeof full !== "string" && full.hand.used >= full.hand.max) {
+                const card = LimitReply({ module: "backups", key: "maxHand", guildId: guild.id, admin: true, title: "Alle Plätze belegt", text: ErrorOf(made), asked: full.hand.used + 1 });
+
+                return { components: card.components, flags: MessageFlags.IsComponentsV2, allowedMentions: { parse: [] } } as MessageCreateOptions;
+            }
+        }
+
         if (made.status !== 200) return Note(ErrorOf(made));
 
         const meta = made.body as IBackupMeta;
@@ -708,7 +720,7 @@ export default class ServerBackupService {
     private async ListView(guild: Guild, actor: Actor, page: number): Promise<MessageCreateOptions> {
         const list = await this.List(guild, actor);
 
-        return typeof list === "string" ? Note(list) : ListReply({ backups: list.backups, page, strip: Strip(list.backups) });
+        return typeof list === "string" ? Note(list) : ListReply({ backups: list.backups, page, strip: Strip(list.backups), max: list.hand.max });
     }
 
     private async OpenView(guild: Guild, actor: Actor, backupId: number): Promise<MessageCreateOptions> {

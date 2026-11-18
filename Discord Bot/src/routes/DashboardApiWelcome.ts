@@ -2,10 +2,10 @@ import { FastifyReply, FastifyRequest } from "fastify";
 import BotClient from "../client/BotClient";
 import Route from "../structures/Route";
 import { DASHBOARD_PATH } from "../constants/Dashboard";
-import { BACKGROUND_HINT, DefaultCard, DefaultDoc, FONT_LABELS, LAYOUT_LABELS, MAX_AVATAR, MAX_RING, MAX_ROLES, MAX_TITLE_SIZE, MIN_AVATAR, MIN_TITLE_SIZE, WELCOME_PLACEHOLDER_KEYS } from "../constants/Welcome";
+import { BACKGROUND_HINT, DefaultCard, DefaultDoc, FONT_LABELS, LAYOUT_LABELS, MAX_AVATAR, MAX_RING, MAX_TITLE_SIZE, MIN_AVATAR, MIN_TITLE_SIZE, WELCOME_PLACEHOLDER_KEYS } from "../constants/Welcome";
 import { KIND_LABELS } from "../constants/Messages";
 import { IWelcomeMessage } from "../interfaces/services/welcome/IWelcome";
-import { WelcomeError, WELCOME_MODULE } from "../services/WelcomeService";
+import { WelcomeError, WelcomeRoleLimit, WELCOME_MODULE } from "../services/WelcomeService";
 import { WantsJSON } from "../utils/admin";
 import logger from "../utils/logger";
 import { GuildResources, IManageAccess, ManageGate } from "../utils/managegate";
@@ -65,7 +65,7 @@ export default class DashboardApiWelcome extends Route {
             defaults: { join: { doc: DefaultDoc("join"), card: DefaultCard("join") }, leave: { doc: DefaultDoc("leave"), card: DefaultCard("leave") } },
             placeholders: WELCOME_PLACEHOLDER_KEYS,
             kinds: { card: "Welcome Card (Bild)", ...KIND_LABELS },
-            limits: { roles: MAX_ROLES, titleMin: MIN_TITLE_SIZE, titleMax: MAX_TITLE_SIZE, avatarMin: MIN_AVATAR, avatarMax: MAX_AVATAR, ringMax: MAX_RING },
+            limits: { roles: WelcomeRoleLimit(guild.id), titleMin: MIN_TITLE_SIZE, titleMax: MAX_TITLE_SIZE, avatarMin: MIN_AVATAR, avatarMax: MAX_AVATAR, ringMax: MAX_RING },
             layouts: LAYOUT_LABELS,
             fonts: FONT_LABELS,
             background: BACKGROUND_HINT,

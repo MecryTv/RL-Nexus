@@ -29,12 +29,12 @@ import {
     LFT_POST_KEYS,
     LFT_PREVIEW_KEYS,
     LFT_QUESTION_KEYS,
-    MAX_EXPIRE,
-    MAX_QUESTIONS,
     MAX_TAG_NAME,
 } from "../constants/Lft";
 import { ILftAnswer, ILftQuestion, ILftSettings } from "../interfaces/services/lft/ILft";
-import { LftError } from "../services/LookingForService";
+import { LftError, LftLimits } from "../services/LookingForService";
+import DashboardApiLft from "../routes/DashboardApiLft";
+import { SetFlags } from "../utils/moduleFlags";
 import { CleanLftAnswers } from "../services/LftModal";
 import { ModalParts, ModalTitle } from "../services/ApplyFlow";
 
@@ -187,11 +187,11 @@ function checkClean(client: BotClient): void {
 
     const many = service.CleanSettings(
         guild,
-        { player: { questions: Array.from({ length: MAX_QUESTIONS + 5 }, (_, index) => ({ id: `q${index + 1}`, label: `Frage ${index + 1}`, kind: "short" })) } },
+        { player: { questions: Array.from({ length: 20 }, (_, index) => ({ id: `q${index + 1}`, label: `Frage ${index + 1}`, kind: "short" })) } },
         base
     ).player.questions;
 
-    check(`Mehr als ${MAX_QUESTIONS} Fragen gehen nicht`, many.length === MAX_QUESTIONS, String(many.length));
+    check("Mehr als 15 Fragen gehen nicht", many.length === 15, String(many.length));
 
     refuses("Ohne Fragen geht es nicht", () => service.CleanSettings(guild, { player: { questions: [] } }, base));
     refuses("Ohne Titel auch nicht", () =>
@@ -203,13 +203,27 @@ function checkClean(client: BotClient): void {
 
     const rest = service.CleanSettings(
         guild,
-        { notice: { channelId: VOICE, roles: [ROLE, GUILD, ROLE, "123"] }, expireDays: 9999, manageRoles: [ROLE, ROLE, GUILD] },
+        { notice: { channelId: VOICE, roles: [ROLE, GUILD, ROLE, "123"] }, expireDays: 100, manageRoles: [ROLE, ROLE, GUILD] },
         base
     );
 
     check("Die Meldung braucht einen Textkanal", rest.notice.channelId === null);
     check("@everyone wird nicht gepingt", !rest.notice.roles.includes(GUILD) && rest.notice.roles.join(",") === ROLE);
-    check("Die Laufzeit wird geklemmt", rest.expireDays === MAX_EXPIRE, String(rest.expireDays));
+    check("Die Laufzeit kommt an", rest.expireDays === 100, String(rest.expireDays));
+    // Review W-0137, Muster aus W-0133: über dem Wert des Servers ablehnen statt still kürzen, mit dem Satz zur Grenze.
+    refuses("Mehr Tage als der Server darf: abgelehnt", () => service.CleanSettings(guild, { expireDays: 300 }, base));
+
+    let sentence = "";
+
+    try {
+        service.CleanSettings(guild, { expireDays: 9999 }, base);
+    } catch (error) {
+        sentence = error instanceof Error ? error.message : String(error);
+    }
+
+    check("…mit dem Satz zur Grenze", sentence.startsWith("Höchstens 180 Tage.") && sentence.includes("RL Nexus"), sentence);
+    check("Ein schon gespeicherter höherer Wert darf bleiben", service.CleanSettings(guild, { expireDays: 300 }, { ...base, expireDays: 300 }).expireDays === 300);
+    check("0 heißt weiter: nie schließen", service.CleanSettings(guild, { expireDays: 0 }, base).expireDays === 0);
     check("Doppelte Rollen fallen weg", rest.manageRoles.join(",") === ROLE);
 
     const text = service.CleanSettings(guild, { notice: { channelId: TEXT } }, base);
@@ -640,6 +654,37 @@ async function checkLists(): Promise<void> {
     check("Die Bildquellen stimmen überein", images.length === 2 && images.includes("{user.avatar}"), images.join(", "));
 }
 
+/** W-0137: ein Server-Wert für die Grenzen von lft. */
+function Limits(values: Record<string, number>) {
+    return { module: "lft", guildId: GUILD, status: null, notice: null, linkMode: null, values, updatedAt: null };
+}
+
+/** W-0137: Fragen und Laufzeit sind Grenzen von RL Nexus, je Server änderbar. */
+async function checkW137(client: BotClient): Promise<void> {
+    console.log("\n  — W-0137: Grenzen —");
+
+    const service = client.lookingForService;
+    const guild = FakeGuild();
+    const base = DefaultLftSettings();
+    const input = { player: { questions: Array.from({ length: 30 }, (_, index) => ({ id: `q${index + 1}`, label: `Frage ${index + 1}`, kind: "short" })) }, expireDays: 300 };
+    const route = new DashboardApiLft(client) as unknown as { Read(access: unknown, query: unknown): Promise<Record<string, any>> };
+
+    service.Settings = async () => base;
+
+    check("Standard: 15 Fragen, 180 Tage", JSON.stringify(LftLimits(GUILD)) === JSON.stringify({ questions: 15, expireDays: 180 }), JSON.stringify(LftLimits(GUILD)));
+    SetFlags([], [], [], [Limits({ maxQuestions: 20, maxExpireDays: 365 })]);
+
+    const own = service.CleanSettings(guild, input, base);
+
+    check("Server-Wert 20 lässt 20 Fragen", own.player.questions.length === 20, String(own.player.questions.length));
+    check("Server-Wert 365 lässt 300 Tage", own.expireDays === 300, String(own.expireDays));
+
+    const read = await route.Read({ guild: { id: GUILD, name: "Dev Server", channels: { cache: new Map() }, roles: { cache: new Map() }, emojis: { cache: new Map() }, members: { cache: new Map() } } }, {});
+
+    check("Route gibt den Server-Wert an die Seite", read.limits?.questions === 20 && read.limits?.expire === 365, JSON.stringify(read.limits));
+    SetFlags([], [], []);
+}
+
 async function main(): Promise<void> {
     console.log("\n🔎 Looking for\n");
 
@@ -655,6 +700,7 @@ async function main(): Promise<void> {
     await checkPublishSave();
     await checkModalFinish();
     await checkLists();
+    await checkW137(client);
 
     console.log(failures === 0 ? "\n✅ Alle Prüfungen bestanden.\n" : `\n❌ ${failures} Prüfung(en) fehlgeschlagen.\n`);
 

@@ -11,13 +11,12 @@ import {
     MAX_BUTTONS,
     MAX_MENU_OPTIONS,
     MAX_MENUS,
-    MAX_MESSAGES,
-    MAX_RESPONSES,
     NextRun,
     WEEKDAYS,
 } from "../constants/Messages";
 import { ICustomMessage } from "../interfaces/services/messages/IMessages";
-import { MessageError, MESSAGES_MODULE } from "../services/MessageService";
+import { MessageError, MessageLimits, MESSAGES_MODULE } from "../services/MessageService";
+import { DashboardLimit } from "../builder/LimitReply";
 import { WantsJSON } from "../utils/admin";
 import logger from "../utils/logger";
 import { GuildResources, IManageAccess, ManageGate } from "../utils/managegate";
@@ -62,7 +61,7 @@ export default class DashboardApiMessages extends Route {
 
             return reply.send(await this.Write(access, (request.body ?? {}) as IBody));
         } catch (error) {
-            if (error instanceof MessageError) return reply.code(400).send({ error: error.message });
+            if (error instanceof MessageError) return reply.code(400).send(error.limit ? DashboardLimit(error.limit, access.guild.id, error.message) : { error: error.message });
 
             throw error;
         }
@@ -84,7 +83,7 @@ export default class DashboardApiMessages extends Route {
         return {
             messages: messages.map((message) => this.Out(message, access)),
             responses,
-            limits: { messages: MAX_MESSAGES, responses: MAX_RESPONSES, buttons: MAX_BUTTONS, menus: MAX_MENUS, menuOptions: MAX_MENU_OPTIONS },
+            limits: { ...MessageLimits(guild.id), buttons: MAX_BUTTONS, menus: MAX_MENUS, menuOptions: MAX_MENU_OPTIONS },
             defaults: { message: DefaultMessageDoc(), response: DefaultResponseDoc(), embed: DefaultEmbed() },
             weekdays: WEEKDAYS,
             matches: MATCH_LABELS,
