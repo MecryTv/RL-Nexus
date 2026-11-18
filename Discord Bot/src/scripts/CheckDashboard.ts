@@ -23,6 +23,7 @@ import { MODULE_IDS, PERMANENT_MODULES } from "../constants/Modules";
 import { MODULE_SETTINGS } from "../constants/ModuleSettings";
 import { DefaultRouletteSettings } from "../constants/RocketRoulette";
 import { AdminStatus, AskAdmin, BackupCall } from "../routes/DashboardApiBackups";
+import { ForwardVitals } from "../routes/DashboardVitals";
 import { DASHBOARD_HOME, DASHBOARD_PATH, DEVELOPER_MODE, DISCORD_EPOCH, OAUTH_SCOPES, SESSION_COOKIE } from "../constants/Dashboard";
 import { FastifyRequest } from "fastify";
 import { WantsJSON } from "../utils/admin";
@@ -1997,6 +1998,43 @@ async function main(): Promise<void> {
     const pointers = [await source("dashboard", "client", "constants", "Ranks.ts"), await source("builder", "EpicPage.ts"), await source("dashboard", "client", "layout", "RoleListImageEditor.ts")].join("\n");
 
     check("Client und Epic-Seite zeigen auf die WebP-Dateien", !/rlranks\/small\/[^`]*\.png|Banner\.png/.test(pointers) && pointers.includes("Banner.webp"));
+
+    // W-0141: echte Ladezeiten gehen ans Admin Dashboard, mit eigenem Token; der Browser bekommt immer 204.
+    const { createServer: vitalsServer } = await import("node:http");
+    const relayed: { url?: string; auth?: string; body: string }[] = [];
+    const vitalsAdmin = vitalsServer((request, response) => {
+        let body = "";
+
+        request.on("data", (chunk) => (body += String(chunk)));
+        request.on("end", () => {
+            relayed.push({ url: request.url, auth: request.headers.authorization, body });
+            response.writeHead(204).end();
+        });
+    });
+
+    await new Promise<void>((resolve) => vitalsAdmin.listen(0, "127.0.0.1", resolve));
+
+    const vitalsUrl = `http://127.0.0.1:${(vitalsAdmin.address() as { port: number }).port}`;
+    const forwarded = await ForwardVitals(vitalsUrl, client.config.SERVER_JWT_SECRET, { device: "mobile", metrics: { LCP: 1800 } });
+    const scopeOf = (auth = "") => (JSON.parse(Buffer.from(auth.replace("Bearer ", "").split(".")[1] ?? "", "base64url").toString() || "{}") as { scope?: string[] }).scope ?? [];
+
+    check("Ladezeiten: weitergereicht an /internal/vitals mit Scope vitals", forwarded === 204 && relayed[0]?.url === "/internal/vitals" && scopeOf(relayed[0]?.auth).includes("vitals") && JSON.parse(relayed[0].body).metrics.LCP === 1800, JSON.stringify(relayed));
+
+    const savedAdmin = client.config.ADMIN_INTERNAL_URL;
+
+    client.config.ADMIN_INTERNAL_URL = vitalsUrl;
+
+    try {
+        const beacon = await fetch(`${BASE}${P}/api/vitals`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ device: "desktop", metrics: { INP: 80 } }) });
+        const tooBig = await fetch(`${BASE}${P}/api/vitals`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pad: "x".repeat(4096) }) });
+
+        for (let wait = 0; wait < 20 && relayed.length < 2; wait++) await new Promise((resolve) => setTimeout(resolve, 25));
+
+        check("Ladezeiten: Route ohne Sitzung 204, setzt kein Cookie, reicht weiter; zu groß 413", beacon.status === 204 && !beacon.headers.get("set-cookie") && relayed.length === 2 && tooBig.status === 413, `${beacon.status} ${tooBig.status} ${relayed.length}`);
+    } finally {
+        client.config.ADMIN_INTERNAL_URL = savedAdmin;
+        vitalsAdmin.close();
+    }
 
     // W-0114: Galerie-Bilder nur als das, was sie sind - der Browser rät nicht.
     const galleryImage = await fetch(`${BASE}/images/default/rocketleague/plattforms/steam.png`);

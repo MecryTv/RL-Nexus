@@ -68,6 +68,7 @@ import { setStripeGateway } from "./shop/stripe.ts";
 import { STATE_KEYS, lastStatusPost, refreshNow, stateKey, stopStatusPost, updateStatusPost } from "./status-post.ts";
 import { STATUS_IMAGES } from "./status/image.ts";
 import { historyData, publicStatus, refreshStatus, statusSnapshot } from "./status/snapshot.ts";
+import { parseVitals, recordVitals, vitalsReport } from "./vitals.ts";
 
 const CHANNEL = "900000000000000009";
 
@@ -549,6 +550,48 @@ try {
 
         assert.ok(expected.length > 0, "keine Stunden in status_checks");
         assert.deepEqual(kept, expected);
+    });
+
+    await check("W-0141: Ladezeiten landen als Stundensummen, der Bericht rechnet p75, cleanup räumt nach 90 Tagen", async () => {
+        const at = new Date(Date.now() - 3 * 24 * 3_600_000);
+        const old = new Date(Date.now() - 100 * 24 * 3_600_000);
+        const hour = (date: Date) => `${date.toISOString().slice(0, 13).replace("T", " ")}:00:00`;
+        const mine = "DELETE FROM web_vitals_hours WHERE hour IN (?, ?)";
+
+        await query(mine, [hour(at), hour(old)]);
+
+        try {
+            await recordVitals("website", parseVitals({ device: "mobile", metrics: { LCP: 1200, CLS: 0.02 } }), at);
+            await recordVitals("website", parseVitals({ device: "mobile", metrics: { LCP: 1300 } }), at);
+            await recordVitals("dashboard", parseVitals({ device: "desktop", metrics: { INP: 90 } }), at);
+            await recordVitals("website", parseVitals({ device: "desktop", metrics: { LCP: 900 } }), old);
+
+            const rows = await query<{ service: string; metric: string; bin: number; samples: number; total: number | string }[]>(
+                "SELECT service, metric, bin, samples, total FROM web_vitals_hours WHERE hour = ? ORDER BY service, metric",
+                [hour(at)]
+            );
+
+            assert.deepEqual(
+                rows.map((row) => [row.service, row.metric, row.bin, row.samples, Number(row.total)]),
+                [
+                    ["website", "LCP", 2, 2, 2500],
+                    ["website", "CLS", 1, 1, 20],
+                    ["dashboard", "INP", 1, 1, 90],
+                ]
+            );
+
+            const report = await vitalsReport(7);
+            const website = report.services.find((entry) => entry.service === "website");
+
+            assert.ok((website?.all.find((stat) => stat.metric === "LCP")?.samples ?? 0) >= 2);
+            assert.ok((website?.days.length ?? 0) >= 1);
+
+            await cleanup();
+            assert.equal((await query<unknown[]>("SELECT 1 FROM web_vitals_hours WHERE hour = ?", [hour(old)])).length, 0, "älter als 90 Tage");
+            assert.equal((await query<unknown[]>("SELECT 1 FROM web_vitals_hours WHERE hour = ?", [hour(at)])).length, 3, "jünger bleibt");
+        } finally {
+            await query(mine, [hour(at), hour(old)]);
+        }
     });
 
     await check("Detail aus echten Zeilen und /public/status mit points und series", async () => {

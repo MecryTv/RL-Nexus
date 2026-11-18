@@ -29,6 +29,7 @@ import { buildUserUI } from "./layout/UserMenu.js";
 import { showFailure } from "./layout/Failure.js";
 import { watchScroll } from "./layout/Topbar.js";
 import { applyCatalog } from "./constants/Modules.js";
+import { url } from "./core/Base.js";
 
 /**
  * Die Daten kamen nicht. Der Grund steht in der Konsole, hier steht, was der
@@ -80,6 +81,9 @@ function failed(page: string): void {
 
 async function boot(): Promise<void> {
     const page = document.body.dataset.page;
+
+    // W-0141: echte Ladezeiten, auf jeder Seite. Eigenes Stück, lädt neben allem anderen.
+    void import("./core/Vitals.js").then((module) => module.startVitals(url("/api/vitals")));
 
     watchScroll();
     applyMotion();

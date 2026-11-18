@@ -44,6 +44,7 @@ import { changelogRoutes } from "./routes/changelog.ts";
 import { publicStatusRoutes, statusRoutes } from "./routes/status.ts";
 import { userRoutes } from "./routes/users.ts";
 import { noteRequest } from "./slow.ts";
+import { publicVitalsRoutes, vitalsRoutes } from "./routes/vitals.ts";
 
 /** Der Build der Oberfläche (npm run build). Fehlt er, liefert der Server nur die API. */
 const DIST = path.join(import.meta.dirname, "..", "dist");
@@ -91,6 +92,7 @@ export async function buildApp(config: IConfig): Promise<FastifyInstance> {
     await app.register(internalServerRoutes, { config });
     await app.register(internalSecurityRoutes, { config });
     await app.register(publicSecurityRoutes, { config });
+    await app.register(publicVitalsRoutes, { config });
     await app.register(mediaFileRoutes, { config });
 
     // Alles hier drin braucht eine Sitzung, die Rolle wird bei jeder Anfrage geprüft.
@@ -136,6 +138,7 @@ export async function buildApp(config: IConfig): Promise<FastifyInstance> {
             await dev.register(redisRoutes, { config });
             await dev.register(dumpRoutes, { config });
             await dev.register(changelogRoutes, { config });
+            await dev.register(vitalsRoutes);
         });
     });
 

@@ -9,6 +9,8 @@ import { buildApp } from "../app.ts";
 import { loadConfig } from "../config.ts";
 import { SESSION_COOKIE, seal } from "../session.ts";
 import { SLOW_REQUEST_MS, SLOW_SQL_MS, forgetSlow, noteQuery, noteRequest, slowReport } from "../slow.ts";
+import { binOf, p75Of, parseVitals, statOf } from "../vitals.ts";
+import { signToken } from "../bot.ts";
 import { USERS, fake } from "./fakes.ts";
 import { ENV, SECRET, check, section } from "./harness.ts";
 
@@ -508,6 +510,52 @@ export async function checkDev(): Promise<void> {
             } finally {
                 fake.botDown = false;
             }
+        });
+
+        await check("W-0141: Ladezeiten prüfen: Gerät und Werte, CLS mal 1000, Unsinn fällt weg, Stufen an den Google-Grenzen", () => {
+            assert.deepEqual(parseVitals({ device: "mobile", metrics: { LCP: 1834.6, CLS: 0.051, INP: -3, TTFB: "x", FID: 12 } }), {
+                device: "mobile",
+                values: [
+                    ["LCP", 1835],
+                    ["CLS", 51],
+                ],
+            });
+            assert.deepEqual(parseVitals({ device: "desktop", metrics: { LCP: 999_999, INP: 120 } }).values, [["INP", 120]]);
+            assert.throws(() => parseVitals({ device: "fernseher", metrics: { LCP: 1 } }), /Gerät/);
+            assert.throws(() => parseVitals({ device: "mobile", metrics: { LCP: 999_999 } }), /Messwerte/);
+            assert.throws(() => parseVitals("kaputt"), /Gerät/);
+            assert.deepEqual([binOf("LCP", 2500), binOf("LCP", 2501), binOf("LCP", 4000), binOf("LCP", 4001), binOf("LCP", 50_000)], [4, 5, 6, 7, 9]);
+        });
+
+        await check("W-0141: p75 und Anteile aus den Stufen", () => {
+            // 100 Aufrufe: 60 in 1000-1500, 30 in 2000-2500, 10 über 10 s (Mittel 12 s).
+            const rows = [
+                { metric: "LCP" as const, bin: 2, samples: 60, total: 60 * 1200 },
+                { metric: "LCP" as const, bin: 4, samples: 30, total: 30 * 2300 },
+                { metric: "LCP" as const, bin: 9, samples: 10, total: 10 * 12_000 },
+            ];
+            const stat = statOf("LCP", rows);
+
+            // 75 % fallen in die Stufe 2000-2500: 15 von 30 hinein, also die Mitte.
+            assert.deepEqual([stat.samples, stat.p75, stat.good, stat.poor], [100, 2250, 0.9, 0.1]);
+            assert.equal(stat.mean, Math.round((60 * 1200 + 30 * 2300 + 10 * 12_000) / 100));
+            assert.equal(p75Of("LCP", [{ metric: "LCP", bin: 9, samples: 4, total: 4 * 15_000 }]), 15_000);
+            assert.deepEqual(statOf("INP", rows), { metric: "INP", samples: 0, p75: null, mean: null, good: null, poor: null });
+        });
+
+        await check("W-0141: /public/vitals ohne Sitzung (204, Unsinn 400), /internal/vitals nur mit Token, /api/dev/vitals nur für Developer", async () => {
+            const beacon = (url: string, payload: unknown, headers: Record<string, string> = {}) =>
+                app.inject({ method: "POST", url, headers: { "content-type": "application/json", ...headers }, payload: JSON.stringify(payload) });
+
+            assert.equal((await beacon("/public/vitals", { device: "mobile", metrics: { LCP: 1800 } })).statusCode, 204);
+            assert.equal((await beacon("/public/vitals", { device: "mobile", metrics: {} })).statusCode, 400);
+            assert.equal((await beacon("/public/vitals", { device: "mobile", metrics: { LCP: 1800 }, pad: "x".repeat(4096) })).statusCode, 413);
+            assert.equal((await beacon("/internal/vitals", { device: "desktop", metrics: { INP: 90 } })).statusCode, 401);
+            assert.equal((await beacon("/internal/vitals", { device: "desktop", metrics: { INP: 90 } }, { authorization: `Bearer ${signToken(config.jwtSecret, "dashboard", ["servers"])}` })).statusCode, 401);
+            assert.equal((await beacon("/internal/vitals", { device: "desktop", metrics: { INP: 90 } }, { authorization: `Bearer ${signToken(config.jwtSecret, "dashboard", ["vitals"])}` })).statusCode, 204);
+            assert.equal((await get("/api/dev/vitals", admin)).statusCode, 403);
+            assert.equal((await get("/api/dev/vitals?days=5")).statusCode, 400);
+            assert.equal((await get("/api/dev/vitals")).statusCode, 503, "ohne Datenbank");
         });
     } finally {
         await app.close();
