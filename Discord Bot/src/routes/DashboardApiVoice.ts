@@ -4,7 +4,7 @@ import BotClient from "../client/BotClient";
 import Route from "../structures/Route";
 import { DASHBOARD_PATH } from "../constants/Dashboard";
 import { MAX_PRESETS, VOICE_ACTIONS, VOICE_REGIONS } from "../constants/Voice";
-import { IVoiceHub } from "../interfaces/services/voice/IVoice";
+import { ITempVoice, IVoiceHub } from "../interfaces/services/voice/IVoice";
 import { VoiceError, VoiceLimits, VOICE_MODULE } from "../services/VoiceService";
 import { DashboardLimit } from "../builder/LimitReply";
 import { WantsJSON } from "../utils/admin";
@@ -31,7 +31,8 @@ export default class DashboardApiVoice extends Route {
             description: "Temp-Voice-Hubs eines Servers",
             prefixed: false,
             requiresAuth: false,
-            rateLimit: { max: 60, timeWindow: "1 minute" },
+            // Review W-0143: Das Fenster lädt bei jedem Sprachwechsel neu; GET und POST teilen sich den Zähler.
+            rateLimit: { max: 120, timeWindow: "1 minute" },
         });
     }
 
@@ -68,6 +69,54 @@ export default class DashboardApiVoice extends Route {
         };
     }
 
+    /** W-0143: alles zu einem offenen Kanal für das Fenster - Live-Werte aus dem Discord-Cache, der Rest aus temp_voices. */
+    private OpenOut(temp: ITempVoice, guild: IManageAccess["guild"]) {
+        const found = guild.channels.cache.get(temp.channelId);
+        const channel = found?.isVoiceBased() ? found : null;
+        const owner = guild.members.cache.get(temp.ownerId);
+        const people = [...(channel?.members.values() ?? [])]
+            .map((member) => ({
+                id: member.id,
+                name: member.displayName,
+                username: member.user.username,
+                avatar: member.displayAvatarURL({ extension: "webp", size: 64 }),
+                owner: member.id === temp.ownerId,
+                mute: Boolean(member.voice.selfMute || member.voice.serverMute),
+                deaf: Boolean(member.voice.selfDeaf || member.voice.serverDeaf),
+                stream: Boolean(member.voice.streaming),
+                video: Boolean(member.voice.selfVideo),
+            }))
+            .sort((a, b) => Number(b.owner) - Number(a.owner) || a.name.localeCompare(b.name, "de"));
+
+        return {
+            channelId: temp.channelId,
+            // W-0140: die Seite gruppiert offene Kanäle nach Hub.
+            hubId: temp.hubId,
+            name: found?.name ?? "(weg)",
+            owner: owner?.displayName ?? temp.ownerId,
+            members: channel ? channel.members.size : 0,
+            privacy: temp.settings.privacy,
+            createdAt: temp.createdAt,
+            ownerId: temp.ownerId,
+            support: temp.support,
+            stealth: temp.settings.stealth,
+            limit: channel ? channel.userLimit : temp.settings.limit,
+            bitrate: channel ? Math.round(channel.bitrate / 1000) : 0,
+            region: channel ? channel.rtcRegion : temp.settings.region,
+            category: channel?.parent?.name ?? null,
+            people,
+            trusted: temp.settings.trusted.map((id) => this.Name(guild, id)),
+            blocked: temp.settings.blocked.map((id) => this.Name(guild, id)),
+        };
+    }
+
+    /** Vertraute und Gesperrte: ohne Mitglied im Cache bleibt die ID der Name. */
+    private Name(guild: IManageAccess["guild"], id: string) {
+        const member = guild.members.cache.get(id);
+
+        return { id, name: member?.displayName ?? id, avatar: member?.displayAvatarURL({ extension: "webp", size: 64 }) ?? null };
+    }
+
     private async Read(access: IManageAccess) {
         const { guild } = access;
         const hubs = await this.client.voiceHubs.OfGuild(guild.id);
@@ -81,21 +130,7 @@ export default class DashboardApiVoice extends Route {
             settings: await this.client.voiceService.Settings(guild.id),
             actions: VOICE_ACTIONS,
             regions: VOICE_REGIONS,
-            open: open.map((temp) => {
-                const channel = guild.channels.cache.get(temp.channelId);
-                const owner = guild.members.cache.get(temp.ownerId);
-
-                return {
-                    channelId: temp.channelId,
-                    // W-0140: die Seite gruppiert offene Kanäle nach Hub.
-                    hubId: temp.hubId,
-                    name: channel?.name ?? "(weg)",
-                    owner: owner?.displayName ?? temp.ownerId,
-                    members: channel?.isVoiceBased() ? channel.members.size : 0,
-                    privacy: temp.settings.privacy,
-                    createdAt: temp.createdAt,
-                };
-            }),
+            open: open.map((temp) => this.OpenOut(temp, guild)),
             guild: {
                 name: guild.name,
                 ...resources,
