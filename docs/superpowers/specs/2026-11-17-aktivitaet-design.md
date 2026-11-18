@@ -106,6 +106,15 @@ Das nginx-Protokoll liegt schon vor und braucht keins von beidem.
   Scannern (Pfade wie `/wp-…`, `/.env`, `/.git`, `*.php`, `/xmlrpc`) und alle
   Anfragen, während im Admin eine Wartung für diesen Dienst lief; sonst sagte
   die Ampel nichts über echte Fehler.
+  **Nachtrag W-0139 (Nutzer, 18.11.2026):** Mit echten Daten lag der 4xx-Anteil
+  fast nur an Scannern mit wechselnden Pfaden. Als 4xx-Fehler zählt seitdem nur
+  „Seite nicht gefunden“ (404), wenn der Aufruf von einer eigenen Seite kam
+  (Referer `nexus-emb.de` oder eine Subdomain): kaputte Links und fehlende Dateien
+  bei uns. Andere 4xx und 404 ohne eigenen Referer sind Rauschen und zählen wie
+  Scanner gar nicht. 5xx zählen weiter alle. Der Scanner-Filter erkennt `.env`,
+  `.git` und Co. an jeder Stelle, Verwaltungspfade (`/cgi-bin`, `/phpmyadmin`,
+  `/vendor/`) und Endungen wie `.asp`, `.bak`, `.sql`. Schon gespeicherte Stunden
+  bleiben, wie sie sind.
 - **Speicherung:** eine Tabelle mit Summen je Stunde (Europe/Berlin) × Dienst ×
   Gerät × Herkunft, dazu Summen je Stunde × Dienst × Statusklasse. Migration 031.
   Aufbewahrung 13 Monate, dann gelöscht.

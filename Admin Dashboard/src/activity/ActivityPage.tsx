@@ -40,7 +40,7 @@ const SOURCE_LABELS: Readonly<Record<ActivitySource, string>> = {
     topgg: "top.gg",
     other: "Sonstige",
 };
-/** Ampel: grün bis 2 % (4xx) und 0,5 % (5xx), darüber gelb mit Warnzeichen. */
+/** Ampel: grün bis 2 % (404 von eigenen Seiten, W-0139) und 0,5 % (5xx), darüber gelb mit Warnzeichen. */
 const LIMITS = { client: 0.02, server: 0.005 } as const;
 
 const PERCENT = new Intl.NumberFormat("de-DE", { maximumFractionDigits: 1 });
@@ -205,10 +205,10 @@ export function ActivityPage(): JSX.Element {
                                 <span className={styles.muted}>Anteil aller Anfragen</span>
                             </header>
                             <div className={styles.errors}>
-                                <ErrorRow share={data.errors.client} limit={LIMITS.client} label="Seite nicht gefunden (4xx)" />
+                                <ErrorRow share={data.errors.client} limit={LIMITS.client} label="Seite nicht gefunden (404)" />
                                 <ErrorRow share={data.errors.server} limit={LIMITS.server} label="Serverfehler (5xx)" />
                             </div>
-                            <p className={styles.muted}>In Ordnung bis 2 % (4xx) und 0,5 % (5xx). Bots, Scanner und Wartungszeiten zählen nicht mit.</p>
+                            <p className={styles.muted}>In Ordnung bis 2 % (404) und 0,5 % (5xx). Als 404 zählen nur kaputte Links und fehlende Dateien auf unseren Seiten; Bots, Scanner und Wartungszeiten zählen nicht mit.</p>
                         </Panel>
                     </div>
                 </>
