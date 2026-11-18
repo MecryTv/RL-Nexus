@@ -167,6 +167,7 @@ export async function internalBackupRoutes(app: FastifyInstance, { config }: { c
             plan: planState(await readPlan(guildId)),
             backups: await listBackups(guildId, "server"),
             hand: { used: await countHand(guildId, "server"), max: await moduleValue("backups", "maxHand", guildId) },
+            keepMax: await moduleValue("backups", "maxPlanKeep", guildId),
         };
     });
 

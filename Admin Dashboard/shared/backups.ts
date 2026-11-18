@@ -229,6 +229,8 @@ export interface IServerBackups {
     /** Neueste zuerst. */
     readonly backups: readonly IBackupMeta[];
     readonly hand: { readonly used: number; readonly max: number };
+    /** W-0137: so viele automatische Backups darf der Server behalten (maxPlanKeep). */
+    readonly keepMax: number;
 }
 
 /** Höchstlänge der Notiz bei einem Backup von Hand. */

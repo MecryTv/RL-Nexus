@@ -774,7 +774,9 @@ export async function checkBackupsDb(config: IConfig, http: IHttp): Promise<void
 
                 const full = await http.raw("POST", internal, botHeaders(), { note: "elftes" });
                 assert.equal(full.statusCode, 409, full.body);
-                assert.equal(((await http.raw("GET", internal, botHeaders())).json() as IServerBackups).hand.max, 10);
+                const standard = (await http.raw("GET", internal, botHeaders())).json() as IServerBackups;
+                assert.equal(standard.hand.max, 10);
+                assert.equal(standard.keepMax, 14, "Behalten höchstens: Standard");
                 assert.equal((await http.raw("PUT", `${internal}/plan`, botHeaders(), plan)).statusCode, 400, "20 behalten ohne Ausnahme");
 
                 await override({ maxHand: 12, maxPlanKeep: 20 });
@@ -782,7 +784,9 @@ export async function checkBackupsDb(config: IConfig, http: IHttp): Promise<void
                 const eleventh = await http.raw("POST", internal, botHeaders(), { note: "elftes" });
                 assert.equal(eleventh.statusCode, 200, eleventh.body);
                 made.push((eleventh.json() as IBackupMeta).id);
-                assert.equal(((await http.raw("GET", internal, botHeaders())).json() as IServerBackups).hand.max, 12, "Antwort zeigt den Server-Wert");
+                const own = (await http.raw("GET", internal, botHeaders())).json() as IServerBackups;
+                assert.equal(own.hand.max, 12, "Antwort zeigt den Server-Wert");
+                assert.equal(own.keepMax, 20, "Behalten höchstens: Server-Wert für die Seite");
 
                 const saved = await http.raw("PUT", `${internal}/plan`, botHeaders(), plan);
                 assert.equal(saved.statusCode, 200, saved.body);
