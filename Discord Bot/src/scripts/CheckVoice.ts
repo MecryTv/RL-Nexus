@@ -17,7 +17,8 @@ import BotClient from "../client/BotClient";
 import { VoicePanel, VoicePresetList, VoiceState } from "../builder/VoiceView";
 import { DefaultHubConfig, DefaultVoiceSettings, FormatVoiceName, MAX_LIMIT, MAX_PRESETS, VOICE_ACTIONS } from "../constants/Voice";
 import { IVoiceSettings } from "../interfaces/services/voice/IVoice";
-import { VoiceError } from "../services/VoiceService";
+import { VoiceError, VoiceLimits } from "../services/VoiceService";
+import { SetFlags } from "../utils/moduleFlags";
 
 const GUILD = "90071992547409961";
 const USER = "90071992547409962";
@@ -338,6 +339,62 @@ function checkSupport(client: BotClient): void {
     check("Nur ein echter Wahrheitswert zählt", service.CleanConfig(guild, { support: "ja" }, config).support === false);
 }
 
+/** W-0137: ein Server-Wert für die Grenzen von voice-hub. */
+function Limits(values: Record<string, number>) {
+    return { module: "voice-hub", guildId: GUILD, status: null, notice: null, linkMode: null, values, updatedAt: null };
+}
+
+/** W-0137: Hubs, Temp-Kanäle und Vertraute sind Grenzen von RL Nexus, je Server änderbar. Ohne Datenbank, die Stubs kommen wieder weg. */
+async function checkW137(client: BotClient): Promise<void> {
+    console.log("\n  — W-0137: Grenzen —");
+
+    const service = client.voiceService;
+    const sent: string[] = [];
+    let created = 0;
+    const base = FakeGuild();
+    const guild = { ...base, channels: { ...base.channels, create: async () => (created++, { id: TEMP, name: "Laras Kanal", send: async () => undefined }) } } as unknown as Guild;
+    const member = { ...FakeMember(guild, USER, null), send: async (text: string) => void sent.push(text) } as unknown as GuildMember;
+    const hub = { id: 1, guildId: GUILD, channelId: HUB, config: { ...DefaultHubConfig(), presets: false }, createdBy: USER };
+    const create = (service as unknown as { Create(hub: unknown, member: GuildMember): Promise<void> }).Create.bind(service);
+    const original = { temps: client.tempVoices.OfGuild, tempCreate: client.tempVoices.Create, hubs: client.voiceHubs.OfGuild, settings: service.Settings };
+    let hubs = 10;
+
+    check("Standard: 10 Hubs, 50 Temp-Kanäle, 25 Vertraute", JSON.stringify(VoiceLimits(GUILD)) === JSON.stringify({ hubs: 10, temp: 50, trusted: 25 }), JSON.stringify(VoiceLimits(GUILD)));
+
+    client.tempVoices.OfGuild = (async () => Array.from({ length: 50 }, () => ({ hubId: 1 }))) as unknown as typeof client.tempVoices.OfGuild;
+    client.tempVoices.Create = (async () => undefined) as unknown as typeof client.tempVoices.Create;
+    client.voiceHubs.OfGuild = (async () => Array.from({ length: hubs }, () => ({}))) as unknown as typeof client.voiceHubs.OfGuild;
+    service.Settings = (async () => ({ panel: "channel" })) as unknown as typeof service.Settings;
+
+    try {
+        await create(hub, member);
+        check("Bei 50 Temp-Kanälen wird kein weiterer angelegt", created === 0, String(created));
+        check("Die Person bekommt Bescheid", sent.length === 1 && sent[0].includes("50"), sent.join(" | "));
+
+        let hit: unknown = null;
+
+        try {
+            await service.AddHub(guild, HUB, USER);
+        } catch (error) {
+            hit = error;
+        }
+
+        const limit = hit instanceof VoiceError ? hit.limit : undefined;
+
+        check("Bei 10 Hubs scheitert der 11. (maxHubs)", limit?.key === "maxHubs" && limit.asked === 11 && limit.allowed === 10, JSON.stringify(limit));
+
+        SetFlags([], [], [], [Limits({ maxTempChannels: 60, maxTrusted: 1 })]);
+        await create(hub, member);
+        check("Server-Wert 60: der 51. Kanal entsteht", created === 1, String(created));
+        check("Server-Wert 1 Vertrauter", service.CleanSettings({ trusted: [USER, OTHER] }, DefaultVoiceSettings(), GUILD).trusted.length === 1);
+        SetFlags([], [], []);
+    } finally {
+        Object.assign(client.tempVoices, { OfGuild: original.temps, Create: original.tempCreate });
+        Object.assign(client.voiceHubs, { OfGuild: original.hubs });
+        Object.assign(service, { Settings: original.settings });
+    }
+}
+
 async function main(): Promise<void> {
     console.log("\n🔊 Temp Voice\n");
 
@@ -348,6 +405,7 @@ async function main(): Promise<void> {
     checkConfig(client);
     checkViews();
     checkSupport(client);
+    await checkW137(client);
 
     if (await client.databaseService.Connect()) {
         try {

@@ -1,12 +1,13 @@
 import { ButtonInteraction, Guild, GuildMember, Message, MessageFlags } from "discord.js";
 import BotClient from "../client/BotClient";
+import { ILimitHit } from "../builder/LimitReply";
+import { ModuleValue } from "../utils/moduleFlags";
 import { IPollTally, MayPing, PING_DENIED, PollCard, VoteReply } from "../builder/CommunityView";
 import {
     DefaultPollSettings,
     MAX_OPTION_NATIVE,
     MAX_OPTION_OWN,
     MAX_POLL_DESCRIPTION,
-    MAX_POLL_OPTIONS,
     MAX_POLL_SECONDS,
     MAX_QUESTION,
     NATIVE_MAX_HOURS,
@@ -17,9 +18,22 @@ import { IPoll, IPollOption, IPollSettings, PollKind } from "../interfaces/servi
 import logger from "../utils/logger";
 import { IsLogTarget, WarmLogTarget } from "../utils/logtarget";
 
-export class PollError extends Error {}
+export class PollError extends Error {
+    /** limit: welche Grenze von RL Nexus gegriffen hat (W-0137), für den Satz und die Anfrage im Dashboard. */
+    constructor(
+        message: string,
+        readonly limit?: ILimitHit
+    ) {
+        super(message);
+    }
+}
 
 export const POLLS_MODULE = "polls";
+
+/** W-0137: Antworten je Umfrage und offene Umfragen, Grenzen von RL Nexus je Server. */
+export function PollLimits(guildId: string): { options: number; open: number } {
+    return { options: ModuleValue(POLLS_MODULE, "maxOptions", guildId), open: ModuleValue(POLLS_MODULE, "maxOpen", guildId) };
+}
 
 export interface IPollInput {
     kind: PollKind;
@@ -73,7 +87,9 @@ export default class PollService {
         if (!question) throw new PollError("Die Frage fehlt.");
         if (question.length > MAX_QUESTION) throw new PollError(`Die Frage darf höchstens ${MAX_QUESTION} Zeichen haben.`);
         if (options.length < 2) throw new PollError("Eine Umfrage braucht mindestens zwei Antworten.");
-        if (options.length > MAX_POLL_OPTIONS) throw new PollError(`Mehr als ${MAX_POLL_OPTIONS} Antworten gehen nicht.`);
+        const maxOptions = PollLimits(guild.id).options;
+
+        if (options.length > maxOptions) throw new PollError(`Mehr als ${maxOptions} Antworten gehen nicht.`);
         if (new Set(options.map((option) => option.label.toLowerCase())).size !== options.length) throw new PollError("Zwei Antworten sind gleich.");
         if (!IsLogTarget(guild.channels.cache.get(channelId))) throw new PollError("Wähle einen Kanal für die Umfrage.");
 
@@ -118,6 +134,11 @@ export default class PollService {
         const clean = this.Clean(guild, input);
 
         if (!MayPing(creator, clean.settings?.ping ?? null)) throw new PollError(PING_DENIED);
+
+        const open = await this.client.polls.CountOpen(guild.id);
+        const max = PollLimits(guild.id).open;
+
+        if (open >= max) throw new PollError(`Mehr als ${max} offene Umfragen gehen nicht. Beende erst eine.`, { module: POLLS_MODULE, key: "maxOpen", asked: open + 1, allowed: max });
 
         // Discord rundet auf volle Stunden.
         const duration = clean.kind === "native" ? Math.round((clean.duration ?? 3_600) / 3_600) * 3_600 : clean.duration;

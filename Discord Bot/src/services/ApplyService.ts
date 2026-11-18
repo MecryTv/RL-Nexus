@@ -14,6 +14,8 @@ import {
     PermissionsString,
 } from "discord.js";
 import BotClient from "../client/BotClient";
+import { ILimitHit } from "../builder/LimitReply";
+import { ModuleValue } from "../utils/moduleFlags";
 import { ApplyCard, ApplyPanelView, ApplyTranscriptCard, IsApplyPanel } from "../builder/ApplyView";
 import {
     AFTER_DECISIONS,
@@ -32,13 +34,10 @@ import {
     MAX_CHANNEL_NAME,
     MAX_CHOICES,
     MAX_DESCRIPTION,
-    MAX_FORMS,
     MAX_HINT,
     MAX_LABEL,
     MAX_NAME,
     MAX_NOTE,
-    MAX_QUESTIONS,
-    MAX_REVIEWERS,
     STAFF_ONLY,
     STATUS_LABELS,
 } from "../constants/Apply";
@@ -69,10 +68,21 @@ export class ApplyError extends Error {
     constructor(
         message: string,
         readonly status = 400,
-        readonly title = "Gerade nicht"
+        readonly title = "Gerade nicht",
+        /** W-0137: welche Grenze von RL Nexus gegriffen hat, für den Satz und die Anfrage im Dashboard. */
+        readonly limit?: ILimitHit
     ) {
         super(message);
     }
+}
+
+/** W-0137: Formulare, Fragen je Formular und Prüfer, Grenzen von RL Nexus je Server. */
+export function ApplyLimits(guildId: string): { forms: number; questions: number; reviewers: number } {
+    return {
+        forms: ModuleValue(APPLY_MODULE, "maxForms", guildId),
+        questions: ModuleValue(APPLY_MODULE, "maxQuestions", guildId),
+        reviewers: ModuleValue(APPLY_MODULE, "maxReviewers", guildId),
+    };
 }
 
 function IsRecord(value: unknown): value is Record<string, unknown> {
@@ -170,7 +180,7 @@ export default class ApplyService {
             value === undefined
                 ? fallback
                 : Array.isArray(value)
-                  ? [...new Set(value.filter((id): id is string => typeof id === "string" && known(id)))].slice(0, MAX_REVIEWERS)
+                  ? [...new Set(value.filter((id): id is string => typeof id === "string" && known(id)))].slice(0, ApplyLimits(guild.id).reviewers)
                   : [];
 
         const channel = typeof raw.channelId === "string" ? guild.channels.cache.get(raw.channelId) : null;
@@ -259,7 +269,7 @@ export default class ApplyService {
 
         if (!name) throw new ApplyError("Gib dem Formular einen Namen. Er steht auch auf der öffentlichen Seite.");
 
-        const questions = raw.questions === undefined ? base.questions : this.CleanQuestions(raw.questions);
+        const questions = raw.questions === undefined ? base.questions : this.CleanQuestions(raw.questions, guild.id);
 
         if (!questions.length) throw new ApplyError("Ohne Fragen gibt es nichts auszufüllen.");
 
@@ -280,13 +290,13 @@ export default class ApplyService {
         };
     }
 
-    private CleanQuestions(input: unknown): IApplyQuestion[] {
+    private CleanQuestions(input: unknown, guildId: string): IApplyQuestion[] {
         if (!Array.isArray(input)) return [];
 
         const seen = new Set<string>();
         const questions: IApplyQuestion[] = [];
 
-        for (const entry of input.slice(0, MAX_QUESTIONS)) {
+        for (const entry of input.slice(0, ApplyLimits(guildId).questions)) {
             if (!IsRecord(entry)) continue;
 
             const label = Text(entry.label, MAX_LABEL);
@@ -344,7 +354,10 @@ export default class ApplyService {
     }
 
     async CreateForm(guild: Guild, member: GuildMember, input: unknown): Promise<IApplyForm> {
-        if ((await this.Forms(guild.id)).length >= MAX_FORMS) throw new ApplyError(`Mehr als ${MAX_FORMS} Formulare gehen nicht.`);
+        const forms = (await this.Forms(guild.id)).length;
+        const max = ApplyLimits(guild.id).forms;
+
+        if (forms >= max) throw new ApplyError(`Mehr als ${max} Formulare gehen nicht.`, 400, "Gerade nicht", { module: APPLY_MODULE, key: "maxForms", asked: forms + 1, allowed: max });
 
         const clean = this.CleanForm(guild, input);
 

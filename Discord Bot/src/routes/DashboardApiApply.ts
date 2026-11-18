@@ -7,15 +7,13 @@ import {
     DefaultForm,
     KIND_LABELS,
     MAX_CHOICES,
-    MAX_FORMS,
     MAX_NOTE,
-    MAX_QUESTIONS,
-    MAX_REVIEWERS,
     PAGE_SIZE,
     STATUS_LABELS,
 } from "../constants/Apply";
 import { ApplyStatus } from "../interfaces/services/apply/IApply";
-import { ApplyError } from "../services/ApplyService";
+import { ApplyError, ApplyLimits } from "../services/ApplyService";
+import { DashboardLimit } from "../builder/LimitReply";
 import { WantsJSON } from "../utils/admin";
 import { ApplyGate, IApplyAccess } from "../utils/applygate";
 import { PersonOf, SearchMembers } from "../utils/dashboard";
@@ -68,6 +66,7 @@ export default class DashboardApiApply extends Route {
 
             return reply.send(await this.Write(access, (request.body ?? {}) as IBody));
         } catch (error) {
+            if (error instanceof ApplyError && error.limit) return reply.code(400).send(DashboardLimit(error.limit, access.guild.id, error.message));
             if (error instanceof ApplyError || error instanceof LogTargetError) return reply.code(400).send({ error: error.message });
 
             throw error;
@@ -99,7 +98,7 @@ export default class DashboardApiApply extends Route {
             defaults: { form: DefaultForm() },
             kinds: KIND_LABELS,
             statuses: STATUS_LABELS,
-            limits: { forms: MAX_FORMS, questions: MAX_QUESTIONS, choices: MAX_CHOICES, note: MAX_NOTE, reviewers: MAX_REVIEWERS },
+            limits: { ...ApplyLimits(guild.id), choices: MAX_CHOICES, note: MAX_NOTE },
             guild: { name: guild.name, ...GuildResources(guild) },
         };
     }

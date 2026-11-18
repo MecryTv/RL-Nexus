@@ -29,8 +29,6 @@ export const PANEL_SECTIONS = 5;
 /** So lange bleibt eine halbe Bewerbung liegen, gerechnet ab der letzten Aktivität. */
 export const DRAFT_TTL = 30 * 60_000;
 
-export const MAX_FORMS = 15;
-export const MAX_QUESTIONS = 20;
 export const MAX_CHOICES = 10;
 export const MAX_NAME = 80;
 export const MAX_LABEL = 200;
@@ -38,7 +36,6 @@ export const MAX_HINT = 200;
 export const MAX_DESCRIPTION = 1000;
 export const MAX_ANSWER = 1024;
 export const MAX_NOTE = 500;
-export const MAX_REVIEWERS = 15;
 
 /** Wie viele Bewerbungen eine Liste auf einmal zeigt. */
 export const PAGE_SIZE = 25;
@@ -160,7 +157,7 @@ export function DefaultForm(): Pick<IApplyForm, "name" | "description" | "emoji"
 export function NextQuestionId(questions: IApplyQuestion[]): string {
     const taken = new Set(questions.map((question) => question.id));
 
-    for (let index = 1; index <= MAX_QUESTIONS + 1; index++) {
+    for (let index = 1; index <= questions.length + 1; index++) {
         if (!taken.has(`q${index}`)) return `q${index}`;
     }
 

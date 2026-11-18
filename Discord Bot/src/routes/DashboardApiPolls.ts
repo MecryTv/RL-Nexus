@@ -2,9 +2,10 @@ import { FastifyReply, FastifyRequest } from "fastify";
 import BotClient from "../client/BotClient";
 import Route from "../structures/Route";
 import { DASHBOARD_PATH } from "../constants/Dashboard";
-import { MAX_OPTION_NATIVE, MAX_OPTION_OWN, MAX_POLL_OPTIONS, NATIVE_MAX_HOURS } from "../constants/Polls";
+import { MAX_OPTION_NATIVE, MAX_OPTION_OWN, NATIVE_MAX_HOURS } from "../constants/Polls";
 import { IPoll } from "../interfaces/services/community/ICommunity";
-import { PollError, POLLS_MODULE } from "../services/PollService";
+import { PollError, PollLimits, POLLS_MODULE } from "../services/PollService";
+import { DashboardLimit } from "../builder/LimitReply";
 import { WantsJSON } from "../utils/admin";
 import { CreateLogThread, LogTargetError, LogTargets } from "../utils/logtarget";
 import { GuildResources, IManageAccess, ManageGate } from "../utils/managegate";
@@ -49,6 +50,7 @@ export default class DashboardApiPolls extends Route {
 
             return reply.send(await this.Write(access, (request.body ?? {}) as IBody));
         } catch (error) {
+            if (error instanceof PollError && error.limit) return reply.code(400).send(DashboardLimit(error.limit, access.guild.id, error.message));
             if (error instanceof PollError || error instanceof LogTargetError) return reply.code(400).send({ error: error.message });
 
             throw error;
@@ -107,7 +109,7 @@ export default class DashboardApiPolls extends Route {
 
         return {
             polls: await Promise.all(polls.map((poll) => this.Out(poll))),
-            limits: { options: MAX_POLL_OPTIONS, own: MAX_OPTION_OWN, native: MAX_OPTION_NATIVE, nativeHours: NATIVE_MAX_HOURS },
+            limits: { options: PollLimits(guild.id).options, own: MAX_OPTION_OWN, native: MAX_OPTION_NATIVE, nativeHours: NATIVE_MAX_HOURS },
             guild: { name: guild.name, ...GuildResources(guild) },
             targets: await LogTargets(guild, []),
         };

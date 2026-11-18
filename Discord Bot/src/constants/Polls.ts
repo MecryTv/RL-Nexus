@@ -5,7 +5,6 @@ import { IPollSettings } from "../interfaces/services/community/ICommunity";
 export const POLL_PREFIX = "poll";
 export const POLL_ACCENT = "#00afff";
 
-export const MAX_POLL_OPTIONS = 10;
 export const MAX_QUESTION = 300;
 export const MAX_POLL_DESCRIPTION = 1000;
 /** Discord erlaubt bei seinen Umfragen 55 Zeichen je Antwort - eigene nehmen mehr. */

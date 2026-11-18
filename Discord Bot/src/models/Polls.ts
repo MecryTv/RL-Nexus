@@ -99,6 +99,13 @@ export default class Polls extends Model<IPollRow> {
         return row ? ToPoll(row) : null;
     }
 
+    /** W-0137: offene Umfragen eines Servers - beendete zählen nicht. */
+    async CountOpen(guildId: string): Promise<number> {
+        const row = await this.db.One<{ total: number | string }>(`SELECT COUNT(*) AS total FROM \`${this.Table}\` WHERE guild_id = ? AND status = 'open'`, [guildId]);
+
+        return Number(row?.total ?? 0);
+    }
+
     async OfGuild(guildId: string, limit = 100): Promise<IPoll[]> {
         const rows = await this.db.Query<IPollRow>(`SELECT * FROM \`${this.Table}\` WHERE guild_id = ? ORDER BY number DESC LIMIT ?`, [guildId, limit]);
 

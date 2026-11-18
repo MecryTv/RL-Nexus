@@ -11,15 +11,15 @@ import {
     VoiceState,
 } from "discord.js";
 import BotClient from "../client/BotClient";
+import { ILimitHit } from "../builder/LimitReply";
+import { ModuleValue } from "../utils/moduleFlags";
 import { InfoCard } from "../builder/CommunityView";
 import { VoicePanel } from "../builder/VoiceView";
 import {
     DefaultHubConfig,
     DefaultVoiceSettings,
-    MAX_HUBS,
     MAX_LIMIT,
     MAX_PRESETS,
-    MAX_TRUSTED,
     MAX_VOICE_NAME,
     REGION_LABELS,
     VOICE_ACCENT,
@@ -30,7 +30,24 @@ import { IHubConfig, ITempVoice, IVoiceHub, IVoiceModuleSettings, IVoiceSettings
 import logger from "../utils/logger";
 import { BlockedAt } from "../utils/security";
 
-export class VoiceError extends Error {}
+export class VoiceError extends Error {
+    /** limit: welche Grenze von RL Nexus gegriffen hat (W-0137), für den Satz und die Anfrage im Dashboard. */
+    constructor(
+        message: string,
+        readonly limit?: ILimitHit
+    ) {
+        super(message);
+    }
+}
+
+/** W-0137: Hubs, Temp-Kanäle und Vertraute je Kanal, Grenzen von RL Nexus je Server. Ohne Server der Standard. */
+export function VoiceLimits(guildId: string | null): { hubs: number; temp: number; trusted: number } {
+    return {
+        hubs: ModuleValue(VOICE_MODULE, "maxHubs", guildId),
+        temp: ModuleValue(VOICE_MODULE, "maxTempChannels", guildId),
+        trusted: ModuleValue(VOICE_MODULE, "maxTrusted", guildId),
+    };
+}
 
 export const VOICE_MODULE = "voice-hub";
 
@@ -120,7 +137,7 @@ export default class VoiceService {
     CleanConfig(guild: Guild, input: unknown, previous: IHubConfig): IHubConfig {
         const raw = IsRecord(input) ? input : {};
         const category = typeof raw.categoryId === "string" ? guild.channels.cache.get(raw.categoryId) : null;
-        const defaults = this.CleanSettings(raw.defaults, previous.defaults);
+        const defaults = this.CleanSettings(raw.defaults, previous.defaults, guild.id);
 
         return {
             name: typeof raw.name === "string" && raw.name.trim() ? raw.name.trim().slice(0, MAX_VOICE_NAME) : previous.name,
@@ -133,7 +150,7 @@ export default class VoiceService {
         };
     }
 
-    CleanSettings(input: unknown, previous: IVoiceSettings = DefaultVoiceSettings()): IVoiceSettings {
+    CleanSettings(input: unknown, previous: IVoiceSettings = DefaultVoiceSettings(), guildId: string | null = null): IVoiceSettings {
         const raw = IsRecord(input) ? input : {};
         const limit = Math.floor(Number(raw.limit));
         const region = typeof raw.region === "string" && REGION_LABELS.has(raw.region) ? raw.region : null;
@@ -144,8 +161,8 @@ export default class VoiceService {
             privacy: raw.privacy === "private" ? "private" : raw.privacy === "public" ? "public" : previous.privacy,
             stealth: typeof raw.stealth === "boolean" ? raw.stealth : previous.stealth,
             region: raw.region === undefined ? previous.region : region,
-            trusted: raw.trusted === undefined ? previous.trusted : Ids(raw.trusted, MAX_TRUSTED),
-            blocked: raw.blocked === undefined ? previous.blocked : Ids(raw.blocked, MAX_TRUSTED),
+            trusted: raw.trusted === undefined ? previous.trusted : Ids(raw.trusted, VoiceLimits(guildId).trusted),
+            blocked: raw.blocked === undefined ? previous.blocked : Ids(raw.blocked, VoiceLimits(guildId).trusted),
         };
     }
 
@@ -153,7 +170,10 @@ export default class VoiceService {
         const channel = typeof channelId === "string" ? guild.channels.cache.get(channelId) : null;
 
         if (!channel || channel.type !== ChannelType.GuildVoice) throw new VoiceError("Wähle einen Sprachkanal.");
-        if ((await this.client.voiceHubs.OfGuild(guild.id)).length >= MAX_HUBS) throw new VoiceError(`Mehr als ${MAX_HUBS} Hubs gehen je Server nicht.`);
+        const hubs = (await this.client.voiceHubs.OfGuild(guild.id)).length;
+        const max = VoiceLimits(guild.id).hubs;
+
+        if (hubs >= max) throw new VoiceError(`Mehr als ${max} Hubs gehen je Server nicht.`, { module: VOICE_MODULE, key: "maxHubs", asked: hubs + 1, allowed: max });
         if (await this.client.voiceHubs.ByChannel(channel.id)) throw new VoiceError("Dieser Kanal ist schon ein Hub.");
         if (await this.client.tempVoices.Get(channel.id)) throw new VoiceError("Das ist ein Kanal, den der Bot gerade selbst verwaltet.");
 
@@ -221,7 +241,17 @@ export default class VoiceService {
             const guild = member.guild;
             const preset = hub.config.presets ? await this.client.voicePresets.Default(member.id) : null;
             const settings: IVoiceSettings = { ...hub.config.defaults, ...(preset ? preset.config : {}) };
-            const open = (await this.client.tempVoices.OfGuild(guild.id)).filter((entry) => entry.hubId === hub.id).length;
+            const all = await this.client.tempVoices.OfGuild(guild.id);
+            const max = VoiceLimits(guild.id).temp;
+
+            // W-0137: Bei der Grenze bleibt die Person im Hub und bekommt kurz Bescheid.
+            if (all.length >= max) {
+                await member.send(`Auf **${guild.name}** gibt es gerade ${all.length} temporäre Sprachkanäle, mehr gehen dort nicht. Versuch es gleich noch einmal.`).catch(() => undefined);
+
+                return;
+            }
+
+            const open = all.filter((entry) => entry.hubId === hub.id).length;
             const game = member.presence?.activities.find((activity) => activity.type === 0)?.name ?? null;
             const name = settings.name ?? FormatVoiceName(hub.config.name, { user: member.displayName, number: open + 1, game });
             const parent = hub.config.categoryId ? guild.channels.cache.get(hub.config.categoryId) : guild.channels.cache.get(hub.channelId)?.parent;
@@ -435,7 +465,7 @@ export default class VoiceService {
             case "trustuser":
                 if (!target) throw new VoiceError("Wähle jemanden aus.");
                 if (settings.trusted.includes(target.id)) return `✅ ${named} ist schon vertraut.`;
-                if (settings.trusted.length >= MAX_TRUSTED) throw new VoiceError(`Mehr als ${MAX_TRUSTED} gehen nicht.`);
+                if (settings.trusted.length >= VoiceLimits(member.guild.id).trusted) throw new VoiceError(`Mehr als ${VoiceLimits(member.guild.id).trusted} gehen nicht.`);
 
                 settings.trusted.push(target.id);
                 settings.blocked = settings.blocked.filter((id) => id !== target.id);
@@ -455,7 +485,7 @@ export default class VoiceService {
                 if (!target) throw new VoiceError("Wähle jemanden aus.");
                 if (target.id === member.id) throw new VoiceError("Dich selbst kannst du nicht blockieren.");
 
-                settings.blocked = [...new Set([...settings.blocked, target.id])].slice(0, MAX_TRUSTED);
+                settings.blocked = [...new Set([...settings.blocked, target.id])].slice(0, VoiceLimits(member.guild.id).trusted);
                 settings.trusted = settings.trusted.filter((id) => id !== target.id);
                 await this.Apply(channel, temp, settings);
 
@@ -479,7 +509,7 @@ export default class VoiceService {
 
                 if (!invite) throw new VoiceError("Der Bot darf hier keine Einladung erstellen.");
 
-                settings.trusted = [...new Set([...settings.trusted, target.id])].slice(0, MAX_TRUSTED);
+                settings.trusted = [...new Set([...settings.trusted, target.id])].slice(0, VoiceLimits(member.guild.id).trusted);
                 await this.Apply(channel, temp, settings);
 
                 const sent = await target
@@ -506,7 +536,7 @@ export default class VoiceService {
                 if (target.user.bot) throw new VoiceError("Einem Bot gehört hier nichts.");
                 if (target.voice.channelId !== channel.id) throw new VoiceError("Er muss dafür in deinem Kanal sein.");
 
-                settings.trusted = [...new Set([...settings.trusted, member.id])].slice(0, MAX_TRUSTED);
+                settings.trusted = [...new Set([...settings.trusted, member.id])].slice(0, VoiceLimits(member.guild.id).trusted);
 
                 await this.client.tempVoices.Save(channel.id, settings, target.id);
                 await channel.permissionOverwrites.set(this.Overwrites(channel.guild, target.id, settings)).catch(() => undefined);
