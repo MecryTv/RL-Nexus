@@ -439,6 +439,13 @@ async function checkW137(client: BotClient): Promise<void> {
 
     check("Ist eine Runde fertig, geht es von selbst los", resumed.length === 1 && started.join(",") === "6" && service.Queue(GUILD, 6).length === 0, `${resumed.length}/${started.join(",")}`);
 
+    // W-0137 Review: Runden, die seit Stunden „laufen“, weil nie jemand gemeldet hat, sperren den Server nicht.
+    running = Array.from({ length: 10 }, (_, index) => FakeRound({ id: 300 + index, blue: [], orange: [], createdAt: Date.now() - 7 * 3_600_000 }));
+
+    for (let index = 0; index < 6; index++) await service.Join(member(index), 6);
+
+    check("Zehn liegengebliebene Runden (7 h alt) zählen nicht: es geht los", started.join(",") === "6,6" && service.Queue(GUILD, 6).length === 0, started.join(","));
+
     const route = new DashboardApiSixMans(client) as unknown as { Read(access: unknown, query: unknown): Promise<Record<string, any>> };
 
     service.Rounds = (async () => ({ rows: [], total: 0 })) as unknown as typeof service.Rounds;

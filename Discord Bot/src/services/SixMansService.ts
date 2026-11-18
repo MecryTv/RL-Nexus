@@ -20,6 +20,7 @@ import {
     MODES,
     MODE_LABELS,
     RankOf,
+    RUNNING_COUNTS_MS,
     SIXMANS_MODULE,
     TEAM_EMOJI,
     TEAM_LABELS,
@@ -37,6 +38,11 @@ export class SixMansError extends Error {
     ) {
         super(message);
     }
+}
+
+/** W-0137: Wie viele Runden für maxRunning zählen - nur die der letzten Stunden. */
+function Counting(rounds: ISixRound[], now = Date.now()): number {
+    return rounds.filter((round) => round.createdAt > now - RUNNING_COUNTS_MS).length;
 }
 
 /** W-0137: eigene Stufen und gleichzeitig laufende Runden, Grenzen von RL Nexus je Server. */
@@ -249,15 +255,16 @@ export default class SixMansService {
         }
 
         const max = SixMansLimits(guildId).running;
+        const counted = Counting(running);
 
         // W-0137: Laufen schon so viele Runden, wie der Server darf, warten alle weiter - Resume() startet sie, sobald eine endet.
-        if (running.length >= max) {
+        if (counted >= max) {
             await this.Panel(member.guild, settings).catch(() => undefined);
 
-            throw new SixMansError(`Gerade laufen ${running.length} Runden, mehr gehen hier nicht gleichzeitig. Ihr bleibt in der Warteschlange: sobald eine Runde fertig ist, geht es los.`, {
+            throw new SixMansError(`Gerade laufen ${counted} Runden, mehr gehen hier nicht gleichzeitig. Ihr bleibt in der Warteschlange: sobald eine Runde fertig ist, geht es los.`, {
                 module: SIXMANS_MODULE,
                 key: "maxRunning",
-                asked: running.length + 1,
+                asked: counted + 1,
                 allowed: max,
             });
         }
@@ -299,7 +306,7 @@ export default class SixMansService {
         const settings = await this.Settings(guild.id);
         const max = SixMansLimits(guild.id).running;
         const started: ISixRound[] = [];
-        let running = (await this.client.sixRounds.Running(guild.id)).length;
+        let running = Counting(await this.client.sixRounds.Running(guild.id));
 
         for (const mode of MODES) {
             if (running >= max || !settings.modes[mode] || this.Queue(guild.id, mode).length < mode) continue;

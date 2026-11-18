@@ -55,6 +55,8 @@ export const PAGE_SIZE = 20;
 export const BOARD_SIZE = 100;
 /** So lange bleiben die Sprachkanäle nach dem Ende stehen. */
 export const CHANNEL_GRACE = 2 * 60 * 1000;
+/** W-0137: Für „Laufende Runden höchstens“ zählen nur Runden dieser Stunden - eine nie gemeldete sperrt den Server nicht für immer. */
+export const RUNNING_COUNTS_MS = 6 * 3_600_000;
 
 export const TEAM_LABELS: Record<1 | 2, string> = { 1: "Blau", 2: "Orange" };
 
