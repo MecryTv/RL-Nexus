@@ -28,7 +28,8 @@ import BotClient from "../client/BotClient";
 import { PanelRows } from "../builder/SelfRoleView";
 import { CleanEmoji, DefaultBody, EmojiKey, MAX_REACTIONS, MAX_ROLES, SELF_ROLE_MODULE, SELF_ROLE_PREFIX } from "../constants/SelfRoles";
 import { ISelfRolePanel } from "../interfaces/services/selfroles/ISelfRoles";
-import { IRawComponent, ReactionParam, SelfRoleError } from "../services/SelfRoleService";
+import { IRawComponent, ReactionParam, SelfRoleError, SelfRoleLimits } from "../services/SelfRoleService";
+import { SetFlags } from "../utils/moduleFlags";
 
 const GUILD = "90071992547409931";
 const TEXT = "90071992547409932";
@@ -112,7 +113,7 @@ function Panel(over: Partial<ISelfRolePanel> = {}): ISelfRolePanel {
 /* ----------------------------------------------------------
    Ein Panel prüfen
    ---------------------------------------------------------- */
-function checkClean(client: BotClient): void {
+async function checkClean(client: BotClient): Promise<void> {
     console.log("\n  — Ein Panel einstellen —");
 
     const guild = FakeGuild();
@@ -131,6 +132,45 @@ function checkClean(client: BotClient): void {
     check("Der Name wird abgeschnitten", clean.name === "Spiele");
     check("Die Art kommt an", clean.kind === "select");
     check("Die Höchstzahl ist gedeckelt", clean.maxRoles === MAX_ROLES, String(clean.maxRoles));
+
+    // W-0137: Panels, Rollen je Panel und Reaktionen sind Grenzen von RL Nexus, je Server.
+    check("W-0137: ohne Server-Wert wie bisher (25 / 25 / 20)", JSON.stringify(SelfRoleLimits(GUILD)) === JSON.stringify({ panels: 25, roles: 25, reactions: 20 }), JSON.stringify(SelfRoleLimits(GUILD)));
+    SetFlags([], [], [], [{ module: "reaction-roles", guildId: GUILD, status: null, notice: null, linkMode: null, values: { maxPanels: 30, maxRoles: 1, maxReactions: 1 }, updatedAt: null }]);
+
+    const small = service.Clean(guild, { name: "Klein", kind: "select", maxRoles: 99, body: DefaultBody(), roles: [{ roleId: ROLE_A }, { roleId: ROLE_B }] });
+
+    check("W-0137: Server-Wert 1 deckelt Höchstzahl und Rollen", small.maxRoles === 1 && small.roles.length === 1, `${small.maxRoles} ${small.roles.length}`);
+    check("W-0137: Grenzen des Servers für die Seite", JSON.stringify(SelfRoleLimits(GUILD)) === JSON.stringify({ panels: 30, roles: 1, reactions: 1 }));
+
+    // Rollen je Panel wieder frei, nur Reaktionen auf 1: sonst kürzt schon CleanRoles.
+    SetFlags([], [], [], [{ module: "reaction-roles", guildId: GUILD, status: null, notice: null, linkMode: null, values: { maxPanels: 30, maxReactions: 1 }, updatedAt: null }]);
+
+    let reaction = "";
+
+    try {
+        service.Clean(guild, { name: "Reaktion", kind: "reactions", body: DefaultBody(), roles: [{ roleId: ROLE_A, emoji: "😀" }, { roleId: ROLE_B, emoji: "😃" }] });
+    } catch (error) {
+        reaction = error instanceof SelfRoleError ? `${error.message}|${error.limit?.key}` : String(error);
+    }
+
+    check("W-0137: Server-Wert 1 bei Reaktionen, mit Grenze im Fehler", reaction.includes("1") && reaction.endsWith("|maxReactions"), reaction);
+
+    const panels = service as unknown as { Panels: (guildId: string) => Promise<unknown[]> };
+    const original = panels.Panels;
+
+    panels.Panels = async () => Array.from({ length: 30 });
+
+    let full = "";
+
+    try {
+        await service.Create(guild, {} as never, { name: "Zu viel", body: DefaultBody(), roles: [] });
+    } catch (error) {
+        full = error instanceof SelfRoleError ? `${error.message}|${error.limit?.key}|${error.limit?.allowed}` : String(error);
+    }
+
+    check("W-0137: 31. Panel mit Server-Wert 30 abgelehnt, Grenze im Fehler", full.endsWith("|maxPanels|30"), full);
+    panels.Panels = original;
+    SetFlags([], [], []);
     check("Die Voraussetzung auch", clean.requireRole === ROLE_C);
     check("Doppelte Rollen fallen weg", clean.roles.filter((role) => role.roleId === ROLE_A).length === 1);
     check("@everyone und Unbekanntes ebenso", clean.roles.length === 2, String(clean.roles.length));
@@ -763,7 +803,7 @@ async function main(): Promise<void> {
 
     const client = new BotClient();
 
-    checkClean(client);
+    await checkClean(client);
     checkRules(client);
     checkView();
     checkLink(client);

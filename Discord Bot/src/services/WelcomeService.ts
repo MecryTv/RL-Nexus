@@ -4,7 +4,8 @@ import { CleanDoc } from "../builder/MessageDoc";
 import { CustomMessageView } from "../builder/CustomView";
 import { IWelcomeCardData, RenderWelcomeCard, WelcomePlaces } from "../builder/WelcomeCard";
 import { CleanGalleryPath, ResolveImagePath } from "../constants/Gallery";
-import { CleanPositions, DefaultDoc, DefaultWelcomeConfig, FONT_LABELS, LAYOUT_LABELS, MAX_AVATAR, MAX_LINE, MAX_RING, MAX_ROLES, MAX_TITLE_SIZE, MIN_AVATAR, MIN_TITLE_SIZE, NormalizeCard } from "../constants/Welcome";
+import { CleanPositions, DefaultDoc, DefaultWelcomeConfig, FONT_LABELS, LAYOUT_LABELS, MAX_AVATAR, MAX_LINE, MAX_RING, MAX_TITLE_SIZE, MIN_AVATAR, MIN_TITLE_SIZE, NormalizeCard } from "../constants/Welcome";
+import { ModuleValue } from "../utils/moduleFlags";
 import { IWelcomeCard, IWelcomeConfig, IWelcomeMessage, IWelcomePositions, WelcomeFont, WelcomeKind, WelcomeLayout } from "../interfaces/services/welcome/IWelcome";
 import { ICustomEmbed } from "../interfaces/services/messages/IMessages";
 import logger from "../utils/logger";
@@ -13,6 +14,11 @@ import { NewRoleProblem } from "../utils/rolegate";
 export class WelcomeError extends Error {}
 
 export const WELCOME_MODULE = "welcome";
+
+/** W-0137: Auto-Rollen höchstens (je für Mitglieder und Bots), Grenze von RL Nexus je Server. */
+export function WelcomeRoleLimit(guildId: string): number {
+    return ModuleValue("welcome", "maxRoles", guildId);
+}
 
 function IsRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -65,7 +71,7 @@ export default class WelcomeService {
             value === undefined
                 ? fallback
                 : Array.isArray(value)
-                  ? [...new Set(value.filter((id): id is string => typeof id === "string" && guild.roles.cache.has(id) && id !== guild.id))].slice(0, MAX_ROLES)
+                  ? [...new Set(value.filter((id): id is string => typeof id === "string" && guild.roles.cache.has(id) && id !== guild.id))].slice(0, WelcomeRoleLimit(guild.id))
                   : [];
 
         return {

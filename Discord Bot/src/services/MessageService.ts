@@ -1,5 +1,7 @@
 import { ButtonInteraction, Guild, GuildMember, InteractionReplyOptions, Message, MessageFlags, PermissionFlagsBits, StringSelectMenuInteraction } from "discord.js";
 import BotClient from "../client/BotClient";
+import { ILimitHit } from "../builder/LimitReply";
+import { ModuleValue } from "../utils/moduleFlags";
 import { CleanDoc } from "../builder/MessageDoc";
 import { CustomMessageView, ICustomSource } from "../builder/CustomView";
 import { InfoCard } from "../builder/CommunityView";
@@ -25,12 +27,10 @@ import {
     MAX_LABEL,
     MAX_MENU_OPTIONS,
     MAX_MENUS,
-    MAX_MESSAGES,
     MAX_OPTION_DESCRIPTION,
     MAX_PLACEHOLDER,
     MAX_NAME,
     MAX_PHRASE,
-    MAX_RESPONSES,
     MESSAGE_ACCENT,
     Matches,
     NextRun,
@@ -53,7 +53,23 @@ import { IMessageDoc } from "../interfaces/builder/IMessageDoc";
 import logger from "../utils/logger";
 import { NewRoleProblem } from "../utils/rolegate";
 
-export class MessageError extends Error {}
+/** limit: welche Grenze von RL Nexus gegriffen hat (W-0137), für den Satz und die Anfrage im Dashboard. */
+export class MessageError extends Error {
+    constructor(
+        message: string,
+        readonly limit?: ILimitHit
+    ) {
+        super(message);
+    }
+}
+
+/** W-0137: Nachrichten und Stichwörter je Server, Grenzen von RL Nexus. */
+export function MessageLimits(guildId: string): { messages: number; responses: number } {
+    return {
+        messages: ModuleValue(MESSAGES_MODULE, "maxMessages", guildId),
+        responses: ModuleValue(MESSAGES_MODULE, "maxResponses", guildId),
+    };
+}
 
 export const MESSAGES_MODULE = "custom-message";
 
@@ -321,8 +337,11 @@ export default class MessageService {
     }
 
     async Create(guild: Guild, input: unknown, userId: string, actor: GuildMember): Promise<ICustomMessage> {
-        if ((await this.client.customMessages.OfGuild(guild.id)).length >= MAX_MESSAGES) {
-            throw new MessageError(`Mehr als ${MAX_MESSAGES} Nachrichten gehen je Server nicht.`);
+        const messages = (await this.client.customMessages.OfGuild(guild.id)).length;
+        const maxMessages = MessageLimits(guild.id).messages;
+
+        if (messages >= maxMessages) {
+            throw new MessageError(`Mehr als ${maxMessages} Nachrichten gehen je Server nicht.`, { module: MESSAGES_MODULE, key: "maxMessages", asked: messages + 1, allowed: maxMessages });
         }
 
         const clean = this.Clean(guild, input);
@@ -626,8 +645,11 @@ export default class MessageService {
     }
 
     async AddResponse(guild: Guild, input: unknown, userId: string): Promise<IAutoResponse> {
-        if ((await this.client.autoResponses.OfGuild(guild.id)).length >= MAX_RESPONSES) {
-            throw new MessageError(`Mehr als ${MAX_RESPONSES} Stichwörter gehen je Server nicht.`);
+        const responses = (await this.client.autoResponses.OfGuild(guild.id)).length;
+        const maxResponses = MessageLimits(guild.id).responses;
+
+        if (responses >= maxResponses) {
+            throw new MessageError(`Mehr als ${maxResponses} Stichwörter gehen je Server nicht.`, { module: MESSAGES_MODULE, key: "maxResponses", asked: responses + 1, allowed: maxResponses });
         }
 
         return this.client.autoResponses.Create({ guildId: guild.id, ...this.CleanResponse(guild, input), createdBy: userId });

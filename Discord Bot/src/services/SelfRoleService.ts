@@ -15,6 +15,8 @@ import {
     StringSelectMenuInteraction,
 } from "discord.js";
 import BotClient from "../client/BotClient";
+import { ILimitHit } from "../builder/LimitReply";
+import { ModuleValue } from "../utils/moduleFlags";
 import ComponentV2Builder from "../builder/ComponentV2Builder";
 import { PanelRows, SelfRolePanelView } from "../builder/SelfRoleView";
 import {
@@ -24,9 +26,6 @@ import {
     MAX_DESCRIPTION,
     MAX_LABEL,
     MAX_NAME,
-    MAX_PANELS,
-    MAX_REACTIONS,
-    MAX_ROLES,
     SELF_ROLE_MODULE,
     SELF_ROLE_PREFIX,
 } from "../constants/SelfRoles";
@@ -36,7 +35,24 @@ import logger from "../utils/logger";
 import { NewRoleProblem } from "../utils/rolegate";
 import { BlockedAt } from "../utils/security";
 
-export class SelfRoleError extends Error {}
+/** limit: welche Grenze von RL Nexus gegriffen hat (W-0137), für den Satz und die Anfrage im Dashboard. */
+export class SelfRoleError extends Error {
+    constructor(
+        message: string,
+        readonly limit?: ILimitHit
+    ) {
+        super(message);
+    }
+}
+
+/** W-0137: Panels, Rollen je Panel und Reaktionen, Grenzen von RL Nexus je Server. */
+export function SelfRoleLimits(guildId: string): { panels: number; roles: number; reactions: number } {
+    return {
+        panels: ModuleValue(SELF_ROLE_MODULE, "maxPanels", guildId),
+        roles: ModuleValue(SELF_ROLE_MODULE, "maxRoles", guildId),
+        reactions: ModuleValue(SELF_ROLE_MODULE, "maxReactions", guildId),
+    };
+}
 
 /** Eine Komponente als JSON, so weit Self Roles hineinschaut. */
 export interface IRawComponent {
@@ -170,7 +186,7 @@ export default class SelfRoleService {
         const channel = typeof raw.channelId === "string" ? guild.channels.cache.get(raw.channelId) : null;
         const body = this.client.messageService.CleanBody(guild, IsRecord(raw.body) ? raw.body : {}, previous?.body ?? DefaultBody(), DefaultMessageDoc()) as IPanelBody;
         const roles = raw.roles === undefined ? (previous?.roles ?? []) : this.CleanRoles(guild, raw.roles);
-        const max = Math.max(0, Math.min(MAX_ROLES, Math.floor(Number(raw.maxRoles ?? previous?.maxRoles ?? 0)) || 0));
+        const max = Math.max(0, Math.min(SelfRoleLimits(guild.id).roles, Math.floor(Number(raw.maxRoles ?? previous?.maxRoles ?? 0)) || 0));
         const require = typeof raw.requireRole === "string" && guild.roles.cache.has(raw.requireRole) ? raw.requireRole : raw.requireRole === undefined ? (previous?.requireRole ?? null) : null;
         const attached = typeof raw.attached === "boolean" ? raw.attached : (previous?.attached ?? false);
         const target = raw.targetId === undefined ? (previous?.targetId ?? null) : typeof raw.targetId === "string" && SNOWFLAKE.test(raw.targetId) ? raw.targetId : null;
@@ -200,7 +216,7 @@ export default class SelfRoleService {
         const seen = new Set<string>();
         const roles: ISelfRole[] = [];
 
-        for (const entry of input.slice(0, MAX_ROLES)) {
+        for (const entry of input.slice(0, SelfRoleLimits(guild.id).roles)) {
             if (!IsRecord(entry) || typeof entry.roleId !== "string") continue;
 
             const role = guild.roles.cache.get(entry.roleId);
@@ -242,7 +258,11 @@ export default class SelfRoleService {
      * diesem Server: für fremde bräuchte der Bot im Kanal „Externe Emojis verwenden“.
      */
     private CheckReactions(guild: Guild, roles: ISelfRole[]): void {
-        if (roles.length > MAX_REACTIONS) throw new SelfRoleError(`Discord erlaubt höchstens ${MAX_REACTIONS} verschiedene Reaktionen an einer Nachricht.`);
+        const reactions = SelfRoleLimits(guild.id).reactions;
+
+        if (roles.length > reactions) {
+            throw new SelfRoleError(`Höchstens ${reactions} verschiedene Reaktionen an einer Nachricht.`, { module: SELF_ROLE_MODULE, key: "maxReactions", asked: roles.length, allowed: reactions });
+        }
 
         const seen = new Set<string>();
 
@@ -281,7 +301,10 @@ export default class SelfRoleService {
     }
 
     async Create(guild: Guild, member: GuildMember, input: unknown): Promise<ISelfRolePanel> {
-        if ((await this.Panels(guild.id)).length >= MAX_PANELS) throw new SelfRoleError(`Mehr als ${MAX_PANELS} Panels gehen nicht.`);
+        const count = (await this.Panels(guild.id)).length;
+        const max = SelfRoleLimits(guild.id).panels;
+
+        if (count >= max) throw new SelfRoleError(`Mehr als ${max} Panels gehen nicht.`, { module: SELF_ROLE_MODULE, key: "maxPanels", asked: count + 1, allowed: max });
 
         const clean = this.Clean(guild, input);
 
@@ -500,7 +523,7 @@ export default class SelfRoleService {
 
         for (const emoji of plan.add) {
             await message.react(emoji).catch(() => {
-                throw new SelfRoleError(`${emoji} ging nicht an die Nachricht. Braucht der Bot „Reaktionen hinzufügen“, oder hängen dort schon ${MAX_REACTIONS} verschiedene?`);
+                throw new SelfRoleError(`${emoji} ging nicht an die Nachricht. Braucht der Bot „Reaktionen hinzufügen“, oder hängen dort schon 20 verschiedene (mehr erlaubt Discord nicht)?`);
             });
         }
     }

@@ -12,10 +12,7 @@ import {
     MAX_IMAGE_PEOPLE,
     MAX_LABEL,
     MAX_LEAD,
-    MAX_LISTS,
     MAX_NAME,
-    MAX_PRESETS,
-    MAX_ROLES,
     MAX_SUB,
     MAX_TITLE,
     MOTIFS,
@@ -24,7 +21,8 @@ import {
 } from "../constants/RoleLists";
 import { RoleListText, TotalMembers } from "../builder/RoleListView";
 import { RenderRoleListCard } from "../builder/RoleListCard";
-import { RoleListError } from "../services/RoleListService";
+import { RoleListError, RoleListLimits } from "../services/RoleListService";
+import { DashboardLimit } from "../builder/LimitReply";
 import { WantsJSON } from "../utils/admin";
 import logger from "../utils/logger";
 import { GuildResources, IManageAccess, ManageGate } from "../utils/managegate";
@@ -113,7 +111,7 @@ export default class DashboardApiRoleLists extends Route {
 
             return reply.send(await this.Write(access, (request.body ?? {}) as IBody));
         } catch (error) {
-            if (error instanceof RoleListError) return reply.code(400).send({ error: error.message });
+            if (error instanceof RoleListError) return reply.code(400).send(error.limit ? DashboardLimit(error.limit, access.guild.id, error.message) : { error: error.message });
 
             throw error;
         }
@@ -159,9 +157,8 @@ export default class DashboardApiRoleLists extends Route {
             templates: Object.fromEntries(Object.entries(LIST_TEMPLATES).map(([key, template]) => [key, template.label])),
             designs: DESIGN_LABELS,
             limits: {
-                lists: MAX_LISTS,
-                roles: MAX_ROLES,
-                presets: MAX_PRESETS,
+                // W-0137: Grenzen von RL Nexus, je Server.
+                ...RoleListLimits(guild.id),
                 title: MAX_TITLE,
                 label: MAX_LABEL,
                 name: MAX_NAME,

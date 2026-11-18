@@ -20,7 +20,8 @@ import { IWelcomeCardData, RenderWelcomeCard, WelcomePlaces } from "../builder/W
 import { RegisterFonts } from "../builder/RankCard";
 import { CleanPositions, DefaultCard, DefaultWelcomeConfig, FitTitle, LineWidth, MAX_AVATAR, MAX_TITLE_SIZE, MIN_TITLE_SIZE, NormalizeCard, SnapPosition, TitleFont, WELCOME_PLACEHOLDER_KEYS } from "../constants/Welcome";
 import { IWelcomeCard, IWelcomeMessage, WelcomeLayout as LayoutName } from "../interfaces/services/welcome/IWelcome";
-import { WelcomeError } from "../services/WelcomeService";
+import { WelcomeError, WelcomeRoleLimit } from "../services/WelcomeService";
+import { SetFlags } from "../utils/moduleFlags";
 
 const GUILD = "90071992547409931";
 const USER = "90071992547409932";
@@ -95,6 +96,19 @@ function checkClean(client: BotClient): void {
     check("Unbekannte Rollen und Doppelte fallen weg", clean.roles.join(",") === ROLE, clean.roles.join(","));
     check("@everyone ist keine Auto-Rolle", !clean.roles.includes(GUILD));
     check("Bot-Rollen stehen getrennt", clean.botRoles.join(",") === ROLE);
+
+    // W-0137: Auto-Rollen höchstens ist eine Grenze von RL Nexus, je Server änderbar.
+    const many = Array.from({ length: 12 }, (_, index) => `9007199254740990${String(index).padStart(2, "0")}`);
+    const cache = guild.roles.cache as unknown as Map<string, Role>;
+
+    for (const id of many) cache.set(id, { id, name: `Rolle ${id}`, managed: false, comparePositionTo: () => -1 } as unknown as Role);
+
+    check("W-0137: ohne Server-Wert höchstens 10 Auto-Rollen", service.Clean(guild, { roles: many }, base).roles.length === 10 && WelcomeRoleLimit(GUILD) === 10);
+    SetFlags([], [], [], [{ module: "welcome", guildId: GUILD, status: null, notice: null, linkMode: null, values: { maxRoles: 11 }, updatedAt: null }]);
+    check("W-0137: Server-Wert 11 gilt für Auto-Rollen und Bot-Rollen", service.Clean(guild, { roles: many, botRoles: many }, base).roles.length === 11 && service.Clean(guild, { botRoles: many }, base).botRoles.length === 11 && WelcomeRoleLimit(GUILD) === 11);
+    SetFlags([], [], []);
+
+    for (const id of many) cache.delete(id);
 
     const fails = (name: string, input: object, expect: string): void => {
         try {

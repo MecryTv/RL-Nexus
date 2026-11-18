@@ -26,6 +26,7 @@ import { MOTIFS, IRoleListImage } from "../constants/RoleLists";
 import { IRoleListGroup, IRoleListMember, IRoleListRole } from "../interfaces/services/rolelists/IRoleLists";
 import { IRoleListSettings } from "../constants/RoleLists";
 import RoleListReady from "../events/rolelists/RoleListReady";
+import { SetFlags } from "../utils/moduleFlags";
 
 const GUILD = "90071992547409971";
 const TEXT = "90071992547409972";
@@ -466,6 +467,7 @@ async function checkSend(client: BotClient): Promise<void> {
     for (let index = store.size; index < 10; index++) await service.Create(guild, { name: `Liste ${index}`, template: "empty" });
 
     await refuses("Die elfte Liste wird abgewiesen", () => service.Create(guild, { name: "Zu viel", template: "empty" }));
+    await checkW137Lists(service, guild, store);
 
     // Ungesendet: kein Nachziehen
     check("Ungesendet: Nachziehen tut nichts", (await service.Refresh(guild, store.get(created.id)!)) === "skipped");
@@ -550,6 +552,42 @@ async function checkSend(client: BotClient): Promise<void> {
 
     await refuses("Die elfte eigene Vorlage wird abgewiesen", () => service.SavePreset(GUILD, "Zu viel", ImagePreset("gold")));
     check("Eigene Vorlagen sind gespeichert", (await service.Presets(GUILD)).length === 10);
+
+    // W-0137: eine elfte Vorlage mit Server-Wert 11, danach wieder 10 für die nächsten Gruppen.
+    SetFlags([], [], [], [Limits({ maxPresets: 11 })]);
+    await service.SavePreset(GUILD, "Elfte", ImagePreset("gold"));
+    check("W-0137: Server-Wert 11 erlaubt die elfte Vorlage", (await service.Presets(GUILD)).length === 11);
+    SetFlags([], [], []);
+    presets.presets = presets.presets.slice(0, 10);
+}
+
+/** W-0137: ein Server-Wert für die Grenzen der Rollenlisten. */
+function Limits(values: Record<string, number>) {
+    return { module: "role-lists", guildId: GUILD, status: null, notice: null, linkMode: null, values, updatedAt: null };
+}
+
+/** W-0137: Listen und Rollen je Liste sind Grenzen von RL Nexus, je Server änderbar. */
+async function checkW137Lists(service: BotClient["roleListService"], guild: Guild, store: Map<number, IRoleList>): Promise<void> {
+    let hit: unknown = null;
+
+    try {
+        await service.Create(guild, { name: "Zu viel", template: "empty" });
+    } catch (error) {
+        hit = error;
+    }
+
+    const limit = hit instanceof RoleListError ? hit.limit : undefined;
+
+    check("W-0137: Fehler trägt die Grenze maxLists (10)", limit?.module === "role-lists" && limit.key === "maxLists" && limit.allowed === 10 && limit.asked === 11, JSON.stringify(limit));
+
+    SetFlags([], [], [], [Limits({ maxLists: 12, maxRoles: 2 })]);
+
+    const eleventh = await service.Create(guild, { name: "Elfte", template: "staff" });
+
+    check("W-0137: Server-Wert 12 erlaubt die elfte Liste", !!eleventh && store.has(eleventh.id));
+    check("W-0137: Server-Wert 2 kürzt die Rollen der Vorlage", eleventh.settings.roles.length === 2, String(eleventh.settings.roles.length));
+    SetFlags([], [], []);
+    store.delete(eleventh.id);
 }
 
 /* ----------------------------------------------------------
@@ -576,6 +614,13 @@ async function checkRoute(client: BotClient): Promise<void> {
     check("Lesen: sechs Bild-Vorlagen und die eigenen", Object.keys(read.imagePresets ?? {}).length === 6 && Array.isArray(read.presets));
     check("Lesen: Mitglieder der Rollen für die Titel", Array.isArray(read.members?.[SUPPORT]) && read.members[SUPPORT].some((member: { name: string }) => member.name === "Mats"));
     check("Lesen: ohne Mitglieder-Intent steht das da", read.intent === false);
+    check("W-0137: Grenzen ohne Server-Wert wie bisher", read.limits?.lists === 10 && read.limits?.roles === 20 && read.limits?.presets === 10, JSON.stringify(read.limits));
+    SetFlags([], [], [], [Limits({ maxLists: 12, maxRoles: 22, maxPresets: 11 })]);
+
+    const own = await route.Read(access);
+
+    check("W-0137: Route gibt den Server-Wert an die Seite", own.limits?.lists === 12 && own.limits?.roles === 22 && own.limits?.presets === 11, JSON.stringify(own.limits));
+    SetFlags([], [], []);
 
     // Eine nie gesendete Liste: an ihr zieht kein Nachzieher der vorigen Gruppe etwas nach.
     const quiet = (await client.roleLists.OfGuild(GUILD)).find((list) => !list.messageId)!;

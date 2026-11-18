@@ -16,7 +16,8 @@ import BotClient from "../client/BotClient";
 import { CustomMessageView } from "../builder/CustomView";
 import { DefaultEmbed, DefaultMessageDoc, DefaultResponseDoc, MAX_BUTTONS, MAX_MENU_OPTIONS, MAX_MENUS, Matches, NextRun, WEEKDAYS } from "../constants/Messages";
 import { ICustomMessage, ISchedule } from "../interfaces/services/messages/IMessages";
-import { MessageError } from "../services/MessageService";
+import { MessageError, MessageLimits } from "../services/MessageService";
+import { SetFlags } from "../utils/moduleFlags";
 import { PanelsOf } from "../utils/guildpanels";
 
 const GUILD = "90071992547409941";
@@ -463,6 +464,45 @@ async function cleanup(client: BotClient): Promise<void> {
     check("Aufgeräumt", (await client.customMessages.OfGuild(GUILD)).length === 0);
 }
 
+/** W-0137: Nachrichten und Stichwörter je Server sind Grenzen von RL Nexus. */
+async function checkLimits(client: BotClient): Promise<void> {
+    console.log("\n  — Grenzen (W-0137) —");
+
+    const service = client.messageService;
+    const messages = client.customMessages as unknown as { OfGuild: (guildId: string) => Promise<unknown[]> };
+    const responses = client.autoResponses as unknown as { OfGuild: (guildId: string) => Promise<unknown[]> };
+    const original = [messages.OfGuild, responses.OfGuild] as const;
+    const full = (count: number) => async () => Array.from({ length: count });
+    const hit = async (action: () => Promise<unknown>): Promise<string> => {
+        try {
+            await action();
+            return "durch";
+        } catch (error) {
+            return error instanceof MessageError ? `${error.message}|${error.limit?.key ?? ""}|${error.limit?.allowed ?? ""}` : String(error);
+        }
+    };
+
+    check("Ohne Server-Wert wie bisher (50 / 50)", JSON.stringify(MessageLimits(GUILD)) === JSON.stringify({ messages: 50, responses: 50 }));
+
+    messages.OfGuild = full(50);
+    responses.OfGuild = full(50);
+
+    const message = await hit(() => service.Create(FakeGuild(), {}, "1", {} as never));
+    const response = await hit(() => service.AddResponse(FakeGuild(), {}, "1"));
+
+    check("51. Nachricht abgelehnt, Grenze im Fehler", message.endsWith("|maxMessages|50"), message);
+    check("51. Stichwort abgelehnt, Grenze im Fehler", response.endsWith("|maxResponses|50"), response);
+
+    SetFlags([], [], [], [{ module: "custom-message", guildId: GUILD, status: null, notice: null, linkMode: null, values: { maxMessages: 60, maxResponses: 60 }, updatedAt: null }]);
+
+    const more = await hit(() => service.Create(FakeGuild(), {}, "1", {} as never));
+
+    check("Server-Wert 60: an der Grenze vorbei (scheitert erst später am leeren Inhalt)", !more.includes("gehen je Server nicht"), more);
+    check("Server-Wert für die Seite", JSON.stringify(MessageLimits(GUILD)) === JSON.stringify({ messages: 60, responses: 60 }));
+    SetFlags([], [], []);
+    [messages.OfGuild, responses.OfGuild] = original;
+}
+
 async function main(): Promise<void> {
     console.log("\n✉️ Custom Message\n");
 
@@ -474,6 +514,7 @@ async function main(): Promise<void> {
     checkResponses(client);
     checkMenus(client);
     await checkView(client);
+    await checkLimits(client);
 
     if (await client.databaseService.Connect()) {
         try {
