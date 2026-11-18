@@ -13,9 +13,19 @@ import { ago } from "../core/Format.js";
 import { clickSound } from "../core/Sound.js";
 import { toast } from "../core/Toast.js";
 import { api, button, card, confirmButton, el, IRole, loading, row, select, stat, toggle } from "../core/Ui.js";
-import { openGroups, parseVoiceTab, VoiceTab, voiceTabHref } from "../constants/Voice.js";
+import { openGroups, parseVoiceTab, PersonState, personStates, regionName, seatsText, VoiceTab, voiceTabHref } from "../constants/Voice.js";
 
 const TABS: VoiceTab[] = ["hubs", "offen"];
+
+// W-0143: Symbol je Status im Fenster eines offenen Kanals - immer mit Wort daneben.
+const STATE_ICONS: Record<PersonState, string> = { stream: "#i-monitor", video: "#i-video", mute: "#i-mic-off", deaf: "#i-headphones-off" };
+const CLOCK = new Intl.DateTimeFormat("de-DE", { hour: "2-digit", minute: "2-digit" });
+const DAY = new Intl.DateTimeFormat("de-DE", { day: "2-digit", month: "2-digit" });
+
+/** „19:31 Uhr“, nach einem Tag mit Datum davor. */
+function clock(at: number): string {
+    return `${Date.now() - at > 20 * 3_600_000 ? `${DAY.format(at)} ` : ""}${CLOCK.format(at)} Uhr`;
+}
 
 interface ISettings {
     name: string | null;
@@ -44,6 +54,25 @@ interface IHub {
     config: IHubConfig;
 }
 
+interface IOpenPerson {
+    id: string;
+    name: string;
+    username: string;
+    avatar: string;
+    owner: boolean;
+    mute: boolean;
+    deaf: boolean;
+    stream: boolean;
+    video: boolean;
+}
+
+/** Vertraute und Gesperrte: ohne Mitglied im Cache ist der Name die ID. */
+interface IOpenName {
+    id: string;
+    name: string;
+    avatar: string | null;
+}
+
 interface IOpen {
     channelId: string;
     /** Null bei alten Zeilen ohne Hub (temp_voices.hub_id). */
@@ -53,6 +82,20 @@ interface IOpen {
     members: number;
     privacy: "public" | "private";
     createdAt: number;
+    // W-0143: für das Fenster eines offenen Kanals.
+    ownerId: string;
+    support: boolean;
+    stealth: boolean;
+    /** 0: ohne Limit. */
+    limit: number;
+    /** kbps, 0 ohne Kanal im Cache. */
+    bitrate: number;
+    region: string | null;
+    category: string | null;
+    /** Besitzer zuerst, sonst nach Name. */
+    people: IOpenPerson[];
+    trusted: IOpenName[];
+    blocked: IOpenName[];
 }
 
 interface IPayload {
@@ -433,18 +476,26 @@ export function renderVoice(guildId: string): void {
             );
         }
 
-        const openRow = (entry: IOpen): HTMLElement =>
-            el(
-                "div",
+        // W-0143: Die Zeile ist ein Knopf, der Klick öffnet das Fenster mit allen Infos.
+        const openRow = (entry: IOpen): HTMLElement => {
+            const rowButton = button(
                 "plrow vcrow",
-                el("div", "snitem__face vcface", icon("#i-mic")),
+                el("span", "snitem__face vcface", icon("#i-mic")),
                 el(
-                    "div",
+                    "span",
                     "plrow__main",
-                    el("div", "plrow__top", el("b", "", entry.name), el("span", `chip ${entry.privacy === "private" ? "chip--warn" : ""}`, entry.privacy === "private" ? "privat" : "offen")),
+                    el("span", "plrow__top", el("b", "", entry.name), el("span", `chip ${entry.privacy === "private" ? "chip--warn" : ""}`, entry.privacy === "private" ? "privat" : "offen")),
                     el("span", "gwrow__facts", `${entry.owner} · ${entry.members} drin · seit ${ago(entry.createdAt)}`)
-                )
+                ),
+                el("span", "vcrow__go", "Infos", icon("#i-chevron"))
             );
+
+            rowButton.dataset.channel = entry.channelId;
+            rowButton.setAttribute("aria-haspopup", "dialog");
+            rowButton.addEventListener("click", () => viewOpen(entry.channelId));
+
+            return rowButton;
+        };
 
         return el(
             "div",
@@ -511,6 +562,156 @@ export function renderVoice(guildId: string): void {
     }
 
     /* ------------------------------------------------------------
+       W-0143: ein offener Kanal groß - nur ansehen, wie die Fallansicht
+       der Moderation. Frischt sich mit jedem Pulse auf.
+       ------------------------------------------------------------ */
+    const viewTitle = el("h2", "", "");
+    const viewSub = el("p", "");
+    const viewBody = el("div", "modal__body mcview__body vcview__body");
+    const viewFoot = el("div", "vcview__foot");
+    const closeView = button("iconbtn modal__x", icon("#i-x"));
+    const dialog = el(
+        "dialog",
+        "modal mcview vcview",
+        el("div", "modal__head mcview__head", el("span", "snitem__face vcface", icon("#i-mic")), el("div", "mcview__title", viewTitle, viewSub), closeView),
+        viewBody,
+        viewFoot
+    );
+    let shownId: string | null = null;
+
+    viewTitle.id = "vcViewTitle";
+    dialog.setAttribute("aria-labelledby", "vcViewTitle");
+    closeView.autofocus = true;
+    closeView.setAttribute("aria-label", "Schließen");
+    document.body.append(dialog);
+
+    /** Zu: der Fokus geht zurück auf die Zeile, auch wenn die Liste inzwischen neu gebaut ist. */
+    function hideOpen(): void {
+        const id = shownId;
+
+        shownId = null;
+
+        if (dialog.open) dialog.close();
+        if (id) openNode.querySelector<HTMLElement>(`[data-channel="${id}"]`)?.focus();
+    }
+
+    closeView.addEventListener("click", hideOpen);
+    dialog.addEventListener("click", (event) => {
+        if (event.target === dialog) hideOpen();
+    });
+    dialog.addEventListener("keydown", (event) => {
+        if (event.key !== "Escape") return;
+
+        event.preventDefault();
+        hideOpen();
+    });
+    dialog.addEventListener("close", () => {
+        if (shownId) hideOpen();
+    });
+
+    function viewOpen(channelId: string): void {
+        shownId = channelId;
+        paintOpenView();
+
+        if (!dialog.open) dialog.showModal();
+    }
+
+    function tile(symbol: string, label: string, value: string, sub: string, ...extra: Node[]): HTMLElement {
+        return el("div", "vcview__tile", el("span", "vcview__label", icon(symbol), label), el("b", "", value), el("small", "", sub), ...extra);
+    }
+
+    function face(url: string | null, className: string): HTMLElement {
+        if (!url) return el("i", className);
+
+        const image = el("img", className);
+
+        image.src = url;
+        image.alt = "";
+        image.loading = "lazy";
+
+        return image;
+    }
+
+    function names(list: IOpenName[], bad = false): HTMLElement {
+        if (!list.length) return el("p", "tkempty", "niemand");
+
+        return el("div", "vcnames", ...list.map((entry) => el("span", `vcname${bad ? " vcname--bad" : ""}`, face(entry.avatar, ""), el("span", "", entry.name))));
+    }
+
+    function person(entry: IOpenPerson): HTMLElement {
+        return el(
+            "div",
+            "vcperson",
+            face(entry.avatar, "vcavatar"),
+            el("span", "vcperson__who", el("b", "", el("span", "vcperson__name", entry.name), ...(entry.owner ? [el("span", "vcowner", icon("#i-crown"), "Besitzer")] : [])), el("small", "", `@${entry.username}`)),
+            el("span", "vcperson__states", ...personStates(entry).map(([key, label]) => el("span", `vcstate vcstate--${key}`, icon(STATE_ICONS[key]), label)))
+        );
+    }
+
+    function paintOpenView(): void {
+        const entry = data?.open.find((item) => item.channelId === shownId);
+
+        // Zu, während das Fenster offen war: der Kopf behält den Namen, der Rumpf sagt es.
+        if (!entry) {
+            viewSub.textContent = "geschlossen";
+            viewBody.replaceChildren(el("div", "tkempty tkempty--big vcview__gone", icon("#i-mic"), el("b", "", "Dieser Kanal ist inzwischen zu."), el("span", "", "Er verschwindet, sobald der Letzte rausgeht.")));
+            viewFoot.hidden = true;
+
+            return;
+        }
+
+        const hub = data!.hubs.find((item) => item.id === entry.hubId);
+        const seats = seatsText(entry.members, entry.limit);
+        const fill = el("i");
+        const facts = el("dl", "mcfacts");
+        const link = el("a", "", icon("#i-external"), "In Discord öffnen");
+        const rows: [string, string][] = [
+            ["Besitzer", entry.owner],
+            ["Sichtbar", entry.stealth ? "versteckt" : "für alle"],
+            ["Limit", entry.limit > 0 ? `${entry.limit} Plätze` : "ohne Limit"],
+            ["Bitrate", entry.bitrate > 0 ? `${entry.bitrate} kbps` : "–"],
+            ["Kategorie", entry.category ?? "keine"],
+            ["Art", entry.support ? "Support-Kanal" : "normaler Kanal"],
+        ];
+
+        fill.style.width = `${entry.limit > 0 ? Math.min(100, (entry.members / entry.limit) * 100) : 0}%`;
+        viewTitle.textContent = entry.name;
+        viewSub.replaceChildren(el("i", "vcview__dot"), `offen seit ${clock(entry.createdAt)} · ${hub ? `aus dem Hub ${hub.channelName ?? "Hub"}` : "ohne Hub"}`);
+
+        for (const [term, value] of rows) facts.append(el("div", "mcfact", el("dt", "", term), el("dd", "", value)));
+
+        viewBody.replaceChildren(
+            el(
+                "div",
+                "vcview__tiles",
+                tile("#i-users", "Im Kanal", seats.value, seats.sub, ...(entry.limit > 0 ? [el("span", `vcview__seats${seats.sub === "voll" ? " is-full" : ""}`, fill)] : [])),
+                tile("#i-clock", "Geöffnet", clock(entry.createdAt), ago(entry.createdAt)),
+                entry.privacy === "private" ? tile("#i-lock", "Zugang", "Privat", "nur Vertraute und Eingeladene") : tile("#i-unlock", "Zugang", "Öffentlich", "jeder darf rein"),
+                tile("#i-globe", "Region", regionName(entry.region, data!.regions), entry.region ? "fest eingestellt" : "Discord wählt")
+            ),
+            el(
+                "section",
+                "mcview__main",
+                el("h3", "vcview__h", "Im Kanal", el("span", "", String(entry.people.length))),
+                entry.people.length ? el("div", "vcpeople", ...entry.people.map(person)) : el("p", "tkempty", "Gerade niemand drin.")
+            ),
+            el(
+                "section",
+                "mcview__side",
+                el("div", "", el("h3", "vcview__h", "Einstellungen"), facts),
+                el("div", "", el("h3", "vcview__h", icon("#i-shield-check"), "Vertraut", el("span", "", String(entry.trusted.length))), names(entry.trusted)),
+                el("div", "", el("h3", "vcview__h", icon("#i-user-x"), "Gesperrt", el("span", "", String(entry.blocked.length))), names(entry.blocked, true))
+            )
+        );
+
+        link.href = `https://discord.com/channels/${encodeURIComponent(guildId)}/${encodeURIComponent(entry.channelId)}`;
+        link.target = "_blank";
+        link.rel = "noopener";
+        viewFoot.hidden = false;
+        viewFoot.replaceChildren(el("span", "", `Kanal-ID ${entry.channelId}`), link);
+    }
+
+    /* ------------------------------------------------------------
        Zeichnen und Laden
        ------------------------------------------------------------ */
     function paint(): void {
@@ -572,6 +773,9 @@ export function renderVoice(guildId: string): void {
         navNode = freshNav;
         openNode = list;
         show();
+
+        // W-0143: ein offenes Fenster zieht mit - auch wenn der Kanal inzwischen zu ist.
+        if (shownId) paintOpenView();
 
         // Wer gerade mit den Pfeiltasten durch die Reiter ging, bleibt dort.
         if (focused) navNode.querySelector<HTMLElement>(`#vctab-${tab}`)?.focus();
