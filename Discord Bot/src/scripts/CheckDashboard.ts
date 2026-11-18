@@ -1916,6 +1916,8 @@ function checkVoiceTabs(): void {
     check("Voice: Kanal ohne Hub geht nicht verloren", titles(openGroups([{ hubId: 9 }, { hubId: 1 }], [{ id: 1, channelName: "Temp Voice" }])) === '[["Temp Voice · 1 offen",1],["Ohne Hub · 1 offen",1]]');
     check("Voice: Hub ohne Kanalnamen heißt Hub", titles(openGroups([{ hubId: 1 }, { hubId: 2 }], [{ id: 1, channelName: null }, { id: 2, channelName: "B" }])) === '[["Hub · 1 offen",1],["B · 1 offen",1]]');
     check("Voice: nichts offen, keine Gruppe", openGroups([], [{ id: 1, channelName: "Temp Voice" }]).length === 0);
+    // Review W-0140 / Spec: ab zwei Hubs mit Überschrift, auch wenn nur einer Kanäle offen hat.
+    check("Voice: zwei Hubs, offen nur in einem: mit Überschrift", titles(openGroups([{ hubId: 2 }], [{ id: 1, channelName: "Temp Voice" }, { id: 2, channelName: "Support-Hub" }])) === '[["Support-Hub · 1 offen",1]]');
 }
 
 async function main(): Promise<void> {

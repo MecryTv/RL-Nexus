@@ -15,12 +15,12 @@ export function voiceTabHref(base: string, guildId: string, tab: VoiceTab): stri
 
 export interface IOpenGroup<T> {
     hubId: number | null;
-    /** Null, wenn es nur eine Gruppe gibt - dann die Liste ohne Überschrift. */
+    /** Null bei einem Hub und nur einer Gruppe - dann die Liste ohne Überschrift wie früher. */
     title: string | null;
     items: T[];
 }
 
-/** Offene Kanäle nach Hub, in der Reihenfolge der Hubs; Kanäle ohne bekannten Hub zuletzt unter „Ohne Hub“. */
+/** Offene Kanäle nach Hub, in der Reihenfolge der Hubs; Kanäle ohne bekannten Hub zuletzt unter „Ohne Hub“. Ab zwei Hubs immer mit Überschrift (Spec). */
 export function openGroups<T extends { hubId: number | null }>(open: T[], hubs: { id: number; channelName: string | null }[]): IOpenGroup<T>[] {
     const known = new Set(hubs.map((hub) => hub.id));
     const groups = [
@@ -28,5 +28,5 @@ export function openGroups<T extends { hubId: number | null }>(open: T[], hubs: 
         { hubId: null, name: "Ohne Hub", items: open.filter((entry) => entry.hubId === null || !known.has(entry.hubId)) },
     ].filter((group) => group.items.length);
 
-    return groups.map((group) => ({ hubId: group.hubId, title: groups.length > 1 ? `${group.name} · ${group.items.length} offen` : null, items: group.items }));
+    return groups.map((group) => ({ hubId: group.hubId, title: groups.length > 1 || hubs.length > 1 ? `${group.name} · ${group.items.length} offen` : null, items: group.items }));
 }

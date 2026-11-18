@@ -46,7 +46,8 @@ interface IHub {
 
 interface IOpen {
     channelId: string;
-    hubId: number;
+    /** Null bei alten Zeilen ohne Hub (temp_voices.hub_id). */
+    hubId: number | null;
     name: string;
     owner: string;
     members: number;
@@ -416,7 +417,11 @@ export function renderVoice(guildId: string): void {
         if (!data!.open.length) {
             const toHubs = button("btn btn--quiet", icon("#i-mic"), "Zum Reiter Hubs");
 
-            toHubs.addEventListener("click", () => choose("hubs"));
+            toHubs.addEventListener("click", () => {
+                choose("hubs");
+                // Der Knopf verschwindet mit dem Reiter - der Fokus geht auf den Reiter Hubs, nicht auf die Seite.
+                navNode.querySelector<HTMLElement>("#vctab-hubs")?.focus();
+            });
 
             return el(
                 "div",
@@ -428,7 +433,7 @@ export function renderVoice(guildId: string): void {
             );
         }
 
-        const row = (entry: IOpen): HTMLElement =>
+        const openRow = (entry: IOpen): HTMLElement =>
             el(
                 "div",
                 "plrow vcrow",
@@ -443,9 +448,9 @@ export function renderVoice(guildId: string): void {
 
         return el(
             "div",
-            "vcopen",
-            el("p", "hintline", `${data!.open.length} Kanal${data!.open.length === 1 ? "" : "e"} offen. Sie verschwinden, sobald der Letzte rausgeht.`),
-            ...openGroups(data!.open, data!.hubs).flatMap((group) => [...(group.title ? [el("h4", "srhead", group.title)] : []), el("div", "pllist", ...group.items.map(row))])
+            "",
+            el("p", "hintline", `${data!.open.length} ${data!.open.length === 1 ? "Kanal" : "Kanäle"} offen. Sie verschwinden, sobald der Letzte rausgeht.`),
+            ...openGroups(data!.open, data!.hubs).flatMap((group) => [...(group.title ? [el("h4", "srhead", group.title)] : []), el("div", "pllist", ...group.items.map(openRow))])
         );
     }
 
@@ -574,6 +579,14 @@ export function renderVoice(guildId: string): void {
 
     loading(host, 4);
     onPulse(guildId, ["voice"], debounce(() => void pulse()));
+
+    // Review W-0140: Wer über die Leiste zurückkommt, landet auf /voice-hub ohne ?reiter - der Reiter folgt der Adresse, wie bei Grenzen.
+    window.addEventListener("guild:shown", (event) => {
+        if ((event as CustomEvent<string>).detail !== "voice-hub" || !data) return;
+
+        tab = parseVoiceTab(window.location.search);
+        show();
+    });
 
     void call<IPayload>("").then((answer) => {
         if (!answer) return;

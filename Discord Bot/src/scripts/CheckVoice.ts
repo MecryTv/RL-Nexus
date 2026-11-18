@@ -348,39 +348,75 @@ async function checkSweep(client: BotClient): Promise<void> {
     const FULL = "90071992547409982";
     const GONE = "90071992547409983";
     const ELSEWHERE = "90071992547409984";
+    const OUTAGE = "90071992547409985";
+    const STUCK = "90071992547409986";
+    const VANISHED = "90071992547409987";
+    const DOWN = "90071992547409990";
     const deleted: string[] = [];
     const removed: string[] = [];
-    const voice = (id: string, humans: number) =>
+    const pulses: string[] = [];
+    const voice = (id: string, humans: number, fail?: Error) =>
         ({
             id,
             isVoiceBased: () => true,
             members: new Collection(Array.from({ length: humans }, (_, index) => [`m${index}`, { user: { bot: false } }] as const)),
-            delete: async () => void deleted.push(id),
+            delete: async () => {
+                if (fail) throw fail;
+
+                deleted.push(id);
+            },
         }) as unknown as GuildBasedChannel;
-    const guild = { id: GUILD, channels: { cache: new Map([[EMPTY, voice(EMPTY, 0)], [FULL, voice(FULL, 1)]]) } } as unknown as Guild;
-    const original = { all: client.tempVoices.All, remove: client.tempVoices.Remove, tick: client.supportService.Tick };
+    const channels = new Map([
+        [EMPTY, voice(EMPTY, 0)],
+        [FULL, voice(FULL, 1)],
+        // Review: fehlende Rechte - die Zeile bleibt, der nächste Start versucht es wieder.
+        [STUCK, voice(STUCK, 0, new Error("Missing Permissions"))],
+        // Review: Discord kennt den Kanal nicht mehr (10003) - dann ist er weg, die Zeile auch.
+        [VANISHED, voice(VANISHED, 0, Object.assign(new Error("Unknown Channel"), { code: 10003 }))],
+    ]);
+    const guild = { id: GUILD, available: true, channels: { cache: channels } } as unknown as Guild;
+    // Review: Ein Server im Ausfall steht im Cache, aber ohne Kanäle.
+    const down = { id: DOWN, available: false, channels: { cache: new Map() } } as unknown as Guild;
+    const original = { all: client.tempVoices.All, remove: client.tempVoices.Remove, tick: client.supportService.Tick, emit: client.pulseService.Emit };
     const runnable = new VoiceSupport(client);
+    let ready = false;
 
     client.guilds.cache.set(GUILD, guild);
+    client.guilds.cache.set(DOWN, down);
+    client.isReady = (() => ready) as typeof client.isReady;
     Object.defineProperty(client.databaseService, "Ready", { get: () => true, configurable: true });
-    client.tempVoices.All = (async () => [EMPTY, FULL, GONE].map((channelId) => ({ channelId, guildId: GUILD })).concat({ channelId: ELSEWHERE, guildId: "90071992547409989" })) as unknown as typeof client.tempVoices.All;
+    client.tempVoices.All = (async () =>
+        [EMPTY, FULL, GONE, STUCK, VANISHED]
+            .map((channelId) => ({ channelId, guildId: GUILD }))
+            .concat({ channelId: ELSEWHERE, guildId: "90071992547409989" }, { channelId: OUTAGE, guildId: DOWN })) as unknown as typeof client.tempVoices.All;
     client.tempVoices.Remove = (async (channelId: string) => void removed.push(channelId)) as unknown as typeof client.tempVoices.Remove;
     client.supportService.Tick = async () => 0;
+    client.pulseService.Emit = ((_guildId: string, _topic: string, data: { channelId?: string }) => void pulses.push(data.channelId ?? "")) as unknown as typeof client.pulseService.Emit;
 
     try {
         await runnable.Execute();
-        check("Der erste Lauf löscht den leeren Kanal", deleted.join() === EMPTY, deleted.join());
-        check("…und die Zeilen von leeren und verschwundenen Kanälen", removed.sort().join() === [EMPTY, GONE].sort().join(), removed.join());
+        check("Solange der Bot nicht bereit ist, räumt nichts auf", deleted.length === 0 && removed.length === 0, `${deleted.length}/${removed.length}`);
+
+        ready = true;
+        await runnable.Execute();
+        check("Der erste Lauf danach löscht den leeren Kanal", deleted.join() === EMPTY, deleted.join());
+        check("…und die Zeilen von leeren, verschwundenen und bei Discord schon gelöschten Kanälen", removed.sort().join() === [EMPTY, GONE, VANISHED].sort().join(), removed.join());
         check("Besetzte Kanäle bleiben", !deleted.includes(FULL) && !removed.includes(FULL));
+        check("Scheitert das Löschen, bleibt die Zeile", !removed.includes(STUCK));
         check("Ein Server, den der Bot (noch) nicht kennt, bleibt unberührt", !removed.includes(ELSEWHERE));
+        check("Ein gerade ausgefallener Server bleibt unberührt", !removed.includes(OUTAGE));
+        check("Das Dashboard erfährt jede Räumung live", pulses.sort().join() === [EMPTY, GONE, VANISHED].sort().join(), pulses.join());
 
         await runnable.Execute();
-        check("Der zweite Lauf räumt nicht noch einmal auf", deleted.length === 1 && removed.length === 2, `${deleted.length}/${removed.length}`);
+        check("Der zweite Lauf räumt nicht noch einmal auf", deleted.length === 1 && removed.length === 3, `${deleted.length}/${removed.length}`);
     } finally {
         Object.assign(client.tempVoices, { All: original.all, Remove: original.remove });
         client.supportService.Tick = original.tick;
+        client.pulseService.Emit = original.emit;
+        delete (client as unknown as Record<string, unknown>).isReady;
         delete (client.databaseService as unknown as Record<string, unknown>).Ready;
         client.guilds.cache.delete(GUILD);
+        client.guilds.cache.delete(DOWN);
     }
 }
 
