@@ -55,6 +55,35 @@ export default class Levels extends Model<ILevelRow> {
         this.db.Bump(this.Table);
     }
 
+    /**
+     * W-0141: mehrere Mitglieder eines Servers auf einmal, wie Add - für
+     * Voice-XP. Eine Anweisung je Runde; ein Server mit über 500 Leuten im
+     * Voice bleibt trotzdem unter der Grenze für Platzhalter.
+     */
+    async AddMany(guildId: string, rows: readonly { userId: string; xp: number; voiceMinutes: number }[]): Promise<void> {
+        if (!rows.length) return;
+
+        const now = Date.now();
+
+        await this.db.Write(
+            `INSERT INTO \`${this.Table}\` (guild_id, user_id, xp, level, messages, voice_minutes, last_message, updated_at)
+             VALUES ${rows.map(() => "(?, ?, ?, 0, 0, ?, 0, ?)").join(", ")}
+             ON DUPLICATE KEY UPDATE xp = xp + VALUES(xp), voice_minutes = voice_minutes + VALUES(voice_minutes), updated_at = VALUES(updated_at)`,
+            rows.flatMap((row) => [guildId, row.userId, Math.max(0, Math.round(row.xp)), row.voiceMinutes, now])
+        );
+
+        this.db.Bump(this.Table);
+    }
+
+    /** W-0141: der Stand mehrerer Mitglieder mit einer Abfrage. Wer keine Zeile hat, fehlt. */
+    async OfMany(guildId: string, userIds: readonly string[]): Promise<Map<string, ILevelEntry>> {
+        if (!userIds.length) return new Map();
+
+        const rows = await this.db.Query<ILevelRow>(`SELECT * FROM \`${this.Table}\` WHERE guild_id = ? AND user_id IN (${userIds.map(() => "?").join(", ")})`, [guildId, ...userIds]);
+
+        return new Map(rows.map((row) => [row.user_id, ToEntry(row)]));
+    }
+
     /** Setzt Punkte und Level hart - für das Dashboard. */
     async Set(guildId: string, userId: string, xp: number, level: number): Promise<void> {
         await this.Upsert(

@@ -265,6 +265,18 @@ async function checkDatabase(client: BotClient): Promise<void> {
     check("Voice-Minuten auch", (await client.levels.Of(GUILD, OTHER))?.voiceMinutes === 3);
     check("Die Sperre merkt sich den Zeitpunkt", (entry?.lastMessage ?? 0) > 0);
 
+    // W-0141: mehrere auf einmal, wie bei Voice-XP.
+    await client.levels.AddMany(GUILD, [
+        { userId: USER, xp: 10, voiceMinutes: 1 },
+        { userId: OTHER, xp: 5, voiceMinutes: 1 },
+    ]);
+
+    const many = await client.levels.OfMany(GUILD, [USER, OTHER, "90071992547409999"]);
+
+    check("Mehrere auf einmal: addiert, Minuten gezählt, Unbekannte fehlen", many.get(USER)?.xp === 210 && many.get(OTHER)?.xp === 55 && many.get(OTHER)?.voiceMinutes === 4 && !many.has("90071992547409999"), JSON.stringify([...many]));
+    check("Mehrere auf einmal: der Zeitpunkt der letzten Nachricht bleibt", (many.get(USER)?.lastMessage ?? 0) === (entry?.lastMessage ?? -1));
+
+
     await client.levels.SetLevel(GUILD, USER, 2);
 
     check("Das Level lässt sich setzen", (await client.levels.Of(GUILD, USER))?.level === 2);
@@ -524,6 +536,17 @@ function World(extra: Partial<ILevelSettings> = {}, env: IWorldEnv = {}): IWorld
                 if (entry) entry.xp = Math.max(0, entry.xp - Math.round(xp));
             },
             SetLevel: async (guildId: string, userId: string, level: number) => void (levels.get(key(guildId, userId))!.level = level),
+            AddMany: async (guildId: string, rows: { userId: string; xp: number; voiceMinutes: number }[]) => {
+                for (const row of rows) {
+                    const entry = levels.get(key(guildId, row.userId)) ?? empty(guildId, row.userId);
+
+                    entry.xp += Math.max(0, Math.round(row.xp));
+                    entry.voiceMinutes += row.voiceMinutes;
+                    levels.set(key(guildId, row.userId), entry);
+                }
+            },
+            OfMany: async (guildId: string, userIds: string[]) =>
+                new Map(userIds.filter((userId) => levels.has(key(guildId, userId))).map((userId) => [userId, { ...levels.get(key(guildId, userId))! }])),
             Set: async (guildId: string, userId: string, xp: number, level: number) => void levels.set(key(guildId, userId), { ...(levels.get(key(guildId, userId)) ?? empty(guildId, userId)), xp, level }),
             All: async (guildId: string) => [...levels.values()].filter((entry) => entry.guildId === guildId && entry.xp > 0).map((entry) => ({ ...entry })),
             Rank: async () => 1,
@@ -656,6 +679,35 @@ async function checkCounting(): Promise<void> {
     (free.guild as unknown as { voiceStates: { cache: Map<string, unknown> } }).voiceStates.cache.set(alone.id, { member: alone, channel: voiceChannel, channelId: VOICE, selfMute: true, selfDeaf: false, mute: false, deaf: false });
     await free.service.Voice();
     check("Voice allein und stumm: Minute gezählt, keine Punkte", free.entry(alone.id).voiceMinutes === 1 && free.entry(alone.id).xp === 0, JSON.stringify(free.entry(alone.id)));
+
+    // W-0141: Voice-XP je Server gebündelt: Lesen, Gesamt und Tag je einmal, egal wie viele im Kanal sitzen.
+    const crowd = World({ voice: { ...DefaultLevelSettings().voice, on: true, xp: XpForLevel(1, DefaultLevelSettings().base), muted: true, alone: true } });
+    const people = ["90071992547409970", "90071992547409971", "90071992547409972"].map((id) => crowd.member(id));
+    const room = { id: VOICE, parentId: null, members: new Collection(people.map((person) => [person.id, person])) };
+    const calls: string[] = [];
+    const crowdLevels = crowd.client.levels as unknown as Record<string, (...args: unknown[]) => Promise<unknown>>;
+    const crowdDays = crowd.client.levelDays as unknown as Record<string, (...args: unknown[]) => Promise<unknown>>;
+
+    for (const [target, name] of [
+        [crowdLevels, "Of"],
+        [crowdLevels, "Add"],
+        [crowdLevels, "AddMany"],
+        [crowdLevels, "OfMany"],
+        [crowdDays, "Add"],
+        [crowdDays, "AddMany"],
+    ] as const) {
+        const original = target[name];
+
+        target[name] = async (...args: unknown[]) => (calls.push(`${target === crowdDays ? "tag" : "levels"}.${name}`), original(...args));
+    }
+
+    for (const person of people) {
+        (crowd.guild as unknown as { voiceStates: { cache: Map<string, unknown> } }).voiceStates.cache.set(person.id, { member: person, channel: room, channelId: VOICE, selfMute: false, selfDeaf: false, mute: false, deaf: false });
+    }
+
+    await crowd.service.Voice();
+    check("Voice für drei: je Server einmal schreiben (gesamt, Tag) und einmal lesen", calls.sort().join() === "levels.AddMany,levels.OfMany,tag.AddMany", calls.join());
+    check("Voice für drei: alle bekommen Minute und Punkte, Level 1 gesetzt", people.every((person) => crowd.entry(person.id).voiceMinutes === 1 && crowd.entry(person.id).xp > 0 && crowd.entry(person.id).level === 1) && people.every((person) => crowd.day(person.id)?.voiceMinutes === 1), JSON.stringify(people.map((person) => crowd.entry(person.id))));
 
     const spam = free.member("90071992547409963");
     const after = free.message(spam, "das wird geloescht", "a1");
