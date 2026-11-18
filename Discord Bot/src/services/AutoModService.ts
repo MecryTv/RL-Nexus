@@ -1,6 +1,7 @@
 import { Guild, GuildMember, Message, PartialMessage, PermissionFlagsBits } from "discord.js";
 import { LRUCache } from "lru-cache";
 import BotClient from "../client/BotClient";
+import { ModuleValue } from "../utils/moduleFlags";
 import ComponentV2Builder from "../builder/ComponentV2Builder";
 import {
     ACTION_LABELS,
@@ -13,9 +14,7 @@ import {
     FILTER_IDS,
     INVITE_PATTERN,
     LINK_PATTERN,
-    MAX_IGNORE,
     MAX_NOTICE,
-    MAX_WORDS,
     MAX_WORD_LENGTH,
     NOTICE_MS,
     Normalize,
@@ -50,6 +49,11 @@ interface ITrail {
  * Auto Mod: nimmt aus dem Chat, was niemand sehen soll - bevor ein Moderator
  * online ist. Acht Filter, je einer mit eigener Aktion. Siehe docs/AutoMod.md.
  */
+/** W-0137: Wörter je Filter und Ausnahmen je Liste, Grenzen von RL Nexus je Server. */
+export function AutoModLimits(guildId: string): { ignore: number; words: number } {
+    return { ignore: ModuleValue(AUTOMOD_MODULE, "maxIgnore", guildId), words: ModuleValue(AUTOMOD_MODULE, "maxWords", guildId) };
+}
+
 export default class AutoModService {
     private readonly client: BotClient;
 
@@ -70,12 +74,13 @@ export default class AutoModService {
 
     Clean(guild: Guild, input: unknown, previous: IAutoModSettings): IAutoModSettings {
         const raw = IsRecord(input) ? input : {};
+        const limits = AutoModLimits(guild.id);
         const base = { ...DefaultAutoModSettings(), ...previous };
         const filters = { ...base.filters };
 
         if (IsRecord(raw.filters)) {
             for (const id of FILTER_IDS) {
-                filters[id] = this.CleanFilter(id, raw.filters[id], base.filters[id] ?? DefaultAutoModSettings().filters[id]);
+                filters[id] = this.CleanFilter(id, raw.filters[id], base.filters[id] ?? DefaultAutoModSettings().filters[id], limits.words);
             }
         }
 
@@ -83,7 +88,7 @@ export default class AutoModService {
             value === undefined
                 ? fallback
                 : Array.isArray(value)
-                  ? [...new Set(value.filter((id): id is string => typeof id === "string" && known(id)))].slice(0, MAX_IGNORE)
+                  ? [...new Set(value.filter((id): id is string => typeof id === "string" && known(id)))].slice(0, limits.ignore)
                   : [];
 
         const target = raw.logChannelId;
@@ -102,7 +107,7 @@ export default class AutoModService {
         };
     }
 
-    private CleanFilter(id: FilterId, input: unknown, previous: IFilterSettings): IFilterSettings {
+    private CleanFilter(id: FilterId, input: unknown, previous: IFilterSettings, maxWords: number): IFilterSettings {
         const raw = IsRecord(input) ? input : {};
         const info = FILTERS.find((filter) => filter.id === id)!;
         const action: AutoAction = ["none", "warn", "timeout", "kick", "ban"].includes(String(raw.action)) ? (raw.action as AutoAction) : previous.action;
@@ -114,7 +119,7 @@ export default class AutoModService {
                           .map((word) => word.trim().slice(0, MAX_WORD_LENGTH).toLowerCase())
                           .filter(Boolean)
                   ),
-              ].slice(0, MAX_WORDS)
+              ].slice(0, maxWords)
             : previous.words;
 
         return {

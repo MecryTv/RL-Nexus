@@ -24,8 +24,6 @@ import {
     DefaultModSupport,
     EVIDENCE_ROOT,
     FormatDuration,
-    MAX_EVIDENCE,
-    MAX_EVIDENCE_BYTES,
     MAX_REASON,
     MAX_SUPPORT_REMIND,
     MAX_SUPPORT_ROLES,
@@ -36,13 +34,15 @@ import {
 } from "../constants/Moderation";
 import { IModCase, IModEvidence, IModSupport } from "../interfaces/services/moderation/IModeration";
 import SupportService from "../services/SupportService";
-import ModerationService, { AttachmentFault, ModerationError, ProofRefusal } from "../services/ModerationService";
+import ModerationService, { AttachmentFault, ModerationError, ModerationLimits, ProofRefusal } from "../services/ModerationService";
 import CommandHandler from "../events/client/CommandHandler";
 import Command from "../structures/Command";
 import Unban from "../commands/moderation/Unban";
 import Unwarn from "../commands/moderation/Unwarn";
 import Giveaway from "../commands/admin/Giveaway";
-import { ActInput } from "../routes/DashboardApiModeration";
+import DashboardApiModeration, { ActInput } from "../routes/DashboardApiModeration";
+import { ParseStages } from "../services/settings/SettingsModel";
+import { SetFlags } from "../utils/moduleFlags";
 import { IsLogTarget } from "../utils/logtarget";
 import { ReadDuration } from "../utils/modcommand";
 import { IMAGE_TOO_LARGE } from "../utils/image";
@@ -56,6 +56,8 @@ const THREAD = "90071992547409985";
 const VOICE = "90071992547409986";
 const FORUM = "90071992547409987";
 const ROLE = "90071992547409988";
+const MB = 1024 * 1024;
+const MAX_EVIDENCE = 20;
 
 let failures = 0;
 
@@ -176,7 +178,7 @@ function checkStages(client: BotClient): void {
         { warns: 0, action: "kick" },
         { warns: 9, action: "explode" },
         "quatsch",
-    ]);
+    ], GUILD);
 
     check("Ungültige Stufen fallen raus, doppelte Zahlen auch", cleaned.length === 3, JSON.stringify(cleaned));
     check("Aufsteigend sortiert", cleaned.map((stage) => stage.warns).join(",") === "2,5,8", JSON.stringify(cleaned));
@@ -378,22 +380,68 @@ async function checkProofGate(client: BotClient): Promise<void> {
     check("Unsinn als Link: abgelehnt", ProofRefusal(needed, { link: "abc" }, GUILD)?.startsWith("Nur https-Links") === true);
     check("http ohne s: abgelehnt", ProofRefusal(needed, { link: "http://clips.example.com/1" }, GUILD)?.startsWith("Nur https-Links") === true);
     check("Eine Textdatei: abgelehnt", ProofRefusal(needed, { image: Attachment({ contentType: "text/plain", name: "a.txt" }) }, GUILD)?.startsWith("Nur Bilder") === true);
-    check("Über 8 MB: abgelehnt", ProofRefusal(needed, { image: Attachment({ size: MAX_EVIDENCE_BYTES + 1 }) }, GUILD)?.startsWith("Das Bild ist größer als 8 MB.") === true);
+    check("Über 8 MB: abgelehnt", ProofRefusal(needed, { image: Attachment({ size: 8 * MB + 1 }) }, GUILD)?.startsWith("Das Bild ist größer als 8 MB.") === true);
     check("Bild von fremdem Host: abgelehnt", ProofRefusal(needed, { image: Attachment({ url: "https://example.com/chat.png" }) }, GUILD)?.startsWith("Dieser Anhang kommt nicht von Discord.") === true);
     check("Gültig: Nachrichtenlink dieses Servers", ProofRefusal(needed, { link: `https://discord.com/channels/${GUILD}/${TEXT}/${THREAD}` }, GUILD) === null);
     check("Gültig: https-Link", ProofRefusal(needed, { link: "https://clips.example.com/1" }, GUILD) === null);
-    check("Gültig: Bild von Discord, genau 8 MB, mit charset", ProofRefusal(needed, { image: Attachment({ size: MAX_EVIDENCE_BYTES, contentType: "image/png; charset=binary" }) }, GUILD) === null);
+    check("Gültig: Bild von Discord, genau 8 MB, mit charset", ProofRefusal(needed, { image: Attachment({ size: 8 * MB, contentType: "image/png; charset=binary" }) }, GUILD) === null);
     check("Gültig: die Nachricht vom Rechtsklick", ProofRefusal(needed, { message: FakeMessage("Du bist so schlecht") }, GUILD) === null);
     check("Ein guter Beweis reicht, auch neben einem kaputten", ProofRefusal(needed, { image: Attachment(), link: "abc" }, GUILD) === null);
-    check("AttachmentFault: ein gutes Bild hat keinen", AttachmentFault(Attachment()) === null);
+    check("AttachmentFault: ein gutes Bild hat keinen", AttachmentFault(Attachment(), GUILD) === null);
 
     // Diese Prüfungen kommen vor Datenbank und Download - das geht ohne beides.
     const service = client.moderationService;
     const author = { id: MOD, name: "Hanna", member: null };
 
     check("AddAttachment: falscher Typ abgelehnt", (await Refusal(() => service.AddAttachment(GUILD, author, 1, Attachment({ contentType: "text/plain" })))) === "Nur Bilder: PNG, JPG, GIF oder WebP.");
-    check("AddAttachment: über 8 MB abgelehnt", (await Refusal(() => service.AddAttachment(GUILD, author, 1, Attachment({ size: MAX_EVIDENCE_BYTES + 1 })))) === "Das Bild ist größer als 8 MB.");
+    check("AddAttachment: über 8 MB abgelehnt", (await Refusal(() => service.AddAttachment(GUILD, author, 1, Attachment({ size: 8 * MB + 1 })))) === "Das Bild ist größer als 8 MB.");
     check("AddAttachment: fremder Host abgelehnt", (await Refusal(() => service.AddAttachment(GUILD, author, 1, Attachment({ url: "https://example.com/chat.png" })))) === "Dieser Anhang kommt nicht von Discord.");
+}
+
+/** W-0137: ein Server-Wert für die Grenzen der Moderation. */
+function Limits(values: Record<string, number>) {
+    return { module: "moderation", guildId: GUILD, status: null, notice: null, linkMode: null, values, updatedAt: null };
+}
+
+/** W-0137: Warn-Stufen und Beweisbild sind Grenzen von RL Nexus, je Server änderbar. */
+async function checkW137(client: BotClient): Promise<void> {
+    console.log("\n  — W-0137: Grenzen —");
+
+    const service = client.moderationService;
+    const author = { id: MOD, name: "Hanna", member: null };
+    const nine = Attachment({ size: 9 * MB });
+    const stages = [1, 2, 3].map((warns) => ({ warns, action: "kick", duration: null }));
+
+    check("Standard: 10 Stufen, 20 Beweise, 8 MB", JSON.stringify(ModerationLimits(GUILD)) === JSON.stringify({ stages: 10, evidence: 20, evidenceMegabytes: 8 }), JSON.stringify(ModerationLimits(GUILD)));
+    check("Beweisbild 9 MB bei Standard: abgelehnt", AttachmentFault(nine, GUILD) === "Das Bild ist größer als 8 MB.", String(AttachmentFault(nine, GUILD)));
+
+    let hit: unknown = null;
+
+    try {
+        await service.AddImage(GUILD, author, 1, Buffer.alloc(9 * MB), "image/png", "gross.png");
+    } catch (error) {
+        hit = error;
+    }
+
+    const limit = hit instanceof ModerationError ? hit.limit : undefined;
+
+    check("Fehler trägt die Grenze evidenceMegabytes (8)", limit?.module === "moderation" && limit.key === "evidenceMegabytes" && limit.asked === 9 && limit.allowed === 8, JSON.stringify(limit));
+
+    SetFlags([], [], [], [Limits({ evidenceMegabytes: 10, maxStages: 2 })]);
+    check("Beweisbild 9 MB bei Server-Wert 10: angenommen", AttachmentFault(nine, GUILD) === null, String(AttachmentFault(nine, GUILD)));
+    check("Server-Wert 2 kürzt die Stufen", service.CleanStages(stages, GUILD).length === 2);
+
+    let parsed = "";
+
+    try {
+        ParseStages("1 kick\n2 kick\n3 kick", ModerationLimits(GUILD).stages);
+    } catch (error) {
+        parsed = error instanceof Error ? error.message : String(error);
+    }
+
+    check("Panel: drei Stufen bei Server-Wert 2 abgelehnt", parsed === "Höchstens 2 Stufen.", parsed);
+    SetFlags([], [], []);
+    check("Ohne Server-Wert gelten wieder 8 MB", AttachmentFault(nine, GUILD) !== null);
 }
 
 async function checkCard(): Promise<void> {
@@ -653,6 +701,32 @@ async function checkEvidence(client: BotClient): Promise<void> {
 
     check("AddProof meldet das als Problem", fullProof.problems.some((problem) => problem.includes(`Mehr als ${MAX_EVIDENCE}`)), fullProof.problems.join(" | "));
 
+    let hit: unknown = null;
+
+    try {
+        await service.AddLink(GUILD, author, entry.number, "https://clips.example.com/44");
+    } catch (error) {
+        hit = error;
+    }
+
+    const limit = hit instanceof ModerationError ? hit.limit : undefined;
+
+    check("W-0137: Fehler trägt die Grenze maxEvidence (20)", limit?.key === "maxEvidence" && limit.asked === 21 && limit.allowed === 20, JSON.stringify(limit));
+    SetFlags([], [], [], [Limits({ maxEvidence: 21 })]);
+
+    const more = await service.AddLink(GUILD, author, entry.number, "https://clips.example.com/45");
+
+    check("W-0137: Server-Wert 21 erlaubt den 21. Beweis", more.evidence.length === 21, String(more.evidence.length));
+
+    // Die Route gibt die Grenzen mit meta=1 an die Seite.
+    const route = new DashboardApiModeration(client) as unknown as { Read(access: unknown, query: Record<string, string>): Promise<Record<string, any>> };
+    const member = { id: MOD, guild: { ownerId: MOD }, permissions: { has: () => true } };
+    const access = { guild: { ...FakeGuild(), id: GUILD, ownerId: MOD, channels: { cache: new Map() } }, member, manage: false, actor: { id: MOD, name: "Hanna" }, locked: false, grant: null };
+    const read = await route.Read(access, { meta: "1" });
+
+    check("W-0137: Route gibt den Server-Wert an die Seite", read.limits?.evidence === 21 && read.limits?.stages === 10 && read.limits?.evidenceMegabytes === 8, JSON.stringify(read.limits));
+    SetFlags([], [], []);
+
     // Zwei Fälle aus checkDatabase und dieser: alle drei in 30 Tagen.
     check("„3. Fall in 30 Tagen“ zählt Verwarnungen und Timeouts", (await client.modCases.RecentPenalties(GUILD, USER, entry.createdAt)) === 3);
 
@@ -689,7 +763,7 @@ async function checkEvidence(client: BotClient): Promise<void> {
         ["Link auf fremden Server", { link: `https://discord.com/channels/12345678901234567/${TEXT}/${THREAD}` }, "Dieser Nachrichtenlink führt auf einen anderen Server."],
         ["Unsinn-Link", { link: "abc" }, "Nur https-Links gehen als Beweis."],
         ["Textdatei", { image: Attachment({ contentType: "text/plain", name: "a.txt" }) }, "Nur Bilder: PNG, JPG, GIF oder WebP."],
-        ["Bild über 8 MB", { image: Attachment({ size: MAX_EVIDENCE_BYTES + 1 }) }, "Das Bild ist größer als 8 MB."],
+        ["Bild über 8 MB", { image: Attachment({ size: 8 * MB + 1 }) }, "Das Bild ist größer als 8 MB."],
     ];
 
     for (const [name, proof, reason] of broken) {
@@ -860,6 +934,7 @@ async function main(): Promise<void> {
     checkViews();
     checkProof(client);
     await checkProofGate(client);
+    await checkW137(client);
     await checkCard();
     await checkAutocomplete();
     await checkSupportCooldown();

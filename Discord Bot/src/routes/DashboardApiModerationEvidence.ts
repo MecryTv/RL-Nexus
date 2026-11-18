@@ -6,7 +6,9 @@ import BotClient from "../client/BotClient";
 import Route from "../structures/Route";
 import { DASHBOARD_PATH } from "../constants/Dashboard";
 import { UPLOAD_TYPES } from "../constants/Gallery";
-import { MAX_EVIDENCE_BYTES } from "../constants/Moderation";
+import { MODERATION_MODULE } from "../constants/Moderation";
+import { settingDef } from "../constants/ModuleSettings";
+import { DashboardLimit } from "../builder/LimitReply";
 import { ModerationError } from "../services/ModerationService";
 import { ModGate } from "../utils/modgate";
 
@@ -26,7 +28,8 @@ export default class DashboardApiModerationEvidence extends Route {
             prefixed: false,
             requiresAuth: false,
             rateLimit: { max: 120, timeWindow: "1 minute" },
-            bodyLimit: MAX_EVIDENCE_BYTES,
+            // W-0137: der höchste Server-Wert - die Grenze dieses Servers prüft AddImage.
+            bodyLimit: settingDef(MODERATION_MODULE, "evidenceMegabytes")!.max * 1024 * 1024,
         });
     }
 
@@ -76,7 +79,7 @@ export default class DashboardApiModerationEvidence extends Route {
                 typeof name === "string" ? name.replace(/[^\p{L}\p{N}._ ()-]/gu, "_").slice(-100) || null : null
             );
         } catch (error) {
-            if (error instanceof ModerationError) return reply.code(400).send({ error: error.message });
+            if (error instanceof ModerationError) return reply.code(400).send(error.limit ? DashboardLimit(error.limit, access.guild.id, error.message) : { error: error.message });
 
             throw error;
         }

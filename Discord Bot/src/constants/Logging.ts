@@ -9,6 +9,7 @@ import { ILogCategory, ILogEventInfo, ILogSettings, LogCategoryId, LogTone } fro
 
 export const LOGGING_MODULE = "logging";
 
+/** Discords Auswahl im Panel nimmt höchstens 25. Die Grenze des Servers (maxIgnore, W-0137) kürzt Clean. */
 export const MAX_IGNORE = 25;
 
 /** Wie viel Text einer Nachricht in die Karte passt. */

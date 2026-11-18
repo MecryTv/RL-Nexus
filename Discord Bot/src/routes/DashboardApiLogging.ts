@@ -3,8 +3,8 @@ import { PermissionFlagsBits } from "discord.js";
 import BotClient from "../client/BotClient";
 import Route from "../structures/Route";
 import { DASHBOARD_PATH } from "../constants/Dashboard";
-import { LOGGING_MODULE, LOG_CATEGORIES, LOG_EVENTS, MAX_IGNORE } from "../constants/Logging";
-import { LogError } from "../services/LogService";
+import { LOGGING_MODULE, LOG_CATEGORIES, LOG_EVENTS } from "../constants/Logging";
+import { LogError, LogLimits } from "../services/LogService";
 import { CreateLogThread, LogTargetError, LogTargets } from "../utils/logtarget";
 import { WantsJSON } from "../utils/admin";
 import logger from "../utils/logger";
@@ -64,7 +64,7 @@ export default class DashboardApiLogging extends Route {
             settings,
             categories: LOG_CATEGORIES,
             events: LOG_EVENTS,
-            limits: { ignore: MAX_IGNORE },
+            limits: LogLimits(guild.id),
             targets: await LogTargets(guild, current),
             // Woran es klemmen könnte: ohne Members-Intent fehlen Beitritt und
             // Austritt, ohne Audit-Log-Recht bleibt "von wem" leer.

@@ -11,7 +11,9 @@ process.env.DEV_CLIENT_SECRET ||= "check-secret";
 
 import { ChannelType, Guild, GuildBasedChannel, Message, PartialMessage, Partials, Role } from "discord.js";
 import BotClient from "../client/BotClient";
-import { CapsShare, DefaultAutoModSettings, FILTERS, MAX_WORDS, Normalize } from "../constants/AutoMod";
+import { CapsShare, DefaultAutoModSettings, FILTERS, Normalize } from "../constants/AutoMod";
+import DashboardApiAutoMod from "../routes/DashboardApiAutoMod";
+import { SetFlags } from "../utils/moduleFlags";
 import { IAutoModSettings } from "../interfaces/services/automod/IAutoMod";
 import AutoModEdits from "../events/automod/AutoModEdits";
 
@@ -111,7 +113,7 @@ function checkClean(client: BotClient): IAutoModSettings {
 
     const many = service.Clean(guild, { filters: { words: { words: Array.from({ length: 400 }, (_, index) => `wort${index}`) } } }, DefaultAutoModSettings());
 
-    check("Die Wortliste ist gedeckelt", many.filters.words.words.length === MAX_WORDS, String(many.filters.words.words.length));
+    check("Die Wortliste ist gedeckelt", many.filters.words.words.length === 200, String(many.filters.words.words.length));
 
     return clean;
 }
@@ -208,6 +210,35 @@ async function checkEdits(client: BotClient): Promise<void> {
     }
 }
 
+/** W-0137: ein Server-Wert für die Grenzen von automod. */
+function Limits(values: Record<string, number>) {
+    return { module: "automod", guildId: GUILD, status: null, notice: null, linkMode: null, values, updatedAt: null };
+}
+
+/** W-0137: Wörter je Filter und Ausnahmen sind Grenzen von RL Nexus, je Server änderbar. */
+async function checkW137(client: BotClient): Promise<void> {
+    console.log("\n  — W-0137: Grenzen —");
+
+    const service = client.autoModService;
+    const guild = FakeGuild();
+    const words = { filters: { words: { words: Array.from({ length: 400 }, (_, index) => `wort${index}`) } } };
+    const ignore = { ignoreChannels: [TEXT, VOICE] };
+    // Die Route liest Kanäle, Threads, Rollen und Emojis - ein leerer Server reicht für die Grenzen.
+    const bare = { id: GUILD, channels: { cache: new Map(), fetchActiveThreads: async () => null }, roles: { cache: new Map() }, emojis: { cache: new Map() }, members: { me: null } };
+    const route = new DashboardApiAutoMod(client) as unknown as { Read(access: unknown): Promise<Record<string, any>> };
+
+    service.Settings = async () => DefaultAutoModSettings();
+    client.settings.Of = (async () => ({ modules: [] })) as unknown as typeof client.settings.Of;
+
+    check("Standard: 2 Ausnahmen bleiben", service.Clean(guild, ignore, DefaultAutoModSettings()).ignoreChannels.length === 2);
+    check("Route: Grenzen ohne Server-Wert wie bisher", JSON.stringify((await route.Read({ guild: bare })).limits) === JSON.stringify({ ignore: 25, words: 200, notice: 200 }), JSON.stringify((await route.Read({ guild: bare })).limits));
+    SetFlags([], [], [], [Limits({ maxWords: 300, maxIgnore: 1 })]);
+    check("Server-Wert 300 lässt 300 Wörter", service.Clean(guild, words, DefaultAutoModSettings()).filters.words.words.length === 300);
+    check("Server-Wert 1 kürzt die Ausnahmen", service.Clean(guild, ignore, DefaultAutoModSettings()).ignoreChannels.length === 1);
+    check("Route gibt den Server-Wert an die Seite", (await route.Read({ guild: bare })).limits?.words === 300 && (await route.Read({ guild: bare })).limits?.ignore === 1);
+    SetFlags([], [], []);
+}
+
 async function main(): Promise<void> {
     console.log("\n🛡️  Auto Mod\n");
 
@@ -217,6 +248,7 @@ async function main(): Promise<void> {
     checkClean(client);
     checkFilters(client);
     await checkEdits(client);
+    await checkW137(client);
 
     console.log(failures === 0 ? "\n✅ Alle Prüfungen bestanden.\n" : `\n❌ ${failures} Prüfung(en) fehlgeschlagen.\n`);
 

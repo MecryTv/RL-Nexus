@@ -2,6 +2,7 @@ import path from "path";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { ChannelType, DiscordAPIError, Guild, GuildMember, Message, MessageFlags, PermissionFlagsBits, RESTJSONErrorCodes, User } from "discord.js";
 import BotClient from "../client/BotClient";
+import { ILimitHit } from "../builder/LimitReply";
 import { CaseCard, ICaseExtra, ICaseMessage } from "../builder/ModerationCard";
 import { CaseView, DirectView } from "../builder/ModerationView";
 import { DASHBOARD_PATH } from "../constants/Dashboard";
@@ -12,20 +13,18 @@ import {
     EVIDENCE_ROOT,
     MAX_BAN,
     MAX_DELETE_SECONDS,
-    MAX_EVIDENCE,
-    MAX_EVIDENCE_BYTES,
     MAX_NOTE,
     MAX_NOTES,
     MAX_PROOF_TEXT,
     MAX_PURGE,
     MAX_REASON,
-    MAX_STAGES,
     MAX_SUPPORT_REMIND,
     MAX_SUPPORT_ROLES,
     MAX_TIMEOUT,
     MESSAGE_LINK,
     MIN_DURATION,
     MOD_ACTIONS,
+    MODERATION_MODULE,
     ParseMessageLink,
     PERMISSION_LABEL,
     PROOF_TIMEOUT_CHOICES,
@@ -38,10 +37,28 @@ import { IModCase, IModConfig, IModDetails, IModEnded, IModEvidence, IModMessage
 import { NewModCase } from "../models/ModCases";
 import { IMAGE_TOO_LARGE, Shrink } from "../utils/image";
 import logger from "../utils/logger";
+import { ModuleValue } from "../utils/moduleFlags";
 import { IsLogTarget, SendLog, WarmLogTarget } from "../utils/logtarget";
 
 /** Was der Moderator falsch gemacht hat oder was nicht geht - Befehl und Dashboard zeigen den Text. */
-export class ModerationError extends Error {}
+export class ModerationError extends Error {
+    /** limit: welche Grenze von RL Nexus gegriffen hat (W-0137), für den Satz und die Anfrage im Dashboard. */
+    constructor(
+        message: string,
+        readonly limit?: ILimitHit
+    ) {
+        super(message);
+    }
+}
+
+/** W-0137: Warn-Stufen, Beweise je Fall und Größe eines Beweisbilds, Grenzen von RL Nexus je Server. */
+export function ModerationLimits(guildId: string): { stages: number; evidence: number; evidenceMegabytes: number } {
+    return {
+        stages: ModuleValue(MODERATION_MODULE, "maxStages", guildId),
+        evidence: ModuleValue(MODERATION_MODULE, "maxEvidence", guildId),
+        evidenceMegabytes: ModuleValue(MODERATION_MODULE, "evidenceMegabytes", guildId),
+    };
+}
 
 export interface IModRequest {
     action: ModAction;
@@ -95,11 +112,12 @@ function IsHttps(value: string): boolean {
 }
 
 /** Woran ein Anhang als Beweis scheitert - null, wenn er taugt. Gilt vor der Strafe wie beim Sichern. */
-export function AttachmentFault(attachment: { url: string; size: number; contentType: string | null }): string | null {
+export function AttachmentFault(attachment: { url: string; size: number; contentType: string | null }, guildId: string): string | null {
+    const megabytes = ModerationLimits(guildId).evidenceMegabytes;
     const host = URL.canParse(attachment.url) ? new URL(attachment.url).hostname : "";
 
     if (!EVIDENCE_TYPES.has((attachment.contentType ?? "").split(";")[0])) return "Nur Bilder: PNG, JPG, GIF oder WebP.";
-    if (attachment.size > MAX_EVIDENCE_BYTES) return "Das Bild ist größer als 8 MB.";
+    if (attachment.size > megabytes * 1024 * 1024) return `Das Bild ist größer als ${megabytes} MB.`;
     if (host !== "cdn.discordapp.com" && host !== "media.discordapp.net") return "Dieser Anhang kommt nicht von Discord.";
 
     return null;
@@ -117,7 +135,7 @@ export function ProofRefusal(needed: string | null, proof: IModProof | undefined
     const faults: (string | null)[] = [];
 
     if (proof?.message) faults.push(null);
-    if (proof?.image) faults.push(AttachmentFault(proof.image));
+    if (proof?.image) faults.push(AttachmentFault(proof.image, guildId));
     if (link) faults.push(MESSAGE_LINK.test(link) ? (ParseMessageLink(link, guildId) ? null : FOREIGN_LINK) : IsHttps(link) ? null : HTTPS_ONLY);
 
     if (faults.includes(null)) return null;
@@ -210,7 +228,7 @@ export default class ModerationService {
                       : null,
             dm: typeof input.dm === "boolean" ? input.dm : previous.dm,
             warnDays: Number.isInteger(days) && days >= 0 && days <= 365 ? days : previous.warnDays,
-            stages: Array.isArray(input.stages) ? this.CleanStages(input.stages) : previous.stages,
+            stages: Array.isArray(input.stages) ? this.CleanStages(input.stages, guild.id) : previous.stages,
             support: this.CleanSupport(guild, input.support, previous.support),
             proof: this.CleanProof(input.proof, previous.proof),
         };
@@ -265,7 +283,7 @@ export default class ModerationService {
     }
 
     /** Je Zahl höchstens eine Stufe, aufsteigend - eine Dauer nur, wo sie Sinn ergibt. */
-    CleanStages(input: unknown[]): IModStage[] {
+    CleanStages(input: unknown[], guildId: string): IModStage[] {
         const stages = new Map<number, IModStage>();
 
         for (const raw of input) {
@@ -287,7 +305,7 @@ export default class ModerationService {
             stages.set(warns, { warns, action, duration: action === "kick" ? null : duration });
         }
 
-        return [...stages.values()].sort((a, b) => a.warns - b.warns).slice(0, MAX_STAGES);
+        return [...stages.values()].sort((a, b) => a.warns - b.warns).slice(0, ModerationLimits(guildId).stages);
     }
 
     async SaveConfig(guild: Guild, input: unknown): Promise<IModConfig> {
@@ -967,7 +985,17 @@ export default class ModerationService {
     /** Ein Bild als Beweis - einmal durch den Canvas, so bleibt nichts als Pixel übrig. */
     async AddImage(guildId: string, author: IModActor, number: number, buffer: Buffer, type: string, name: string | null): Promise<IModCase> {
         if (!EVIDENCE_TYPES.has(type)) throw new ModerationError("Nur PNG, JPG, GIF oder WebP.");
-        if (buffer.length === 0 || buffer.length > MAX_EVIDENCE_BYTES) throw new ModerationError("Das Bild ist leer oder größer als 8 MB.");
+        const megabytes = ModerationLimits(guildId).evidenceMegabytes;
+
+        if (buffer.length === 0) throw new ModerationError("Das Bild ist leer.");
+        if (buffer.length > megabytes * 1024 * 1024) {
+            throw new ModerationError(`Das Bild ist größer als ${megabytes} MB.`, {
+                module: MODERATION_MODULE,
+                key: "evidenceMegabytes",
+                asked: Math.ceil(buffer.length / 1024 / 1024),
+                allowed: megabytes,
+            });
+        }
 
         const entry = await this.CaseOf(guildId, number);
         const image = await Shrink(buffer, type).catch((error: unknown) => {
@@ -1061,7 +1089,7 @@ export default class ModerationService {
 
     /** Ein Anhang aus Discord (/fall beweis) - nur von Discords eigenem Speicher. */
     async AddAttachment(guildId: string, author: IModActor, number: number, attachment: { url: string; size: number; contentType: string | null; name: string }): Promise<IModCase> {
-        const fault = AttachmentFault(attachment);
+        const fault = AttachmentFault(attachment, guildId);
 
         if (fault) throw new ModerationError(fault);
 
@@ -1093,8 +1121,11 @@ export default class ModerationService {
         const entry = await this.CaseOf(guildId, number);
         let added = 0;
         let stored = "";
+        const max = ModerationLimits(guildId).evidence;
         const updated = await this.client.modCases.Mutate(entry.id, (current) => {
-            if (current.evidence.length >= MAX_EVIDENCE) throw new ModerationError(`Mehr als ${MAX_EVIDENCE} Beweise gehen an einem Fall nicht.`);
+            if (current.evidence.length >= max) {
+                throw new ModerationError(`Mehr als ${max} Beweise gehen an einem Fall nicht.`, { module: MODERATION_MODULE, key: "maxEvidence", asked: current.evidence.length + 1, allowed: max });
+            }
 
             added = Math.max(0, ...current.evidence.map((item) => item.id)) + 1;
             stored = typeof value === "string" ? value : value(added);

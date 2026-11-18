@@ -133,6 +133,8 @@ interface IMeta {
     config: IConfig;
     presets: { durations: [string, number][]; deletes: [number, string][]; proof: [number | null, string][] };
     channels: { id: string; name: string }[];
+    /** W-0137: Grenzen von RL Nexus für diesen Server. */
+    limits: { stages: number; evidence: number; evidenceMegabytes: number };
     targets?: ILogTargets;
     /** Nur für wer den Server verwaltet: woraus der Support-Warteraum gewählt wird. */
     resources?: { roles: IRole[]; channels: { id: string; name: string }[]; voice: { id: string; name: string }[] };
@@ -642,8 +644,8 @@ export function renderModeration(guildId: string): void {
 
         if (mine !== ticket || !data) return;
 
-        if (data.me && data.config && data.presets && data.channels) {
-            meta = { me: data.me, config: data.config, presets: data.presets, channels: data.channels, targets: data.targets, resources: data.resources };
+        if (data.me && data.config && data.presets && data.channels && data.limits) {
+            meta = { me: data.me, config: data.config, presets: data.presets, channels: data.channels, limits: data.limits, targets: data.targets, resources: data.resources };
             settingsDraft = structuredClone(data.config);
         }
 
@@ -1050,8 +1052,10 @@ export function renderModeration(guildId: string): void {
 
             if (!chosen) return;
 
-            if (chosen.size > 8 * 1024 * 1024) {
-                warn("Das Bild ist größer als 8 MB.");
+            const megabytes = meta?.limits.evidenceMegabytes ?? 8;
+
+            if (chosen.size > megabytes * 1024 * 1024) {
+                warn(`Das Bild ist größer als ${megabytes} MB.`);
 
                 return;
             }
@@ -1738,7 +1742,7 @@ export function renderModeration(guildId: string): void {
         const add = button("tkadd", icon("#i-plus"), el("span", "", "Stufe hinzufügen"));
 
         add.addEventListener("click", () => {
-            if (cfg.stages.length >= 10) return;
+            if (cfg.stages.length >= meta!.limits.stages) return;
 
             const next = Math.max(0, ...cfg.stages.map((stage) => stage.warns)) + 1;
 
