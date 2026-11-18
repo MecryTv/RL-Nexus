@@ -12,6 +12,7 @@ Internet ──► nginx auf dem Host (80, 443, Zertifikate über certbot)
               ├─ dashboard.nexus-emb.de ──► 127.0.0.1:3000  rlnexus-bot (/dcapi/admin/* ist von außen zu)
               ├─ db.nexus-emb.de ─────────► php-fpm         phpMyAdmin (/usr/share/phpmyadmin)
               ├─ mail., autodiscover. ────► 127.0.0.1:8081  Mailcow
+              ├─ discord.nexus-emb.de ────► 302             https://discord.gg/CjG2HFGw95 (Support-Server)
               └─ webmail.nexus-emb.de ────► 127.0.0.1:8082  SnappyMail
 
 rlnexus-website ──► /var/www/nexus-emb.de/dist, data/content, data/flags
@@ -48,10 +49,10 @@ Im Folgenden steht **`/home/rlnexus`** für den Ordner des Bots. Die nginx-Konfi
 ## Vorher
 
 * **Debian 13 (trixie)**, ein Konto mit `sudo`.
-* **DNS** auf die IP des Servers: `nexus-emb.de`, `www`, `dashboard`, `admin`, `status`, `db` und `webmail` (dürfen hinter dem Proxy von Cloudflare liegen), dazu `mail`, `autodiscover` und `autoconfig` als **„Nur DNS“**: Über den Proxy gehen nur Webseiten, kein SMTP und kein IMAP. Prüfen:
+* **DNS** auf die IP des Servers: `nexus-emb.de`, `www`, `dashboard`, `admin`, `status`, `db`, `webmail` und `discord` (dürfen hinter dem Proxy von Cloudflare liegen), dazu `mail`, `autodiscover` und `autoconfig` als **„Nur DNS“**: Über den Proxy gehen nur Webseiten, kein SMTP und kein IMAP. Prüfen:
 
     ```bash
-    for name in nexus-emb.de www.nexus-emb.de dashboard.nexus-emb.de admin.nexus-emb.de status.nexus-emb.de db.nexus-emb.de webmail.nexus-emb.de mail.nexus-emb.de; do echo "$name: $(dig +short "$name" | tail -1)"; done
+    for name in nexus-emb.de www.nexus-emb.de dashboard.nexus-emb.de admin.nexus-emb.de status.nexus-emb.de db.nexus-emb.de webmail.nexus-emb.de discord.nexus-emb.de mail.nexus-emb.de; do echo "$name: $(dig +short "$name" | tail -1)"; done
     ```
 
     Hinter Cloudflare stehen dort Adressen von Cloudflare, bei `mail` die des Servers. Kommt bei `dig +short AAAA nexus-emb.de` eine fremde Adresse (oft die Parkseite des Anbieters), den AAAA-Eintrag löschen.
@@ -335,6 +336,7 @@ Die Konfiguration liegt wie bei Debian üblich unter `/etc/nginx/sites-available
 | `nginx/dashboard.nexus-emb.de.conf` | `/etc/nginx/sites-available/dashboard.nexus-emb.de` | Bot-Dashboard, Container `rlnexus-bot` auf `127.0.0.1:3000` |
 | `nginx/mail.nexus-emb.de.conf` | `/etc/nginx/sites-available/mail.nexus-emb.de` | Mailcow auf `127.0.0.1:8081`, dazu `autodiscover.` und `autoconfig.` |
 | `nginx/webmail.nexus-emb.de.conf` | `/etc/nginx/sites-available/webmail.nexus-emb.de` | SnappyMail auf `127.0.0.1:8082` |
+| `nginx/discord.nexus-emb.de.conf` | `/etc/nginx/sites-available/discord.nexus-emb.de` | Weiterleitung (302) auf den Support-Server `https://discord.gg/CjG2HFGw95` |
 | `nginx/db.nexus-emb.de.conf` | `/etc/nginx/sites-available/db.nexus-emb.de` | phpMyAdmin über php-fpm, aus Schritt 5 |
 | `nginx/ersatzseite.conf` | `/etc/nginx/sites-available/ersatzseite` | Alles ohne eigene Seite, etwa die IP des Servers: die Ersatzseite mit 404, über https bricht nginx die Verbindung ab |
 | `nginx/snippets/rlnexus-ersatzseite.conf` | `/etc/nginx/snippets/rlnexus-ersatzseite.conf` | Kein eigenes Ziel: Hauptseite, Dashboard, Admin Dashboard und Statusseite binden es ein. Antwortet ihr Container nicht (502, 504), kommt die Ersatzseite |
@@ -361,7 +363,7 @@ sudo mkdir -p /var/www/ersatzseite && sudo cp ersatzseite/* /var/www/ersatzseite
 sudo cp snippets/rlnexus-ersatzseite.conf /etc/nginx/snippets/
 # W-0138: Ordner für das Protokoll der Aktivität, sonst bricht nginx -t ab.
 sudo install -d -o www-data -g adm -m 0750 /var/log/nginx/rlnexus-aktivitaet
-for site in ersatzseite nexus-emb.de dashboard.nexus-emb.de admin.nexus-emb.de status.nexus-emb.de db.nexus-emb.de mail.nexus-emb.de webmail.nexus-emb.de; do
+for site in ersatzseite nexus-emb.de dashboard.nexus-emb.de admin.nexus-emb.de status.nexus-emb.de db.nexus-emb.de mail.nexus-emb.de webmail.nexus-emb.de discord.nexus-emb.de; do
   sudo cp "$site.conf" "/etc/nginx/sites-available/$site"
   sudo ln -sf "/etc/nginx/sites-available/$site" "/etc/nginx/sites-enabled/$site"
 done
@@ -394,6 +396,8 @@ sudo chmod 600 origin.key && cat origin.csr
 ```
 
 In Cloudflare unter *SSL/TLS → Ursprungsserver → Zertifikat erstellen* „Eigenen privaten Schlüssel und CSR verwenden“ wählen, die CSR einfügen, das Zertifikat als `/etc/ssl/cloudflare/origin.pem` speichern. In `admin.nexus-emb.de` und `webmail.nexus-emb.de` unter `/etc/nginx/sites-available/` dann `ssl_certificate /etc/ssl/cloudflare/origin.pem;` und `ssl_certificate_key /etc/ssl/cloudflare/origin.key;`. Die certbot-Verlängerungen für admin, webmail und die unbenutzte Kette `mail.nexus-emb.de` liegen ausgesetzt unter `/root/claude/letsencrypt-renewal-ausgesetzt/`.
+
+`discord.nexus-emb.de` (W-0144) trägt dasselbe Ursprungszertifikat, ohne certbot: Auf dem Server steht der Block aus der Vorlage ein zweites Mal mit `listen 443 ssl;` und `listen [::]:443 ssl;`, dazu die vier TLS-Zeilen wie in `webmail.nexus-emb.de`. Die Subdomain muss deshalb über den Proxy von Cloudflare laufen.
 
 Ändert sich eine Vorlage unter `nginx/` später im Repo, die neue Fassung **nicht** einfach drüberkopieren: certbot hat die Datei unter `/etc/nginx/sites-available/` um Zertifikat und Umleitung ergänzt. Die Änderung dort von Hand nachziehen, dann `sudo nginx -t && sudo systemctl reload nginx`.
 
@@ -545,6 +549,7 @@ curl -sI https://status.nexus-emb.de | head -1                # HTTP/2 200
 curl -s https://status.nexus-emb.de/public/status | head -c 40   # {"checkedAt":…
 curl -sI https://mail.nexus-emb.de | head -1                  # HTTP/2 200
 curl -sI https://webmail.nexus-emb.de | head -1               # HTTP/2 200
+curl -sI https://discord.nexus-emb.de | grep -i location      # https://discord.gg/CjG2HFGw95
 curl -s -o /dev/null -w "%{http_code}\n" https://db.nexus-emb.de/   # 401, nginx fragt nach Name und Passwort
 ```
 
