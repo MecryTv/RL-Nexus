@@ -23,6 +23,7 @@ import {
     MAX_TIMEOUT,
     MESSAGE_LINK,
     MIN_DURATION,
+    EVIDENCE_MAX_MB,
     MOD_ACTIONS,
     MODERATION_MODULE,
     ParseMessageLink,
@@ -51,12 +52,11 @@ export class ModerationError extends Error {
     }
 }
 
-/** W-0137: Warn-Stufen, Beweise je Fall und Größe eines Beweisbilds, Grenzen von RL Nexus je Server. */
-export function ModerationLimits(guildId: string): { stages: number; evidence: number; evidenceMegabytes: number } {
+/** W-0137: Warn-Stufen und Beweise je Fall, Grenzen von RL Nexus je Server. */
+export function ModerationLimits(guildId: string): { stages: number; evidence: number } {
     return {
         stages: ModuleValue(MODERATION_MODULE, "maxStages", guildId),
         evidence: ModuleValue(MODERATION_MODULE, "maxEvidence", guildId),
-        evidenceMegabytes: ModuleValue(MODERATION_MODULE, "evidenceMegabytes", guildId),
     };
 }
 
@@ -112,12 +112,11 @@ function IsHttps(value: string): boolean {
 }
 
 /** Woran ein Anhang als Beweis scheitert - null, wenn er taugt. Gilt vor der Strafe wie beim Sichern. */
-export function AttachmentFault(attachment: { url: string; size: number; contentType: string | null }, guildId: string): string | null {
-    const megabytes = ModerationLimits(guildId).evidenceMegabytes;
+export function AttachmentFault(attachment: { url: string; size: number; contentType: string | null }): string | null {
     const host = URL.canParse(attachment.url) ? new URL(attachment.url).hostname : "";
 
     if (!EVIDENCE_TYPES.has((attachment.contentType ?? "").split(";")[0])) return "Nur Bilder: PNG, JPG, GIF oder WebP.";
-    if (attachment.size > megabytes * 1024 * 1024) return `Das Bild ist größer als ${megabytes} MB.`;
+    if (attachment.size > EVIDENCE_MAX_MB * 1024 * 1024) return `Das Bild ist größer als ${EVIDENCE_MAX_MB} MB.`;
     if (host !== "cdn.discordapp.com" && host !== "media.discordapp.net") return "Dieser Anhang kommt nicht von Discord.";
 
     return null;
@@ -135,7 +134,7 @@ export function ProofRefusal(needed: string | null, proof: IModProof | undefined
     const faults: (string | null)[] = [];
 
     if (proof?.message) faults.push(null);
-    if (proof?.image) faults.push(AttachmentFault(proof.image, guildId));
+    if (proof?.image) faults.push(AttachmentFault(proof.image));
     if (link) faults.push(MESSAGE_LINK.test(link) ? (ParseMessageLink(link, guildId) ? null : FOREIGN_LINK) : IsHttps(link) ? null : HTTPS_ONLY);
 
     if (faults.includes(null)) return null;
@@ -985,17 +984,8 @@ export default class ModerationService {
     /** Ein Bild als Beweis - einmal durch den Canvas, so bleibt nichts als Pixel übrig. */
     async AddImage(guildId: string, author: IModActor, number: number, buffer: Buffer, type: string, name: string | null): Promise<IModCase> {
         if (!EVIDENCE_TYPES.has(type)) throw new ModerationError("Nur PNG, JPG, GIF oder WebP.");
-        const megabytes = ModerationLimits(guildId).evidenceMegabytes;
-
         if (buffer.length === 0) throw new ModerationError("Das Bild ist leer.");
-        if (buffer.length > megabytes * 1024 * 1024) {
-            throw new ModerationError(`Das Bild ist größer als ${megabytes} MB.`, {
-                module: MODERATION_MODULE,
-                key: "evidenceMegabytes",
-                asked: Math.ceil(buffer.length / 1024 / 1024),
-                allowed: megabytes,
-            });
-        }
+        if (buffer.length > EVIDENCE_MAX_MB * 1024 * 1024) throw new ModerationError(`Das Bild ist größer als ${EVIDENCE_MAX_MB} MB.`);
 
         const entry = await this.CaseOf(guildId, number);
         const image = await Shrink(buffer, type).catch((error: unknown) => {
@@ -1089,7 +1079,7 @@ export default class ModerationService {
 
     /** Ein Anhang aus Discord (/fall beweis) - nur von Discords eigenem Speicher. */
     async AddAttachment(guildId: string, author: IModActor, number: number, attachment: { url: string; size: number; contentType: string | null; name: string }): Promise<IModCase> {
-        const fault = AttachmentFault(attachment, guildId);
+        const fault = AttachmentFault(attachment);
 
         if (fault) throw new ModerationError(fault);
 

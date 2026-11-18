@@ -484,7 +484,6 @@ function checkAllModules(): void {
         ["role-lists", "maxPresets", 10, 1, 25, false],
         ["moderation", "maxStages", 10, 1, 20, false],
         ["moderation", "maxEvidence", 20, 1, 50, true],
-        ["moderation", "evidenceMegabytes", 8, 1, 25, true],
         ["automod", "maxWords", 200, 10, 1000, true],
         ["automod", "maxIgnore", 25, 1, 25, false],
         ["logging", "maxIgnore", 25, 1, 25, false],
@@ -513,8 +512,13 @@ function checkAllModules(): void {
 
     check("Neue Grenzen im Verzeichnis wie freigegeben", wrong.length === 0, wrong.map(([module, key]) => `${module}.${key}`).join(", "));
     check(
-        "Galerie und Transkript-Größe sind keine Grenzen mehr, Transkript-Nachrichten bleiben",
-        !settingDef("gallery", "imageMegabytes") && settingsOf("gallery").length === 0 && !settingDef("tickets", "transcriptMegabytes") && settingDef("tickets", "transcriptMessages")?.standard === 5000
+        "Galerie, Transkript, Clip-Datei und Beweisbild sind keine Grenzen mehr (Nutzer, 18.11.)",
+        !settingDef("gallery", "imageMegabytes") &&
+            settingsOf("gallery").length === 0 &&
+            !settingDef("tickets", "transcriptMegabytes") &&
+            !settingDef("tickets", "transcriptMessages") &&
+            !settingDef("clips", "fileMegabytes") &&
+            !settingDef("moderation", "evidenceMegabytes")
     );
     check("Rank Roles bleibt ohne Grenze (Ausnahme des Nutzers)", settingsOf("rank-roles").length === 0);
 

@@ -387,7 +387,7 @@ async function checkProofGate(client: BotClient): Promise<void> {
     check("Gültig: Bild von Discord, genau 8 MB, mit charset", ProofRefusal(needed, { image: Attachment({ size: 8 * MB, contentType: "image/png; charset=binary" }) }, GUILD) === null);
     check("Gültig: die Nachricht vom Rechtsklick", ProofRefusal(needed, { message: FakeMessage("Du bist so schlecht") }, GUILD) === null);
     check("Ein guter Beweis reicht, auch neben einem kaputten", ProofRefusal(needed, { image: Attachment(), link: "abc" }, GUILD) === null);
-    check("AttachmentFault: ein gutes Bild hat keinen", AttachmentFault(Attachment(), GUILD) === null);
+    check("AttachmentFault: ein gutes Bild hat keinen", AttachmentFault(Attachment()) === null);
 
     // Diese Prüfungen kommen vor Datenbank und Download - das geht ohne beides.
     const service = client.moderationService;
@@ -412,8 +412,8 @@ async function checkW137(client: BotClient): Promise<void> {
     const nine = Attachment({ size: 9 * MB });
     const stages = [1, 2, 3].map((warns) => ({ warns, action: "kick", duration: null }));
 
-    check("Standard: 10 Stufen, 20 Beweise, 8 MB", JSON.stringify(ModerationLimits(GUILD)) === JSON.stringify({ stages: 10, evidence: 20, evidenceMegabytes: 8 }), JSON.stringify(ModerationLimits(GUILD)));
-    check("Beweisbild 9 MB bei Standard: abgelehnt", AttachmentFault(nine, GUILD) === "Das Bild ist größer als 8 MB.", String(AttachmentFault(nine, GUILD)));
+    check("Standard: 10 Stufen, 20 Beweise", JSON.stringify(ModerationLimits(GUILD)) === JSON.stringify({ stages: 10, evidence: 20 }), JSON.stringify(ModerationLimits(GUILD)));
+    check("Beweisbild 9 MB: abgelehnt, 8 MB ist fest", AttachmentFault(nine) === "Das Bild ist größer als 8 MB.", String(AttachmentFault(nine)));
 
     let hit: unknown = null;
 
@@ -425,10 +425,10 @@ async function checkW137(client: BotClient): Promise<void> {
 
     const limit = hit instanceof ModerationError ? hit.limit : undefined;
 
-    check("Fehler trägt die Grenze evidenceMegabytes (8)", limit?.module === "moderation" && limit.key === "evidenceMegabytes" && limit.asked === 9 && limit.allowed === 8, JSON.stringify(limit));
+    check("Keine Grenze von RL Nexus: der Fehler trägt keine", hit instanceof ModerationError && hit.message === "Das Bild ist größer als 8 MB." && limit === undefined, JSON.stringify(limit));
 
     SetFlags([], [], [], [Limits({ evidenceMegabytes: 10, maxStages: 2 })]);
-    check("Beweisbild 9 MB bei Server-Wert 10: angenommen", AttachmentFault(nine, GUILD) === null, String(AttachmentFault(nine, GUILD)));
+    check("Ein alter Server-Wert 10 ändert nichts mehr", AttachmentFault(nine) !== null, String(AttachmentFault(nine)));
     check("Server-Wert 2 kürzt die Stufen", service.CleanStages(stages, GUILD).length === 2);
 
     let parsed = "";
@@ -441,7 +441,6 @@ async function checkW137(client: BotClient): Promise<void> {
 
     check("Panel: drei Stufen bei Server-Wert 2 abgelehnt", parsed === "Höchstens 2 Stufen.", parsed);
     SetFlags([], [], []);
-    check("Ohne Server-Wert gelten wieder 8 MB", AttachmentFault(nine, GUILD) !== null);
 }
 
 async function checkCard(): Promise<void> {

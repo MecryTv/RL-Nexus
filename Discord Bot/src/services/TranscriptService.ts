@@ -16,7 +16,7 @@ import ComponentV2Builder from "../builder/ComponentV2Builder";
 import { IsModerator, OptionOf, RELAY_MARK, SupportRoleOf } from "../builder/TicketPanel";
 import { Duration, RenderTranscript } from "../builder/TranscriptHtml";
 import { DASHBOARD_PATH } from "../constants/Dashboard";
-import { TicketNumber, TRANSCRIPT_MAX_MB } from "../constants/Tickets";
+import { TicketNumber, TRANSCRIPT_MAX_MB, TRANSCRIPT_MAX_MESSAGES } from "../constants/Tickets";
 import {
     AttachmentKey,
     INLINE_TYPES,
@@ -226,9 +226,9 @@ export default class TranscriptService {
         return { transcript, file: html.length <= MAX_DISCORD_UPLOAD ? html : null };
     }
 
-    /** Bis zu „Transkript höchstens … Nachrichten“ (Admin, je Server) eines Kanals, die älteste zuerst. */
+    /** Bis zu TRANSCRIPT_MAX_MESSAGES Nachrichten eines Kanals, die älteste zuerst. */
     private async Read(channel: GuildTextBasedChannel): Promise<{ messages: Message[]; truncated: boolean }> {
-        const limit = ModuleValue("tickets", "transcriptMessages", channel.guildId);
+        const limit = TRANSCRIPT_MAX_MESSAGES;
         const fetched: Message[] = [];
         let before: string | undefined;
 

@@ -38,6 +38,10 @@ alle Grenzen eines Servers im Reiter „Grenzen“ des Bot-Dashboards.
 - **Galerie** und **Transkript-Größe**: keine Grenze von RL Nexus mehr, aber eine
   feste technische Obergrenze im Code, nirgends angezeigt, nicht anfragbar:
   Bild 8 MB (wie vor W-0133), Transkript 100 MB.
+- **Clip-Datei**, **Beweisbild** und **Transkript-Nachrichten** genauso (Nutzer,
+  18.11.2026, nach der Sichtprüfung): Clip 100 MB, Beweisbild 8 MB, Transkript
+  5.000 Nachrichten, fest im Code (`CLIP_MAX_MB`, `EVIDENCE_MAX_MB`,
+  `TRANSCRIPT_MAX_MESSAGES`). Die Moderation behält Stufen und Beweise je Fall.
 
 ## Die Grenzen
 

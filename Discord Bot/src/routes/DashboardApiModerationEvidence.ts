@@ -6,8 +6,7 @@ import BotClient from "../client/BotClient";
 import Route from "../structures/Route";
 import { DASHBOARD_PATH } from "../constants/Dashboard";
 import { UPLOAD_TYPES } from "../constants/Gallery";
-import { MODERATION_MODULE } from "../constants/Moderation";
-import { settingDef } from "../constants/ModuleSettings";
+import { EVIDENCE_MAX_MB } from "../constants/Moderation";
 import { DashboardLimit } from "../builder/LimitReply";
 import { ModerationError } from "../services/ModerationService";
 import { ModGate } from "../utils/modgate";
@@ -28,8 +27,7 @@ export default class DashboardApiModerationEvidence extends Route {
             prefixed: false,
             requiresAuth: false,
             rateLimit: { max: 120, timeWindow: "1 minute" },
-            // W-0137: der höchste Server-Wert - die Grenze dieses Servers prüft AddImage.
-            bodyLimit: settingDef(MODERATION_MODULE, "evidenceMegabytes")!.max * 1024 * 1024,
+            bodyLimit: EVIDENCE_MAX_MB * 1024 * 1024,
         });
     }
 

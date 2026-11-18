@@ -10,6 +10,8 @@ export const CLIPS_ACCENT = "#ff1e2d";
 export const WINNERS_ACCENT = "#ffc53d";
 
 export const MAX_PRIZE = 100;
+/** So groß darf ein Clip sein - fest, keine Grenze von RL Nexus mehr (Nutzer, 18.11.). */
+export const CLIP_MAX_MB = 100;
 /* W-0133: Clips je Person, Plätze und die Größe eines Videos kommen aus dem Admin (constants/ModuleSettings.ts). */
 export const MAX_BLOCKED = 200;
 export const MAX_BLOCK_REASON = 200;

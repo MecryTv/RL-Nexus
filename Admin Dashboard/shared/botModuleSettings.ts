@@ -53,7 +53,6 @@ export const MODULE_SETTINGS: Readonly<Record<string, readonly IModuleSettingDef
     tickets: [
         def("maxOpenPerUser", "Offene Tickets je Person, höchste Wahl", null, 10, 1, 24, true, true),
         def("maxModerators", "Moderatoren höchstens", null, 25, 1, 25, true, false),
-        def("transcriptMessages", "Transkript höchstens", "Nachrichten", 5000, 100, 20000, true, true),
     ],
     levels: [
         def("maxXpPerAction", "XP je Aktion höchstens", null, 500, 1, 5000, true, true),
@@ -77,7 +76,6 @@ export const MODULE_SETTINGS: Readonly<Record<string, readonly IModuleSettingDef
     ],
     clips: [
         def("maxPerUser", "Clips je Person, höchste Wahl", null, 10, 1, 50, true, true),
-        def("fileMegabytes", "Clip-Datei höchstens", "MB", 100, 1, 500, true, true),
         def("places", "Plätze in der Wahl", null, 3, 1, 10, true, false),
     ],
     // W-0137 (18.11.2026): Grenzen für alle Module; Standard = bisherige Konstante.
@@ -107,7 +105,6 @@ export const MODULE_SETTINGS: Readonly<Record<string, readonly IModuleSettingDef
     moderation: [
         def("maxStages", "Warn-Stufen höchstens", null, 10, 1, 20, true, false),
         def("maxEvidence", "Beweise je Fall höchstens", null, 20, 1, 50, true, true),
-        def("evidenceMegabytes", "Beweisbild höchstens", "MB", 8, 1, 25, true, true),
     ],
     automod: [
         def("maxWords", "Wörter je Filter höchstens", null, 200, 10, 1000, true, true),

@@ -65,11 +65,11 @@ export async function checkModules(): Promise<void> {
     });
 
     // W-0133: Verzeichnis der Einstellungen und Werte je Server.
-    await check("Verzeichnis: 66 Werte in 24 Modulen (W-0137), jeder Standard liegt in seinen Grenzen", () => {
+    await check("Verzeichnis: 63 Werte in 24 Modulen (W-0137), jeder Standard liegt in seinen Grenzen", () => {
         const all = Object.values(MODULE_SETTINGS).flat();
 
         assert.equal(Object.keys(MODULE_SETTINGS).length, 24);
-        assert.equal(all.length, 66);
+        assert.equal(all.length, 63);
         assert.ok(all.every((def) => def.min <= def.standard && def.standard <= def.max), all.filter((def) => def.standard > def.max || def.standard < def.min).map((def) => def.key).join(","));
         assert.equal(MODULE_SETTINGS.tickets.find((def) => def.key === "maxOpenPerUser")?.max, 24);
         // W-0137: Galerie und Transkript-Größe sind keine Grenzen mehr.

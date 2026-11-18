@@ -5,7 +5,7 @@ import Route from "../structures/Route";
 import { PRIVATE_HINT } from "../constants/StaffGrant";
 import { DASHBOARD_PATH } from "../constants/Dashboard";
 import { SNOWFLAKE } from "../constants/Discord";
-import { DURATION_PRESETS, DELETE_CHOICES, MOD_ACTIONS, PROOF_TIMEOUT_CHOICES } from "../constants/Moderation";
+import { DURATION_PRESETS, DELETE_CHOICES, EVIDENCE_MAX_MB, MOD_ACTIONS, PROOF_TIMEOUT_CHOICES } from "../constants/Moderation";
 import { IModCase, ModAction } from "../interfaces/services/moderation/IModeration";
 import { IModActor, IModProof, IModRequest, ModerationError, ModerationLimits } from "../services/ModerationService";
 import { DashboardLimit } from "../builder/LimitReply";
@@ -179,7 +179,7 @@ export default class DashboardApiModeration extends Route {
             result.me = { id: access.actor.id, name: access.actor.name, manage, actions: await this.client.moderationService.AllowedActions(member) };
             result.config = config;
             result.presets = { durations: DURATION_PRESETS, deletes: DELETE_CHOICES, proof: PROOF_TIMEOUT_CHOICES };
-            result.limits = ModerationLimits(guild.id);
+            result.limits = { ...ModerationLimits(guild.id), evidenceMegabytes: EVIDENCE_MAX_MB };
             // Für "Nachrichten löschen": wo der Bot und das Mitglied lesen können.
             result.channels = [...guild.channels.cache.values()]
                 .filter(
