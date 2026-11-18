@@ -22,7 +22,9 @@ export class DatabaseUnavailable extends PublicError {
 
 const MIGRATIONS = path.join(import.meta.dirname, "migrations");
 export const MIGRATIONS_TABLE = "admin_migrations";
-const POOL_LIMIT = 3;
+// W-0141: 3 reichten knapp nicht, wenn Nachrichten-Uhr (alle 2 s), Backup-Lesen und Suche gleichzeitig liefen.
+// Auf dem VPS: max_connections 151, höchstens 11 je gleichzeitig benutzt (18.11.2026), Bot-Pool 5.
+const POOL_LIMIT = 5;
 
 let pool: Pool | null = null;
 
