@@ -699,6 +699,8 @@ export default class TeamService {
     private readonly roleChain = new Map<string, Promise<void>>();
     /** Je Server sendet nur einer die Übersicht - zwei Speichern kurz hintereinander hinterließen sonst doppelte Köpfe. */
     private readonly publishChain = new Map<string, Promise<unknown>>();
+    /** W-0146 (Review I1): der zuletzt aufgefrischte Server - der nächste Lauf beginnt dahinter. */
+    private refreshAfter: string | null = null;
 
     constructor(client: BotClient) {
         this.client = client;
@@ -2138,14 +2140,18 @@ export default class TeamService {
      * PRIME_API_TOKEN oder solange Prime den Schlüssel ablehnt (W-0145) nichts.
      * Fällig ist, was der gespeicherte Stand sagt (snapshot.at), ein Neustart
      * allein macht also nichts fällig. Höchstens REFRESH_GUILDS fällige Server je
-     * Lauf, die übrigen kommen im nächsten dran.
+     * Lauf, reihum: Der nächste Lauf beginnt hinter dem zuletzt geprüften, sonst
+     * belegten große Kader, die fällig bleiben, dauerhaft alle Plätze (Review I1).
      */
     async RefreshTick(): Promise<{ guilds: number; edited: number }> {
         const done = { guilds: 0, edited: 0 };
 
         if (!this.client.databaseService.Ready || !this.client.primeService.IsConfigured) return done;
 
-        for (const guild of this.client.guilds.cache.values()) {
+        const guilds = [...this.client.guilds.cache.values()];
+        const start = guilds.findIndex((guild) => guild.id === this.refreshAfter) + 1;
+
+        for (const guild of [...guilds.slice(start), ...guilds.slice(0, start)]) {
             // Auch zwischen zwei Servern fragen: Lehnt Prime ab, ist das nach der ersten Antwort bekannt.
             if (done.guilds >= REFRESH_GUILDS || (await this.client.primeService.access.Locked())) break;
 
@@ -2165,6 +2171,7 @@ export default class TeamService {
             if (result === null) continue;
 
             done.guilds++;
+            this.refreshAfter = guild.id;
 
             if (result === "failed") continue;
 

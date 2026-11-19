@@ -2651,6 +2651,23 @@ async function checkRefresh(client: BotClient): Promise<void> {
         check("  die übrigen im nächsten", second.guilds === 5 - REFRESH_GUILDS && due.size === 0, JSON.stringify(second));
         check("Teams-Modul aus: Server übergangen", !touched.includes("aus"), touched.join(","));
 
+        // Review I1: Drei Server mit großem Kader bleiben fällig - ein vierter kommt trotzdem dran, reihum.
+        const always = new Set(["g1", "g2", "g3"]);
+        const answering0 = service.AutoRefresh;
+
+        due.clear();
+        due.add("g4");
+        touched.length = 0;
+        service.AutoRefresh = async (target: Guild) => {
+            touched.push(target.id);
+
+            return always.has(target.id) || due.delete(target.id) ? { answered: 1, edited: 0 } : null;
+        };
+        await service.RefreshTick();
+        await service.RefreshTick();
+        check("Drei Server bleiben fällig: der vierte kommt trotzdem dran (reihum)", touched.includes("g4"), touched.join(","));
+        service.AutoRefresh = answering0;
+
         // Review I2: Bekommt ein Server gar keine Antwort von Prime, ist Prime gerade weg - die übrigen warten.
         const answering = service.AutoRefresh;
 
