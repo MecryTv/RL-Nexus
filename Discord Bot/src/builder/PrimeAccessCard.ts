@@ -34,6 +34,10 @@ export interface IPrimeAccessCard {
     hours: ("ok" | "down" | null)[];
     /** Grün: so viele Anfragen hat Prime während der Sperre abgelehnt. */
     refused: number;
+    /** Rot: welche Vorwarnungen rausgingen - 1 = 7 Tage vorher, 2 = 1 Tag vorher, 3 = beide. */
+    warned?: number;
+    /** Rot: ob PRIME_ACCESS_EXPIRES eingetragen ist. */
+    dated?: boolean;
 }
 
 export const PRIME_ACCESS_URL = "https://prime.rocketplanet.gg/access";
@@ -147,13 +151,32 @@ function stripLeft(card: IPrimeAccessCard): string {
     return `${clock(first)} ${date(first) === date(card.now) ? "heute" : "gestern"}`;
 }
 
-function stations(card: IPrimeAccessCard): { names: string[]; at: number; alt: string } {
-    if (card.state === "back") return { names: ["Abgelaufen", "Neuer Schlüssel", "Wieder da"], at: 2, alt: "Abgelaufen, neuer Schlüssel, wieder da: alles erledigt" };
-    if (card.state === "locked") return { names: ["7 Tage vorher", "1 Tag vorher", "Abgelaufen"], at: 2, alt: "7 Tage vorher, 1 Tag vorher, abgelaufen: alle Stationen erreicht" };
+/** Die drei Stationen: welche erreicht ist und welche gerade gilt. */
+function stations(card: IPrimeAccessCard): { names: string[]; at: number; reached: boolean[]; alt: string } {
+    const ahead = ["7 Tage vorher", "1 Tag vorher", "Abgelaufen"];
+
+    if (card.state === "back") return { names: ["Abgelaufen", "Neuer Schlüssel", "Wieder da"], at: 2, reached: [true, true, true], alt: "Abgelaufen, neuer Schlüssel, wieder da: alles erledigt" };
+
+    if (card.state === "locked") {
+        // Review: erreicht ist eine Vorwarnung nur, wenn sie wirklich rausging.
+        const warned = card.warned ?? 0;
+        const alt =
+            warned === 3
+                ? "Vorwarnungen 7 Tage und 1 Tag vorher, dann abgelaufen"
+                : warned === 1
+                  ? "Vorwarnung 7 Tage vorher, die 1 Tag vorher blieb aus, dann abgelaufen"
+                  : warned === 2
+                    ? "Vorwarnung 1 Tag vorher, dann abgelaufen"
+                    : card.dated
+                      ? "Vorwarnungen ausgeblieben, dann abgelaufen"
+                      : "Vorwarnungen ausgeblieben, kein Ablaufdatum eingetragen";
+
+        return { names: ahead, at: 2, reached: [(warned & 1) > 0, (warned & 2) > 0, true], alt };
+    }
 
     return card.stage === 2
-        ? { names: ["7 Tage vorher", "1 Tag vorher", "Abgelaufen"], at: 1, alt: "Zweite Warnung 1 Tag vorher, danach läuft der Zugang ab" }
-        : { names: ["7 Tage vorher", "1 Tag vorher", "Abgelaufen"], at: 0, alt: "Erste Warnung 7 Tage vorher, die zweite kommt 1 Tag vorher" };
+        ? { names: ahead, at: 1, reached: [true, true, false], alt: "Zweite Warnung 1 Tag vorher, danach läuft der Zugang ab" }
+        : { names: ahead, at: 0, reached: [true, false, false], alt: "Erste Warnung 7 Tage vorher, die zweite kommt 1 Tag vorher" };
 }
 
 /** Alt-Text: alles, was auf dem Bild steht. */
@@ -320,7 +343,7 @@ function drawFigure(ctx: SKRSContext2D, card: IPrimeAccessCard): void {
 /** Drei Stationen rechts neben der Zahl: wann der Bot schreibt. */
 function drawStations(ctx: SKRSContext2D, card: IPrimeAccessCard): void {
     const color = LOOK[card.state].color;
-    const { names, at } = stations(card);
+    const { names, at, reached } = stations(card);
     const x = 404;
     const y = 160;
     const width = 290;
@@ -332,21 +355,28 @@ function drawStations(ctx: SKRSContext2D, card: IPrimeAccessCard): void {
     ctx.moveTo(x, y);
     ctx.lineTo(x + width, y);
     ctx.stroke();
+
+    // Farbig nur die Strecken zwischen zwei erreichten Stationen.
     ctx.strokeStyle = color;
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-    ctx.lineTo(x + step * at, y);
-    ctx.stroke();
+
+    for (let index = 0; index < names.length - 1; index++) {
+        if (!reached[index] || !reached[index + 1]) continue;
+
+        ctx.beginPath();
+        ctx.moveTo(x + step * index, y);
+        ctx.lineTo(x + step * (index + 1), y);
+        ctx.stroke();
+    }
 
     names.forEach((name, index) => {
         const cx = x + step * index;
 
         ctx.beginPath();
         ctx.arc(cx, y, index === at ? 9 : 7, 0, Math.PI * 2);
-        ctx.fillStyle = index <= at ? color : C.bg;
+        ctx.fillStyle = reached[index] ? color : C.bg;
         ctx.fill();
         ctx.lineWidth = 3;
-        ctx.strokeStyle = index <= at ? color : C.line;
+        ctx.strokeStyle = reached[index] ? color : C.line;
         ctx.stroke();
         ctx.font = "700 12px Rajdhani";
         ctx.fillStyle = index === at ? C.text : C.dim;

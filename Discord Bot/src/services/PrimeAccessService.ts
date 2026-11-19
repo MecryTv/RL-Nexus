@@ -98,7 +98,7 @@ interface IAccessRecord {
     notified: boolean;
     lastOk: number | null;
     refused: number;
-    /** Die zuletzt gemeldete gelbe Stufe: "<Ablauf>:<1|2>". */
+    /** Die gemeldeten gelben Stufen: "<Ablauf>:<Maske>", 1 = 7 Tage vorher, 2 = 1 Tag vorher. */
     warned: string | null;
 }
 
@@ -223,7 +223,14 @@ export class PrimeAccessWatch {
 
         this.record = { ...this.record, sentAt: now, notified: true };
         await this.Save();
-        await this.Deliver({ state: "locked", at: this.record.since ?? now, answer, refused: this.record.refused }, now);
+        await this.Deliver({ state: "locked", at: this.record.since ?? now, answer, refused: this.record.refused, warned: this.Warned(), dated: this.expires !== null }, now);
+    }
+
+    /** Welche gelben Stufen für das eingetragene Ablaufdatum rausgingen (Maske, 0 ohne Datum). */
+    private Warned(): number {
+        const [at, mask] = (this.record.warned ?? "").split(":").map(Number);
+
+        return this.expires !== null && at === this.expires ? (mask ?? 0) : 0;
     }
 
     /** Gelb: 7 Tage und 1 Tag vor dem Ablauf, je Stufe einmal. Nicht, solange Prime schon ablehnt. */
@@ -233,12 +240,12 @@ export class PrimeAccessWatch {
 
         const left = this.expires - now;
         const stage = left <= 0 || left > 7 * DAY ? 0 : left <= DAY ? 2 : 1;
-        const [at, sent] = (this.record.warned ?? "").split(":").map(Number);
-        const done = at === this.expires ? (sent ?? 0) : 0;
+        const done = this.Warned();
 
-        if (stage === 0 || stage <= done || this.record.state === "locked" || !this.Discord()) return;
+        // Je Stufe einmal, und nach der späten Warnung nicht noch die frühe.
+        if (stage === 0 || (done & stage) > 0 || (stage === 1 && (done & 2) > 0) || this.record.state === "locked" || !this.Discord()) return;
 
-        this.record.warned = `${this.expires}:${stage}`;
+        this.record.warned = `${this.expires}:${done | stage}`;
         await this.Save();
         await this.Deliver({ state: "soon", at: this.expires, stage: stage as 1 | 2, answer: "Zugang aktiv", refused: 0 }, now);
     }

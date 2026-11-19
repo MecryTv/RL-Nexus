@@ -284,7 +284,8 @@ async function checkPrimeAccess(): Promise<void> {
         ["bald", { ...base, state: "soon", at: now + 7 * 24 * hour, stage: 1, answer: "Zugang aktiv", lastOk: now, hours: [] }, 1076],
         [
             "abgelaufen",
-            { ...base, state: "locked", at: Date.UTC(2026, 10, 18, 22), answer: "401 · Access expired", lastOk: Date.UTC(2026, 10, 18, 21, 57), hours: [...Array(4).fill("ok"), ...Array(20).fill("down")] },
+            // So sah der Ablauf am 18.11.2026 aus: 403, ein Grund von Prime ist nicht bekannt.
+            { ...base, state: "locked", at: Date.UTC(2026, 10, 18, 22), answer: "HTTP 403", lastOk: Date.UTC(2026, 10, 18, 21, 57), hours: [...Array(4).fill("ok"), ...Array(20).fill("down")] },
             1240,
         ],
         [
@@ -327,6 +328,17 @@ async function checkPrimeAccess(): Promise<void> {
     const long = await RenderPrimeAccessCard({ ...locked, answer: "401 · The Prime API token is not valid." });
 
     check("Lange Antwort von Prime: die Kacheln werden höher", (await loadImage(long)).height > 1240);
+
+    // Review M7: Ohne gesendete Vorwarnung sind „7 Tage vorher“ und „1 Tag vorher“ nicht erreicht.
+    const warned = await RenderPrimeAccessCard({ ...locked, warned: 3, dated: true });
+    const unwarned = await RenderPrimeAccessCard({ ...locked, warned: 0, dated: false });
+
+    check("Rot ohne Vorwarnung sieht anders aus als nach beiden Vorwarnungen", !warned.equals(unwarned));
+    check("  Alt-Text: Vorwarnungen ausgeblieben, kein Ablaufdatum", PrimeAccessAlt({ ...locked, warned: 0, dated: false }).includes("Vorwarnungen ausgeblieben, kein Ablaufdatum eingetragen"), PrimeAccessAlt({ ...locked, warned: 0, dated: false }));
+    check("  nach beiden Vorwarnungen: 7 Tage und 1 Tag vorher", PrimeAccessAlt({ ...locked, warned: 3, dated: true }).includes("Vorwarnungen 7 Tage und 1 Tag vorher, dann abgelaufen"), PrimeAccessAlt({ ...locked, warned: 3, dated: true }));
+    check("  nur die späte Vorwarnung", PrimeAccessAlt({ ...locked, warned: 2, dated: true }).includes("Vorwarnung 1 Tag vorher, dann abgelaufen"), PrimeAccessAlt({ ...locked, warned: 2, dated: true }));
+
+    await writeFile("card-check-prime-abgelaufen.png", unwarned);
 }
 
 async function hasSize(png: Buffer, width: number, height: number): Promise<boolean> {

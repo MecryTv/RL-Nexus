@@ -481,6 +481,7 @@ async function checkAccessWatch(): Promise<void> {
     await run(watch, refused, t0);
     check("Erste Ablehnung: rote DM", dms.length === 1 && dms[0]!.includes("Prime-Zugang abgelaufen"), `${dms.length} DMs`);
     check("  sie nennt, was Prime sagt", dms[0]?.includes("401 · The Prime API token is not valid.") === true);
+    check("  und dass ohne Ablaufdatum keine Vorwarnung kam", dms[0]?.includes("Vorwarnungen ausgeblieben, kein Ablaufdatum eingetragen") === true, dms[0]?.slice(0, 300));
 
     await run(watch, refused, t0 + HOUR);
     await run(watch, refused, t0 + 23 * HOUR);
@@ -537,6 +538,10 @@ async function checkAccessWatch(): Promise<void> {
     watch = new PrimeAccessWatch(fake(iso));
     await watch.Tick(t0 + 9 * DAY + 2 * HOUR);
     check("  nach einem Neustart keine doppelte", dms.length === 2, `${dms.length} DMs`);
+
+    // Review M7: Das Rot danach zeigt beide Vorwarnungen als erreicht; ohne Datum keine.
+    await run(watch, refused, t0 + 10 * DAY + HOUR);
+    check("Rot nach beiden Vorwarnungen nennt sie", dms[2]?.includes("Vorwarnungen 7 Tage und 1 Tag vorher, dann abgelaufen") === true, dms[2]?.slice(0, 300));
 
     dms.length = 0;
     state.clear();
