@@ -96,6 +96,16 @@ Ohne `PRIME_API_TOKEN` bleibt das Holen aus. Die Peaks reichen dann für eine MM
 
 `Prime jetzt abfragen` unter *Anzeige* holt alles sofort neu.
 
+### Selbst auffrischen (W-0146)
+
+Steht die Übersicht im Kanal, als Hub oder als Karten, hält der Bot sie selbst aktuell. Alle 5 Minuten schaut er nach, ob ein Spieler einen Prime-Stand hat, der älter ist als **Übersicht auffrischen alle**. Das ist eine Grenze des Moduls: Standard 30 Minuten, 15 bis 240, im Admin Dashboard unter Module einstellbar, auch für einzelne Server. Server sehen den Wert im Reiter Grenzen.
+
+Ist es so weit, holt er wie sonst höchstens 12 Spieler und bearbeitet die Nachrichten, die schon stehen. Neu gepostet wird dabei nie. Fehlt eine Nachricht, bräuchte der Hub mehr oder weniger Nachrichten oder müsste eine über die V2-Grenze, bleibt alles, bis jemand im Dashboard neu sendet. Bei „Alle Teams einzeln“ zählen nur Teams, deren Karte im Kanal steht, und bearbeitet wird nur die Karte, an deren Team sich etwas geändert hat. Das Bearbeiten läuft durch dieselbe Reihe je Server wie das Senden.
+
+Bearbeitet wird nur, wenn Prime geantwortet hat und sich dadurch etwas zeigt: andere MMR, ein anderer Rang oder ein neuerer Stand in der Fußzeile. Antwortet Prime gar nicht, bleibt die Nachricht, wie sie ist, sonst verschwänden die Ränge im Kanal. Ohne `PRIME_API_TOKEN` oder solange Prime den Schlüssel ablehnt (W-0145, siehe [Prime](Prime.md)) fasst der Lauf nichts an.
+
+Ob etwas fällig ist, sagt der gespeicherte Stand der Spieler. Ein Neustart allein macht also nichts fällig, und der erste Lauf kommt 5 Minuten nach dem Start. Je Lauf kommen höchstens 3 Server dran (`REFRESH_GUILDS`). Sind mehr fällig, etwa nach einer längeren Pause, folgen sie in den nächsten Läufen und verteilen sich dabei von selbst. Ein Kader mit mehr als 12 Spielern braucht so mehrere Läufe, bis alle frisch sind.
+
 ### Epic-Name geändert
 
 Ändert jemand seinen Epic-Namen, findet Prime den alten nicht mehr. Das merkt der Abgleich, aber nur bei einem Namen, den er vorher schon gefunden hatte. Gehört der alte Name inzwischen einem anderen Konto, zählt das genauso; dessen Ränge kommen nie ins Team.
@@ -390,6 +400,7 @@ Gerechnet wird **nur im Bot**: die Seite zeigt die Werte, die aus der Route komm
 | Menü | `events/teams/TeamMenu.ts` → `TeamService.Handle()` |
 | Custom-ID | `teams:menu`, ab 26 Teams und im Hub `teams:menu:<n>` — welches Team gemeint ist, steht im gewählten Wert |
 | Rechner | `utils/formula.ts` |
+| Selbst auffrischen | `runnables/TeamRefresh.ts` (alle 5 Minuten) → `TeamService.RefreshTick()` und `AutoRefresh()`; Abstand aus der Grenze `teams.refreshMinutes` (`constants/ModuleSettings.ts`), gesperrter Zugang über `PrimeAccessWatch.Locked()` |
 | Epic-Name geändert | `services/EpicNameService.ts` (Ablauf), `services/teams/EpicName.ts` (erkennen, umbenennen, Platzhalter), `builder/EpicNameView.ts` (DMs und Fenster), Aufruf in `TeamService.Sync()`. Fälle in `epic_name_cases` (`042_epic_name_cases.sql`), ein Fall je Person und altem Namen. Zeitgeber `runnables/EpicNameCases.ts` |
 | Custom-ID Epic-Name | `epic:ask:<fall>`, `epic:again:<fall>`, Fenster `epic:modal:<fall>` → `events/teams/EpicNameButtons.ts` |
 
@@ -398,7 +409,7 @@ Gerechnet wird **nur im Bot**: die Seite zeigt die Werte, die aus der Route komm
 ## Prüfen
 
 ```bash
-npm run check:teams   # Formel-Rechner, Team-MMR, Kader saeubern, die Karten, Rollen im Kader, Raenge, Rang-Icons, Aufgaben-Abzeichen, Platzhalter je Spieler, gezeichnete Karte, Menues ab 26 Teams, Team-Hub samt Kette; mit Datenbank: teams.created
+npm run check:teams   # Formel-Rechner, Team-MMR, Kader saeubern, die Karten, Rollen im Kader, Raenge, Rang-Icons, Aufgaben-Abzeichen, Platzhalter je Spieler, gezeichnete Karte, Menues ab 26 Teams, Team-Hub samt Kette, selbst auffrischen; mit Datenbank: teams.created
 npm run icons:teams   # die Abzeichen der Aufgaben neu malen: SVG in teamicons/ -> PNG fuer Galerie und Emojis
 npm run check:absences # Abmeldungen: Tage lesen, Regeln, Zusammenlegen, Zurueckmelden, Stand je Team, Einstellungen, Bild; mit Datenbank: anlegen, aendern, loeschen, aufraeumen
 npm run check:epicname # Epic-Name geaendert: erkennen, selbst holen, Fall und DM, Fenster, umbenennen in allen Kadern und /rank link, Platzhalter, Captain, getippte DM
