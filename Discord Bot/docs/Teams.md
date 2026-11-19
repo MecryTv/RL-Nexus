@@ -110,7 +110,7 @@ Ob etwas fällig ist, sagt der gespeicherte Stand der Spieler. Ein Neustart alle
 
 Ändert jemand seinen Epic-Namen, findet Prime den alten nicht mehr. Das merkt der Abgleich, aber nur bei einem Namen, den er vorher schon gefunden hatte. Gehört der alte Name inzwischen einem anderen Konto, zählt das genauso; dessen Ränge kommen nie ins Team.
 
-1. **Selbst holen.** Kennt der Bot die Epic-Konto-ID (aus dem letzten Stand oder aus `/rank link`), fragt er Prime danach. Gibt es einen neuen Namen, ändert er ihn überall und schickt dem Spieler einen kurzen Hinweis ohne Knopf. Antwortet Prime nicht, versucht er es beim nächsten Abgleich wieder.
+1. **Selbst holen.** Kennt der Bot die Epic-Konto-ID (aus dem letzten Stand oder aus `/rank link`), fragt er Prime danach. Gibt es einen neuen Namen, ändert er ihn überall und schickt dem Spieler einen kurzen Hinweis ohne Knopf. Antwortet Prime nicht, versucht er es beim nächsten fälligen Abgleich wieder, mit `Prime jetzt abfragen` sofort.
 2. **Sonst fragen.** Wer eine Discord-ID im Kader hat, bekommt eine DM: wo der alte Name steht (alle Kader auf allen Servern, dazu `/rank link`), zuletzt gesehener Rang und ein Knopf. Der Knopf öffnet ein Fenster für den neuen Namen. Prime muss ihn kennen, und ist die Konto-ID bekannt, muss er dazu gehören. Danach wird die DM grün.
 3. **Captain.** Kommt die DM nicht an, bekommen die Captains der betroffenen Teams sofort eine DM (ohne Captain die Co-Captains, nie die Person selbst). Sonst nach 3 Tagen ohne Antwort. Je Fall nur einmal, ohne Ping, mit Link ins Dashboard.
 

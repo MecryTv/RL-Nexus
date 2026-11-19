@@ -280,8 +280,11 @@ function World(options: IWorldOptions) {
     const dms: ISentDm[] = [];
     const publishes: string[] = [];
     const cases = FakeCases();
+    const asked: string[] = [];
     const answer = async (query: string) => {
         const reply = options.prime[query];
+
+        asked.push(query);
 
         if (reply === "throw") throw new Error("Prime antwortet nicht.");
 
@@ -332,7 +335,7 @@ function World(options: IWorldOptions) {
     const names = (id: number) => store.get(id)!.players.filter((player) => player.discordId === NICO).map((player) => player.epicName).join();
     const snapshot = (id: number) => store.get(id)!.players.find((player) => player.discordId === NICO)!.snapshot!;
 
-    return { client, service, store, account, saved, dms, publishes, cases: cases.rows, previous, before, loaded, names, snapshot };
+    return { client, service, store, account, saved, dms, publishes, cases: cases.rows, previous, before, loaded, names, snapshot, asked };
 }
 
 async function checkLost(): Promise<void> {
@@ -354,7 +357,22 @@ async function checkLost(): Promise<void> {
     const failing = World({ prime: { "Vyrox.Nico": null, "acc-1": "throw" }, accountId: "acc-1", linked: false });
 
     await failing.service.Sync(failing.loaded());
-    check("Prime wirft beim Selbst-Holen: alter Stand bleibt, keine DM, kein Fall", JSON.stringify(failing.snapshot(1)) === JSON.stringify(failing.previous) && failing.dms.length === 0 && failing.cases.size === 0, JSON.stringify(failing.snapshot(1)));
+
+    const held = failing.snapshot(1);
+
+    check("Prime wirft beim Selbst-Holen: alter Stand bleibt, keine DM, kein Fall", JSON.stringify({ ...held, at: failing.previous.at }) === JSON.stringify(failing.previous) && failing.dms.length === 0 && failing.cases.size === 0, JSON.stringify(held));
+    // W-0146 (Review M3): sonst wäre der Spieler bei jedem Lauf der Team-Übersicht gleich wieder fällig. „Prime jetzt abfragen“ fragt trotzdem sofort.
+    check("  die Uhrzeit rückt vor, der Spieler ist nicht bei jedem Lauf gleich wieder fällig", held.at > failing.previous.at, String(held.at));
+
+
+    const askedAccount = () => failing.asked.filter((query) => query === "acc-1").length;
+    const first = askedAccount();
+
+    await failing.service.Sync(failing.loaded());
+    check("  der nächste Abgleich gleich danach fragt nicht erneut", askedAccount() === first, failing.asked.join(","));
+
+    await failing.service.Sync(failing.loaded(), true);
+    check("  mit „Prime jetzt abfragen“ (force) wird trotzdem gleich wieder gefragt", askedAccount() > first, failing.asked.join(","));
 
     const ask = World({ prime: { "Vyrox.Nico": null }, accountId: null, linked: false });
 

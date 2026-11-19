@@ -40,8 +40,10 @@ export default class EpicNameService {
         if (accountId) {
             const profile = await this.client.primeService.Profile(accountId).catch(() => undefined);
 
-            // Prime antwortet nicht, oder kennt das Konto noch unter dem alten Namen: beim nächsten Abgleich noch einmal.
-            if (profile === undefined || profile?.name.toLowerCase() === oldName.toLowerCase()) return previous;
+            // Prime antwortet nicht, oder kennt das Konto noch unter dem alten Namen: beim nächsten fälligen Abgleich noch einmal,
+            // mit „Prime jetzt abfragen“ sofort. Die Uhrzeit rückt vor, sonst wäre der Spieler bei jedem Lauf der
+            // Team-Übersicht gleich wieder fällig (W-0146, Review M3).
+            if (profile === undefined || profile?.name.toLowerCase() === oldName.toLowerCase()) return { ...previous, at: fresh.at };
 
             if (profile) {
                 const result = await this.Rename({ guildId: input.guildId, current: input.team, loaded: input.loaded, discordId: player.discordId, oldName, newName: profile.name, accountId });
