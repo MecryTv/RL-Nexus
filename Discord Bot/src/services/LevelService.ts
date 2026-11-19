@@ -549,14 +549,22 @@ export default class LevelService {
     }
 
     /** Wie Promote, mit einem schon gelesenen Stand (W-0141: Voice liest alle eines Servers auf einmal). */
-    private async PromoteFrom(member: GuildMember, settings: ILevelSettings, before: number | null, channelId: string | null, entry: ILevelEntry): Promise<boolean> {
+    private async PromoteFrom(member: GuildMember, settings: ILevelSettings, before: number | null, channelId: string | null, entry: ILevelEntry, retry = true): Promise<boolean> {
         const level = LevelFromXp(entry.xp, settings.base);
         const from = before ?? entry.level;
 
         if (level === entry.level) return false;
         // Review W-0141: nur wenn der Stand noch der gelesene ist. Kam eine zweite Gutschrift dazwischen, hat sie schon
         // aufgestiegen und gemeldet; ein älterer Stand setzt nie ein höheres Level zurück.
-        if (!(await this.client.levels.ChangeLevel(member.guild.id, member.id, entry.level, level))) return false;
+        if (!(await this.client.levels.ChangeLevel(member.guild.id, member.id, entry.level, level))) {
+            // Nachreview W-0141: Die andere stieg vielleicht auf ein niedrigeres Level, als die Punkte jetzt hergeben.
+            // Einmal neu lesen und, wenn es noch weiter geht, ab dem neuen Stand aufsteigen.
+            if (!retry) return false;
+
+            const fresh = await this.client.levels.Of(member.guild.id, member.id);
+
+            return fresh !== null && LevelFromXp(fresh.xp, settings.base) > fresh.level ? this.PromoteFrom(member, settings, null, channelId, fresh, false) : false;
+        }
         if (level <= from) return false;
 
         await this.Rewards(member, level, settings);

@@ -805,6 +805,25 @@ async function checkAnnounce(): Promise<void> {
     check("Zwei Gutschriften gleichzeitig über eine Stufe: genau eine Nachricht", race.sent.length === 1, String(race.sent.length));
     check("Zwei Gutschriften gleichzeitig: das Level stimmt", race.entry(OTHER).level === LevelFromXp(race.entry(OTHER).xp, race.settings.base), JSON.stringify(race.entry(OTHER)));
 
+    // Nachreview W-0141: verschiedene Ziel-Level. Voice las noch den Stand für Level 1, Chat schon den für Level 3;
+    // Voice gewinnt das Compare-and-Set von 0. Chat liest danach neu und steigt doch noch auf 3.
+    const split = World();
+    const splitter = split.member(OTHER);
+    const readAll = split.client.levels.Of.bind(split.client.levels);
+    let firstRead = true;
+
+    split.levels.set(`${GUILD}:${OTHER}`, { ...split.entry(OTHER), xp: XpForLevel(3, split.settings.base), level: 0 });
+    split.client.levels.Of = async (guildId: string, userId: string) => {
+        const entry = await readAll(guildId, userId);
+
+        if (!firstRead || !entry) return entry;
+        firstRead = false;
+
+        return { ...entry, xp: XpForLevel(1, split.settings.base) };
+    };
+    await Promise.all([split.service.Promote(splitter, split.settings, null, TEXT), split.service.Promote(splitter, split.settings, null, TEXT)]);
+    check("Zwei Aufstiege auf verschiedene Level gleichzeitig: am Ende das Level der Punkte (Nachreview)", split.entry(OTHER).level === 3, JSON.stringify(split.entry(OTHER)));
+
     // W-0141: eine Gutschrift liest den Stand einmal und schreibt Gesamt- und Tageswert gleichzeitig.
     const lean = World();
     const leanLevels = lean.client.levels as unknown as Record<"Of" | "Add", (...args: unknown[]) => Promise<unknown>>;
