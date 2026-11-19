@@ -19,8 +19,8 @@ export default class TeamRefresh extends Runnable {
     }
 
     async Execute(): Promise<void> {
-        const { guilds, edited } = await this.client.teamService.RefreshTick();
+        const { checked, edited } = await this.client.teamService.RefreshTick();
 
-        if (guilds) logger.tasks(`🛡️ Team-Übersicht: ${guilds} Server aufgefrischt, ${edited} Nachricht(en) bearbeitet`);
+        if (checked) logger.tasks(`🛡️ Team-Übersicht: ${checked} Server geprüft, ${edited} bearbeitet`);
     }
 }

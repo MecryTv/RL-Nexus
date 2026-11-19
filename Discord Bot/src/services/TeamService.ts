@@ -2145,8 +2145,9 @@ export default class TeamService {
      * Lauf, reihum: Der nächste Lauf beginnt hinter dem zuletzt geprüften, sonst
      * belegten große Kader, die fällig bleiben, dauerhaft alle Plätze (Review I1).
      */
-    async RefreshTick(): Promise<{ guilds: number; edited: number }> {
-        const done = { guilds: 0, edited: 0 };
+    async RefreshTick(): Promise<{ checked: number; edited: number }> {
+        // Review M9: geprüft (Prime gefragt) und bearbeitet (Übersicht geändert) je Server.
+        const done = { checked: 0, edited: 0 };
 
         if (!this.client.databaseService.Ready || !this.client.primeService.IsConfigured) return done;
 
@@ -2155,7 +2156,7 @@ export default class TeamService {
 
         for (const guild of [...guilds.slice(start), ...guilds.slice(0, start)]) {
             // Auch zwischen zwei Servern fragen: Lehnt Prime ab, ist das nach der ersten Antwort bekannt.
-            if (done.guilds >= REFRESH_GUILDS || (await this.client.primeService.access.Locked())) break;
+            if (done.checked >= REFRESH_GUILDS || (await this.client.primeService.access.Locked())) break;
 
             const open = await this.client.settings.Of(guild.id).then(
                 (found) => found.modules.includes(TEAMS_MODULE),
@@ -2172,12 +2173,12 @@ export default class TeamService {
 
             if (result === null) continue;
 
-            done.guilds++;
+            done.checked++;
             this.refreshAfter = guild.id;
 
             if (result === "failed") continue;
 
-            done.edited += result.edited;
+            if (result.edited) done.edited++;
 
             // Review I2: Bekam dieser Server gar keine Antwort von Prime, ist Prime gerade weg - die übrigen warten auf den nächsten Lauf.
             if (!result.answered) break;

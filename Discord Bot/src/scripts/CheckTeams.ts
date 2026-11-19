@@ -2736,11 +2736,11 @@ async function checkRefresh(client: BotClient): Promise<void> {
 
         const first = await service.RefreshTick();
 
-        check(`Fünf Server zugleich fällig (etwa nach einer längeren Pause): ${REFRESH_GUILDS} in diesem Lauf`, first.guilds === REFRESH_GUILDS && due.size === 5 - REFRESH_GUILDS, JSON.stringify(first));
+        check(`Fünf Server zugleich fällig (etwa nach einer längeren Pause): ${REFRESH_GUILDS} in diesem Lauf`, first.checked === REFRESH_GUILDS && due.size === 5 - REFRESH_GUILDS, JSON.stringify(first));
 
         const second = await service.RefreshTick();
 
-        check("  die übrigen im nächsten", second.guilds === 5 - REFRESH_GUILDS && due.size === 0, JSON.stringify(second));
+        check("  die übrigen im nächsten", second.checked === 5 - REFRESH_GUILDS && due.size === 0, JSON.stringify(second));
         check("Teams-Modul aus: Server übergangen", !touched.includes("aus"), touched.join(","));
 
         // Review I1: Drei Server mit großem Kader bleiben fällig - ein vierter kommt trotzdem dran, reihum.
@@ -2774,7 +2774,17 @@ async function checkRefresh(client: BotClient): Promise<void> {
 
         const fell = await service.RefreshTick();
 
-        check("Auffrischen wirft: Grund im Log, zählt als geprüft, der nächste Server kommt dran", warned.some((line) => line.includes("Datenbank weg")) && fell.guilds === 2 && touched.includes("g2"), `${JSON.stringify(fell)} · ${warned.join(" | ")}`);
+        check("Auffrischen wirft: Grund im Log, zählt als geprüft, der nächste Server kommt dran", warned.some((line) => line.includes("Datenbank weg")) && fell.checked === 2 && touched.includes("g2"), `${JSON.stringify(fell)} · ${warned.join(" | ")}`);
+
+        // Review M9: geprüft und bearbeitet getrennt gezählt - bearbeitet je Server, nicht je Nachricht.
+        due.clear();
+        due.add("g1");
+        due.add("g2");
+        service.AutoRefresh = async (target: Guild) => (due.delete(target.id) ? { answered: 1, edited: target.id === "g1" ? 2 : 0 } : null);
+
+        const counted = await service.RefreshTick();
+
+        check("Gezählt: 2 Server geprüft, 1 bearbeitet (zwei Nachrichten sind ein Server)", counted.checked === 2 && counted.edited === 1, JSON.stringify(counted));
         service.AutoRefresh = answering0;
 
         // Review I2: Bekommt ein Server gar keine Antwort von Prime, ist Prime gerade weg - die übrigen warten.
@@ -2802,12 +2812,23 @@ async function checkRefresh(client: BotClient): Promise<void> {
         const task = new TeamRefresh(client);
         const start = new Date();
 
-        service.RefreshTick = async () => (ran++, { guilds: 0, edited: 0 });
-        await task.Execute();
+        const tasks: string[] = [];
+        const realTasks = logger.tasks;
+
+        service.RefreshTick = async () => (ran++, { checked: 2, edited: 1 });
+        logger.tasks = (message: string) => void tasks.push(message);
+
+        try {
+            await task.Execute();
+        } finally {
+            logger.tasks = realTasks;
+        }
+
         check(
             "Läuft alle 5 Minuten, zum ersten Mal 5 Minuten nach dem Start",
             task.type === TaskTypes.INTERVAL && task.expression === "5m" && ran === 1 && client.runnableService.CalculateNextRun(task, start)?.getTime() === start.getTime() + 5 * MIN
         );
+        check("  im Log: „2 Server geprüft, 1 bearbeitet“ (Review M9)", tasks.some((line) => line.includes("2 Server geprüft, 1 bearbeitet")), tasks.join(" | "));
     } finally {
         service.Settings = original.settings;
         service.Teams = original.teams;
