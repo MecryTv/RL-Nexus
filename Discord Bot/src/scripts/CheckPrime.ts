@@ -450,13 +450,15 @@ async function checkAccessWatch(): Promise<void> {
     let probes = 0;
     const refused = HttpError(401, '{"Error":{"Message":"The Prime API token is not valid.","Type":"Unauthorized"}}');
 
-    const fake = (expires = "") =>
+    const fake = (expires = "", db = { ready: true }, discord = { ready: true }) =>
         ({
             config: { DEV_USER_IDs: ["1"], PRIME_ACCESS_EXPIRES: expires },
-            isReady: () => true,
+            isReady: () => discord.ready,
             users: { fetch: async () => ({ tag: "dev", send: async (message: { components: { toJSON(): unknown }[] }) => void dms.push(JSON.stringify(message.components[0]?.toJSON())) }) },
             databaseService: {
-                Ready: true,
+                get Ready() {
+                    return db.ready;
+                },
                 Query: async (sql: string, values: string[] = []) => {
                     if (sql.startsWith("SELECT")) return state.has(values[0]!) ? [{ value: state.get(values[0]!) }] : [];
 
@@ -584,6 +586,30 @@ async function checkAccessWatch(): Promise<void> {
     await run(watch, long, t0 + 3 * DAY);
     check("bot_state: jeder Eintrag unter 255 Zeichen", writes.length > 0 && writes.every((value) => value.length <= 255), `${Math.max(...writes.map((value) => value.length))} Zeichen`);
     check("  und der Grund von Prime steht nicht darin", writes.every((value) => !value.includes("Grund-Ende") && !value.includes("not valid")), writes.at(-1));
+
+    // Review M1: Nach einem Neustart verbindet sich die Datenbank parallel zum Login. Kommt die
+    // erste Ablehnung vorher, darf das nicht noch einmal Rot schicken.
+    state.clear();
+    dms.length = 0;
+    await run(new PrimeAccessWatch(fake()), refused, t0);
+
+    const db = { ready: false };
+    const restarted = new PrimeAccessWatch(fake("", db));
+
+    await run(restarted, refused, t0 + 60_000);
+    db.ready = true;
+    await run(restarted, refused, t0 + 90_000);
+    check("Neustart, Datenbank erst später bereit: keine doppelte rote DM", count("Prime-Zugang abgelaufen") === 1, `${count("Prime-Zugang abgelaufen")} rot`);
+
+    // Kommt sie gar nicht, gilt nach zwei Minuten der Speicher - sonst bliebe jede DM aus.
+    state.clear();
+    dms.length = 0;
+
+    const without = new PrimeAccessWatch(fake("", { ready: false }));
+
+    await run(without, refused, t0);
+    await run(without, refused, t0 + 3 * 60_000);
+    check("  ohne Datenbank nach zwei Minuten trotzdem Rot", count("Prime-Zugang abgelaufen") === 1, `${count("Prime-Zugang abgelaufen")} rot`);
 }
 
 /**

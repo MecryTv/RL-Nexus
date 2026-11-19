@@ -3,6 +3,7 @@ import BotClient from "../client/BotClient";
 import ComponentV2Builder from "../builder/ComponentV2Builder";
 import { IPrimeAccessCard, PRIME_ACCESS_URL, PrimeAccessAlt, PrimeAccessColor, RenderPrimeAccessCard } from "../builder/PrimeAccessCard";
 import { PRIME_ACCOUNT } from "../constants/Prime";
+import { DATABASE_WAIT_MS } from "./DatabaseService";
 import type { PrimeError } from "./PrimeService";
 import logger from "../utils/logger";
 
@@ -116,6 +117,10 @@ const EMPTY: IAccessRecord = { state: "ok", since: null, sentAt: null, notified:
 export class PrimeAccessWatch {
     private record: IAccessRecord = { ...EMPTY };
     private loaded = false;
+    /** Wann zuerst nach dem Zustand gefragt wurde - für die Wartezeit auf die Datenbank. */
+    private startedAt: number | null = null;
+    /** Ohne Datenbank entschieden, nach DATABASE_WAIT_MS. */
+    private guessed = false;
     private chain: Promise<void> = Promise.resolve();
     private hours = new Map<number, "ok" | "down">();
     private lastQueryAt = 0;
@@ -162,10 +167,12 @@ export class PrimeAccessWatch {
     private async Handle(result: "ok" | "other" | PrimeError, now: number): Promise<void> {
         if (result === "other") return;
 
-        await this.Load();
         this.hours.set(Math.floor(now / HOUR), result === "ok" ? "ok" : "down");
 
         for (const hour of this.hours.keys()) if (hour <= Math.floor(now / HOUR) - 24) this.hours.delete(hour);
+
+        // Ohne den gespeicherten Zustand keine Entscheidung - sonst schickt ein Neustart doppelt (Review).
+        if (!(await this.Load(now))) return;
 
         if (result === "ok") {
             const was = this.record;
@@ -207,8 +214,7 @@ export class PrimeAccessWatch {
     /** Gelb: 7 Tage und 1 Tag vor dem Ablauf, je Stufe einmal. Nicht, solange Prime schon ablehnt. */
     private async Warn(now: number): Promise<void> {
         if (this.expires === null || !this.client.primeService.IsConfigured) return;
-
-        await this.Load();
+        if (!(await this.Load(now))) return;
 
         const left = this.expires - now;
         const stage = left <= 0 || left > 7 * DAY ? 0 : left <= DAY ? 2 : 1;
@@ -232,17 +238,36 @@ export class PrimeAccessWatch {
         logger.info(`🎮 Prime-Zugang: DM „${card.state}“ an ${sent} Developer`);
     }
 
-    private async Load(): Promise<void> {
-        if (this.loaded) return;
+    /**
+     * Liest den gespeicherten Zustand einmal. false: noch nicht möglich, also
+     * nichts entscheiden. Die Datenbank verbindet sich parallel zum Login; so
+     * lange wie andere Start-Ereignisse (DATABASE_WAIT_MS) wird auf sie gewartet,
+     * danach gilt der Speicher - sonst bliebe ohne Datenbank jede DM aus.
+     */
+    private async Load(now: number): Promise<boolean> {
+        if (this.loaded) return true;
 
-        this.loaded = true;
+        this.startedAt ??= now;
 
-        // ponytail: ohne Datenbank gilt nur der Speicher - ein Neustart kann dann einmal doppelt schicken.
-        if (!this.client.databaseService?.Ready) return;
+        if (this.client.databaseService?.Ready) {
+            try {
+                const [row] = await this.client.databaseService.Query<{ value: string }>("SELECT value FROM bot_state WHERE name = ?", [KEY]);
 
-        const [row] = await this.client.databaseService.Query<{ value: string }>("SELECT value FROM bot_state WHERE name = ?", [KEY]);
+                // Schon ohne Datenbank entschieden: dann gilt der Speicher und wird jetzt nachgetragen.
+                if (this.guessed) await this.Save();
+                else if (row?.value) this.record = { ...EMPTY, ...(JSON.parse(row.value) as Partial<IAccessRecord>) };
 
-        if (row?.value) this.record = { ...EMPTY, ...(JSON.parse(row.value) as Partial<IAccessRecord>) };
+                this.loaded = true;
+
+                return true;
+            } catch (error) {
+                logger.warn(`🎮 Prime-Zugang: Zustand nicht gelesen - ${String(error)}`);
+            }
+        }
+
+        this.guessed ||= now - this.startedAt >= DATABASE_WAIT_MS;
+
+        return this.guessed;
     }
 
     private async Save(): Promise<void> {
