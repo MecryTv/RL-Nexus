@@ -5,7 +5,7 @@ import { formatVital, groupSlow, positionOf, ratingOf, shareOf, verdictOf } from
 import { inLanes } from "../lanes.ts";
 import { check, section } from "./harness.ts";
 
-const side = (entries: ISlowSide["entries"]): ISlowSide => ({ since: "2026-11-18T06:00:00.000Z", requestMs: 500, sqlMs: 200, requests: 100, slowRequests: 3, queries: 900, slowQueries: 1, entries });
+const side = (entries: ISlowSide["entries"]): ISlowSide => ({ since: "2026-11-18T06:00:00.000Z", requestMs: 500, sqlMs: 200, requests: 100, slowRequests: 3, queries: 900, slowQueries: 1, poolWaits: 0, entries });
 const stat = (metric: IVitalStat["metric"], p75: number | null): IVitalStat => ({ metric, samples: p75 === null ? 0 : 10, p75, good: null, poor: null });
 
 /** W-0141: Seite Developer → Leistung, die reine Logik (src/performance/performance.ts). */
@@ -75,6 +75,25 @@ export async function checkPerformance(): Promise<void> {
             ["admin", "admin"]
         );
         assert.deepEqual(groupSlow({ ...report, bot: null }, "bot"), []);
+    });
+
+    await check("Nachreview W-0141: Warten auf eine freie Verbindung als eigene Art „pool“, Median und Max aus der Wartezeit", () => {
+        const report: ISlowReport = {
+            admin: side([
+                { kind: "pool", at: "2026-11-18T10:00:00.000Z", ms: 20, what: "SELECT 1", status: null, waitMs: 450 },
+                { kind: "pool", at: "2026-11-18T09:00:00.000Z", ms: 0, what: "SELECT 1", status: null, waitMs: 10_000 },
+                { kind: "sql", at: "2026-11-18T08:00:00.000Z", ms: 300, what: "SELECT 1", status: null, waitMs: 0 },
+            ]),
+            bot: null,
+        };
+
+        assert.deepEqual(
+            groupSlow(report, "all").map((group) => [group.kind, group.what, group.count, group.median, group.max]),
+            [
+                ["pool", "SELECT 1", 2, 5225, 10_000],
+                ["sql", "SELECT 1", 1, 300, 300],
+            ]
+        );
     });
 
     await check("W-0141: Abfragen in Spuren: höchstens so viele gleichzeitig, Ergebnis in der Reihenfolge der Einträge, ein Fehler bricht ab", async () => {

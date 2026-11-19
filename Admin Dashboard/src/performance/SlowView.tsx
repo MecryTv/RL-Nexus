@@ -12,6 +12,9 @@ import styles from "./Performance.module.scss";
 
 const SOURCE_NAMES: Readonly<Record<SlowSource, string>> = { admin: "Admin", bot: "Bot" };
 
+/** Nachreview W-0141: Vor der Abfrage steht, was langsam war. Bei „Pool“ war es das Warten auf eine freie Verbindung. */
+const KIND_PREFIX: Readonly<Record<ISlowGroup["kind"], string>> = { request: "", sql: "SQL · ", pool: "Pool · " };
+
 /** Ab einer Sekunde rot, darunter gelb; die Zahl steht immer dabei. */
 function Ms({ value, label }: { readonly value: number; readonly label: string }): JSX.Element {
     return (
@@ -38,6 +41,10 @@ function Process({ name, side }: { readonly name: string; readonly side: ISlowSi
                         <dt>SQL ab {formatNumber(side.sqlMs)} ms</dt>
                         <dd>{shareOf(side.slowQueries, side.queries)}</dd>
                     </div>
+                    <div>
+                        <dt>Pool-Warten ab {formatNumber(side.sqlMs)} ms</dt>
+                        <dd>{shareOf(side.poolWaits, side.queries)}</dd>
+                    </div>
                 </dl>
             )}
         </Panel>
@@ -51,7 +58,7 @@ function Group({ group }: { readonly group: ISlowGroup }): JSX.Element {
                 <summary className={styles.groupRow}>
                     <Badge tone={group.source === "admin" ? "info" : "pro"}>{SOURCE_NAMES[group.source]}</Badge>
                     <code className={styles.what} title={group.what}>
-                        {group.kind === "sql" ? "SQL · " : ""}
+                        {KIND_PREFIX[group.kind]}
                         {group.what}
                     </code>
                     <span className={styles.count}>
@@ -59,10 +66,10 @@ function Group({ group }: { readonly group: ISlowGroup }): JSX.Element {
                         <small>{group.count === 1 ? "Fall" : "Fälle"}</small>
                     </span>
                     <span className={styles.wide}>
-                        <Ms value={group.median} label="Median" />
+                        <Ms value={group.median} label={group.kind === "pool" ? "gewartet, Median" : "Median"} />
                     </span>
                     <span className={styles.wide}>
-                        <Ms value={group.max} label="Max" />
+                        <Ms value={group.max} label={group.kind === "pool" ? "gewartet, Max" : "Max"} />
                     </span>
                     <span className={[styles.when, styles.wide].join(" ")}>{formatDateTime(group.last)}</span>
                     <Icon name="chevron-right" size={16} className={styles.chevron} />
@@ -73,10 +80,20 @@ function Group({ group }: { readonly group: ISlowGroup }): JSX.Element {
                     </li>
                     {group.entries.map((entry, index) => (
                         <li key={`${entry.at}-${index}`}>
-                            <b>{formatNumber(entry.ms)} ms</b>
-                            <span>{formatDateTime(entry.at)}</span>
-                            {entry.status !== null && <span className={styles.dim}>Status {entry.status}</span>}
-                            {entry.waitMs !== null && entry.waitMs > 0 && <span className={styles.dim}>dazu {formatNumber(entry.waitMs)} ms auf eine freie Verbindung gewartet</span>}
+                            {entry.kind === "pool" ? (
+                                <>
+                                    <b>{formatNumber(entry.waitMs ?? 0)} ms auf eine freie Verbindung gewartet</b>
+                                    <span>{formatDateTime(entry.at)}</span>
+                                    {entry.ms > 0 && <span className={styles.dim}>die Abfrage selbst {formatNumber(entry.ms)} ms</span>}
+                                </>
+                            ) : (
+                                <>
+                                    <b>{formatNumber(entry.ms)} ms</b>
+                                    <span>{formatDateTime(entry.at)}</span>
+                                    {entry.status !== null && <span className={styles.dim}>Status {entry.status}</span>}
+                                    {entry.waitMs !== null && entry.waitMs > 0 && <span className={styles.dim}>dazu {formatNumber(entry.waitMs)} ms auf eine freie Verbindung gewartet</span>}
+                                </>
+                            )}
                         </li>
                     ))}
                 </ul>
@@ -143,8 +160,9 @@ export function SlowView(): JSX.Element {
                     </>
                 )}
                 <p className={styles.dim}>
-                    Gelb ab der Schwelle, rot ab einer Sekunde. Routen als Muster (:id), SQL ohne Werte. Bei SQL zählt die Abfrage selbst; wie lange sie auf eine freie
-                    Verbindung warten musste, steht beim Fall dabei. Abfragen in Transaktionen misst der Admin-Server nicht. Nach einem Neustart ist die Liste leer.
+                    Gelb ab der Schwelle, rot ab einer Sekunde. Routen als Muster (:id), SQL ohne Werte. Bei SQL zählt die Abfrage selbst. War nur das Warten auf eine
+                    freie Verbindung zu lang, steht der Fall als „Pool“ mit der Wartezeit da; bekam eine Abfrage gar keine Verbindung, mit der Zeit bis zum Abbruch.
+                    Abfragen in Transaktionen misst der Admin-Server nicht. Nach einem Neustart ist die Liste leer.
                 </p>
             </Panel>
         </>

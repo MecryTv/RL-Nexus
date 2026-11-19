@@ -8,7 +8,7 @@ import { LOG_PAGE_ENTRIES, LOG_SEARCH } from "../../shared/limits.ts";
 import { buildApp } from "../app.ts";
 import { loadConfig } from "../config.ts";
 import { SESSION_COOKIE, seal } from "../session.ts";
-import { SLOW_REQUEST_MS, SLOW_SQL_MS, forgetSlow, noteQuery, noteRequest, slowReport } from "../slow.ts";
+import { SLOW_REQUEST_MS, SLOW_SQL_MS, acquireTimed, forgetSlow, noteQuery, noteRequest, slowReport } from "../slow.ts";
 import { binOf, p75Of, parseVitals, statOf } from "../vitals.ts";
 import { signToken } from "../bot.ts";
 import { USERS, fake } from "./fakes.ts";
@@ -445,7 +445,7 @@ export async function checkDev(): Promise<void> {
             assert.ok(!JSON.stringify(tech).includes(config.clientSecret) && !JSON.stringify(tech).includes(config.botToken));
         });
 
-        await check("W-0141: Langsames landet mit Muster im Ringpuffer, Schnelles nur in der Zählung, höchstens 200", () => {
+        await check("W-0141: Langsames landet mit Muster im Ringpuffer, Schnelles nur in der Zählung, höchstens 200", async () => {
             forgetSlow();
             noteRequest("GET", "/api/users/:id", 200, 30);
             noteRequest("GET", "/api/users/:id", 200, 812);
@@ -463,10 +463,19 @@ export async function checkDev(): Promise<void> {
                 ]
             );
 
-            // Review W-0141: Warten auf eine freie Verbindung zählt nicht als langsames SQL, steht aber dabei.
+            // Nachreview W-0141: Warten auf eine freie Verbindung ist kein langsames SQL. Es steht als eigene Art „pool“
+            // mit eigener Zählung da; ein Fehler beim Holen der Verbindung mit ms 0 und der verstrichenen Zeit.
             noteQuery("SELECT 3", 20, 450);
-            assert.deepEqual([slowReport().entries[0].ms, slowReport().entries[0].waitMs], [20, 450]);
+            assert.deepEqual([slowReport().entries[0].kind, slowReport().entries[0].ms, slowReport().entries[0].waitMs], ["pool", 20, 450]);
+            assert.deepEqual([slowReport().slowQueries, slowReport().poolWaits], [1, 1]);
             assert.equal(slowReport().entries.find((entry) => entry.what === "SELECT * FROM users WHERE id = ? AND name = ? AND guild = ?")?.waitMs, 0);
+            await assert.rejects(
+                acquireTimed("SELECT 9", () => new Promise((_resolve, reject) => setTimeout(() => reject(new Error("pool timeout")), SLOW_SQL_MS + 20))),
+                /pool timeout/
+            );
+            assert.deepEqual([slowReport().entries[0].kind, slowReport().entries[0].what, slowReport().entries[0].ms], ["pool", "SELECT 9", 0]);
+            assert.ok((slowReport().entries[0].waitMs ?? 0) >= SLOW_SQL_MS, String(slowReport().entries[0].waitMs));
+            assert.deepEqual([slowReport().queries, slowReport().slowQueries, slowReport().poolWaits], [4, 1, 2]);
 
             for (let index = 0; index < 250; index++) noteQuery("SELECT 2", 300);
             assert.equal(slowReport().entries.length, 200);

@@ -14,7 +14,7 @@ import {
     TableName,
 } from "../constants/Database";
 import logger from "../utils/logger";
-import { NoteQuery } from "../utils/slow";
+import { AcquireTimed, NoteQuery } from "../utils/slow";
 
 // Wird geworfen, wenn jemand ohne Datenbank abfragt. Ein eigener Typ, damit
 // Aufrufer den Fall von einem echten SQL-Fehler unterscheiden können - das
@@ -214,15 +214,15 @@ export default class DatabaseService implements IDatabaseService {
      * voller Pool aus wie langsames SQL.
      */
     private async Timed(sql: string, params: unknown[]): Promise<unknown> {
-        const asked = performance.now();
-        const connection = await this.Pool().getConnection();
+        const pool = this.Pool();
+        const { connection, waitMs } = await AcquireTimed(sql, () => pool.getConnection());
         const started = performance.now();
 
         try {
             return await connection.query(sql, params);
         } finally {
             await connection.release();
-            NoteQuery(sql, performance.now() - started, started - asked);
+            NoteQuery(sql, performance.now() - started, waitMs);
         }
     }
 

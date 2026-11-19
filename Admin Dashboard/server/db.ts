@@ -3,7 +3,7 @@ import path from "node:path";
 import { createConnection, createPool, type Pool } from "mariadb";
 import type { IConfig, IDatabaseConfig } from "./config.ts";
 import { PublicError } from "./errors.ts";
-import { noteQuery } from "./slow.ts";
+import { acquireTimed, noteQuery } from "./slow.ts";
 
 /**
  * Die Datenbank des Bots, mit eigenem Pool.
@@ -113,15 +113,15 @@ export async function query<T>(sql: string, values: readonly unknown[] = []): Pr
 
     // W-0141: Dauer messen, Langsames merkt server/slow.ts (ohne die Werte). Review: Das Warten auf eine
     // freie Verbindung steht getrennt, sonst sähe ein voller Pool aus wie langsames SQL.
-    const asked = performance.now();
-    const connection = await pool.getConnection();
+    const ready = pool;
+    const { connection, waitMs } = await acquireTimed(sql, () => ready.getConnection());
     const started = performance.now();
 
     try {
         return (await connection.query(sql, values)) as T;
     } finally {
         await connection.release();
-        noteQuery(sql, performance.now() - started, started - asked);
+        noteQuery(sql, performance.now() - started, waitMs);
     }
 }
 

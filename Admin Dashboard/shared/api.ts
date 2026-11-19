@@ -719,7 +719,8 @@ export interface IBotCommand {
 
 /** W-0141: eine langsame Anfrage oder Datenbank-Abfrage. Routen als Muster (/api/users/:id), SQL ohne Werte. */
 export interface ISlowEntry {
-    readonly kind: "request" | "sql";
+    /** Nachreview W-0141: "pool" - nur das Warten auf eine freie Verbindung lag über der Schwelle, nicht die Abfrage. */
+    readonly kind: "request" | "sql" | "pool";
     readonly at: string;
     readonly ms: number;
     /** „GET /api/users/:id“ oder die Abfrage mit ? statt Werten, gekürzt. */
@@ -739,6 +740,8 @@ export interface ISlowSide {
     readonly slowRequests: number;
     readonly queries: number;
     readonly slowQueries: number;
+    /** Nachreview W-0141: Abfragen, die nur zu lange auf eine freie Verbindung gewartet haben (oder keine bekamen). */
+    readonly poolWaits: number;
     readonly entries: readonly ISlowEntry[];
 }
 

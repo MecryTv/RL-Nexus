@@ -19,7 +19,7 @@ import { MODULE_IDS } from "../constants/Modules";
 import Command from "../structures/Command";
 import { ApplyPanelRef, FetchState, PanelDiff } from "../utils/guildpanels";
 import { CreateToken } from "../utils/jwt";
-import { ForgetSlow, NoteQuery, NoteRequest, SLOW_REQUEST_MS, SlowReport } from "../utils/slow";
+import { AcquireTimed, ForgetSlow, NoteQuery, NoteRequest, SLOW_REQUEST_MS, SLOW_SQL_MS, SlowReport } from "../utils/slow";
 
 const PORT = 3998;
 const BASE = `http://127.0.0.1:${PORT}`;
@@ -219,9 +219,26 @@ async function main(): Promise<void> {
         JSON.stringify(noted.entries)
     );
 
-    // Review W-0141: Warten auf eine freie Verbindung zählt nicht als langsames SQL, steht aber dabei.
+    // Nachreview W-0141: Warten auf eine freie Verbindung ist kein langsames SQL. Es steht als eigene Art „pool“
+    // mit eigener Zählung da; ein Fehler beim Holen der Verbindung mit ms 0 und der verstrichenen Zeit.
     NoteQuery("SELECT 3", 20, 450);
-    check("Warten auf den Pool getrennt von der Abfrage", SlowReport().entries[0].ms === 20 && SlowReport().entries[0].waitMs === 450, JSON.stringify(SlowReport().entries[0]));
+    check(
+        "Warten auf den Pool als eigene Art, nicht als langsames SQL gezählt",
+        SlowReport().entries[0].kind === "pool" && SlowReport().entries[0].ms === 20 && SlowReport().entries[0].waitMs === 450 && SlowReport().slowQueries === 1 && SlowReport().poolWaits === 1,
+        JSON.stringify({ entry: SlowReport().entries[0], slowQueries: SlowReport().slowQueries, poolWaits: SlowReport().poolWaits })
+    );
+
+    const acquireFailed = await AcquireTimed("SELECT 9", () => new Promise<never>((_resolve, reject) => setTimeout(() => reject(new Error("pool timeout")), SLOW_SQL_MS + 20))).then(
+        () => null,
+        (error: Error) => error.message
+    );
+    const failedEntry = SlowReport().entries[0];
+
+    check(
+        "Fehler beim Holen der Verbindung: gemerkt mit ms 0 und der verstrichenen Zeit",
+        acquireFailed === "pool timeout" && failedEntry.kind === "pool" && failedEntry.what === "SELECT 9" && failedEntry.ms === 0 && (failedEntry.waitMs ?? 0) >= SLOW_SQL_MS && SlowReport().poolWaits === 2,
+        JSON.stringify({ acquireFailed, failedEntry })
+    );
 
     for (let index = 0; index < 250; index++) NoteQuery("SELECT 2", 300);
     check("Höchstens 200 gemerkt", SlowReport().entries.length === 200, String(SlowReport().entries.length));

@@ -83,6 +83,7 @@ export interface ISlowGroup {
     readonly kind: ISlowEntry["kind"];
     readonly what: string;
     readonly count: number;
+    /** Bei „pool“ die Wartezeit auf eine freie Verbindung, sonst die Dauer selbst. */
     readonly median: number;
     readonly max: number;
     readonly last: string;
@@ -120,7 +121,8 @@ export function groupSlow(report: ISlowReport, source: SlowSource | "all"): ISlo
     return [...groups.entries()]
         .map(([key, group]): ISlowGroup => {
             const entries = [...group.entries].sort((a, b) => b.at.localeCompare(a.at));
-            const times = entries.map((entry) => entry.ms);
+            // Nachreview W-0141: Bei „pool“ war das Warten zu lang, nicht die Abfrage: Median und Max aus der Wartezeit.
+            const times = entries.map((entry) => (entry.kind === "pool" ? (entry.waitMs ?? 0) : entry.ms));
 
             return { key, source: group.source, kind: entries[0].kind, what: entries[0].what, count: entries.length, median: median(times), max: Math.max(...times), last: entries[0].at, entries };
         })

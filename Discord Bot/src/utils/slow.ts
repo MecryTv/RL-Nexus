@@ -11,7 +11,8 @@ export const SLOW_SQL_MS = 200;
 const KEEP = 200;
 
 export interface ISlowEntry {
-    kind: "request" | "sql";
+    /** Nachreview W-0141: "pool" - nur das Warten auf eine freie Verbindung lag über der Schwelle, nicht die Abfrage. */
+    kind: "request" | "sql" | "pool";
     at: string;
     ms: number;
     what: string;
@@ -22,7 +23,7 @@ export interface ISlowEntry {
 
 let since = Date.now();
 let entries: ISlowEntry[] = [];
-let counts = { requests: 0, slowRequests: 0, queries: 0, slowQueries: 0 };
+let counts = { requests: 0, slowRequests: 0, queries: 0, slowQueries: 0, poolWaits: 0 };
 
 function Keep(entry: ISlowEntry): void {
     entries.push(entry);
@@ -47,13 +48,32 @@ export function NoteRequest(method: string, route: string, status: number, ms: n
     Keep({ kind: "request", at: new Date(now).toISOString(), ms: Math.round(ms), what: `${method} ${route}`, status, waitMs: null });
 }
 
-/** Review W-0141: ms ist die Abfrage selbst, waitMs das Warten auf eine freie Verbindung davor. Gemerkt wird, wenn eins davon über der Schwelle liegt. */
+/**
+ * Review W-0141: ms ist die Abfrage selbst, waitMs das Warten auf eine freie Verbindung davor.
+ * Nachreview: Langsames SQL ist nur, was selbst über der Schwelle liegt. War nur das Warten zu lang,
+ * steht der Fall als eigene Art „pool“ da und zählt in poolWaits.
+ */
 export function NoteQuery(sql: string, ms: number, waitMs = 0, now = Date.now()): void {
     counts.queries++;
-    if (ms < SLOW_SQL_MS && waitMs < SLOW_SQL_MS) return;
 
-    counts.slowQueries++;
-    Keep({ kind: "sql", at: new Date(now).toISOString(), ms: Math.round(ms), what: SqlShape(sql), status: null, waitMs: Math.round(waitMs) });
+    const kind = ms >= SLOW_SQL_MS ? "sql" : waitMs >= SLOW_SQL_MS ? "pool" : null;
+
+    if (kind === null) return;
+    if (kind === "sql") counts.slowQueries++;
+    else counts.poolWaits++;
+    Keep({ kind, at: new Date(now).toISOString(), ms: Math.round(ms), what: SqlShape(sql), status: null, waitMs: Math.round(waitMs) });
+}
+
+/** Nachreview W-0141: eine Verbindung holen und die Wartezeit messen. Scheitert das Holen (etwa acquireTimeout), wird es mit ms 0 und der verstrichenen Zeit gemerkt. */
+export async function AcquireTimed<C>(sql: string, acquire: () => Promise<C>): Promise<{ connection: C; waitMs: number }> {
+    const asked = performance.now();
+
+    try {
+        return { connection: await acquire(), waitMs: performance.now() - asked };
+    } catch (error) {
+        NoteQuery(sql, 0, performance.now() - asked);
+        throw error;
+    }
 }
 
 export function SlowReport() {
@@ -64,5 +84,5 @@ export function SlowReport() {
 export function ForgetSlow(): void {
     since = Date.now();
     entries = [];
-    counts = { requests: 0, slowRequests: 0, queries: 0, slowQueries: 0 };
+    counts = { requests: 0, slowRequests: 0, queries: 0, slowQueries: 0, poolWaits: 0 };
 }
