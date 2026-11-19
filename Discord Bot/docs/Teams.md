@@ -90,7 +90,7 @@ Braucht „Rollen verwalten“ für die Rolle und „Kanäle verwalten“ für d
 
 ## Woher die Zahlen kommen
 
-Der Bot fragt Prime über den Epic-Namen und merkt sich je Spieler den letzten Stand: aktuelle MMR je Playlist, Rang und Division. Der Stand hält **30 Minuten**; danach wird beim nächsten Aufruf neu geholt, höchstens **12 Spieler je Anfrage**. Antwortet Prime nicht, steht die Karte trotzdem — mit dem Stand von vorhin, und darunter steht, von wann er ist.
+Der Bot fragt Prime über den Epic-Namen und merkt sich je Spieler den letzten Stand: aktuelle MMR je Playlist, Rang und Division. Der Stand hält **30 Minuten**; danach wird beim nächsten Aufruf neu geholt, höchstens **12 Spieler je Anfrage**. Antwortet Prime für einen Spieler nicht, behält er seinen letzten Stand samt Uhrzeit, nur mit dem Fehler daran. Die Karte steht also trotzdem — mit dem Stand von vorhin, und darunter steht, von wann er ist.
 
 Ohne `PRIME_API_TOKEN` bleibt das Holen aus. Die Peaks reichen dann für eine MMR, die Ränge fehlen.
 

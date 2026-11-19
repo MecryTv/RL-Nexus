@@ -53,6 +53,8 @@ import DashboardApiTeams, { HubParts } from "../routes/DashboardApiTeams";
 import { ApplyCategoryDraft, ParseCategoryDraft, EmojiId, NeedsResend, NormalizeTeamSettings, RefreshDue, RolePlan, RoleTargets, SameMessage, TeamError, TeamOverwrites, TextName, Usable, ViewFacts } from "../services/TeamService";
 import TeamRefresh from "../runnables/TeamRefresh";
 import TaskTypes from "../enums/TaskTypes";
+import { HttpError, PrimeError } from "../services/PrimeService";
+import { IPrimeProfile } from "../interfaces/services/prime/IPrimeService";
 import { Evaluate, FormulaError } from "../utils/formula";
 
 const GUILD = "90071992547409951";
@@ -2330,7 +2332,8 @@ async function checkRefresh(client: BotClient): Promise<void> {
     const aged = (id: string, minutes: number, current = 1450): ITeamPlayer => {
         const player = Player(id, "player", 1500, current);
 
-        player.snapshot!.at = Date.now() - minutes * MIN;
+        // Die Konto-ID, wie Prime sie liefert: so gleicht ein Stand, der nichts Neues bringt, dem alten.
+        player.snapshot = { ...player.snapshot!, at: Date.now() - minutes * MIN, accountId: `acc-${player.epicName}` };
 
         return player;
     };
@@ -2340,7 +2343,7 @@ async function checkRefresh(client: BotClient): Promise<void> {
     check("Ohne Epic-Namen zählt kein Stand", !RefreshDue([FakeTeam([{ ...aged("c", 500), epicName: "" }])], 30 * MIN));
     check("Noch nie geholt: fällig", RefreshDue([FakeTeam([{ ...aged("d", 0), snapshot: undefined }])], 30 * MIN));
 
-    // Ein Kanal wie in Discord und Prime als Attrappe: antwortet mit prime.value oder scheitert mit prime.error.
+    // Ein Kanal wie in Discord und Prime als Attrappe: antwortet mit prime.value oder scheitert mit prime.error (nur für prime.only, sonst für alle).
     const service = client.teamService;
     const groups: ITeamGroup[] = [{ id: 1, guildId: GUILD, name: "Main", position: 0 }];
     const alive = new Set<string>();
@@ -2367,7 +2370,8 @@ async function checkRefresh(client: BotClient): Promise<void> {
         },
     };
     const guild = { ...FakeGuild(), channels: { cache: new Map([[TEXT, channel]]) } } as unknown as Guild;
-    const prime = { value: 1450, error: null as string | null, calls: 0 };
+    const prime = { value: 1450, error: null as PrimeError | null, only: null as string | null, calls: 0 };
+    const saved = new Map<number, ITeamPlayer[]>();
     let settings: ITeamSettings = { ...DefaultTeamSettings(), channelId: TEXT, layout: "hub" };
     let teams: ITeam[] = [];
     const chained = service as unknown as { Serial: <T>(guildId: string, task: () => Promise<T>) => Promise<T> };
@@ -2377,7 +2381,7 @@ async function checkRefresh(client: BotClient): Promise<void> {
         settings: service.Settings,
         teams: service.Teams,
         groups: service.Groups,
-        fetch: service.Fetch,
+        profile: client.primeService.Profile,
         auto: service.AutoRefresh,
         tick: service.RefreshTick,
         serial: chained.Serial,
@@ -2400,12 +2404,18 @@ async function checkRefresh(client: BotClient): Promise<void> {
     service.Settings = async () => settings;
     service.Teams = async () => teams;
     service.Groups = async () => groups;
-    service.Fetch = async (name: string) => {
+    client.primeService.Profile = async (name: string) => {
         prime.calls++;
 
-        return prime.error
-            ? { name: null, platform: null, mmr: { "1v1": null, "2v2": null, "3v3": null }, tier: null, tierName: null, divisionName: null, at: Date.now(), error: prime.error }
-            : { name, platform: "Epic Games", mmr: { "1v1": null, "2v2": null, "3v3": prime.value }, tier: 18, tierName: "Champion III", divisionName: "II", at: Date.now(), error: null };
+        if (prime.error && (!prime.only || prime.only === name)) throw prime.error;
+
+        return {
+            name,
+            platform: "Epic Games",
+            accountId: `acc-${name}`,
+            ranks: [{ key: "3v3", mmr: prime.value, tier: 18, tierName: "Champion III", divisionName: "II" }],
+            fetchedAt: new Date().toISOString(),
+        } as unknown as IPrimeProfile;
     };
     chained.Serial = <T>(guildId: string, task: () => Promise<T>): Promise<T> => {
         viaChain.push(guildId);
@@ -2414,7 +2424,7 @@ async function checkRefresh(client: BotClient): Promise<void> {
     };
     client.moduleSettings.Save = async (_guild: string, _module: string, config: object) => void (settings = config as ITeamSettings);
     (client.settings as unknown as { Of: unknown }).Of = async (id: string) => ({ modules: id === "aus" ? [] : ["teams"] });
-    client.teams.SavePlayers = async () => undefined;
+    client.teams.SavePlayers = async (id: number, players: ITeamPlayer[]) => void saved.set(id, structuredClone(players));
     client.teams.SetMessage = async (id: number, messageId: string | null) => {
         const team = teams.find((entry) => entry.id === id);
 
@@ -2463,9 +2473,38 @@ async function checkRefresh(client: BotClient): Promise<void> {
         check("Nächster Lauf holt den Rest, der Stand in der Fußzeile ändert sich: bearbeitet", (await service.AutoRefresh(guild)) === chain.length && prime.calls === 1, `${prime.calls} · ${log}`);
 
         age(45);
-        prime.error = "Prime antwortet nicht (10000 ms)";
+        prime.error = new PrimeError("Prime antwortet nicht (10000 ms)", "Timeout");
         reset();
         check("Prime antwortet nicht: nicht bearbeitet, die Ränge im Kanal bleiben", (await service.AutoRefresh(guild)) === 0 && prime.calls > 0 && log.length === 0, `${prime.calls} · ${log}`);
+        prime.error = null;
+
+        // Review I3: Teilantwort - einer scheitert, die anderen antworten. Niemand verliert seinen Rang.
+        teams = [FakeTeam(Array.from({ length: 12 }, (_, index) => aged(`t${index}`, 45)), { id: 1, name: "Alpha" })];
+        prime.error = HttpError(500, "");
+        prime.only = "epic-t11";
+        prime.value = 1650;
+        reset();
+        await service.AutoRefresh(guild);
+
+        const failed = teams[0]!.players[11]!.snapshot!;
+
+        check(
+            "Teilantwort, 11 von 12: keiner verliert seinen Rang",
+            teams[0]!.players.every((player) => player.snapshot?.tierName === "Champion III" && player.snapshot.mmr["3v3"] !== null) && failed.mmr["3v3"] === 1450 && failed.error !== null,
+            JSON.stringify(failed)
+        );
+        check("  der gescheiterte behält seine Uhrzeit, die Fußzeile bleibt ehrlich", Date.now() - failed.at >= 45 * MIN, String(Date.now() - failed.at));
+
+        age(45);
+        prime.only = null;
+        saved.clear();
+        reset();
+        await service.AutoRefresh(guild);
+        check(
+            "Alle scheitern: keine leeren Stände in der Datenbank",
+            (saved.get(1) ?? []).length === 12 && saved.get(1)!.every((player) => player.snapshot?.mmr["3v3"] !== null && player.snapshot?.tierName !== null),
+            JSON.stringify(saved.get(1)?.[0]?.snapshot)
+        );
         prime.error = null;
 
         age(45);
@@ -2553,7 +2592,7 @@ async function checkRefresh(client: BotClient): Promise<void> {
         service.Settings = original.settings;
         service.Teams = original.teams;
         service.Groups = original.groups;
-        service.Fetch = original.fetch;
+        client.primeService.Profile = original.profile;
         service.AutoRefresh = original.auto;
         service.RefreshTick = original.tick;
         chained.Serial = original.serial;

@@ -1650,9 +1650,14 @@ export default class TeamService {
 
                 if (fresh.error === null || fresh.missing) answered++;
 
-                // Plan 33: Antwortet Prime nicht, bleibt die Konto-ID - sonst ginge nach einem
-                // Ausfall das Erkennen verloren und ein fremdes Konto unter altem Namen käme durch.
-                if (fresh.error !== null && !fresh.missing && !fresh.accountId) fresh.accountId = old?.accountId ?? null;
+                // W-0146 (Review I3): Antwortet Prime nicht, bleibt der alte Stand samt Uhrzeit und
+                // Konto-ID (Plan 33), nur mit dem Fehler daran. So verschwinden keine Ränge, und die
+                // Fußzeile sagt ehrlich, von wann der Stand ist. Fällig bleibt er trotzdem - wie oft
+                // das neu versucht wird, bremst der Abbruch bei Zeitüberschreitung.
+                if (fresh.error !== null && !fresh.missing && old) {
+                    player.snapshot = { ...old, error: fresh.error };
+                    continue;
+                }
 
                 const kind = NameLost(old, fresh);
 
