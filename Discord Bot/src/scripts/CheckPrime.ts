@@ -210,16 +210,25 @@ async function checkAccess(client: BotClient): Promise<void> {
 
     check("401 ist ein Zugangsfehler", refused.type === "Access" && refused.status === 401, `${refused.type} ${refused.status}`);
     check("  mit dem Grund von Prime", refused.message.includes("The Prime API token is not valid."), refused.message);
-    // Review: Prime liegt hinter Cloudflare. Ein 403 von Firewall oder Bot-Schutz kommt als HTML
-    // und heißt nicht, dass der Zugang abgelaufen ist - nur ein 403 mit Grund von Prime zählt.
+    // Live-Log 19.11.2026: Mit dem abgelaufenen Zugang kam 403, den Rumpf kennen wir nicht. Also
+    // zählt jeder 403 - außer einer HTML-Seite: Prime liegt hinter Cloudflare, und Firewall oder
+    // Bot-Schutz antworten ebenfalls mit 403 (Review).
     const forbidden = HttpError(403, '{"Error":{"Message":"Access expired","Type":"Forbidden"}}');
     const firewall = HttpError(403, "<!DOCTYPE html><title>Attention Required! | Cloudflare</title>");
 
+    check("403 ohne Rumpf ist ein Zugangsfehler (so lief der Zugang ab)", HttpError(403, "").type === "Access", HttpError(403, "").type);
     check("403 mit Grund von Prime auch", forbidden.type === "Access", forbidden.type);
     check("403 von Cloudflare (HTML) bleibt ein HTTP-Fehler", firewall.type === "HTTP", firewall.type);
-    check("403 ohne Rumpf bleibt ein HTTP-Fehler", HttpError(403, "").type === "HTTP", HttpError(403, "").type);
+    check("  auch mit Leerraum davor", HttpError(403, "\n  <html><body>blocked</body></html>").type === "HTTP");
+    check("  und an Content-Type text/html erkannt", HttpError(403, "blocked", "text/html; charset=UTF-8").type === "HTTP");
     check("403 CrossSiteRequest (Kontoseiten) ist kein Zugangsfehler", HttpError(403, '{"Error":{"Message":"Website account endpoints only accept same-origin requests.","Type":"CrossSiteRequest"}}').type === "HTTP");
     check("502 bleibt ein HTTP-Fehler", HttpError(502, "<html>").type === "HTTP", HttpError(502, "<html>").type);
+
+    // Den Rumpf führt der Fehler mit, gekürzt und ohne Schlüssel - damit man beim nächsten Mal sieht, was Prime sagt.
+    const page = HttpError(403, `<html>${"x".repeat(500)} geheimer-schluessel</html>`, "text/html", "geheimer-schluessel");
+
+    check("Der Rumpf steht gekürzt im Fehler", page.body.startsWith("<html>") && page.body.length <= 200, `${page.body.length} Zeichen`);
+    check("  ohne den Schlüssel", !HttpError(403, "Bearer geheimer-schluessel abgelehnt", "", "geheimer-schluessel").body.includes("geheimer-schluessel"));
 
     class LockedPrime extends PrimeService {
         public locked = false;
@@ -341,6 +350,23 @@ async function checkAccess(client: BotClient): Promise<void> {
         check("  nach einer Stunde kommt sie wieder", errors.length === 2, `${errors.length}`);
 
         noisy.Close();
+
+        // Ohne Grund von Prime (so lief der Zugang am 18.11. ab) nennt die Zeile den Rumpf.
+        class Bare extends PrimeService {
+            protected override async Load(): Promise<IPrimeProfile | null> {
+                throw HttpError(403, "");
+            }
+
+            public override get IsConfigured(): boolean {
+                return true;
+            }
+        }
+
+        const bare = new Bare(client);
+
+        await bare.Profile("Neu4").catch(() => null);
+        check("Ohne Grund steht der Rumpf in der Fehlerzeile", (errors.at(-1) ?? "").includes("403") && (errors.at(-1) ?? "").includes("Rumpf leer"), errors.at(-1));
+        bare.Close();
     } finally {
         logger.error = real.error;
         logger.warn = real.warn;

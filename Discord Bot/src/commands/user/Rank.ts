@@ -141,7 +141,10 @@ export default class Rank extends Command {
             // Im Log steht er schon als Fehler (PrimeService, einmal je Stunde) - nicht noch je Aufruf.
             const locked = prime?.type === "Access";
 
-            if (!locked) logger.warn(`🎮 Prime: ${prime ? `${prime.type} ${prime.message}` : String(error)}`);
+            // Ein HTTP-Fehler ohne Grund (etwa eine Cloudflare-Seite) bekommt den Anfang des Rumpfs dazu.
+            const body = prime?.body && !prime.reason ? ` (Rumpf „${prime.body.slice(0, 120)}“)` : "";
+
+            if (!locked) logger.warn(`🎮 Prime: ${prime ? `${prime.type} ${prime.message}${body}` : String(error)}`);
 
             await interaction.editReply({ content: locked ? PRIME_ACCESS_TEXT : "Rocket League antwortet gerade nicht. Versuch es später noch einmal." });
 

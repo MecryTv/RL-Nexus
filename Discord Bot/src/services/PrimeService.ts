@@ -102,27 +102,31 @@ export class PrimeError extends Error {
     status: number;
     /** W-0145: Der Grund in den Worten von Prime, ohne Vorspann - für die DM an die Developer. */
     reason: string;
+    /** W-0145: Der Rumpf der Antwort, gekürzt und ohne Schlüssel - fürs Log, wenn Prime keinen Grund nennt. */
+    body: string;
 
-    constructor(message: string, type = "Unknown", status = 0, reason = "") {
+    constructor(message: string, type = "Unknown", status = 0, reason = "", body = "") {
         super(message);
         this.name = "PrimeError";
         this.type = type;
         this.status = status;
         this.reason = reason;
+        this.body = body;
     }
 }
 
 /**
- * W-0145: Ein Fehler mit HTTP-Status. 401 heißt: Prime lehnt den Schlüssel ab -
- * abgelaufen, gesperrt oder falsch. Das ist kein Ausfall und bekommt deshalb die
- * Art "Access". Den Grund schreibt Prime in den Rumpf, etwa
- * {"Error":{"Type":"Unauthorized","Message":"The Prime API token is not valid."}}.
+ * W-0145: Ein Fehler mit HTTP-Status. 401 und 403 heißen: Prime lehnt den
+ * Schlüssel ab. Das ist kein Ausfall und bekommt deshalb die Art "Access".
+ * Gesehen im Live-Log am 19.11.2026: der abgelaufene Zugang bekam 403, der
+ * ersetzte alte Schlüssel 401. Einen Grund schreibt Prime teils in den Rumpf,
+ * etwa {"Error":{"Type":"Unauthorized","Message":"The Prime API token is not valid."}}.
  *
- * Ein 403 zählt nur mit einem solchen Grund (Review): Prime liegt hinter
- * Cloudflare, und Firewall oder Bot-Schutz antworten ebenfalls mit 403, dann
- * aber mit HTML. CrossSiteRequest kommt nur von den Kontoseiten.
+ * Ausnahme (Review): ein 403 als HTML-Seite. Prime liegt hinter Cloudflare, und
+ * Firewall oder Bot-Schutz antworten ebenfalls mit 403 - das ist kein
+ * abgelaufener Zugang. CrossSiteRequest kommt nur von den Kontoseiten.
  */
-export function HttpError(status: number, raw: string): PrimeError {
+export function HttpError(status: number, raw: string, contentType = "", secret = ""): PrimeError {
     let reason = "";
     let type = "";
 
@@ -135,9 +139,11 @@ export function HttpError(status: number, raw: string): PrimeError {
         // Kein JSON - dann bleibt es beim Status.
     }
 
-    const access = status === 401 || (status === 403 && reason !== "" && type !== "CrossSiteRequest");
+    const html = contentType.toLowerCase().includes("text/html") || raw.trimStart().startsWith("<");
+    const access = status === 401 || (status === 403 && !html && type !== "CrossSiteRequest");
+    const body = (secret ? raw.split(secret).join("…") : raw).replace(/\s+/g, " ").trim().slice(0, 200);
 
-    return new PrimeError(`Prime antwortete mit ${status}${reason ? `: ${reason}` : ""}`, access ? "Access" : "HTTP", status, reason);
+    return new PrimeError(`Prime antwortete mit ${status}${reason ? `: ${reason}` : ""}`, access ? "Access" : "HTTP", status, reason, body);
 }
 
 const NOT_FOUND = new Set(["InvalidPlayer", "PlayerNotFound", "NotFound"]);
@@ -215,6 +221,7 @@ export default class PrimeService implements IPrimeService {
             });
 
             let status = 0;
+            let contentType = "";
             let raw = "";
             let done = false;
 
@@ -236,6 +243,7 @@ export default class PrimeService implements IPrimeService {
 
             request.on("response", (headers) => {
                 status = Number(headers[":status"] ?? 0);
+                contentType = String(headers["content-type"] ?? "");
             });
 
             request.on("data", (chunk: string) => {
@@ -246,7 +254,7 @@ export default class PrimeService implements IPrimeService {
 
             request.on("end", () => {
                 if (status !== 200) {
-                    settle(HttpError(status, raw));
+                    settle(HttpError(status, raw, contentType, this.client.config.PRIME_API_TOKEN));
                     return;
                 }
 
@@ -329,7 +337,10 @@ export default class PrimeService implements IPrimeService {
         if (Date.now() - this.alarmAt < PRIME_ACCESS_LOG_EVERY) return;
 
         this.alarmAt = Date.now();
-        logger.error(`🎮 Prime lehnt den Zugang ab (${error.message}). Keine Ränge, bis ein neuer PRIME_API_TOKEN in der .env steht: https://prime.rocketplanet.gg/access`);
+        // Ohne Grund von Prime den Rumpf dazu - so sieht man beim nächsten Mal, was Prime sagt.
+        const detail = error.reason ? error.message : `${error.message}, Rumpf ${error.body ? `„${error.body}“` : "leer"}`;
+
+        logger.error(`🎮 Prime lehnt den Zugang ab (${detail}). Keine Ränge, bis ein neuer PRIME_API_TOKEN in der .env steht: https://prime.rocketplanet.gg/access`);
     }
 
     /**

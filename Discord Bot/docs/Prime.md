@@ -170,7 +170,18 @@ Den Schlüssel lehnt Prime **nicht** mit 200 ab, sondern mit HTTP **401** (gemes
 | ohne `authorization` | `401 {"Error":{"Type":"Unauthorized","Message":"Provide a Prime API token as a bearer token."}}` |
 | falscher Schlüssel | `401 {"Error":{"Type":"Unauthorized","Message":"The Prime API token is not valid."}}` |
 
-Wie die Antwort bei einem **abgelaufenen** Zugang genau aussieht, ließ sich nicht nachstellen (der neue Schlüssel gilt). Die Zugangsseite kennt dafür den Status `expired` („This authorization has reached its expiry date"), daneben `disabled`, `denied` und `unapproved`. `PrimeService` macht deshalb aus **401** und aus einem **403 mit Grund von Prime** einen `PrimeError` mit `type: "Access"` und dem Grund in der Meldung (`HttpError()`). Ein 403 ohne Prime-JSON bleibt ein gewöhnlicher HTTP-Fehler: Prime liegt hinter Cloudflare, und Firewall oder Bot-Schutz antworten ebenfalls mit 403, dann aber mit HTML. `CrossSiteRequest` (nur von den Kontoseiten) zählt auch nicht.
+Im Live-Log vom 19.11.2026 (Sessions 71/72) steht, wie es beim echten Ablauf aussah:
+
+| Fall | Antwort |
+|---|---|
+| Zugang abgelaufen (18.11.2026 23:00), Abfragen am 19.11. von 07:42 bis 19:14 | **403** |
+| alter Schlüssel, nachdem der Zugang erneuert war (19:33 bis 19:41) | **401** |
+
+Den Rumpf des Ablauf-403 kennen wir nicht, der alte Code hat ihn verworfen. Die Zugangsseite kennt den Status `expired` („This authorization has reached its expiry date"), daneben `disabled`, `denied` und `unapproved`.
+
+`PrimeService` macht deshalb aus **401 und 403** einen `PrimeError` mit `type: "Access"` und dem Grund von Prime in der Meldung (`HttpError()`). Ausnahme: ein 403 als **HTML-Seite** (Content-Type `text/html` oder ein Rumpf, der mit `<` beginnt) bleibt ein gewöhnlicher HTTP-Fehler. Prime liegt hinter Cloudflare, und Firewall oder Bot-Schutz antworten ebenfalls mit 403. `CrossSiteRequest` (nur von den Kontoseiten) zählt auch nicht.
+
+Den Rumpf führt der Fehler gekürzt mit (`PrimeError.body`, höchstens 200 Zeichen, der Schlüssel wird darin ersetzt). Nennt Prime keinen Grund, steht er in der Fehlerzeile im Log - so sieht man beim nächsten Ablauf, was Prime schickt.
 
 Was daraus folgt:
 
@@ -186,8 +197,8 @@ Jeder in `DEV_USER_IDs` bekommt eine DM als Bild (Entwurf D, `builder/PrimeAcces
 | Farbe | Wann | Wie oft |
 |---|---|---|
 | Gelb „läuft bald ab“ | 7 Tage und 1 Tag vor `PRIME_ACCESS_EXPIRES` | je Stufe einmal; ohne Datum nie |
-| Rot „abgelaufen“ | beim ersten Aufruf, den Prime mit 401 (oder 403 mit Grund von Prime) ablehnt | einmal, dann höchstens alle 24 Stunden eine Erinnerung, solange gesperrt |
-| Grün „wieder da“ | beim ersten erfolgreichen Aufruf danach | einmal |
+| Rot „abgelaufen“ | beim ersten Aufruf, den Prime mit 401 oder 403 ablehnt (403 als HTML-Seite zählt nicht) | höchstens einmal je 24 Stunden: als Erinnerung, solange gesperrt, und auch bei einer neuen Sperre kurz nach der letzten |
+| Grün „wieder da“ | beim ersten erfolgreichen Aufruf danach | einmal, und nur, wenn für diese Sperre ein Rot rausging |
 
 Gemeldet wird über `PrimeAccessWatch` (`services/PrimeAccessService.ts`): `PrimeService` meldet jede Abfrage an Prime dorthin. Was zuletzt gemeldet wurde, steht in `bot_state` unter `prime_access`, damit ein Neustart nichts doppelt schickt.
 
