@@ -25,6 +25,7 @@
         "rule": "layout-transition",
         "value": "*",
         "files": [
+          "src/dashboard/client/style.css",
           "src/dashboard/public/assets/style.css"
         ],
         "createdAt": "2026-09-11T18:24:58.736Z",
@@ -34,6 +35,7 @@
         "rule": "side-tab",
         "value": "*",
         "files": [
+          "src/dashboard/client/style.css",
           "src/dashboard/public/assets/style.css"
         ],
         "createdAt": "2026-09-18T12:54:20.129Z",

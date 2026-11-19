@@ -10,6 +10,10 @@
  * assets/chunks: eine solche Datei ändert sich nie, der Browser darf sie ein
  * Jahr behalten (DashboardAssets). Vorher waren es rund 40 Module, die jede
  * Seite einzeln und alle nachgeladen hat.
+ *
+ * Gepflegt wird client/style.css, ausgeliefert assets/style.css: dieselbe Datei
+ * ohne Kommentare und Leerraum (W-0141). Ohne Bündeln, damit url("fonts/...")
+ * so stehen bleibt, wie es neben der fertigen Datei passt.
  */
 import { build, BuildOptions, context } from "esbuild";
 import { rm } from "node:fs/promises";
@@ -35,17 +39,26 @@ const options: BuildOptions = {
     logLevel: "info",
 };
 
+const styles: BuildOptions = {
+    entryPoints: [path.join(ROOT, "client", "style.css")],
+    minify: true,
+    outfile: path.join(OUT, "style.css"),
+    legalComments: "none",
+    logLevel: "info",
+};
+
 async function main(): Promise<void> {
     // Alte Stücke weg - sonst sammeln sich mit jedem Bau Dateien mit alten Prüfsummen.
     for (const folder of ["chunks", ...LEGACY]) await rm(path.join(OUT, folder), { recursive: true, force: true });
 
     if (process.argv.includes("--watch")) {
         await (await context(options)).watch();
+        await (await context(styles)).watch();
 
         return;
     }
 
-    await build(options);
+    await Promise.all([build(options), build(styles)]);
 }
 
 void main();

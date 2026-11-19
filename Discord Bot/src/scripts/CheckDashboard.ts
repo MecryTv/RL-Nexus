@@ -1825,7 +1825,7 @@ async function checkLimitsMarkup(): Promise<void> {
     const root = path.join(process.cwd(), "src", "dashboard");
     const pages = path.join(root, "client", "pages");
     const page = await readFile(path.join(pages, "GuildLimits.ts"), "utf8").catch(() => "");
-    const css = (await readFile(path.join(root, "public", "assets", "style.css"), "utf8")).split(/\r?\n/);
+    const css = (await readFile(path.join(root, "client", "style.css"), "utf8")).split(/\r?\n/);
     const foreign = [];
 
     for (const file of await readdir(pages)) {
@@ -1885,7 +1885,7 @@ async function checkRankRolesStyles(): Promise<void> {
     console.log("\n— Rank Roles: eigene Klassen für das Raster —");
 
     const root = path.join(process.cwd(), "src", "dashboard");
-    const css = (await readFile(path.join(root, "public", "assets", "style.css"), "utf8")).split(/\r?\n/);
+    const css = (await readFile(path.join(root, "client", "style.css"), "utf8")).split(/\r?\n/);
     const pages = path.join(root, "client", "pages");
     const page = await readFile(path.join(pages, "GuildRankRoles.ts"), "utf8");
     const others = await Promise.all(
@@ -2107,6 +2107,15 @@ async function main(): Promise<void> {
     // Die Hausfarbe steht in style.css selbst, eine zweite Farbdatei gibt es
     // nicht mehr. Fehlt sie dort, sind Knoepfe, Marken und Fokusringe farblos.
     check("style.css traegt die Hausfarbe #ff1e2d", (await css.text()).includes("--brand:#ff1e2d"));
+
+    // E9 (W-0141): Gepflegt wird client/style.css, ausgeliefert die verkleinerte Fassung aus build:dashboard.
+    // Fehlt darin eine Klasse der Quelle, wurde nach einer Änderung nicht neu gebaut.
+    const cssSource = await readFile(path.join(process.cwd(), "src", "dashboard", "client", "style.css"), "utf8");
+    const cssBuilt = await readFile(path.join(process.cwd(), "src", "dashboard", "public", "assets", "style.css"), "utf8");
+    const sourceClasses = new Set([...cssSource.replace(/\/\*[\s\S]*?\*\//g, "").matchAll(/\.([a-zA-Z][\w-]*)/g)].map((match) => match[1]!).filter((name) => !name.startsWith("woff")));
+    const lostClasses = [...sourceClasses].filter((name) => !cssBuilt.includes(`.${name}`));
+
+    check("style.css: ausgeliefert verkleinert, aus der Quelle gebaut", cssBuilt.length < cssSource.length * 0.85 && cssBuilt.split("\n").length <= 3 && lostClasses.length === 0, `${cssBuilt.length} von ${cssSource.length} Zeichen, ${cssBuilt.split("\n").length} Zeilen, fehlt: ${lostClasses.slice(0, 5).join(", ")}`);
 
     const js = await fetch(`${BASE}${P}/assets/app.js`);
     check("app.js wird ausgeliefert (Frontend gebaut?)", js.status === 200, `${js.status} - npm run build:dashboard`);
