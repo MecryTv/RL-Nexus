@@ -204,7 +204,7 @@ Gemeldet wird über `PrimeAccessWatch` (`services/PrimeAccessService.ts`): `Prim
 
 Damit ein Ablauf auch auffällt, wenn niemand `/rank` benutzt, schaut `runnables/PrimeAccess.ts` alle zehn Minuten nach: Gelb prüfen und, wenn in der letzten Stunde keine Abfrage an Prime lief, eine Probe (`PrimeService.Probe()`, `ResolveUser` mit einem Namen, den es nicht geben muss: auch „InvalidPlayer“ heißt, der Schlüssel wurde angenommen). Also höchstens eine zusätzliche Abfrage je Stunde.
 
-Grenzen: Die 24-Stunden-Leiste, „zuletzt erfolgreich“ und die Zahl der abgelehnten Anfragen liegen im Speicher und werden nur mit einer DM gespeichert. Nach einem Neustart ist die Leiste deshalb grau. Das Konto auf der Karte (`PRIME_ACCOUNT`) steht fest im Code, Prime verrät es über die API nicht. Ohne Verbindung zu Discord wird der Zustand trotzdem gespeichert, die DM fällt dann aus.
+Grenzen: Die 24-Stunden-Leiste, „zuletzt erfolgreich“ und die Zahl der abgelehnten Anfragen liegen im Speicher und werden nur mit einer DM gespeichert. Nach einem Neustart ist die Leiste deshalb grau. Das Konto auf der Karte (`PRIME_ACCOUNT`) steht fest im Code, Prime verrät es über die API nicht. Ohne Verbindung zu Discord gilt eine DM nicht als geschickt, sie kommt beim nächsten Anlass (nächste Abfrage oder nächster Durchlauf). Den gespeicherten Zustand liest der Bot erst, wenn die Datenbank bereit ist; bis dahin entscheidet er nichts, nach zwei Minuten ohne Datenbank gilt der Speicher. Scheitert das Speichern, geht die DM trotzdem raus und der Fehler ins Log.
 
 ---
 

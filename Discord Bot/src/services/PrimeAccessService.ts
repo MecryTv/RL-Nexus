@@ -181,6 +181,9 @@ export class PrimeAccessWatch {
 
             if (was.state !== "locked") return;
 
+            // Grün ist fällig, aber Discord noch nicht verbunden: gesperrt lassen, beim nächsten Erfolg erneut (Review).
+            if (was.notified && !this.Discord()) return;
+
             // sentAt bleibt: Flattert der Zugang, kommt das nächste Rot erst einen Tag nach dem letzten (Review).
             this.record = { ...this.record, state: "ok", since: null, refused: 0, notified: false };
             await this.Save();
@@ -200,7 +203,8 @@ export class PrimeAccessWatch {
         this.record = fresh ? { ...this.record, state: "locked", since: now, refused: 1, notified: false } : { ...this.record, refused: this.record.refused + 1 };
 
         // Rot höchstens einmal je Tag - als Erinnerung und auch bei einer neuen Sperre kurz nach der letzten.
-        if (this.record.sentAt !== null && now - this.record.sentAt < DAY) {
+        // Ohne Verbindung zu Discord gilt nichts als geschickt - beim nächsten Mal erneut (Review).
+        if ((this.record.sentAt !== null && now - this.record.sentAt < DAY) || !this.Discord()) {
             if (fresh) await this.Save();
 
             return;
@@ -221,17 +225,19 @@ export class PrimeAccessWatch {
         const [at, sent] = (this.record.warned ?? "").split(":").map(Number);
         const done = at === this.expires ? (sent ?? 0) : 0;
 
-        if (stage === 0 || stage <= done || this.record.state === "locked") return;
+        if (stage === 0 || stage <= done || this.record.state === "locked" || !this.Discord()) return;
 
         this.record.warned = `${this.expires}:${stage}`;
         await this.Save();
         await this.Deliver({ state: "soon", at: this.expires, stage: stage as 1 | 2, answer: "Zugang aktiv", refused: 0 }, now);
     }
 
-    private async Deliver(card: Pick<IPrimeAccessCard, "state" | "at" | "answer" | "refused"> & Partial<IPrimeAccessCard>, now: number): Promise<void> {
-        // Wie Guardian: ohne Verbindung zu Discord gibt es niemanden, dem man schreiben kann.
-        if (!this.client.isReady?.()) return;
+    /** Wie Guardian: ohne Verbindung zu Discord gibt es niemanden, dem man schreiben kann. */
+    private Discord(): boolean {
+        return this.client.isReady?.() === true;
+    }
 
+    private async Deliver(card: Pick<IPrimeAccessCard, "state" | "at" | "answer" | "refused"> & Partial<IPrimeAccessCard>, now: number): Promise<void> {
         const hours = Array.from({ length: 24 }, (_, index) => this.hours.get(Math.floor(now / HOUR) - 23 + index) ?? null);
         const sent = await this.send(this.client, { now, account: PRIME_ACCOUNT, lastOk: this.record.lastOk, hours, ...card });
 
@@ -273,6 +279,9 @@ export class PrimeAccessWatch {
     private async Save(): Promise<void> {
         if (!this.client.databaseService?.Ready) return;
 
-        await this.client.databaseService.Query("INSERT INTO bot_state (name, value) VALUES (?, ?) ON DUPLICATE KEY UPDATE value = VALUES(value)", [KEY, JSON.stringify(this.record)]);
+        // Ein Fehler hier darf die DM nicht aufhalten - schlimmstenfalls schickt ein Neustart sie noch einmal (Review).
+        await this.client.databaseService
+            .Query("INSERT INTO bot_state (name, value) VALUES (?, ?) ON DUPLICATE KEY UPDATE value = VALUES(value)", [KEY, JSON.stringify(this.record)])
+            .catch((error) => logger.warn(`🎮 Prime-Zugang: Zustand nicht gespeichert - ${String(error)}`));
     }
 }

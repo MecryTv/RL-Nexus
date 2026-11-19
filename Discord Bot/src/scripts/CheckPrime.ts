@@ -610,6 +610,56 @@ async function checkAccessWatch(): Promise<void> {
     await run(without, refused, t0);
     await run(without, refused, t0 + 3 * 60_000);
     check("  ohne Datenbank nach zwei Minuten trotzdem Rot", count("Prime-Zugang abgelaufen") === 1, `${count("Prime-Zugang abgelaufen")} rot`);
+
+    // Review M2: Ist Discord noch nicht verbunden, gilt eine DM nicht als geschickt - beim nächsten Mal erneut.
+    state.clear();
+    dms.length = 0;
+
+    const discord = { ready: false };
+    const offline = new PrimeAccessWatch(fake("", { ready: true }, discord));
+
+    await run(offline, refused, t0);
+    discord.ready = true;
+    await run(offline, refused, t0 + 5 * 60_000);
+    check("Discord erst später verbunden: Rot kommt beim nächsten Mal", count("Prime-Zugang abgelaufen") === 1, `${count("Prime-Zugang abgelaufen")} rot`);
+
+    discord.ready = false;
+    await run(offline, "ok", t0 + 10 * 60_000);
+    discord.ready = true;
+    await run(offline, "ok", t0 + 15 * 60_000);
+    check("  Grün ebenso", count("Prime-Zugang wieder da") === 1, `${count("Prime-Zugang wieder da")} grün`);
+
+    const soon = `${new Date(t0 + 6 * DAY).toISOString().slice(0, 16)}Z`;
+    const yellow = new PrimeAccessWatch(fake(soon, { ready: true }, discord));
+
+    discord.ready = false;
+    await yellow.Tick(t0 + HOUR);
+    discord.ready = true;
+    await yellow.Tick(t0 + HOUR + 10 * 60_000);
+    check("  Gelb ebenso", count("Prime-Zugang läuft bald ab") === 1, `${count("Prime-Zugang läuft bald ab")} gelb`);
+
+    // Kann der Zustand nicht gespeichert werden, geht die DM trotzdem raus und der Fehler ins Log.
+    state.clear();
+    dms.length = 0;
+
+    const broken = fake();
+    const warned: string[] = [];
+    const realWarn = logger.warn;
+
+    (broken.databaseService as unknown as { Query: (sql: string) => Promise<unknown[]> }).Query = async (sql: string) => {
+        if (sql.startsWith("SELECT")) return [];
+
+        throw new Error("Datenbank weg");
+    };
+    logger.warn = (message: string) => void warned.push(message);
+
+    try {
+        await run(new PrimeAccessWatch(broken), refused, t0);
+    } finally {
+        logger.warn = realWarn;
+    }
+
+    check("Speichern scheitert: Rot geht trotzdem raus, der Fehler steht im Log", count("Prime-Zugang abgelaufen") === 1 && warned.some((line) => line.includes("Datenbank weg")), `${count("Prime-Zugang abgelaufen")} rot | ${warned.join(" | ")}`);
 }
 
 /**
