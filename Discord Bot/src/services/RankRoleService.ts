@@ -7,6 +7,8 @@ import { IRankRoleChange, IRankRoleResult, IRankRoleSettings, Playlist } from ".
 import logger from "../utils/logger";
 import { NewRoleProblem } from "../utils/rolegate";
 import { LinkUsable } from "../models/PlayerAccount";
+import { PRIME_ACCESS_TEXT } from "../constants/Prime";
+import { PrimeError } from "./PrimeService";
 
 export class RankRoleError extends Error {}
 
@@ -172,7 +174,14 @@ export default class RankRoleService {
         if (!account || !epicName) throw new RankRoleError("Verbinde erst dein Epic-Konto: **/rank link**.");
 
         // W-0125: über die Konto-ID, nicht den Namen. Ein alter Name kann inzwischen einem anderen Spieler gehören.
-        const profile = known ?? (await this.client.primeService.Profile(account.account_id).catch(() => null));
+        // W-0145 (Review): Lehnt Prime den Zugang ab, liegt es nicht am Spieler - das sagt die Meldung dann auch.
+        const profile =
+            known ??
+            (await this.client.primeService.Profile(account.account_id).catch((error: unknown) => {
+                if (error instanceof PrimeError && error.type === "Access") throw new RankRoleError(PRIME_ACCESS_TEXT);
+
+                return null;
+            }));
 
         if (!profile) throw new RankRoleError(`Prime kennt **${epicName}** gerade nicht. Versuch es später noch einmal.`);
 
