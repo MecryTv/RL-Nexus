@@ -2370,7 +2370,7 @@ async function checkRefresh(client: BotClient): Promise<void> {
         },
     };
     const guild = { ...FakeGuild(), channels: { cache: new Map([[TEXT, channel]]) } } as unknown as Guild;
-    const prime = { value: 1450, error: null as PrimeError | null, only: null as string | null, calls: 0 };
+    const prime = { value: 1450, error: null as PrimeError | null, only: null as string | null, stale: null as "down" | null, calls: 0 };
     const saved = new Map<number, ITeamPlayer[]>();
     let settings: ITeamSettings = { ...DefaultTeamSettings(), channelId: TEXT, layout: "hub" };
     let teams: ITeam[] = [];
@@ -2415,6 +2415,7 @@ async function checkRefresh(client: BotClient): Promise<void> {
             accountId: `acc-${name}`,
             ranks: [{ key: "3v3", mmr: prime.value, tier: 18, tierName: "Champion III", divisionName: "II" }],
             fetchedAt: new Date().toISOString(),
+            ...(prime.stale ? { stale: prime.stale } : {}),
         } as unknown as IPrimeProfile;
     };
     chained.Serial = <T>(guildId: string, task: () => Promise<T>): Promise<T> => {
@@ -2456,7 +2457,7 @@ async function checkRefresh(client: BotClient): Promise<void> {
 
         check(
             "Abstand je Server 15 Min., Stand 20 Min.: fällig, Prime gefragt, Hub bearbeitet",
-            edited === chain.length && prime.calls === 3 && log.length === chain.length && log.every((entry) => entry.startsWith("edit ")),
+            edited?.edited === chain.length && prime.calls === 3 && log.length === chain.length && log.every((entry) => entry.startsWith("edit ")),
             `${edited} · ${prime.calls} · ${log}`
         );
         check("  nie neu gepostet, nichts gelöscht, dieselbe Kette", JSON.stringify([settings.messageId, ...settings.moreIds]) === JSON.stringify(chain) && chain.every((id) => alive.has(id!)));
@@ -2466,16 +2467,36 @@ async function checkRefresh(client: BotClient): Promise<void> {
         // 13 Spieler, alle fällig: Prime bekommt höchstens 12. Der älteste bleibt fürs nächste Mal.
         teams = [FakeTeam(Array.from({ length: 12 }, (_, index) => aged(`m${index}`, 40, 1600)), { id: 1, name: "Alpha" }), FakeTeam([aged("old", 50, 1600)], { id: 2, name: "Bravo", position: 1 })];
         reset();
-        check("Prime antwortet, an der Übersicht ändert sich nichts: nicht bearbeitet", (await service.AutoRefresh(guild)) === 0 && log.length === 0, `${log}`);
+        check("Prime antwortet, an der Übersicht ändert sich nichts: nicht bearbeitet", (await service.AutoRefresh(guild))?.edited === 0 && log.length === 0, `${log}`);
         check("  höchstens 12 Spieler je Lauf bei Prime", prime.calls === 12, `${prime.calls}`);
 
         reset();
-        check("Nächster Lauf holt den Rest, der Stand in der Fußzeile ändert sich: bearbeitet", (await service.AutoRefresh(guild)) === chain.length && prime.calls === 1, `${prime.calls} · ${log}`);
+        check("Nächster Lauf holt den Rest, der Stand in der Fußzeile ändert sich: bearbeitet", (await service.AutoRefresh(guild))?.edited === chain.length && prime.calls === 1, `${prime.calls} · ${log}`);
 
         age(45);
         prime.error = new PrimeError("Prime antwortet nicht (10000 ms)", "Timeout");
         reset();
-        check("Prime antwortet nicht: nicht bearbeitet, die Ränge im Kanal bleiben", (await service.AutoRefresh(guild)) === 0 && prime.calls > 0 && log.length === 0, `${prime.calls} · ${log}`);
+        check("Prime antwortet nicht: nicht bearbeitet, die Ränge im Kanal bleiben", (await service.AutoRefresh(guild))?.edited === 0 && log.length === 0, `${prime.calls} · ${log}`);
+        check("  nach der ersten Zeitüberschreitung fragt der Abgleich nicht weiter (Review I2)", prime.calls === 1, `${prime.calls}`);
+
+        age(45);
+        prime.error = new PrimeError("socket hang up", "Transport");
+        reset();
+        await service.AutoRefresh(guild);
+        check("  ebenso nach einem Verbindungsfehler", prime.calls === 1, `${prime.calls}`);
+        prime.error = null;
+
+        // Ein alter Stand aus dem Zwischenspeicher, weil Prime nicht antwortet: keine Antwort, Schluss, die Ränge bleiben.
+        age(45);
+        prime.stale = "down";
+        prime.value = 1999;
+        reset();
+
+        const cached = await service.AutoRefresh(guild);
+
+        check("Zwischenspeicher statt Antwort (stale): zählt nicht, Schluss nach der ersten, alter Stand bleibt", cached?.answered === 0 && prime.calls === 1 && teams[0]!.players[0]!.snapshot!.mmr["3v3"] === 1600, `${JSON.stringify(cached)} · ${prime.calls} · ${teams[0]!.players[0]!.snapshot!.mmr["3v3"]}`);
+        prime.stale = null;
+        prime.value = 1600;
         prime.error = null;
 
         // Review I3: Teilantwort - einer scheitert, die anderen antworten. Niemand verliert seinen Rang.
@@ -2511,7 +2532,7 @@ async function checkRefresh(client: BotClient): Promise<void> {
         prime.value = 1700;
         alive.delete(chain[0]!);
         reset();
-        check("Hub von Hand gelöscht: nichts neu gepostet, nichts gelöscht", (await service.AutoRefresh(guild)) === 0 && log.length === 0, `${log}`);
+        check("Hub von Hand gelöscht: nichts neu gepostet, nichts gelöscht", (await service.AutoRefresh(guild))?.edited === 0 && log.length === 0, `${log}`);
 
         settings = { ...settings, messageId: null, moreIds: [] };
         reset();
@@ -2532,7 +2553,7 @@ async function checkRefresh(client: BotClient): Promise<void> {
 
         const cards = await service.AutoRefresh(guild);
 
-        check("Karten: nur die des geänderten Teams bearbeitet, die gelöschte nicht neu gepostet", cards === 1 && log.join(",") === "edit 1" && prime.calls === 2, `${cards} · ${prime.calls} · ${log}`);
+        check("Karten: nur die des geänderten Teams bearbeitet, die gelöschte nicht neu gepostet", cards?.edited === 1 && log.join(",") === "edit 1" && prime.calls === 2, `${cards} · ${prime.calls} · ${log}`);
 
         // Der Lauf über alle Server.
         const due = new Set<string>();
@@ -2544,7 +2565,7 @@ async function checkRefresh(client: BotClient): Promise<void> {
         service.AutoRefresh = async (target: Guild) => {
             touched.push(target.id);
 
-            return due.delete(target.id) ? 1 : null;
+            return due.delete(target.id) ? { answered: 1, edited: 1 } : null;
         };
         client.primeService.access.Locked = async () => locked;
         Object.defineProperty(client.databaseService, "Ready", { get: () => true, configurable: true });
@@ -2571,6 +2592,21 @@ async function checkRefresh(client: BotClient): Promise<void> {
 
         check("  die übrigen im nächsten", second.guilds === 5 - REFRESH_GUILDS && due.size === 0, JSON.stringify(second));
         check("Teams-Modul aus: Server übergangen", !touched.includes("aus"), touched.join(","));
+
+        // Review I2: Bekommt ein Server gar keine Antwort von Prime, ist Prime gerade weg - die übrigen warten.
+        const answering = service.AutoRefresh;
+
+        fill();
+        touched.length = 0;
+        service.AutoRefresh = async (target: Guild) => {
+            touched.push(target.id);
+            due.delete(target.id);
+
+            return { answered: 0, edited: 0 };
+        };
+        await service.RefreshTick();
+        check("Ein Server bekommt gar keine Antwort von Prime: der Lauf hört dort auf", touched.length === 1, touched.join(","));
+        service.AutoRefresh = answering;
 
         fill();
         touched.length = 0;

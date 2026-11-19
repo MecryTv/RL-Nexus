@@ -94,6 +94,7 @@ import { Evaluate, FormulaError } from "../utils/formula";
 import { ILimitHit, LimitSentence } from "../builder/LimitReply";
 import { settingDef } from "../constants/ModuleSettings";
 import { ModuleValue } from "../utils/moduleFlags";
+import { PrimeDown } from "./PrimeService";
 import { AbsenceSettingsOf } from "../constants/Absences";
 import logger from "../utils/logger";
 import { CanAssignRole, NewRoleProblem } from "../utils/rolegate";
@@ -1631,12 +1632,13 @@ export default class TeamService {
         const now = Date.now();
         let left = SYNC_BATCH;
         let answered = 0;
+        let halted = false;
 
         for (const team of teams) {
             let touched = false;
 
             for (const player of team.players) {
-                if (left <= 0) break;
+                if (left <= 0 || halted) break;
                 if (!player.epicName) continue;
 
                 const old = player.snapshot;
@@ -1646,7 +1648,10 @@ export default class TeamService {
                 left--;
                 touched = true;
 
-                const fresh = await this.Fetch(player.epicName);
+                const { snapshot: fresh, halt } = await this.Ask(player.epicName);
+
+                // W-0146 (Review I2): Zeitüberschreitung oder Verbindungsfehler - die übrigen Spieler warten aufs nächste Mal.
+                halted = halt;
 
                 if (fresh.error === null || fresh.missing) answered++;
 
@@ -1669,7 +1674,7 @@ export default class TeamService {
             }
 
             if (touched) await this.client.teams.SavePlayers(team.id, team.players).catch(() => undefined);
-            if (left <= 0) break;
+            if (left <= 0 || halted) break;
         }
 
         return answered;
@@ -1677,6 +1682,14 @@ export default class TeamService {
 
     /** Der Stand zu einem Namen oder einer Epic-Konto-ID. Wirft nie. */
     async Fetch(epicName: string): Promise<IPlayerSnapshot> {
+        return (await this.Ask(epicName)).snapshot;
+    }
+
+    /**
+     * Wie Fetch, dazu halt (W-0146, Review I2): Prime ist gerade nicht zu erreichen,
+     * jede weitere Frage gleich danach scheiterte genauso - Sync hört dann auf.
+     */
+    private async Ask(epicName: string): Promise<{ snapshot: IPlayerSnapshot; halt: boolean }> {
         const snapshot = EmptySnapshot();
 
         snapshot.at = Date.now();
@@ -1688,7 +1701,14 @@ export default class TeamService {
                 snapshot.error = "Prime kennt diesen Namen nicht.";
                 snapshot.missing = true;
 
-                return snapshot;
+                return { snapshot, halt: false };
+            }
+
+            // Ein alter Stand aus dem Zwischenspeicher, weil Prime nicht antwortete: keine Antwort - Sync behält dann den gespeicherten.
+            if (profile.stale) {
+                snapshot.error = "Prime antwortet nicht.";
+
+                return { snapshot, halt: profile.stale === "down" };
             }
 
             snapshot.name = profile.name;
@@ -1706,9 +1726,11 @@ export default class TeamService {
             }
         } catch (error) {
             snapshot.error = error instanceof Error ? error.message : "Prime antwortet nicht.";
+
+            return { snapshot, halt: PrimeDown(error) };
         }
 
-        return snapshot;
+        return { snapshot, halt: false };
     }
 
     /* ----------------------------------------------------------
@@ -2105,16 +2127,22 @@ export default class TeamService {
 
             if (!open) continue;
 
-            const edited = await this.AutoRefresh(guild).catch((error) => {
+            const result = await this.AutoRefresh(guild).catch((error) => {
                 logger.warn(`🛡️ Team-Übersicht auf ${guild.id} nicht aufgefrischt: ${String(error)}`);
 
-                return 0;
+                return "failed" as const;
             });
 
-            if (edited === null) continue;
+            if (result === null) continue;
 
             done.guilds++;
-            done.edited += edited;
+
+            if (result === "failed") continue;
+
+            done.edited += result.edited;
+
+            // Review I2: Bekam dieser Server gar keine Antwort von Prime, ist Prime gerade weg - die übrigen warten auf den nächsten Lauf.
+            if (!result.answered) break;
         }
 
         return done;
@@ -2125,10 +2153,10 @@ export default class TeamService {
      * als „Übersicht auffrischen alle“. Holt wie sonst höchstens SYNC_BATCH Spieler
      * und bearbeitet nur, was im Kanal steht - nie neu posten. Bearbeitet wird nur,
      * wenn Prime geantwortet hat und sich dadurch etwas zeigt.
-     * null: nichts gepostet oder nichts fällig, Prime nicht gefragt. Sonst die Zahl
-     * der bearbeiteten Nachrichten.
+     * null: nichts gepostet oder nichts fällig, Prime nicht gefragt. Sonst, für wie
+     * viele Spieler Prime geantwortet hat und wie viele Nachrichten bearbeitet sind.
      */
-    async AutoRefresh(guild: Guild): Promise<number | null> {
+    async AutoRefresh(guild: Guild): Promise<{ answered: number; edited: number } | null> {
         const settings = await this.Settings(guild.id);
         const hub = settings.layout === "hub";
 
@@ -2143,15 +2171,17 @@ export default class TeamService {
         const before = new Map(teams.map((team) => [team.id, PrimeFacts([team])]));
         const whole = PrimeFacts(teams);
 
-        // Antwortet Prime gar nicht, bleibt die Nachricht - sonst verschwänden die Ränge im Kanal.
-        if (!(await this.Sync(teams, false, maxAge))) return 0;
+        const answered = await this.Sync(teams, false, maxAge);
+
+        // Antwortet Prime gar nicht, bleibt die Nachricht.
+        if (!answered) return { answered, edited: 0 };
 
         const changed = new Set(teams.filter((team) => PrimeFacts([team]) !== before.get(team.id)).map((team) => team.id));
 
-        if (hub ? PrimeFacts(teams) === whole : !changed.size) return 0;
+        if (hub ? PrimeFacts(teams) === whole : !changed.size) return { answered, edited: 0 };
 
         // Der neue Stand ist gespeichert (Sync). In der Reihe je Server liest das Bearbeiten Kette und Karten frisch.
-        return this.Serial(guild.id, () => this.EditNow(guild, changed));
+        return { answered, edited: await this.Serial(guild.id, () => this.EditNow(guild, changed)) };
     }
 
     /** Hub oder die Karten aus `changed` mit dem gespeicherten Stand bearbeiten. Was fehlt oder neu gesendet werden müsste, bleibt. */

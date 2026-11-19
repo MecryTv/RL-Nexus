@@ -148,6 +148,15 @@ export function HttpError(status: number, raw: string, contentType = "", secret 
 
 const NOT_FOUND = new Set(["InvalidPlayer", "PlayerNotFound", "NotFound"]);
 
+/**
+ * W-0146 (Review I2): Prime ist gerade nicht zu erreichen - Zeitüberschreitung oder
+ * Verbindungsfehler. Eine weitere Frage gleich danach scheitert genauso; der
+ * Team-Abgleich hört dann auf, statt je Spieler zehn Sekunden zu warten.
+ */
+export function PrimeDown(error: unknown): boolean {
+    return error instanceof PrimeError && (error.type === "Timeout" || error.type === "Transport");
+}
+
 export default class PrimeService implements IPrimeService {
     client: BotClient;
 
@@ -324,7 +333,8 @@ export default class PrimeService implements IPrimeService {
             if (!hit) throw error;
             if (!locked) logger.warn(`🎮 Prime nicht erreichbar, alter Stand für "${wanted}": ${String(error)}`);
 
-            return hit.value ? { ...hit.value, stale: locked ? "access" : true } : hit.value;
+            // W-0146: "down" heißt, Prime antwortet gerade gar nicht - der Team-Abgleich hört dann auf.
+            return hit.value ? { ...hit.value, stale: locked ? "access" : PrimeDown(error) ? "down" : true } : hit.value;
         }
     }
 
