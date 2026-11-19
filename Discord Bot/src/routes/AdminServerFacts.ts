@@ -30,16 +30,21 @@ export default class AdminServerFacts extends Route {
             .slice(0, 50);
         const viewer = SNOWFLAKE.test(query.viewer ?? "") ? query.viewer! : null;
         const ready = this.client.databaseService.Ready;
-        const modules = ready ? await this.client.settings.ModulesOf(ids).catch(() => new Map<string, string[]>()) : new Map<string, string[]>();
+        // W-0141: Module und offene Tickets aller Server mit je einer Abfrage, gleichzeitig.
+        const [modules, tickets] = ready
+            ? await Promise.all([
+                  this.client.settings.ModulesOf(ids).catch(() => new Map<string, string[]>()),
+                  this.client.tickets.OpenCounts(ids).catch(() => new Map<string, number>()),
+              ])
+            : [new Map<string, string[]>(), new Map<string, number>()];
         const facts: Record<string, unknown> = {};
 
         for (const id of ids) {
             const guild = this.client.guilds.cache.get(id)!;
-            const tickets = ready ? await this.client.tickets.OpenOfGuild(id).catch(() => []) : [];
             const owner = guild.members.cache.get(guild.ownerId) ?? (await guild.members.fetch(guild.ownerId).catch(() => null));
             const member = viewer ? Boolean(guild.members.cache.get(viewer) ?? (await guild.members.fetch(viewer).catch(() => null))) : false;
 
-            facts[id] = { modules: (modules.get(id) ?? []).length, openTickets: tickets.length, viewerMember: member, ownerName: owner?.displayName ?? null };
+            facts[id] = { modules: (modules.get(id) ?? []).length, openTickets: tickets.get(id) ?? 0, viewerMember: member, ownerName: owner?.displayName ?? null };
         }
 
         return facts;

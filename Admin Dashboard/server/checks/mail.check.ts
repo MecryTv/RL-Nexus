@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { simpleParser } from "mailparser";
 import MailComposer from "nodemailer/lib/mail-composer/index.js";
 import { createTransport, type Transporter } from "nodemailer";
+import { pendingDone, pendingFailed, pendingFresh, pendingOpened, pendingStart, pendingStep, withPending } from "../../src/mail/pending.ts";
 import { buildApp } from "../app.ts";
 import { loadConfig, type IMailServer } from "../config.ts";
 import { InvalidInput } from "../errors.ts";
@@ -28,8 +29,64 @@ const MAIL_ENV = {
     DISCORD_INVITE_URL: "https://discord.gg/rlnexus",
 };
 
+/** W-0141: eine Mail in der Liste, für die Prüfungen der sofortigen Aktionen. */
+const listMail = (uid: number, seen = true) => ({ uid, from: null, to: [], subject: `Mail ${uid}`, date: "2026-11-18T10:00:00.000Z", preview: "", seen, flagged: false, answered: false, attachments: false });
+
 export async function checkMail(): Promise<void> {
     section("Postfach");
+
+    await check("W-0141: Verschieben und „ungelesen“ wirken in der Liste sofort: weg bzw. fett, der Rest bleibt, wie er ist", () => {
+        const list = [listMail(1), listMail(2), listMail(3, false)];
+        const sending = pendingStart(pendingStart(new Map(), 1, "gone")!, 2, "unread")!;
+
+        assert.deepEqual(
+            withPending(list, sending).map((entry) => [entry.uid, entry.seen]),
+            [
+                [2, false],
+                [3, false],
+            ]
+        );
+        assert.equal(withPending(list, new Map()), list, "ohne Auftrag dieselbe Liste");
+    });
+
+    await check("W-0141 Review: markieren → wieder öffnen → schließen zeigt den Stand des Servers, nicht mehr fett", () => {
+        const marked = pendingDone(pendingStart(new Map(), 5, "unread")!, 5);
+
+        assert.equal(withPending([listMail(5)], marked)[0].seen, false, "nach dem Markieren fett");
+
+        // Beim Öffnen setzt der Server \Seen; danach gilt sein Stand.
+        const reopened = pendingOpened(marked, 5);
+
+        assert.equal(reopened.size, 0);
+        assert.equal(withPending([listMail(5, true)], reopened)[0].seen, true);
+    });
+
+    await check("W-0141 Review: Nach Erfolg verschwindet der Auftrag mit frischen Daten der Liste, vorher nicht; ein Fehler nimmt ihn sofort zurück", () => {
+        const sending = pendingStart(new Map(), 7, "gone")!;
+
+        assert.equal(pendingFresh(sending).size, 1, "frische Daten während der Anfrage: bleibt");
+        assert.equal(pendingFresh(pendingDone(sending, 7)).size, 0, "nach Erfolg und frischen Daten: weg");
+        assert.equal(pendingFailed(sending, 7).size, 0, "Fehler: sofort weg");
+    });
+
+    await check("W-0141 Review: Doppelklick auf Verschieben schickt nur eine Anfrage, die zweite holt nichts zurück", () => {
+        const first = pendingStart(new Map(), 9, "gone")!;
+
+        assert.equal(pendingStart(first, 9, "gone"), null, "zweite Aktion auf dieselbe Mail wird nicht gestartet");
+        assert.notEqual(pendingStart(first, 10, "gone"), null, "eine andere Mail geht");
+        assert.equal(withPending([listMail(9)], pendingDone(first, 9)).length, 0, "die verschobene bleibt weg");
+    });
+
+    await check("W-0141 Nachreview: Aktion in A läuft, Wechsel zu B, Aktion in B, Antwort aus A kommt: B behält Sofortanzeige und Doppelklick-Sperre", () => {
+        let stored = pendingStep({ key: "", state: new Map() }, "1-A", (state) => pendingStart(state, 3, "gone"))!;
+        stored = pendingStep(stored, "1-B", (state) => pendingStart(state, 4, "gone"))!;
+        const after = pendingStep(stored, "1-A", (state) => pendingDone(state, 3));
+
+        assert.equal(after, stored, "die Antwort aus A ändert den Stand von B nicht");
+        assert.equal(after!.key, "1-B");
+        assert.equal(withPending([listMail(4)], after!.state).length, 0, "die Mail in B bleibt weg");
+        assert.equal(pendingStep(after!, "1-B", (state) => pendingStart(state, 4, "gone")), null, "Doppelklick in B bleibt gesperrt");
+    });
 
     const config = loadConfig(MAIL_ENV, []);
     const mail = config.mail;

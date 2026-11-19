@@ -533,6 +533,18 @@ async function checkDatabase(client: BotClient): Promise<void> {
     check("Eine zweite Stimme ersetzt die erste", (await client.polls.VotesOf(poll.id, USER)).join("") === "2");
     check("Gezählt wird einmal", (await client.polls.Tally(poll.id)).voters === 1);
     check("Die Stimme liegt auf der richtigen Antwort", (await client.polls.Tally(poll.id)).counts["2"] === 1);
+
+    // W-0141: Die Liste im Dashboard zählt alle Umfragen mit zwei Abfragen statt zwei je Umfrage.
+    const db = client.databaseService;
+    const query = db.Query.bind(db);
+    let asked = 0;
+
+    db.Query = (async (sql: string, values?: unknown[]) => (asked++, query(sql, values))) as typeof db.Query;
+    const many = await client.polls.TallyMany([poll.id, second.id]);
+    db.Query = query;
+    check("Viele Umfragen auf einmal: zwei Abfragen", asked === 2, String(asked));
+    check("Viele Umfragen auf einmal: gleiche Zahlen", many.get(poll.id)?.counts["2"] === 1 && many.get(poll.id)?.voters === 1, JSON.stringify([...many]));
+    check("Viele Umfragen auf einmal: ohne Stimmen leer", many.get(second.id)?.voters === 0 && Object.keys(many.get(second.id)?.counts ?? { x: 1 }).length === 0, JSON.stringify([...many]));
     check("Wer was gewählt hat, steht da", (await client.polls.Voters(poll.id)).some((vote) => vote.user_id === USER && vote.option_id === "2"));
 
     await client.polls.SetVotes(poll.id, USER, []);

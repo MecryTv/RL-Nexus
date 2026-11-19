@@ -138,8 +138,8 @@ export async function checkNav(): Promise<void> {
         const developer = visibleAreas("developer");
 
         assert.equal(developer.at(-1)?.id, "dev");
-        // W-0061: Changelog kam dazu.
-        assert.equal(developer.at(-1)?.pages.length, 6);
+        // W-0061: Changelog kam dazu, W-0141 Leistung.
+        assert.equal(developer.at(-1)?.pages.length, 7);
 
         const entries = navEntries("admin");
 

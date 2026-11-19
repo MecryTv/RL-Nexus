@@ -1,8 +1,8 @@
 import type { FastifyInstance } from "fastify";
-import type { IMaintenanceState, ITech } from "../../shared/api.ts";
+import type { IMaintenanceState, ISlowReport, ITech } from "../../shared/api.ts";
 import { accessOf } from "../access.ts";
 import { audit } from "../audit.ts";
-import { botOverview, botStatus, restartBot } from "../bot.ts";
+import { botOverview, botSlow, botStatus, restartBot } from "../bot.ts";
 import type { IConfig } from "../config.ts";
 import { websiteStatus } from "../content.ts";
 import { databaseReady, query } from "../db.ts";
@@ -12,6 +12,7 @@ import { notifyStatus } from "../notify.ts";
 import { MAINTENANCE_FILES, endMaintenance, parseStart, readMaintenanceState, setMaintenanceUntil, startMaintenance, stepMaintenance, type MaintenanceArea } from "../maintenance.ts";
 import { body, oneOf } from "../validate.ts";
 import { cacheState } from "../cache.ts";
+import { slowReport } from "../slow.ts";
 
 /** Wartung, Neustart und Technik-Ansicht. Nur für Developer. */
 
@@ -46,6 +47,9 @@ async function databaseInfo(): Promise<ITech["database"]> {
 }
 
 export async function operationRoutes(app: FastifyInstance, { config }: { config: IConfig }): Promise<void> {
+    // W-0141: langsame Anfragen und Abfragen von Admin-Server und Bot, je die letzten 200 seit dem Start.
+    app.get("/api/dev/slow", async (request): Promise<ISlowReport> => ({ admin: slowReport(), bot: await botSlow(config, accessOf(request).id) }));
+
     app.get("/api/tech", async (request): Promise<ITech> => {
         const [bot, website, database] = await Promise.all([botOverview(config, accessOf(request).id), websiteStatus(config), databaseInfo()]);
         const memory = process.memoryUsage();

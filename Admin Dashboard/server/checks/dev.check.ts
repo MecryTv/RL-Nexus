@@ -3,11 +3,14 @@ import { existsSync, readFileSync } from "node:fs";
 import { appendFile, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import type { ILogFeed, ILogSearch, ILogSessionPage, ILogView, IMaintenancePlan, IMaintenanceState } from "../../shared/api.ts";
+import type { ILogFeed, ILogSearch, ILogSessionPage, ILogView, IMaintenancePlan, IMaintenanceState, ISlowReport } from "../../shared/api.ts";
 import { LOG_PAGE_ENTRIES, LOG_SEARCH } from "../../shared/limits.ts";
 import { buildApp } from "../app.ts";
 import { loadConfig } from "../config.ts";
 import { SESSION_COOKIE, seal } from "../session.ts";
+import { SLOW_REQUEST_MS, SLOW_SQL_MS, acquireTimed, forgetSlow, noteQuery, noteRequest, slowReport } from "../slow.ts";
+import { binOf, p75Of, parseVitals, statOf } from "../vitals.ts";
+import { signToken } from "../bot.ts";
 import { USERS, fake } from "./fakes.ts";
 import { ENV, SECRET, check, section } from "./harness.ts";
 
@@ -440,6 +443,133 @@ export async function checkDev(): Promise<void> {
             // Welche Application angemeldet hat, steht da, aber niemals ein Geheimnis.
             assert.deepEqual([tech.admin.developerMode, tech.admin.clientId], [false, config.clientId]);
             assert.ok(!JSON.stringify(tech).includes(config.clientSecret) && !JSON.stringify(tech).includes(config.botToken));
+        });
+
+        await check("W-0141: Langsames landet mit Muster im Ringpuffer, Schnelles nur in der Zählung, höchstens 200", async () => {
+            forgetSlow();
+            noteRequest("GET", "/api/users/:id", 200, 30);
+            noteRequest("GET", "/api/users/:id", 200, 812);
+            noteQuery("SELECT *  FROM   users\n  WHERE id = ? AND name = 'Max' AND guild = 123456789012345678", 250);
+            noteQuery("SELECT 1", 3);
+
+            const report = slowReport();
+
+            assert.deepEqual([report.requests, report.slowRequests, report.queries, report.slowQueries], [2, 1, 2, 1]);
+            assert.deepEqual(
+                report.entries.map((entry) => [entry.kind, entry.what, entry.status, entry.ms]),
+                [
+                    ["sql", "SELECT * FROM users WHERE id = ? AND name = ? AND guild = ?", null, 250],
+                    ["request", "GET /api/users/:id", 200, 812],
+                ]
+            );
+
+            // Nachreview W-0141: Warten auf eine freie Verbindung ist kein langsames SQL. Es steht als eigene Art „pool“
+            // mit eigener Zählung da; ein Fehler beim Holen der Verbindung mit ms 0 und der verstrichenen Zeit.
+            noteQuery("SELECT 3", 20, 450);
+            assert.deepEqual([slowReport().entries[0].kind, slowReport().entries[0].ms, slowReport().entries[0].waitMs], ["pool", 20, 450]);
+            assert.deepEqual([slowReport().slowQueries, slowReport().poolWaits], [1, 1]);
+            assert.equal(slowReport().entries.find((entry) => entry.what === "SELECT * FROM users WHERE id = ? AND name = ? AND guild = ?")?.waitMs, 0);
+            await assert.rejects(
+                acquireTimed("SELECT 9", () => new Promise((_resolve, reject) => setTimeout(() => reject(new Error("pool timeout")), SLOW_SQL_MS + 20))),
+                /pool timeout/
+            );
+            assert.deepEqual([slowReport().entries[0].kind, slowReport().entries[0].what, slowReport().entries[0].ms], ["pool", "SELECT 9", 0]);
+            assert.ok((slowReport().entries[0].waitMs ?? 0) >= SLOW_SQL_MS, String(slowReport().entries[0].waitMs));
+            assert.deepEqual([slowReport().queries, slowReport().slowQueries, slowReport().poolWaits], [4, 1, 2]);
+
+            for (let index = 0; index < 250; index++) noteQuery("SELECT 2", 300);
+            assert.equal(slowReport().entries.length, 200);
+            forgetSlow();
+        });
+
+        await check("W-0141: Der Hook misst echte Anfragen mit dem Routenmuster, EventSource-Leitungen nicht", async () => {
+            const probe = await buildApp(config);
+
+            probe.get("/probe/:id", async () => {
+                await new Promise((resolve) => setTimeout(resolve, SLOW_REQUEST_MS + 30));
+
+                return { ok: true };
+            });
+
+            try {
+                forgetSlow();
+                await probe.inject({ method: "GET", url: "/probe/123456789012345678" });
+                await probe.inject({ method: "GET", url: "/probe/7", headers: { accept: "text/event-stream" } });
+
+                const report = slowReport();
+
+                assert.deepEqual([report.requests, report.slowRequests], [1, 1]);
+                assert.deepEqual([report.entries[0].what, report.entries[0].status], ["GET /probe/:id", 200]);
+                assert.ok(report.entries[0].ms >= SLOW_REQUEST_MS, String(report.entries[0].ms));
+            } finally {
+                forgetSlow();
+                await probe.close();
+            }
+        });
+
+        await check("W-0141: /api/dev/slow nur für Developer, mit Admin-Server und Bot; Bot weg heißt null", async () => {
+            assert.equal((await get("/api/dev/slow", admin)).statusCode, 403);
+
+            const response = await get("/api/dev/slow");
+            const report = response.json() as ISlowReport;
+
+            assert.equal(response.statusCode, 200);
+            assert.deepEqual([report.admin.requestMs, report.admin.sqlMs], [SLOW_REQUEST_MS, SLOW_SQL_MS]);
+            assert.equal(report.bot?.entries[0].what, "GET /dashboard/api/guilds/:id/levels");
+
+            fake.botDown = true;
+
+            try {
+                assert.equal(((await get("/api/dev/slow")).json() as ISlowReport).bot, null);
+            } finally {
+                fake.botDown = false;
+            }
+        });
+
+        await check("W-0141: Ladezeiten prüfen: Gerät und Werte, CLS mal 1000, Unsinn fällt weg, Stufen an den Google-Grenzen", () => {
+            assert.deepEqual(parseVitals({ device: "mobile", metrics: { LCP: 1834.6, CLS: 0.051, INP: -3, TTFB: "x", FID: 12 } }), {
+                device: "mobile",
+                values: [
+                    ["LCP", 1835],
+                    ["CLS", 51],
+                ],
+            });
+            assert.deepEqual(parseVitals({ device: "desktop", metrics: { LCP: 999_999, INP: 120 } }).values, [["INP", 120]]);
+            assert.throws(() => parseVitals({ device: "fernseher", metrics: { LCP: 1 } }), /Gerät/);
+            assert.throws(() => parseVitals({ device: "mobile", metrics: { LCP: 999_999 } }), /Messwerte/);
+            assert.throws(() => parseVitals("kaputt"), /Gerät/);
+            assert.deepEqual([binOf("LCP", 2500), binOf("LCP", 2501), binOf("LCP", 4000), binOf("LCP", 4001), binOf("LCP", 50_000)], [4, 5, 6, 7, 9]);
+        });
+
+        await check("W-0141: p75 und Anteile aus den Stufen", () => {
+            // 100 Aufrufe: 60 in 1000-1500, 30 in 2000-2500, 10 über 10 s (Mittel 12 s).
+            const rows = [
+                { metric: "LCP" as const, bin: 2, samples: 60, total: 60 * 1200 },
+                { metric: "LCP" as const, bin: 4, samples: 30, total: 30 * 2300 },
+                { metric: "LCP" as const, bin: 9, samples: 10, total: 10 * 12_000 },
+            ];
+            const stat = statOf("LCP", rows);
+
+            // 75 % fallen in die Stufe 2000-2500: 15 von 30 hinein, also die Mitte.
+            assert.deepEqual([stat.samples, stat.p75, stat.good, stat.poor], [100, 2250, 0.9, 0.1]);
+            assert.equal("mean" in stat, false, "kein Mittel mehr: die Seite zeigt es nicht (Review)");
+            assert.equal(p75Of("LCP", [{ metric: "LCP", bin: 9, samples: 4, total: 4 * 15_000 }]), 15_000);
+            assert.deepEqual(statOf("INP", rows), { metric: "INP", samples: 0, p75: null, good: null, poor: null });
+        });
+
+        await check("W-0141: /public/vitals ohne Sitzung (204, Unsinn 400), /internal/vitals nur mit Token, /api/dev/vitals nur für Developer", async () => {
+            const beacon = (url: string, payload: unknown, headers: Record<string, string> = {}) =>
+                app.inject({ method: "POST", url, headers: { "content-type": "application/json", ...headers }, payload: JSON.stringify(payload) });
+
+            assert.equal((await beacon("/public/vitals", { device: "mobile", metrics: { LCP: 1800 } })).statusCode, 204);
+            assert.equal((await beacon("/public/vitals", { device: "mobile", metrics: {} })).statusCode, 400);
+            assert.equal((await beacon("/public/vitals", { device: "mobile", metrics: { LCP: 1800 }, pad: "x".repeat(4096) })).statusCode, 413);
+            assert.equal((await beacon("/internal/vitals", { device: "desktop", metrics: { INP: 90 } })).statusCode, 401);
+            assert.equal((await beacon("/internal/vitals", { device: "desktop", metrics: { INP: 90 } }, { authorization: `Bearer ${signToken(config.jwtSecret, "dashboard", ["servers"])}` })).statusCode, 401);
+            assert.equal((await beacon("/internal/vitals", { device: "desktop", metrics: { INP: 90 } }, { authorization: `Bearer ${signToken(config.jwtSecret, "dashboard", ["vitals"])}` })).statusCode, 204);
+            assert.equal((await get("/api/dev/vitals", admin)).statusCode, 403);
+            assert.equal((await get("/api/dev/vitals?days=5")).statusCode, 400);
+            assert.equal((await get("/api/dev/vitals")).statusCode, 503, "ohne Datenbank");
         });
     } finally {
         await app.close();

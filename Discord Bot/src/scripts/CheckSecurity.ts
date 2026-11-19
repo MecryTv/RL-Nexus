@@ -98,6 +98,8 @@ void (async () => {
         clipService: { Message: record("clip"), ReactionAdd: record("stimme") },
         settings: { Of: async () => ({ modules: [VOICE_MODULE, LEVELS_MODULE] }) },
         voiceHubs: { ByChannel: async () => ({ id: 1 }) },
+        // Seit W-0143 meldet VoiceService Sprachwechsel nur, wenn jemand zuschaut: hier schaut niemand zu.
+        pulseService: { Watching: () => false, Emit: () => undefined },
     } as unknown as BotClient;
     const voice = new VoiceService(events) as unknown as { Voice: VoiceService["Voice"]; Create: () => Promise<void>; Cleanup: () => Promise<void> };
     voice.Create = record("kanal");
@@ -126,11 +128,12 @@ void (async () => {
     const levels = new LevelService({
         ...events,
         guilds: { cache: new Map([["1", { id: "1", ownerId: FREE, afkChannelId: null, voiceStates: { cache: new Map([FULL, FREE].map((id) => [id, { channel: { id: "2" }, member: { id, user: { bot: false } } }])) } }]]) },
-    } as unknown as BotClient) as unknown as { Voice: LevelService["Voice"]; Settings: () => Promise<object>; VoiceXp: () => Promise<number>; Credit: (member: { id: string }) => Promise<void> };
+    } as unknown as BotClient) as unknown as { Voice: LevelService["Voice"]; Settings: () => Promise<object>; VoiceXp: () => Promise<number>; CreditVoice: (guildId: string, credits: { member: { id: string } }[]) => Promise<void> };
     const credited: string[] = [];
     levels.Settings = async () => ({});
     levels.VoiceXp = async () => 5;
-    levels.Credit = async (member) => void credited.push(member.id);
+    // W-0141: Voice-Punkte gehen je Server gebündelt über CreditVoice.
+    levels.CreditVoice = async (_guildId, credits) => void credited.push(...credits.map((credit) => credit.member.id));
     await levels.Voice(Date.now());
     check("Voice-Punkte nur für Nicht-Gesperrte", credited.join(",") === FREE, credited.join(","));
 

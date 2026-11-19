@@ -33,6 +33,37 @@ function preloadFonts(names: readonly string[]): Plugin {
 }
 
 /**
+ * W-0141: Den Chunk der Anwendung gleich mit dem HTML anfordern.
+ *
+ * main.tsx wartet erst auf die Inhalte aus dem Admin Dashboard (bis zu zwei
+ * Sekunden) und lädt danach `import("./App")`. Ohne Vorladen beginnt der
+ * größte Download erst dann. So laufen beide gleichzeitig: Inhalte und App,
+ * dazu die Stücke, die App braucht, und ihr Stylesheet.
+ */
+function preloadApp(): Plugin {
+    return {
+        name: "rl-nexus:preload-app",
+        apply: "build",
+        transformIndexHtml(_html, context) {
+            const bundle = context.bundle ?? {};
+            const app = Object.values(bundle).find((output) => output.type === "chunk" && output.facadeModuleId?.endsWith("/src/App.tsx"));
+
+            if (!app || app.type !== "chunk") return [];
+
+            const entry = Object.values(bundle).find((output) => output.type === "chunk" && output.isEntry);
+            const skip = new Set(entry?.type === "chunk" ? [entry.fileName, ...entry.imports] : []);
+            const scripts = [app.fileName, ...app.imports].filter((file) => !skip.has(file));
+            const css = [...(app.viteMetadata?.importedCss ?? [])];
+
+            return [
+                ...scripts.map((file) => ({ tag: "link", attrs: { rel: "modulepreload", href: `/${file}`, crossorigin: "" }, injectTo: "head" as const })),
+                ...css.map((file) => ({ tag: "link", attrs: { rel: "preload", href: `/${file}`, as: "style" }, injectTo: "head" as const })),
+            ];
+        },
+    };
+}
+
+/**
  * Jede Textdatei des Builds zusätzlich gepackt ablegen, als .gz und als .br.
  *
  * nginx liefert sie mit `gzip_static` und `brotli_static` fertig aus, statt
@@ -222,6 +253,7 @@ export default defineConfig(({ command, mode }) => {
                 "rajdhani-latin-600-normal",
                 "orbitron-latin-700-normal",
             ]),
+            preloadApp(),
             precompress(),
         ],
         css: {

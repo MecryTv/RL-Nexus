@@ -792,6 +792,11 @@ async function checkDatabase(client: BotClient): Promise<void> {
     check("Offene Tickets eines Users", (await tickets.OpenOf(GUILD, USER)).length === 1);
     check("Offene Tickets des Servers für Live Tickets", (await tickets.OpenOfGuild(GUILD)).length === 2);
 
+    // W-0141: die Serverliste im Admin zählt offene Tickets aller Server mit einer Abfrage.
+    const open = await tickets.OpenCounts([GUILD, "000000000000000001"]);
+
+    check("Offene Tickets je Server gezählt", open.get(GUILD) === 2 && (open.get("000000000000000001") ?? 0) === 0, JSON.stringify([...open]));
+
     const due = await tickets.DueReminders(Date.now());
 
     check("Ein fälliger Termin wird gefunden", due.some((ticket) => ticket.id === first.id));

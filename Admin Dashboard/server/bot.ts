@@ -1,5 +1,5 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
-import type { IBotCommand, IBotOverview, IBotStatus } from "../shared/api.ts";
+import type { IBotCommand, IBotOverview, IBotStatus, ISlowSide } from "../shared/api.ts";
 import type { IBotRestoreReport, IServerPartJson } from "../shared/backups.ts";
 import type { IBotMembers, IBotServer, IBotServerDetail, IBotServerFacts, IBotShowcase } from "../shared/servers.ts";
 import type { IConfig } from "./config.ts";
@@ -226,6 +226,11 @@ async function botJson<T>(config: IConfig, userId: string, path: string, timeout
     } catch {
         return null;
     }
+}
+
+/** W-0141: die langsamen Anfragen und Abfragen, die der Bot seit seinem Start gemerkt hat. null: Der Bot antwortet nicht. */
+export function botSlow(config: IConfig, userId: string): Promise<ISlowSide | null> {
+    return botJson<ISlowSide>(config, userId, "/admin/dev/slow");
 }
 
 /** W-0062: Live-Daten eines Partner-Servers für die Webseite. null: Der Bot antwortet nicht oder ist nicht dort. */

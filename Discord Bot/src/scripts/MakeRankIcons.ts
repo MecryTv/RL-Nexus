@@ -11,7 +11,7 @@
  *
  * Dieses Skript legt daneben eine 160er-Fassung ab - klein genug für Listen,
  * groß genug für Bildschirme mit doppelter Auflösung. Kommen neue Abzeichen
- * dazu, einmal laufen lassen.
+ * dazu, einmal laufen lassen. W-0141: als WebP, gut halb so groß wie PNG.
  */
 import { createCanvas, loadImage } from "@napi-rs/canvas";
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
@@ -46,9 +46,9 @@ async function main(): Promise<void> {
         ctx.imageSmoothingQuality = "high";
         ctx.drawImage(image, 0, 0, SIZE, SIZE);
 
-        const small = await canvas.encode("png");
+        const small = await canvas.encode("webp", 90);
 
-        await writeFile(path.join(TARGET, name), small);
+        await writeFile(path.join(TARGET, name.replace(/\.png$/i, ".webp")), small);
 
         before += source.length;
         after += small.length;

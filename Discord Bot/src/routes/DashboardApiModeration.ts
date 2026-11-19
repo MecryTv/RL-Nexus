@@ -153,30 +153,34 @@ export default class DashboardApiModeration extends Route {
         const action = MOD_ACTIONS.includes(query.action as ModAction) ? (query.action as ModAction) : null;
         const before = query.before && /^\d{1,9}$/.test(query.before) ? Number(query.before) : null;
         const targetId = query.user && SNOWFLAKE.test(query.user) ? query.user : null;
-        const rows = await cases.List(
-            guild.id,
-            { action, active: query.status === "active", targetId, query: (query.q ?? "").slice(0, 100), hidden: manage && query.hidden === "1" },
-            before,
-            PAGE_SIZE + 1
-        );
+        const meta = query.meta === "1";
+        // W-0141: Liste, Zahlen, Verlauf-Kopf und Einstellungen hängen nicht voneinander ab - gleichzeitig.
+        const [rows, stats, counts, config, actions] = await Promise.all([
+            cases.List(
+                guild.id,
+                { action, active: query.status === "active", targetId, query: (query.q ?? "").slice(0, 100), hidden: manage && query.hidden === "1" },
+                before,
+                PAGE_SIZE + 1
+            ),
+            before === null ? cases.Stats(guild.id) : null,
+            targetId && before === null ? cases.CountsOf(guild.id, targetId) : null,
+            meta ? this.client.modSettings.Of(guild.id) : null,
+            meta ? this.client.moderationService.AllowedActions(member) : null,
+        ]);
         const result: Record<string, unknown> = {
             cases: rows.slice(0, PAGE_SIZE).map((entry) => this.Out(guild, entry)),
             more: rows.length > PAGE_SIZE,
         };
 
-        if (before === null) {
-            const stats = await cases.Stats(guild.id);
-
+        if (stats) {
             // W-0071: Wie viele ausgeblendet sind, sehen nur die, die den Server verwalten.
             result.stats = manage ? stats : { ...stats, hidden: 0 };
         }
         // Der Kopf des Verlaufs, wenn nach einem User gefiltert wird.
-        if (targetId && before === null) result.target = await this.Target(guild, targetId, await cases.CountsOf(guild.id, targetId));
+        if (targetId && counts) result.target = await this.Target(guild, targetId, counts);
 
-        if (query.meta === "1") {
-            const config = await this.client.modSettings.Of(guild.id);
-
-            result.me = { id: access.actor.id, name: access.actor.name, manage, actions: await this.client.moderationService.AllowedActions(member) };
+        if (config) {
+            result.me = { id: access.actor.id, name: access.actor.name, manage, actions };
             result.config = config;
             result.presets = { durations: DURATION_PRESETS, deletes: DELETE_CHOICES, proof: PROOF_TIMEOUT_CHOICES };
             result.limits = { ...ModerationLimits(guild.id), evidenceMegabytes: EVIDENCE_MAX_MB };

@@ -226,15 +226,39 @@ export function isModuleDetail(data: unknown): data is IModuleDetail {
     );
 }
 
-/** Holt einen Inhalt. `null` bei jedem Fehler: dann gelten die eingebauten Daten. */
-export async function loadContent<T>(file: string, isValid: (data: unknown) => data is T): Promise<ILoaded<T> | null> {
-    try {
-        const response = await fetch(`/content/${file}`, { cache: "no-cache", signal: AbortSignal.timeout(TIMEOUT) });
-        if (!response.ok) return null;
+/**
+ * W-0141: Header und Seite fragen oft gleichzeitig nach derselben Datei, ein
+ * Seitenwechsel gleich noch einmal. Eine Minute lang teilen sie sich einen
+ * Abruf. Ein Fehler bleibt nicht hängen: Der nächste Aufruf fragt neu.
+ */
+const SHARED_FOR = 60_000;
+const shared = new Map<string, { readonly at: number; readonly body: Promise<unknown> }>();
+
+function contentBody(file: string): Promise<unknown> {
+    const hit = shared.get(file);
+    if (hit && Date.now() - hit.at < SHARED_FOR) return hit.body;
+
+    const body = fetch(`/content/${file}`, { cache: "no-cache", signal: AbortSignal.timeout(TIMEOUT) }).then((response) => {
+        if (!response.ok) throw new Error(String(response.status));
 
         // Der Entwicklungsserver von Vite antwortet auf unbekannte Pfade mit
         // index.html. Das scheitert hier am Parsen und landet im catch.
-        const body: unknown = await response.json();
+        return response.json() as Promise<unknown>;
+    });
+    const entry = { at: Date.now(), body };
+
+    shared.set(file, entry);
+    body.catch(() => {
+        if (shared.get(file) === entry) shared.delete(file);
+    });
+
+    return body;
+}
+
+/** Holt einen Inhalt. `null` bei jedem Fehler: dann gelten die eingebauten Daten. */
+export async function loadContent<T>(file: string, isValid: (data: unknown) => data is T): Promise<ILoaded<T> | null> {
+    try {
+        const body = await contentBody(file);
         if (!isShape(body) || typeof body.revision !== "number" || !isValid(body.data)) return null;
 
         return { data: body.data, revision: body.revision };

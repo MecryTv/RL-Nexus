@@ -324,6 +324,9 @@ export interface ILegalText {
 export const CUSTOMER_FILTERS = ["all", "trial", "subscription", "one_time", "gift", "expired", "banned"] as const;
 export type CustomerFilter = (typeof CUSTOMER_FILTERS)[number];
 
+/** Nachreview W-0141: so lang darf die Suche der Kundenliste sein, im Feld wie auf dem Server. */
+export const CUSTOMER_SEARCH_MAX = 100;
+
 /** Eine Zeile der Kundenliste. Die Mail ist gekürzt. */
 export interface ICustomerRow {
     readonly id: string;
@@ -348,9 +351,19 @@ export interface ICustomerStats {
     readonly banned: number;
 }
 
+/**
+ * W-0141: eine Seite der Kundenliste. Filter und Suche (Name, ID oder volle
+ * Mail, Groß und klein egal) rechnet der Server, die Zahlen an den Filtern gehen
+ * über alle Personen, ohne Suche.
+ */
 export interface ICustomerList {
     readonly stats: ICustomerStats;
+    readonly counts: Readonly<Record<CustomerFilter, number>>;
     readonly customers: readonly ICustomerRow[];
+    /** So viele passen zu Filter und Suche. */
+    readonly total: number;
+    readonly page: number;
+    readonly pageSize: number;
 }
 
 export interface ICustomerGrant {
@@ -389,16 +402,6 @@ export interface ICustomerDetail {
     readonly events: readonly ICustomerEvent[];
     /** Nur nach „Rolle neu setzen“: was der Abgleich gemeldet hat. */
     readonly lastSync?: { readonly joined: string; readonly roles: string; readonly notes: readonly string[] };
-}
-
-/** Filter und Suche der Kundenliste. Die Suche trifft Name, ID und Mail, Groß und klein egal. */
-export function customerMatches(row: ICustomerRow, filter: CustomerFilter, search: string): boolean {
-    if (filter !== "all" && row.status !== filter) return false;
-
-    const needle = search.trim().toLowerCase();
-    if (needle === "") return true;
-
-    return [row.id, row.name ?? "", row.email].some((value) => value.toLowerCase().includes(needle));
 }
 
 /** „mecry@gmail.com“ → „m***@gmail.com“. */

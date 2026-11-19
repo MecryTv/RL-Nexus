@@ -17,6 +17,7 @@ import { SECRET_COLUMN } from "../database.ts";
 import { CACHE_AREAS } from "../cache-areas.ts";
 import { cached, forget } from "../cache.ts";
 import { query } from "../db.ts";
+import { inLanes } from "../lanes.ts";
 
 /** Nutzerdaten (W-0051): Liste, Profil und Auskunft, gelesen über die Liste in shared/userdata.ts. */
 
@@ -154,17 +155,25 @@ async function shortRows(source: IUserdataSource, id: string): Promise<{ readonl
     });
 }
 
+/**
+ * W-0141: Rund 120 Quellen, je eine kleine Abfrage. Nacheinander war das bei
+ * jedem Profil eine lange Kette; drei Spuren lassen im Pool Platz für alles
+ * andere. Ein UNION ALL über alle Quellen wäre eine Abfrage, mischt aber
+ * Zeichensätze und Spaltentypen der Tabellen (DATETIME neben Zahl) und fiele
+ * ganz aus, sobald eine Tabelle fehlt.
+ */
+const LANES = 3;
+
 /** Alles zu einer Person, eine Zeile je Fundstelle. Servernamen setzt der Aufrufer. */
 export async function personRows(id: string): Promise<Omit<IUserdataRow, "guildName">[]> {
-    const rows: Omit<IUserdataRow, "guildName">[] = [];
+    const sources = sourcesOf();
+    const found = await inLanes(sources, LANES, (source) => shortRows(source, id));
 
-    for (const source of sourcesOf()) {
-        for (const row of await shortRows(source, id)) {
-            rows.push({ area: areaOf.get(source) as UserdataArea, table: source.table, role: source.role, label: row.label, guildId: row.guild, at: row.at });
-        }
-    }
+    return found.flatMap((rows, index) => {
+        const source = sources[index];
 
-    return rows;
+        return rows.map((row) => ({ area: areaOf.get(source) as UserdataArea, table: source.table, role: source.role, label: row.label, guildId: row.guild, at: row.at }));
+    });
 }
 
 /** Ein Wert für JSON: Zeiten als ISO, gepackte Spalten entpackt, sonstige Bytes als Base64. */
@@ -194,31 +203,27 @@ function exportValue(value: unknown, packed: boolean): unknown {
  */
 export async function personExport(id: string): Promise<Partial<Record<UserdataArea, Record<string, Record<string, unknown>[]>>>> {
     const result: Partial<Record<UserdataArea, Record<string, Record<string, unknown>[]>>> = {};
+    const pairs = USERDATA_AREAS.flatMap((area) => area.sources.map((source) => ({ area, source })));
+    // W-0141: in Spuren wie personRows; zusammengesetzt wird danach in der Reihenfolge der Liste.
+    const found = await inLanes(pairs, LANES, ({ source }): Promise<Record<string, unknown>[]> => {
+        if (source.role !== "person") return shortRows(source, id).then((rows) => rows.map((row) => ({ label: row.label, zeit: row.at, server: row.guild })));
 
-    for (const area of USERDATA_AREAS) {
-        for (const source of area.sources) {
-            const key = `${source.table}.${source.column}`;
-
-            if (source.role !== "person") {
-                const rows = await shortRows(source, id);
-                if (rows.length > 0) (result[area.id] ??= {})[key] = rows.map((row) => ({ label: row.label, zeit: row.at, server: row.guild }));
-                continue;
-            }
-
-            const rows = await rowsOf<Record<string, unknown>>(`SELECT * FROM ${source.table} WHERE ${matchSql(source)}`, [matchValue(source, id)]);
-            if (rows.length === 0) continue;
-
+        return rowsOf<Record<string, unknown>>(`SELECT * FROM ${source.table} WHERE ${matchSql(source)}`, [matchValue(source, id)]).then((rows) => {
             const hidden = new Set(source.hidden ?? []);
             const packed = new Set(source.packed ?? []);
 
-            (result[area.id] ??= {})[key] = rows.map((row) =>
+            return rows.map((row) =>
                 Object.fromEntries(
                     Object.entries(row)
                         .filter(([column]) => !hidden.has(column) && !SECRET_COLUMN.test(column))
                         .map(([column, value]) => [column, exportValue(value, packed.has(column))])
                 )
             );
-        }
+        });
+    });
+
+    for (const [index, { area, source }] of pairs.entries()) {
+        if (found[index].length > 0) (result[area.id] ??= {})[`${source.table}.${source.column}`] = found[index];
     }
 
     return result;

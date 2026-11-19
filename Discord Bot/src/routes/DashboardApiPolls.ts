@@ -6,6 +6,7 @@ import { MAX_OPTION_NATIVE, MAX_OPTION_OWN, NATIVE_MAX_HOURS } from "../constant
 import { IPoll } from "../interfaces/services/community/ICommunity";
 import { PollError, PollLimits, POLLS_MODULE } from "../services/PollService";
 import { DashboardLimit } from "../builder/LimitReply";
+import { IPollTally } from "../builder/CommunityView";
 import { WantsJSON } from "../utils/admin";
 import { CreateLogThread, LogTargetError, LogTargets } from "../utils/logtarget";
 import { GuildResources, IManageAccess, ManageGate } from "../utils/managegate";
@@ -57,8 +58,8 @@ export default class DashboardApiPolls extends Route {
         }
     }
 
-    private async Out(poll: IPoll) {
-        const tally = await this.client.pollService.Results(poll);
+    private async Out(poll: IPoll, known?: IPollTally) {
+        const tally = known ?? (await this.client.pollService.Results(poll));
 
         return {
             id: poll.id,
@@ -106,9 +107,11 @@ export default class DashboardApiPolls extends Route {
         }
 
         const polls = await this.client.polls.OfGuild(guild.id);
+        // W-0141: Knopf-Umfragen zählen alle zusammen, Discord-Umfragen wie bisher über Results.
+        const tallies = await this.client.polls.TallyMany(polls.filter((poll) => poll.kind === "buttons").map((poll) => poll.id));
 
         return {
-            polls: await Promise.all(polls.map((poll) => this.Out(poll))),
+            polls: await Promise.all(polls.map((poll) => this.Out(poll, tallies.get(poll.id)))),
             limits: { options: PollLimits(guild.id).options, own: MAX_OPTION_OWN, native: MAX_OPTION_NATIVE, nativeHours: NATIVE_MAX_HOURS },
             guild: { name: guild.name, ...GuildResources(guild) },
             targets: await LogTargets(guild, []),

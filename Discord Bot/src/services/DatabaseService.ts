@@ -14,6 +14,7 @@ import {
     TableName,
 } from "../constants/Database";
 import logger from "../utils/logger";
+import { AcquireTimed, NoteQuery } from "../utils/slow";
 
 // Wird geworfen, wenn jemand ohne Datenbank abfragt. Ein eigener Typ, damit
 // Aufrufer den Fall von einem echten SQL-Fehler unterscheiden können - das
@@ -207,8 +208,26 @@ export default class DatabaseService implements IDatabaseService {
         return this.pool;
     }
 
+    /**
+     * W-0141: Dauer jeder Abfrage, Langsames merkt utils/slow.ts (ohne die Werte).
+     * Review: Das Warten auf eine freie Verbindung steht getrennt, sonst sähe ein
+     * voller Pool aus wie langsames SQL.
+     */
+    private async Timed(sql: string, params: unknown[]): Promise<unknown> {
+        const pool = this.Pool();
+        const { connection, waitMs } = await AcquireTimed(sql, () => pool.getConnection());
+        const started = performance.now();
+
+        try {
+            return await connection.query(sql, params);
+        } finally {
+            await connection.release();
+            NoteQuery(sql, performance.now() - started, waitMs);
+        }
+    }
+
     async Query<T>(sql: string, params: unknown[] = []): Promise<T[]> {
-        const rows = await this.Pool().query(sql, params);
+        const rows = await this.Timed(sql, params);
 
         // Der Treiber hängt an jedem Ergebnis noch "meta" - das gehört nicht in
         // die Zeilen, die weitergereicht werden.
@@ -222,7 +241,7 @@ export default class DatabaseService implements IDatabaseService {
     }
 
     async Write(sql: string, params: unknown[] = []): Promise<IWriteResult> {
-        const result = (await this.Pool().query(sql, params)) as { affectedRows?: number; insertId?: number };
+        const result = (await this.Timed(sql, params)) as { affectedRows?: number; insertId?: number };
 
         return { affectedRows: result.affectedRows ?? 0, insertId: Number(result.insertId ?? 0) };
     }

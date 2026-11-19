@@ -41,7 +41,7 @@ export interface IImageEditorOptions {
 /** Wie die Motive ungefähr aussehen - gezeichnet werden sie im Bot (builder/RoleListCard.ts). */
 const MOTIF_SWATCH: Record<RoleListMotif, string> = {
     arena: "radial-gradient(circle at 70% 15%, #6a1422 0%, #1c0c12 45%, #0b1118 80%)",
-    nexus: `center / cover url("${BASE}/assets/images/RL%20Nexus%20Banner.png")`,
+    nexus: `center / cover url("${BASE}/assets/images/RL%20Nexus%20Banner.webp")`,
     spotlight: "radial-gradient(circle at 50% -10%, #5a1220 0%, #170a10 38%, #070a0f 70%)",
     carbon: "repeating-linear-gradient(45deg, #0f141b 0 7px, #141b24 7px 14px)",
     grid: "linear-gradient(rgba(0,229,255,.14) 1px, transparent 1px) 0 0 / 14px 14px, linear-gradient(90deg, rgba(0,229,255,.14) 1px, transparent 1px) 0 0 / 14px 14px, radial-gradient(circle at 50% 115%, #08405a 0%, #05060f 70%)",

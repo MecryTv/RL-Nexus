@@ -32,6 +32,8 @@ export async function cleanup(): Promise<void> {
 
         // Ohne Meldung: Hier fallen jeden Tag rund 2900 Zeilen weg, das ist Alltag.
         await query(`DELETE FROM status_checks WHERE checked_at < NOW() - INTERVAL ${HISTORY_DAYS} DAY`);
+        // W-0141: echte Ladezeiten als Stundensummen, 90 Tage wie die Statusprüfungen. Die Stunde steht in UTC.
+        await query("DELETE FROM web_vitals_hours WHERE hour < UTC_TIMESTAMP() - INTERVAL 90 DAY").catch(() => undefined);
         // Shop: Bestellungen, die nie bezahlt wurden, nach 30 Tagen. Eine Lastschrift meldet sich erst Tage
         // nach dem Checkout (async_payment_succeeded), bis dahin muss die Bestellung da sein.
         // Discord-Tokens, die nicht mehr gelten dürfen.

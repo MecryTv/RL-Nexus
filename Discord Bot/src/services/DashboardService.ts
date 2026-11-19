@@ -806,16 +806,24 @@ export default class DashboardService implements IDashboardService {
     }
 
     async Payload(session: IDashboardSession): Promise<IDashboardPayload> {
-        const guilds = await this.GuildsOf(session);
-        const user = await this.User(session);
+        // W-0141: /api/me kommt bei jedem Seitenaufruf. Was nicht voneinander abhängt, gleichzeitig.
+        // ShopAccess teilt sich den laufenden Abruf mit GuildsOf (shopLoading), Paywall ist 60 s gemerkt.
+        const [guilds, user, shop, paywall, ends, catalog] = await Promise.all([
+            this.GuildsOf(session),
+            this.User(session),
+            this.ShopAccess(session.userId),
+            this.Paywall(),
+            // W-0017: bis wann der Zugang läuft, für die Einstellungsseite. Scheitert das, fehlt nur die Zeile.
+            this.ShopEnds(session.userId).catch(() => null),
+            this.client.catalogService.Fresh(),
+        ]);
 
         // Free, Zugang aus dem Shop, Guardian oder Testphase (siehe DisplayGroup).
-        user.group = DisplayGroup(user.group, await this.ShopAccess(session.userId), guilds, await this.Paywall());
-        // W-0017: bis wann der Zugang läuft, für die Einstellungsseite. Scheitert das, fehlt nur die Zeile.
-        user.access = await this.ShopEnds(session.userId).catch(() => null);
+        user.group = DisplayGroup(user.group, shop, guilds, paywall);
+        user.access = ends;
 
         // W-0069: Ein fertiger Discord-Link ginge ohne state nicht mehr; eingeladen wird über /einladen?guild=…
-        return { user, guilds, inviteURL: `${DASHBOARD_PATH}/einladen`, catalog: await this.client.catalogService.Fresh() };
+        return { user, guilds, inviteURL: `${DASHBOARD_PATH}/einladen`, catalog };
     }
 
     /** Zugang laut Shop, mit Cache. Wirft nie: Kann der Bot die Tabellen nicht lesen, bleibt die Schranke offen, außer Beta könnte laufen. */
@@ -849,8 +857,10 @@ export default class DashboardService implements IDashboardService {
                 access = ALLOWED;
             } else {
                 const db = this.client.databaseService;
-                const customer = await db.One<{ banned_at: Date | null }>("SELECT banned_at FROM shop_customers WHERE user_id = ?", [userId]);
-                const grants = await db.Query<IShopGrantRow>("SELECT source, starts_at, ends_at, ended_at, cancel_at_period_end FROM shop_grants WHERE user_id = ?", [userId]);
+                const [customer, grants] = await Promise.all([
+                    db.One<{ banned_at: Date | null }>("SELECT banned_at FROM shop_customers WHERE user_id = ?", [userId]),
+                    db.Query<IShopGrantRow>("SELECT source, starts_at, ends_at, ended_at, cancel_at_period_end FROM shop_grants WHERE user_id = ?", [userId]),
+                ]);
 
                 access = ShopDecision({ paywall, group, banned: customer?.banned_at != null, grants, now: new Date() });
             }

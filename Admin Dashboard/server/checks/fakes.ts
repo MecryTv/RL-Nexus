@@ -355,6 +355,23 @@ globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit): P
         return json({ members: 1240, online: 312, modules: ["teams", "apply"], teams: [{ name: "Apex A", group: null, mmr: 1500, rank: "GC 1", players: 3 }] });
     }
 
+    // W-0141: was der Bot an langsamen Anfragen gemerkt hat.
+    if (url === `${config.botApiUrl}/dcapi/admin/dev/slow`) {
+        if (fake.botDown) throw new TypeError("fetch failed");
+        if (!String(headers.Authorization ?? "").startsWith("Bearer ")) return json({ error: "Unauthorized" }, 401);
+
+        return json({
+            since: "2026-10-05T10:00:00.000Z",
+            requestMs: 500,
+            sqlMs: 200,
+            requests: 40,
+            slowRequests: 1,
+            queries: 900,
+            slowQueries: 0,
+            entries: [{ kind: "request", at: "2026-10-05T10:05:00.000Z", ms: 640, what: "GET /dashboard/api/guilds/:id/levels", status: 200 }],
+        });
+    }
+
     if (url === `${config.botApiUrl}/dcapi/admin/overview`) {
         if (fake.botDown) throw new TypeError("fetch failed");
         if (!String(headers.Authorization ?? "").startsWith("Bearer ")) return json({ error: "Unauthorized" }, 401);

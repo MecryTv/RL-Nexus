@@ -159,13 +159,37 @@ export default class Polls extends Model<IPollRow> {
 
     /** Stimmen je Antwort und wie viele Leute abgestimmt haben. */
     async Tally(pollId: number): Promise<{ counts: Record<string, number>; voters: number }> {
-        const rows = await this.db.Query<{ option_id: string; total: number }>(
-            `SELECT option_id, COUNT(*) AS total FROM \`${TABLES.pollVotes}\` WHERE poll_id = ? GROUP BY option_id`,
-            [pollId]
-        );
-        const voters = await this.db.One<{ total: number }>(`SELECT COUNT(DISTINCT user_id) AS total FROM \`${TABLES.pollVotes}\` WHERE poll_id = ?`, [pollId]);
+        return (await this.TallyMany([pollId])).get(pollId)!;
+    }
 
-        return { counts: Object.fromEntries(rows.map((row) => [row.option_id, Number(row.total)])), voters: Number(voters?.total ?? 0) };
+    /** W-0141: dasselbe für viele Umfragen mit zwei Abfragen - die Liste im Dashboard fragte sonst zweimal je Umfrage. */
+    async TallyMany(pollIds: number[]): Promise<Map<number, { counts: Record<string, number>; voters: number }>> {
+        const out = new Map(pollIds.map((id) => [id, { counts: {} as Record<string, number>, voters: 0 }]));
+
+        if (!pollIds.length) return out;
+
+        const marks = pollIds.map(() => "?").join(", ");
+        const [rows, voters] = await Promise.all([
+            this.db.Query<{ poll_id: number; option_id: string; total: number }>(
+                `SELECT poll_id, option_id, COUNT(*) AS total FROM \`${TABLES.pollVotes}\` WHERE poll_id IN (${marks}) GROUP BY poll_id, option_id`,
+                pollIds
+            ),
+            this.db.Query<{ poll_id: number; total: number }>(`SELECT poll_id, COUNT(DISTINCT user_id) AS total FROM \`${TABLES.pollVotes}\` WHERE poll_id IN (${marks}) GROUP BY poll_id`, pollIds),
+        ]);
+
+        for (const row of rows) {
+            const tally = out.get(Number(row.poll_id));
+
+            if (tally) tally.counts[row.option_id] = Number(row.total);
+        }
+
+        for (const row of voters) {
+            const tally = out.get(Number(row.poll_id));
+
+            if (tally) tally.voters = Number(row.total);
+        }
+
+        return out;
     }
 
     /** Wer was gewählt hat - nur für Umfragen, die nicht anonym sind. */

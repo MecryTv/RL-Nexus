@@ -13,6 +13,7 @@ import { useToast } from "../toast/context";
 import { draftFor, type ReplyKind } from "./draft";
 import { LazyComposer } from "./LazyComposer";
 import styles from "./mail.module.scss";
+import type { MailPending } from "./pending.ts";
 
 /** Das Dokument im iframe: eigene CSP, Links öffnen sich in einem neuen Tab. */
 function frameDocument(html: string, images: boolean): string {
@@ -34,6 +35,7 @@ export function Reader({
     folders,
     onChanged,
     onGone,
+    pending,
 }: {
     readonly account: IMailAccount;
     readonly accounts: readonly IMailAccount[];
@@ -42,6 +44,8 @@ export function Reader({
     readonly folders: readonly IMailFolder[];
     readonly onChanged: () => void;
     readonly onGone: () => void;
+    /** W-0141: Was die Liste sofort zeigt (mail/pending.ts). start ist false, solange auf diese Mail schon eine Aktion läuft. */
+    readonly pending: { readonly start: (uid: number, kind: MailPending) => boolean; readonly done: (uid: number) => void; readonly failed: (uid: number) => void };
 }): JSX.Element {
     const notify = useToast();
     const [images, setImages] = useState(false);
@@ -68,8 +72,31 @@ export function Reader({
         }
     }
 
-    const move = (target: MailMoveTarget, done: string) => run(() => api(`/api/mail/${account.id}/message/move?folder=${encodeURIComponent(folder)}&uid=${uid}`, { method: "POST", body: { target } }), done, true);
-    const markUnread = () => run(() => api(base, { method: "PATCH", body: { seen: false } }), "Als ungelesen markiert", true);
+    /**
+     * W-0141: Verschieben und „ungelesen“ zeigt die Liste sofort und der
+     * Lesebereich schließt. Scheitert es, steht die Mail wieder da und der
+     * Grund kommt als Meldung. Löschen wartet weiter auf den Server.
+     */
+    async function rightAway(action: () => Promise<unknown>, done: string, kind: MailPending): Promise<void> {
+        // Läuft auf diese Mail schon eine Aktion (Doppelklick), geht keine zweite Anfrage raus.
+        if (!pending.start(uid, kind)) return;
+
+        onGone();
+
+        try {
+            await action();
+            pending.done(uid);
+            notify(done);
+            onChanged();
+        } catch (failure) {
+            pending.failed(uid);
+            notify(messageOf(failure), "danger");
+        }
+    }
+
+    const move = (target: MailMoveTarget, done: string) =>
+        rightAway(() => api(`/api/mail/${account.id}/message/move?folder=${encodeURIComponent(folder)}&uid=${uid}`, { method: "POST", body: { target } }), done, "gone");
+    const markUnread = () => rightAway(() => api(base, { method: "PATCH", body: { seen: false } }), "Als ungelesen markiert", "unread");
     const remove = () => run(() => api(base, { method: "DELETE" }), role === "trash" ? "Endgültig gelöscht" : "In den Papierkorb gelegt", true);
 
     if (error && !data) return <Failure message={error.message} onRetry={reload} />;

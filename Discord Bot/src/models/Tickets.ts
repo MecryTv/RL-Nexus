@@ -179,6 +179,18 @@ export default class Tickets extends Model<ITicketRow> {
         return rows.map(ToTicket);
     }
 
+    /** W-0141: offene Tickets je Server, eine Abfrage für alle - die Admin-Serverliste lud sonst je Server bis 200 ganze Zeilen. */
+    async OpenCounts(guildIds: string[]): Promise<Map<string, number>> {
+        if (!guildIds.length) return new Map();
+
+        const rows = await this.db.Query<{ guild_id: string; total: number }>(
+            `SELECT guild_id, COUNT(*) AS total FROM \`${this.Table}\` WHERE guild_id IN (${guildIds.map(() => "?").join(", ")}) AND status <> 'closed' GROUP BY guild_id`,
+            guildIds
+        );
+
+        return new Map(rows.map((row) => [row.guild_id, Number(row.total)]));
+    }
+
     /** Wie viele Tickets die User auf einem Server schon hatten - offen und geschlossen. */
     async CountsByOpener(guildId: string, openerIds: string[]): Promise<Map<string, number>> {
         const unique = [...new Set(openerIds)];

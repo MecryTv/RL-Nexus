@@ -235,21 +235,41 @@ interface IHourRow {
     readonly latency_max: number | string | null;
 }
 
+/** W-0141: gemerkte Stunden bis vor `from`, in die die Datenbank nicht mehr schreibt. Ganz neu gelesen wird höchstens einmal am Tag. */
+let kept: { readonly from: number; readonly at: number; readonly hours: readonly IHour[] } | null = null;
+const FULL_EVERY = 24 * HOUR;
+
+/** Gemerkte Stunden vor `from` (ohne die vor `oldest`) und die frisch gelesenen ab `from`, nach Stunde sortiert. */
+export function mergeHours(kept: readonly IHour[], fresh: readonly IHour[], from: number, oldest: number): IHour[] {
+    return [...kept.filter((entry) => entry.hour >= oldest && entry.hour < from), ...fresh.filter((entry) => entry.hour >= from)].sort((a, b) => a.hour - b.hour);
+}
+
 /**
  * Stunden und Ausfälle der letzten 90 Tage. `null` ohne Datenbank.
+ *
+ * W-0141: Alle zwei Minuten 90 Tage zu gruppieren kostete eine halbe Sekunde
+ * (Slow-Log, rund 106 000 Zeilen). Fertige Stunden ändern sich nicht mehr:
+ * gelesen wird nur ab der vorletzten Stunde, die Zeit zwischen Messung und
+ * Schreiben fällt damit nicht durch.
  *
  * SUM liefert bei MariaDB DECIMAL, das kommt als Text: daher überall Number().
  */
 export async function loadHistory(now: number, current: Partial<Record<StatusService, CheckState>>): Promise<{ readonly hours: IHour[]; readonly outages: IOutage[] } | null> {
     if (!databaseReady()) return null;
 
+    const from = Math.floor(now / HOUR) - 1;
+    const oldest = Math.floor((now - HISTORY_DAYS * 24 * HOUR) / HOUR);
+    const base = kept !== null && now - kept.at < FULL_EVERY ? kept : null;
+    const since = base === null ? `NOW() - INTERVAL ${HISTORY_DAYS} DAY` : "FROM_UNIXTIME(?)";
+
     const [hourRows, downRows] = await Promise.all([
         query<IHourRow[]>(
             `SELECT service, FLOOR(UNIX_TIMESTAMP(checked_at) / 3600) AS hour, COUNT(*) AS checks,
                     SUM(state = 'down') AS down, SUM(state = 'warn') AS warn,
                     SUM(latency_ms) AS latency_sum, COUNT(latency_ms) AS latency_count, MAX(latency_ms) AS latency_max
-             FROM status_checks WHERE checked_at >= NOW() - INTERVAL ${HISTORY_DAYS} DAY
-             GROUP BY service, hour`
+             FROM status_checks WHERE checked_at >= ${since}
+             GROUP BY service, hour`,
+            base === null ? [] : [base.from * 3600]
         ),
         query<{ service: StatusService; at: number | string }[]>(
             `SELECT service, UNIX_TIMESTAMP(checked_at) AS at FROM status_checks
@@ -257,7 +277,7 @@ export async function loadHistory(now: number, current: Partial<Record<StatusSer
         ),
     ]);
 
-    const hours = hourRows.map(
+    const read = hourRows.map(
         (row): IHour => ({
             service: row.service,
             hour: Number(row.hour),
@@ -269,6 +289,9 @@ export async function loadHistory(now: number, current: Partial<Record<StatusSer
             latencyMax: row.latency_max === null ? null : Number(row.latency_max),
         })
     );
+    const hours = base === null ? read.filter((entry) => entry.hour >= oldest).sort((a, b) => a.hour - b.hour) : mergeHours(base.hours, read, base.from, oldest);
+
+    kept = { from, at: base?.at ?? now, hours: hours.filter((entry) => entry.hour < from) };
 
     return { hours, outages: outagesFrom(downRows.map((row) => ({ service: row.service, at: Number(row.at) * 1000 })), now, current) };
 }

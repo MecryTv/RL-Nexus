@@ -43,6 +43,8 @@ import { newsRoutes } from "./routes/news.ts";
 import { changelogRoutes } from "./routes/changelog.ts";
 import { publicStatusRoutes, statusRoutes } from "./routes/status.ts";
 import { userRoutes } from "./routes/users.ts";
+import { noteRequest } from "./slow.ts";
+import { publicVitalsRoutes, vitalsRoutes } from "./routes/vitals.ts";
 
 /** Der Build der Oberfläche (npm run build). Fehlt er, liefert der Server nur die API. */
 const DIST = path.join(import.meta.dirname, "..", "dist");
@@ -66,6 +68,15 @@ export async function buildApp(config: IConfig): Promise<FastifyInstance> {
         return reply.code(status).send({ error: message });
     });
 
+    // W-0141: Dauer jeder Antwort mit dem Muster der Route. Langsames landet im
+    // Ringpuffer (server/slow.ts), zu sehen unter Developer. EventSource-Leitungen
+    // bleiben absichtlich lange offen und zählen nicht.
+    app.addHook("onResponse", async (request, reply) => {
+        if (request.headers.accept?.includes("text/event-stream")) return;
+
+        noteRequest(request.method, request.routeOptions.url ?? "(ohne Route)", reply.statusCode, reply.elapsedTime);
+    });
+
     await app.register(rateLimit, { global: true, max: 300, timeWindow: "1 minute" });
     app.addHook("onRequest", guardWrites(config));
 
@@ -81,6 +92,7 @@ export async function buildApp(config: IConfig): Promise<FastifyInstance> {
     await app.register(internalServerRoutes, { config });
     await app.register(internalSecurityRoutes, { config });
     await app.register(publicSecurityRoutes, { config });
+    await app.register(publicVitalsRoutes, { config });
     await app.register(mediaFileRoutes, { config });
 
     // Alles hier drin braucht eine Sitzung, die Rolle wird bei jeder Anfrage geprüft.
@@ -126,6 +138,7 @@ export async function buildApp(config: IConfig): Promise<FastifyInstance> {
             await dev.register(redisRoutes, { config });
             await dev.register(dumpRoutes, { config });
             await dev.register(changelogRoutes, { config });
+            await dev.register(vitalsRoutes);
         });
     });
 

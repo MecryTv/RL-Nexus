@@ -11,6 +11,7 @@ process.env.CLIENT_SECRET ||= "check-secret";
 process.env.DEV_CLIENT_SECRET ||= "check-secret";
 
 import path from "path";
+import { build } from "esbuild";
 import { existsSync } from "node:fs";
 import { mkdtemp, readdir, readFile, rm, stat, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -23,6 +24,7 @@ import { MODULE_IDS, PERMANENT_MODULES } from "../constants/Modules";
 import { MODULE_SETTINGS } from "../constants/ModuleSettings";
 import { DefaultRouletteSettings } from "../constants/RocketRoulette";
 import { AdminStatus, AskAdmin, BackupCall } from "../routes/DashboardApiBackups";
+import { ForwardVitals } from "../routes/DashboardVitals";
 import { DASHBOARD_HOME, DASHBOARD_PATH, DEVELOPER_MODE, DISCORD_EPOCH, OAUTH_SCOPES, SESSION_COOKIE } from "../constants/Dashboard";
 import { FastifyRequest } from "fastify";
 import { WantsJSON } from "../utils/admin";
@@ -37,6 +39,7 @@ import { askableCount, limitCards, limitCounts, limitName, limitRequestText, lim
 import { IOpenGroup, openGroups, parseVoiceTab, personStates, regionName, seatsText, voiceTabHref } from "../dashboard/client/constants/Voice";
 import { IModuleLimit } from "../dashboard/client/interfaces/IGuild";
 import CatalogService, { Catalog } from "../services/CatalogService";
+import { STYLES } from "./BuildDashboard";
 import { CommandPaths } from "../routes/AdminCommands";
 import { ApplyHelpCatalog } from "../constants/Help";
 import { CodeFromForm, RedeemAtAdmin } from "../routes/DashboardBeta";
@@ -1824,7 +1827,7 @@ async function checkLimitsMarkup(): Promise<void> {
     const root = path.join(process.cwd(), "src", "dashboard");
     const pages = path.join(root, "client", "pages");
     const page = await readFile(path.join(pages, "GuildLimits.ts"), "utf8").catch(() => "");
-    const css = (await readFile(path.join(root, "public", "assets", "style.css"), "utf8")).split(/\r?\n/);
+    const css = (await readFile(path.join(root, "client", "style.css"), "utf8")).split(/\r?\n/);
     const foreign = [];
 
     for (const file of await readdir(pages)) {
@@ -1884,7 +1887,7 @@ async function checkRankRolesStyles(): Promise<void> {
     console.log("\n— Rank Roles: eigene Klassen für das Raster —");
 
     const root = path.join(process.cwd(), "src", "dashboard");
-    const css = (await readFile(path.join(root, "public", "assets", "style.css"), "utf8")).split(/\r?\n/);
+    const css = (await readFile(path.join(root, "client", "style.css"), "utf8")).split(/\r?\n/);
     const pages = path.join(root, "client", "pages");
     const page = await readFile(path.join(pages, "GuildRankRoles.ts"), "utf8");
     const others = await Promise.all(
@@ -1994,6 +1997,59 @@ async function main(): Promise<void> {
     // 1,4 MB, die niemand liest: ohne Abbruch bleibt die Antwort im Server stecken und Stop() wartet ewig.
     await logo.body?.cancel();
 
+    // W-0141: Rang-Abzeichen und der Banner im Rollenlisten-Editor als WebP, klein.
+    for (const image of ["rocketleague/rlranks/small/Champion%203.webp", "RL%20Nexus%20Banner.webp"]) {
+        const response = await fetch(`${BASE}${P}/assets/images/${image}`);
+        const bytes = (await response.arrayBuffer()).byteLength;
+
+        check(`WebP ausgeliefert und unter 150 KB: ${decodeURIComponent(image)}`, response.status === 200 && response.headers.get("content-type") === "image/webp" && bytes < 150 * 1024, `${response.status} ${response.headers.get("content-type")} ${bytes}`);
+    }
+
+    const source = (...parts: string[]) => readFile(path.join(process.cwd(), "src", ...parts), "utf8");
+    const pointers = [await source("dashboard", "client", "constants", "Ranks.ts"), await source("builder", "EpicPage.ts"), await source("dashboard", "client", "layout", "RoleListImageEditor.ts")].join("\n");
+
+    const vitals = await source("dashboard", "client", "core", "Vitals.ts");
+
+    check("Ladezeiten ohne Cookies und ohne Referer (Review W-0141)", vitals.includes('credentials: "omit"') && vitals.includes('referrerPolicy: "no-referrer"'));
+    check("Client und Epic-Seite zeigen auf die WebP-Dateien", !/rlranks\/small\/[^`]*\.png|Banner\.png/.test(pointers) && pointers.includes("Banner.webp"));
+
+    // W-0141: echte Ladezeiten gehen ans Admin Dashboard, mit eigenem Token; der Browser bekommt immer 204.
+    const { createServer: vitalsServer } = await import("node:http");
+    const relayed: { url?: string; auth?: string; body: string }[] = [];
+    const vitalsAdmin = vitalsServer((request, response) => {
+        let body = "";
+
+        request.on("data", (chunk) => (body += String(chunk)));
+        request.on("end", () => {
+            relayed.push({ url: request.url, auth: request.headers.authorization, body });
+            response.writeHead(204).end();
+        });
+    });
+
+    await new Promise<void>((resolve) => vitalsAdmin.listen(0, "127.0.0.1", resolve));
+
+    const vitalsUrl = `http://127.0.0.1:${(vitalsAdmin.address() as { port: number }).port}`;
+    const forwarded = await ForwardVitals(vitalsUrl, client.config.SERVER_JWT_SECRET, { device: "mobile", metrics: { LCP: 1800 } });
+    const scopeOf = (auth = "") => (JSON.parse(Buffer.from(auth.replace("Bearer ", "").split(".")[1] ?? "", "base64url").toString() || "{}") as { scope?: string[] }).scope ?? [];
+
+    check("Ladezeiten: weitergereicht an /internal/vitals mit Scope vitals", forwarded === 204 && relayed[0]?.url === "/internal/vitals" && scopeOf(relayed[0]?.auth).includes("vitals") && JSON.parse(relayed[0].body).metrics.LCP === 1800, JSON.stringify(relayed));
+
+    const savedAdmin = client.config.ADMIN_INTERNAL_URL;
+
+    client.config.ADMIN_INTERNAL_URL = vitalsUrl;
+
+    try {
+        const beacon = await fetch(`${BASE}${P}/api/vitals`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ device: "desktop", metrics: { INP: 80 } }) });
+        const tooBig = await fetch(`${BASE}${P}/api/vitals`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pad: "x".repeat(4096) }) });
+
+        for (let wait = 0; wait < 20 && relayed.length < 2; wait++) await new Promise((resolve) => setTimeout(resolve, 25));
+
+        check("Ladezeiten: Route ohne Sitzung 204, setzt kein Cookie, reicht weiter; zu groß 413", beacon.status === 204 && !beacon.headers.get("set-cookie") && relayed.length === 2 && tooBig.status === 413, `${beacon.status} ${tooBig.status} ${relayed.length}`);
+    } finally {
+        client.config.ADMIN_INTERNAL_URL = savedAdmin;
+        vitalsAdmin.close();
+    }
+
     // W-0114: Galerie-Bilder nur als das, was sie sind - der Browser rät nicht.
     const galleryImage = await fetch(`${BASE}/images/default/rocketleague/plattforms/steam.png`);
     check("Galerie-Bild mit nosniff", galleryImage.status === 200 && galleryImage.headers.get("x-content-type-options") === "nosniff", `${galleryImage.status} ${galleryImage.headers.get("x-content-type-options")}`);
@@ -2053,6 +2109,16 @@ async function main(): Promise<void> {
     // Die Hausfarbe steht in style.css selbst, eine zweite Farbdatei gibt es
     // nicht mehr. Fehlt sie dort, sind Knoepfe, Marken und Fokusringe farblos.
     check("style.css traegt die Hausfarbe #ff1e2d", (await css.text()).includes("--brand:#ff1e2d"));
+
+    // E9 (W-0141): Gepflegt wird client/style.css, ausgeliefert die verkleinerte Fassung aus build:dashboard.
+    // Nachreview: im Speicher mit denselben Optionen neu gebaut und genau verglichen, Zeilenenden egal. So fällt
+    // jede Änderung an der Quelle auf, nach der niemand neu gebaut hat, auch ein geänderter Wert.
+    const cssBuilt = (await readFile(path.join(process.cwd(), "src", "dashboard", "public", "assets", "style.css"), "utf8")).replace(/\r\n/g, "\n");
+    const cssFresh = ((await build({ ...STYLES, write: false, logLevel: "silent" })).outputFiles[0]?.text ?? "").replace(/\r\n/g, "\n");
+    let cssDiff = 0;
+
+    while (cssDiff < cssBuilt.length && cssBuilt[cssDiff] === cssFresh[cssDiff]) cssDiff++;
+    check("style.css: ausgeliefert ist genau der Bau aus client/style.css (sonst npm run build:dashboard)", cssFresh !== "" && cssBuilt === cssFresh, `ab Zeichen ${cssDiff}: „${cssBuilt.slice(cssDiff, cssDiff + 40)}“ statt „${cssFresh.slice(cssDiff, cssDiff + 40)}“`);
 
     const js = await fetch(`${BASE}${P}/assets/app.js`);
     check("app.js wird ausgeliefert (Frontend gebaut?)", js.status === 200, `${js.status} - npm run build:dashboard`);

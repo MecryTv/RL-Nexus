@@ -1,3 +1,4 @@
+import { createContext, useContext, useMemo } from "react";
 import type { IMailAddress, IMailOverview } from "../../shared/api";
 import { useLive } from "./live";
 import { useApi, type IApiState } from "./useApi";
@@ -19,13 +20,31 @@ export function boxColor(index: number): string {
 /**
  * Alle Postfächer mit Ordnern und Zahlen. Neue Mails meldet der Server über
  * `mail`. Die Minute bleibt als Netz, falls die Verbindung hängt.
+ *
+ * W-0141: Jede Abfrage fragt alle Postfächer per IMAP ab. Shell, Postfach und
+ * Startseite holten sie bisher jede für sich, eine neue Mail kostete so zwei
+ * bis drei Runden. Jetzt holt nur die Shell (useMailOverviewSource) und reicht
+ * den Stand über MailOverviewProvider an alle Seiten weiter.
  */
+const MailOverviewContext = createContext<IApiState<IMailOverview> | null>(null);
+
+export const MailOverviewProvider = MailOverviewContext.Provider;
+
+export function useMailOverviewSource(): IApiState<IMailOverview> {
+    const { data, error, loading, updatedAt, reload } = useApi<IMailOverview>("/api/mail", 60_000);
+
+    useLive("mail", reload);
+
+    // Gleicher Stand, gleiches Objekt: Sonst rendert jede Seite mit, wenn die Shell aus anderem Grund neu rendert.
+    return useMemo(() => ({ data, error, loading, updatedAt, reload }), [data, error, loading, updatedAt, reload]);
+}
+
 export function useMailOverview(): IApiState<IMailOverview> {
-    const state = useApi<IMailOverview>("/api/mail", 60_000);
+    const shared = useContext(MailOverviewContext);
 
-    useLive("mail", state.reload);
+    if (!shared) throw new Error("useMailOverview braucht die Shell drumherum (MailOverviewProvider).");
 
-    return state;
+    return shared;
 }
 
 /** Ungelesenes in den Posteingängen aller Postfächer. null: noch unbekannt. */

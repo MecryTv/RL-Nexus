@@ -1,4 +1,4 @@
-import { useEffect, useState, type JSX } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from "react";
 import { Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type { IMailBox, IMailPage } from "../../shared/api";
 import { MAIL_LIST_FILTERS, type MailListFilter } from "../../shared/limits";
@@ -17,6 +17,7 @@ import { FolderSelect, Folders } from "../mail/Folders";
 import { LazyComposer } from "../mail/LazyComposer";
 import { MessageList } from "../mail/MessageList";
 import { Reader } from "../mail/Reader";
+import { pendingDone, pendingFailed, pendingFresh, pendingOpened, pendingStart, pendingStep, withPending, type IPendingStore, type MailPending, type PendingState } from "../mail/pending.ts";
 import { inboxOf, inboxUnread, legacyAllPath, startPath } from "../mail/route.ts";
 import styles from "../mail/mail.module.scss";
 import { useMe } from "../session/context";
@@ -65,8 +66,11 @@ function useListParams(): {
     };
 }
 
+/** W-0141: kein Auftrag unterwegs, als feste Instanz, damit die Liste nicht neu rechnet. */
+const NO_PENDING: PendingState = new Map();
+
 /** Die Liste eines Ordners. Eigene Komponente, damit sie nur lädt, wenn ein Ordner offen ist. */
-function FolderPane({ box, folder, uid }: { readonly box: IMailBox; readonly folder: string; readonly uid: number | null }): JSX.Element {
+function FolderPane({ box, folder, uid, pending, onFresh }: { readonly box: IMailBox; readonly folder: string; readonly uid: number | null; readonly pending: PendingState; readonly onFresh: () => void }): JSX.Element {
     const list = useListParams();
     const navigate = useNavigate();
     const state = useApi<IMailPage>(`/api/mail/${box.id}/messages?folder=${encodeURIComponent(folder)}&${list.search}`);
@@ -74,6 +78,14 @@ function FolderPane({ box, folder, uid }: { readonly box: IMailBox; readonly fol
     const name = current?.name ?? folder;
 
     useLive("mail", state.reload);
+
+    // W-0141: was gerade verschoben oder als ungelesen markiert wird, zeigt die Liste schon so.
+    // Kommen frische Daten, zeigen sie bestätigte Aufträge selbst.
+    useEffect(() => {
+        if (state.data) onFresh();
+    }, [state.data, onFresh]);
+
+    const shown = useMemo(() => (state.data ? { ...state, data: { ...state.data, messages: withPending(state.data.messages, pending) } } : state), [state, pending]);
 
     // W-0128: Mehrere auf einmal gibt es nur im Papierkorb. War die offene Mail dabei, schließt der Lesebereich.
     const deleteMany =
@@ -87,7 +99,7 @@ function FolderPane({ box, folder, uid }: { readonly box: IMailBox; readonly fol
     return (
         <MessageList
             title={`${name} · ${box.label}`}
-            state={state}
+            state={shown}
             filter={list.filter}
             query={list.query}
             page={list.page}
@@ -139,6 +151,41 @@ export function MailPage(): JSX.Element {
     const unread = unreadOf(overview.data);
     const listPath = box !== null && folder !== null ? `${mailPath(box.id, folder)}${listSearch}` : "/post";
 
+    // W-0141: was die Liste schon zeigt, bevor der Server antwortet (mail/pending.ts), je Ordner.
+    // Im Ref steht der Stand sofort, damit ein Doppelklick die laufende Aktion sieht; der State rendert.
+    const here = box !== null && folder !== null ? `${box.id}-${folder}` : "";
+    const pendingRef = useRef<IPendingStore>({ key: "", state: new Map() });
+    const [pending, setPending] = useState<IPendingStore>({ key: "", state: new Map() });
+    const change = useCallback(
+        (next: (state: PendingState) => PendingState | null): boolean => {
+            const stored = pendingStep(pendingRef.current, here, next);
+
+            if (stored === null) return false;
+            if (stored !== pendingRef.current) {
+                pendingRef.current = stored;
+                setPending(stored);
+            }
+
+            return true;
+        },
+        [here]
+    );
+    const pendingHere = pending.key === here ? pending.state : NO_PENDING;
+    const pendingActions = useMemo(
+        () => ({
+            start: (entry: number, kind: MailPending) => change((state) => pendingStart(state, entry, kind)),
+            done: (entry: number) => void change((state) => pendingDone(state, entry)),
+            failed: (entry: number) => void change((state) => pendingFailed(state, entry)),
+        }),
+        [change]
+    );
+    const onFresh = useCallback(() => void change(pendingFresh), [change]);
+
+    // Wieder geöffnet: Ab jetzt gilt der Stand der Mail selbst (beim Öffnen setzt der Server \Seen).
+    useEffect(() => {
+        if (uid !== null) change((state) => pendingOpened(state, uid));
+    }, [uid, change]);
+
     function closeReader(): void {
         navigate(listPath);
     }
@@ -185,7 +232,7 @@ export function MailPage(): JSX.Element {
                             <>
                                 <FolderSelect box={box} folder={folder} />
                                 {/* Eigener key je Ordner: Beim Wechsel lädt die Liste frisch, statt kurz die des alten Ordners zu zeigen. */}
-                                <FolderPane key={`${box.id}-${folder}`} box={box} folder={folder} uid={uid} />
+                                <FolderPane key={`${box.id}-${folder}`} box={box} folder={folder} uid={uid} pending={pendingHere} onFresh={onFresh} />
                             </>
                         )}
                     </section>
@@ -205,6 +252,7 @@ export function MailPage(): JSX.Element {
                                     folders={box.folders ?? []}
                                     onChanged={overview.reload}
                                     onGone={() => navigate(listPath)}
+                                    pending={pendingActions}
                                 />
                             ) : (
                                 <div className={styles.pick}>

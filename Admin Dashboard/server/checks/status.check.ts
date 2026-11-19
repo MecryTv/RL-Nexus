@@ -11,7 +11,7 @@ import { USERS } from "./fakes.ts";
 import { chartGeometry } from "../../src/status/chart.ts";
 import { ago, canReport, countdown, uptimeRow } from "../../src/status/format.ts";
 import { buildDetail, findGaps, incidentFor, loadDetail, mergeOutages, quantile, setDetailSource, unionMinutes, type IRawCheck } from "../status/detail.ts";
-import { hourPoints, outagesFrom, summarize, type IHour } from "../status/history.ts";
+import { hourPoints, mergeHours, outagesFrom, summarize, type IHour } from "../status/history.ts";
 import { ENV, SECRET, check, config, section } from "./harness.ts";
 
 const MINUTE = 60_000;
@@ -28,6 +28,23 @@ function hour(offset: number, { down = 0, warn = 0, latency = 100 } = {}): IHour
 
 export async function checkStatus(): Promise<void> {
     section("Status: Verlauf auswerten");
+
+    await check("W-0141: Fertige Stunden bleiben gemerkt, neu kommt nur ab der vorletzten, älter als 90 Tage fällt weg", () => {
+        const oldest = NOW_HOUR - 90 * 24;
+        const kept = [{ ...hour(0), hour: oldest - 1 }, { ...hour(0), hour: oldest }, hour(5), hour(1)];
+        const fresh = [{ ...hour(1), checks: 31 }, hour(0)];
+        const merged = mergeHours(kept, fresh, NOW_HOUR - 1, oldest);
+
+        assert.deepEqual(
+            merged.map((entry) => [entry.hour - NOW_HOUR, entry.checks]),
+            [
+                [-90 * 24, 30],
+                [-5, 30],
+                [-1, 31],
+                [0, 30],
+            ]
+        );
+    });
 
     await check("Aufeinanderfolgende Ausfälle sind einer, eine Lücke über 5 Minuten trennt", () => {
         const start = NOW - 3 * HOUR;

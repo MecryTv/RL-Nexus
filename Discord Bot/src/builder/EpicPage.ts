@@ -83,7 +83,7 @@ function epicOpen(name: string, sub: string): string {
 function chip(rank: IEpicRank): string {
     const file = RANK_ICONS[rank.tier] ?? RANK_ICONS[0];
 
-    return `<span class="chip"><img src="${IMAGES}/rlranks/small/${encodeURIComponent(file)}.png" alt=""><span>${EscapeHtml(rank.mode)}</span>${EscapeHtml(rank.name)}</span>`;
+    return `<span class="chip"><img src="${IMAGES}/rlranks/small/${encodeURIComponent(file)}.webp" alt=""><span>${EscapeHtml(rank.mode)}</span>${EscapeHtml(rank.name)}</span>`;
 }
 
 /** Befehle wie /rank link im Klartext fett, nach dem Maskieren. */

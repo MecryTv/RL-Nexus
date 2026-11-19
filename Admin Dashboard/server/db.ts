@@ -3,6 +3,7 @@ import path from "node:path";
 import { createConnection, createPool, type Pool } from "mariadb";
 import type { IConfig, IDatabaseConfig } from "./config.ts";
 import { PublicError } from "./errors.ts";
+import { acquireTimed, noteQuery } from "./slow.ts";
 
 /**
  * Die Datenbank des Bots, mit eigenem Pool.
@@ -22,7 +23,9 @@ export class DatabaseUnavailable extends PublicError {
 
 const MIGRATIONS = path.join(import.meta.dirname, "migrations");
 export const MIGRATIONS_TABLE = "admin_migrations";
-const POOL_LIMIT = 3;
+// W-0141: 3 reichten knapp nicht, wenn Nachrichten-Uhr (alle 2 s), Backup-Lesen und Suche gleichzeitig liefen.
+// Auf dem VPS: max_connections 151, höchstens 11 je gleichzeitig benutzt (18.11.2026), Bot-Pool 5.
+const POOL_LIMIT = 5;
 
 let pool: Pool | null = null;
 
@@ -108,7 +111,18 @@ async function migrate(database: IDatabaseConfig): Promise<void> {
 export async function query<T>(sql: string, values: readonly unknown[] = []): Promise<T> {
     if (!pool) throw new DatabaseUnavailable();
 
-    return (await pool.query(sql, values)) as T;
+    // W-0141: Dauer messen, Langsames merkt server/slow.ts (ohne die Werte). Review: Das Warten auf eine
+    // freie Verbindung steht getrennt, sonst sähe ein voller Pool aus wie langsames SQL.
+    const ready = pool;
+    const { connection, waitMs } = await acquireTimed(sql, () => ready.getConnection());
+    const started = performance.now();
+
+    try {
+        return (await connection.query(sql, values)) as T;
+    } finally {
+        await connection.release();
+        noteQuery(sql, performance.now() - started, waitMs);
+    }
 }
 
 /** Eine Abfrage innerhalb einer Transaktion. */

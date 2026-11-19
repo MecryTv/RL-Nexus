@@ -1,6 +1,6 @@
 import { Fragment, useCallback, useEffect, useState, type JSX } from "react";
 import { Link, Outlet, useLocation, useNavigation } from "react-router-dom";
-import { unreadOf, useMailOverview } from "../api/mail";
+import { MailOverviewProvider, unreadOf, useMailOverviewSource } from "../api/mail";
 import { useHalted, useSuspects } from "../api/userdata";
 import logo from "../assets/logo.webp";
 import { areaOf, navEntries, pageOf, visibleAreas, type INavArea } from "../nav/areas.ts";
@@ -62,7 +62,9 @@ export function Shell(): JSX.Element {
     const me = useMe();
     const { signOut } = useSession();
     const location = useLocation();
-    const unread = unreadOf(useMailOverview().data) ?? 0;
+    // W-0141: einmal für alle Seiten, siehe api/mail.ts.
+    const mail = useMailOverviewSource();
+    const unread = unreadOf(mail.data) ?? 0;
     const halted = useHalted();
     const suspects = useSuspects();
     const loading = useNavigation().state === "loading";
@@ -206,7 +208,9 @@ export function Shell(): JSX.Element {
                 </header>
 
                 <main id="inhalt" className={styles.content} tabIndex={-1}>
-                    <Outlet />
+                    <MailOverviewProvider value={mail}>
+                        <Outlet />
+                    </MailOverviewProvider>
                 </main>
             </div>
 

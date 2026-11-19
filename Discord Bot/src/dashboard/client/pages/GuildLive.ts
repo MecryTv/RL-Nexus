@@ -17,6 +17,7 @@ import { icon, need } from "../core/Dom.js";
 import { failureText } from "../core/Gallery.js";
 import { clickSound, tone } from "../core/Sound.js";
 import { toast } from "../core/Toast.js";
+import { face } from "../core/Ui.js";
 import { emojiNode, emojiPicker, IServerEmoji } from "../layout/EmojiPicker.js";
 import { galleryUrl, pickImage } from "../layout/ImagePicker.js";
 
@@ -160,12 +161,8 @@ function bytes(size: number): string {
 }
 
 function avatar(person: { name: string; avatar: string | null }): HTMLElement {
-    const box = el("span", "travatar");
-
-    if (person.avatar?.startsWith("https://")) box.style.backgroundImage = `url("${person.avatar.replace(/["\\]/g, "")}")`;
-    else box.textContent = person.name.trim().slice(0, 1).toUpperCase() || "?";
-
-    return box;
+    // W-0141: dasselbe Bild wie überall, als <img loading="lazy"> (core/Ui.ts).
+    return face(person);
 }
 
 /**

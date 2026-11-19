@@ -102,6 +102,11 @@ function useNow(interval: number): number {
     return now;
 }
 
+/** W-0141: „vor 12 Sekunden“ tickt für sich. Sonst rendert die ganze Seite samt 90-Tage-Balken jede Sekunde neu. */
+function Ago({ iso }: { readonly iso: string }): string {
+    return relative(iso, useNow(1000));
+}
+
 /** Antwortet der Server nicht oder nicht mit JSON (Proxy-Fehlerseite, leere Antwort), steht das hier. */
 const UNREACHABLE = "Der Server mit den Statusdaten antwortet gerade nicht. Die Seite versucht es gleich von selbst noch einmal.";
 
@@ -433,7 +438,8 @@ function Incident({ incident }: { readonly incident: IIncident }): JSX.Element {
     );
 }
 
-function Maintenance({ incident, now }: { readonly incident: IIncident; readonly now: number }): JSX.Element {
+function Maintenance({ incident }: { readonly incident: IIncident }): JSX.Element {
+    const now = useNow(1000);
     const start = Date.parse(incident.startsAt ?? "");
     const end = Date.parse(incident.endsAt ?? "");
     const running = start <= now && now < end;
@@ -479,7 +485,8 @@ function Issue({ issue }: { readonly issue: IPastIssue }): JSX.Element {
 
 export function StatusApp(): JSX.Element {
     const { status, error } = useStatus();
-    const now = useNow(1000);
+    // Minuten reichen hier: Sekunden zählen nur Ago und der Wartungs-Countdown, jeweils für sich.
+    const now = useNow(60_000);
 
     useEffect(() => {
         if (status) document.title = `${STATE_TEXT[status.state].title} · Status · RL Nexus`;
@@ -523,7 +530,11 @@ export function StatusApp(): JSX.Element {
                                     <h1 className={styles.stateTitle}>{STATE_TEXT[status.state].title}</h1>
                                     <p className={styles.stateText}>
                                         {STATE_TEXT[status.state].text}{" "}
-                                        {status.checkedAt && `Geprüft ${relative(status.checkedAt, now)}, alle 2 Minuten neu.`}
+                                        {status.checkedAt && (
+                                            <>
+                                                Geprüft <Ago iso={status.checkedAt} />, alle 2 Minuten neu.
+                                            </>
+                                        )}
                                     </p>
                                 </div>
                             </div>
@@ -562,7 +573,7 @@ export function StatusApp(): JSX.Element {
                         ))}
 
                         {status.maintenance.map((incident) => (
-                            <Maintenance key={incident.id} incident={incident} now={now} />
+                            <Maintenance key={incident.id} incident={incident} />
                         ))}
 
                         <section aria-labelledby="dienste">

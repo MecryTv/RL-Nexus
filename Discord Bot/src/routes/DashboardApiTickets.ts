@@ -122,8 +122,8 @@ export default class DashboardApiTickets extends Route {
     }
 
     private async Read(guild: Guild): Promise<unknown> {
-        const config = await this.client.ticketSettings.Of(guild.id);
-        const blacklist = await this.client.ticketBlacklist.Of(guild.id);
+        // W-0141: beides unabhängig, gleichzeitig.
+        const [config, blacklist] = await Promise.all([this.client.ticketSettings.Of(guild.id), this.client.ticketBlacklist.Of(guild.id)]);
 
         return {
             config,

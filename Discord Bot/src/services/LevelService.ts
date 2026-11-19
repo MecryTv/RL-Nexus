@@ -86,6 +86,23 @@ function Ids(value: unknown, has: (id: string) => boolean, max: number): string[
  * Level System: Punkte für Nachrichten und Zeit im Sprachkanal, Rollen ab
  * einem Level und eine Rangliste. Siehe docs/Levels.md.
  */
+/**
+ * Review W-0141: Ein Deadlock (1213) oder ein Lock-Timeout (1205) rollt die
+ * Anweisung zurück. Bei den Mehrzeilen-Upserts der Voice-Runde hinge sonst die
+ * Minute aller Leute eines Servers daran: einmal neu versuchen.
+ */
+async function OnceMoreOnLock<T>(work: () => Promise<T>): Promise<T> {
+    try {
+        return await work();
+    } catch (error) {
+        const errno = (error as { errno?: number }).errno;
+
+        if (errno !== 1213 && errno !== 1205) throw error;
+
+        return work();
+    }
+}
+
 export default class LevelService {
     private readonly client: BotClient;
     // Wer wann zuletzt Punkte bekam - spart je Nachricht eine Abfrage.
@@ -370,6 +387,7 @@ export default class LevelService {
             if (!(await this.client.settings.Of(guild.id)).modules.includes(LEVELS_MODULE)) continue;
 
             const settings = await this.Settings(guild.id);
+            const credits: { member: GuildMember; xp: number }[] = [];
 
             for (const state of guild.voiceStates.cache.values()) {
                 const member = state.member;
@@ -378,12 +396,46 @@ export default class LevelService {
                 // W-0057: Gesperrte sammeln auch im Sprachkanal keine Punkte.
                 if (BlockedAt(member.id, guild.ownerId)) continue;
 
-                const xp = (await this.VoiceXp(state, member, settings, now)) * minutes;
-
-                await this.Credit(member, xp, { voiceMinutes: minutes }, settings, null).catch((error) =>
-                    logger.warn(`📈 Voice-Punkte für ${member.id} auf ${guild.id} - ${String(error)}`)
-                );
+                credits.push({ member, xp: (await this.VoiceXp(state, member, settings, now)) * minutes });
             }
+
+            await this.CreditVoice(guild.id, credits, minutes, settings).catch((error) => logger.warn(`📈 Voice-Punkte auf ${guild.id} - ${String(error)}`));
+        }
+    }
+
+    /**
+     * W-0141: eine Voice-Runde für alle eines Servers. Gesamt und Tag je eine
+     * Anweisung, danach einmal lesen - bisher zwei bis vier Abfragen je Person
+     * und Minute. Aufsteigen wie bei Credit, nur ohne Chat-Kanal.
+     */
+    private async CreditVoice(guildId: string, credits: readonly { member: GuildMember; xp: number }[], minutes: number, settings: ILevelSettings): Promise<void> {
+        // W-0119: gerade gelöscht (Admin Dashboard) - direkt vor dem Schreiben nichts mehr anlegen.
+        const kept = credits.filter(({ member }) => !this.client.activityService?.Forgotten(member.id));
+
+        if (!kept.length) return;
+
+        const day = Today();
+
+        // Jede Anweisung für sich neu versuchen: Die andere kann schon geschrieben haben.
+        await Promise.all([
+            OnceMoreOnLock(() => this.client.levels.AddMany(guildId, kept.map(({ member, xp }) => ({ userId: member.id, xp: Math.max(0, xp), voiceMinutes: minutes })))),
+            OnceMoreOnLock(() => this.client.levelDays.AddMany(kept.map(({ member, xp }) => ({ guildId, userId: member.id, day, xp: Math.max(0, xp), messages: 0, voiceMinutes: minutes })))),
+        ]);
+        this.Changed(guildId);
+
+        const earning = kept.filter(({ xp }) => xp > 0);
+
+        if (!earning.length) return;
+
+        const entries = await this.client.levels.OfMany(
+            guildId,
+            earning.map(({ member }) => member.id)
+        );
+
+        for (const { member } of earning) {
+            const entry = entries.get(member.id);
+
+            if (entry) await this.PromoteFrom(member, settings, null, null, entry).catch((error) => logger.warn(`📈 Aufstieg für ${member.id} auf ${guildId} - ${String(error)}`));
         }
     }
 
@@ -451,16 +503,19 @@ export default class LevelService {
         channelId: string | null
     ): Promise<void> {
         const points = Math.max(0, xp);
-        const before = points > 0 ? ((await this.client.levels.Of(member.guild.id, member.id))?.level ?? 0) : 0;
 
         // W-0119: gerade gelöscht (Admin Dashboard) - direkt vor dem Schreiben nichts mehr anlegen.
         if (this.client.activityService?.Forgotten(member.id)) return;
 
-        await this.client.levels.Add(member.guild.id, member.id, points, extra);
-        await this.client.levelDays.Add(member.guild.id, member.id, Today(), { xp: points, messages: extra.messages, voiceMinutes: extra.voiceMinutes });
+        // W-0141: Gesamt und Tag hängen nicht voneinander ab - gleichzeitig statt nacheinander.
+        await Promise.all([
+            this.client.levels.Add(member.guild.id, member.id, points, extra),
+            this.client.levelDays.Add(member.guild.id, member.id, Today(), { xp: points, messages: extra.messages, voiceMinutes: extra.voiceMinutes }),
+        ]);
         this.Changed(member.guild.id);
 
-        if (points > 0) await this.Promote(member, settings, before, channelId);
+        // Das alte Level ist die gespeicherte Spalte level: Add ändert sie nicht, ein eigenes Lesen davor spart W-0141.
+        if (points > 0) await this.Promote(member, settings, null, channelId);
     }
 
     /**
@@ -484,23 +539,36 @@ export default class LevelService {
     /**
      * Nach einer Gutschrift: Level neu rechnen und bei einem Aufstieg Rollen und
      * genau eine Nachricht für den ganzen Sprung. true: aufgestiegen. Der
-     * Nachtrag schreibt selbst und ruft nur das hier.
+     * Nachtrag schreibt selbst und ruft nur das hier. before null: das
+     * gespeicherte Level vor dieser Rechnung.
      */
-    async Promote(member: GuildMember, settings: ILevelSettings, before: number, channelId: string | null): Promise<boolean> {
+    async Promote(member: GuildMember, settings: ILevelSettings, before: number | null, channelId: string | null): Promise<boolean> {
         const entry = await this.client.levels.Of(member.guild.id, member.id);
 
-        if (!entry) return false;
+        return entry ? this.PromoteFrom(member, settings, before, channelId, entry) : false;
+    }
 
+    /** Wie Promote, mit einem schon gelesenen Stand (W-0141: Voice liest alle eines Servers auf einmal). */
+    private async PromoteFrom(member: GuildMember, settings: ILevelSettings, before: number | null, channelId: string | null, entry: ILevelEntry, retry = true): Promise<boolean> {
         const level = LevelFromXp(entry.xp, settings.base);
+        const from = before ?? entry.level;
 
         if (level === entry.level) return false;
+        // Review W-0141: nur wenn der Stand noch der gelesene ist. Kam eine zweite Gutschrift dazwischen, hat sie schon
+        // aufgestiegen und gemeldet; ein älterer Stand setzt nie ein höheres Level zurück.
+        if (!(await this.client.levels.ChangeLevel(member.guild.id, member.id, entry.level, level))) {
+            // Nachreview W-0141: Die andere stieg vielleicht auf ein niedrigeres Level, als die Punkte jetzt hergeben.
+            // Einmal neu lesen und, wenn es noch weiter geht, ab dem neuen Stand aufsteigen.
+            if (!retry) return false;
 
-        await this.client.levels.SetLevel(member.guild.id, member.id, level);
+            const fresh = await this.client.levels.Of(member.guild.id, member.id);
 
-        if (level <= before) return false;
+            return fresh !== null && LevelFromXp(fresh.xp, settings.base) > fresh.level ? this.PromoteFrom(member, settings, null, channelId, fresh, false) : false;
+        }
+        if (level <= from) return false;
 
         await this.Rewards(member, level, settings);
-        await this.Announce(member, level, before, entry, settings, channelId).catch((error) => logger.warn(`📈 Aufstieg für ${member.id} auf ${member.guild.id} nicht gemeldet - ${String(error)}`));
+        await this.Announce(member, level, from, entry, settings, channelId).catch((error) => logger.warn(`📈 Aufstieg für ${member.id} auf ${member.guild.id} nicht gemeldet - ${String(error)}`));
 
         return true;
     }

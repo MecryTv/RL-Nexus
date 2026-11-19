@@ -265,9 +265,23 @@ async function checkDatabase(client: BotClient): Promise<void> {
     check("Voice-Minuten auch", (await client.levels.Of(GUILD, OTHER))?.voiceMinutes === 3);
     check("Die Sperre merkt sich den Zeitpunkt", (entry?.lastMessage ?? 0) > 0);
 
+    // W-0141: mehrere auf einmal, wie bei Voice-XP.
+    await client.levels.AddMany(GUILD, [
+        { userId: USER, xp: 10, voiceMinutes: 1 },
+        { userId: OTHER, xp: 5, voiceMinutes: 1 },
+    ]);
+
+    const many = await client.levels.OfMany(GUILD, [USER, OTHER, "90071992547409999"]);
+
+    check("Mehrere auf einmal: addiert, Minuten gezählt, Unbekannte fehlen", many.get(USER)?.xp === 210 && many.get(OTHER)?.xp === 55 && many.get(OTHER)?.voiceMinutes === 4 && !many.has("90071992547409999"), JSON.stringify([...many]));
+    check("Mehrere auf einmal: der Zeitpunkt der letzten Nachricht bleibt", (many.get(USER)?.lastMessage ?? 0) === (entry?.lastMessage ?? -1));
+
+
     await client.levels.SetLevel(GUILD, USER, 2);
 
     check("Das Level lässt sich setzen", (await client.levels.Of(GUILD, USER))?.level === 2);
+    check("Level nur ändern, wenn es noch das alte ist (Review W-0141)", (await client.levels.ChangeLevel(GUILD, USER, 1, 5)) === false && (await client.levels.ChangeLevel(GUILD, USER, 2, 3)) === true && (await client.levels.Of(GUILD, USER))?.level === 3);
+    await client.levels.SetLevel(GUILD, USER, 2);
 
     const top = await client.levels.Top(GUILD, 10);
 
@@ -524,6 +538,28 @@ function World(extra: Partial<ILevelSettings> = {}, env: IWorldEnv = {}): IWorld
                 if (entry) entry.xp = Math.max(0, entry.xp - Math.round(xp));
             },
             SetLevel: async (guildId: string, userId: string, level: number) => void (levels.get(key(guildId, userId))!.level = level),
+            // Wie in MariaDB: nur, wenn das Level noch das erwartete ist (Review W-0141).
+            ChangeLevel: async (guildId: string, userId: string, from: number, to: number) => {
+                await Promise.resolve();
+                const entry = levels.get(key(guildId, userId));
+
+                if (!entry || entry.level !== from) return false;
+
+                entry.level = to;
+
+                return true;
+            },
+            AddMany: async (guildId: string, rows: { userId: string; xp: number; voiceMinutes: number }[]) => {
+                for (const row of rows) {
+                    const entry = levels.get(key(guildId, row.userId)) ?? empty(guildId, row.userId);
+
+                    entry.xp += Math.max(0, Math.round(row.xp));
+                    entry.voiceMinutes += row.voiceMinutes;
+                    levels.set(key(guildId, row.userId), entry);
+                }
+            },
+            OfMany: async (guildId: string, userIds: string[]) =>
+                new Map(userIds.filter((userId) => levels.has(key(guildId, userId))).map((userId) => [userId, { ...levels.get(key(guildId, userId))! }])),
             Set: async (guildId: string, userId: string, xp: number, level: number) => void levels.set(key(guildId, userId), { ...(levels.get(key(guildId, userId)) ?? empty(guildId, userId)), xp, level }),
             All: async (guildId: string) => [...levels.values()].filter((entry) => entry.guildId === guildId && entry.xp > 0).map((entry) => ({ ...entry })),
             Rank: async () => 1,
@@ -657,6 +693,57 @@ async function checkCounting(): Promise<void> {
     await free.service.Voice();
     check("Voice allein und stumm: Minute gezählt, keine Punkte", free.entry(alone.id).voiceMinutes === 1 && free.entry(alone.id).xp === 0, JSON.stringify(free.entry(alone.id)));
 
+    // W-0141: Voice-XP je Server gebündelt: Lesen, Gesamt und Tag je einmal, egal wie viele im Kanal sitzen.
+    const crowd = World({ voice: { ...DefaultLevelSettings().voice, on: true, xp: XpForLevel(1, DefaultLevelSettings().base), muted: true, alone: true } });
+    const people = ["90071992547409970", "90071992547409971", "90071992547409972"].map((id) => crowd.member(id));
+    const room = { id: VOICE, parentId: null, members: new Collection(people.map((person) => [person.id, person])) };
+    const calls: string[] = [];
+    const crowdLevels = crowd.client.levels as unknown as Record<string, (...args: unknown[]) => Promise<unknown>>;
+    const crowdDays = crowd.client.levelDays as unknown as Record<string, (...args: unknown[]) => Promise<unknown>>;
+
+    for (const [target, name] of [
+        [crowdLevels, "Of"],
+        [crowdLevels, "Add"],
+        [crowdLevels, "AddMany"],
+        [crowdLevels, "OfMany"],
+        [crowdDays, "Add"],
+        [crowdDays, "AddMany"],
+    ] as const) {
+        const original = target[name];
+
+        target[name] = async (...args: unknown[]) => (calls.push(`${target === crowdDays ? "tag" : "levels"}.${name}`), original(...args));
+    }
+
+    for (const person of people) {
+        (crowd.guild as unknown as { voiceStates: { cache: Map<string, unknown> } }).voiceStates.cache.set(person.id, { member: person, channel: room, channelId: VOICE, selfMute: false, selfDeaf: false, mute: false, deaf: false });
+    }
+
+    await crowd.service.Voice();
+    check("Voice für drei: je Server einmal schreiben (gesamt, Tag) und einmal lesen", calls.sort().join() === "levels.AddMany,levels.OfMany,tag.AddMany", calls.join());
+    check("Voice für drei: alle bekommen Minute und Punkte, Level 1 gesetzt", people.every((person) => crowd.entry(person.id).voiceMinutes === 1 && crowd.entry(person.id).xp > 0 && crowd.entry(person.id).level === 1) && people.every((person) => crowd.day(person.id)?.voiceMinutes === 1), JSON.stringify(people.map((person) => crowd.entry(person.id))));
+
+    // Review W-0141: Ein Deadlock im Mehrzeilen-Upsert kostet nicht die Minute aller, die Anweisung läuft einmal neu.
+    const locked = World({ voice: { ...DefaultLevelSettings().voice, on: true, xp: 5, muted: true, alone: true } });
+    const lockedPeople = ["90071992547409980", "90071992547409981"].map((id) => locked.member(id));
+    const lockedRoom = { id: VOICE, parentId: null, members: new Collection(lockedPeople.map((person) => [person.id, person])) };
+    const lockedLevels = locked.client.levels as unknown as Record<string, (...args: unknown[]) => Promise<unknown>>;
+    const realAddMany = lockedLevels.AddMany;
+    let tries = 0;
+
+    lockedLevels.AddMany = async (...args: unknown[]) => {
+        tries++;
+        if (tries === 1) throw Object.assign(new Error("Deadlock found when trying to get lock"), { errno: 1213 });
+
+        return realAddMany(...args);
+    };
+
+    for (const person of lockedPeople) {
+        (locked.guild as unknown as { voiceStates: { cache: Map<string, unknown> } }).voiceStates.cache.set(person.id, { member: person, channel: lockedRoom, channelId: VOICE, selfMute: false, selfDeaf: false, mute: false, deaf: false });
+    }
+
+    await locked.service.Voice();
+    check("Deadlock bei Voice-XP: einmal neu versucht, alle haben ihre Minute", tries === 2 && lockedPeople.every((person) => locked.entry(person.id).voiceMinutes === 1 && locked.day(person.id)?.voiceMinutes === 1), JSON.stringify({ tries, entries: lockedPeople.map((person) => locked.entry(person.id)) }));
+
     const spam = free.member("90071992547409963");
     const after = free.message(spam, "das wird geloescht", "a1");
 
@@ -706,6 +793,51 @@ async function checkAnnounce(): Promise<void> {
 
     // W-0043: Aufstiege nie mehr per DM.
     check("Voice ohne festen Kanal: keine Nachricht, keine DM", voice.sent.length === 0, JSON.stringify(voice.sent));
+
+    // Review W-0141: zwei Gutschriften gleichzeitig (Chat und Voice) über dieselbe Stufe: ein Aufstieg, eine Nachricht.
+    const race = World();
+    const racer = race.member(OTHER);
+
+    await Promise.all([
+        race.service.Credit(racer, XpForLevel(1, race.settings.base), { messages: 1 }, race.settings, TEXT),
+        race.service.Credit(racer, XpForLevel(1, race.settings.base), { messages: 1 }, race.settings, TEXT),
+    ]);
+    check("Zwei Gutschriften gleichzeitig über eine Stufe: genau eine Nachricht", race.sent.length === 1, String(race.sent.length));
+    check("Zwei Gutschriften gleichzeitig: das Level stimmt", race.entry(OTHER).level === LevelFromXp(race.entry(OTHER).xp, race.settings.base), JSON.stringify(race.entry(OTHER)));
+
+    // Nachreview W-0141: verschiedene Ziel-Level. Voice las noch den Stand für Level 1, Chat schon den für Level 3;
+    // Voice gewinnt das Compare-and-Set von 0. Chat liest danach neu und steigt doch noch auf 3.
+    const split = World();
+    const splitter = split.member(OTHER);
+    const readAll = split.client.levels.Of.bind(split.client.levels);
+    let firstRead = true;
+
+    split.levels.set(`${GUILD}:${OTHER}`, { ...split.entry(OTHER), xp: XpForLevel(3, split.settings.base), level: 0 });
+    split.client.levels.Of = async (guildId: string, userId: string) => {
+        const entry = await readAll(guildId, userId);
+
+        if (!firstRead || !entry) return entry;
+        firstRead = false;
+
+        return { ...entry, xp: XpForLevel(1, split.settings.base) };
+    };
+    await Promise.all([split.service.Promote(splitter, split.settings, null, TEXT), split.service.Promote(splitter, split.settings, null, TEXT)]);
+    check("Zwei Aufstiege auf verschiedene Level gleichzeitig: am Ende das Level der Punkte (Nachreview)", split.entry(OTHER).level === 3, JSON.stringify(split.entry(OTHER)));
+
+    // W-0141: eine Gutschrift liest den Stand einmal und schreibt Gesamt- und Tageswert gleichzeitig.
+    const lean = World();
+    const leanLevels = lean.client.levels as unknown as Record<"Of" | "Add", (...args: unknown[]) => Promise<unknown>>;
+    const leanDays = lean.client.levelDays as unknown as Record<"Add", (...args: unknown[]) => Promise<unknown>>;
+    const steps: string[] = [];
+    const [of, add, addDay] = [leanLevels.Of, leanLevels.Add, leanDays.Add];
+
+    leanLevels.Of = async (...args) => (steps.push("lesen"), of(...args));
+    leanLevels.Add = async (...args) => (steps.push("gesamt"), await Promise.resolve(), add(...args).then(() => void steps.push("gesamt fertig")));
+    leanDays.Add = async (...args) => (steps.push("tag"), await Promise.resolve(), addDay(...args).then(() => void steps.push("tag fertig")));
+    await lean.service.Credit(lean.member(OTHER), XpForLevel(2, lean.settings.base), { messages: 1 }, lean.settings, TEXT);
+    check("Gutschrift: Stand nur einmal gelesen", steps.filter((step) => step === "lesen").length === 1, steps.join(", "));
+    check("Gutschrift: Gesamt und Tag gleichzeitig geschrieben", steps.indexOf("tag") < steps.indexOf("gesamt fertig"), steps.join(", "));
+    check("Gutschrift mit Aufstieg 0 → 2: Level gesetzt, eine Nachricht", lean.entry(OTHER).level === 2 && lean.sent.length === 1, JSON.stringify({ entry: lean.entry(OTHER), sent: lean.sent.length }));
 
     const gone = World({ announce: "channel", announceChannelId: "999" });
 

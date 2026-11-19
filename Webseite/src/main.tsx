@@ -84,3 +84,6 @@ const container = document.getElementById("root");
 if (container === null) throw new Error("Kein Element mit der ID 'root' gefunden.");
 
 void start(container);
+
+// W-0141: echte Ladezeiten, nur im Betrieb. Eigenes Stück, bremst den Start nicht.
+if (import.meta.env.PROD) void import("./services/vitals").then((module) => module.startVitals("/api/vitals"));

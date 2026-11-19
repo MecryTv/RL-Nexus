@@ -594,7 +594,7 @@ Die Seite ist breiter als die übrigen (`--shell` 1440 statt 1180 px). Auf schma
 
 Die Oberfläche trägt dieselbe Handschrift wie die [Webseite](https://nexus-emb.de) und die Rang-Karte, die der Bot in Discord postet: fast schwarzer Grund, **abgeschnittene statt gerundeter Ecken**, Oxanium für den Text, Rajdhani für die gesperrten Großbuchstaben-Labels, Orbitron für das Wortzeichen.
 
-Alles Farbige, Maße und Schriften stehen als Tokens am Kopf von `assets/style.css` — dieselben Werte wie `src/constants/RankCard.ts` und `src/styles/_tokens.scss` der Webseite. Wer dort eine Farbe dreht, dreht sie hier mit.
+Alles Farbige, Maße und Schriften stehen als Tokens am Kopf von `client/style.css` (ausgeliefert verkleinert unter `public/assets/style.css`, gebaut von `npm run build:dashboard`) — dieselben Werte wie `src/constants/RankCard.ts` und `src/styles/_tokens.scss` der Webseite. Wer dort eine Farbe dreht, dreht sie hier mit.
 
 Die Abschrägung macht **eine** Regel: zwei Selektorlisten am Anfang von `style.css` setzen `clip-path` auf alle Flächen (`--cut`) und alles Kleine (`--cut-sm`). Wer eine neue Fläche hinzufügt, trägt sie dort ein.
 
@@ -637,6 +637,7 @@ src/dashboard/
                          Topbar, GuildCard, Report (Fehler-Pop-up)
     pages/               eine Datei je Seite: Servers, Guild, Settings, Docu,
                          ClipsBoard und je Modul eine Guild*-Datei
+    style.css            Stylesheet: Tokens, Abschrägungen, Bausteine (die Quelle)
   public/
     index.html           Serverauswahl
     guild.html           Detailseite
@@ -647,7 +648,7 @@ src/dashboard/
     clips.html           Clips der Woche, öffentlich
     denied.html          Login abgebrochen
     mfa.html             Discord-Konto ohne Zwei-Faktor
-    assets/style.css     Stylesheet: Tokens, Abschrägungen, Bausteine
+    assets/style.css     client/style.css verkleinert - Ergebnis von npm run build:dashboard
     assets/fonts/        Oxanium, Rajdhani, Orbitron, selbst ausgeliefert
     assets/images/       Logo, Rang-Abzeichen, Plattform- und Statistik-Symbole
     assets/app.js        Einstieg - Ergebnis von npm run build:dashboard

@@ -1,4 +1,4 @@
-import { useId, useMemo, useState, type JSX, type MouseEvent } from "react";
+import { memo, useId, useMemo, useState, type JSX, type MouseEvent } from "react";
 import { STATUS_SERVICE_LABELS, type DetailRange, type IServiceDetail } from "../../shared/status";
 import { Segmented } from "../components/Segmented";
 import { formatDuration, formatNumber } from "../format";
@@ -56,8 +56,11 @@ const STAMP = new Intl.DateTimeFormat("de-DE", {
 
 const percentX = (x: number): string => `${(x / WIDTH) * 100}%`;
 
-/** Die Antwortzeit eines Dienstes: Linie, nicht gemessene Zeit schraffiert, Ausfälle rot, langsame Prüfungen als Punkt. */
-export function LatencyChart({
+/**
+ * Die Antwortzeit eines Dienstes: Linie, nicht gemessene Zeit schraffiert, Ausfälle rot, langsame Prüfungen als Punkt.
+ * W-0141: memo, damit der Sekundentakt des Leitstands die Diagramme nicht jedes Mal neu rendert.
+ */
+export const LatencyChart = memo(function LatencyChart({
     service,
     range,
     dataRange,
@@ -227,4 +230,4 @@ export function LatencyChart({
             </ul>
         </div>
     );
-}
+});

@@ -6,6 +6,7 @@ import { Button, LinkButton } from "../components/Button";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { formatNumber } from "../format";
 import { useToast } from "../toast/context";
+import { useNow } from "../useNow";
 import { PlanDialog } from "./PlanDialog";
 import { deletionSteps, elapsedShare, personName, remaining, when, type StepState } from "./plan.ts";
 import styles from "./userdata.module.scss";
@@ -61,8 +62,18 @@ export function Steps({ deletion }: { readonly deletion: IDeletion }): JSX.Eleme
     );
 }
 
-/** Restzeit als kleiner Ring mit Uhrzeit, wie beim Status-Knopf. Angehalten und Erledigtes nur mit Zeit. */
-export function Due({ deletion, now }: { readonly deletion: IDeletion; readonly now: number }): JSX.Element {
+/** W-0141: „nächste in 4:12“ mit eigener Uhr, damit nicht die ganze Seite jede Sekunde neu rendert. */
+export function Remaining({ at }: { readonly at: string }): string {
+    return remaining(at, useNow(1000));
+}
+
+/**
+ * Restzeit als kleiner Ring mit Uhrzeit, wie beim Status-Knopf. Angehalten und Erledigtes nur mit Zeit.
+ * W-0141: eigene Uhr, im Sekundentakt nur, solange die Löschung läuft.
+ */
+export function Due({ deletion }: { readonly deletion: IDeletion }): JSX.Element {
+    const now = useNow(deletion.state === "geplant" ? 1000 : 60_000);
+
     if (deletion.state === "angehalten") return <span className={styles.dim}>geplant für {when(deletion.dueAt, now)}</span>;
     if (deletion.state !== "geplant") return <span className={styles.dim}>{when(deletion.doneAt ?? deletion.cancelledAt ?? deletion.dueAt, now)}</span>;
 

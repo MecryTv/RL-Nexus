@@ -104,9 +104,17 @@ export default class DashboardApiLevels extends Route {
 
     private async Read(access: IManageAccess, query: { page?: string }) {
         const { guild } = access;
-        const settings = await this.client.levelService.Settings(guild.id);
         const page = Math.max(1, Math.min(50, Number(query.page) || 1));
-        const top = await this.client.levels.Top(guild.id, 25, (page - 1) * 25);
+        // W-0141: alles, was nicht voneinander abhängt, gleichzeitig statt sieben Runden nacheinander.
+        const [settings, top, total, backfill, week, month, boardPost] = await Promise.all([
+            this.client.levelService.Settings(guild.id),
+            this.client.levels.Top(guild.id, 25, (page - 1) * 25),
+            this.client.levels.Total(guild.id),
+            this.client.levelBackfill.Of(guild.id),
+            this.client.levelTop.Of(guild.id, "week"),
+            this.client.levelTop.Of(guild.id, "month"),
+            this.client.levelBoardPosts.Of(guild.id),
+        ]);
 
         return {
             settings,
@@ -135,13 +143,13 @@ export default class DashboardApiLevels extends Route {
             designSize: DESIGN_SIZE,
             fonts: DESIGN_FONTS,
             page,
-            total: await this.client.levels.Total(guild.id),
+            total,
             top: top.map((entry) => this.Out(entry, access, settings.base)),
-            backfill: await this.client.levelBackfill.Of(guild.id),
+            backfill,
             // Plan 37: was beim letzten Post der Aktivsten passiert ist.
-            topStatus: { week: await this.client.levelTop.Of(guild.id, "week"), month: await this.client.levelTop.Of(guild.id, "month") },
+            topStatus: { week, month },
             // Plan 43: was im Kanal steht und was zuletzt schiefging.
-            boardPostStatus: await this.client.levelBoardPosts.Of(guild.id),
+            boardPostStatus: boardPost,
             guild: { name: guild.name, ...GuildResources(guild) },
         };
     }
