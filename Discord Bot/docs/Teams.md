@@ -98,7 +98,7 @@ Ohne `PRIME_API_TOKEN` bleibt das Holen aus. Die Peaks reichen dann für eine MM
 
 ### Selbst auffrischen (W-0146)
 
-Steht die Übersicht im Kanal, als Hub oder als Karten, hält der Bot sie selbst aktuell. Alle 5 Minuten schaut er nach, ob ein Spieler einen Prime-Stand hat, der älter ist als **Übersicht auffrischen alle**. Das ist eine Grenze des Moduls: Standard 30 Minuten, 15 bis 240, im Admin Dashboard unter Module einstellbar, auch für einzelne Server. Server sehen den Wert im Reiter Grenzen.
+Steht die Übersicht im Kanal, als Hub oder als Karten, hält der Bot sie selbst aktuell. Alle 5 Minuten schaut er nach, ob ein Spieler einen Prime-Stand hat, der älter ist als **Übersicht auffrischen alle**. Das ist eine Grenze des Moduls: Standard 30 Minuten, 15 bis 240, im Admin Dashboard unter Module einstellbar, auch für einzelne Server. Server sehen den Wert im Reiter Grenzen. Öfter als „Ränge neu holen nach“ (RL Tracking) fragt der Bot Prime ohnehin nicht; steht dieser Wert höher, gilt er auch hier. Die Uhrzeit eines Stands ist die von Primes Antwort, auch wenn er aus dem Zwischenspeicher kommt.
 
 Ist es so weit, holt er wie sonst höchstens 12 Spieler und bearbeitet die Nachrichten, die schon stehen. Neu gepostet wird dabei nie. Fehlt eine Nachricht, bräuchte der Hub mehr oder weniger Nachrichten oder müsste eine über die V2-Grenze, bleibt alles, bis jemand im Dashboard neu sendet. Bei „Alle Teams einzeln“ zählen nur Teams, deren Karte im Kanal steht, und bearbeitet wird nur die Karte, an deren Team sich etwas geändert hat. Das Bearbeiten läuft durch dieselbe Reihe je Server wie das Senden.
 

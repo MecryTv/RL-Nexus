@@ -2370,7 +2370,7 @@ async function checkRefresh(client: BotClient): Promise<void> {
         },
     };
     const guild = { ...FakeGuild(), channels: { cache: new Map([[TEXT, channel]]) } } as unknown as Guild;
-    const prime = { value: 1450, error: null as PrimeError | null, only: null as string | null, stale: null as "down" | "access" | null, calls: 0 };
+    const prime = { value: 1450, error: null as PrimeError | null, only: null as string | null, stale: null as "down" | "access" | null, fetchedAt: null as number | null, calls: 0 };
     const saved = new Map<number, ITeamPlayer[]>();
     let settings: ITeamSettings = { ...DefaultTeamSettings(), channelId: TEXT, layout: "hub" };
     let teams: ITeam[] = [];
@@ -2414,7 +2414,7 @@ async function checkRefresh(client: BotClient): Promise<void> {
             platform: "Epic Games",
             accountId: `acc-${name}`,
             ranks: [{ key: "3v3", mmr: prime.value, tier: 18, tierName: "Champion III", divisionName: "II" }],
-            fetchedAt: new Date().toISOString(),
+            fetchedAt: new Date(prime.fetchedAt ?? Date.now()).toISOString(),
             ...(prime.stale ? { stale: prime.stale } : {}),
         } as unknown as IPrimeProfile;
     };
@@ -2463,6 +2463,26 @@ async function checkRefresh(client: BotClient): Promise<void> {
         check("  nie neu gepostet, nichts gelöscht, dieselbe Kette", JSON.stringify([settings.messageId, ...settings.moreIds]) === JSON.stringify(chain) && chain.every((id) => alive.has(id!)));
         check("  bearbeitet über die Reihe je Server (nichts doppelt)", viaChain.includes(GUILD), viaChain.join(","));
         SetFlags([], [], []);
+
+        // Review M6: Prime wird ohnehin höchstens alle „Ränge neu holen nach“ (RL Tracking) gefragt - öfter auffrischen brächte nichts.
+        age(20);
+        SetFlags(
+            [{ module: "rl-tracking", status: "on", notice: null, values: { rankMaxAgeMinutes: 60 } } as never],
+            [],
+            [],
+            [{ module: "teams", guildId: GUILD, status: null, notice: null, linkMode: null, values: { refreshMinutes: 15 }, updatedAt: null }]
+        );
+        reset();
+        check("Ränge gelten 60 Min. (RL Tracking), Abstand 15, Stand 20 Min.: nicht fällig", (await service.AutoRefresh(guild)) === null && prime.calls === 0, `${prime.calls}`);
+        SetFlags([], [], []);
+
+        // Der Stand trägt die Zeit der echten Antwort von Prime, auch aus dem Zwischenspeicher.
+        prime.fetchedAt = Date.now() - 8 * MIN;
+
+        const cachedStand = await service.Fetch("epic-x");
+
+        check("Treffer aus dem Zwischenspeicher: der Stand trägt die Zeit von Primes Antwort (Review M6)", cachedStand.at === prime.fetchedAt, `${Date.now() - cachedStand.at} ms alt`);
+        prime.fetchedAt = null;
 
         // 13 Spieler, alle fällig: Prime bekommt höchstens 12. Der älteste bleibt fürs nächste Mal.
         teams = [FakeTeam(Array.from({ length: 12 }, (_, index) => aged(`m${index}`, 40, 1600)), { id: 1, name: "Alpha" }), FakeTeam([aged("old", 50, 1600)], { id: 2, name: "Bravo", position: 1 })];

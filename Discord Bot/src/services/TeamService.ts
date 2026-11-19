@@ -1712,6 +1712,9 @@ export default class TeamService {
                 return { snapshot, halt: profile.stale === "down" || profile.stale === "access" };
             }
 
+            // W-0146 (Review M6): die Zeit der echten Antwort von Prime, auch für einen Treffer aus dem Zwischenspeicher -
+            // sonst behauptete die Fußzeile einen frischeren Stand, als es gibt.
+            snapshot.at = Date.parse(profile.fetchedAt) || snapshot.at;
             snapshot.name = profile.name;
             snapshot.platform = profile.platform;
             snapshot.accountId = profile.accountId;
@@ -2165,7 +2168,8 @@ export default class TeamService {
 
         // Der Hub zeigt alle Teams, bei „Alle Teams einzeln“ zählen nur die mit Karte im Kanal.
         const teams = (await this.Teams(guild.id)).filter((team) => hub || team.messageId);
-        const maxAge = ModuleValue("teams", "refreshMinutes", guild.id) * 60_000;
+        // Review M6: Prime wird ohnehin höchstens alle „Ränge neu holen nach“ (RL Tracking) gefragt - öfter hilft nicht.
+        const maxAge = Math.max(ModuleValue("teams", "refreshMinutes", guild.id), ModuleValue("rl-tracking", "rankMaxAgeMinutes", null)) * 60_000;
 
         if (!RefreshDue(teams, maxAge)) return null;
 
