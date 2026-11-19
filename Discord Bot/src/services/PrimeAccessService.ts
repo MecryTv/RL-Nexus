@@ -57,7 +57,7 @@ export async function SendPrimeAccess(client: BotClient, card: IPrimeAccessCard)
         await user
             .send(message)
             .then(() => sent++)
-            .catch(() => logger.warn(`🎮 Prime-Zugang: DM an ${user.tag} ging nicht raus - Direktnachrichten zu?`));
+            .catch((error: unknown) => logger.warn(`🎮 Prime-Zugang: DM an ${user.tag} ging nicht raus - Direktnachrichten zu? (${String(error)})`));
     }
 
     return sent;

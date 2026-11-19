@@ -418,6 +418,7 @@ async function checkAccessMessage(): Promise<void> {
 
     check("Rot geht an den, der DMs offen hat", count === 1 && sent.length === 1 && sent[0]?.to === "1", `${count} gesendet`);
     check("  geschlossene DMs und Unbekannte landen nur im Log", warnings.length === 2, warnings.join(" | "));
+    check("  mit dem Fehler von Discord", warnings.some((line) => line.includes("Cannot send messages to this user")), warnings.join(" | "));
     check("  als Bild mit Alt-Text", files[0]?.name === "prime-zugang.png" && json.includes("attachment://prime-zugang.png") && json.includes(JSON.stringify(PrimeAccessAlt(locked)).slice(1, 60)), json.slice(0, 200));
     check("  mit Zeitstempel, der live zählt", json.includes(`<t:${Math.floor(locked.at / 1000)}:R>`), json.slice(0, 300));
     check("  sagt, wohin der neue Schlüssel gehört", json.includes("`PRIME_API_TOKEN`"));
