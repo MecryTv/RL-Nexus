@@ -3671,7 +3671,15 @@ try {
         });
 
         await check("W-0141: Kunden vom Server: Status und laufender Zugang aus SQL wie customerStatus und accessOf, für alle Kunden", async () => {
+            // Nachreview W-0141: zwei unbegrenzte Zugänge; laufend ist in JS wie in SQL der mit der kleineren id.
+            const TWICE = "99999999999999999936";
+            const unlimited = { userId: TWICE, productId: null, startsAt: new Date(Date.now() - 86_400_000), endsAt: null, roleId: null, stripeSubscriptionId: null, orderId: null, grantedBy: null };
+            await records.upsertCustomer({ id: TWICE, name: "check 36", email: `${TWICE}@example.test` });
+            await records.insertGrant({ ...unlimited, source: "gift" });
+            await records.insertGrant({ ...unlimited, source: "one_time" });
+
             const now = new Date();
+            assert.deepEqual([accessOfGrants(await records.grantsOf(TWICE), now).status, (await records.customerPage("all", likeOf(TWICE), 1)).rows[0]?.status], ["gift", "gift"]);
             const sql = new Map((await records.customerPage("all", null, 1, 1_000_000)).rows.map((row) => [row.userId, row]));
             const everyone = await records.allCustomers();
 

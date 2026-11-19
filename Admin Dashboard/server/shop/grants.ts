@@ -58,10 +58,13 @@ export function isActive(grant: IGrant, now: Date): boolean {
     return grant.endedAt === null && grant.startsAt <= now && (grant.frozenAt != null || grant.endsAt === null || grant.endsAt.getTime() + graceOf(grant) > now.getTime());
 }
 
-/** Das spätere Ende, unbegrenzt zuerst. */
+/**
+ * Das spätere Ende, unbegrenzt zuerst. Nachreview W-0141: Gleich lange (auch zwei unbegrenzte) bleiben in der
+ * Reihenfolge der Liste, also nach id wie bei grantsOf und allCustomers; so wählt accessOf denselben Zugang wie
+ * CUSTOMER_VIEW in records.ts (ORDER BY ends_at IS NULL DESC, ends_at DESC, id).
+ */
 function laterFirst(a: IGrant, b: IGrant): number {
-    if (a.endsAt === null) return -1;
-    if (b.endsAt === null) return 1;
+    if (a.endsAt === null || b.endsAt === null) return Number(a.endsAt !== null) - Number(b.endsAt !== null);
 
     return b.endsAt.getTime() - a.endsAt.getTime();
 }
