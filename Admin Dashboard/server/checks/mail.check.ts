@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { simpleParser } from "mailparser";
 import MailComposer from "nodemailer/lib/mail-composer/index.js";
 import { createTransport, type Transporter } from "nodemailer";
-import { pendingDone, pendingFailed, pendingFresh, pendingOpened, pendingStart, withPending } from "../../src/mail/pending.ts";
+import { pendingDone, pendingFailed, pendingFresh, pendingOpened, pendingStart, pendingStep, withPending } from "../../src/mail/pending.ts";
 import { buildApp } from "../app.ts";
 import { loadConfig, type IMailServer } from "../config.ts";
 import { InvalidInput } from "../errors.ts";
@@ -75,6 +75,17 @@ export async function checkMail(): Promise<void> {
         assert.equal(pendingStart(first, 9, "gone"), null, "zweite Aktion auf dieselbe Mail wird nicht gestartet");
         assert.notEqual(pendingStart(first, 10, "gone"), null, "eine andere Mail geht");
         assert.equal(withPending([listMail(9)], pendingDone(first, 9)).length, 0, "die verschobene bleibt weg");
+    });
+
+    await check("W-0141 Nachreview: Aktion in A läuft, Wechsel zu B, Aktion in B, Antwort aus A kommt: B behält Sofortanzeige und Doppelklick-Sperre", () => {
+        let stored = pendingStep({ key: "", state: new Map() }, "1-A", (state) => pendingStart(state, 3, "gone"))!;
+        stored = pendingStep(stored, "1-B", (state) => pendingStart(state, 4, "gone"))!;
+        const after = pendingStep(stored, "1-A", (state) => pendingDone(state, 3));
+
+        assert.equal(after, stored, "die Antwort aus A ändert den Stand von B nicht");
+        assert.equal(after!.key, "1-B");
+        assert.equal(withPending([listMail(4)], after!.state).length, 0, "die Mail in B bleibt weg");
+        assert.equal(pendingStep(after!, "1-B", (state) => pendingStart(state, 4, "gone")), null, "Doppelklick in B bleibt gesperrt");
     });
 
     const config = loadConfig(MAIL_ENV, []);

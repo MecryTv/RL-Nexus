@@ -17,7 +17,7 @@ import { FolderSelect, Folders } from "../mail/Folders";
 import { LazyComposer } from "../mail/LazyComposer";
 import { MessageList } from "../mail/MessageList";
 import { Reader } from "../mail/Reader";
-import { pendingDone, pendingFailed, pendingFresh, pendingOpened, pendingStart, withPending, type MailPending, type PendingState } from "../mail/pending.ts";
+import { pendingDone, pendingFailed, pendingFresh, pendingOpened, pendingStart, pendingStep, withPending, type IPendingStore, type MailPending, type PendingState } from "../mail/pending.ts";
 import { inboxOf, inboxUnread, legacyAllPath, startPath } from "../mail/route.ts";
 import styles from "../mail/mail.module.scss";
 import { useMe } from "../session/context";
@@ -154,17 +154,16 @@ export function MailPage(): JSX.Element {
     // W-0141: was die Liste schon zeigt, bevor der Server antwortet (mail/pending.ts), je Ordner.
     // Im Ref steht der Stand sofort, damit ein Doppelklick die laufende Aktion sieht; der State rendert.
     const here = box !== null && folder !== null ? `${box.id}-${folder}` : "";
-    const pendingRef = useRef<{ readonly key: string; readonly state: PendingState }>({ key: "", state: new Map() });
-    const [pending, setPending] = useState<{ readonly key: string; readonly state: PendingState }>({ key: "", state: new Map() });
+    const pendingRef = useRef<IPendingStore>({ key: "", state: new Map() });
+    const [pending, setPending] = useState<IPendingStore>({ key: "", state: new Map() });
     const change = useCallback(
         (next: (state: PendingState) => PendingState | null): boolean => {
-            const current = pendingRef.current.key === here ? pendingRef.current.state : new Map();
-            const updated = next(current);
+            const stored = pendingStep(pendingRef.current, here, next);
 
-            if (updated === null) return false;
-            if (updated !== current || pendingRef.current.key !== here) {
-                pendingRef.current = { key: here, state: updated };
-                setPending(pendingRef.current);
+            if (stored === null) return false;
+            if (stored !== pendingRef.current) {
+                pendingRef.current = stored;
+                setPending(stored);
             }
 
             return true;

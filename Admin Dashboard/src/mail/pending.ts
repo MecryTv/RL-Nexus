@@ -55,6 +55,27 @@ export function pendingOpened(state: PendingState, uid: number): PendingState {
     return only(state, (entry) => entry !== uid);
 }
 
+/** Der Stand gilt für einen Ordner (`key`, etwa "3-INBOX"); ein anderer Ordner beginnt leer. */
+export interface IPendingStore {
+    readonly key: string;
+    readonly state: PendingState;
+}
+
+/**
+ * Ein Schritt für den Ordner `key`. null: abgelehnt (etwa ein Doppelklick). Ändert der Schritt
+ * nichts, kommt `stored` selbst zurück: Dann muss niemand neu zeichnen. Nachreview W-0141: Eine
+ * späte Antwort aus einem Ordner, den man schon verlassen hat, ändert nichts und lässt damit den
+ * Stand des neuen Ordners stehen.
+ */
+export function pendingStep(stored: IPendingStore, key: string, next: (state: PendingState) => PendingState | null): IPendingStore | null {
+    const current = stored.key === key ? stored.state : new Map<number, IPendingEntry>();
+    const updated = next(current);
+
+    if (updated === null) return null;
+
+    return updated !== current ? { key, state: updated } : stored;
+}
+
 export function withPending<T extends IMailSummary>(messages: readonly T[], pending: PendingState): readonly T[] {
     if (pending.size === 0) return messages;
 
