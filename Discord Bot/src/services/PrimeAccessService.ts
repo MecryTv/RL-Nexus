@@ -83,8 +83,10 @@ interface IAccessRecord {
     state: "ok" | "locked";
     /** Die erste Ablehnung. */
     since: number | null;
-    /** Die letzte rote DM - Erinnerung frühestens 24 Stunden danach. */
+    /** Die letzte rote DM - die nächste frühestens 24 Stunden danach, auch bei einer neuen Sperre. */
     sentAt: number | null;
+    /** Ob für die laufende Sperre ein Rot rausging - nur dann kommt beim Erfolg Grün. */
+    notified: boolean;
     lastOk: number | null;
     refused: number;
     answer: string | null;
@@ -93,7 +95,7 @@ interface IAccessRecord {
 }
 
 const KEY = "prime_access";
-const EMPTY: IAccessRecord = { state: "ok", since: null, sentAt: null, lastOk: null, refused: 0, answer: null, warned: null };
+const EMPTY: IAccessRecord = { state: "ok", since: null, sentAt: null, notified: false, lastOk: null, refused: 0, answer: null, warned: null };
 
 /**
  * W-0145: Meldet den Developern per DM, wenn der Prime-Zugang bald abläuft
@@ -171,9 +173,12 @@ export class PrimeAccessWatch {
 
             if (was.state !== "locked") return;
 
-            this.record = { ...EMPTY, lastOk: now, warned: was.warned };
+            // sentAt bleibt: Flattert der Zugang, kommt das nächste Rot erst einen Tag nach dem letzten (Review).
+            this.record = { ...this.record, state: "ok", since: null, refused: 0, notified: false };
             await this.Save();
-            await this.Deliver({ state: "back", at: was.since ?? now, until: now, answer: "Zugang wieder aktiv", refused: was.refused }, now);
+
+            // Grün nur, wenn für diese Sperre ein Rot rausging.
+            if (was.notified) await this.Deliver({ state: "back", at: was.since ?? now, until: now, answer: "Zugang wieder aktiv", refused: was.refused }, now);
 
             return;
         }
@@ -182,17 +187,18 @@ export class PrimeAccessWatch {
 
         // Gekürzt: bot_state fasst 255 Zeichen, und die Kachel zeigt ohnehin nur zwei Zeilen.
         const answer = (result.reason ? `${result.status} · ${result.reason}` : `HTTP ${result.status}`).slice(0, 80);
+        const fresh = this.record.state !== "locked";
 
-        if (this.record.state !== "locked") {
-            this.record = { ...this.record, state: "locked", since: now, sentAt: now, refused: 1, answer };
-        } else {
-            this.record = { ...this.record, refused: this.record.refused + 1, answer };
+        this.record = fresh ? { ...this.record, state: "locked", since: now, refused: 1, notified: false, answer } : { ...this.record, refused: this.record.refused + 1, answer };
 
-            if (now - (this.record.sentAt ?? 0) < DAY) return;
+        // Rot höchstens einmal je Tag - als Erinnerung und auch bei einer neuen Sperre kurz nach der letzten.
+        if (this.record.sentAt !== null && now - this.record.sentAt < DAY) {
+            if (fresh) await this.Save();
 
-            this.record.sentAt = now;
+            return;
         }
 
+        this.record = { ...this.record, sentAt: now, notified: true };
         await this.Save();
         await this.Deliver({ state: "locked", at: this.record.since ?? now, answer, refused: this.record.refused }, now);
     }

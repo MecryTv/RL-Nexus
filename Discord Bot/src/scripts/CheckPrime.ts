@@ -534,6 +534,20 @@ async function checkAccessWatch(): Promise<void> {
 
     await watch.Tick(t0 + 2 * HOUR + 2 * 60_000);
     check("  und eine Stunde später die nächste", probes === 2, `${probes} Proben`);
+
+    // Review I1: Flattert der Zugang (abwechselnd abgelehnt und angenommen), darf das keine DM-Flut auslösen.
+    const count = (word: string) => dms.filter((dm) => dm.includes(word)).length;
+
+    state.clear();
+    dms.length = 0;
+    watch = new PrimeAccessWatch(fake());
+
+    for (let index = 0; index < 10; index++) await run(watch, index % 2 === 0 ? refused : "ok", t0 + index * 60_000);
+
+    check("Flattern: 10 Wechsel in 10 Minuten ergeben höchstens 1 Rot und 1 Grün", count("Prime-Zugang abgelaufen") <= 1 && count("Prime-Zugang wieder da") <= 1, `${count("Prime-Zugang abgelaufen")} rot, ${count("Prime-Zugang wieder da")} grün`);
+
+    await run(watch, refused, t0 + DAY + 60_000);
+    check("  einen Tag nach dem letzten Rot meldet eine neue Sperre wieder", count("Prime-Zugang abgelaufen") === 2, `${count("Prime-Zugang abgelaufen")} rot`);
 }
 
 /**
