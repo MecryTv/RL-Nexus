@@ -51,6 +51,11 @@ const LOOK: Readonly<Record<PrimeAccessState, { color: string; icon: "clock" | "
     back: { color: "#23a55a", icon: "check", title: "Prime-Zugang wieder da", sub: "Ränge kommen wieder an, alles läuft", label: "Gesperrt war es", word: "Läuft" },
 };
 
+/** Die Farbe des Zustands, auch für den Rand der DM. */
+export function PrimeAccessColor(state: PrimeAccessState): string {
+    return LOOK[state].color;
+}
+
 /** Was an Prime hängt - eine Reihe Punkte in der Farbe des Zustands. */
 export const PRIME_AFFECTED = ["/rank search, /rank me", "Rang-Rollen", "RL Team-Übersicht", "Epic-Login (Name)"];
 

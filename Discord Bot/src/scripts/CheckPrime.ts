@@ -21,6 +21,8 @@ import { Collection } from "discord.js";
 import Rank from "../commands/user/Rank";
 import RankButtons from "../events/rank/RankButtons";
 import logger from "../utils/logger";
+import { IPrimeAccessCard, PRIME_ACCESS_URL, PrimeAccessAlt } from "../builder/PrimeAccessCard";
+import { SendPrimeAccess } from "../services/PrimeAccessService";
 
 let failures = 0;
 
@@ -329,6 +331,65 @@ async function checkAccess(client: BotClient): Promise<void> {
 }
 
 /**
+ * W-0145: Die DM an die Developer. Nie echt gesendet: ein nachgestellter
+ * Client sammelt, was rausginge. Ein Developer mit geschlossenen DMs und einer,
+ * den Discord nicht kennt, dürfen den Versand an die anderen nicht aufhalten.
+ */
+async function checkAccessMessage(): Promise<void> {
+    console.log("\n  — DM an die Developer —");
+
+    const now = Date.UTC(2026, 10, 19, 18, 52);
+    const sent: { to: string; message: Record<string, unknown> }[] = [];
+    const warnings: string[] = [];
+    const client = {
+        config: { DEV_USER_IDs: ["1", "2", "3"], PRIME_API_TOKEN: "geheimer-pruef-schluessel" },
+        users: {
+            fetch: async (id: string) => {
+                if (id === "3") throw new Error("Unknown User");
+
+                return {
+                    tag: `dev${id}`,
+                    send: async (message: Record<string, unknown>) => {
+                        if (id === "2") throw new Error("Cannot send messages to this user");
+                        sent.push({ to: id, message });
+                    },
+                };
+            },
+        },
+    } as unknown as BotClient;
+    const locked: IPrimeAccessCard = { state: "locked", now, account: "Nexus EMB", at: now - 20 * 3_600_000, answer: "401 · Access expired", lastOk: null, hours: Array(24).fill("down"), refused: 3 };
+
+    const real = logger.warn;
+    logger.warn = (message: string) => void warnings.push(message);
+
+    let count = -1;
+
+    try {
+        count = await SendPrimeAccess(client, locked);
+    } finally {
+        logger.warn = real;
+    }
+
+    const json = JSON.stringify(sent[0]?.message ?? {});
+    const files = (sent[0]?.message.files ?? []) as { name?: string }[];
+
+    check("Rot geht an den, der DMs offen hat", count === 1 && sent.length === 1 && sent[0]?.to === "1", `${count} gesendet`);
+    check("  geschlossene DMs und Unbekannte landen nur im Log", warnings.length === 2, warnings.join(" | "));
+    check("  als Bild mit Alt-Text", files[0]?.name === "prime-zugang.png" && json.includes("attachment://prime-zugang.png") && json.includes(JSON.stringify(PrimeAccessAlt(locked)).slice(1, 60)), json.slice(0, 200));
+    check("  mit Zeitstempel, der live zählt", json.includes(`<t:${Math.floor(locked.at / 1000)}:R>`), json.slice(0, 300));
+    check("  sagt, wohin der neue Schlüssel gehört", json.includes("`PRIME_API_TOKEN`"));
+    check("  Knopf zur Prime-Kontoseite", json.includes(PRIME_ACCESS_URL) && json.includes("Prime-Konto öffnen"));
+    check("  der Schlüssel selbst steht nirgends", !json.includes("geheimer-pruef-schluessel"));
+
+    sent.length = 0;
+    await SendPrimeAccess(client, { ...locked, state: "back", until: now, answer: "Zugang wieder aktiv", lastOk: now });
+
+    const back = JSON.stringify(sent[0]?.message ?? {});
+
+    check("Grün: „Wieder da“ mit Zeitstempel, ohne Schritt zum Schlüssel", back.includes(`Wieder da seit <t:${Math.floor(now / 1000)}:R>`) && !back.includes("PRIME_API_TOKEN`"), back.slice(0, 300));
+}
+
+/**
  * Die Umrechnung ist der Kern: steht sie falsch, sieht jede Zahl im Dashboard
  * plausibel aus und ist trotzdem daneben. Die Werte stammen aus einer echten
  * Antwort von Prime.
@@ -487,6 +548,7 @@ async function main(): Promise<void> {
     // Prime-Anbindung geprueft.
     await checkCache(client);
     await checkAccess(client);
+    await checkAccessMessage();
 
     if (!player) {
         console.log("\n⏭️  Kein Spielername übergeben - die echte Abfrage bleibt aus.\n   npm run check:prime -- DEIN_EPIC_NAME\n");
