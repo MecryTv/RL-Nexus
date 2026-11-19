@@ -2291,12 +2291,25 @@ export default class TeamService {
     private async EditChain(guild: Guild, settings: ITeamSettings, payloads: ICustomView[]): Promise<number> {
         const channel = guild.channels.cache.get(settings.channelId ?? "");
         const chain = [settings.messageId, ...settings.moreIds].filter((id): id is string => id !== null);
+        // Review M2: nie still aufgeben - der Grund steht im Log.
+        const skip = (reason: string): number => {
+            logger.warn(`🛡️ Team-Hub auf ${guild.id} nicht aufgefrischt: ${reason}. Er bleibt bis zum nächsten Senden aus dem Dashboard.`);
 
-        if (!channel?.isTextBased() || chain.length !== payloads.length || !CardsInOrder(chain)) return 0;
+            return 0;
+        };
+
+        if (!channel?.isTextBased()) return skip("den Kanal gibt es nicht mehr");
+        if (chain.length !== payloads.length) return skip(`er braucht jetzt ${payloads.length} Nachrichten, im Kanal stehen ${chain.length}`);
+        if (!CardsInOrder(chain)) return skip("seine Nachrichten stehen nicht in ihrer Reihenfolge");
 
         const found = await Promise.all(chain.map((id) => channel.messages.fetch(id).catch(() => null)));
+        const missing = found.findIndex((message) => !message);
 
-        if (found.some((message, index) => !message || NeedsResend(message, payloads[index]!))) return 0;
+        if (missing >= 0) return skip(`Nachricht ${missing + 1} fehlt im Kanal`);
+
+        const crossing = found.findIndex((message, index) => NeedsResend(message!, payloads[index]!));
+
+        if (crossing >= 0) return skip(`Nachricht ${crossing + 1} müsste über die V2-Grenze`);
 
         let edited = 0;
 

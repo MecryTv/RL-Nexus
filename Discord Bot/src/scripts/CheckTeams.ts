@@ -2348,6 +2348,7 @@ async function checkRefresh(client: BotClient): Promise<void> {
     const service = client.teamService;
     const groups: ITeamGroup[] = [{ id: 1, guildId: GUILD, name: "Main", position: 0 }];
     const alive = new Set<string>();
+    const broken = new Set<string>();
     const log: string[] = [];
     let next = 1000;
     const channel = {
@@ -2355,7 +2356,18 @@ async function checkRefresh(client: BotClient): Promise<void> {
         type: ChannelType.GuildText,
         isTextBased: () => true,
         messages: {
-            fetch: async (id: string) => (alive.has(id) ? { id, flags: { has: () => true }, edit: async () => void log.push(`edit ${id}`) } : Promise.reject(new Error("Unknown Message"))),
+            fetch: async (id: string) =>
+                alive.has(id)
+                    ? {
+                          id,
+                          flags: { has: () => true },
+                          edit: async () => {
+                              log.push(`edit ${id}`);
+
+                              if (broken.has(id)) throw new Error("Discord 500");
+                          },
+                      }
+                    : Promise.reject(new Error("Unknown Message")),
             delete: async (id: string) => {
                 log.push(`delete ${id}`);
                 alive.delete(id);
@@ -2627,6 +2639,49 @@ async function checkRefresh(client: BotClient): Promise<void> {
         const cards = await service.AutoRefresh(guild);
 
         check("Karten: nur die des geänderten Teams bearbeitet, die gelöschte nicht neu gepostet", cards?.edited === 1 && log.join(",") === "edit 1" && prime.calls === 2, `${cards} · ${prime.calls} · ${log}`);
+
+        // Review M2/M8: Die Kette des Hubs gibt nie still auf, und ein Fehler beim Bearbeiten wirft nicht weiter.
+        const editChain = (service as unknown as { EditChain: (guild: Guild, settings: ITeamSettings, payloads: unknown[]) => Promise<number> }).EditChain.bind(service);
+        const v2 = { components: [], flags: MessageFlags.IsComponentsV2, allowedMentions: { parse: [] } };
+        const plain = { content: "Hub", components: [], allowedMentions: { parse: [] } };
+        const three: ITeamSettings = { ...DefaultTeamSettings(), channelId: TEXT, layout: "hub", messageId: "101", moreIds: ["102", "103"] };
+        const gaveUp = async (payloads: unknown[], over: Partial<ITeamSettings>, word: string): Promise<string> => {
+            warned.length = 0;
+            reset();
+
+            const result = await editChain(guild, { ...three, ...over }, payloads);
+
+            return result === 0 && log.length === 0 && warned.some((line) => line.includes(word)) ? "" : `${result} · ${log} · ${warned.join(" | ")}`;
+        };
+
+        alive.clear();
+        ["101", "102", "103"].forEach((id) => alive.add(id));
+
+        let why = await gaveUp([v2, v2], {}, "2 Nachrichten");
+
+        check("Hub braucht weniger Nachrichten als im Kanal: nichts bearbeitet, Grund im Log", why === "", why);
+        why = await gaveUp([v2, v2, v2, v2], {}, "4 Nachrichten");
+        check("Hub braucht mehr Nachrichten: ebenso", why === "", why);
+        why = await gaveUp([v2, plain, v2], {}, "V2");
+        check("Eine müsste über die V2-Grenze: ebenso", why === "", why);
+        why = await gaveUp([v2, v2, v2], { messageId: "103", moreIds: ["101", "102"] }, "Reihenfolge");
+        check("Kette nicht in ihrer Reihenfolge: ebenso", why === "", why);
+        alive.delete("102");
+        why = await gaveUp([v2, v2, v2], {}, "fehlt");
+        check("Eine Nachricht fehlt: ebenso", why === "", why);
+        alive.add("102");
+        broken.add("102");
+        warned.length = 0;
+        reset();
+
+        const partly = await editChain(guild, three, [v2, v2, v2]).catch(() => -1);
+
+        check(
+            "Bearbeiten scheitert mitten in der Kette: Grund im Log, Rest nicht angefasst, kein Fehler nach außen",
+            partly === 1 && log.join(",") === "edit 101,edit 102" && warned.some((line) => line.includes("Nachricht 2")),
+            `${partly} · ${log} · ${warned.join(" | ")}`
+        );
+        broken.clear();
 
         // Der Lauf über alle Server.
         const due = new Set<string>();
