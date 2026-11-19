@@ -113,23 +113,31 @@ export class PrimeError extends Error {
 }
 
 /**
- * W-0145: Ein Fehler mit HTTP-Status. 401 und 403 heißen: Prime lehnt den
- * Schlüssel ab - abgelaufen, gesperrt oder falsch. Das ist kein Ausfall und
- * bekommt deshalb die Art "Access". Den Grund schreibt Prime in den Rumpf, etwa
+ * W-0145: Ein Fehler mit HTTP-Status. 401 heißt: Prime lehnt den Schlüssel ab -
+ * abgelaufen, gesperrt oder falsch. Das ist kein Ausfall und bekommt deshalb die
+ * Art "Access". Den Grund schreibt Prime in den Rumpf, etwa
  * {"Error":{"Type":"Unauthorized","Message":"The Prime API token is not valid."}}.
+ *
+ * Ein 403 zählt nur mit einem solchen Grund (Review): Prime liegt hinter
+ * Cloudflare, und Firewall oder Bot-Schutz antworten ebenfalls mit 403, dann
+ * aber mit HTML. CrossSiteRequest kommt nur von den Kontoseiten.
  */
 export function HttpError(status: number, raw: string): PrimeError {
     let reason = "";
+    let type = "";
 
     try {
         const error = (JSON.parse(raw) as IRawEnvelope<unknown>).Error;
 
         reason = error?.Message || error?.Type || "";
+        type = error?.Type ?? "";
     } catch {
         // Kein JSON - dann bleibt es beim Status.
     }
 
-    return new PrimeError(`Prime antwortete mit ${status}${reason ? `: ${reason}` : ""}`, status === 401 || status === 403 ? "Access" : "HTTP", status, reason);
+    const access = status === 401 || (status === 403 && reason !== "" && type !== "CrossSiteRequest");
+
+    return new PrimeError(`Prime antwortete mit ${status}${reason ? `: ${reason}` : ""}`, access ? "Access" : "HTTP", status, reason);
 }
 
 const NOT_FOUND = new Set(["InvalidPlayer", "PlayerNotFound", "NotFound"]);

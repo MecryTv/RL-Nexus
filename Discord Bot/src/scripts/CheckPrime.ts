@@ -210,7 +210,15 @@ async function checkAccess(client: BotClient): Promise<void> {
 
     check("401 ist ein Zugangsfehler", refused.type === "Access" && refused.status === 401, `${refused.type} ${refused.status}`);
     check("  mit dem Grund von Prime", refused.message.includes("The Prime API token is not valid."), refused.message);
-    check("403 auch", HttpError(403, "").type === "Access", HttpError(403, "").type);
+    // Review: Prime liegt hinter Cloudflare. Ein 403 von Firewall oder Bot-Schutz kommt als HTML
+    // und heißt nicht, dass der Zugang abgelaufen ist - nur ein 403 mit Grund von Prime zählt.
+    const forbidden = HttpError(403, '{"Error":{"Message":"Access expired","Type":"Forbidden"}}');
+    const firewall = HttpError(403, "<!DOCTYPE html><title>Attention Required! | Cloudflare</title>");
+
+    check("403 mit Grund von Prime auch", forbidden.type === "Access", forbidden.type);
+    check("403 von Cloudflare (HTML) bleibt ein HTTP-Fehler", firewall.type === "HTTP", firewall.type);
+    check("403 ohne Rumpf bleibt ein HTTP-Fehler", HttpError(403, "").type === "HTTP", HttpError(403, "").type);
+    check("403 CrossSiteRequest (Kontoseiten) ist kein Zugangsfehler", HttpError(403, '{"Error":{"Message":"Website account endpoints only accept same-origin requests.","Type":"CrossSiteRequest"}}').type === "HTTP");
     check("502 bleibt ein HTTP-Fehler", HttpError(502, "<html>").type === "HTTP", HttpError(502, "<html>").type);
 
     class LockedPrime extends PrimeService {
