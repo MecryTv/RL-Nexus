@@ -55,6 +55,8 @@ export interface IConfig {
 
     /** Token fuer prime.rocketplanet.gg - ohne ihn holen /rank, Teams und Rank Roles keine Raenge. */
     PRIME_API_TOKEN: string;
+    /** W-0145: Wann der Prime-Zugang abläuft, ISO mit Uhrzeit. Leer = keine Warnung vorher, nur wenn Prime ablehnt. */
+    PRIME_ACCESS_EXPIRES: string;
 
     // W-0125: Epic Account Services (dev.epicgames.com/portal) für /rank link.
     // Ohne Client-ID und Secret lässt sich kein Epic-Konto verbinden; /rank search geht trotzdem.

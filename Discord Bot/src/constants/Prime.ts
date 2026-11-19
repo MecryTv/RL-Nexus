@@ -20,6 +20,21 @@ export const PRIME_ACCESS_TEXT = "Die Rang-Abfrage ist gerade nicht freigeschalt
 export const PRIME_ACCESS_LOG_EVERY = 60 * 60 * 1000;
 
 /**
+ * W-0145: Das Rocket-League-Konto hinter dem Prime-Zugang, für die DM an die
+ * Developer. Prime verrät es über die API nicht (die Kontoabfragen nehmen nur
+ * Anfragen der Webseite an).
+ *
+ * ponytail: fest im Code - wechselt der Zugang auf ein anderes Konto, hier nachziehen.
+ */
+export const PRIME_ACCOUNT = "Nexus EMB";
+
+/**
+ * W-0145: Der Name, mit dem die stündliche Probe fragt. Ob es ihn gibt, ist
+ * egal: Antwortet Prime mit „InvalidPlayer“, hat es den Schlüssel angenommen.
+ */
+export const PRIME_PROBE_USER = "RLNexusProbe";
+
+/**
  * Das oeffentliche Profil bei rocketleague.tracker.network.
  *
  * Steht als Knopf unter jeder Rang-Karte: die Karte zeigt den Stand, der Tracker

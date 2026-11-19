@@ -22,7 +22,7 @@ import Rank from "../commands/user/Rank";
 import RankButtons from "../events/rank/RankButtons";
 import logger from "../utils/logger";
 import { IPrimeAccessCard, PRIME_ACCESS_URL, PrimeAccessAlt } from "../builder/PrimeAccessCard";
-import { SendPrimeAccess } from "../services/PrimeAccessService";
+import { ParseAccessExpiry, PrimeAccessWatch, SendPrimeAccess } from "../services/PrimeAccessService";
 
 let failures = 0;
 
@@ -228,6 +228,14 @@ async function checkAccess(client: BotClient): Promise<void> {
     }
 
     const prime = new LockedPrime(client);
+    const noted: string[] = [];
+    const note = prime.access.Note.bind(prime.access);
+
+    // W-0145: Jede Abfrage geht an die Überwachung des Zugangs, die Ablehnung mit ihrer Art.
+    prime.access.Note = (result, now) => {
+        noted.push(typeof result === "string" ? result : result.type);
+        note(result, now);
+    };
 
     prime.locked = true;
 
@@ -237,6 +245,7 @@ async function checkAccess(client: BotClient): Promise<void> {
     );
 
     check("Ohne alten Stand kommt der Zugangsfehler durch", thrown instanceof PrimeError && thrown.type === "Access", String(thrown));
+    check("  und landet bei der Überwachung des Zugangs", noted.join() === "Access", noted.join());
 
     prime.locked = false;
     await prime.Profile("Spieler");
@@ -390,6 +399,136 @@ async function checkAccessMessage(): Promise<void> {
 }
 
 /**
+ * W-0145: Wann die DM rausgeht. Je Zustand einmal, Rot höchstens alle 24
+ * Stunden als Erinnerung, Gelb 7 Tage und 1 Tag vor PRIME_ACCESS_EXPIRES. Der
+ * gemeldete Zustand steht in bot_state, ein Neustart schickt nichts doppelt.
+ * Datenbank und Discord sind nachgestellt.
+ */
+async function checkAccessWatch(): Promise<void> {
+    console.log("\n  — Wann die DM rausgeht —");
+
+    const HOUR = 3_600_000;
+    const DAY = 24 * HOUR;
+    const t0 = Date.UTC(2026, 10, 18, 22, 5);
+    const state = new Map<string, string>();
+    const dms: string[] = [];
+    let probes = 0;
+    const refused = HttpError(401, '{"Error":{"Message":"The Prime API token is not valid.","Type":"Unauthorized"}}');
+
+    const fake = (expires = "") =>
+        ({
+            config: { DEV_USER_IDs: ["1"], PRIME_ACCESS_EXPIRES: expires },
+            isReady: () => true,
+            users: { fetch: async () => ({ tag: "dev", send: async (message: { components: { toJSON(): unknown }[] }) => void dms.push(JSON.stringify(message.components[0]?.toJSON())) }) },
+            databaseService: {
+                Ready: true,
+                Query: async (sql: string, values: string[] = []) => {
+                    if (sql.startsWith("SELECT")) return state.has(values[0]!) ? [{ value: state.get(values[0]!) }] : [];
+
+                    state.set(values[0]!, values[1]!);
+
+                    return [];
+                },
+            },
+            primeService: { IsConfigured: true, Probe: async () => void probes++ },
+        }) as unknown as BotClient;
+
+    const run = async (watch: PrimeAccessWatch, result: "ok" | "other" | PrimeError, at: number) => {
+        watch.Note(result, at);
+        await watch.Idle();
+    };
+
+    let watch = new PrimeAccessWatch(fake());
+
+    await run(watch, refused, t0);
+    check("Erste Ablehnung: rote DM", dms.length === 1 && dms[0]!.includes("Prime-Zugang abgelaufen"), `${dms.length} DMs`);
+    check("  sie nennt, was Prime sagt", dms[0]?.includes("401 · The Prime API token is not valid.") === true);
+
+    await run(watch, refused, t0 + HOUR);
+    await run(watch, refused, t0 + 23 * HOUR);
+    check("Weitere Ablehnungen am selben Tag: keine DM", dms.length === 1, `${dms.length} DMs`);
+
+    await run(watch, refused, t0 + DAY + 60_000);
+    check("Nach 24 Stunden noch gesperrt: eine Erinnerung", dms.length === 2, `${dms.length} DMs`);
+
+    watch = new PrimeAccessWatch(fake());
+    await run(watch, refused, t0 + DAY + 2 * HOUR);
+    check("Neustart, immer noch gesperrt: keine neue DM", dms.length === 2, `${dms.length} DMs`);
+
+    await run(watch, "other", t0 + DAY + 3 * HOUR);
+    check("Ein Ausfall ohne Ablehnung ändert nichts", dms.length === 2, `${dms.length} DMs`);
+
+    await run(watch, "ok", t0 + DAY + 4 * HOUR);
+    check("Erste erfolgreiche Abfrage: grüne DM", dms.length === 3 && dms[2]!.includes("Prime-Zugang wieder da"), `${dms.length} DMs`);
+    check("  mit der Dauer der Sperre und den abgelehnten Anfragen", dms[2]?.includes("1 Tag 4 Std.") === true && dms[2]?.includes("5 Anfragen") === true, dms[2]?.slice(0, 400));
+
+    await run(watch, "ok", t0 + DAY + 5 * HOUR);
+    watch = new PrimeAccessWatch(fake());
+    await run(watch, "ok", t0 + DAY + 6 * HOUR);
+    check("Danach und nach einem Neustart: keine weitere DM", dms.length === 3, `${dms.length} DMs`);
+
+    // Gelb: nur mit PRIME_ACCESS_EXPIRES, 7 Tage und 1 Tag vorher, je einmal.
+    const expires = t0 + 10 * DAY;
+    const iso = `${new Date(expires).toISOString().slice(0, 16)}Z`;
+
+    check("PRIME_ACCESS_EXPIRES: ISO mit Uhrzeit wird gelesen", ParseAccessExpiry(iso) === expires && ParseAccessExpiry("2026-12-18T23:00+01:00") === Date.UTC(2026, 11, 18, 22), String(ParseAccessExpiry(iso)));
+    check("  leer heißt: kein Datum", ParseAccessExpiry("") === null);
+    check("  Unsinn und ein Datum ohne Uhrzeit sind ungültig", ParseAccessExpiry("morgen") === "invalid" && ParseAccessExpiry("2026-12-18") === "invalid");
+
+    dms.length = 0;
+    watch = new PrimeAccessWatch(fake(iso));
+    await watch.Tick(t0 + 2 * DAY);
+    check("Gelb: 8 Tage vorher noch nichts", dms.length === 0, `${dms.length} DMs`);
+
+    await watch.Tick(t0 + 3 * DAY + 60_000);
+    check("  7 Tage vorher die erste Warnung", dms.length === 1 && dms[0]!.includes("Prime-Zugang läuft bald ab") && dms[0]!.includes("Erste Warnung"), `${dms.length} DMs`);
+
+    await watch.Tick(t0 + 5 * DAY);
+    check("  dazwischen nichts", dms.length === 1, `${dms.length} DMs`);
+
+    await watch.Tick(t0 + 9 * DAY + 60_000);
+    check("  1 Tag vorher die zweite", dms.length === 2 && dms[1]!.includes("Zweite Warnung"), `${dms.length} DMs`);
+
+    watch = new PrimeAccessWatch(fake(iso));
+    await watch.Tick(t0 + 9 * DAY + 2 * HOUR);
+    check("  nach einem Neustart keine doppelte", dms.length === 2, `${dms.length} DMs`);
+
+    dms.length = 0;
+    state.clear();
+    await new PrimeAccessWatch(fake()).Tick(t0 + 9 * DAY);
+    check("Ohne PRIME_ACCESS_EXPIRES keine gelbe DM", dms.length === 0, `${dms.length} DMs`);
+
+    const warnings: string[] = [];
+    const real = logger.warn;
+
+    logger.warn = (message: string) => void warnings.push(message);
+
+    try {
+        const broken = new PrimeAccessWatch(fake("nächsten Dienstag"));
+
+        await broken.Tick(t0);
+        await broken.Tick(t0 + HOUR);
+        check("Ungültiges Datum: einmal eine Warnung im Log, keine DM, kein Absturz", warnings.filter((line) => line.includes("PRIME_ACCESS_EXPIRES")).length === 1 && dms.length === 0, warnings.join(" | "));
+    } finally {
+        logger.warn = real;
+    }
+
+    // Die Probe: höchstens eine Abfrage je Stunde, und nur, wenn sonst keine lief.
+    probes = 0;
+    watch = new PrimeAccessWatch(fake());
+    await run(watch, "ok", t0);
+    await watch.Tick(t0 + 30 * 60_000);
+    check("Probe: lief in der Stunde schon eine Abfrage, fragt sie nicht", probes === 0, `${probes} Proben`);
+
+    await watch.Tick(t0 + HOUR + 60_000);
+    await watch.Tick(t0 + HOUR + 11 * 60_000);
+    check("  sonst genau eine je Stunde", probes === 1, `${probes} Proben`);
+
+    await watch.Tick(t0 + 2 * HOUR + 2 * 60_000);
+    check("  und eine Stunde später die nächste", probes === 2, `${probes} Proben`);
+}
+
+/**
  * Die Umrechnung ist der Kern: steht sie falsch, sieht jede Zahl im Dashboard
  * plausibel aus und ist trotzdem daneben. Die Werte stammen aus einer echten
  * Antwort von Prime.
@@ -531,6 +670,27 @@ async function checkLive(client: BotClient, player: string): Promise<void> {
 
     check("Prime lehnt ab, der Bot erkennt den Zugangsfehler", refused instanceof PrimeError && refused.type === "Access", refused instanceof PrimeError ? `${refused.type} ${refused.status}: ${refused.message}` : String(refused));
 
+    // Die stündliche Probe: mit dem echten Schlüssel „ok“, mit dem falschen „Access“.
+    const notes = (prime: PrimeService): string[] => {
+        const seen: string[] = [];
+        const note = prime.access.Note.bind(prime.access);
+
+        prime.access.Note = (result, now) => {
+            seen.push(typeof result === "string" ? result : result.type);
+            note(result, now);
+        };
+
+        return seen;
+    };
+    const good = notes(service);
+    const bad = notes(wrong);
+
+    await service.Probe();
+    await wrong.Probe();
+
+    check("Probe mit dem echten Schlüssel: angenommen", good.join() === "ok", good.join());
+    check("Probe mit dem falschen: abgelehnt", bad.join() === "Access", bad.join());
+
     wrong.Close();
 }
 
@@ -549,6 +709,7 @@ async function main(): Promise<void> {
     await checkCache(client);
     await checkAccess(client);
     await checkAccessMessage();
+    await checkAccessWatch();
 
     if (!player) {
         console.log("\n⏭️  Kein Spielername übergeben - die echte Abfrage bleibt aus.\n   npm run check:prime -- DEIN_EPIC_NAME\n");

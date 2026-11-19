@@ -20,6 +20,7 @@ import {
     PRIME_BASE_URL,
     PRIME_CACHE_KEEP,
     PRIME_CACHE_MAX,
+    PRIME_PROBE_USER,
     PRIME_TIMEOUT,
     EXTRA_PLAYLISTS,
     TierName,
@@ -28,6 +29,7 @@ import {
     TOURNAMENT_PLAYLIST,
     TRACKED_PLAYLISTS,
 } from "../constants/Prime";
+import { PrimeAccessWatch } from "./PrimeAccessService";
 
 /** Was Prime zu einem Namen zurückgibt. */
 interface IRawUser {
@@ -98,12 +100,15 @@ interface IRawEnvelope<T> {
 export class PrimeError extends Error {
     type: string;
     status: number;
+    /** W-0145: Der Grund in den Worten von Prime, ohne Vorspann - für die DM an die Developer. */
+    reason: string;
 
-    constructor(message: string, type = "Unknown", status = 0) {
+    constructor(message: string, type = "Unknown", status = 0, reason = "") {
         super(message);
         this.name = "PrimeError";
         this.type = type;
         this.status = status;
+        this.reason = reason;
     }
 }
 
@@ -124,7 +129,7 @@ export function HttpError(status: number, raw: string): PrimeError {
         // Kein JSON - dann bleibt es beim Status.
     }
 
-    return new PrimeError(`Prime antwortete mit ${status}${reason ? `: ${reason}` : ""}`, status === 401 || status === 403 ? "Access" : "HTTP", status);
+    return new PrimeError(`Prime antwortete mit ${status}${reason ? `: ${reason}` : ""}`, status === 401 || status === 403 ? "Access" : "HTTP", status, reason);
 }
 
 const NOT_FOUND = new Set(["InvalidPlayer", "PlayerNotFound", "NotFound"]);
@@ -141,8 +146,12 @@ export default class PrimeService implements IPrimeService {
     private pending = 0;
     private alarmAt = 0;
 
+    /** W-0145: Merkt sich jede Abfrage und schreibt den Developern, wenn der Zugang kippt. */
+    readonly access: PrimeAccessWatch;
+
     constructor(client: BotClient) {
         this.client = client;
+        this.access = new PrimeAccessWatch(client);
     }
 
     get IsConfigured(): boolean {
@@ -281,6 +290,7 @@ export default class PrimeService implements IPrimeService {
             const profile = await this.Load(wanted);
             const entry = { value: profile, at: Date.now() };
 
+            this.access.Note("ok");
             this.cache.set(key, entry);
 
             // W-0129: auch unter der Konto-ID - der Knopf unter der Rang-Karte fragt
@@ -294,6 +304,7 @@ export default class PrimeService implements IPrimeService {
             const locked = error instanceof PrimeError && error.type === "Access";
 
             if (locked) this.Alarm(error);
+            this.access.Note(locked ? error : "other");
             if (!hit) throw error;
             if (!locked) logger.warn(`🎮 Prime nicht erreichbar, alter Stand für "${wanted}": ${String(error)}`);
 
@@ -311,6 +322,27 @@ export default class PrimeService implements IPrimeService {
 
         this.alarmAt = Date.now();
         logger.error(`🎮 Prime lehnt den Zugang ab (${error.message}). Keine Ränge, bis ein neuer PRIME_API_TOKEN in der .env steht: https://prime.rocketplanet.gg/access`);
+    }
+
+    /**
+     * W-0145: Eine Abfrage nur, um zu sehen, ob Prime den Schlüssel annimmt -
+     * für die stündliche Probe (runnables/PrimeAccess.ts). Ein unbekannter Name
+     * ist dabei ein Erfolg: Prime hat geantwortet und den Schlüssel angenommen.
+     */
+    async Probe(): Promise<void> {
+        if (!this.IsConfigured) return;
+
+        try {
+            await this.Query("/Resolver/ResolveUser", { User: PRIME_PROBE_USER });
+            this.access.Note("ok");
+        } catch (error) {
+            if (error instanceof PrimeError && NOT_FOUND.has(error.type)) return this.access.Note("ok");
+
+            const locked = error instanceof PrimeError && error.type === "Access";
+
+            if (locked) this.Alarm(error);
+            this.access.Note(locked ? error : "other");
+        }
     }
 
     protected async Load(name: string): Promise<IPrimeProfile | null> {

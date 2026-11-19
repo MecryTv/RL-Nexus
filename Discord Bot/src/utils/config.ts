@@ -117,6 +117,9 @@ export default function LoadConfig(): IConfig {
         // Raenge ueber prime.rocketplanet.gg fuer /rank, Teams und Rank Roles.
         // Fehlt der Token, holen sie nichts - alles andere laeuft weiter.
         PRIME_API_TOKEN: Text("PRIME_API_TOKEN"),
+        // W-0145: Ablauf des Zugangs, ISO mit Uhrzeit (2026-12-18T23:00). Gelesen und
+        // geprüft wird er in services/PrimeAccessService.ts; ungültig = Warnung im Log.
+        PRIME_ACCESS_EXPIRES: Text("PRIME_ACCESS_EXPIRES"),
 
         // W-0125: Epic-Login für /rank link - siehe docs/EpicLogin.md.
         EPIC_CLIENT_ID: Text("EPIC_CLIENT_ID"),

@@ -179,6 +179,22 @@ Was daraus folgt:
 * Im Bot-Log steht eine Zeile auf Fehler-Ebene, höchstens einmal je Stunde (`PRIME_ACCESS_LOG_EVERY`): `🎮 Prime lehnt den Zugang ab (Prime antwortete mit 401: …). Keine Ränge, bis ein neuer PRIME_API_TOKEN in der .env steht`. Die Warnungen je Aufruf entfallen dafür, sonst liefe das Log bei jedem `/rank` und jedem Team-Abgleich voll.
 * Neuen Schlüssel holen: <https://prime.rocketplanet.gg/access>, in die `.env` als `PRIME_API_TOKEN`, Bot neu starten. Das Ablaufdatum steht dort unter „Access expiry"; über die API lässt es sich nicht abfragen (`/Account/*` nimmt nur Anfragen der Webseite selbst an und antwortet sonst `403 CrossSiteRequest`).
 
+### DM an die Developer (W-0145)
+
+Jeder in `DEV_USER_IDs` bekommt eine DM als Bild (Entwurf D, `builder/PrimeAccessCard.ts`), darunter eine Zeile mit Discord-Zeitstempel und der Knopf „Prime-Konto öffnen“. Bei Gelb und Rot steht in der Zeile, dass der neue Schlüssel in `PRIME_API_TOKEN` gehört. Der Schlüssel selbst steht nie in der Nachricht.
+
+| Farbe | Wann | Wie oft |
+|---|---|---|
+| Gelb „läuft bald ab“ | 7 Tage und 1 Tag vor `PRIME_ACCESS_EXPIRES` | je Stufe einmal; ohne Datum nie |
+| Rot „abgelaufen“ | beim ersten Aufruf, den Prime mit 401 oder 403 ablehnt | einmal, dann höchstens alle 24 Stunden eine Erinnerung, solange gesperrt |
+| Grün „wieder da“ | beim ersten erfolgreichen Aufruf danach | einmal |
+
+Gemeldet wird über `PrimeAccessWatch` (`services/PrimeAccessService.ts`): `PrimeService` meldet jede Abfrage an Prime dorthin. Was zuletzt gemeldet wurde, steht in `bot_state` unter `prime_access`, damit ein Neustart nichts doppelt schickt.
+
+Damit ein Ablauf auch auffällt, wenn niemand `/rank` benutzt, schaut `runnables/PrimeAccess.ts` alle zehn Minuten nach: Gelb prüfen und, wenn in der letzten Stunde keine Abfrage an Prime lief, eine Probe (`PrimeService.Probe()`, `ResolveUser` mit einem Namen, den es nicht geben muss: auch „InvalidPlayer“ heißt, der Schlüssel wurde angenommen). Also höchstens eine zusätzliche Abfrage je Stunde.
+
+Grenzen: Die 24-Stunden-Leiste, „zuletzt erfolgreich“ und die Zahl der abgelehnten Anfragen liegen im Speicher und werden nur mit einer DM gespeichert. Nach einem Neustart ist die Leiste deshalb grau. Das Konto auf der Karte (`PRIME_ACCOUNT`) steht fest im Code, Prime verrät es über die API nicht. Ohne Verbindung zu Discord wird der Zustand trotzdem gespeichert, die DM fällt dann aus.
+
 ---
 
 ## Wie oft geholt wird
@@ -329,6 +345,9 @@ src/models/PlayerRanks.ts                  Gespeicherte Ränge, Peak, Reward-Lev
 src/models/Clubs.ts                        Eigene Clubs des Bots (nicht die aus dem Spiel)
 src/constants/WTSI.ts                      Die Rechnung
 src/scripts/CheckPrime.ts                  npm run check:prime
+src/builder/PrimeAccessCard.ts             W-0145: Bild der DM an die Developer
+src/services/PrimeAccessService.ts         W-0145: DM, Auslöser, Drosselung, bot_state
+src/runnables/PrimeAccess.ts               W-0145: alle 10 Minuten Gelb prüfen und Probe
 ```
 
 ---
