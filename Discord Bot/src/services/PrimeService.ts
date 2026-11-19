@@ -106,6 +106,26 @@ export class PrimeError extends Error {
     }
 }
 
+/**
+ * W-0145: Ein Fehler mit HTTP-Status. 401 und 403 heißen: Prime lehnt den
+ * Schlüssel ab - abgelaufen, gesperrt oder falsch. Das ist kein Ausfall und
+ * bekommt deshalb die Art "Access". Den Grund schreibt Prime in den Rumpf, etwa
+ * {"Error":{"Type":"Unauthorized","Message":"The Prime API token is not valid."}}.
+ */
+export function HttpError(status: number, raw: string): PrimeError {
+    let reason = "";
+
+    try {
+        const error = (JSON.parse(raw) as IRawEnvelope<unknown>).Error;
+
+        reason = error?.Message || error?.Type || "";
+    } catch {
+        // Kein JSON - dann bleibt es beim Status.
+    }
+
+    return new PrimeError(`Prime antwortete mit ${status}${reason ? `: ${reason}` : ""}`, status === 401 || status === 403 ? "Access" : "HTTP", status);
+}
+
 const NOT_FOUND = new Set(["InvalidPlayer", "PlayerNotFound", "NotFound"]);
 
 export default class PrimeService implements IPrimeService {
@@ -207,7 +227,7 @@ export default class PrimeService implements IPrimeService {
 
             request.on("end", () => {
                 if (status !== 200) {
-                    settle(new PrimeError(`Prime antwortete mit ${status}`, "HTTP", status));
+                    settle(HttpError(status, raw));
                     return;
                 }
 
@@ -270,7 +290,10 @@ export default class PrimeService implements IPrimeService {
         } catch (error) {
             if (!hit) throw error;
             logger.warn(`🎮 Prime nicht erreichbar, alter Stand für "${wanted}": ${String(error)}`);
-            return hit.value ? { ...hit.value, stale: true } : hit.value;
+            // W-0145: Ein gesperrter Zugang ist kein Ausfall - die Karte sagt dann, was los ist.
+            const stale = error instanceof PrimeError && error.type === "Access" ? "access" : true;
+
+            return hit.value ? { ...hit.value, stale } : hit.value;
         }
     }
 

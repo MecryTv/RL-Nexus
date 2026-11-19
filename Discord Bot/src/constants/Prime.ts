@@ -11,6 +11,12 @@ export const PRIME_BASE_URL = "https://prime.rocketplanet.gg";
 export const PRIME_TIMEOUT = 10_000;
 
 /**
+ * W-0145: Was /rank sagt, wenn Prime den Schlüssel ablehnt (401/403) - etwa weil
+ * der Zugang abgelaufen ist. Rocket League antwortet dann ja, nur nicht dem Bot.
+ */
+export const PRIME_ACCESS_TEXT = "Die Rang-Abfrage ist gerade nicht freigeschaltet, der Zugang des Bots zu den Rocket-League-Daten muss erneuert werden. Versuch es später noch einmal.";
+
+/**
  * Das oeffentliche Profil bei rocketleague.tracker.network.
  *
  * Steht als Knopf unter jeder Rang-Karte: die Karte zeigt den Stand, der Tracker

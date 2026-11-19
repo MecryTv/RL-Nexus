@@ -14,9 +14,12 @@ import path from "path";
 import { readdirSync, readFileSync } from "node:fs";
 import BotClient from "../client/BotClient";
 import { DivisionName, TierName, ToMMR, ToPlatform, ToPlayerID, TrackerURL, TRACKED_PLAYLISTS } from "../constants/Prime";
-import PrimeService, { PrimeError } from "../services/PrimeService";
+import PrimeService, { HttpError, PrimeError } from "../services/PrimeService";
 import { IPrimeProfile } from "../interfaces/services/prime/IPrimeService";
-import { PRIME_CACHE_TTL } from "../constants/Prime";
+import { PRIME_ACCESS_TEXT, PRIME_CACHE_TTL } from "../constants/Prime";
+import { Collection } from "discord.js";
+import Rank from "../commands/user/Rank";
+import RankButtons from "../events/rank/RankButtons";
 
 let failures = 0;
 
@@ -188,6 +191,96 @@ async function checkCache(client: BotClient): Promise<void> {
     prime.Close();
 }
 
+/**
+ * W-0145: Am 18.11.2026 lief der Prime-Zugang ab, und /rank sagte allen
+ * „Rocket League antwortet gerade nicht“. Ein abgelaufener oder falscher
+ * Schlüssel ist aber kein Ausfall: Prime antwortet, nur eben mit 401 (gemessen
+ * mit einem falschen Schlüssel) oder 403. Das bekommt die Art "Access" und eine
+ * ehrliche Meldung.
+ */
+async function checkAccess(client: BotClient): Promise<void> {
+    console.log("\n  — Zugang abgelaufen oder ungültig —");
+
+    const UNAUTHORIZED = '{"Error":{"Message":"The Prime API token is not valid.","Type":"Unauthorized"}}';
+
+    const refused = HttpError(401, UNAUTHORIZED);
+
+    check("401 ist ein Zugangsfehler", refused.type === "Access" && refused.status === 401, `${refused.type} ${refused.status}`);
+    check("  mit dem Grund von Prime", refused.message.includes("The Prime API token is not valid."), refused.message);
+    check("403 auch", HttpError(403, "").type === "Access", HttpError(403, "").type);
+    check("502 bleibt ein HTTP-Fehler", HttpError(502, "<html>").type === "HTTP", HttpError(502, "<html>").type);
+
+    class LockedPrime extends PrimeService {
+        public locked = false;
+
+        protected override async Load(name: string): Promise<IPrimeProfile | null> {
+            if (this.locked) throw HttpError(401, UNAUTHORIZED);
+
+            return { name, accountId: "abc", ranks: [], stats: [], club: null, fetchedAt: new Date().toISOString() } as unknown as IPrimeProfile;
+        }
+
+        public override get IsConfigured(): boolean {
+            return true;
+        }
+    }
+
+    const prime = new LockedPrime(client);
+
+    prime.locked = true;
+
+    const thrown = await prime.Profile("Neu").then(
+        () => null,
+        (error: unknown) => error
+    );
+
+    check("Ohne alten Stand kommt der Zugangsfehler durch", thrown instanceof PrimeError && thrown.type === "Access", String(thrown));
+
+    prime.locked = false;
+    await prime.Profile("Spieler");
+
+    const entry = (prime as unknown as { cache: Map<string, { at: number }> }).cache.get("spieler");
+
+    if (entry) entry.at = Date.now() - PRIME_CACHE_TTL - 1000;
+
+    prime.locked = true;
+
+    const kept = await prime.Profile("Spieler");
+
+    check("Mit altem Stand kommt der zurück", kept?.name === "Spieler", String(kept?.name));
+    check("  markiert als gesperrt, nicht als Ausfall", kept?.stale === "access", String(kept?.stale));
+
+    prime.Close();
+
+    // Was Nutzer lesen: /rank search und der Knopf unter der Karte.
+    const replies: { content?: string | null }[] = [];
+    const fakeClient = {
+        primeService: { IsConfigured: true, Profile: async () => Promise.reject(HttpError(401, UNAUTHORIZED)) },
+        databaseService: { Ready: false },
+        cooldowns: new Collection(),
+        guardian: { ReportError: async (error: Error) => void replies.push({ content: `Fehler: ${error.message}` }) },
+    } as unknown as BotClient;
+
+    await new Rank(fakeClient).Execute({
+        options: { getString: () => "Nova", getSubcommand: () => "search" },
+        user: { id: "1" },
+        guildId: null,
+        deferReply: async () => undefined,
+        editReply: async (message: { content?: string }) => void replies.push(message),
+    } as never);
+
+    check("/rank search sagt, dass die Abfrage nicht freigeschaltet ist", replies.at(-1)?.content === PRIME_ACCESS_TEXT, String(replies.at(-1)?.content));
+
+    await new RankButtons(fakeClient).Execute({
+        isButton: () => true,
+        customId: "rk:extra:abc:1",
+        user: { id: "1" },
+        guildId: null,
+        deferUpdate: async () => undefined,
+        followUp: async (message: { content?: string }) => void replies.push(message),
+    } as never);
+
+    check("Der Knopf unter der Karte auch", replies.at(-1)?.content === PRIME_ACCESS_TEXT, String(replies.at(-1)?.content));
+}
 
 /**
  * Die Umrechnung ist der Kern: steht sie falsch, sieht jede Zahl im Dashboard
@@ -318,6 +411,20 @@ async function checkLive(client: BotClient, player: string): Promise<void> {
     check("  und denselben Namen", byId?.name === profile.name, String(byId?.name));
 
     service.Forget(profile.accountId);
+
+    // W-0145: Wie Prime einen falschen Schlüssel ablehnt - so sah es aus, als
+    // der Zugang am 18.11.2026 ablief.
+    console.log("\n  — Falscher Schlüssel —");
+
+    const wrong = new PrimeService({ config: { PRIME_API_TOKEN: "falscher-schluessel" } } as unknown as BotClient);
+    const refused = await wrong.Profile(player).then(
+        () => null,
+        (error: unknown) => error
+    );
+
+    check("Prime lehnt ab, der Bot erkennt den Zugangsfehler", refused instanceof PrimeError && refused.type === "Access", refused instanceof PrimeError ? `${refused.type} ${refused.status}: ${refused.message}` : String(refused));
+
+    wrong.Close();
 }
 
 async function main(): Promise<void> {
@@ -333,6 +440,7 @@ async function main(): Promise<void> {
     // Braucht kein Netz: der Zwischenspeicher wird mit einer nachgestellten
     // Prime-Anbindung geprueft.
     await checkCache(client);
+    await checkAccess(client);
 
     if (!player) {
         console.log("\n⏭️  Kein Spielername übergeben - die echte Abfrage bleibt aus.\n   npm run check:prime -- DEIN_EPIC_NAME\n");

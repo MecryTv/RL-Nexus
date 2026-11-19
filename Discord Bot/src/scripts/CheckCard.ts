@@ -186,6 +186,17 @@ async function main(): Promise<void> {
     check("Ein alter Stand wird gezeichnet", stale.length > 0);
     check("  und sieht anders aus als ein frischer", !stale.equals(fresh), "sonst fehlt die Warnung");
 
+    // W-0145: Lehnt Prime den Zugang ab, sagt die Zeile das - nicht „Rocket League antwortet nicht“.
+    const locked = await RenderRankCard({
+        profile: { ...PROFILE, fetchedAt: alt, stale: "access" },
+        discordName: "PruefName",
+        avatarURL: null,
+    });
+
+    await writeFile("card-check-access.png", locked);
+
+    check("Gesperrter Zugang hat einen eigenen Hinweis", !locked.equals(fresh) && !locked.equals(stale), "sonst steht dort der Ausfall-Text oder gar keiner");
+
     console.log("\n— Grenzfälle —");
 
     // W-0132: Die Karte ist enger geworden. Was dort zuerst überläuft: ein

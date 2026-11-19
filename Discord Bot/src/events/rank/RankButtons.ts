@@ -5,6 +5,8 @@ import { RANK_PREFIX, RankMessage } from "../../builder/RankView";
 import { RankCardPage } from "../../builder/RankCard";
 import { IPrimeProfile } from "../../interfaces/services/prime/IPrimeService";
 import { ClosedText, ModuleOpen } from "../../utils/moduleFlags";
+import { PRIME_ACCESS_TEXT } from "../../constants/Prime";
+import { PrimeError } from "../../services/PrimeService";
 
 /** Jeder Klick zeichnet die Karte neu (knapp eine Sekunde) - nicht öfter als alle drei Sekunden je Nutzer. */
 const COOLDOWN_MS = 3000;
@@ -92,9 +94,10 @@ export default class RankButtons extends Event {
             profile = await this.client.primeService.Profile(accountId);
 
             if (!profile) content = "Dieses Epic-Konto gibt es nicht mehr.";
-        } catch {
+        } catch (error) {
             profile = null;
-            content = "Rocket League antwortet gerade nicht. Versuch es gleich noch einmal.";
+            // W-0145: Wie bei /rank - ein abgelaufener Schlüssel ist kein Ausfall.
+            content = error instanceof PrimeError && error.type === "Access" ? PRIME_ACCESS_TEXT : "Rocket League antwortet gerade nicht. Versuch es gleich noch einmal.";
         }
 
         if (!profile) {

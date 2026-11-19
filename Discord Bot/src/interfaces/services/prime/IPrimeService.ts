@@ -92,8 +92,11 @@ export interface IPrimeProfile {
      * true, wenn Prime beim letzten Versuch nicht antwortete und stattdessen der
      * gespeicherte Stand zurueckkam. Die Werte sind dann echt, aber alt - wer
      * sie anzeigt, soll das dazuschreiben.
+     *
+     * W-0145: "access", wenn Prime nicht ausfiel, sondern den Schlüssel ablehnte
+     * (Zugang abgelaufen oder ungültig) - der Hinweis lautet dann anders.
      */
-    stale?: boolean;
+    stale?: boolean | "access";
 }
 
 export default interface IPrimeService {

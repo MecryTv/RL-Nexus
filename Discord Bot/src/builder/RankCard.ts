@@ -1218,9 +1218,11 @@ function ago(iso: string): string {
  * und sagt auch warum.
  */
 function drawFreshness(ctx: SKRSContext2D, profile: IPrimeProfile): void {
-    const stale = profile.stale === true;
+    const stale = Boolean(profile.stale);
+    // W-0145: Lehnt Prime den Zugang ab, antwortet Rocket League sehr wohl - nur nicht dem Bot.
+    const cause = profile.stale === "access" ? "Rang-Abfrage nicht freigeschaltet" : "Rocket League antwortet gerade nicht";
     const text = stale
-        ? `Rocket League antwortet gerade nicht, angezeigt wird der Stand von ${ago(profile.fetchedAt)}`
+        ? `${cause}, angezeigt wird der Stand von ${ago(profile.fetchedAt)}`
         : `Stand ${ago(profile.fetchedAt)} · wird alle 10 Minuten erneuert`;
 
     // Links unten, nicht rechts: rechts unten laeuft die rote Eckklammer des

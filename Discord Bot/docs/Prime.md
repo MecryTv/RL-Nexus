@@ -161,6 +161,23 @@ Fachfehler liefert Prime als `200` mit einem `Error`-Objekt im Rumpf:
 
 `PrimeService` übersetzt das in einen `PrimeError` mit `type`. Ein unbekannter Spieler wird zu `null` (die Route antwortet `404`), alles andere wirft weiter (die Route antwortet `502` — das Problem sitzt dann nicht im Dashboard).
 
+### Zugang abgelaufen oder Schlüssel falsch (W-0145)
+
+Den Schlüssel lehnt Prime **nicht** mit 200 ab, sondern mit HTTP **401** (gemessen am 19.11.2026):
+
+| Anfrage | Antwort |
+|---|---|
+| ohne `authorization` | `401 {"Error":{"Type":"Unauthorized","Message":"Provide a Prime API token as a bearer token."}}` |
+| falscher Schlüssel | `401 {"Error":{"Type":"Unauthorized","Message":"The Prime API token is not valid."}}` |
+
+Wie die Antwort bei einem **abgelaufenen** Zugang genau aussieht, ließ sich nicht nachstellen (der neue Schlüssel gilt). Die Zugangsseite kennt dafür den Status `expired` („This authorization has reached its expiry date"), daneben `disabled`, `denied` und `unapproved`. `PrimeService` behandelt deshalb **401 und 403** gleich: `PrimeError` mit `type: "Access"` und dem Grund von Prime in der Meldung (`HttpError()`).
+
+Was daraus folgt:
+
+* `/rank search`, `/rank me` und der Knopf unter der Karte sagen dann „Die Rang-Abfrage ist gerade nicht freigeschaltet …" (`PRIME_ACCESS_TEXT`) statt „Rocket League antwortet gerade nicht".
+* Liegt ein alter Stand im Zwischenspeicher, kommt er wie bei einem Ausfall zurück, aber mit `stale: "access"`. Die Karte schreibt dann „Rang-Abfrage nicht freigeschaltet, angezeigt wird der Stand von …".
+* Neuen Schlüssel holen: <https://prime.rocketplanet.gg/access>, in die `.env` als `PRIME_API_TOKEN`, Bot neu starten. Das Ablaufdatum steht dort unter „Access expiry"; über die API lässt es sich nicht abfragen (`/Account/*` nimmt nur Anfragen der Webseite selbst an und antwortet sonst `403 CrossSiteRequest`).
+
 ---
 
 ## Wie oft geholt wird

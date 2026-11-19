@@ -5,6 +5,7 @@ import Category from "../../enums/Category";
 import { IPrimeProfile } from "../../interfaces/services/prime/IPrimeService";
 import { RankMessage } from "../../builder/RankView";
 import { LINK_COOLDOWN_DEV } from "../../constants/Database";
+import { PRIME_ACCESS_TEXT } from "../../constants/Prime";
 import { PrimeError } from "../../services/PrimeService";
 import { EpicLinkURL, EpicLoginReady } from "../../utils/epicLogin";
 import { EpicAdopt } from "../../utils/epic";
@@ -138,7 +139,8 @@ export default class Rank extends Command {
 
             logger.warn(`🎮 Prime: ${prime ? `${prime.type} ${prime.message}` : String(error)}`);
 
-            await interaction.editReply({ content: "Rocket League antwortet gerade nicht. Versuch es später noch einmal." });
+            // W-0145: Ein abgelaufener oder falscher Schlüssel ist kein Ausfall von Rocket League.
+            await interaction.editReply({ content: prime?.type === "Access" ? PRIME_ACCESS_TEXT : "Rocket League antwortet gerade nicht. Versuch es später noch einmal." });
 
             return null;
         }
