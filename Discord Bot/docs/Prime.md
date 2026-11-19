@@ -176,6 +176,7 @@ Was daraus folgt:
 
 * `/rank search`, `/rank me` und der Knopf unter der Karte sagen dann „Die Rang-Abfrage ist gerade nicht freigeschaltet …" (`PRIME_ACCESS_TEXT`) statt „Rocket League antwortet gerade nicht".
 * Liegt ein alter Stand im Zwischenspeicher, kommt er wie bei einem Ausfall zurück, aber mit `stale: "access"`. Die Karte schreibt dann „Rang-Abfrage nicht freigeschaltet, angezeigt wird der Stand von …".
+* Im Bot-Log steht eine Zeile auf Fehler-Ebene, höchstens einmal je Stunde (`PRIME_ACCESS_LOG_EVERY`): `🎮 Prime lehnt den Zugang ab (Prime antwortete mit 401: …). Keine Ränge, bis ein neuer PRIME_API_TOKEN in der .env steht`. Die Warnungen je Aufruf entfallen dafür, sonst liefe das Log bei jedem `/rank` und jedem Team-Abgleich voll.
 * Neuen Schlüssel holen: <https://prime.rocketplanet.gg/access>, in die `.env` als `PRIME_API_TOKEN`, Bot neu starten. Das Ablaufdatum steht dort unter „Access expiry"; über die API lässt es sich nicht abfragen (`/Account/*` nimmt nur Anfragen der Webseite selbst an und antwortet sonst `403 CrossSiteRequest`).
 
 ---

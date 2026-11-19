@@ -16,6 +16,7 @@ import {
     CAREER_STATS,
     DivisionName,
     PLACEMENT_MATCHES,
+    PRIME_ACCESS_LOG_EVERY,
     PRIME_BASE_URL,
     PRIME_CACHE_KEEP,
     PRIME_CACHE_MAX,
@@ -138,6 +139,7 @@ export default class PrimeService implements IPrimeService {
 
     private session: ClientHttp2Session | null = null;
     private pending = 0;
+    private alarmAt = 0;
 
     constructor(client: BotClient) {
         this.client = client;
@@ -288,13 +290,27 @@ export default class PrimeService implements IPrimeService {
 
             return profile;
         } catch (error) {
-            if (!hit) throw error;
-            logger.warn(`🎮 Prime nicht erreichbar, alter Stand für "${wanted}": ${String(error)}`);
             // W-0145: Ein gesperrter Zugang ist kein Ausfall - die Karte sagt dann, was los ist.
-            const stale = error instanceof PrimeError && error.type === "Access" ? "access" : true;
+            const locked = error instanceof PrimeError && error.type === "Access";
 
-            return hit.value ? { ...hit.value, stale } : hit.value;
+            if (locked) this.Alarm(error);
+            if (!hit) throw error;
+            if (!locked) logger.warn(`🎮 Prime nicht erreichbar, alter Stand für "${wanted}": ${String(error)}`);
+
+            return hit.value ? { ...hit.value, stale: locked ? "access" : true } : hit.value;
         }
+    }
+
+    /**
+     * W-0145: Prime lehnt den Schlüssel ab. Das gehört als Fehler ins Log, aber
+     * höchstens einmal je PRIME_ACCESS_LOG_EVERY - sonst schreibt jedes /rank,
+     * jeder Knopf und jeder Team-Abgleich dieselbe Zeile.
+     */
+    private Alarm(error: PrimeError): void {
+        if (Date.now() - this.alarmAt < PRIME_ACCESS_LOG_EVERY) return;
+
+        this.alarmAt = Date.now();
+        logger.error(`🎮 Prime lehnt den Zugang ab (${error.message}). Keine Ränge, bis ein neuer PRIME_API_TOKEN in der .env steht: https://prime.rocketplanet.gg/access`);
     }
 
     protected async Load(name: string): Promise<IPrimeProfile | null> {

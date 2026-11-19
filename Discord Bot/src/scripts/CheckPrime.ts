@@ -20,6 +20,7 @@ import { PRIME_ACCESS_TEXT, PRIME_CACHE_TTL } from "../constants/Prime";
 import { Collection } from "discord.js";
 import Rank from "../commands/user/Rank";
 import RankButtons from "../events/rank/RankButtons";
+import logger from "../utils/logger";
 
 let failures = 0;
 
@@ -280,6 +281,51 @@ async function checkAccess(client: BotClient): Promise<void> {
     } as never);
 
     check("Der Knopf unter der Karte auch", replies.at(-1)?.content === PRIME_ACCESS_TEXT, String(replies.at(-1)?.content));
+
+    // Im Log: eine klare Fehlerzeile, aber nicht bei jedem /rank - sonst läuft es voll.
+    const errors: string[] = [];
+    const warnings: string[] = [];
+    const real = { error: logger.error, warn: logger.warn };
+
+    logger.error = (message: string) => void errors.push(message);
+    logger.warn = (message: string) => void warnings.push(message);
+
+    try {
+        const noisy = new LockedPrime(client);
+
+        await noisy.Profile("Erster");
+        noisy.locked = true;
+
+        for (const name of ["Neu1", "Neu2", "Erster"]) {
+            const entry = (noisy as unknown as { cache: Map<string, { at: number }> }).cache.get(name.toLowerCase());
+
+            if (entry) entry.at = Date.now() - PRIME_CACHE_TTL - 1000;
+
+            await noisy.Profile(name).catch(() => null);
+        }
+
+        await new Rank(fakeClient).Execute({
+            options: { getString: () => "Nova", getSubcommand: () => "search" },
+            user: { id: "1" },
+            guildId: null,
+            deferReply: async () => undefined,
+            editReply: async () => undefined,
+        } as never);
+
+        check("Gesperrter Zugang: genau eine Fehlerzeile", errors.length === 1, `${errors.length}: ${errors.join(" | ")}`);
+        check("  sie sagt, was zu tun ist", /PRIME_API_TOKEN/.test(errors[0] ?? "") && (errors[0] ?? "").includes("The Prime API token is not valid."), errors[0]);
+        check("  keine Warnung je Anfrage dazu", warnings.length === 0, warnings.join(" | "));
+
+        (noisy as unknown as { alarmAt: number }).alarmAt = 0;
+        await noisy.Profile("Neu3").catch(() => null);
+
+        check("  nach einer Stunde kommt sie wieder", errors.length === 2, `${errors.length}`);
+
+        noisy.Close();
+    } finally {
+        logger.error = real.error;
+        logger.warn = real.warn;
+    }
 }
 
 /**

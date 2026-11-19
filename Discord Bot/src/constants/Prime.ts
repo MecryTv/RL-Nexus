@@ -16,6 +16,9 @@ export const PRIME_TIMEOUT = 10_000;
  */
 export const PRIME_ACCESS_TEXT = "Die Rang-Abfrage ist gerade nicht freigeschaltet, der Zugang des Bots zu den Rocket-League-Daten muss erneuert werden. Versuch es später noch einmal.";
 
+/** W-0145: So oft steht ein abgelehnter Zugang höchstens als Fehler im Bot-Log. */
+export const PRIME_ACCESS_LOG_EVERY = 60 * 60 * 1000;
+
 /**
  * Das oeffentliche Profil bei rocketleague.tracker.network.
  *

@@ -137,10 +137,13 @@ export default class Rank extends Command {
         } catch (error) {
             const prime = error instanceof PrimeError ? error : null;
 
-            logger.warn(`🎮 Prime: ${prime ? `${prime.type} ${prime.message}` : String(error)}`);
-
             // W-0145: Ein abgelaufener oder falscher Schlüssel ist kein Ausfall von Rocket League.
-            await interaction.editReply({ content: prime?.type === "Access" ? PRIME_ACCESS_TEXT : "Rocket League antwortet gerade nicht. Versuch es später noch einmal." });
+            // Im Log steht er schon als Fehler (PrimeService, einmal je Stunde) - nicht noch je Aufruf.
+            const locked = prime?.type === "Access";
+
+            if (!locked) logger.warn(`🎮 Prime: ${prime ? `${prime.type} ${prime.message}` : String(error)}`);
+
+            await interaction.editReply({ content: locked ? PRIME_ACCESS_TEXT : "Rocket League antwortet gerade nicht. Versuch es später noch einmal." });
 
             return null;
         }
