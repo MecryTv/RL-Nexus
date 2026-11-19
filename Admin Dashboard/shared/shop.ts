@@ -324,6 +324,9 @@ export interface ILegalText {
 export const CUSTOMER_FILTERS = ["all", "trial", "subscription", "one_time", "gift", "expired", "banned"] as const;
 export type CustomerFilter = (typeof CUSTOMER_FILTERS)[number];
 
+/** Nachreview W-0141: so lang darf die Suche der Kundenliste sein, im Feld wie auf dem Server. */
+export const CUSTOMER_SEARCH_MAX = 100;
+
 /** Eine Zeile der Kundenliste. Die Mail ist gekürzt. */
 export interface ICustomerRow {
     readonly id: string;

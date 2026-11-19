@@ -29,7 +29,7 @@ import { backupDatabaseName, ensureBackupDatabase } from "./backups/store.ts";
 import { signToken } from "./bot.ts";
 import { forgetAllUsers, forgetUser, namesFilled } from "./users.ts";
 import { deletionRound } from "./userdata/clock.ts";
-import { CUSTOMER_FILTERS, type ICancelReceipt, type ICheckoutStart, type ICustomerDetail, type ICustomerList, type IShopProduct, type IShopProductList, type IShopSettingsView, type IShopState, type IUnlockProgress, type IWithdrawOrder, type IWithdrawReceipt } from "../shared/shop.ts";
+import { CUSTOMER_FILTERS, CUSTOMER_SEARCH_MAX, type ICancelReceipt, type ICheckoutStart, type ICustomerDetail, type ICustomerList, type IShopProduct, type IShopProductList, type IShopSettingsView, type IShopState, type IUnlockProgress, type IWithdrawOrder, type IWithdrawReceipt } from "../shared/shop.ts";
 import type { IIncidentList, IPublicStatus, IStatusDetail } from "../shared/status.ts";
 import { loadRevoked, readSession, revokeSession } from "./access.ts";
 import { buildApp } from "./app.ts";
@@ -3652,6 +3652,9 @@ try {
             for (const filter of CUSTOMER_FILTERS) assert.equal(counts[filter], (await customerList(`filter=${filter}`)).total, filter);
             assert.equal(counts.all >= 5 && counts.trial >= 1 && counts.expired >= 1 && counts.banned >= 1, true);
             assert.deepEqual([(await get("/api/shop/customers?filter=none")).statusCode, (await get("/api/shop/customers?page=0")).statusCode], [400, 400]);
+            // Nachreview W-0141: Das Suchfeld lässt höchstens CUSTOMER_SEARCH_MAX Zeichen zu, so viele nimmt auch der Server.
+            const longest = "x".repeat(CUSTOMER_SEARCH_MAX);
+            assert.deepEqual([(await get(`/api/shop/customers?q=${longest}`)).statusCode, (await get(`/api/shop/customers?q=${longest}x`)).statusCode], [200, 400]);
         });
 
         await check("W-0141: Kunden vom Server: Seiten ohne Lücke und Doppel, eine Seite zu weit wird die letzte", async () => {

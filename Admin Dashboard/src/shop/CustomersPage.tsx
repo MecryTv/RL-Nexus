@@ -1,7 +1,7 @@
 import { useEffect, useState, type JSX } from "react";
 import { useQueryParam } from "../nav/useQueryParam.ts";
 import { SEARCH_DEBOUNCE_MS } from "../../shared/search";
-import { CUSTOMER_FILTERS, formatPrice, type CustomerFilter, type ICustomerList, type IShopProductList } from "../../shared/shop";
+import { CUSTOMER_FILTERS, CUSTOMER_SEARCH_MAX, formatPrice, type CustomerFilter, type ICustomerList, type IShopProductList } from "../../shared/shop";
 import { useLive } from "../api/live";
 import { useApi } from "../api/useApi";
 import { Badge } from "../components/Badge";
@@ -40,16 +40,24 @@ export function CustomersPage(): JSX.Element {
     const [search, setSearch] = useQueryParam();
     const [page, setPage] = useState(1);
     const [wanted, setWanted] = useState(() => search.trim());
-    const [openId, setOpenId] = useState<string | null>(null);
+    // Nachreview W-0141: Name beim Öffnen gemerkt. Fällt die Person danach aus Filter oder Seite, bleibt der Titel.
+    const [opened, setOpened] = useState<{ readonly id: string; readonly name: string | null } | null>(null);
     // Für Resttage und Monatsnamen reicht der Stand beim Öffnen der Seite.
     const [now] = useState(() => Date.now());
 
     // W-0141: Seite, Filter und Suche rechnet der Server. Gefragt wird erst, wenn das Tippen kurz ruht.
+    // Nachreview: Erst dann zurück auf Seite 1, in einem Schritt mit der Suche, auch bei einer Suche aus der Adresse (?q=).
     useEffect(() => {
-        const timer = setTimeout(() => setWanted(search.trim()), SEARCH_DEBOUNCE_MS);
+        const timer = setTimeout(() => {
+            const next = search.trim();
+
+            if (next === wanted) return;
+            setWanted(next);
+            setPage(1);
+        }, SEARCH_DEBOUNCE_MS);
 
         return () => clearTimeout(timer);
-    }, [search]);
+    }, [search, wanted]);
 
     const list = useApi<ICustomerList>(`/api/shop/customers?${new URLSearchParams({ page: String(page), filter, ...(wanted ? { q: wanted } : {}) }).toString()}`);
     const products = useApi<IShopProductList>("/api/shop/products");
@@ -59,7 +67,6 @@ export function CustomersPage(): JSX.Element {
     const everyone = list.data?.counts.all ?? 0;
     const total = list.data?.total ?? 0;
     const pages = list.data ? Math.max(1, Math.ceil(list.data.total / list.data.pageSize)) : 1;
-    const opened = customers.find((row) => row.id === openId) ?? null;
     const stats = list.data?.stats;
 
     return (
@@ -128,10 +135,8 @@ export function CustomersPage(): JSX.Element {
                                     id="kunden-suche"
                                     type="search"
                                     value={search}
-                                    onChange={(event) => {
-                                        setSearch(event.target.value);
-                                        setPage(1);
-                                    }}
+                                    onChange={(event) => setSearch(event.target.value)}
+                                    maxLength={CUSTOMER_SEARCH_MAX}
                                     placeholder="Name, ID oder Mail …"
                                     autoComplete="off"
                                 />
@@ -161,14 +166,14 @@ export function CustomersPage(): JSX.Element {
                                         const until = untilText(row, now);
 
                                         return (
-                                            <tr key={row.id} className={row.id === openId ? styles.selected : undefined} onClick={() => setOpenId(row.id)}>
+                                            <tr key={row.id} className={row.id === opened?.id ? styles.selected : undefined} onClick={() => setOpened({ id: row.id, name: row.name })}>
                                                 <td>
                                                     <span className={styles.person}>
                                                         <span className={styles.initial} aria-hidden="true">
                                                             {(row.name ?? "?").slice(0, 1).toUpperCase()}
                                                         </span>
                                                         <span>
-                                                            <button type="button" className={styles.personName} onClick={() => setOpenId(row.id)}>
+                                                            <button type="button" className={styles.personName} onClick={() => setOpened({ id: row.id, name: row.name })}>
                                                                 {row.name ?? "Unbekannt"}
                                                             </button>
                                                             <small>{shortId(row.id)}</small>
@@ -193,8 +198,8 @@ export function CustomersPage(): JSX.Element {
                 </>
             )}
 
-            <SidePanel open={openId !== null} title={opened?.name ?? "Person"} onClose={() => setOpenId(null)}>
-                {openId !== null && <CustomerPanel key={openId} id={openId} products={products.data?.products ?? []} onChanged={list.reload} />}
+            <SidePanel open={opened !== null} title={opened?.name ?? "Person"} onClose={() => setOpened(null)}>
+                {opened !== null && <CustomerPanel key={opened.id} id={opened.id} products={products.data?.products ?? []} onChanged={list.reload} />}
             </SidePanel>
         </>
     );

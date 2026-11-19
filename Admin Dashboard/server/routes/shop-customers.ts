@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import type { IMe } from "../../shared/api.ts";
 import { PAGE_SIZE } from "../../shared/limits.ts";
-import { CUSTOMER_FILTERS, formatPrice, maskEmail, type CustomerFilter, type ICustomerDetail, type ICustomerGrant, type ICustomerList, type ICustomerRow, type IGuildRole, type ShopStatus } from "../../shared/shop.ts";
+import { CUSTOMER_FILTERS, CUSTOMER_SEARCH_MAX, formatPrice, maskEmail, type CustomerFilter, type ICustomerDetail, type ICustomerGrant, type ICustomerList, type ICustomerRow, type IGuildRole, type ShopStatus } from "../../shared/shop.ts";
 import { accessOf } from "../access.ts";
 import { audit } from "../audit.ts";
 import type { IConfig } from "../config.ts";
@@ -271,7 +271,7 @@ export async function shopCustomerRoutes(app: FastifyInstance, { config }: { con
 
         const params = request.query as { page?: unknown; filter?: unknown; q?: unknown };
         const filter = params.filter === undefined ? "all" : oneOf(params.filter, CUSTOMER_FILTERS, "Der Filter");
-        const search = text(params.q, "Die Suche", { max: 100 });
+        const search = text(params.q, "Die Suche", { max: CUSTOMER_SEARCH_MAX });
         const page = pageNumber(params.page);
         const [list, products, revenueCents] = await Promise.all([customerPage(filter, search ? likeOf(search) : null, page), listProducts(), revenueSince(monthStart(new Date()))]);
 
