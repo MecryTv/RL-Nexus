@@ -2349,6 +2349,7 @@ async function checkRefresh(client: BotClient): Promise<void> {
     const groups: ITeamGroup[] = [{ id: 1, guildId: GUILD, name: "Main", position: 0 }];
     const alive = new Set<string>();
     const broken = new Set<string>();
+    let hold: Promise<void> | null = null;
     const log: string[] = [];
     let next = 1000;
     const channel = {
@@ -2363,6 +2364,7 @@ async function checkRefresh(client: BotClient): Promise<void> {
                           flags: { has: () => true },
                           edit: async () => {
                               log.push(`edit ${id}`);
+                              await hold;
 
                               if (broken.has(id)) throw new Error("Discord 500");
                           },
@@ -2387,8 +2389,6 @@ async function checkRefresh(client: BotClient): Promise<void> {
     const saved = new Map<number, ITeamPlayer[]>();
     let settings: ITeamSettings = { ...DefaultTeamSettings(), channelId: TEXT, layout: "hub" };
     let teams: ITeam[] = [];
-    const chained = service as unknown as { Serial: <T>(guildId: string, task: () => Promise<T>) => Promise<T> };
-    const viaChain: string[] = [];
     const guildIds = ["g1", "g2", "g3", "g4", "g5", "aus"];
     const original = {
         settings: service.Settings,
@@ -2397,7 +2397,6 @@ async function checkRefresh(client: BotClient): Promise<void> {
         profile: client.primeService.Profile,
         auto: service.AutoRefresh,
         tick: service.RefreshTick,
-        serial: chained.Serial,
         save: client.moduleSettings.Save,
         of: client.settings.Of,
         players: client.teams.SavePlayers,
@@ -2413,7 +2412,6 @@ async function checkRefresh(client: BotClient): Promise<void> {
     const warned: string[] = [];
     const reset = () => {
         log.length = 0;
-        viaChain.length = 0;
         prime.calls = 0;
     };
 
@@ -2434,11 +2432,6 @@ async function checkRefresh(client: BotClient): Promise<void> {
             fetchedAt: new Date(prime.fetchedAt ?? Date.now()).toISOString(),
             ...(prime.stale ? { stale: prime.stale } : {}),
         } as unknown as IPrimeProfile;
-    };
-    chained.Serial = <T>(guildId: string, task: () => Promise<T>): Promise<T> => {
-        viaChain.push(guildId);
-
-        return original.serial.call(service, guildId, task) as Promise<T>;
     };
     client.moduleSettings.Save = async (_guild: string, _module: string, config: object) => void (settings = config as ITeamSettings);
     (client.settings as unknown as { Of: unknown }).Of = async (id: string) => ({ modules: id === "aus" ? [] : ["teams"] });
@@ -2480,7 +2473,6 @@ async function checkRefresh(client: BotClient): Promise<void> {
             `${edited} · ${prime.calls} · ${log}`
         );
         check("  nie neu gepostet, nichts gelöscht, dieselbe Kette", JSON.stringify([settings.messageId, ...settings.moreIds]) === JSON.stringify(chain) && chain.every((id) => alive.has(id!)));
-        check("  bearbeitet über die Reihe je Server (nichts doppelt)", viaChain.includes(GUILD), viaChain.join(","));
         SetFlags([], [], []);
 
         // Review M6: Prime wird ohnehin höchstens alle „Ränge neu holen nach“ (RL Tracking) gefragt - öfter auffrischen brächte nichts.
@@ -2502,6 +2494,36 @@ async function checkRefresh(client: BotClient): Promise<void> {
 
         check("Treffer aus dem Zwischenspeicher: der Stand trägt die Zeit von Primes Antwort (Review M6)", cachedStand.at === prime.fetchedAt, `${Date.now() - cachedStand.at} ms alt`);
         prime.fetchedAt = null;
+
+        // Review M8: Läuft gerade ein Senden aus dem Dashboard, wartet das Bearbeiten dahinter (Reihe je Server) - nichts doppelt.
+        let release: () => void = () => undefined;
+
+        hold = new Promise<void>((resolve) => (release = resolve));
+        age(20);
+        perServer(15);
+        prime.value = 1620;
+        reset();
+
+        const publishing = service.Publish(guild);
+        const refreshing = service.AutoRefresh(guild);
+
+        await new Promise((resolve) => setTimeout(resolve, 300));
+
+        const early = log.length;
+
+        release();
+        hold = null;
+        await publishing;
+
+        const late = await refreshing;
+
+        check(
+            "Senden läuft gerade: das Auffrischen wartet dahinter, dann bearbeitet es dieselbe Kette",
+            early === 1 && late?.edited === chain.length && log.length === 2 * chain.length && log.every((entry) => entry.startsWith("edit ")),
+            `${early} · ${JSON.stringify(late)} · ${log}`
+        );
+        SetFlags([], [], []);
+        prime.value = 1600;
 
         // 13 Spieler, alle fällig: Prime bekommt höchstens 12. Der älteste bleibt fürs nächste Mal.
         teams = [FakeTeam(Array.from({ length: 12 }, (_, index) => aged(`m${index}`, 40, 1600)), { id: 1, name: "Alpha" }), FakeTeam([aged("old", 50, 1600)], { id: 2, name: "Bravo", position: 1 })];
@@ -2736,6 +2758,23 @@ async function checkRefresh(client: BotClient): Promise<void> {
         await service.RefreshTick();
         await service.RefreshTick();
         check("Drei Server bleiben fällig: der vierte kommt trotzdem dran (reihum)", touched.includes("g4"), touched.join(","));
+
+        // Review M8: Wirft das Auffrischen eines Servers, steht das im Log, er zählt als geprüft, die übrigen laufen weiter.
+        due.clear();
+        due.add("g2");
+        touched.length = 0;
+        warned.length = 0;
+        service.AutoRefresh = async (target: Guild) => {
+            touched.push(target.id);
+
+            if (target.id === "g1") throw new Error("Datenbank weg");
+
+            return due.delete(target.id) ? { answered: 1, edited: 0 } : null;
+        };
+
+        const fell = await service.RefreshTick();
+
+        check("Auffrischen wirft: Grund im Log, zählt als geprüft, der nächste Server kommt dran", warned.some((line) => line.includes("Datenbank weg")) && fell.guilds === 2 && touched.includes("g2"), `${JSON.stringify(fell)} · ${warned.join(" | ")}`);
         service.AutoRefresh = answering0;
 
         // Review I2: Bekommt ein Server gar keine Antwort von Prime, ist Prime gerade weg - die übrigen warten.
@@ -2776,7 +2815,6 @@ async function checkRefresh(client: BotClient): Promise<void> {
         client.primeService.Profile = original.profile;
         service.AutoRefresh = original.auto;
         service.RefreshTick = original.tick;
-        chained.Serial = original.serial;
         client.moduleSettings.Save = original.save;
         (client.settings as unknown as { Of: unknown }).Of = original.of;
         client.teams.SavePlayers = original.players;
