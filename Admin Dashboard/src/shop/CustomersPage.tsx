@@ -1,6 +1,7 @@
-import { useDeferredValue, useMemo, useState, type JSX } from "react";
+import { useEffect, useState, type JSX } from "react";
 import { useQueryParam } from "../nav/useQueryParam.ts";
-import { CUSTOMER_FILTERS, customerMatches, formatPrice, type CustomerFilter, type ICustomerList, type IShopProductList } from "../../shared/shop";
+import { SEARCH_DEBOUNCE_MS } from "../../shared/search";
+import { CUSTOMER_FILTERS, formatPrice, type CustomerFilter, type ICustomerList, type IShopProductList } from "../../shared/shop";
 import { useLive } from "../api/live";
 import { useApi } from "../api/useApi";
 import { Badge } from "../components/Badge";
@@ -9,7 +10,6 @@ import { Metric } from "../components/Metric";
 import { PageHeader } from "../components/PageHeader";
 import { SidePanel } from "../components/SidePanel";
 import { Failure, Loading } from "../components/Status";
-import { pageOfRows } from "../../shared/limits";
 import { Pager } from "../components/Pager";
 import { useTitle } from "../useTitle";
 import { STATUS, shortId, untilText } from "./customer";
@@ -29,30 +29,36 @@ const FILTER_LABELS: Readonly<Record<CustomerFilter, string>> = {
 const MONTH = new Intl.DateTimeFormat("de-DE", { month: "long" });
 
 /**
- * Shop → Kunden (Entwurf A): oben vier Zahlen, darunter Filter und Suche, die
- * ohne neues Laden filtern, dann die Tabelle. Ein Klick auf eine Zeile öffnet
- * rechts alles zu der Person, mit den Aktionen.
+ * Shop → Kunden (Entwurf A): oben vier Zahlen, darunter Filter und Suche, dann
+ * die Tabelle in Seiten zu 50. Ein Klick auf eine Zeile öffnet rechts alles zu
+ * der Person, mit den Aktionen.
  */
 export function CustomersPage(): JSX.Element {
     useTitle("Kunden");
-    const list = useApi<ICustomerList>("/api/shop/customers");
-    const products = useApi<IShopProductList>("/api/shop/products");
-    useLive("shop", list.reload);
 
     const [filter, setFilter] = useState<CustomerFilter>("all");
     const [search, setSearch] = useQueryParam();
+    const [page, setPage] = useState(1);
+    const [wanted, setWanted] = useState(() => search.trim());
     const [openId, setOpenId] = useState<string | null>(null);
     // Für Resttage und Monatsnamen reicht der Stand beim Öffnen der Seite.
     const [now] = useState(() => Date.now());
 
-    const [page, setPage] = useState(1);
-    // W-0141: Bis zu 5000 Zeilen. Gefiltert wird mit dem zurückgestellten Suchtext, gezeigt werden 50 je Seite;
-    // Tippen bleibt flüssig, und nicht jede Taste baut die ganze Tabelle neu.
-    const deferred = useDeferredValue(search);
-    const customers = useMemo(() => list.data?.customers ?? [], [list.data]);
-    const rows = useMemo(() => customers.filter((row) => customerMatches(row, filter, deferred)), [customers, filter, deferred]);
-    const counts = useMemo(() => new Map(CUSTOMER_FILTERS.map((entry) => [entry, customers.filter((row) => customerMatches(row, entry, "")).length])), [customers]);
-    const shown = pageOfRows(rows, page);
+    // W-0141: Seite, Filter und Suche rechnet der Server. Gefragt wird erst, wenn das Tippen kurz ruht.
+    useEffect(() => {
+        const timer = setTimeout(() => setWanted(search.trim()), SEARCH_DEBOUNCE_MS);
+
+        return () => clearTimeout(timer);
+    }, [search]);
+
+    const list = useApi<ICustomerList>(`/api/shop/customers?${new URLSearchParams({ page: String(page), filter, ...(wanted ? { q: wanted } : {}) }).toString()}`);
+    const products = useApi<IShopProductList>("/api/shop/products");
+    useLive("shop", list.reload);
+
+    const customers = list.data?.customers ?? [];
+    const everyone = list.data?.counts.all ?? 0;
+    const total = list.data?.total ?? 0;
+    const pages = list.data ? Math.max(1, Math.ceil(list.data.total / list.data.pageSize)) : 1;
     const opened = customers.find((row) => row.id === openId) ?? null;
     const stats = list.data?.stats;
 
@@ -112,7 +118,7 @@ export function CustomersPage(): JSX.Element {
                                     }}
                                 >
                                     {FILTER_LABELS[entry]}
-                                    <span className={styles.chipCount}>{counts.get(entry) ?? 0}</span>
+                                    <span className={styles.chipCount}>{list.data?.counts[entry] ?? 0}</span>
                                 </button>
                             ))}
                         </div>
@@ -134,11 +140,11 @@ export function CustomersPage(): JSX.Element {
                     </div>
 
                     <p className={styles.count} aria-live="polite">
-                        {rows.length === customers.length ? `${customers.length} Personen` : `${rows.length} von ${customers.length} Personen`}
+                        {total === everyone ? `${everyone} Personen` : `${total} von ${everyone} Personen`}
                     </p>
 
-                    {rows.length === 0 ? (
-                        <p className={styles.empty}>{customers.length === 0 ? "Noch hat sich niemand auf der Preisseite angemeldet." : "Niemand passt zu Filter und Suche."}</p>
+                    {customers.length === 0 ? (
+                        <p className={styles.empty}>{everyone === 0 ? "Noch hat sich niemand auf der Preisseite angemeldet." : "Niemand passt zu Filter und Suche."}</p>
                     ) : (
                         <div className={styles.frame}>
                             <table className={styles.table}>
@@ -151,7 +157,7 @@ export function CustomersPage(): JSX.Element {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {shown.rows.map((row) => {
+                                    {customers.map((row) => {
                                         const until = untilText(row, now);
 
                                         return (
@@ -183,7 +189,7 @@ export function CustomersPage(): JSX.Element {
                             </table>
                         </div>
                     )}
-                    <Pager page={shown.page} pages={shown.pages} onPage={setPage} />
+                    <Pager page={list.data?.page ?? 1} pages={pages} onPage={setPage} />
                 </>
             )}
 

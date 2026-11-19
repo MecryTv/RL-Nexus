@@ -16,14 +16,6 @@ export const MAINTENANCE_LIMITS = { title: 80, text: 200, steps: 8, step: 40, ah
 /** Listen kommen in Seiten zu so vielen Einträgen. */
 export const PAGE_SIZE = 50;
 
-/** W-0141: eine Seite aus einer schon geladenen Liste. Eine Seite außerhalb wird die nächstgelegene, eine leere Liste ist Seite 1 von 1. */
-export function pageOfRows<T>(rows: readonly T[], page: number, size = PAGE_SIZE): { readonly page: number; readonly pages: number; readonly rows: readonly T[] } {
-    const pages = Math.max(1, Math.ceil(rows.length / size));
-    const current = Math.min(pages, Math.max(1, Math.floor(page)));
-
-    return { page: current, pages, rows: rows.slice((current - 1) * size, current * size) };
-}
-
 /** Die Gruppen aus dashboard_groups (ENUM der Migration 002 im Bot). Developer kommen aus DEV_USER_IDs. */
 export const GROUPS = ["administrator", "partner", "premium"] as const;
 export type Group = (typeof GROUPS)[number];

@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import type { Options } from "nodemailer/lib/mailer/index.js";
-import { customerMatches, durationLabel, formatPrice, maskEmail, parsePrice, priceSuffix, type IShopSettings, type IWithdrawReceipt } from "../../shared/shop.ts";
-import { pageOfRows } from "../../shared/limits.ts";
+import { durationLabel, formatPrice, maskEmail, parsePrice, priceSuffix, type IShopSettings, type IWithdrawReceipt } from "../../shared/shop.ts";
 import { EMPTY_DRAFT, draftOf, inputOf, previewOf, settingsUntouched } from "../../src/shop/draft.ts";
 import { accessFacts, freeSummary, noticeText, stripeWarning, switchFacts, switchTitle } from "../../src/shop/access.ts";
 import { readSession } from "../access.ts";
@@ -310,27 +309,6 @@ export async function checkShop(): Promise<void> {
         assert.equal(customerStatus([grant({})], NOW, NOW), "banned");
         assert.equal(customerStatus([grant({})], null, NOW), "one_time");
         assert.equal(customerStatus([grant({ endsAt: new Date(NOW.getTime() - DAY_MS) })], null, NOW), "expired");
-    });
-
-    await check("Filter und Suche", () => {
-        const row = { id: "284901234567897731", name: "mecry", email: "m***@gmail.com", status: "trial", productTitle: null, until: null, cancelAtPeriodEnd: false } as const;
-
-        assert.equal(customerMatches(row, "all", ""), true);
-        assert.equal(customerMatches(row, "trial", ""), true);
-        assert.equal(customerMatches(row, "subscription", ""), false);
-        assert.equal(customerMatches(row, "all", "MEC"), true);
-        assert.equal(customerMatches(row, "all", "7731"), true);
-        assert.equal(customerMatches(row, "all", "gmail"), true);
-        assert.equal(customerMatches(row, "all", "xyz"), false);
-        assert.equal(customerMatches({ ...row, status: "none" }, "expired", ""), false);
-    });
-
-    await check("W-0141: Kunden seitenweise: 50 je Seite, Seite außerhalb wird die letzte, leere Liste ist eine Seite", () => {
-        const rows = Array.from({ length: 120 }, (_, index) => index);
-
-        assert.deepEqual([pageOfRows(rows, 1).rows.length, pageOfRows(rows, 3).rows, pageOfRows(rows, 3).pages], [50, rows.slice(100), 3]);
-        assert.deepEqual([pageOfRows(rows, 9).page, pageOfRows(rows, 0).page], [3, 1]);
-        assert.deepEqual(pageOfRows([], 2), { page: 1, pages: 1, rows: [] });
     });
 
     await check("Erstattungsvorschlag nach Resttagen", () => {

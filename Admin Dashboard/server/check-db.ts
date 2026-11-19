@@ -29,7 +29,7 @@ import { backupDatabaseName, ensureBackupDatabase } from "./backups/store.ts";
 import { signToken } from "./bot.ts";
 import { forgetAllUsers, forgetUser, namesFilled } from "./users.ts";
 import { deletionRound } from "./userdata/clock.ts";
-import type { ICancelReceipt, ICheckoutStart, ICustomerDetail, ICustomerList, IShopProduct, IShopProductList, IShopSettingsView, IShopState, IUnlockProgress, IWithdrawOrder, IWithdrawReceipt } from "../shared/shop.ts";
+import { CUSTOMER_FILTERS, type ICancelReceipt, type ICheckoutStart, type ICustomerDetail, type ICustomerList, type IShopProduct, type IShopProductList, type IShopSettingsView, type IShopState, type IUnlockProgress, type IWithdrawOrder, type IWithdrawReceipt } from "../shared/shop.ts";
 import type { IIncidentList, IPublicStatus, IStatusDetail } from "../shared/status.ts";
 import { loadRevoked, readSession, revokeSession } from "./access.ts";
 import { buildApp } from "./app.ts";
@@ -59,9 +59,11 @@ import { SESSION_COOKIE, seal } from "./session.ts";
 import { setShopMailer } from "./shop/mail.ts";
 import { setLegalDir } from "./shop/legal.ts";
 import * as records from "./shop/records.ts";
+import { likeOf } from "./search/sources.ts";
 import { activeGrant, readSettings as readShopSettings, setAccessMode } from "./shop/store.ts";
 import { catchUpFree, catchUpPaid, switchAccess } from "./shop/access.ts";
-import { LATEST_END, isActive } from "./shop/grants.ts";
+import { LATEST_END, accessOf as accessOfGrants, isActive } from "./shop/grants.ts";
+import { customerStatus } from "./shop/customers.ts";
 import type { IAccessPreview } from "../shared/shop.ts";
 import { shopSessionCookie } from "./shop/session.ts";
 import { setStripeGateway } from "./shop/stripe.ts";
@@ -3609,7 +3611,7 @@ try {
         await records.setBanned(KUNDE.sperre, USERS.admin, "check:db Grund");
 
         await check("Kunden: Liste mit Zahlen, Status und gekürzter Mail", async () => {
-            const response = await get("/api/shop/customers");
+            const response = await get("/api/shop/customers?q=999999999999999999");
             assert.equal(response.statusCode, 200, response.body);
             const list = response.json() as ICustomerList;
             const row = (id: string) => list.customers.find((entry) => entry.id === id);
@@ -3618,6 +3620,69 @@ try {
             assert.equal(row(KUNDE.kauf)?.email, "9***@example.test");
             assert.equal(list.stats.paid >= 1 && list.stats.trial >= 1 && list.stats.banned >= 1, true);
             assert.equal(list.stats.revenueCents >= 4499, true);
+        });
+
+        // W-0141: Seite, Filter, Suche und die Zahlen an den Filtern rechnet der Server in SQL, nicht mehr der Browser über bis zu 5000 Zeilen.
+        const ALT = "99999999999999999935";
+        await records.upsertCustomer({ id: ALT, name: "check 35", email: `${ALT}@example.test` });
+        await records.insertTrial(ALT, new Date(Date.now() - 86_400_000), null);
+        const customerList = async (search: string): Promise<ICustomerList> => {
+            const response = await get(`/api/shop/customers?${search}`);
+            assert.equal(response.statusCode, 200, `${search}: ${response.body}`);
+
+            return response.json() as ICustomerList;
+        };
+        const shownIds = (list: ICustomerList): string[] => list.customers.map((row) => `${row.id.slice(-2)} ${row.status}`).sort();
+
+        await check("W-0141: Kunden vom Server: Status wie customerStatus, Filter, Suche nach ID, Name und voller Mail", async () => {
+            const all = await customerList("q=9999999999999999993");
+            assert.deepEqual(shownIds(all), ["31 trial", "32 one_time", "33 banned", "34 none", "35 expired"]);
+            assert.deepEqual([all.total, all.page, all.pageSize], [5, 1, 50]);
+            assert.deepEqual(shownIds(await customerList("filter=trial&q=9999999999999999993")), ["31 trial"]);
+            assert.deepEqual(shownIds(await customerList("filter=expired&q=9999999999999999993")), ["35 expired"]);
+            assert.deepEqual(shownIds(await customerList("q=CHECK%2033")), ["33 banned"]);
+            assert.deepEqual(shownIds(await customerList(`q=${KUNDE.kauf}%40example`)), ["32 one_time"]);
+            assert.equal((await customerList(`q=${KUNDE.kauf}%40example`)).customers[0]?.email, "9***@example.test");
+            // Prozent und Unterstrich zählen wörtlich, Umlaute brechen die ID-Spalte (ascii) nicht.
+            assert.deepEqual([(await customerList("q=999999999999999999_3")).total, (await customerList("q=%25")).total, (await customerList("q=%C3%A4%C3%B6")).total], [0, 0, 0]);
+        });
+
+        await check("W-0141: Kunden vom Server: Zahl je Filter wie die gefilterte Liste, Werte außerhalb 400", async () => {
+            const counts = (await customerList("")).counts;
+            for (const filter of CUSTOMER_FILTERS) assert.equal(counts[filter], (await customerList(`filter=${filter}`)).total, filter);
+            assert.equal(counts.all >= 5 && counts.trial >= 1 && counts.expired >= 1 && counts.banned >= 1, true);
+            assert.deepEqual([(await get("/api/shop/customers?filter=none")).statusCode, (await get("/api/shop/customers?page=0")).statusCode], [400, 400]);
+        });
+
+        await check("W-0141: Kunden vom Server: Seiten ohne Lücke und Doppel, eine Seite zu weit wird die letzte", async () => {
+            const like = likeOf("9999999999999999993");
+            const pages = [await records.customerPage("all", like, 1, 2), await records.customerPage("all", like, 2, 2), await records.customerPage("all", like, 3, 2)];
+            assert.deepEqual(
+                pages.map((entry) => [entry.page, entry.rows.length]),
+                [
+                    [1, 2],
+                    [2, 2],
+                    [3, 1],
+                ]
+            );
+            assert.deepEqual(pages.flatMap((entry) => entry.rows.map((row) => row.userId)).sort(), [KUNDE.test, KUNDE.kauf, KUNDE.sperre, KUNDE.abo, ALT].sort());
+            const beyond = await records.customerPage("all", like, 9, 2);
+            assert.deepEqual([beyond.page, beyond.total, beyond.rows.length], [3, 5, 1]);
+        });
+
+        await check("W-0141: Kunden vom Server: Status und laufender Zugang aus SQL wie customerStatus und accessOf, für alle Kunden", async () => {
+            const now = new Date();
+            const sql = new Map((await records.customerPage("all", null, 1, 1_000_000)).rows.map((row) => [row.userId, row]));
+            const everyone = await records.allCustomers();
+
+            assert.equal(sql.size, everyone.length);
+            for (const { customer, grants } of everyone) {
+                const running = accessOfGrants(grants, now).grant;
+                const row = sql.get(customer.userId);
+
+                assert.equal(row?.status, customerStatus(grants, customer.bannedAt, now), customer.userId);
+                assert.deepEqual([row?.running?.source ?? null, row?.running?.productId ?? null, row?.running?.endsAt?.getTime() ?? null], [running?.source ?? null, running?.productId ?? null, running?.endsAt?.getTime() ?? null], customer.userId);
+            }
         });
 
         await check("Kunden: eine Person mit voller Mail, bezahltem Betrag, Vorschlag und Verlauf", async () => {

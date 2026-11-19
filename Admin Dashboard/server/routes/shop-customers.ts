@@ -1,20 +1,22 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import type { IMe } from "../../shared/api.ts";
-import { formatPrice, maskEmail, type ICustomerDetail, type ICustomerGrant, type ICustomerList, type ICustomerRow, type IGuildRole } from "../../shared/shop.ts";
+import { PAGE_SIZE } from "../../shared/limits.ts";
+import { CUSTOMER_FILTERS, formatPrice, maskEmail, type CustomerFilter, type ICustomerDetail, type ICustomerGrant, type ICustomerList, type ICustomerRow, type IGuildRole, type ShopStatus } from "../../shared/shop.ts";
 import { accessOf } from "../access.ts";
 import { audit } from "../audit.ts";
 import type { IConfig } from "../config.ts";
+import { pageNumber } from "../database.ts";
 import { DatabaseUnavailable, databaseReady } from "../db.ts";
 import { fetchMember, fetchRoles } from "../discord.ts";
 import { InvalidInput, PublicError } from "../errors.ts";
 import { publish } from "../events.ts";
 import { berlinEndOfDay, customerStatus, eventText, monthStart, refundSuggestion, trialTarget, type TrialChange } from "../shop/customers.ts";
-import { LATEST_END, accessOf as accessOfGrants, formatDay, isActive, type IGrant } from "../shop/grants.ts";
+import { LATEST_END, formatDay, isActive, type IGrant } from "../shop/grants.ts";
 import { cancelReceivedMail, endedMail, giftMail, sendShopMail } from "../shop/mail.ts";
 import {
-    allCustomers,
     clearBanned,
     customerOf,
+    customerPage,
     endGrant,
     eventsOf,
     grantsOf,
@@ -35,14 +37,13 @@ import {
 import { findProduct, listProducts, readSettings } from "../shop/store.ts";
 import { stripeGateway } from "../shop/stripe.ts";
 import { syncMember } from "../shop/sync.ts";
-import { body, snowflake, text } from "../validate.ts";
+import { likeOf } from "../search/sources.ts";
+import { body, oneOf, snowflake, text } from "../validate.ts";
 
 /**
  * Shop → Kunden: Liste, eine Person und die Aktionen. Liegt unter
  * requireSession, also nur für Admins und Developer.
  */
-
-const DAY = 86_400_000;
 
 function requireDatabase(): void {
     if (!databaseReady()) throw new DatabaseUnavailable();
@@ -264,28 +265,27 @@ export async function customerDetail(config: IConfig, userId: string, lastSync?:
 }
 
 export async function shopCustomerRoutes(app: FastifyInstance, { config }: { config: IConfig }): Promise<void> {
-    app.get("/api/shop/customers", async (): Promise<ICustomerList> => {
+    // W-0141: seitenweise. Filter, Suche und die Zahlen an den Filtern rechnet die Datenbank (customerPage), nicht mehr der Browser.
+    app.get("/api/shop/customers", async (request): Promise<ICustomerList> => {
         requireDatabase();
 
-        const now = new Date();
-        const [entries, products, revenueCents] = await Promise.all([allCustomers(), listProducts(), revenueSince(monthStart(now))]);
+        const params = request.query as { page?: unknown; filter?: unknown; q?: unknown };
+        const filter = params.filter === undefined ? "all" : oneOf(params.filter, CUSTOMER_FILTERS, "Der Filter");
+        const search = text(params.q, "Die Suche", { max: 100 });
+        const page = pageNumber(params.page);
+        const [list, products, revenueCents] = await Promise.all([customerPage(filter, search ? likeOf(search) : null, page), listProducts(), revenueSince(monthStart(new Date()))]);
 
-        const customers: ICustomerRow[] = entries.map(({ customer, grants }) => {
-            const running = accessOfGrants(grants, now).grant;
-
-            return {
-                id: customer.userId,
-                name: customer.name,
-                email: customer.email ? maskEmail(customer.email) : "",
-                status: customerStatus(grants, customer.bannedAt, now),
-                productTitle: running === null ? null : running.source === "trial" ? "Test" : (products.find((product) => product.id === running.productId)?.title ?? null),
-                until: running?.endsAt?.toISOString() ?? null,
-                cancelAtPeriodEnd: running?.cancelAtPeriodEnd ?? false,
-            };
-        });
-
-        const count = (status: string): number => customers.filter((row) => row.status === status).length;
-        const soon = now.getTime() + 2 * DAY;
+        const customers: ICustomerRow[] = list.rows.map(({ userId, name, email, status, running }) => ({
+            id: userId,
+            name,
+            email: email ? maskEmail(email) : "",
+            status,
+            productTitle: running === null ? null : running.source === "trial" ? "Test" : (products.find((product) => product.id === running.productId)?.title ?? null),
+            until: running?.endsAt?.toISOString() ?? null,
+            cancelAtPeriodEnd: running?.cancelAtPeriodEnd ?? false,
+        }));
+        const count = (status: ShopStatus): number => list.counts.get(status) ?? 0;
+        const everyone = [...list.counts.values()].reduce((sum, value) => sum + value, 0);
 
         return {
             stats: {
@@ -293,11 +293,15 @@ export async function shopCustomerRoutes(app: FastifyInstance, { config }: { con
                 paidSubscription: count("subscription"),
                 paidOneTime: count("one_time"),
                 trial: count("trial"),
-                trialEndingSoon: customers.filter((row) => row.status === "trial" && row.until !== null && Date.parse(row.until) <= soon).length,
+                trialEndingSoon: list.trialEndingSoon,
                 revenueCents,
                 banned: count("banned"),
             },
+            counts: Object.fromEntries(CUSTOMER_FILTERS.map((entry) => [entry, entry === "all" ? everyone : count(entry)])) as Record<CustomerFilter, number>,
             customers,
+            total: list.total,
+            page: list.page,
+            pageSize: PAGE_SIZE,
         };
     });
 

@@ -1,3 +1,5 @@
+import { PAGE_SIZE } from "../../shared/limits.ts";
+import type { CustomerFilter, ShopStatus } from "../../shared/shop.ts";
 import { query } from "../db.ts";
 import type { ICancelCandidate } from "./cancel.ts";
 import { orderNo, type GrantSource, type IGrant } from "./grants.ts";
@@ -57,7 +59,91 @@ export async function customerOf(userId: string): Promise<ICustomer | null> {
     return row ? customerFrom(row) : null;
 }
 
-/** Alle Kunden mit ihren Zugängen, zuletzt angemeldete zuerst. ponytail: alles auf einmal, bei sehr vielen Kunden blättern. */
+/**
+ * W-0141: je Kunde der Status in SQL, dieselbe Regel wie customerStatus (customers.ts) mit accessOf (grants.ts):
+ * gesperrt, sonst die Quelle des laufenden Zugangs mit dem spätesten Ende (unbegrenzt zuerst), sonst
+ * „expired“, wenn es je einen gab, sonst „none“. b ist dieser laufende Zugang.
+ */
+const CUSTOMER_VIEW = `SELECT c.user_id, c.name, c.email, COALESCE(c.last_login_at, c.created_at) AS seen_at,
+        CASE WHEN c.banned_at IS NOT NULL THEN 'banned'
+             WHEN b.id IS NOT NULL THEN b.source
+             WHEN EXISTS (SELECT 1 FROM shop_grants e WHERE e.user_id = c.user_id) THEN 'expired'
+             ELSE 'none' END AS status,
+        b.source AS grant_source, b.product_id, b.ends_at, b.cancel_at_period_end
+   FROM shop_customers c
+   LEFT JOIN shop_grants b ON b.id = (SELECT g.id FROM shop_grants g WHERE g.user_id = c.user_id AND ${activeGrant("g")} ORDER BY g.ends_at IS NULL DESC, g.ends_at DESC, g.id LIMIT 1)`;
+
+export interface ICustomerListEntry {
+    readonly userId: string;
+    readonly name: string | null;
+    readonly email: string | null;
+    readonly status: ShopStatus;
+    /** Der laufende Zugang, null ohne. */
+    readonly running: { readonly source: GrantSource; readonly productId: number | null; readonly endsAt: Date | null; readonly cancelAtPeriodEnd: boolean } | null;
+}
+
+/**
+ * W-0141: eine Seite der Kundenliste, zuletzt angemeldete zuerst. `like` kommt aus likeOf (search/sources.ts)
+ * und trifft ID, Name oder volle Mail. Die Zahlen je Status gehen über alle Kunden, ohne Suche. Eine Seite
+ * hinter der letzten wird die letzte.
+ */
+export async function customerPage(
+    filter: CustomerFilter,
+    like: string | null,
+    page: number,
+    size = PAGE_SIZE
+): Promise<{ readonly rows: ICustomerListEntry[]; readonly total: number; readonly page: number; readonly counts: ReadonlyMap<ShopStatus, number>; readonly trialEndingSoon: number }> {
+    const where: string[] = [];
+    const values: unknown[] = [];
+
+    if (filter !== "all") {
+        where.push("status = ?");
+        values.push(filter);
+    }
+    if (like !== null) {
+        // Die ID-Spalte ist ascii: als utf8mb4 vergleichen, sonst bricht ein Umlaut in der Suche die Abfrage.
+        where.push("(CONVERT(user_id USING utf8mb4) LIKE ? ESCAPE '!' OR name LIKE ? ESCAPE '!' OR email LIKE ? ESCAPE '!')");
+        values.push(like, like, like);
+    }
+
+    const clause = where.length > 0 ? `WHERE ${where.join(" AND ")}` : "";
+    const [groups, [found]] = await Promise.all([
+        query<{ status: ShopStatus; n: number | string; soon: number | string | null }[]>(
+            `SELECT status, COUNT(*) AS n, SUM(status = 'trial' AND ends_at <= NOW() + INTERVAL 2 DAY) AS soon FROM (${CUSTOMER_VIEW}) v GROUP BY status`
+        ),
+        query<{ total: number | string }[]>(`SELECT COUNT(*) AS total FROM (${CUSTOMER_VIEW}) v ${clause}`, values),
+    ]);
+    const total = Number(found?.total ?? 0);
+    const current = Math.min(page, Math.max(1, Math.ceil(total / size)));
+    const rows = await query<
+        {
+            user_id: string;
+            name: string | null;
+            email: string | null;
+            status: ShopStatus;
+            grant_source: GrantSource | null;
+            product_id: number | null;
+            ends_at: Date | null;
+            cancel_at_period_end: number | null;
+        }[]
+    >(`SELECT * FROM (${CUSTOMER_VIEW}) v ${clause} ORDER BY seen_at DESC, user_id LIMIT ? OFFSET ?`, [...values, size, (current - 1) * size]);
+
+    return {
+        rows: rows.map((row) => ({
+            userId: row.user_id,
+            name: row.name,
+            email: row.email,
+            status: row.status,
+            running: row.grant_source === null ? null : { source: row.grant_source, productId: row.product_id, endsAt: row.ends_at, cancelAtPeriodEnd: row.cancel_at_period_end === 1 },
+        })),
+        total,
+        page: current,
+        counts: new Map(groups.map((group) => [group.status, Number(group.n)])),
+        trialEndingSoon: groups.reduce((sum, group) => sum + Number(group.soon ?? 0), 0),
+    };
+}
+
+/** Alle Kunden mit ihren Zugängen, zuletzt angemeldete zuerst. ponytail: alles auf einmal (für die Suche der Leiste), die Kundenliste blättert mit customerPage. */
 export async function allCustomers(): Promise<{ readonly customer: ICustomer; readonly grants: IGrant[] }[]> {
     const rows = await query<ICustomerRow[]>(`SELECT ${CUSTOMER_COLUMNS} FROM shop_customers ORDER BY COALESCE(last_login_at, created_at) DESC LIMIT 5000`);
     const grants = await query<IGrantRow[]>(`SELECT ${GRANT_COLUMNS} FROM shop_grants ORDER BY id`);
