@@ -47,8 +47,9 @@ export const SYNC_BATCH = 12;
 
 /**
  * W-0146: So viele Server frischt ein Lauf von runnables/TeamRefresh.ts höchstens auf (je bis zu
- * SYNC_BATCH Spieler bei Prime). Sind mehr fällig, etwa nach einem Neustart, kommen sie
- * in den nächsten Läufen dran und verteilen sich so von selbst.
+ * SYNC_BATCH Spieler bei Prime), reihum. Sind mehr fällig, etwa nach einer längeren Pause,
+ * kommen sie in den nächsten Läufen dran und verteilen sich so von selbst. Ein Neustart
+ * allein macht nichts fällig: Fällig ist, was der gespeicherte Stand sagt.
  */
 export const REFRESH_GUILDS = 3;
 

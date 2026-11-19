@@ -2714,7 +2714,7 @@ async function checkRefresh(client: BotClient): Promise<void> {
 
         const first = await service.RefreshTick();
 
-        check(`Fünf Server zugleich fällig (etwa nach einem Neustart): ${REFRESH_GUILDS} in diesem Lauf`, first.guilds === REFRESH_GUILDS && due.size === 5 - REFRESH_GUILDS, JSON.stringify(first));
+        check(`Fünf Server zugleich fällig (etwa nach einer längeren Pause): ${REFRESH_GUILDS} in diesem Lauf`, first.guilds === REFRESH_GUILDS && due.size === 5 - REFRESH_GUILDS, JSON.stringify(first));
 
         const second = await service.RefreshTick();
 
