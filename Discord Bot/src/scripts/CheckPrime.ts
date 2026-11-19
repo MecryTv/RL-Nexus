@@ -264,6 +264,31 @@ async function checkAccess(client: BotClient): Promise<void> {
     check("Ohne alten Stand kommt der Zugangsfehler durch", thrown instanceof PrimeError && thrown.type === "Access", String(thrown));
     check("  und landet bei der Überwachung des Zugangs", noted.join() === "Access", noted.join());
 
+    // Review: wie die stündliche Probe die Antworten deutet - ohne Netz, Query nachgestellt.
+    const probe = new PrimeService({ config: { PRIME_API_TOKEN: "pruef-schluessel", PRIME_ACCESS_EXPIRES: "" } } as unknown as BotClient);
+    const probed: string[] = [];
+    const probeNote = probe.access.Note.bind(probe.access);
+
+    probe.access.Note = (result, now) => {
+        probed.push(typeof result === "string" ? result : result.type);
+        probeNote(result, now);
+    };
+
+    for (const answer of [
+        () => Promise.resolve({ AccountID: "abc" }),
+        () => Promise.reject(new PrimeError("", "InvalidPlayer", 200)),
+        () => Promise.reject(HttpError(401, UNAUTHORIZED)),
+        () => Promise.reject(HttpError(403, "")),
+        () => Promise.reject(HttpError(403, "<html>Cloudflare</html>")),
+        () => Promise.reject(new PrimeError("Prime antwortet nicht (10000 ms)", "Timeout")),
+    ]) {
+        (probe as unknown as { Query: () => Promise<unknown> }).Query = answer;
+        await probe.Probe();
+    }
+
+    check("Probe: Antwort und InvalidPlayer heißen angenommen, 401/403 abgelehnt, Cloudflare und Timeout weder noch", probed.join() === "ok,ok,Access,Access,other,other", probed.join());
+    probe.Close();
+
     prime.locked = false;
     await prime.Profile("Spieler");
 
