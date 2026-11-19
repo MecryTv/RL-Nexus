@@ -54,6 +54,7 @@ import { ApplyCategoryDraft, ParseCategoryDraft, EmojiId, NeedsResend, Normalize
 import TeamRefresh from "../runnables/TeamRefresh";
 import TaskTypes from "../enums/TaskTypes";
 import { HttpError, PrimeError } from "../services/PrimeService";
+import logger from "../utils/logger";
 import { IPrimeProfile } from "../interfaces/services/prime/IPrimeService";
 import { Evaluate, FormulaError } from "../utils/formula";
 
@@ -2391,11 +2392,13 @@ async function checkRefresh(client: BotClient): Promise<void> {
         full: client.teams.Full,
         setMessage: client.teams.SetMessage,
         locked: client.primeService.access.Locked,
+        warn: logger.warn,
     };
     const configured = (value: boolean) => Object.defineProperty(client.primeService, "IsConfigured", { get: () => value, configurable: true });
     const age = (minutes: number) => {
         for (const team of teams) for (const player of team.players) player.snapshot!.at = Date.now() - minutes * MIN;
     };
+    const warned: string[] = [];
     const reset = () => {
         log.length = 0;
         viaChain.length = 0;
@@ -2435,6 +2438,7 @@ async function checkRefresh(client: BotClient): Promise<void> {
         if (team) team.messageId = messageId;
     };
     configured(true);
+    logger.warn = (message: string) => void warned.push(message);
 
     try {
         // Der Hub steht im Kanal, gepostet wie aus dem Dashboard.
@@ -2590,7 +2594,18 @@ async function checkRefresh(client: BotClient): Promise<void> {
         prime.value = 1700;
         alive.delete(chain[0]!);
         reset();
-        check("Hub von Hand gelöscht: nichts neu gepostet, nichts gelöscht", (await service.AutoRefresh(guild))?.edited === 0 && log.length === 0, `${log}`);
+        warned.length = 0;
+        check("Hub von Hand gelöscht: nichts neu gepostet, nichts gelöscht, Prime nicht gefragt (Review M1)", (await service.AutoRefresh(guild)) === null && log.length === 0 && prime.calls === 0, `${prime.calls} · ${log}`);
+        await service.AutoRefresh(guild);
+        check("  einmal im Log, nicht bei jedem Lauf", warned.filter((line) => line.includes("Kopf")).length === 1, warned.join(" | "));
+
+        const away = settings;
+
+        settings = { ...settings, channelId: "123" };
+        age(45);
+        reset();
+        check("Kanal der Übersicht gibt es nicht mehr: Prime nicht gefragt", (await service.AutoRefresh(guild)) === null && prime.calls === 0, `${prime.calls}`);
+        settings = away;
 
         settings = { ...settings, messageId: null, moreIds: [] };
         reset();
@@ -2713,6 +2728,7 @@ async function checkRefresh(client: BotClient): Promise<void> {
         client.teams.Full = original.full;
         client.teams.SetMessage = original.setMessage;
         client.primeService.access.Locked = original.locked;
+        logger.warn = original.warn;
         delete (client.primeService as unknown as Record<string, unknown>).IsConfigured;
         delete (client.databaseService as unknown as Record<string, unknown>).Ready;
 

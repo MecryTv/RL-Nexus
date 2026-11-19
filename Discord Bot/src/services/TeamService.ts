@@ -701,6 +701,8 @@ export default class TeamService {
     private readonly publishChain = new Map<string, Promise<unknown>>();
     /** W-0146 (Review I1): der zuletzt aufgefrischte Server - der nächste Lauf beginnt dahinter. */
     private refreshAfter: string | null = null;
+    /** W-0146 (Review M1): Server, deren Übersicht im Kanal fehlt - einmal im Log, nicht bei jedem Lauf. */
+    private readonly refreshGone = new Set<string>();
 
     constructor(client: BotClient) {
         this.client = client;
@@ -2198,12 +2200,20 @@ export default class TeamService {
 
         if (!settings.channelId || (hub && !settings.messageId)) return null;
 
+        const channel = guild.channels.cache.get(settings.channelId);
+
+        // Review M1: Wo nichts zu bearbeiten ist, wird Prime gar nicht erst gefragt.
+        if (!channel?.isTextBased()) return this.Gone(guild.id, "den Kanal der Übersicht gibt es nicht mehr");
+
         // Der Hub zeigt alle Teams, bei „Alle Teams einzeln“ zählen nur die mit Karte im Kanal.
         const teams = (await this.Teams(guild.id)).filter((team) => hub || team.messageId);
         // Review M6: Prime wird ohnehin höchstens alle „Ränge neu holen nach“ (RL Tracking) gefragt - öfter hilft nicht.
         const maxAge = Math.max(ModuleValue("teams", "refreshMinutes", guild.id), ModuleValue("rl-tracking", "rankMaxAgeMinutes", null)) * 60_000;
 
         if (!RefreshDue(teams, maxAge)) return null;
+        if (hub && !(await channel.messages.fetch(settings.messageId!).catch(() => null))) return this.Gone(guild.id, "der Kopf des Hubs fehlt im Kanal");
+
+        this.refreshGone.delete(guild.id);
 
         const before = new Map(teams.map((team) => [team.id, PrimeFacts([team])]));
         const whole = PrimeFacts(teams);
@@ -2219,6 +2229,15 @@ export default class TeamService {
 
         // Der neue Stand ist gespeichert (Sync). In der Reihe je Server liest das Bearbeiten Kette und Karten frisch.
         return { answered, edited: await this.Serial(guild.id, () => this.EditNow(guild, changed)) };
+    }
+
+    /** Review M1: Die Übersicht fehlt im Kanal - einmal ins Log, bis sie wieder da ist. null wie „nichts fällig“. */
+    private Gone(guildId: string, reason: string): null {
+        if (!this.refreshGone.has(guildId)) logger.warn(`🛡️ Team-Übersicht auf ${guildId}: ${reason}, kein Auffrischen bis zum nächsten Senden aus dem Dashboard`);
+
+        this.refreshGone.add(guildId);
+
+        return null;
     }
 
     /** Hub oder die Karten aus `changed` mit dem gespeicherten Stand bearbeiten. Was fehlt oder neu gesendet werden müsste, bleibt. */
