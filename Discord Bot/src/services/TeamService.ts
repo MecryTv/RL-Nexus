@@ -1635,7 +1635,8 @@ export default class TeamService {
         let halted = false;
 
         for (const team of teams) {
-            let touched = false;
+            // Je gefragtem Spieler der Epic-Name, unter dem gefragt wurde (Review I4).
+            const asked = new Map<string, string>();
 
             for (const player of team.players) {
                 if (left <= 0 || halted) break;
@@ -1646,7 +1647,7 @@ export default class TeamService {
                 if (!force && old && now - old.at < maxAge) continue;
 
                 left--;
-                touched = true;
+                asked.set(player.id, player.epicName);
 
                 const { snapshot: fresh, halt } = await this.Ask(player.epicName);
 
@@ -1673,11 +1674,35 @@ export default class TeamService {
                     : fresh;
             }
 
-            if (touched) await this.client.teams.SavePlayers(team.id, team.players).catch(() => undefined);
+            if (asked.size) await this.SaveStands(team, asked).catch(() => undefined);
             if (left <= 0 || halted) break;
         }
 
         return answered;
+    }
+
+    /**
+     * W-0146 (Review I4): Speichert, was der Abgleich geholt hat, ohne einen Kader zu
+     * überschreiben, den jemand währenddessen gespeichert hat. Die Zeile wird neu
+     * gelesen; je player.id kommen nur Stand und Epic-Name (nach einer Umbenennung)
+     * dazu, und nur, wo noch der Name steht, unter dem gefragt wurde. Hinzugefügte
+     * oder entfernte Spieler bleiben, wie sie gespeichert wurden - und damit auch
+     * team_members, das beim Speichern des Kaders ausgerichtet wird.
+     * ponytail: zwischen Lesen und Schreiben bleibt ein Fenster von Millisekunden.
+     */
+    private async SaveStands(team: ITeam, asked: Map<string, string>): Promise<void> {
+        const stored = await this.client.teams.Full(team.id);
+
+        if (!stored) return;
+
+        const synced = new Map(team.players.map((player) => [player.id, player]));
+        const players = stored.players.map((player) => {
+            const mine = synced.get(player.id);
+
+            return mine && asked.get(player.id) === player.epicName ? { ...player, epicName: mine.epicName, snapshot: mine.snapshot } : player;
+        });
+
+        await this.client.teams.SavePlayers(team.id, players);
     }
 
     /** Der Stand zu einem Namen oder einer Epic-Konto-ID. Wirft nie. */

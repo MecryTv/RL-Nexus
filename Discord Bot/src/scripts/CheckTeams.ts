@@ -2370,7 +2370,7 @@ async function checkRefresh(client: BotClient): Promise<void> {
         },
     };
     const guild = { ...FakeGuild(), channels: { cache: new Map([[TEXT, channel]]) } } as unknown as Guild;
-    const prime = { value: 1450, error: null as PrimeError | null, only: null as string | null, stale: null as "down" | "access" | null, fetchedAt: null as number | null, calls: 0 };
+    const prime = { value: 1450, error: null as PrimeError | null, only: null as string | null, stale: null as "down" | "access" | null, fetchedAt: null as number | null, hook: null as (() => void) | null, calls: 0 };
     const saved = new Map<number, ITeamPlayer[]>();
     let settings: ITeamSettings = { ...DefaultTeamSettings(), channelId: TEXT, layout: "hub" };
     let teams: ITeam[] = [];
@@ -2388,6 +2388,7 @@ async function checkRefresh(client: BotClient): Promise<void> {
         save: client.moduleSettings.Save,
         of: client.settings.Of,
         players: client.teams.SavePlayers,
+        full: client.teams.Full,
         setMessage: client.teams.SetMessage,
         locked: client.primeService.access.Locked,
     };
@@ -2406,6 +2407,7 @@ async function checkRefresh(client: BotClient): Promise<void> {
     service.Groups = async () => groups;
     client.primeService.Profile = async (name: string) => {
         prime.calls++;
+        prime.hook?.();
 
         if (prime.error && (!prime.only || prime.only === name)) throw prime.error;
 
@@ -2426,6 +2428,7 @@ async function checkRefresh(client: BotClient): Promise<void> {
     client.moduleSettings.Save = async (_guild: string, _module: string, config: object) => void (settings = config as ITeamSettings);
     (client.settings as unknown as { Of: unknown }).Of = async (id: string) => ({ modules: id === "aus" ? [] : ["teams"] });
     client.teams.SavePlayers = async (id: number, players: ITeamPlayer[]) => void saved.set(id, structuredClone(players));
+    client.teams.Full = async (id: number) => structuredClone(teams.find((team) => team.id === id) ?? null);
     client.teams.SetMessage = async (id: number, messageId: string | null) => {
         const team = teams.find((entry) => entry.id === id);
 
@@ -2561,6 +2564,28 @@ async function checkRefresh(client: BotClient): Promise<void> {
         );
         prime.error = null;
 
+        // Review I4: Speichert jemand den Kader, während Prime gefragt wird, bleibt seine Änderung - die Stände kommen trotzdem an.
+        const stored = FakeTeam([aged("k1", 45), aged("k2", 45), aged("k3", 45)], { id: 7, name: "Kader" });
+
+        teams = [structuredClone(stored)];
+        client.teams.Full = async (id: number) => (id === stored.id ? structuredClone(stored) : null);
+        prime.hook = () => {
+            // Beim ersten Spieler: k2 bekommt einen anderen Epic-Namen, k3 fliegt raus, „neu“ kommt dazu.
+            stored.players = [stored.players[0]!, { ...stored.players[1]!, epicName: "epic-k2-neu" }, { ...Player("neu", "sub", null, null), snapshot: undefined }];
+            prime.hook = null;
+        };
+        prime.value = 1777;
+        saved.clear();
+        reset();
+        await service.AutoRefresh(guild);
+
+        const kept = saved.get(7) ?? [];
+
+        check("Kader während der Abfrage gespeichert: hinzugefügt und entfernt bleibt so", kept.map((player) => player.id).join(",") === "k1,k2,neu", kept.map((player) => player.id).join(","));
+        check("  der Stand kommt trotzdem an", kept[0]?.snapshot?.mmr["3v3"] === 1777, JSON.stringify(kept[0]?.snapshot));
+        check("  ein neuer Epic-Name bleibt, ohne den Stand des alten", kept[1]?.epicName === "epic-k2-neu" && kept[1]?.snapshot?.mmr["3v3"] === 1450, JSON.stringify(kept[1]));
+        client.teams.Full = async (id: number) => structuredClone(teams.find((team) => team.id === id) ?? null);
+
         age(45);
         prime.value = 1700;
         alive.delete(chain[0]!);
@@ -2668,6 +2693,7 @@ async function checkRefresh(client: BotClient): Promise<void> {
         client.moduleSettings.Save = original.save;
         (client.settings as unknown as { Of: unknown }).Of = original.of;
         client.teams.SavePlayers = original.players;
+        client.teams.Full = original.full;
         client.teams.SetMessage = original.setMessage;
         client.primeService.access.Locked = original.locked;
         delete (client.primeService as unknown as Record<string, unknown>).IsConfigured;

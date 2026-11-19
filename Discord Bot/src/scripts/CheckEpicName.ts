@@ -58,7 +58,8 @@ async function checkSnapshot(): Promise<void> {
                 return name === "Vyrox.Nico" ? Profile("Vyrox.Nico", "acc-1") : null;
             },
         },
-        teams: { SavePlayers: async (id: number, players: ITeamPlayer[]) => void saved.set(id, structuredClone(players)) },
+        // W-0146: Sync liest die Zeile vor dem Speichern neu.
+        teams: { SavePlayers: async (id: number, players: ITeamPlayer[]) => void saved.set(id, structuredClone(players)), Full: async () => structuredClone(team) },
     } as unknown as BotClient;
     const team = { id: 1, guildId: "1", players: [Player("Vyrox.Nico", NICO), Player("Weg", ZEN), Player("Kaputt")] } as unknown as ITeam;
 
@@ -297,6 +298,8 @@ function World(options: IWorldOptions) {
         epicNameCases: cases.model,
         teams: {
             SavePlayers: async (id: number, players: ITeamPlayer[]) => void (store.get(id)!.players = structuredClone(players)),
+            // W-0146: Sync liest die Zeile vor dem Speichern neu.
+            Full: async (id: number) => structuredClone(store.get(id) ?? null),
             WithPlayer: async (discordId: string) => [...store.values()].filter((team) => team.players.some((player) => player.discordId === discordId)).map((team) => structuredClone(team)),
         },
         moduleSettings: { Save: async (guildId: string, _module: string, config: ITeamSettings) => void saved.set(guildId, structuredClone(config)) },
