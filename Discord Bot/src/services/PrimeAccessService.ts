@@ -89,13 +89,14 @@ interface IAccessRecord {
     notified: boolean;
     lastOk: number | null;
     refused: number;
-    answer: string | null;
     /** Die zuletzt gemeldete gelbe Stufe: "<Ablauf>:<1|2>". */
     warned: string | null;
 }
 
+// Nur Zahlen, Wahrheitswerte und kurze feste Texte: bot_state.value fasst 255 Zeichen (Migration 058).
+// Was Prime sagt, steht deshalb nicht darin, sondern nur im Speicher (Review).
 const KEY = "prime_access";
-const EMPTY: IAccessRecord = { state: "ok", since: null, sentAt: null, notified: false, lastOk: null, refused: 0, answer: null, warned: null };
+const EMPTY: IAccessRecord = { state: "ok", since: null, sentAt: null, notified: false, lastOk: null, refused: 0, warned: null };
 
 /**
  * W-0145: Meldet den Developern per DM, wenn der Prime-Zugang bald abläuft
@@ -185,11 +186,11 @@ export class PrimeAccessWatch {
 
         if (result.type !== "Access") return;
 
-        // Gekürzt: bot_state fasst 255 Zeichen, und die Kachel zeigt ohnehin nur zwei Zeilen.
+        // Gekürzt: die Kachel zeigt ohnehin nur zwei Zeilen.
         const answer = (result.reason ? `${result.status} · ${result.reason}` : `HTTP ${result.status}`).slice(0, 80);
         const fresh = this.record.state !== "locked";
 
-        this.record = fresh ? { ...this.record, state: "locked", since: now, refused: 1, notified: false, answer } : { ...this.record, refused: this.record.refused + 1, answer };
+        this.record = fresh ? { ...this.record, state: "locked", since: now, refused: 1, notified: false } : { ...this.record, refused: this.record.refused + 1 };
 
         // Rot höchstens einmal je Tag - als Erinnerung und auch bei einer neuen Sperre kurz nach der letzten.
         if (this.record.sentAt !== null && now - this.record.sentAt < DAY) {

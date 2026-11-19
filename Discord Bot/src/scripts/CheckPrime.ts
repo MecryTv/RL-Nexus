@@ -445,6 +445,7 @@ async function checkAccessWatch(): Promise<void> {
     const DAY = 24 * HOUR;
     const t0 = Date.UTC(2026, 10, 18, 22, 5);
     const state = new Map<string, string>();
+    const writes: string[] = [];
     const dms: string[] = [];
     let probes = 0;
     const refused = HttpError(401, '{"Error":{"Message":"The Prime API token is not valid.","Type":"Unauthorized"}}');
@@ -460,6 +461,7 @@ async function checkAccessWatch(): Promise<void> {
                     if (sql.startsWith("SELECT")) return state.has(values[0]!) ? [{ value: state.get(values[0]!) }] : [];
 
                     state.set(values[0]!, values[1]!);
+                    writes.push(values[1]!);
 
                     return [];
                 },
@@ -574,6 +576,14 @@ async function checkAccessWatch(): Promise<void> {
 
     await run(watch, refused, t0 + DAY + 60_000);
     check("  einen Tag nach dem letzten Rot meldet eine neue Sperre wieder", count("Prime-Zugang abgelaufen") === 2, `${count("Prime-Zugang abgelaufen")} rot`);
+
+    // Review M3: bot_state.value fasst 255 Zeichen. Auch ein langer Grund mit Anführungszeichen
+    // und Backslashes darf den Eintrag nicht sprengen - er gehört gar nicht hinein.
+    const long = HttpError(401, JSON.stringify({ Error: { Type: "Unauthorized", Message: `"${"\\x".repeat(300)}" Grund-Ende` } }));
+
+    await run(watch, long, t0 + 3 * DAY);
+    check("bot_state: jeder Eintrag unter 255 Zeichen", writes.length > 0 && writes.every((value) => value.length <= 255), `${Math.max(...writes.map((value) => value.length))} Zeichen`);
+    check("  und der Grund von Prime steht nicht darin", writes.every((value) => !value.includes("Grund-Ende") && !value.includes("not valid")), writes.at(-1));
 }
 
 /**
