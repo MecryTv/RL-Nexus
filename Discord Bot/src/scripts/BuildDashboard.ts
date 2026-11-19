@@ -39,7 +39,8 @@ const options: BuildOptions = {
     logLevel: "info",
 };
 
-const styles: BuildOptions = {
+/** Auch für check:dashboard: Der Check baut damit im Speicher nach und vergleicht mit der ausgelieferten Datei. */
+export const STYLES: BuildOptions = {
     entryPoints: [path.join(ROOT, "client", "style.css")],
     minify: true,
     outfile: path.join(OUT, "style.css"),
@@ -53,12 +54,13 @@ async function main(): Promise<void> {
 
     if (process.argv.includes("--watch")) {
         await (await context(options)).watch();
-        await (await context(styles)).watch();
+        await (await context(STYLES)).watch();
 
         return;
     }
 
-    await Promise.all([build(options), build(styles)]);
+    await Promise.all([build(options), build(STYLES)]);
 }
 
-void main();
+// Nur als Skript bauen, nicht beim Import durch check:dashboard.
+if (require.main === module) void main();

@@ -11,6 +11,7 @@ process.env.CLIENT_SECRET ||= "check-secret";
 process.env.DEV_CLIENT_SECRET ||= "check-secret";
 
 import path from "path";
+import { build } from "esbuild";
 import { existsSync } from "node:fs";
 import { mkdtemp, readdir, readFile, rm, stat, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -38,6 +39,7 @@ import { askableCount, limitCards, limitCounts, limitName, limitRequestText, lim
 import { IOpenGroup, openGroups, parseVoiceTab, personStates, regionName, seatsText, voiceTabHref } from "../dashboard/client/constants/Voice";
 import { IModuleLimit } from "../dashboard/client/interfaces/IGuild";
 import CatalogService, { Catalog } from "../services/CatalogService";
+import { STYLES } from "./BuildDashboard";
 import { CommandPaths } from "../routes/AdminCommands";
 import { ApplyHelpCatalog } from "../constants/Help";
 import { CodeFromForm, RedeemAtAdmin } from "../routes/DashboardBeta";
@@ -2109,13 +2111,14 @@ async function main(): Promise<void> {
     check("style.css traegt die Hausfarbe #ff1e2d", (await css.text()).includes("--brand:#ff1e2d"));
 
     // E9 (W-0141): Gepflegt wird client/style.css, ausgeliefert die verkleinerte Fassung aus build:dashboard.
-    // Fehlt darin eine Klasse der Quelle, wurde nach einer Änderung nicht neu gebaut.
-    const cssSource = await readFile(path.join(process.cwd(), "src", "dashboard", "client", "style.css"), "utf8");
-    const cssBuilt = await readFile(path.join(process.cwd(), "src", "dashboard", "public", "assets", "style.css"), "utf8");
-    const sourceClasses = new Set([...cssSource.replace(/\/\*[\s\S]*?\*\//g, "").matchAll(/\.([a-zA-Z][\w-]*)/g)].map((match) => match[1]!).filter((name) => !name.startsWith("woff")));
-    const lostClasses = [...sourceClasses].filter((name) => !cssBuilt.includes(`.${name}`));
+    // Nachreview: im Speicher mit denselben Optionen neu gebaut und genau verglichen, Zeilenenden egal. So fällt
+    // jede Änderung an der Quelle auf, nach der niemand neu gebaut hat, auch ein geänderter Wert.
+    const cssBuilt = (await readFile(path.join(process.cwd(), "src", "dashboard", "public", "assets", "style.css"), "utf8")).replace(/\r\n/g, "\n");
+    const cssFresh = ((await build({ ...STYLES, write: false, logLevel: "silent" })).outputFiles[0]?.text ?? "").replace(/\r\n/g, "\n");
+    let cssDiff = 0;
 
-    check("style.css: ausgeliefert verkleinert, aus der Quelle gebaut", cssBuilt.length < cssSource.length * 0.85 && cssBuilt.split("\n").length <= 3 && lostClasses.length === 0, `${cssBuilt.length} von ${cssSource.length} Zeichen, ${cssBuilt.split("\n").length} Zeilen, fehlt: ${lostClasses.slice(0, 5).join(", ")}`);
+    while (cssDiff < cssBuilt.length && cssBuilt[cssDiff] === cssFresh[cssDiff]) cssDiff++;
+    check("style.css: ausgeliefert ist genau der Bau aus client/style.css (sonst npm run build:dashboard)", cssFresh !== "" && cssBuilt === cssFresh, `ab Zeichen ${cssDiff}: „${cssBuilt.slice(cssDiff, cssDiff + 40)}“ statt „${cssFresh.slice(cssDiff, cssDiff + 40)}“`);
 
     const js = await fetch(`${BASE}${P}/assets/app.js`);
     check("app.js wird ausgeliefert (Frontend gebaut?)", js.status === 200, `${js.status} - npm run build:dashboard`);
