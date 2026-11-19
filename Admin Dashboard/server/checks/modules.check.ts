@@ -65,11 +65,13 @@ export async function checkModules(): Promise<void> {
     });
 
     // W-0133: Verzeichnis der Einstellungen und Werte je Server.
-    await check("Verzeichnis: 63 Werte in 24 Modulen (W-0137), jeder Standard liegt in seinen Grenzen", () => {
+    await check("Verzeichnis: 64 Werte in 24 Modulen (W-0137, W-0146), jeder Standard liegt in seinen Grenzen", () => {
         const all = Object.values(MODULE_SETTINGS).flat();
 
         assert.equal(Object.keys(MODULE_SETTINGS).length, 24);
-        assert.equal(all.length, 63);
+        assert.equal(all.length, 64);
+        // W-0146: wie oft sich die gepostete Team-Übersicht selbst auffrischt, je Server änderbar.
+        assert.deepEqual(MODULE_SETTINGS.teams.find((def) => def.key === "refreshMinutes"), { key: "refreshMinutes", label: "Übersicht auffrischen alle", unit: "Min.", standard: 30, min: 15, max: 240, server: true, askable: false });
         assert.ok(all.every((def) => def.min <= def.standard && def.standard <= def.max), all.filter((def) => def.standard > def.max || def.standard < def.min).map((def) => def.key).join(","));
         assert.equal(MODULE_SETTINGS.tickets.find((def) => def.key === "maxOpenPerUser")?.max, 24);
         // W-0137: Galerie und Transkript-Größe sind keine Grenzen mehr.
