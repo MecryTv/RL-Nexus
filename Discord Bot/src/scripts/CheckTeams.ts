@@ -15,7 +15,8 @@ import path from "path";
 import { existsSync } from "fs";
 import { createCanvas, loadImage } from "@napi-rs/canvas";
 import { ChannelType, Collection, Guild, GuildBasedChannel, GuildMember, MessageFlags, PermissionFlagsBits, Role } from "discord.js";
-import { SetFlags } from "../utils/moduleFlags";
+import { ModuleValue, SetFlags } from "../utils/moduleFlags";
+import { settingDef } from "../constants/ModuleSettings";
 import BotClient from "../client/BotClient";
 import { HubDoc, ChannelsText, LeaguesText, LineupText, PLAYER_FIELDS, PlayerKey, PlayerValues, RoleValues, RosterText, StaffText, HubMessages, IHubMessage, TeamCardView, TeamOwnValues, TeamValues, Formats } from "../builder/TeamView";
 import { BestPeak, CardRank, ITeamCardData, ITeamCardImages, Lines, RenderTeamCard, TeamCardWidth, TeamPlaces } from "../builder/TeamCard";
@@ -2303,6 +2304,23 @@ async function checkLimits(client: BotClient): Promise<void> {
     SetFlags([], [], []);
 }
 
+/** W-0146: Die gepostete Übersicht frischt Ränge und MMR selbst auf. */
+async function checkRefresh(): Promise<void> {
+    console.log("\n  — Selbst auffrischen (W-0146) —");
+
+    const def = settingDef("teams", "refreshMinutes");
+
+    check(
+        "Verzeichnis: „Übersicht auffrischen alle“ 30 Min., 15 bis 240, je Server, nicht auf Anfrage",
+        def?.label === "Übersicht auffrischen alle" && def.unit === "Min." && def.standard === 30 && def.min === 15 && def.max === 240 && def.server && !def.askable,
+        JSON.stringify(def)
+    );
+
+    SetFlags([], [], [], [{ module: "teams", guildId: GUILD, status: null, notice: null, linkMode: null, values: { refreshMinutes: 60 }, updatedAt: null }]);
+    check("Wert je Server greift, andere Server behalten den Standard", def !== undefined && ModuleValue("teams", "refreshMinutes", GUILD) === 60 && ModuleValue("teams", "refreshMinutes", "1") === 30);
+    SetFlags([], [], []);
+}
+
 async function main(): Promise<void> {
     console.log("\n🛡️  RL Team-Übersicht\n");
 
@@ -2331,6 +2349,7 @@ async function main(): Promise<void> {
     await checkRoleIcons(client);
     await checkActor();
     await checkEpic();
+    await checkRefresh();
 
     if (await client.databaseService.Connect()) {
         try {

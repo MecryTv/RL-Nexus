@@ -42,6 +42,8 @@ export const MODULE_SETTINGS: Readonly<Record<string, readonly IModuleSettingDef
         def("maxTeams", "Teams höchstens", null, 40, 1, 200, true, true),
         def("maxPlayers", "Spieler je Team", null, 12, 1, 50, true, true),
         def("maxAbsenceDays", "Abwesenheit höchstens", "Tage", 365, 1, 730, true, false),
+        // W-0146: wie oft sich die gepostete Übersicht selbst auffrischt (runnables/TeamRefresh.ts).
+        def("refreshMinutes", "Übersicht auffrischen alle", "Min.", 30, 15, 240, true, false),
     ],
     "anti-villain": [
         def("raidWindowSeconds", "Raid erkannt in", "s", 30, 5, 300, true, false),
