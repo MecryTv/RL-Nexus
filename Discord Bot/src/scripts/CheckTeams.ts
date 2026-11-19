@@ -2370,7 +2370,7 @@ async function checkRefresh(client: BotClient): Promise<void> {
         },
     };
     const guild = { ...FakeGuild(), channels: { cache: new Map([[TEXT, channel]]) } } as unknown as Guild;
-    const prime = { value: 1450, error: null as PrimeError | null, only: null as string | null, stale: null as "down" | null, calls: 0 };
+    const prime = { value: 1450, error: null as PrimeError | null, only: null as string | null, stale: null as "down" | "access" | null, calls: 0 };
     const saved = new Map<number, ITeamPlayer[]>();
     let settings: ITeamSettings = { ...DefaultTeamSettings(), channelId: TEXT, layout: "hub" };
     let teams: ITeam[] = [];
@@ -2484,7 +2484,20 @@ async function checkRefresh(client: BotClient): Promise<void> {
         reset();
         await service.AutoRefresh(guild);
         check("  ebenso nach einem Verbindungsfehler", prime.calls === 1, `${prime.calls}`);
+
+        age(45);
+        prime.error = HttpError(401, "");
+        reset();
+        await service.AutoRefresh(guild);
+        check("  und sofort, wenn Prime den Schlüssel ablehnt (Review M7)", prime.calls === 1, `${prime.calls}`);
         prime.error = null;
+
+        age(45);
+        prime.stale = "access";
+        reset();
+        await service.AutoRefresh(guild);
+        check("  auch mit altem Stand aus dem Zwischenspeicher", prime.calls === 1, `${prime.calls}`);
+        prime.stale = null;
 
         // Ein alter Stand aus dem Zwischenspeicher, weil Prime nicht antwortet: keine Antwort, Schluss, die Ränge bleiben.
         age(45);

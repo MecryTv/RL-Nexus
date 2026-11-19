@@ -94,7 +94,7 @@ import { Evaluate, FormulaError } from "../utils/formula";
 import { ILimitHit, LimitSentence } from "../builder/LimitReply";
 import { settingDef } from "../constants/ModuleSettings";
 import { ModuleValue } from "../utils/moduleFlags";
-import { PrimeDown } from "./PrimeService";
+import { PrimeDown, PrimeError } from "./PrimeService";
 import { AbsenceSettingsOf } from "../constants/Absences";
 import logger from "../utils/logger";
 import { CanAssignRole, NewRoleProblem } from "../utils/rolegate";
@@ -1650,7 +1650,7 @@ export default class TeamService {
 
                 const { snapshot: fresh, halt } = await this.Ask(player.epicName);
 
-                // W-0146 (Review I2): Zeitüberschreitung oder Verbindungsfehler - die übrigen Spieler warten aufs nächste Mal.
+                // W-0146 (Review I2, M7): Zeitüberschreitung, Verbindungsfehler oder gesperrter Zugang - die übrigen Spieler warten aufs nächste Mal.
                 halted = halt;
 
                 if (fresh.error === null || fresh.missing) answered++;
@@ -1686,8 +1686,9 @@ export default class TeamService {
     }
 
     /**
-     * Wie Fetch, dazu halt (W-0146, Review I2): Prime ist gerade nicht zu erreichen,
-     * jede weitere Frage gleich danach scheiterte genauso - Sync hört dann auf.
+     * Wie Fetch, dazu halt (W-0146, Review I2 und M7): Prime ist gerade nicht zu
+     * erreichen oder lehnt den Schlüssel ab, jede weitere Frage gleich danach
+     * scheiterte genauso - Sync hört dann auf.
      */
     private async Ask(epicName: string): Promise<{ snapshot: IPlayerSnapshot; halt: boolean }> {
         const snapshot = EmptySnapshot();
@@ -1708,7 +1709,7 @@ export default class TeamService {
             if (profile.stale) {
                 snapshot.error = "Prime antwortet nicht.";
 
-                return { snapshot, halt: profile.stale === "down" };
+                return { snapshot, halt: profile.stale === "down" || profile.stale === "access" };
             }
 
             snapshot.name = profile.name;
@@ -1727,7 +1728,7 @@ export default class TeamService {
         } catch (error) {
             snapshot.error = error instanceof Error ? error.message : "Prime antwortet nicht.";
 
-            return { snapshot, halt: PrimeDown(error) };
+            return { snapshot, halt: PrimeDown(error) || (error instanceof PrimeError && error.type === "Access") };
         }
 
         return { snapshot, halt: false };
