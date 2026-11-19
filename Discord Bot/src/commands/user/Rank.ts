@@ -5,6 +5,7 @@ import Category from "../../enums/Category";
 import { IPrimeProfile } from "../../interfaces/services/prime/IPrimeService";
 import { RankMessage } from "../../builder/RankView";
 import { LINK_COOLDOWN_DEV } from "../../constants/Database";
+import { PRIME_ACCESS_TEXT } from "../../constants/Prime";
 import { PrimeError } from "../../services/PrimeService";
 import { EpicLinkURL, EpicLoginReady } from "../../utils/epicLogin";
 import { EpicAdopt } from "../../utils/epic";
@@ -136,9 +137,16 @@ export default class Rank extends Command {
         } catch (error) {
             const prime = error instanceof PrimeError ? error : null;
 
-            logger.warn(`🎮 Prime: ${prime ? `${prime.type} ${prime.message}` : String(error)}`);
+            // W-0145: Ein abgelaufener oder falscher Schlüssel ist kein Ausfall von Rocket League.
+            // Im Log steht er schon als Fehler (PrimeService, einmal je Stunde) - nicht noch je Aufruf.
+            const locked = prime?.type === "Access";
 
-            await interaction.editReply({ content: "Rocket League antwortet gerade nicht. Versuch es später noch einmal." });
+            // Ein HTTP-Fehler ohne Grund (etwa eine Cloudflare-Seite) bekommt den Anfang des Rumpfs dazu.
+            const body = prime?.body && !prime.reason ? ` (Rumpf „${prime.body.slice(0, 120)}“)` : "";
+
+            if (!locked) logger.warn(`🎮 Prime: ${prime ? `${prime.type} ${prime.message}${body}` : String(error)}`);
+
+            await interaction.editReply({ content: locked ? PRIME_ACCESS_TEXT : "Rocket League antwortet gerade nicht. Versuch es später noch einmal." });
 
             return null;
         }

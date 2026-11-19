@@ -161,6 +161,51 @@ Fachfehler liefert Prime als `200` mit einem `Error`-Objekt im Rumpf:
 
 `PrimeService` übersetzt das in einen `PrimeError` mit `type`. Ein unbekannter Spieler wird zu `null` (die Route antwortet `404`), alles andere wirft weiter (die Route antwortet `502` — das Problem sitzt dann nicht im Dashboard).
 
+### Zugang abgelaufen oder Schlüssel falsch (W-0145)
+
+Den Schlüssel lehnt Prime **nicht** mit 200 ab, sondern mit HTTP **401** (gemessen am 19.11.2026):
+
+| Anfrage | Antwort |
+|---|---|
+| ohne `authorization` | `401 {"Error":{"Type":"Unauthorized","Message":"Provide a Prime API token as a bearer token."}}` |
+| falscher Schlüssel | `401 {"Error":{"Type":"Unauthorized","Message":"The Prime API token is not valid."}}` |
+
+Im Live-Log vom 19.11.2026 (Sessions 71/72) steht, wie es beim echten Ablauf aussah:
+
+| Fall | Antwort |
+|---|---|
+| Zugang abgelaufen (18.11.2026 23:00), Abfragen am 19.11. von 07:42 bis 19:14 | **403** |
+| alter Schlüssel, nachdem der Zugang erneuert war (19:33 bis 19:41) | **401** |
+
+Den Rumpf des Ablauf-403 kennen wir nicht, der alte Code hat ihn verworfen. Die Zugangsseite kennt den Status `expired` („This authorization has reached its expiry date"), daneben `disabled`, `denied` und `unapproved`.
+
+`PrimeService` macht deshalb aus **401 und 403** einen `PrimeError` mit `type: "Access"` und dem Grund von Prime in der Meldung (`HttpError()`). Ausnahme: ein 403 als **HTML-Seite** (Content-Type `text/html` oder ein Rumpf, der mit `<` beginnt) bleibt ein gewöhnlicher HTTP-Fehler. Prime liegt hinter Cloudflare, und Firewall oder Bot-Schutz antworten ebenfalls mit 403. `CrossSiteRequest` (nur von den Kontoseiten) zählt auch nicht.
+
+Den Rumpf führt der Fehler gekürzt mit (`PrimeError.body`, höchstens 200 Zeichen, der Schlüssel wird darin ersetzt). Nennt Prime keinen Grund, steht er in der Fehlerzeile im Log - so sieht man beim nächsten Ablauf, was Prime schickt.
+
+Was daraus folgt:
+
+* `/rank search`, `/rank me` und der Knopf unter der Karte sagen dann „Die Rang-Abfrage ist gerade nicht freigeschaltet …" (`PRIME_ACCESS_TEXT`) statt „Rocket League antwortet gerade nicht".
+* Liegt ein alter Stand im Zwischenspeicher, kommt er wie bei einem Ausfall zurück, aber mit `stale: "access"`. Die Karte schreibt dann „Rang-Abfrage nicht freigeschaltet, angezeigt wird der Stand von …".
+* Im Bot-Log steht eine Zeile auf Fehler-Ebene, höchstens einmal je Stunde (`PRIME_ACCESS_LOG_EVERY`): `🎮 Prime lehnt den Zugang ab (Prime antwortete mit 401: …). Keine Ränge, bis ein neuer PRIME_API_TOKEN in der .env steht`. Die Warnungen je Aufruf entfallen dafür, sonst liefe das Log bei jedem `/rank` und jedem Team-Abgleich voll.
+* Neuen Schlüssel holen: <https://prime.rocketplanet.gg/access>, in die `.env` als `PRIME_API_TOKEN`, dann den **Bot-Container neu erstellen**: `docker compose -f docker-compose.prod.yml up -d --force-recreate --no-deps bot`. Ein bloßer Neustart (`docker restart`) behält die alten Umgebungsvariablen und damit den alten Schlüssel. Das Ablaufdatum steht dort unter „Access expiry" (gleich als `PRIME_ACCESS_EXPIRES` eintragen); über die API lässt es sich nicht abfragen (`/Account/*` nimmt nur Anfragen der Webseite selbst an und antwortet sonst `403 CrossSiteRequest`).
+
+### DM an die Developer (W-0145)
+
+Jeder in `DEV_USER_IDs` bekommt eine DM als Bild (Entwurf D, `builder/PrimeAccessCard.ts`), darunter eine Zeile mit Discord-Zeitstempel und der Knopf „Prime-Konto öffnen“. Bei Gelb und Rot steht in der Zeile, dass der neue Schlüssel in `PRIME_API_TOKEN` gehört. Der Schlüssel selbst steht nie in der Nachricht.
+
+| Farbe | Wann | Wie oft |
+|---|---|---|
+| Gelb „läuft bald ab“ | 7 Tage und 1 Tag vor `PRIME_ACCESS_EXPIRES` | je Stufe einmal; ohne Datum nie |
+| Rot „abgelaufen“ | beim ersten Aufruf, den Prime mit 401 oder 403 ablehnt (403 als HTML-Seite zählt nicht) | höchstens einmal je 24 Stunden: als Erinnerung, solange gesperrt, und auch bei einer neuen Sperre kurz nach der letzten |
+| Grün „wieder da“ | beim ersten erfolgreichen Aufruf danach | einmal, und nur, wenn für diese Sperre ein Rot rausging |
+
+Gemeldet wird über `PrimeAccessWatch` (`services/PrimeAccessService.ts`): `PrimeService` meldet jede Abfrage an Prime dorthin. Was zuletzt gemeldet wurde, steht in `bot_state` unter `prime_access`, damit ein Neustart nichts doppelt schickt.
+
+Damit ein Ablauf auch auffällt, wenn niemand `/rank` benutzt, schaut `runnables/PrimeAccess.ts` alle zehn Minuten nach: Gelb prüfen und, wenn in der letzten Stunde keine Abfrage an Prime lief, eine Probe (`PrimeService.Probe()`, `ResolveUser` mit einem Namen, den es nicht geben muss: auch „InvalidPlayer“ heißt, der Schlüssel wurde angenommen). Also höchstens eine zusätzliche Abfrage je Stunde.
+
+Grenzen: Die 24-Stunden-Leiste, „zuletzt erfolgreich“ und die Zahl der abgelehnten Anfragen liegen im Speicher und werden nur mit einer DM gespeichert. Nach einem Neustart ist die Leiste deshalb grau. Das Konto auf der Karte (`PRIME_ACCOUNT`) steht fest im Code, Prime verrät es über die API nicht. Ohne Verbindung zu Discord gilt eine DM nicht als geschickt, sie kommt beim nächsten Anlass (nächste Abfrage oder nächster Durchlauf). Den gespeicherten Zustand liest der Bot erst, wenn die Datenbank bereit ist; bis dahin entscheidet er nichts, nach zwei Minuten ohne Datenbank gilt der Speicher. Scheitert das Speichern, geht die DM trotzdem raus und der Fehler ins Log.
+
 ---
 
 ## Wie oft geholt wird
@@ -311,6 +356,9 @@ src/models/PlayerRanks.ts                  Gespeicherte Ränge, Peak, Reward-Lev
 src/models/Clubs.ts                        Eigene Clubs des Bots (nicht die aus dem Spiel)
 src/constants/WTSI.ts                      Die Rechnung
 src/scripts/CheckPrime.ts                  npm run check:prime
+src/builder/PrimeAccessCard.ts             W-0145: Bild der DM an die Developer
+src/services/PrimeAccessService.ts         W-0145: DM, Auslöser, Drosselung, bot_state
+src/runnables/PrimeAccess.ts               W-0145: alle 10 Minuten Gelb prüfen und Probe
 ```
 
 ---

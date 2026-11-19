@@ -16,9 +16,11 @@ import {
     CAREER_STATS,
     DivisionName,
     PLACEMENT_MATCHES,
+    PRIME_ACCESS_LOG_EVERY,
     PRIME_BASE_URL,
     PRIME_CACHE_KEEP,
     PRIME_CACHE_MAX,
+    PRIME_PROBE_USER,
     PRIME_TIMEOUT,
     EXTRA_PLAYLISTS,
     TierName,
@@ -27,6 +29,7 @@ import {
     TOURNAMENT_PLAYLIST,
     TRACKED_PLAYLISTS,
 } from "../constants/Prime";
+import { PrimeAccessWatch } from "./PrimeAccessService";
 
 /** Was Prime zu einem Namen zurückgibt. */
 interface IRawUser {
@@ -97,13 +100,50 @@ interface IRawEnvelope<T> {
 export class PrimeError extends Error {
     type: string;
     status: number;
+    /** W-0145: Der Grund in den Worten von Prime, ohne Vorspann - für die DM an die Developer. */
+    reason: string;
+    /** W-0145: Der Rumpf der Antwort, gekürzt und ohne Schlüssel - fürs Log, wenn Prime keinen Grund nennt. */
+    body: string;
 
-    constructor(message: string, type = "Unknown", status = 0) {
+    constructor(message: string, type = "Unknown", status = 0, reason = "", body = "") {
         super(message);
         this.name = "PrimeError";
         this.type = type;
         this.status = status;
+        this.reason = reason;
+        this.body = body;
     }
+}
+
+/**
+ * W-0145: Ein Fehler mit HTTP-Status. 401 und 403 heißen: Prime lehnt den
+ * Schlüssel ab. Das ist kein Ausfall und bekommt deshalb die Art "Access".
+ * Gesehen im Live-Log am 19.11.2026: der abgelaufene Zugang bekam 403, der
+ * ersetzte alte Schlüssel 401. Einen Grund schreibt Prime teils in den Rumpf,
+ * etwa {"Error":{"Type":"Unauthorized","Message":"The Prime API token is not valid."}}.
+ *
+ * Ausnahme (Review): ein 403 als HTML-Seite. Prime liegt hinter Cloudflare, und
+ * Firewall oder Bot-Schutz antworten ebenfalls mit 403 - das ist kein
+ * abgelaufener Zugang. CrossSiteRequest kommt nur von den Kontoseiten.
+ */
+export function HttpError(status: number, raw: string, contentType = "", secret = ""): PrimeError {
+    let reason = "";
+    let type = "";
+
+    try {
+        const error = (JSON.parse(raw) as IRawEnvelope<unknown>).Error;
+
+        reason = error?.Message || error?.Type || "";
+        type = error?.Type ?? "";
+    } catch {
+        // Kein JSON - dann bleibt es beim Status.
+    }
+
+    const html = contentType.toLowerCase().includes("text/html") || raw.trimStart().startsWith("<");
+    const access = status === 401 || (status === 403 && !html && type !== "CrossSiteRequest");
+    const body = (secret ? raw.split(secret).join("…") : raw).replace(/\s+/g, " ").trim().slice(0, 200);
+
+    return new PrimeError(`Prime antwortete mit ${status}${reason ? `: ${reason}` : ""}`, access ? "Access" : "HTTP", status, reason, body);
 }
 
 const NOT_FOUND = new Set(["InvalidPlayer", "PlayerNotFound", "NotFound"]);
@@ -118,9 +158,14 @@ export default class PrimeService implements IPrimeService {
 
     private session: ClientHttp2Session | null = null;
     private pending = 0;
+    private alarmAt = 0;
+
+    /** W-0145: Merkt sich jede Abfrage und schreibt den Developern, wenn der Zugang kippt. */
+    readonly access: PrimeAccessWatch;
 
     constructor(client: BotClient) {
         this.client = client;
+        this.access = new PrimeAccessWatch(client);
     }
 
     get IsConfigured(): boolean {
@@ -176,6 +221,7 @@ export default class PrimeService implements IPrimeService {
             });
 
             let status = 0;
+            let contentType = "";
             let raw = "";
             let done = false;
 
@@ -197,6 +243,7 @@ export default class PrimeService implements IPrimeService {
 
             request.on("response", (headers) => {
                 status = Number(headers[":status"] ?? 0);
+                contentType = String(headers["content-type"] ?? "");
             });
 
             request.on("data", (chunk: string) => {
@@ -207,7 +254,7 @@ export default class PrimeService implements IPrimeService {
 
             request.on("end", () => {
                 if (status !== 200) {
-                    settle(new PrimeError(`Prime antwortete mit ${status}`, "HTTP", status));
+                    settle(HttpError(status, raw, contentType, this.client.config.PRIME_API_TOKEN));
                     return;
                 }
 
@@ -259,6 +306,7 @@ export default class PrimeService implements IPrimeService {
             const profile = await this.Load(wanted);
             const entry = { value: profile, at: Date.now() };
 
+            this.access.Note("ok");
             this.cache.set(key, entry);
 
             // W-0129: auch unter der Konto-ID - der Knopf unter der Rang-Karte fragt
@@ -268,9 +316,51 @@ export default class PrimeService implements IPrimeService {
 
             return profile;
         } catch (error) {
+            // W-0145: Ein gesperrter Zugang ist kein Ausfall - die Karte sagt dann, was los ist.
+            const locked = error instanceof PrimeError && error.type === "Access";
+
+            if (locked) this.Alarm(error);
+            this.access.Note(locked ? error : "other");
             if (!hit) throw error;
-            logger.warn(`🎮 Prime nicht erreichbar, alter Stand für "${wanted}": ${String(error)}`);
-            return hit.value ? { ...hit.value, stale: true } : hit.value;
+            if (!locked) logger.warn(`🎮 Prime nicht erreichbar, alter Stand für "${wanted}": ${String(error)}`);
+
+            return hit.value ? { ...hit.value, stale: locked ? "access" : true } : hit.value;
+        }
+    }
+
+    /**
+     * W-0145: Prime lehnt den Schlüssel ab. Das gehört als Fehler ins Log, aber
+     * höchstens einmal je PRIME_ACCESS_LOG_EVERY - sonst schreibt jedes /rank,
+     * jeder Knopf und jeder Team-Abgleich dieselbe Zeile.
+     */
+    private Alarm(error: PrimeError): void {
+        if (Date.now() - this.alarmAt < PRIME_ACCESS_LOG_EVERY) return;
+
+        this.alarmAt = Date.now();
+        // Ohne Grund von Prime den Rumpf dazu - so sieht man beim nächsten Mal, was Prime sagt.
+        const detail = error.reason ? error.message : `${error.message}, Rumpf ${error.body ? `„${error.body}“` : "leer"}`;
+
+        logger.error(`🎮 Prime lehnt den Zugang ab (${detail}). Keine Ränge, bis ein neuer PRIME_API_TOKEN in der .env steht: https://prime.rocketplanet.gg/access`);
+    }
+
+    /**
+     * W-0145: Eine Abfrage nur, um zu sehen, ob Prime den Schlüssel annimmt -
+     * für die stündliche Probe (runnables/PrimeAccess.ts). Ein unbekannter Name
+     * ist dabei ein Erfolg: Prime hat geantwortet und den Schlüssel angenommen.
+     */
+    async Probe(): Promise<void> {
+        if (!this.IsConfigured) return;
+
+        try {
+            await this.Query("/Resolver/ResolveUser", { User: PRIME_PROBE_USER });
+            this.access.Note("ok");
+        } catch (error) {
+            if (error instanceof PrimeError && NOT_FOUND.has(error.type)) return this.access.Note("ok");
+
+            const locked = error instanceof PrimeError && error.type === "Access";
+
+            if (locked) this.Alarm(error);
+            this.access.Note(locked ? error : "other");
         }
     }
 

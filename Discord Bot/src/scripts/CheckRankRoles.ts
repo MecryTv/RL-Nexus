@@ -15,6 +15,8 @@ import { DefaultRankRoleSettings, RANK_GROUPS, RANK_ROLES_MODULE, StepOf, Steps 
 import { IPrimeProfile, IPrimeRank } from "../interfaces/services/prime/IPrimeService";
 import { IRankRoleSettings } from "../interfaces/services/rankroles/IRankRoles";
 import { RankRoleError } from "../services/RankRoleService";
+import { HttpError } from "../services/PrimeService";
+import { PRIME_ACCESS_TEXT } from "../constants/Prime";
 
 const GUILD = "90071992547409961";
 const TEXT = "90071992547409962";
@@ -294,6 +296,17 @@ async function checkApply(client: BotClient): Promise<void> {
 
     Stub(client, Settings({ playlists: { "1v1": { on: false, roles: {} }, "2v2": { on: false, roles: {} }, "3v3": { on: false, roles: {} } } }), []);
     await refuses("Ohne eingeschaltete Playlist auch nicht", () => service.Apply(FakeMember(FakeGuild(), []).member));
+
+    // W-0145 (Review): Lehnt Prime den Zugang ab, kennt Prime den Spieler sehr wohl - die Meldung sagt, was wirklich los ist.
+    Stub(client, Settings(), [FakeRank("3v3", 14, 1300)]);
+    client.primeService.Profile = (async () => Promise.reject(HttpError(403, ""))) as typeof client.primeService.Profile;
+
+    const locked = await service.Apply(FakeMember(FakeGuild(), []).member).then(
+        () => "kein Fehler",
+        (error: unknown) => (error instanceof RankRoleError ? error.message : String(error))
+    );
+
+    check("Gesperrter Prime-Zugang: Rang-Rollen sagen, dass die Abfrage nicht freigeschaltet ist", locked === PRIME_ACCESS_TEXT, locked);
 
     console.log("\n  — Nach /rank me —");
 

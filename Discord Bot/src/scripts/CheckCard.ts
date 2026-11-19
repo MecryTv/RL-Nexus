@@ -17,6 +17,7 @@ import path from "path";
 import { createCanvas, loadImage } from "@napi-rs/canvas";
 import { RegisterFonts, RenderRankCard, RewardBarLayout, TierTextSize } from "../builder/RankCard";
 import { IPrimeProfile } from "../interfaces/services/prime/IPrimeService";
+import { IPrimeAccessCard, PrimeAccessAlt, RenderPrimeAccessCard } from "../builder/PrimeAccessCard";
 import {
     CARD_HEIGHT,
     CARD_WIDTH,
@@ -186,6 +187,17 @@ async function main(): Promise<void> {
     check("Ein alter Stand wird gezeichnet", stale.length > 0);
     check("  und sieht anders aus als ein frischer", !stale.equals(fresh), "sonst fehlt die Warnung");
 
+    // W-0145: Lehnt Prime den Zugang ab, sagt die Zeile das - nicht „Rocket League antwortet nicht“.
+    const locked = await RenderRankCard({
+        profile: { ...PROFILE, fetchedAt: alt, stale: "access" },
+        discordName: "PruefName",
+        avatarURL: null,
+    });
+
+    await writeFile("card-check-access.png", locked);
+
+    check("Gesperrter Zugang hat einen eigenen Hinweis", !locked.equals(fresh) && !locked.equals(stale), "sonst steht dort der Ausfall-Text oder gar keiner");
+
     console.log("\n— Grenzfälle —");
 
     // W-0132: Die Karte ist enger geworden. Was dort zuerst überläuft: ein
@@ -245,12 +257,88 @@ async function main(): Promise<void> {
     check(`„100%“ endet im Season-Kasten (${Math.round(bar.percentEnd)} von 350)`, bar.percentEnd <= 350 - 18);
     check(`  und der Balken bleibt breit genug (${Math.round(bar.w)} px)`, bar.w >= 120);
 
+    await checkPrimeAccess();
+
     if (failed > 0) {
         console.log(`\n\x1b[31m❌ ${failed} Prüfung(en) fehlgeschlagen.\x1b[0m\n`);
         process.exit(1);
     }
 
     console.log("\n\x1b[32m✅ Alle Prüfungen bestanden.\x1b[0m  card-check.png liegt bereit.\n");
+}
+
+/**
+ * W-0145: Die DM an die Developer zum Prime-Zugang (Entwurf D). Mit den
+ * Beispieldaten des Entwurfs muss jede Karte genau so groß werden wie das
+ * gewählte Entwurfs-PNG (1440 × 1076, 1240, 1176) - sonst hat sich am Aufbau
+ * etwas verschoben.
+ */
+async function checkPrimeAccess(): Promise<void> {
+    console.log("\n— Prime-Zugang (DM an die Developer) —");
+
+    // 19.11.2026, 19:52 Berliner Zeit.
+    const now = Date.UTC(2026, 10, 19, 18, 52);
+    const hour = 3_600_000;
+    const base = { now, account: "Nexus EMB", refused: 0 };
+    const cards: [string, IPrimeAccessCard, number][] = [
+        ["bald", { ...base, state: "soon", at: now + 7 * 24 * hour, stage: 1, answer: "Zugang aktiv", lastOk: now, hours: [] }, 1076],
+        [
+            "abgelaufen",
+            // So sah der Ablauf am 18.11.2026 aus: 403, ein Grund von Prime ist nicht bekannt.
+            { ...base, state: "locked", at: Date.UTC(2026, 10, 18, 22), answer: "HTTP 403", lastOk: Date.UTC(2026, 10, 18, 21, 57), hours: [...Array(4).fill("ok"), ...Array(20).fill("down")] },
+            1240,
+        ],
+        [
+            "wieder-da",
+            {
+                ...base,
+                state: "back",
+                at: Date.UTC(2026, 10, 18, 22),
+                until: now - 4 * 60_000,
+                answer: "Zugang wieder aktiv",
+                lastOk: now,
+                refused: 37,
+                hours: [...Array(3).fill("ok"), ...Array(20).fill("down"), "ok"],
+            },
+            1176,
+        ],
+    ];
+
+    for (const [name, card, height] of cards) {
+        const started = Date.now();
+        const png = await RenderPrimeAccessCard(card);
+
+        await writeFile(`card-check-prime-${name}.png`, png);
+
+        check(`Zustand ${name}: 1440 × ${height} wie der Entwurf`, await hasSize(png, 1440, height));
+        check(`  in ${Date.now() - started} ms und unter 1 MB`, Date.now() - started < 3000 && png.length < 1_000_000, `${png.length} Bytes`);
+    }
+
+    const locked = cards[1]![1];
+    const alt = PrimeAccessAlt(locked);
+
+    check("Alt-Text nennt Titel, Zeitpunkt und Konto", alt.startsWith("Prime-Zugang abgelaufen.") && alt.includes("23:00 Uhr") && alt.includes("Konto: Nexus EMB"), alt);
+    check("  und die drei Schritte", alt.includes("1. Zugang auf prime.rocketplanet.gg erneuern") && alt.includes("3. Bot-Container neu erstellen"), alt);
+    check("  und die 24 Stunden ab 20:00 gestern", alt.includes("Letzte 24 Stunden ab 20:00 gestern: 4 Stunden in Ordnung, 20 Stunden gesperrt"), alt);
+    check("Gelb: noch 7 Tage, am 26.11.2026 um 19:52 Uhr", PrimeAccessAlt(cards[0]![1]).includes("Läuft ab in 7 Tagen, am 26.11.2026 um 19:52 Uhr"), PrimeAccessAlt(cards[0]![1]));
+    check("Grün: Dauer, Zeitraum und abgelehnte Anfragen", PrimeAccessAlt(cards[2]![1]).includes("20 Std. 48 Min., 18.11. 23:00 bis 19.11. 19:48 Uhr") && PrimeAccessAlt(cards[2]![1]).includes("37 Anfragen"), PrimeAccessAlt(cards[2]![1]));
+    check("Zuletzt erfolgreich an einem älteren Tag: „17.11. · 22:57 Uhr“", PrimeAccessAlt({ ...locked, lastOk: Date.UTC(2026, 10, 17, 21, 57) }).includes("Zuletzt erfolgreich: 17.11. · 22:57 Uhr"), PrimeAccessAlt({ ...locked, lastOk: Date.UTC(2026, 10, 17, 21, 57) }));
+
+    // Eine lange Antwort von Prime bricht um, statt aus der Kachel zu laufen.
+    const long = await RenderPrimeAccessCard({ ...locked, answer: "401 · The Prime API token is not valid." });
+
+    check("Lange Antwort von Prime: die Kacheln werden höher", (await loadImage(long)).height > 1240);
+
+    // Review M7: Ohne gesendete Vorwarnung sind „7 Tage vorher“ und „1 Tag vorher“ nicht erreicht.
+    const warned = await RenderPrimeAccessCard({ ...locked, warned: 3, dated: true });
+    const unwarned = await RenderPrimeAccessCard({ ...locked, warned: 0, dated: false });
+
+    check("Rot ohne Vorwarnung sieht anders aus als nach beiden Vorwarnungen", !warned.equals(unwarned));
+    check("  Alt-Text: Vorwarnungen ausgeblieben, kein Ablaufdatum", PrimeAccessAlt({ ...locked, warned: 0, dated: false }).includes("Vorwarnungen ausgeblieben, kein Ablaufdatum eingetragen"), PrimeAccessAlt({ ...locked, warned: 0, dated: false }));
+    check("  nach beiden Vorwarnungen: 7 Tage und 1 Tag vorher", PrimeAccessAlt({ ...locked, warned: 3, dated: true }).includes("Vorwarnungen 7 Tage und 1 Tag vorher, dann abgelaufen"), PrimeAccessAlt({ ...locked, warned: 3, dated: true }));
+    check("  nur die späte Vorwarnung", PrimeAccessAlt({ ...locked, warned: 2, dated: true }).includes("Vorwarnung 1 Tag vorher, dann abgelaufen"), PrimeAccessAlt({ ...locked, warned: 2, dated: true }));
+
+    await writeFile("card-check-prime-abgelaufen.png", unwarned);
 }
 
 async function hasSize(png: Buffer, width: number, height: number): Promise<boolean> {
