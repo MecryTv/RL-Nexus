@@ -95,8 +95,11 @@ export interface IPrimeProfile {
      *
      * W-0145: "access", wenn Prime nicht ausfiel, sondern den Schlüssel ablehnte
      * (Zugang abgelaufen oder ungültig) - der Hinweis lautet dann anders.
+     *
+     * W-0146: "down" bei Zeitüberschreitung oder Verbindungsfehler (PrimeDown) -
+     * wie true, nur hört der Team-Abgleich danach auf.
      */
-    stale?: boolean | "access";
+    stale?: boolean | "access" | "down";
 }
 
 export default interface IPrimeService {

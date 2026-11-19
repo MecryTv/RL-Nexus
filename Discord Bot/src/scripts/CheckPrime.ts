@@ -14,7 +14,7 @@ import path from "path";
 import { readdirSync, readFileSync } from "node:fs";
 import BotClient from "../client/BotClient";
 import { DivisionName, TierName, ToMMR, ToPlatform, ToPlayerID, TrackerURL, TRACKED_PLAYLISTS } from "../constants/Prime";
-import PrimeService, { HttpError, PrimeError } from "../services/PrimeService";
+import PrimeService, { HttpError, PrimeDown, PrimeError } from "../services/PrimeService";
 import { IPrimeProfile } from "../interfaces/services/prime/IPrimeService";
 import { PRIME_ACCESS_TEXT, PRIME_CACHE_TTL } from "../constants/Prime";
 import { Collection } from "discord.js";
@@ -113,11 +113,12 @@ async function checkCache(client: BotClient): Promise<void> {
     class FakePrime extends PrimeService {
         public loads = 0;
         public down = false;
+        public cause = new PrimeError("Prime antwortet nicht", "Network");
 
         protected override async Load(name: string): Promise<IPrimeProfile | null> {
             this.loads += 1;
 
-            if (this.down) throw new PrimeError("Prime antwortet nicht", "Network");
+            if (this.down) throw this.cause;
 
             return profile(name);
         }
@@ -173,6 +174,19 @@ async function checkCache(client: BotClient): Promise<void> {
     check("Bei Ausfall wird es noch einmal versucht", prime.loads === loadsBefore + 1);
     check("  und der alte Stand kommt zurueck", rescued?.name === "Spieler", String(rescued?.name));
     check("  als alt markiert", rescued?.stale === true, String(rescued?.stale));
+
+    // W-0146 (Review I2): Antwortet Prime gar nicht (Zeit, Verbindung), heißt der alte Stand „down“ - der Team-Abgleich hört dann auf.
+    prime.cause = new PrimeError("Prime antwortet nicht (10000 ms)", "Timeout");
+
+    if (entry) entry.at = Date.now() - PRIME_CACHE_TTL - 1000;
+
+    const down = await prime.Profile("Spieler");
+
+    check("  bei Zeitüberschreitung als „down“", down?.stale === "down", String(down?.stale));
+    check(
+        "PrimeDown: Zeit und Verbindung ja, HTTP, Zugang und andere Fehler nein",
+        PrimeDown(new PrimeError("", "Timeout")) && PrimeDown(new PrimeError("", "Transport")) && !PrimeDown(HttpError(500, "")) && !PrimeDown(HttpError(401, "")) && !PrimeDown(new Error("x"))
+    );
 
     // W-0129: Der Knopf unter der Rang-Karte fragt über die Konto-ID. Nach einer
     // Suche über den Namen muss die ohne neue Anfrage kommen - und Vergessen
@@ -705,6 +719,18 @@ async function checkAccessWatch(): Promise<void> {
     }
 
     check("Speichern scheitert: Rot geht trotzdem raus, der Fehler steht im Log", count("Prime-Zugang abgelaufen") === 1 && warned.some((line) => line.includes("Datenbank weg")), `${count("Prime-Zugang abgelaufen")} rot | ${warned.join(" | ")}`);
+
+    // W-0146: Die Team-Übersicht fragt vor dem Auffrischen, ob Prime gerade ablehnt - auch gleich nach einem Neustart.
+    state.clear();
+    watch = new PrimeAccessWatch(fake());
+    check("Gesperrt? Ohne Ablehnung nein", !(await watch.Locked(t0)));
+
+    await run(watch, refused, t0);
+    check("  nach einer Ablehnung ja", await watch.Locked(t0 + 60_000));
+    check("  nach einem Neustart ebenso, aus dem gespeicherten Zustand", await new PrimeAccessWatch(fake()).Locked(t0 + 120_000));
+
+    await run(watch, "ok", t0 + HOUR);
+    check("  nach einer angenommenen Abfrage wieder nein", !(await watch.Locked(t0 + HOUR + 60_000)));
 }
 
 /**

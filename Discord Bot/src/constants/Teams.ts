@@ -45,6 +45,14 @@ export const SNAPSHOT_MAX_AGE = 30 * 60 * 1000;
 /** Wie viele Spieler ein Abruf höchstens bei Prime nachfragt. */
 export const SYNC_BATCH = 12;
 
+/**
+ * W-0146: So viele Server frischt ein Lauf von runnables/TeamRefresh.ts höchstens auf (je bis zu
+ * SYNC_BATCH Spieler bei Prime), reihum. Sind mehr fällig, etwa nach einer längeren Pause,
+ * kommen sie in den nächsten Läufen dran und verteilen sich so von selbst. Ein Neustart
+ * allein macht nichts fällig: Fällig ist, was der gespeicherte Stand sagt.
+ */
+export const REFRESH_GUILDS = 3;
+
 export const PLAYLISTS: PlaylistSlot[] = ["1v1", "2v2", "3v3"];
 
 /** Die Reihenfolge ist auch die der Auswahl im Dashboard. */
