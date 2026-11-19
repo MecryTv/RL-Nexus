@@ -40,6 +40,7 @@ import {
     PLAIN_FORMATS,
     PLAYING_ROLES,
     RankFormatter,
+    REFRESH_GUILDS,
     RoleFormatter,
     ROLE_LABELS,
     ROLE_ORDER,
@@ -49,7 +50,9 @@ import { IconImage, RANK_ICON_FILES, RANK_ICON_ROOT, RankIconImage, RankIconName
 import { IsImageFile } from "../constants/Gallery";
 import { ITeam, ITeamGroup, ITeamPlayer, ITeamSettings, ITeamView, TeamRole } from "../interfaces/services/teams/ITeams";
 import DashboardApiTeams, { HubParts } from "../routes/DashboardApiTeams";
-import { ApplyCategoryDraft, ParseCategoryDraft, EmojiId, NeedsResend, NormalizeTeamSettings, RolePlan, RoleTargets, SameMessage, TeamError, TeamOverwrites, TextName, Usable, ViewFacts } from "../services/TeamService";
+import { ApplyCategoryDraft, ParseCategoryDraft, EmojiId, NeedsResend, NormalizeTeamSettings, RefreshDue, RolePlan, RoleTargets, SameMessage, TeamError, TeamOverwrites, TextName, Usable, ViewFacts } from "../services/TeamService";
+import TeamRefresh from "../runnables/TeamRefresh";
+import TaskTypes from "../enums/TaskTypes";
 import { Evaluate, FormulaError } from "../utils/formula";
 
 const GUILD = "90071992547409951";
@@ -1634,7 +1637,7 @@ async function checkSending(client: BotClient): Promise<void> {
 
         service.Settings = async () => ({ ...base, layout: "hub" });
         service.Groups = async () => groups;
-        service.Sync = async () => void steps.push("sync");
+        service.Sync = async () => (steps.push("sync"), 0);
         service.Views = async () => ({ views: [service.Look(team, groups, base)], groups, settings: base });
         client.teams.Full = async () => team;
 
@@ -2305,10 +2308,12 @@ async function checkLimits(client: BotClient): Promise<void> {
 }
 
 /** W-0146: Die gepostete Übersicht frischt Ränge und MMR selbst auf. */
-async function checkRefresh(): Promise<void> {
+async function checkRefresh(client: BotClient): Promise<void> {
     console.log("\n  — Selbst auffrischen (W-0146) —");
 
     const def = settingDef("teams", "refreshMinutes");
+    const perServer = (minutes: number) =>
+        SetFlags([], [], [], [{ module: "teams", guildId: GUILD, status: null, notice: null, linkMode: null, values: { refreshMinutes: minutes }, updatedAt: null }]);
 
     check(
         "Verzeichnis: „Übersicht auffrischen alle“ 30 Min., 15 bis 240, je Server, nicht auf Anfrage",
@@ -2316,9 +2321,254 @@ async function checkRefresh(): Promise<void> {
         JSON.stringify(def)
     );
 
-    SetFlags([], [], [], [{ module: "teams", guildId: GUILD, status: null, notice: null, linkMode: null, values: { refreshMinutes: 60 }, updatedAt: null }]);
+    perServer(60);
     check("Wert je Server greift, andere Server behalten den Standard", def !== undefined && ModuleValue("teams", "refreshMinutes", GUILD) === 60 && ModuleValue("teams", "refreshMinutes", "1") === 30);
     SetFlags([], [], []);
+
+    // Fällig ist ein Server, sobald ein Spieler mit Epic-Namen einen älteren Stand hat als den Abstand.
+    const MIN = 60_000;
+    const aged = (id: string, minutes: number, current = 1450): ITeamPlayer => {
+        const player = Player(id, "player", 1500, current);
+
+        player.snapshot!.at = Date.now() - minutes * MIN;
+
+        return player;
+    };
+
+    check("Stand 10 Min. alt, Abstand 30: nicht fällig", !RefreshDue([FakeTeam([aged("a", 10)])], 30 * MIN));
+    check("Ein Spieler 31 Min. alt: fällig", RefreshDue([FakeTeam([aged("a", 10), aged("b", 31)])], 30 * MIN));
+    check("Ohne Epic-Namen zählt kein Stand", !RefreshDue([FakeTeam([{ ...aged("c", 500), epicName: "" }])], 30 * MIN));
+    check("Noch nie geholt: fällig", RefreshDue([FakeTeam([{ ...aged("d", 0), snapshot: undefined }])], 30 * MIN));
+
+    // Ein Kanal wie in Discord und Prime als Attrappe: antwortet mit prime.value oder scheitert mit prime.error.
+    const service = client.teamService;
+    const groups: ITeamGroup[] = [{ id: 1, guildId: GUILD, name: "Main", position: 0 }];
+    const alive = new Set<string>();
+    const log: string[] = [];
+    let next = 1000;
+    const channel = {
+        id: TEXT,
+        type: ChannelType.GuildText,
+        isTextBased: () => true,
+        messages: {
+            fetch: async (id: string) => (alive.has(id) ? { id, flags: { has: () => true }, edit: async () => void log.push(`edit ${id}`) } : Promise.reject(new Error("Unknown Message"))),
+            delete: async (id: string) => {
+                log.push(`delete ${id}`);
+                alive.delete(id);
+            },
+        },
+        send: async () => {
+            const id = String(next++);
+
+            log.push(`send ${id}`);
+            alive.add(id);
+
+            return { id };
+        },
+    };
+    const guild = { ...FakeGuild(), channels: { cache: new Map([[TEXT, channel]]) } } as unknown as Guild;
+    const prime = { value: 1450, error: null as string | null, calls: 0 };
+    let settings: ITeamSettings = { ...DefaultTeamSettings(), channelId: TEXT, layout: "hub" };
+    let teams: ITeam[] = [];
+    const chained = service as unknown as { Serial: <T>(guildId: string, task: () => Promise<T>) => Promise<T> };
+    const viaChain: string[] = [];
+    const guildIds = ["g1", "g2", "g3", "g4", "g5", "aus"];
+    const original = {
+        settings: service.Settings,
+        teams: service.Teams,
+        groups: service.Groups,
+        fetch: service.Fetch,
+        auto: service.AutoRefresh,
+        tick: service.RefreshTick,
+        serial: chained.Serial,
+        save: client.moduleSettings.Save,
+        of: client.settings.Of,
+        players: client.teams.SavePlayers,
+        setMessage: client.teams.SetMessage,
+        locked: client.primeService.access.Locked,
+    };
+    const configured = (value: boolean) => Object.defineProperty(client.primeService, "IsConfigured", { get: () => value, configurable: true });
+    const age = (minutes: number) => {
+        for (const team of teams) for (const player of team.players) player.snapshot!.at = Date.now() - minutes * MIN;
+    };
+    const reset = () => {
+        log.length = 0;
+        viaChain.length = 0;
+        prime.calls = 0;
+    };
+
+    service.Settings = async () => settings;
+    service.Teams = async () => teams;
+    service.Groups = async () => groups;
+    service.Fetch = async (name: string) => {
+        prime.calls++;
+
+        return prime.error
+            ? { name: null, platform: null, mmr: { "1v1": null, "2v2": null, "3v3": null }, tier: null, tierName: null, divisionName: null, at: Date.now(), error: prime.error }
+            : { name, platform: "Epic Games", mmr: { "1v1": null, "2v2": null, "3v3": prime.value }, tier: 18, tierName: "Champion III", divisionName: "II", at: Date.now(), error: null };
+    };
+    chained.Serial = <T>(guildId: string, task: () => Promise<T>): Promise<T> => {
+        viaChain.push(guildId);
+
+        return original.serial.call(service, guildId, task) as Promise<T>;
+    };
+    client.moduleSettings.Save = async (_guild: string, _module: string, config: object) => void (settings = config as ITeamSettings);
+    (client.settings as unknown as { Of: unknown }).Of = async (id: string) => ({ modules: id === "aus" ? [] : ["teams"] });
+    client.teams.SavePlayers = async () => undefined;
+    client.teams.SetMessage = async (id: number, messageId: string | null) => {
+        const team = teams.find((entry) => entry.id === id);
+
+        if (team) team.messageId = messageId;
+    };
+    configured(true);
+
+    try {
+        // Der Hub steht im Kanal, gepostet wie aus dem Dashboard.
+        teams = [FakeTeam([aged("a1", 5), aged("a2", 5)], { id: 1, name: "Alpha" }), FakeTeam([aged("b1", 5)], { id: 2, name: "Bravo", position: 1 })];
+        await service.Publish(guild);
+
+        const chain = [settings.messageId, ...settings.moreIds];
+
+        reset();
+        check("Hub frisch (5 Min.): nicht fällig, Prime nicht gefragt", (await service.AutoRefresh(guild)) === null && prime.calls === 0 && log.length === 0, `${prime.calls} · ${log}`);
+
+        age(45);
+        perServer(60);
+        reset();
+        check("Abstand je Server 60 Min., Stand 45 Min.: noch nicht fällig", (await service.AutoRefresh(guild)) === null && prime.calls === 0, `${prime.calls}`);
+
+        age(20);
+        perServer(15);
+        prime.value = 1600;
+        reset();
+
+        const edited = await service.AutoRefresh(guild);
+
+        check(
+            "Abstand je Server 15 Min., Stand 20 Min.: fällig, Prime gefragt, Hub bearbeitet",
+            edited === chain.length && prime.calls === 3 && log.length === chain.length && log.every((entry) => entry.startsWith("edit ")),
+            `${edited} · ${prime.calls} · ${log}`
+        );
+        check("  nie neu gepostet, nichts gelöscht, dieselbe Kette", JSON.stringify([settings.messageId, ...settings.moreIds]) === JSON.stringify(chain) && chain.every((id) => alive.has(id!)));
+        check("  bearbeitet über die Reihe je Server (nichts doppelt)", viaChain.includes(GUILD), viaChain.join(","));
+        SetFlags([], [], []);
+
+        // 13 Spieler, alle fällig: Prime bekommt höchstens 12. Der älteste bleibt fürs nächste Mal.
+        teams = [FakeTeam(Array.from({ length: 12 }, (_, index) => aged(`m${index}`, 40, 1600)), { id: 1, name: "Alpha" }), FakeTeam([aged("old", 50, 1600)], { id: 2, name: "Bravo", position: 1 })];
+        reset();
+        check("Prime antwortet, an der Übersicht ändert sich nichts: nicht bearbeitet", (await service.AutoRefresh(guild)) === 0 && log.length === 0, `${log}`);
+        check("  höchstens 12 Spieler je Lauf bei Prime", prime.calls === 12, `${prime.calls}`);
+
+        reset();
+        check("Nächster Lauf holt den Rest, der Stand in der Fußzeile ändert sich: bearbeitet", (await service.AutoRefresh(guild)) === chain.length && prime.calls === 1, `${prime.calls} · ${log}`);
+
+        age(45);
+        prime.error = "Prime antwortet nicht (10000 ms)";
+        reset();
+        check("Prime antwortet nicht: nicht bearbeitet, die Ränge im Kanal bleiben", (await service.AutoRefresh(guild)) === 0 && prime.calls > 0 && log.length === 0, `${prime.calls} · ${log}`);
+        prime.error = null;
+
+        age(45);
+        prime.value = 1700;
+        alive.delete(chain[0]!);
+        reset();
+        check("Hub von Hand gelöscht: nichts neu gepostet, nichts gelöscht", (await service.AutoRefresh(guild)) === 0 && log.length === 0, `${log}`);
+
+        settings = { ...settings, messageId: null, moreIds: [] };
+        reset();
+        check("Ohne gepostete Übersicht: nichts, Prime nicht gefragt", (await service.AutoRefresh(guild)) === null && prime.calls === 0);
+
+        // Alle Teams einzeln: nur die Karte, deren Team sich geändert hat. Eine fehlende kommt nicht neu.
+        settings = { ...DefaultTeamSettings(), channelId: TEXT, layout: "cards" };
+        teams = [
+            FakeTeam([aged("c1", 45)], { id: 1, name: "Alpha", messageId: "1" }),
+            FakeTeam([aged("d1", 5)], { id: 2, name: "Bravo", position: 1, messageId: "2" }),
+            FakeTeam([aged("e1", 45)], { id: 3, name: "Charlie", position: 2, messageId: "3" }),
+        ];
+        alive.clear();
+        alive.add("1");
+        alive.add("2");
+        prime.value = 1800;
+        reset();
+
+        const cards = await service.AutoRefresh(guild);
+
+        check("Karten: nur die des geänderten Teams bearbeitet, die gelöschte nicht neu gepostet", cards === 1 && log.join(",") === "edit 1" && prime.calls === 2, `${cards} · ${prime.calls} · ${log}`);
+
+        // Der Lauf über alle Server.
+        const due = new Set<string>();
+        const touched: string[] = [];
+        let locked = false;
+
+        for (const id of guildIds) client.guilds.cache.set(id, { id } as unknown as Guild);
+
+        service.AutoRefresh = async (target: Guild) => {
+            touched.push(target.id);
+
+            return due.delete(target.id) ? 1 : null;
+        };
+        client.primeService.access.Locked = async () => locked;
+        Object.defineProperty(client.databaseService, "Ready", { get: () => true, configurable: true });
+
+        const fill = () => ["g1", "g2", "g3", "g4", "g5"].forEach((id) => due.add(id));
+
+        fill();
+        configured(false);
+        await service.RefreshTick();
+        check("Ohne PRIME_API_TOKEN: kein Server angefasst", touched.length === 0, touched.join(","));
+
+        configured(true);
+        locked = true;
+        await service.RefreshTick();
+        check("Prime-Zugang gesperrt (W-0145): kein Server angefasst", touched.length === 0, touched.join(","));
+
+        locked = false;
+
+        const first = await service.RefreshTick();
+
+        check(`Fünf Server zugleich fällig (etwa nach einem Neustart): ${REFRESH_GUILDS} in diesem Lauf`, first.guilds === REFRESH_GUILDS && due.size === 5 - REFRESH_GUILDS, JSON.stringify(first));
+
+        const second = await service.RefreshTick();
+
+        check("  die übrigen im nächsten", second.guilds === 5 - REFRESH_GUILDS && due.size === 0, JSON.stringify(second));
+        check("Teams-Modul aus: Server übergangen", !touched.includes("aus"), touched.join(","));
+
+        fill();
+        touched.length = 0;
+        client.primeService.access.Locked = async () => touched.length > 0;
+        await service.RefreshTick();
+        check("Sperre mitten im Lauf: die übrigen Server warten", touched.length === 1, touched.join(","));
+
+        let ran = 0;
+        const task = new TeamRefresh(client);
+        const start = new Date();
+
+        service.RefreshTick = async () => (ran++, { guilds: 0, edited: 0 });
+        await task.Execute();
+        check(
+            "Läuft alle 5 Minuten, zum ersten Mal 5 Minuten nach dem Start",
+            task.type === TaskTypes.INTERVAL && task.expression === "5m" && ran === 1 && client.runnableService.CalculateNextRun(task, start)?.getTime() === start.getTime() + 5 * MIN
+        );
+    } finally {
+        service.Settings = original.settings;
+        service.Teams = original.teams;
+        service.Groups = original.groups;
+        service.Fetch = original.fetch;
+        service.AutoRefresh = original.auto;
+        service.RefreshTick = original.tick;
+        chained.Serial = original.serial;
+        client.moduleSettings.Save = original.save;
+        (client.settings as unknown as { Of: unknown }).Of = original.of;
+        client.teams.SavePlayers = original.players;
+        client.teams.SetMessage = original.setMessage;
+        client.primeService.access.Locked = original.locked;
+        delete (client.primeService as unknown as Record<string, unknown>).IsConfigured;
+        delete (client.databaseService as unknown as Record<string, unknown>).Ready;
+
+        for (const id of guildIds) client.guilds.cache.delete(id);
+
+        SetFlags([], [], []);
+    }
 }
 
 async function main(): Promise<void> {
@@ -2349,7 +2599,7 @@ async function main(): Promise<void> {
     await checkRoleIcons(client);
     await checkActor();
     await checkEpic();
-    await checkRefresh();
+    await checkRefresh(client);
 
     if (await client.databaseService.Connect()) {
         try {

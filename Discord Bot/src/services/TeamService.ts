@@ -52,6 +52,7 @@ import {
     PLAIN_FORMATS,
     PLAYING_ROLES,
     PLAYLISTS,
+    REFRESH_GUILDS,
     ROLE_LABELS,
     ROLE_ORDER,
     SNAPSHOT_MAX_AGE,
@@ -668,6 +669,22 @@ export function ViewFacts(view: ITeamView): IOrderFacts {
         players: view.team.players.filter((player) => PLAYING_ROLES.includes(player.role)).length,
         league: view.team.links[0]?.label ?? null,
     };
+}
+
+/** W-0146: Fällig, sobald ein Spieler mit Epic-Namen noch nie oder vor mehr als maxAge geholt wurde - dieselbe Frage wie in Sync. */
+export function RefreshDue(teams: ITeam[], maxAge: number, now = Date.now()): boolean {
+    return teams.some((team) => team.players.some((player) => player.epicName && (!player.snapshot || now - player.snapshot.at >= maxAge)));
+}
+
+/**
+ * W-0146: Was die Übersicht von Prime zeigt - je Spieler der Stand ohne seine
+ * Uhrzeit, dazu der älteste Stand (die Fußzeile). Bleibt das gleich, bleibt
+ * auch die Nachricht, wie sie ist.
+ */
+export function PrimeFacts(teams: ITeam[]): string {
+    const stamps = teams.flatMap((team) => team.players.map((player) => player.snapshot?.at ?? 0)).filter((at) => at > 0);
+
+    return JSON.stringify([stamps.length ? Math.min(...stamps) : 0, teams.map((team) => team.players.map((player) => ({ ...player.snapshot, at: undefined })))]);
 }
 
 /**
@@ -1603,12 +1620,17 @@ export default class TeamService {
      * Holt, was zu alt ist - hoechstens SYNC_BATCH Spieler je Aufruf. Prime ist
      * ein fremder Dienst; ein Kader mit fuenfzig Spielern darf ihn nicht in
      * einem Rutsch anfragen, und die Uebersicht soll trotzdem stehen.
+     *
+     * W-0146: maxAge für das Auffrischen im Kanal („Übersicht auffrischen alle“).
+     * Gibt zurück, für wie viele Spieler Prime geantwortet hat - auch „kenne ich
+     * nicht“; Zeitüberschreitung oder Fehler zählen nicht.
      */
-    async Sync(teams: ITeam[], force = false): Promise<void> {
-        if (!this.client.primeService.IsConfigured) return;
+    async Sync(teams: ITeam[], force = false, maxAge = SNAPSHOT_MAX_AGE): Promise<number> {
+        if (!this.client.primeService.IsConfigured) return 0;
 
         const now = Date.now();
         let left = SYNC_BATCH;
+        let answered = 0;
 
         for (const team of teams) {
             let touched = false;
@@ -1619,12 +1641,14 @@ export default class TeamService {
 
                 const old = player.snapshot;
 
-                if (!force && old && now - old.at < SNAPSHOT_MAX_AGE) continue;
+                if (!force && old && now - old.at < maxAge) continue;
 
                 left--;
                 touched = true;
 
                 const fresh = await this.Fetch(player.epicName);
+
+                if (fresh.error === null || fresh.missing) answered++;
 
                 // Plan 33: Antwortet Prime nicht, bleibt die Konto-ID - sonst ginge nach einem
                 // Ausfall das Erkennen verloren und ein fremdes Konto unter altem Namen käme durch.
@@ -1642,6 +1666,8 @@ export default class TeamService {
             if (touched) await this.client.teams.SavePlayers(team.id, team.players).catch(() => undefined);
             if (left <= 0) break;
         }
+
+        return answered;
     }
 
     /** Der Stand zu einem Namen oder einer Epic-Konto-ID. Wirft nie. */
@@ -2049,6 +2075,152 @@ export default class TeamService {
         }
 
         await this.Send(guild, team, payload).catch(() => undefined);
+    }
+
+    /**
+     * W-0146: Ein Lauf von runnables/TeamRefresh.ts über alle Server. Ohne
+     * PRIME_API_TOKEN oder solange Prime den Schlüssel ablehnt (W-0145) nichts.
+     * Fällig ist, was der gespeicherte Stand sagt (snapshot.at), ein Neustart
+     * allein macht also nichts fällig. Höchstens REFRESH_GUILDS fällige Server je
+     * Lauf, die übrigen kommen im nächsten dran.
+     */
+    async RefreshTick(): Promise<{ guilds: number; edited: number }> {
+        const done = { guilds: 0, edited: 0 };
+
+        if (!this.client.databaseService.Ready || !this.client.primeService.IsConfigured) return done;
+
+        for (const guild of this.client.guilds.cache.values()) {
+            // Auch zwischen zwei Servern fragen: Lehnt Prime ab, ist das nach der ersten Antwort bekannt.
+            if (done.guilds >= REFRESH_GUILDS || (await this.client.primeService.access.Locked())) break;
+
+            const open = await this.client.settings.Of(guild.id).then(
+                (found) => found.modules.includes(TEAMS_MODULE),
+                () => false
+            );
+
+            if (!open) continue;
+
+            const edited = await this.AutoRefresh(guild).catch((error) => {
+                logger.warn(`🛡️ Team-Übersicht auf ${guild.id} nicht aufgefrischt: ${String(error)}`);
+
+                return 0;
+            });
+
+            if (edited === null) continue;
+
+            done.guilds++;
+            done.edited += edited;
+        }
+
+        return done;
+    }
+
+    /**
+     * W-0146: Frischt die gepostete Übersicht auf, wenn ihr Prime-Stand älter ist
+     * als „Übersicht auffrischen alle“. Holt wie sonst höchstens SYNC_BATCH Spieler
+     * und bearbeitet nur, was im Kanal steht - nie neu posten. Bearbeitet wird nur,
+     * wenn Prime geantwortet hat und sich dadurch etwas zeigt.
+     * null: nichts gepostet oder nichts fällig, Prime nicht gefragt. Sonst die Zahl
+     * der bearbeiteten Nachrichten.
+     */
+    async AutoRefresh(guild: Guild): Promise<number | null> {
+        const settings = await this.Settings(guild.id);
+        const hub = settings.layout === "hub";
+
+        if (!settings.channelId || (hub && !settings.messageId)) return null;
+
+        // Der Hub zeigt alle Teams, bei „Alle Teams einzeln“ zählen nur die mit Karte im Kanal.
+        const teams = (await this.Teams(guild.id)).filter((team) => hub || team.messageId);
+        const maxAge = ModuleValue("teams", "refreshMinutes", guild.id) * 60_000;
+
+        if (!RefreshDue(teams, maxAge)) return null;
+
+        const before = new Map(teams.map((team) => [team.id, PrimeFacts([team])]));
+        const whole = PrimeFacts(teams);
+
+        // Antwortet Prime gar nicht, bleibt die Nachricht - sonst verschwänden die Ränge im Kanal.
+        if (!(await this.Sync(teams, false, maxAge))) return 0;
+
+        const changed = new Set(teams.filter((team) => PrimeFacts([team]) !== before.get(team.id)).map((team) => team.id));
+
+        if (hub ? PrimeFacts(teams) === whole : !changed.size) return 0;
+
+        // Der neue Stand ist gespeichert (Sync). In der Reihe je Server liest das Bearbeiten Kette und Karten frisch.
+        return this.Serial(guild.id, () => this.EditNow(guild, changed));
+    }
+
+    /** Hub oder die Karten aus `changed` mit dem gespeicherten Stand bearbeiten. Was fehlt oder neu gesendet werden müsste, bleibt. */
+    private async EditNow(guild: Guild, changed: Set<number>): Promise<number> {
+        const { views: unordered, groups, settings } = await this.Views(guild, false);
+        const channel = guild.channels.cache.get(settings.channelId ?? "");
+
+        if (!channel?.isTextBased()) return 0;
+
+        const views = OrderTeams(unordered, ViewFacts, settings.order);
+
+        if (settings.layout === "hub") {
+            if (!settings.messageId) return 0;
+
+            const apply = this.client.databaseService.Ready && (await this.client.settings.Of(guild.id)).modules.includes(APPLY_MODULE);
+            const messages = await HubMessages(this.client, settings, views, groups, guild, apply);
+
+            return this.EditChain(guild, settings, messages.map((message) => message.view));
+        }
+
+        // ponytail: nur die Karte des geänderten Teams. {epicname.rank} eines anderen Teams in einer Karte zieht erst mit deren eigenem Wechsel nach.
+        let edited = 0;
+
+        for (const view of views) {
+            if (!view.team.messageId || !changed.has(view.team.id)) continue;
+
+            const message = await channel.messages.fetch(view.team.messageId).catch(() => null);
+
+            if (!message) continue;
+
+            const payload = await TeamCardView(this.client, settings, view, guild, views);
+
+            if (NeedsResend(message, payload)) continue;
+
+            try {
+                await message.edit({ ...payload, attachments: [] });
+                edited++;
+            } catch (error) {
+                logger.warn(`🛡️ Team-Karte ${view.team.id} auf ${guild.id} nicht aufgefrischt: ${String(error)}`);
+            }
+        }
+
+        return edited;
+    }
+
+    /**
+     * Die Kette des Hubs nur bearbeiten. Fehlt eine Nachricht, stimmen Folge oder
+     * Zahl nicht oder müsste eine über die V2-Grenze, bleibt alles stehen, bis
+     * jemand im Dashboard neu sendet.
+     */
+    private async EditChain(guild: Guild, settings: ITeamSettings, payloads: ICustomView[]): Promise<number> {
+        const channel = guild.channels.cache.get(settings.channelId ?? "");
+        const chain = [settings.messageId, ...settings.moreIds].filter((id): id is string => id !== null);
+
+        if (!channel?.isTextBased() || chain.length !== payloads.length || !CardsInOrder(chain)) return 0;
+
+        const found = await Promise.all(chain.map((id) => channel.messages.fetch(id).catch(() => null)));
+
+        if (found.some((message, index) => !message || NeedsResend(message, payloads[index]!))) return 0;
+
+        let edited = 0;
+
+        for (const [index, message] of found.entries()) {
+            try {
+                await message!.edit({ ...payloads[index]!, attachments: [] });
+                edited++;
+            } catch (error) {
+                // ponytail: der Rest der Kette bleibt auf dem alten Stand, bis der nächste Wechsel oder ein Senden sie nachzieht.
+                logger.warn(`🛡️ Team-Hub auf ${guild.id}: Nachricht ${index + 1} nicht aufgefrischt: ${String(error)}`);
+                break;
+            }
+        }
+
+        return edited;
     }
 
     /**

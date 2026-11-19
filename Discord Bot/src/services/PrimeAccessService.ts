@@ -154,6 +154,20 @@ export class PrimeAccessWatch {
         this.Queue(() => this.Handle(result, now));
     }
 
+    /**
+     * W-0146: Lehnt Prime den Schlüssel gerade ab? In der Reihe gelesen, also nach
+     * allem schon Gemeldeten, und gleich nach einem Neustart aus dem gespeicherten
+     * Zustand. Ohne Datenbank (noch kein Zustand) heißt es nein.
+     */
+    async Locked(now = Date.now()): Promise<boolean> {
+        let locked = false;
+
+        this.Queue(async () => void (locked = (await this.Load(now)) && this.record.state === "locked"));
+        await this.chain;
+
+        return locked;
+    }
+
     /** Für die Prüfungen: wartet, bis alles Gemeldete verarbeitet ist. */
     Idle(): Promise<void> {
         return this.chain;

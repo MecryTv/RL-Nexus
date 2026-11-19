@@ -705,6 +705,18 @@ async function checkAccessWatch(): Promise<void> {
     }
 
     check("Speichern scheitert: Rot geht trotzdem raus, der Fehler steht im Log", count("Prime-Zugang abgelaufen") === 1 && warned.some((line) => line.includes("Datenbank weg")), `${count("Prime-Zugang abgelaufen")} rot | ${warned.join(" | ")}`);
+
+    // W-0146: Die Team-Übersicht fragt vor dem Auffrischen, ob Prime gerade ablehnt - auch gleich nach einem Neustart.
+    state.clear();
+    watch = new PrimeAccessWatch(fake());
+    check("Gesperrt? Ohne Ablehnung nein", !(await watch.Locked(t0)));
+
+    await run(watch, refused, t0);
+    check("  nach einer Ablehnung ja", await watch.Locked(t0 + 60_000));
+    check("  nach einem Neustart ebenso, aus dem gespeicherten Zustand", await new PrimeAccessWatch(fake()).Locked(t0 + 120_000));
+
+    await run(watch, "ok", t0 + HOUR);
+    check("  nach einer angenommenen Abfrage wieder nein", !(await watch.Locked(t0 + HOUR + 60_000)));
 }
 
 /**
