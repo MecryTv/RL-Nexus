@@ -72,7 +72,15 @@ export function ParseAccessExpiry(raw: string): number | null | "invalid" {
     const value = raw.trim();
 
     if (!value) return null;
-    if (!/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?$/.test(value)) return "invalid";
+    const parts = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?$/.exec(value);
+
+    if (!parts) return "invalid";
+
+    // Date.parse rollt unmögliche Daten weiter (30.02. wird 02.03.) - deshalb das Datum selbst zurückrechnen (Review).
+    const [year, month, day, hour, minute, second] = parts.slice(1).map((part) => Number(part ?? 0)) as [number, number, number, number, number, number];
+    const calendar = new Date(Date.UTC(year, month - 1, day));
+
+    if (calendar.getUTCMonth() !== month - 1 || calendar.getUTCDate() !== day || hour > 23 || minute > 59 || second > 59) return "invalid";
 
     const at = Date.parse(value.replace(" ", "T"));
 
@@ -133,6 +141,9 @@ export class PrimeAccessWatch {
         const parsed = ParseAccessExpiry(client.config.PRIME_ACCESS_EXPIRES ?? "");
 
         if (parsed === "invalid") logger.warn(`🎮 PRIME_ACCESS_EXPIRES ist kein Datum mit Uhrzeit (etwa 2026-12-18T23:00) - keine Warnung vor dem Ablauf.`);
+        if (typeof parsed === "number" && parsed <= Date.now()) {
+            logger.warn(`🎮 PRIME_ACCESS_EXPIRES liegt in der Vergangenheit (${new Date(parsed).toISOString()}) - nach dem Erneuern das neue Ablaufdatum eintragen.`);
+        }
 
         this.expires = parsed === "invalid" ? null : parsed;
     }

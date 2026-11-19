@@ -512,6 +512,13 @@ async function checkAccessWatch(): Promise<void> {
     check("PRIME_ACCESS_EXPIRES: ISO mit Uhrzeit wird gelesen", ParseAccessExpiry(iso) === expires && ParseAccessExpiry("2026-12-18T23:00+01:00") === Date.UTC(2026, 11, 18, 22), String(ParseAccessExpiry(iso)));
     check("  leer heißt: kein Datum", ParseAccessExpiry("") === null);
     check("  Unsinn und ein Datum ohne Uhrzeit sind ungültig", ParseAccessExpiry("morgen") === "invalid" && ParseAccessExpiry("2026-12-18") === "invalid");
+    // Review M6: Date.parse rollt unmögliche Daten weiter (30.02. wird 02.03.) - das darf nicht durchgehen.
+    check(
+        "  unmögliche Daten sind ungültig (30.02., Monat 13, 24:30, 23:60)",
+        ["2026-02-30T23:00", "2026-13-01T10:00", "2026-12-18T24:30", "2026-12-18T23:60"].every((value) => ParseAccessExpiry(value) === "invalid"),
+        ["2026-02-30T23:00", "2026-13-01T10:00", "2026-12-18T24:30", "2026-12-18T23:60"].map((value) => String(ParseAccessExpiry(value))).join(", ")
+    );
+    check("  ein Schalttag ist gültig", typeof ParseAccessExpiry("2028-02-29T12:00") === "number");
 
     dms.length = 0;
     watch = new PrimeAccessWatch(fake(iso));
@@ -547,6 +554,13 @@ async function checkAccessWatch(): Promise<void> {
         await broken.Tick(t0);
         await broken.Tick(t0 + HOUR);
         check("Ungültiges Datum: einmal eine Warnung im Log, keine DM, kein Absturz", warnings.filter((line) => line.includes("PRIME_ACCESS_EXPIRES")).length === 1 && dms.length === 0, warnings.join(" | "));
+
+        warnings.length = 0;
+
+        const past = new PrimeAccessWatch(fake("2020-01-01T00:00"));
+
+        await past.Tick(t0);
+        check("Datum in der Vergangenheit: einmal im Log, keine DM", warnings.filter((line) => line.includes("PRIME_ACCESS_EXPIRES") && line.includes("Vergangenheit")).length === 1 && dms.length === 0, warnings.join(" | "));
     } finally {
         logger.warn = real;
     }
