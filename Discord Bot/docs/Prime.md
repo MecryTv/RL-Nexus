@@ -63,6 +63,8 @@ Die **PlayerID** wird aus der Antwort von Schritt 1 zusammengesetzt: `<Plattform
 | `Nintendo` | `Switch` |
 | `Steam` | `Steam` |
 
+**Seit spätestens 20.11.2026 schickt der Resolver die rechte Spalte** („Epic“, „PS4“, „XboxOne“), bei `IdentityProvider` wie bei `LinkedAccounts`. Der Bot kannte nur die linke und brach jede Abfrage mit „Unbekannte Plattform: Epic“ ab (W-0148). `ProviderName()` in `constants/Prime.ts` führt seitdem beide Schreibweisen auf die linke Spalte zurück, gleich beim Lesen der Antwort in `PrimeService.Load`. Der Rest des Bots sieht weiter nur die Klartextnamen, egal welche Variante Prime gerade schickt. `npm run check:prime` prüft beide.
+
 Aufgelöst wird über den **Epic-Namen** oder die **Epic-Konto-ID** — jedes Rocket-League-Konto hängt an einem Epic-Konto, auch bei Steam, Xbox, PlayStation oder Switch. Genau deshalb verbindet `/rank link` das Epic-Konto (über den Epic-Login, siehe [EpicLogin.md](EpicLogin.md)).
 
 ### Der Ingame-Club

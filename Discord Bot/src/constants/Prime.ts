@@ -247,6 +247,17 @@ export const PLATFORM_PREFIX: Record<string, string> = {
     Xbox: "XboxOne",
 };
 
+/**
+ * W-0148: Seit spaetestens 20.11.2026 schickt der Resolver die PsyNet-Namen
+ * ("Epic", "PS4", "XboxOne") statt der Klartextnamen. Hier geht beides auf den
+ * Klartextnamen zurueck, damit der Rest des Bots bei einer Schreibweise bleibt.
+ */
+const PSYNET_PROVIDER: Record<string, string> = Object.fromEntries(Object.entries(PLATFORM_PREFIX).map(([provider, prefix]) => [prefix, provider]));
+
+export function ProviderName(raw: string): string {
+    return PSYNET_PROVIDER[raw] ?? raw;
+}
+
 export function ToPlayerID(provider: string, accountId: string): string | null {
     const prefix = PLATFORM_PREFIX[provider];
 
