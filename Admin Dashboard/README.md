@@ -341,13 +341,13 @@ Unter **Developer → Logs** stehen alle Sessions des Bots, neueste zuerst, mit 
 
 Das Suchfeld oben sucht über **alle** Sessions, neueste zuerst, groß und klein egal. Die Treffer stehen nach Session gruppiert da, die Zeilennummer links öffnet genau diese Stelle. Ohne Begriff geht es auch: Stufe „Nur Fehler“ zeigt alle Fehler aller Sessions. Nach 300 Treffern hört die Suche auf und sagt das.
 
-In einer Session wird jede Zeile mit Zeitstempel ein Eintrag: Zeit, Kategorie, Text. Folgezeilen wie Stacktraces hängen am Eintrag und klappen ab vier Zeilen zu. Dazu:
+In einer Session wird jede Zeile mit Zeitstempel ein Eintrag: Zeit, Kategorie, Text. Folgezeilen wie Stacktraces hängen am Eintrag und klappen ab vier Zeilen zu. Die neuesten Einträge stehen oben, Seite 1 ist die neueste, ältere kommen mit „Weiter“. Auch die Treffer der Suche stehen je Session mit dem neuesten oben. Dazu:
 
 - **Kategorien** (TASKS, HTTP, GUARDIAN ERROR …) als Schalter mit Anzahl. Ein Klick blendet sie aus.
 - **Stufe:** alle, Warnungen und Fehler, nur Fehler. Ein HTTP-Status ab 500 zählt als Fehler, 4xx nicht.
 - **Textfilter**, sucht auch in den Folgezeilen und markiert die Treffer.
-- **Zwischen Fehlern springen**, auch über Seiten hinweg. Tasten: `n` vor, `N` zurück, `/` springt in den Filter.
-- **Mitlesen:** Läuft die Session noch, kommen neue Einträge alle drei Sekunden dazu. Wer ganz unten ist, bleibt unten.
+- **Zwischen Fehlern springen**, auch über Seiten hinweg. Tasten: `n` zum nächsten weiter unten (älter), `N` zum vorigen, `/` springt in den Filter.
+- **Mitlesen:** Läuft die Session noch, kommen neue Einträge alle drei Sekunden oben dazu. Wer oben ist, sieht sie kommen; wer weiter unten liest, bleibt an seiner Stelle.
 
 Alle Filter stehen in der Adresse (`?aus=TASKS&stufe=error&q=pool&zeile=458`). Ein Link auf eine Zeilennummer lässt sich also weitergeben und zeigt dieselbe Stelle mit denselben Filtern.
 

@@ -151,12 +151,12 @@ function SearchResults({ path, needle, onClear }: { readonly path: string; reado
                         </span>
                     </h3>
                     <LogList label={`Treffer in Session ${group.session.number}`}>
-                        {group.hits.map((hit, index) => (
+                        {group.hits.toReversed().map((hit, index, shown) => (
                             <LogLine
                                 key={`${hit.part}-${hit.entry.line}`}
                                 entry={hit.entry}
                                 link={`/dev/logs/${group.session.number}?teil=${hit.part + 1}&zeile=${hit.entry.line}`}
-                                showDate={index === 0 || group.hits[index - 1].entry.date !== hit.entry.date}
+                                showDate={index === 0 || shown[index - 1].entry.date !== hit.entry.date}
                                 needle={needle}
                                 jump
                             />
