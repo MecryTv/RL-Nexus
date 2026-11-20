@@ -23,7 +23,7 @@ const LEVEL_OPTIONS = LOG_LEVEL_FILTERS.map((value) => ({ value, label: LOG_LEVE
 /** So oft fragt das Mitlesen nach, was dazukam. */
 const LIVE_INTERVAL = 3000;
 
-/** So nah am Ende der Liste gilt man als „unten“: Dann scrollt das Mitlesen mit. */
+/** So nah am Anfang der Liste gilt man als „oben“: Dann bleiben neue Einträge im Blick. */
 const STICK_DISTANCE = 120;
 
 /** Wie lange der Textfilter nach dem letzten Tastendruck wartet. */
@@ -36,7 +36,7 @@ interface ITail {
     readonly last: number;
     /** Zählt die Abrufe. Jeder neue Wert stellt den nächsten Abruf an. */
     readonly round: number;
-    /** Das Ende der Liste war zu sehen, als Neues kam: Dann scrollt sie mit. */
+    /** Der Anfang der Liste war zu sehen, als Neues kam: Dann bleibt er im Blick. */
     readonly stick: boolean;
     readonly failed: boolean;
 }
@@ -75,8 +75,8 @@ function useTail(path: string | null, base: ILogView | null, onReload: (feed: IL
                 .then((feed) => {
                     if (feed.partChanged || !feed.running) return onReload(feed);
 
-                    const bottom = list.current?.getBoundingClientRect().bottom;
-                    const stick = feed.last > last && bottom !== undefined && bottom <= window.innerHeight + STICK_DISTANCE;
+                    const top = list.current?.getBoundingClientRect().top;
+                    const stick = feed.last > last && top !== undefined && top >= -STICK_DISTANCE;
 
                     setTail((previous) => {
                         const before = previous?.base === base ? previous.entries : base.entries;
@@ -188,12 +188,13 @@ export function LogViewPage(): JSX.Element {
     // Wo man gerade steht: am letzten Sprung, sonst an der Zeile aus der Adresse.
     const position = cursor?.filter === filter.toString() ? cursor.index : (data?.target?.index ?? null);
 
+    // Die Richtung zählt wie auf dem Bildschirm: 1 ist weiter unten, also älter.
     function neighbour(direction: 1 | -1): { readonly index: number } | undefined {
         if (!data) return undefined;
 
-        const from = position ?? (direction > 0 ? pageStart - 1 : pageStart + data.entries.length);
+        const from = position ?? (direction > 0 ? pageStart + data.entries.length : pageStart - 1);
 
-        return direction > 0 ? errors.find((mark) => mark.index > from) : errors.findLast((mark) => mark.index < from);
+        return direction > 0 ? errors.findLast((mark) => mark.index < from) : errors.find((mark) => mark.index > from);
     }
 
     function jump(direction: 1 | -1): void {
@@ -259,8 +260,10 @@ export function LogViewPage(): JSX.Element {
 
     const tail = useTail(running && atEnd && live ? `/api/logs/sessions/${n}/neu?${filter}${filter.size > 0 ? "&" : ""}part=${data.part}` : null, data, onReload, list);
 
+    // Neues kommt oben dazu. Wer weiter unten liest, bleibt an seiner Stelle, weil der Browser sie hält.
+    // ponytail: verlässt sich auf Scroll Anchoring (Chrome, Edge, Firefox). Ohne das rutscht die Liste; dann eine Zeile vor und nach dem Einfügen messen und nachscrollen.
     useEffect(() => {
-        if (tail?.stick) list.current?.lastElementChild?.scrollIntoView({ block: "end" });
+        if (tail?.stick) list.current?.firstElementChild?.scrollIntoView({ block: "nearest" });
     }, [tail]);
 
     function toEnd(): void {
@@ -272,6 +275,7 @@ export function LogViewPage(): JSX.Element {
     // --- Ansicht ------------------------------------------------------------
 
     const session = data?.session;
+    // In der Reihenfolge der Datei, älteste zuerst. Angezeigt wird umgekehrt: neueste oben.
     const entries = tail?.entries ?? data?.entries ?? [];
     const partTotal = data?.categories.reduce((sum, category) => sum + category.count, 0) ?? 0;
     const needle = q.toLowerCase();
@@ -284,10 +288,13 @@ export function LogViewPage(): JSX.Element {
         return `?${next}`;
     };
 
-    const onPage = (next: number): void => {
+    const onPage = (next: string | null): void => {
         setCursor(null);
-        update({ seite: String(next), zeile: null });
+        update({ seite: next, zeile: null });
     };
+
+    // Seite 1 ist die neueste. Adresse und API zählen weiter vom Anfang der Datei; die neueste Seite steht dort ohne Nummer.
+    const pager = data && <Pager page={data.pages - data.page + 1} pages={data.pages} onPage={(shown) => onPage(shown === 1 ? null : String(data.pages - shown + 1))} />;
 
     return (
         <>
@@ -418,7 +425,7 @@ export function LogViewPage(): JSX.Element {
                                 <Button size="sm" variant="ghost" icon="chevron-up" disabled={!neighbour(-1)} onClick={() => jump(-1)} aria-keyshortcuts="Shift+N" title="Taste Umschalt+N">
                                     Voriger
                                 </Button>
-                                <span className={styles.jumpState}>{at === -1 ? `${formatNumber(errors.length)} Fehler` : `Fehler ${at + 1} von ${formatNumber(errors.length)}`}</span>
+                                <span className={styles.jumpState}>{at === -1 ? `${formatNumber(errors.length)} Fehler` : `Fehler ${errors.length - at} von ${formatNumber(errors.length)}`}</span>
                                 <Button size="sm" variant="ghost" icon="chevron-down" disabled={!neighbour(1)} onClick={() => jump(1)} aria-keyshortcuts="N" title="Taste N">
                                     Nächster
                                 </Button>
@@ -432,8 +439,8 @@ export function LogViewPage(): JSX.Element {
                                     {live ? (tail?.failed ? "Mitlesen hakt" : "Liest mit") : "Mitlesen pausiert"}
                                 </Button>
                             ) : (
-                                <Button size="sm" icon="chevron-down" onClick={toEnd}>
-                                    Zum Ende und mitlesen
+                                <Button size="sm" icon="chevron-up" onClick={toEnd}>
+                                    Neueste zeigen und mitlesen
                                 </Button>
                             ))}
                     </div>
@@ -447,26 +454,26 @@ export function LogViewPage(): JSX.Element {
                         </p>
                     )}
 
-                    <Pager page={data.page} pages={data.pages} onPage={onPage} />
+                    {pager}
 
                     {entries.length === 0 ? (
                         <p className={styles.empty}>{filtered ? "Kein Eintrag passt zum Filter." : "In diesem Teil steht noch kein Eintrag."}</p>
                     ) : (
-                        <LogList ref={list} label={`Einträge, Seite ${data.page} von ${data.pages}`}>
-                            {entries.map((entry, index) => (
+                        <LogList ref={list} label={`Einträge, neueste oben, Seite ${data.pages - data.page + 1} von ${data.pages}`}>
+                            {entries.toReversed().map((entry, index, shown) => (
                                 <LogLine
                                     key={entry.line}
                                     entry={entry}
                                     link={linkTo(entry.line)}
-                                    showDate={index === 0 || entries[index - 1].date !== entry.date}
+                                    showDate={index === 0 || shown[index - 1].date !== entry.date}
                                     needle={needle}
-                                    marked={pageStart + index === position}
+                                    marked={pageStart + entries.length - 1 - index === position}
                                 />
                             ))}
                         </LogList>
                     )}
 
-                    <Pager page={data.page} pages={data.pages} onPage={onPage} />
+                    {pager}
                 </>
             )}
         </>
