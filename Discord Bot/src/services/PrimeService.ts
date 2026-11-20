@@ -23,6 +23,7 @@ import {
     PRIME_PROBE_USER,
     PRIME_TIMEOUT,
     EXTRA_PLAYLISTS,
+    ProviderName,
     TierName,
     ToMMR,
     ToPlayerID,
@@ -384,7 +385,8 @@ export default class PrimeService implements IPrimeService {
             throw error;
         }
 
-        const playerId = ToPlayerID(user.IdentityProvider, user.AccountID);
+        const provider = ProviderName(user.IdentityProvider);
+        const playerId = ToPlayerID(provider, user.AccountID);
 
         if (!playerId) {
             throw new PrimeError(`Unbekannte Plattform: ${user.IdentityProvider}`, "Platform");
@@ -394,12 +396,12 @@ export default class PrimeService implements IPrimeService {
 
         return {
             name: user.DisplayName,
-            platform: user.IdentityProvider,
+            platform: provider,
             accountId: user.AccountID,
             playerId,
             linked: (user.LinkedAccounts ?? []).map(
                 (entry): IPrimeLinkedAccount => ({
-                    platform: entry.IdentityProvider,
+                    platform: ProviderName(entry.IdentityProvider),
                     name: entry.DisplayName,
                     accountId: entry.AccountID,
                 })

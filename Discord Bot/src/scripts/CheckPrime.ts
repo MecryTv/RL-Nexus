@@ -775,6 +775,50 @@ function checkMath(): void {
     );
 }
 
+// W-0148: Seit spätestens 20.11.2026 schickt der Resolver die PsyNet-Namen
+// ("Epic", "PS4", "XboxOne") statt der Klartextnamen. Beides muss gehen -
+// ohne Netz, die Antworten nachgestellt wie live gemessen.
+async function checkResolverNames(): Promise<void> {
+    console.log("\n  — Plattformnamen vom Resolver —");
+
+    const service = new PrimeService({ config: { PRIME_API_TOKEN: "pruef-schluessel", PRIME_ACCESS_EXPIRES: "" } } as unknown as BotClient);
+    const load = (service as unknown as { Load: (name: string) => Promise<IPrimeProfile | null> }).Load.bind(service);
+
+    for (const [label, provider, linked] of [
+        ["Neue Namen", "Epic", ["PS4", "Steam", "XboxOne", "Switch"]],
+        ["Alte Namen", "Epic Games", ["PlayStation", "Steam", "Xbox", "Nintendo"]],
+    ] as const) {
+        (service as unknown as { Query: (path: string) => Promise<unknown> }).Query = async (path: string) =>
+            path === "/Resolver/ResolveUser"
+                ? {
+                      AccountID: "abc",
+                      DisplayName: "Spieler",
+                      IdentityProvider: provider,
+                      LinkedAccounts: linked.map((name, index) => ({ AccountID: String(index), DisplayName: "Spieler", IdentityProvider: name })),
+                  }
+                : {};
+
+        let profile: IPrimeProfile | null = null;
+        let thrown: unknown = null;
+
+        try {
+            profile = await load("Spieler");
+        } catch (error) {
+            thrown = error;
+        }
+
+        check(`${label}: PlayerID wird Epic|abc|0`, profile?.playerId === "Epic|abc|0", thrown ? String(thrown) : String(profile?.playerId));
+        check("  Plattform heißt Epic Games", profile?.platform === "Epic Games", String(profile?.platform));
+        check(
+            "  verknüpfte Konten mit Klartextnamen",
+            profile?.linked.map((account) => account.platform).join() === "PlayStation,Steam,Xbox,Nintendo",
+            profile?.linked.map((account) => account.platform).join() ?? ""
+        );
+    }
+
+    service.Close();
+}
+
 async function checkLive(client: BotClient, player: string): Promise<void> {
     console.log(`\n  — Echte Abfrage: ${player} —`);
 
@@ -915,6 +959,7 @@ async function main(): Promise<void> {
     await checkAccess(client);
     await checkAccessMessage();
     await checkAccessWatch();
+    await checkResolverNames();
 
     if (!player) {
         console.log("\n⏭️  Kein Spielername übergeben - die echte Abfrage bleibt aus.\n   npm run check:prime -- DEIN_EPIC_NAME\n");
