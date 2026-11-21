@@ -1,6 +1,8 @@
-import { ContainerBuilder, MessageFlags, MessageMentionOptions } from "discord.js";
+import { AttachmentBuilder, ContainerBuilder, MessageFlags, MessageMentionOptions } from "discord.js";
 import ComponentV2Builder from "./ComponentV2Builder";
-import { REGION_LABELS, VOICE_ACCENT, VOICE_ACTIONS, VOICE_PREFIX, VOICE_REGIONS } from "../constants/Voice";
+import { IVoicePanelImage, RenderVoicePanel, VOICE_PANEL_FILE, VoicePanelAlt } from "./VoicePanelImage";
+import { REGION_LABELS, VOICE_ACCENT, VOICE_MENU_ACTIONS, VOICE_PREFIX, VOICE_REGIONS } from "../constants/Voice";
+import { ButtonOptions } from "../interfaces/builder/IComponentV2Builder";
 import { IHubConfig, ITempVoice, IVoicePreset } from "../interfaces/services/voice/IVoice";
 
 /**
@@ -17,28 +19,51 @@ function view(builder: ComponentV2Builder): IVoiceView {
     return { components: [builder.build()], allowedMentions: { parse: [] } };
 }
 
-/** Das Panel: ein Auswahlmenü mit den Optionen, die der Hub erlaubt. */
-export function VoicePanel(config: IHubConfig, inChannel: boolean): IVoiceView {
-    const options = VOICE_ACTIONS.filter((entry) => config.actions.includes(entry.value));
-    const builder = new ComponentV2Builder({ accentColor: VOICE_ACCENT });
+export interface IVoicePanelView extends IVoiceView {
+    files: AttachmentBuilder[];
+}
 
-    builder
-        .text("## 🔊 Dein Sprachkanal")
-        .text(
-            inChannel
-                ? "Alles hier steuerst du selbst, solange der Kanal dir gehört."
-                : "Wähle eine Option, während du in deinem eigenen Kanal sitzt."
-        );
+/**
+ * Das Panel (W-0151, Entwurf G3): oben das gezeichnete Bild mit dem Stand, darunter
+ * ein Menü mit den Optionen, die der Hub erlaubt, und die Knöpfe Presets und
+ * Kanal löschen. Löschen steht nicht im Menü, sondern als roter Knopf mit Rückfrage.
+ */
+export async function VoicePanel(config: IHubConfig, image: IVoicePanelImage): Promise<IVoicePanelView> {
+    const options = VOICE_MENU_ACTIONS.filter((entry) => config.actions.includes(entry.value));
+    const builder = new ComponentV2Builder({ accentColor: VOICE_ACCENT });
+    const png = await RenderVoicePanel(image);
+
+    builder.image(`attachment://${VOICE_PANEL_FILE}`, VoicePanelAlt(image));
 
     if (options.length) {
         builder.select({
             customId: `${VOICE_PREFIX}:menu`,
-            placeholder: "Was möchtest du ändern?",
+            placeholder: "⚙️ Kanal einstellen …",
             options: options.map((entry) => ({ label: entry.name, value: entry.value, description: entry.description, emoji: entry.emoji })),
         });
     }
 
-    if (config.presets) builder.buttons({ customId: `${VOICE_PREFIX}:presets`, label: "Presets", emoji: "📌", tone: "secondary" });
+    const buttons: ButtonOptions[] = [];
+
+    if (config.presets) buttons.push({ customId: `${VOICE_PREFIX}:presets`, label: "Presets", emoji: "📌", tone: "secondary" });
+    if (config.actions.includes("deletechannel")) buttons.push({ customId: `${VOICE_PREFIX}:delete`, label: "Kanal löschen", emoji: "🗑️", tone: "danger" });
+
+    builder.buttons(...buttons);
+
+    return { ...view(builder), files: [new AttachmentBuilder(png, { name: VOICE_PANEL_FILE })] };
+}
+
+/** Rückfrage vor dem Löschen - ein roter Knopf direkt im Panel soll keinen Kanal mit Leuten darin per Fehlklick löschen. */
+export function VoiceDeletePrompt(): IVoiceView {
+    const builder = new ComponentV2Builder({ accentColor: "#da373c" });
+
+    builder
+        .text("### 🗑️ Kanal wirklich löschen?")
+        .text("Alle, die gerade drin sind, fliegen raus.")
+        .buttons(
+            { customId: `${VOICE_PREFIX}:delete:yes`, label: "Löschen", tone: "danger" },
+            { customId: `${VOICE_PREFIX}:delete:no`, label: "Abbrechen", tone: "secondary" }
+        );
 
     return view(builder);
 }

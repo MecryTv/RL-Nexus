@@ -15,7 +15,7 @@ process.env.DEV_CLIENT_SECRET ||= "check-secret";
 import { ChannelType, Collection, Guild, GuildBasedChannel, GuildMember, Role, VoiceBasedChannel } from "discord.js";
 import BotClient from "../client/BotClient";
 import { writeFile } from "node:fs/promises";
-import { VoicePanel, VoicePresetList, VoiceState } from "../builder/VoiceView";
+import { VoiceDeletePrompt, VoicePanel, VoicePresetList, VoiceState } from "../builder/VoiceView";
 import { IVoicePanelImage, RenderVoicePanel, VOICE_PANEL_FILE, VoicePanelAlt } from "../builder/VoicePanelImage";
 import { DefaultHubConfig, DefaultVoiceSettings, FormatVoiceName, MAX_LIMIT, MAX_PRESETS, VOICE_ACTIONS, VOICE_MENU_ACTIONS } from "../constants/Voice";
 import { IVoiceSettings } from "../interfaces/services/voice/IVoice";
@@ -176,21 +176,61 @@ function checkConfig(client: BotClient): void {
 /* ----------------------------------------------------------
    Panel und Presets
    ---------------------------------------------------------- */
-function checkViews(): void {
+/** Alle Knöpfe und Menüs in einem Kasten, egal wie tief sie stecken. */
+function controls(node: unknown, found: { custom_id?: string; style?: number; type?: number; placeholder?: string; options?: { value: string }[] }[] = []): typeof found {
+    if (Array.isArray(node)) node.forEach((entry) => controls(entry, found));
+    else if (node && typeof node === "object") {
+        const entry = node as Record<string, unknown>;
+
+        if (typeof entry.custom_id === "string") found.push(entry as (typeof found)[number]);
+        Object.values(entry).forEach((value) => controls(value, found));
+    }
+
+    return found;
+}
+
+/** Eine Reihe ohne Knöpfe lehnt Discord ab - sie darf nie entstehen. */
+function emptyRow(node: unknown): boolean {
+    if (Array.isArray(node)) return node.some(emptyRow);
+    if (!node || typeof node !== "object") return false;
+
+    const entry = node as Record<string, unknown>;
+
+    if (entry.type === 1 && Array.isArray(entry.components) && entry.components.length === 0) return true;
+
+    return Object.values(entry).some(emptyRow);
+}
+
+async function checkViews(): Promise<void> {
     console.log("\n  — Panel —");
 
     const config = DefaultHubConfig();
-    const panel = JSON.stringify(VoicePanel(config, true).components[0].toJSON());
+    const image: IVoicePanelImage = { kind: "channel", ownerName: "Lara", avatarURL: null, privacy: "public", stealth: false, limit: 0, region: null };
+    const view = await VoicePanel(config, image);
+    const json = view.components[0].toJSON();
+    const panel = JSON.stringify(json);
+    const found = controls(json);
+    const menu = found.find((entry) => entry.custom_id === "voice:menu");
+    const remove = found.find((entry) => entry.custom_id === "voice:delete");
 
-    check("Das Panel hat ein Auswahlmenü", panel.includes("voice:menu"));
-    check("Alle 13 Optionen stehen drin", VOICE_ACTIONS.every((action) => panel.includes(`"${action.value}"`)));
+    check("Das Panel zeigt das Bild als Anhang", panel.includes("attachment://voice-panel.png"));
+    check("  und hängt es an", view.files.length === 1 && view.files[0].name === "voice-panel.png", String(view.files[0]?.name));
+    check("Das Panel hat ein Auswahlmenü", menu?.placeholder === "⚙️ Kanal einstellen …", String(menu?.placeholder));
+    check("  mit 12 Optionen, ohne Löschen", menu?.options?.length === 12 && !menu.options.some((option) => option.value === "deletechannel"), String(menu?.options?.length));
     check("Die Beschreibungen kommen mit", panel.includes("Kanal · Neuer Name für den Kanal"));
-    check("Der Preset-Knopf ist da", panel.includes("voice:presets"));
-    check("Ohne Presets kein Knopf", !JSON.stringify(VoicePanel({ ...config, presets: false }, true).components[0].toJSON()).includes("voice:presets"));
+    check("Der Preset-Knopf ist da", found.some((entry) => entry.custom_id === "voice:presets"));
+    check("Kanal löschen ist ein roter Knopf", remove?.style === 4, JSON.stringify(remove));
+    check("Ohne Presets kein Preset-Knopf", !JSON.stringify((await VoicePanel({ ...config, presets: false }, image)).components[0].toJSON()).includes("voice:presets"));
 
-    const trimmed = JSON.stringify(VoicePanel({ ...config, actions: ["name", "userlimit"] }, false).components[0].toJSON());
+    const trimmed = (await VoicePanel({ ...config, actions: ["name", "userlimit"], presets: false }, { kind: "fixed" })).components[0].toJSON();
+    const trimmedControls = controls(trimmed);
 
-    check("Abgeschaltete Optionen fehlen", !trimmed.includes("deletechannel") && trimmed.includes("userlimit"));
+    check("Abgeschaltete Optionen fehlen", !JSON.stringify(trimmed).includes("deletechannel") && JSON.stringify(trimmed).includes("userlimit"));
+    check("Ohne Löschen und Presets: kein Knopf, keine leere Reihe", !trimmedControls.some((entry) => entry.type === 2) && !emptyRow(trimmed), JSON.stringify(trimmedControls));
+
+    const prompt = JSON.stringify(VoiceDeletePrompt().components[0].toJSON());
+
+    check("Löschen fragt nach: Löschen und Abbrechen", prompt.includes("voice:delete:yes") && prompt.includes("voice:delete:no") && prompt.includes("Kanal wirklich löschen?"));
 
     const state = JSON.stringify(
         VoiceState(
@@ -744,7 +784,7 @@ async function main(): Promise<void> {
     await client.configService.Initialize();
 
     checkConfig(client);
-    checkViews();
+    await checkViews();
     await checkImage();
     checkSupport(client);
     await checkW137(client);

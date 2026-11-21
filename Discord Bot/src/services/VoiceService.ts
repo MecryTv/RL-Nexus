@@ -16,6 +16,7 @@ import { AskLine, ILimitHit, IsServerAdmin } from "../builder/LimitReply";
 import { ModuleValue } from "../utils/moduleFlags";
 import { InfoCard } from "../builder/CommunityView";
 import { VoicePanel } from "../builder/VoiceView";
+import { IVoicePanelImage } from "../builder/VoicePanelImage";
 import {
     DefaultHubConfig,
     DefaultVoiceSettings,
@@ -104,7 +105,7 @@ export default class VoiceService {
 
         if (!hubs.length) throw new VoiceError("Leg zuerst einen Hub an, sonst steuert das Panel nichts.");
 
-        const sent = await channel.send({ ...VoicePanel(hubs[0].config, false), flags: MessageFlags.IsComponentsV2 }).catch(() => null);
+        const sent = await channel.send({ ...(await VoicePanel(hubs[0].config, { kind: "fixed" })), flags: MessageFlags.IsComponentsV2 }).catch(() => null);
 
         if (!sent) throw new VoiceError("Die Nachricht ging nicht raus. Darf der Bot in den Kanal schreiben?");
 
@@ -302,9 +303,17 @@ export default class VoiceService {
 
             // Panel in den Chat des Kanals - beim festen Panel steht es schon woanders.
             if (!support && panel.panel === "voice") {
-                await channel
-                    .send({ ...VoicePanel(hub.config, true), flags: MessageFlags.IsComponentsV2 })
-                    .catch(() => undefined);
+                const image: IVoicePanelImage = {
+                    kind: "channel",
+                    ownerName: member.displayName,
+                    avatarURL: member.displayAvatarURL({ extension: "png", size: 256 }),
+                    privacy: settings.privacy,
+                    stealth: settings.stealth,
+                    limit: settings.limit,
+                    region: settings.region,
+                };
+
+                await channel.send({ ...(await VoicePanel(hub.config, image)), flags: MessageFlags.IsComponentsV2 }).catch(() => undefined);
             }
 
             logger.user(`🔊 ${channel.name} auf ${guild.id} angelegt (für ${member.id})`);
