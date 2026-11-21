@@ -124,7 +124,15 @@ export default class VoicePanelHandler extends Event {
 
         // voice:delete - erst nachfragen, voice:delete:yes löscht, voice:delete:no bricht ab (W-0151)
         if (parts[1] === "delete") {
-            if (parts[2] === "yes") return this.Done(interaction, member, await service.Run(member, "deletechannel"), true);
+            if (parts[2] === "yes") {
+                // Erst antworten, dann löschen: Mit dem Kanal verschwindet auch diese Rückfrage,
+                // eine Antwort danach beantwortet Discord mit „Unknown Message“.
+                await service.Mine(member);
+                await interaction.update({ ...InfoCard("🗑️ Der Kanal wird gelöscht."), flags: MessageFlags.IsComponentsV2 });
+                await service.Run(member, "deletechannel");
+
+                return;
+            }
 
             if (parts[2] === "no") {
                 await interaction.update({ ...InfoCard("Abgebrochen, der Kanal bleibt."), flags: MessageFlags.IsComponentsV2 });

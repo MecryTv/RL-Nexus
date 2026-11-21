@@ -976,8 +976,24 @@ async function checkPanelHandler(client: BotClient): Promise<void> {
         await click("voice:delete:no");
         check("Abbrechen löscht nichts", !runs.includes("deletechannel") && answers.at(-1)?.startsWith("update:") === true && answers.at(-1)?.includes("Abgebrochen") === true, answers.at(-1));
 
+        // Live gesehen (W-0151): Mit dem Kanal verschwindet auch die Rückfrage. Wer erst löscht und dann
+        // antwortet, bekommt von Discord „Unknown Message“ - also erst antworten, dann löschen.
+        const timeline: string[] = [];
+        const run = service.Run;
+
+        service.Run = (async (...args: Parameters<typeof service.Run>) => {
+            timeline.push(`run:${args[1]}`);
+
+            return run(...args);
+        }) as typeof service.Run;
+        answers.push = (...items: string[]) => {
+            timeline.push(...items.map(() => "antwort"));
+
+            return Array.prototype.push.apply(answers, items);
+        };
         await click("voice:delete:yes");
         check("Löschen bestätigt: der Kanal wird gelöscht", runs.at(-1) === "deletechannel" && resets.length === 5, `${runs.join()} / ${resets.length}`);
+        check("  erst die Antwort, dann löschen", timeline.join() === "antwort,run:deletechannel", timeline.join());
         check("Keine unerwarteten Fehler", errors.length === 0, errors.join(" | "));
     } finally {
         Object.assign(service, { ResetPanel: original.reset, Mine: original.mine, Run: original.run });
