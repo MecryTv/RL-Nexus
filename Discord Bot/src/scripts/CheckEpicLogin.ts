@@ -209,11 +209,13 @@ async function checkAdopt(): Promise<void> {
 
     await EpicAdopt(prime, USER, { accountId: ACCOUNT, displayName: null });
     check("Ohne Namen von Epic: Name aus Prime, Ränge gespeichert", prime.calls.includes(`link ${USER} ${ACCOUNT} Aus Prime`) && prime.calls.includes("snapshot"), prime.calls.join(", "));
+    // W-0150/W-0152: Verbinden speichert auch gleich den letzten Rang-Stand.
+    check("  und der letzte Rang-Stand dazu", prime.calls.includes("stand"), prime.calls.join(", "));
 
     const down = Client([], { primeService: { IsConfigured: true, Profile: async () => Promise.reject(new Error("weg")) } });
 
     await EpicAdopt(down, USER, { accountId: ACCOUNT, displayName: "Nova Lukas" });
-    check("Prime fällt aus: trotzdem verbunden, ohne Ränge", down.calls.includes(`link ${USER} ${ACCOUNT} Nova Lukas`) && !down.calls.includes("snapshot"), down.calls.join(", "));
+    check("Prime fällt aus: trotzdem verbunden, ohne Ränge", down.calls.includes(`link ${USER} ${ACCOUNT} Nova Lukas`) && !down.calls.includes("snapshot") && !down.calls.includes("stand"), down.calls.join(", "));
 }
 
 /* ----------------------------------------------------------

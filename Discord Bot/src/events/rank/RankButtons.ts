@@ -116,6 +116,9 @@ export default class RankButtons extends Event {
         // aus, bleibt die Karte eben ohne Namen.
         const owner = this.client.databaseService.Ready ? await this.client.accounts.TrustedOwner("epic", profile.accountId, interaction.guildId).catch(() => null) : null;
         const member = owner ? await this.client.users.fetch(owner).catch(() => null) : null;
+        // W-0152: „Deine Karte“ genau dann, wenn /rank me diese Karte zeigen würde - auch bei einem
+        // nur per Name verbundenen Konto, solange der Modus das zulässt.
+        const linked = this.client.databaseService.Ready ? await this.client.accounts.Linked(interaction.user.id, "epic", "card", interaction.guildId).catch(() => null) : null;
 
         const message = await RankMessage(
             {
@@ -124,7 +127,7 @@ export default class RankButtons extends Event {
                 avatarURL: member?.displayAvatarURL({ extension: "png", size: 256 }) ?? null,
                 page,
                 // W-0150: Für die Zeile über einem alten Stand - die eigene Karte oder die eines anderen.
-                self: owner === interaction.user.id,
+                self: linked?.account_id === profile.accountId,
             },
             interaction.user.id
         );

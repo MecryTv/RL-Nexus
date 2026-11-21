@@ -145,15 +145,33 @@ function drawTiles(ctx: SKRSContext2D, data: Extract<IVoicePanelImage, { kind: "
         ctx.fillText(tile.label, x + width / 2, top + 42);
         tracked(ctx, "0px");
 
-        shrink(ctx, tile.value, "800 {size}px Oxanium", 40, 24, width - 24);
+        // W-0152: Oxanium hat kein „∞“, die Ersatzschrift zeichnet es winzig - also größer bestellen.
+        const infinite = tile.value === "∞";
+
+        shrink(ctx, tile.value, "800 {size}px Oxanium", infinite ? 88 : 40, 24, width - 24);
         ctx.fillStyle = tile.color;
-        centered(ctx, Fit(ctx, tile.value, width - 24), x + width / 2, top + 94);
+        centered(ctx, Fit(ctx, tile.value, width - 24), x + width / 2, top + (infinite ? 110 : 94));
     });
 
     return left;
 }
 
-export async function RenderVoicePanel(data: IVoicePanelImage): Promise<Buffer> {
+/** W-0152: Das feste Panel sieht immer gleich aus - einmal je Prozess zeichnen reicht. */
+let fixedPng: Promise<Buffer> | null = null;
+
+export function RenderVoicePanel(data: IVoicePanelImage): Promise<Buffer> {
+    if (data.kind !== "fixed") return Render(data);
+
+    fixedPng ??= Render(data).catch((error: unknown) => {
+        fixedPng = null;
+
+        throw error;
+    });
+
+    return fixedPng;
+}
+
+async function Render(data: IVoicePanelImage): Promise<Buffer> {
     await RegisterFonts();
 
     const canvas = createCanvas(WIDTH, HEIGHT);

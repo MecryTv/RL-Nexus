@@ -394,10 +394,8 @@ export default class Rank extends Command {
         }
 
         await this.client.accounts.Unlink(userId, "epic");
-        // Review W-0125: mit dem Konto gehen seine Ränge und die Rang-Rollen auf allen Servern.
+        // Review W-0125: mit dem Konto gehen seine Ränge (samt letztem Rang-Stand, W-0150) und die Rang-Rollen auf allen Servern.
         await this.client.ranks.Clear(userId);
-        // W-0150: und der letzte Rang-Stand.
-        await this.client.primeSnapshots.Clear(userId);
         void this.client.rankRoleService.Strip(userId).catch(() => 0);
 
         logger.user(`🎮 Epic getrennt: ${userId} (war ${current.display_name ?? current.account_id})`);
@@ -496,13 +494,15 @@ export default class Rank extends Command {
             : null;
 
         const member = owner ? await this.client.users.fetch(owner).catch(() => null) : null;
+        // W-0152: „Deine Karte“ genau dann, wenn /rank me sie zeigen würde - wie die Knöpfe darunter.
+        const linked = this.client.databaseService.Ready ? await this.client.accounts.Linked(interaction.user.id, "epic", "card", interaction.guildId).catch(() => null) : null;
 
         await this.Send(
             interaction,
             profile,
             member?.username ?? null,
             member?.displayAvatarURL({ extension: "png", size: 256 }) ?? null,
-            owner === interaction.user.id
+            linked?.account_id === profile.accountId
         );
     }
 }
