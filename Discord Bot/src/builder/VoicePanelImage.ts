@@ -153,7 +153,22 @@ function drawTiles(ctx: SKRSContext2D, data: Extract<IVoicePanelImage, { kind: "
     return left;
 }
 
-export async function RenderVoicePanel(data: IVoicePanelImage): Promise<Buffer> {
+/** W-0152: Das feste Panel sieht immer gleich aus - einmal je Prozess zeichnen reicht. */
+let fixedPng: Promise<Buffer> | null = null;
+
+export function RenderVoicePanel(data: IVoicePanelImage): Promise<Buffer> {
+    if (data.kind !== "fixed") return Render(data);
+
+    fixedPng ??= Render(data).catch((error: unknown) => {
+        fixedPng = null;
+
+        throw error;
+    });
+
+    return fixedPng;
+}
+
+async function Render(data: IVoicePanelImage): Promise<Buffer> {
     await RegisterFonts();
 
     const canvas = createCanvas(WIDTH, HEIGHT);

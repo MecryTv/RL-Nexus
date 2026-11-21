@@ -54,14 +54,15 @@ export async function VoicePanel(config: IHubConfig, image: IVoicePanelImage): P
 }
 
 /** Rückfrage vor dem Löschen - ein roter Knopf direkt im Panel soll keinen Kanal mit Leuten darin per Fehlklick löschen. */
-export function VoiceDeletePrompt(): IVoiceView {
+export function VoiceDeletePrompt(channelId: string): IVoiceView {
     const builder = new ComponentV2Builder({ accentColor: "#da373c" });
 
     builder
         .text("### 🗑️ Kanal wirklich löschen?")
         .text("Alle, die gerade drin sind, fliegen raus.")
         .buttons(
-            { customId: `${VOICE_PREFIX}:delete:yes`, label: "Löschen", tone: "danger" },
+            // W-0152: mit Kanal-ID - eine alte Rückfrage löscht nie einen später geöffneten Kanal.
+            { customId: `${VOICE_PREFIX}:delete:yes:${channelId}`, label: "Löschen", tone: "danger" },
             { customId: `${VOICE_PREFIX}:delete:no`, label: "Abbrechen", tone: "secondary" }
         );
 

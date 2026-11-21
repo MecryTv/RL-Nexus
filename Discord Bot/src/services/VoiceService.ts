@@ -114,6 +114,10 @@ export default class VoiceService {
 
     /** Setzt das Panel im Chat des Kanals neu. Fehlt die Nachricht oder das Recht, passiert still nichts. */
     async RefreshPanel(channel: VoiceBasedChannel): Promise<void> {
+        // W-0152: Ein wartender Anstoß ist damit erledigt - sonst käme dasselbe Bild gleich noch einmal.
+        clearTimeout(this.refreshTimers.get(channel.id));
+        this.refreshTimers.delete(channel.id);
+
         try {
             const temp = await this.client.tempVoices.Get(channel.id);
 
@@ -410,7 +414,12 @@ export default class VoiceService {
 
             // Panel in den Chat des Kanals - beim festen Panel steht es schon woanders.
             if (!support && panel.panel === "voice") {
-                const sent = await channel.send({ ...(await VoicePanel(hub.config, await this.PanelImage(channel, temp))), flags: MessageFlags.IsComponentsV2 }).catch(() => null);
+                // W-0152: Ein Panel, das nicht rausgeht (etwa ohne „Dateien anhängen“), soll im Log stehen.
+                const sent = await channel.send({ ...(await VoicePanel(hub.config, await this.PanelImage(channel, temp))), flags: MessageFlags.IsComponentsV2 }).catch((error: unknown) => {
+                    logger.warn(`🔊 Panel in ${channel.id} auf ${guild.id} nicht gesendet: ${String(error)}`);
+
+                    return null;
+                });
 
                 // W-0151: Damit der Bot das Bild bei jeder Änderung neu setzen kann.
                 if (sent) await this.client.tempVoices.SetPanel(channel.id, sent.id).catch(() => undefined);

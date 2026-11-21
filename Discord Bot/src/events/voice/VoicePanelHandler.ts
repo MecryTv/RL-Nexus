@@ -125,9 +125,18 @@ export default class VoicePanelHandler extends Event {
         // voice:delete - erst nachfragen, voice:delete:yes löscht, voice:delete:no bricht ab (W-0151)
         if (parts[1] === "delete") {
             if (parts[2] === "yes") {
+                const { channel } = await service.Mine(member);
+
+                // W-0152: Die Rückfrage gehört zu dem Kanal, in dem gefragt wurde. Sitzt die Person
+                // inzwischen in einem anderen eigenen Kanal, löscht eine alte Rückfrage nicht diesen.
+                if (parts[3] !== channel.id) {
+                    await interaction.update({ ...InfoCard("Diese Rückfrage gehört zu einem anderen Kanal. Klick im Panel deines jetzigen Kanals noch einmal auf **Kanal löschen**."), flags: MessageFlags.IsComponentsV2 });
+
+                    return;
+                }
+
                 // Erst antworten, dann löschen: Mit dem Kanal verschwindet auch diese Rückfrage,
                 // eine Antwort danach beantwortet Discord mit „Unknown Message“.
-                await service.Mine(member);
                 await interaction.update({ ...InfoCard("🗑️ Der Kanal wird gelöscht."), flags: MessageFlags.IsComponentsV2 });
                 await service.Run(member, "deletechannel");
 
@@ -141,8 +150,9 @@ export default class VoicePanelHandler extends Event {
             }
 
             // Erst prüfen, ob ihm der Kanal gehört - sonst fragt das Panel umsonst.
-            await service.Mine(member);
-            await interaction.reply({ ...VoiceDeletePrompt(), flags: EPHEMERAL });
+            const { channel } = await service.Mine(member);
+
+            await interaction.reply({ ...VoiceDeletePrompt(channel.id), flags: EPHEMERAL });
 
             return;
         }

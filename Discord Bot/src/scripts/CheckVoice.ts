@@ -248,9 +248,9 @@ async function checkViews(): Promise<void> {
     check("Abgeschaltete Optionen fehlen", !JSON.stringify(trimmed).includes("deletechannel") && JSON.stringify(trimmed).includes("userlimit"));
     check("Ohne Löschen und Presets: kein Knopf, keine leere Reihe", !trimmedControls.some((entry) => entry.type === 2) && !emptyRow(trimmed), JSON.stringify(trimmedControls));
 
-    const prompt = JSON.stringify(VoiceDeletePrompt().components[0].toJSON());
+    const prompt = JSON.stringify(VoiceDeletePrompt("123").components[0].toJSON());
 
-    check("Löschen fragt nach: Löschen und Abbrechen", prompt.includes("voice:delete:yes") && prompt.includes("voice:delete:no") && prompt.includes("Kanal wirklich löschen?"));
+    check("Löschen fragt nach: Löschen und Abbrechen", prompt.includes("voice:delete:yes:123") && prompt.includes("voice:delete:no") && prompt.includes("Kanal wirklich löschen?"));
 
     const state = JSON.stringify(
         VoiceState(
@@ -493,6 +493,18 @@ async function checkDatabase(client: BotClient): Promise<void> {
     const raced = await client.tempVoices.Get(TEMP);
 
     check("Kanaländerung neben einem Preset: Zutritt und Freigaben bleiben", raced?.settings.privacy === flipped && raced.settings.trusted.includes(NEWCOMER) && raced.settings.limit === 7, JSON.stringify(raced?.settings));
+
+    // W-0152: Ein sofortiges Neusetzen (nach jeder Panel-Benutzung) räumt einen wartenden
+    // Anstoß ab - sonst kommt dasselbe Bild drei Sekunden später noch einmal.
+    await wait(120);
+
+    const settled = panelEdits.length;
+
+    service.QueueRefresh(fake.channel);
+    await service.RefreshPanel(fake.channel);
+    await wait(120);
+
+    check("Sofort neu gesetzt: der wartende Anstoß entfällt", panelEdits.length === settled + 1, `${panelEdits.length - settled} Mal`);
 
     console.log("\n  — Presets —");
 
@@ -923,6 +935,9 @@ async function checkImage(): Promise<void> {
     check("Alt-Text privat: Privat, unsichtbar, ∞, Rotterdam", ["Privat", "unsichtbar", "Plätze: ∞", "Rotterdam"].every((part) => altClosed.includes(part)), altClosed);
     check("Alt-Text festes Panel", VoicePanelAlt(fixed).includes("Dein Sprachkanal"), VoicePanelAlt(fixed));
     check("Dateiname des Anhangs", VOICE_PANEL_FILE === "voice-panel.png");
+
+    // W-0152: Das feste Panel sieht immer gleich aus - jeder Klick darauf soll es nicht neu zeichnen.
+    check("Festes Panel: einmal gezeichnet, danach dasselbe Bild", (await RenderVoicePanel(fixed)) === (await RenderVoicePanel(fixed)));
 }
 
 /* ----------------------------------------------------------
@@ -954,7 +969,7 @@ async function checkPanelHandler(client: BotClient): Promise<void> {
     service.Mine = (async () => {
         if (mineFails) throw new VoiceError("Der Kanal gehört dir nicht.");
 
-        return { channel: {}, temp: {} };
+        return { channel: { id: "chan-1" }, temp: {} };
     }) as unknown as typeof service.Mine;
     service.Run = (async (_member: GuildMember, action: string) => {
         runs.push(action);
@@ -1007,6 +1022,12 @@ async function checkPanelHandler(client: BotClient): Promise<void> {
 
         await click("voice:delete");
         check("Löschen-Knopf fragt nur nach", answers.at(-1)?.includes("Kanal wirklich löschen?") === true && runs.length === before && resets.length === 5, `${answers.at(-1)} / ${runs.join()}`);
+        // W-0152: Die Rückfrage gehört zu dem Kanal, in dem gefragt wurde.
+        check("  die Rückfrage trägt die Kanal-ID", answers.at(-1)?.includes("voice:delete:yes:chan-1") === true, answers.at(-1));
+
+        // Eine alte Rückfrage, inzwischen sitzt die Person in einem anderen eigenen Kanal: nichts löschen.
+        await click("voice:delete:yes:chan-alt");
+        check("Alte Rückfrage für einen anderen Kanal löscht nichts", !runs.includes("deletechannel") && answers.at(-1)?.startsWith("update:") === true && answers.at(-1)?.includes("anderen Kanal") === true, answers.at(-1));
 
         await click("voice:delete:no");
         check("Abbrechen löscht nichts", !runs.includes("deletechannel") && answers.at(-1)?.startsWith("update:") === true && answers.at(-1)?.includes("Abgebrochen") === true, answers.at(-1));
@@ -1026,7 +1047,7 @@ async function checkPanelHandler(client: BotClient): Promise<void> {
 
             return Array.prototype.push.apply(answers, items);
         };
-        await click("voice:delete:yes");
+        await click("voice:delete:yes:chan-1");
         check("Löschen bestätigt: der Kanal wird gelöscht", runs.at(-1) === "deletechannel" && resets.length === 5, `${runs.join()} / ${resets.length}`);
         check("  erst die Antwort, dann löschen", timeline.join() === "antwort,run:deletechannel", timeline.join());
         check("Keine unerwarteten Fehler", errors.length === 0, errors.join(" | "));

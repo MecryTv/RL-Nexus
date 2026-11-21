@@ -107,10 +107,10 @@ Anfang wie überall: `ManageGate()` (`utils/managegate.ts`) — Sitzung, „Serv
 | Anlegen | `VoiceChannels` hört auf `VoiceStateUpdate`. Zwei Beitritte in derselben Sekunde ergeben trotzdem nur einen Kanal |
 | Aufräumen | Der letzte raus, Kanal weg. Beim Start räumt `Sweep()` auf, was einen Neustart nicht überlebt hat |
 | Rechte | Privat setzt `Connect` für `@everyone` auf nein, unsichtbar zusätzlich `ViewChannel`; Vertraute und der Besitzer bekommen eigene Einträge |
-| Panel | `VoicePanelHandler` – Auswahlmenü, User-Auswahl, Modals, die Presets und `voice:delete` (Rückfrage, `voice:delete:yes`/`:no`), alles mit `voice:`-IDs. Bild: `builder/VoicePanelImage.ts`, Neusetzen: `VoiceService.RefreshPanel`/`QueueRefresh`/`ResetPanel`, Discord-Änderungen: `events/voice/VoiceChannelUpdate.ts` → `VoiceService.ChannelChanged` |
+| Panel | `VoicePanelHandler` – Auswahlmenü, User-Auswahl, Modals, die Presets und `voice:delete` (Rückfrage, `voice:delete:yes:<kanal>`/`:no` – die Kanal-ID sorgt dafür, dass eine alte Rückfrage keinen später geöffneten Kanal löscht), alles mit `voice:`-IDs. Bild: `builder/VoicePanelImage.ts`, Neusetzen: `VoiceService.RefreshPanel`/`QueueRefresh`/`ResetPanel`, Discord-Änderungen: `events/voice/VoiceChannelUpdate.ts` → `VoiceService.ChannelChanged` |
 | Support-Hub | `VoiceService.Create()` schickt kein Panel, `Cleanup()` reicht den Kanal nicht weiter. Der Warteraum selbst: `services/SupportService.ts`, siehe [Moderation.md](Moderation.md#support-warteraum) |
 
-Der Bot braucht **Kanäle verwalten** (anlegen, umbenennen, löschen, Rechte setzen) und **Mitglieder verschieben**, um jemanden in seinen Kanal zu ziehen.
+Der Bot braucht **Kanäle verwalten** (anlegen, umbenennen, löschen, Rechte setzen) und **Mitglieder verschieben**, um jemanden in seinen Kanal zu ziehen. Für das Panel im Sprachkanal außerdem **Nachrichten senden**, **Dateien anhängen** (das Bild) und **Nachrichtenverlauf lesen** (zum Neusetzen). Fehlt eins davon, geht das Panel nicht raus; der Bot schreibt dann eine Warnung ins Log.
 
 ---
 
