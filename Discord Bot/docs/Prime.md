@@ -318,7 +318,18 @@ Der Unterschied ist der Notvorrat: Ist der Eintrag nicht mehr frisch, wird neu g
 
 Ohne alten Stand bleibt es beim Fehler; einen zu erfinden wäre schlimmer als keiner.
 
-Im Normalfall steht dort schlicht, wie alt die Zahlen sind (`Stand vor 4 Minuten · wird alle 10 Minuten erneuert`).
+**Nach einem Neustart (W-0150).** Der Arbeitsspeicher ist dann leer. Damit `/rank` trotzdem etwas zeigt, steht der letzte vollständige Stand jedes **verknüpften** Kontos zusätzlich in `prime_snapshots` (Migration 059): eine Zeile je Discord-Nutzer, das ganze Profil als JSON, überschrieben bei jeder frischen Antwort von Prime, egal wer gefragt hat (`PrimeService.Remember`). Nur nachgeschlagene Namen landen dort nie. Kein Schalter, kein Höchstalter.
+
+Gelesen wird die Tabelle nur von `/rank me`, `/rank search` und dem Knopf unter der Karte, und erst, wenn Prime ausfällt und der Arbeitsspeicher nichts hat. Gesucht wird über die Konto-ID oder, bei `/rank search`, über den Anzeigenamen (Groß- und Kleinschreibung egal). `/rank link`, Rang-Rollen und Team-Übersicht greifen nie darauf zurück; nach einem gespeicherten Stand verteilt `/rank me` auch keine Rang-Rollen. Gelöscht wird die Zeile mit den Rängen: bei `/rank unlink`, beim Wechsel auf ein anderes Epic-Konto, bei der Übernahme per Epic-Login und über die Löschung von Nutzerdaten im Admin Dashboard.
+
+Über jeder Karte mit altem Stand, egal ob aus dem Arbeitsspeicher oder aus der Tabelle, steht eine Zeile mit Discord-Zeitstempel (`StaleNotice()` in `builder/RankView.ts`), darunter klein der Tipp:
+
+> ⚠️ **Rocket League antwortet gerade nicht.** Das ist dein letzter Stand vom 20. November 2026 18:42 (vor 14 Stunden).
+> -# Für aktuelle Zahlen /rank me später noch einmal ausführen.
+
+Bei `/rank search` heißt es „der letzte Stand von **Name**“, bei abgelehntem Zugang beginnt die Zeile mit „**Die Rang-Abfrage ist gerade nicht freigeschaltet.**“. Bei frischem Stand ist der Text leer, so verschwindet die Zeile auch beim Seitenwechsel.
+
+Im Normalfall steht unten auf der Karte schlicht, wie alt die Zahlen sind (`Stand vor 4 Minuten · wird alle 10 Minuten erneuert`).
 
 `PrimeService.Load()` ist `protected` und nicht `private`. Das ist Absicht: `npm run check:prime` stellt damit einen Ausfall nach und prüft beide Wege — mit altem Stand und ohne. Ungetestet wäre dieser Zweig das Papier nicht wert, auf dem er steht, denn zu sehen bekommt man ihn nur, wenn ohnehin gerade etwas schiefgeht.
 
