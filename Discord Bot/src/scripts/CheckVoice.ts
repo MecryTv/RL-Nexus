@@ -260,8 +260,10 @@ async function checkViews(): Promise<void> {
     );
 
     check("Der Stand nennt den Besitzer", state.includes(`<@${USER}>`));
-    check("Der Stand nennt die Plätze", state.includes("4 Plätze"));
-    check("Der Stand nennt die Vertrauten", state.includes(`<@${OTHER}>`));
+    check("Der Stand nennt die Plätze", state.includes("Plätze: 4"), state);
+    check("Der Stand nennt die Freigegebenen", state.includes(`Freigegeben: <@${OTHER}>`), state);
+    // Review (W-0151): Die neuen Namen gelten auch in den Antworten.
+    check("  ohne die alten Begriffe", !/Vertraut|Größe|Blockiert/.test(state), state);
 
     console.log("\n  — Presets —");
 
@@ -333,12 +335,21 @@ async function checkDatabase(client: BotClient): Promise<void> {
         }
     };
 
-    check("Umbenennen", (await service.Run(owner, "name", { text: "Ranked 2v2" })).includes("Ranked 2v2"));
+    // Review (W-0151): Die Antworten tragen dieselben Symbole und Begriffe wie das Menü.
+    const renamed = await service.Run(owner, "name", { text: "Ranked 2v2" });
+
+    check("Umbenennen", renamed.includes("Ranked 2v2") && renamed.startsWith("✏️"), renamed);
     check("Der Kanal wurde wirklich geändert", fake.edits.at(-1)?.name === "Ranked 2v2");
-    check("Größe setzen", (await service.Run(owner, "userlimit", { text: "4" })).includes("4"));
+
+    const seats = await service.Run(owner, "userlimit", { text: "4" });
+
+    check("Größe setzen", seats.includes("4") && seats.startsWith("👥"), seats);
     check("0 heißt unbegrenzt", (await service.Run(owner, "userlimit", { text: "0" })).includes("unbegrenzt"));
     await fails("Eine Größe muss eine Zahl sein", () => service.Run(owner, "userlimit", { text: "viele" }), "Zahl");
-    check("Privat schalten", (await service.Run(owner, "privacy")).includes("Privat"));
+
+    const closed = await service.Run(owner, "privacy");
+
+    check("Privat schalten", closed.includes("Privat") && closed.includes("freigegeben") && !closed.includes("vertraut"), closed);
     check("Und wieder offen", (await service.Run(owner, "privacy")).includes("Offen"));
     check("Unsichtbar schalten", (await service.Run(owner, "stealthmode")).includes("Unsichtbar"));
     await service.Run(owner, "stealthmode");
@@ -354,7 +365,7 @@ async function checkDatabase(client: BotClient): Promise<void> {
     check("Er ist blockiert und nicht mehr vertraut", blocked?.settings.blocked.includes(OTHER) === true && blocked.settings.trusted.length === 0);
     check("Blockierte fliegen raus", kicked);
     check("Blockierung aufheben", (await service.Run(owner, "unblockuser", { target: other })).includes(OTHER));
-    await fails("Sich selbst blockiert niemand", () => service.Run(owner, "blockuser", { target: owner }), "selbst");
+    await fails("Sich selbst blockiert niemand", () => service.Run(owner, "blockuser", { target: owner }), "nicht sperren");
     await fails("Ohne Ziel geht es nicht", () => service.Run(owner, "trustuser", {}), "aus");
 
     check("Einladen verschickt eine DM", (await service.Run(owner, "inviteuser", { target: other })).includes("Einladung"));
@@ -458,6 +469,30 @@ async function checkDatabase(client: BotClient): Promise<void> {
     await wait(120);
 
     check("Kanal ohne Temp Voice: nichts", panelEdits.length === 5, String(panelEdits.length));
+
+    // Review (W-0151): Kommt die Kanaländerung, während „Preset anwenden“ noch speichert, sieht
+    // ChannelChanged einen alten Stand. Es darf nur Plätze und Region schreiben, nicht den
+    // alten Zutritt und die alten Freigaben zurück.
+    const before = await client.tempVoices.Get(TEMP);
+    // Was das Preset gerade schreibt - muss sich vom alten Stand unterscheiden, sonst prüft das nichts.
+    const flipped = before!.settings.privacy === "private" ? "public" : "private";
+    const NEWCOMER = "90071992547409977";
+
+    await client.tempVoices.Save(TEMP, { ...before!.settings, privacy: flipped, trusted: [...before!.settings.trusted, NEWCOMER] });
+
+    const realGet = client.tempVoices.Get;
+
+    client.tempVoices.Get = (async () => before) as typeof client.tempVoices.Get;
+
+    try {
+        await changeTo({ userLimit: 7 });
+    } finally {
+        client.tempVoices.Get = realGet;
+    }
+
+    const raced = await client.tempVoices.Get(TEMP);
+
+    check("Kanaländerung neben einem Preset: Zutritt und Freigaben bleiben", raced?.settings.privacy === flipped && raced.settings.trusted.includes(NEWCOMER) && raced.settings.limit === 7, JSON.stringify(raced?.settings));
 
     console.log("\n  — Presets —");
 

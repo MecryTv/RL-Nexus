@@ -74,11 +74,11 @@ export function VoiceState(temp: ITempVoice, note: string): IVoiceView {
     const builder = new ComponentV2Builder({ accentColor: VOICE_ACCENT });
     const lines = [
         `Besitzer: <@${temp.ownerId}>`,
-        `Größe: ${settings.limit ? `${settings.limit} Plätze` : "unbegrenzt"}`,
+        `Plätze: ${settings.limit ? settings.limit : "unbegrenzt"}`,
         `Zutritt: ${settings.privacy === "private" ? "privat" : "offen"}${settings.stealth ? " · unsichtbar" : ""}`,
         `Region: ${REGION_LABELS.get(settings.region ?? "") ?? "Automatisch"}`,
-        ...(settings.trusted.length ? [`Vertraut: ${settings.trusted.map((id) => `<@${id}>`).join(", ")}`] : []),
-        ...(settings.blocked.length ? [`Blockiert: ${settings.blocked.map((id) => `<@${id}>`).join(", ")}`] : []),
+        ...(settings.trusted.length ? [`Freigegeben: ${settings.trusted.map((id) => `<@${id}>`).join(", ")}`] : []),
+        ...(settings.blocked.length ? [`Gesperrt: ${settings.blocked.map((id) => `<@${id}>`).join(", ")}`] : []),
     ];
 
     return view(builder.text(note).subtext(lines.join(" · ")));

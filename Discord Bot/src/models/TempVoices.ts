@@ -72,6 +72,16 @@ export default class TempVoices extends Model<ITempVoiceRow> {
         } as Partial<ITempVoiceRow>);
     }
 
+    /**
+     * W-0151 (Review): Plätze und Region, wie Discord sie gerade hat - nur diese beiden
+     * Felder, direkt in der Datenbank. Wer stattdessen die ganzen Einstellungen schreibt,
+     * kann ein gleichzeitig laufendes „Preset anwenden“ mit einem alten Stand überschreiben.
+     */
+    async SetChannelValues(channelId: string, limit: number, region: string | null): Promise<void> {
+        await this.db.Write(`UPDATE \`${this.Table}\` SET settings = JSON_SET(settings, '$.limit', ?, '$.region', ?) WHERE channel_id = ?`, [limit, region, channelId]);
+        this.db.Bump(this.Table);
+    }
+
     /** W-0151: welche Nachricht das Panel des Kanals ist. */
     async SetPanel(channelId: string, messageId: string | null): Promise<void> {
         await this.Update([channelId], { panel_message_id: messageId } as Partial<ITempVoiceRow>);

@@ -184,7 +184,7 @@ export default class VoicePanelHandler extends Event {
         const isName = action === "name";
         const modal = new ModalBuilder()
             .setCustomId(`${VOICE_PREFIX}:modal:${action}`)
-            .setTitle(isName ? "Kanal umbenennen" : "Benutzerbegrenzung")
+            .setTitle(isName ? "Kanal umbenennen" : "Plätze")
             .addLabelComponents(
                 new LabelBuilder()
                     .setLabel(isName ? "Neuer Name" : "Wie viele Plätze?")

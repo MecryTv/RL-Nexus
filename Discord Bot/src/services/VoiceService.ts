@@ -172,7 +172,7 @@ export default class VoiceService {
         if (!temp) return;
 
         if (temp.settings.limit !== after.userLimit || temp.settings.region !== after.rtcRegion) {
-            await this.client.tempVoices.Save(after.id, { ...temp.settings, limit: after.userLimit, region: after.rtcRegion }).catch(() => undefined);
+            await this.client.tempVoices.SetChannelValues(after.id, after.userLimit, after.rtcRegion).catch(() => undefined);
         }
 
         this.QueueRefresh(after);
@@ -584,7 +584,7 @@ export default class VoiceService {
                 settings.name = name;
                 await this.Apply(channel, temp, settings);
 
-                return `📝 Der Kanal heißt jetzt **${name}**.`;
+                return `✏️ Der Kanal heißt jetzt **${name}**.`;
             }
 
             case "userlimit": {
@@ -595,7 +595,7 @@ export default class VoiceService {
                 settings.limit = limit;
                 await this.Apply(channel, temp, settings);
 
-                return limit ? `🔢 Höchstens **${limit}** Leute.` : "🔢 Der Kanal ist jetzt unbegrenzt.";
+                return limit ? `👥 Höchstens **${limit}** Leute.` : "👥 Der Kanal ist jetzt unbegrenzt.";
             }
 
             case "privacy":
@@ -603,7 +603,7 @@ export default class VoiceService {
                 await this.Apply(channel, temp, settings);
 
                 return settings.privacy === "private"
-                    ? "🔒 Privat: Nur wer vertraut ist oder eingeladen wurde, kommt rein."
+                    ? "🔒 Privat: Nur wer freigegeben oder eingeladen ist, kommt rein."
                     : "🔓 Offen: Jeder darf rein.";
 
             case "stealthmode":
@@ -625,7 +625,7 @@ export default class VoiceService {
 
             case "trustuser":
                 if (!target) throw new VoiceError("Wähle jemanden aus.");
-                if (settings.trusted.includes(target.id)) return `✅ ${named} ist schon vertraut.`;
+                if (settings.trusted.includes(target.id)) return `✅ ${named} ist schon freigegeben.`;
                 if (settings.trusted.length >= VoiceLimits(member.guild.id).trusted) throw new VoiceError(`Mehr als ${VoiceLimits(member.guild.id).trusted} gehen nicht.`);
 
                 settings.trusted.push(target.id);
@@ -640,17 +640,17 @@ export default class VoiceService {
                 settings.trusted = settings.trusted.filter((id) => id !== target.id);
                 await this.Apply(channel, temp, settings);
 
-                return `❌ ${named} ist nicht mehr vertraut.`;
+                return `❌ ${named} ist nicht mehr freigegeben.`;
 
             case "blockuser": {
                 if (!target) throw new VoiceError("Wähle jemanden aus.");
-                if (target.id === member.id) throw new VoiceError("Dich selbst kannst du nicht blockieren.");
+                if (target.id === member.id) throw new VoiceError("Dich selbst kannst du nicht sperren.");
 
                 settings.blocked = [...new Set([...settings.blocked, target.id])].slice(0, VoiceLimits(member.guild.id).trusted);
                 settings.trusted = settings.trusted.filter((id) => id !== target.id);
                 await this.Apply(channel, temp, settings);
 
-                if (target.voice.channelId === channel.id) await target.voice.disconnect("Blockiert").catch(() => undefined);
+                if (target.voice.channelId === channel.id) await target.voice.disconnect("Gesperrt").catch(() => undefined);
 
                 return `🚫 ${named} kommt hier nicht mehr rein.`;
             }
