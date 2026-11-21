@@ -4,6 +4,7 @@ import {
     ChannelType,
     Guild,
     GuildMember,
+    Message,
     MessageFlags,
     OverwriteResolvable,
     PermissionFlagsBits,
@@ -124,6 +125,35 @@ export default class VoiceService {
             await message.edit({ components: view.components, files: view.files, attachments: [], allowedMentions: view.allowedMentions });
         } catch (error) {
             logger.debug(`🔊 Panel in ${channel.id} nicht neu gesetzt: ${String(error)}`);
+        }
+    }
+
+    /**
+     * Nach jeder Benutzung des Panels: Discord leert das Menü, sobald die Nachricht
+     * neu gesetzt wird, und Name und Profilbild im Bild sind danach aktuell.
+     * Ein Panel aus der Zeit vor W-0151 übernimmt der Bot dabei als Panel des Kanals.
+     */
+    async ResetPanel(message: Message): Promise<void> {
+        try {
+            const channel = message.channel;
+
+            if (channel.isVoiceBased()) {
+                const temp = await this.client.tempVoices.Get(channel.id);
+
+                if (temp && !temp.support) {
+                    if (temp.panelMessageId !== message.id) await this.client.tempVoices.SetPanel(channel.id, message.id);
+
+                    return await this.RefreshPanel(channel);
+                }
+            }
+
+            // Das feste Panel für alle: ohne Besitzer, sein Bild ändert sich nie.
+            const hubs = message.guildId ? await this.client.voiceHubs.OfGuild(message.guildId) : [];
+            const view = await VoicePanel(hubs[0]?.config ?? DefaultHubConfig(), { kind: "fixed" });
+
+            await message.edit({ components: view.components, files: view.files, attachments: [], allowedMentions: view.allowedMentions });
+        } catch (error) {
+            logger.debug(`🔊 Panel ${message.id} nicht zurückgesetzt: ${String(error)}`);
         }
     }
 

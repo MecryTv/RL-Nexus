@@ -12,7 +12,8 @@
 process.env.CLIENT_SECRET ||= "check-secret";
 process.env.DEV_CLIENT_SECRET ||= "check-secret";
 
-import { ChannelType, Collection, Guild, GuildBasedChannel, GuildMember, Role, VoiceBasedChannel } from "discord.js";
+import { ChannelType, Collection, Guild, GuildBasedChannel, GuildMember, Interaction, Message, Role, VoiceBasedChannel } from "discord.js";
+import VoicePanelHandler from "../events/voice/VoicePanelHandler";
 import BotClient from "../client/BotClient";
 import { writeFile } from "node:fs/promises";
 import { VoiceDeletePrompt, VoicePanel, VoicePresetList, VoiceState } from "../builder/VoiceView";
@@ -413,6 +414,12 @@ async function checkDatabase(client: BotClient): Promise<void> {
     check("Panel-Nachricht gelöscht: kein Fehler, nichts gesetzt", !threw && panelEdits.length === 2, String(panelEdits.length));
 
     panelGone = false;
+
+    // Ein Panel von vor W-0151: der Bot kennt seine ID noch nicht und übernimmt es beim ersten Klick.
+    await client.tempVoices.SetPanel(TEMP, null);
+    await service.ResetPanel({ ...panelMessage, channel: fake.channel, guildId: GUILD } as unknown as Message);
+
+    check("Altes Panel: beim ersten Klick übernommen und neu gesetzt", (await client.tempVoices.Get(TEMP))?.panelMessageId === PANEL_MESSAGE && panelEdits.length === 3, String(panelEdits.length));
 
     console.log("\n  — Presets —");
 
@@ -845,6 +852,104 @@ async function checkImage(): Promise<void> {
     check("Dateiname des Anhangs", VOICE_PANEL_FILE === "voice-panel.png");
 }
 
+/* ----------------------------------------------------------
+   W-0151: Menü setzt sich zurück, Löschen fragt nach
+   ---------------------------------------------------------- */
+async function checkPanelHandler(client: BotClient): Promise<void> {
+    console.log("\n  — Panel: Menü und Löschen —");
+
+    const handler = new VoicePanelHandler(client);
+    const service = client.voiceService;
+    const original = {
+        reset: service.ResetPanel,
+        mine: service.Mine,
+        run: service.Run,
+        of: client.settings.Of,
+        get: client.tempVoices.Get,
+        presets: client.voicePresets.Of,
+        report: client.guardian.ReportError,
+    };
+    const resets: string[] = [];
+    const runs: string[] = [];
+    const answers: string[] = [];
+    const modals: string[] = [];
+    const errors: string[] = [];
+    let mineFails = false;
+    const member = FakeMember(FakeGuild(), USER, null);
+
+    service.ResetPanel = (async (message: { id: string }) => void resets.push(message.id)) as unknown as typeof service.ResetPanel;
+    service.Mine = (async () => {
+        if (mineFails) throw new VoiceError("Der Kanal gehört dir nicht.");
+
+        return { channel: {}, temp: {} };
+    }) as unknown as typeof service.Mine;
+    service.Run = (async (_member: GuildMember, action: string) => {
+        runs.push(action);
+
+        return "✅ Erledigt.";
+    }) as unknown as typeof service.Run;
+    client.settings.Of = (async () => ({ modules: [VOICE_MODULE] })) as unknown as typeof client.settings.Of;
+    client.tempVoices.Get = (async () => null) as unknown as typeof client.tempVoices.Get;
+    client.voicePresets.Of = (async () => []) as unknown as typeof client.voicePresets.Of;
+    client.guardian.ReportError = (async (error: Error) => void errors.push(error.message)) as unknown as typeof client.guardian.ReportError;
+
+    const text = (payload: { components?: { toJSON: () => unknown }[] }) => JSON.stringify(payload.components?.map((component) => component.toJSON()) ?? payload);
+    const click = (customId: string, values: string[] = []) =>
+        handler.Execute({
+            customId,
+            values,
+            guildId: GUILD,
+            member,
+            message: { id: "panel-1" },
+            deferred: false,
+            replied: false,
+            inCachedGuild: () => true,
+            isMessageComponent: () => true,
+            isModalSubmit: () => false,
+            isStringSelectMenu: () => customId === "voice:menu",
+            isUserSelectMenu: () => false,
+            isButton: () => customId !== "voice:menu",
+            reply: async (payload: never) => void answers.push(text(payload)),
+            update: async (payload: never) => void answers.push(`update:${text(payload)}`),
+            followUp: async (payload: never) => void answers.push(text(payload)),
+            showModal: async (modal: { data: { custom_id: string } }) => void modals.push(modal.data.custom_id),
+        } as unknown as Interaction);
+
+    try {
+        await click("voice:menu", ["privacy"]);
+        check("Menü: Aktion läuft, danach wird das Panel zurückgesetzt", runs.at(-1) === "privacy" && resets.length === 1, `${runs.join()} / ${resets.length}`);
+
+        mineFails = true;
+        await click("voice:menu", ["privacy"]);
+        mineFails = false;
+        check("Menü mit Fehler: Hinweis und trotzdem zurückgesetzt", answers.at(-1)?.includes("gehört dir nicht") === true && resets.length === 2, `${answers.at(-1)} / ${resets.length}`);
+
+        await click("voice:menu", ["name"]);
+        check("Menü mit Fenster: Fenster auf, Panel zurückgesetzt", modals.at(-1) === "voice:modal:name" && resets.length === 3, `${modals.join()} / ${resets.length}`);
+
+        await click("voice:presets");
+        check("Presets-Knopf: Panel zurückgesetzt", resets.length === 4, String(resets.length));
+
+        const before = runs.length;
+
+        await click("voice:delete");
+        check("Löschen-Knopf fragt nur nach", answers.at(-1)?.includes("Kanal wirklich löschen?") === true && runs.length === before && resets.length === 5, `${answers.at(-1)} / ${runs.join()}`);
+
+        await click("voice:delete:no");
+        check("Abbrechen löscht nichts", !runs.includes("deletechannel") && answers.at(-1)?.startsWith("update:") === true && answers.at(-1)?.includes("Abgebrochen") === true, answers.at(-1));
+
+        await click("voice:delete:yes");
+        check("Löschen bestätigt: der Kanal wird gelöscht", runs.at(-1) === "deletechannel" && resets.length === 5, `${runs.join()} / ${resets.length}`);
+        check("Keine unerwarteten Fehler", errors.length === 0, errors.join(" | "));
+    } finally {
+        Object.assign(service, { ResetPanel: original.reset, Mine: original.mine, Run: original.run });
+        client.settings.Of = original.of;
+        client.tempVoices.Get = original.get;
+        client.voicePresets.Of = original.presets;
+        client.guardian.ReportError = original.report;
+    }
+}
+
 async function main(): Promise<void> {
     console.log("\n🔊 Temp Voice\n");
 
@@ -855,6 +960,7 @@ async function main(): Promise<void> {
     checkConfig(client);
     await checkViews();
     await checkImage();
+    await checkPanelHandler(client);
     checkSupport(client);
     await checkW137(client);
     await checkSweep(client);
