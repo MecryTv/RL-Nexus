@@ -93,6 +93,8 @@ function Client(rows: IRow[] = [], extra: Record<string, unknown> = {}): BotClie
             },
         },
         ranks: { Snapshot: async () => calls.push("snapshot"), SaveProfile: async () => calls.push("profile"), Clear: async () => calls.push("clear") },
+        // W-0150: letzter Rang-Stand je verknüpftem Konto.
+        primeSnapshots: { Save: async () => calls.push("stand"), Clear: async () => calls.push("stand weg") },
         rankRoleService: { Strip: async () => (calls.push("strip"), 0) },
         guilds: { cache: new Map() },
         ...extra,

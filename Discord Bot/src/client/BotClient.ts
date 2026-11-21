@@ -54,6 +54,7 @@ import GuildSettings from "../models/GuildSettings";
 import DashboardGroups from "../models/DashboardGroups";
 import Notifications from "../models/Notifications";
 import PlayerRanks from "../models/PlayerRanks";
+import PrimeSnapshots from "../models/PrimeSnapshots";
 import Clubs from "../models/Clubs";
 import Team from "../models/Team";
 import PlayerAccount from "../models/PlayerAccount";
@@ -171,6 +172,7 @@ export default class BotClient extends Client implements IBotClient {
     groups: DashboardGroups;
     notifications: Notifications;
     ranks: PlayerRanks;
+    primeSnapshots: PrimeSnapshots;
     clubs: Clubs;
     settings: GuildSettings;
     teams: Team;
@@ -334,6 +336,7 @@ export default class BotClient extends Client implements IBotClient {
         this.groups = new DashboardGroups(this);
         this.notifications = new Notifications(this);
         this.ranks = new PlayerRanks(this);
+        this.primeSnapshots = new PrimeSnapshots(this);
         this.clubs = new Clubs(this);
         this.settings = new GuildSettings(this);
         this.teams = new Team(this);

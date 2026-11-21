@@ -6,7 +6,7 @@ import { IPrimeProfile } from "../../interfaces/services/prime/IPrimeService";
 import { RankMessage } from "../../builder/RankView";
 import { LINK_COOLDOWN_DEV } from "../../constants/Database";
 import { PRIME_ACCESS_TEXT } from "../../constants/Prime";
-import { PrimeError } from "../../services/PrimeService";
+import { PrimeDown, PrimeError } from "../../services/PrimeService";
 import { EpicLinkURL, EpicLoginReady } from "../../utils/epicLogin";
 import { EpicAdopt } from "../../utils/epic";
 import { CurrentLinkMode, ModuleValue } from "../../utils/moduleFlags";
@@ -128,8 +128,12 @@ export default class Rank extends Command {
     /**
      * Holt ein Profil und übersetzt jeden Ausfall in einen Satz, den der Nutzer
      * versteht. null heißt: es wurde bereits geantwortet.
+     *
+     * W-0150: fallback - fällt Prime aus und hat der Arbeitsspeicher nichts, kommt
+     * der zuletzt gespeicherte Stand eines verknüpften Kontos (prime_snapshots).
+     * Nur für me und search; /rank link verknüpft nur, was Prime eben bestätigt hat.
      */
-    private async Fetch(interaction: ChatInputCommandInteraction, name: string): Promise<IPrimeProfile | null> {
+    private async Fetch(interaction: ChatInputCommandInteraction, name: string, fallback = false): Promise<IPrimeProfile | null> {
         let profile: IPrimeProfile | null;
 
         try {
@@ -145,6 +149,11 @@ export default class Rank extends Command {
             const body = prime?.body && !prime.reason ? ` (Rumpf „${prime.body.slice(0, 120)}“)` : "";
 
             if (!locked) logger.warn(`🎮 Prime: ${prime ? `${prime.type} ${prime.message}${body}` : String(error)}`);
+
+            // Datenbank nicht bereit oder Lesen scheitert: dann eben die Meldung wie bisher.
+            const stored = fallback && this.client.databaseService.Ready ? await this.client.primeSnapshots.Lookup(name).catch(() => null) : null;
+
+            if (stored) return { ...stored, stale: locked ? "access" : PrimeDown(error) ? "down" : true, fromStore: true };
 
             await interaction.editReply({ content: locked ? PRIME_ACCESS_TEXT : "Rocket League antwortet gerade nicht. Versuch es später noch einmal." });
 
@@ -165,15 +174,19 @@ export default class Rank extends Command {
     /**
      * Zeichnet Seite 1 (Ranked) und hängt sie an die Antwort. Darunter der Knopf
      * zu den Extra-Modi und der Tracker - siehe builder/RankView.ts.
+     *
+     * W-0150: self - die eigene Karte; die Zeile über einem alten Stand sagt dann
+     * „dein letzter Stand“ statt „der letzte Stand von …“.
      */
     private async Send(
         interaction: ChatInputCommandInteraction,
         profile: IPrimeProfile,
         discordName: string | null,
-        avatarURL: string | null
+        avatarURL: string | null,
+        self: boolean
     ): Promise<void> {
         const started = Date.now();
-        const message = await RankMessage({ profile, discordName, avatarURL, page: "ranked" }, interaction.user.id);
+        const message = await RankMessage({ profile, discordName, avatarURL, page: "ranked", self }, interaction.user.id);
 
         logger.info(`🖼️  Rang-Karte für ${profile.name} in ${Date.now() - started} ms`);
 
@@ -381,6 +394,8 @@ export default class Rank extends Command {
         await this.client.accounts.Unlink(userId, "epic");
         // Review W-0125: mit dem Konto gehen seine Ränge und die Rang-Rollen auf allen Servern.
         await this.client.ranks.Clear(userId);
+        // W-0150: und der letzte Rang-Stand.
+        await this.client.primeSnapshots.Clear(userId);
         void this.client.rankRoleService.Strip(userId).catch(() => 0);
 
         logger.user(`🎮 Epic getrennt: ${userId} (war ${current.display_name ?? current.account_id})`);
@@ -420,7 +435,7 @@ export default class Rank extends Command {
 
         // Über die Konto-ID statt über den Namen: ein Spieler kann sich im Spiel
         // umbenennen, die ID bleibt.
-        const profile = await this.Fetch(interaction, account.account_id);
+        const profile = await this.Fetch(interaction, account.account_id, true);
 
         if (!profile) return;
 
@@ -431,11 +446,13 @@ export default class Rank extends Command {
             interaction,
             profile,
             owner ? interaction.user.username : null,
-            owner ? interaction.user.displayAvatarURL({ extension: "png", size: 256 }) : null
+            owner ? interaction.user.displayAvatarURL({ extension: "png", size: 256 }) : null,
+            true
         );
 
         // Mit Rank Roles: die Rang-Rollen zum eben gezeigten Rang. Neu dazu sieht nur, wer fragt.
-        if (!interaction.inCachedGuild()) return;
+        // W-0150: nicht nach einem gespeicherten Stand - der kann Wochen alt sein.
+        if (!interaction.inCachedGuild() || profile.fromStore) return;
 
         const result = await this.client.rankRoleService.AfterRankMe(interaction.member, profile).catch(() => null);
 
@@ -466,7 +483,7 @@ export default class Rank extends Command {
 
         await interaction.deferReply();
 
-        const profile = await this.Fetch(interaction, name);
+        const profile = await this.Fetch(interaction, name, true);
 
         if (!profile) return;
 
@@ -482,7 +499,8 @@ export default class Rank extends Command {
             interaction,
             profile,
             member?.username ?? null,
-            member?.displayAvatarURL({ extension: "png", size: 256 }) ?? null
+            member?.displayAvatarURL({ extension: "png", size: 256 }) ?? null,
+            owner === interaction.user.id
         );
     }
 }

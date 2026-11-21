@@ -20,6 +20,7 @@ import { PRIME_ACCESS_TEXT, PRIME_CACHE_TTL } from "../constants/Prime";
 import { Collection } from "discord.js";
 import Rank from "../commands/user/Rank";
 import RankButtons from "../events/rank/RankButtons";
+import { RankMessage, StaleNotice } from "../builder/RankView";
 import logger from "../utils/logger";
 import { IPrimeAccessCard, PRIME_ACCESS_URL, PrimeAccessAlt } from "../builder/PrimeAccessCard";
 import { ParseAccessExpiry, PrimeAccessWatch, SendPrimeAccess } from "../services/PrimeAccessService";
@@ -943,6 +944,282 @@ async function checkLive(client: BotClient, player: string): Promise<void> {
     wrong.Close();
 }
 
+/**
+ * W-0150: Prime mit nachgestelltem Load. Remember läuft neben der Antwort her -
+ * die Unterklasse hält das Versprechen fest, damit eine Prüfung darauf warten kann.
+ */
+class RememberingPrime extends PrimeService {
+    public saving: Promise<void> = Promise.resolve();
+
+    protected override async Load(name: string): Promise<IPrimeProfile | null> {
+        return {
+            name: `Name-${name}`,
+            platform: "Epic Games",
+            accountId: name,
+            playerId: `Epic|${name}|0`,
+            linked: [],
+            seasonLevel: 1,
+            seasonWins: 0,
+            ranks: [],
+            stats: [],
+            club: null,
+            fetchedAt: new Date().toISOString(),
+        } as IPrimeProfile;
+    }
+
+    protected override Remember(profile: IPrimeProfile): Promise<void> {
+        this.saving = super.Remember(profile);
+
+        return this.saving;
+    }
+
+    public override get IsConfigured(): boolean {
+        return true;
+    }
+}
+
+/**
+ * W-0150: Bei jeder frischen Antwort wird der Stand mitgeschrieben, aber nur
+ * für Konten, die hier verknüpft sind - ein bloß nachgeschlagener Name
+ * hinterlässt nichts. Ohne Datenbank: Owner und Save sind nachgestellt.
+ */
+async function checkSnapshotWiring(): Promise<void> {
+    console.log("\n  — Letzter Rang-Stand: wann er geschrieben wird —");
+
+    const saved: string[] = [];
+    const snapshots = { Save: async (userId: string, profile: IPrimeProfile) => void saved.push(`${userId}:${profile.accountId}`) };
+    const fake = {
+        config: { PRIME_API_TOKEN: "pruef-schluessel", PRIME_ACCESS_EXPIRES: "" },
+        // Query für die Überwachung des Zugangs (bot_state), hier ohne Inhalt.
+        databaseService: { Ready: true, Query: async () => [] },
+        accounts: { Owner: async (_platform: string, accountId: string) => (accountId === "w0150linked" ? "90071992547409972" : null) },
+        primeSnapshots: snapshots,
+    } as unknown as BotClient;
+    const prime = new RememberingPrime(fake);
+
+    await prime.Profile("w0150linked");
+    await prime.saving;
+    await prime.Profile("w0150frei");
+    await prime.saving;
+
+    check("Verknüpftes Konto: gespeichert unter dem Discord-Nutzer", saved.join() === "90071992547409972:w0150linked", saved.join());
+    check("  ein nur nachgeschlagenes nicht", !saved.some((entry) => entry.endsWith(":w0150frei")), saved.join());
+
+    // Scheitert das Speichern, darf das die Antwort nicht kosten.
+    snapshots.Save = async () => Promise.reject(new Error("Datenbank weg"));
+    prime.Forget();
+
+    const still = await prime.Profile("w0150linked");
+    const failed = await prime.saving.then(
+        () => false,
+        () => true
+    );
+
+    check("Scheitert das Speichern, kommt die Antwort trotzdem", still?.accountId === "w0150linked" && !failed);
+    prime.Close();
+
+    // Trennen und Wechseln löschen den Stand zusammen mit den Rängen. Per Lesen, ohne Discord.
+    const source = (file: string): string => readFileSync(path.join(process.cwd(), "src", ...file.split("/")), "utf8");
+    const rank = source("commands/user/Rank.ts");
+    const epic = source("utils/epic.ts");
+
+    // Dazwischen dürfen nur Kommentarzeilen stehen.
+    check("/rank unlink löscht den Stand mit den Rängen", /ranks\.Clear\(userId\);\s*(?:\/\/.*\s*)*await this\.client\.primeSnapshots\.Clear\(userId\);/.test(rank));
+    check("Wechsel auf ein anderes Epic-Konto auch", /ranks\.Clear\(userId\);\s*(?:\/\/.*\s*)*await client\.primeSnapshots\.Clear\(userId\);/.test(epic));
+    check("Verbinden speichert den Stand gleich mit", /SaveProfile\([^;]*\);\s*(?:\/\/.*\s*)*await client\.primeSnapshots\.Save\(userId, profile\);/.test(epic));
+}
+
+/** W-0150: Ein gespeicherter Stand vom 20.11.2026, 18:42 UTC (Sekunden 1795200120). */
+const STORED: IPrimeProfile = {
+    name: "PruefName",
+    platform: "Epic Games",
+    accountId: "w0150acc",
+    playerId: "Epic|w0150acc|0",
+    linked: [],
+    seasonLevel: 1,
+    seasonWins: 0,
+    ranks: [],
+    stats: [],
+    club: null,
+    fetchedAt: "2026-11-20T18:42:00.000Z",
+};
+
+/** W-0150: Die Zeile über einer Karte mit altem Stand (Entwurf B), Texte wie im Design. */
+async function checkStaleNotice(): Promise<void> {
+    console.log("\n  — Hinweis über der Karte bei altem Stand —");
+
+    const me = StaleNotice({ ...STORED, stale: "down" }, true);
+    const other = StaleNotice({ ...STORED, stale: true }, false);
+
+    check("Frischer Stand: keine Zeile", StaleNotice(STORED, true) === null);
+    check(
+        "/rank me bei Ausfall",
+        me === "⚠️ **Rocket League antwortet gerade nicht.** Das ist dein letzter Stand vom <t:1795200120:f> (<t:1795200120:R>).\n-# Für aktuelle Zahlen /rank me später noch einmal ausführen.",
+        String(me)
+    );
+    check(
+        "/rank search bei Ausfall, mit Name",
+        other === "⚠️ **Rocket League antwortet gerade nicht.** Das ist der letzte Stand von **PruefName** vom <t:1795200120:f> (<t:1795200120:R>).\n-# Für aktuelle Zahlen /rank search später noch einmal ausführen.",
+        String(other)
+    );
+    check(
+        "Zugang abgelehnt: eigener erster Satz",
+        StaleNotice({ ...STORED, stale: "access" }, true)?.startsWith("⚠️ **Die Rang-Abfrage ist gerade nicht freigeschaltet.** Das ist dein letzter Stand vom ") === true,
+        String(StaleNotice({ ...STORED, stale: "access" }, true))
+    );
+
+    const fresh = await RankMessage({ profile: STORED, discordName: null, avatarURL: null, page: "ranked", self: true }, "1");
+    const old = await RankMessage({ profile: { ...STORED, stale: "down" }, discordName: null, avatarURL: null, page: "ranked", self: true }, "1");
+
+    check("Nachricht mit frischem Stand: Text leer", fresh.content === "", fresh.content);
+    check("  mit altem Stand: die Zeile", old.content === me, old.content);
+}
+
+/**
+ * W-0150: Fällt Prime aus und hat der Arbeitsspeicher nichts, holt /rank den
+ * gespeicherten Stand - /rank link nicht. Ohne Datenbank bleibt es bei der Meldung.
+ */
+async function checkFallback(): Promise<void> {
+    console.log("\n  — /rank bei Ausfall: gespeicherter Stand —");
+
+    const DOWN = "Rocket League antwortet gerade nicht. Versuch es später noch einmal.";
+    const state = { failure: new PrimeError("Prime antwortet nicht (10000 ms)", "Timeout") as Error, profile: null as IPrimeProfile | null };
+    const db = { Ready: true };
+    const replies: { content?: string; files?: unknown[] }[] = [];
+    const fake = {
+        primeService: { IsConfigured: true, Profile: async () => state.profile ?? Promise.reject(state.failure) },
+        databaseService: db,
+        primeSnapshots: { Lookup: async (wanted: string) => (wanted.toLowerCase() === "pruefname" || wanted === "w0150acc" ? STORED : null) },
+        accounts: { TrustedOwner: async () => "2" },
+        users: { fetch: async () => null },
+        cooldowns: new Collection(),
+        guardian: { ReportError: async (error: Error) => void replies.push({ content: `Fehler: ${error.message}` }) },
+    } as unknown as BotClient;
+    const interaction = { editReply: async (message: { content?: string }) => void replies.push(message) };
+    const fetch = (name: string, fallback?: boolean) =>
+        (new Rank(fake) as unknown as { Fetch: (i: unknown, n: string, f?: boolean) => Promise<IPrimeProfile | null> }).Fetch(interaction, name, fallback);
+
+    const rescued = await fetch("PruefName", true);
+
+    check("Zeitüberschreitung: der gespeicherte Stand kommt", rescued?.name === "PruefName" && rescued.fromStore === true, `${String(rescued?.name)} ${String(rescued?.fromStore)}`);
+    check("  als „down“ markiert, ohne Meldung", rescued?.stale === "down" && replies.length === 0, `${String(rescued?.stale)}, ${replies.length} Antworten`);
+
+    const plain = await fetch("PruefName");
+
+    check("Ohne Rückgriff (/rank link): die Meldung wie bisher", plain === null && replies.at(-1)?.content === DOWN, String(replies.at(-1)?.content));
+
+    state.failure = HttpError(401, "");
+
+    const locked = await fetch("w0150acc", true);
+
+    check("Zugang abgelehnt: Stand als „access“", locked?.stale === "access" && locked.fromStore === true, String(locked?.stale));
+
+    state.failure = HttpError(502, "<html>");
+    check("Anderer Fehler: Stand als alt (true)", (await fetch("w0150acc", true))?.stale === true);
+
+    state.failure = new PrimeError("Prime antwortet nicht (10000 ms)", "Timeout");
+
+    const unknown = await fetch("Fremd", true);
+
+    check("Nichts gespeichert: die Meldung", unknown === null && replies.at(-1)?.content === DOWN, String(replies.at(-1)?.content));
+
+    db.Ready = false;
+
+    const offline = await fetch("PruefName", true);
+
+    check("Datenbank nicht bereit: die Meldung, kein Fehler", offline === null && replies.at(-1)?.content === DOWN, String(replies.at(-1)?.content));
+
+    db.Ready = true;
+
+    // Der Knopf unter der Karte: derselbe Rückgriff, und die Zeile verschwindet wieder, sobald der Stand frisch ist.
+    const click = async (user: string) => {
+        await new RankButtons(fake).Execute({
+            isButton: () => true,
+            customId: `rk:extra:w0150acc:${user}`,
+            user: { id: user },
+            guildId: null,
+            deferUpdate: async () => undefined,
+            reply: async (message: { content?: string }) => void replies.push(message),
+            followUp: async (message: { content?: string }) => void replies.push(message),
+            editReply: async (message: { content?: string }) => void replies.push(message),
+        } as never);
+
+        return replies.at(-1);
+    };
+
+    const stale = await click("2");
+
+    check("Knopf bei Ausfall: Karte mit der Zeile", stale?.content === StaleNotice({ ...STORED, stale: "down" }, true) && (stale.files?.length ?? 0) === 1, String(stale?.content));
+
+    state.profile = { ...STORED, fetchedAt: new Date().toISOString() };
+
+    const fresh = await click("3");
+
+    check("  wieder frisch: die Zeile ist weg", fresh?.content === "" && (fresh.files?.length ?? 0) === 1, String(fresh?.content));
+}
+
+/** W-0150: Dasselbe mit echter Datenbank und einer echten Zeile in player_accounts. */
+async function checkSnapshotWrites(client: BotClient): Promise<void> {
+    console.log("\n  — Letzter Rang-Stand: Speichern mit Datenbank —");
+
+    const user = "90071992547409972";
+    const prime = new RememberingPrime(client);
+
+    try {
+        await client.accounts.Link(user, "epic", "w0150linked", "W0150Linked", true);
+
+        await prime.Profile("w0150linked");
+        await prime.saving;
+        await prime.Profile("w0150frei");
+        await prime.saving;
+
+        check("Verknüpftes Konto: der Stand steht in der Datenbank", (await client.primeSnapshots.Lookup("w0150linked"))?.accountId === "w0150linked");
+        check("  ein nur nachgeschlagenes nicht", (await client.primeSnapshots.Lookup("w0150frei")) === null);
+    } finally {
+        prime.Close();
+        await client.primeSnapshots.Clear(user).catch(() => undefined);
+        await client.accounts.Unlink(user, "epic").catch(() => false);
+    }
+}
+
+/**
+ * W-0150: Der letzte Stand je verknüpftem Konto. Ohne ihn hatte /rank nach
+ * jedem Neustart nichts mehr, sobald Prime ausfiel. Gefunden wird er über die
+ * Konto-ID oder den Anzeigenamen, Groß- und Kleinschreibung egal.
+ */
+async function checkSnapshots(client: BotClient): Promise<void> {
+    console.log("\n  — Letzter Rang-Stand —");
+
+    const user = "90071992547409971";
+    const fetchedAt = "2026-11-20T18:42:00.000Z";
+    const stand = (name: string): IPrimeProfile =>
+        ({ name, platform: "Epic Games", accountId: "w0150acc", playerId: "Epic|w0150acc|0", linked: [], seasonLevel: 3, seasonWins: 4, ranks: [], stats: [], club: null, fetchedAt }) as IPrimeProfile;
+    const rows = async () => (await client.databaseService.Query<{ user_id: string }>("SELECT user_id FROM prime_snapshots WHERE user_id = ?", [user])).length;
+
+    try {
+        await client.primeSnapshots.Save(user, stand("PruefName"));
+
+        const byId = await client.primeSnapshots.Lookup("w0150acc");
+        const byName = await client.primeSnapshots.Lookup("pruefname");
+
+        check("Gespeichert und über die Konto-ID gefunden", byId?.name === "PruefName", String(byId?.name));
+        check("  mit dem Zeitpunkt der Abfrage", byId?.fetchedAt === fetchedAt, String(byId?.fetchedAt));
+        check("  auch über den Namen in anderer Schreibweise", byName?.name === "PruefName" && byName.fetchedAt === fetchedAt, String(byName?.name));
+
+        await client.primeSnapshots.Save(user, stand("Neu"));
+
+        const renamed = await client.primeSnapshots.Lookup("w0150acc");
+
+        check("Neuer Stand überschreibt den alten", renamed?.name === "Neu" && (await rows()) === 1, `${String(renamed?.name)}, ${await rows()} Zeilen`);
+
+        await client.primeSnapshots.Clear(user);
+
+        check("Nach dem Löschen ist nichts mehr da", (await client.primeSnapshots.Lookup("w0150acc")) === null);
+    } finally {
+        await client.databaseService.Write("DELETE FROM prime_snapshots WHERE user_id = ?", [user]).catch(() => undefined);
+    }
+}
+
 async function main(): Promise<void> {
     const client = new BotClient();
     const player = process.argv[2]?.trim();
@@ -960,6 +1237,21 @@ async function main(): Promise<void> {
     await checkAccessMessage();
     await checkAccessWatch();
     await checkResolverNames();
+    await checkSnapshotWiring();
+    await checkStaleNotice();
+    await checkFallback();
+
+    // W-0150: Nur mit Datenbank - ohne bleibt es bei einem Hinweis.
+    if (await client.databaseService.Connect()) {
+        try {
+            await checkSnapshots(client);
+            await checkSnapshotWrites(client);
+        } finally {
+            await client.databaseService.Close();
+        }
+    } else {
+        console.log("\n  — Datenbank —\n  übersprungen: keine Verbindung (siehe Meldung oben)");
+    }
 
     if (!player) {
         console.log("\n⏭️  Kein Spielername übergeben - die echte Abfrage bleibt aus.\n   npm run check:prime -- DEIN_EPIC_NAME\n");

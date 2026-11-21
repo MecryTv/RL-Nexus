@@ -79,12 +79,14 @@ export const USERDATA_AREAS: readonly IUserdataAreaDef[] = [
     {
         id: "spieler",
         label: "Rocket-League-Konten",
-        inside: ["Verknüpfte Konten", "Ränge", "Spielerprofil", "Epic-Namen"],
+        inside: ["Verknüpfte Konten", "Ränge", "Spielerprofil", "Letzter Rang-Stand", "Epic-Namen"],
         icon: "link",
         sources: [
             { table: "player_accounts", column: "user_id", role: "person", time: "linked_at", label: "CONCAT(platform, ' · ', COALESCE(display_name, account_id))" },
             { table: "player_profiles", column: "user_id", role: "person", time: "updated_at", label: "'Spielerprofil'" },
             { table: "player_ranks", column: "user_id", role: "person", time: "updated_at", label: "CONCAT(playlist, ' · ', COALESCE(tier, '–'))" },
+            // W-0150: der letzte Stand aus Prime für /rank bei Ausfall.
+            { table: "prime_snapshots", column: "user_id", role: "person", time: "fetched_at", label: "CONCAT('Rang-Stand · ', display_name)" },
             { table: "user_connections", column: "user_id", role: "person", time: ms("updated_at"), label: "CONCAT(platform, ' · ', COALESCE(name, account_id))" },
             { table: "epic_name_cases", column: "user_id", role: "person", time: ms("detected_at"), label: "CONCAT('Epic-Name geändert: ', old_name)" },
         ],
@@ -372,6 +374,7 @@ export const USERDATA_IGNORED: Readonly<Record<string, string>> = {
     "lft_requests.*": "Antworten, gehören zur Person aus user_id",
     "epic_name_cases.*": "gehört zur Person aus user_id",
     "player_profiles.*": "gehört zur Person aus user_id",
+    "prime_snapshots.*": "gehört zur Person aus user_id",
     "voice_presets.*": "gehört zur Person aus user_id",
     "temp_voices.*": "Einstellungen des Kanals, gehört zur Person aus owner_id",
     "contact_messages.*": "Inhalt der Nachricht, gehört zur Zeile",
