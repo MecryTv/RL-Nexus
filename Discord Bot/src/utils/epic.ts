@@ -34,9 +34,8 @@ export async function EpicAdopt(client: BotClient, userId: string, epic: IEpicAc
     // Review W-0125: Ein anderes Konto als vorher - Ränge und Rang-Rollen des alten gehen.
     // Die Rollen im Hintergrund: die Seite soll nicht auf jeden Server warten.
     if (current && current.account_id !== epic.accountId) {
+        // Mit den Rängen geht auch der letzte Rang-Stand des alten Kontos (W-0150).
         await client.ranks.Clear(userId);
-        // W-0150: auch der letzte Rang-Stand des alten Kontos.
-        await client.primeSnapshots.Clear(userId);
         void client.rankRoleService.Strip(userId).catch(() => 0);
     }
 

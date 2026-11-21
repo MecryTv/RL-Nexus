@@ -1017,16 +1017,8 @@ async function checkSnapshotWiring(): Promise<void> {
 
     check("Scheitert das Speichern, kommt die Antwort trotzdem", still?.accountId === "w0150linked" && !failed);
     prime.Close();
-
-    // Trennen und Wechseln löschen den Stand zusammen mit den Rängen. Per Lesen, ohne Discord.
-    const source = (file: string): string => readFileSync(path.join(process.cwd(), "src", ...file.split("/")), "utf8");
-    const rank = source("commands/user/Rank.ts");
-    const epic = source("utils/epic.ts");
-
-    // Dazwischen dürfen nur Kommentarzeilen stehen.
-    check("/rank unlink löscht den Stand mit den Rängen", /ranks\.Clear\(userId\);\s*(?:\/\/.*\s*)*await this\.client\.primeSnapshots\.Clear\(userId\);/.test(rank));
-    check("Wechsel auf ein anderes Epic-Konto auch", /ranks\.Clear\(userId\);\s*(?:\/\/.*\s*)*await client\.primeSnapshots\.Clear\(userId\);/.test(epic));
-    check("Verbinden speichert den Stand gleich mit", /SaveProfile\([^;]*\);\s*(?:\/\/.*\s*)*await client\.primeSnapshots\.Save\(userId, profile\);/.test(epic));
+    // W-0152: Ob Trennen und Wechseln den Stand löschen, prüft checkSnapshots jetzt mit der
+    // Datenbank (ranks.Clear), das Speichern beim Verbinden check:epiclogin.
 }
 
 /** W-0150: Ein gespeicherter Stand vom 20.11.2026, 18:42 UTC (Sekunden 1795200120). */
@@ -1085,12 +1077,13 @@ async function checkFallback(): Promise<void> {
     const DOWN = "Rocket League antwortet gerade nicht. Versuch es später noch einmal.";
     const state = { failure: new PrimeError("Prime antwortet nicht (10000 ms)", "Timeout") as Error, profile: null as IPrimeProfile | null, missing: false };
     const db = { Ready: true };
+    const accounts = { TrustedOwner: async (): Promise<string | null> => "2", Owner: async (): Promise<string | null> => "2" };
     const replies: { content?: string; files?: unknown[]; allowedMentions?: { parse?: unknown[] } }[] = [];
     const fake = {
         primeService: { IsConfigured: true, Profile: async () => (state.missing ? null : (state.profile ?? Promise.reject(state.failure))) },
         databaseService: db,
         primeSnapshots: { Lookup: async (wanted: string) => (wanted.toLowerCase() === "pruefname" || wanted === "w0150acc" ? STORED : null) },
-        accounts: { TrustedOwner: async () => "2" },
+        accounts,
         users: { fetch: async () => null },
         cooldowns: new Collection(),
         guardian: { ReportError: async (error: Error) => void replies.push({ content: `Fehler: ${error.message}` }) },
@@ -1169,6 +1162,25 @@ async function checkFallback(): Promise<void> {
     const fresh = await click("3");
 
     check("  wieder frisch: die Zeile ist weg", fresh?.content === "" && (fresh.files?.length ?? 0) === 1, String(fresh?.content));
+
+    // W-0152: Nur per Name verbunden zeigt TrustedOwner niemanden - die eigene Karte bleibt
+    // trotzdem „dein letzter Stand“, wie bei /rank me. Sonst kippt der Text beim Umblättern.
+    state.profile = null;
+    accounts.TrustedOwner = async () => null;
+    accounts.Owner = async () => "5";
+
+    const own = await click("5");
+
+    check("Konto nur per Name verbunden: beim Umblättern weiter „dein letzter Stand“", own?.content === StaleNotice({ ...STORED, stale: "down" }, true), String(own?.content));
+
+    await (new Rank(fake) as unknown as { Search: (i: unknown) => Promise<void> }).Search({
+        options: { getString: () => "PruefName" },
+        user: { id: "5", username: "fuenf" },
+        guildId: null,
+        deferReply: async () => undefined,
+        editReply: async (message: { content?: string }) => void replies.push(message),
+    });
+    check("  /rank search nach dem eigenen Namen genauso", replies.at(-1)?.content === StaleNotice({ ...STORED, stale: "down" }, true), String(replies.at(-1)?.content));
 }
 
 /** W-0150: Dasselbe mit echter Datenbank und einer echten Zeile in player_accounts. */
@@ -1248,6 +1260,17 @@ async function checkSnapshots(client: BotClient): Promise<void> {
         await client.primeSnapshots.Clear(user);
 
         check("Nach dem Löschen ist nichts mehr da", (await client.primeSnapshots.Lookup("w0150acc")) === null);
+
+        // W-0152: /rank unlink, ein Wechsel des Epic-Kontos und die Übernahme beim Login räumen
+        // alle über ranks.Clear ab - der Stand muss dabei mitgehen.
+        await client.primeSnapshots.Save(user, stand("PruefName"));
+        await client.ranks.Clear(user);
+        check("Ränge gelöscht (Trennen, Kontowechsel): der Stand ist auch weg", (await client.primeSnapshots.Lookup("w0150acc")) === null);
+
+        // W-0152: Akzente zählen, Groß- und Kleinschreibung nicht - „Rene“ ist ein anderer Spieler als „René“.
+        await client.primeSnapshots.Save(user, stand("René"));
+        check("„rene“ findet „René“ nicht", (await client.primeSnapshots.Lookup("rene")) === null);
+        check("  „RENÉ“ schon", (await client.primeSnapshots.Lookup("RENÉ"))?.name === "René", String((await client.primeSnapshots.Lookup("RENÉ"))?.name));
     } finally {
         await client.databaseService.Write("DELETE FROM prime_snapshots WHERE user_id = ?", [user]).catch(() => undefined);
     }

@@ -152,9 +152,12 @@ export default class PlayerRanks extends Model<IPlayerRankRow> {
     async Clear(userId: string): Promise<void> {
         await this.db.Write(`DELETE FROM \`${TABLES.ranks}\` WHERE user_id = ?`, [userId]);
         await this.db.Write(`DELETE FROM \`${TABLES.profiles}\` WHERE user_id = ?`, [userId]);
+        // W-0150/W-0152: der letzte Rang-Stand geht mit - hier, damit kein Aufrufer ihn vergisst.
+        await this.db.Write(`DELETE FROM \`${TABLES.primeSnapshots}\` WHERE user_id = ?`, [userId]);
 
         this.db.Bump(TABLES.ranks);
         this.db.Bump(TABLES.profiles);
+        this.db.Bump(TABLES.primeSnapshots);
     }
 
     /** Aus den gespeicherten Zeilen die Eingabe für die WTSI-Rechnung bauen. */

@@ -132,9 +132,8 @@ export default class EpicCallback extends Route {
         if (owner && owner.userId !== userId && !owner.verified) {
             logger.warn(`🎮 Epic-Login übernimmt ${epic.accountId}: per Name bei ${owner.userId}, jetzt per Login bei ${userId}`);
             await this.client.accounts.Unlink(owner.userId, "epic");
+            // Mit den Rängen geht auch der letzte Rang-Stand (W-0150).
             await this.client.ranks.Clear(owner.userId);
-            // W-0150: der letzte Rang-Stand geht mit dem Konto.
-            await this.client.primeSnapshots.Clear(owner.userId);
             void this.client.rankRoleService.Strip(owner.userId).catch(() => 0);
         }
 

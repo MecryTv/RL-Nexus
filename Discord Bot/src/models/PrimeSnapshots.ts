@@ -39,14 +39,15 @@ export default class PrimeSnapshots extends Model<IPrimeSnapshotRow> {
 
     /**
      * Über die Konto-ID (/rank me, der Knopf unter der Karte) oder den
-     * Anzeigenamen (/rank search). Groß- und Kleinschreibung regelt die Collation.
+     * Anzeigenamen (/rank search). Groß- und Kleinschreibung egal, Akzente nicht
+     * (W-0152: die Spalte ist utf8mb4_bin, LOWER auf beiden Seiten).
      *
      * Ohne Cache: gelesen wird nur bei einem Ausfall, und das Admin Dashboard
      * löscht Nutzerdaten an diesem Bot vorbei.
      */
     async Lookup(wanted: string): Promise<IPrimeProfile | null> {
         const row = await this.db.One<IPrimeSnapshotRow>(
-            `SELECT profile, fetched_at FROM \`${this.Table}\` WHERE account_id = ? OR display_name = ? ORDER BY fetched_at DESC LIMIT 1`,
+            `SELECT profile, fetched_at FROM \`${this.Table}\` WHERE account_id = ? OR LOWER(display_name) = LOWER(?) ORDER BY fetched_at DESC LIMIT 1`,
             [wanted, wanted]
         );
 
@@ -57,7 +58,7 @@ export default class PrimeSnapshots extends Model<IPrimeSnapshotRow> {
         return profile ? { ...profile, fetchedAt: new Date(row.fetched_at).toISOString() } : null;
     }
 
-    /** Beim Trennen und beim Wechsel auf ein anderes Epic-Konto. */
+    /** Löscht den Stand. Trennen und Kontowechsel laufen über PlayerRanks.Clear, das ihn mitnimmt (W-0152). */
     async Clear(userId: string): Promise<void> {
         await this.Delete(userId);
     }
