@@ -1,9 +1,11 @@
 import {
     ButtonInteraction,
     CategoryChannel,
+    Channel,
     ChannelType,
     Guild,
     GuildMember,
+    Message,
     MessageFlags,
     OverwriteResolvable,
     PermissionFlagsBits,
@@ -16,12 +18,14 @@ import { AskLine, ILimitHit, IsServerAdmin } from "../builder/LimitReply";
 import { ModuleValue } from "../utils/moduleFlags";
 import { InfoCard } from "../builder/CommunityView";
 import { VoicePanel } from "../builder/VoiceView";
+import { IVoicePanelImage } from "../builder/VoicePanelImage";
 import {
     DefaultHubConfig,
     DefaultVoiceSettings,
     MAX_LIMIT,
     MAX_PRESETS,
     MAX_VOICE_NAME,
+    PANEL_REFRESH_MS,
     REGION_LABELS,
     VOICE_ACCENT,
     VOICE_ACTION_VALUES,
@@ -79,8 +83,112 @@ export default class VoiceService {
     // W-0140: Sweep() läuft einmal nach dem Start, nicht bei jedem Lauf.
     private swept = false;
 
+    /** W-0151: so lange werden Änderungen gesammelt, bevor das Panel neu gesetzt wird. Die Prüfungen setzen es kürzer. */
+    refreshDelay = PANEL_REFRESH_MS;
+    private refreshTimers = new Map<string, NodeJS.Timeout>();
+
     constructor(client: BotClient) {
         this.client = client;
+    }
+
+    /* ----------------------------------------------------------
+       W-0151: das Panel als Bild
+       ---------------------------------------------------------- */
+    /**
+     * Was das Bild zeigt. Plätze und Region kommen aus dem Kanal selbst: Der
+     * Besitzer darf sie auch in Discord ändern, am Bot vorbei.
+     */
+    async PanelImage(channel: VoiceBasedChannel, temp: ITempVoice): Promise<IVoicePanelImage> {
+        const owner = channel.guild.members.cache.get(temp.ownerId) ?? (await channel.guild.members.fetch(temp.ownerId).catch(() => null));
+
+        return {
+            kind: "channel",
+            ownerName: owner?.displayName ?? "Unbekannt",
+            avatarURL: owner?.displayAvatarURL({ extension: "png", size: 256 }) ?? null,
+            privacy: temp.settings.privacy,
+            stealth: temp.settings.stealth,
+            limit: channel.userLimit,
+            region: channel.rtcRegion,
+        };
+    }
+
+    /** Setzt das Panel im Chat des Kanals neu. Fehlt die Nachricht oder das Recht, passiert still nichts. */
+    async RefreshPanel(channel: VoiceBasedChannel): Promise<void> {
+        try {
+            const temp = await this.client.tempVoices.Get(channel.id);
+
+            if (!temp?.panelMessageId || temp.support) return;
+
+            const message = await channel.messages.fetch(temp.panelMessageId);
+            const hub = temp.hubId === null ? null : await this.client.voiceHubs.Get(temp.hubId);
+            const view = await VoicePanel(hub?.config ?? DefaultHubConfig(), await this.PanelImage(channel, temp));
+
+            await message.edit({ components: view.components, files: view.files, attachments: [], allowedMentions: view.allowedMentions });
+        } catch (error) {
+            logger.debug(`🔊 Panel in ${channel.id} nicht neu gesetzt: ${String(error)}`);
+        }
+    }
+
+    /**
+     * Nach jeder Benutzung des Panels: Discord leert das Menü, sobald die Nachricht
+     * neu gesetzt wird, und Name und Profilbild im Bild sind danach aktuell.
+     * Ein Panel aus der Zeit vor W-0151 übernimmt der Bot dabei als Panel des Kanals.
+     */
+    async ResetPanel(message: Message): Promise<void> {
+        try {
+            const channel = message.channel;
+
+            if (channel.isVoiceBased()) {
+                const temp = await this.client.tempVoices.Get(channel.id);
+
+                if (temp && !temp.support) {
+                    if (temp.panelMessageId !== message.id) await this.client.tempVoices.SetPanel(channel.id, message.id);
+
+                    return await this.RefreshPanel(channel);
+                }
+            }
+
+            // Das feste Panel für alle: ohne Besitzer, sein Bild ändert sich nie.
+            const hubs = message.guildId ? await this.client.voiceHubs.OfGuild(message.guildId) : [];
+            const view = await VoicePanel(hubs[0]?.config ?? DefaultHubConfig(), { kind: "fixed" });
+
+            await message.edit({ components: view.components, files: view.files, attachments: [], allowedMentions: view.allowedMentions });
+        } catch (error) {
+            logger.debug(`🔊 Panel ${message.id} nicht zurückgesetzt: ${String(error)}`);
+        }
+    }
+
+    /**
+     * Ein Kanal wurde in Discord geändert. Der Besitzer darf Plätze und Region dort
+     * selbst einstellen, am Bot vorbei: dann übernimmt der Bot die Werte (sonst
+     * speichert „Preset speichern“ einen alten Stand) und setzt das Panel neu.
+     */
+    async ChannelChanged(before: Channel, after: Channel): Promise<void> {
+        if (!after.isVoiceBased() || !before.isVoiceBased()) return;
+        if (before.userLimit === after.userLimit && before.rtcRegion === after.rtcRegion) return;
+
+        const temp = await this.client.tempVoices.Get(after.id).catch(() => null);
+
+        if (!temp) return;
+
+        if (temp.settings.limit !== after.userLimit || temp.settings.region !== after.rtcRegion) {
+            await this.client.tempVoices.Save(after.id, { ...temp.settings, limit: after.userLimit, region: after.rtcRegion }).catch(() => undefined);
+        }
+
+        this.QueueRefresh(after);
+    }
+
+    /** Bündelt Anstöße: mehrere Änderungen kurz hintereinander ergeben ein Neusetzen. */
+    QueueRefresh(channel: VoiceBasedChannel): void {
+        clearTimeout(this.refreshTimers.get(channel.id));
+
+        const timer = setTimeout(() => {
+            this.refreshTimers.delete(channel.id);
+            void this.RefreshPanel(channel);
+        }, this.refreshDelay);
+
+        timer.unref?.();
+        this.refreshTimers.set(channel.id, timer);
     }
 
     /* ----------------------------------------------------------
@@ -104,7 +212,7 @@ export default class VoiceService {
 
         if (!hubs.length) throw new VoiceError("Leg zuerst einen Hub an, sonst steuert das Panel nichts.");
 
-        const sent = await channel.send({ ...VoicePanel(hubs[0].config, false), flags: MessageFlags.IsComponentsV2 }).catch(() => null);
+        const sent = await channel.send({ ...(await VoicePanel(hubs[0].config, { kind: "fixed" })), flags: MessageFlags.IsComponentsV2 }).catch(() => null);
 
         if (!sent) throw new VoiceError("Die Nachricht ging nicht raus. Darf der Bot in den Kanal schreiben?");
 
@@ -289,8 +397,8 @@ export default class VoiceService {
             });
 
             const support = hub.config.support;
+            const temp = await this.client.tempVoices.Create({ channelId: channel.id, guildId: guild.id, hubId: hub.id, ownerId: member.id, settings: { ...settings, name }, support });
 
-            await this.client.tempVoices.Create({ channelId: channel.id, guildId: guild.id, hubId: hub.id, ownerId: member.id, settings: { ...settings, name }, support });
             await member.voice.setChannel(channel).catch(() => undefined);
 
             this.client.pulseService.Emit(guild.id, "voice", { channelId: channel.id, open: true });
@@ -302,9 +410,10 @@ export default class VoiceService {
 
             // Panel in den Chat des Kanals - beim festen Panel steht es schon woanders.
             if (!support && panel.panel === "voice") {
-                await channel
-                    .send({ ...VoicePanel(hub.config, true), flags: MessageFlags.IsComponentsV2 })
-                    .catch(() => undefined);
+                const sent = await channel.send({ ...(await VoicePanel(hub.config, await this.PanelImage(channel, temp))), flags: MessageFlags.IsComponentsV2 }).catch(() => null);
+
+                // W-0151: Damit der Bot das Bild bei jeder Änderung neu setzen kann.
+                if (sent) await this.client.tempVoices.SetPanel(channel.id, sent.id).catch(() => undefined);
             }
 
             logger.user(`🔊 ${channel.name} auf ${guild.id} angelegt (für ${member.id})`);
@@ -349,6 +458,7 @@ export default class VoiceService {
             await channel
                 .send({ ...InfoCard(`🔄 <@${next.id}> hat den Kanal übernommen, der bisherige Besitzer ist weg.`), flags: MessageFlags.IsComponentsV2 })
                 .catch(() => undefined);
+            this.QueueRefresh(channel);
         }
     }
 
@@ -434,6 +544,8 @@ export default class VoiceService {
         await this.client.tempVoices.Save(temp.channelId, settings);
         // Review W-0143: Sperren, Limit, Name, Vertraute ändern keinen Sprachzustand - das Fenster soll es trotzdem sehen.
         this.client.pulseService.Emit(channel.guild.id, "voice", { channelId: temp.channelId, changed: true });
+        // W-0151: Zutritt, Plätze, Region und Unsichtbar stehen im Panel-Bild (auch nach Presets).
+        this.QueueRefresh(channel);
     }
 
     /* ----------------------------------------------------------
@@ -590,6 +702,7 @@ export default class VoiceService {
                 await this.client.tempVoices.Save(channel.id, settings, target.id);
                 await channel.permissionOverwrites.set(this.Overwrites(channel.guild, target.id, settings)).catch(() => undefined);
                 this.client.pulseService.Emit(channel.guild.id, "voice", { channelId: channel.id, changed: true });
+                this.QueueRefresh(channel);
 
                 return `🔄 Der Kanal gehört jetzt ${named}.`;
             }

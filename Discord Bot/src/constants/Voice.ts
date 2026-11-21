@@ -8,25 +8,36 @@ export const VOICE_PREFIX = "voice";
 export const VOICE_ACCENT = "#5865f2";
 
 export const MAX_PRESETS = 5;
+
+/** W-0151: Änderungen am Kanal so lange sammeln, bevor das Panel-Bild neu gesetzt wird. */
+export const PANEL_REFRESH_MS = 3000;
 export const MAX_VOICE_NAME = 90;
 export const MAX_LIMIT = 99;
 
-/** Die Auswahl im Panel - Reihenfolge, Text und Symbol wie hier. */
+/**
+ * Die Auswahl im Panel - Reihenfolge, Text und Symbol wie hier. W-0151: deutsche
+ * Namen wie bei den Presets, sortiert nach Kanal, Leute, Mehr. Discord-Menüs
+ * kennen keine Zwischenüberschriften, deshalb steht der Bereich vorn in der
+ * Beschreibung. Das Dashboard zeigt dieselben Namen (DashboardApiVoice).
+ */
 export const VOICE_ACTIONS: { name: string; value: VoiceAction; description: string; emoji: string }[] = [
-    { name: "Name", value: "name", description: "Ändere den Namen des temporären Sprachkanals", emoji: "📝" },
-    { name: "User Limit", value: "userlimit", description: "Ändere die Benutzerbegrenzung des Sprachkanals", emoji: "🔢" },
-    { name: "Privacy", value: "privacy", description: "Ändere die Privatsphäre (öffentlich/privat)", emoji: "🔒" },
-    { name: "Stealth Mode", value: "stealthmode", description: "Schalte den Stealth-Modus ein/aus (Kanal unsichtbar)", emoji: "👻" },
-    { name: "Trust User", value: "trustuser", description: "Erlaube einem User den Beitritt im privaten Modus", emoji: "✅" },
-    { name: "Untrust User", value: "untrustuser", description: "Entziehe einem User das Beitrittsrecht", emoji: "❌" },
-    { name: "Invite User", value: "inviteuser", description: "Lade einen User in deinen Sprachkanal ein", emoji: "🔗" },
-    { name: "Kick User", value: "kickuser", description: "Entferne einen Benutzer aus dem Sprachkanal", emoji: "🚪" },
-    { name: "Region", value: "region", description: "Ändere die Region des temporären Sprachkanals", emoji: "🌐" },
-    { name: "Block User", value: "blockuser", description: "Blockiere einen User für diesen Sprachkanal", emoji: "🚫" },
-    { name: "Unblock User", value: "unblockuser", description: "Hebe die Blockierung eines Users wieder auf", emoji: "🔓" },
-    { name: "Transfer Ownership", value: "transferownership", description: "Übertrage den Besitz des Kanals an einen User", emoji: "🔄" },
-    { name: "Delete Channel", value: "deletechannel", description: "Lösche den temporären Sprachkanal", emoji: "🗑️" },
+    { name: "Umbenennen", value: "name", description: "Kanal · Neuer Name für den Kanal", emoji: "✏️" },
+    { name: "Plätze", value: "userlimit", description: "Kanal · Wie viele hineindürfen", emoji: "👥" },
+    { name: "Zutritt", value: "privacy", description: "Kanal · Öffentlich oder privat", emoji: "🔒" },
+    { name: "Unsichtbar", value: "stealthmode", description: "Kanal · Kanal für andere aus- oder einblenden", emoji: "👻" },
+    { name: "Region", value: "region", description: "Kanal · Sprachregion des Kanals", emoji: "🌐" },
+    { name: "Einladen", value: "inviteuser", description: "Leute · Jemanden direkt einladen", emoji: "🔗" },
+    { name: "Freigeben", value: "trustuser", description: "Leute · Darf auch in den privaten Kanal", emoji: "✅" },
+    { name: "Freigabe entziehen", value: "untrustuser", description: "Leute · Freigabe wieder wegnehmen", emoji: "❌" },
+    { name: "Rauswerfen", value: "kickuser", description: "Leute · Jemanden aus dem Kanal nehmen", emoji: "🚪" },
+    { name: "Sperren", value: "blockuser", description: "Leute · Kommt nicht mehr hinein", emoji: "🚫" },
+    { name: "Entsperren", value: "unblockuser", description: "Leute · Sperre aufheben", emoji: "🔓" },
+    { name: "Übergeben", value: "transferownership", description: "Mehr · Kanal an jemand anderen geben", emoji: "🔄" },
+    { name: "Kanal löschen", value: "deletechannel", description: "Mehr · Kanal sofort löschen", emoji: "🗑️" },
 ];
+
+/** Was ins Menü kommt: alles außer Löschen, das hat einen eigenen roten Knopf. */
+export const VOICE_MENU_ACTIONS = VOICE_ACTIONS.filter((entry) => entry.value !== "deletechannel");
 
 export const VOICE_ACTION_VALUES = VOICE_ACTIONS.map((entry) => entry.value);
 

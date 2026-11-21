@@ -12,6 +12,8 @@ export interface ITempVoiceRow {
     /** Vor 031 der Stand der Warteraum-Karte, seither nur noch true. NULL: gewöhnlicher Kanal. */
     support: unknown;
     created_at: number | string;
+    /** W-0151 (Migration 060). */
+    panel_message_id?: string | null;
 }
 
 function ToTemp(row: ITempVoiceRow): ITempVoice {
@@ -23,6 +25,7 @@ function ToTemp(row: ITempVoiceRow): ITempVoice {
         settings: { ...DefaultVoiceSettings(), ...Unpack<Partial<IVoiceSettings>>(row.settings, {}) },
         support: Boolean(row.support),
         createdAt: Number(row.created_at),
+        panelMessageId: row.panel_message_id ?? null,
     };
 }
 
@@ -67,6 +70,11 @@ export default class TempVoices extends Model<ITempVoiceRow> {
             settings: JSON.stringify(settings),
             ...(ownerId ? { owner_id: ownerId } : {}),
         } as Partial<ITempVoiceRow>);
+    }
+
+    /** W-0151: welche Nachricht das Panel des Kanals ist. */
+    async SetPanel(channelId: string, messageId: string | null): Promise<void> {
+        await this.Update([channelId], { panel_message_id: messageId } as Partial<ITempVoiceRow>);
     }
 
     async Remove(channelId: string): Promise<void> {

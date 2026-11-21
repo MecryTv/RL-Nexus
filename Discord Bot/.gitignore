@@ -7,8 +7,9 @@ dist
 /logs
 atlas-credentials.env
 .tmp-preview
-# Ergebnis von npm run check:card - nur zum Ansehen
+# Ergebnis von npm run check:card und check:voice - nur zum Ansehen
 card-check*.png
+voice-panel-check*.png
 # Galerie: Default- und Privacy-Bilder kommen mit, Guild-Uploads nicht
 /src/images/*
 !/src/images/default

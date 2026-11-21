@@ -12,12 +12,15 @@ import {
 import BotClient from "../../client/BotClient";
 import Event from "../../structures/Event";
 import { InfoCard } from "../../builder/CommunityView";
-import { VoicePresetList, VoiceRegionPrompt, VoiceState, VoiceUserPrompt } from "../../builder/VoiceView";
+import { VoiceDeletePrompt, VoicePresetList, VoiceRegionPrompt, VoiceState, VoiceUserPrompt } from "../../builder/VoiceView";
 import { MAX_LIMIT, MAX_PRESETS, MAX_VOICE_NAME, NEEDS_USER, VOICE_ACTIONS, VOICE_PREFIX } from "../../constants/Voice";
 import { VoiceAction } from "../../interfaces/services/voice/IVoice";
 import { VoiceError, VOICE_MODULE } from "../../services/VoiceService";
 
 const EPHEMERAL = MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral;
+
+/** Was direkt auf dem Panel sitzt - danach wird es neu gesetzt (W-0151). */
+const PANEL_CONTROLS = new Set([`${VOICE_PREFIX}:menu`, `${VOICE_PREFIX}:presets`, `${VOICE_PREFIX}:delete`]);
 
 /**
  * Das Temp-Voice-Panel: Auswahlmenü, User-Auswahl, Modals und die Presets.
@@ -60,6 +63,11 @@ export default class VoicePanelHandler extends Event {
             const normalized = error instanceof Error ? error : new Error(String(error));
 
             await this.client.guardian.ReportError(normalized, interaction, `Voice-Panel: ${interaction.customId}`);
+        } finally {
+            // W-0151: Discord meldet eine Auswahl nur, wenn sie sich ändert. Nach jeder Benutzung
+            // des Panels (auch bei Fehlern) die Nachricht neu setzen: das Menü ist wieder leer,
+            // dieselbe Option lässt sich erneut wählen, und das Bild ist aktuell.
+            if (component && PANEL_CONTROLS.has(interaction.customId)) await this.client.voiceService.ResetPanel(interaction.message).catch(() => undefined);
         }
     }
 
@@ -113,6 +121,31 @@ export default class VoicePanelHandler extends Event {
         }
 
         if (!interaction.isButton()) return;
+
+        // voice:delete - erst nachfragen, voice:delete:yes löscht, voice:delete:no bricht ab (W-0151)
+        if (parts[1] === "delete") {
+            if (parts[2] === "yes") {
+                // Erst antworten, dann löschen: Mit dem Kanal verschwindet auch diese Rückfrage,
+                // eine Antwort danach beantwortet Discord mit „Unknown Message“.
+                await service.Mine(member);
+                await interaction.update({ ...InfoCard("🗑️ Der Kanal wird gelöscht."), flags: MessageFlags.IsComponentsV2 });
+                await service.Run(member, "deletechannel");
+
+                return;
+            }
+
+            if (parts[2] === "no") {
+                await interaction.update({ ...InfoCard("Abgebrochen, der Kanal bleibt."), flags: MessageFlags.IsComponentsV2 });
+
+                return;
+            }
+
+            // Erst prüfen, ob ihm der Kanal gehört - sonst fragt das Panel umsonst.
+            await service.Mine(member);
+            await interaction.reply({ ...VoiceDeletePrompt(), flags: EPHEMERAL });
+
+            return;
+        }
 
         // voice:presets - die eigenen Presets
         if (parts[1] === "presets") {

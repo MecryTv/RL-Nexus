@@ -40,30 +40,37 @@ Wer den Hub betreten darf, regelt Discord: gib nur dem Team das Recht, sich mit 
 
 ## Das Panel
 
-Ein Auswahlmenü mit diesen Optionen — abgeschaltete stehen nicht drin:
+Seit W-0151 ein Kasten mit einem gezeichneten Kopf (`builder/VoicePanelImage.ts`, 1200 × 264, im Look der Rang-Karte): links Profilbild und Name des Besitzers, darüber rot **TEMP VOICE** (bei unsichtbarem Kanal **TEMP VOICE · UNSICHTBAR**), rechts drei Kacheln **Zutritt** (Offen grün, Privat orange), **Plätze** (nur das Limit, ∞ ohne Limit, nie die Belegung) und **Region**. Darunter das Menü **⚙️ Kanal einstellen …** und die Knöpfe **📌 Presets** und rot **🗑️ Kanal löschen**. Das Bild hat einen Alt-Text mit allem, was draufsteht.
+
+Im Menü stehen diese Optionen, sortiert nach Kanal, Leute und Mehr. Discord-Menüs kennen keine Zwischenüberschriften, deshalb steht der Bereich vorn in der Beschreibung. Abgeschaltete Optionen stehen nicht drin, das Dashboard zeigt dieselben Namen:
 
 | | Option | Was passiert |
 |---|---|---|
-| 📝 | Name | Kanal umbenennen (Eingabefeld) |
-| 🔢 | User Limit | Plätze setzen, 0 heißt unbegrenzt |
-| 🔒 | Privacy | Umschalten zwischen offen und privat |
-| 👻 | Stealth Mode | Kanal unsichtbar machen und wieder zeigen |
-| ✅ | Trust User | Darf rein, auch wenn der Kanal privat ist |
-| ❌ | Untrust User | Nimmt das Vertrauen wieder weg |
-| 🔗 | Invite User | Einladung per DM, gültig eine Stunde und einmal nutzbar |
-| 🚪 | Kick User | Wirft jemanden aus dem Kanal |
+| ✏️ | Umbenennen | Kanal umbenennen (Eingabefeld) |
+| 👥 | Plätze | Plätze setzen, 0 heißt unbegrenzt |
+| 🔒 | Zutritt | Umschalten zwischen offen und privat |
+| 👻 | Unsichtbar | Kanal unsichtbar machen und wieder zeigen |
 | 🌐 | Region | Region wechseln |
-| 🚫 | Block User | Kommt nicht mehr rein, sieht den Kanal nicht — und fliegt sofort raus |
-| 🔓 | Unblock User | Hebt die Blockierung auf |
-| 🔄 | Transfer Ownership | Übergibt den Kanal an jemanden, der drin sitzt |
-| 🗑️ | Delete Channel | Löscht den Kanal sofort |
+| 🔗 | Einladen | Einladung per DM, gültig eine Stunde und einmal nutzbar |
+| ✅ | Freigeben | Darf rein, auch wenn der Kanal privat ist |
+| ❌ | Freigabe entziehen | Nimmt die Freigabe wieder weg |
+| 🚪 | Rauswerfen | Wirft jemanden aus dem Kanal |
+| 🚫 | Sperren | Kommt nicht mehr rein, sieht den Kanal nicht — und fliegt sofort raus |
+| 🔓 | Entsperren | Hebt die Sperre auf |
+| 🔄 | Übergeben | Übergibt den Kanal an jemanden, der drin sitzt |
 
-Alles davon darf nur, wem der Kanal gehört. Jede Antwort sieht nur der, der geklickt hat; das Panel selbst bleibt stehen.
+**Kanal löschen** ist kein Menüeintrag, sondern der rote Knopf. Er fragt zuerst nur den Klickenden „Kanal wirklich löschen?“ (Löschen / Abbrechen). Ob es ihn gibt, hängt wie die Menüeinträge an der Option im Hub.
+
+Alles davon darf nur, wem der Kanal gehört. Jede Antwort sieht nur der, der geklickt hat.
+
+**Nach jeder Benutzung setzt der Bot das Panel neu** (`VoiceService.ResetPanel`), auch wenn die Aktion scheitert. Discord meldet eine Auswahl nur, wenn sie sich ändert: Ohne das Neusetzen blieb die letzte Option im Menü stehen und ließ sich nicht noch einmal wählen. Dabei wird auch das Bild neu gemalt, also mit aktuellem Namen und Profilbild. Panels von vor W-0151 stellt der Bot beim ersten Klick auf das neue Aussehen um.
+
+**Das Bild zeigt immer den Stand:** Der Bot merkt sich je Kanal die Panel-Nachricht (`temp_voices.panel_message_id`, Migration 060) und setzt sie nach jeder Änderung über das Panel, nach Presets und beim Besitzerwechsel neu (`QueueRefresh`, gebündelt über 3 Sekunden). Plätze und Region liest er direkt aus dem Kanal: Ändert der Besitzer sie in den Discord-Kanaleinstellungen, übernimmt der Bot sie in seine Einstellungen (damit Presets stimmen) und malt neu (`VoiceChannelUpdate`). Zutritt und Unsichtbar kommen aus den Einstellungen des Bots, eine Änderung der Rechte von Hand liest er nicht. Fehlt die Panel-Nachricht oder das Recht, passiert still nichts.
 
 **Wohin das Panel geht**, steht im Dashboard:
 
 - **In den Chat des eigenen Kanals** (Standard): Jeder neue Kanal bekommt das Panel gleich in seinen Text-Chat.
-- **In einen festen Kanal**: Das Panel steht einmal irgendwo und gilt für alle. Praktisch, wenn ihr die Kanal-Chats abgeschaltet habt. Gesendet wird es über den Knopf *Panel senden*.
+- **In einen festen Kanal**: Das Panel steht einmal irgendwo und gilt für alle. Praktisch, wenn ihr die Kanal-Chats abgeschaltet habt. Gesendet wird es über den Knopf *Panel senden*. Sein Bild hat keinen Besitzer: „Dein Sprachkanal“ und „Betritt einen Hub, dann stellst du hier deinen Kanal ein.“
 
 Geht der Besitzer raus und jemand bleibt drin, übernimmt der Nächste den Kanal — der Bot sagt das im Chat.
 
@@ -100,7 +107,7 @@ Anfang wie überall: `ManageGate()` (`utils/managegate.ts`) — Sitzung, „Serv
 | Anlegen | `VoiceChannels` hört auf `VoiceStateUpdate`. Zwei Beitritte in derselben Sekunde ergeben trotzdem nur einen Kanal |
 | Aufräumen | Der letzte raus, Kanal weg. Beim Start räumt `Sweep()` auf, was einen Neustart nicht überlebt hat |
 | Rechte | Privat setzt `Connect` für `@everyone` auf nein, unsichtbar zusätzlich `ViewChannel`; Vertraute und der Besitzer bekommen eigene Einträge |
-| Panel | `VoicePanelHandler` – Auswahlmenü, User-Auswahl, Modals und die Presets, alles mit `voice:`-IDs |
+| Panel | `VoicePanelHandler` – Auswahlmenü, User-Auswahl, Modals, die Presets und `voice:delete` (Rückfrage, `voice:delete:yes`/`:no`), alles mit `voice:`-IDs. Bild: `builder/VoicePanelImage.ts`, Neusetzen: `VoiceService.RefreshPanel`/`QueueRefresh`/`ResetPanel`, Discord-Änderungen: `events/voice/VoiceChannelUpdate.ts` → `VoiceService.ChannelChanged` |
 | Support-Hub | `VoiceService.Create()` schickt kein Panel, `Cleanup()` reicht den Kanal nicht weiter. Der Warteraum selbst: `services/SupportService.ts`, siehe [Moderation.md](Moderation.md#support-warteraum) |
 
 Der Bot braucht **Kanäle verwalten** (anlegen, umbenennen, löschen, Rechte setzen) und **Mitglieder verschieben**, um jemanden in seinen Kanal zu ziehen.
@@ -110,7 +117,8 @@ Der Bot braucht **Kanäle verwalten** (anlegen, umbenennen, löschen, Rechte set
 ## Prüfen
 
 ```bash
-npm run check:voice   # Vorgaben, Namensvorlage, Panel, Presets, Support-Hub, Datenbank und alle 13 Aktionen
+npm run check:voice   # Vorgaben, Namensvorlage, Panel samt Bild, Menü-Reset und Löschen mit Rückfrage, Presets, Support-Hub, Datenbank und alle 13 Aktionen
+                      # legt voice-panel-check.png, -privat.png und -fest.png zum Ansehen ab
 ```
 
 Die Sprachkanäle sind dabei erfunden — der Testkanal merkt sich nur, was der Bot an ihm ändern wollte. Ob Discord mitspielt, zeigt erst ein echter Server.

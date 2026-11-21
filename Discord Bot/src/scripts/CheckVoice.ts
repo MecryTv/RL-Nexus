@@ -12,10 +12,13 @@
 process.env.CLIENT_SECRET ||= "check-secret";
 process.env.DEV_CLIENT_SECRET ||= "check-secret";
 
-import { ChannelType, Collection, Guild, GuildBasedChannel, GuildMember, Role, VoiceBasedChannel } from "discord.js";
+import { ChannelType, Collection, Guild, GuildBasedChannel, GuildMember, Interaction, Message, Role, VoiceBasedChannel } from "discord.js";
+import VoicePanelHandler from "../events/voice/VoicePanelHandler";
 import BotClient from "../client/BotClient";
-import { VoicePanel, VoicePresetList, VoiceState } from "../builder/VoiceView";
-import { DefaultHubConfig, DefaultVoiceSettings, FormatVoiceName, MAX_LIMIT, MAX_PRESETS, VOICE_ACTIONS } from "../constants/Voice";
+import { writeFile } from "node:fs/promises";
+import { VoiceDeletePrompt, VoicePanel, VoicePresetList, VoiceState } from "../builder/VoiceView";
+import { IVoicePanelImage, RenderVoicePanel, VOICE_PANEL_FILE, VoicePanelAlt } from "../builder/VoicePanelImage";
+import { DefaultHubConfig, DefaultVoiceSettings, FormatVoiceName, MAX_LIMIT, MAX_PRESETS, VOICE_ACTIONS, VOICE_MENU_ACTIONS } from "../constants/Voice";
 import { IVoiceSettings } from "../interfaces/services/voice/IVoice";
 import { VoiceError, VoiceLimits, VOICE_MODULE } from "../services/VoiceService";
 import { SetFlags } from "../utils/moduleFlags";
@@ -27,6 +30,8 @@ const USER = "90071992547409962";
 const OTHER = "90071992547409963";
 const HUB = "90071992547409964";
 const TEMP = "90071992547409965";
+const PANEL_MESSAGE = "90071992547409979";
+const OTHER_CHANNEL = "90071992547409978";
 const CATEGORY = "90071992547409966";
 const TEXT = "90071992547409967";
 const ROLE = "90071992547409968";
@@ -45,6 +50,8 @@ interface IFakeChannel {
     edits: Record<string, unknown>[];
     deleted: boolean;
     invites: number;
+    /** W-0151: liefert die Panel-Nachricht; ohne eigenen Wert gibt es keine. */
+    fetchMessage: (id: string) => Promise<unknown>;
 }
 
 function FakeGuild(): Guild {
@@ -67,19 +74,33 @@ function FakeGuild(): Guild {
 }
 
 function FakeChannel(guild: Guild): IFakeChannel {
-    const state: IFakeChannel = { channel: null as unknown as VoiceBasedChannel, edits: [], deleted: false, invites: 0 };
+    const state: IFakeChannel = {
+        channel: null as unknown as VoiceBasedChannel,
+        edits: [],
+        deleted: false,
+        invites: 0,
+        fetchMessage: async () => {
+            throw Object.assign(new Error("Unknown Message"), { code: 10008 });
+        },
+    };
 
     state.channel = {
         id: TEMP,
         name: "Laras Kanal",
         guild,
         members: new Map(),
+        userLimit: 0,
+        rtcRegion: null,
         isVoiceBased: () => true,
         edit: async (options: Record<string, unknown>) => {
             state.edits.push(options);
+            // Wie Discord: Plätze und Region stehen danach am Kanal.
+            if (typeof options.userLimit === "number") Object.assign(state.channel, { userLimit: options.userLimit });
+            if ("rtcRegion" in options) Object.assign(state.channel, { rtcRegion: options.rtcRegion ?? null });
 
             return state.channel;
         },
+        messages: { fetch: (id: string) => state.fetchMessage(id) },
         delete: async () => {
             state.deleted = true;
 
@@ -111,6 +132,7 @@ function FakeMember(guild: Guild, id: string, channel: VoiceBasedChannel | null,
             disconnect: async () => patch.disconnect?.(),
         },
         send: async () => undefined,
+        displayAvatarURL: () => null,
     } as unknown as GuildMember;
 }
 
@@ -126,6 +148,20 @@ function checkConfig(client: BotClient): void {
 
     check("Standard: alle 13 Optionen", base.actions.length === 13);
     check("Standard: Presets erlaubt", base.presets);
+
+    // W-0151: deutsche Namen, sortiert nach Kanal, Leute, Mehr.
+    const names = VOICE_ACTIONS.map((entry) => `${entry.value}=${entry.name}`).join(",");
+
+    check(
+        "Optionen heißen deutsch, in dieser Reihenfolge",
+        names ===
+            "name=Umbenennen,userlimit=Plätze,privacy=Zutritt,stealthmode=Unsichtbar,region=Region,inviteuser=Einladen,trustuser=Freigeben,untrustuser=Freigabe entziehen,kickuser=Rauswerfen,blockuser=Sperren,unblockuser=Entsperren,transferownership=Übergeben,deletechannel=Kanal löschen",
+        names
+    );
+    check("  Beschreibungen beginnen mit dem Bereich", VOICE_ACTIONS.every((entry) => /^(Kanal|Leute|Mehr) · /.test(entry.description)));
+    check("  kein „User“ mehr im Namen", VOICE_ACTIONS.every((entry) => !entry.name.includes("User")));
+    check("  Umbenennen ✏️, Plätze 👥", VOICE_ACTIONS[0].emoji === "✏️" && VOICE_ACTIONS[1].emoji === "👥");
+    check("Menü: 12 Optionen, ohne Löschen", VOICE_MENU_ACTIONS.length === 12 && !VOICE_MENU_ACTIONS.some((entry) => entry.value === "deletechannel"));
 
     const clean = service.CleanConfig(guild, { name: "  {user} zockt  ", categoryId: CATEGORY, actions: ["name", "quatsch", "region"], presets: false }, base);
 
@@ -160,21 +196,61 @@ function checkConfig(client: BotClient): void {
 /* ----------------------------------------------------------
    Panel und Presets
    ---------------------------------------------------------- */
-function checkViews(): void {
+/** Alle Knöpfe und Menüs in einem Kasten, egal wie tief sie stecken. */
+function controls(node: unknown, found: { custom_id?: string; style?: number; type?: number; placeholder?: string; options?: { value: string }[] }[] = []): typeof found {
+    if (Array.isArray(node)) node.forEach((entry) => controls(entry, found));
+    else if (node && typeof node === "object") {
+        const entry = node as Record<string, unknown>;
+
+        if (typeof entry.custom_id === "string") found.push(entry as (typeof found)[number]);
+        Object.values(entry).forEach((value) => controls(value, found));
+    }
+
+    return found;
+}
+
+/** Eine Reihe ohne Knöpfe lehnt Discord ab - sie darf nie entstehen. */
+function emptyRow(node: unknown): boolean {
+    if (Array.isArray(node)) return node.some(emptyRow);
+    if (!node || typeof node !== "object") return false;
+
+    const entry = node as Record<string, unknown>;
+
+    if (entry.type === 1 && Array.isArray(entry.components) && entry.components.length === 0) return true;
+
+    return Object.values(entry).some(emptyRow);
+}
+
+async function checkViews(): Promise<void> {
     console.log("\n  — Panel —");
 
     const config = DefaultHubConfig();
-    const panel = JSON.stringify(VoicePanel(config, true).components[0].toJSON());
+    const image: IVoicePanelImage = { kind: "channel", ownerName: "Lara", avatarURL: null, privacy: "public", stealth: false, limit: 0, region: null };
+    const view = await VoicePanel(config, image);
+    const json = view.components[0].toJSON();
+    const panel = JSON.stringify(json);
+    const found = controls(json);
+    const menu = found.find((entry) => entry.custom_id === "voice:menu");
+    const remove = found.find((entry) => entry.custom_id === "voice:delete");
 
-    check("Das Panel hat ein Auswahlmenü", panel.includes("voice:menu"));
-    check("Alle 13 Optionen stehen drin", VOICE_ACTIONS.every((action) => panel.includes(`"${action.value}"`)));
-    check("Die Beschreibungen kommen mit", panel.includes("Ändere den Namen des temporären Sprachkanals"));
-    check("Der Preset-Knopf ist da", panel.includes("voice:presets"));
-    check("Ohne Presets kein Knopf", !JSON.stringify(VoicePanel({ ...config, presets: false }, true).components[0].toJSON()).includes("voice:presets"));
+    check("Das Panel zeigt das Bild als Anhang", panel.includes("attachment://voice-panel.png"));
+    check("  und hängt es an", view.files.length === 1 && view.files[0].name === "voice-panel.png", String(view.files[0]?.name));
+    check("Das Panel hat ein Auswahlmenü", menu?.placeholder === "⚙️ Kanal einstellen …", String(menu?.placeholder));
+    check("  mit 12 Optionen, ohne Löschen", menu?.options?.length === 12 && !menu.options.some((option) => option.value === "deletechannel"), String(menu?.options?.length));
+    check("Die Beschreibungen kommen mit", panel.includes("Kanal · Neuer Name für den Kanal"));
+    check("Der Preset-Knopf ist da", found.some((entry) => entry.custom_id === "voice:presets"));
+    check("Kanal löschen ist ein roter Knopf", remove?.style === 4, JSON.stringify(remove));
+    check("Ohne Presets kein Preset-Knopf", !JSON.stringify((await VoicePanel({ ...config, presets: false }, image)).components[0].toJSON()).includes("voice:presets"));
 
-    const trimmed = JSON.stringify(VoicePanel({ ...config, actions: ["name", "userlimit"] }, false).components[0].toJSON());
+    const trimmed = (await VoicePanel({ ...config, actions: ["name", "userlimit"], presets: false }, { kind: "fixed" })).components[0].toJSON();
+    const trimmedControls = controls(trimmed);
 
-    check("Abgeschaltete Optionen fehlen", !trimmed.includes("deletechannel") && trimmed.includes("userlimit"));
+    check("Abgeschaltete Optionen fehlen", !JSON.stringify(trimmed).includes("deletechannel") && JSON.stringify(trimmed).includes("userlimit"));
+    check("Ohne Löschen und Presets: kein Knopf, keine leere Reihe", !trimmedControls.some((entry) => entry.type === 2) && !emptyRow(trimmed), JSON.stringify(trimmedControls));
+
+    const prompt = JSON.stringify(VoiceDeletePrompt().components[0].toJSON());
+
+    check("Löschen fragt nach: Löschen und Abbrechen", prompt.includes("voice:delete:yes") && prompt.includes("voice:delete:no") && prompt.includes("Kanal wirklich löschen?"));
 
     const state = JSON.stringify(
         VoiceState(
@@ -288,6 +364,100 @@ async function checkDatabase(client: BotClient): Promise<void> {
     check("Den Kanal übergeben", (await service.Run(owner, "transferownership", { target: other })).includes(OTHER));
     check("Jetzt gehört er dem anderen", (await client.tempVoices.Get(TEMP))?.ownerId === OTHER);
     await fails("Und der Alte darf nichts mehr", () => service.Run(owner, "name", { text: "Meins" }), "gehört");
+
+    console.log("\n  — Panel neu setzen —");
+
+    // W-0151: Die Panel-Nachricht merkt sich der Bot je Kanal und setzt sie bei Änderungen neu.
+    const panelEdits: Record<string, unknown>[] = [];
+    let panelGone = false;
+    const panelMessage = {
+        id: PANEL_MESSAGE,
+        edit: async (options: Record<string, unknown>) => {
+            panelEdits.push(options);
+
+            return panelMessage;
+        },
+    };
+    const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+    fake.fetchMessage = async (id: string) => {
+        if (panelGone || id !== PANEL_MESSAGE) throw Object.assign(new Error("Unknown Message"), { code: 10008 });
+
+        return panelMessage;
+    };
+
+    await client.tempVoices.SetPanel(TEMP, PANEL_MESSAGE);
+
+    check("Die Panel-Nachricht steht beim Kanal", (await client.tempVoices.Get(TEMP))?.panelMessageId === PANEL_MESSAGE);
+
+    service.refreshDelay = 20;
+    service.QueueRefresh(fake.channel);
+    service.QueueRefresh(fake.channel);
+    service.QueueRefresh(fake.channel);
+    await wait(120);
+
+    const files = panelEdits[0]?.files as { name?: string }[] | undefined;
+
+    check("Drei Anstöße kurz hintereinander: einmal neu gesetzt", panelEdits.length === 1, String(panelEdits.length));
+    check("  mit neuem Bild, das alte Bild fliegt raus", files?.[0]?.name === "voice-panel.png" && Array.isArray(panelEdits[0]?.attachments), JSON.stringify(Object.keys(panelEdits[0] ?? {})));
+
+    await service.Run(other, "privacy");
+    await wait(120);
+
+    check("Zutritt umstellen setzt das Panel neu", panelEdits.length === 2, String(panelEdits.length));
+
+    panelGone = true;
+
+    let threw = false;
+
+    await service.RefreshPanel(fake.channel).catch(() => (threw = true));
+
+    check("Panel-Nachricht gelöscht: kein Fehler, nichts gesetzt", !threw && panelEdits.length === 2, String(panelEdits.length));
+
+    panelGone = false;
+
+    // Ein Panel von vor W-0151: der Bot kennt seine ID noch nicht und übernimmt es beim ersten Klick.
+    await client.tempVoices.SetPanel(TEMP, null);
+    await service.ResetPanel({ ...panelMessage, channel: fake.channel, guildId: GUILD } as unknown as Message);
+
+    check("Altes Panel: beim ersten Klick übernommen und neu gesetzt", (await client.tempVoices.Get(TEMP))?.panelMessageId === PANEL_MESSAGE && panelEdits.length === 3, String(panelEdits.length));
+
+    console.log("\n  — Änderungen direkt in Discord —");
+
+    // W-0151: Plätze und Region darf der Besitzer auch in den Kanaleinstellungen ändern.
+    const snapshot = () => ({ ...fake.channel }) as unknown as VoiceBasedChannel;
+    const changeTo = async (patch: Record<string, unknown>) => {
+        const before = snapshot();
+
+        Object.assign(fake.channel, patch);
+        await service.ChannelChanged(before, fake.channel);
+    };
+
+    await changeTo({ userLimit: 3 });
+    await wait(120);
+
+    check("Plätze in Discord geändert: landet in den Einstellungen", (await client.tempVoices.Get(TEMP))?.settings.limit === 3);
+    check("  und das Panel wird neu gesetzt", panelEdits.length === 4, String(panelEdits.length));
+
+    await changeTo({ userLimit: 4 });
+    await changeTo({ rtcRegion: "rotterdam" });
+    await changeTo({ userLimit: 6 });
+    await wait(120);
+
+    const synced = await client.tempVoices.Get(TEMP);
+
+    check("Drei Änderungen kurz hintereinander: einmal neu gesetzt", panelEdits.length === 5, String(panelEdits.length));
+    check("  Plätze und Region stimmen", synced?.settings.limit === 6 && synced.settings.region === "rotterdam", JSON.stringify(synced?.settings));
+
+    await changeTo({ name: "Nur ein neuer Name" });
+    await wait(120);
+
+    check("Nur der Name geändert: kein Neusetzen", panelEdits.length === 5, String(panelEdits.length));
+
+    await service.ChannelChanged({ ...snapshot(), id: OTHER_CHANNEL } as unknown as VoiceBasedChannel, { ...snapshot(), id: OTHER_CHANNEL, userLimit: 9 } as unknown as VoiceBasedChannel);
+    await wait(120);
+
+    check("Kanal ohne Temp Voice: nichts", panelEdits.length === 5, String(panelEdits.length));
 
     console.log("\n  — Presets —");
 
@@ -677,6 +847,163 @@ async function checkReviewPulse(client: BotClient): Promise<void> {
     }
 }
 
+/* ----------------------------------------------------------
+   W-0151: das Bild des Panels
+   ---------------------------------------------------------- */
+function pngSize(png: Buffer): { width: number; height: number; png: boolean } {
+    return { png: png.subarray(1, 4).toString("ascii") === "PNG", width: png.readUInt32BE(16), height: png.readUInt32BE(20) };
+}
+
+async function checkImage(): Promise<void> {
+    console.log("\n  — Bild des Panels —");
+
+    const open: IVoicePanelImage = { kind: "channel", ownerName: "Fischi_", avatarURL: null, privacy: "public", stealth: false, limit: 5, region: null };
+    const closed: IVoicePanelImage = {
+        kind: "channel",
+        ownerName: "ꜱᴛᴀʀʟɪɢʜᴛ🌟Long_Name_Example_32",
+        avatarURL: null,
+        privacy: "private",
+        stealth: true,
+        limit: 0,
+        region: "rotterdam",
+    };
+    const fixed: IVoicePanelImage = { kind: "fixed" };
+
+    for (const [label, data, file] of [
+        ["öffentlich", open, "voice-panel-check.png"],
+        ["privat und unsichtbar, langer Name", closed, "voice-panel-check-privat.png"],
+        ["festes Panel", fixed, "voice-panel-check-fest.png"],
+    ] as const) {
+        const png = await RenderVoicePanel(data);
+        const size = pngSize(png);
+
+        check(`Bild ${label}: PNG 1200 × 264`, size.png && size.width === 1200 && size.height === 264, JSON.stringify(size));
+        await writeFile(file, png);
+    }
+
+    const altOpen = VoicePanelAlt(open);
+    const altClosed = VoicePanelAlt(closed);
+
+    check("Alt-Text öffentlich: Zutritt, Plätze, Region", altOpen.includes("Zutritt: Offen") && altOpen.includes("Plätze: 5") && altOpen.includes("Region: Auto"), altOpen);
+    check("Alt-Text privat: Privat, unsichtbar, ∞, Rotterdam", ["Privat", "unsichtbar", "Plätze: ∞", "Rotterdam"].every((part) => altClosed.includes(part)), altClosed);
+    check("Alt-Text festes Panel", VoicePanelAlt(fixed).includes("Dein Sprachkanal"), VoicePanelAlt(fixed));
+    check("Dateiname des Anhangs", VOICE_PANEL_FILE === "voice-panel.png");
+}
+
+/* ----------------------------------------------------------
+   W-0151: Menü setzt sich zurück, Löschen fragt nach
+   ---------------------------------------------------------- */
+async function checkPanelHandler(client: BotClient): Promise<void> {
+    console.log("\n  — Panel: Menü und Löschen —");
+
+    const handler = new VoicePanelHandler(client);
+    const service = client.voiceService;
+    const original = {
+        reset: service.ResetPanel,
+        mine: service.Mine,
+        run: service.Run,
+        of: client.settings.Of,
+        get: client.tempVoices.Get,
+        presets: client.voicePresets.Of,
+        report: client.guardian.ReportError,
+    };
+    const resets: string[] = [];
+    const runs: string[] = [];
+    const answers: string[] = [];
+    const modals: string[] = [];
+    const errors: string[] = [];
+    let mineFails = false;
+    const member = FakeMember(FakeGuild(), USER, null);
+
+    service.ResetPanel = (async (message: { id: string }) => void resets.push(message.id)) as unknown as typeof service.ResetPanel;
+    service.Mine = (async () => {
+        if (mineFails) throw new VoiceError("Der Kanal gehört dir nicht.");
+
+        return { channel: {}, temp: {} };
+    }) as unknown as typeof service.Mine;
+    service.Run = (async (_member: GuildMember, action: string) => {
+        runs.push(action);
+
+        return "✅ Erledigt.";
+    }) as unknown as typeof service.Run;
+    client.settings.Of = (async () => ({ modules: [VOICE_MODULE] })) as unknown as typeof client.settings.Of;
+    client.tempVoices.Get = (async () => null) as unknown as typeof client.tempVoices.Get;
+    client.voicePresets.Of = (async () => []) as unknown as typeof client.voicePresets.Of;
+    client.guardian.ReportError = (async (error: Error) => void errors.push(error.message)) as unknown as typeof client.guardian.ReportError;
+
+    const text = (payload: { components?: { toJSON: () => unknown }[] }) => JSON.stringify(payload.components?.map((component) => component.toJSON()) ?? payload);
+    const click = (customId: string, values: string[] = []) =>
+        handler.Execute({
+            customId,
+            values,
+            guildId: GUILD,
+            member,
+            message: { id: "panel-1" },
+            deferred: false,
+            replied: false,
+            inCachedGuild: () => true,
+            isMessageComponent: () => true,
+            isModalSubmit: () => false,
+            isStringSelectMenu: () => customId === "voice:menu",
+            isUserSelectMenu: () => false,
+            isButton: () => customId !== "voice:menu",
+            reply: async (payload: never) => void answers.push(text(payload)),
+            update: async (payload: never) => void answers.push(`update:${text(payload)}`),
+            followUp: async (payload: never) => void answers.push(text(payload)),
+            showModal: async (modal: { data: { custom_id: string } }) => void modals.push(modal.data.custom_id),
+        } as unknown as Interaction);
+
+    try {
+        await click("voice:menu", ["privacy"]);
+        check("Menü: Aktion läuft, danach wird das Panel zurückgesetzt", runs.at(-1) === "privacy" && resets.length === 1, `${runs.join()} / ${resets.length}`);
+
+        mineFails = true;
+        await click("voice:menu", ["privacy"]);
+        mineFails = false;
+        check("Menü mit Fehler: Hinweis und trotzdem zurückgesetzt", answers.at(-1)?.includes("gehört dir nicht") === true && resets.length === 2, `${answers.at(-1)} / ${resets.length}`);
+
+        await click("voice:menu", ["name"]);
+        check("Menü mit Fenster: Fenster auf, Panel zurückgesetzt", modals.at(-1) === "voice:modal:name" && resets.length === 3, `${modals.join()} / ${resets.length}`);
+
+        await click("voice:presets");
+        check("Presets-Knopf: Panel zurückgesetzt", resets.length === 4, String(resets.length));
+
+        const before = runs.length;
+
+        await click("voice:delete");
+        check("Löschen-Knopf fragt nur nach", answers.at(-1)?.includes("Kanal wirklich löschen?") === true && runs.length === before && resets.length === 5, `${answers.at(-1)} / ${runs.join()}`);
+
+        await click("voice:delete:no");
+        check("Abbrechen löscht nichts", !runs.includes("deletechannel") && answers.at(-1)?.startsWith("update:") === true && answers.at(-1)?.includes("Abgebrochen") === true, answers.at(-1));
+
+        // Live gesehen (W-0151): Mit dem Kanal verschwindet auch die Rückfrage. Wer erst löscht und dann
+        // antwortet, bekommt von Discord „Unknown Message“ - also erst antworten, dann löschen.
+        const timeline: string[] = [];
+        const run = service.Run;
+
+        service.Run = (async (...args: Parameters<typeof service.Run>) => {
+            timeline.push(`run:${args[1]}`);
+
+            return run(...args);
+        }) as typeof service.Run;
+        answers.push = (...items: string[]) => {
+            timeline.push(...items.map(() => "antwort"));
+
+            return Array.prototype.push.apply(answers, items);
+        };
+        await click("voice:delete:yes");
+        check("Löschen bestätigt: der Kanal wird gelöscht", runs.at(-1) === "deletechannel" && resets.length === 5, `${runs.join()} / ${resets.length}`);
+        check("  erst die Antwort, dann löschen", timeline.join() === "antwort,run:deletechannel", timeline.join());
+        check("Keine unerwarteten Fehler", errors.length === 0, errors.join(" | "));
+    } finally {
+        Object.assign(service, { ResetPanel: original.reset, Mine: original.mine, Run: original.run });
+        client.settings.Of = original.of;
+        client.tempVoices.Get = original.get;
+        client.voicePresets.Of = original.presets;
+        client.guardian.ReportError = original.report;
+    }
+}
+
 async function main(): Promise<void> {
     console.log("\n🔊 Temp Voice\n");
 
@@ -685,7 +1012,9 @@ async function main(): Promise<void> {
     await client.configService.Initialize();
 
     checkConfig(client);
-    checkViews();
+    await checkViews();
+    await checkImage();
+    await checkPanelHandler(client);
     checkSupport(client);
     await checkW137(client);
     await checkSweep(client);
