@@ -31,6 +31,7 @@ const OTHER = "90071992547409963";
 const HUB = "90071992547409964";
 const TEMP = "90071992547409965";
 const PANEL_MESSAGE = "90071992547409979";
+const OTHER_CHANNEL = "90071992547409978";
 const CATEGORY = "90071992547409966";
 const TEXT = "90071992547409967";
 const ROLE = "90071992547409968";
@@ -420,6 +421,43 @@ async function checkDatabase(client: BotClient): Promise<void> {
     await service.ResetPanel({ ...panelMessage, channel: fake.channel, guildId: GUILD } as unknown as Message);
 
     check("Altes Panel: beim ersten Klick übernommen und neu gesetzt", (await client.tempVoices.Get(TEMP))?.panelMessageId === PANEL_MESSAGE && panelEdits.length === 3, String(panelEdits.length));
+
+    console.log("\n  — Änderungen direkt in Discord —");
+
+    // W-0151: Plätze und Region darf der Besitzer auch in den Kanaleinstellungen ändern.
+    const snapshot = () => ({ ...fake.channel }) as unknown as VoiceBasedChannel;
+    const changeTo = async (patch: Record<string, unknown>) => {
+        const before = snapshot();
+
+        Object.assign(fake.channel, patch);
+        await service.ChannelChanged(before, fake.channel);
+    };
+
+    await changeTo({ userLimit: 3 });
+    await wait(120);
+
+    check("Plätze in Discord geändert: landet in den Einstellungen", (await client.tempVoices.Get(TEMP))?.settings.limit === 3);
+    check("  und das Panel wird neu gesetzt", panelEdits.length === 4, String(panelEdits.length));
+
+    await changeTo({ userLimit: 4 });
+    await changeTo({ rtcRegion: "rotterdam" });
+    await changeTo({ userLimit: 6 });
+    await wait(120);
+
+    const synced = await client.tempVoices.Get(TEMP);
+
+    check("Drei Änderungen kurz hintereinander: einmal neu gesetzt", panelEdits.length === 5, String(panelEdits.length));
+    check("  Plätze und Region stimmen", synced?.settings.limit === 6 && synced.settings.region === "rotterdam", JSON.stringify(synced?.settings));
+
+    await changeTo({ name: "Nur ein neuer Name" });
+    await wait(120);
+
+    check("Nur der Name geändert: kein Neusetzen", panelEdits.length === 5, String(panelEdits.length));
+
+    await service.ChannelChanged({ ...snapshot(), id: OTHER_CHANNEL } as unknown as VoiceBasedChannel, { ...snapshot(), id: OTHER_CHANNEL, userLimit: 9 } as unknown as VoiceBasedChannel);
+    await wait(120);
+
+    check("Kanal ohne Temp Voice: nichts", panelEdits.length === 5, String(panelEdits.length));
 
     console.log("\n  — Presets —");
 

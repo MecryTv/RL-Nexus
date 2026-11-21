@@ -1,6 +1,7 @@
 import {
     ButtonInteraction,
     CategoryChannel,
+    Channel,
     ChannelType,
     Guild,
     GuildMember,
@@ -155,6 +156,26 @@ export default class VoiceService {
         } catch (error) {
             logger.debug(`🔊 Panel ${message.id} nicht zurückgesetzt: ${String(error)}`);
         }
+    }
+
+    /**
+     * Ein Kanal wurde in Discord geändert. Der Besitzer darf Plätze und Region dort
+     * selbst einstellen, am Bot vorbei: dann übernimmt der Bot die Werte (sonst
+     * speichert „Preset speichern“ einen alten Stand) und setzt das Panel neu.
+     */
+    async ChannelChanged(before: Channel, after: Channel): Promise<void> {
+        if (!after.isVoiceBased() || !before.isVoiceBased()) return;
+        if (before.userLimit === after.userLimit && before.rtcRegion === after.rtcRegion) return;
+
+        const temp = await this.client.tempVoices.Get(after.id).catch(() => null);
+
+        if (!temp) return;
+
+        if (temp.settings.limit !== after.userLimit || temp.settings.region !== after.rtcRegion) {
+            await this.client.tempVoices.Save(after.id, { ...temp.settings, limit: after.userLimit, region: after.rtcRegion }).catch(() => undefined);
+        }
+
+        this.QueueRefresh(after);
     }
 
     /** Bündelt Anstöße: mehrere Änderungen kurz hintereinander ergeben ein Neusetzen. */
