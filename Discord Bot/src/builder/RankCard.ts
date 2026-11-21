@@ -1,6 +1,7 @@
 import { readdir } from "node:fs/promises";
 import path from "path";
 import { Canvas, GlobalFonts, Image, Path2D, SKRSContext2D, createCanvas, loadImage } from "@napi-rs/canvas";
+import { LRUCache } from "lru-cache";
 import { IPrimeProfile, IPrimeRank } from "../interfaces/services/prime/IPrimeService";
 import {
     CARD_HEIGHT,
@@ -90,24 +91,34 @@ export function RegisterFonts(): Promise<void> {
     return fonts;
 }
 
-// Bilder ändern sich nicht - einmal laden reicht für die Laufzeit des Prozesses.
+// Eigene Dateien ändern sich nicht - einmal laden reicht für die Laufzeit des Prozesses.
 const images = new Map<string, Image | null>();
 
+// W-0152: Avatare von Discord bringen ständig neue URLs mit, also mit Grenze.
+// Ein Fehlschlag gilt nur kurz, danach wird es noch einmal versucht.
+// ponytail: 150 Avatare je Prozess, größer nur, wenn Karten spürbar oft neu laden.
+const remote = new LRUCache<string, { image: Image | null }>({ max: 150, ttl: 6 * 3_600_000 });
+const REMOTE_FAILED_MS = 5 * 60_000;
+
 export async function image(file: string): Promise<Image | null> {
-    const cached = images.get(file);
+    const isRemote = /^https?:\/\//.test(file);
+    const cached = isRemote ? remote.get(file)?.image : images.get(file);
 
     if (cached !== undefined) return cached;
 
     try {
         const loaded = await loadImage(file);
 
-        images.set(file, loaded);
+        if (isRemote) remote.set(file, { image: loaded });
+        else images.set(file, loaded);
 
         return loaded;
     } catch (error) {
         // Ein fehlendes Bild kostet sein Symbol, nicht die ganze Karte.
         logger.warn(`🖼️  Bild nicht ladbar: ${file} (${String(error)})`);
-        images.set(file, null);
+
+        if (isRemote) remote.set(file, { image: null }, { ttl: REMOTE_FAILED_MS });
+        else images.set(file, null);
 
         return null;
     }

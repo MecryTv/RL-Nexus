@@ -145,9 +145,12 @@ function drawTiles(ctx: SKRSContext2D, data: Extract<IVoicePanelImage, { kind: "
         ctx.fillText(tile.label, x + width / 2, top + 42);
         tracked(ctx, "0px");
 
-        shrink(ctx, tile.value, "800 {size}px Oxanium", 40, 24, width - 24);
+        // W-0152: Oxanium hat kein „∞“, die Ersatzschrift zeichnet es winzig - also größer bestellen.
+        const infinite = tile.value === "∞";
+
+        shrink(ctx, tile.value, "800 {size}px Oxanium", infinite ? 88 : 40, 24, width - 24);
         ctx.fillStyle = tile.color;
-        centered(ctx, Fit(ctx, tile.value, width - 24), x + width / 2, top + 94);
+        centered(ctx, Fit(ctx, tile.value, width - 24), x + width / 2, top + (infinite ? 110 : 94));
     });
 
     return left;

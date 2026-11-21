@@ -13,9 +13,11 @@
  */
 import { existsSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
+import { createServer } from "node:http";
+import { AddressInfo } from "node:net";
 import path from "path";
 import { createCanvas, loadImage } from "@napi-rs/canvas";
-import { RegisterFonts, RenderRankCard, RewardBarLayout, TierTextSize } from "../builder/RankCard";
+import { RegisterFonts, RenderRankCard, RewardBarLayout, TierTextSize, image } from "../builder/RankCard";
 import { IPrimeProfile } from "../interfaces/services/prime/IPrimeService";
 import { IPrimeAccessCard, PrimeAccessAlt, RenderPrimeAccessCard } from "../builder/PrimeAccessCard";
 import {
@@ -258,6 +260,7 @@ async function main(): Promise<void> {
     check(`  und der Balken bleibt breit genug (${Math.round(bar.w)} px)`, bar.w >= 120);
 
     await checkPrimeAccess();
+    await checkImageCache();
 
     if (failed > 0) {
         console.log(`\n\x1b[31m❌ ${failed} Prüfung(en) fehlgeschlagen.\x1b[0m\n`);
@@ -339,6 +342,49 @@ async function checkPrimeAccess(): Promise<void> {
     check("  nur die späte Vorwarnung", PrimeAccessAlt({ ...locked, warned: 2, dated: true }).includes("Vorwarnung 1 Tag vorher, dann abgelaufen"), PrimeAccessAlt({ ...locked, warned: 2, dated: true }));
 
     await writeFile("card-check-prime-abgelaufen.png", unwarned);
+}
+
+/**
+ * W-0152: Avatare kommen von Discord, jede Karte bringt neue URLs mit. Der
+ * Zwischenspeicher dafür muss eine Grenze haben - sonst wächst er bis zum
+ * Neustart. Ein kleiner Server hier zählt, wie oft ein Bild wirklich geholt wird.
+ */
+async function checkImageCache(): Promise<void> {
+    const png = createCanvas(2, 2).toBuffer("image/png");
+    const hits = new Map<string, number>();
+    const server = createServer((request, response) => {
+        const url = request.url ?? "";
+
+        hits.set(url, (hits.get(url) ?? 0) + 1);
+
+        if (url.startsWith("/fehlt")) {
+            response.writeHead(404).end();
+
+            return;
+        }
+
+        response.writeHead(200, { "Content-Type": "image/png" }).end(png);
+    });
+
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+
+    const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+
+    await image(`${base}/avatar/erster`);
+    await image(`${base}/avatar/erster`);
+    check("Avatar-URL: zweimal gebraucht, einmal geholt", hits.get("/avatar/erster") === 1, `${hits.get("/avatar/erster")} Mal`);
+
+    // Viele andere Avatare drängen den ersten irgendwann hinaus.
+    for (let index = 0; index < 400; index++) await image(`${base}/avatar/${index}`);
+
+    await image(`${base}/avatar/erster`);
+    check("  nach 400 anderen Avataren ist der erste nicht mehr gemerkt", hits.get("/avatar/erster") === 2, `${hits.get("/avatar/erster")} Mal geholt`);
+
+    check("Kaputte Avatar-URL: kein Bild, kein Absturz", (await image(`${base}/fehlt`)) === null);
+    await image(`${base}/fehlt`);
+    check("  und sie wird nicht bei jeder Karte neu angefragt", hits.get("/fehlt") === 1, `${hits.get("/fehlt")} Mal`);
+
+    server.close();
 }
 
 async function hasSize(png: Buffer, width: number, height: number): Promise<boolean> {
