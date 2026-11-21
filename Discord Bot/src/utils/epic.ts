@@ -35,12 +35,16 @@ export async function EpicAdopt(client: BotClient, userId: string, epic: IEpicAc
     // Die Rollen im Hintergrund: die Seite soll nicht auf jeden Server warten.
     if (current && current.account_id !== epic.accountId) {
         await client.ranks.Clear(userId);
+        // W-0150: auch der letzte Rang-Stand des alten Kontos.
+        await client.primeSnapshots.Clear(userId);
         void client.rankRoleService.Strip(userId).catch(() => 0);
     }
 
     if (profile) {
         await client.ranks.Snapshot(userId, profile.ranks);
         await client.ranks.SaveProfile(userId, profile.seasonLevel, profile.seasonWins, profile.stats, profile.club);
+        // W-0150: Beim Abfragen oben war das Konto oft noch nicht verknüpft, also hier.
+        await client.primeSnapshots.Save(userId, profile);
     }
 
     return { name, profile };

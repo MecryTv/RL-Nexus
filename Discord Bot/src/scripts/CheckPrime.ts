@@ -944,6 +944,115 @@ async function checkLive(client: BotClient, player: string): Promise<void> {
 }
 
 /**
+ * W-0150: Prime mit nachgestelltem Load. Remember läuft neben der Antwort her -
+ * die Unterklasse hält das Versprechen fest, damit eine Prüfung darauf warten kann.
+ */
+class RememberingPrime extends PrimeService {
+    public saving: Promise<void> = Promise.resolve();
+
+    protected override async Load(name: string): Promise<IPrimeProfile | null> {
+        return {
+            name: `Name-${name}`,
+            platform: "Epic Games",
+            accountId: name,
+            playerId: `Epic|${name}|0`,
+            linked: [],
+            seasonLevel: 1,
+            seasonWins: 0,
+            ranks: [],
+            stats: [],
+            club: null,
+            fetchedAt: new Date().toISOString(),
+        } as IPrimeProfile;
+    }
+
+    protected override Remember(profile: IPrimeProfile): Promise<void> {
+        this.saving = super.Remember(profile);
+
+        return this.saving;
+    }
+
+    public override get IsConfigured(): boolean {
+        return true;
+    }
+}
+
+/**
+ * W-0150: Bei jeder frischen Antwort wird der Stand mitgeschrieben, aber nur
+ * für Konten, die hier verknüpft sind - ein bloß nachgeschlagener Name
+ * hinterlässt nichts. Ohne Datenbank: Owner und Save sind nachgestellt.
+ */
+async function checkSnapshotWiring(): Promise<void> {
+    console.log("\n  — Letzter Rang-Stand: wann er geschrieben wird —");
+
+    const saved: string[] = [];
+    const snapshots = { Save: async (userId: string, profile: IPrimeProfile) => void saved.push(`${userId}:${profile.accountId}`) };
+    const fake = {
+        config: { PRIME_API_TOKEN: "pruef-schluessel", PRIME_ACCESS_EXPIRES: "" },
+        // Query für die Überwachung des Zugangs (bot_state), hier ohne Inhalt.
+        databaseService: { Ready: true, Query: async () => [] },
+        accounts: { Owner: async (_platform: string, accountId: string) => (accountId === "w0150linked" ? "90071992547409972" : null) },
+        primeSnapshots: snapshots,
+    } as unknown as BotClient;
+    const prime = new RememberingPrime(fake);
+
+    await prime.Profile("w0150linked");
+    await prime.saving;
+    await prime.Profile("w0150frei");
+    await prime.saving;
+
+    check("Verknüpftes Konto: gespeichert unter dem Discord-Nutzer", saved.join() === "90071992547409972:w0150linked", saved.join());
+    check("  ein nur nachgeschlagenes nicht", !saved.some((entry) => entry.endsWith(":w0150frei")), saved.join());
+
+    // Scheitert das Speichern, darf das die Antwort nicht kosten.
+    snapshots.Save = async () => Promise.reject(new Error("Datenbank weg"));
+    prime.Forget();
+
+    const still = await prime.Profile("w0150linked");
+    const failed = await prime.saving.then(
+        () => false,
+        () => true
+    );
+
+    check("Scheitert das Speichern, kommt die Antwort trotzdem", still?.accountId === "w0150linked" && !failed);
+    prime.Close();
+
+    // Trennen und Wechseln löschen den Stand zusammen mit den Rängen. Per Lesen, ohne Discord.
+    const source = (file: string): string => readFileSync(path.join(process.cwd(), "src", ...file.split("/")), "utf8");
+    const rank = source("commands/user/Rank.ts");
+    const epic = source("utils/epic.ts");
+
+    // Dazwischen dürfen nur Kommentarzeilen stehen.
+    check("/rank unlink löscht den Stand mit den Rängen", /ranks\.Clear\(userId\);\s*(?:\/\/.*\s*)*await this\.client\.primeSnapshots\.Clear\(userId\);/.test(rank));
+    check("Wechsel auf ein anderes Epic-Konto auch", /ranks\.Clear\(userId\);\s*(?:\/\/.*\s*)*await client\.primeSnapshots\.Clear\(userId\);/.test(epic));
+    check("Verbinden speichert den Stand gleich mit", /SaveProfile\([^;]*\);\s*(?:\/\/.*\s*)*await client\.primeSnapshots\.Save\(userId, profile\);/.test(epic));
+}
+
+/** W-0150: Dasselbe mit echter Datenbank und einer echten Zeile in player_accounts. */
+async function checkSnapshotWrites(client: BotClient): Promise<void> {
+    console.log("\n  — Letzter Rang-Stand: Speichern mit Datenbank —");
+
+    const user = "90071992547409972";
+    const prime = new RememberingPrime(client);
+
+    try {
+        await client.accounts.Link(user, "epic", "w0150linked", "W0150Linked", true);
+
+        await prime.Profile("w0150linked");
+        await prime.saving;
+        await prime.Profile("w0150frei");
+        await prime.saving;
+
+        check("Verknüpftes Konto: der Stand steht in der Datenbank", (await client.primeSnapshots.Lookup("w0150linked"))?.accountId === "w0150linked");
+        check("  ein nur nachgeschlagenes nicht", (await client.primeSnapshots.Lookup("w0150frei")) === null);
+    } finally {
+        prime.Close();
+        await client.primeSnapshots.Clear(user).catch(() => undefined);
+        await client.accounts.Unlink(user, "epic").catch(() => false);
+    }
+}
+
+/**
  * W-0150: Der letzte Stand je verknüpftem Konto. Ohne ihn hatte /rank nach
  * jedem Neustart nichts mehr, sobald Prime ausfiel. Gefunden wird er über die
  * Konto-ID oder den Anzeigenamen, Groß- und Kleinschreibung egal.
@@ -998,11 +1107,13 @@ async function main(): Promise<void> {
     await checkAccessMessage();
     await checkAccessWatch();
     await checkResolverNames();
+    await checkSnapshotWiring();
 
     // W-0150: Nur mit Datenbank - ohne bleibt es bei einem Hinweis.
     if (await client.databaseService.Connect()) {
         try {
             await checkSnapshots(client);
+            await checkSnapshotWrites(client);
         } finally {
             await client.databaseService.Close();
         }

@@ -324,6 +324,9 @@ export default class PrimeService implements IPrimeService {
             // einer Suche keine zweite Anfrage, und beide Seiten zeigen denselben Stand.
             if (profile) this.cache.set(profile.accountId.toLowerCase(), entry);
 
+            // W-0150: für /rank bei einem späteren Ausfall. Die Antwort wartet nicht darauf.
+            if (profile) void this.Remember(profile);
+
             return profile;
         } catch (error) {
             // W-0145: Ein gesperrter Zugang ist kein Ausfall - die Karte sagt dann, was los ist.
@@ -336,6 +339,24 @@ export default class PrimeService implements IPrimeService {
 
             // W-0146: "down" heißt, Prime antwortet gerade gar nicht - der Team-Abgleich hört dann auf.
             return hit.value ? { ...hit.value, stale: locked ? "access" : PrimeDown(error) ? "down" : true } : hit.value;
+        }
+    }
+
+    /**
+     * W-0150: Den frischen Stand festhalten, falls Prime später ausfällt und der
+     * Arbeitsspeicher leer ist (prime_snapshots). Nur für Konten, die hier
+     * verknüpft sind, egal wer gefragt hat. Wirft nie: am Speichern darf keine
+     * Rang-Abfrage scheitern.
+     */
+    protected async Remember(profile: IPrimeProfile): Promise<void> {
+        try {
+            if (!this.client.databaseService.Ready) return;
+
+            const owner = await this.client.accounts.Owner("epic", profile.accountId);
+
+            if (owner) await this.client.primeSnapshots.Save(owner, profile);
+        } catch (error) {
+            logger.debug(`🎮 Rang-Stand für ${profile.accountId} nicht gespeichert: ${String(error)}`);
         }
     }
 
