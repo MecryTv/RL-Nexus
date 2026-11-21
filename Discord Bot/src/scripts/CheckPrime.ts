@@ -1077,7 +1077,12 @@ async function checkFallback(): Promise<void> {
     const DOWN = "Rocket League antwortet gerade nicht. Versuch es später noch einmal.";
     const state = { failure: new PrimeError("Prime antwortet nicht (10000 ms)", "Timeout") as Error, profile: null as IPrimeProfile | null, missing: false };
     const db = { Ready: true };
-    const accounts = { TrustedOwner: async (): Promise<string | null> => "2", Owner: async (): Promise<string | null> => "2" };
+    // Linked: das Konto, dessen Karte /rank me dem Nutzer zeigen würde.
+    const accounts = {
+        TrustedOwner: async (): Promise<string | null> => "2",
+        Owner: async (): Promise<string | null> => "2",
+        Linked: async (): Promise<{ account_id: string } | null> => ({ account_id: "w0150acc" }),
+    };
     const replies: { content?: string; files?: unknown[]; allowedMentions?: { parse?: unknown[] } }[] = [];
     const fake = {
         primeService: { IsConfigured: true, Profile: async () => (state.missing ? null : (state.profile ?? Promise.reject(state.failure))) },
@@ -1181,6 +1186,15 @@ async function checkFallback(): Promise<void> {
         editReply: async (message: { content?: string }) => void replies.push(message),
     });
     check("  /rank search nach dem eigenen Namen genauso", replies.at(-1)?.content === StaleNotice({ ...STORED, stale: "down" }, true), String(replies.at(-1)?.content));
+
+    // Review W-0152: Im Modus „login“ zählt ein nur per Name verbundenes Konto nicht - /rank me
+    // sagt dann „kein Konto verbunden“. Die Zeile darf nicht auf /rank me verweisen.
+    accounts.Linked = async () => null;
+    accounts.Owner = async () => "6";
+
+    const unusable = await click("6");
+
+    check("  zählt die Verknüpfung für /rank me nicht: „der letzte Stand von …“", unusable?.content === StaleNotice({ ...STORED, stale: "down" }, false), String(unusable?.content));
 }
 
 /** W-0150: Dasselbe mit echter Datenbank und einer echten Zeile in player_accounts. */

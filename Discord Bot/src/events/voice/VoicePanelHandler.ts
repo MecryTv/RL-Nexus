@@ -129,8 +129,9 @@ export default class VoicePanelHandler extends Event {
 
                 // W-0152: Die Rückfrage gehört zu dem Kanal, in dem gefragt wurde. Sitzt die Person
                 // inzwischen in einem anderen eigenen Kanal, löscht eine alte Rückfrage nicht diesen.
+                // Rückfragen von vor W-0152 haben keine ID und landen ebenfalls hier.
                 if (parts[3] !== channel.id) {
-                    await interaction.update({ ...InfoCard("Diese Rückfrage gehört zu einem anderen Kanal. Klick im Panel deines jetzigen Kanals noch einmal auf **Kanal löschen**."), flags: MessageFlags.IsComponentsV2 });
+                    await interaction.update({ ...InfoCard("Diese Rückfrage ist veraltet oder gehört zu einem anderen Kanal. Klick im Panel deines jetzigen Kanals noch einmal auf **Kanal löschen**."), flags: MessageFlags.IsComponentsV2 });
 
                     return;
                 }

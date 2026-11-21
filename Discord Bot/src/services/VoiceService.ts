@@ -416,7 +416,8 @@ export default class VoiceService {
             if (!support && panel.panel === "voice") {
                 // W-0152: Ein Panel, das nicht rausgeht (etwa ohne „Dateien anhängen“), soll im Log stehen.
                 const sent = await channel.send({ ...(await VoicePanel(hub.config, await this.PanelImage(channel, temp))), flags: MessageFlags.IsComponentsV2 }).catch((error: unknown) => {
-                    logger.warn(`🔊 Panel in ${channel.id} auf ${guild.id} nicht gesendet: ${String(error)}`);
+                    // 10003: Der Besitzer ist sofort wieder gegangen, der Kanal ist schon weg - kein Fehler.
+                    if ((error as { code?: number }).code !== 10003) logger.warn(`🔊 Panel in ${channel.id} auf ${guild.id} nicht gesendet: ${String(error)}`);
 
                     return null;
                 });

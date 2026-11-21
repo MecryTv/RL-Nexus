@@ -494,15 +494,15 @@ export default class Rank extends Command {
             : null;
 
         const member = owner ? await this.client.users.fetch(owner).catch(() => null) : null;
-        // W-0152: Eigene Karte auch bei einem nur per Name verbundenen Konto - wie die Knöpfe darunter.
-        const linked = this.client.databaseService.Ready ? await this.client.accounts.Owner("epic", profile.accountId).catch(() => null) : null;
+        // W-0152: „Deine Karte“ genau dann, wenn /rank me sie zeigen würde - wie die Knöpfe darunter.
+        const linked = this.client.databaseService.Ready ? await this.client.accounts.Linked(interaction.user.id, "epic", "card", interaction.guildId).catch(() => null) : null;
 
         await this.Send(
             interaction,
             profile,
             member?.username ?? null,
             member?.displayAvatarURL({ extension: "png", size: 256 }) ?? null,
-            linked === interaction.user.id
+            linked?.account_id === profile.accountId
         );
     }
 }

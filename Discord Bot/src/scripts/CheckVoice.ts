@@ -450,10 +450,14 @@ async function checkDatabase(client: BotClient): Promise<void> {
     check("Plätze in Discord geändert: landet in den Einstellungen", (await client.tempVoices.Get(TEMP))?.settings.limit === 3);
     check("  und das Panel wird neu gesetzt", panelEdits.length === 4, String(panelEdits.length));
 
+    // Zwischen den Änderungen schreibt die Datenbank - unter Last dauert das länger als 20 ms,
+    // dann feuerte der Timer zwischendurch (W-0152: im Gesamtlauf aller Prüfungen gesehen).
+    service.refreshDelay = 400;
     await changeTo({ userLimit: 4 });
     await changeTo({ rtcRegion: "rotterdam" });
     await changeTo({ userLimit: 6 });
-    await wait(120);
+    await wait(800);
+    service.refreshDelay = 20;
 
     const synced = await client.tempVoices.Get(TEMP);
 
@@ -1028,6 +1032,10 @@ async function checkPanelHandler(client: BotClient): Promise<void> {
         // Eine alte Rückfrage, inzwischen sitzt die Person in einem anderen eigenen Kanal: nichts löschen.
         await click("voice:delete:yes:chan-alt");
         check("Alte Rückfrage für einen anderen Kanal löscht nichts", !runs.includes("deletechannel") && answers.at(-1)?.startsWith("update:") === true && answers.at(-1)?.includes("anderen Kanal") === true, answers.at(-1));
+
+        // Review W-0152: Rückfragen von vor W-0152 tragen keine ID - auch die löschen nichts.
+        await click("voice:delete:yes");
+        check("  Rückfrage ohne Kanal-ID (vor W-0152): löscht nichts, heißt veraltet", !runs.includes("deletechannel") && answers.at(-1)?.includes("veraltet") === true, answers.at(-1));
 
         await click("voice:delete:no");
         check("Abbrechen löscht nichts", !runs.includes("deletechannel") && answers.at(-1)?.startsWith("update:") === true && answers.at(-1)?.includes("Abgebrochen") === true, answers.at(-1));
