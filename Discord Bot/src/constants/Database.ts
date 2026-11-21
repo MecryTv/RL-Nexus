@@ -77,6 +77,8 @@ export const TABLES = {
     avDebris: "av_debris",
     // W-0104: abgemeldete Sitzungen des Bot-Dashboards.
     revokedSessions: "dashboard_revoked_sessions",
+    // W-0150: letzter Rang-Stand je verknüpftem Konto, für /rank bei Prime-Ausfall.
+    primeSnapshots: "prime_snapshots",
 } as const;
 
 export type TableName = (typeof TABLES)[keyof typeof TABLES];

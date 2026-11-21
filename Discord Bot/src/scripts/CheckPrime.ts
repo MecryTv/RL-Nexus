@@ -943,6 +943,44 @@ async function checkLive(client: BotClient, player: string): Promise<void> {
     wrong.Close();
 }
 
+/**
+ * W-0150: Der letzte Stand je verknüpftem Konto. Ohne ihn hatte /rank nach
+ * jedem Neustart nichts mehr, sobald Prime ausfiel. Gefunden wird er über die
+ * Konto-ID oder den Anzeigenamen, Groß- und Kleinschreibung egal.
+ */
+async function checkSnapshots(client: BotClient): Promise<void> {
+    console.log("\n  — Letzter Rang-Stand —");
+
+    const user = "90071992547409971";
+    const fetchedAt = "2026-11-20T18:42:00.000Z";
+    const stand = (name: string): IPrimeProfile =>
+        ({ name, platform: "Epic Games", accountId: "w0150acc", playerId: "Epic|w0150acc|0", linked: [], seasonLevel: 3, seasonWins: 4, ranks: [], stats: [], club: null, fetchedAt }) as IPrimeProfile;
+    const rows = async () => (await client.databaseService.Query<{ user_id: string }>("SELECT user_id FROM prime_snapshots WHERE user_id = ?", [user])).length;
+
+    try {
+        await client.primeSnapshots.Save(user, stand("PruefName"));
+
+        const byId = await client.primeSnapshots.Lookup("w0150acc");
+        const byName = await client.primeSnapshots.Lookup("pruefname");
+
+        check("Gespeichert und über die Konto-ID gefunden", byId?.name === "PruefName", String(byId?.name));
+        check("  mit dem Zeitpunkt der Abfrage", byId?.fetchedAt === fetchedAt, String(byId?.fetchedAt));
+        check("  auch über den Namen in anderer Schreibweise", byName?.name === "PruefName" && byName.fetchedAt === fetchedAt, String(byName?.name));
+
+        await client.primeSnapshots.Save(user, stand("Neu"));
+
+        const renamed = await client.primeSnapshots.Lookup("w0150acc");
+
+        check("Neuer Stand überschreibt den alten", renamed?.name === "Neu" && (await rows()) === 1, `${String(renamed?.name)}, ${await rows()} Zeilen`);
+
+        await client.primeSnapshots.Clear(user);
+
+        check("Nach dem Löschen ist nichts mehr da", (await client.primeSnapshots.Lookup("w0150acc")) === null);
+    } finally {
+        await client.databaseService.Write("DELETE FROM prime_snapshots WHERE user_id = ?", [user]).catch(() => undefined);
+    }
+}
+
 async function main(): Promise<void> {
     const client = new BotClient();
     const player = process.argv[2]?.trim();
@@ -960,6 +998,17 @@ async function main(): Promise<void> {
     await checkAccessMessage();
     await checkAccessWatch();
     await checkResolverNames();
+
+    // W-0150: Nur mit Datenbank - ohne bleibt es bei einem Hinweis.
+    if (await client.databaseService.Connect()) {
+        try {
+            await checkSnapshots(client);
+        } finally {
+            await client.databaseService.Close();
+        }
+    } else {
+        console.log("\n  — Datenbank —\n  übersprungen: keine Verbindung (siehe Meldung oben)");
+    }
 
     if (!player) {
         console.log("\n⏭️  Kein Spielername übergeben - die echte Abfrage bleibt aus.\n   npm run check:prime -- DEIN_EPIC_NAME\n");
