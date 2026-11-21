@@ -155,14 +155,16 @@ export default class Rank extends Command {
 
             if (stored) return { ...stored, stale: locked ? "access" : PrimeDown(error) ? "down" : true, fromStore: true };
 
-            await interaction.editReply({ content: locked ? PRIME_ACCESS_TEXT : "Rocket League antwortet gerade nicht. Versuch es später noch einmal." });
+            await interaction.editReply({ content: locked ? PRIME_ACCESS_TEXT : "Rocket League antwortet gerade nicht. Versuch es später noch einmal.", allowedMentions: { parse: [] } });
 
             return null;
         }
 
         if (!profile) {
+            // Der Name ist eine Eingabe - ohne parse: [] pingt „@everyone“ als Name alle an (der Bot ist Administrator).
             await interaction.editReply({
                 content: `Den Epic-Namen **${name}** gibt es nicht. Prüf die Schreibweise, sie muss genau wie im Spiel sein.`,
+                allowedMentions: { parse: [] },
             });
 
             return null;

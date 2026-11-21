@@ -105,8 +105,8 @@ export default class RankButtons extends Event {
         }
 
         if (!profile) {
-            if (mine) await interaction.followUp({ content: content ?? "", flags: MessageFlags.Ephemeral });
-            else await interaction.editReply({ content });
+            if (mine) await interaction.followUp({ content: content ?? "", flags: MessageFlags.Ephemeral, allowedMentions: { parse: [] } });
+            else await interaction.editReply({ content, allowedMentions: { parse: [] } });
 
             return;
         }

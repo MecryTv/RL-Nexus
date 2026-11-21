@@ -49,7 +49,7 @@ export function StaleNotice(profile: IPrimeProfile, self: boolean): string | nul
 export async function RankMessage(
     data: IRankCardData & { page: RankCardPage; self: boolean },
     ownerId: string
-): Promise<{ content: string; files: AttachmentBuilder[]; components: ActionRowBuilder<ButtonBuilder>[] }> {
+): Promise<{ content: string; files: AttachmentBuilder[]; components: ActionRowBuilder<ButtonBuilder>[]; allowedMentions: { parse: [] } }> {
     const png = await RenderRankCard(data);
 
     return {
@@ -57,5 +57,7 @@ export async function RankMessage(
         content: StaleNotice(data.profile, data.self) ?? "",
         files: [new AttachmentBuilder(png, { name: `rank-${data.profile.accountId}-${data.page}.png` })],
         components: [RankRow(data.profile, data.page, ownerId)],
+        // Der Name in der Zeile kommt von Prime - pingen soll er niemanden.
+        allowedMentions: { parse: [] },
     };
 }

@@ -992,7 +992,7 @@ async function checkSnapshotWiring(): Promise<void> {
         config: { PRIME_API_TOKEN: "pruef-schluessel", PRIME_ACCESS_EXPIRES: "" },
         // Query für die Überwachung des Zugangs (bot_state), hier ohne Inhalt.
         databaseService: { Ready: true, Query: async () => [] },
-        accounts: { Owner: async (_platform: string, accountId: string) => (accountId === "w0150linked" ? "90071992547409972" : null) },
+        accounts: { OwnerNow: async (_platform: string, accountId: string) => (accountId === "w0150linked" ? "90071992547409972" : null) },
         primeSnapshots: snapshots,
     } as unknown as BotClient;
     const prime = new RememberingPrime(fake);
@@ -1083,11 +1083,11 @@ async function checkFallback(): Promise<void> {
     console.log("\n  — /rank bei Ausfall: gespeicherter Stand —");
 
     const DOWN = "Rocket League antwortet gerade nicht. Versuch es später noch einmal.";
-    const state = { failure: new PrimeError("Prime antwortet nicht (10000 ms)", "Timeout") as Error, profile: null as IPrimeProfile | null };
+    const state = { failure: new PrimeError("Prime antwortet nicht (10000 ms)", "Timeout") as Error, profile: null as IPrimeProfile | null, missing: false };
     const db = { Ready: true };
-    const replies: { content?: string; files?: unknown[] }[] = [];
+    const replies: { content?: string; files?: unknown[]; allowedMentions?: { parse?: unknown[] } }[] = [];
     const fake = {
-        primeService: { IsConfigured: true, Profile: async () => state.profile ?? Promise.reject(state.failure) },
+        primeService: { IsConfigured: true, Profile: async () => (state.missing ? null : (state.profile ?? Promise.reject(state.failure))) },
         databaseService: db,
         primeSnapshots: { Lookup: async (wanted: string) => (wanted.toLowerCase() === "pruefname" || wanted === "w0150acc" ? STORED : null) },
         accounts: { TrustedOwner: async () => "2" },
@@ -1131,6 +1131,18 @@ async function checkFallback(): Promise<void> {
 
     db.Ready = true;
 
+    // Review: Namen kommen von außen (Eingabe bei /rank search, Antwort von Prime). Der Bot ist
+    // Administrator - eine Antwort darf deshalb niemanden anpingen, auch nicht mit @everyone im Namen.
+    const quiet = (message?: { allowedMentions?: { parse?: unknown[] } }) => Array.isArray(message?.allowedMentions?.parse) && message.allowedMentions.parse.length === 0;
+
+    check("  die Ausfall-Meldung pingt niemanden an", quiet(replies.at(-1)), JSON.stringify(replies.at(-1)?.allowedMentions));
+
+    state.missing = true;
+    await fetch("@everyone", true);
+    state.missing = false;
+
+    check("Unbekannter Name „@everyone“: Meldung ohne Ping", replies.at(-1)?.content?.includes("@everyone") === true && quiet(replies.at(-1)), JSON.stringify(replies.at(-1)?.allowedMentions));
+
     // Der Knopf unter der Karte: derselbe Rückgriff, und die Zeile verschwindet wieder, sobald der Stand frisch ist.
     const click = async (user: string) => {
         await new RankButtons(fake).Execute({
@@ -1150,6 +1162,7 @@ async function checkFallback(): Promise<void> {
     const stale = await click("2");
 
     check("Knopf bei Ausfall: Karte mit der Zeile", stale?.content === StaleNotice({ ...STORED, stale: "down" }, true) && (stale.files?.length ?? 0) === 1, String(stale?.content));
+    check("  die Karte pingt niemanden an", quiet(stale), JSON.stringify(stale?.allowedMentions));
 
     state.profile = { ...STORED, fetchedAt: new Date().toISOString() };
 
@@ -1175,6 +1188,23 @@ async function checkSnapshotWrites(client: BotClient): Promise<void> {
 
         check("Verknüpftes Konto: der Stand steht in der Datenbank", (await client.primeSnapshots.Lookup("w0150linked"))?.accountId === "w0150linked");
         check("  ein nur nachgeschlagenes nicht", (await client.primeSnapshots.Lookup("w0150frei")) === null);
+
+        // Review: Löscht das Admin Dashboard die Daten am Zwischenspeicher des Bots vorbei,
+        // darf eine Abfrage kurz danach keinen neuen Stand für die gelöschte Person anlegen.
+        await client.accounts.Owner("epic", "w0150linked");
+        await client.primeSnapshots.Clear(user);
+        await client.databaseService.Write("DELETE FROM player_accounts WHERE user_id = ?", [user]);
+
+        const later = new RememberingPrime(client);
+
+        try {
+            await later.Profile("w0150linked");
+            await later.saving;
+        } finally {
+            later.Close();
+        }
+
+        check("Am Zwischenspeicher vorbei gelöscht: kein neuer Stand", (await client.primeSnapshots.Lookup("w0150linked")) === null);
     } finally {
         prime.Close();
         await client.primeSnapshots.Clear(user).catch(() => undefined);
@@ -1197,12 +1227,15 @@ async function checkSnapshots(client: BotClient): Promise<void> {
     const rows = async () => (await client.databaseService.Query<{ user_id: string }>("SELECT user_id FROM prime_snapshots WHERE user_id = ?", [user])).length;
 
     try {
-        await client.primeSnapshots.Save(user, stand("PruefName"));
+        // Review (Datenschutz): die verknüpften Plattform-Konten deckt die Erklärung nicht ab - sie kommen nicht mit.
+        await client.primeSnapshots.Save(user, { ...stand("PruefName"), linked: [{ platform: "Steam", name: "PruefSteam", accountId: "76561190000000000" }] });
 
         const byId = await client.primeSnapshots.Lookup("w0150acc");
         const byName = await client.primeSnapshots.Lookup("pruefname");
+        const stored = await client.databaseService.Query<{ profile: string }>("SELECT profile FROM prime_snapshots WHERE user_id = ?", [user]);
 
         check("Gespeichert und über die Konto-ID gefunden", byId?.name === "PruefName", String(byId?.name));
+        check("  ohne verknüpfte Plattform-Konten", byId?.linked.length === 0 && !JSON.stringify(stored).includes("PruefSteam"), JSON.stringify(byId?.linked));
         check("  mit dem Zeitpunkt der Abfrage", byId?.fetchedAt === fetchedAt, String(byId?.fetchedAt));
         check("  auch über den Namen in anderer Schreibweise", byName?.name === "PruefName" && byName.fetchedAt === fetchedAt, String(byName?.name));
 

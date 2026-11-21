@@ -154,4 +154,16 @@ export default class PlayerAccount extends Model<IPlayerAccountRow> {
 
         return rows[0]?.user_id ?? null;
     }
+
+    /**
+     * Wie Owner, aber am Zwischenspeicher vorbei. W-0150 (Review): Wer gespeicherte Daten
+     * anlegt, fragt die Datenbank selbst - das Admin Dashboard löscht Nutzerdaten ohne den
+     * Zwischenspeicher des Bots, und ein veralteter Treffer würde eine gelöschte Person
+     * wieder anlegen.
+     */
+    async OwnerNow(platform: Platform, accountId: string): Promise<string | null> {
+        const row = await this.db.One<{ user_id: string }>(`SELECT user_id FROM \`${this.Table}\` WHERE platform = ? AND account_id = ? LIMIT 1`, [platform, accountId]);
+
+        return row?.user_id ?? null;
+    }
 }

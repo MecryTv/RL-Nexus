@@ -352,7 +352,7 @@ export default class PrimeService implements IPrimeService {
         try {
             if (!this.client.databaseService.Ready) return;
 
-            const owner = await this.client.accounts.Owner("epic", profile.accountId);
+            const owner = await this.client.accounts.OwnerNow("epic", profile.accountId);
 
             if (owner) await this.client.primeSnapshots.Save(owner, profile);
         } catch (error) {

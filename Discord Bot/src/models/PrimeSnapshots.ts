@@ -28,7 +28,9 @@ export default class PrimeSnapshots extends Model<IPrimeSnapshotRow> {
                 user_id: userId,
                 account_id: profile.accountId,
                 display_name: profile.name,
-                profile: JSON.stringify(profile),
+                // Review (Datenschutz): die verknüpften Steam-, PSN-, Xbox- und Switch-Konten deckt die
+                // Erklärung nicht ab, und die Karte braucht sie nicht - sie bleiben draußen.
+                profile: JSON.stringify({ ...profile, linked: [], stale: undefined, fromStore: undefined }),
                 fetched_at: new Date(profile.fetchedAt),
             },
             ["account_id", "display_name", "profile", "fetched_at"]
