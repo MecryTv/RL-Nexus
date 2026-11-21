@@ -20,6 +20,7 @@ import { PRIME_ACCESS_TEXT, PRIME_CACHE_TTL } from "../constants/Prime";
 import { Collection } from "discord.js";
 import Rank from "../commands/user/Rank";
 import RankButtons from "../events/rank/RankButtons";
+import { RankMessage, StaleNotice } from "../builder/RankView";
 import logger from "../utils/logger";
 import { IPrimeAccessCard, PRIME_ACCESS_URL, PrimeAccessAlt } from "../builder/PrimeAccessCard";
 import { ParseAccessExpiry, PrimeAccessWatch, SendPrimeAccess } from "../services/PrimeAccessService";
@@ -1028,6 +1029,135 @@ async function checkSnapshotWiring(): Promise<void> {
     check("Verbinden speichert den Stand gleich mit", /SaveProfile\([^;]*\);\s*(?:\/\/.*\s*)*await client\.primeSnapshots\.Save\(userId, profile\);/.test(epic));
 }
 
+/** W-0150: Ein gespeicherter Stand vom 20.11.2026, 18:42 UTC (Sekunden 1795200120). */
+const STORED: IPrimeProfile = {
+    name: "PruefName",
+    platform: "Epic Games",
+    accountId: "w0150acc",
+    playerId: "Epic|w0150acc|0",
+    linked: [],
+    seasonLevel: 1,
+    seasonWins: 0,
+    ranks: [],
+    stats: [],
+    club: null,
+    fetchedAt: "2026-11-20T18:42:00.000Z",
+};
+
+/** W-0150: Die Zeile über einer Karte mit altem Stand (Entwurf B), Texte wie im Design. */
+async function checkStaleNotice(): Promise<void> {
+    console.log("\n  — Hinweis über der Karte bei altem Stand —");
+
+    const me = StaleNotice({ ...STORED, stale: "down" }, true);
+    const other = StaleNotice({ ...STORED, stale: true }, false);
+
+    check("Frischer Stand: keine Zeile", StaleNotice(STORED, true) === null);
+    check(
+        "/rank me bei Ausfall",
+        me === "⚠️ **Rocket League antwortet gerade nicht.** Das ist dein letzter Stand vom <t:1795200120:f> (<t:1795200120:R>).\n-# Für aktuelle Zahlen /rank me später noch einmal ausführen.",
+        String(me)
+    );
+    check(
+        "/rank search bei Ausfall, mit Name",
+        other === "⚠️ **Rocket League antwortet gerade nicht.** Das ist der letzte Stand von **PruefName** vom <t:1795200120:f> (<t:1795200120:R>).\n-# Für aktuelle Zahlen /rank search später noch einmal ausführen.",
+        String(other)
+    );
+    check(
+        "Zugang abgelehnt: eigener erster Satz",
+        StaleNotice({ ...STORED, stale: "access" }, true)?.startsWith("⚠️ **Die Rang-Abfrage ist gerade nicht freigeschaltet.** Das ist dein letzter Stand vom ") === true,
+        String(StaleNotice({ ...STORED, stale: "access" }, true))
+    );
+
+    const fresh = await RankMessage({ profile: STORED, discordName: null, avatarURL: null, page: "ranked", self: true }, "1");
+    const old = await RankMessage({ profile: { ...STORED, stale: "down" }, discordName: null, avatarURL: null, page: "ranked", self: true }, "1");
+
+    check("Nachricht mit frischem Stand: Text leer", fresh.content === "", fresh.content);
+    check("  mit altem Stand: die Zeile", old.content === me, old.content);
+}
+
+/**
+ * W-0150: Fällt Prime aus und hat der Arbeitsspeicher nichts, holt /rank den
+ * gespeicherten Stand - /rank link nicht. Ohne Datenbank bleibt es bei der Meldung.
+ */
+async function checkFallback(): Promise<void> {
+    console.log("\n  — /rank bei Ausfall: gespeicherter Stand —");
+
+    const DOWN = "Rocket League antwortet gerade nicht. Versuch es später noch einmal.";
+    const state = { failure: new PrimeError("Prime antwortet nicht (10000 ms)", "Timeout") as Error, profile: null as IPrimeProfile | null };
+    const db = { Ready: true };
+    const replies: { content?: string; files?: unknown[] }[] = [];
+    const fake = {
+        primeService: { IsConfigured: true, Profile: async () => state.profile ?? Promise.reject(state.failure) },
+        databaseService: db,
+        primeSnapshots: { Lookup: async (wanted: string) => (wanted.toLowerCase() === "pruefname" || wanted === "w0150acc" ? STORED : null) },
+        accounts: { TrustedOwner: async () => "2" },
+        users: { fetch: async () => null },
+        cooldowns: new Collection(),
+        guardian: { ReportError: async (error: Error) => void replies.push({ content: `Fehler: ${error.message}` }) },
+    } as unknown as BotClient;
+    const interaction = { editReply: async (message: { content?: string }) => void replies.push(message) };
+    const fetch = (name: string, fallback?: boolean) =>
+        (new Rank(fake) as unknown as { Fetch: (i: unknown, n: string, f?: boolean) => Promise<IPrimeProfile | null> }).Fetch(interaction, name, fallback);
+
+    const rescued = await fetch("PruefName", true);
+
+    check("Zeitüberschreitung: der gespeicherte Stand kommt", rescued?.name === "PruefName" && rescued.fromStore === true, `${String(rescued?.name)} ${String(rescued?.fromStore)}`);
+    check("  als „down“ markiert, ohne Meldung", rescued?.stale === "down" && replies.length === 0, `${String(rescued?.stale)}, ${replies.length} Antworten`);
+
+    const plain = await fetch("PruefName");
+
+    check("Ohne Rückgriff (/rank link): die Meldung wie bisher", plain === null && replies.at(-1)?.content === DOWN, String(replies.at(-1)?.content));
+
+    state.failure = HttpError(401, "");
+
+    const locked = await fetch("w0150acc", true);
+
+    check("Zugang abgelehnt: Stand als „access“", locked?.stale === "access" && locked.fromStore === true, String(locked?.stale));
+
+    state.failure = HttpError(502, "<html>");
+    check("Anderer Fehler: Stand als alt (true)", (await fetch("w0150acc", true))?.stale === true);
+
+    state.failure = new PrimeError("Prime antwortet nicht (10000 ms)", "Timeout");
+
+    const unknown = await fetch("Fremd", true);
+
+    check("Nichts gespeichert: die Meldung", unknown === null && replies.at(-1)?.content === DOWN, String(replies.at(-1)?.content));
+
+    db.Ready = false;
+
+    const offline = await fetch("PruefName", true);
+
+    check("Datenbank nicht bereit: die Meldung, kein Fehler", offline === null && replies.at(-1)?.content === DOWN, String(replies.at(-1)?.content));
+
+    db.Ready = true;
+
+    // Der Knopf unter der Karte: derselbe Rückgriff, und die Zeile verschwindet wieder, sobald der Stand frisch ist.
+    const click = async (user: string) => {
+        await new RankButtons(fake).Execute({
+            isButton: () => true,
+            customId: `rk:extra:w0150acc:${user}`,
+            user: { id: user },
+            guildId: null,
+            deferUpdate: async () => undefined,
+            reply: async (message: { content?: string }) => void replies.push(message),
+            followUp: async (message: { content?: string }) => void replies.push(message),
+            editReply: async (message: { content?: string }) => void replies.push(message),
+        } as never);
+
+        return replies.at(-1);
+    };
+
+    const stale = await click("2");
+
+    check("Knopf bei Ausfall: Karte mit der Zeile", stale?.content === StaleNotice({ ...STORED, stale: "down" }, true) && (stale.files?.length ?? 0) === 1, String(stale?.content));
+
+    state.profile = { ...STORED, fetchedAt: new Date().toISOString() };
+
+    const fresh = await click("3");
+
+    check("  wieder frisch: die Zeile ist weg", fresh?.content === "" && (fresh.files?.length ?? 0) === 1, String(fresh?.content));
+}
+
 /** W-0150: Dasselbe mit echter Datenbank und einer echten Zeile in player_accounts. */
 async function checkSnapshotWrites(client: BotClient): Promise<void> {
     console.log("\n  — Letzter Rang-Stand: Speichern mit Datenbank —");
@@ -1108,6 +1238,8 @@ async function main(): Promise<void> {
     await checkAccessWatch();
     await checkResolverNames();
     await checkSnapshotWiring();
+    await checkStaleNotice();
+    await checkFallback();
 
     // W-0150: Nur mit Datenbank - ohne bleibt es bei einem Hinweis.
     if (await client.databaseService.Connect()) {

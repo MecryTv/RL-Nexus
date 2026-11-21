@@ -100,6 +100,11 @@ export interface IPrimeProfile {
      * wie true, nur hört der Team-Abgleich danach auf.
      */
     stale?: boolean | "access" | "down";
+    /**
+     * W-0150: Der Stand kommt aus prime_snapshots, nicht aus dem Arbeitsspeicher -
+     * nur /rank greift darauf zurück. Rang-Rollen werden danach nicht verteilt.
+     */
+    fromStore?: boolean;
 }
 
 export default interface IPrimeService {

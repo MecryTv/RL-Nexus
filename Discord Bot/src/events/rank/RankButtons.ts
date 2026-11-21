@@ -6,7 +6,7 @@ import { RankCardPage } from "../../builder/RankCard";
 import { IPrimeProfile } from "../../interfaces/services/prime/IPrimeService";
 import { ClosedText, ModuleOpen } from "../../utils/moduleFlags";
 import { PRIME_ACCESS_TEXT } from "../../constants/Prime";
-import { PrimeError } from "../../services/PrimeService";
+import { PrimeDown, PrimeError } from "../../services/PrimeService";
 
 /** Jeder Klick zeichnet die Karte neu (knapp eine Sekunde) - nicht öfter als alle drei Sekunden je Nutzer. */
 const COOLDOWN_MS = 3000;
@@ -95,9 +95,13 @@ export default class RankButtons extends Event {
 
             if (!profile) content = "Dieses Epic-Konto gibt es nicht mehr.";
         } catch (error) {
-            profile = null;
+            const locked = error instanceof PrimeError && error.type === "Access";
+            // W-0150: Wie bei /rank - der zuletzt gespeicherte Stand, wenn es einen gibt.
+            const stored = this.client.databaseService.Ready ? await this.client.primeSnapshots.Lookup(accountId).catch(() => null) : null;
+
+            profile = stored && { ...stored, stale: locked ? "access" : PrimeDown(error) ? "down" : true, fromStore: true };
             // W-0145: Wie bei /rank - ein abgelaufener Schlüssel ist kein Ausfall.
-            content = error instanceof PrimeError && error.type === "Access" ? PRIME_ACCESS_TEXT : "Rocket League antwortet gerade nicht. Versuch es gleich noch einmal.";
+            content = locked ? PRIME_ACCESS_TEXT : "Rocket League antwortet gerade nicht. Versuch es gleich noch einmal.";
         }
 
         if (!profile) {
@@ -119,10 +123,13 @@ export default class RankButtons extends Event {
                 discordName: member?.username ?? null,
                 avatarURL: member?.displayAvatarURL({ extension: "png", size: 256 }) ?? null,
                 page,
+                // W-0150: Für die Zeile über einem alten Stand - die eigene Karte oder die eines anderen.
+                self: owner === interaction.user.id,
             },
             interaction.user.id
         );
 
+        // W-0150: content ist leer, sobald der Stand frisch ist - so verschwindet die Zeile wieder.
         await interaction.editReply({ ...message, attachments: [] });
     }
 
