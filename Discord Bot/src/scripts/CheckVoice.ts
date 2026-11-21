@@ -14,7 +14,9 @@ process.env.DEV_CLIENT_SECRET ||= "check-secret";
 
 import { ChannelType, Collection, Guild, GuildBasedChannel, GuildMember, Role, VoiceBasedChannel } from "discord.js";
 import BotClient from "../client/BotClient";
+import { writeFile } from "node:fs/promises";
 import { VoicePanel, VoicePresetList, VoiceState } from "../builder/VoiceView";
+import { IVoicePanelImage, RenderVoicePanel, VOICE_PANEL_FILE, VoicePanelAlt } from "../builder/VoicePanelImage";
 import { DefaultHubConfig, DefaultVoiceSettings, FormatVoiceName, MAX_LIMIT, MAX_PRESETS, VOICE_ACTIONS, VOICE_MENU_ACTIONS } from "../constants/Voice";
 import { IVoiceSettings } from "../interfaces/services/voice/IVoice";
 import { VoiceError, VoiceLimits, VOICE_MODULE } from "../services/VoiceService";
@@ -691,6 +693,49 @@ async function checkReviewPulse(client: BotClient): Promise<void> {
     }
 }
 
+/* ----------------------------------------------------------
+   W-0151: das Bild des Panels
+   ---------------------------------------------------------- */
+function pngSize(png: Buffer): { width: number; height: number; png: boolean } {
+    return { png: png.subarray(1, 4).toString("ascii") === "PNG", width: png.readUInt32BE(16), height: png.readUInt32BE(20) };
+}
+
+async function checkImage(): Promise<void> {
+    console.log("\n  — Bild des Panels —");
+
+    const open: IVoicePanelImage = { kind: "channel", ownerName: "Fischi_", avatarURL: null, privacy: "public", stealth: false, limit: 5, region: null };
+    const closed: IVoicePanelImage = {
+        kind: "channel",
+        ownerName: "ꜱᴛᴀʀʟɪɢʜᴛ🌟Long_Name_Example_32",
+        avatarURL: null,
+        privacy: "private",
+        stealth: true,
+        limit: 0,
+        region: "rotterdam",
+    };
+    const fixed: IVoicePanelImage = { kind: "fixed" };
+
+    for (const [label, data, file] of [
+        ["öffentlich", open, "voice-panel-check.png"],
+        ["privat und unsichtbar, langer Name", closed, "voice-panel-check-privat.png"],
+        ["festes Panel", fixed, "voice-panel-check-fest.png"],
+    ] as const) {
+        const png = await RenderVoicePanel(data);
+        const size = pngSize(png);
+
+        check(`Bild ${label}: PNG 1200 × 264`, size.png && size.width === 1200 && size.height === 264, JSON.stringify(size));
+        await writeFile(file, png);
+    }
+
+    const altOpen = VoicePanelAlt(open);
+    const altClosed = VoicePanelAlt(closed);
+
+    check("Alt-Text öffentlich: Zutritt, Plätze, Region", altOpen.includes("Zutritt: Offen") && altOpen.includes("Plätze: 5") && altOpen.includes("Region: Auto"), altOpen);
+    check("Alt-Text privat: Privat, unsichtbar, ∞, Rotterdam", ["Privat", "unsichtbar", "Plätze: ∞", "Rotterdam"].every((part) => altClosed.includes(part)), altClosed);
+    check("Alt-Text festes Panel", VoicePanelAlt(fixed).includes("Dein Sprachkanal"), VoicePanelAlt(fixed));
+    check("Dateiname des Anhangs", VOICE_PANEL_FILE === "voice-panel.png");
+}
+
 async function main(): Promise<void> {
     console.log("\n🔊 Temp Voice\n");
 
@@ -700,6 +745,7 @@ async function main(): Promise<void> {
 
     checkConfig(client);
     checkViews();
+    await checkImage();
     checkSupport(client);
     await checkW137(client);
     await checkSweep(client);

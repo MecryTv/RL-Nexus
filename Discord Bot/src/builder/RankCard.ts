@@ -93,7 +93,7 @@ export function RegisterFonts(): Promise<void> {
 // Bilder ändern sich nicht - einmal laden reicht für die Laufzeit des Prozesses.
 const images = new Map<string, Image | null>();
 
-async function image(file: string): Promise<Image | null> {
+export async function image(file: string): Promise<Image | null> {
     const cached = images.get(file);
 
     if (cached !== undefined) return cached;
@@ -223,7 +223,7 @@ function tinted(key: string, source: Image, size: number, color: string): Canvas
    ---------------------------------------------------------- */
 
 /** Ein Rechteck mit abgeschrägten Ecken - die Grundform des ganzen HUD. */
-function bevelPath(ctx: SKRSContext2D, x: number, y: number, w: number, h: number, cut: number): void {
+export function bevelPath(ctx: SKRSContext2D, x: number, y: number, w: number, h: number, cut: number): void {
     ctx.beginPath();
     ctx.moveTo(x + cut, y);
     ctx.lineTo(x + w - cut, y);
@@ -237,7 +237,7 @@ function bevelPath(ctx: SKRSContext2D, x: number, y: number, w: number, h: numbe
 }
 
 /** Strich mit Schein. Der Schatten ist hier das Leuchten, nicht der Schatten. */
-function glow(ctx: SKRSContext2D, color: string, blur: number, draw: () => void): void {
+export function glow(ctx: SKRSContext2D, color: string, blur: number, draw: () => void): void {
     ctx.save();
     ctx.shadowColor = color;
     ctx.shadowBlur = blur;
@@ -249,7 +249,7 @@ function glow(ctx: SKRSContext2D, color: string, blur: number, draw: () => void)
  * Ein dunkles Panel mit leuchtender Kante - der Baustein, aus dem die Karte
  * besteht.
  */
-function panel(
+export function panel(
     ctx: SKRSContext2D,
     x: number,
     y: number,
