@@ -29,6 +29,7 @@ const USER = "90071992547409962";
 const OTHER = "90071992547409963";
 const HUB = "90071992547409964";
 const TEMP = "90071992547409965";
+const PANEL_MESSAGE = "90071992547409979";
 const CATEGORY = "90071992547409966";
 const TEXT = "90071992547409967";
 const ROLE = "90071992547409968";
@@ -47,6 +48,8 @@ interface IFakeChannel {
     edits: Record<string, unknown>[];
     deleted: boolean;
     invites: number;
+    /** W-0151: liefert die Panel-Nachricht; ohne eigenen Wert gibt es keine. */
+    fetchMessage: (id: string) => Promise<unknown>;
 }
 
 function FakeGuild(): Guild {
@@ -69,19 +72,33 @@ function FakeGuild(): Guild {
 }
 
 function FakeChannel(guild: Guild): IFakeChannel {
-    const state: IFakeChannel = { channel: null as unknown as VoiceBasedChannel, edits: [], deleted: false, invites: 0 };
+    const state: IFakeChannel = {
+        channel: null as unknown as VoiceBasedChannel,
+        edits: [],
+        deleted: false,
+        invites: 0,
+        fetchMessage: async () => {
+            throw Object.assign(new Error("Unknown Message"), { code: 10008 });
+        },
+    };
 
     state.channel = {
         id: TEMP,
         name: "Laras Kanal",
         guild,
         members: new Map(),
+        userLimit: 0,
+        rtcRegion: null,
         isVoiceBased: () => true,
         edit: async (options: Record<string, unknown>) => {
             state.edits.push(options);
+            // Wie Discord: Plätze und Region stehen danach am Kanal.
+            if (typeof options.userLimit === "number") Object.assign(state.channel, { userLimit: options.userLimit });
+            if ("rtcRegion" in options) Object.assign(state.channel, { rtcRegion: options.rtcRegion ?? null });
 
             return state.channel;
         },
+        messages: { fetch: (id: string) => state.fetchMessage(id) },
         delete: async () => {
             state.deleted = true;
 
@@ -113,6 +130,7 @@ function FakeMember(guild: Guild, id: string, channel: VoiceBasedChannel | null,
             disconnect: async () => patch.disconnect?.(),
         },
         send: async () => undefined,
+        displayAvatarURL: () => null,
     } as unknown as GuildMember;
 }
 
@@ -344,6 +362,57 @@ async function checkDatabase(client: BotClient): Promise<void> {
     check("Den Kanal übergeben", (await service.Run(owner, "transferownership", { target: other })).includes(OTHER));
     check("Jetzt gehört er dem anderen", (await client.tempVoices.Get(TEMP))?.ownerId === OTHER);
     await fails("Und der Alte darf nichts mehr", () => service.Run(owner, "name", { text: "Meins" }), "gehört");
+
+    console.log("\n  — Panel neu setzen —");
+
+    // W-0151: Die Panel-Nachricht merkt sich der Bot je Kanal und setzt sie bei Änderungen neu.
+    const panelEdits: Record<string, unknown>[] = [];
+    let panelGone = false;
+    const panelMessage = {
+        id: PANEL_MESSAGE,
+        edit: async (options: Record<string, unknown>) => {
+            panelEdits.push(options);
+
+            return panelMessage;
+        },
+    };
+    const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+    fake.fetchMessage = async (id: string) => {
+        if (panelGone || id !== PANEL_MESSAGE) throw Object.assign(new Error("Unknown Message"), { code: 10008 });
+
+        return panelMessage;
+    };
+
+    await client.tempVoices.SetPanel(TEMP, PANEL_MESSAGE);
+
+    check("Die Panel-Nachricht steht beim Kanal", (await client.tempVoices.Get(TEMP))?.panelMessageId === PANEL_MESSAGE);
+
+    service.refreshDelay = 20;
+    service.QueueRefresh(fake.channel);
+    service.QueueRefresh(fake.channel);
+    service.QueueRefresh(fake.channel);
+    await wait(120);
+
+    const files = panelEdits[0]?.files as { name?: string }[] | undefined;
+
+    check("Drei Anstöße kurz hintereinander: einmal neu gesetzt", panelEdits.length === 1, String(panelEdits.length));
+    check("  mit neuem Bild, das alte Bild fliegt raus", files?.[0]?.name === "voice-panel.png" && Array.isArray(panelEdits[0]?.attachments), JSON.stringify(Object.keys(panelEdits[0] ?? {})));
+
+    await service.Run(other, "privacy");
+    await wait(120);
+
+    check("Zutritt umstellen setzt das Panel neu", panelEdits.length === 2, String(panelEdits.length));
+
+    panelGone = true;
+
+    let threw = false;
+
+    await service.RefreshPanel(fake.channel).catch(() => (threw = true));
+
+    check("Panel-Nachricht gelöscht: kein Fehler, nichts gesetzt", !threw && panelEdits.length === 2, String(panelEdits.length));
+
+    panelGone = false;
 
     console.log("\n  — Presets —");
 

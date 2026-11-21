@@ -8,6 +8,9 @@ export const VOICE_PREFIX = "voice";
 export const VOICE_ACCENT = "#5865f2";
 
 export const MAX_PRESETS = 5;
+
+/** W-0151: Änderungen am Kanal so lange sammeln, bevor das Panel-Bild neu gesetzt wird. */
+export const PANEL_REFRESH_MS = 3000;
 export const MAX_VOICE_NAME = 90;
 export const MAX_LIMIT = 99;
 

@@ -73,6 +73,8 @@ export interface ITempVoice {
     /** Aus einem Support-Hub: kein Panel, kein Besitzerwechsel. */
     support: boolean;
     createdAt: number;
+    /** W-0151: die Panel-Nachricht im Chat des Kanals, null solange unbekannt. */
+    panelMessageId?: string | null;
 }
 
 export interface IVoicePreset {
