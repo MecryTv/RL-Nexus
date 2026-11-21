@@ -15,7 +15,7 @@ process.env.DEV_CLIENT_SECRET ||= "check-secret";
 import { ChannelType, Collection, Guild, GuildBasedChannel, GuildMember, Role, VoiceBasedChannel } from "discord.js";
 import BotClient from "../client/BotClient";
 import { VoicePanel, VoicePresetList, VoiceState } from "../builder/VoiceView";
-import { DefaultHubConfig, DefaultVoiceSettings, FormatVoiceName, MAX_LIMIT, MAX_PRESETS, VOICE_ACTIONS } from "../constants/Voice";
+import { DefaultHubConfig, DefaultVoiceSettings, FormatVoiceName, MAX_LIMIT, MAX_PRESETS, VOICE_ACTIONS, VOICE_MENU_ACTIONS } from "../constants/Voice";
 import { IVoiceSettings } from "../interfaces/services/voice/IVoice";
 import { VoiceError, VoiceLimits, VOICE_MODULE } from "../services/VoiceService";
 import { SetFlags } from "../utils/moduleFlags";
@@ -127,6 +127,20 @@ function checkConfig(client: BotClient): void {
     check("Standard: alle 13 Optionen", base.actions.length === 13);
     check("Standard: Presets erlaubt", base.presets);
 
+    // W-0151: deutsche Namen, sortiert nach Kanal, Leute, Mehr.
+    const names = VOICE_ACTIONS.map((entry) => `${entry.value}=${entry.name}`).join(",");
+
+    check(
+        "Optionen heißen deutsch, in dieser Reihenfolge",
+        names ===
+            "name=Umbenennen,userlimit=Plätze,privacy=Zutritt,stealthmode=Unsichtbar,region=Region,inviteuser=Einladen,trustuser=Freigeben,untrustuser=Freigabe entziehen,kickuser=Rauswerfen,blockuser=Sperren,unblockuser=Entsperren,transferownership=Übergeben,deletechannel=Kanal löschen",
+        names
+    );
+    check("  Beschreibungen beginnen mit dem Bereich", VOICE_ACTIONS.every((entry) => /^(Kanal|Leute|Mehr) · /.test(entry.description)));
+    check("  kein „User“ mehr im Namen", VOICE_ACTIONS.every((entry) => !entry.name.includes("User")));
+    check("  Umbenennen ✏️, Plätze 👥", VOICE_ACTIONS[0].emoji === "✏️" && VOICE_ACTIONS[1].emoji === "👥");
+    check("Menü: 12 Optionen, ohne Löschen", VOICE_MENU_ACTIONS.length === 12 && !VOICE_MENU_ACTIONS.some((entry) => entry.value === "deletechannel"));
+
     const clean = service.CleanConfig(guild, { name: "  {user} zockt  ", categoryId: CATEGORY, actions: ["name", "quatsch", "region"], presets: false }, base);
 
     check("Der Name wird sauber übernommen", clean.name === "{user} zockt", clean.name);
@@ -168,7 +182,7 @@ function checkViews(): void {
 
     check("Das Panel hat ein Auswahlmenü", panel.includes("voice:menu"));
     check("Alle 13 Optionen stehen drin", VOICE_ACTIONS.every((action) => panel.includes(`"${action.value}"`)));
-    check("Die Beschreibungen kommen mit", panel.includes("Ändere den Namen des temporären Sprachkanals"));
+    check("Die Beschreibungen kommen mit", panel.includes("Kanal · Neuer Name für den Kanal"));
     check("Der Preset-Knopf ist da", panel.includes("voice:presets"));
     check("Ohne Presets kein Knopf", !JSON.stringify(VoicePanel({ ...config, presets: false }, true).components[0].toJSON()).includes("voice:presets"));
 
