@@ -42,7 +42,10 @@ function adminServer(): Plugin {
                 return;
             }
 
-            const child: ChildProcess = spawn(process.execPath, ["--watch", "--env-file=.env", "server/index.ts", "--dev"], { cwd: root, stdio: "inherit" });
+            // PORT fest setzen: --env-file überschreibt kein geerbtes PORT (preview_start setzt 5174),
+            // der Server landete sonst auf dem Port von Vite statt dort, wohin der Proxy zeigt.
+            const env = { ...process.env, PORT: String(SERVER_PORT) };
+            const child: ChildProcess = spawn(process.execPath, ["--watch", "--env-file=.env", "server/index.ts", "--dev"], { cwd: root, stdio: "inherit", env });
 
             // Nicht beim Neustart von Vite beenden (etwa nach einer Änderung an
             // dieser Datei): Der neue Durchlauf findet den Port dann belegt und nimmt ihn.
