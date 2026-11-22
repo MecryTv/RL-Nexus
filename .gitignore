@@ -6,3 +6,4 @@ t12-check.log
 t12-db.log
 t12-lint.log
 t12-tsc.log
+.playwright
