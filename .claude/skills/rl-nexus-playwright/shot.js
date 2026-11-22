@@ -49,7 +49,8 @@ function slug(url) {
             page.on("console", (m) => m.type() === "error" && errors.push(`Konsole: ${m.text()}`));
             page.on("pageerror", (e) => errors.push(`Seitenfehler: ${e.message}`));
             page.on("response", (r) => r.status() >= 400 && errors.push(`HTTP ${r.status()}: ${r.url()}`));
-            page.on("requestfailed", (r) => errors.push(`Abgebrochen: ${r.url()} (${r.failure()?.errorText})`));
+            // ERR_ABORTED ist gewollt (AbortController, React-StrictMode im Dev-Modus), kein Fehler.
+            page.on("requestfailed", (r) => r.failure()?.errorText !== "net::ERR_ABORTED" && errors.push(`Fehlgeschlagen: ${r.url()} (${r.failure()?.errorText})`));
 
             try {
                 await page.goto(url, { waitUntil: "load", timeout: 30_000 });

@@ -39,7 +39,9 @@ NAME=vorher WIDTHS=1440 node .claude/skills/rl-nexus-playwright/shot.js http://l
 STATE=admin node .claude/skills/rl-nexus-playwright/shot.js http://localhost:5174/
 ```
 
-Standardbreiten 390, 768, 1440. Das Skript scrollt einmal durch die Seite (Abschnitte blenden sich erst beim Scrollen ein), speichert Ganzseiten-PNGs in `.playwright/shots/` und listet Konsolenfehler, Seitenfehler, HTTP ab 400 und abgebrochene Anfragen. Exit-Code 1, sobald davon etwas auftritt. Weitere Schalter: `THEME=dark`, `HEADED=1` (Fenster zeigen, Standard ist unsichtbar).
+Standardbreiten 390, 768, 1440. Das Skript scrollt einmal durch die Seite (Abschnitte blenden sich erst beim Scrollen ein), speichert Ganzseiten-PNGs in `.playwright/shots/` und listet Konsolenfehler, Seitenfehler, HTTP ab 400 und fehlgeschlagene Anfragen (gewollte Abbrüche `ERR_ABORTED` nicht). Exit-Code 1, sobald davon etwas auftritt. Weitere Schalter: `THEME=dark`, `HEADED=1` (Fenster zeigen, Standard ist unsichtbar).
+
+Kein Fehler der Seite: Elemente mit `100vh` oder `position: fixed` (Seitenleiste im Admin Dashboard) enden im Ganzseitenbild nach 900 px. Für sie einen normalen Screenshot ohne `fullPage` nehmen.
 
 Danach die Bilder mit Read ansehen. Für works: `works asset W-xxxx .playwright/shots/<datei>.png --kind vorher|nachher --desc "..."`. Ist der Nutzer unterwegs, das Bild mit SendUserFile schicken.
 
