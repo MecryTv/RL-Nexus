@@ -70,4 +70,5 @@ const { chromium, OUT, ADMIN_STATE } = require("D:/Development/RL Nexus/.claude/
 - Nur lokale Adressen. Keine Tests gegen nexus-emb.de oder andere Live-Seiten, Discord nur über den Dev-Server.
 - `.playwright/admin-state.json` ist eine gültige Admin-Sitzung: nie committen, kopieren, hochladen oder in Worktrees mitnehmen.
 - Shop nur mit dem Admin-Server im `--dev`-Modus (Stripe-Testschlüssel).
+- Vor `works done` oder `check:db` den Server `admin-ui` wieder stoppen (`preview_stop`): Sein Versand-Zeitgeber greift sonst Testzeilen von `check:db` ab, und „Hängt eine Zeile mitten im Lauf auf sending“ schlägt fehl.
 - Schlägt `pw.js` mit „Playwright fehlt“ fehl (etwa nach einem Plugin-Update), den genannten `npm run setup` ausführen.
