@@ -5,7 +5,7 @@ import { SNOWFLAKE } from "../constants/Discord";
 import Route from "../structures/Route";
 import { EXEMPT_GROUPS } from "./AdminServer";
 
-/** W-0064: Gilt „ein Server pro Person“ für diese Person? Administrator, Developer und Partner sind ausgenommen. */
+/** W-0064: Gilt „ein Server pro Person“ für diese Person? Administrator, Developer, Dev-Tester und Partner sind ausgenommen. */
 export default class AdminUserExempt extends Route {
     constructor(client: BotClient) {
         super(client, {

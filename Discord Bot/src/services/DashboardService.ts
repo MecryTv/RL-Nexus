@@ -181,7 +181,7 @@ export function BetaErrorText(query: unknown): string | null {
 
 /**
  * Beta Access (Plan 22): Im Beta-Modus gilt weder Free noch Paid. Herein kommt
- * nur, wer einen Code eingelöst hat, dazu Administrator und Developer. null:
+ * nur, wer einen Code eingelöst hat, dazu Administrator, Developer und Dev-Tester. null:
  * Die Schranke spielt keine Rolle, es gilt die Bezahlschranke wie sonst.
  */
 export function BetaGate(input: { readonly betaMode: boolean; readonly group: DashboardGroup; readonly member: boolean }): IShopAccess | null {
@@ -584,9 +584,9 @@ export default class DashboardService implements IDashboardService {
     }
 
     /**
-     * Die Gruppe eines Nutzers. Administrator, Partner und Premium stehen in der
-     * Datenbank (dashboard_groups, von Hand eingetragen). Developer kommt aus
-     * DEV_USER_IDs.
+     * Die Gruppe eines Nutzers. Administrator, Dev-Tester, Partner und Premium
+     * stehen in der Datenbank (dashboard_groups, vergeben im Admin Dashboard).
+     * Developer kommt aus DEV_USER_IDs und steht über Dev-Tester.
      *
      * Ohne Datenbank bleibt nur Developer übrig, alle anderen sind Testphase.
      */

@@ -5,8 +5,8 @@ import Route from "../structures/Route";
 import { PassUser } from "../utils/invitepass";
 import { InviterOf } from "../utils/servers";
 
-/** Gruppen, für die „ein Server pro Person“ nicht gilt (W-0064). */
-export const EXEMPT_GROUPS = ["administrator", "developer", "partner"];
+/** Gruppen, für die „ein Server pro Person“ nicht gilt (W-0064), Dev-Tester seit W-0154. */
+export const EXEMPT_GROUPS = ["administrator", "developer", "devtester", "partner"];
 
 /** W-0064: ein Server samt Einlader (Audit-Log, sonst Owner) und ob der ausgenommen ist. */
 export default class AdminServer extends Route {
