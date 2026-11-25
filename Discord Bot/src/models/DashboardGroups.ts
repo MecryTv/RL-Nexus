@@ -1,8 +1,8 @@
 import Model from "../structures/Model";
 import { OrNull, TABLES, TableName } from "../constants/Database";
 
-/** Gruppen, die in der Datenbank stehen. "developer" und "testphase" nicht - siehe Migration 002. */
-export const STORED_GROUPS = ["administrator", "partner", "premium"] as const;
+/** Gruppen, die in der Datenbank stehen. "developer" und "testphase" nicht - siehe Migration 002, "devtester" seit 062 (W-0154). */
+export const STORED_GROUPS = ["administrator", "devtester", "partner", "premium"] as const;
 
 export type StoredGroup = (typeof STORED_GROUPS)[number];
 
@@ -35,7 +35,7 @@ export default class DashboardGroups extends Model<IDashboardGroupRow> {
 
     /** Alle vergebenen Gruppen, für die Übersicht im Admin-Dashboard. */
     async All(): Promise<IDashboardGroupRow[]> {
-        return this.Where({}, "FIELD(group_name, 'administrator', 'partner', 'premium'), granted_at ASC");
+        return this.Where({}, "FIELD(group_name, 'administrator', 'devtester', 'partner', 'premium'), granted_at ASC");
     }
 
     /**
@@ -66,7 +66,7 @@ export default class DashboardGroups extends Model<IDashboardGroupRow> {
 
     /** Wie viele je Gruppe - eine Abfrage statt einer je Gruppe. */
     async Counts(): Promise<Record<StoredGroup, number>> {
-        const counts = { administrator: 0, partner: 0, premium: 0 };
+        const counts = { administrator: 0, devtester: 0, partner: 0, premium: 0 };
 
         const rows = await this.db.Cached(this.Table, "counts", () =>
             this.db.Query<{ group_name: StoredGroup; total: number }>(

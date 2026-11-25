@@ -20,8 +20,7 @@ import { DatabaseUnavailable } from "../services/DatabaseService";
 import { TeamMMR, WTSI } from "../constants/WTSI";
 import PlayerRanks from "../models/PlayerRanks";
 import { DAY_MS, HOUR_MS, SplitSpan } from "../constants/Activity";
-import { PERMANENT_MODULES } from "../constants/Modules";
-import DashboardService from "../services/DashboardService";
+import { PERMANENT_MODULES } from "../constants/Modules";import DashboardService from "../services/DashboardService";
 
 // Eine Snowflake, die es bei Discord nicht gibt - Stand 2262.
 const GUILD = "9007199254740991";
@@ -172,7 +171,15 @@ async function checkGroups(client: BotClient): Promise<void> {
 
         await model.Revoke(USER_B);
         check("Nach dem Entzug bleibt der Developer", (await service.GroupOf(USER_B)) === "developer");
-    } finally {
+
+        // W-0154: Dev-Tester steht in der Datenbank, ist kein Staff, zählt bei Beta aber wie ein eingelöster Code.
+        await model.Grant(USER_A, "devtester", USER_B, "Prüflauf");
+        check("Dev-Tester kommt aus der Datenbank", (await service.GroupOf(USER_A)) === "devtester");
+        check("Dev-Tester ist kein Staff", (await service.IsStaff(USER_A)) === false);
+        check("Dev-Tester zählt als Beta-Mitglied", await service.BetaMember(USER_A));
+
+        await model.Grant(USER_B, "devtester", USER_A);
+        check("Developer sticht Dev-Tester", (await service.GroupOf(USER_B)) === "developer");    } finally {
         client.config.DEV_USER_IDs = savedDevs;
 
         await model.Revoke(USER_A).catch(() => undefined);

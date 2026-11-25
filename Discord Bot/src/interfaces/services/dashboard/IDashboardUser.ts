@@ -6,7 +6,8 @@
 // "zugang" ebenso nicht: läuft ein Kauf oder Geschenk aus dem Shop (DisplayGroup).
 // "free" auch nicht: Bei Free Access (Bezahlschranke aus) bekommt es jeder ohne feste Gruppe.
 // "beta" auch nicht: im Beta-Modus, wer einen Beta-Code eingelöst hat (Plan 22).
-export const DASHBOARD_GROUPS = ["administrator", "developer", "partner", "premium", "beta", "zugang", "guardian", "free", "testphase"] as const;
+// "devtester" (W-0154) steht in der Datenbank wie Partner, ist aber kein Staff: Testkonten des Teams.
+export const DASHBOARD_GROUPS = ["administrator", "developer", "devtester", "partner", "premium", "beta", "zugang", "guardian", "free", "testphase"] as const;
 
 export type DashboardGroup = (typeof DASHBOARD_GROUPS)[number];
 
