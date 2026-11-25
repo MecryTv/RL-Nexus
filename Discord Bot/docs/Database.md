@@ -58,7 +58,7 @@ Angelegt wird es beim Start aus `src/database/migrations/*.sql`, in der Reihenfo
 
 | Tabelle | Wofür | Schlüssel |
 |---|---|---|
-| `dashboard_groups` | Wer im Dashboard Administrator, Partner oder Premium ist | `user_id` |
+| `dashboard_groups` | Wer im Dashboard Administrator, Dev-Tester, Partner oder Premium ist | `user_id` |
 | `notifications` | Meldungen, die einen Nutzer betreffen | `id` |
 | `player_ranks` | Letzter Rang je Spieler und Playlist, samt Peak | `user_id` + `playlist` |
 | `player_profiles` | Reward-Level, Karriere-Werte und der Ingame-Club je Spieler | `user_id` |
