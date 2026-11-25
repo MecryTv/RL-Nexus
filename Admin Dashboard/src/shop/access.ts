@@ -83,13 +83,13 @@ export function switchTitle(to: AccessMode): string {
     return `Auf ${MODE_NAMES[to]} umstellen?`;
 }
 
-/** Wer im Beta-Modus noch hineinkommt. Ohne Tester: der Hinweis, dass bis zum ersten Code nur Administrator und Developer drin sind. */
+/** Wer im Beta-Modus noch hineinkommt. Ohne Tester: der Hinweis, dass bis zum ersten Code nur Administrator, Developer und Dev-Tester drin sind. */
 function testerFact(testers: number): IAccessFact {
     if (testers === 0) {
         return {
             count: null,
             lead: "Noch hat niemand einen Beta-Code eingelöst.",
-            detail: "Bis dahin kommen nur Administrator und Developer ins Bot-Dashboard. Codes erzeugst du unter Bot → Beta Access.",
+            detail: "Bis dahin kommen nur Administrator, Developer und Dev-Tester ins Bot-Dashboard. Codes erzeugst du unter Bot → Beta Access.",
         };
     }
 

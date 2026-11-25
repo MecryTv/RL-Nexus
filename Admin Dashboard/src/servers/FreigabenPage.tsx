@@ -116,7 +116,7 @@ export function FreigabenPage(): JSX.Element {
                 <div>
                     <dt>Ausgenommen</dt>
                     <dd>Team</dd>
-                    <small>Administrator, Developer, Partner{data.paid ? "" : ", bei Free Access alle"}</small>
+                    <small>Administrator, Developer, Dev-Tester, Partner{data.paid ? "" : ", bei Free Access alle"}</small>
                 </div>
             </dl>
 

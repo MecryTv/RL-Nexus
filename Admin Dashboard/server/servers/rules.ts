@@ -18,7 +18,7 @@ export interface IJoinInput {
     readonly paid: boolean;
     /** Server steht auf der Sperrliste (Bot entfernen mit Sperre). */
     readonly blocked: boolean;
-    /** Einlader ist Administrator, Developer oder Partner. */
+    /** Einlader ist Administrator, Developer, Dev-Tester oder Partner. */
     readonly exempt: boolean;
     /** Bot war schon vor dem Start da: Das regelt die Wahl, nicht der Beitritt. */
     readonly legacy: boolean;

@@ -250,7 +250,7 @@ const OTHER = "sofern er nicht noch Ansprechpartner eines anderen Eintrags ist";
 export function roleNotice(before: IEntry | null, after: IEntryInput | "loeschen", group: Group | null): string | null {
     if (!before || before.kind === "supporter" || !before.contactId) return null;
 
-    const keeps = group === "administrator" || group === "premium";
+    const keeps = group !== null && group !== "partner";
     const loses = keeps ? `behält die Gruppe ${GROUP_LABELS[group]}, verliert aber @Partner` : "verliert die Gruppe Partner und @Partner";
 
     if (after === "loeschen") return `Der Ansprechpartner ${loses}, ${OTHER}.`;
