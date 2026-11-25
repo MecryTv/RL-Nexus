@@ -91,6 +91,12 @@ export async function checkInput(): Promise<void> {
         assert.deepEqual(errorResponse(new DatabaseUnavailable()), { status: 503, message: "Die Datenbank ist gerade nicht erreichbar.", log: false });
         assert.deepEqual(errorResponse(new DiscordUnavailable("intern")), { status: 503, message: "Discord antwortet gerade nicht. Versuch es gleich noch einmal.", log: true });
         assert.equal(errorResponse({ code: "ER_NO_SUCH_TABLE" }).status, 503);
+        // W-0155: Ein ENUM-Wert, den die Datenbank noch nicht kennt (etwa Dev-Tester vor Migration 062 des Bots).
+        assert.deepEqual(errorResponse({ code: "WARN_DATA_TRUNCATED", errno: 1265 }), {
+            status: 503,
+            message: "Die Datenbank kennt diesen Wert noch nicht. Aktualisiere zuerst den Bot, er bringt die passende Migration mit.",
+            log: true,
+        });
         assert.equal(errorResponse({ code: "ECONNREFUSED" }).message, "Die Datenbank ist gerade nicht erreichbar.");
         assert.deepEqual(errorResponse({ statusCode: 429 }), { status: 429, message: "Zu viele Anfragen auf einmal. Warte einen Moment.", log: false });
 

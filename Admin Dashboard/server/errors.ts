@@ -57,6 +57,11 @@ export function errorResponse(thrown: unknown): IErrorResponse {
         return { status: 503, message: "Die Tabellen des Bots fehlen noch. Starte den Bot einmal, er legt sie an.", log: true };
     }
 
+    // W-0155: Ein Wert, den ein ENUM der Datenbank noch nicht kennt (strikter sql_mode). Meist ist der Bot älter als das Admin Dashboard.
+    if (error.code === "WARN_DATA_TRUNCATED") {
+        return { status: 503, message: "Die Datenbank kennt diesen Wert noch nicht. Aktualisiere zuerst den Bot, er bringt die passende Migration mit.", log: true };
+    }
+
     if (typeof error.code === "string" && CONNECTION_CODES.has(error.code)) {
         return { status: 503, message: "Die Datenbank ist gerade nicht erreichbar.", log: true };
     }
