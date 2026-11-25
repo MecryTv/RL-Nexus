@@ -3,6 +3,7 @@ import type { IGroupEvent, IGroupList, IUserRef } from "../../shared/api.ts";
 import { GROUPS, NOTE_MAX, type Group } from "../../shared/limits.ts";
 import { accessOf } from "../access.ts";
 import { audit } from "../audit.ts";
+import { botModulesReload } from "../bot.ts";
 import { publish } from "../events.ts";
 import type { IConfig } from "../config.ts";
 import { query } from "../db.ts";
@@ -17,6 +18,15 @@ import { body, oneOf, snowflake, text } from "../validate.ts";
  * Lesezugriffe eine Minute im Cache: eine Änderung greift dort nach
  * spätestens einer Minute, genau wie bisher per SQL.
  */
+
+/**
+ * W-0154: Dev-Tester sehen Module auf Beta. Der Bot hält die Liste bis zu 5
+ * Minuten, nach einem Wechsel von oder zu Dev-Tester lädt er sie gleich neu.
+ * Erreicht er den Bot nicht, steht es nur im Log.
+ */
+async function reloadBetaModules(config: IConfig, userId: string): Promise<void> {
+    if (!(await botModulesReload(config, userId))) console.warn("[gruppen] Bot nicht erreicht, Beta-Module gelten nach spätestens 5 Minuten.");
+}
 
 /** So viele Änderungen zeigt der Verlauf. Alles davor steht im Protokoll. */
 const HISTORY = 20;
@@ -97,6 +107,7 @@ export async function groupRoutes(app: FastifyInstance, { config }: { config: IC
         // W-0062: Gruppe Partner bringt die Rolle @Partner mit. Nur ein Wechsel weg von Partner nimmt sie (außer ein Eintrag trägt sie);
         // jemand, der die Rolle von Hand hat, behält sie bei anderen Wechseln (Review-Fund 2).
         await syncPartnerRole(config, userId, { mayRemove: before === "partner" && group !== "partner", actor }).catch((error: Error) => console.warn("[partner] Rolle nach Gruppenwechsel:", error.message));
+        if (before === "devtester" || group === "devtester") await reloadBetaModules(config, actor.id);
 
         publish("groups");
 
@@ -120,6 +131,8 @@ export async function groupRoutes(app: FastifyInstance, { config }: { config: IC
         } else {
             await syncPartnerRole(config, userId, { mayRemove: false, actor }).catch((error: Error) => console.warn("[partner] Rolle nach Gruppenwechsel:", error.message));
         }
+
+        if (before === "devtester") await reloadBetaModules(config, actor.id);
 
         publish("groups");
 

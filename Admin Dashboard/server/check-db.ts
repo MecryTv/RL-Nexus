@@ -201,6 +201,39 @@ try {
         assert.ok(recent.every((entry) => !("detail" in entry)));
     });
 
+    // W-0154: Dev-Tester sehen Beta-Module. Der Bot lädt sie nur neu, wenn Dev-Tester dazukommt oder wegfällt.
+    await check("Dev-Tester: vergeben und entziehen, der Bot lädt die Module neu", async () => {
+        const reloads: string[] = [];
+        const real = globalThis.fetch;
+
+        globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+            const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+            if (!url.endsWith("/dcapi/admin/modules/reload")) return real(input, init);
+
+            reloads.push(init?.method ?? "GET");
+
+            return new Response("{}", { status: 200, headers: { "Content-Type": "application/json" } });
+        }) as typeof fetch;
+
+        try {
+            assert.equal((await write("PUT", `/api/groups/${IDS[0]}`, { group: "devtester", note: "Check" })).statusCode, 204);
+
+            const entry = ((await get("/api/groups")).json() as IGroupList).entries.find((candidate) => candidate.user.id === IDS[0]);
+            assert.equal(entry?.group, "devtester");
+
+            assert.equal((await write("DELETE", `/api/groups/${IDS[0]}`)).statusCode, 204);
+            assert.deepEqual(reloads, ["POST", "POST"]);
+
+            // Ein Wechsel ohne Dev-Tester lässt den Bot in Ruhe.
+            assert.equal((await write("PUT", `/api/groups/${IDS[0]}`, { group: "premium" })).statusCode, 204);
+            assert.equal((await write("DELETE", `/api/groups/${IDS[0]}`)).statusCode, 204);
+            assert.deepEqual(reloads, ["POST", "POST"]);
+        } finally {
+            globalThis.fetch = real;
+            await query("DELETE FROM dashboard_groups WHERE user_id = ?", [IDS[0]]);
+        }
+    });
+
     section("Meldungen");
 
     // An eine Gruppe nur, wenn in ihr keine echten Einträge stehen: sonst bekämen echte Leute die Test-Meldung.
