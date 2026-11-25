@@ -158,8 +158,8 @@ export interface IShopAccess {
     readonly unsure?: boolean;
 }
 
-/** Im Beta-Modus ohne Code herein (Plan 22). Partner braucht einen Code. */
-const BETA_FREE: readonly DashboardGroup[] = ["administrator", "developer"];
+/** Im Beta-Modus ohne Code herein (Plan 22), Dev-Tester seit W-0154. Partner braucht einen Code. */
+const BETA_FREE: readonly DashboardGroup[] = ["administrator", "developer", "devtester"];
 
 /** Was die Sperrseite nach einem gescheiterten Einlösen sagt, per ?beta=… (routes/DashboardBeta.ts). */
 export const BETA_ERRORS = {
@@ -181,7 +181,7 @@ export function BetaErrorText(query: unknown): string | null {
 
 /**
  * Beta Access (Plan 22): Im Beta-Modus gilt weder Free noch Paid. Herein kommt
- * nur, wer einen Code eingelöst hat, dazu Administrator und Developer. null:
+ * nur, wer einen Code eingelöst hat, dazu Administrator, Developer und Dev-Tester. null:
  * Die Schranke spielt keine Rolle, es gilt die Bezahlschranke wie sonst.
  */
 export function BetaGate(input: { readonly betaMode: boolean; readonly group: DashboardGroup; readonly member: boolean }): IShopAccess | null {
@@ -200,8 +200,8 @@ function MissingSchema(error: unknown): boolean {
     return errno === 1054 || errno === 1146;
 }
 
-/** Ohne Kauf frei (Partner seit der Entscheidung vom 17.10.2026, Premium nicht). */
-const FREE_GROUPS: readonly DashboardGroup[] = ["administrator", "developer", "partner"];
+/** Ohne Kauf frei (Partner seit der Entscheidung vom 17.10.2026, Dev-Tester seit W-0154, Premium nicht). */
+const FREE_GROUPS: readonly DashboardGroup[] = ["administrator", "developer", "devtester", "partner"];
 const DAY_MS = 86_400_000;
 const BERLIN_DAY = new Intl.DateTimeFormat("de-DE", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "Europe/Berlin" });
 const ALLOWED: IShopAccess = { allowed: true, reason: "" };
@@ -584,9 +584,9 @@ export default class DashboardService implements IDashboardService {
     }
 
     /**
-     * Die Gruppe eines Nutzers. Administrator, Partner und Premium stehen in der
-     * Datenbank (dashboard_groups, von Hand eingetragen). Developer kommt aus
-     * DEV_USER_IDs.
+     * Die Gruppe eines Nutzers. Administrator, Dev-Tester, Partner und Premium
+     * stehen in der Datenbank (dashboard_groups, vergeben im Admin Dashboard).
+     * Developer kommt aus DEV_USER_IDs und steht über Dev-Tester.
      *
      * Ohne Datenbank bleibt nur Developer übrig, alle anderen sind Testphase.
      */
@@ -912,11 +912,17 @@ export default class DashboardService implements IDashboardService {
     }
 
     /**
-     * Hat die Person einen Beta-Code eingelöst? Ein Datenbankfehler geht nach
+     * Hat die Person einen Beta-Code eingelöst oder ist sie Dev-Tester (W-0154,
+     * zählt für die Staff-Freigabe im Beta-Modus)? Ein Datenbankfehler geht nach
      * oben: LoadShopAccess sperrt dann, ohne es zu merken - im Zweifel zu.
      */
     async BetaMember(userId: string): Promise<boolean> {
-        return (await this.client.databaseService.One<{ user_id: string }>("SELECT user_id FROM beta_members WHERE user_id = ?", [userId])) != null;
+        return (
+            (await this.client.databaseService.One<{ user_id: string }>(
+                "SELECT user_id FROM beta_members WHERE user_id = ? UNION SELECT user_id FROM dashboard_groups WHERE user_id = ? AND group_name = 'devtester'",
+                [userId, userId]
+            )) != null
+        );
     }
 
     /** shop_settings.paywall, eine Minute gemerkt. Ohne Datenbank oder Tabelle: aus. */

@@ -98,7 +98,7 @@ export function BetaPage(): JSX.Element {
                     {mode === "beta" ? (
                         <>
                             <b>Beta Access ist an{changedAt ? ` seit ${formatDateTime(changedAt)}` : ""}.</b> Ins Bot-Dashboard kommt nur, wer unten als Tester
-                            steht, dazu Administrator und Developer.
+                            steht, dazu Administrator, Developer und Dev-Tester.
                         </>
                     ) : (
                         <>

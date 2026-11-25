@@ -37,6 +37,7 @@ import { AccessText } from "../dashboard/client/constants/Access";
 import { applyCatalog, CATEGORIES, MODULES } from "../dashboard/client/constants/Modules";
 import { askableCount, limitCards, limitCounts, limitName, limitRequestText, limitsHref, limitStatus, limitStatusText, limitTabs, parseLimitsQuery, wishProblem } from "../dashboard/client/constants/Limits";
 import { IOpenGroup, openGroups, parseVoiceTab, personStates, regionName, seatsText, voiceTabHref } from "../dashboard/client/constants/Voice";
+import { GROUP_ORDER, GROUPS, STAFF_GROUPS } from "../dashboard/client/constants/Groups";
 import { IModuleLimit } from "../dashboard/client/interfaces/IGuild";
 import CatalogService, { Catalog } from "../services/CatalogService";
 import { STYLES } from "./BuildDashboard";
@@ -44,7 +45,7 @@ import { CommandPaths } from "../routes/AdminCommands";
 import { ApplyHelpCatalog } from "../constants/Help";
 import { CodeFromForm, RedeemAtAdmin } from "../routes/DashboardBeta";
 import IDashboardGuild, { DashboardRole } from "../interfaces/services/dashboard/IDashboardGuild";
-import { DashboardGroup } from "../interfaces/services/dashboard/IDashboardUser";
+import { DASHBOARD_GROUPS, DashboardGroup } from "../interfaces/services/dashboard/IDashboardUser";
 import { Open, Seal } from "../utils/seal";
 import { CreateInviteState, DecideInvite, INVITE_COOKIE_LIFETIME, INVITE_LIFETIME, INVITE_STATE_COOKIE, NonceList, TakeInviteState } from "../utils/invitestate";
 import { JoinStarted } from "../utils/joinoutcome";
@@ -296,6 +297,8 @@ async function checkPaywall(client: BotClient): Promise<void> {
             DisplayGroup("testphase", none, mod, false) === "free"
     );
     check("Paid: nur Tests → Testphase, sonst Zugang", DisplayGroup("testphase", trial, mod, true) === "testphase" && DisplayGroup("premium", shop, mod, true) === "zugang");
+    check("Dev-Tester ohne Kauf herein, auch gesperrt", decide("devtester").allowed && decide("devtester", [], { banned: true }).allowed);
+    check("Anzeige: Dev-Tester bleibt Dev-Tester", DisplayGroup("devtester", none, mod, true) === "devtester" && DisplayGroup("devtester", none, [], false) === "devtester");
 
     check("Gesperrt ist als Sperre erkennbar", decide("testphase", [], { banned: true }).banned === true && decide("testphase").banned !== true);
     check(
@@ -412,6 +415,11 @@ async function checkGroups(client: BotClient): Promise<void> {
     } finally {
         client.config.DEV_USER_IDs = saved;
     }
+
+    // W-0154: Abzeichen im Bot-Dashboard.
+    check("Jede Gruppe hat Abzeichen und Platz in der Rangfolge", DASHBOARD_GROUPS.every((group) => GROUPS[group] !== undefined && GROUP_ORDER.includes(group)));
+    check("Dev-Tester: Name und Symbol", GROUPS.devtester?.label === "Dev-Tester" && GROUPS.devtester?.icon === "#i-code");
+    check("Dev-Tester ist kein Staff im Client", !STAFF_GROUPS.includes("devtester"));
 }
 
 /**
@@ -925,6 +933,7 @@ async function checkBeta(client: BotClient): Promise<void> {
         "Beta an: Administrator und Developer ohne Code",
         BetaGate({ betaMode: true, group: "administrator", member: false }) === null && BetaGate({ betaMode: true, group: "developer", member: false }) === null
     );
+    check("Beta an: Dev-Tester ohne Code", BetaGate({ betaMode: true, group: "devtester", member: false }) === null);
 
     const locked = BetaGate({ betaMode: true, group: "partner", member: false });
     const tester = BetaGate({ betaMode: true, group: "testphase", member: true });

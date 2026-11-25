@@ -137,6 +137,28 @@
     background: var(--c-panel-fill);
 }
 
+/* W-0154, Entwurf R1 B: Dev-Tester hängt als eigene Karte unter Developer, eingerückt und mit einem Winkel verbunden. */
+.stack {
+    display: grid;
+    min-width: 0;
+}
+
+.dock {
+    position: relative;
+    margin: var(--s-3) 0 0 22px;
+
+    &::before {
+        position: absolute;
+        top: calc(-1 * var(--s-3) - 1px);
+        left: -14px;
+        width: 12px;
+        height: 34px;
+        border-bottom: 2px solid color-mix(in srgb, var(--group) 55%, transparent);
+        border-left: 2px solid color-mix(in srgb, var(--group) 55%, transparent);
+        content: "";
+    }
+}
+
 .cardHead {
     display: flex;
     align-items: baseline;

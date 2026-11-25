@@ -11,6 +11,7 @@ import { ParseServerId } from "../events/servers/ServerLimitButtons";
 import { JoinProblem, SameName } from "../routes/DashboardApiTeam";
 import { GateFresh, GateNow, GATE_NO_TTL, GATE_OK_TTL, PassUsable, RefuseFor } from "../utils/invitepass";
 import { NoAccessReply, PickInviter } from "../utils/servers";
+import { EXEMPT_GROUPS } from "../routes/AdminServer";
 
 let failures = 0;
 
@@ -57,6 +58,7 @@ check(
     "Bei Free Access bleibt der Bot immer, ohne Pass und ohne Ansprechpartner",
     RefuseFor({ free: true, pass: false, team: false, contacts: 0 }) === null && RefuseFor({ free: false, pass: false, team: false, contacts: 0 }) === "pass"
 );
+check("„Ein Server pro Person“ gilt nicht für Team, Partner und Dev-Tester (W-0154)", ["administrator", "developer", "devtester", "partner"].every((group) => EXEMPT_GROUPS.includes(group)));
 check("Ohne Pass geht der Bot, außer das Team hat eingeladen", RefuseFor({ pass: false, team: false, contacts: 3 }) === "pass" && RefuseFor({ pass: false, team: true, contacts: 0 }) === null);
 check("Ohne Ansprechpartner geht er, unbekannt heißt bleiben", RefuseFor({ pass: true, team: false, contacts: 0 }) === "contact" && RefuseFor({ pass: true, team: false, contacts: null }) === null);
 check(

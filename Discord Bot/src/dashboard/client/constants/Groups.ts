@@ -16,6 +16,13 @@ export const GROUPS: Record<DashboardGroup, { label: string; icon: string; color
         color: "var(--purple)",
         grants: "Sieht jeden Server, auf dem RL Nexus läuft, und darf Entwickler-Befehle ausführen.",
     },
+    // W-0154: Testkonten des Teams. Wie ein normaler Nutzer, aber Beta und Paid sind immer offen.
+    devtester: {
+        label: "Dev-Tester",
+        icon: "#i-code",
+        color: "color-mix(in srgb, var(--purple-soft) 60%, #fff)",
+        grants: "Du testest RL Nexus fürs Team. Du siehst nur deine eigenen Server wie jeder andere, aber alles auf Beta und Paid ist für dich immer offen und kostenlos.",
+    },
     partner: {
         label: "Partner",
         icon: "#i-gem",
@@ -62,7 +69,7 @@ export const GROUPS: Record<DashboardGroup, { label: string; icon: string; color
 
 // Rangfolge wie in DashboardService.GroupOf() - die Übersicht in den
 // Einstellungen zeigt sie genau so von oben nach unten.
-export const GROUP_ORDER: DashboardGroup[] = ["administrator", "developer", "partner", "premium", "beta", "zugang", "guardian", "free", "testphase"];
+export const GROUP_ORDER: DashboardGroup[] = ["administrator", "developer", "devtester", "partner", "premium", "beta", "zugang", "guardian", "free", "testphase"];
 
 // Nur diese beiden sehen zusätzlich Server, die ihnen nicht gehören - dieselbe
 // Grenze zieht DashboardService.IsStaff() auf der Serverseite.

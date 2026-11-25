@@ -16,12 +16,13 @@ export const MAINTENANCE_LIMITS = { title: 80, text: 200, steps: 8, step: 40, ah
 /** Listen kommen in Seiten zu so vielen Einträgen. */
 export const PAGE_SIZE = 50;
 
-/** Die Gruppen aus dashboard_groups (ENUM der Migration 002 im Bot). Developer kommen aus DEV_USER_IDs. */
-export const GROUPS = ["administrator", "partner", "premium"] as const;
+/** Die Gruppen aus dashboard_groups (ENUM der Migrationen 002 und 062 im Bot). Developer kommen aus DEV_USER_IDs, Dev-Tester sind ihre Untergruppe (W-0154). */
+export const GROUPS = ["administrator", "devtester", "partner", "premium"] as const;
 export type Group = (typeof GROUPS)[number];
 
 export const GROUP_LABELS: Readonly<Record<Group, string>> = {
     administrator: "Administrator",
+    devtester: "Dev-Tester",
     partner: "Partner",
     premium: "Premium",
 };
@@ -35,6 +36,7 @@ export const GROUP_LABELS: Readonly<Record<Group, string>> = {
 export const GROUP_GRANTS = {
     administrator: "Sieht jeden Server, auf dem RL Nexus läuft.",
     developer: "Sieht jeden Server, auf dem RL Nexus läuft, und darf Entwickler-Befehle ausführen.",
+    devtester: "Testkonto des Teams. Verhält sich wie ein normaler Nutzer und sieht nur eigene Server, kann aber alles auf Beta und Paid immer und kostenlos nutzen. Bekommt keine Developer-DMs.",
     partner: "Kennzeichnung für Partner-Organisationen.",
     premium: "Kennzeichnung für Premium-Zugang. Freigeschaltet ist daran heute noch nichts.",
     guardian: "Moderiert mindestens einen Server mit RL Nexus, ohne eigenes Abo. Dort stehen Live Tickets, Transcriptions und Moderation offen.",

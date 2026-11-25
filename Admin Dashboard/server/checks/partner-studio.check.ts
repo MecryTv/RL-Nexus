@@ -5,6 +5,7 @@ import { pathToFileURL } from "node:url";
 import { checkEntryInput, SECTIONS_FOR, type IEntry, type IEntryInput, type ISection } from "../../shared/partners.ts";
 import { addSection, adoptServerContact, inputOf, newEntry, roleNotice, sectionAction, switchKind, templateSections } from "../../src/partners/draft.ts";
 import { partnerMessage, type IPartnerContext } from "../../src/partners/preview.ts";
+import { groupHint } from "../../src/partners/labels.ts";
 import { check, section } from "./harness.ts";
 
 const WEBSITE_CONTENT = path.join(import.meta.dirname, "..", "..", "..", "Webseite", "src", "services", "Content.ts");
@@ -175,6 +176,9 @@ export async function checkPartnerStudio(): Promise<void> {
         assert.match(roleNotice(before, { ...before, contactId: "100000000000000002" }, "partner") ?? "", /@Partner/);
         assert.equal(roleNotice(before, { ...before, name: "Neu" }, "partner"), null);
         assert.equal(roleNotice(saved(newEntry("partner", "Ohne Kontakt", { partnerType: "organisation" })), "loeschen", null), null);
+        // W-0154: Ein Dev-Tester als Ansprechpartner behält seine Gruppe, er verliert nur @Partner.
+        assert.match(roleNotice(before, "loeschen", "devtester") ?? "", /behält die Gruppe Dev-Tester/);
+        assert.match(groupHint("Testkonto", "devtester") ?? "", /Dev-Tester und bleibt es/);
     });
 
     await check("Vorschau: Entwurf mit ausgeblendetem Abschnitt, neue Adresse aus dem Namen", async () => {

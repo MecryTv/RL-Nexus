@@ -23,6 +23,7 @@ export const ROLE_LABELS: Readonly<Record<IRoleState["state"], string>> = {
 export function groupHint(name: string, group: Group | null): string | null {
     if (group === "administrator") return `${name} ist Administrator und bleibt es. Die Rolle @Partner bekommt er trotzdem.`;
     if (group === "premium") return `${name} ist schon Premium und bleibt es. Die Rolle @Partner bekommt er trotzdem.`;
+    if (group === "devtester") return `${name} ist Dev-Tester und bleibt es. Die Rolle @Partner bekommt er trotzdem.`;
     if (group === "partner") return `${name} ist schon Partner.`;
 
     return null;

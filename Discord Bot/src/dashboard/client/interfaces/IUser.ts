@@ -4,7 +4,7 @@ import { IGuild } from "./IGuild.js";
 import { IAccessEnd } from "../constants/Access.js";
 
 // Spiegelt IDashboardUser aus dem Backend.
-export type DashboardGroup = "administrator" | "developer" | "partner" | "premium" | "beta" | "zugang" | "guardian" | "free" | "testphase";
+export type DashboardGroup = "administrator" | "developer" | "devtester" | "partner" | "premium" | "beta" | "zugang" | "guardian" | "free" | "testphase";
 
 export interface IUser {
     id: string;

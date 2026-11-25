@@ -381,17 +381,20 @@ Eine Gruppe ist eine reine **Anzeige** — sie vergibt keine Rechte auf einem Di
 |---|---|---|---|
 | Administrator | Tabelle `dashboard_groups` | ja | ja |
 | Developer | `DEV_USER_IDs` in der `.env` | ja | ja |
+| Dev-Tester | Tabelle `dashboard_groups` (`devtester`, W-0154) | nein | ja, dazu ohne Code im Beta-Modus und Module auf Beta |
 | Partner | Tabelle `dashboard_groups` | nein | ja |
 | Premium | Tabelle `dashboard_groups` | nein | nein (ohne Kauf als Testphase angezeigt) |
 | Zugang | — (Paid Access: läuft ein Abo, Einmalkauf oder Geschenk aus dem Shop) | nein | gekauft |
 | Guardian | — (Paid Access: wer keine andere Gruppe und keinen Kauf hat, aber auf mindestens einem Server Moderator oder Co-Admin ist) | nein | nur Server mit zahlendem Owner |
 | Beta | — (Beta Access: wer einen Beta-Code eingelöst hat) | nein | nur mit Code, siehe „Beta Access“ |
-| Free | — (Free Access, also Bezahlschranke aus: alle ohne Administrator, Developer oder Partner) | nein | Schranke ist aus |
+| Free | — (Free Access, also Bezahlschranke aus: alle ohne Administrator, Developer, Dev-Tester oder Partner) | nein | Schranke ist aus |
 | Testphase | — (Paid Access: es laufen nur Tests; sonst wer nirgends steht und deshalb die Sperrseite sieht) | nein | nein |
 
 **Guardian** wird nicht gespeichert: `DashboardService.Payload()` macht aus „Testphase" Guardian, sobald ein Server mit der Rolle „Moderator" in der Liste steht. Grünes Schild, dieselbe Marke wie überall.
 
 **Vergeben wird das im Admin Dashboard** unter *Bot → Gruppen* (`https://admin.nexus-emb.de/gruppen`): Discord-ID eintragen, Name und Avatar zur Kontrolle, Gruppe und Notiz wählen. Das Admin Dashboard schreibt dabei auch `granted_by`, so bleibt sichtbar, wer eine Gruppe vergeben hat. Die Seite dafür im Bot-Dashboard (`/admins`) ist entfernt. Ein Nutzer hat höchstens einen Eintrag; steht er zusätzlich in `DEV_USER_IDs`, gewinnt Administrator, sonst Developer.
+
+**Dev-Tester** (W-0154) sind Testkonten des Teams, im Admin Dashboard eine Untergruppe von Developer. Sie verhalten sich wie normale Nutzer (kein Staff, nur eigene Server, keine Entwickler-Befehle, keine Developer-DMs), kommen aber ohne Kauf durch die Bezahlschranke, ohne Code durch den Beta-Modus (`BETA_FREE`) und sehen Module auf Beta, auch auf ihren eigenen Servern (`BETA_USERS_SQL` in `utils/moduleFlags.ts`). Module auf „aus“ bleiben auch für sie zu. Ein Wechsel von oder zu Dev-Tester im Admin Dashboard lässt den Bot die Module gleich neu laden.
 
 Ohne Admin Dashboard geht es weiter direkt in der Tabelle `dashboard_groups`:
 
@@ -416,11 +419,11 @@ Eine Gruppe dazu heißt: einen Eintrag in `DASHBOARD_GROUPS` (`IDashboardUser.ts
 Den Zugang verkauft der Shop des Admin Dashboards (`nexus-emb.de/preise`). Der Bot liest dafür drei Tabellen, die das Admin Dashboard anlegt: `shop_settings` (Schalter `paywall`), `shop_grants` (Zugänge) und `shop_customers` (Sperre). Er schreibt nichts hinein.
 
 - **Bezahlschranke aus** (`paywall = 0`), Tabellen fehlen oder die Datenbank antwortet nicht: alles wie oben, niemand wird gesperrt. Lieber offen als alle ausgesperrt; im Log steht dann einmal je Minute eine Warnung.
-- **Bezahlschranke an:** Ohne Kauf herein kommen Administrator, Developer und Partner. Alle anderen, auch **Premium**, brauchen einen laufenden Zugang: Test, Abo, Einmalkauf oder ein Geschenk unter *Shop → Kunden* im Admin Dashboard. Wer bisher Premium hat, bekommt vor dem Livegang am besten ein Geschenk.
-- **Läuft ein Zugang?** Dieselbe Regel wie im Admin-Server: nicht beendet, schon begonnen und das Ende noch nicht erreicht. Ein nicht gekündigtes Abo gilt einen Tag länger, weil Stripe die neue Periode erst danach meldet. Gesperrte bekommen über den Shop keinen Zugang; eine freie Gruppe (Administrator, Developer, Partner) gilt trotzdem. Die Sperrseite bietet ihnen statt „Zugang holen“ den Weg zum Support.
+- **Bezahlschranke an:** Ohne Kauf herein kommen Administrator, Developer, Dev-Tester und Partner. Alle anderen, auch **Premium**, brauchen einen laufenden Zugang: Test, Abo, Einmalkauf oder ein Geschenk unter *Shop → Kunden* im Admin Dashboard. Wer bisher Premium hat, bekommt vor dem Livegang am besten ein Geschenk.
+- **Läuft ein Zugang?** Dieselbe Regel wie im Admin-Server: nicht beendet, schon begonnen und das Ende noch nicht erreicht. Ein nicht gekündigtes Abo gilt einen Tag länger, weil Stripe die neue Periode erst danach meldet. Gesperrte bekommen über den Shop keinen Zugang; eine freie Gruppe (Administrator, Developer, Dev-Tester, Partner) gilt trotzdem. Die Sperrseite bietet ihnen statt „Zugang holen“ den Weg zum Support.
 - **Ohne Zugang** liefert `GuildsOf` nur Server, auf denen die Person Moderator oder Co-Admin („Server verwalten“) ist und deren **Owner** Zugang hat. Dort sieht sie als Guardian Tickets, Transcripts und Moderation; Co-Admins dürfen dort ohne eigenen Kauf keine Module verwalten. Der eigene Server ohne eigenen Kauf bleibt weg. Weil der Filter in `GuildsOf` sitzt, gilt er für jede Dashboard-API, die über diese Liste prüft.
 - **Bewerbungen und Transcripts** prüfen nicht über `GuildsOf`, deshalb fragen `utils/applygate.ts` und `routes/DashboardTranscript.ts` `GuildAllowed`: eigener Zugang oder zahlender Owner. Wer ein Ticket selbst eröffnet hat, liest sein Transcript weiter.
-- **Anzeige** (`DisplayGroup`): Bei ausgeschalteter Schranke (Free Access) ist jeder ohne Administrator, Developer oder Partner „Free“, auch Käufer, denn ihr Zugang ist dann pausiert. Bei Paid Access steht als „Testphase“, bei wem nur Tests laufen, als „Zugang“, wer ein Abo, einen Einmalkauf oder ein Geschenk hat. Bis wann und die Rechnungen stehen unter „Mein Zugang“ auf nexus-emb.de.
+- **Anzeige** (`DisplayGroup`): Bei ausgeschalteter Schranke (Free Access) ist jeder ohne Administrator, Developer, Dev-Tester oder Partner „Free“, auch Käufer, denn ihr Zugang ist dann pausiert. Bei Paid Access steht als „Testphase“, bei wem nur Tests laufen, als „Zugang“, wer ein Abo, einen Einmalkauf oder ein Geschenk hat. Bis wann und die Rechnungen stehen unter „Mein Zugang“ auf nexus-emb.de.
 - **Free und Paid Access** schaltet das Admin Dashboard (*Shop → Einstellungen*). Es setzt dabei `paywall`, pausiert Abos bei Stripe und friert Zugänge ein; der Bot muss dafür nichts tun.
 - **Leere Liste:** Startseite und Serverseiten zeigen `zugang.html`: Schloss, der Grund („Dein Test ist am 15.10.2026 abgelaufen.“, „Dein Abo ist beendet.“, „Du hast noch keinen Zugang.“, bei Sperre „Wende dich bitte an den Support.“), „Zugang holen“ auf `SITE_PUBLIC_URL/preise` und „Abmelden“.
 - **Cache:** Ein erlaubter Zugang gilt eine Minute, ein verweigerter zehn Sekunden (wer gerade gekauft hat, ist nach spätestens zehn Sekunden drin), der Schalter selbst eine Minute.
@@ -429,7 +432,7 @@ Den Zugang verkauft der Shop des Admin Dashboards (`nexus-emb.de/preise`). Der B
 
 Der dritte Modus neben Free und Paid Access, umgeschaltet im Admin Dashboard unter *Shop → Einstellungen* (`shop_settings.access_mode = 'beta'`). Im Beta-Modus gilt weder Kauf noch freier Zugang:
 
-- Herein kommen Administrator und Developer ohne Code, alle anderen nur mit eingelöstem Beta-Code (Tabelle `beta_members`). Auch Partner brauchen einen Code.
+- Herein kommen Administrator, Developer und Dev-Tester ohne Code, alle anderen nur mit eingelöstem Beta-Code (Tabelle `beta_members`). Auch Partner brauchen einen Code.
 - Ohne Code: keine Server, auch nicht als Guardian, dafür `zugang.html` mit einem Feld für den Code und „Code anfragen“ (Kontakt auf der Webseite).
 - Das Feld schickt `POST /beta` als `text/plain` (`code=…`), damit die Seite ohne Skript auskommt. Die Route (`routes/DashboardBeta.ts`) löst über das Admin Dashboard ein (`ADMIN_INTERNAL_URL/internal/beta/redeem`, Token mit Scope `beta`), leert den gemerkten Zugang und leitet auf die Startseite. Klappt es nicht, steht der Grund über dem Feld (`?beta=falsch|weg|leer`). Zehn Versuche je zehn Minuten.
 - Tester stehen als Gruppe „Beta“ im Profil.

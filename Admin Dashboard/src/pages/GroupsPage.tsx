@@ -22,17 +22,18 @@ import { useToast } from "../toast/context";
 import { useTitle } from "../useTitle";
 import styles from "./GroupsPage.module.scss";
 
-const GROUP_TONE: Readonly<Record<Group, BadgeTone>> = { administrator: "pro", partner: "info", premium: "warn" };
+const GROUP_TONE: Readonly<Record<Group, BadgeTone>> = { administrator: "pro", devtester: "neutral", partner: "info", premium: "warn" };
 const ID_ERROR = "Eine Discord-ID besteht aus 17 bis 20 Ziffern.";
 const ID_HINT = "In Discord Rechtsklick auf die Person, dann „Nutzer-ID kopieren“. Dafür muss der Entwicklermodus an sein.";
 
 /** Die Karten in der Rangfolge des Bots (DashboardService.GroupOf): wer weiter oben steht, gewinnt. */
-const CARDS = ["administrator", "developer", "partner", "premium"] as const;
+const CARDS = ["administrator", "developer", "devtester", "partner", "premium"] as const;
 type Card = (typeof CARDS)[number];
 
 const CARD_COLORS: Readonly<Record<Card, string>> = {
     administrator: "var(--c-red-bright)",
     developer: "var(--c-mod-moderation)",
+    devtester: "color-mix(in srgb, var(--c-mod-moderation) 55%, #fff)",
     partner: "var(--c-blue)",
     premium: "var(--c-mod-engagement)",
 };
@@ -120,6 +121,7 @@ function eventText(event: IGroupEvent): string {
 
 function GroupCard({
     card,
+    docked = false,
     members,
     total,
     expanded,
@@ -128,6 +130,8 @@ function GroupCard({
     onRevoke,
 }: {
     readonly card: Card;
+    /** W-0154, Entwurf R1 B: Dev-Tester hängt eingerückt unter Developer. */
+    readonly docked?: boolean;
     readonly members: readonly IMember[];
     /** Wie viele die Gruppe ohne Suche hat. */
     readonly total: number;
@@ -140,12 +144,13 @@ function GroupCard({
     const titleId = `gruppe-${card}`;
 
     return (
-        <section className={styles.card} style={{ "--group": CARD_COLORS[card] } as CSSProperties} aria-labelledby={titleId}>
+        <section className={docked ? `${styles.card} ${styles.dock}` : styles.card} style={{ "--group": CARD_COLORS[card] } as CSSProperties} aria-labelledby={titleId}>
             <header className={styles.cardHead}>
                 <h2 id={titleId} className={styles.cardTitle}>
                     <span className={styles.dot} aria-hidden="true" />
                     {CARD_LABELS[card]}
                     {card === "developer" && <span className={styles.source}>aus DEV_USER_IDs</span>}
+                    {card === "devtester" && <span className={styles.source}>Untergruppe von Developer</span>}
                 </h2>
                 <span className={styles.count} aria-label={`${total} ${total === 1 ? "Person" : "Personen"}`}>
                     {formatNumber(total)}
@@ -314,6 +319,23 @@ export function GroupsPage(): JSX.Element {
 
     const people = new Set([...(data?.entries.map((entry) => entry.user.id) ?? []), ...developerIds]).size;
     const cards = CARDS.filter((card) => filter === "alle" || filter === card);
+    const groupCard = (card: Card, docked = false): JSX.Element => {
+        const all = membersOf(card);
+
+        return (
+            <GroupCard
+                key={card}
+                card={card}
+                docked={docked}
+                members={all.filter((member) => matches(member, needle))}
+                total={all.length}
+                expanded={expanded.has(card) || needle !== ""}
+                onToggle={() => toggle(card)}
+                onEdit={openForm}
+                onRevoke={setRevoking}
+            />
+        );
+    };
 
     return (
         <>
@@ -372,11 +394,17 @@ export function GroupsPage(): JSX.Element {
                                         if (isGroup(event.target.value)) setGroup(event.target.value);
                                     }}
                                 >
-                                    {GROUPS.map((value) => (
-                                        <option key={value} value={value}>
-                                            {GROUP_LABELS[value]}
-                                        </option>
-                                    ))}
+                                    {GROUPS.map((value) =>
+                                        value === "devtester" ? (
+                                            <optgroup key={value} label="Developer">
+                                                <option value={value}>{GROUP_LABELS[value]}</option>
+                                            </optgroup>
+                                        ) : (
+                                            <option key={value} value={value}>
+                                                {GROUP_LABELS[value]}
+                                            </option>
+                                        )
+                                    )}
                                 </select>
                             </Field>
 
@@ -416,20 +444,18 @@ export function GroupsPage(): JSX.Element {
 
                     <div className={styles.grid}>
                         {cards.map((card) => {
-                            const all = membersOf(card);
+                            // Unter „Alle“ stehen Developer und Dev-Tester übereinander in einer Spalte (Entwurf R1 B).
+                            if (card === "devtester" && filter === "alle") return null;
+                            if (card === "developer" && filter === "alle") {
+                                return (
+                                    <div key={card} className={styles.stack}>
+                                        {groupCard("developer")}
+                                        {groupCard("devtester", true)}
+                                    </div>
+                                );
+                            }
 
-                            return (
-                                <GroupCard
-                                    key={card}
-                                    card={card}
-                                    members={all.filter((member) => matches(member, needle))}
-                                    total={all.length}
-                                    expanded={expanded.has(card) || needle !== ""}
-                                    onToggle={() => toggle(card)}
-                                    onEdit={openForm}
-                                    onRevoke={setRevoking}
-                                />
-                            );
+                            return groupCard(card);
                         })}
                     </div>
 

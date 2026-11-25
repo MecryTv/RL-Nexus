@@ -151,14 +151,14 @@ export async function partnerRoutes(app: FastifyInstance, { config }: { config: 
 
     /**
      * „Partner-Gruppe entfernen“ im Reiter Konto: nimmt nur die Gruppe Partner
-     * (Administrator und Premium bleiben) und trägt die Person bei allen
+     * (andere Gruppen bleiben) und trägt die Person bei allen
      * Einträgen als Ansprechpartner aus, damit auch @Partner geht.
      */
     app.delete("/api/partners/:id/group", async (request) => {
         const entry = await entryOf(request);
 
         if (!entry.contactId || entry.kind === "supporter") throw new InvalidInput("Dieser Eintrag hat keinen Ansprechpartner.");
-        if (!(await revokeGroupIf(entry.contactId, "partner"))) throw new PublicError(409, "Der Ansprechpartner hat nicht die Gruppe Partner. Administrator und Premium bleiben.");
+        if (!(await revokeGroupIf(entry.contactId, "partner"))) throw new PublicError(409, "Der Ansprechpartner hat nicht die Gruppe Partner. Andere Gruppen bleiben.");
 
         const actor = actorOf(request);
 

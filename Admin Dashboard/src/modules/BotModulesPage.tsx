@@ -58,7 +58,7 @@ import { GuildIcon, ServerScope } from "./ServerScope";
  */
 const STATUS_TEXT: Readonly<Record<ModuleStatus, string>> = {
     on: "Überall, wo Server es eingeschaltet haben.",
-    beta: "Nur wo Inhaber oder ein Server-Verwalter Beta-Tester ist.",
+    beta: "Nur wo Inhaber oder ein Server-Verwalter Beta-Tester oder Dev-Tester ist.",
     off: "Überall abgeschaltet, Befehle antworten mit dem Hinweis.",
 };
 
@@ -411,7 +411,7 @@ export function BotModulesPage(): JSX.Element {
                                         {draft.status === "off"
                                             ? `Betrifft ${reach} Server: Dort ist das Modul dann aus.`
                                             : draft.status === "beta"
-                                              ? `Bleibt nur auf Servern, deren Inhaber oder Server-Verwalter Beta-Tester sind${betaServers !== null ? ` (heute ${betaServers})` : ""}.`
+                                              ? `Bleibt nur auf Servern, deren Inhaber oder Server-Verwalter Beta-Tester oder Dev-Tester sind${betaServers !== null ? ` (heute ${betaServers})` : ""}.`
                                               : `Wieder an auf ${reach} Servern.`}
                                     </p>
                                 )}

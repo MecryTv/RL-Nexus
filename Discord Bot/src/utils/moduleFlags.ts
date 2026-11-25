@@ -72,6 +72,9 @@ const listeners: ((state: IFlagsState) => void)[] = [];
 
 const isLinkMode = (value: unknown): value is LinkMode => LINK_MODES.includes(value as LinkMode);
 
+/** Wer Module auf Beta sieht: wer einen Beta-Code eingelöst hat und die Dev-Tester (W-0154). */
+export const BETA_USERS_SQL = "SELECT user_id FROM beta_members UNION SELECT user_id FROM dashboard_groups WHERE group_name = 'devtester'";
+
 /** Setzt den Stand. Für die Checks direkt, sonst über LoadFlags. */
 export function SetFlags(rows: Iterable<IModuleFlagRow>, users: Iterable<string>, guilds: Iterable<string>, rowsPerServer: Iterable<IModuleOverrideRow> = []): void {
     flags = new Map([...rows].map((row) => [row.module, row]));
@@ -131,7 +134,7 @@ function configOf(raw: unknown): IConfig {
 
 /**
  * Beta-Server: Inhaber oder ein Mitglied mit „Server verwalten“ steht in
- * beta_members. Geprüft werden nur die Mitglieder im Cache; Beta-Tester sind
+ * beta_members oder ist Dev-Tester. Geprüft werden nur die Mitglieder im Cache; Beta-Tester sind
  * wenige, jeder wird je Server einmal nachgeschlagen.
  */
 function BetaGuildsOf(client: BotClient, users: Set<string>): string[] {
@@ -187,7 +190,7 @@ export async function LoadFlags(client: BotClient): Promise<boolean> {
     try {
         const [rows, members, perServer] = await Promise.all([
             client.databaseService.Query<{ module: string; status: ModuleStatus; notice: string | null; config: unknown }>("SELECT module, status, notice, config FROM bot_module_settings"),
-            client.databaseService.Query<{ user_id: string }>("SELECT user_id FROM beta_members"),
+            client.databaseService.Query<{ user_id: string }>(BETA_USERS_SQL),
             LoadOverrides(client),
         ]);
 

@@ -22,6 +22,7 @@ import AdminModulesReload from "../routes/AdminModulesReload";
 import AdminModulesState from "../routes/AdminModulesState";
 import {
     ActiveModules,
+    BETA_USERS_SQL,
     BetaGuildCount,
     ClosedText,
     CurrentLinkMode,
@@ -620,6 +621,7 @@ async function main(): Promise<void> {
     SetFlags([{ module: "clips", status: "beta", notice: "@everyone <b>x</b>" }], ["u9"], ["g2"]);
     check("Beta: offen nur auf Beta-Servern und für Beta-Tester in DMs", ModuleOpen("clips", "g2") && !ModuleOpen("clips", "g1") && ModuleOpen("clips", null, "u9") && !ModuleOpen("clips", null, "u1"));
     check("Hinweis kommt unverändert zurück, maskiert wird bei der Ausgabe", ClosedText("clips") === "@everyone <b>x</b>" && NoticeOf("clips") === "@everyone <b>x</b>");
+    check("Beta-Nutzer: mit Code und Dev-Tester (W-0154)", BETA_USERS_SQL.includes("beta_members") && BETA_USERS_SQL.includes("dashboard_groups") && BETA_USERS_SQL.includes("'devtester'"));
     check("Was nicht gesetzt ist, bleibt offen", ModuleOpen("polls", "g1"));
 
     SetFlags(
