@@ -21,7 +21,7 @@ import { TeamMMR, WTSI } from "../constants/WTSI";
 import PlayerRanks from "../models/PlayerRanks";
 import { DAY_MS, HOUR_MS, SplitSpan } from "../constants/Activity";
 import { PERMANENT_MODULES } from "../constants/Modules";
-import { BETA_USERS_SQL } from "../utils/moduleFlags";
+import { BETA_USERS_SQL, LoadFlags, ModuleOpen } from "../utils/moduleFlags";
 import DashboardService from "../services/DashboardService";
 
 // Eine Snowflake, die es bei Discord nicht gibt - Stand 2262.
@@ -185,6 +185,20 @@ async function checkGroups(client: BotClient): Promise<void> {
 
         const betaUsers = (await client.databaseService.Query<{ user_id: string }>(BETA_USERS_SQL)).map((row) => row.user_id);
         check("Dev-Tester sieht Beta-Module", betaUsers.includes(USER_A));
+
+        // W-0155: das Verhalten, nicht nur die Abfrage. Zwei Prüf-Module, geladen wie im Betrieb.
+        const probes = ["w0155-beta", "w0155-aus"];
+
+        try {
+            await client.databaseService.Write("INSERT INTO bot_module_settings (module, status) VALUES (?, 'beta'), (?, 'off') ON DUPLICATE KEY UPDATE status = VALUES(status)", probes);
+
+            check("Modul-Einstellungen mit Prüf-Modulen geladen", await LoadFlags(client));
+            check("Modul auf Beta ist für den Dev-Tester in DMs offen", ModuleOpen("w0155-beta", null, USER_A));
+            check("Ohne Code und ohne Dev-Tester bleibt es zu", !ModuleOpen("w0155-beta", null, "999999999999999155"));
+            check("Modul auf aus bleibt auch für den Dev-Tester zu", !ModuleOpen("w0155-aus", null, USER_A));
+        } finally {
+            await client.databaseService.Write("DELETE FROM bot_module_settings WHERE module IN (?, ?)", probes);
+        }
     } finally {
         client.config.DEV_USER_IDs = savedDevs;
 
